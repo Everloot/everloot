@@ -12,7 +12,7 @@ import { pinLink, WORLD_MAP } from "@/lib/world-map";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, type Column } from "@/components/ui";
-import { EmptyTab, EntityHeader, EntityTop, known, LINK, Unreachable } from "../../entity";
+import { EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, MapName, ShowOnMap, Unreachable } from "../../entity";
 import { NpcLootPanel } from "../../loot-tables";
 import { entitySummary, observedLine } from "@/lib/evidence";
 import { loadItemFacts } from "@/lib/rollup-compute";
@@ -58,10 +58,10 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
 const RANK_LABELS: Record<NpcRank, string> = { normal: "Normal", elite: "Elite", rare: "Rare", rare_elite: "Rare elite", boss: "Boss" };
 
 const pinColumns: Column<NpcPin>[] = [
-  { key: "map", header: "Map", numeric: true, cell: (p) => p.mapId },
+  { key: "map", header: "Map", cell: (p) => <MapName mapId={p.mapId} /> },
   { key: "at", header: "Position", numeric: true, cell: (p) => `${p.x}, ${p.y}` },
   { key: "installs", header: "Reporters", numeric: true, cell: (p) => p.reporters },
-  { key: "show", header: "", cell: (p) => { const href = pinLink(p.mapId, p.x, p.y); return href ? <Link href={href} className={LINK}>Show on the map</Link> : null; } },
+  { key: "show", header: MAP_LINK_HEADER, cell: (p) => { const href = pinLink(p.mapId, p.x, p.y); return href ? <ShowOnMap href={href} mapId={p.mapId} x={p.x} y={p.y} /> : null; } },
 ];
 
 /**

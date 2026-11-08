@@ -34,7 +34,7 @@ import { MarketBox, loadMarketBox } from "@/app/tools/auctions/MarketBox";
 import { pendingLine } from "../../../../../../kb/src/pending-loot";
 import { itemDropSources } from "../../../../../../kb/src/loot-tables";
 import { loadLootTables, loadReportedItemFacts } from "@/lib/rollup-compute";
-import { EmptyTab, EntityHeader, EntityIcon, EntityTop, known, LINK, Unreachable } from "../../entity";
+import { EmptyTab, EntityHeader, EntityIcon, EntityTop, known, LINK, MAP_LINK_HEADER, MapName, ShowOnMap, Unreachable } from "../../entity";
 import { ItemSourcesPanel } from "../../loot-tables";
 import { itemSummary } from "@/lib/evidence";
 
@@ -163,10 +163,10 @@ export default async function ItemPage(props: Props) {
   const sources = itemDropSources(loot.tables, itemId);
   const pinColumns: Column<(typeof page.pins)[number]>[] = [
     { key: "npc", header: "NPC", cell: (p) => <EntityLink kind="npc" id={p.npcId} name={p.name ?? names.npcs.get(p.npcId)} /> },
-    { key: "map", header: "Map", numeric: true, cell: (p) => p.mapId },
+    { key: "map", header: "Map", cell: (p) => <MapName mapId={p.mapId} /> },
     { key: "at", header: "Position", numeric: true, cell: (p) => `${p.x}, ${p.y}` },
     { key: "installs", header: "Reporters", numeric: true, cell: (p) => p.reporters },
-    { key: "show", header: "", cell: (p) => { const href = pinLink(p.mapId, p.x, p.y); return href ? <Link href={href} className={LINK}>Show on the map</Link> : null; } },
+    { key: "show", header: MAP_LINK_HEADER, cell: (p) => { const href = pinLink(p.mapId, p.x, p.y); return href ? <ShowOnMap href={href} mapId={p.mapId} x={p.x} y={p.y} /> : null; } },
   ];
 
   // A development leftover sharing an icon ("Monster - Item, Flower - White") stays out, as it does in the item lists.

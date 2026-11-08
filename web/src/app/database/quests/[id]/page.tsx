@@ -9,7 +9,7 @@ import { loadWorldFacts } from "@/lib/rollup-compute";
 import { pinLink } from "@/lib/world-map";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Badge, Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
-import { EmptyTab, EntityHeader, EntityTop, known, LINK, Unreachable } from "../../entity";
+import { EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, ShowOnMap, Unreachable } from "../../entity";
 import { entitySummary, observedLine } from "@/lib/evidence";
 import { loadItemFacts } from "@/lib/rollup-compute";
 import { itemNames, npcNames } from "@/lib/names";
@@ -49,7 +49,7 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
   };
 }
 
-interface Person { role: string; npcId: number; map: string | null }
+interface Person { role: string; npcId: number; map: { href: string; mapId: number; x: number; y: number } | null }
 
 export default async function QuestPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -60,7 +60,8 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
   // Where players saw the giver and the turn-in NPC stand, as map links, when 3 installs agree.
   const where = (npcId: number | null) => {
     const pin = npcId === null || facts.unreachable ? undefined : npcPage(npcId, facts).pins.find((p) => pinLink(p.mapId, p.x, p.y));
-    return pin ? pinLink(pin.mapId, pin.x, pin.y) : null;
+    const href = pin ? pinLink(pin.mapId, pin.x, pin.y) : null;
+    return pin && href ? { href, mapId: pin.mapId, x: pin.x, y: pin.y } : null;
   };
   // The title players agree on; else the Warcraft Wiki's, for a quest the game files list (docs/DATA_POLICY.md).
   const reported = facts.unreachable ? null : page.title;
@@ -160,7 +161,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
                     columns={[
                       { key: "role", header: "Role", nowrap: true, cell: (p: Person) => p.role },
                       { key: "npc", header: "NPC", cell: (p: Person) => npcLink(p.npcId) },
-                      { key: "map", header: "", cell: (p: Person) => (p.map ? <Link href={p.map} className={LINK}>Show on the map</Link> : null) },
+                      { key: "map", header: MAP_LINK_HEADER, cell: (p: Person) => (p.map ? <ShowOnMap {...p.map} /> : null) },
                     ]}
                     rows={people}
                     rowKey={(p) => p.role}
