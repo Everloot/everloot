@@ -274,8 +274,14 @@ async function fromLoader(loader: CorpusLoader, render: (records: unknown[]) => 
   return `${render(records)}\n${answerFooter(corpus.dataAsOf)}`;
 }
 
-/** Pages a self-hosted server follows at most; with a key (EVERLOOT_API_KEY) a page holds far more records. */
-const MAX_CORPUS_PAGES = 50;
+/**
+ * Guards against a runaway feed, not working limits: pages followed, bytes per page, bytes in all. The feed held
+ * 48,962 records in 98 anonymous pages (about 13 MB) on 2026-11-09; with a key (EVERLOOT_API_KEY) a page holds ten
+ * times the records. Without a key the site allows 30 requests an hour, so a corpus past 30 pages needs one.
+ */
+const MAX_CORPUS_PAGES = 400;
+const MAX_PAGE_BYTES = 8_000_000;
+const MAX_CORPUS_BYTES = 128_000_000;
 
 /** A page from a newer snapshot than the first page: start again, the corpus moved on mid-read. */
 class SnapshotMoved extends Error {}
@@ -295,16 +301,19 @@ async function readCorpusPages(url: string, key: string | undefined): Promise<{ 
   for (let page = 0; next; page++) {
     if (page >= MAX_CORPUS_PAGES) throw new Error("Public corpus has too many pages");
     const response = await fetch(next, { ...init, signal: AbortSignal.timeout(10_000) });
-    if (!response.ok || Number(response.headers.get("content-length")) > 2_000_000) throw new Error("Public corpus too large or unavailable");
+    if (response.status === 429 && !key) throw new Error(`Public corpus rate limited after ${page} pages; set EVERLOOT_API_KEY to read it in larger pages`);
+    if (!response.ok || Number(response.headers.get("content-length")) > MAX_PAGE_BYTES) throw new Error("Public corpus too large or unavailable");
     const reader = response.body?.getReader();
     if (!reader) throw new Error("Public corpus has no body");
     const chunks: Uint8Array[] = [];
+    let pageSize = 0;
     try {
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
+        pageSize += value.byteLength;
         size += value.byteLength;
-        if (size > 2_000_000) { await reader.cancel(); throw new Error("Public corpus too large"); }
+        if (pageSize > MAX_PAGE_BYTES || size > MAX_CORPUS_BYTES) { await reader.cancel(); throw new Error("Public corpus too large"); }
         chunks.push(value);
       }
     } finally { reader.releaseLock(); }
