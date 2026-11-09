@@ -24,6 +24,7 @@ import RealmPage, { generateMetadata as realmMetadata } from "./[realm]/page";
 import RealmItemPage, { generateMetadata as itemMetadata } from "./[realm]/[itemId]/page";
 import CrossRealmItemPage, { generateMetadata as crossMetadata } from "./item/[itemId]/page";
 import { MarketBox, loadMarketBox } from "./MarketBox";
+import { UNNAMED_REASON } from "./parts";
 import DatabaseItemPage from "../../database/items/[id]/page";
 import { GET as sitemapIndex } from "../../auctions-sitemap.xml/route";
 import { GET as sitemapChunk } from "../../auctions-sitemap/[n]/route";
@@ -220,6 +221,22 @@ test("the cross-realm page compares every realm with a price", async () => {
   expect(html).toContain("Mal&#x27;Ganis");
   expect((await crossMetadata(props)).robots).toMatchObject({ index: true });
   expect((await crossMetadata({ params: Promise.resolve({ itemId: "9999" }) })).robots).toMatchObject({ index: false });
+});
+
+test("an unnamed item's price pages say why the name is missing and still link to the item page; a named one says nothing", async () => {
+  // Item 4306 has prices but no agreed, matched or tooltip name in the fixture: it reads "Item 4306" on both pages.
+  const cross = renderToStaticMarkup(await CrossRealmItemPage({ params: Promise.resolve({ itemId: "4306" }) }));
+  expect(text(cross)).toContain("Item 4306");
+  expect(text(cross)).toContain(UNNAMED_REASON);
+  expect(cross).toContain('href="/database/items/4306"');
+  const realmPage = renderToStaticMarkup(await RealmItemPage(item("forever", "4306")));
+  expect(text(realmPage)).toContain(UNNAMED_REASON);
+  expect(realmPage).toContain('href="/database/items/4306"');
+  // Three installs named 2589 Linen Cloth: no reason line on either page.
+  const namedCross = renderToStaticMarkup(await CrossRealmItemPage({ params: Promise.resolve({ itemId: "2589" }) }));
+  expect(text(namedCross)).toContain("Linen Cloth");
+  expect(namedCross).not.toContain("data-unnamed-reason");
+  expect(renderToStaticMarkup(await RealmItemPage(item("forever", "2589")))).not.toContain("data-unnamed-reason");
 });
 
 test("the item database page gets a small Auction House box only when a price is public", async () => {

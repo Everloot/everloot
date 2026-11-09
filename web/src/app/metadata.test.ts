@@ -132,6 +132,17 @@ test("every MCP tool page has a description that fits", async () => {
   }
 });
 
+test("every record kind page has a description that fits", async () => {
+  const { generateMetadata } = await import("./docs/api/records/[kind]/page");
+  const { ALL_RECORD_KINDS } = await import("@everloot/protocol");
+  for (const kind of ALL_RECORD_KINDS) {
+    const m = await generateMetadata({ params: Promise.resolve({ kind }) });
+    within(m.description, kind);
+    expect(m.alternates?.canonical, kind).toBe(`/docs/api/records/${kind}`);
+  }
+  expect(await generateMetadata({ params: Promise.resolve({ kind: "nope" }) })).toEqual({});
+});
+
 test("every docs page without a dynamic segment is checked", () => {
   expect(docsRoutes.map(([path]) => path)).toEqual(expect.arrayContaining(["/docs", "/docs/quickstart", "/docs/guides/account", "/docs/cookbook/ask-claude"]));
 });

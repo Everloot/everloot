@@ -13,7 +13,7 @@ import {
   AH_PATH, crossRealmHref, indexable, itemAcrossRealms, itemIdParam, itemLabel, realmBoards, type MarketRow,
 } from "@/lib/auction-house";
 import { auctionNames, itemArt } from "../../art";
-import { Contribute, Facts, PriceFacts, RealmPrices, count, itemQuality } from "../../parts";
+import { Contribute, Facts, PriceFacts, RealmPrices, UnnamedReason, count, itemQuality } from "../../parts";
 
 type Props = { params: Promise<{ itemId: string }> };
 
@@ -84,6 +84,8 @@ export default async function CrossRealmItemPage(props: Props) {
       />
 
       <div className="space-y-10">
+        <UnnamedReason id={itemId} names={names} />
+
         {!state && (
           <Card><p className="text-fg-2" role="status">Market values are unavailable right now. They are unrecorded, not zero.</p></Card>
         )}

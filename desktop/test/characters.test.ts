@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { summarizeCharacters } from "../src/main/characters";
+import { LOCAL_ONLY_CATEGORIES } from "../src/shared/ledger";
 import { charactersFromFiles } from "../src/main/save-facts";
 
 const SV = `EverlootDB = { ["version"] = "0.3.3", ["installId"] = "x", ["records"] = {
@@ -110,4 +111,49 @@ test("professions and this week's raid lockouts join their character's keyed row
   const later = summarizeCharacters(sv, Date.parse("2026-11-11T12:00:01Z")).progress[0];
   expect(later.lockouts).toEqual([]);
   expect(later.professions).toHaveLength(2);
+});
+
+test("with a ledger in the file, the week and the categories are the ledger's, uploaded rows count only from before it, and local-only categories are marked", () => {
+  const sec = (iso: string) => Date.parse(iso) / 1000;
+  const ev = (at: string, key: string, category: string, copper: number) => `{ ["at"] = ${sec(at)}, ["key"] = "${key}", ["category"] = "${category}", ["copper"] = ${copper} }`;
+  const sv = `EverlootDB = { ["version"] = "0.3.21", ["installId"] = "x",
+    ["roster"] = { ["0a1b2c3d"] = { ["name"] = "Arthas", ["realm"] = "Nightslayer", ["class"] = "PALADIN", ["level"] = 60 } },
+    ["ledger"] = { ["events"] = {
+      ${ev("2026-10-11T23:00:00Z", "0a1b2c3d", "mail_in", 500)},
+      ${ev("2026-10-15T12:00:00Z", "0a1b2c3d", "trade_out", 700)},
+      ${ev("2026-10-17T10:00:00Z", "0a1b2c3d", "loot", 2000)},
+      ${ev("2026-10-18T08:00:00Z", "0a1b2c3d", "repair", 300)},
+      ${ev("2026-10-18T09:00:00Z", "deadbeef", "loot", 9999)},
+    }, ["sales"] = {}, ["daily"] = { ["0a1b2c3d"] = { ["2026-10-17"] = 1500000 } } },
+    ["records"] = { ["money_event"] = {
+      { ["character"] = "Arthas", ["realm"] = "Nightslayer", ["capturedAt"] = "2026-09-01T09:00:00Z", ["category"] = "loot", ["copper"] = 100 },
+      { ["character"] = "Arthas", ["realm"] = "Nightslayer", ["capturedAt"] = "2026-10-18T09:00:00Z", ["category"] = "vendor", ["copper"] = 500 },
+    } } }`;
+  const now = Date.parse("2026-10-18T12:00:00Z");
+  const [c] = summarizeCharacters(sv, now).characters;
+  expect(c).toMatchObject({ character: "Arthas", realm: "Nightslayer" });
+  // The Gold tab's "7 days" starts at 2026-10-12 UTC: in 2000, out 300 + 700. The mail from the 11th is outside it.
+  expect(c.week).toEqual({ earned: 2000, spent: 1000 });
+  // All time: the ledger's rows plus the uploaded loot from September, which is older than the ledger's first event.
+  // The vendor row from the 18th is after it, so it is not counted twice. A ledger key the roster does not name is left out.
+  expect(c.earned).toEqual({ loot: 2100, mail_in: 500 });
+  expect(c.spent).toEqual({ repair: 300, trade_out: 700 });
+  expect(LOCAL_ONLY_CATEGORIES).toEqual(["trade_in", "mail_in", "repair", "vendor_spend", "trade_out", "mail_out"]);
+  expect(c.receipts[0]).toEqual({ at: "2026-10-18T08:00:00Z", category: "repair", copper: 300, direction: "out" });
+  // The shared parse hands the same two tables to the Characters page.
+  const d = mkdtempSync(join(tmpdir(), "everloot-ledger-"));
+  try {
+    const file = join(d, "Everloot.lua");
+    writeFileSync(file, sv);
+    expect(charactersFromFiles([file], now)).toEqual(summarizeCharacters(sv, now));
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+
+test("a save without the ledger, or with a ledger the roster cannot name, still counts its uploaded money events", () => {
+  const now = Date.parse("2026-10-18T12:00:00Z");
+  const noLedger = summarizeCharacters(SV, now).characters[0];
+  expect(noLedger.earned).toEqual({ loot: 1000, vendor: 500 });
+  expect(noLedger.week).toEqual({ earned: 1400, spent: 0 });
+  const orphan = SV.replace(`["records"]`, `["ledger"] = { ["events"] = { { ["at"] = ${Date.parse("2026-10-18T08:00:00Z") / 1000}, ["key"] = "0a1b2c3d", ["category"] = "repair", ["copper"] = 300 } } }, ["records"]`);
+  expect(summarizeCharacters(orphan, now).characters[0]).toEqual(noLedger);
 });
