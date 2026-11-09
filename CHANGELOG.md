@@ -117,6 +117,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and the other from the clock, so they disagreed. Both pages say when the GitHub facts are older than 26 hours.
 
 ### Added
+- Site: the limits and keys page has a Scopes section: a table of every scope a key can carry (read:public on every
+  key; read:own, link:own and sync:own opt-in on the key form), what each allows and which routes check it. A test
+  keeps the table at one row per scope the code defines.
 - Site: an item, NPC or quest page shared on Discord or X shows its own card: the name, its type and how many of
   the 3 installs agree on the name, as text on the brand canvas. Before, every database page showed the site card.
 - Addon: the Everloot window's sidebar is now Home, Gold, Collection, Professions and Settings. Ask, Build plan and
