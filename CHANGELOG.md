@@ -150,6 +150,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   until three installs agree, a "Track this" link to the collections tool and a relation tab ("Reputation from" on a
   faction, "Earned by" on a title) whose empty state names the 3-install rule and says what no game file read so far
   carries; a faction page also shows its lore archive page when the archive has one under the same name.
+- Site: the limits and keys page has a Scopes section: a table of every scope a key can carry (read:public on every
+  key; read:own, link:own and sync:own opt-in on the key form), what each allows and which routes check it. A test
+  keeps the table at one row per scope the code defines.
 - Site: the MCP resources page gives each prompt its own section (title, arguments with their allowed values, the
   `prompts/get` call and the message the server returns), shows one `resources/read` of the builds resource with the
   shape of its document and one entity read that equals the `item_page` answer, and the MCP sidebar lists the three
