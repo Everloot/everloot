@@ -55,7 +55,7 @@ test("nameplates are named for the census only: the player pages item never read
   const item = playerPages.slice(0, playerPages.indexOf("</li>"));
   expect(item).toContain("target, mouse over or group with");
   expect(item).not.toMatch(/nameplate/i);
-  expect(text).toContain("Last updated: 9 November 2026");
+  expect(text).toContain("Last updated: November 9, 2026");
 });
 
 test("saved builds: what is kept, that characters are typed labels, that a shared link is public, and deletion", () => {
