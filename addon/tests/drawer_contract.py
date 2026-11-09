@@ -2,8 +2,9 @@
 The button drawer (modules/drawer.lua): other addons' LibDBIcon minimap buttons gather into the Everloot
 minimap button, and hovering the crest shows them in a small grid. Blizzard frames and unknown buttons are
 never touched, a late LibDBIcon button is collected too, the crest's clicks are unchanged, no buttons means no
-drawer, the switch and /everloot buttons off leave every button where it is, a client without LibStub, a
-minimap or C_Timer gets no error, and the one-time chat notice is said once per install.
+drawer, the switch and /everloot buttons off leave every button where it is, another addon that gathers minimap
+buttons keeps them, a client without LibStub, a minimap or C_Timer gets no error, and the one-time chat notice is
+said once per install.
 """
 from pathlib import Path
 from lupa.lua51 import LuaRuntime
@@ -46,6 +47,11 @@ function Frame.IsMouseOver(self) return rawget(self, 'mouse') == true end
 function Frame.SetPoint(self, point, rel, relPoint, x, y) table.insert(self.points, { point, rel, relPoint, x, y }) end
 function Frame.ClearAllPoints(self) self.points = {} end
 function Frame.SetAlpha(self, a) self.alpha = a end
+function Frame.SetFrameLevel(self, l) self.level = l end
+function Frame.GetFrameLevel(self) return rawget(self, 'level') or 1 end
+function Frame.SetBackdrop(self, b) self.backdrop = b end
+function Frame.SetColorTexture(self, r, g, b, a) self.color = { r, g, b, a } end
+function Frame.SetWidth(self, w) self.width = w end
 function Frame.SetSize(self, w, h) self.width, self.height = w, h end
 function Frame.IsObjectType() return true end
 function Frame.SetText(self, t) self.text = t end
@@ -137,13 +143,15 @@ elsewhere = CreateFrame('Button', 'LibDBIcon10_Elsewhere', UIParent)
 """
 
 
-def fresh(api: str = MINIMAP + TIMER + LIBDBICON + CHILDREN, saved: str = "nil", login: bool = True):
+def fresh(api: str = MINIMAP + TIMER + LIBDBICON + CHILDREN, saved: str = "nil", login: bool = True, window: str = ""):
     lua = LuaRuntime()
     lua.execute(WORLD)
     lua.execute(api)
     lua.execute(f"EverlootDB = {saved}")
     for file in ["core.lua", "modules/options.lua", "modules/minimap.lua", "modules/drawer.lua"]:
         lua.execute((root / file).read_text(encoding="utf-8"))
+        if file == "core.lua" and window:
+            lua.execute(window)
     lua.execute("planned = 0; Everloot.Planner = { Open = function() planned = planned + 1 end }")
     lua.execute("Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')")
     if login:
@@ -179,12 +187,35 @@ def test_libdbicon_buttons_are_collected_and_laid_out_and_nothing_else_is():
     assert(D.frame.shown, 'hover opens the drawer')
     assert(#alpha.points == 1 and alpha.points[1][2] == D.frame and alpha.alpha == 1)
     assert(#beta.points == 1 and beta.points[1][2] == D.frame and beta.points[1][4] > alpha.points[1][4], 'side by side')
+    -- A LibDBIcon ring is drawn wider than its 31-pixel button, from the top-left: cells leave room for it, and
+    -- each button draws above the one before it so no ring shadow dims the icon beside or below it.
+    assert(beta.points[1][4] - alpha.points[1][4] >= 36, 'cells wider than a ring')
+    assert(alpha.level > D.frame:GetFrameLevel() and beta.level == alpha.level + 1, 'later buttons draw above earlier ones')
+    assert(rawget(D.frame, 'backdrop') and D.frame.backdrop.edgeFile, 'the drawer has a panel without the window loaded')
+    -- The accent bar: two pixels wide, the window's green, down the edge that faces the crest (the drawer opens to
+    -- the crest's left, so its right edge).
+    local bar = D.frame.accent
+    assert(bar and bar.width == 2 and bar.color[2] > 0.9 and bar.color[1] < 0.7 and bar.color[3] < 0.3, 'a green bar')
+    assert(bar.points[1][1] == 'TOPRIGHT' and bar.points[2][1] == 'BOTTOMRIGHT' and bar.points[1][2] == D.frame, 'down the right edge')
     -- LibDBIcon putting a button back around the minimap no longer moves it, and it cannot be dragged off.
     libdbicon.Refresh('Alpha')
     assert(#alpha.points == 1 and alpha.points[1][2] == D.frame, 'LibDBIcon repositioning is ignored')
     assert(alpha.scripts.OnDragStart == nil and alpha.scripts.OnDragStop == nil, 'no drag-to-move')
     """)
     assert "buttons: ready (2 addon buttons" in lua.eval("Everloot:Status()")
+
+
+def test_the_drawer_borrows_the_window_panel_when_the_window_is_loaded():
+    # window.lua loads before drawer.lua and exposes its backdrop; the drawer then looks like the rest of Everloot.
+    lua = fresh(window="styled = {}; Everloot.Window = { Backdrop = function(f) styled[#styled + 1] = f end, COLORS = { accent = { 0.1, 0.95, 0.2, 1 } } }")
+    lua.execute("""
+    local D = Everloot.Drawer
+    assert(#styled == 1 and styled[1] == D.frame, 'the window styles the drawer panel')
+    assert(rawget(D.frame, 'backdrop') == nil, 'and the drawer sets no panel of its own')
+    assert(D.frame.accent.color[1] == 0.1 and D.frame.accent.color[2] == 0.95, 'the bar takes the window accent')
+    """)
+    toc = (root / "Everloot.toc").read_text(encoding="utf-8")
+    assert toc.index("modules\\window.lua") < toc.index("modules\\drawer.lua")
 
 
 def test_a_late_libdbicon_button_is_collected():
@@ -320,6 +351,35 @@ def test_off_collects_nothing_and_the_switch_and_command_work():
     """)
 
 
+def test_another_button_collector_keeps_the_buttons():
+    # MinimapButtonButton loaded: nothing is gathered, the crest opens no panel, and the status says why. The check
+    # runs at login, since that addon loads after Everloot and the module's init cannot see it yet.
+    lua = fresh(MINIMAP + TIMER + LIBDBICON + CHILDREN + "C_AddOns = { IsAddOnLoaded = function(n) return n == 'MinimapButtonButton' end }")
+    lua.execute("""
+    local D, crest = Everloot.Drawer, Everloot.Minimap.button
+    assert(#D.collected == 0 and alpha.parent == Minimap and beta.parent == Minimap, 'left to the other collector')
+    assert(rawget(alpha, 'SetPoint') == nil, 'and not stubbed')
+    crest.mouse = true
+    hover(crest)
+    assert(D.frame == nil or not D.frame.shown, 'no empty panel over the other panel')
+    """)
+    assert notices(lua) == 0
+    assert "buttons: off (MinimapButtonButton gathers the addon buttons already" in lua.eval("Everloot:Status()")
+    # A collector the list does not know takes a button after us: that button is left where it went, the rest stay.
+    lua = fresh()
+    lua.execute("""
+    local D, crest = Everloot.Drawer, Everloot.Minimap.button
+    local container = CreateFrame('Frame', 'OtherCollectorContainer', UIParent)
+    alpha:SetParent(container)
+    local before = #alpha.points
+    crest.mouse = true
+    hover(crest)
+    assert(#D.collected == 1 and D.collected[1] == beta, 'alpha is theirs now')
+    assert(#alpha.points == before and alpha.parent == container, 'and is not moved into the drawer')
+    assert(D.frame.shown and #beta.points == 1 and D.frame.width == 8 * 2 + 38, 'the drawer holds the one it still has')
+    """)
+
+
 def test_a_client_without_libstub_minimap_or_timers_gets_no_error():
     # No LibStub: the scans still collect the buttons already on the minimap.
     lua = fresh(MINIMAP + TIMER + "libdbicon = { CreateIcon = function(name) return CreateFrame('Button', 'LibDBIcon10_' .. name, Minimap) end }\n"
@@ -375,11 +435,13 @@ def test_the_one_time_notice_is_printed_once():
 if __name__ == "__main__":
     test_the_toc_loads_the_drawer_after_the_minimap_button()
     test_libdbicon_buttons_are_collected_and_laid_out_and_nothing_else_is()
+    test_the_drawer_borrows_the_window_panel_when_the_window_is_loaded()
     test_a_late_libdbicon_button_is_collected()
     test_hover_shows_the_drawer_until_the_mouse_leaves_and_clicks_are_unchanged()
     test_with_the_minimap_button_off_the_addon_buttons_stay_on_the_minimap()
     test_no_buttons_no_drawer()
     test_off_collects_nothing_and_the_switch_and_command_work()
+    test_another_button_collector_keeps_the_buttons()
     test_a_client_without_libstub_minimap_or_timers_gets_no_error()
     test_the_one_time_notice_is_printed_once()
-    print("Lua 5.1 drawer: LibDBIcon buttons only, late buttons, hover and leave, clicks unchanged, off, missing APIs, one notice")
+    print("Lua 5.1 drawer: LibDBIcon buttons only, window panel, late buttons, hover and leave, clicks unchanged, off, another collector, missing APIs, one notice")

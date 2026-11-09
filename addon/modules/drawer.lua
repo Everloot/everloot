@@ -2,7 +2,8 @@
 -- crest shows them in a small grid beside it. Only LibDBIcon buttons (frames named LibDBIcon10_<name> on the
 -- minimap) are taken; Blizzard frames and any other button are never touched. The crest's clicks stay as
 -- they are. Off (/everloot buttons off or the settings page) collects nothing, and the buttons already taken
--- go back to the minimap with the next /reload. Records nothing.
+-- go back to the minimap with the next /reload. Another addon that gathers minimap buttons keeps them. Records
+-- nothing.
 
 local E = Everloot
 local D = { collected = {} }
@@ -10,11 +11,18 @@ E.Drawer = D
 
 local PREFIX = "LibDBIcon10_"
 local COLUMNS = 6
-local CELL = 32 -- a LibDBIcon button is 31 pixels square
-local PAD = 6
+-- A LibDBIcon button is 31 pixels square, but its ring and shadow are drawn larger from its top-left corner, so a
+-- 32-pixel cell put every ring over the icon beside it and every shadow over the icon below.
+local CELL = 38
+local PAD = 8
+local ACCENT = { 0.612, 0.941, 0.227, 1 } -- the window's accent green, when the window is not there to lend it
 local POLL_SECONDS = 0.25 -- how often an open drawer checks whether the mouse has left
 local NOTICE_SECONDS = 5 -- the notice waits for the other addons' buttons to settle, so the count is right
 local RESCANS = { 3, 10 } -- seconds after entering the world: buttons some addons make late
+-- Addons that gather minimap buttons themselves. Two collectors take the same buttons from each other (each one
+-- reparents them and stubs their SetPoint), and the loser's panel opens empty over the winner's, dimming every icon
+-- under it. Seen with MinimapButtonButton; when one of these is loaded the drawer leaves the buttons to it.
+local COLLECTORS = { "MinimapButtonButton" }
 
 local collectedSet = {}
 local original = {} -- per button: the frame type's own SetPoint and ClearAllPoints, for our layout
@@ -23,6 +31,18 @@ local function noop() end
 
 local function after(seconds, f)
   if C_Timer and C_Timer.After then pcall(C_Timer.After, seconds, f) end
+end
+
+--- The name of a loaded addon that gathers minimap buttons itself, or nil. Asked at login, once every addon has
+--- loaded; the module's own init runs before the addons after it in load order exist.
+local function otherCollector()
+  local loaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
+  if type(loaded) ~= "function" then return nil end
+  for _, name in ipairs(COLLECTORS) do
+    local ok, yes = pcall(loaded, name)
+    if ok and yes then return name end
+  end
+  return nil
 end
 
 local function count()
@@ -51,10 +71,24 @@ local function drawer()
   f:SetPoint("TOPRIGHT", D.crest, "TOPLEFT", -2, 0)
   -- A minimap moved to the left edge would otherwise open the drawer off the screen.
   if f.SetClampedToScreen then f:SetClampedToScreen(true) end
-  if f.SetBackdrop then
+  -- The window's own panel (its canvas inside the bronze edge), so the drawer looks like the rest of Everloot.
+  if E.Window and E.Window.Backdrop then
+    E.Window.Backdrop(f)
+  elseif f.SetBackdrop then
     f:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
       tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
     if f.SetBackdropColor then f:SetBackdropColor(0.05, 0.05, 0.07, 0.95) end
+  end
+  -- A two-pixel bar in the window's accent green on the edge facing the crest: the drawer is the crest's tab, and
+  -- the green is the window title's, not a frame of its own around the other addons' rings.
+  local bar = f.CreateTexture and f:CreateTexture(nil, "OVERLAY")
+  if bar then
+    local accent = E.Window and E.Window.COLORS and E.Window.COLORS.accent or ACCENT
+    bar:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -4)
+    bar:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -4, 4)
+    bar:SetWidth(2)
+    if bar.SetColorTexture then bar:SetColorTexture(unpack(accent)) end
+    f.accent = bar
   end
   f:Hide()
   D.frame = f
@@ -62,14 +96,24 @@ local function drawer()
 end
 
 --- Places the shown buttons in rows of COLUMNS and sizes the drawer to fit. Returns how many are shown.
+--- Each button sits one frame level above the one before it: a ring's shadow falls to the right and below, so the
+--- button it would fall on draws over it and no icon is dimmed by its neighbour.
 local function layout()
   local f, shown = drawer(), 0
+  local base = (tonumber(f.GetFrameLevel and f:GetFrameLevel()) or 1) + 5
+  -- A button whose parent is no longer the drawer was taken by another addon after us: it is left to that addon
+  -- and never moved again (its stubbed SetPoint is that addon's now, so nothing is restored either).
+  for i = #D.collected, 1, -1 do
+    local b = D.collected[i]
+    if b:GetParent() ~= f then table.remove(D.collected, i) end
+  end
   for _, b in ipairs(D.collected) do
     local own = original[b]
     own.ClearAllPoints(b)
     if b:IsShown() then
       local column, row = shown % COLUMNS, math.floor(shown / COLUMNS)
       own.SetPoint(b, "TOPLEFT", f, "TOPLEFT", PAD + column * CELL, -(PAD + row * CELL))
+      if b.SetFrameLevel then b:SetFrameLevel(base + shown) end
       b:SetAlpha(1)
       shown = shown + 1
     end
@@ -98,9 +142,8 @@ local function collect(b)
   b.SetPoint, b.ClearAllPoints = noop, noop
   b:SetScript("OnDragStart", nil)
   b:SetScript("OnDragStop", nil)
-  -- LibDBIcon sets its own strata and level; above the drawer's background, or the panel would cover them.
+  -- LibDBIcon sets its own strata; the drawer's, or the panel would cover the button. Layout sets the level.
   if b.SetFrameStrata then b:SetFrameStrata("DIALOG") end
-  if b.SetFrameLevel then b:SetFrameLevel((tonumber(f.GetFrameLevel and f:GetFrameLevel()) or 1) + 5) end
   collectedSet[b] = true
   D.collected[#D.collected + 1] = b
   table.sort(D.collected, function(x, y) return x:GetName() < y:GetName() end)
@@ -163,6 +206,11 @@ E:RegisterModule("buttons", function()
   f:RegisterEvent("PLAYER_ENTERING_WORLD")
   f:HookScript("OnEvent", function(_, event)
     if event ~= "PLAYER_LOGIN" and event ~= "PLAYER_ENTERING_WORLD" then return end
+    if D.leftTo == nil then D.leftTo = otherCollector() or false end
+    if D.leftTo then
+      E:SetNote("buttons", string.format("off (%s gathers the addon buttons already; Everloot leaves them to it)", D.leftTo))
+      return
+    end
     hook()
     scan()
     if event == "PLAYER_LOGIN" then return end
