@@ -17,6 +17,13 @@ import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { wikiHref } from "@/lib/wiki";
 import { prepPage } from "@/lib/wiki-dungeon";
+import { npcLootTable } from "../../../../../../kb/src/loot-tables";
+import EntityLink from "@/components/EntityLink";
+import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
+import { itemNames } from "@/lib/names";
+import { loadItemFacts, loadLootTables } from "@/lib/rollup-compute";
+import { Unreachable } from "../../entity";
+import { NpcLootPanel } from "../../loot-tables";
 import { zoneHref } from "@/lib/zones";
 
 export const dynamic = "force-dynamic";
@@ -100,6 +107,16 @@ export default async function InstancePage(props: Props) {
   const bossMeta = (b: BossRow) => (b.boss
     ? `${b.boss.kills.toLocaleString("en-US")} kills · ${b.boss.reporters} ${b.boss.reporters === 1 ? "install" : "installs"} · ${dayLabel(b.boss.lastSeen)}`
     : b.reported ? reportedLabel(b.reported) : "Not confirmed yet");
+
+  // Loot, per boss: the loot table of each creature 3 installs tie to the encounter, the same table its NPC page shows.
+  const lootBosses = bosses.flatMap((b) => (b.boss?.npcIds.length ? [{ encounterId: b.encounterId, name: b.name ?? `Encounter ${b.encounterId}`, npcIds: b.boss.npcIds }] : []));
+  const loot = unreachable || lootBosses.length === 0 ? null : await loadLootTables();
+  const lootTables = new Map(loot && !loot.unreachable ? lootBosses.flatMap((b) => b.npcIds).map((id) => [id, npcLootTable(loot.tables, id)]) : []);
+  // Item names (and icons, when the game files have them) for the drop rows; an item nobody named stays "Item N".
+  const droppedIds = [...lootTables.values()].flatMap((t) => t.rows.map((r) => r.itemId));
+  const itemFacts = droppedIds.length ? await loadItemFacts() : null;
+  const names = itemFacts && !itemFacts.unreachable ? itemNames(itemFacts) : new Map<number, string>();
+  const tips = await loadItemTips(droppedIds.length ? await loadSiteAssets() : null, droppedIds);
 
   const unconfirmed = row.reported > 0
     ? `No entrance is confirmed yet. ${row.reported} ${row.reported === 1 ? "install has" : "installs have"} zoned in, and 3 must agree on the place.`
@@ -190,6 +207,40 @@ export default async function InstancePage(props: Props) {
                   : "No boss here has 3 installs reporting it yet. Kills, installs and last seen show once one does.") : undefined}
               empty={empty("No boss has 3 installs reporting it here yet, and the game files list none.")}
             />
+          </section>
+
+          <section aria-labelledby="loot">
+            <SectionHeading id="loot" note="Each boss's loot is the loot table of the creature 3 installs tie to its encounter, the same rows its NPC page shows. A rate needs loot windows from 3 installs; short of that, the count so far shows and no rate.">
+              Loot
+            </SectionHeading>
+            {unreachable || loot?.unreachable ? <Unreachable />
+              : lootBosses.length === 0 ? empty("No loot to show yet: no boss here has a creature 3 installs agree on. Loot shows per boss once 3 installs report the boss and loot it.")
+              : (
+                <div className="space-y-4">
+                  {lootBosses.map((b) => (
+                    <div key={b.encounterId} data-boss-loot={b.encounterId}>
+                      <h3 className="text-cell font-semibold text-fg">{b.name}</h3>
+                      {b.npcIds.map((id) => {
+                        const table = lootTables.get(id)!;
+                        return (
+                          <div key={id}>
+                            <p className="flex flex-wrap items-center gap-x-3 pt-1 text-meta">
+                              <Link href={`/database/npcs/${id}`} className={link}>NPC {id}</Link>
+                              {table.state === "short" && <AgreementMeter count={table.span.installs} withText />}
+                            </p>
+                            <NpcLootPanel
+                              table={table}
+                              title={b.name}
+                              dataAsOf={loot!.dataAsOf}
+                              item={(itemId) => <EntityLink kind="item" id={itemId} name={names.get(itemId) ?? tips.get(itemId)?.name} icon={tips.get(itemId)?.icon} />}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              )}
           </section>
         </div>
       </article>

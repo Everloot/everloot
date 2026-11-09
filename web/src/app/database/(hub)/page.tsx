@@ -31,7 +31,7 @@ export const dynamic = "force-dynamic";
 const n = (x: number) => x.toLocaleString("en-US");
 
 /** One block of the browse index: a heading with its count, then its links, 13 px on 26 px lines. */
-function Block({ heading, href, count, note, links }: { heading: string; href?: string; count?: ReactNode; note?: string; links: { href: string; label: string; count?: ReactNode }[] }) {
+function Block({ heading, href, count, note, links }: { heading: string; href?: string; count?: ReactNode; note?: ReactNode; links: { href: string; label: string; count?: ReactNode }[] }) {
   return (
     <section className="mb-6 break-inside-avoid">
       <h2 className="flex items-baseline justify-between gap-3 text-cell font-semibold text-fg">
@@ -78,10 +78,9 @@ export default async function DatabasePage() {
     "/database/zones": n(publicZones().length),
     // The instances the game files place in a released zone, like the zone count: it reads the files, not the uploads.
     "/database/instances": n(instanceRows().size),
-    // A form, not a list: a verb where the others carry a count.
-    "/tools/guild-board": "look up",
   };
-  const players = DATABASE_HUBS.map((h) => ({ href: h.href, label: h.label, count: counts[h.href] }));
+  const hubLinks = (source: "players" | "files") => DATABASE_HUBS.filter((h) => h.source === source).map((h) => ({ href: h.href, label: h.label, count: counts[h.href] }));
+  const beforeLaunch = Date.now() < Date.parse(LAUNCH_AT);
   // Retired and unnamed buckets ("Trade Goods (OBSOLETE)", "Subclass 0") stay on the class page only, and a class
   // whose one subclass is itself ("Quest › Quest") lists none: the heading already says it.
   const subclassLinks = (c: (typeof classes)[number]) => {
@@ -111,8 +110,15 @@ export default async function DatabasePage() {
         />
 
         <nav aria-label="Browse the database" className="mt-6 columns-2 gap-x-8 sm:columns-3 lg:columns-4">
-          {/* Before launch every count here is empty; one line says why rather than a column of blanks. */}
-          <Block heading="Seen by players" note={Date.now() < Date.parse(LAUNCH_AT) ? `The addon starts recording when the game launches on ${longDate(LAUNCH.date)}.` : undefined} links={players} />
+          {/* An empty meter needs its why: before launch recording has not started, after it a row waits for agreement. */}
+          <Block
+            heading="Seen by players"
+            note={beforeLaunch
+              ? `The addon starts recording when the game launches on ${longDate(LAUNCH.date)}.`
+              : <>A row fills when 3 installs agree. <Link href="/addon" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Get the addon</Link>.</>}
+            links={hubLinks("players")}
+          />
+          <Block heading="From the game files" links={hubLinks("files")} />
           <Block heading="All items" href="/database/items" count={n(T.items.length)} links={[]} />
           {classes.map((c) => (
             <Block

@@ -15,6 +15,9 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: a dungeon or raid page gains a Loot section after Bosses: for each boss 3 installs report, the loot table of
+  its creature, the same rows its NPC page shows, or how many installs have looted it so far. In the list, an instance
+  the game files place no entrance for says so beside its id, with the reason on hover.
 - Site: the armory opens at `/armory`: a page for every WoW Forever character and guild that Blizzard's API returns,
   read hourly, with guild rosters, three boards (item level, gear score, honorable kills), a form to hide a character
   and a form to ask for one. Each page says "Data from Blizzard Entertainment", carries no ad and is not indexed yet.
@@ -42,7 +45,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
 
 ### Fixed
-- Site: the tools catalogue supplies the menu, uses Collections and Guild board, and farming no longer asks for a launch notification.
+- Site: /database splits its rows into "Seen by players" and "From the game files", says after launch that a row fills when 3 installs agree, and drops the Guilds lookup row (the Tools menu has it).
 - Knowledge base: a self-hosted MCP server and `coverage-report` read the whole public corpus again. The reader stopped
   at 50 pages and 2 MB in all, and the feed is now about 98 pages and 13 MB; the limits are per page with a high total
   guard. Without a key the site allows 30 requests an hour, so a rate-limited read now says to set `EVERLOOT_API_KEY`.
@@ -51,6 +54,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the schemas page marks the three shapes that describe a bulk-export file rather than an endpoint and says that
   `reporters` in the API and MCP shapes is the count the open-data files call `installs`; the API page names the routes
   its own pages fetch (/api/map/pins, /api/suggest) as outside the OpenAPI contract. The open-data notes say the same.
+- Site: the tools catalogue supplies the menu, uses Collections and Guild board, and farming no longer asks for a launch notification.
 - Desktop App: the Characters page reads the addon's local ledger (`EverlootDB.ledger`) from the save file beside the
   `money_event` rows, so its 7-day net is the Gold tab's "7 days" for the same character (today and the six UTC days
   before it) and repairs, vendor purchases, trades and mail appear in money by category, marked local only. Uploaded
@@ -292,6 +296,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and the snapshot is read again only after a minute. The route itself is unchanged.
 
 ### Changed
+- Docs: the docs index lists the backlog, the open-data export, the live-client probes, and the dated notes and folders it had left out.
 - Companion: the command line's `main` takes its uploader, price refresher, file watcher and console as an optional argument,
   with the real ones as defaults, so the watch and prices loop is tested with fakes (upload then prices on each settled
   write, prices alone, a failed refresh that keeps the previous file, upload never writing prices). Nothing it sends changes.
