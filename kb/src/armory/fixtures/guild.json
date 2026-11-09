@@ -1,0 +1,18 @@
+{
+  "faction": {
+    "type": "HORDE",
+    "name": "Horde"
+  },
+  "ruleset": {
+    "key": {
+      "href": "https://eu.api.blizzard.com/data/wow/ruleset/1?namespace=dynamic-forever-eu"
+    },
+    "name": "PvP",
+    "id": 1
+  },
+  "member_count": 84,
+  "created_timestamp": 1793847323000,
+  "id": 900010,
+  "name": "Copper Owls",
+  "slug": "copper-owls"
+}

@@ -1,0 +1,54 @@
+{
+  "members": [
+    {
+      "rank": 4,
+      "character": {
+        "level": 40,
+        "playable_class": {
+          "key": {
+            "href": "https://eu.api.blizzard.com/data/wow/playable-class/7?namespace=static-1.60.1_70399-forever-eu"
+          },
+          "id": 7
+        },
+        "playable_race": {
+          "key": {
+            "href": "https://eu.api.blizzard.com/data/wow/playable-race/2?namespace=static-1.60.1_70399-forever-eu"
+          },
+          "id": 2
+        },
+        "faction": {
+          "type": "HORDE"
+        },
+        "id": 900001,
+        "name": "Ember",
+        "surname": "Vale",
+        "slug": "ember-vale"
+      }
+    },
+    {
+      "rank": 4,
+      "character": {
+        "level": 39,
+        "playable_class": {
+          "key": {
+            "href": "https://eu.api.blizzard.com/data/wow/playable-class/11?namespace=static-1.60.1_70399-forever-eu"
+          },
+          "id": 11
+        },
+        "playable_race": {
+          "key": {
+            "href": "https://eu.api.blizzard.com/data/wow/playable-race/96?namespace=static-1.60.1_70399-forever-eu"
+          },
+          "id": 96
+        },
+        "faction": {
+          "type": "HORDE"
+        },
+        "id": 900002,
+        "name": "Willow",
+        "surname": "Stone",
+        "slug": "willow-stone"
+      }
+    }
+  ]
+}
