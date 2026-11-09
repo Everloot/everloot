@@ -64,3 +64,71 @@ it("refreshes before expiry", async () => {
   await api.get("/test", "profile");
   expect(f).toHaveBeenCalledTimes(4);
 });
+
+it("caches an OAuth failure for the instance", async () => {
+  const f = vi.fn().mockResolvedValue(new Response(null, { status: 401 }));
+  const api = new ForeverApi({
+    clientId: "id",
+    clientSecret: "secret",
+    region: "eu",
+    fetchImpl: f,
+  });
+  await expect(api.get("/one", "profile")).rejects.toThrow("OAuth");
+  await expect(api.get("/two", "profile")).rejects.toThrow("OAuth");
+  expect(f).toHaveBeenCalledTimes(1);
+  expect(f.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+});
+
+it("types API network errors as transient and applies a request timeout", async () => {
+  const f = vi
+    .fn()
+    .mockResolvedValueOnce(
+      Response.json({ access_token: "fake", expires_in: 3600 }),
+    )
+    .mockRejectedValueOnce(new TypeError("fetch failed"));
+  const api = new ForeverApi({
+    clientId: "id",
+    clientSecret: "secret",
+    region: "eu",
+    fetchImpl: f,
+  });
+  await expect(api.get("/test", "profile")).rejects.toMatchObject({
+    status: null,
+    phase: "api",
+    transient: true,
+  });
+  expect(f.mock.calls[1][1].signal).toBeInstanceOf(AbortSignal);
+});
+
+it("retries a body stream network error but preserves malformed JSON as fatal", async () => {
+  for (const error of [
+    new TypeError("terminated"),
+    new SyntaxError("bad JSON"),
+  ]) {
+    const f = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({ access_token: "fake", expires_in: 3600 }),
+      )
+      .mockResolvedValueOnce({
+        status: 200,
+        headers: new Headers(),
+        json: async () => {
+          throw error;
+        },
+      });
+    const api = new ForeverApi({
+      clientId: "id",
+      clientSecret: "secret",
+      region: "eu",
+      fetchImpl: f,
+    });
+    const request = api.get("/test", "profile");
+    if (error instanceof TypeError)
+      await expect(request).rejects.toMatchObject({
+        transient: true,
+        status: null,
+      });
+    else await expect(request).rejects.toBe(error);
+  }
+});

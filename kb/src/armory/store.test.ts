@@ -67,7 +67,5 @@ it("does not expose response bodies in RPC errors", async () => {
       .fn()
       .mockResolvedValue(new Response("private data", { status: 500 })),
   });
-  await expect(store.purge()).rejects.toThrow(
-    "Armory RPC armory_purge HTTP 500",
-  );
+  await expect(store.purge()).rejects.toThrow("Armory RPC HTTP 500");
 });

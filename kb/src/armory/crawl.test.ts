@@ -1,10 +1,17 @@
 import { it, expect, vi } from "vitest";
+import { ApiError } from "./api.js";
+import { StoreError } from "./store.js";
 import { runCrawl } from "./crawl.js";
 import profile from "./fixtures/character.json";
 import equipment from "./fixtures/equipment.json";
 import pvp from "./fixtures/pvp.json";
 import guild from "./fixtures/guild.json";
 import roster from "./fixtures/roster.json";
+function bodyFor(path: string): unknown {
+  if (path.endsWith("equipment")) return equipment;
+  if (path.endsWith("pvp-summary")) return pvp;
+  return { ...profile, slug: decodeURIComponent(path.split("/").at(-1)!) };
+}
 function setup(count = 1) {
   const store = {
     seedFromPlayers: vi.fn().mockResolvedValue(2),
@@ -28,11 +35,7 @@ function setup(count = 1) {
   const api = {
     get: vi.fn(async (path: string, ..._args: unknown[]) => ({
       status: 200 as 200 | 304 | 404,
-      body: (path.endsWith("equipment")
-        ? equipment
-        : path.endsWith("pvp-summary")
-          ? pvp
-          : profile) as unknown,
+      body: bodyFor(path),
       lastModified: "new" as string | null,
     })),
   };
@@ -64,7 +67,7 @@ it.each([404, 429, 500])("isolates guild HTTP %i", async (status) => {
     k === "guild" ? [{ slug: "copper-owls", tries: 0, stored: false }] : [],
   );
   api.get.mockImplementation(async () => {
-    if (status !== 404) throw Error(`HTTP ${status}`);
+    if (status !== 404) throw new ApiError(status, "api");
     return { status: 404, body: null, lastModified: null };
   });
   const s = await runCrawl({ region: "eu", budget: 5, store, api });
@@ -96,6 +99,8 @@ it("guild summary", async () => {
     calls: 2,
     guilds: { fetched: 1, missing: 0, retried: 0 },
     characters: { fetched: 0, unchanged: 0, missing: 0, retried: 0 },
+    skipped: { no_surname: 1, invalid_slug: 0, slug_mismatch: 0 },
+    invalid: 0,
     enqueued: 4,
     purged: 3,
   });
@@ -114,11 +119,7 @@ it("batches 100 and caps rate/concurrency", async () => {
       active--;
       return {
         status: 200,
-        body: path.endsWith("equipment")
-          ? equipment
-          : path.endsWith("pvp-summary")
-            ? pvp
-            : profile,
+        body: bodyFor(path),
         lastModified: "date",
       };
     });
@@ -129,6 +130,13 @@ it("batches 100 and caps rate/concurrency", async () => {
       100, 5,
     ]);
     expect(s.characters.fetched).toBe(105);
+    expect(
+      new Set(
+        store.upsertCharacters.mock.calls
+          .flatMap((c) => c[1])
+          .map((r: any) => r.slug),
+      ).size,
+    ).toBe(105);
     expect(max).toBeLessThanOrEqual(8);
     for (const start of starts)
       expect(
@@ -177,14 +185,10 @@ it("deletes a stored character on equipment 404", async () => {
 it("one failed character does not stop other rows", async () => {
   const { store, api } = setup(2);
   api.get.mockImplementation(async (path) => {
-    if (path.includes("vale-0")) throw Error("HTTP 500");
+    if (path.includes("vale-0")) throw new ApiError(500, "api");
     return {
       status: 200,
-      body: path.endsWith("equipment")
-        ? equipment
-        : path.endsWith("pvp-summary")
-          ? pvp
-          : profile,
+      body: bodyFor(path),
       lastModified: null,
     };
   });
@@ -209,4 +213,107 @@ it("zero budget does no Blizzard reads", async () => {
     0,
   );
   expect(api.get).not.toHaveBeenCalled();
+});
+
+it.each([401, 403, 400])(
+  "fails closed on HTTP %i without bumping rows",
+  async (status) => {
+    const { store, api } = setup(30);
+    const log = vi.fn();
+    api.get.mockRejectedValue(new ApiError(status, "api"));
+    await expect(
+      runCrawl({ region: "eu", budget: 90, store, api, log }),
+    ).rejects.toThrow();
+    expect(store.retry).not.toHaveBeenCalled();
+    expect(api.get.mock.calls.length).toBeLessThanOrEqual(8);
+    expect(log.mock.calls.flat().join(" ")).toContain(`HTTP ${status}`);
+    expect(store.purge).toHaveBeenCalled();
+  },
+);
+it("aborts OAuth and zod errors without retry", async () => {
+  for (const body of ["oauth", "schema"]) {
+    const { store, api } = setup(10);
+    const log = vi.fn();
+    if (body === "oauth") api.get.mockRejectedValue(new ApiError(500, "oauth"));
+    else
+      api.get.mockResolvedValue({ status: 200, body: {}, lastModified: null });
+    await expect(
+      runCrawl({ region: "eu", budget: 30, store, api, log }),
+    ).rejects.toThrow();
+    expect(store.retry).not.toHaveBeenCalled();
+    expect(log.mock.calls.flat().join(" ")).toMatch(/OAuth|schema/);
+  }
+});
+it("retries a network failure and continues", async () => {
+  const { store, api } = setup();
+  api.get.mockRejectedValue(new ApiError(null, "api"));
+  const s = await runCrawl({ region: "eu", budget: 3, store, api });
+  expect(s.characters.retried).toBe(1);
+  expect(store.retry).toHaveBeenCalled();
+});
+it("counts and removes skipped profiles without retry", async () => {
+  for (const identity of [
+    { surname: null },
+    { surname: "" },
+    { slug: "invalid--slug" },
+  ]) {
+    const { store, api } = setup();
+    api.get.mockImplementation(async (path) => ({
+      status: 200,
+      body: path.endsWith("equipment")
+        ? equipment
+        : path.endsWith("pvp-summary")
+          ? pvp
+          : { ...profile, ...identity },
+      lastModified: null,
+    }));
+    const s = await runCrawl({ region: "eu", budget: 3, store, api });
+    expect(s.skipped.no_surname + s.skipped.invalid_slug).toBe(1);
+    expect(store.upsertCharacters).not.toHaveBeenCalled();
+    expect(store.retry).not.toHaveBeenCalled();
+    expect(store.missing).toHaveBeenCalled();
+  }
+});
+it("isolates a rejected batch and preserves 99 good rows", async () => {
+  vi.useFakeTimers();
+  try {
+    const { store, api } = setup(100);
+    store.upsertCharacters.mockImplementation(async (_r, rows: any[]) => {
+      if (rows.length > 1 || rows[0].slug === "ember-vale-4")
+        throw new StoreError(400);
+      return rows.length;
+    });
+    const pending = runCrawl({ region: "eu", budget: 300, store, api });
+    await vi.runAllTimersAsync();
+    const s = await pending;
+    expect(s.characters.fetched).toBe(99);
+    expect(s.invalid).toBe(1);
+    expect(store.upsertCharacters.mock.calls).toHaveLength(101);
+    expect(store.retry).not.toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+it("counts mismatches and ages the original queue identity", async () => {
+  const { store, api } = setup();
+  api.get.mockImplementation(async (path) => ({
+    status: 200,
+    body: path.endsWith("equipment")
+      ? equipment
+      : path.endsWith("pvp-summary")
+        ? pvp
+        : { ...profile, slug: "different-name" },
+    lastModified: null,
+  }));
+  const s = await runCrawl({ region: "eu", budget: 3, store, api });
+  expect(s.skipped.slug_mismatch).toBe(1);
+  expect(store.missing).toHaveBeenCalledWith("eu", "character", "ember-vale-0");
+  expect(store.upsertCharacters).not.toHaveBeenCalled();
+});
+it("batches unchanged touches", async () => {
+  const { store, api } = setup(20);
+  api.get.mockResolvedValue({ status: 304, body: null, lastModified: null });
+  await runCrawl({ region: "eu", budget: 60, store, api });
+  expect(store.touch).toHaveBeenCalledTimes(1);
+  expect(store.touch.mock.calls[0][2]).toHaveLength(20);
 });

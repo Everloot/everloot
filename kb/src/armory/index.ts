@@ -8,6 +8,8 @@ export async function armoryCrawl(flags: Map<string, string>): Promise<void> {
   const region = flags.get("region");
   if (region !== "us" && region !== "eu")
     throw Error("--region must be us or eu");
+  if (flags.has("budget") && !flags.get("budget")?.trim())
+    throw Error("--budget requires a value");
   const budget = Number(flags.get("budget") ?? 6000);
   if (!Number.isSafeInteger(budget) || budget < 0)
     throw Error("--budget must be a nonnegative integer");

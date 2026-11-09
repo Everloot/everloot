@@ -8,9 +8,10 @@ const faction = z.object({ name: z.enum(["Alliance", "Horde"]) }).passthrough();
 const key = z.object({ href: z.string().url() }).passthrough();
 const profileSchema = z
   .object({
+    slug: z.string().optional(),
     id: z.number().int(),
     name: z.string(),
-    surname: z.string(),
+    surname: z.string().nullish(),
     level: z.number().int().min(1).max(60),
     ruleset: label,
     race: label,
@@ -69,7 +70,7 @@ const rosterSchema = z
             .object({
               slug: z.string(),
               name: z.string(),
-              surname: z.string(),
+              surname: z.string().nullish(),
               level: z.number().int(),
               playable_class: z.object({ id: z.number().int() }).passthrough(),
               playable_race: z.object({ id: z.number().int() }).passthrough(),
@@ -85,19 +86,34 @@ export function characterSlug(name: string, surname: string): string {
   return `${name}-${surname}`.toLowerCase();
 }
 export function guildSlugFromHref(href: string): string {
-  return new URL(href).pathname.split("/").filter(Boolean).at(-1)!;
+  return decodeURIComponent(
+    new URL(href).pathname.split("/").filter(Boolean).at(-1)!,
+  ).toLowerCase();
+}
+export class SkippedRow extends Error {
+  constructor(readonly reason: "no_surname" | "invalid_slug") {
+    super(reason);
+  }
+}
+export function validSlug(slug: string): boolean {
+  return slug.length <= 64 && /^[\p{L}\p{N}]+(-[\p{L}\p{N}]+)*$/u.test(slug);
 }
 export function parseCharacter(
   profile: unknown,
   equipment: unknown,
   pvp: unknown,
   lastModified: string | null,
+  apiSlug?: string,
 ) {
-  const p = profileSchema.parse(profile),
-    e = equipmentSchema.parse(equipment),
+  const p = profileSchema.parse(profile);
+  if (!p.surname?.trim()) throw new SkippedRow("no_surname");
+  // Forever profiles may omit slug; preserve the API roster/queue identity then.
+  const slug = (p.slug ?? apiSlug ?? "").toLowerCase();
+  if (!validSlug(slug)) throw new SkippedRow("invalid_slug");
+  const e = equipmentSchema.parse(equipment),
     v = pvpSchema.parse(pvp);
   return {
-    slug: characterSlug(p.name, p.surname),
+    slug,
     character_id: p.id,
     name: p.name,
     surname: p.surname,
@@ -140,9 +156,34 @@ export function parseGuild(
 ) {
   const g = guildSchema.parse(guild),
     r = rosterSchema.parse(roster);
+  const skipped = { no_surname: 0, invalid_slug: 0 };
+  const members = r.members.flatMap(({ character: c, rank }) => {
+    if (!c.surname?.trim()) {
+      skipped.no_surname++;
+      return [];
+    }
+    const slug = c.slug.toLowerCase();
+    if (!validSlug(slug)) {
+      skipped.invalid_slug++;
+      return [];
+    }
+    return [
+      {
+        character_slug: slug,
+        name: c.name,
+        surname: c.surname,
+        level: c.level,
+        class_id: c.playable_class.id,
+        race_id: c.playable_race.id,
+        rank,
+      },
+    ];
+  });
+  if (!validSlug(g.slug.toLowerCase())) throw new SkippedRow("invalid_slug");
   return {
+    skipped,
     guild: {
-      slug: g.slug,
+      slug: g.slug.toLowerCase(),
       guild_id: g.id,
       name: g.name,
       faction: g.faction.name,
@@ -155,15 +196,7 @@ export function parseGuild(
           : new Date(g.created_timestamp).toISOString(),
       last_modified: lastModified,
     },
-    members: r.members.map(({ character: c, rank }) => ({
-      character_slug: c.slug,
-      name: c.name,
-      surname: c.surname,
-      level: c.level,
-      class_id: c.playable_class.id,
-      race_id: c.playable_race.id,
-      rank,
-    })),
+    members,
   };
 }
 export type CharacterRow = ReturnType<typeof parseCharacter>;

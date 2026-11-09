@@ -3,18 +3,12 @@
     {
       "rank": 4,
       "character": {
-        "level": 40,
+        "level": 60,
         "playable_class": {
-          "key": {
-            "href": "https://eu.api.blizzard.com/data/wow/playable-class/7?namespace=static-1.60.1_70399-forever-eu"
-          },
-          "id": 7
+          "id": 3
         },
         "playable_race": {
-          "key": {
-            "href": "https://eu.api.blizzard.com/data/wow/playable-race/2?namespace=static-1.60.1_70399-forever-eu"
-          },
-          "id": 2
+          "id": 8
         },
         "faction": {
           "type": "HORDE"
@@ -48,6 +42,24 @@
         "name": "Willow",
         "surname": "Stone",
         "slug": "willow-stone"
+      }
+    },
+    {
+      "rank": 9,
+      "character": {
+        "id": 900003,
+        "name": "Ash",
+        "slug": "ash",
+        "level": 12,
+        "playable_class": {
+          "id": 1
+        },
+        "playable_race": {
+          "id": 2
+        },
+        "faction": {
+          "type": "HORDE"
+        }
       }
     }
   ]

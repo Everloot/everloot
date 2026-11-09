@@ -6,6 +6,20 @@ export interface QueueRow {
   tries: number;
   stored: boolean;
 }
+export class StoreError extends Error {
+  constructor(readonly status: number | null) {
+    super(
+      `Armory RPC ${status === null ? "network failure" : `HTTP ${status}`}`,
+    );
+  }
+  get transient(): boolean {
+    return (
+      this.status === null ||
+      this.status === 429 ||
+      (this.status >= 500 && this.status <= 599)
+    );
+  }
+}
 export class ArmoryStore {
   constructor(
     private readonly cfg: {
@@ -15,21 +29,32 @@ export class ArmoryStore {
     },
   ) {}
   async rpc<T>(name: string, args: Record<string, unknown> = {}): Promise<T> {
-    const response = await (this.cfg.fetchImpl ?? fetch)(
-      `${this.cfg.url.replace(/\/$/, "")}/rest/v1/rpc/${name}`,
-      {
-        method: "POST",
-        headers: {
-          apikey: this.cfg.serviceKey,
-          Authorization: `Bearer ${this.cfg.serviceKey}`,
-          "Content-Type": "application/json",
-          Prefer: "return=representation",
+    let response: Response;
+    try {
+      response = await (this.cfg.fetchImpl ?? fetch)(
+        `${this.cfg.url.replace(/\/$/, "")}/rest/v1/rpc/${name}`,
+        {
+          method: "POST",
+          signal: AbortSignal.timeout(15_000),
+          headers: {
+            apikey: this.cfg.serviceKey,
+            Authorization: `Bearer ${this.cfg.serviceKey}`,
+            "Content-Type": "application/json",
+            Prefer: "return=representation",
+          },
+          body: JSON.stringify(args),
         },
-        body: JSON.stringify(args),
-      },
-    );
-    if (!response.ok) throw Error(`Armory RPC ${name} HTTP ${response.status}`);
-    const text = await response.text();
+      );
+    } catch {
+      throw new StoreError(null);
+    }
+    if (!response.ok) throw new StoreError(response.status);
+    let text: string;
+    try {
+      text = await response.text();
+    } catch {
+      throw new StoreError(null);
+    }
     return (text ? JSON.parse(text) : null) as T;
   }
   seedFromPlayers() {

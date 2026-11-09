@@ -8,7 +8,10 @@ export interface EquipmentItem {
   quality: { type: string };
   inventory_type: { type: string };
 }
-const slots: Record<string, RankedSlot> = {
+const slots: Record<string, RankedSlot | null> = {
+  SHIRT: null,
+  TABARD: null,
+  AMMO: null,
   HEAD: "HeadSlot",
   NECK: "NeckSlot",
   SHOULDER: "ShoulderSlot",
@@ -17,6 +20,7 @@ const slots: Record<string, RankedSlot> = {
   LEGS: "LegsSlot",
   FEET: "FeetSlot",
   WRIST: "WristSlot",
+  HAND: "HandsSlot",
   HANDS: "HandsSlot",
   FINGER_1: "Finger0Slot",
   FINGER_2: "Finger1Slot",
@@ -37,7 +41,7 @@ const inventory: Record<string, number> = {
   LEGS: 7,
   FEET: 8,
   WRIST: 9,
-  HANDS: 10,
+  HAND: 10,
   FINGER: 11,
   TRINKET: 12,
   WEAPON: 13,
@@ -78,7 +82,7 @@ export function gearNumbers(equipped: EquipmentItem[]): {
   const levels = new Map(
     equipped
       .filter((e) => slots[e.slot.type])
-      .map((e) => [e.slot.type, e.level.value]),
+      .map((e) => [slots[e.slot.type]!, e.level.value]),
   );
   if (
     equipped.some(
@@ -86,7 +90,7 @@ export function gearNumbers(equipped: EquipmentItem[]): {
         e.slot.type === "MAIN_HAND" && e.inventory_type.type === "TWOHWEAPON",
     )
   )
-    levels.set("OFF_HAND", levels.get("MAIN_HAND")!);
+    levels.set("SecondaryHandSlot", levels.get("MainHandSlot")!);
   return {
     item_level: levels.size
       ? Math.floor([...levels.values()].reduce((a, b) => a + b, 0) / 17)

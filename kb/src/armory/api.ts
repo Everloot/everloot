@@ -8,9 +8,28 @@ export interface ApiResult {
   lastModified: string | null;
 }
 
+export class ApiError extends Error {
+  constructor(
+    readonly status: number | null,
+    readonly phase: "api" | "oauth",
+  ) {
+    super(
+      `Blizzard ${phase === "oauth" ? "OAuth" : "API"} ${status === null ? "network failure" : `HTTP ${status}`}`,
+    );
+  }
+  get transient(): boolean {
+    return (
+      this.phase === "api" &&
+      (this.status === null ||
+        this.status === 429 ||
+        (this.status >= 500 && this.status <= 599))
+    );
+  }
+}
 export class ForeverApi {
   private token?: { value: string; expires: number };
   private pending?: Promise<string>;
+  private oauthFailure?: ApiError;
   constructor(
     private readonly cfg: {
       clientId: string;
@@ -22,6 +41,7 @@ export class ForeverApi {
   ) {}
 
   private async accessToken(): Promise<string> {
+    if (this.oauthFailure) throw this.oauthFailure;
     const now = this.cfg.now ?? Date.now;
     if (this.token && this.token.expires > now() + 60_000)
       return this.token.value;
@@ -31,6 +51,7 @@ export class ForeverApi {
         "https://oauth.battle.net/token",
         {
           method: "POST",
+          signal: AbortSignal.timeout(15_000),
           headers: {
             Authorization: `Basic ${Buffer.from(`${this.cfg.clientId}:${this.cfg.clientSecret}`).toString("base64")}`,
             "Content-Type": "application/x-www-form-urlencoded",
@@ -39,8 +60,7 @@ export class ForeverApi {
           body: "grant_type=client_credentials",
         },
       );
-      if (!response.ok)
-        throw new Error(`Blizzard OAuth HTTP ${response.status}`);
+      if (!response.ok) throw new ApiError(response.status, "oauth");
       const body = (await response.json()) as {
         access_token: string;
         expires_in: number;
@@ -53,6 +73,10 @@ export class ForeverApi {
     })();
     try {
       return await this.pending;
+    } catch (error) {
+      this.oauthFailure =
+        error instanceof ApiError ? error : new ApiError(null, "oauth");
+      throw this.oauthFailure;
     } finally {
       this.pending = undefined;
     }
@@ -75,18 +99,33 @@ export class ForeverApi {
     };
     if (opts?.ifModifiedSince)
       headers["If-Modified-Since"] = opts.ifModifiedSince;
-    const response = await (this.cfg.fetchImpl ?? fetch)(url.toString(), {
-      headers,
-    });
+    let response: Response;
+    try {
+      response = await (this.cfg.fetchImpl ?? fetch)(url.toString(), {
+        headers,
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch {
+      throw new ApiError(null, "api");
+    }
     if (
       response.status !== 200 &&
       response.status !== 304 &&
       response.status !== 404
     )
-      throw new Error(`Blizzard API HTTP ${response.status}`);
+      throw new ApiError(response.status, "api");
+    let body: unknown = null;
+    if (response.status === 200) {
+      try {
+        body = await response.json();
+      } catch (error) {
+        if (error instanceof SyntaxError) throw error;
+        throw new ApiError(null, "api");
+      }
+    }
     return {
       status: response.status,
-      body: response.status === 200 ? await response.json() : null,
+      body,
       lastModified: response.headers.get("last-modified"),
     };
   }
