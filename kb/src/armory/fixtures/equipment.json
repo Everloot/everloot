@@ -1,0 +1,400 @@
+{
+  "equipped_items": [
+    {
+      "item": {
+        "id": 910000
+      },
+      "slot": {
+        "type": "HEAD",
+        "name": "Head"
+      },
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Copper Training Item 1",
+      "inventory_type": {
+        "type": "HEAD",
+        "name": "Head"
+      },
+      "level": {
+        "value": 51,
+        "display_string": "Item Level 51"
+      }
+    },
+    {
+      "item": {
+        "id": 910001
+      },
+      "slot": {
+        "type": "NECK",
+        "name": "Neck"
+      },
+      "quality": {
+        "type": "UNCOMMON",
+        "name": "Uncommon"
+      },
+      "name": "Copper Training Item 2",
+      "inventory_type": {
+        "type": "NECK",
+        "name": "Neck"
+      },
+      "level": {
+        "value": 44,
+        "display_string": "Item Level 44"
+      }
+    },
+    {
+      "item": {
+        "id": 910002
+      },
+      "slot": {
+        "type": "SHOULDER",
+        "name": "Shoulders"
+      },
+      "quality": {
+        "type": "UNCOMMON",
+        "name": "Uncommon"
+      },
+      "name": "Copper Training Item 3",
+      "inventory_type": {
+        "type": "SHOULDER",
+        "name": "Shoulder"
+      },
+      "level": {
+        "value": 55,
+        "display_string": "Item Level 55"
+      }
+    },
+    {
+      "item": {
+        "id": 910003
+      },
+      "slot": {
+        "type": "SHIRT",
+        "name": "Shirt"
+      },
+      "quality": {
+        "type": "COMMON",
+        "name": "Common"
+      },
+      "name": "Copper Training Item 4",
+      "inventory_type": {
+        "type": "BODY",
+        "name": "Shirt"
+      },
+      "level": {
+        "value": 1,
+        "display_string": "Item Level 1"
+      }
+    },
+    {
+      "item": {
+        "id": 910004
+      },
+      "slot": {
+        "type": "CHEST",
+        "name": "Chest"
+      },
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Copper Training Item 5",
+      "inventory_type": {
+        "type": "CHEST",
+        "name": "Chest"
+      },
+      "level": {
+        "value": 62,
+        "display_string": "Item Level 62"
+      }
+    },
+    {
+      "item": {
+        "id": 910005
+      },
+      "slot": {
+        "type": "WAIST",
+        "name": "Waist"
+      },
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Copper Training Item 6",
+      "inventory_type": {
+        "type": "WAIST",
+        "name": "Waist"
+      },
+      "level": {
+        "value": 58,
+        "display_string": "Item Level 58"
+      }
+    },
+    {
+      "item": {
+        "id": 910006
+      },
+      "slot": {
+        "type": "LEGS",
+        "name": "Legs"
+      },
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Copper Training Item 7",
+      "inventory_type": {
+        "type": "LEGS",
+        "name": "Legs"
+      },
+      "level": {
+        "value": 63,
+        "display_string": "Item Level 63"
+      }
+    },
+    {
+      "item": {
+        "id": 910007
+      },
+      "slot": {
+        "type": "FEET",
+        "name": "Feet"
+      },
+      "quality": {
+        "type": "UNCOMMON",
+        "name": "Uncommon"
+      },
+      "name": "Copper Training Item 8",
+      "inventory_type": {
+        "type": "FEET",
+        "name": "Feet"
+      },
+      "level": {
+        "value": 54,
+        "display_string": "Item Level 54"
+      }
+    },
+    {
+      "item": {
+        "id": 910008
+      },
+      "slot": {
+        "type": "WRIST",
+        "name": "Wrist"
+      },
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Copper Training Item 9",
+      "inventory_type": {
+        "type": "WRIST",
+        "name": "Wrist"
+      },
+      "level": {
+        "value": 54,
+        "display_string": "Item Level 54"
+      }
+    },
+    {
+      "item": {
+        "id": 910009
+      },
+      "slot": {
+        "type": "HANDS",
+        "name": "Hands"
+      },
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Copper Training Item 10",
+      "inventory_type": {
+        "type": "HAND",
+        "name": "Hands"
+      },
+      "level": {
+        "value": 60,
+        "display_string": "Item Level 60"
+      }
+    },
+    {
+      "item": {
+        "id": 910010
+      },
+      "slot": {
+        "type": "FINGER_1",
+        "name": "Ring 1"
+      },
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Copper Training Item 11",
+      "inventory_type": {
+        "type": "FINGER",
+        "name": "Finger"
+      },
+      "level": {
+        "value": 61,
+        "display_string": "Item Level 61"
+      }
+    },
+    {
+      "item": {
+        "id": 910011
+      },
+      "slot": {
+        "type": "FINGER_2",
+        "name": "Ring 2"
+      },
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Copper Training Item 12",
+      "inventory_type": {
+        "type": "FINGER",
+        "name": "Finger"
+      },
+      "level": {
+        "value": 54,
+        "display_string": "Item Level 54"
+      }
+    },
+    {
+      "item": {
+        "id": 910012
+      },
+      "slot": {
+        "type": "TRINKET_1",
+        "name": "Trinket 1"
+      },
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Copper Training Item 13",
+      "inventory_type": {
+        "type": "TRINKET",
+        "name": "Trinket"
+      },
+      "level": {
+        "value": 63,
+        "display_string": "Item Level 63"
+      }
+    },
+    {
+      "item": {
+        "id": 910013
+      },
+      "slot": {
+        "type": "TRINKET_2",
+        "name": "Trinket 2"
+      },
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Copper Training Item 14",
+      "inventory_type": {
+        "type": "TRINKET",
+        "name": "Trinket"
+      },
+      "level": {
+        "value": 62,
+        "display_string": "Item Level 62"
+      }
+    },
+    {
+      "item": {
+        "id": 910014
+      },
+      "slot": {
+        "type": "BACK",
+        "name": "Back"
+      },
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Copper Training Item 15",
+      "inventory_type": {
+        "type": "CLOAK",
+        "name": "Back"
+      },
+      "level": {
+        "value": 55,
+        "display_string": "Item Level 55"
+      }
+    },
+    {
+      "item": {
+        "id": 910015
+      },
+      "slot": {
+        "type": "MAIN_HAND",
+        "name": "Main Hand"
+      },
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Copper Training Item 16",
+      "inventory_type": {
+        "type": "TWOHWEAPON",
+        "name": "Two-Hand"
+      },
+      "level": {
+        "value": 63,
+        "display_string": "Item Level 63"
+      }
+    },
+    {
+      "item": {
+        "id": 910016
+      },
+      "slot": {
+        "type": "RANGED",
+        "name": "Ranged"
+      },
+      "quality": {
+        "type": "RARE",
+        "name": "Rare"
+      },
+      "name": "Copper Training Item 17",
+      "inventory_type": {
+        "type": "RANGED",
+        "name": "Ranged"
+      },
+      "level": {
+        "value": 53,
+        "display_string": "Item Level 53"
+      }
+    },
+    {
+      "item": {
+        "id": 910017
+      },
+      "slot": {
+        "type": "AMMO",
+        "name": "Ammo"
+      },
+      "quality": {
+        "type": "COMMON",
+        "name": "Common"
+      },
+      "name": "Copper Training Item 18",
+      "inventory_type": {
+        "type": "AMMO",
+        "name": "Ammo"
+      },
+      "level": {
+        "value": 45,
+        "display_string": "Item Level 45"
+      }
+    }
+  ]
+}

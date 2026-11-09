@@ -69,29 +69,34 @@ export default function Page() {
 
       <H2 id="commands">Slash commands</H2>
       <P>
-        Most commands start with <C>/everloot</C>. Typing it on its own opens the Talents / Raid workspace.
-        Left-click the minimap button for that workspace; right-click it for settings. These are the commands the
-        addon has:
+        Most commands start with <C>/everloot</C>. Typing it on its own opens the planner workspace, the Talents and
+        Raid tabs. Left-click the minimap button for the Everloot window; right-click it for settings. These are the
+        commands the addon has:
       </P>
       <Table
         head={["Command", "What it does"]}
         rows={[
+          [<C key="window">/everloot window</C>, "Opens or closes the Everloot window, the same as a left-click on the minimap button."],
+          [<C key="a2">/everloot options</C>, "Opens the addon's settings page, with a switch for each part and what it records. A right-click on the minimap button does the same."],
           [<C key="planner">/everloot planner [talents|raid]</C>, "Opens the matching planner tab. Copy a plan on the website with Copy for addon, paste it here and choose Import."],
-          [<C key="a">/everloot status</C>, "Prints the version and your install id, each part of the addon and how many rows it holds."],
-          [<C key="a2">/everloot options</C>, "Opens the addon's settings page, with a switch for each part and what it records."],
           [<C key="a3">/everloot buttons off</C>, <>Stops gathering other addons&apos; minimap buttons into the Everloot button (hover the crest to open them). They return to the minimap after <C>/reload</C>; <C>buttons on</C> gathers them again.</>],
+          [<C key="a">/everloot status</C>, "Prints the version and your install id, each part of the addon and how many rows it holds."],
           [<C key="b">/everloot version</C>, "Prints the addon version."],
           [<C key="c">/everloot auctions off</C>, <>Turns off auction capture, which is on in a new install. <C>auctions on</C> turns it back on. Type <C>/reload</C> to apply either.</>],
           [<C key="d">/everloot scan</C>, "At the auction house, starts a full scan, like the Scan this house button. At most one scan every 15 minutes, and nothing scans until you ask."],
           [<C key="d2">/everloot scanprompt off</C>, <>Stops the small Scan prices for Everloot prompt that shows when you open the auction house. <C>scanprompt on</C> brings it back. The button and <C>/everloot scan</C> still work.</>],
+          [<C key="d3">/everloot vendor on</C>, <>At a merchant, sells grey items and repairs with your own gold, never the guild bank. <C>vendor off</C> stops both.</>],
+          [<C key="d4">/everloot mail on</C>, <>Adds a Collect all button at the mailbox that takes money and items from auction letters only, never cash on delivery. <C>mail off</C> removes it.</>],
           [<C key="e">/everloot price [item]</C>, "Prints the price of an item. Shift-click an item into the command, or give its item id."],
-          [<C key="e2">/everloot gph start</C>, <>Starts a gold per hour session in a small window. <C>gph pause</C>, <C>gph stop</C> (saves it), <C>gph reset</C>, <C>gph show</C>, <C>gph hide</C>, <C>gph history</C> (the last five) and <C>gph cut on|off</C> (the 5% auction cut). Sessions stay in your file and are never uploaded.</>],
+          [<C key="e2">/everloot gph start</C>, <>Starts a gold per hour session in a small window. <C>gph pause</C>, <C>gph stop</C> (saves it), <C>gph reset</C>, <C>gph show</C> (or <C>gph</C> alone), <C>gph hide</C>, <C>gph history</C> (the last five) and <C>gph cut on|off</C> (the 5% auction cut). Sessions stay in your file and are never uploaded.</>],
           [<C key="f">/everloot completion on</C>, <>Turns on the completion tracker, which reads your achievements, reputation, titles and completed quests. <C>completion</C> reads now; <C>completion off</C> turns it off and deletes every row it wrote.</>],
           [<C key="g">/everloot census off</C>, <>Turns off the census, which is on in a new install and counts race, class, level and faction, never a name. It deletes every row the census wrote. <C>census</C> says whether it is on; <C>census on</C> turns it back on.</>],
           [<C key="g2">/everloot players on</C>, <>Turns on the players module, the one part that records other players&apos; names: name, realm, race, class, level and guild of characters you target, mouse over or group with. Its rows are sent only from the upload page and can appear on <Link href="/docs/guides/privacy#player-pages" className={docLink}>player pages</Link>. <C>players</C> says whether it is on; <C>players off</C> turns it off and deletes every row it wrote.</>],
+          [<C key="g3">/everloot pulls on</C>, <>In the builds that carry it, records a summary of each boss pull. <C>pulls</C> says whether it is on and how many pulls it holds; <C>pulls off</C> turns it off and deletes every pull.</>],
           [<C key="h">/everloot addons on</C>, <>Records the list of your installed addons. <C>addons off</C> stops it and deletes every recorded addon row.</>],
+          [<C key="h2">/everloot link &lt;code&gt;</C>, <>Links the character you are playing to your everloot.app account with the code the site shows you. <C>link</C> says how many links this file holds; <C>link clear</C> deletes them.</>],
           [<C key="i">/everloot talents</C>, "Prints your talent build for each spec group, with a share code."],
-          [<C key="j">/everloot plan &lt;share code&gt;</C>, <>Loads a plan from the <Link href="/tools/talents" className={docLink}>talent calculator</Link> and shows it beside the talent window. It is display only. <C>plan</C> reopens the panel, <C>plan hide</C> closes it and <C>plan clear</C> forgets it.</>],
+          [<C key="j">/everloot plan &lt;share code&gt;</C>, <>Loads a plan from the <Link href="/tools/talents" className={docLink}>talent calculator</Link> and shows it beside the talent window. It is display only. <C>plan</C> reopens the panel and lists your saved plans, <C>plan &lt;number&gt;</C> loads one of them, <C>plan hide</C> closes the panel and <C>plan clear</C> forgets it.</>],
           [<C key="k">/everloot raid</C>, <>Lists the raid buffs missing from each group in your raid. <C>raid code</C> gives a link that opens the raid in the <Link href="/tools/raid" className={docLink}>raid builder</Link>.</>],
           [<C key="l">/everloot selftest</C>, "Checks that the talent calls the addon relies on work in your client, and prints PASS, FAIL, SKIP and INFO lines."],
           [<C key="m">/ask &lt;question&gt;</C>, <>Stores a question of up to 500 characters. The answer shows in chat after you <C>/reload</C>, once the <Link href="/docs/guides/desktop" className={docLink}>Desktop App</Link> has fetched it.</>],

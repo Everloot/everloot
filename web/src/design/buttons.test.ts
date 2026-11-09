@@ -80,7 +80,7 @@ const PRIMARY = [
   "app/tools/guild-board/page.tsx",
   "app/tools/professions/[profession]/page.tsx",
   "app/upload/UploadClient.tsx",
-  "app/not-found.tsx",
+  "app/not-found-parts.tsx",
   "app/page.tsx",
   "components/BrowseFilters.tsx",
   "components/CookieConsent.tsx",
