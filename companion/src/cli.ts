@@ -96,7 +96,17 @@ export function uploadNotice(): string {
     "Source: https://github.com/Everloot/everloot";
 }
 
-async function main(argv: string[]): Promise<void> {
+/** What main needs from the host; tests pass fakes, the command line gets the real uploader, price refresher, watcher and console. */
+export interface MainDeps {
+  uploadFile: typeof uploadFile;
+  refreshPrices: typeof refreshPrices;
+  watchFile: typeof watchFile;
+  console: Pick<Console, "log" | "error">;
+}
+
+const host: MainDeps = { uploadFile, refreshPrices, watchFile, console };
+
+export async function main(argv: string[], deps: MainDeps = host): Promise<void> {
   const args = parseArgs(argv);
   const statePath = args.state ?? defaultStatePath({ platform: process.platform, env: process.env, home: homedir() });
   const state = createSentState(statePath);
@@ -115,53 +125,53 @@ async function main(argv: string[]): Promise<void> {
     );
     try {
       const enabled = providers();
-      console.log(enabled.length ? `Answering with ${enabled.map((p) => p.name).join(" > ")}.` : "Answering with plain search (no providers in config.json).");
+      deps.console.log(enabled.length ? `Answering with ${enabled.map((p) => p.name).join(" > ")}.` : "Answering with plain search (no providers in config.json).");
     } catch (err) {
-      console.log(`Model providers not loaded (config.json: ${err instanceof Error ? err.message : String(err)}); other questions will fail with that until it is fixed.`);
+      deps.console.log(`Model providers not loaded (config.json: ${err instanceof Error ? err.message : String(err)}); other questions will fail with that until it is fixed.`);
     }
-    console.log("Price questions are answered from the recorded market, without a model.");
+    deps.console.log("Price questions are answered from the recorded market, without a model.");
     const store = createAnswerStore(join(dirname(statePath), "answers.json"));
     const addonsDir = join(args.game!, "Interface", "AddOns");
     const answer = async (file: string) => {
       try {
         const r = await answerPending({ svFile: file, addonsDir, engine, store });
-        if (r.answered || r.failed) console.log(`${file}: answered ${r.answered}, failed ${r.failed}. /reload in game to read them.`);
+        if (r.answered || r.failed) deps.console.log(`${file}: answered ${r.answered}, failed ${r.failed}. /reload in game to read them.`);
       } catch (err) {
-        console.error(`${file}: ${err instanceof Error ? err.message : String(err)}`);
+        deps.console.error(`${file}: ${err instanceof Error ? err.message : String(err)}`);
       }
     };
     for (const file of files) {
       await answer(file);
-      watchFile(file, debounce(() => void answer(file), 2000));
+      deps.watchFile(file, debounce(() => void answer(file), 2000));
     }
-    console.log(`Answering /ask for ${files.length} account(s). Leave this running; Ctrl+C stops it.`);
+    deps.console.log(`Answering /ask for ${files.length} account(s). Leave this running; Ctrl+C stops it.`);
     return;
   }
   const addonsDir = args.game ? join(args.game, "Interface", "AddOns") : null;
   const prices = async () => {
     if (!addonsDir) return;
     try {
-      const r = await refreshPrices({ svFiles: files, addonsDir, endpoint: args.endpoint });
-      console.log(`Prices: ${r.items} items on ${r.realms} realm(s) written to ${addonsDir}. /reload in game to see them.`);
+      const r = await deps.refreshPrices({ svFiles: files, addonsDir, endpoint: args.endpoint });
+      deps.console.log(`Prices: ${r.items} items on ${r.realms} realm(s) written to ${addonsDir}. /reload in game to see them.`);
     } catch (err) {
-      console.error(`Prices not updated (the previous ones stay): ${err instanceof Error ? err.message : String(err)}`);
+      deps.console.error(`Prices not updated (the previous ones stay): ${err instanceof Error ? err.message : String(err)}`);
     }
   };
   if (args.command === "prices") return prices();
   const send = async (file: string) => {
     try {
-      console.log(uploadSummary(file, await uploadFile(file, { endpoint: args.endpoint, state, collects, sharesInstall: sharesInstallWith(file, files) })));
+      deps.console.log(uploadSummary(file, await deps.uploadFile(file, { endpoint: args.endpoint, state, collects, sharesInstall: sharesInstallWith(file, files) })));
       if (args.command === "watch") await prices();
     } catch (err) {
-      console.error(`${file}: ${err instanceof Error ? err.message : String(err)}`);
+      deps.console.error(`${file}: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
-  console.log(uploadNotice());
+  deps.console.log(uploadNotice());
   for (const file of files) await send(file);
   if (args.command === "watch") {
     // The game writes SavedVariables at logout or /reload; wait for the write to settle.
-    for (const file of files) watchFile(file, debounce(() => void send(file), 5000));
-    console.log(`Watching ${files.length} file(s). Leave this running while you play; Ctrl+C stops it.`);
+    for (const file of files) deps.watchFile(file, debounce(() => void send(file), 5000));
+    deps.console.log(`Watching ${files.length} file(s). Leave this running while you play; Ctrl+C stops it.`);
   }
 }
 
