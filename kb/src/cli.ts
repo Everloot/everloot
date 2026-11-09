@@ -6,6 +6,7 @@ import { auditSources } from "./audit-sources.js";
 import { compareBaseline, readBaseline, writeBaselineReport } from "./baseline-report.js";
 import { buildCoverageReport, readCoverageBaseline, writeCoverageReport } from "./coverage-report.js";
 import { BlizzardClient } from "./blizzard/client.js";
+import { armoryCrawl } from "./armory/index.js";
 import {
   backfillBluePosts, ingestBluePosts, loadFetchState, loadOverrides, loadStore, saveFetchState, saveStore, type BlueGame, type BlueRegion, type IngestResult,
 } from "./blue-posts.js";
@@ -349,6 +350,10 @@ async function main(): Promise<number> {
   const db = () => (opened ??= openDb(flags.get("db") ?? "data/everloot-kb.sqlite"));
 
   switch (cmd) {
+    case "armory-crawl": {
+      await armoryCrawl(flags);
+      return 0;
+    }
     case "import-wiki": {
       if (!args[0]) break;
       let limit: number | undefined;

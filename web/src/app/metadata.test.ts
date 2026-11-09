@@ -38,7 +38,7 @@ const routes: [string, () => Promise<{ metadata: Metadata }>, boolean][] = [
   ["/database/objects", async () => ({ metadata: await (await import("./database/objects/page")).generateMetadata({}) }), true],
   ["/database/quest-chains", async () => ({ metadata: await (await import("./database/quest-chains/page")).generateMetadata({}) }), true],
   ["/database/quests", async () => ({ metadata: await (await import("./database/quests/page")).generateMetadata({}) }), true],
-  // A spell page builds its title from the id alone; without the names file no id is ruled out, so 1 is checked here.
+  // A spell page titles itself from the names file, or the id alone without it; no id is ruled out then, so 1 is checked here.
   ["/database/spells/1", async () => ({ metadata: await (await import("./database/spells/[id]/page")).generateMetadata({ params: Promise.resolve({ id: "1" }) }) }), false],
   ["/database/titles", async () => ({ metadata: await (await import("./database/titles/page")).generateMetadata({}) }), true],
   ["/database/vendors", async () => ({ metadata: await (await import("./database/vendors/page")).generateMetadata({}) }), true],
