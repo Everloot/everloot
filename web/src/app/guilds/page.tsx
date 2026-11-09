@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, Container, DataTable, EmptyState, FilterBar, Input, PageHeader, ResultStrip, SectionHeading, type Column, type FilterControl } from "@/components/ui";
 import { FAMILIES } from "@/data/families";
+import { armoryOn } from "@/lib/armory";
 import { dataAgeLabel } from "@/lib/data-age";
 import {
   factionLabel, guildPath, guildSearchPrefix, guildsOn, ladderHref, loadGuildData, loadGuildRealms, loadGuildSearch, loadLadder, parseLadderQuery, raidsOpen, realmPath,
@@ -138,6 +139,7 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
           meta={!data.unreachable && <span>{dataAgeLabel(data.dataAsOf)}</span>}
         />
         <div className="space-y-6">
+          {armoryOn() && <p className="text-sm text-fg-2">Guild rosters as Blizzard&apos;s API lists them are in the <Link href="/armory" className={link}>armory</Link>.</p>}
           <form action="/guilds" method="get" role="search" className="flex max-w-xl flex-col gap-2 sm:flex-row">
             <label htmlFor="guild-q" className="sr-only">Guild name</label>
             <Input id="guild-q" name="q" type="search" defaultValue={q} maxLength={40} autoComplete="off" placeholder="Start of a guild name, 2 letters or more" className="flex-1" />

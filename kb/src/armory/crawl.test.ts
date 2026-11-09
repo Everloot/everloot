@@ -106,6 +106,7 @@ it("guild summary", async () => {
     },
     invalid: 0,
     rejected: 0,
+    touch_failed: { character: 0, guild: 0 },
     enqueued: 4,
     purged: 3,
   });
@@ -364,6 +365,7 @@ it.each(["schema", "href", 400, 410])(
       "ember-vale-0",
       "7 days",
     );
+    expect(store.retry).toHaveBeenCalledTimes(1);
     const summary = JSON.parse(log.mock.calls.at(-1)![0]);
     expect(summary.invalid).toBe(1);
     expect(summary.rejected).toBe(0);
@@ -494,3 +496,63 @@ it("stops fallback and the run if deferring an outage also fails", async () => {
   expect(store.retry).toHaveBeenCalledTimes(1);
   expect(store.purge).toHaveBeenCalled();
 });
+
+it("stops after ten non-transient row failures without deferring in-flight rows", async () => {
+  const { store, api } = setup(40);
+  const log = vi.fn();
+  api.get.mockRejectedValue(new ApiError(400, "api"));
+  await expect(
+    runCrawl({ region: "eu", budget: 120, store, api, log }),
+  ).rejects.toThrow("10 non-transient row failures");
+  expect(store.retry).toHaveBeenCalledTimes(10);
+  expect(store.retry.mock.calls.every((c) => c[3] === "7 days")).toBe(true);
+  expect(api.get.mock.calls.length).toBeLessThanOrEqual(17);
+  expect(store.purge).toHaveBeenCalled();
+  expect(log.mock.calls.flat().join(" ")).toContain(
+    "10 non-transient row failures",
+  );
+  const s = JSON.parse(log.mock.calls.at(-1)![0]);
+  expect(s.invalid).toBe(10);
+});
+it("stops a rejected-batch fallback after ten failures, leaving the rest untouched", async () => {
+  vi.useFakeTimers();
+  try {
+    const { store, api } = setup(100);
+    const log = vi.fn();
+    store.upsertCharacters.mockRejectedValue(new StoreError(400));
+    const pending = runCrawl({ region: "eu", budget: 300, store, api, log });
+    const rejection = expect(pending).rejects.toThrow(
+      "10 non-transient row failures",
+    );
+    await vi.runAllTimersAsync();
+    await rejection;
+    expect(store.upsertCharacters).toHaveBeenCalledTimes(11);
+    expect(store.retry).toHaveBeenCalledTimes(10);
+    const s = JSON.parse(log.mock.calls.at(-1)![0]);
+    expect(s.rejected).toBe(10);
+    expect(store.purge).toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+it.each(["character", "guild"] as const)(
+  "logs a rejected %s touch batch without deferring or deleting rows",
+  async (kind) => {
+    const { store, api } = setup(kind === "character" ? 20 : 0);
+    if (kind === "guild")
+      store.take.mockImplementation(async (_r, k) =>
+        k === "guild" ? [{ slug: "copper-owls", tries: 0, stored: true }] : [],
+      );
+    const log = vi.fn();
+    api.get.mockResolvedValue({ status: 304, body: null, lastModified: null });
+    store.touch.mockRejectedValue(new StoreError(400));
+    const s = await runCrawl({ region: "eu", budget: 60, store, api, log });
+    expect(store.retry).not.toHaveBeenCalled();
+    expect(store.missing).not.toHaveBeenCalled();
+    expect(s[kind === "guild" ? "guilds" : "characters"].unchanged).toBe(0);
+    expect(s.invalid + s.rejected).toBe(0);
+    expect(s.touch_failed[kind]).toBe(kind === "guild" ? 1 : 20);
+    expect(log.mock.calls.flat().join(" ")).toContain("touch batch skipped");
+    expect(store.purge).toHaveBeenCalled();
+  },
+);

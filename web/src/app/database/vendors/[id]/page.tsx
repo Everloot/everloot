@@ -115,7 +115,7 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
                       { key: "item", header: "Item", cell: (o: VendorOffer) => <ItemTip tip={tips.get(o.itemId)}><EntityLink kind="item" id={o.itemId} name={items.get(o.itemId) ?? tips.get(o.itemId)?.name} /></ItemTip> },
                       { key: "price", header: "Price", numeric: true, cell: (o: VendorOffer) => formatCopper(o.priceCopper) },
                       { key: "stock", header: "Stock", numeric: true, cell: (o: VendorOffer) => stockLabel(o) },
-                      { key: "installs", header: "Reporters", numeric: true, cell: (o: VendorOffer) => o.reporters },
+                      { key: "installs", header: "Installs", numeric: true, cell: (o: VendorOffer) => o.reporters },
                     ]}
                     rows={page.offers}
                     rowKey={(o) => `${o.itemId}-${o.priceCopper}`}

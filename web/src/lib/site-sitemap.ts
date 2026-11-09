@@ -15,7 +15,7 @@ import { DATABASE_HUB_PATHS } from "@/lib/database-hubs";
 import { instancePaths } from "@/lib/database-sitemap";
 import { loadSightings } from "@/lib/instances";
 import { loadListNames } from "@/lib/item-view";
-import { achievementHref, chainHref, factionHref, loadCatalog, titleHref } from "@/lib/completion-lists";
+import { achievementHref, chainHref, factionHeaderOnly, factionHref, loadCatalog, titleHref } from "@/lib/completion-lists";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { RANKINGS, hubIndexable, loadRankingWeeks, rankingIndexable, rankingPath, rankingView } from "@/lib/rankings";
 import { hasContent, publicZones, zoneContents, zoneHref } from "@/lib/zones";
@@ -32,8 +32,9 @@ const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://everloot.app";
  * extraction date for the pages drawn from the game files, the day the launch sentence was read for
  * /wow-forever. Every other page has none, because a made-up date teaches crawlers to ignore the field.
  *
- * Null when the world facts or the census cannot be read: the zone and ranking pages would be missing, and the
- * route answers 503 (uncached) rather than a shorter sitemap the CDN keeps for an hour, as the database sitemap does.
+ * Null when the world facts, the census, the instance store or the item names cannot be read: the zone, ranking,
+ * dungeon or item category pages would be missing, and the route answers 503 (uncached) rather than a shorter
+ * sitemap the CDN keeps for an hour, as the database sitemap does.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap | null> {
   const staticRoutes = ["/", "/wow-forever", "/methodology", "/about", "/privacy", "/terms", "/security", "/accessibility", "/contact", "/upload", "/addon", "/lore", "/lore/coverage", "/changes", "/map", "/map/eastern-kingdoms", "/map/kalimdor", ...DATABASE_HUB_PATHS, "/tools", "/tools/collections", "/tools/guild-board", "/tools/auctions", "/tools/gold-ledger", "/tools/legacy", "/addons", "/addons/popular", "/census", "/addons/ecosystem", "/addons/polestar", "/addons/polestar/packs", "/addons/polestar/wanted", "/chat"];
@@ -44,7 +45,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap | null> {
   const talentRoutes = TALENT_CLASSES.map((slug) => `/tools/talents/${slug}`);
   // Item categories from the client layer: each class and subclass that holds items, first page only, and only
   // once half that page has a name (the page itself says noindex until then).
-  const { named } = await loadListNames();
+  const { named, degraded } = await loadListNames();
+  if (degraded) return null;
   const itemRoutes = CLIENT_TAXONOMY.classes.filter((c) => c.items > 0).flatMap((c) => [
     ...(categoryNamedEnough(c.id, undefined, named) ? [itemsHref(c.slug)] : []),
     ...CLIENT_TAXONOMY.subclasses.filter((s) => s.classId === c.id && s.items > 0 && categoryNamedEnough(c.id, s.id, named)).map((s) => itemsHref(c.slug, s.slug)),
@@ -52,14 +54,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap | null> {
   // Zone pages with something on them, like the item categories: one with nothing yet says noindex itself. The page
   // counts the players' treasures and entrances too, so it is asked with the same sightings.
   const [world, seen] = await Promise.all([loadWorldFacts(), loadSightings()]);
-  if (world.unreachable) return null;
+  if (world.unreachable || seen.unreachable) return null;
   const contents = zoneContents(world, undefined, seen);
   const zoneRoutes = publicZones().filter((z) => hasContent(contents.get(z.mapId))).map((z) => zoneHref(z.mapId, z.name));
   // Each dungeon and raid page, under the rule its page states (lib/database-sitemap.ts).
   const instanceRoutes = instancePaths(seen);
   // Achievement, faction, title and quest chain pages exist only for entries three players reported, so each listed one has content.
   const catalog = await loadCatalog();
-  const catalogRoutes = catalog ? [...catalog.achievements.map((a) => achievementHref(a.achievementId, a.name)), ...catalog.factions.map((f) => factionHref(f.factionId, f.name)), ...catalog.titles.map((t) => titleHref(t.titleId, t.name)), ...catalog.chains.map((c) => chainHref(c.questLineId, c.name))] : [];
+  const catalogRoutes = catalog ? [...catalog.achievements.map((a) => achievementHref(a.achievementId, a.name)), ...catalog.factions.filter((f) => !factionHeaderOnly(f)).map((f) => factionHref(f.factionId, f.name)), ...catalog.titles.map((t) => titleHref(t.titleId, t.name)), ...catalog.chains.map((c) => chainHref(c.questLineId, c.name))] : [];
   // The rankings hub and each unfiltered ranking, once it asks to be indexed (10 ranked rows).
   const rankings = await loadRankingWeeks();
   if (rankings.unreachable) return null;

@@ -15,6 +15,25 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Site: the achievement, title, faction and quest chain lists, the farming and profession pages and the scoring method say
+  a fact is confirmed by three installs, not three players, as the upload guide has it; the install count is one column,
+  "Installs", on every table (it was "Install IDs" on objects and drops and "Reporters" on NPCs, items and vendors); and
+  the coverage, instance and item pages count "n of 3 installs" from the meter's own labels instead of a written 3.
+- Site: an addon page typed in the wrong case, and the four retired tool addresses (/tools/database, /tools/completionist,
+  /tools/guild-tracker, /tools/profession-planner), answer a permanent 308 like every other moved address on the site.
+  Before, they answered a temporary 307, so a crawler kept asking for the old address.
+- Site: a faction page says whether the faction is a header of the reputation pane (Yes or No) and names its parent
+  faction from the game files, with the id shown once; a header with no standing of its own is noindex and out of the
+  sitemap. Faction, achievement and instance pages take the item pages' title, "Ironforge – WoW Forever faction".
+- Site: a spell page's tab reads "Spell 1 · Everloot" once; its title went around the shared page metadata, so the
+  layout added the brand a second time, and it had no Open Graph or Twitter card. The title check now covers the route.
+- Site: every public database list and detail page (NPCs, quests, objects, vendors, spells, achievements, titles, factions,
+  quest chains, drops, coverage), the census and the rankings are kept at the CDN for five minutes like the profession pages,
+  and the database index, zones and instances come down from an hour to the same five minutes, so a page drawn while
+  storage was unreachable is replaced within minutes. Items and the map keep their hour.
+- Web: the accessibility page describes the motion the site has, Glint included, instead of only 150 ms fades, and the
+- Site: the accessibility page describes the motion the site has, Glint included, instead of only 150 ms fades, and the
+  accessibility, terms, privacy and rankings dates use the site's one date format (November 4, 2026).
 - Addon: a loading screen inside the minute after the last gold snapshot writes no new row unless the balance changed;
   the last snapshot's time is kept in the saved file, so a /reload no longer adds a row each.
 - Addon: the button drawer leaves the minimap buttons to MinimapButtonButton when that addon is loaded, and to any
@@ -86,8 +105,20 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   dozen questions. A key is counted as before.
 - Site: `/addon` links the CurseForge project beside the zip download ("Get it on CurseForge"), counted as an
   `addon_download` to CurseForge like the other download links. The same tested zip is uploaded there on each release.
+- Site: a saved build's short link (`/b/<slug>`) reads the store once per visit, for the page and its metadata together,
+  instead of twice. The short "Storage unreachable" notice on the collections, guild board, gold ledger, census, addon,
+  popular addons and profession pages is one shared constant beside the long one.
+- Site: `/sitemap.xml` answers 503, uncached, while the instance store or the item names cannot be read, as it already
+  did for the world facts and the census, instead of a sitemap without the dungeon pages and item categories that the
+  CDN kept for an hour.
+
+- Site: /addons and the addon tracker's Rising board count a star change over the same window, the 7 days before
+  the newest daily count, and print it the same way ("+21 since 2026-10-28"); before, one counted from the snapshot
+  and the other from the clock, so they disagreed. Both pages say when the GitHub facts are older than 26 hours.
 
 ### Added
+- Site: an item, NPC or quest page shared on Discord or X shows its own card: the name, its type and how many of
+  the 3 installs agree on the name, as text on the brand canvas. Before, every database page showed the site card.
 - Addon: the Everloot window's sidebar is now Home, Gold, Collection, Professions and Settings. Ask, Build plan and
   Auctions left the sidebar; `/ask` and `/everloot plan` still work.
 - Addon: Home lists every character this install has seen (gold, level, professions, raid lockouts, last seen) with
@@ -172,6 +203,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the header search box suggests dungeons and raids as you type, from the same rows as full search, with or without
   the leading "The": "deadm" offers the Deadmines, labelled "Dungeon, level 16". A box scoped to items, NPCs, quests or
   objects keeps to that type.
+- Site: `/api/health` has a route test: a fresh heartbeat answers 200, any other 503, both `Cache-Control: no-store`,
+  and the snapshot is read again only after a minute. The route itself is unchanged.
 
 ### Changed
 - Site: the item lists, the census, the rankings and the MCP `population` tool read stored files the snapshot cron

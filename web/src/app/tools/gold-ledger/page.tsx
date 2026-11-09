@@ -4,7 +4,7 @@ import { webApplicationJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { goldFactsFromRecords, handleGoldLedger } from "../../../../../kb/src/gold-ledger";
-import { STORAGE_UNREACHABLE, uploadStore } from "@/lib/upload-store";
+import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT, uploadStore } from "@/lib/upload-store";
 import { dataAgeLabel } from "@/lib/data-age";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, Disclosure, EmptyState, Field, PageHeader, SectionHeading } from "@/components/ui";
@@ -45,7 +45,7 @@ export default async function GoldLedgerPage(
         trail={trailFor("/tools/gold-ledger")!}
         title={HEADING}
         lede={lede}
-        meta={<span>{corpus.unreachable ? "Storage unreachable" : dataAgeLabel(corpus.dataAsOf)}</span>}
+        meta={<span>{corpus.unreachable ? STORAGE_UNREACHABLE_SHORT : dataAgeLabel(corpus.dataAsOf)}</span>}
         actions={<>
           <Link href="/tools/auctions" className="btn">Auction House</Link>
         </>}

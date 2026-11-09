@@ -51,7 +51,7 @@ export default async function ObjectsPage(props: { searchParams?: Promise<Search
     { key: "id", header: "Object", sortable: true, cell: (o) => <Link href={`/database/objects/${o.objectId}`} className={LINK}>{names.get(o.objectId) ?? `Object ${o.objectId}`}</Link> },
     { key: "windows", header: "Loot windows", numeric: true, sortable: true, cell: (o) => o.windows },
     { key: "items", header: "Items seen", numeric: true, sortable: true, cell: (o) => o.items },
-    { key: "installs", header: "Install IDs", numeric: true, sortable: true, cell: (o) => o.reporters },
+    { key: "installs", header: "Installs", numeric: true, sortable: true, cell: (o) => o.reporters },
   ];
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
   const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "object" : "objects"} page={q.page} perPage={PER_PAGE} href={(page) => href({ ...q, page })} label="Object pages" />;

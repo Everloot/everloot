@@ -92,6 +92,22 @@ export const factionHref = (id: number, name: string) => `/database/factions/${s
 export const titleHref = (id: number, name: string) => `/database/titles/${segment(id, name)}`;
 export const chainHref = (id: number, name: string) => `/database/quest-chains/${segment(id, name)}`;
 
+/**
+ * What the game files say of a faction beyond its name: the parent they name for it, and whether they name it as
+ * another faction's parent (a header of the reputation pane). Null when the file could not be read.
+ */
+export function factionInFiles(id: number): { parent: { id: number; name: string } | null; header: boolean } | null {
+  let factions: typeof CLIENT_FACTIONS.factions;
+  try { factions = CLIENT_FACTIONS.factions; } catch { return null; }
+  const row = factions.find((f) => f.id === id);
+  if (!row) return null;
+  const parent = row.parentId === undefined ? undefined : factions.find((f) => f.id === row.parentId);
+  return { parent: parent ? { id: parent.id, name: parent.name } : null, header: factions.some((f) => f.parentId === id) };
+}
+
+/** A header the files list without a standing of its own: no player reported one, so its page is noindex and out of the sitemap. */
+export const factionHeaderOnly = (entry: Listed<FactionEntry>): boolean => !entry.confirmed && (factionInFiles(entry.factionId)?.header ?? false);
+
 /** The id in an `<id>-<slug>` segment, or null when the segment does not start with one. */
 export function parseSegment(value: string): number | null {
   const m = /^([1-9]\d{0,8})(?:-[a-z0-9-]*)?$/.exec(value);

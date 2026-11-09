@@ -16,7 +16,8 @@ vi.mock("next/link", () => ({
 }));
 vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NOT_FOUND"); },
-  redirect: (to: string) => { throw new Error(`REDIRECT ${to}`); },
+  permanentRedirect: (to: string) => { throw new Error(`308 ${to}`); },
+  redirect: (to: string) => { throw new Error(`307 ${to}`); },
 }));
 
 import AddonProfilePage, { generateMetadata } from "./page";
@@ -127,11 +128,11 @@ test("a registry-approved addon the curated map lacks is published with the regi
   expect(meta.robots).toBeUndefined();
 });
 
-test("a name matches without regard to case and redirects to the owner's spelling", async () => {
+test("a name matches without regard to case and answers 308 to the owner's spelling", async () => {
   store.loadCorpus.mockResolvedValue(corpus(three("Olympus")));
-  await expect(html("olympus")).rejects.toThrow("REDIRECT /addons/Olympus");
+  await expect(html("olympus")).rejects.toThrow("308 /addons/Olympus");
   expect(await html("Olympus")).toContain("Installs reporting");
-  await expect(html("POLESTAR")).rejects.toThrow("REDIRECT /addons/Polestar");
+  await expect(html("POLESTAR")).rejects.toThrow("308 /addons/Polestar");
 });
 
 test("a malformed percent-encoded name is a 404, not an error", async () => {
@@ -169,8 +170,14 @@ test("when GitHub cannot be reached the page still renders, says why, and keeps 
   const limited = await html("Polestar");
   expect(limited).toContain("GitHub is limiting how often");
   expect(limited).toContain('href="https://github.com/fitzforge/polestar/releases"');
+  github.addonGithub.mockResolvedValue({ status: "unavailable", rateLimited: false });
+  const down = await html("Polestar");
+  expect(down).toContain("GitHub did not answer");
+  expect(down).toContain('href="https://github.com/fitzforge/polestar/releases"');
   github.addonGithub.mockResolvedValue({ status: "missing" });
-  expect(await html("Polestar")).toContain("was not found on GitHub");
+  const missing = await html("Polestar");
+  expect(missing).toContain("was not found on GitHub");
+  expect(missing).not.toContain("Repository facts");
 });
 
 test("an approved addon below three installs still shows its repository, with the opt-in instead of numbers", async () => {

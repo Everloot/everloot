@@ -15,7 +15,7 @@ import { itemSourceValue } from "./item-source";
 import { RelationTarget, SameIcon } from "@/components/EntityRelations";
 import { pinLink } from "@/lib/world-map";
 import { gameNameFor, loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
-import { Badge, Container, DataTable, EvidenceLine, Facts, InShort, OpenData, QUALITY_TEXT, Tabs, TooltipFrame, qualityOf, type Column, type Fact, type TabItem } from "@/components/ui";
+import { Badge, Container, DataTable, EvidenceLine, Facts, InShort, OpenData, QUALITY_TEXT, Tabs, TooltipFrame, qualityOf, reportedLabel, type Column, type Fact, type TabItem } from "@/components/ui";
 import { isDevelopmentItemName } from "../../../../../../kb/src/dev-item-names";
 import { categoryOf } from "../../../../../../kb/src/item-taxonomy";
 import { edgesFrom, evidenceLabel, type Edge, type Rel } from "../../../../../../kb/src/edges";
@@ -36,6 +36,7 @@ import { itemDropSources } from "../../../../../../kb/src/loot-tables";
 import { loadLootTables, loadReportedItemFacts } from "@/lib/rollup-compute";
 import { EmptyTab, EntityHeader, EntityIcon, EntityTop, known, LINK, MAP_LINK_HEADER, MapName, ShowOnMap, Unreachable } from "../../entity";
 import { ItemSourcesPanel } from "../../loot-tables";
+import { unknownItem } from "../../unknown";
 import { itemSummary } from "@/lib/evidence";
 
 const PROFESSIONS = { href: "/tools/professions", label: "Professions" };
@@ -44,16 +45,6 @@ const PROFESSIONS = { href: "/tools/professions", label: "Professions" };
 type Props = { params: Promise<{ id: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> };
 
 export const dynamic = "force-dynamic";
-
-/**
- * An id neither the game files nor any upload knows: no row in the client layer, no report about it (even one
- * short of the 3 installs), no relation. It is a 404, not an empty page. While upload storage is out of reach
- * nothing can be ruled out.
- */
-function unknownItem(itemId: number, facts: Awaited<ReturnType<typeof loadShownNames>>["facts"], relations: readonly Edge[], seen: { seen: Set<number>; unreachable: boolean }): boolean {
-  if (facts.unreachable || seen.unreachable || categoryOf(CLIENT_TAXONOMY, itemId) !== null || relations.length > 0 || seen.seen.has(itemId)) return false;
-  return !facts.names.some((r) => r.itemId === itemId) && !facts.rates.some((r) => r.itemId === itemId);
-}
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const params = await props.params;
@@ -73,7 +64,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
     dropSources: page.drops.length, vendors: targets("sold_by"), createdBy: targets("created_by"), usedIn: targets("reagent_for"), questRewards: targets("reward_from"),
   });
   return {
-    ...pageMetadata({ title: entityTitle(name?.name ?? `Item ${itemId}`, "item"), description, path: `/database/items/${itemId}` }),
+    ...pageMetadata({ title: entityTitle(name?.name ?? `Item ${itemId}`, "item"), description, path: `/database/items/${itemId}`, image: `/database/items/${itemId}/opengraph-image` }),
     // Indexed once players have reported the item, or a source names it in the current build.
     robots: { index: itemIndexable(page, facts.unreachable, name), follow: true },
   };
@@ -165,7 +156,7 @@ export default async function ItemPage(props: Props) {
     { key: "npc", header: "NPC", cell: (p) => <EntityLink kind="npc" id={p.npcId} name={p.name ?? names.npcs.get(p.npcId)} /> },
     { key: "map", header: "Map", cell: (p) => <MapName mapId={p.mapId} /> },
     { key: "at", header: "Position", numeric: true, cell: (p) => `${p.x}, ${p.y}` },
-    { key: "installs", header: "Reporters", numeric: true, cell: (p) => p.reporters },
+    { key: "installs", header: "Installs", numeric: true, cell: (p) => p.reporters },
     { key: "show", header: MAP_LINK_HEADER, cell: (p) => { const href = pinLink(p.mapId, p.x, p.y); return href ? <ShowOnMap href={href} mapId={p.mapId} x={p.x} y={p.y} /> : null; } },
   ];
 
@@ -302,7 +293,7 @@ export default async function ItemPage(props: Props) {
           <section aria-label="Item report progress" className="mt-3 space-y-1 text-meta text-fg-2">
             <p>Not yet confirmed. Each value needs 3 installs to agree.</p>
             <ul>
-              {reported.progress!.map((p) => <li key={p.fact}>{`${FACT_WORD[p.fact]}: ${p.reporters} of 3 installs reported (build ${p.build}).`}</li>)}
+              {reported.progress!.map((p) => <li key={p.fact}>{`${FACT_WORD[p.fact]}: ${reportedLabel(p.reporters)} (build ${p.build}).`}</li>)}
             </ul>
           </section>
         )}

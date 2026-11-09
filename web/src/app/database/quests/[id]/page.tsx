@@ -10,6 +10,7 @@ import { pinLink } from "@/lib/world-map";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Badge, Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
 import { EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, ShowOnMap, Unreachable } from "../../entity";
+import { unknownQuest } from "../../unknown";
 import { entitySummary, observedLine } from "@/lib/evidence";
 import { loadItemFacts } from "@/lib/rollup-compute";
 import { itemNames, npcNames } from "@/lib/names";
@@ -24,14 +25,6 @@ import { entityTitle, questDescription } from "@/lib/entity-meta";
 
 export const dynamic = "force-dynamic";
 
-/**
- * An id no upload mentions and the game files' quest list (the titles file) does not hold: a 404, not an empty
- * page. Without that file, or with storage out of reach, nothing can be ruled out.
- */
-function unknownQuest(questId: number, facts: Awaited<ReturnType<typeof loadWorldFacts>>, wiki: Awaited<ReturnType<typeof loadQuestNames>>): boolean {
-  return !facts.unreachable && wiki !== null && !wiki.names.has(questId) && !facts.quests.some((r) => r.questId === questId);
-}
-
 export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const params = await props.params;
   if (!/^[1-9]\d*$/.test(params.id)) return { robots: { index: false, follow: true } };
@@ -44,7 +37,7 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
     name: title, id: page.questId, level: shown?.level ?? null, giver: shown?.giverNpcId != null, turnIn: shown?.turnInNpcId != null, rewards: shown?.rewards.length ?? 0,
   });
   return {
-    ...pageMetadata({ title: entityTitle(title, "quest"), description, path: `/database/quests/${params.id}` }),
+    ...pageMetadata({ title: entityTitle(title, "quest"), description, path: `/database/quests/${params.id}`, image: `/database/quests/${page.questId}/opengraph-image` }),
     robots: { index: questIndexable(page, facts.unreachable), follow: true },
   };
 }

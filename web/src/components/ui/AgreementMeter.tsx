@@ -8,6 +8,11 @@ export function agreementLabel(count: number): string {
   return `${clampAgreement(count)} of ${AGREEMENT_NEEDED} installs agree`;
 }
 
+/** "1 of 3 installs reported": installs that reported the fact at all, whatever each one said. Clamped the same way. */
+export function reportedLabel(count: number): string {
+  return `${clampAgreement(count)} of ${AGREEMENT_NEEDED} installs reported`;
+}
+
 export function clampAgreement(count: number): Agreement {
   return Math.max(0, Math.min(AGREEMENT_NEEDED, Math.floor(Number.isFinite(count) ? count : 0))) as Agreement;
 }

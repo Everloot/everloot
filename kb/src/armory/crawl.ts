@@ -34,6 +34,7 @@ export interface Summary {
   };
   invalid: number;
   rejected: number;
+  touch_failed: Record<Kind, number>;
   enqueued: number;
   purged: number;
 }
@@ -64,10 +65,12 @@ export async function runCrawl(cfg: {
     },
     invalid: 0,
     rejected: 0,
+    touch_failed: { character: 0, guild: 0 },
     enqueued: 0,
     purged: 0,
   };
   let fatal: Error | undefined;
+  let nonTransientFailures = 0;
   const logged = new Set<string>();
   function reason(error: unknown): string {
     return error instanceof ApiError || error instanceof StoreError
@@ -100,10 +103,17 @@ export async function runCrawl(cfg: {
     error: unknown,
     rejected = false,
   ) {
-    if (!dryRun) await store.retry(region, kind, slug, "7 days");
+    // Reserve the failure before awaiting storage, so concurrent workers stop at ten exactly.
+    if (fatal || nonTransientFailures >= 10) return;
+    nonTransientFailures++;
     if (rejected) summary.rejected++;
     else summary.invalid++;
     logError(rejected ? "storage row rejected" : "row failure", error);
+    if (nonTransientFailures === 10) {
+      fatal = new Error("Stopped after 10 non-transient row failures");
+      cfg.log?.("armory stopped: 10 non-transient row failures");
+    }
+    if (!dryRun) await store.retry(region, kind, slug, "7 days");
   }
   let reserved = 0;
   const starts: number[] = [];
@@ -169,6 +179,7 @@ export async function runCrawl(cfg: {
       }
       // Split only a row-rejected batch. Stop sending single writes if storage fails.
       for (let index = 0; index < rows.length; index++) {
+        if (fatal) break;
         const row = rows[index];
         try {
           if (!dryRun) await store.upsertCharacters(region, [row]);
@@ -195,10 +206,9 @@ export async function runCrawl(cfg: {
         slugs.length;
     } catch (error) {
       if (authenticationFailure(error)) throw error;
-      for (const slug of slugs) {
-        if (transient(error)) await retry(kind, slug);
-        else await defer(kind, slug, error, error instanceof StoreError);
-      }
+      summary.touch_failed[kind] += slugs.length;
+      logError("touch batch skipped", error);
+      // Keep the rows stale for the next run; a batch-level error says nothing about individual rows.
     }
   }
   async function row(kind: Kind, q: QueueRow, cost: number) {

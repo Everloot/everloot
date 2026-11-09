@@ -42,21 +42,6 @@ export function boardHref(q: BoardQuery): string {
   return s ? `/addons?${s}` : "/addons";
 }
 
-export interface StarPoint { at: string; stars: number }
-
-/**
- * Stars gained against the oldest daily count kept in the 7 days before the newest one. Anchored on the
- * snapshot, not the clock, so a page built from an older snapshot still compares like with like. Null without
- * a current count or without an older point.
- */
-export function starChange(history: readonly StarPoint[] | undefined, current: number | null): { change: number; since: string } | null {
-  if (current === null || !history || history.length < 2) return null;
-  const points = [...history].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
-  const newest = Date.parse(points[points.length - 1].at);
-  const base = points.find((p) => Date.parse(p.at) >= newest - 7 * 86_400_000 && Date.parse(p.at) < newest);
-  return base ? { change: current - base.stars, since: base.at } : null;
-}
-
 const OWNER = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
 
 /** The GitHub account that owns the repository, or null when the repo field is not owner/name. */
@@ -123,11 +108,11 @@ export function sortBoard(rows: readonly BoardRow[], sort: BoardSort, desc: bool
   }).map((row, i) => ({ ...row, rank: i + 1 }));
 }
 
-/** Every project as a row, in the default order. */
-export function boardRows(view: EcosystemView, history: Readonly<Record<string, readonly StarPoint[]>>): BoardRow[] {
+/** Every project as a row, in the default order. The change is the view's own, the one the tracker's Rising board shows. */
+export function boardRows(view: EcosystemView): BoardRow[] {
   const rows = view.projects.map((p): BoardRow => {
     const m = p.metrics?.status === "ok" ? p.metrics : null;
-    const delta = starChange(history[p.id], m?.stars ?? null);
+    const delta = p.starGain7d;
     return {
       project: p,
       rank: 0,

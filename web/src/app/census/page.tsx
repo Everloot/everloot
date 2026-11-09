@@ -4,7 +4,7 @@ import { pageMetadata } from "@/lib/seo";
 import { dataAgeLabel } from "@/lib/data-age";
 import { loadCensus } from "@/lib/rollup-compute";
 import { REPO_URL } from "@/lib/source";
-import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
+import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT } from "@/lib/upload-store";
 import { trailFor } from "@/lib/breadcrumbs";
 import { playerPagesOn } from "@/lib/player-pages";
 import { guildsOn } from "@/lib/guild-switch";
@@ -258,7 +258,7 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
           lede="Counted from Everloot uploads by players who turned the census on: their own characters and the players they target, mouse over or group with."
           meta={<>
             <span className="font-mono text-xs">
-              {!ready ? "Storage unreachable"
+              {!ready ? STORAGE_UNREACHABLE_SHORT
                 : !view.launched ? "Not launched yet"
                 : plural(w.installs, "reporting install", "reporting installs")}
             </span>
