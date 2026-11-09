@@ -32,24 +32,38 @@ export const ARMORY_RULESETS = [
 ] as const;
 export const rulesetName = (id: number) => ARMORY_RULESETS.find((r) => r.id === id)?.label ?? "Unknown";
 
-/** A character or guild slug as the API spells it and the table checks it: lower-case words joined by hyphens. */
-const SLUG = /^[a-z0-9]+(-[a-z0-9]+)+$/;
-export const validArmorySlug = (s: string | undefined): s is string => typeof s === "string" && s.length <= 64 && SLUG.test(s);
+/**
+ * A character or guild slug as the table checks it (`^[[:alnum:]]+(-[[:alnum:]]+)*$`, at most 64 characters): one or
+ * more words of letters (any script) and digits joined by hyphens, in lower case. A single word is a slug too.
+ */
+const SLUG = /^[\p{L}\p{N}]+(-[\p{L}\p{N}]+)*$/u;
+export const validArmorySlug = (s: string | undefined): s is string =>
+  typeof s === "string" && [...s].length <= 64 && s === s.toLowerCase() && SLUG.test(s);
 
-/** The form fields: a first name and a surname, letters only. */
-export const NAME_RULE = /^[A-Za-z]{2,12}$/;
-export const SURNAME_RULE = /^[A-Za-z]{2,24}$/;
-/** `name-surname` in lower case, as the API's `slug`; null when either part is not letters only. */
+/** A slug from an address: decoded once (the segment may arrive percent-encoded), composed (NFC). Null if it does not decode. */
+export function slugFromSegment(segment: string): string | null {
+  try { return decodeURIComponent(segment).normalize("NFC"); } catch { return null; }
+}
+
+/** The form fields: a first name and a surname, letters of any script. The browser patterns are the same rules. */
+export const NAME_RULE = /^\p{L}{2,12}$/u;
+export const SURNAME_RULE = /^\p{L}{2,24}$/u;
+export const NAME_PATTERN = "\\p{L}{2,12}";
+export const SURNAME_PATTERN = "\\p{L}{2,24}";
+/** `name-surname` composed (NFC) and in lower case, as the API's `slug`; null when either part is not letters only. */
 export function characterSlugOf(name: string, surname: string): string | null {
-  const n = name.trim(), s = surname.trim();
+  const n = name.trim().normalize("NFC"), s = surname.trim().normalize("NFC");
   return NAME_RULE.test(n) && SURNAME_RULE.test(s) ? `${n}-${s}`.toLowerCase() : null;
 }
+
+/** A search prefix: 2 to 24 letters of any script. */
+export const SEARCH_RULE = /^\p{L}{2,24}$/u;
 
 export const ARMORY_PATH = "/armory";
 export const ARMORY_HIDE_PATH = "/armory/hide";
 export const ARMORY_SUBMIT_PATH = "/armory/submit";
-export const armoryCharacterPath = (region: string, slug: string) => `/armory/${region}/${slug}`;
-export const armoryGuildPath = (region: string, slug: string) => `/armory/${region}/guilds/${slug}`;
+export const armoryCharacterPath = (region: string, slug: string) => `/armory/${region}/${encodeURIComponent(slug)}`;
+export const armoryGuildPath = (region: string, slug: string) => `/armory/${region}/guilds/${encodeURIComponent(slug)}`;
 /** The hide form, filled in for one character. */
 export function armoryHidePath(c?: { region: string; name: string; surname: string }): string {
   return c ? `${ARMORY_HIDE_PATH}?${new URLSearchParams({ region: c.region, name: c.name, surname: c.surname })}` : ARMORY_HIDE_PATH;

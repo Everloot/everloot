@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { Container, PageHeader } from "@/components/ui";
 import { ARMORY_HIDE_PATH, ARMORY_PATH, armoryOn } from "@/lib/armory";
 import { armoryStore } from "@/lib/armory-store";
-import { ArmoryCredit, armoryMetadata, CharacterFields, first, link, newest, NOT_FOUND_METADATA } from "../parts";
+import { ArmoryCredit, armoryMetadata, CharacterFields, first, FormUnreachable, link, newest, NOT_FOUND_METADATA } from "../parts";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +26,7 @@ export default async function ArmoryHidePage(props: { searchParams: Promise<Sear
   const params = await props.searchParams;
   const done = first(params.done) === "1";
   const error = first(params.error);
+  // A store out of reach still draws the form; the read time is then unrecorded.
   const counts = await armoryStore().counts().catch(() => null);
 
   return (
@@ -39,6 +40,7 @@ export default async function ArmoryHidePage(props: { searchParams: Promise<Sear
         />
 
         {done && <p role="status" className="rounded-card border border-line bg-panel p-4 text-fg">Done. That character is hidden and will not be read again.</p>}
+        {counts === null && <FormUnreachable />}
         {error && <p role="alert" className="rounded-card border border-line bg-panel p-4 text-fg">{ERROR[error] ?? ERROR.invalid}</p>}
 
         <form action="/armory/hide/send" method="post" className="space-y-4">

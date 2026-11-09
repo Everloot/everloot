@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Card } from "@/components/ui";
-import { BLIZZARD_CREDIT, readLine } from "@/lib/armory";
+import { BLIZZARD_CREDIT, NAME_PATTERN, readLine, SURNAME_PATTERN } from "@/lib/armory";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 
@@ -29,6 +29,9 @@ export function ArmoryCredit({ at }: { at: string | null | undefined }) {
 
 export const Unreachable = () => <Card><p className="text-fg-2" role="status">{STORAGE_UNREACHABLE}</p></Card>;
 
+/** Above a form when storage did not answer: the form still shows, and says sending may fail. */
+export const FormUnreachable = () => <p role="status" className="text-meta text-warning">{STORAGE_UNREACHABLE} Sending this form may fail until it is back.</p>;
+
 /** The newest of some read times, or null. */
 export function newest(times: readonly (string | null | undefined)[]): string | null {
   let best: string | null = null;
@@ -50,11 +53,11 @@ export function CharacterFields({ region, name, surname }: { region?: string; na
       </div>
       <div className="space-y-1">
         <label htmlFor="armory-name" className="text-sm text-fg">Name</label>
-        <input id="armory-name" name="name" required minLength={2} maxLength={12} pattern="[A-Za-z]{2,12}" autoComplete="off" defaultValue={name ?? ""} className={field} />
+        <input id="armory-name" name="name" required minLength={2} maxLength={12} pattern={NAME_PATTERN} autoComplete="off" defaultValue={name ?? ""} className={field} />
       </div>
       <div className="space-y-1">
         <label htmlFor="armory-surname" className="text-sm text-fg">Surname</label>
-        <input id="armory-surname" name="surname" required minLength={2} maxLength={24} pattern="[A-Za-z]{2,24}" autoComplete="off" defaultValue={surname ?? ""} className={field} />
+        <input id="armory-surname" name="surname" required minLength={2} maxLength={24} pattern={SURNAME_PATTERN} autoComplete="off" defaultValue={surname ?? ""} className={field} />
       </div>
     </>
   );

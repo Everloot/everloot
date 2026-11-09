@@ -111,9 +111,22 @@ describe("the character page", () => {
     }
   });
 
-  test("storage out of reach says so instead of throwing", async () => {
+  test("storage out of reach says so instead of throwing, still crediting Blizzard", async () => {
     holder.store = broken();
-    expect(await html(pages.character("eu", "velkara-duskmantle"))).toContain(STORAGE_UNREACHABLE);
+    const out = await html(pages.character("eu", "velkara-duskmantle"));
+    expect(out).toContain(STORAGE_UNREACHABLE);
+    expect(out).toContain(BLIZZARD_CREDIT);
+    expect(out).toContain("Read time unrecorded");
+  });
+
+  test("an accented name has a page, by its encoded address or its plain one", async () => {
+    mem.putCharacter(armoryCharacter({ slug: "élodie-brún", name: "Élodie", surname: "Brún", itemLevel: 50 }));
+    for (const segment of ["%C3%A9lodie-br%C3%BAn", "élodie-brún"]) {
+      const out = await html(pages.character("eu", segment));
+      expect(out).toContain("Élodie Brún");
+      expect(out).toContain('href="/armory/hide?region=eu&amp;name=%C3%89lodie&amp;surname=Br%C3%BAn"');
+    }
+    expect(await html(pages.board("item-level"))).toContain('href="/armory/eu/%C3%A9lodie-br%C3%BAn"');
   });
 });
 
@@ -137,7 +150,16 @@ describe("the guild page", () => {
     expect(await html(pages.guild("eu", "ember-wardens"))).not.toContain("Velkara");
     await expect(pages.guild("eu", "no-guild")).rejects.toThrow("NEXT_NOT_FOUND");
     holder.store = broken();
-    expect(await html(pages.guild("eu", "ember-wardens"))).toContain(STORAGE_UNREACHABLE);
+    const out = await html(pages.guild("eu", "ember-wardens"));
+    expect(out).toContain(STORAGE_UNREACHABLE);
+    expect(out).toContain(BLIZZARD_CREDIT);
+    expect(out).toContain("Read time unrecorded");
+  });
+
+  test("a single-word guild slug has a page, and the hub finds it", async () => {
+    mem.putGuild(armoryGuild({ slug: "wardens", name: "Wardens" }), []);
+    expect(await html(pages.guild("eu", "wardens"))).toContain("Wardens");
+    expect(await html(pages.hub({ guild: "war" }))).toContain('href="/armory/eu/guilds/wardens"');
   });
 });
 
@@ -170,6 +192,8 @@ describe("the hub", () => {
     expect(out).toContain('href="/armory/eu/guilds/ember-wardens"');
     expect(out).toContain("Read 2026-11-09 11:30 UTC");
     expect(await html(pages.hub({ q: "v1" }))).toContain("Type 2 to 24 letters");
+    mem.putCharacter(armoryCharacter({ slug: "élodie-brún", name: "Élodie", surname: "Brún" }));
+    expect(await html(pages.hub({ q: "Élo" }))).toContain('href="/armory/eu/%C3%A9lodie-br%C3%BAn"');
     holder.store = broken();
     expect(await html(pages.hub())).toContain(STORAGE_UNREACHABLE);
   });
@@ -180,6 +204,7 @@ test("the forms keep their fields, confirm, and say what went wrong", async () =
   expect(hide).toContain('action="/armory/hide/send"');
   expect(hide).toContain('value="Velkara"');
   expect(hide).toContain("not read it from Blizzard again");
+  expect(hide).toContain('pattern="\\p{L}{2,12}"');
   expect(await html(pages.hide({ done: "1" }))).toContain("Done. That character is hidden");
   expect(await html(pages.hide({ error: "storage" }))).toContain("We could not save that");
   const submit = await html(pages.submit({ done: "1" }));

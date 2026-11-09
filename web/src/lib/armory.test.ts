@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import {
-  armoryBoardHref, armoryBoardQuery, armoryHidePath, armoryOn, characterSlugOf, classTokenOfId, classTokenOfName,
-  metricValue, raceOfId, readLine, slotLabel, validArmorySlug,
+  armoryBoardHref, armoryBoardQuery, armoryCharacterPath, armoryGuildPath, armoryHidePath, armoryOn, characterSlugOf, classTokenOfId, classTokenOfName,
+  metricValue, raceOfId, readLine, slotLabel, slugFromSegment, validArmorySlug,
 } from "./armory";
 
 test("the switch is on only for EVERLOOT_ARMORY=1", () => {
@@ -9,13 +9,25 @@ test("the switch is on only for EVERLOOT_ARMORY=1", () => {
   for (const v of [undefined, "", "0", "true"]) expect(armoryOn({ EVERLOOT_ARMORY: v })).toBe(false);
 });
 
-test("a character slug is name-surname in lower case, letters only", () => {
+test("a character slug is name-surname in lower case, letters of any script", () => {
   expect(characterSlugOf(" Velkara ", "Duskmantle")).toBe("velkara-duskmantle");
-  for (const [n, s] of [["V", "Duskmantle"], ["Velkara", ""], ["Vel1", "Dusk"], ["Vel kara", "Dusk"], ["Velkara", "Dusk-mantle"], ["Vélkara", "Dusk"]]) {
+  expect(characterSlugOf("Vélkara", "Dúskmantle")).toBe("vélkara-dúskmantle");
+  // A decomposed é (e + combining accent) is composed first, as the API spells it.
+  expect(characterSlugOf("Ve\u0301lkara", "Dusk")).toBe("vélkara-dusk");
+  expect(characterSlugOf("Ølvir", "Stål")).toBe("ølvir-stål");
+  for (const [n, s] of [["V", "Duskmantle"], ["Velkara", ""], ["Vel1", "Dusk"], ["Vel kara", "Dusk"], ["Velkara", "Dusk-mantle"], ["Velkara", "Dusk'mantle"]]) {
     expect(characterSlugOf(n!, s!)).toBeNull();
   }
-  expect(validArmorySlug("velkara-duskmantle")).toBe(true);
-  for (const s of ["velkara", "Velkara-Dusk", "a--b", "-a-b", "a-b/../c", "x".repeat(40) + "-" + "y".repeat(30)]) expect(validArmorySlug(s)).toBe(false);
+});
+
+test("a slug is one or more lower-case words of letters and digits joined by hyphens, 64 characters at most", () => {
+  for (const s of ["velkara-duskmantle", "wardens", "vélkara-dúskmantle", "guild-of-7", "ølvir", "é".repeat(64)]) expect(validArmorySlug(s)).toBe(true);
+  for (const s of ["Velkara-Dusk", "Vélkara", "a--b", "-a-b", "a-b-", "a-b/../c", "a b", "a_b", "", "é".repeat(65), "x".repeat(40) + "-" + "y".repeat(30)]) {
+    expect(validArmorySlug(s)).toBe(false);
+  }
+  expect(slugFromSegment("v%C3%A9lkara-duskmantle")).toBe("vélkara-duskmantle");
+  expect(slugFromSegment("vélkara-duskmantle")).toBe("vélkara-duskmantle");
+  expect(slugFromSegment("%E0%A4%A")).toBeNull();
 });
 
 test("board filters accept the four rulesets and two regions, and refuse anything else", () => {
@@ -43,4 +55,6 @@ test("the read line and the figures", () => {
   expect(metricValue("item-level", 57.413)).toBe("57.41");
   expect(metricValue("honorable-kills", 12345)).toBe("12,345");
   expect(armoryHidePath({ region: "eu", name: "Velkara", surname: "Duskmantle" })).toBe("/armory/hide?region=eu&name=Velkara&surname=Duskmantle");
+  expect(armoryCharacterPath("eu", "vélkara-duskmantle")).toBe("/armory/eu/v%C3%A9lkara-duskmantle");
+  expect(armoryGuildPath("us", "wardens")).toBe("/armory/us/guilds/wardens");
 });

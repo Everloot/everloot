@@ -19,7 +19,7 @@ export function armoryCharacter(over: Partial<ArmoryCharacter> = {}): ArmoryChar
 export function armoryGuild(over: Partial<ArmoryGuild> = {}): ArmoryGuild {
   return {
     region: "eu", slug: "ember-wardens", guildId: 77, name: "Ember Wardens", faction: "Horde", rulesetId: 2, ruleset: "Normal",
-    memberCount: 3, createdAt: "2026-10-01T12:00:00.000Z", fetchedAt: "2026-11-09T09:00:00.000Z",
+    memberCount: 3, createdAt: "2026-10-01T12:00:00.000Z", fetchedAt: "2026-11-09T09:00:00.000Z", checkedAt: "2026-11-09T09:00:00.000Z",
     ...over,
   };
 }

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { Container, PageHeader } from "@/components/ui";
 import { ARMORY_HIDE_PATH, ARMORY_PATH, ARMORY_SUBMIT_PATH, armoryOn } from "@/lib/armory";
 import { armoryStore } from "@/lib/armory-store";
-import { ArmoryCredit, armoryMetadata, CharacterFields, first, link, newest, NOT_FOUND_METADATA } from "../parts";
+import { ArmoryCredit, armoryMetadata, CharacterFields, first, FormUnreachable, link, newest, NOT_FOUND_METADATA } from "../parts";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +26,7 @@ export default async function ArmorySubmitPage(props: { searchParams: Promise<Se
   const params = await props.searchParams;
   const done = first(params.done);
   const error = first(params.error);
+  // A store out of reach still draws the form; the read time is then unrecorded.
   const counts = await armoryStore().counts().catch(() => null);
 
   return (
@@ -40,6 +41,7 @@ export default async function ArmorySubmitPage(props: { searchParams: Promise<Se
 
         {done === "1" && <p role="status" className="rounded-card border border-line bg-panel p-4 text-fg">Thanks. The character is queued; its page appears once it has been read.</p>}
         {done === "0" && <p role="status" className="rounded-card border border-line bg-panel p-4 text-fg">Nothing to add: that character is queued already, was read in the last 20 days, or cannot be added.</p>}
+        {counts === null && <FormUnreachable />}
         {error && <p role="alert" className="rounded-card border border-line bg-panel p-4 text-fg">{ERROR[error] ?? ERROR.invalid}</p>}
 
         <form action="/armory/submit/send" method="post" className="space-y-4">

@@ -6,7 +6,7 @@ import { Card, Container, DataTable, Facts, PageHeader, SectionHeading, type Col
 import { QUALITY_TEXT, type Quality } from "@/components/ui/quality";
 import {
   ARMORY_PATH, armoryBoardHref, armoryCharacterPath, armoryGuildPath, armoryHidePath, armoryOn, classTokenOfName, isArmoryRegion,
-  metricOfKey, metricValue, regionLabel, slotLabel, validArmorySlug, ARMORY_BOARDS,
+  metricOfKey, metricValue, regionLabel, slotLabel, slugFromSegment, validArmorySlug, ARMORY_BOARDS,
 } from "@/lib/armory";
 import { armoryStore, type ArmoryCharacter, type ArmoryItem, type ArmoryRank } from "@/lib/armory-store";
 import { classText } from "@/app/players/player-view";
@@ -18,8 +18,9 @@ export const dynamic = "force-dynamic";
 type Params = { region: string; slug: string };
 
 /** The character, null when there is none (or the address is not one), "unreachable" when storage did not answer. */
-const load = cache(async (region: string, slug: string): Promise<ArmoryCharacter | null | "unreachable"> => {
-  if (!isArmoryRegion(region) || !validArmorySlug(slug)) return null;
+const load = cache(async (region: string, segment: string): Promise<ArmoryCharacter | null | "unreachable"> => {
+  const slug = slugFromSegment(segment);
+  if (!isArmoryRegion(region) || slug === null || !validArmorySlug(slug)) return null;
   try { return await armoryStore().character(region, slug); } catch { return "unreachable"; }
 });
 
@@ -64,7 +65,10 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
     return (
       <Container width="reading">
         <PageHeader trail={[{ name: "Home", path: "/" }, { name: "Armory", path: ARMORY_PATH }]} title="Character" />
-        <Unreachable />
+        <div className="space-y-3">
+          <Unreachable />
+          <ArmoryCredit at={null} />
+        </div>
       </Container>
     );
   }

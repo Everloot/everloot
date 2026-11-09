@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { Card, Container, DataTable, Input, PageHeader, SectionHeading, type Column } from "@/components/ui";
 import {
   ARMORY_BOARDS, ARMORY_HIDE_PATH, ARMORY_KEPT_DAYS, ARMORY_METRICS, ARMORY_PATH, ARMORY_SUBMIT_PATH, armoryBoardPath, armoryCharacterPath,
-  armoryGuildPath, armoryOn, classTokenOfName, regionLabel,
+  armoryGuildPath, armoryOn, classTokenOfName, regionLabel, SEARCH_RULE,
 } from "@/lib/armory";
 import { armoryStore, type ArmoryCount, type ArmoryGuildHit, type ArmoryHit } from "@/lib/armory-store";
 import { classText } from "@/app/players/player-view";
@@ -15,7 +15,6 @@ import { ArmoryCredit, armoryMetadata, first, link, newest, NOT_FOUND_METADATA, 
 export const dynamic = "force-dynamic";
 
 const SEARCH_LIMIT = 25;
-const PREFIX = /^[A-Za-z]{2,24}$/;
 
 export async function generateMetadata(): Promise<Metadata> {
   if (!armoryOn()) return NOT_FOUND_METADATA;
@@ -64,8 +63,8 @@ function SearchForm({ id, name, label, value }: { id: string; name: string; labe
 /** What a search found, or why it found nothing. Never throws: a storage failure says so. */
 async function results<T>(raw: string, find: (prefix: string) => Promise<T[]>): Promise<{ prefix: string; rows: T[] | "unreachable" } | "invalid" | null> {
   if (!raw) return null;
-  if (!PREFIX.test(raw)) return "invalid";
-  const prefix = raw.toLowerCase();
+  const prefix = raw.normalize("NFC").toLowerCase();
+  if (!SEARCH_RULE.test(prefix)) return "invalid";
   try { return { prefix, rows: await find(prefix) }; } catch { return { prefix, rows: "unreachable" }; }
 }
 
@@ -95,7 +94,7 @@ export default async function ArmoryPage(props: { searchParams: Promise<{ q?: st
           <SectionHeading id="armory-find">Find a character or a guild</SectionHeading>
           <SearchForm id="armory-q" name="q" label="Character name" value={q} />
           <SearchForm id="armory-guild" name="guild" label="Guild name" value={g} />
-          {(characters === "invalid" || guilds === "invalid") && <p className="text-sm text-fg-2">Type 2 to 24 letters, no digits or spaces.</p>}
+          {(characters === "invalid" || guilds === "invalid") && <p className="text-sm text-fg-2">Type 2 to 24 letters, no digits, spaces or hyphens.</p>}
           {characters && characters !== "invalid" && (
             characters.rows === "unreachable" ? <Unreachable /> : characters.rows.length === 0
               ? <p className="text-sm text-fg-2">No character starts with &ldquo;{characters.prefix}&rdquo; yet. <Link href={ARMORY_SUBMIT_PATH} className={link}>Add one</Link>.</p>

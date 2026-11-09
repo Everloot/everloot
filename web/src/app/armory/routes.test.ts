@@ -66,6 +66,13 @@ test("a hide deletes by region and slug, clears the cached armory pages and conf
   expect(mocks.revalidatePath).toHaveBeenCalledWith("/armory", "layout");
 });
 
+test("a name with accents is accepted and its slug is composed and in lower case", async () => {
+  await hide(form({ region: "eu", name: "E\u0301lodie", surname: "BRÚN" }));
+  expect(mocks.hide).toHaveBeenCalledWith("eu", "élodie-brún");
+  await submit(form({ region: "us", name: "Ølvir", surname: "Stål" }));
+  expect(mocks.enqueue).toHaveBeenCalledWith("us", "character", "ølvir-stål", "website");
+});
+
 test("a submission queues the character from the website, and says when there was nothing to add", async () => {
   const r = await submit(form({ ...good, region: "us" }));
   expect(where(r).pathname + where(r).search).toBe("/armory/submit?done=1");

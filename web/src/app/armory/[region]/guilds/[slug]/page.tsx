@@ -5,7 +5,7 @@ import { cache } from "react";
 import { Container, DataTable, PageHeader, SectionHeading, type Column } from "@/components/ui";
 import {
   ARMORY_PATH, armoryCharacterPath, armoryGuildPath, armoryOn, classTokenOfId, isArmoryRegion, metricValue, raceOfId, regionLabel,
-  UNKNOWN, validArmorySlug,
+  slugFromSegment, UNKNOWN, validArmorySlug,
 } from "@/lib/armory";
 import { armoryStore, type ArmoryGuild, type ArmoryMember } from "@/lib/armory-store";
 import { className, classText } from "@/app/players/player-view";
@@ -16,8 +16,9 @@ export const dynamic = "force-dynamic";
 
 type Params = { region: string; slug: string };
 
-const load = cache(async (region: string, slug: string): Promise<{ guild: ArmoryGuild; roster: ArmoryMember[] } | null | "unreachable"> => {
-  if (!isArmoryRegion(region) || !validArmorySlug(slug)) return null;
+const load = cache(async (region: string, segment: string): Promise<{ guild: ArmoryGuild; roster: ArmoryMember[] } | null | "unreachable"> => {
+  const slug = slugFromSegment(segment);
+  if (!isArmoryRegion(region) || slug === null || !validArmorySlug(slug)) return null;
   try {
     const store = armoryStore();
     const [guild, roster] = await Promise.all([store.guild(region, slug), store.roster(region, slug)]);
@@ -78,7 +79,10 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params> }
     return (
       <Container width="data">
         <PageHeader trail={[{ name: "Home", path: "/" }, { name: "Armory", path: ARMORY_PATH }]} title="Guild" />
-        <Unreachable />
+        <div className="space-y-3">
+          <Unreachable />
+          <ArmoryCredit at={null} />
+        </div>
       </Container>
     );
   }

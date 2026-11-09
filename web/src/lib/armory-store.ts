@@ -1,11 +1,13 @@
-import { ARMORY_RECHECK_DAYS, type ArmoryMetricKey } from "./armory";
+import { z } from "zod";
+import { ARMORY_RECHECK_DAYS, SEARCH_RULE, type ArmoryMetricKey } from "./armory";
 import { authQuery } from "./supabase/server";
 
 /**
  * Where the armory rows live: Supabase in production (the functions of 20261109120000_armory.sql, called with the
  * service key through authQuery), and maps in memory in development, which follow the same rules and forget
  * everything on restart. The pages are the only readers: nothing here feeds an API answer, an export or the MCP tools.
- * Only two writes: a hide, and a character put in the crawler's queue.
+ * Only two writes: a hide, and a character put in the crawler's queue. Every answer is checked against the shape the
+ * contract gives; one that does not match is an error, as storage out of reach is, never a page of "undefined".
  */
 
 export interface ArmoryItem { slot: string; itemId: number; name: string; level: number | null; quality: string | null; inventoryType: string | null }
@@ -21,7 +23,7 @@ export interface ArmoryCharacter {
 
 export interface ArmoryGuild {
   region: string; slug: string; guildId: number; name: string; faction: string; rulesetId: number; ruleset: string;
-  memberCount: number; createdAt: string | null; fetchedAt: string;
+  memberCount: number; createdAt: string | null; fetchedAt: string; checkedAt: string;
 }
 
 export interface ArmoryMember {
@@ -60,102 +62,109 @@ export interface ArmoryStore {
 }
 
 type Query = <T>(path: string, init?: RequestInit) => Promise<T>;
-type Raw = Record<string, unknown>;
 
-const num = (v: unknown): number | null => (v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
-const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
-const rows = (v: unknown): Raw[] => (Array.isArray(v) ? v.filter((r): r is Raw => typeof r === "object" && r !== null) : []);
+// PostgREST sends numeric and bigint as JSON numbers; a numeric string is accepted too, anything else is a mismatch.
+const num = z.union([z.number(), z.string().regex(/^-?\d+(\.\d+)?$/).transform(Number)]);
+const numOrNull = num.nullable();
+const textOrNull = z.string().nullable();
 
-/** Equipment as armory_upsert_characters stores it; an entry without a slot and an item id is left out. */
-function toItems(v: unknown): ArmoryItem[] {
-  return rows(v).flatMap((e) => {
-    const slot = str(e.slot), itemId = num(e.item_id);
-    if (!slot || itemId === null) return [];
-    return [{ slot, itemId, name: str(e.name) ?? `Item ${itemId}`, level: num(e.level), quality: str(e.quality), inventoryType: str(e.inventory_type) }];
-  });
-}
+const ItemRow = z.object({
+  slot: z.string(), item_id: num, name: textOrNull.optional(), level: numOrNull.optional(), quality: textOrNull.optional(), inventory_type: textOrNull.optional(),
+}).transform((e): ArmoryItem => ({
+  slot: e.slot, itemId: e.item_id, name: e.name ?? `Item ${e.item_id}`, level: e.level ?? null, quality: e.quality ?? null, inventoryType: e.inventory_type ?? null,
+}));
 
-export const toCharacter = (r: Raw): ArmoryCharacter => ({
-  region: String(r.region), slug: String(r.slug), characterId: num(r.character_id) ?? 0, name: String(r.name), surname: String(r.surname),
-  level: num(r.level) ?? 0, rulesetId: num(r.ruleset_id) ?? 0, ruleset: String(r.ruleset ?? ""), raceId: num(r.race_id) ?? 0, race: String(r.race ?? ""),
-  classId: num(r.class_id) ?? 0, class: String(r.class ?? ""), faction: String(r.faction ?? ""), gender: str(r.gender),
-  guildSlug: str(r.guild_slug), guildName: str(r.guild_name), lastLogin: str(r.last_login),
-  equippedItemLevel: num(r.equipped_item_level), averageItemLevel: num(r.average_item_level), itemLevel: num(r.item_level), gearScore: num(r.gear_score),
-  honorableKills: num(r.honorable_kills), pvpRank: num(r.pvp_rank), equipment: toItems(r.equipment),
-  fetchedAt: String(r.fetched_at), checkedAt: String(r.checked_at),
-});
+const CharacterRow = z.object({
+  region: z.string(), slug: z.string(), character_id: num, name: z.string(), surname: z.string(), level: num,
+  ruleset_id: num, ruleset: z.string(), race_id: num, race: z.string(), class_id: num, class: z.string(),
+  faction: z.string(), gender: textOrNull, guild_slug: textOrNull, guild_name: textOrNull, last_login: textOrNull,
+  equipped_item_level: numOrNull, average_item_level: numOrNull, item_level: numOrNull, gear_score: numOrNull,
+  honorable_kills: numOrNull, pvp_rank: numOrNull, equipment: z.array(ItemRow), fetched_at: z.string(), checked_at: z.string(),
+}).transform((r): ArmoryCharacter => ({
+  region: r.region, slug: r.slug, characterId: r.character_id, name: r.name, surname: r.surname, level: r.level,
+  rulesetId: r.ruleset_id, ruleset: r.ruleset, raceId: r.race_id, race: r.race, classId: r.class_id, class: r.class,
+  faction: r.faction, gender: r.gender, guildSlug: r.guild_slug, guildName: r.guild_name, lastLogin: r.last_login,
+  equippedItemLevel: r.equipped_item_level, averageItemLevel: r.average_item_level, itemLevel: r.item_level, gearScore: r.gear_score,
+  honorableKills: r.honorable_kills, pvpRank: r.pvp_rank, equipment: r.equipment, fetchedAt: r.fetched_at, checkedAt: r.checked_at,
+}));
 
-const toGuild = (r: Raw): ArmoryGuild => ({
-  region: String(r.region), slug: String(r.slug), guildId: num(r.guild_id) ?? 0, name: String(r.name), faction: String(r.faction ?? ""),
-  rulesetId: num(r.ruleset_id) ?? 0, ruleset: String(r.ruleset ?? ""), memberCount: num(r.member_count) ?? 0,
-  createdAt: str(r.created_at), fetchedAt: String(r.fetched_at),
-});
+const GuildRow = z.object({
+  region: z.string(), slug: z.string(), guild_id: num, name: z.string(), faction: z.string(), ruleset_id: num, ruleset: z.string(),
+  member_count: num, created_at: textOrNull, fetched_at: z.string(), checked_at: z.string(),
+}).transform((r): ArmoryGuild => ({
+  region: r.region, slug: r.slug, guildId: r.guild_id, name: r.name, faction: r.faction, rulesetId: r.ruleset_id, ruleset: r.ruleset,
+  memberCount: r.member_count, createdAt: r.created_at, fetchedAt: r.fetched_at, checkedAt: r.checked_at,
+}));
 
-const toMember = (r: Raw): ArmoryMember => ({
-  characterSlug: String(r.character_slug), name: String(r.name), surname: String(r.surname ?? ""), level: num(r.level),
-  classId: num(r.class_id), raceId: num(r.race_id), rank: num(r.rank), itemLevel: num(r.item_level), gearScore: num(r.gear_score), stored: r.stored === true,
-});
+const MemberRow = z.object({
+  character_slug: z.string(), name: z.string(), surname: z.string(), level: numOrNull, class_id: numOrNull, race_id: numOrNull,
+  rank: numOrNull, item_level: numOrNull, gear_score: numOrNull, stored: z.boolean(),
+}).transform((r): ArmoryMember => ({
+  characterSlug: r.character_slug, name: r.name, surname: r.surname, level: r.level, classId: r.class_id, raceId: r.race_id,
+  rank: r.rank, itemLevel: r.item_level, gearScore: r.gear_score, stored: r.stored,
+}));
 
-const toHit = (r: Raw): ArmoryHit => ({
-  region: String(r.region), slug: String(r.slug), name: String(r.name), surname: String(r.surname ?? ""), level: num(r.level) ?? 0,
-  class: String(r.class ?? ""), race: String(r.race ?? ""), ruleset: String(r.ruleset ?? ""), guildName: str(r.guild_name),
-});
+const HitRow = z.object({
+  region: z.string(), slug: z.string(), name: z.string(), surname: z.string(), level: num, class: z.string(), race: z.string(),
+  ruleset: z.string(), guild_name: textOrNull,
+}).transform((r): ArmoryHit => ({
+  region: r.region, slug: r.slug, name: r.name, surname: r.surname, level: r.level, class: r.class, race: r.race, ruleset: r.ruleset, guildName: r.guild_name,
+}));
 
-const toGuildHit = (r: Raw): ArmoryGuildHit => ({
-  region: String(r.region), slug: String(r.slug), name: String(r.name), faction: String(r.faction ?? ""), ruleset: String(r.ruleset ?? ""), memberCount: num(r.member_count) ?? 0,
-});
+const GuildHitRow = z.object({
+  region: z.string(), slug: z.string(), name: z.string(), faction: z.string(), ruleset: z.string(), member_count: num,
+}).transform((r): ArmoryGuildHit => ({ region: r.region, slug: r.slug, name: r.name, faction: r.faction, ruleset: r.ruleset, memberCount: r.member_count }));
 
-const toBoardRow = (r: Raw): ArmoryBoardRow => ({
-  rank: num(r.rank) ?? 0, region: String(r.region), slug: String(r.slug), name: String(r.name), surname: String(r.surname ?? ""), level: num(r.level) ?? 0,
-  class: String(r.class ?? ""), race: String(r.race ?? ""), faction: String(r.faction ?? ""), ruleset: String(r.ruleset ?? ""), rulesetId: num(r.ruleset_id) ?? 0,
-  guildName: str(r.guild_name), value: num(r.value) ?? 0, fetchedAt: String(r.fetched_at),
-});
+const BoardRow = z.object({
+  rank: num, region: z.string(), slug: z.string(), name: z.string(), surname: z.string(), level: num, class: z.string(), race: z.string(),
+  faction: z.string(), ruleset: z.string(), ruleset_id: num, guild_name: textOrNull, value: num, fetched_at: z.string(),
+}).transform((r): ArmoryBoardRow => ({
+  rank: r.rank, region: r.region, slug: r.slug, name: r.name, surname: r.surname, level: r.level, class: r.class, race: r.race,
+  faction: r.faction, ruleset: r.ruleset, rulesetId: r.ruleset_id, guildName: r.guild_name, value: r.value, fetchedAt: r.fetched_at,
+}));
 
-/** The Supabase store: one RPC per call, through `query` (authQuery, or a fake in tests). */
+const RankRow = z.object({ metric: z.enum(["item_level", "gear_score", "honorable_kills"]), rank: num, of: num });
+
+const CountRow = z.object({
+  region: z.string(), ruleset_id: num, ruleset: z.string(), characters: num, guilds: num, newest: textOrNull,
+}).transform((r): ArmoryCount => ({ region: r.region, rulesetId: r.ruleset_id, ruleset: r.ruleset, characters: r.characters, guilds: r.guilds, newest: r.newest }));
+
+/** The Supabase store: one RPC per call, through `query` (authQuery, or a fake in tests); every answer checked. */
 export function createCloudArmoryStore(query: Query = authQuery): ArmoryStore {
-  const rpc = <T,>(fn: string, args: Record<string, unknown>) => query<T>(`rpc/${fn}`, { method: "POST", body: JSON.stringify(args) });
+  const rpc = async <S extends z.ZodTypeAny>(fn: string, args: Record<string, unknown>, shape: S): Promise<z.output<S>> =>
+    shape.parse(await query<unknown>(`rpc/${fn}`, { method: "POST", body: JSON.stringify(args) }));
   return {
-    async character(region, slug) {
-      const found = rows(await rpc("armory_character", { p_region: region, p_slug: slug }));
-      return found[0] ? toCharacter(found[0]) : null;
-    },
-    async guild(region, slug) {
-      const found = rows(await rpc("armory_guild", { p_region: region, p_slug: slug }));
-      return found[0] ? toGuild(found[0]) : null;
-    },
-    async roster(region, slug) { return rows(await rpc("armory_roster", { p_region: region, p_slug: slug })).map(toMember); },
-    async search(prefix, limit) { return rows(await rpc("armory_search", { p_prefix: prefix, p_limit: limit })).map(toHit); },
-    async searchGuilds(prefix, limit) { return rows(await rpc("armory_search_guilds", { p_prefix: prefix, p_limit: limit })).map(toGuildHit); },
+    async character(region, slug) { return (await rpc("armory_character", { p_region: region, p_slug: slug }, z.array(CharacterRow)))[0] ?? null; },
+    async guild(region, slug) { return (await rpc("armory_guild", { p_region: region, p_slug: slug }, z.array(GuildRow)))[0] ?? null; },
+    async roster(region, slug) { return rpc("armory_roster", { p_region: region, p_slug: slug }, z.array(MemberRow)); },
+    async search(prefix, limit) { return rpc("armory_search", { p_prefix: prefix, p_limit: limit }, z.array(HitRow)); },
+    async searchGuilds(prefix, limit) { return rpc("armory_search_guilds", { p_prefix: prefix, p_limit: limit }, z.array(GuildHitRow)); },
     async board(metric, region, rulesetId, limit) {
-      return rows(await rpc("armory_board", { p_metric: metric, p_region: region, p_ruleset_id: rulesetId, p_limit: limit })).map(toBoardRow);
+      return rpc("armory_board", { p_metric: metric, p_region: region, p_ruleset_id: rulesetId, p_limit: limit }, z.array(BoardRow));
     },
-    async rank(region, slug) {
-      return rows(await rpc("armory_rank", { p_region: region, p_slug: slug })).flatMap((r) => {
-        const rank = num(r.rank), of = num(r.of);
-        return rank === null || of === null ? [] : [{ metric: String(r.metric) as ArmoryMetricKey, rank, of }];
-      });
-    },
-    async counts() {
-      return rows(await rpc("armory_counts", {})).map((r) => ({
-        region: String(r.region), rulesetId: num(r.ruleset_id) ?? 0, ruleset: String(r.ruleset ?? ""),
-        characters: num(r.characters) ?? 0, guilds: num(r.guilds) ?? 0, newest: str(r.newest),
-      }));
-    },
-    async hide(region, slug) { await rpc("armory_hide", { p_region: region, p_slug: slug }); },
+    async rank(region, slug) { return rpc("armory_rank", { p_region: region, p_slug: slug }, z.array(RankRow)); },
+    async counts() { return rpc("armory_counts", {}, z.array(CountRow)); },
+    async hide(region, slug) { await query("rpc/armory_hide", { method: "POST", body: JSON.stringify({ p_region: region, p_slug: slug }) }); },
     async enqueue(region, kind, slug, source) {
-      return (await rpc<unknown>("armory_enqueue", { p_region: region, p_kind: kind, p_slug: slug, p_source: source })) === true;
+      return rpc("armory_enqueue", { p_region: region, p_kind: kind, p_slug: slug, p_source: source }, z.boolean());
     },
   };
+}
+
+/** A store with nothing behind it: every call fails, so each page shows storage as out of reach. */
+export function createUnavailableArmoryStore(reason: string): ArmoryStore {
+  const fail = async (): Promise<never> => { throw new Error(reason); };
+  return { character: fail, guild: fail, roster: fail, search: fail, searchGuilds: fail, board: fail, rank: fail, counts: fail, hide: fail, enqueue: fail };
 }
 
 /** A development store, with the writes the crawler would make so tests and a local server can fill it. */
 export interface MemoryArmoryStore extends ArmoryStore {
   putCharacter(c: ArmoryCharacter): void;
   putGuild(g: ArmoryGuild, members: Omit<ArmoryMember, "itemLevel" | "gearScore" | "stored">[]): void;
+  /** What armory_touch does on a 304: the stored rows count as read now, `fetched_at` and `checked_at` both. */
+  touch(region: string, kind: "character" | "guild", slugs: string[]): number;
   queued(): { region: string; kind: string; slug: string; source: string }[];
 }
-
-const SEARCH_PREFIX = /^[a-z]{2,}$/;
 
 /** The same rules as the SQL, for development without a database. */
 export function createMemoryArmoryStore(now: () => Date = () => new Date()): MemoryArmoryStore {
@@ -170,9 +179,23 @@ export function createMemoryArmoryStore(now: () => Date = () => new Date()): Mem
   const ranked = (metric: ArmoryMetricKey, keep: (c: ArmoryCharacter) => boolean) =>
     [...characters.values()].filter((c) => valueOf(c, metric) !== null && keep(c))
       .sort((a, b) => valueOf(b, metric)! - valueOf(a, metric)! || login(b) - login(a));
+  const prefixOf = (prefix: string) => {
+    const p = prefix.trim().normalize("NFC").toLowerCase();
+    return SEARCH_RULE.test(p) ? p : null;
+  };
   return {
     putCharacter(c) { if (!hides.has(key(c.region, c.slug))) characters.set(key(c.region, c.slug), c); },
     putGuild(g, list) { guilds.set(key(g.region, g.slug), g); members.set(key(g.region, g.slug), list); },
+    touch(region, kind, slugs) {
+      const at = now().toISOString();
+      const rows: Map<string, ArmoryCharacter | ArmoryGuild> = kind === "character" ? characters : guilds;
+      let n = 0;
+      for (const slug of slugs) {
+        const row = rows.get(key(region, slug));
+        if (row) { row.fetchedAt = at; row.checkedAt = at; n += 1; }
+      }
+      return n;
+    },
     queued() { return [...queue.values()]; },
     async character(region, slug) { return characters.get(key(region, slug)) ?? null; },
     async guild(region, slug) { return guilds.get(key(region, slug)) ?? null; },
@@ -183,15 +206,15 @@ export function createMemoryArmoryStore(now: () => Date = () => new Date()): Mem
       });
     },
     async search(prefix, limit) {
-      const p = prefix.trim().toLowerCase();
-      if (!SEARCH_PREFIX.test(p)) return [];
+      const p = prefixOf(prefix);
+      if (!p) return [];
       return [...characters.values()].filter((c) => c.name.toLowerCase().startsWith(p))
         .sort((a, b) => a.name.localeCompare(b.name) || a.surname.localeCompare(b.surname)).slice(0, limit)
         .map((c) => ({ region: c.region, slug: c.slug, name: c.name, surname: c.surname, level: c.level, class: c.class, race: c.race, ruleset: c.ruleset, guildName: c.guildName }));
     },
     async searchGuilds(prefix, limit) {
-      const p = prefix.trim().toLowerCase();
-      if (!SEARCH_PREFIX.test(p)) return [];
+      const p = prefixOf(prefix);
+      if (!p) return [];
       return [...guilds.values()].filter((g) => g.name.toLowerCase().startsWith(p)).sort((a, b) => a.name.localeCompare(b.name)).slice(0, limit)
         .map((g) => ({ region: g.region, slug: g.slug, name: g.name, faction: g.faction, ruleset: g.ruleset, memberCount: g.memberCount }));
     },
@@ -232,24 +255,33 @@ export function createMemoryArmoryStore(now: () => Date = () => new Date()): Mem
     async enqueue(region, kind, slug, source) {
       const qk = `${region}/${kind}/${slug}`;
       if (queue.has(qk) || (kind === "character" && hides.has(key(region, slug)))) return false;
+      // Fresh is checked_at, as the SQL has it: a 304 counts as a read.
       const stored = kind === "character" ? characters.get(key(region, slug)) : guilds.get(key(region, slug));
-      const fresh = stored && now().getTime() - Date.parse(kind === "character" ? (stored as ArmoryCharacter).checkedAt : stored.fetchedAt) < ARMORY_RECHECK_DAYS * 86_400_000;
-      if (fresh) return false;
+      if (stored && now().getTime() - Date.parse(stored.checkedAt) < ARMORY_RECHECK_DAYS * 86_400_000) return false;
       queue.set(qk, { region, kind, slug, source });
       return true;
     },
   };
 }
 
-/** The store this deployment uses: Supabase when its variables are set, memory in development, nothing in production without them. */
+/**
+ * The store this deployment uses: Supabase when its variables are set, memory in development. In production without
+ * them it is a store whose every call fails, so the pages say storage is out of reach; it never throws here.
+ */
 export function armoryStoreFrom(env: Record<string, string | undefined> = process.env, query?: Query): ArmoryStore {
   if (env.SUPABASE_URL?.trim() && env.SUPABASE_SERVICE_ROLE_KEY?.trim()) return createCloudArmoryStore(query);
-  if (env.NODE_ENV === "production") throw new Error("Armory storage is not configured");
+  if (env.NODE_ENV === "production") return createUnavailableArmoryStore("Armory storage is not configured");
   return createMemoryArmoryStore();
 }
 
 const held = globalThis as typeof globalThis & { __everlootArmory?: ArmoryStore };
-/** One store per server process, so the development store keeps its rows between requests. */
-export function armoryStore(): ArmoryStore {
-  return (held.__everlootArmory ??= armoryStoreFrom());
+/** One store per server process, so the development store keeps its rows between requests. Never throws. */
+export function armoryStore(build: () => ArmoryStore = armoryStoreFrom): ArmoryStore {
+  if (held.__everlootArmory) return held.__everlootArmory;
+  try {
+    return (held.__everlootArmory = build());
+  } catch (err) {
+    // Not kept, so the next request tries again.
+    return createUnavailableArmoryStore(err instanceof Error ? err.message : "Armory storage is unavailable");
+  }
 }

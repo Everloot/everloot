@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { armoryCharacter, armoryGuild } from "./armory.fixture";
-import { armoryStoreFrom, createCloudArmoryStore, createMemoryArmoryStore } from "./armory-store";
+import { armoryStore, armoryStoreFrom, createCloudArmoryStore, createMemoryArmoryStore } from "./armory-store";
 
 describe("the Supabase store", () => {
   const fake = (answer: unknown) => {
@@ -26,28 +26,40 @@ describe("the Supabase store", () => {
       [(s) => s.enqueue("eu", "character", "velkara-duskmantle", "website"), "armory_enqueue", { p_region: "eu", p_kind: "character", p_slug: "velkara-duskmantle", p_source: "website" }],
     ];
     for (const [run, fn, args] of cases) {
-      const { query, store } = fake([]);
+      const { query, store } = fake(fn === "armory_enqueue" ? true : []);
       await run(store);
       expect(call(query)).toEqual({ path: `rpc/${fn}`, method: "POST", body: args });
     }
   });
 
-  test("maps the stored row to the page's shape, numbers from strings too, and drops broken equipment", async () => {
-    const { store } = fake([{
+  const stored = {
       region: "eu", slug: "velkara-duskmantle", character_id: 9001, name: "Velkara", surname: "Duskmantle", level: 60, ruleset_id: 2, ruleset: "Normal",
       race_id: 8, race: "Troll", class_id: 3, class: "Hunter", faction: "Horde", gender: "FEMALE", guild_slug: "ember-wardens", guild_name: "Ember Wardens",
       guild_id: 77, last_login: null, equipped_item_level: 58, average_item_level: 58, item_level: "57.41", gear_score: null, honorable_kills: 12, pvp_rank: 0,
-      equipment: [{ slot: "HEAD", item_id: 16846, name: "Giantstalker's Helmet", level: 66, quality: "EPIC", inventory_type: "HEAD" }, { name: "no slot" }],
+      equipment: [{ slot: "HEAD", item_id: 16846, name: "Giantstalker's Helmet", level: 66, quality: "EPIC", inventory_type: "HEAD" }],
       fetched_at: "2026-11-09T10:00:00+00:00", checked_at: "2026-11-09T10:00:00+00:00",
-    }]);
-    const c = await store.character("eu", "velkara-duskmantle");
+  };
+
+  test("maps the stored row to the page's shape, a numeric string too", async () => {
+    const c = await fake([stored]).store.character("eu", "velkara-duskmantle");
     expect(c).toMatchObject({ itemLevel: 57.41, gearScore: null, pvpRank: 0, lastLogin: null, guildSlug: "ember-wardens" });
     expect(c!.equipment).toEqual([{ slot: "HEAD", itemId: 16846, name: "Giantstalker's Helmet", level: 66, quality: "EPIC", inventoryType: "HEAD" }]);
   });
 
+  test("an answer of another shape is an error, never a page of undefined", async () => {
+    const { name: _name, ...noName } = stored;
+    for (const bad of [[noName], [{ ...stored, level: "sixty" }], [{ ...stored, equipment: [{ name: "no slot" }] }], [{ ...stored, fetched_at: null }], { rows: [] }, null]) {
+      await expect(fake(bad).store.character("eu", "velkara-duskmantle")).rejects.toThrow();
+    }
+    await expect(fake([{ metric: "dps", rank: 1, of: 2 }]).store.rank("eu", "a-b")).rejects.toThrow();
+    await expect(fake([{ rank: 1, region: "eu" }]).store.board("item_level", null, null, 10)).rejects.toThrow();
+    await expect(fake([{ character_slug: "a-b", name: "A", surname: "B", level: 1, class_id: 1, race_id: 1, rank: 0, item_level: null, gear_score: null }]).store.roster("eu", "x")).rejects.toThrow();
+    await expect(fake("yes").store.enqueue("eu", "character", "a-b", "website")).rejects.toThrow();
+  });
+
   test("no row is null, and only a true enqueue answer counts as queued", async () => {
     expect(await fake([]).store.character("eu", "a-b")).toBeNull();
-    expect(await fake(null).store.guild("eu", "a-b")).toBeNull();
+    expect(await fake([]).store.guild("eu", "a-b")).toBeNull();
     expect(await fake(true).store.enqueue("eu", "character", "a-b", "website")).toBe(true);
     expect(await fake(false).store.enqueue("eu", "character", "a-b", "website")).toBe(false);
   });
@@ -57,11 +69,24 @@ describe("the Supabase store", () => {
     await expect(store.counts()).rejects.toThrow("down");
   });
 
-  test("picked when Supabase is configured; memory in development; refused in production without it", () => {
-    expect(() => armoryStoreFrom({ NODE_ENV: "production" })).toThrow();
+  test("picked when Supabase is configured; memory in development; in production without it, every call fails", async () => {
+    const missing = armoryStoreFrom({ NODE_ENV: "production" });
+    await expect(missing.counts()).rejects.toThrow("not configured");
+    await expect(missing.hide("eu", "a-b")).rejects.toThrow("not configured");
     expect(armoryStoreFrom({ NODE_ENV: "development" })).toHaveProperty("putCharacter");
     expect(armoryStoreFrom({ SUPABASE_URL: "https://x.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "k" })).not.toHaveProperty("putCharacter");
   });
+});
+
+test("armoryStore never throws: a factory that fails gives a store whose calls fail, and is tried again next time", async () => {
+  const held = globalThis as { __everlootArmory?: unknown };
+  delete held.__everlootArmory;
+  const failing = armoryStore(() => { throw new Error("no key"); });
+  await expect(failing.counts()).rejects.toThrow("no key");
+  expect(held.__everlootArmory).toBeUndefined();
+  const memory = createMemoryArmoryStore();
+  expect(armoryStore(() => memory)).toBe(memory);
+  delete held.__everlootArmory;
 });
 
 describe("the memory store", () => {
@@ -113,6 +138,28 @@ describe("the memory store", () => {
     expect(await s.enqueue("eu", "character", "velkara-duskmantle", "website")).toBe(true);
     expect(await s.enqueue("eu", "character", "velkara-duskmantle", "website")).toBe(false);
     expect(s.queued()).toEqual([{ region: "eu", kind: "character", slug: "velkara-duskmantle", source: "website" }]);
+  });
+
+  test("a guild is fresh by checked_at, and a 304 touch counts as a read for both times", async () => {
+    const s = filled();
+    s.putGuild(armoryGuild({ fetchedAt: "2026-10-12T00:00:00.000Z", checkedAt: "2026-11-09T00:00:00.000Z" }), []);
+    expect(await s.enqueue("eu", "guild", "ember-wardens", "seed")).toBe(false);
+    s.putGuild(armoryGuild({ slug: "wardens", fetchedAt: "2026-10-12T00:00:00.000Z", checkedAt: "2026-10-12T00:00:00.000Z" }), []);
+    expect(s.touch("eu", "guild", ["wardens", "not-stored"])).toBe(1);
+    expect(await s.guild("eu", "wardens")).toMatchObject({ fetchedAt: "2026-11-10T00:00:00.000Z", checkedAt: "2026-11-10T00:00:00.000Z" });
+    expect(await s.enqueue("eu", "guild", "wardens", "seed")).toBe(false);
+    s.putCharacter(armoryCharacter({ slug: "orla-fenwick", region: "us", checkedAt: "2026-10-01T00:00:00Z", fetchedAt: "2026-10-01T00:00:00Z" }));
+    expect(s.touch("us", "character", ["orla-fenwick"])).toBe(1);
+    expect(await s.character("us", "orla-fenwick")).toMatchObject({ fetchedAt: "2026-11-10T00:00:00.000Z", checkedAt: "2026-11-10T00:00:00.000Z" });
+  });
+
+  test("search takes letters of any script", async () => {
+    const s = filled();
+    s.putCharacter(armoryCharacter({ slug: "élodie-brun", name: "Élodie", surname: "Brun" }));
+    s.putGuild(armoryGuild({ slug: "wardens", name: "Wardens" }), []);
+    expect((await s.search("él", 25)).map((h) => h.slug)).toEqual(["élodie-brun"]);
+    expect((await s.search("É", 25))).toEqual([]);
+    expect((await s.searchGuilds("war", 25)).map((g) => g.slug)).toEqual(["wardens"]);
   });
 
   test("search wants two letters and orders by name; counts group by region and ruleset", async () => {
