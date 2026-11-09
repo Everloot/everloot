@@ -15,6 +15,13 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Addon: item tooltips and `/everloot price` end with up to three muted lines from this install's own rows: "Sold by
+  <NPC> (your sighting)" from the vendor windows it opened, "Reagent for n recipes you know" from its recipe colours,
+  and "Seen in <zone>" for a drop source it met. Without own rows the price file's public vendors and reagent count
+  show instead, when the file carries them. Display only; nothing recorded or uploaded changes.
+- Companion: the EverlootPrices slot file can carry a `sources` block after the drops (public vendor NPC ids and a
+  reagent-of count per item, checksummed like the drops, with the vendors' names outside the checksum). The block is
+  optional: a file without it is read as before. The Desktop App does not write it yet.
 - Addon: the Gold tab's Overview chart follows the period buttons (today, 7 days, 30 days, or all for the ledger's
   90 days), one bar a day; Sales shows the auction house's cut beside each sale's deposit, and the by-item rows show
   sales per day over the period and the last sold day. Display only; nothing recorded or uploaded changes.
