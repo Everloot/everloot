@@ -4,8 +4,8 @@ Decided 2026-10-18. Everloot keeps three tiers, each for one kind of data, and e
 placed by the rule below before any code is written for it. The point is that when data starts arriving
 (uploads, game builds, market scans, the census, keys) nobody has to guess where it lives, who may
 write it, who may read it, and how it is protected. Companion to [architecture.md](architecture.md)
-(how the parts fit), [DATA_POLICY.md](DATA_POLICY.md) (what we publish) and [ASSETS.md](ASSETS.md)
-(the game-file buckets).
+(how the parts fit), [DATA_POLICY.md](DATA_POLICY.md) (what we publish), [ASSETS.md](ASSETS.md)
+(the game-file buckets) and [ENVIRONMENT.md](ENVIRONMENT.md) (the names of the variables and secrets each tier is reached with).
 
 ## The three tiers
 
@@ -66,6 +66,8 @@ DATA_POLICY.
 | Knowledge release (lore, entities, rollups, catalogs) | Artifact | `everloot-uploads` bucket, `knowledge/<release>.sqlite` + manifest | Maintainer release job | Through pages, MCP, APIs | Nightly mirror |
 | Raw uploads | Artifact | `everloot-uploads`, `uploads/<date>/<id>.json` | `/api/intake` | No, ever | Nightly mirror |
 | Corpus snapshot | Artifact | `everloot-uploads`, `snapshots/corpus.json` | Cron every 10 min | Sanitized copy at `/api/corpus/public` | Nightly mirror |
+| Market rollup (full auction scans) | Artifact | `everloot-uploads`, `snapshots/market.json` | The same cron, `writeMarket` | Values only for a realm and item day that 3 reporters scanned (one upload address each; one of Everloot's own installs counts alone), through `/tools/auctions`, item pages, `/api/market/prices` and the `market_value` tool | Nightly mirror |
+| Census (`population`) | Artifact | `everloot-uploads`, `snapshots/census.json` | The same cron, `writeCensus` | Counts only at 10 characters from 3 installs and 3 addresses, through `/census`, `/rankings` and the `population` tool | Nightly mirror |
 | Game-file facts and tooltips | Artifact | `everloot-game-data` (private), per build | Maintainer upload | Facts through pages, never the files | Not yet (see gaps) |
 | Icons, frames, maps | Artifact | `everloot-assets` (public at assets.everloot.app), per build | Maintainer upload | Yes, art only, with CORS limited to the site | Not yet (see gaps) |
 | Generated game-data layer, talents, raid, map JSON | Git | `web/src/data/game-data/`, `web/src/data/talents/` | Build watch and maintainers by PR | Yes through pages | Git |
@@ -73,15 +75,13 @@ DATA_POLICY.
 | Grants, suppressions | Live rows | `publication_grants`, `character_suppressions` | Sharing routes | Govern what is public | Nightly dump + offsite S3 |
 | Quotas, usage, keys | Live rows | `intake_quota_buckets`, `usage_counters`, `api_keys`, `api_key_usage` | Guard and metrics | No; `/status` shows aggregates | Nightly dump + offsite S3 |
 | Changes and ecosystem feeds, blue posts | Git + artifact | Generated files by the scheduled workflows | Actions | Yes | Git |
-| Bulk export (corpus, drops, edges, items as NDJSON + index) | Artifact | A public bucket of its own, one folder per export, `latest.json` as the pointer | `npm run export-bulk` then `scripts/upload-bulk.mjs` | Yes, once the bucket exists (RELEASING.md) | Add to the mirror when created |
+| Bulk export (corpus, drops, edges, items as NDJSON + index) | Artifact | The public bulk bucket, served at `data.everloot.app`, one folder per export, `latest.json` as the pointer | `npm run export-bulk` then `scripts/upload-bulk.mjs`, by hand | Yes, live: `data.everloot.app/latest.json` names the current export (RELEASING.md) | Not yet: `backup-r2.mjs` mirrors the uploads bucket only |
 | Protocol package | Git + npm | `packages/protocol`, committed `dist/` and `schema/` | PR; publish by hand | Yes | Git |
 
 Coming datasets, placed now so the code is written to the right spot:
 
 | Dataset | Tier | Place |
 |---|---|---|
-| Market scans and sale ledgers | Observation (rule 3) | Record kinds in the protocol, raw in R2, rollups in the release; a per-day price object in R2 for bulk |
-| Census (`population`) | Observation (rule 3) | Record kind, raw in R2, published at the 10-character and 3-install threshold through the release |
 | Saved builds (talent codes, names, notes, character labels) | Live rows (rule 4) | Supabase (`saved_builds`, `build_characters`), per account, private unless the link is shared; deleted with the account. A code link (`#plan=`, `/b/<codes>`) still stores nothing |
 | Profiles (handle, display name, status, main and active character, public profile choices) | Live rows (rule 4) | Supabase (`user_profiles`), one row per account, private unless the player turns the public profile on; deleted with the account |
 | Trait tables, spell effects per build | Blizzard's (rule 2) | Private bucket per build; the reviewed JSON layer in git |

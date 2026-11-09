@@ -175,3 +175,20 @@ test("an install verifies the zip against the release's SHA256SUMS and refuses a
   const unlisted = vi.fn(async () => new Response("deadbeef  nope.zip"));
   await expect(installAddon({ version: "0.3.3", endpoint: "https://everloot.app", addonsDir: addons, send: unlisted as unknown as typeof fetch })).rejects.toThrow(/not listed/);
 });
+
+test("the app installs a newer addon itself only when the switch is on, the addon is there and no install is running", async () => {
+  const { addonUpdateAction } = await import("../src/main/addon");
+  const on = { autoUpdate: true, installed: "0.3.17", latest: "0.3.20", attempted: new Set<string>(), installing: false };
+  expect(addonUpdateAction(on)).toBe("install");
+  expect(addonUpdateAction({ ...on, autoUpdate: false })).toBe("notice");
+  // Never into a folder where the player has not installed the addon.
+  expect(addonUpdateAction({ ...on, installed: null })).toBe("none");
+  expect(addonUpdateAction({ ...on, latest: null })).toBe("none");
+  expect(addonUpdateAction({ ...on, latest: "0.3.17" })).toBe("none");
+  expect(addonUpdateAction({ ...on, installed: "0.3.21" })).toBe("none");
+  // A version that already failed once this run is offered, not tried again.
+  expect(addonUpdateAction({ ...on, attempted: new Set(["0.3.20"]) })).toBe("notice");
+  expect(addonUpdateAction({ ...on, attempted: new Set(["0.3.19"]) })).toBe("install");
+  // A manual install or another check is already writing the folder.
+  expect(addonUpdateAction({ ...on, installing: true })).toBe("none");
+});

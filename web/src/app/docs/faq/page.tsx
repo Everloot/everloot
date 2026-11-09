@@ -8,7 +8,7 @@ import { REPO_URL } from "@/lib/source";
 import { CREDIT_LINE } from "@everloot/protocol";
 
 export const metadata: Metadata = pageMetadata({
-  title: "Everloot FAQ",
+  title: "FAQ",
   description: "Short answers to what players and developers ask about Everloot: cost, accounts and keys, the addon, missing facts, data age, reuse and how to report a mistake.",
   path: "/docs/faq",
 });

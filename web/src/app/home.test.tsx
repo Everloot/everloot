@@ -11,6 +11,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {} }) }));
 
 import Home from "./page";
 import { loadTimeline } from "@/lib/changes";
+import { toolHref, tools } from "@/data/tools";
 
 const html = renderToStaticMarkup(await Home());
 
@@ -18,12 +19,17 @@ test("no ticker, aurora, scroll reveal or glow", () => {
   expect(html).not.toMatch(/ticker|aurora|reveal|cta-glow/);
 });
 
-test("tool status keeps its meaning: a tool still collecting shows the 0-of-3 meter, a planned one says so, a live one carries no label", () => {
+test("tool status keeps its meaning: a tool still collecting shows the 0-of-3 meter, a live one carries no label, and only a coming-soon tool says Planned", () => {
   const list = html.slice(html.indexOf('id="tools-title"'), html.indexOf('id="agree"'));
   const row = (href: string) => list.slice(list.indexOf(`href="${href}"`), list.indexOf("</a>", list.indexOf(`href="${href}"`)));
   expect(row("/tools/guild-board")).toContain('aria-label="0 of 3 installs agree"');
-  expect(row("/tools/farming-routes")).toMatch(/text-muted[^"]*"[^>]*>Planned</);
+  // Farming is live and collecting (#826): it carries the meter, not the Planned label; the sitemap keys on the same status.
+  expect(row("/tools/farming-routes")).toContain('aria-label="0 of 3 installs agree"');
+  expect(row("/tools/farming-routes")).not.toContain("Planned");
   expect(row("/tools/raid")).not.toMatch(/installs agree|Planned/);
+  const planned = tools.filter((t) => t.status === "coming-soon").map(toolHref);
+  for (const href of planned) expect(row(href), href).toMatch(/text-muted[^"]*"[^>]*>Planned</);
+  expect((list.match(/>Planned</g) ?? []).length).toBe(planned.length);
 });
 
 test("no emoji or pictographs", () => {

@@ -23,14 +23,14 @@ Flags are read from `web/wrangler.jsonc` vars. Applied database migrations were 
 
 | Surface | Flag (production) | What it shows | Source |
 | --- | --- | --- | --- |
-| `/players/<ruleset>/<realm>/<name>` | `EVERLOOT_PLAYER_PAGES=1`; `EVERLOOT_PLAYER_PAGES_INDEX` unset, so noindex | Name, class, race, level, guild, realm, last-seen day; "Hide this character" | `player_seen` sightings, including other players the addon saw (`addon/modules/players.lua`, `web/src/lib/player-pages.ts`) |
+| `/players/<ruleset>/<realm>/<name>` (redirects to `/characters/...` since 2026-11-05, #773) | `EVERLOOT_PLAYER_PAGES=1`; `EVERLOOT_PLAYER_PAGES_INDEX` unset, so noindex | Name, class, race, level, guild, realm, last-seen day; "Hide this character" | `player_seen` sightings, including other players the addon saw (`addon/modules/players.lua`, `web/src/lib/player-pages.ts`) |
 | `/players/opt-out` | same | Hides and deletes a character, no account | `character_suppressions` |
 | `/u/<handle>` | `EVERLOOT_PROFILES=1` | Ticked character labels (name, class, realm), shared builds, status | Typed labels, not game data (`web/src/app/u/[handle]/page.tsx`) |
 | `/me/characters/<id>` | `EVERLOOT_SAVED_BUILDS=1` | One typed label's saved builds; owner only | `build_characters` |
 | `POST /api/me/characters/link-codes`, `POST .../links` | `EVERLOOT_CHARACTER_LINKS` unset (404) | Code, then link rows | `web/src/lib/character-links.ts`; no account UI renders it |
 | `character_links`, `character_visibility`, `set_visibility`, `public_character()` | none; unwired | `page_public`, `show_gear/collections/gold/guild`, `ranked_*`, `indexable` default false | `supabase/migrations/20261021190000_character_links.sql` |
 | `/guilds/...` | `EVERLOOT_GUILDS=1` | Guild kills agreed by 2 installs, roster | `guild_kill` rows; no gear (`kb/src/guilds.ts`) |
-| Desktop "Characters" | local only | Gold, gear and item level per named character; keyed progress counts; talent points by class | `desktop/src/main/characters.ts` reads the save file; nothing uploaded |
+| Desktop "Characters" | local only | Gold, gear and item level per named character; keyed progress counts, professions and this week's raid lockouts; talent points by class | `desktop/src/main/characters.ts` reads the save file; nothing uploaded |
 | Social cards | n/a | Text-and-shapes cards (`renderCard`, `renderBuildCard`); no game art | `web/src/lib/og-card.tsx`, six `opengraph-image.tsx` routes; none per player |
 
 What the addon records about the player's own character, and whether it can be tied to a named, linked character:
@@ -40,10 +40,10 @@ What the addon records about the player's own character, and whether it can be t
 | Identity | `character_link` (schema only; no `/everloot link` command yet), `census_self`, `player_seen` | GUID in transit; name and realm | Link: link endpoint only. Census: hashed. Player: when the owner allows it |
 | Equipped gear | `gear_snapshot`, `gear.lua` (16 slots, item id, item level, hourly) | `character`, `realm` | Held by Desktop/CLI; web upload only with an operator-issued grant (`kb/src/publication.ts`) |
 | Talents | `talent_snapshot`, `talents.lua` (nodes, Blizzard loadout string) | None: class and level only | Anonymous intake; not shown per character anywhere |
-| Professions | None. The addon window reads `GetProfessions` locally (`window.lua`); `recipe_observed` is anonymous | None | n/a |
+| Professions | `profession_owned`, `owned.lua` (with completion on; S5 groundwork). The addon window also reads `GetProfessions` (`window.lua`); `recipe_observed` is anonymous | Opaque 8-hex `characterKey`, as completion | Never: no uploader sends it and intake has no schema for it; Desktop only |
 | Reputations, achievements, titles, quests | `*_owned`, `completion.lua` (off until `/everloot completion on`) | Opaque 8-hex `characterKey`; the link row carries `completionKey` to join it | `collection` grant only |
 | Collections (mounts, pets) | `collection_owned` is in the schema and allowlist; no addon module writes it | n/a | n/a |
-| Raid lockouts | `raid_lockout`, `guild.lua` (`GetSavedInstanceInfo`) | Guild name only, not the character | `guild` grant only |
+| Raid lockouts | `raid_lockout`, `guild.lua` (`GetSavedInstanceInfo`); `lockout_owned`, `owned.lua` (with completion on; S5 groundwork) | `raid_lockout`: guild name only. `lockout_owned`: opaque `characterKey` | `raid_lockout`: `guild` grant only. `lockout_owned`: never; Desktop only |
 | Boss kills | `encounter` (anonymous), `guild_kill` (guild's) | None | Anonymous; guild rollup |
 | Guild | `player_seen.guild`, `guild_snapshot` | Name on `player_seen` | As above |
 | Gold | `gold_snapshot`, `money_event` | `character`, `realm` | `gold` grant only |
@@ -52,8 +52,8 @@ Shown nowhere today: a linked character's own page, its gear, talents, professio
 
 ## 2. The showcase
 
-Address: `/characters/<ruleset>/<realm>/<name>`, using the same slug rules as `playerPath`. A separate page, because
-the ADR says a link never adds data to a sighting page. It renders only from `public_character()` and the linked
+Address: `/characters/<ruleset>/<realm>/<name>`, using the same slug rules as `playerPath`. Since 2026-11-05 (#773) the
+sighting is a second section on this address, never mixed into the showcase. It renders only from `public_character()` and the linked
 account's own synced rows. Nothing comes from `players`, the census or other installs. No row, a frozen link or a
 hidden character returns 404 with noindex.
 
@@ -118,8 +118,8 @@ on review. "Carlos" means it waits on a flag flip, an applied migration or a pol
 | S2 | Link Step 1 (HUB-P02/P03): `/everloot link`, Desktop sender, owner list and unlink | M | Code can merge; turning it on needs D0 wording, D8 dispute contact, migration readback, `EVERLOOT_CHARACTER_LINKS=1` | Code only |
 | S3 | Identity-only public page and real card | M | Carlos: public-character contract, a DATA_POLICY section, `EVERLOOT_SHOWCASE=1` | No (launch week at best) |
 | S4 | Planned builds on the page | S | Carlos: apply the `build_characters.link_id` migration | No |
-| S5 | Private own-character sync: gear, talents, reputations, professions, lockouts | L | Carlos: D1 and D9, sources/consent migration, `sync:own` scope | No |
-| S6 | Public sections and per-section switches | M | Carlos: publication rule for linked characters; migration for new `show_*` columns | No |
+| S5 | Private own-character sync: gear, talents, reputations, professions, lockouts | L | D1 accepted and D9 resolved (2026-11-06). Code built behind `EVERLOOT_PRIVATE_SYNC`; Carlos: apply `20261106120000_private_sync.sql`, approve the DATA_POLICY draft, set the switch | No |
+| S6 | Public sections and per-section switches | M | Rule accepted 2026-11-06; `show_*` columns in the same migration. Carlos: as S5, plus a /privacy line before the switch | No |
 | S7 | Raid section | M | After S5 and S6; target before 12/09 | No |
 
 **S0.** `web/src/lib/character-showcase.ts` builds a typed `Showcase` (sections, states, dates) from plain inputs.
@@ -156,10 +156,33 @@ guild-scoped `raid_lockout`. Gear already names the character. Owner sees the pa
 from another account, a revoked source or anonymous intake never show; a missing client call shows `unsupported`;
 unlink deletes the derived rows (D3).
 
+Done ahead of D1/D9 (groundwork, local only): the addon writes `profession_owned` (characterKey, class, level,
+profession, skillLine, rank, maxRank) and `lockout_owned` (characterKey, class, level, instance, instanceId,
+difficultyId, difficulty, bossesKilledCount, bossesTotal, resetAt) in `addon/modules/owned.lua`, under the completion key and
+switch, latest state only. No uploader sends them (`LOCAL_ONLY_KINDS` in `web/src/lib/upload-batches.ts`), the protocol
+has no schema for them so intake refuses them, and the Desktop App's Characters page shows them on the keyed rows. None of it is checked in game yet (PROBE-01).
+
+Built (2026-11-06) behind `EVERLOOT_PRIVATE_SYNC` (off), which also needs `EVERLOOT_CHARACTER_LINKS`. The model follows
+D9 as resolved: the link decides, not the install, so there are no sources and no `contested` state. Per link and
+category (`gear`, `talents`, `professions`, `reputations`, `raids`, `achievements`) the database keeps the latest capture
+only, newest wins, a duplicate is a no-op, and the install is a keyed hash on the fact. `profession_owned` and
+`lockout_owned` are not in `@everloot/protocol` (the intake must keep refusing them); the sync endpoint defines their
+shapes from the addon's rows in `web/src/lib/private-sync.ts`. Talent rows carry no character key, so a request groups
+rows by character (`{ name, realm, records }`) and the link is found by name and realm among the account's own links.
+Routes: `POST /api/me/characters/sync` (sync:own key), `GET`/`POST /api/me/characters/links/<id>/sync` (consent,
+session and Origin), and the section switches on the existing visibility route. The owner's preview is
+`/me/characters/links/<id>`. Not built yet: the Desktop sender, account-page controls, `characterKey` on
+`talent_snapshot`, and the talent share code (the section shows points per tree from the class catalog, and no tree
+when a node is unknown). To turn it on: [private sync switch-on](../2026-11-06-private-sync-switch-on.md).
+
 **S6.** The switches turn on each public section. Today only an operator grant can publish owned rows; S6 needs a
 rule that the owner's own switch on a live link publishes their own synced rows. Migration: `show_talents`,
 `show_professions`, `show_reputations`, `show_raids` (or reuse `show_collections` for reputations). Tests: each
 section appears only with its switch on; switching off removes it from the page and the card on the next request.
+Built (2026-11-06) with S5: `public_character_facts` returns only switched-on, consented categories of a link that
+`public_character` would return, and the page and both cards read it on every request. Gear and collections reuse
+`show_gear` and `show_collections`; the migration adds `show_talents`, `show_professions`, `show_reputations` and
+`show_raids`.
 
 **S7.** Lockout and guild kills sections plus the card's raid block, ready for 2026-12-09. Tests: kills from
 another character on the same account never count; the guild block says it is the guild's; reset rolls over.
@@ -187,7 +210,6 @@ Sweeping all characters on a realm is not part of it.
   Counting an owner-published equipped item as a report is a separate decision.
 - **Talent code conversion.** Mapping `talent_snapshot` node ids to the calculator's code is assumed, not tested;
   S5 starts with a fixture from a real snapshot.
-- **Two pages per character.** Sightings at `/players/...`, the owner's page at `/characters/...`. Whether one
-  links to the other is for Carlos; the ADR forbids mixing their data.
+- **Two pages per character.** Decided 2026-11-05 (#773): one address per character, `/characters/<ruleset>/<realm>/<name>`, with the owner's showcase and the sighting as separate sections; `/players/...` redirects there.
 - **Schedule.** S3 needs S2 turned on, which needs D8. If D8 slips past 11/04, the sample page (S0, S1) is what the
   site shows on launch day.

@@ -1,5 +1,5 @@
 import { agreedItemNames } from "../../../kb/src/item-page";
-import { loadItemNames, type ItemNames } from "@/lib/game-assets";
+import { loadItemNames, PRIVATE_UNREACHABLE, type ItemNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
 import { loadItemFacts } from "@/lib/rollup-compute";
 
@@ -21,15 +21,18 @@ export interface ShownNames {
    * item name rule (docs/DATA_POLICY.md). Any other id may be unreleased content.
    */
   showsTip(id: number): boolean;
+  /** Upload storage or the private bucket could not be read: names may be missing (components/EdgeDegraded.tsx). */
+  degraded: boolean;
 }
 
 export async function loadShownNames(): Promise<ShownNames> {
-  const [facts, matched] = await Promise.all([loadItemFacts(), loadItemNames(CLIENT_LAYER.build.version)]);
+  const [facts, read] = await Promise.all([loadItemFacts(), loadItemNames(CLIENT_LAYER.build.version)]);
+  const matched = read === PRIVATE_UNREACHABLE ? null : read;
   const agreed = facts.unreachable ? new Map<number, string>() : agreedItemNames(facts);
   // The same test as itemPage's name, drops and pins (pins come only with a drop), in one pass.
   const dropped = new Set(facts.unreachable ? [] : facts.rates.filter((r) => r.public).map((r) => r.itemId));
   return {
-    facts, agreed, matched,
+    facts, agreed, matched, degraded: facts.unreachable || read === PRIVATE_UNREACHABLE,
     named: { has: (id) => agreed.has(id) || Boolean(matched?.names.has(id)) },
     showsTip: (id) => agreed.has(id) || dropped.has(id) || Boolean(matched?.names.has(id)),
   };

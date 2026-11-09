@@ -3,12 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, Container, DataTable, PageHeader, SectionHeading, type Column } from "@/components/ui";
 import { dataAgeLabel } from "@/lib/data-age";
-import { factionLabel, guildPath, guildsOn, hideGuildPath, loadGuildPage, type GuildMember } from "@/lib/guilds";
+import { factionLabel, guildPath, guildsOn, hideGuildPath, loadGuildPage, realmPath, type GuildMember } from "@/lib/guilds";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
-import type { AgreedKill, GuildProgress } from "../../../../../../kb/src/guilds";
+import type { AgreedKill } from "../../../../../../kb/src/guilds";
 import { className, classText } from "../../../players/player-view";
-import { day, guildRobots, link, number, Progress, sourceLabel } from "../../parts";
+import { day, decodeSlug, guildRobots, InstanceCard, link, memberCountLine, number, Progress, sourceLabel } from "../../parts";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,8 @@ type Params = { params: Promise<{ slug: string; guild: string }> };
 export async function generateMetadata(props: Params): Promise<Metadata> {
   if (!guildsOn()) return {};
   const { slug, guild } = await props.params;
-  const loaded = await loadGuildPage(decodeURIComponent(slug), decodeURIComponent(guild));
+  const [realm, name] = [decodeSlug(slug), decodeSlug(guild)];
+  const loaded = realm === null || name === null ? null : await loadGuildPage(realm, name);
   if (!loaded || loaded === "unreachable") return { robots: { index: false, follow: false } };
   const { summary } = loaded.page;
   return {
@@ -59,7 +60,9 @@ const memberMeta = (m: GuildMember) => [`${m.level} ${className(m.class)}`, m.ra
 export default async function GuildPage(props: Params) {
   if (!guildsOn()) notFound();
   const { slug, guild } = await props.params;
-  const loaded = await loadGuildPage(decodeURIComponent(slug), decodeURIComponent(guild));
+  const [realm, name] = [decodeSlug(slug), decodeSlug(guild)];
+  if (realm === null || name === null) notFound();
+  const loaded = await loadGuildPage(realm, name);
   if (loaded === null) notFound();
   if (loaded === "unreachable") {
     return (
@@ -76,18 +79,17 @@ export default async function GuildPage(props: Params) {
   const faction = factionLabel(summary.faction);
   const lastActivity = [summary.latestKillAt?.slice(0, 10), summary.lastSeen].filter((d): d is string => Boolean(d)).sort().at(-1);
   const officerRoster = board?.roster ?? [];
-  // The officers' count when they published one; otherwise how many characters the page lists, said as what it is.
-  const memberCount = board?.memberCount
-    ? `${number(board.memberCount)} ${board.memberCount === 1 ? "member" : "members"}`
-    : officerRoster.length ? `${number(officerRoster.length)} on the officers' roster`
-    : members.length ? `${number(members.length)} ${members.length === 1 ? "character" : "characters"} seen` : null;
+  const memberCount = memberCountLine(board, members.length);
   const withAlts = members.some((m) => m.alts.length > 0);
 
   return (
     <Container width="data">
       <article>
         <PageHeader
-          trail={[{ name: "Home", path: "/" }, { name: "Guilds", path: "/guilds" }, { name: summary.guildName, path: guildPath(summary.realm, summary.guildName) }]}
+          trail={[
+            { name: "Home", path: "/" }, { name: "Guilds", path: "/guilds" }, { name: summary.realm, path: realmPath(summary.realm) },
+            { name: summary.guildName, path: guildPath(summary.realm, summary.guildName) },
+          ]}
           title={summary.guildName}
           lede={`${faction ? `${faction} guild` : "Guild"} on ${summary.realm}`}
           meta={
@@ -164,24 +166,3 @@ export default async function GuildPage(props: Params) {
   );
 }
 
-/** One instance: bosses killed out of its bosses, then each boss with the day it fell and who reported it; unkilled bosses muted. */
-function InstanceCard({ progress }: { progress: GuildProgress }) {
-  const id = `instance-${progress.instanceMapId}`;
-  return (
-    <Card as="section" padding="none" aria-labelledby={id}>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 pt-4 sm:px-6 sm:pt-5">
-        <h3 id={id} className="text-h2-sm text-fg">{progress.instanceName}</h3>
-        <Progress killed={progress.killed} bosses={progress.bosses} />
-      </div>
-      <ol className="mt-3 border-t border-line">
-        {progress.list.map((b) => (
-          <li key={b.encounterId} className={`flex min-h-row items-center gap-3 border-b border-line px-4 text-cell last:border-b-0 sm:px-6 ${b.killed ? "text-fg" : "text-muted"}`}>
-            <span className="min-w-0 flex-1 truncate">{b.name}</span>
-            {b.killed && <span className="shrink-0 text-cell-2 text-fg-2">{b.killedAt ? day(b.killedAt) : ""}{b.killedAt && b.source ? " · " : ""}{sourceLabel(b.source)}</span>}
-            {!b.killed && <span className="shrink-0 text-cell-2">Not yet</span>}
-          </li>
-        ))}
-      </ol>
-    </Card>
-  );
-}

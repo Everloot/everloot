@@ -3,11 +3,11 @@
 The in-game addon for WoW: Forever. It records what you see while you play (sightings, loot
 windows, vendors, full auction-house scans you start, recipes, trainers, your own gold, the world
 position of each zone you enter) into its SavedVariables file, shows `/ask` answers from the
-companion, and adds auction prices to item tooltips. It uses only the game's addon API and never
+Everloot Desktop App, and adds auction prices to item tooltips. It uses only the game's addon API and never
 plays the character. Records match the upload contract (`packages/protocol`, see its `schema/records/`) field for
 field.
 
-**Status:** 0.3.15 Alpha. The automated contract tests pass; live-client rendering of the Home window (0.3.14),
+**Status:** 0.3.21 Alpha. The automated contract tests pass; live-client rendering of the Everloot window's tabs,
 crest, fonts and interactions remains unverified. The in-client checks in
 `docs/2026-10-08-beta-client-checklist.md`, `docs/2026-10-18-addon-0.3.2-beta-checklist.md`,
 `docs/2026-10-19-addon-0.3.3-beta-checklist.md` and `docs/2026-10-21-addon-0.3.10-launch-checklist.md` are still open, and the full scan
@@ -36,22 +36,34 @@ A replication scan that cannot start or times out now tries a **partial price sa
 search APIs are available. It reads actual item/commodity search rows for at most 20 browse keys and 40
 requests, paced at least one second apart and within 90 seconds of starting. It stops when the house closes
 or auctions are disabled. Empty attempts refund the cooldown; successful samples retain it. The sample is
-not a full-market snapshot and does not populate the full-scan cache.
+not a full-market snapshot and does not populate the full-scan cache. Before a sample stores, only the newest
+earlier sample of that realm stays in the file, so samples do not fill the per-kind row cap.
 
 Profession observations retain the API's recipe ID and learned flag when available. A client with a
 complete-list reader uses it; otherwise the status explicitly says **filtered recipe list**. The addon never
-changes the player's filters. Up to 500 recipes are read in chunks; reaching that cap is reported. Learning,
-rank and colour changes add fresh observations, and disabling professions stops queued chunks.
+changes the player's filters. Up to 500 recipes are read in chunks; reaching that cap is reported. Only learned
+recipes are written (the status counts the others). For each recipe and colour the file keeps the lowest and the
+highest rank it was seen at: the highest is written when the colour changes, or at the first logout or reload on a
+new UTC day, so levelling a profession adds a few rows per recipe, not one per skill point or per reload. Disabling professions stops queued chunks.
 Tooltip prices show the item's newest public observation day separately from when the price file was built,
 and warn when either is old. Community values combine all auction houses on the realm; they are recorded
 asking-price estimates, not live listings or guaranteed sale prices.
 Below the prices, the tooltip shows where the item drops when three installs looted the source: each rate as
 drops of loot windows, with its installs and the date of the uploads behind it, from the drop rates the Desktop
 App writes into the same `EverlootPrices` file. Once that file is in the game, a missing price or drop source is
-said in one grey line; nothing is written to your SavedVariables. Without the file, tooltips carry no community line,
+said in one muted line; nothing is written to your SavedVariables. Without the file, tooltips carry no community line,
 and the first item tooltip says once per install, in chat, that community prices come from the Everloot Desktop App
 (everloot.app/addon). `addon/tests/drops_contract.py` holds the rules.
 Nothing in the addon calls a buy, bid or post API; `addon/tests/market_contract.py` traps them.
+
+Price tooltips use separate label/value rows with native coin icons. Community market, minimum and historical
+values stay distinct from your own scan; the vendor sell price appears beside them when the client knows it.
+The amounts are per unit. The header names your realm with its ruleset (PvP, PvE, RP, RP-PvP, Hardcore) split off
+the name in its own colour, as the realm list shows it; drop rates sit in the value column too, their loot windows
+and installs beneath. A source you have met is named as your client showed it ("Drops from Defias Bandit"), read
+from your own sightings and loot in the saved file; one you have not met keeps its id ("NPC 116"). Dates, units listed, reporters, all-house scope and stale-data warnings remain visible.
+`/everloot price` prints the same amounts as plain text. Disenchant outcomes and values are not yet available;
+the addon does not guess them from an item's color or type.
 
 ### Ask about an item's price
 
@@ -78,6 +90,39 @@ When scans are on, the cooldown is over and no scan is running, opening the auct
 **Scan prices for Everloot** prompt beside it, once per visit. One click scans; closing it hides it until
 the next visit. It never scans by itself. `/everloot scanprompt off` turns it off (the **Everloot scan**
 button and `/everloot scan` still work). With scans off, the first visit prints one line saying how to opt in.
+
+## Commands
+
+Every command the addon answers. This table is the source for the in-game help line (`core.lua`) and the
+guide at everloot.app/docs/guides/addon; `addon/tests/commands_contract.py` fails when the three drift.
+`/everloot` on its own opens the planner workspace.
+
+| Command | What it does |
+|---|---|
+| `/everloot window` | Opens or closes the Everloot window (left-click on the minimap button does the same). |
+| `/everloot options` | Opens the settings page, one switch per module (right-click on the minimap button does the same). |
+| `/everloot planner [talents\|raid]` | Opens the planner workspace on the named tab, where a website plan is pasted and imported. |
+| `/everloot buttons on\|off` | Gathers other addons' minimap buttons into the Everloot button, or leaves them on the minimap; `/reload` to apply. |
+| `/everloot status` | Prints the version, each module and how many rows it holds, and any paused collection. |
+| `/everloot version` | Prints the addon version. |
+| `/everloot auctions on\|off` | Auction scans, on in a new install; `/reload` to apply. |
+| `/everloot scan` | At the auction house, starts a full scan, like the **Scan this house** button; at most one every 15 minutes. |
+| `/everloot scanprompt on\|off` | The scan prompt shown when the auction house opens; the button and `/everloot scan` still work with it off. |
+| `/everloot vendor on\|off` | At a merchant, sell grey items and repair with your own gold; never the guild bank. |
+| `/everloot mail on\|off` | The **Collect all** button at the mailbox, for auction letters only. |
+| `/everloot price [item]` | Prints the price of an item from the files already in the game: shift-click the item into the command, or give its id. |
+| `/everloot gph [start\|pause\|stop\|reset\|show\|hide\|cut on\|off\|history]` | Gold per hour: start, pause or stop a session, reset it, show or hide its window, take the 5% auction cut or not, or list the last five. The sessions stay in your file. |
+| `/everloot addons on\|off` | The installed addon list, off until enabled; off deletes every recorded addon row. |
+| `/everloot completion [on\|off]` | The completion tracker, off until enabled; bare reads now, off deletes every row it wrote. |
+| `/everloot census [on\|off]` | The census, on in a new install; bare says whether it is on and how many rows it holds, off deletes them. |
+| `/everloot players [on\|off]` | The players module, off until enabled; bare says whether it is on and how many characters it holds, off deletes them. |
+| `/everloot pulls [on\|off]` | Boss pull summaries, in the builds that carry them; bare says whether it is on, off deletes every pull. |
+| `/everloot link [code\|clear]` | Links this character to your everloot.app account with the code the site shows; bare counts the links, clear deletes them. |
+| `/everloot selftest` | Checks the talent calls the addon relies on and prints PASS, FAIL, SKIP and INFO lines. |
+| `/everloot talents` | Prints your talent build per spec group, with a share code. |
+| `/everloot plan [share code\|number\|hide\|clear]` | Loads a talent plan from a share code or from your saved list by number and shows it beside the talent window; bare reopens the panel, hide closes it, clear forgets it. |
+| `/everloot raid [code]` | Lists the raid buffs missing from each group; code gives a link that opens the raid in the site's raid builder. |
+| `/ask <question>` | Stores a question of up to 500 characters; the answer shows in chat after `/reload`, once the Desktop App has fetched it. |
 
 ## NPC and quest facts
 
@@ -106,9 +151,12 @@ trip out; it ends after 30 minutes outside, in another instance, at the game's r
 killed is pulled again; only time outside counts toward the 30 minutes. No names
 (`docs/design/specs/2026-11-02-pull-and-run-records-design.md`). The start, length and runs, like the boss pulls below,
 wait on `E.RUN_RECORDS` in `core.lua`: off until the release that ships them, so a nightly writes encounter rows as
-before. None of these has run in the Forever client yet. The quest-log calls (`GetQuestLogTitle`, `C_QuestLog.GetQuestTagInfo`)
-have not been tried in the Forever client; a call that is missing or returns something unexpected records
-nothing for that field. The site shows each value only after 3 installs agree.
+before. None of these has run in the Forever client yet. Forever's client uses the modern UI: on launch night 0.3.16
+recorded no quests and no vendors, because `QUEST_ACCEPTED` carries only the quest id there and the old
+`GetQuestLogTitle` and `GetMerchantItemInfo` are missing. Quests are now read with `C_QuestLog.GetLogIndexForQuestID`
+and `C_QuestLog.GetInfo`, and vendor prices with `C_MerchantFrame.GetItemInfo`, as the build's API documentation and
+its own merchant window do; clients with the old calls keep them. A call that is missing or returns something
+unexpected records nothing for that field. The site shows each value only after 3 installs agree.
 
 When the game shows you an item's tooltip, `modules/itemfacts.lua` records the numbers the game files do not
 hold: armor, block, damage per second, each stat and each resistance, one `item_fact` row per line with the item
@@ -127,7 +175,7 @@ open and close the window, `gph history` prints the last five, `gph cut on|off` 
   quest rewards, purchases and crafts are left out), money you loot or get as your share of group loot,
   quest money (`QUEST_TURNED_IN`), and what you sell at a vendor. A reload or logout pauses the clock and
   the session resumes when you are back; after a crash it waits, paused.
-- Each item is valued from the Everloot market value on your realm (the file the Desktop App or companion
+- Each item is valued from the Everloot market value on your realm (the file the Everloot Desktop App
   writes), else your own last full scan, else the vendor price, and the window says which. With the cut on
   (the default) 5% is taken from market and scan values, as the faction houses take it.
 - Total = item values + looted money + quest money. Vendor sales are shown apart and not added: the items
@@ -164,7 +212,25 @@ expands, clicks or changes anything.
   installs report it identically.
 - **Owned rows** (`achievement_owned`, `reputation_owned`, `title_owned`, `quest_owned`): your character's
   progress under an 8-digit key made from your install id and the character's GUID, never the name. They
-  leave this file only from the upload page, with the collection choice ticked and a verified grant.
+  leave this file from the upload page, with the collection choice ticked and a verified grant, or through the
+  Desktop App's private sync described below.
+- **Character rows** (`profession_owned`, `lockout_owned`, `talent_owned`): your professions, this week's raid
+  lockouts and the talent build of your active spec group, under the same key. They are never part of an upload
+  file. The Everloot Desktop App's private sync sends these own-character rows (professions, raid lockouts, the active
+  talent build) only for a character you linked: the app sends that character's rows and everloot.app keeps only the
+  categories you switched on. Each
+  read replaces this character's row, a build with no spent points writes none, and `/everloot completion off`
+  deletes them with the rest. The anonymous `talent_snapshot` of the talents module is unchanged.
+- **Character sheet row** (`stats_owned`): the numbers the character sheet shows (attributes, attack power, hit, crit,
+  haste, expertise, spell power, healing, armor, defense, dodge, parry, block), one row per character under the same key, read out of combat. Percent stats are
+  rounded to 2 decimals and the rest to whole numbers; a stat the game will not give is left out, and with fewer than
+  the five attributes there is no row. Never part of an upload file; the Desktop App's private sync sends it for a linked character and everloot.app keeps it
+  only if you switched on that category; `/everloot completion off` deletes it.
+- **PvP row** (`pvp_owned`): the PvP rank (renown on Forever's PvP rank faction: rank, points, next-rank threshold,
+  top rank), the season and lifetime honorable kills from the Statistics tab, one row per character under the same key.
+  Whole numbers only, no rank title; a field the game will not give is left out, and with neither a rank nor honorable
+  kills there is no row. A read made before the statistics load keeps the character's last kill count. Never part of an upload file; sent and kept the same way as the stats row;
+  `/everloot completion off` deletes it.
 - A changed achievement or standing replaces its earlier row. Titles and completed quests are additions.
 - The file stays bounded: at most 1500 achievements read, 600 progress rows per character, and about 3 MB
   of completion rows and remembered ids in all. A limit reached stops recording, says so once in chat that
@@ -183,17 +249,58 @@ game's options API shows the page as a window instead.
 
 ## The Everloot window
 
-Left-click the minimap button, or `/everloot window`, for the Everloot window. **Home** shows your character, gold on
-hand, the peak this install has seen and the money the gold module recorded for this character (loot, quests,
-vendors, auctions, flights), the gold per hour session with a Pause button, your professions with their skill and
-the recipe colours the file holds, and how many rows of each kind are in your saved file. A value the game does not
-give is a dash. **Gold** opens the gold per hour window, **Build plan** the plan workspace and **Settings** this page;
-the other items say what to use for now.
+Left-click the minimap button, or `/everloot window`, for the Everloot window. Its sidebar has five items.
+
+- **Home** lists every character this install has seen: gold, level, professions, raid lockouts (shown only while the completion tracker is on) and when it was last
+  seen, with totals for each realm and for the account and a "This week" line (gold in and out for this character over
+  seven days). Below it, the gold per hour session with a Pause button.
+- **Gold** has four tabs. **Overview** shows every character's gold by realm and the last 30 days as bars. **Ledger**
+  lists the money events by category, by day or by receipt. **Sales** lists auction sales one by one or by item.
+  **Session** is the gold per hour session. Ledger and Sales can be set to today, 7 days, 30 days or all; Overview always
+  shows the last 30 days. Overview, Ledger and Sales can be set to this character or the account; Session has neither.
+- **Collection** shows this character's achievements, reputation, titles and raid lockouts from the rows the
+  completion tracker wrote, so it needs `/everloot completion on`; with it off the tab says so and has a button that runs that command.
+- **Professions** shows each profession in the profession book with its rank and the recipes recorded for it by
+  difficulty colour.
+- **Settings** opens this page. "What you've added", the row counts in your saved file, is on that page now.
+
+Ask, Build plan and Auctions are no longer in the sidebar. `/ask` and `/everloot plan` (the planner workspace) still work.
+
+The Gold tab and the character list on Home read two tables that exist only in your SavedVariables file.
+`EverlootDB.roster` holds one row per character you log in with (name, realm, class, level, faction, gold while the
+gold module is on, professions); the **Your characters** row in the options turns it off. `EverlootDB.ledger` holds
+your money events, your auction sales and each character's closing gold for each day, kept per character: up to 5,000
+events and 90 days, 2,000 sales and 400 daily closes, the oldest dropped first. For days before the ledger existed, the
+Gold tab also reads the older `money_event` rows from the file, without copying them. Neither table is a record, neither is
+read by an upload, and nothing in the window uploads anything. An auction sale is recorded when you collect its
+letter at the mailbox, from the invoice: item name, count, the price after the auction house's cut and the deposit.
+The buyer's name is never read.
+
+When the game says a buyer was found, Sales lists the item at once as "sold, gold pending". Collecting the letter
+turns that row "paid" with the price; a row with no letter after 48 hours reads "unmatched", and a letter collected
+later still fills it. The ledger also records repairs and vendor purchases at an open merchant (a repair paid from the
+guild bank costs you nothing and is left out), gold traded with another player (Trades in, Trades out), gold sent with
+a letter (Mail out) and gold in a letter from one of your own characters (Mail in). A letter from anyone else, or the
+auction house's own letter, adds no Mail in row. Gold that goes from one of your characters to another is marked as
+such: with the account selected it leaves the totals and shows on its own line, "Moved between your characters";
+with one character selected it counts as that character's gold in or out. The trade partner's and the letter's names
+are compared with your own characters' names and then dropped. These categories are local only and never uploaded.
+Today, 7 days and 30 days start at UTC midnight (today, today and the 6 days before it, today and the 29 days before
+it).
 
 The window is built the first time it opens and registers no events, so recording never depends on it. An error
 inside it closes it until `/reload` and `/everloot status` names the error. The **Everloot window** switch on the
 settings page turns it off; the minimap button then opens the plan workspace as before. The crest it uses is
 `media/crest.tga`, which the release zip carries beside the code.
+
+Hovering the minimap button shows what its clicks do. The Minimap button switch on the settings page hides it after a `/reload`; `/everloot window` still opens the window.
+
+The minimap button also holds other addons' minimap buttons. Buttons made with LibDBIcon (most addons' round
+minimap buttons) move into it at login; hover the crest and they show in a small panel beside it, which closes
+when the mouse leaves. Its clicks stay the same. Blizzard's own minimap buttons and any other button are left
+where they are. The first time it gathers a button, chat says how many. `/everloot buttons off`, or the **Addon
+buttons in the Everloot button** switch on the settings page, turns it off; the buttons go back around the
+minimap after a `/reload`.
 
 ## Census
 
@@ -231,6 +338,11 @@ Off until `/everloot players on` (then `/reload`), and meant to stay off until t
 switched on (`docs/design/specs/2026-10-20-player-pages-design.md`). This is the one module that reads other
 players' names and guilds, so it is separate from the census, which never does. `/everloot players` says
 whether it is on and how many characters it holds; `/everloot players off` stops it at once and deletes every row.
+An install with it off is asked once, in an Everloot window a few seconds after the first loading screen and never in
+combat: **Turn on** runs `/everloot players on`, **Leave off** keeps it off. The window says what is recorded and
+points to `/everloot players off` and the hide form (everloot.app/players/opt-out). Either answer, or
+`/everloot players on|off` typed or set on the settings page, is saved as `playersAsked`, and the question never
+comes back. `addon/tests/options_contract.py` holds the rules.
 
 - **What a row holds** (`player_seen`): name (`UnitName`), realm (`GetRealmName`), race and class tokens
   (`UnitRace`, `UnitClass`), level (`UnitLevel`) and the guild name when the game shows one (`GetGuildInfo`).
@@ -298,8 +410,8 @@ code (`EL-7K3Q-9P`) to a signed-in player; it works once, for 15 minutes. Nothin
 
 ### Bring a website plan into the game
 
-Open `/everloot`, or **Build plan** in the Everloot window, for the **Talents / Raid** workspace. With the window
-off, a left-click on the minimap button opens the workspace instead.
+Open `/everloot` for the **Talents / Raid** workspace, or load a plan straight into the plan panel with
+`/everloot plan <share code>`.
 Right-click the minimap button, or use `/everloot options`, for collection settings.
 `/everloot status` still prints the collector status.
 
@@ -420,27 +532,41 @@ addon/
 │   ├── openworld.lua   target/mouseover sightings, NPC window places, loot windows, merchant windows
 │   ├── itemfacts.lua   armor, stats and resistances from the item tooltips you see, once per item and build
 │   ├── guild.lua       roster, attendance, saved lockouts (published only through an officer)
+│   ├── roster.lua      your own characters for the window's Home: name, realm, class, level, gold, professions; local only
+│   ├── ledger.lua      the gold ledger's local store for the window's Gold tab; never uploaded
 │   ├── gear.lua        equipped item level sample, at most once an hour
 │   ├── auctions.lua    full auction-house scans you start (Forever); listed buyouts on older clients; on in a new install
 │   ├── gold.lua        your own gold: loot, quests, vendors, flights, mailed auction sales, postage, buyouts
 │   ├── professions.lua recipe colours at your rank (C_TradeSkillUI); required rank and cost from trainer windows
-│   ├── ask.lua         /ask stores a question; the companion's answers show after /reload
+│   ├── ask.lua         /ask stores a question; the Everloot Desktop App's answers show after /reload
+│   ├── link.lua        /everloot link: ties the character you play to your everloot.app account
+│   ├── options.lua     the settings page (Esc > Options > AddOns > Everloot, or /everloot options)
+│   ├── minimap.lua     the minimap button: left-click the window, right-click the settings
+│   ├── drawer.lua      the button drawer: other addons' minimap buttons gathered into the Everloot button
+│   ├── auctiontab.lua  the Everloot tab at the auction house: scan, cooldown, Share now, price lookup
 │   ├── addons.lua      your installed addons' names, titles and versions; off until enabled
 │   ├── mapbounds.lua   each zone's corners in world coordinates, once per zone per build
 │   ├── talents.lua     your talent build per spec group, plus the game's own loadout string
 │   ├── completion.lua  achievements, reputation, titles, quest chains: catalogs and your progress; off until enabled
+│   ├── owned.lua       this character's professions, raid lockouts and talent build; runs with the completion tracker
+│   ├── charstats.lua   this character's sheet numbers as the paper doll shows them; runs with the completion tracker
+│   ├── pvp.lua         this character's PvP rank and honorable kills; runs with the completion tracker
 │   ├── census.lua      race, class, level and faction of your characters and players you see; on in a new install
 │   ├── players.lua     name, realm, race, class, level and guild of your characters and players you see; off until enabled
 │   ├── pulls.lua       each boss pull: your group's names, classes, roles and damage meter totals; on once released
 │   ├── selftest.lua    /everloot selftest and /everloot talents
 │   ├── plan.lua        share code reader and the display-only plan panel
+│   ├── planner.lua     the planner workspace: website talent and raid plans beside your character; /everloot planner
 │   ├── raid_data.lua   raid buff list generated from web/src/data/game-data/raid-*.json
 │   ├── raid.lua        /everloot raid: buffs missing per group, and a raid share code; display only
-│   ├── prices.lua      item tooltips: your latest scan and the companion's community prices
+│   ├── prices.lua      item tooltips: your latest scan and the Everloot Desktop App's community prices
 │   ├── drops.lua       item tooltips: where an item drops, from the public rates in the same file
 │   ├── gph.lua         gold per hour sessions, kept in your file only
 │   ├── conveniences.lua  sell greys and repair at a merchant, Collect all at the mailbox; each off until enabled, no records
-│   └── window.lua      the Everloot window: Home from what the file holds; built on first open, no records
+│   ├── window.lua      the Everloot window: Home from what the file holds; built on first open, no records
+│   ├── view_gold.lua   the window's Gold tab: gold by realm, the ledger, auction sales, the gph session; display only
+│   ├── view_collection.lua  the window's Collection tab: achievements, reputation, titles, lockouts; display only
+│   └── view_professions.lua  the window's Professions tab: each profession, its rank and recorded recipes; display only
 ├── media/crest.tga     the crest, 128 px, packaged beside the code
 └── tests/              Lua 5.1 contract tests and their fixtures
 ```

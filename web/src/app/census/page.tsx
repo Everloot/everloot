@@ -4,7 +4,7 @@ import { pageMetadata } from "@/lib/seo";
 import { dataAgeLabel } from "@/lib/data-age";
 import { loadCensus } from "@/lib/rollup-compute";
 import { REPO_URL } from "@/lib/source";
-import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
+import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT } from "@/lib/upload-store";
 import { trailFor } from "@/lib/breadcrumbs";
 import { playerPagesOn } from "@/lib/player-pages";
 import { guildsOn } from "@/lib/guild-switch";
@@ -209,7 +209,11 @@ function Filtered({ view: v, window: w }: { view: FilteredCensus; window: Census
 
 /** The census counting rule, word for word as the page has always stated it. */
 const ruleOf = (view: CensusView) =>
-  `Each character counts once, and a number shows only when it covers at least ${view.rule.minCharacters} characters reported by at least ${view.rule.minInstalls} installs from at least ${view.rule.minReporters} addresses, rounded to the nearest ${view.rule.roundTo}.`;
+  `Each character counts once, and a number shows only when it covers at least ${view.rule.minCharacters} characters reported by at least ${view.rule.minInstalls} installs from at least ${view.rule.minReporters} addresses, rounded to the nearest ${view.rule.roundTo}.${view.trusted ? trustedRule(view) : ""}`;
+
+/** Said beside the rule while Everloot's own installs count on their own (kb/src/trusted-source.ts). */
+const trustedRule = (view: CensusView) =>
+  ` While few players upload, Everloot's own installs also count on their own, so these numbers can come from one player's game and lean towards the zones they play in. The ${view.rule.minCharacters}-character minimum and the rounding still apply.`;
 
 /** The top of the page's content: an EmptyState until the window has numbers, then one sentence. */
 function Headline({ view, window: w }: { view: CensusView; window: CensusWindow }) {
@@ -232,7 +236,7 @@ function Headline({ view, window: w }: { view: CensusView; window: CensusWindow 
   return (
     <p className="max-w-[65ch] text-lg text-fg-2">
       About {number(w.characters!)} characters were {w.id === "week" ? "active in the last 7 days" : "seen since launch"} {span},
-      counted from {plural(w.installs, "install", "installs")} that turned the census on.
+      counted from {plural(w.installs, "install", "installs")} that turned the census on{view.trusted ? ", including Everloot's own" : ""}.
     </p>
   );
 }
@@ -254,7 +258,7 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
           lede="Counted from Everloot uploads by players who turned the census on: their own characters and the players near them, the ones they target, mouse over or group with or see a nameplate for."
           meta={<>
             <span className="font-mono text-xs">
-              {!ready ? "Storage unreachable"
+              {!ready ? STORAGE_UNREACHABLE_SHORT
                 : !view.launched ? "Not launched yet"
                 : plural(w.installs, "reporting install", "reporting installs")}
             </span>

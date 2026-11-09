@@ -1,7 +1,8 @@
 import { expect, test } from "vitest";
 import { REALMS } from "../data/realms";
 import { RULESETS } from "../data/wow-forever-launch";
-import { DEFAULT_RULESET, RULESET_SLUGS, realmInfo, realmMap, realmMapKey, realmRuleset, rulesetParam } from "./realms";
+import { REALM_RULESETS } from "../design/tokens";
+import { DEFAULT_RULESET, RULESET_LABEL, RULESET_SLUGS, realmInfo, realmMap, realmMapKey, realmParts, realmRegion, realmRuleset, rulesetFromName, rulesetParam } from "./realms";
 
 // These tests read the realm map as committed, so they hold before and after it is filled. ./realms-empty.test.ts
 // pins the map empty and checks that everything behaves as before the map existed.
@@ -32,6 +33,34 @@ test("a realm the map does not list is forever, never a guess", () => {
   }
 });
 
+test("a realm whose name ends in its ruleset is on that ruleset; the map still wins, and a name without one stays forever", () => {
+  expect(rulesetFromName("CAMWOW US1 Realm 4 PvP")).toBe("pvp");
+  expect(rulesetFromName("CAMWOW AU1 Realm 2 PvP")).toBe("pvp");
+  expect(rulesetFromName("Some Realm PvE")).toBe("normal");
+  expect(rulesetFromName("Some Realm Normal")).toBe("normal");
+  expect(rulesetFromName("Some Realm RP")).toBe("rp");
+  expect(rulesetFromName("Some Realm RP-PvP")).toBe("rp-pvp");
+  expect(rulesetFromName("Some Realm RP PvP ")).toBe("rp-pvp");
+  // The realm list as players copied it (Blizzard forums, 2026-11-03): one word for RP-PvP, capitals for PvE.
+  expect(rulesetFromName("CAMWOW US1 Realm 9 RPPVP")).toBe("rp-pvp");
+  expect(rulesetFromName("CAMWOW AU1 Realm 4 RPPvP")).toBe("rp-pvp");
+  expect(rulesetFromName("CAMWOW US1 Realm 1 PVE")).toBe("normal");
+  expect(rulesetFromName("CAMWOW US1 Realm 10 RP")).toBe("rp");
+  expect(rulesetFromName("Some Realm Hardcore")).toBe("hardcore");
+  for (const realm of ["PvP", "Mal'Ganis", "Stormrage", "Pvpland", "Forever"]) expect(rulesetFromName(realm)).toBeNull();
+  expect(realmRuleset("CAMWOW US1 Realm 4 PvP")).toBe("pvp");
+});
+
+test("a realm's name splits into the name and the ruleset it ends in, as the tooltip shows it", () => {
+  expect(realmParts("CAMWOW US1 Realm 4 PvP")).toEqual({ base: "CAMWOW US1 Realm 4", ruleset: "pvp" });
+  expect(realmParts("Some Realm RP-PvP")).toEqual({ base: "Some Realm", ruleset: "rp-pvp" });
+  expect(realmParts("CAMWOW US2 Realm 10 RPPVP")).toEqual({ base: "CAMWOW US2 Realm 10", ruleset: "rp-pvp" });
+  expect(realmParts("Mal'Ganis")).toEqual({ base: "Mal'Ganis", ruleset: null });
+  expect(RULESET_LABEL.normal).toBe("PvE");
+  // Every ruleset has its name colour.
+  expect([...REALM_RULESETS]).toEqual([...RULESET_SLUGS]);
+});
+
 test("only a ruleset's slug is a ruleset parameter", () => {
   expect(rulesetParam(undefined)).toBeNull();
   expect(rulesetParam("")).toBeNull();
@@ -39,3 +68,11 @@ test("only a ruleset's slug is a ruleset parameter", () => {
   for (const bad of ["all", "forever", "PvP", "pve", "rp_pvp"]) expect(rulesetParam(bad)).toBeUndefined();
 });
 
+
+test("a realm's region comes from the region code in its name, never a guess", () => {
+  expect(realmRegion("CAMWOW US1 Realm 4 PvP")).toBe("us");
+  expect(realmRegion("CAMWOW EU5 Realm 4 PvP")).toBe("eu");
+  expect(realmRegion("camwow kr2 realm 1 rp")).toBe("kr");
+  expect(realmRegion("Mal'Ganis")).toBeNull();
+  expect(realmRegion("Eusebius")).toBeNull();
+});

@@ -14,7 +14,118 @@ build that has a zip in the repository. Earlier builds have none.
 
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
+### Added
+- Site: the armory opens at `/armory`: a page for every WoW Forever character and guild that Blizzard's API returns,
+  read hourly, with guild rosters, three boards (item level, gear score, honorable kills), a form to hide a character
+  and a form to ask for one. Each page says "Data from Blizzard Entertainment", carries no ad and is not indexed yet.
+- Knowledge base: the open data export's game-files folder gains one file per committed catalog (achievements, factions,
+  titles, quest lines, mounts, encounters, recipes, class gear and its restrictions, class spells, races, legacy perks,
+  talent nodes, raid buffs): ids, the names the files hold and each file's build, every row counted, with a schema each
+  and a manifest line. The README and the download page no longer list the catalogs as missing. Nothing observed changes.
+- Addon: item tooltips and `/everloot price` end with up to three muted lines from this install's own rows: "Sold by
+  <NPC> (your sighting)" from the vendor windows it opened, "Reagent for n recipes you know" from its recipe colours,
+  and "Seen in <zone>" for a drop source it met. Without own rows the price file's public vendors and reagent count
+  show instead, when the file carries them. Display only; nothing recorded or uploaded changes.
+- Companion: the EverlootPrices slot file can carry a `sources` block after the drops (public vendor NPC ids and a
+  reagent-of count per item, checksummed like the drops, with the vendors' names outside the checksum). The block is
+  optional: a file without it is read as before. The Desktop App does not write it yet.
+- Site: every record kind has a docs page, `/docs/api/records/<kind>`, generated from its schema: each field with its type,
+  whether it is required and its description, nested fields included, whether the kind is in the public corpus, where it
+  goes, and the cross-field rules the server checks. The sidebar lists them and the schemas table links each kind to its page.
+- Site: the account guide and the addon page link the sample character page (/showcase/character), so a player can see
+  what a character page holds before linking one. The sample stays out of search and the sitemap.
+- Addon: the Gold tab's Overview chart follows the period buttons (today, 7 days, 30 days, or all for the ledger's
+  90 days), one bar a day; Sales shows the auction house's cut beside each sale's deposit, and the by-item rows show
+  sales per day over the period and the last sold day. Display only; nothing recorded or uploaded changes.
+- Site: a profession page answers to its skill line id, `/tools/professions/171` or `/tools/professions/171-alchemy`, and
+  redirects for good to the slug page it already had, keeping the skill range and class context in the query; an unknown id
+  is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
+
 ### Fixed
+- Site: the schemas page marks the three shapes that describe a bulk-export file rather than an endpoint and says that
+  `reporters` in the API and MCP shapes is the count the open-data files call `installs`; the API page names the routes
+  its own pages fetch (/api/map/pins, /api/suggest) as outside the OpenAPI contract. The open-data notes say the same.
+- Desktop App: the Characters page reads the addon's local ledger (`EverlootDB.ledger`) from the save file beside the
+  `money_event` rows, so its 7-day net is the Gold tab's "7 days" for the same character (today and the six UTC days
+  before it) and repairs, vendor purchases, trades and mail appear in money by category, marked local only. Uploaded
+  rows count only from before the ledger's first event, as the Gold tab reads them. Nothing recorded or uploaded changes.
+- Site: a database address with an id nothing knows (an item or NPC such as /database/items/999999) answers its 404 with a
+  body again: the heading, "No report for this id yet; three installs make it public" with the addon link, and a search box
+  prefilled with the id. The site 404 leads with the same search box, prefilled with the last part of the address tried.
+- Site: an Auction House price page for an item with no public name says why under its title: a name shows once
+  three installs report the same one, or when the game files and the Warcraft Wiki agree on one. The title stays
+  "Item N" and the prices stand. Before, the page gave the id and the prices with no reason.
+- Site: the achievement, title, faction and quest chain lists, the farming and profession pages and the scoring method say
+  a fact is confirmed by three installs, not three players, as the upload guide has it; the install count is one column,
+  "Installs", on every table (it was "Install IDs" on objects and drops and "Reporters" on NPCs, items and vendors); and
+  the coverage, instance and item pages count "n of 3 installs" from the meter's own labels instead of a written 3.
+- Site: an addon page typed in the wrong case, and the four retired tool addresses (/tools/database, /tools/completionist,
+  /tools/guild-tracker, /tools/profession-planner), answer a permanent 308 like every other moved address on the site.
+  Before, they answered a temporary 307, so a crawler kept asking for the old address.
+- Site: a faction page says whether the faction is a header of the reputation pane (Yes or No) and names its parent
+  faction from the game files, with the id shown once; a header with no standing of its own is noindex and out of the
+  sitemap. Faction, achievement and instance pages take the item pages' title, "Ironforge – WoW Forever faction".
+- Site: a spell page's tab reads "Spell 1 · Everloot" once; its title went around the shared page metadata, so the
+  layout added the brand a second time, and it had no Open Graph or Twitter card. The title check now covers the route.
+- Site: a named spell page is titled "Blizzard – WoW Forever spell" with a description that names it, and its Creates,
+  Costs and Taught by sections no longer say "Get the addon" or show the agreement meter: those relations are the game
+  files' own, so an empty one is left out and a spell the files relate to nothing gets one line naming the build read.
+- Site: every public database list and detail page (NPCs, quests, objects, vendors, spells, achievements, titles, factions,
+  quest chains, drops, coverage), the census and the rankings are kept at the CDN for five minutes like the profession pages,
+  and the database index, zones and instances come down from an hour to the same five minutes, so a page drawn while
+  storage was unreachable is replaced within minutes. Items and the map keep their hour.
+- Web: the accessibility page describes the motion the site has, Glint included, instead of only 150 ms fades, and the
+- Site: the accessibility page describes the motion the site has, Glint included, instead of only 150 ms fades, and the
+  accessibility, terms, privacy and rankings dates use the site's one date format (November 4, 2026).
+- Addon: the in-game help line, the README's command table and the site's addon guide list the same commands, with
+  `version`, `planner`, `gph hide`, `gph cut on|off`, `plan hide|clear`, `window`, `vendor`, `mail`, `link` and
+  `plan <number>` where one list had left them out; the guide says a left-click on the minimap button opens the window;
+  the README's file tree names every module; and a contract test fails when the three lists drift.
+- Addon: a loading screen inside the minute after the last gold snapshot writes no new row unless the balance changed;
+  the last snapshot's time is kept in the saved file, so a /reload no longer adds a row each.
+- Addon: the button drawer leaves the minimap buttons to MinimapButtonButton when that addon is loaded, and to any
+  addon that takes a button after Everloot did. Before, both gathered the same buttons and hovering the crest opened
+  an empty Everloot panel over the other addon's, which dimmed every icon under it. The drawer's cells also leave
+  room for a LibDBIcon ring, each button draws above the one before it, and the panel is the window's own canvas and
+  bronze edge with a thin bar in the window's green down the side that faces the crest.
+- Addon: the PvP row keeps a character's last honorable kill count when a read comes before the Statistics tab has
+  loaded, and skips a statistic the game flags to skip. A talent choice past the site's range is left off that node
+  instead of failing the whole talent row on sync.
+- Site: an addon page, title and download links exist only for an addon the owner approved (the curated source map or the
+  ecosystem registry). Before, any addon three installs reported got a page, and its title came from the uploads. The
+  usage board at /addons/popular still counts what players run, and links only the approved ones.
+- Site: the public-page cache keeps its pages across a deploy that changes nothing they show. Its versions are computed
+  from the build itself (the rendering source, the dependencies, the files a page names under `_next/static`, the
+  Worker's switches) and ship inside the Worker bundle; an API-only or test-only change keeps the cache, and a changed
+  script, style or page starts a new one. A name repeated in the query keeps its order in the cache key, and the
+  sign-in, sign-up, password-reset, `/me` and auth routes are never read from or stored in it.
+- Addon: an item's name and quality are recorded once, not again in every loot window and on every vendor that sells
+  it, and a vendor is recorded once per UTC day unless an item, a price or a limited stock changed. Before, about ten
+  vendor visits filled the 2,000-row cap for item names and every new name after that was lost.
+- Site and MCP: chat search reads a misspelled place or word as its common spelling and says so: "does thunderbluff have
+  a zeppeling?" is read as "thunder bluff" and "zeppelin" and finds The Zephyr instead of unrelated lore. Names from the
+  game files are never respelled. "learn mining in orgrimmar" finds the trainer, "what dungeon at level 30" lists the
+  dungeons near that level from the map entrances, a page named in the question opens with its first sentence, and
+  flight masters show only when the question is about flying or that place. Spanish price questions ("cuánto cuesta
+  linen cloth") go to the price lookup, and the chat no longer opens with the archive note meant for AI clients.
+- Addon: the Everloot price block shows once per hover. Comparing an item opens the game's comparison tooltips beside
+  the main one, and each of them carried the block too, so one hover read it up to three times.
+- CurseForge: an Alpha release uploads as a CurseForge Beta, named "Everloot <version> Beta". CurseForge's Files tab hides
+  alpha files unless a visitor ticks "Show alpha files", so with every file an Alpha it read "No Results". GitHub still marks
+  the release a pre-release, and the site still calls the addon an Alpha.
+- Addon: a guild roster snapshot is stored at most once every six hours, and not when the roster reads the same as
+  the last one; a raid lockout is stored once until a boss goes down or the week resets, and an expired one not at
+  all; attendance is stored once per set of people in a raid run. Before, every guildmate's login or logout stored a
+  whole snapshot (about 50 KB for a 500-member guild) and every loading screen stored the lockouts again.
+- Site: a realm whose name ends in RP-PvP written as one word ("CAMWOW US1 Realm 9 RPPVP", as players copied Forever's
+  realm list) is filed under RP-PvP on the Auction House instead of "Realms not mapped yet".
+- Addon: a partial price sample (the search-based fallback when a full scan cannot run) keeps only the newest earlier
+  sample of that realm before it stores, so two samples no longer fill the 2,000-row `auction_scan` cap and later samples no
+  longer report "stored 0". Another realm's rows stay.
+- Site: the separator between the facts under an Auction House title reads "·", not "Â·".
+- Site and MCP: recipe skill ranges agree on the recipe id the trade-skill window reports, not the recipe's name, so an
+  install on a Spanish client ("Peletería") counts toward the same range as English ones. A recipe the game files list
+  is published under the files' English profession name, with the recipe name and reagents English clients showed.
 - Site: search finds dungeons and raids by name, with or without the leading "The", and an exact name puts the instance page
   first: "deadmines" now opens with `/database/instances/36-deadmines`. The group of wiki pages is headed Wiki, not Guides,
   so it no longer reads as the reviewed class guides at `/guides`.
@@ -30,9 +141,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: `/ask` sends the visitor to the chat at `/chat` instead of a 404; the addon's command and the header both say Ask.
 - Site: the talent calculator no longer asks for the account's saved builds when no one is signed in, so a signed-out
   visit leaves no 401 in the browser console. Save still offers sign-in as before.
-- Desktop App: on macOS the app no longer logs "Unable to set login item" on every start. Start-up registers a login item
-  only when "Start when I sign in" is on; Settings still applies the switch either way.
-- Desktop App: the game-folder hint on the first-run screen shows a macOS or Linux path on those systems, not a Windows one.
 - Addon and companion: when `/ask` cannot be answered (the companion offline, no model set up), the reason is shown once and
   the question stays queued, so the retry's answer still reaches the game. Before, the question was dropped and a later answer never
   appeared. After each `/reload` the addon says how many questions are still waiting. Needs the next addon and Desktop App
@@ -42,8 +150,109 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: without a key, `/api/tools/{tool}` (what the site's chat calls for each answer) counts against the MCP server's
   200 requests an hour per address instead of the bulk endpoints' 30, so a signed-out chat no longer runs out after a
   dozen questions. A key is counted as before.
+- Site: `/addon` links the CurseForge project beside the zip download ("Get it on CurseForge"), counted as an
+  `addon_download` to CurseForge like the other download links. The same tested zip is uploaded there on each release.
+- Site: a saved build's short link (`/b/<slug>`) reads the store once per visit, for the page and its metadata together,
+  instead of twice. The short "Storage unreachable" notice on the collections, guild board, gold ledger, census, addon,
+  popular addons and profession pages is one shared constant beside the long one.
+- Site: `/sitemap.xml` answers 503, uncached, while the instance store or the item names cannot be read, as it already
+  did for the world facts and the census, instead of a sitemap without the dungeon pages and item categories that the
+  CDN kept for an hour.
+
+- Site: /addons and the addon tracker's Rising board count a star change over the same window, the 7 days before
+  the newest daily count, and print it the same way ("+21 since 2026-10-28"); before, one counted from the snapshot
+  and the other from the clock, so they disagreed. Both pages say when the GitHub facts are older than 26 hours.
 
 ### Added
+- Site: a "Write a wiki page" guide under Docs › Guides says how a wiki page is proposed and reviewed, with the page
+  types, the front matter, the rules and the check from the wiki README; the wiki hub and the lore archive link to it.
+- Site: a faction page and a title page carry In short, Copy for AI, a "Player reports" fact that stays an empty meter
+  until three installs agree, a "Track this" link to the collections tool and a relation tab ("Reputation from" on a
+  faction, "Earned by" on a title) whose empty state names the 3-install rule and says what no game file read so far
+  carries; a faction page also shows its lore archive page when the archive has one under the same name.
+- Site: a class page links the census narrowed to its class and the classes ranking, and the search page with no
+  query lists what a search finds (items, NPCs, quests, zones, objects, the lore archive, tools and docs), each
+  linked to its list, with four queries to try. Before, the class page stopped at the database links and an empty
+  search page showed the field alone.
+- Site: `/docs/mcp` tables the record kinds the knowledge tools cover, where each kind comes from and the tool that
+  reads it on its own, and says how a record id is formed: a catalog record's stable synthetic id against the in-game
+  id the page tools take.
+- Site: the limits and keys page has a Scopes section: a table of every scope a key can carry (read:public on every
+  key; read:own, link:own and sync:own opt-in on the key form), what each allows and which routes check it. A test
+  keeps the table at one row per scope the code defines.
+- Site: the MCP resources page gives each prompt its own section (title, arguments with their allowed values, the
+  `prompts/get` call and the message the server returns), shows one `resources/read` of the builds resource with the
+  shape of its document and one entity read that equals the `item_page` answer, and the MCP sidebar lists the three
+  prompts under the page.
+- Site: an item, NPC or quest page shared on Discord or X shows its own card: the name, its type and how many of
+  the 3 installs agree on the name, as text on the brand canvas. Before, every database page showed the site card.
+- Addon: each Professions block lists the next recipes a trainer teaches at or above the current rank (up to three,
+  lowest rank first) with the cost and the trainer's name, from the trainer rows the install already has, or says to
+  open a trainer's window; under the blocks, "Other characters" lists every other character's professions and ranks
+  from the local roster. Display only: nothing recorded or uploaded changes.
+- Addon: the Everloot window's sidebar is now Home, Gold, Collection, Professions and Settings. Ask, Build plan and
+  Auctions left the sidebar; `/ask` and `/everloot plan` still work.
+- Addon: Home lists every character this install has seen (gold, level, professions, raid lockouts, last seen) with
+  realm and account totals and a "This week" line. "What you've added" moved to the Settings page.
+- Addon: Home says what this character is missing, under the portrait: achievements left, factions not exalted, titles
+  not held, professions with no recipe read and this week's raids with bosses left, counted from the rows Collection
+  and Professions already show; each line opens that tab. With the completion tracker off the strip says so and offers
+  Collection's Turn on button. The gold box adds "Account this week: +in / -out" over every character under this
+  character's own week line.
+- Addon: the Gold tab has Overview (gold by character and realm, the last 30 days as bars), Ledger (by category, day or
+  receipt), Sales and Session. It reads a new local ledger, `EverlootDB.ledger` (5,000 events or 90 days, 2,000 sales,
+  400 daily closes per character), and a local roster, `EverlootDB.roster` (options row "Your characters"). Neither is uploaded.
+- Addon: each auction sale is recorded by item from the mailbox invoice (item name, count, price after the cut,
+  deposit) when you collect the letter. The buyer's name is not read.
+- Addon: Sales lists a sale as "sold, gold pending" from the moment the game says a buyer was found, and the same row
+  turns "paid" when you collect the letter. A letter collected after 48 hours still fills its row.
+- Addon: the ledger records repairs and vendor purchases at an open merchant (a guild-bank repair costs you nothing and
+  is left out), gold traded with another player, gold sent with a letter, and gold in a letter from one of your own
+  characters. With the account selected, gold moved between your own characters leaves the totals and shows on its own
+  line, "Moved between your characters". These categories stay in the local ledger and are not uploaded.
+- Addon: the Gold tab's Today, 7 days and 30 days start at UTC midnight, so the first day is a whole day.
+- Addon: Collection tab for achievements, reputation, titles and raid lockouts (needs the completion tracker on) and a
+  Professions tab with each profession's rank and recorded recipe colours.
+- Site: the gear rankings are scored every 30 minutes by a new cron (`/api/cron/profiles`) and stored, instead of on
+  every page view; the boards say how long ago. Each view still filters the stored boards against who is ranked right
+  now, so a switch turned off takes a character off on the next request. Ranked characters get a daily history of
+  level, item level and Gear Score, drawn as a chart on their page from the second day. Behind `EVERLOOT_LEADERBOARDS`
+  (off; needs migration `20261107150000_profile_pipeline.sql`). Design: `docs/design/2026-11-07-profile-pipeline.md`.
+- Site: item level and Gear Score rankings for linked characters at /rankings/item-level and /rankings/gear-score
+  (`EVERLOOT_LEADERBOARDS`, migration `20261107120000_gear_board.sql`, the data policy's "Gear rankings"). A character
+  is on them only while its player made the page public, turned gear sync on and chose "Rank my gear" on the account page.
+  Both numbers are averages over 17 slots with each item at the game files' item level; Gear Score v1 weighs each slot by
+  its stat budget in the game's `RandPropPoints` table. Filters by ruleset and region, and the character page shows its
+  place on each board.
+- Addon, Desktop App and site: a linked character's active talent build syncs to its page. The addon keeps it as a
+  keyed `talent_owned` row (local only, deleted by `/everloot completion off`), the Desktop App sends it with the other
+  synced categories, and the site keeps it under the talents switch. The anonymous `talent_snapshot` is never synced.
+- Site and MCP: while few players upload, Everloot's own installs (Worker secret `EVERLOOT_TRUSTED_INSTALLS`) make an
+  Auction House day or a census count public on their own. Everyone else still needs 3 reporters, and a census count
+  still needs 10 characters, the hiding of small counts and rounding to 5. A value that rests on them says "includes
+  Everloot's own scans" on the Auction House pages, in chat price answers and `market_value`, and the census and
+  `population` say when their numbers include them. Scans already waiting for a third reporter count from the next
+  rollup run.
+- Site, behind `EVERLOOT_PRIVATE_SYNC` (off; its migration is not applied): private sync of your own linked characters.
+  A key with the new `sync:own` scope sends a character's gear, active talents, professions, reputations, raid lockouts,
+  and achievements and titles. Each category is kept only when you hold that character's live link and turned its sync
+  on, and only its newest capture is kept. You see it all on a signed-in preview, and each section shows on the
+  character's public page only when you switch it on. Turning a category's sync off or unlinking deletes what was synced.
+- Site, behind `EVERLOOT_PRIVATE_SYNC` (off): /account turns each linked character's sync and page sections on and off,
+  and links to the preview. A sync key may send 20 times an hour, and achievements count only those the character earned.
+- Addon and Desktop App: with the completion tracker on, the addon keeps each of your characters' professions (rank of
+  max rank) and this week's raid lockouts (bosses killed of total, reset time) under the completion key, latest state
+  only, and the Desktop App's Characters page shows them on the keyed rows. They stay on your computer: no upload, the
+  upload page included, sends them, and the Desktop App's Chat does not read them. Not yet checked in game.
+- Addon: player names stay off by default, and the addon now asks once, in game, whether to turn them on. The question
+  comes a few seconds after the first loading screen, never in combat, and says what is recorded (name, realm, race,
+  class, level and guild of your characters and of players you target, mouse over or group with), how to turn it off
+  (`/everloot players off`) and where to hide a character (everloot.app/players/opt-out). After an answer, or a choice
+  made with `/everloot players on|off` or the settings page, it is never asked again.
+- Site: the Auction House lists each realm that has scans but no public prices yet, with how many of the 3 players needed
+  have scanned there ("1 of 3 players have scanned; prices go public at 3"). A player is counted once per upload address,
+  on the item with the most players on one day in the last 7. `/api/market/prices` without a realm returns the same counts
+  in `pending`. Counts only: no price or quantity below 3 players is shown.
 - Desktop App and site, behind `EVERLOOT_CHARACTER_LINKS` (off): the addon's `/everloot link <code>` (0.3.15) writes one
   link row for the character you are playing, with a code made on the account page. The Desktop App, signed in, sends it only
   to the account's own link endpoint; uploads never carry link rows. The account page lists your linked characters,
@@ -70,11 +279,44 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the header search box suggests dungeons and raids as you type, from the same rows as full search, with or without
   the leading "The": "deadm" offers the Deadmines, labelled "Dungeon, level 16". A box scoped to items, NPCs, quests or
   objects keeps to that type.
-- Addon and site: the census also counts players the game shows a nameplate for (`via: "nameplate"`, protocol 1.25.0),
+- Addon and site: the census also counts players the game shows a nameplate for (`via: "nameplate"`, protocol 1.26.0),
   at most 10 new ones a second; still race, class, level and faction only, and the players module still never reads
-  nameplates. Needs the next addon release (0.3.16); no migration.
+  nameplates. Needs the next addon release; no migration.
+- Site: `/api/health` has a route test: a fresh heartbeat answers 200, any other 503, both `Cache-Control: no-store`,
+  and the snapshot is read again only after a minute. The route itself is unchanged.
 
 ### Changed
+- Companion: the command line's `main` takes its uploader, price refresher, file watcher and console as an optional argument,
+  with the real ones as defaults, so the watch and prices loop is tested with fakes (upload then prices on each settled
+  write, prices alone, a failed refresh that keeps the previous file, upload never writing prices). Nothing it sends changes.
+- Site: the item lists, the census, the rankings and the MCP `population` tool read stored files the snapshot cron
+  writes, instead of rebuilding from every upload on each new server instance. The census is one snapshot the cron
+  extends with only the uploads received since its last run; the item lists' agreed names, public drops, and the items
+  players have seen with where they came from are one small file written after each snapshot that added uploads.
+  Both show the same values as before. With no file yet (the first minutes after a deploy) the pages read as before.
+- Site: private sync is on (`EVERLOOT_PRIVATE_SYNC`). A player can make a key with "Sync my linked characters", turn
+  sync on per character and category on /account, see what arrived on a signed-in preview, and show each section on
+  the character's public page. The data policy section is in effect and /privacy has the matching item.
+- MCP (0.9.1): every tool's annotations carry all four hints (`readOnlyHint: true`, `destructiveHint: false`,
+  `idempotentHint: true`, `openWorldHint: false`), in the live tool list and in `/schema/mcp/<tool>.json`, so a directory
+  that scores unannotated tools as destructive and open-world has nothing to assume. Lore hits open and guild boards close by
+  saying their names and excerpts are quoted source text, not instructions, as Blizzard's posts already did, and the
+  server's instructions tell every client the same and that no tool writes. `server.json` (and its copy at
+  `/.well-known/mcp/server-card.json`) now carries the listing icons and the `kb` subfolder for the registry.
+- Site: a character's page reads as one page. Its parts come in a fixed order, each with its own source line: the
+  owner's showcase, what the addon last saw, the guild it was seen in (the guild's own page: its size, its agreed raid
+  progress, labelled as the guild's and not the character's attendance, and up to eight other characters seen in it),
+  then links to the class's pages at the character's level. A rail lists the parts and the date of each source. The
+  sighting names the faction its race plays on (none for Skyborne). When the guild's officers published a board, the
+  guild part also shows that character's rank, the loot they gave it and whether it was at their last raid
+  (`EVERLOOT_CHARACTER_GUILD_FACTS`); the privacy policy, the privacy guide and the data policy say so.
+- Site: the drop rates API (`/api/rollups/drops`) gives each rate `sourceName` once 3 installs agree on the NPC's or
+  object's name, so the Desktop App's price file can name sources a player never met.
+- Site: the Auction House files a realm under the PvE, PvP, RP, RP-PvP or Hardcore tab when its name ends in that
+  ruleset, as Forever's realm list names them ("CAMWOW US1 Realm 4 PvP"); the realm map still overrides, and a realm
+  whose name names no ruleset stays under "Realms not mapped yet". Realm names show split the same way: the name, then
+  its ruleset in that ruleset's colour, in the realm column, the realm menu, a realm's page title and an item's
+  Auction House box. The Normal tab reads PvE.
 - Site: `/sign-in` and `/sign-up` are one centred card under Glint and the home art: the Battle.net button, a row of provider
   tiles (Google, GitHub, Discord, Twitch; Microsoft keeps its text button, as its guidelines ask), then email, then the links.
   GitHub joins the social providers behind `EVERLOOT_AUTH_V2` (`GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`).
@@ -131,6 +373,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the player pages are live. A player page shows what the addon last saw of a character — race, class,
   level, guild and the day — found by the start of the name, and every page carries a hide link and a hide
   form. The search index stays off for now, so the pages are reached by name and are not listed anywhere.
+- Site: character links and public character pages are on (`EVERLOOT_CHARACTER_LINKS`, `EVERLOOT_SHOWCASE`). On
+  /account a player links their own characters with a code typed in game, unlinks them, and can give each one a
+  public page at `/characters/<ruleset>/<realm>/<name>` with its name, level, race, class, faction and realm and two
+  share images. A new link is private, every page is noindex, and the hide form takes a page down without an
+  account. A character two accounts link stays frozen until it is settled: write to hello@everloot.app, we reply
+  within 7 days. The data policy, /privacy and the account page say so.
 
 ### Added
 - Site: the open data export, at `/database/download`. The published data as NDJSON files anyone can download
@@ -181,6 +429,137 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
+
+## [desktop-v0.1.20] - 2026-11-06
+
+### Added
+- Private sync now sends three more parts of a linked character: the active talent build, the character sheet's stats
+  (attributes, attack power, hit, crit, haste, expertise, spell power, healing, armor, defense, dodge, parry, block) and
+  PvP standing (rank, rank points, top rank, season, lifetime honorable kills). They come from the addon's next
+  release, which records them with the completion tracker on. As before, only characters you linked are sent, and
+  everloot.app keeps only the categories you switched on for that character on /account.
+
+### Changed
+- The Characters page no longer says professions and raid lockouts stay on your computer. They never go in an upload,
+  and private sync sends them only for a character you linked.
+
+## [0.3.21] - 2026-11-06
+
+Release channel: Alpha
+
+Drop rows name their source even when you never met it, with the names the site knows. Needs Desktop App 0.1.18 or
+later to write the names into the price file. Not yet seen in the Forever client.
+
+### Changed
+- A tooltip's drop row names its source from the price file when you never met it: "Drops from Battered Chest" instead
+  of "Drops from object 106318", and `/everloot price` says "Battered Chest (object 106318)". A name your own client
+  showed still comes first, and a source the site has no name for keeps its id.
+
+## [desktop-v0.1.19] - 2026-11-06
+
+### Added
+- Private sync of your linked characters. Signed in with a key made with "Sync my linked characters" on everloot.app,
+  the app sends the characters you linked from this save file after each upload: the newest gear, professions,
+  reputations, raid lockouts, and achievements and titles. The site keeps a category only when you turned its sync on
+  for that character on /account. A capture the site has kept is not sent again; a changed one is, and so is one for a
+  category whose sync is off or a character not linked yet, so turning sync on later still fills it in. Talent builds
+  are not sent yet: the addon's talent rows do not say which character they belong to. A key without that permission
+  gets one line saying which key to make.
+- The Characters page shows each character's professions and this week's raid lockouts once the addon records them
+  (the next addon release). They stay on your computer: no upload sends them.
+
+## [desktop-v0.1.18] - 2026-11-06
+
+### Changed
+- The app keeps the Everloot addon up to date on its own: a newer release installs into a game folder that already has
+  the addon, checked against the release's checksums, and the app says so once: "Everloot addon updated to X. Type
+  /reload in game." Settings → Game has the switch, "Keep the addon up to date", on by default. With it off, or when
+  an install fails, the tray's tooltip and menu show "Addon X available", which opens the Addon page. Before, the only
+  sign was one silent notification per version, easy to miss while the game is full screen.
+- The price file names the drop sources the site knows, beside the drop rates, so addon 0.3.21 and later can name a
+  source you never met ("Drops from Battered Chest" instead of "Drops from object 106318").
+
+### Fixed
+- On macOS the app no longer logs "Unable to set login item" on every start. Start-up registers a login item only when
+  "Start when I sign in" is on; Settings still applies the switch either way.
+- The game-folder hint on the first-run screen shows a macOS or Linux path on those systems, not a Windows one.
+
+## [0.3.20] - 2026-11-06
+
+Release channel: Alpha
+
+RP-PvP realms whose name ends in one word, "RPPVP", get their ruleset in the tooltip header. Not yet seen in the
+Forever client.
+
+### Fixed
+- On a realm whose name ends in RP-PvP written as one word ("CAMWOW US1 Realm 9 RPPVP", as players copied Forever's
+  realm list), the tooltip header splits RP-PvP off in its own colour, as it does for the other rulesets.
+
+## [0.3.19] - 2026-11-05
+
+Release channel: Alpha
+
+Drop rows in item tooltips name the creature or object they come from, when you have met it. Not yet seen in the
+Forever client.
+
+### Changed
+- A tooltip's drop rows name the sources you have met, as your client showed them: "Drops from Defias Bandit"
+  instead of "Drops from NPC 116", and `/everloot price` says "Defias Bandit (NPC 116)". The names come from your own
+  NPC and object sightings and what you looted, already in the saved file; nothing new is written. A source you never met
+  keeps its id.
+
+## [0.3.18] - 2026-11-05
+
+Release channel: Alpha
+
+Item tooltips read like the game's own: each price on its own row with gold, silver and copper icons, your realm and
+its ruleset in the header, and drop rates beside their sources. The minimap button gathers other addons' buttons.
+None of this has been seen in the Forever client yet.
+
+### Changed
+- Item tooltip prices are two-column rows, the label on the left and the amount on the right in the game's
+  gold, silver and copper icons (Market value, Min buyout, Historical, your scan's min buyout and value, and the
+  vendor sell price when the client knows it), with dates, units, reporters and warnings on muted lines beneath. The
+  Everloot header names the realm with its ruleset (PvP, PvE, RP, RP-PvP, Hardcore) split off in its own colour, and
+  says once that amounts are per unit. Drop rates sit in the value column too, their loot windows and installs beneath;
+  the note for what is missing drops its own "Everloot:". The Auction House tab's lookup shows the same rows in a
+  scrolling result, and Home, Options and the Auction House tab share one native style. `/everloot price` prints the
+  same amounts as plain text.
+
+### Added
+- The Everloot minimap button gathers other addons' minimap buttons. Hover the crest to see them in a small
+  panel; its clicks work as before, and Blizzard's own buttons stay where they are. It is on by default and covers
+  buttons made with LibDBIcon, which most addons use. `/everloot buttons off`, or the switch in the settings, puts
+  them back after a `/reload`.
+
+## [0.3.17] - 2026-11-05
+
+Release channel: Alpha
+
+Fixes from the first night of WoW: Forever. Quests, vendors and recipes now reach everloot.app from the live client,
+and the minimap button wears the Everloot crest. Quest and vendor capture follows the build's own API documentation and
+merchant window; it still needs to be seen working in game.
+
+### Fixed
+- Quests you accept and vendors you open are recorded again. On launch night no install sent a single quest or vendor:
+  Forever's client uses the modern quest log and merchant calls, and the addon now reads them.
+- Recipe collection no longer stops within hours. Every install paused it at its 2,000-row limit on night one, filled
+  almost entirely with recipes the player had not learned, which the site does not use. Only learned recipes are kept
+  now, and only the ranks that narrow a skill range. On first load the addon drops the unused rows and starts again.
+- The minimap button and the in-game addon list show the Everloot crest instead of stock game icons.
+
+## [0.3.16] - 2026-11-05
+
+Release channel: Alpha
+
+Layout fixes for the Options and auction-house panels reported from the live Forever client.
+The corrected layout still needs in-game verification; automated UI contracts do not verify the game renderer.
+
+### Fixed
+- Settings scroll within the Options panel, keep Reload reachable, and fit the Ask controls inside the panel.
+  Wrapped descriptions retain enough space at smaller panel sizes.
+- The auction scan prompt fits its wrapped explanation and button; the backup scan action sits below the
+  auction window instead of overlapping Search. Scan cooldowns and click-only behavior are unchanged.
 
 ## [0.3.15] - 2026-11-01
 

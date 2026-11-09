@@ -252,6 +252,77 @@ describe("the owner's list", () => {
     expect(Object.keys(body.links[0]).sort()).toEqual(Object.keys(own).sort());
   });
 
+  test("with private sync off, nothing about sync is read or listed", async () => {
+    vi.stubEnv("EVERLOOT_SHOWCASE", "1");
+    vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "");
+    auth.authQuery.mockResolvedValueOnce([{ ...own, ruleset: "forever", character_visibility: { page_public: true } }]);
+    const body = await (await list()).json();
+    expect(body.links[0].sync).toBeUndefined();
+    expect(body.links[0].page).toEqual({ public: true, path: "/characters/forever/forever-pioneer/thrallina" });
+    expect(sentToDatabase()).not.toMatch(/show_|own_character_facts/);
+  });
+
+  test("with private sync on, each link lists its sync per category and, with the pages on, its section switches; never the facts", async () => {
+    vi.stubEnv("EVERLOOT_SHOWCASE", "1");
+    vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1");
+    const consent = (on: string[], captured: Record<string, string> = {}) => ["gear", "stats", "talents", "pvp", "professions", "reputations", "raids", "achievements"]
+      .map((category) => ({ category, consented: on.includes(category), captured_at: captured[category] ?? null, data: captured[category] ? { secret: "fact-data" } : null }));
+    auth.authQuery.mockImplementation(async (path: string, init?: { body: string }) => {
+      if (path.startsWith("character_links?")) {
+        return [
+          { ...own, ruleset: "forever", character_visibility: { page_public: true, show_gear: true, show_stats: false, show_talents: false, show_pvp: true, show_professions: false, show_reputations: false, show_raids: false, show_collections: true } },
+          { ...own, id: OTHER_ID, name: "Jainara", status: "frozen", ruleset: "forever", character_visibility: null },
+        ];
+      }
+      if (path === "rpc/own_character_facts") {
+        const { p_link_id } = JSON.parse(init!.body);
+        return p_link_id === LINK_ID ? consent(["gear", "achievements"], { gear: "2026-11-05T10:00:00+00:00" }) : consent(["raids"]);
+      }
+      throw new Error(`unexpected ${path}`);
+    });
+    const res = await list();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const [path] = auth.authQuery.mock.calls[0];
+    expect(path).toContain("character_visibility(page_public,show_gear,show_stats,show_talents,show_pvp,show_professions,show_reputations,show_raids,show_collections)");
+    expect(body.links[0].page.sections).toEqual({ gear: true, stats: false, talents: false, pvp: true, professions: false, reputations: false, raids: false, achievements: true });
+    expect(body.links[0].sync).toEqual([
+      { category: "gear", on: true, capturedAt: "2026-11-05T10:00:00.000Z" },
+      { category: "stats", on: false, capturedAt: null },
+      { category: "talents", on: false, capturedAt: null },
+      { category: "pvp", on: false, capturedAt: null },
+      { category: "professions", on: false, capturedAt: null },
+      { category: "reputations", on: false, capturedAt: null },
+      { category: "raids", on: false, capturedAt: null },
+      { category: "achievements", on: true, capturedAt: null },
+    ]);
+    // A link with no visibility row has every switch off.
+    expect(Object.values(body.links[1].page.sections)).toEqual([false, false, false, false, false, false, false, false]);
+    expect(body.links[1].sync.find((c: { category: string }) => c.category === "raids").on).toBe(true);
+    // Each read is the session's own account.
+    for (const [p, init] of auth.authQuery.mock.calls.slice(1)) {
+      expect(p).toBe("rpc/own_character_facts");
+      expect(JSON.parse(init.body).p_user_id).toBe(USER.id);
+    }
+    expect(JSON.stringify(body)).not.toContain("fact-data");
+  });
+
+  test("with private sync on but the pages off, sync is listed with no page and no section switches", async () => {
+    vi.stubEnv("EVERLOOT_SHOWCASE", "");
+    vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1");
+    auth.authQuery.mockResolvedValueOnce([own]).mockResolvedValueOnce([{ category: "gear", consented: true, captured_at: null, data: null }]);
+    const body = await (await list()).json();
+    expect(body.links[0].page).toBeUndefined();
+    expect(body.links[0].sync[0]).toEqual({ category: "gear", on: true, capturedAt: null });
+    expect(auth.authQuery.mock.calls[0][0]).not.toContain("show_");
+  });
+
+  test("with private sync on, a sync read failing is a 503, never a list that says sync is off", async () => {
+    vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1");
+    auth.authQuery.mockResolvedValueOnce([own]).mockRejectedValueOnce(new Error("down"));
+    expect((await list()).status).toBe(503);
+  });
+
   test("signed out the list is 401; an API key is never read for it", async () => {
     auth.getUser.mockResolvedValue(null);
     const res = await list();

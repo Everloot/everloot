@@ -149,6 +149,12 @@ export function createIntakeQuota(opts: {
       return consume("api", clientIp(req));
     },
     install(installId: string) { return consume("install", installId); },
+    /**
+     * Private sync (POST /api/me/characters/sync): 20 requests an hour per sync:own key, given as its SHA-256 hash.
+     * It borrows the install scope, which every applied quota function has, so no migration: the `sync:` prefix makes
+     * its own bucket, and is longer than any install id can be.
+     */
+    syncKey(keyHash: string) { return consume("install", `sync:${keyHash}`); },
     async prune() {
       if (!url || !secret) {
         if (production) throw new Error("Quota storage is not configured");

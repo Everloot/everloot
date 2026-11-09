@@ -13,7 +13,7 @@ decision, section 9 says so.
 | --- | --- |
 | A ladder per raid tier: rank, guild, realm, progress (`6/8`), filterable by region, realm, faction. | `/guilds`: a ladder per raid instance from agreed kills, filterable by realm and faction. |
 | A guild page: progress per raid with kill dates, a roster with class and level, a rank on the realm and overall. | `/guilds/<realm>/<guild>`: the same, from the guild's own members' uploads and, when officers publish, their roster. |
-| A character page that names the guild and links to it. | `/players/<ruleset>/<realm>/<name>` links to the guild page. |
+| A character page that names the guild and links to it. | `/players/<ruleset>/<realm>/<name>` (`/characters/...` since 2026-11-05, #773) links to the guild page. |
 | Armory sync fills everything. | There is no Forever armory. Everything comes from the addon, and a fact is published only when enough installs agree, as everywhere on the site. |
 | A score. | None. Carlos decided on 2026-09-29 that the components stay separate; the ladder orders by progression alone, which is also how WoWProgress ranks within a tier. |
 

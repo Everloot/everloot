@@ -1,13 +1,16 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import ItemTip from "@/components/game/ItemTip";
-import { Card, Contribute as ContributeCard, DataTable, EmptyState, QUALITY_LABEL, QUALITY_TEXT, qualityOf as qualityToken, type Column, type Quality } from "@/components/ui";
-import { SPARK_BOX, itemHref, itemLabel, money, percent, sparkline, type ItemNames, type MarketRow, type RulesetSummary } from "@/lib/auction-house";
+import { AGREEMENT_NEEDED, AgreementMeter, Card, Contribute as ContributeCard, DataTable, EmptyState, QUALITY_LABEL, QUALITY_TEXT, qualityOf as qualityToken, type Column, type Quality } from "@/components/ui";
+import { SPARK_BOX, itemHref, itemLabel, money, percent, realmHref, sparkline, type ItemNames, type MarketRow, type PendingRealm, type RulesetSummary } from "@/lib/auction-house";
 import { RULESET_LABEL, isRulesetSlug, type RulesetSlug } from "@/lib/realms";
-import { HISTORY_DAYS, formatCopper, type PublicDay } from "../../../../../kb/src/market";
+import { RealmName } from "./RealmName";
+import { HISTORY_DAYS, formatCopper, reportersText, type PublicDay } from "../../../../../kb/src/market";
 import type { ItemTip as Tip } from "./art";
 import { categoryRow } from "./browse";
 import TimeAgo from "./TimeAgo";
+
+export { RealmName };
 
 /** The quality token for a tooltip's quality name ("Uncommon"); null without a tooltip. */
 export function qualityOf(tip: Tip | undefined): Quality | null {
@@ -103,11 +106,45 @@ export function Contribute() {
   );
 }
 
-/** Facts beside each other under a page title: "Prices updated 4 min ago Â· 3 realms". */
+/**
+ * Why an item reads "Item N" (lib/items.ts shownItemName, as art.ts auctionNames applies it): no name three
+ * installs agree on, none the game files and the Warcraft Wiki agree on, and no tooltip from a scanned item.
+ */
+export const UNNAMED_REASON = "No agreed name yet: a name shows once three installs report the same one, or when the game files and the Warcraft Wiki agree on one. The prices are real.";
+
+/** The one line under the header of an unnamed item's price page; nothing for a named item. */
+export function UnnamedReason({ id, names }: { id: number; names: ItemNames }) {
+  if (names.has(id)) return null;
+  return <p className="text-cell text-fg-2" data-unnamed-reason>{UNNAMED_REASON}</p>;
+}
+
+/** How the counts in PendingRealms are made, in one sentence. */
+export const PENDING_RULE = "A player is counted when they scanned the same item there on one day in the last 7 days; installs behind one upload address count once.";
+
+/** Realms with scans but no public price yet, each with how many of the 3 players have scanned there. Counts only. */
+export function PendingRealms({ realms }: { realms: PendingRealm[] }) {
+  return (
+    <section aria-labelledby="ah-pending" className="mt-4">
+      <h2 id="ah-pending" className="text-cell font-medium text-fg">Not public yet</h2>
+      <p className="mt-1 text-meta text-fg-2">{PENDING_RULE}</p>
+      <ul className="mt-2 divide-y divide-line border-y border-line">
+        {realms.map((r) => (
+          <li key={r.slug} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-cell">
+            <span aria-hidden="true"><AgreementMeter count={r.reporters} /></span>
+            <Link href={realmHref(r)} className="text-fg hover:underline underline-offset-4"><RealmName name={r.realm} /></Link>
+            <span className="text-fg-2">{r.reporters} of {AGREEMENT_NEEDED} players have scanned; prices go public at {AGREEMENT_NEEDED}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** Facts beside each other under a page title: "Prices updated 4 min ago · 3 realms". */
 export function Facts({ items }: { items: ReactNode[] }) {
   return (
     <>
-      {items.flatMap((item, i) => (i === 0 ? [<span key={i}>{item}</span>] : [<span key={`s${i}`} aria-hidden="true">Â·</span>, <span key={i}>{item}</span>]))}
+      {items.flatMap((item, i) => (i === 0 ? [<span key={i}>{item}</span>] : [<span key={`s${i}`} aria-hidden="true">·</span>, <span key={i}>{item}</span>]))}
     </>
   );
 }
@@ -160,18 +197,21 @@ export function PriceChart({ points }: { points: PublicDay[] }) {
   );
 }
 
+/** A reporter count; under 3 the day is public because Everloot's own installs scanned it, and the cell says so. */
+const reporterCell = (n: number) => (n < AGREEMENT_NEEDED ? reportersText(n) : n);
+
 /** One item's price on each realm, each row linking to that realm's page for it. */
 export function RealmPrices({ rows, caption, empty }: { rows: MarketRow[]; caption: string; empty: string }) {
   const columns: Column<MarketRow>[] = [
     {
       key: "realm", header: "Realm", nowrap: true,
-      cell: (r) => <Link href={itemHref(r.realm, r.value.itemId)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{r.realm.name}</Link>,
+      cell: (r) => <Link href={itemHref(r.realm, r.value.itemId)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg"><RealmName name={r.realm.name} /></Link>,
     },
     { key: "market", header: "Market value", numeric: true, cell: (r) => <span className={r.value.market === null ? "text-muted" : undefined}>{money(r.value.market)}</span> },
     { key: "min", header: "Min buyout", numeric: true, cell: (r) => formatCopper(r.value.min) },
     { key: "historical", header: "Historical", numeric: true, cell: (r) => formatCopper(r.value.historical) },
     { key: "units", header: "Units", numeric: true, cell: (r) => r.value.quantity.toLocaleString("en-US") },
-    { key: "reporters", header: "Reporters", numeric: true, cell: (r) => r.value.reporters },
+    { key: "reporters", header: "Reporters", numeric: true, cell: (r) => reporterCell(r.value.reporters) },
     { key: "day", header: "Day", numeric: true, cell: (r) => r.value.day },
   ];
   return <DataTable caption={caption} columns={columns} rows={rows} rowKey={(r) => r.realm.key} empty={<EmptyState framed={false} message={empty} />} />;
@@ -184,7 +224,7 @@ export function DayTable({ points, caption }: { points: PublicDay[]; caption: st
     { key: "value", header: "Value", numeric: true, cell: (p) => formatCopper(p.market) },
     { key: "min", header: "Min buyout", numeric: true, cell: (p) => formatCopper(p.min) },
     { key: "units", header: "Units", numeric: true, cell: (p) => `${p.quantity.toLocaleString("en-US")}${p.thin ? " (thin)" : ""}` },
-    { key: "reporters", header: "Reporters", numeric: true, cell: (p) => p.reporters },
+    { key: "reporters", header: "Reporters", numeric: true, cell: (p) => reporterCell(p.reporters) },
   ];
   return <DataTable caption={caption} columns={columns} rows={[...points].reverse()} rowKey={(p) => p.day} />;
 }

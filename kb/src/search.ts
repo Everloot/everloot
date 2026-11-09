@@ -42,6 +42,8 @@ const STOPWORDS = new Set([
   "which", "who", "whom", "whose", "why", "with", "would",
   // The same questions typed without the apostrophe ("whats", not "what's").
   "whats", "wheres", "whos", "hows",
+  // "does Thunder Bluff have a zeppelin", "is there any", "my mount": asking words, not the topic.
+  "have", "has", "there", "any", "my",
 ]);
 
 /**
@@ -58,6 +60,9 @@ export const PICK_WORDS = new Set(["best", "better", "worse", "worst", "good", "
 export function allTerms(name: string): string {
   return (name.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).join(" ");
 }
+
+/** Whether a lowercased word carries no topic: a stopword or contraction debris. */
+export const askingWord = (term: string): boolean => term.length <= 1 || STOPWORDS.has(term);
 
 export function contentTerms(input: string): string[] {
   const terms = input.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
@@ -190,8 +195,8 @@ export async function search(source: ReleaseSource, query: string, limit = 10, o
   // The SQL boost matches the raw query or its meaningful words, so a long exact page enters the pool.
   const wanted = contentTerms(raw).join(" ");
   params.push(raw, wanted, Math.max(limit, 50));
-  const pool = await db.all<SearchHit>(
-    `SELECT ${ROW}
+  const pool = await db.all<SearchHit & { lead?: string }>(
+    `SELECT ${ROW}, ${LEAD}
      FROM entities_fts JOIN entities e ON e.id = entities_fts.rowid
      WHERE ${conds.join(" AND ")}
      ORDER BY CASE WHEN e.name = ? COLLATE NOCASE OR e.name = ? COLLATE NOCASE THEN 0 ELSE 1 END,
@@ -221,13 +226,131 @@ export async function search(source: ReleaseSource, query: string, limit = 10, o
   const named = expanded.length ? await pagesNamed(db, expanded, opts) : [];
   for (const h of named) seen.add(h.id);
   const merged = [...named, ...exact.filter((h) => !seen.has(h.id) && [wanted, asked].includes(allTerms(h.name))), ...pool.filter((h) => !named.some((n) => n.id === h.id))];
-  const rank = (hit: SearchHit) => (allTerms(hit.name) === wanted ? 0 : contentTerms(hit.name).join(" ") === wanted ? 1 : 2);
+  // Then a title holding every asked word ("Thunder Bluff to Orgrimmar travel guide" for "orgrimmar to thunder bluff")
+  // before pages that hold some of them in the title and the rest in the text.
+  const wantedTerms = wanted.split(" ");
+  const rank = (hit: SearchHit) => {
+    const name = allTerms(hit.name);
+    if (name === wanted) return 0;
+    if (contentTerms(hit.name).join(" ") === wanted) return 1;
+    const words = new Set(name.split(" "));
+    return wantedTerms.length > 1 && wantedTerms.every((t) => words.has(t)) ? 2 : 3;
+  };
   // At the same rank, Everloot's own curated entries come before the copied Warcraft Wiki pages.
   const own = (hit: SearchHit) => (hit.sourceId === "curated" ? 0 : 1);
   // Re-rank only the first RERANK rows: they are the same rows whatever the limit, so page cuts at
   // different limits stay a stable prefix of one ordering. Rows after them keep the SQL order.
   const head = merged.slice(0, RERANK).sort((a, b) => rank(a) - rank(b) || own(a) - own(b));
-  return [...head, ...merged.slice(RERANK)].slice(0, limit);
+  // A page the question names ("where does Linen Cloth drop") opens with its own first lines ("Hogger is an elite
+  // gnoll…"), not the fragment where bm25 found the words ("…Model updated."). Other hits keep the fragment that
+  // shows why they matched.
+  const namedIn = (hit: SearchHit) => rank(hit) < 2 || ` ${asked} `.includes(` ${allTerms(hit.name)} `);
+  return [...head, ...merged.slice(RERANK)].slice(0, limit).map(({ lead, ...hit }: SearchHit & { lead?: string }) =>
+    (lead !== undefined && namedIn(hit) ? { ...hit, snippet: lead } : hit));
+}
+
+/** The body's opening, the same cut as an exact lookup's snippet. */
+const LEAD = `CASE WHEN length(e.body) > 160 THEN substr(e.body, 1, 160) || '…' ELSE e.body END AS lead`;
+
+/** A word the player changed and what it was read as. */
+export interface Respelling { from: string; to: string }
+
+/** At most this many spellings are tried for one word, so one check stays one query under D1's bound-parameter cap. */
+const MAX_TRIES = 90;
+/** A word on this many pages or fewer may be a typo; a spelling on more than COMMON of them (the count stops at 20) replaces it. */
+const RARE = 2;
+const COMMON = 10;
+
+/**
+ * The spellings tried for a word: one letter dropped ("zeppeling"), two neighbours swapped, one vowel changed, one
+ * letter doubled ("orgrimar"), two vowels swapped ("monestary"), in that order.
+ */
+function nearSpellings(word: string): string[] {
+  const out = new Set<string>();
+  for (let i = 0; i < word.length; i++) out.add(word.slice(0, i) + word.slice(i + 1));
+  for (let i = 0; i < word.length - 1; i++) out.add(word.slice(0, i) + word[i + 1] + word[i] + word.slice(i + 2));
+  for (let i = 0; i < word.length; i++) {
+    if (!"aeiou".includes(word[i]!)) continue;
+    for (const v of "aeiou") if (v !== word[i]) out.add(word.slice(0, i) + v + word.slice(i + 1));
+  }
+  for (let i = 0; i < word.length; i++) out.add(word.slice(0, i + 1) + word.slice(i));
+  // Two vowels typed in each other's place ("monestary" for "monastery").
+  const vowels = [...word].flatMap((c, i) => ("aeiou".includes(c) ? [i] : []));
+  for (const [n, i] of vowels.entries()) for (const j of vowels.slice(n + 1)) {
+    if (word[i] === word[j]) continue;
+    const swapped = [...word];
+    [swapped[i], swapped[j]] = [swapped[j]!, swapped[i]!];
+    out.add(swapped.join(""));
+  }
+  out.delete(word);
+  return [...out].filter((w) => w.length >= 3);
+}
+
+/**
+ * How many pages (capped) carry each FTS query, one statement for all of them: one row with a column per query. Not a
+ * UNION ALL, since D1 refuses a compound SELECT of more than five terms; MAX_TRIES keeps it under D1's 100 parameters.
+ */
+async function pageCounts(db: ReleaseDb, queries: readonly string[]): Promise<number[]> {
+  if (!queries.length) return [];
+  const columns = queries.map((_, i) => `(SELECT count(*) FROM (SELECT 1 FROM entities_fts WHERE entities_fts MATCH ? LIMIT 20)) AS n${i}`);
+  const [row] = await db.all<Record<string, number>>(`SELECT ${columns.join(", ")}`, ...queries);
+  return queries.map((_, i) => Number(row?.[`n${i}`] ?? 0));
+}
+
+/** The question's other topic words, quoted for FTS. */
+const others = (question: string, word: string) => contentTerms(question).filter((t) => t !== word).map((t) => `"${t}"`).join(" ");
+
+/**
+ * Of spellings equally common, the one that most pages carry beside the question's other words ("scarlet monastery
+ * level", not "scarlet monetary level"); the first tried when none does.
+ */
+async function inContext(db: ReleaseDb, spellings: readonly string[], context: string): Promise<string> {
+  if (!context) return spellings[0]!;
+  const counts = await pageCounts(db, spellings.map((w) => `"${w}" ${context}`));
+  return spellings[counts.indexOf(Math.max(...counts))]!;
+}
+
+/**
+ * The question with its words read the way the pages write them, for when no page title holds every word: a name typed
+ * as one word becomes the page title's words ("thunderbluff" → "thunder bluff", "mankriks" → "mankrik s"), and a
+ * word no page carries, or only a page or two, becomes its nearest spelling that many pages carry ("zeppeling" →
+ * "zeppelin"). A word the pages use is kept. Null when nothing changes. One query per word of five letters or more.
+ */
+export async function respell(
+  source: ReleaseSource, question: string, keep: ReadonlySet<string> = new Set(),
+): Promise<{ text: string; changes: Respelling[] } | null> {
+  const db = releaseDb(source);
+  const changes: Respelling[] = [];
+  for (const word of new Set(contentTerms(question))) {
+    // `keep`: words the caller knows are right, such as names in the game files that the 2023 pages never had.
+    if (word.length < 5 || !/^\p{L}+$/u.test(word) || PICK_WORDS.has(word) || keep.has(word)) continue;
+    // A page title holding the word as typed means it is a name already ("Zephyr"), so it is never split or changed.
+    const splits = [];
+    for (let i = 3; i < word.length; i++) splits.push(`${word.slice(0, i)} ${word.slice(i)}`);
+    const near = nearSpellings(word).slice(0, MAX_TRIES - splits.length - 2);
+    const queries = [`name : "${word}"`, `"${word}"`, ...splits.map((s) => `name : "${s}"`), ...near.map((w) => `"${w}"`)];
+    const counts = await pageCounts(db, queries);
+    const [inTitle, onPages] = counts as [number, number];
+    let to: string | null = null;
+    if (!inTitle) {
+      const split = splits.findIndex((_, i) => counts[2 + i]! > 0);
+      if (split !== -1) to = splits[split]!;
+    }
+    // A word a page title carries is a name ("Sneed"), never another word's typo ("seed").
+    if (!to && !inTitle && onPages <= RARE) {
+      // The spelling most pages use; on a tie, the one the question's other words fit. A word a page or two carry is
+      // most likely the same typo on those pages ("monestary"), so it gives way only to a spelling on many more of them.
+      const nearCounts = counts.slice(2 + splits.length);
+      const most = Math.max(0, ...nearCounts);
+      const tied = near.filter((_, i) => nearCounts[i] === most);
+      if (most > (onPages ? COMMON : 0)) to = tied.length > 1 ? await inContext(db, tied, others(question, word)) : tied[0]!;
+    }
+    if (to) changes.push({ from: word, to });
+  }
+  if (!changes.length) return null;
+  let text = question;
+  for (const c of changes) text = text.replace(new RegExp(`(?<![\\p{L}\\p{N}])${c.from}(?![\\p{L}\\p{N}])`, "giu"), c.to);
+  return { text, changes };
 }
 
 /** The pages whose title is one of `names` (by normalized name), in the names' order; at most 2 per name. */

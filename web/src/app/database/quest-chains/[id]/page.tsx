@@ -20,7 +20,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   // A listed entry is a page, from the game files or three players' reports; nothing listed says noindex rather than cache a thin page.
   if (!entry) return { robots: { index: false, follow: true } };
   return {
-    ...pageMetadata({ title: `${entry.name} (quest chain)`, description: `The ${entry.name} quest chain in WoW: Forever and the quests in it${entry.confirmed ? ", as three players reported it." : `. ${CLIENT_LABEL}.`}`, path: chainHref(entry.questLineId, entry.name) }),
+    ...pageMetadata({ title: `${entry.name} (quest chain)`, description: `The ${entry.name} quest chain in WoW: Forever and the quests in it${entry.confirmed ? ", as three installs reported it." : `. ${CLIENT_LABEL}.`}`, path: chainHref(entry.questLineId, entry.name) }),
     robots: { index: true, follow: true },
   };
 }

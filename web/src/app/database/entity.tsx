@@ -7,6 +7,7 @@ import { UNCONFIRMED_TITLE } from "@/components/ui/Badge";
 import { trailFor } from "@/lib/breadcrumbs";
 import { breadcrumbJsonLd, type Crumb } from "@/lib/jsonld";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
+import { WORLD_MAP } from "@/lib/world-map";
 
 // The layout every database entity page shares (item, NPC, quest, object, vendor), read like an item
 // database: a compact title with its type line, the tooltip box and the quick facts side by side,
@@ -74,8 +75,12 @@ export function EntityTop({ box, facts }: { box: ReactNode; facts: ReactNode }) 
   );
 }
 
-/** A quick fact's value, or the empty agreement meter while no install has reported it. */
-export const known = (value: ReactNode) => (value === null || value === undefined || value === "" ? <AgreementMeter count={0} /> : value);
+/**
+ * A quick fact's value, or while it is not agreed the agreement meter: empty until an install reports it, then how
+ * many of the 3 have (`reported`, a count short of 3), never the value they reported.
+ */
+export const known = (value: ReactNode, reported = 0) =>
+  (value === null || value === undefined || value === "" ? <AgreementMeter count={reported} withText={reported > 0} /> : value);
 
 /**
  * An empty tab: one line. The agreement meter and "Get the addon" for what players report; a plain line
@@ -104,3 +109,17 @@ export const FREQUENCY = <span title="A loot window is a recorded loot, not a ve
 
 /** The shared link style for a name in a table. */
 export const LINK = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
+
+/** The zone a UiMap id names, as the zone pages say it; "Map <id>" for one the map does not draw. */
+export const zoneName = (mapId: number): string => WORLD_MAP.zones.find((z) => z.uiMapId === mapId)?.name ?? `Map ${mapId}`;
+
+/** A Map cell of a pin table: the zone by name, with the UiMap id in the tooltip for anyone matching it to the game files. */
+export const MapName = ({ mapId }: { mapId: number }) => <span title={`UiMap ${mapId}`}>{zoneName(mapId)}</span>;
+
+/** The header of a pin table's link column: the <th> has a name for screen readers and no visible word. */
+export const MAP_LINK_HEADER = <span className="sr-only">Map link</span>;
+
+/** A pin table's link to the map. Each one says where it goes (WCAG 2.4.4), since every row's link reads the same. */
+export function ShowOnMap({ href, mapId, x, y }: { href: string; mapId: number; x: number; y: number }) {
+  return <Link href={href} className={LINK} aria-label={`Show ${zoneName(mapId)} at ${x}, ${y} on the map`}>Show on the map</Link>;
+}

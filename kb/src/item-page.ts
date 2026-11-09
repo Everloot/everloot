@@ -73,7 +73,7 @@ function clean(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function agreedLabel(rows: { installId: string; label: string }[]): string | null {
+function labelGroups(rows: { installId: string; label: string }[]): { label: string; installs: Set<string> }[] {
   const groups = new Map<string, { label: string; installs: Set<string> }>();
   for (const row of rows) {
     const key = clean(row.label);
@@ -82,8 +82,22 @@ function agreedLabel(rows: { installId: string; label: string }[]): string | nul
     group.installs.add(row.installId);
     groups.set(key, group);
   }
-  const winners = [...groups.values()].filter((group) => group.installs.size >= ITEM_AGREEMENT);
+  return [...groups.values()];
+}
+
+function agreedLabel(rows: { installId: string; label: string }[]): string | null {
+  const winners = labelGroups(rows).filter((group) => group.installs.size >= ITEM_AGREEMENT);
   return winners.length === 1 ? winners[0]!.label : null;
+}
+
+/**
+ * How many installs reported the leading name of an item with no agreed name: the count short of 3. 0 when no install
+ * reported one, when one is agreed, and when two names each have 3. A count only, never the name.
+ */
+export function itemNameReporters(itemId: number, facts: Pick<ItemFacts, "names">): number {
+  const sizes = labelGroups(facts.names.filter((row) => row.itemId === itemId).map((row) => ({ installId: row.installId, label: row.name }))).map((g) => g.installs.size);
+  const most = Math.max(0, ...sizes);
+  return most < ITEM_AGREEMENT ? most : 0;
 }
 
 /** Every item with an agreed name, by id: the same names `itemPage` gives, in one pass over the sightings. */

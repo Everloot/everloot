@@ -112,15 +112,27 @@ test("vendors list the agreed vendor with its name and zone", async () => {
   expect(page).toContain(">Elwynn Forest<");
 });
 
-test("nothing uploaded yet: the empty meter, one sentence and a plain addon link, no button", async () => {
+test("nothing uploaded yet: the empty meter and plain addon link stay, while the recording notice ends at launch", async () => {
   store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], dataAsOf: "2026-10-10T00:00:00.000Z" });
-  const page = await html(NpcList(search()));
-  expect(page).toContain("data-empty-state");
-  expect(page).toContain('href="/addon"');
-  expect(page).not.toContain("btn");
-  // Nothing to filter yet, so no filter bar; the line says what will appear and when.
-  expect(page).not.toContain("NPC filters");
-  expect(page).toContain("The addon starts recording when the game launches on November 4");
+  vi.useFakeTimers({ toFake: ["Date"] });
+  try {
+    for (const date of ["2026-10-25T12:00:00Z", "2026-11-10T12:00:00Z"]) {
+      vi.setSystemTime(new Date(date));
+      const page = await html(NpcList(search()));
+      expect(page).toContain("data-empty-state");
+      expect(page).toContain('href="/addon"');
+      expect(page).not.toContain("btn");
+      expect(page).not.toContain("NPC filters");
+      expect(page).toContain("NPC shows here once 3 installs agree on it.");
+      if (date.startsWith("2026-10")) {
+        expect(page).toContain("The addon starts recording when the game launches on November 4");
+      } else {
+        expect(page).not.toContain("The addon starts recording");
+      }
+    }
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test("the plain lists are indexed, each page under its own URL; any filter, sort or search is noindex with the plain list as canonical", async () => {

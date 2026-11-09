@@ -7,37 +7,78 @@ local E = Everloot
 E.DROP_INSTALLS = 3        -- as the site: a rate is public once three installs looted its source
 E.DROP_SOURCES_SHOWN = 3   -- tooltip lines per item; the rest are counted
 
--- The drops block: { status = "absent" | "verifying" | "ready" | "bad", data, asOf }.
-local drops
+-- The drops block and the sources block (public vendors and reagent-of counts, beside the drops), each
+-- { status = "absent" | "verifying" | "ready" | "bad", data, asOf, names }.
+local drops, sources
 
 function E:ResetDrops()
-  drops = nil
+  drops, sources = nil, nil
+end
+
+--- The block's `names`, one "n116=Defias Bandit" or "o1731=Copper Vein" line each, as { n116 = name }: the names
+--- the site knows for the sources, written by the Desktop App. Outside the checksum, so a name is display text only:
+--- its pipes are doubled, so the game prints them instead of reading a colour or a link.
+local function sourceNames(text)
+  local names = {}
+  if type(text) ~= "string" then return names end
+  for key, name in text:gmatch("([no]%d+)=([^\n]+)") do names[key] = name:sub(1, 100):gsub("|", "||") end
+  return names
+end
+
+--- One checksummed block of EverlootPricesDB (`key`), read once: absent when the file has no such table, verifying
+--- while its Adler-32 `sum` is checked a slice per frame, then ready or bad. `what` names it in the chat warning.
+--- `set` stores the entry in the module before the check starts (a small block passes within the call) and `current`
+--- reads it back, so a reset while checking is seen.
+local function loadBlock(key, what, set, current)
+  local db = type(EverlootPricesDB) == "table" and EverlootPricesDB[key]
+  if type(db) ~= "table" then
+    set({ status = "absent" })
+  elseif type(db.data) ~= "string" or type(db.sum) ~= "number" then
+    set({ status = "bad" })
+    print("Everloot: " .. what .. " failed their checksum and are not shown.")
+  else
+    local entry = { status = "verifying", data = ";" .. db.data .. ";", asOf = db.dataAsOf, names = sourceNames(db.names) }
+    set(entry)
+    E.VerifyChecksum(db.data, db.sum, function(ok)
+      if current() ~= entry then return end -- reset while checking
+      entry.status = ok and "ready" or "bad"
+      if not ok then
+        entry.data = nil
+        print("Everloot: " .. what .. " failed their checksum and are not shown.")
+      end
+    end)
+  end
+  return current()
 end
 
 --- The drops block of EverlootPricesDB: "itemId,kind,sourceId,drops,windows,installs;..." grouped by item, best
 --- rate first, with an Adler-32 `sum`. Searched, not parsed, like the prices: a tooltip reads its item's run only.
 local function dropFile()
-  if drops == nil then
-    local db = type(EverlootPricesDB) == "table" and EverlootPricesDB.drops
-    if type(db) ~= "table" then
-      drops = { status = "absent" }
-    elseif type(db.data) ~= "string" or type(db.sum) ~= "number" then
-      drops = { status = "bad" }
-      print("Everloot: drop sources failed their checksum and are not shown.")
-    else
-      local entry = { status = "verifying", data = ";" .. db.data .. ";", asOf = db.dataAsOf }
-      drops = entry
-      E.VerifyChecksum(db.data, db.sum, function(ok)
-        if drops ~= entry then return end -- reset while checking
-        entry.status = ok and "ready" or "bad"
-        if not ok then
-          entry.data = nil
-          print("Everloot: drop sources failed their checksum and are not shown.")
-        end
-      end)
-    end
-  end
+  if drops == nil then loadBlock("drops", "drop sources", function(entry) drops = entry end, function() return drops end) end
   return drops
+end
+
+--- The sources block: "itemId,npcId/npcId,reagentOf;..." one row per item, items ascending, with an Adler-32 `sum`.
+--- The vendors are the NPCs the site has public rows selling the item, the count is how many recipes it is a basic
+--- reagent of, by the site's own three-installs rule. A file from an app that does not write the block is "absent".
+local function sourceFile()
+  if sources == nil then loadBlock("sources", "item sources", function(entry) sources = entry end, function() return sources end) end
+  return sources
+end
+
+--- One item's public sources from the file: { vendors = { npcId, ... }, reagentOf = n, names = { n116 = name } }.
+--- Nil while the block is missing, being checked or failed, and when the file has no row for the item.
+function E:PublicSources(itemId)
+  local entry = sourceFile()
+  if entry.status ~= "ready" then return nil end
+  local at = entry.data:find(";" .. itemId .. ",", 1, true)
+  if not at then return nil end
+  local text = entry.data:match("^;([^;]+)", at)
+  local id, vendors, reagentOf = text:match("^(%d+),([%d/]*),(%d+)$")
+  if tonumber(id) ~= itemId then return nil end
+  local ids = {}
+  for npcId in vendors:gmatch("%d+") do ids[#ids + 1] = tonumber(npcId) end
+  return { vendors = ids, reagentOf = tonumber(reagentOf), names = entry.names }
 end
 
 --- One item's public sources, best rate first: { { kind = "npc" | "object", id, drops, windows, installs } }.
@@ -75,13 +116,21 @@ function E:DropLines(itemId)
   local out = {}
   for i = 1, math.min(#sources, E.DROP_SOURCES_SHOWN) do
     local s = sources[i]
-    out[#out + 1] = { r = 0.9, g = 0.8, b = 0.5, text = string.format("Everloot drop: %s %d · %.1f%% (%d of %d loot windows) · %d installs",
-      s.kind == "npc" and "NPC" or "object", s.id, 100 * s.drops / s.windows, s.drops, s.windows, s.installs) }
+    local source, rate = string.format("%s %d", s.kind == "npc" and "NPC" or "object", s.id), string.format("%.1f%%", 100 * s.drops / s.windows)
+    -- A source is named as this install's client showed it (its own rows, modules/openworld.lua), else by the name
+    -- the site knows (the slot file's names). Chat keeps the id beside the name, the tooltip shows the name alone.
+    local name = (E.SourceName and E:SourceName(s.kind, s.id)) or entry.names[(s.kind == "npc" and "n" or "o") .. s.id]
+    local said = name and (name .. " (" .. source .. ")") or source
+    -- `text` is the plain sentence for chat and a tooltip without two columns. The game's tooltip shows `left` and
+    -- `right` as a row, the rate in the value column like a price, with `detail` (its denominator) muted beneath.
+    out[#out + 1] = { r = 0.9, g = 0.8, b = 0.5, wrap = true,
+      text = string.format("Everloot drop: %s · %s (%d of %d loot windows) · %d installs", said, rate, s.drops, s.windows, s.installs),
+      left = "Drops from " .. (name or source), right = rate, detail = string.format("  %d of %d loot windows, %d installs", s.drops, s.windows, s.installs) }
   end
   local day = type(entry.asOf) == "string" and entry.asOf:match("^%d%d%d%d%-%d%d%-%d%d")
   local more = #sources - E.DROP_SOURCES_SHOWN
   local tail = more > 1 and string.format(" · %d more sources", more) or more == 1 and " · 1 more source" or ""
-  out[#out + 1] = { r = 0.6, g = 0.6, b = 0.6,
+  out[#out + 1] = { r = 0.788, g = 0.765, b = 0.69, wrap = true,
     text = "  " .. (day and ("drop rates from uploads as of " .. day) or "drop rates: upload date unknown") .. tail }
   return out, nil
 end

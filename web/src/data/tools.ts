@@ -21,7 +21,7 @@ export const tools: Tool[] = [
     shortTitle: "Talents",
     tagline: "Plan a build, share it with its game build attached.",
     description:
-      "Plan WoW: Forever talents for any class: point rules, two talent sets, undo and reset, and a share link that names the game build. Trees and rules are unconfirmed beta data.",
+      "Plan WoW: Forever talents for any class: point rules, two talent sets, undo and reset, and a share link that names the game build. Trees and rules are unconfirmed, read from build 1.60.1.",
     status: "live",
     keywords: [
       "wow forever talent calculator",
@@ -100,7 +100,7 @@ export const tools: Tool[] = [
     tagline: "Gold and reputation areas from uploads.",
     description:
       "Gold and reputation farming areas from what players upload. Gathering is on the profession pages, and dungeons have their own list.",
-    status: "coming-soon",
+    status: "collecting",
     keywords: [
       "wow forever farming",
       "wow forever gold farm",
@@ -184,7 +184,7 @@ export const TOOL_LINES: Record<string, string> = {
   "/tools/farming-routes": "Gold and reputation farming areas, filled in from what players upload.",
   "/chat": "Ask a question in plain words. Your own AI model looks it up in Everloot's data and names the sources.",
   "/tools/legacy": "WoW: Forever's Legacy perk trees as the game files hold them: ids, ranks, prerequisites and spend gates, unconfirmed.",
-  "/tools/auctions": "Auction House prices by realm, from player scans. A price shows once 3 reporters agree.",
+  "/tools/auctions": "Auction House prices by realm, from player scans. A price shows once 3 reporters agree, or from Everloot's own scans.",
   "/census": "Races, classes and levels, counted from players who turned the census on.",
   "/rankings": "WoW: Forever week by week, from players who turned the census on.",
   "/addons": "Addons made for WoW: Forever, ranked by GitHub stars.",

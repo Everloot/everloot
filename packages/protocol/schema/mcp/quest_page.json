@@ -4,6 +4,8 @@
   "description": "Returns one Forever quest's page by quest id: agreed title, level, giver, turn-in and rewards. Each fact needs 3 installs agreeing. No copied quest text. Use it when you have a quest id, from a search_knowledge hit or entity_relations; use answer_sources for a question about the quest's story or chain, and entity_relations for what the quest rewards. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
   "annotations": {
     "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
     "openWorldHint": false
   },
   "inputSchema": {

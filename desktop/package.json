@@ -2,7 +2,7 @@
   "name": "everloot-desktop",
   "productName": "Everloot Desktop App",
   "license": "AGPL-3.0-only",
-  "version": "0.1.17",
+  "version": "0.1.20",
   "private": true,
   "description": "Everloot Desktop App: uploads the addon's save file after every logout, keeps market prices in game and answers /ask, from the system tray.",
   "homepage": "https://everloot.app",
@@ -21,19 +21,20 @@
     "pack": "npm run build && electron-builder --publish never"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "0.133.0",
-    "@modelcontextprotocol/sdk": "1.32.0",
+    "@anthropic-ai/sdk": "0.137.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@types/node": "^22.10.0",
-    "electron": "44.9.1",
-    "electron-builder": "26.15.3",
+    "electron": "44.10.2",
+    "electron-builder": "26.18.0",
     "esbuild": "0.28.2",
     "fflate": "0.8.3",
     "typescript": "^5.6.3",
     "typescript-native": "npm:typescript@^7.0.2",
-    "vitest": "^5.0.3"
+    "vitest": "^5.1.0"
   },
   "overrides": {
-    "global-agent": "4.1.3"
+    "global-agent": "4.1.3",
+    "minimatch@>=7.0.0 <11.0.1": "11.0.4"
   },
   "build": {
     "appId": "app.everloot.desktop",

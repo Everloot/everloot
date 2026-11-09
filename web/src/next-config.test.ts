@@ -6,6 +6,7 @@ import nextConfig from "../next.config.js";
 import { PREFIXES, SERVED } from "./lib/build-versions";
 import { CHAT_PROVIDERS } from "./lib/chat/providers";
 import { isProtectedPath } from "./lib/document-boundary";
+import { isPrivatePath } from "./lib/cf-edge-cache";
 
 // The served version's prefix (/beta before launch, none once Live is served) shows the same pages; another
 // version's prefix shows its notice. Read from the routing table, so the switch at launch changes no test here.
@@ -23,7 +24,9 @@ test("the old gold-per-hour page answers 301 with the addon page's section about
   expect(redirects).toContainEqual({ source: "/connect", destination: "/docs", permanent: true });
   expect(redirects).toContainEqual({ source: "/ask", destination: "/chat", permanent: true });
   expect(redirects).toContainEqual({ source: "/lore/forever-launch-date", destination: "/wow-forever", permanent: true });
-  expect(redirects).toHaveLength(7);
+  // /characters/<ruleset>/... are the character pages; the bare path is the player search, not a 404.
+  expect(redirects).toContainEqual({ source: "/characters", destination: "/players", permanent: true });
+  expect(redirects).toHaveLength(8);
 });
 
 test("www.everloot.app answers 301 with the same path on the apex, and only that host does", async () => {
@@ -90,16 +93,68 @@ test("a file imported with ?inline is its bytes inside the bundle, for the link 
 });
 
 /** The headers a request for `path` gets: Next applies every matching entry in order, and a later entry's key wins. */
-test("the public pages rendered on every request are kept at the CDN; the changes and search pages briefly; signed-in pages never", async () => {
+test("the public pages rendered on every request are kept at the CDN; the pages drawn from the corpus briefly; signed-in pages never", async () => {
   // Found live 10/27: /database, /map and /changes answered private, no-store, so every visit ran the server.
   const hour = "max-age=3600, stale-while-revalidate=86400";
   const brief = "max-age=300, stale-while-revalidate=3600";
-  for (const [path, value] of [["/database", hour], ["/map", hour], ["/map/kalimdor", hour], ["/changes", brief], ["/search", brief], ["/tools/professions", brief], ["/tools/professions/alchemy", brief], ["/tools/professions/blacksmithing", brief]] as const) {
+  for (const [path, value] of [["/database/items", hour], ["/database/items/2589", hour], ["/map", hour], ["/map/kalimdor", hour], ["/changes", brief], ["/search", brief], ["/tools/professions", brief], ["/tools/professions/alchemy", brief], ["/tools/professions/blacksmithing", brief]] as const) {
     const got = await headersFor(path);
     expect(got["CDN-Cache-Control"], path).toBe(value);
   }
+  // Every page that renders from the whole corpus without cookies: five minutes, so a page drawn while storage was
+  // unreachable does not stay an hour (#816). Each type's list and one of its details; the drops list has no detail.
+  const brieflyKept = [
+    "/database", "/census", "/rankings", "/rankings/gear-score", "/rankings/item-level", "/rankings/era-us-pvp-level-60",
+    "/database/drops",
+    ...["npcs", "quests", "objects", "vendors", "spells", "achievements", "titles", "factions", "quest-chains", "zones", "instances", "coverage"]
+      .flatMap((type) => [`/database/${type}`, `/database/${type}/dun-morogh`]),
+  ];
+  for (const path of brieflyKept) expect((await headersFor(path))["CDN-Cache-Control"], path).toBe(brief);
   for (const path of ["/chat", "/account", "/settings", "/sign-in", "/api/tools/search_knowledge", "/changes/feed.xml", "/tools/profession-planner"]) {
     expect(await headersFor(path), path).not.toHaveProperty("CDN-Cache-Control");
+  }
+});
+
+test("only the public pages rendered per request are marked for the shared CDN cache", async () => {
+  const marked = (await nextConfig.headers!())
+    .filter((entry) => entry.headers.some((header) => header.key === "CDN-Cache-Control"))
+    .map((entry) => entry.source)
+    .sort();
+  // A fixed allowlist: a new CDN-marked source is a deliberate decision, and this test makes it one. Everyone
+  // shares these copies, so the list may only hold pages whose HTML is the same for every visitor. The named
+  // records a visitor can see are re-authorized on every read (kb/src/corpus.ts publicRecords) and the people
+  // results on /search are drawn in the browser, so no visitor's names are in a cached page.
+  expect(marked).toEqual([
+    "/census",
+    "/changes",
+    "/database",
+    "/database/achievements/:path*",
+    "/database/coverage/:path*",
+    "/database/drops/:path*",
+    "/database/factions/:path*",
+    "/database/instances/:path*",
+    "/database/items",
+    "/database/items/:path*",
+    "/database/npcs/:path*",
+    "/database/objects/:path*",
+    "/database/quest-chains/:path*",
+    "/database/quests/:path*",
+    "/database/spells/:path*",
+    "/database/titles/:path*",
+    "/database/vendors/:path*",
+    "/database/zones/:path*",
+    "/map",
+    "/map/:path*",
+    "/rankings/:path*",
+    "/search",
+    "/tools/professions/:path*",
+  ].sort());
+  // The pages that hold a session, the account or a collection never join that list, whatever a future edit adds.
+  for (const source of marked) {
+    expect(isProtectedPath(source.replace(/:path\*$/, "")), source).toBe(false);
+    // Nor a session route the edge cache refuses by route: the two lists must never overlap.
+    expect(isPrivatePath(source.replace(/\/:path\*$/, "") || "/"), source).toBe(false);
+    expect(source, source).not.toMatch(/^\/(?:guilds?|players?|u|account|settings|chat|tools\/collections)(?:\/|$)/);
   }
 });
 
@@ -166,10 +221,8 @@ test("Chat may ask for the microphone (dictation); every other page, the account
   }
 });
 
-test("only the root sitemap gets static CDN caching; fallible sitemaps and private routes set their own policy", async () => {
-  const got = await headersFor("/sitemap.xml");
-  expect(got["CDN-Cache-Control"]).toBe("max-age=3600, stale-while-revalidate=86400");
-  for (const path of ["/", "/database-sitemap.xml", "/database-sitemap/3.xml", "/auctions-sitemap.xml", "/auctions-sitemap/0.xml", ...PROTECTED, "/sign-in", "/api/auth/session", "/api/me"]) {
+test("the sitemaps and private routes set their own CDN policy; none gets a static one that would keep a 503", async () => {
+  for (const path of ["/", "/sitemap.xml", "/database-sitemap.xml", "/database-sitemap/3.xml", "/auctions-sitemap.xml", "/auctions-sitemap/0.xml", ...PROTECTED, "/sign-in", "/api/auth/session", "/api/me"]) {
     const h = await headersFor(path);
     expect(h["CDN-Cache-Control"], path).toBeUndefined();
   }

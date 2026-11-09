@@ -25,6 +25,8 @@ vi.mock("@/lib/shown-item-names", () => ({ loadShownNames: async () => ({
 vi.mock("@/lib/shown-search-names", () => ({ loadShownSearchNames: () => namesRead.pending ?? Promise.resolve({ items: new Map(), npcs: new Map(), quests: new Map() }) }));
 const icons = vi.hoisted(() => ({ asked: [] as number[][], map: new Map<number, string>() }));
 vi.mock("@/lib/item-icons", () => ({ shownItemIcons: async (ids: number[]) => { icons.asked.push(ids); return icons.map; } }));
+// The Characters and Guilds groups load in the browser; here a marker shows where they would sit, and the fallback.
+vi.mock("./PeopleResults", () => ({ default: ({ q, empty }: { q: string; empty?: ReactNode }) => <div data-people={q}>{empty}</div> }));
 
 async function render(query: Record<string, string>, path = release) {
   vi.stubEnv("KB_SNAPSHOT_PATH", path);
@@ -54,6 +56,29 @@ test("without a query it shows the form and no results", async () => {
   expect(html).not.toContain("data-entry-list");
   expect(html).not.toContain('href="/lore/');
   expect(html).toContain("Search Everloot");
+});
+
+test("without a query it says what a search finds, with each list and four queries to try; a query replaces that with its results", async () => {
+  const html = await render({});
+  expect(html).toContain('id="search-start"');
+  expect(html).toContain("What you can search");
+  // Every kind links its own list, by the name the result groups use.
+  for (const [kind, href] of [["Items", "/database/items"], ["NPCs", "/database/npcs"], ["Quests", "/database/quests"], ["Zones", "/database/zones"], ["Objects", "/database/objects"], ["Lore archive", "/lore"], ["Tools", "/tools"], ["Docs", "/docs"]]) {
+    expect(html, kind).toContain(`href="${href}"`);
+    expect(html, kind).toContain(`>${kind}</a>`);
+  }
+  // The examples are the lookups /chat opens with and the field's own placeholder, each a search.
+  for (const q of ["Linen Cloth", "Thrall", "Elwynn Forest", "6948"]) expect(html, q).toContain(`href="/search?q=${encodeURIComponent(q)}"`);
+  expect(html).toContain('placeholder="A name or an id: Thrall, Elwynn Forest, 6948"');
+  // The hint never needs a store read: the page asked nothing of the search or the icons.
+  expect(icons.asked.at(-1)).toEqual([]);
+
+  siteSearch.groups = [{ type: "npc", heading: "NPCs", results: [{ label: "Thrall", href: "/database/npcs/1", note: "id 1", exact: true }] }];
+  const found = await render({ q: "thrall" });
+  expect(found).not.toContain('id="search-start"');
+  expect(found).not.toContain("What you can search");
+  siteSearch.groups = [];
+  expect(await render({ q: "zzzz" })).not.toContain("What you can search");
 });
 
 test("a query shows the groups the site search found, each under its heading, and a link to every lore result", async () => {
@@ -129,6 +154,44 @@ test("the overview keeps its All-N link into the scoped search, not the database
   siteSearch.groups = [];
 });
 
+test("characters and guilds join the overview only with their switch on, never in the page's own HTML", async () => {
+  siteSearch.groups = [
+    { type: "npc", heading: "NPCs", total: 1, results: [{ label: "Thrall", href: "/database/npcs/1", exact: true }] },
+    { type: "lore", heading: "Lore archive", total: 1, results: [{ label: "Thrall", href: "/lore/1-thrall", exact: true }] },
+    { type: "tool", heading: "Tools", total: 1, results: [{ label: "Thrall tool", href: "/tools/x", exact: false }] },
+  ];
+  expect(await render({ q: "thrall" })).not.toContain("data-people");
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  const players = await render({ q: "thrall" });
+  expect(players).toContain('data-people="thrall"');
+  // After the database groups, before the lore archive and tools.
+  expect(players.indexOf('id="results-npc"')).toBeLessThan(players.indexOf("data-people"));
+  expect(players.indexOf("data-people")).toBeLessThan(players.indexOf('id="results-lore"'));
+  vi.unstubAllEnvs();
+  vi.stubEnv("EVERLOOT_GUILDS", "1");
+  expect(await render({ q: "thrall" })).toContain('data-people="thrall"');
+  // A scoped search lists one database type only.
+  expect(await render({ q: "thrall", in: "npc" })).not.toContain("data-people");
+  siteSearch.groups = [];
+});
+
+test("text that cannot start a character or guild name asks for neither", async () => {
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  // Digits are never in a character name.
+  expect(await render({ q: "6948" })).not.toContain("data-people");
+  vi.stubEnv("EVERLOOT_GUILDS", "1");
+  expect(await render({ q: "t" })).not.toContain("data-people");
+  // A guild name may be digits, but text with no letter is an id lookup.
+  expect(await render({ q: "6948" })).not.toContain("data-people");
+});
+
+test("with no database match the character lookup still runs, and the empty line is its fallback", async () => {
+  siteSearch.groups = [];
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  const html = await render({ q: "zuljinna" });
+  expect(html).toMatch(/<div data-people="zuljinna"><p[^>]*>Nothing matches that\./);
+});
+
 test("the search is a plain GET form, so it works without JavaScript", async () => {
   const html = await render({ q: "thrall" });
   expect(html).toMatch(/<form[^>]*action="\/search"[^>]*method="get"/);
@@ -177,7 +240,8 @@ test("no hits offers the wiki's own search for the encoded query", async () => {
 
 test("the page is never indexed and canonicalises to /search", async () => {
   vi.stubEnv("KB_SNAPSHOT_PATH", release);
-  const { metadata } = await import("./page");
+  const { generateMetadata } = await import("./page");
+  const metadata = await generateMetadata({ searchParams: Promise.resolve({ q: "Thrall" }) });
   expect(metadata.robots).toMatchObject({ index: false, follow: true });
   expect(metadata.alternates).toMatchObject({ canonical: "/search" });
 });

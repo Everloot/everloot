@@ -1,4 +1,4 @@
-import { agreedDifficulties, bossLabel, confirmedEntrances, instanceBosses, type InstanceBoss } from "../../../kb/src/instances";
+import { agreedDifficulties, bossLabel, confirmedEntrances, instanceBosses, reportedBosses, type InstanceBoss } from "../../../kb/src/instances";
 import type { ClientEncounter } from "../../../kb/src/client-encounters";
 import { CLIENT_ENCOUNTERS } from "@/data/game-data/client-encounters";
 import { dayLabel } from "./report-labels";
@@ -34,6 +34,8 @@ export interface InstanceRow {
   confirmed: (InstancePlace & { installs: number; lastSeen: string | null })[];
   reported: number;
   bosses: InstanceBoss[];
+  /** Encounters fewer than 3 installs report here: encounter id -> how many installs did. A count, never a boss. */
+  reportedBosses: Map<number, number>;
   /** The encounters the game files list for it (DungeonEncounter), in the files' order; empty when they list none. */
   encounters: ClientEncounter[];
 }
@@ -49,18 +51,21 @@ export interface BossRow {
   /** True when the name shown is the files', not one 3 installs agreed on. */
   filesName: boolean;
   boss: InstanceBoss | null;
+  /** For an encounter the files list and no boss confirms: how many installs reported it so far, short of 3. */
+  reported: number;
 }
 
-export function bossRows(row: Pick<InstanceRow, "bosses" | "encounters">): BossRow[] {
+export function bossRows(row: Pick<InstanceRow, "bosses" | "encounters"> & Partial<Pick<InstanceRow, "reportedBosses">>): BossRow[] {
   const files = new Map(row.encounters.map((e) => [e.id, e.name]));
   const out: BossRow[] = row.bosses.map((b) => ({
     encounterId: b.encounterId,
     name: b.name ?? files.get(b.encounterId) ?? null,
     filesName: b.name === null && files.has(b.encounterId),
     boss: b,
+    reported: 0,
   }));
   const reported = new Set(row.bosses.map((b) => b.encounterId));
-  for (const e of row.encounters) if (!reported.has(e.id)) out.push({ encounterId: e.id, name: e.name, filesName: true, boss: null });
+  for (const e of row.encounters) if (!reported.has(e.id)) out.push({ encounterId: e.id, name: e.name, filesName: true, boss: null, reported: row.reportedBosses?.get(e.id) ?? 0 });
   return out;
 }
 
@@ -152,7 +157,7 @@ export function instanceRows(
   const row = (id: number): InstanceRow => {
     const lv = data.entrances.find((f) => f.mapId === id);
     const level = lv?.minLevel !== undefined && lv.maxLevel !== undefined ? { min: lv.minLevel, max: lv.maxLevel } : null;
-    const r = out.get(id) ?? { instanceMapId: id, name: null, raid: null, difficulty: difficulty.get(id) ?? null, level, difficulties: lv?.difficultyIds ?? [], files: [], confirmed: [], reported: 0, bosses: [], encounters: encounters[String(id)] ?? [] };
+    const r = out.get(id) ?? { instanceMapId: id, name: null, raid: null, difficulty: difficulty.get(id) ?? null, level, difficulties: lv?.difficultyIds ?? [], files: [], confirmed: [], reported: 0, bosses: [], reportedBosses: new Map(), encounters: encounters[String(id)] ?? [] };
     out.set(id, r);
     return r;
   };
@@ -178,6 +183,11 @@ export function instanceRows(
     r.confirmed.push({ ...at, installs: e.reporters, lastSeen: e.lastSeen });
   }
   for (const [id, list] of instanceBosses(facts.encounters, asOf, RECHECK_SCOPES, facts.entrances)) row(id).bosses = list;
+  // A count joins a row the files or 3 installs already give; it never adds an instance of its own.
+  for (const [id, counts] of reportedBosses(facts.encounters, RECHECK_SCOPES, facts.entrances)) {
+    const r = out.get(id);
+    if (r) r.reportedBosses = counts;
+  }
   for (const r of out.values()) {
     if (r.confirmed.length) continue;
     const installs = new Set(facts.entrances.filter((e) => e.instanceMapId === r.instanceMapId).map((e) => e.installId));

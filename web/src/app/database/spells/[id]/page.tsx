@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, type Column, type TabItem } from "@/components/ui";
-import { EmptyTab, EntityHeader, EntityTop, known, LINK } from "../../entity";
+import { EmptyTab, EntityHeader, EntityTop, LINK } from "../../entity";
 import { entitySummary, evidenceLine } from "@/lib/evidence";
 import { loadEdges } from "@/lib/edges";
 import { loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
@@ -11,6 +11,7 @@ import { edgesFrom, edgesTo, type Edge, type Rel } from "../../../../../../kb/sr
 import { entityLabel } from "../../../../../../kb/src/edges";
 import { trailFor } from "@/lib/breadcrumbs";
 import { spellIndexable } from "@/lib/indexable";
+import { DESCRIPTION_MAX, pageMetadata } from "@/lib/seo";
 
 /**
  * A spell page. The spell is the game's own data: its name, its text and its relations all come
@@ -70,15 +71,34 @@ async function loadSpell(spellId: number) {
   return { edges, assets, all, name, tip, unknown };
 }
 
+/**
+ * The description from the name the files give, cut at a word when a long name leaves no room; the shape the other
+ * database pages take (the lead sentence, what the page holds, the id). Without a name it says where the id comes from.
+ */
+function spellDescription(name: string | undefined, id: number): string {
+  if (!name) return `Spell ${id} from the WoW: Forever client files: what it creates, what it costs and which talent teaches it, with the build it was read from.`;
+  const lead = `${name} is a spell in WoW: Forever.`;
+  const full = `${lead} What it creates, what it costs and which profession teaches it, from the game files. Spell ID ${id}.`;
+  if (full.length <= DESCRIPTION_MAX) return full;
+  // Eight characters shorter than the full form at most is not enough: the short form must still clear DESCRIPTION_MIN
+  // at the name length where the full one first fails, so it keeps "what it costs" and drops only the source clause.
+  const short = `${lead} What it creates, what it costs and who teaches it. Spell ID ${id}.`;
+  return short.length <= DESCRIPTION_MAX ? short : `${short.slice(0, DESCRIPTION_MAX - 1).replace(/\s+\S*$/, "")}…`;
+}
+
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const params = await props.params;
   if (!/^[1-9]\d*$/.test(params.id)) return { robots: { index: false, follow: true } };
   const { all, name, tip, unknown } = await loadSpell(Number(params.id));
   if (unknown) notFound();
+  const shown = name ?? tip?.name ?? undefined;
   return {
-    title: `Spell ${params.id} · Everloot`,
-    description: `Spell ${params.id} from the WoW: Forever client files: what it creates, what it costs and which talent teaches it, with the build it was read from.`,
-    alternates: { canonical: `/database/spells/${params.id}` },
+    ...pageMetadata({
+      // The item pages' title shape, "Blizzard – WoW Forever spell"; the layout adds "· Everloot" once.
+      title: shown ? `${shown} – WoW Forever spell` : `Spell ${params.id}`,
+      description: spellDescription(shown, Number(params.id)),
+      path: `/database/spells/${params.id}`,
+    }),
     robots: { index: spellIndexable({ named: Boolean(name ?? tip?.name), text: Boolean(tip?.text), relations: all.length }), follow: true },
   };
 }
@@ -97,7 +117,6 @@ export default async function SpellPage(props: Props) {
   const creates = rel("created_by");
   const costs = rel("reagent_for");
   const taught = rel("in_skill_line");
-  const rewards = rel("reward_from");
 
   // The page in three lines: what it is, what the files say it does, and where the name came from.
   const summary = entitySummary({
@@ -108,22 +127,24 @@ export default async function SpellPage(props: Props) {
     named: Boolean(name),
   });
 
-  const relationTab = (id: string, label: string, r: Rel, empty: string): TabItem => {
+  // Every relation here is the game files' own, so an empty one is not something a player report could fill: the tab
+  // is left out rather than shown with the agreement meter and "Get the addon". When the files relate nothing to the
+  // spell, one plain line names the build that was read instead of the tab strip.
+  const relationTab = (id: string, label: string, r: Rel): TabItem | null => {
     const rows = rel(r);
+    if (!rows.length) return null;
     return {
       id, label, count: rows.length,
-      panel: rows.length
-        ? <><p className="mb-2 text-meta text-fg-2">{evidenceLine(rows[0]!, Date.now())}</p><DataTable dense caption={`${label}: ${title}`} columns={relationColumns} rows={rows} rowKey={(e) => { const o = otherEnd(e); return `${e.rel}-${e.evidence}-${o.kind}-${o.id}`; }} /></>
-        : <EmptyTab message={empty} players={false} />,
+      panel: <><p className="mb-2 text-meta text-fg-2">{evidenceLine(rows[0]!, Date.now())}</p><DataTable dense caption={`${label}: ${title}`} columns={relationColumns} rows={rows} rowKey={(e) => { const o = otherEnd(e); return `${e.rel}-${e.evidence}-${o.kind}-${o.id}`; }} /></>,
     };
   };
 
-  const tabs: TabItem[] = [
-    relationTab("creates", relLabel.created_by!, "created_by", "The files say it creates nothing."),
-    relationTab("costs", relLabel.reagent_for!, "reagent_for", "The files say it costs nothing."),
-    relationTab("taught-by", relLabel.in_skill_line!, "in_skill_line", "The files say no profession teaches it."),
-    ...(rewards.length ? [relationTab("reward-from", relLabel.reward_from!, "reward_from", "")] : []),
-  ];
+  const tabs = [
+    relationTab("creates", relLabel.created_by!, "created_by"),
+    relationTab("costs", relLabel.reagent_for!, "reagent_for"),
+    relationTab("taught-by", relLabel.in_skill_line!, "in_skill_line"),
+    relationTab("reward-from", relLabel.reward_from!, "reward_from"),
+  ].filter((t): t is TabItem => t !== null);
 
   const trail = [...trailFor("/database/spells")!, { name: title, path: `/database/spells/${spellId}` }];
 
@@ -144,8 +165,9 @@ export default async function SpellPage(props: Props) {
               items={[
                 { label: "Spell id", value: <span className="tabular-nums">{spellId}</span>, numeric: true },
                 { label: "Build", value: build },
-                { label: "Creates", value: known(creates.length || null), numeric: true },
-                { label: "Costs", value: known(costs.length || null), numeric: true },
+                // Counts from the files, so a zero is a zero and not an agreement meter waiting on a report.
+                { label: "Creates", value: <span className="tabular-nums">{creates.length}</span>, numeric: true },
+                { label: "Costs", value: <span className="tabular-nums">{costs.length}</span>, numeric: true },
               ]}
             />
           }
@@ -154,7 +176,9 @@ export default async function SpellPage(props: Props) {
         <OpenData
           text={[`${title} (spell ${spellId})`, tip?.text ?? "", ...summary, `Source: https://everloot.app/database/spells/${spellId}`].filter(Boolean).join("\n")}
         />
-        <Tabs label={`${title}: relations`} tabs={tabs} />
+        {tabs.length
+          ? <Tabs label={`${title}: relations`} tabs={tabs} />
+          : <EmptyTab message={`The game files list nothing here (build ${build}).`} players={false} action={null} />}
       </article>
     </Container>
   );

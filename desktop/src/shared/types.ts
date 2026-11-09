@@ -29,6 +29,8 @@ export interface Settings {
   startInTray: boolean;
   /** The player closed the Overview's note that the data folder has grown past DATA_NOTICE_BYTES; it is not shown again. */
   dataNoticeDismissed: boolean;
+  /** Install a newer addon release on its own, into a game folder that already has the addon. On by default. */
+  autoUpdateAddon: boolean;
 }
 
 export type JobState = "off" | "idle" | "running" | "ok" | "error";
@@ -209,12 +211,12 @@ export interface CharacterRow {
   itemLevel: number | null;
   /** The latest gear snapshot's slots, in the game's order. */
   equipped: GearSlot[];
-  /** Copper by category, from money events this file holds. */
+  /** Copper by category, from the file's local ledger and the money events from before it (shared/ledger.ts names the categories). */
   spent: Record<string, number>;
   earned: Record<string, number>;
   /** Dated gold snapshots in time order, thinned to at most sixty points for a sparkline. */
   history: { at: string; copper: number }[];
-  /** Money events from the last seven days. */
+  /** Money events from today and the six UTC days before it, the Gold tab's "7 days". */
   week: { earned: number; spent: number };
   /** The last thirty UTC days of money events, oldest first. */
   days: MoneyDay[];
@@ -233,6 +235,20 @@ export interface ProgressRow {
   titles: number;
   quests: number;
   talentPoints: number | null;
+  /** The addon's profession_owned rows for this key: the latest state; never in an upload, not given to Chat, sent only by private sync for a linked character. */
+  professions: ProfessionRow[];
+  /** The addon's lockout_owned rows for this key that have not reset yet; never in an upload, not given to Chat, sent only by private sync for a linked character. */
+  lockouts: LockoutRow[];
+}
+export interface ProfessionRow { name: string; rank: number; maxRank: number }
+export interface LockoutRow {
+  instance: string;
+  /** The game's difficulty name ("40 Player"), or "" when it gave none. */
+  difficulty: string;
+  killed: number;
+  total: number;
+  /** When the lockout resets, ISO 8601 UTC. */
+  resetAt: string;
 }
 export interface CharactersInfo {
   characters: CharacterRow[];
@@ -277,6 +293,8 @@ export interface AppState {
   builds: BuildsStatus;
   /** The site's last receipt for runs and boss pulls said it reads them; the settings page describes them only then. */
   runRecords?: boolean;
+  /** A newer addon release the app did not install itself (the switch is off, or the install failed); shown in the tray. */
+  addonUpdate?: string | null;
 }
 
 /** What `window.everloot` offers the page. Implemented in preload.ts over IPC. */

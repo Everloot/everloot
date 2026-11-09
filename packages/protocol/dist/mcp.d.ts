@@ -3,8 +3,9 @@ import { z } from "zod";
  * The Everloot MCP server's tools: names, titles, descriptions, input schemas and annotations, in the
  * order the server lists them. kb/src/mcp-server.ts registers from this table and supplies the handlers;
  * the connect page and llms.txt list from it; schema/mcp/<tool>.json is generated from it. Every tool
- * is read-only. Today every tool answers with one text block (TOOL_OUTPUT); structured output is a later
- * minor release, tool by tool.
+ * is read-only, and its annotations say so with all four hints (readOnlyHint, destructiveHint, idempotentHint,
+ * openWorldHint), so a directory never has to assume the worst for one it cannot read. Today every tool answers
+ * with one text block (TOOL_OUTPUT); structured output is a later minor release, tool by tool.
  */
 /** Record kinds in the knowledge release (lore and reference data). */
 export declare const KNOWLEDGE_KINDS: readonly ["item", "npc", "object", "quest", "zone", "spell", "lore_page", "creator", "realm", "achievement", "faction", "title", "quest_chain", "mount", "legacy_perk", "race", "instance", "build"];
@@ -1183,6 +1184,8 @@ export interface McpToolDef {
     outputSchema?: z.ZodRawShape;
     annotations: {
         readOnlyHint: true;
+        destructiveHint: false;
+        idempotentHint: true;
         openWorldHint: false;
     };
 }
@@ -1265,6 +1268,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -1327,6 +1332,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -1400,6 +1407,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -1418,6 +1427,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -1480,6 +1491,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -1516,6 +1529,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -1563,6 +1578,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -1608,6 +1625,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -1718,6 +1737,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -1749,6 +1770,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -1793,6 +1816,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -1818,6 +1843,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -1845,6 +1872,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -1911,6 +1940,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -2016,6 +2047,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -2109,6 +2142,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -2209,6 +2244,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -2258,6 +2295,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -2315,6 +2354,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -2344,6 +2385,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -2431,6 +2474,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -2517,6 +2562,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -2548,6 +2595,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -2590,6 +2639,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -2617,6 +2668,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -2658,6 +2711,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -2693,6 +2748,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -2715,6 +2772,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -2795,6 +2854,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -2851,6 +2912,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -2919,6 +2982,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -2955,6 +3020,8 @@ export declare const MCP_TOOLS: {
         };
         readonly annotations: {
             readonly readOnlyHint: true;
+            readonly destructiveHint: false;
+            readonly idempotentHint: true;
             readonly openWorldHint: false;
         };
     };
@@ -3042,6 +3109,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -3104,6 +3173,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -3177,6 +3248,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -3195,6 +3268,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -3257,6 +3332,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -3293,6 +3370,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -3340,6 +3419,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -3385,6 +3466,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -3495,6 +3578,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -3526,6 +3611,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -3570,6 +3657,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -3595,6 +3684,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -3622,6 +3713,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -3688,6 +3781,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -3793,6 +3888,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -3886,6 +3983,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -3986,6 +4085,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -4035,6 +4136,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -4092,6 +4195,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -4121,6 +4226,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -4208,6 +4315,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -4294,6 +4403,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -4325,6 +4436,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -4367,6 +4480,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -4394,6 +4509,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -4435,6 +4552,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -4470,6 +4589,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -4492,6 +4613,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -4572,6 +4695,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -4628,6 +4753,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -4696,6 +4823,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
@@ -4732,6 +4861,8 @@ export declare const MCP_TOOL_LIST: ({
     };
     annotations: {
         readonly readOnlyHint: true;
+        readonly destructiveHint: false;
+        readonly idempotentHint: true;
         readonly openWorldHint: false;
     };
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";

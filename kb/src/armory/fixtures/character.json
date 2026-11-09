@@ -1,0 +1,45 @@
+{
+  "level": 60,
+  "faction": {
+    "type": "HORDE",
+    "name": "Horde"
+  },
+  "race": {
+    "key": {
+      "href": "https://eu.api.blizzard.com/data/wow/playable-race/8?namespace=static-1.60.1_70399-forever-eu"
+    },
+    "name": "Troll",
+    "id": 8
+  },
+  "character_class": {
+    "key": {
+      "href": "https://eu.api.blizzard.com/data/wow/playable-class/3?namespace=static-1.60.1_70399-forever-eu"
+    },
+    "name": "Hunter",
+    "id": 3
+  },
+  "gender": {
+    "type": "MALE",
+    "name": "Male"
+  },
+  "ruleset": {
+    "key": {
+      "href": "https://eu.api.blizzard.com/data/wow/ruleset/1?namespace=dynamic-forever-eu"
+    },
+    "name": "PvP",
+    "id": 1
+  },
+  "last_login_timestamp": 1735689600000,
+  "equipped_item_level": 57,
+  "average_item_level": 59,
+  "id": 900001,
+  "name": "Ember",
+  "surname": "Vale",
+  "guild": {
+    "id": 900010,
+    "name": "Copper Owls",
+    "key": {
+      "href": "https://eu.api.blizzard.com/data/wow/guild/copper-owls?namespace=profile-forever-eu"
+    }
+  }
+}

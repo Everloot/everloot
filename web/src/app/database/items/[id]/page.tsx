@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import JsonLd from "@/components/JsonLd";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { entityPageJsonLd } from "@/lib/jsonld";
 import AdSlot from "@/components/AdSlot";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasCard } from "@/lib/tooltip";
-import { itemPage } from "../../../../../../kb/src/item-page";
+import { itemNameReporters, itemPage } from "../../../../../../kb/src/item-page";
 import { loadShownNames } from "@/lib/shown-item-names";
 import { loadEdges } from "@/lib/edges";
 import { loadItemSeen } from "@/lib/item-seen";
@@ -14,7 +15,7 @@ import { itemSourceValue } from "./item-source";
 import { RelationTarget, SameIcon } from "@/components/EntityRelations";
 import { pinLink } from "@/lib/world-map";
 import { gameNameFor, loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
-import { Badge, Container, DataTable, EvidenceLine, Facts, InShort, OpenData, QUALITY_TEXT, Tabs, TooltipFrame, qualityOf, type Column, type Fact, type TabItem } from "@/components/ui";
+import { Badge, Container, DataTable, EvidenceLine, Facts, InShort, OpenData, QUALITY_TEXT, Tabs, TooltipFrame, qualityOf, reportedLabel, type Column, type Fact, type TabItem } from "@/components/ui";
 import { isDevelopmentItemName } from "../../../../../../kb/src/dev-item-names";
 import { categoryOf } from "../../../../../../kb/src/item-taxonomy";
 import { edgesFrom, evidenceLabel, type Edge, type Rel } from "../../../../../../kb/src/edges";
@@ -33,8 +34,9 @@ import { MarketBox, loadMarketBox } from "@/app/tools/auctions/MarketBox";
 import { pendingLine } from "../../../../../../kb/src/pending-loot";
 import { itemDropSources } from "../../../../../../kb/src/loot-tables";
 import { loadLootTables, loadReportedItemFacts } from "@/lib/rollup-compute";
-import { EmptyTab, EntityHeader, EntityIcon, EntityTop, known, LINK, Unreachable } from "../../entity";
+import { EmptyTab, EntityHeader, EntityIcon, EntityTop, known, LINK, MAP_LINK_HEADER, MapName, ShowOnMap, Unreachable } from "../../entity";
 import { ItemSourcesPanel } from "../../loot-tables";
+import { unknownItem } from "../../unknown";
 import { itemSummary } from "@/lib/evidence";
 
 const PROFESSIONS = { href: "/tools/professions", label: "Professions" };
@@ -43,16 +45,6 @@ const PROFESSIONS = { href: "/tools/professions", label: "Professions" };
 type Props = { params: Promise<{ id: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> };
 
 export const dynamic = "force-dynamic";
-
-/**
- * An id neither the game files nor any upload knows: no row in the client layer, no report about it (even one
- * short of the 3 installs), no relation. It is a 404, not an empty page. While upload storage is out of reach
- * nothing can be ruled out.
- */
-function unknownItem(itemId: number, facts: Awaited<ReturnType<typeof loadShownNames>>["facts"], relations: readonly Edge[], seen: { seen: Set<number>; unreachable: boolean }): boolean {
-  if (facts.unreachable || seen.unreachable || categoryOf(CLIENT_TAXONOMY, itemId) !== null || relations.length > 0 || seen.seen.has(itemId)) return false;
-  return !facts.names.some((r) => r.itemId === itemId) && !facts.rates.some((r) => r.itemId === itemId);
-}
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const params = await props.params;
@@ -72,7 +64,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
     dropSources: page.drops.length, vendors: targets("sold_by"), createdBy: targets("created_by"), usedIn: targets("reagent_for"), questRewards: targets("reward_from"),
   });
   return {
-    ...pageMetadata({ title: entityTitle(name?.name ?? `Item ${itemId}`, "item"), description, path: `/database/items/${itemId}` }),
+    ...pageMetadata({ title: entityTitle(name?.name ?? `Item ${itemId}`, "item"), description, path: `/database/items/${itemId}`, image: `/database/items/${itemId}/opengraph-image` }),
     // Indexed once players have reported the item, or a source names it in the current build.
     robots: { index: itemIndexable(page, facts.unreachable, name), follow: true },
   };
@@ -86,7 +78,7 @@ export default async function ItemPage(props: Props) {
   if (/^[a-z][a-z0-9-]*$/.test(params.id)) return CategoryPage({ classSlug: params.id, search: (await props.searchParams) ?? {} });
   if (!/^[1-9]\d*$/.test(params.id)) notFound();
   const itemId = Number(params.id);
-  const [{ facts, agreed, matched, showsTip }, edges, itemSeen, auctions] = await Promise.all([loadShownNames(), loadEdges(), loadItemSeen(), loadMarketBox(itemId)]);
+  const [{ facts, agreed, matched, showsTip, degraded }, edges, itemSeen, auctions] = await Promise.all([loadShownNames(), loadEdges(), loadItemSeen(), loadMarketBox(itemId)]);
   const page = itemPage(itemId, facts);
   if (unknownItem(itemId, facts, edgesFrom([...edges.observed, ...edges.client], "item", itemId), itemSeen)) notFound();
   // Named by players (3 installs agree); the badge and the facts card say so.
@@ -162,10 +154,10 @@ export default async function ItemPage(props: Props) {
   const sources = itemDropSources(loot.tables, itemId);
   const pinColumns: Column<(typeof page.pins)[number]>[] = [
     { key: "npc", header: "NPC", cell: (p) => <EntityLink kind="npc" id={p.npcId} name={p.name ?? names.npcs.get(p.npcId)} /> },
-    { key: "map", header: "Map", numeric: true, cell: (p) => p.mapId },
+    { key: "map", header: "Map", cell: (p) => <MapName mapId={p.mapId} /> },
     { key: "at", header: "Position", numeric: true, cell: (p) => `${p.x}, ${p.y}` },
-    { key: "installs", header: "Reporters", numeric: true, cell: (p) => p.reporters },
-    { key: "show", header: "", cell: (p) => { const href = pinLink(p.mapId, p.x, p.y); return href ? <Link href={href} className={LINK}>Show on the map</Link> : null; } },
+    { key: "installs", header: "Installs", numeric: true, cell: (p) => p.reporters },
+    { key: "show", header: MAP_LINK_HEADER, cell: (p) => { const href = pinLink(p.mapId, p.x, p.y); return href ? <ShowOnMap href={href} mapId={p.mapId} x={p.x} y={p.y} /> : null; } },
   ];
 
   // A development leftover sharing an icon ("Monster - Item, Flower - White") stays out, as it does in the item lists.
@@ -260,7 +252,7 @@ export default async function ItemPage(props: Props) {
       { label: "Quality", value: category.quality ? <span className={shownQuality ? QUALITY_TEXT[shownQuality] : undefined}>{category.quality.name}</span> : known(null) },
     ] : [{ label: "Game files", value: "Not found" }]),
     ...(facts.unreachable ? [] : [
-      { label: "Reported name", value: known(page.name) },
+      { label: "Reported name", value: known(page.name, itemNameReporters(itemId, facts)) },
       { label: "Drop sources", value: known(page.drops.length || null), numeric: true },
       { label: "Map positions", value: known(page.pins.length || null), numeric: true },
       ...(source ? [{ label: "Source", value: source }] : []),
@@ -269,6 +261,7 @@ export default async function ItemPage(props: Props) {
 
   return (
     <Container width="data">
+      <EdgeDegraded when={degraded || itemSeen.unreachable || edges.unreachable || reported.unreachable} />
       <JsonLd data={entityPageJsonLd({ name: title, path: `/database/items/${itemId}`, identifier: `item:${itemId}` })} />
       <article>
         <EntityHeader
@@ -300,7 +293,7 @@ export default async function ItemPage(props: Props) {
           <section aria-label="Item report progress" className="mt-3 space-y-1 text-meta text-fg-2">
             <p>Not yet confirmed. Each value needs 3 installs to agree.</p>
             <ul>
-              {reported.progress!.map((p) => <li key={p.fact}>{`${FACT_WORD[p.fact]}: ${p.reporters} of 3 installs reported (build ${p.build}).`}</li>)}
+              {reported.progress!.map((p) => <li key={p.fact}>{`${FACT_WORD[p.fact]}: ${reportedLabel(p.reporters)} (build ${p.build}).`}</li>)}
             </ul>
           </section>
         )}

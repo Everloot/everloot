@@ -13,6 +13,7 @@ import { GAME_DATA_CREDIT, SITE, TALENT_CLASSES } from "@everloot/protocol";
 import { CLIENT_LABEL } from "./edges.js";
 import { slugify } from "./lore-slug.js";
 import { expandAliases } from "./name-aliases.js";
+import { allTerms, askingWord } from "./search.js";
 
 export type FilesFactKind = "instance" | "boss" | "zone" | "flight" | "mount" | "achievement" | "talent";
 
@@ -33,6 +34,8 @@ export interface FilesIndex {
   facts: FilesFact[];
   /** Zone names by map id, the released zones only, so an observed position can name its zone. */
   zones?: Readonly<Record<number, string>>;
+  /** Each dungeon and raid with the level its entrance gives, for "what dungeon at level 30". */
+  instances?: readonly { name: string; level: number; raid: boolean }[];
 }
 
 /** The committed game-data files, already parsed; each optional, so the index grows as files land. */
@@ -76,12 +79,14 @@ export function buildFilesIndex(files: GameDataFiles): FilesIndex {
   const encounters = rec(rec(files.encounters)?.instances);
   stamp(rec(files.encounters)?.build);
   const seenInstance = new Set<number>();
+  const instances: { name: string; level: number; raid: boolean }[] = [];
   for (const e of arr(map?.entrances)) {
     const r = rec(e); const id = num(r?.mapId); const name = str(r?.name);
     if (id === undefined || !name || seenInstance.has(id)) continue;
     seenInstance.add(id);
     const kind = r?.raid === true ? "raid" : r?.raid === false ? "dungeon" : "instance";
     const min = num(r?.minLevel); const max = num(r?.maxLevel);
+    if (min !== undefined && kind !== "instance") instances.push({ name, level: min, raid: kind === "raid" });
     const level = min !== undefined && max !== undefined ? (min === max ? `level ${min}` : `levels ${min} to ${max}`) : "";
     const zone = zoneName.get(num(r?.uiMapId) ?? -1);
     const bosses = arr(encounters?.[String(id)]);
@@ -150,7 +155,7 @@ export function buildFilesIndex(files: GameDataFiles): FilesIndex {
       }
     }
   }
-  return { build, extractedAt, facts, zones: Object.fromEntries(zoneName) };
+  return { build, extractedAt, facts, zones: Object.fromEntries(zoneName), instances };
 }
 
 const readJson = (path: string): unknown => (existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : undefined);
@@ -172,6 +177,18 @@ export function readFilesIndex(gameDataDir: string): FilesIndex {
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const mentions = (question: string, name: string) => new RegExp(`(^|[^\\p{L}\\p{N}])${escape(name)}(?=$|[^\\p{L}\\p{N}])`, "iu").test(question);
 
+const nameWordsCache = new WeakMap<FilesIndex, Set<string>>();
+/** Every word of every name the files carry: a question's spelling of them is never read as another word. */
+export function filesNameWords(index: FilesIndex | null): ReadonlySet<string> {
+  if (!index) return new Set();
+  let words = nameWordsCache.get(index);
+  if (!words) {
+    words = new Set(index.facts.flatMap((f) => allTerms(f.name).split(" ")).filter(Boolean));
+    nameWordsCache.set(index, words);
+  }
+  return words;
+}
+
 /** The evidence shape answer_sources returns, built here so the two files agree on the label and the source. */
 export interface FilesEvidence {
   claim: string;
@@ -180,32 +197,90 @@ export interface FilesEvidence {
   licence: string;
   asOf: string | null;
   url?: string;
+  /**
+   * How answer_sources places the piece, never shown: "answer" when it answers the whole question (the dungeons for a
+   * level), so archive pages that only share its words are left out; "place" for a zone the question only mentions
+   * ("the warlock trainer in Undercity"), which goes after the pages that answer.
+   */
+  role?: "answer" | "place";
+}
+
+/** Words that ask about flying ("how do I fly to", "cómo vuelo a"): then a flight master is part of the answer. */
+const FLYING = /\b(?:fly|flying|flies|flight|flights|flightmaster|gryphon|gryphons|wind ?riders?|hippogryphs?|bats?|taxi|vuelo|vuelos|vuela|volar|grifos?)\b/i;
+
+/**
+ * Words that still ask about the place itself: "where is Thunder Bluff", "what level is Westfall", and the Spanish
+ * the question bank asks ("de qué nivel es Durotar", "dónde queda Lakeshire").
+ */
+const ABOUT_PLACE = new Set([
+  "located", "location", "zone", "city", "capital", "level", "levels", "map", "go", "reach", "continent", "area", "region",
+  "de", "del", "el", "la", "los", "las", "en", "es", "a", "al", "qué", "que", "dónde", "donde", "queda", "está", "esta",
+  "nivel", "cómo", "como", "llego", "llegar", "ir", "zona", "ciudad", "mapa",
+]);
+
+/** Whether the question is about the zone itself: no topic word is left once its name is taken out. */
+function aboutPlace(question: string, name: string): boolean {
+  const rest = question.replace(new RegExp(`(^|[^\\p{L}\\p{N}])${escape(name)}(?=$|[^\\p{L}\\p{N}])`, "giu"), " ");
+  return allTerms(rest).split(" ").filter(Boolean).every((t) => askingWord(t) || ABOUT_PLACE.has(t));
+}
+
+const LEVEL = /\b(?:level|lvl|lv)\s*(\d{1,2})\b|\b(\d{1,2})\s*(?:level|lvl)\b/i;
+/** How far from the asked level a dungeon still counts as near it, and how many the answer names. */
+const NEAR_LEVELS = 7;
+const MAX_LISTED = 5;
+
+/** "what dungeon at level 30": the dungeons (raids, when asked for) whose entrance level is nearest it, from the files. */
+function instancesForLevel(question: string, index: FilesIndex): string | null {
+  const wantsRaid = /\braids?\b/i.test(question);
+  if (!wantsRaid && !/\b(?:dungeons?|instances?)\b/i.test(question)) return null;
+  const m = LEVEL.exec(question);
+  const level = m ? Number(m[1] ?? m[2]) : NaN;
+  if (!(level >= 1 && level <= 99)) return null;
+  const all = (index.instances ?? []).filter((i) => i.raid === wantsRaid);
+  if (!all.length) return null;
+  const kind = wantsRaid ? "raid" : "dungeon";
+  const near = all
+    .filter((i) => Math.abs(i.level - level) <= NEAR_LEVELS)
+    .sort((a, b) => Math.abs(a.level - level) - Math.abs(b.level - level) || a.level - b.level)
+    .slice(0, MAX_LISTED);
+  if (near.length) return `${wantsRaid ? "Raids" : "Dungeons"} near level ${level}, by the level each entrance gives in the game files: ${near.map((i) => `${i.name} (${i.level})`).join(", ")}.`;
+  // Nothing near is an answer too: say where the game's range starts and ends rather than leave it to unrelated pages.
+  const byLevel = [...all].sort((a, b) => a.level - b.level);
+  const low = byLevel[0]!; const high = byLevel.at(-1)!;
+  return `No ${kind} in the game files is near level ${level}: their entrances give levels from ${low.level} (${low.name}) to ${high.level} (${high.name}).`;
 }
 
 /**
  * The facts whose names the question mentions as whole words, longest names first so "Blackrock Depths"
- * wins over "Blackrock" and a boss named like its instance is not counted twice; at most `limit`.
+ * wins over "Blackrock" and a boss named like its instance is not counted twice; at most `limit`. A question
+ * for a dungeon at a level gets the list first.
  */
 export function filesEvidence(question: string, index: FilesIndex | null, limit: number): FilesEvidence[] {
   if (!index || !index.facts.length || limit <= 0) return [];
   // "where is BRD" names Blackrock Depths: the short forms expand before the facts are matched, as in search.
   const q = expandAliases(question.trim()).text;
   if (!q) return [];
-  const matched = index.facts.filter((f) => f.name.length >= 3 && mentions(q, f.name));
-  matched.sort((a, b) => b.name.length - a.name.length);
+  const source = { title: `WoW: Forever game files, build ${index.build || "unrecorded"} (${CLIENT_LABEL})`, url: `${SITE}/database/download` };
   const out: FilesEvidence[] = [];
+  const list = instancesForLevel(q, index);
+  if (list) out.push({ claim: list, kind: "files", source, licence: GAME_DATA_CREDIT, asOf: index.extractedAt, url: `${SITE}/database/instances`, role: "answer" });
+  const flying = FLYING.test(q);
+  // "Stormwind" is how players say the zone named Stormwind City.
+  const named = (f: FilesFact) => mentions(q, f.name) || (f.kind === "zone" && / City$/.test(f.name) && mentions(q, f.name.slice(0, -5)));
+  // A flight master answers a question about flying, or about the place it is named after ("where is Lakeshire").
+  const matched = index.facts.filter((f) => f.name.length >= 3 && named(f) && (f.kind !== "flight" || flying || aboutPlace(q, f.name)));
+  matched.sort((a, b) => b.name.length - a.name.length);
   const seen = new Set<string>();
   for (const f of matched) {
+    if (out.length >= limit) break;
     // One per thing, not per name: a talent two classes share is two facts, and both are the answer.
     if (seen.has(f.claim)) continue;
     seen.add(f.claim);
     out.push({
-      claim: f.claim, kind: "files",
-      source: { title: `WoW: Forever game files, build ${index.build || "unrecorded"} (${CLIENT_LABEL})`, url: `${SITE}/database/download` },
-      licence: GAME_DATA_CREDIT, asOf: index.extractedAt,
+      claim: f.claim, kind: "files", source, licence: GAME_DATA_CREDIT, asOf: index.extractedAt,
       ...(f.url ? { url: f.url } : {}),
+      ...(f.kind === "zone" && !aboutPlace(q, f.name) && !aboutPlace(q, f.name.replace(/ City$/, "")) ? { role: "place" as const } : {}),
     });
-    if (out.length >= limit) break;
   }
   return out;
 }

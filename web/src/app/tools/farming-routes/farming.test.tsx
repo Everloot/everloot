@@ -101,7 +101,7 @@ test("with no uploads gold shows the empty state with the meter, and invents not
   store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], dataAsOf: null });
   const none = await html(FarmingPage(search()));
   expect(section(none, "gold")).toContain("data-empty-state");
-  expect(section(none, "gold")).toContain("No gold areas yet: a zone shows once 3 players upload loot from the same mobs there.");
+  expect(section(none, "gold")).toContain("No gold areas yet: a zone shows once 3 installs upload loot from the same mobs there.");
   expect(section(none, "gold")).toContain('aria-label="0 of 3 installs agree"');
   expect(section(none, "gold")).not.toContain("<table");
 });

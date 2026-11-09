@@ -141,7 +141,7 @@ function charactersIn(db: Record<string, unknown>): CharacterBase | null {
       records.push({ ...(row as Record<string, unknown>), kind });
     }
   }
-  return collectCharacters(records);
+  return collectCharacters(records, { ledger: db.ledger, roster: db.roster });
 }
 
 /** Every account file's characters at `now`, in file order. A file that cannot be read shows on the Upload page. */

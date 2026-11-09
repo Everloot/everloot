@@ -15,7 +15,7 @@
   // The workers.dev host would serve production with no Access in front of it.
   "workers_dev": false,
   // The schedules in src/lib/cf-crons.ts (cf-crons.test.ts holds the two lists equal).
-  "triggers": { "crons": ["*/10 * * * *", "23 * * * *"] },
+  "triggers": { "crons": ["*/10 * * * *", "23 * * * *", "7,37 * * * *"] },
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
@@ -45,6 +45,11 @@
     // KNOWLEDGE_RELEASE_SHA256 below to the same release.
     { "binding": "KNOWLEDGE_D1", "database_name": "everloot-knowledge-2026-11-01", "database_id": "47ac29c7-c9f8-4574-bb31-c27774de1e7e" }
   ],
+  // Name lookups per address per minute on /search/people (src/app/search/people/route.ts), counted at each
+  // Cloudflare location. The zone's one rate-limiting rule (Free plan) is the /database/* scraper rule.
+  "ratelimits": [
+    { "name": "PEOPLE_SEARCH_LIMIT", "namespace_id": "1001", "simple": { "limit": 60, "period": 60 } }
+  ],
   // Repository files the pages read at run time (news, guides, wiki pages), copied into .open-next/repo by
   // scripts/cf-bundle-files.mjs and uploaded as text modules, so node:fs finds them under /bundle/repo.
   "find_additional_modules": true,
@@ -73,8 +78,17 @@
     "EVERLOOT_PLAYER_PAGES": "1",
     "EVERLOOT_SAVED_BUILDS": "1",
     "EVERLOOT_GUILDS": "1",
+    // A character's page shows the officers' rank, loot and attendance for that character (owner, 2026-11-06).
+    "EVERLOOT_CHARACTER_GUILD_FACTS": "1",
     "EVERLOOT_PROFILES": "1",
     "EVERLOOT_CHAT_WORKSPACE": "1",
+    "EVERLOOT_CHARACTER_LINKS": "1",
+    "EVERLOOT_SHOWCASE": "1",
+    // Armory: a page for every Forever character and guild from the Blizzard API; unset means /armory answers 404 (owner, 2026-11-09).
+    "EVERLOOT_ARMORY": "1",
+    "EVERLOOT_PRIVATE_SYNC": "1",
+    // Item level and Gear Score boards for linked characters whose owner chose "Rank my gear" (owner, 2026-11-06).
+    "EVERLOOT_LEADERBOARDS": "1",
     "NEWS_DIR": "/bundle/repo/kb/news",
     "GUIDES_DIR": "/bundle/repo/kb/guides",
     "WIKI_DIR": "/bundle/repo/kb/wiki",

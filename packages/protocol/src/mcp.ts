@@ -5,8 +5,9 @@ import { ITEM_FACTS } from "./records.js";
  * The Everloot MCP server's tools: names, titles, descriptions, input schemas and annotations, in the
  * order the server lists them. kb/src/mcp-server.ts registers from this table and supplies the handlers;
  * the connect page and llms.txt list from it; schema/mcp/<tool>.json is generated from it. Every tool
- * is read-only. Today every tool answers with one text block (TOOL_OUTPUT); structured output is a later
- * minor release, tool by tool.
+ * is read-only, and its annotations say so with all four hints (readOnlyHint, destructiveHint, idempotentHint,
+ * openWorldHint), so a directory never has to assume the worst for one it cannot read. Today every tool answers
+ * with one text block (TOOL_OUTPUT); structured output is a later minor release, tool by tool.
  */
 
 /** Record kinds in the knowledge release (lore and reference data). */
@@ -574,7 +575,7 @@ export interface McpToolDef {
   inputSchema: z.ZodRawShape;
   /** Present on tools that also answer with structuredContent of this shape; the text block stays. */
   outputSchema?: z.ZodRawShape;
-  annotations: { readOnlyHint: true; openWorldHint: false };
+  annotations: { readOnlyHint: true; destructiveHint: false; idempotentHint: true; openWorldHint: false };
 }
 
 /** Every tool, keyed by name, in the order the server lists them. */
@@ -585,14 +586,14 @@ export const MCP_TOOLS = {
       "Searches WoW lore, Forever reference data and the game-file catalogs (achievements, factions, titles, quest chains, mounts, legacy perks, races, instances) by names, keywords or a question. Exact-name matches rank first. Every hit carries its id, kind, source, licence and date, and a game-file hit says when player uploads confirm it. Use it to find a record from a name or a topic, then pass the hit's id to get_entity for its summary, or to fetch as a string for the whole text. Use get_by_name when you already know the exact full name, and answer_sources when you need cited evidence for a question rather than records. search is the same search in the ChatGPT connector shape.",
     inputSchema: searchArgs,
     outputSchema: { hits: z.array(knowledgeHit) },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   get_entity: {
     title: "Get one knowledge record by id",
     description: "Returns one knowledge record's summary, by the numeric id a search_knowledge or get_by_name hit gave: title, a short excerpt in the source's words, the URL to cite, source, licence and date. A game-file record carries its build and says when player uploads confirm it. Use it to read one hit again by its id; for the whole text, call fetch with the same id as a string. An id no record has returns a null hit, not an error. Give field, a JSON pointer such as /questIds, to read one value of the record's data instead of the excerpt; an array comes in pages of up to 48 rows, and nextOffset says where the next page starts. A pointer that leads nowhere answers with the keys it could have used, not an error.",
     inputSchema: { id: z.number().int().describe("The numeric id of a search_knowledge or get_by_name hit."), ...fieldReadInput },
     outputSchema: { hit: knowledgeHit.nullable(), ...fieldReadOutput },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   get_by_name: {
     title: "Get records by exact name",
@@ -602,7 +603,7 @@ export const MCP_TOOLS = {
       kind: z.enum(KNOWLEDGE_KINDS).optional().describe(KIND_FILTER),
     },
     outputSchema: { hits: z.array(knowledgeHit) },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   search: {
     title: "Search (ChatGPT connector contract)",
@@ -610,7 +611,7 @@ export const MCP_TOOLS = {
       "Searches the knowledge base in the shape ChatGPT connectors and deep research call by name: up to 10 results, each with an id for fetch, a title and a URL to cite. It is the same search as search_knowledge. Use it only when the client expects the search and fetch pair; other clients should call search_knowledge. The text block is the same JSON as a string.",
     inputSchema: { query: z.string().max(1000).describe("What to look up: names, questions, keywords. Question words are ignored.") },
     outputSchema: { results: z.array(searchResult) },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   fetch: {
     title: "Fetch one document (ChatGPT connector contract)",
@@ -618,7 +619,7 @@ export const MCP_TOOLS = {
       "Returns one knowledge record in full, by the string id a search result gave: title, the full text in the source's words, the URL to cite, and metadata with the source, licence and date. It is the ChatGPT connector counterpart of get_entity, which gives only an excerpt. Use it after search, or with a search_knowledge id as a string. Give field, a JSON pointer such as /questIds, to read one value of the record's data: text then holds that value as JSON, and an array comes in pages of up to 48 rows with nextOffset for the next page. A long array in a whole record is cut at 48 rows. The text block is the same JSON as a string.",
     inputSchema: { id: z.string().max(20).describe("An id from a search result."), ...fieldReadInput },
     outputSchema: fetchedDocument.shape,
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   answer_sources: {
     title: "Evidence for a question, each piece with its source",
@@ -633,7 +634,7 @@ export const MCP_TOOLS = {
       furtherReading: z.array(z.object({ site: z.string(), url: z.string() })).describe("Search links on other sites. Nothing was fetched."),
       dataAsOf: z.string().nullable().describe("When the observed layer was current; null when it is not connected."),
     },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   profession_path: {
     title: "Profession leveling path",
@@ -645,7 +646,7 @@ export const MCP_TOOLS = {
       toSkill: z.number().int().min(1).max(500).describe("Skill to stop at, 1 to 500, above fromSkill."),
     },
     outputSchema: { ...uploadsAnswer, page: professionPath.optional() },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   recipe_thresholds: {
     title: "Recipe skill ranges",
@@ -656,7 +657,7 @@ export const MCP_TOOLS = {
       recipe: z.string().optional().describe("Part of a recipe name to narrow the list. Without it, every recipe of the profession."),
     },
     outputSchema: { ...uploadsAnswer, page: recipeThresholds.optional() },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   item_page: {
     title: "Item page for a drop",
@@ -664,7 +665,7 @@ export const MCP_TOOLS = {
       "Returns one Forever item's page by item id: the agreed name, drop frequency from observed loot windows, agreed map pins, and player-reported armor, block, damage per second, stats and resistances. A number is public when one value has 3 agreeing installs in the newest build that 3 installs reported, and no competing value has 3; contested numbers are withheld. Each number states its agreeing installs, build and last seen, with the corpus date and method. Missing numbers are [?] with a reason. No baseline rows or player names. Use it when you have an item id; use market_value for its price, entity_relations for what drops or sells it, and item_categories for its class and slot. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
     inputSchema: { itemId: z.number().int().positive().describe("The game's item id, from a drop row, entity_relations or the extId of a search_knowledge hit of kind item.") },
     outputSchema: { ...uploadsAnswer, page: itemPage.optional() },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   npc_page: {
     title: "NPC page",
@@ -672,7 +673,7 @@ export const MCP_TOOLS = {
       "Returns one Forever NPC's page by NPC id: the agreed name, the agreed map pins, and the loot windows reported for it that are not yet in the drop rates. A name or pin needs 3 installs agreeing; a pin does not require a drop. No copied spawn list. Use it to name or place an NPC when you have its id, from a search_knowledge hit, a drop row or entity_relations; use vendor_page for what an NPC sells, item_page for one drop's rate, entity_relations for every typed link, and world_map_near for what stands around it. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
     inputSchema: { npcId: z.number().int().positive().describe("The game's NPC id, from world_map_near, entity_relations or the extId of a search_knowledge hit of kind npc.") },
     outputSchema: { ...uploadsAnswer, page: npcPage.optional() },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   object_page: {
     title: "Game object page",
@@ -680,7 +681,7 @@ export const MCP_TOOLS = {
       "Returns one game object's page (a chest, herb, ore vein or fishing pool) by its entry id: the items players looted from it, each with observed loot windows, windows with the item and distinct install reports, and where players saw it on the minimap. A frequency is public after 3 install reports; a public object with nothing in its windows reads as a measured zero. The name shows once 3 installs agree on it. Use it for gathering nodes and containers; use npc_page for creatures, and item_page for every source of one item. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
     inputSchema: { objectId: z.number().int().positive().describe("The object's entry id, from a world_map_near treasure, as in /database/objects/1731.") },
     outputSchema: { ...uploadsAnswer, page: objectPage.optional() },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   quest_page: {
     title: "Quest page",
@@ -688,7 +689,7 @@ export const MCP_TOOLS = {
       "Returns one Forever quest's page by quest id: agreed title, level, giver, turn-in and rewards. Each fact needs 3 installs agreeing. No copied quest text. Use it when you have a quest id, from a search_knowledge hit or entity_relations; use answer_sources for a question about the quest's story or chain, and entity_relations for what the quest rewards. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
     inputSchema: { questId: z.number().int().positive().describe("The game's quest id, from entity_relations or the extId of a search_knowledge hit of kind quest.") },
     outputSchema: { ...uploadsAnswer, page: questPage.optional() },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   vendor_page: {
     title: "Vendor page",
@@ -696,7 +697,7 @@ export const MCP_TOOLS = {
       "Returns the goods one Forever vendor sells, by the vendor's NPC id, each with the copper price players saw. An item is listed when 3 installs agree on that item and its copper price; two agreed prices both stay listed. No copied catalog. Use it for what a vendor sells and at what price; use npc_page for where the vendor stands, entity_relations with the sold_by relation for who sells an item, and market_value for auction prices. The id is the same NPC id npc_page takes. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
     inputSchema: { vendorNpcId: z.number().int().positive().describe("The vendor's NPC id, the id npc_page takes, from world_map_near or entity_relations.") },
     outputSchema: { ...uploadsAnswer, page: vendorPage.optional() },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   world_map_near: {
     title: "What is near a place on the map",
@@ -711,7 +712,7 @@ export const MCP_TOOLS = {
       limit: z.number().int().min(1).max(NEAR_MAX_LIMIT).default(NEAR_DEFAULT_LIMIT).describe(`Most results per list, 1 to ${NEAR_MAX_LIMIT}, default ${NEAR_DEFAULT_LIMIT}.`),
     },
     outputSchema: { ...uploadsAnswer, page: mapNear.optional() },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   entity_relations: {
     title: "How an item, NPC, spell or quest connects to others",
@@ -725,7 +726,7 @@ export const MCP_TOOLS = {
       limit: z.number().int().min(1).max(100).default(25).describe("Most lines per relation, 1 to 100, default 25."),
     },
     outputSchema: { ...uploadsAnswer, page: entityRelations.optional() },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   item_categories: {
     title: "Item categories: class, subclass, slot and quality",
@@ -753,7 +754,7 @@ export const MCP_TOOLS = {
       credit: z.string(),
       url: z.string().optional().describe(PAGE_URL),
     },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   talent_tree: {
     title: "Talent trees for one class",
@@ -791,7 +792,7 @@ export const MCP_TOOLS = {
       credit: z.string(),
       url: z.string().optional().describe(PAGE_URL),
     },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   talent_plan: {
     title: "Read a talent share code",
@@ -820,7 +821,7 @@ export const MCP_TOOLS = {
       credit: z.string(),
       url: z.string().optional().describe("The build's own link on everloot.app, absolute: the calculator opened on this plan, with a preview card for sharing."),
     },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   class_races: {
     title: "Races that can be a class, with their racial traits",
@@ -852,7 +853,7 @@ export const MCP_TOOLS = {
       credit: z.string(),
       url: z.string().optional().describe(PAGE_URL),
     },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   collection_gap: {
     title: "Owned versus missing in a collection",
@@ -863,7 +864,7 @@ export const MCP_TOOLS = {
       ownerInstallId: z.string().describe("The player's own install id, whose owned upload to compare."),
     },
     outputSchema: { ...uploadsAnswer, page: collectionGap.optional() },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   completion_progress: {
     title: "Achievement, reputation, title and quest progress",
@@ -874,7 +875,7 @@ export const MCP_TOOLS = {
       characterKey: z.string().max(8).optional().describe("One character's 8-digit key from the upload, when the install has several. Without it, every character."),
     },
     outputSchema: { ...uploadsAnswer, page: completionProgress.optional() },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   guild_board: {
     title: "Guild board its officers published",
@@ -885,7 +886,7 @@ export const MCP_TOOLS = {
       realm: z.string().describe("The guild's realm, as guild_search gives it."),
     },
     outputSchema: { ...uploadsAnswer, page: guildBoard.optional() },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   guild_search: {
     title: "Find a guild by the start of its name",
@@ -896,7 +897,7 @@ export const MCP_TOOLS = {
       limit: z.number().int().min(1).max(25).default(10).describe("Most guilds listed, 1 to 25, default 10."),
     },
     outputSchema: { ...uploadsAnswer, page: guildSearch.optional() },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   guild_rankings: {
     title: "Guild ladder for one raid or dungeon",
@@ -909,7 +910,7 @@ export const MCP_TOOLS = {
       limit: z.number().int().min(1).max(100).default(20).describe("Most guilds listed, 1 to 100, default 20."),
     },
     outputSchema: { ...uploadsAnswer, page: guildRankings.optional() },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   auction_history: {
     title: "Auction history for one item",
@@ -920,7 +921,7 @@ export const MCP_TOOLS = {
       itemId: z.number().int().positive().describe("The game's item id, as item_page takes it."),
     },
     outputSchema: { ...uploadsAnswer, page: auctionHistory.optional() },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   market_value: {
     title: "Forever market value for one item",
@@ -931,7 +932,7 @@ export const MCP_TOOLS = {
       itemId: z.number().int().positive().describe("The game's item id, as item_page takes it."),
     },
     outputSchema: { ...uploadsAnswer, page: marketPage.optional() },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   gold_ledger: {
     title: "Gold ledger for one character",
@@ -942,7 +943,7 @@ export const MCP_TOOLS = {
       realm: z.string().describe("The character's realm, as the game shows it."),
     },
     outputSchema: { ...uploadsAnswer, page: goldLedger.optional() },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   coverage: {
     title: "Database coverage by zone, type and field",
@@ -952,7 +953,7 @@ export const MCP_TOOLS = {
       zone: z.number().int().positive().optional().describe("Released UiMap zone id, such as 1429 for Elwynn Forest. Omit for all released zones."),
       type: z.enum(["quests", "npcs", "pins", "vendors", "drops", "rares", "entrances", "bosses", "treasures"]).optional().describe("Coverage type. Omit for all types."),
     },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   population: {
     title: "Who plays what: population by race, class, faction and level",
@@ -965,7 +966,7 @@ export const MCP_TOOLS = {
       window: z.enum(CENSUS_WINDOWS).default("week").describe("week (default): active in the last 7 days. launch: seen since launch."),
     },
     outputSchema: { ...uploadsAnswer, page: populationPage.optional() },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   recent_changes: {
     title: "Recent official changes for WoW: Forever",
@@ -981,7 +982,7 @@ export const MCP_TOOLS = {
       entries: z.array(changeEntry),
       url: z.string().optional().describe("The changes page on everloot.app with the same filter, absolute."),
     },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   ecosystem_projects: {
     title: "WoW: Forever addons and open-source projects",
@@ -1002,7 +1003,7 @@ export const MCP_TOOLS = {
       projects: z.array(ecosystemProject),
       url: z.string().optional().describe(PAGE_URL),
     },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   everloot_plan: {
     title: "Everloot implementation tracker",
@@ -1013,7 +1014,7 @@ export const MCP_TOOLS = {
       rows: z.array(planRow).describe("Every row, in the tracker's order."),
       counts: z.object({ live: z.number().int(), next: z.number().int(), waiting: z.number().int(), shape: z.number().int() }),
     },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
 } as const satisfies Record<string, McpToolDef>;
 

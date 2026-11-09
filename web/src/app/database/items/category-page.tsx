@@ -7,9 +7,9 @@ import {
   activeFilters, BINDINGS, CLIENT_TAXONOMY as T, categoryNamedEnough, categoryQuery, developmentLeftovers, itemFacets, ITEM_LEVEL_BRACKETS, ITEMS_PER_PAGE, itemsHref,
   listItems, NAME_FROM, SOURCES, shownItemName, subclassLabel, toggled, UNRECORDED, type CategoryQuery, type NameSource,
 } from "@/lib/items";
-import { loadItemSeen } from "@/lib/item-seen";
+import { loadListNames, loadListSeen } from "@/lib/item-view";
 import { pageMetadata } from "@/lib/seo";
-import { loadShownNames } from "@/lib/shown-item-names";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
 import { classLabel, hasClassContext, parseClassContext, withClassContext, withoutClassContext } from "@/lib/class-context";
 import ClassContextChip from "@/components/classes/ClassContextChip";
@@ -73,7 +73,7 @@ export async function categoryMetadata(classSlug: string | undefined, subclassKe
   const page = plain ? r.q.page : 1;
   // A later page of the plain list is indexed like page 1: once half the rows it shows have a name. The plain
   // list shows named rows first, so its first pages fill with them; until then a page is a list of "Item N".
-  const shown = plain ? await loadShownNames() : null;
+  const shown = plain ? await loadListNames() : null;
   const named = shown?.named ?? null;
   // The plain list leaves the development leftovers out, so its pages, count and indexing do too.
   const hidden = shown ? developmentLeftovers(T.items, (id) => shown.agreed.get(id) ?? shown.matched?.names.get(id)?.name) : undefined;
@@ -119,7 +119,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const usable = context ? classUse(CLIENT_CLASS_GEAR, context.classSlug, context.level) : null;
   const fits = (row: ItemRow) => !usable || usable(row) !== "no";
   const base = (cls ? filterItems(T, { classId: cls.id, subclassId: sub?.id }) : T.items).filter(fits);
-  const [{ agreed, matched, showsTip }, seen] = await Promise.all([loadShownNames(), loadItemSeen()]);
+  const [{ agreed, matched, showsTip, degraded }, seen] = await Promise.all([loadListNames(), loadListSeen()]);
   const nameOf = (id: number) => agreed.get(id) ?? matched?.names.get(id)?.name;
   // The game file name, icon and tooltip facts only for items players reported (3 installs) or the item name rule
   // names, as on the item page: a list of every id in the files must not become a list of unreleased items.
@@ -316,6 +316,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
 
   return (
     <Container width="data">
+      <EdgeDegraded when={degraded || seen.unreachable} />
       <article>
         <DataTitle title={title} trail={trail} aside={strip} />
         <FilterBar

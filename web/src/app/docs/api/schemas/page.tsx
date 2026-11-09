@@ -5,6 +5,8 @@ import { C, H2, H3, List, P, Params, Table, docLink } from "@/components/docs/bl
 import DocPage from "@/components/docs/DocPage";
 import { endpointHref } from "@/lib/docs/nav";
 import { schemaFields } from "@/lib/docs/examples";
+import { FILE_SCHEMAS } from "@/lib/docs/file-schemas";
+import { recordHref } from "@/lib/docs/records";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
@@ -67,13 +69,14 @@ export default function SchemasPage() {
       <H2 id="record-kinds">Record kinds</H2>
       <P>
         The addon writes records, and each has a <C>kind</C>. The public corpus holds the kinds marked below; the rest stay
-        private to the upload. Each kind has its own schema file.
+        private to the upload. Each kind has a page with its fields, and its own schema file.
       </P>
       <Table
-        head={["Kind", "In the public corpus"]}
+        head={["Kind", "In the public corpus", "Schema file"]}
         rows={ALL_RECORD_KINDS.map((kind) => [
-          <a key="k" href={`/schema/records/${kind}.json`} className={docLink}><C>{kind}</C></a>,
+          <Link key="k" href={recordHref(kind)} className={docLink}><C>{kind}</C></Link>,
           PUBLIC_RECORD_KINDS.includes(kind) ? "Yes" : "No",
+          <a key="f" href={`/schema/records/${kind}.json`} className={docLink}><C>{`${kind}.json`}</C></a>,
         ])}
       />
 
@@ -100,10 +103,13 @@ export default function SchemasPage() {
       <H2 id="response-shapes">Response shapes</H2>
       <P>
         One section per shape. The fields are the top-level ones; the full shape, with everything nested, is in the JSON Schema
-        file named under each heading.
+        file named under each heading. Three shapes describe a file of the bulk export rather than an endpoint&apos;s answer,
+        and say so. Wherever a shape carries <C>reporters</C>, it is the count of installs that agree on that fact, the same
+        number the open-data files call <C>installs</C>.
       </P>
       {names.map((name) => {
         const routes = usedBy(name);
+        const file = FILE_SCHEMAS[name];
         return (
           <section key={name}>
             <H3 id={name}>{name}</H3>
@@ -120,6 +126,8 @@ export default function SchemasPage() {
                   ))}
                   .
                 </>
+              ) : file ? (
+                <> Describes a file, not an endpoint: {file}.</>
               ) : (
                 <> A part of other answers.</>
               )}

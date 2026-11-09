@@ -55,7 +55,7 @@ test("nameplates are named for the census only: the player pages item never read
   const item = playerPages.slice(0, playerPages.indexOf("</li>"));
   expect(item).toContain("target, mouse over or group with");
   expect(item).not.toMatch(/nameplate/i);
-  expect(text).toContain("Last updated: 4 November 2026");
+  expect(text).toContain("Last updated: 9 November 2026");
 });
 
 test("saved builds: what is kept, that characters are typed labels, that a shared link is public, and deletion", () => {
@@ -92,6 +92,53 @@ test("profiles: private by default, what a public profile shows and never shows,
     "It never shows the BattleTag, the email, a label's note or a build that is not shared.",
     "A handle changes at most 5 times a day.",
   ]) expect(policy).toContain(claim);
+});
+
+test("linked characters: private until a page is turned on, how a dispute is settled, the hide form, and never verified", () => {
+  const items = html.slice(html.indexOf('<li id="linked-characters">'), html.indexOf('<li id="chat-projects">'));
+  expect(items).toContain('href="/players/opt-out"');
+  expect(items).toContain('href="mailto:hello@everloot.app"');
+  expect(items.toLowerCase()).not.toContain("verified");
+  for (const claim of [
+    "Link rows never go in an upload.",
+    "Neither the game's id nor the install id is stored.",
+    "We don't check it with Blizzard.",
+    "until we settle it: write to hello@everloot.app and we reply within 7 days",
+    "A linked character is private: only you see it, unless you give it a public page.",
+    "It never shows your BattleTag, your email, your account, your handle or the hashes.",
+    "Search engines are asked not to index it.",
+    "Anyone can hide a character on the hide form, without an account",
+    "Linked characters are unlinked, and their public pages turned on or off, on your account page.",
+    "Linked characters and their page settings: until you unlink the character or delete your account.",
+  ]) expect(text).toContain(claim);
+  for (const claim of [
+    "## Public character pages",
+    "it never calls the character verified or owned",
+    "write to hello@everloot.app: we reply within 7 days",
+  ]) expect(policy).toContain(claim);
+});
+
+test("private sync: what the app sends, that the link decides, private by default, deletion, and never verified", () => {
+  const item = html.slice(html.indexOf('<li id="private-sync">'), html.indexOf('<li id="chat-projects">'));
+  expect(item.toLowerCase()).not.toContain("verified");
+  for (const claim of [
+    "Sync my linked characters",
+    "the active talent build",
+    "Every category starts off.",
+    "kept only when your account holds a live link to that character",
+    "only the newest capture of each category",
+    "Nothing synced is public until you turn your page on and that section on.",
+    "Turning a category's sync off deletes what was synced for it at once; unlinking the character or deleting your account deletes all of it.",
+    "Synced data is turned on and off, and each section shown or hidden, on your account page.",
+    "Synced character data: the newest capture of each category, until you turn that category off, unlink the character or delete your account.",
+  ]) expect(text).toContain(claim);
+  for (const claim of [
+    "## Private sync and owner-published sections",
+    "In effect from 6 November 2026",
+    "The link decides, not the computer.",
+    "achievements this character earned",
+  ]) expect(policy).toContain(claim);
+  expect(policy).not.toContain("Not in effect yet.");
 });
 
 test("chat's free model: what goes to the provider, what never does, and what we keep", () => {

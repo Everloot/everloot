@@ -3,6 +3,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { Badge, Container, DataTable, Facts, TooltipFrame } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { achievementHref, loadCatalog, parseSegment } from "@/lib/completion-lists";
+import { entityTitle } from "@/lib/entity-meta";
 import { pageMetadata } from "@/lib/seo";
 import { CLIENT_LABEL } from "../../../../../../kb/src/edges";
 import { CLIENT_ACHIEVEMENTS } from "@/data/game-data/client-achievements";
@@ -31,7 +32,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const name = listed?.name ?? files?.title ?? `Achievement ${id}`;
   const criteria = entry?.criteria ? "reported criteria" : files?.criteria.length ? "the criteria from the game files" : "criteria count";
   return {
-    ...pageMetadata({ title: `${name} (achievement)`, description: `The ${name} achievement in WoW: Forever: category, points and ${criteria}, ${entry ? "from player reports and the build's own game files as each has them." : `from the build's own game files. ${CLIENT_LABEL}.`}`, path: achievementHref(id!, name) }),
+    ...pageMetadata({ title: entityTitle(name, "achievement"), description: `The ${name} achievement in WoW: Forever: category, points and ${criteria}, ${entry ? "from player reports and the build's own game files as each has them." : `from the build's own game files. ${CLIENT_LABEL}.`}`, path: achievementHref(id!, name) }),
     robots: { index: true, follow: true },
   };
 }
@@ -90,7 +91,7 @@ export default async function AchievementPage(props: Props) {
         {fileCriteria.length > 0 && (
           <DataTable
             dense
-            caption={`Criteria of ${title}${fromReports ? ", as three players reported them" : ""}`}
+            caption={`Criteria of ${title}${fromReports ? ", as three installs reported them" : ""}`}
             columns={[
               {
                 key: "text", header: "Criterion",
@@ -106,7 +107,7 @@ export default async function AchievementPage(props: Props) {
           <p className="mt-2 text-meta text-muted">Criteria read from the client&apos;s own files of build {fileVersion} (found in game files, unconfirmed). They show as players reported them once three installs send the same list.</p>
         )}
         {entry && !entry.criteria && entry.criteriaCount > 0 && fileCriteria.length === 0 ? (
-          <EmptyTab players={false} action={null} message="The criteria show once three players report the same full list." />
+          <EmptyTab players={false} action={null} message="The criteria show once three installs report the same full list." />
         ) : null}
         {!entry && files && (
           <p className="mt-2 text-meta text-muted">Found in game files, unconfirmed. Criteria and text are the game files&apos;; the category and the count of installs that earned it appear once three installs agree.</p>

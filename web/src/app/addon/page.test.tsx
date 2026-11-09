@@ -70,6 +70,9 @@ test("the addon and every desktop build are offered with version, date, size and
   const html = await render(() => Promise.resolve(Response.json(releases)));
   const text = visible(html);
   expect(html).toContain(`href="${addon.downloadPath}"`);
+  // The same tested zip is on CurseForge, for players who install with its app.
+  expect(html).toContain('href="https://www.curseforge.com/wow/addons/everloot"');
+  expect(text).toContain("Get it on CurseForge");
   expect(text).toContain(`Version ${addon.version}, Alpha, released 2026-10-18`);
   expect(text).toContain("Version 0.1.0, released 2026-10-19");
   for (const [label, size] of [["Windows installer", "108 MB"], ["Windows portable", "108 MB"], ["macOS disk image", "125 MB"], ["Linux AppImage", "122 MB"]]) {
@@ -100,6 +103,16 @@ test("install steps, the upload page, privacy, data policy and source are linked
   }
 });
 
+test("with the showcase on, the privacy section links the sample character page; off, the page never points at a 404", async () => {
+  vi.stubEnv("EVERLOOT_SHOWCASE", "1");
+  const on = await render(() => Promise.resolve(Response.json(releases)));
+  expect(on).toContain('href="/showcase/character"');
+  expect(visible(on)).toContain("What your own character page looks like: see the sample character");
+  vi.stubEnv("EVERLOOT_SHOWCASE", "");
+  const off = await render(() => Promise.resolve(Response.json(releases)));
+  expect(off).not.toContain("/showcase/character");
+});
+
 test("at build, when GitHub cannot be read the addon still downloads and the app points at the releases page", async () => {
   vi.stubEnv("NEXT_PHASE", "phase-production-build");
   const html = await render(() => Promise.reject(new Error("offline")));
@@ -107,6 +120,19 @@ test("at build, when GitHub cannot be read the addon still downloads and the app
   expect(visible(html)).toContain("could not be loaded right now");
   expect(html).toContain('href="https://github.com/Everloot/everloot/releases"');
   expect(html).not.toContain("DesktopApp-");
+});
+
+test("at build, a failed read is asked again with a minute's lifetime, so a fallback page is rebuilt a minute after the deploy", async () => {
+  vi.stubEnv("NEXT_PHASE", "phase-production-build");
+  const answers = [() => Promise.reject(new Error("timed out")), () => Promise.resolve(Response.json(releases))];
+  const fetch = vi.fn(() => answers.shift()!());
+  vi.stubGlobal("fetch", fetch);
+  const html = renderToStaticMarkup(await AddonPage());
+  // The lowest lifetime among a page's fetches is the page's own (Next.js), so this sets the build's copy to a minute.
+  const lifetimes = fetch.mock.calls.map((call) => ((call as unknown[])[1] as { next?: { revalidate?: number } }).next?.revalidate);
+  expect(lifetimes).toEqual([3600, 60]);
+  expect(html).toContain("DesktopApp-0.1.0-win-x64-setup.exe");
+  expect(visible(html)).not.toContain("could not be loaded right now");
 });
 
 test("an hourly rebuild with GitHub down throws, so the cache keeps serving the last good page", async () => {

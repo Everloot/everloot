@@ -8,8 +8,20 @@ vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
 }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
+const players = vi.hoisted(() => ({ store: null as PlayerStore | null }));
+vi.mock("@/lib/player-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/player-store")>()), playerStore: () => players.store }));
+// The names synced facts are drawn with: fixed here, so a published-sections test reads no item or catalog store.
+const factNames = vi.hoisted(() => ({ load: vi.fn() }));
+vi.mock("@/lib/character-facts-names", () => ({ loadFactNames: factNames.load }));
+// The gear boards, fed in whole: their own reads are tested in app/rankings/gear-board.test.tsx.
+const gearBoard = vi.hoisted(() => ({ load: vi.fn() }));
+vi.mock("@/lib/leaderboards", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/leaderboards")>()), loadGearBoard: gearBoard.load }));
 
-import Page, { generateMetadata } from "./[ruleset]/[realm]/[name]/page";
+import { createMemoryPlayerStore, type PlayerStore } from "@/lib/player-store";
+import { FOOTER_LINE, NOT_RECORDED_LINE } from "@/lib/character-showcase";
+import { PLAYER_SIGHTING_LINE } from "@/app/players/player-view";
+import * as pageModule from "./[ruleset]/[realm]/[name]/page";
+import Page, { dynamic, generateMetadata } from "./[ruleset]/[realm]/[name]/page";
 import { GET as wideCard } from "./[ruleset]/[realm]/[name]/card.png/route";
 import { GET as squareCard } from "./[ruleset]/[realm]/[name]/card-square.png/route";
 
@@ -34,6 +46,7 @@ async function pngSize(res: Response): Promise<{ width: number; height: number }
 }
 
 beforeEach(() => {
+  players.store = createMemoryPlayerStore();
   vi.stubEnv("EVERLOOT_SHOWCASE", "1");
   vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
   vi.stubEnv("SUPABASE_URL", "");
@@ -60,12 +73,21 @@ describe("a public character", () => {
     expect(auth.authQuery).toHaveBeenCalledWith("rpc/public_character", expect.objectContaining({ method: "POST" }));
     expect(JSON.parse(auth.authQuery.mock.calls[0][1].body)).toEqual({ p_ruleset: "forever", p_realm_slug: "forever-pioneer", p_name: "thrallina" });
     expect(html).toContain("Thrallina");
-    expect(html).toContain("Level 24 Orc Shaman · Forever Pioneer");
+    // The header band: the line, then the realm and side, from the link row.
+    expect(html).toContain(">Level 24 Orc Shaman<");
+    expect(html).toContain("<span>Forever Pioneer</span>");
+    expect(html).toContain('data-faction="true">Horde<');
     expect(html).toContain('data-section="identity"');
     expect(html).toContain("From the player&#x27;s own addon upload, 2026-10-30 (2 days ago)");
     expect(html).toContain("Not checked against Blizzard");
-    // Identity only: no other section, and no sample banner.
+    // Identity, and the stats as one line (no collector records them): no other section, no headline number, no
+    // title, no guild, and no sample banner.
     for (const key of ["gear", "talents", "professions", "reputations", "raids", "collections"]) expect(html).not.toContain(`data-section="${key}"`);
+    expect(html).toContain('data-section="stats" data-state="unsupported"');
+    expect(html).toContain(NOT_RECORDED_LINE);
+    expect(html).toContain('href="#showcase-stats"');
+    expect(html).not.toMatch(/>0</);
+    for (const absent of ["data-headlines", "data-title", "data-guild", "data-paper-doll"]) expect(html).not.toContain(absent);
     expect(html).not.toContain("data-sample");
     expect(html).not.toMatch(/verified|owner|proven|✓/i);
     // Someone whose character this really is can hide it without an account.
@@ -184,7 +206,9 @@ describe("planned builds (S4)", () => {
     // Dated by the newest build; no in-game tree table or calculator link, since nothing was synced from the game.
     expect(html).toContain("2026-10-31");
     expect(html).not.toContain("Points per tree");
-    expect(html).not.toContain("/tools/talents/");
+    // The talents section opens no build; the class links further down are the plain calculator, the same for anyone.
+    const talents = html.slice(html.indexOf('data-section="talents"'), html.indexOf("</section>", html.indexOf('data-section="talents"')));
+    expect(talents).not.toContain("/tools/talents/");
     for (const secret of ["my private note", "EL1-", USER_ID, "Thrall#1234"]) expect(html).not.toContain(secret);
     expect(html).not.toMatch(/verified|owner|proven|✓/i);
   });
@@ -215,5 +239,311 @@ describe("planned builds (S4)", () => {
     expect((await card(wideCard)).status).toBe(200);
     expect((await card(squareCard)).status).toBe(200);
     expect(askedForBuilds()).toBe(false);
+  });
+});
+
+describe("published sections (private sync, S6)", () => {
+  const FACTS_RPC = "rpc/public_character_facts";
+  /** What public_character_facts returns for the switched-on sections, plus fields it never sends. */
+  const GEAR = {
+    category: "gear", captured_at: "2026-10-31T09:00:00+00:00", data: { equipped: [{ slot: "HeadSlot", itemId: 16842, itemLevel: 66 }] },
+    source_ref: "d".repeat(64), install_id: "install-1234", user_id: USER_ID,
+  };
+  const PROFESSIONS = { category: "professions", captured_at: "2026-10-30T09:00:00+00:00", data: { professions: [{ name: "Mining", skillLine: 186, rank: 280, maxRank: 300 }] } };
+  const answer = (facts: unknown) => auth.authQuery.mockImplementation(async (path: string) => {
+    if (path === "rpc/public_character") return [ROW];
+    if (path === FACTS_RPC) {
+      if (facts instanceof Error) throw facts;
+      return facts;
+    }
+    throw new Error(`unexpected ${path}`);
+  });
+  const askedForFacts = () => auth.authQuery.mock.calls.some(([path]) => path === FACTS_RPC);
+  const on = () => { vi.stubEnv("EVERLOOT_CHARACTER_LINKS", "1"); vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1"); };
+
+  beforeEach(() => {
+    factNames.load.mockReset().mockResolvedValue({ item: (id: number) => (id === 16842 ? "Earthfury Helmet" : null), catalog: null, talentTrees: null });
+  });
+
+  test("with the switch off nothing asks for facts, and the page and cards are as before", async () => {
+    answer([GEAR]);
+    for (const [links, sync] of [["1", ""], ["1", "true"], ["", "1"]]) {
+      vi.stubEnv("EVERLOOT_CHARACTER_LINKS", links);
+      vi.stubEnv("EVERLOOT_PRIVATE_SYNC", sync);
+      const html = await render();
+      expect(html).toContain("Thrallina");
+      expect(html).not.toContain('data-section="gear"');
+      expect((await card(wideCard)).status).toBe(200);
+    }
+    expect(askedForFacts()).toBe(false);
+    expect(factNames.load).not.toHaveBeenCalled();
+  });
+
+  test("on, the page shows exactly the sections the owner switched on, dated, with names only where installs agree", async () => {
+    on();
+    answer([GEAR, PROFESSIONS]);
+    const html = await render();
+    expect(JSON.parse(auth.authQuery.mock.calls.find(([path]) => path === FACTS_RPC)![1].body))
+      .toEqual({ p_ruleset: "forever", p_realm_slug: "Forever Pioneer", p_name: "Thrallina" });
+    expect(html).toContain('data-section="gear"');
+    expect(html).toContain("Earthfury Helmet");
+    expect(html).toContain('href="/database/items/16842"');
+    expect(html).toContain('data-section="professions"');
+    expect(html).toContain("280 / 300");
+    for (const key of ["talents", "reputations", "raids", "collections"]) expect(html).not.toContain(`data-section="${key}"`);
+    // The header's date is the newest published capture.
+    expect(html).toContain("From the player&#x27;s own addon upload, 2026-10-31 (1 day ago)");
+    expect(html).not.toMatch(/verified|owner|proven|✓/i);
+    for (const secret of [USER_ID, "d".repeat(64), "install-1234", "Thrall#1234", "source_ref"]) expect(html).not.toContain(secret);
+  });
+
+  test("a published stats fact is drawn; without one the stats keep the not-recorded line", async () => {
+    on();
+    answer([PROFESSIONS]);
+    const without = await render();
+    expect(without).toContain('data-section="stats" data-state="unsupported"');
+    expect(without).toContain(NOT_RECORDED_LINE);
+    answer([{ category: "stats", captured_at: "2026-10-31T09:00:00+00:00", data: { stats: { strength: 1234, meleeCrit: 12.34, agility: 0, meleeHit: 0 } } }]);
+    const html = await render();
+    expect(html).toContain('data-section="stats"');
+    expect(html).not.toContain('data-section="stats" data-state="unsupported"');
+    expect(html).not.toContain(NOT_RECORDED_LINE);
+    expect(html).toContain("1,234");
+    expect(html).toContain("12.34%");
+    expect(html).not.toContain("0.00%");
+  });
+
+  test("a published pvp fact is drawn; without one the section is left out", async () => {
+    on();
+    answer([PROFESSIONS]);
+    expect(await render()).not.toContain('data-section="pvp"');
+    answer([{ category: "pvp", captured_at: "2026-10-31T09:00:00+00:00", data: { rank: 7, rankPoints: null, rankThreshold: null, rankMax: 14, season: null, honorableKills: 12_345 } }]);
+    const html = await render();
+    expect(html).toContain('data-section="pvp"');
+    expect(html).toContain("Rank 7 of 14");
+    expect(html).toContain("Honorable kills 12,345");
+    expect(html).not.toContain("Season");
+  });
+
+  test("a section switched off is gone on the next request", async () => {
+    on();
+    answer([GEAR, PROFESSIONS]);
+    expect(await render()).toContain('data-section="gear"');
+    // The owner switched gear off: public_character_facts no longer returns it (supabase/tests/private_sync.sql).
+    answer([PROFESSIONS]);
+    const html = await render();
+    expect(html).not.toContain('data-section="gear"');
+    expect(html).not.toContain("Earthfury Helmet");
+    expect(html).toContain('data-section="professions"');
+  });
+
+  test("a hidden, frozen or private character is a 404 and its facts are never asked for", async () => {
+    on();
+    auth.authQuery.mockImplementation(async (path: string) => (path === FACTS_RPC ? [GEAR] : []));
+    await expect(Page(props())).rejects.toThrow("NEXT_NOT_FOUND");
+    expect((await card(wideCard)).status).toBe(404);
+    expect(askedForFacts()).toBe(false);
+  });
+
+  test("a failed or malformed read leaves the sections out and keeps the page", async () => {
+    on();
+    for (const facts of [new Error("down"), [{ category: "gear", captured_at: "not a date", data: {} }, { category: "gold", captured_at: "2026-10-31T09:00:00Z", data: {} }]]) {
+      answer(facts);
+      const html = await render();
+      expect(html).toContain("Thrallina");
+      expect(html).not.toContain('data-section="gear"');
+    }
+  });
+
+  test("the cards draw from the published sections too", async () => {
+    on();
+    answer([GEAR]);
+    expect((await card(wideCard)).status).toBe(200);
+    expect(askedForFacts()).toBe(true);
+  });
+});
+
+describe("gear ranks (EVERLOOT_LEADERBOARDS)", () => {
+  const entry = (name: string, itemLevel: number, gearScore: number) => ({
+    name, realm: "Forever Pioneer", realmBase: "Forever Pioneer", ruleset: null, region: null, race: "Orc", class: "SHAMAN", faction: "Horde",
+    level: 24, path: `/characters/forever/forever-pioneer/${name.toLowerCase()}`, capturedAt: "2026-10-31T09:00:00Z", itemLevel, gearScore,
+    linkId: `link-${name}`,
+  });
+  const on = () => { for (const k of ["EVERLOOT_LEADERBOARDS", "EVERLOOT_CHARACTER_LINKS", "EVERLOOT_PRIVATE_SYNC"]) vi.stubEnv(k, "1"); };
+  beforeEach(() => {
+    gearBoard.load.mockReset().mockResolvedValue({ state: "ready", generatedAt: "2026-11-01T12:00:00Z", notCounted: 0, entries: [entry("Thrallina", 40, 41), entry("Other", 45, 39)] });
+    auth.authQuery.mockImplementation(async (path: string) => (path === "rpc/public_character" ? [ROW] : []));
+  });
+
+  test("a ranked character's page shows its number and place on both boards, linked to them", async () => {
+    on();
+    const html = await render();
+    expect(html).toContain('aria-label="Rankings"');
+    expect(html).toMatch(/Item level <span[^>]*>40<\/span> <a href="\/rankings\/item-level"[^>]*>#2<\/a>/);
+    expect(html).toMatch(/Gear Score <span[^>]*>41<\/span> <a href="\/rankings\/gear-score"[^>]*>#1<\/a>/);
+  });
+
+  test("off the boards, or with them off, the page has no ranks and the boards are not read", async () => {
+    on();
+    gearBoard.load.mockResolvedValue({ state: "ready", generatedAt: "2026-11-01T12:00:00Z", notCounted: 0, entries: [entry("Other", 45, 39)] });
+    expect(await render()).not.toContain('aria-label="Rankings"');
+    gearBoard.load.mockClear();
+    vi.stubEnv("EVERLOOT_LEADERBOARDS", "");
+    expect(await render()).not.toContain('aria-label="Rankings"');
+    expect(gearBoard.load).not.toHaveBeenCalled();
+  });
+
+  test("a ranked character with two tracked days or more gets its chart, read for its own link only", async () => {
+    on();
+    const points = [
+      { day: "2026-11-04", metric: "item_level", value: 38 }, { day: "2026-11-04", metric: "gear_score", value: 39 },
+      { day: "2026-11-06", metric: "item_level", value: 40 }, { day: "2026-11-06", metric: "gear_score", value: 41 },
+    ];
+    const track = vi.fn((_body: unknown) => points);
+    auth.authQuery.mockImplementation(async (path: string, init?: RequestInit) =>
+      path === "rpc/public_character" ? [ROW] : path === "rpc/character_track_points" ? track(JSON.parse(String(init?.body))) : []);
+    const html = await render();
+    expect(track).toHaveBeenCalledWith({ p_link_id: "link-Thrallina" });
+    expect(html).toContain("data-track-chart");
+    expect(html).toContain('aria-label="Thrallina: item level and Gear Score by day"');
+    expect(html).toContain("<th scope=\"row\">2026-11-06</th><td>40</td><td>41</td>");
+    // One day is not a line yet.
+    track.mockReturnValue(points.slice(0, 2));
+    expect(await render()).not.toContain("data-track-chart");
+    // Off the boards: no chart, and its points are not read.
+    track.mockClear();
+    gearBoard.load.mockResolvedValue({ state: "ready", generatedAt: "2026-11-01T12:00:00Z", notCounted: 0, entries: [entry("Other", 45, 39)] });
+    expect(await render()).not.toContain("data-track-chart");
+    expect(track).not.toHaveBeenCalled();
+  });
+});
+
+describe("one page for a character: the owner's showcase and what the addon saw", () => {
+  /** A sighting another player's addon sent: a different race and level than the link row, so the sources can be told apart. */
+  const SEEN = { name: "Thrallina", realm: "Forever Pioneer", race: "Scourge", class: "SHAMAN", level: 22, guild: "Night Watch", seen: "2026-10-20" };
+  const seen = () => players.store!.upsert([SEEN]);
+  const text = async (p = PARAMS) => (await render(p)).replace(/&#x27;/g, "'");
+
+  test("the page is drawn on every request: force-dynamic, with no revalidate window", () => {
+    expect(dynamic).toBe("force-dynamic");
+    expect("revalidate" in pageModule).toBe(false);
+  });
+
+  test("a sighting alone is a page: the row's facts, where they came from, the hide link and the policy", async () => {
+    vi.stubEnv("EVERLOOT_SHOWCASE", "");
+    await seen();
+    const out = await text();
+    expect(auth.authQuery).not.toHaveBeenCalled();
+    expect(out).toContain('data-part="sighting"');
+    expect(out).not.toContain('data-part="showcase"');
+    expect(out).toContain("Level 22 Undead Shaman · Forever Pioneer");
+    expect(out).toMatch(/text-class-shaman">Shaman</);
+    expect(out).toContain("Night Watch");
+    expect(out).toContain('Last seen <span class="font-mono">2026-10-20</span>');
+    expect(out).toContain(PLAYER_SIGHTING_LINE);
+    expect(out).not.toContain(FOOTER_LINE);
+    expect(out).toContain('href="/players/opt-out?realm=Forever%20Pioneer&amp;name=Thrallina"');
+    expect(out).toContain('href="/privacy#player-pages"');
+    expect(out).not.toMatch(/\b\d{2}:\d{2}\b/);
+    // Breadcrumb: Home, Characters (the search), the character.
+    expect(out).toMatch(/"name":"Characters","item":"[^"]*\/players"/);
+    expect(out).toMatch(/"name":"Thrallina","item":"[^"]*\/characters\/forever\/forever-pioneer\/thrallina"/);
+  });
+
+  test("a showcase alone is a page with its own source line and no sighting part", async () => {
+    const out = await text();
+    expect(out).toContain('data-part="showcase"');
+    expect(out).not.toContain('data-part="sighting"');
+    expect(out).toContain(FOOTER_LINE);
+    expect(out).toContain("From the player's own addon upload, 2026-10-30 (2 days ago)");
+    expect(out).not.toContain(PLAYER_SIGHTING_LINE);
+  });
+
+  test("with both, the owner's part comes first, each says where it came from, and neither borrows from the other", async () => {
+    await seen();
+    const out = await text();
+    const owner = out.indexOf('data-part="showcase"'), sighting = out.indexOf('data-part="sighting"');
+    expect(owner).toBeGreaterThan(-1);
+    expect(sighting).toBeGreaterThan(owner);
+    // The header and the owner's part are the link row's (Orc, level 24); the sighting's facts stay in its own part.
+    expect(out).toContain("Level 24 Orc Shaman");
+    expect(out.slice(0, owner)).toContain("Forever Pioneer");
+    expect(out.slice(0, owner)).toContain("Horde");
+    expect(out.slice(0, sighting)).not.toMatch(/Undead|Night Watch|2026-10-20/);
+    expect(out.slice(sighting)).toContain("Undead");
+    expect(out.slice(sighting)).not.toContain(">Orc<");
+    expect(out.indexOf(FOOTER_LINE)).toBeGreaterThan(owner);
+    expect(out.indexOf(FOOTER_LINE)).toBeLessThan(sighting);
+    expect(out.indexOf(PLAYER_SIGHTING_LINE)).toBeGreaterThan(sighting);
+    expect(out.match(/Hide this character/g)).toHaveLength(1);
+  });
+
+  test("neither is a 404 with noindex", async () => {
+    auth.authQuery.mockResolvedValue([]);
+    await expect(Page(props())).rejects.toThrow("NEXT_NOT_FOUND");
+    expect(await generateMetadata(props())).toEqual({ title: "Page not found", robots: { index: false, follow: false } });
+  });
+
+  test("with both switches off it is a 404 and neither store is asked, whatever rows exist", async () => {
+    await seen();
+    const get = vi.spyOn(players.store!, "get");
+    vi.stubEnv("EVERLOOT_SHOWCASE", "0");
+    vi.stubEnv("EVERLOOT_PLAYER_PAGES", "");
+    await expect(Page(props())).rejects.toThrow("NEXT_NOT_FOUND");
+    expect(await generateMetadata(props())).toEqual({ title: "Page not found", robots: { index: false, follow: false } });
+    expect(get).not.toHaveBeenCalled();
+    expect(auth.authQuery).not.toHaveBeenCalled();
+  });
+
+  test("with the player pages off, a sighting is never read or shown, and there is no hide link", async () => {
+    await seen();
+    const get = vi.spyOn(players.store!, "get");
+    vi.stubEnv("EVERLOOT_PLAYER_PAGES", "0");
+    const out = await render();
+    expect(out).toContain('data-part="showcase"');
+    expect(out).not.toContain('data-part="sighting"');
+    expect(out).not.toContain("Hide this character");
+    auth.authQuery.mockResolvedValue([]);
+    await expect(Page(props())).rejects.toThrow("NEXT_NOT_FOUND");
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  test("a hidden character's sighting is gone at once: a 404 alone, and left out beside a showcase", async () => {
+    await seen();
+    await players.store!.suppress("Forever Pioneer", "Thrallina");
+    expect(await render()).not.toContain('data-part="sighting"');
+    auth.authQuery.mockResolvedValue([]);
+    await expect(Page(props())).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+
+  test("always noindex, nofollow: the player pages' index switch does not reach this page", async () => {
+    vi.stubEnv("EVERLOOT_PLAYER_PAGES_INDEX", "1");
+    vi.stubEnv("EVERLOOT_SHOWCASE", "");
+    await seen();
+    const meta = await generateMetadata(props({ ruleset: "forever", realm: "Forever-Pioneer", name: "THRALLINA" }));
+    expect(meta.robots).toEqual({ index: false, follow: false });
+    expect(meta.alternates?.canonical).toBe("/characters/forever/forever-pioneer/thrallina");
+    expect(String(meta.title)).toContain("Level 22 Undead Shaman");
+  });
+
+  test("player storage failing says so in its place and keeps the owner's part", async () => {
+    vi.spyOn(players.store!, "get").mockRejectedValue(new Error("Player storage unavailable (500)"));
+    const out = await render();
+    expect(out).toContain('data-part="showcase"');
+    expect(out).toContain("Player storage is unreachable right now");
+    vi.stubEnv("EVERLOOT_SHOWCASE", "");
+    const alone = await render();
+    expect(alone).toContain("Player storage is unreachable right now");
+    expect(alone).not.toContain("Thrallina");
+    expect((await generateMetadata(props())).robots).toEqual({ index: false, follow: false });
+  });
+
+  test("an address that cannot be a character never reaches the player store", async () => {
+    vi.stubEnv("EVERLOOT_SHOWCASE", "");
+    const get = vi.spyOn(players.store!, "get");
+    for (const p of [{ ...PARAMS, name: "y" }, { ...PARAMS, name: "thrall1" }, { ...PARAMS, realm: "x" }, { ...PARAMS, realm: "forever%20pioneer" }, { ...PARAMS, ruleset: "for.ever" }, { ...PARAMS, name: "%E0%A4%A" }]) {
+      await expect(Page(props(p))).rejects.toThrow("NEXT_NOT_FOUND");
+    }
+    expect(get).not.toHaveBeenCalled();
   });
 });

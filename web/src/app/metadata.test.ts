@@ -29,7 +29,7 @@ const routes: [string, () => Promise<{ metadata: Metadata }>, boolean][] = [
   ["/changes", () => import("./changes/page"), true],
   ["/accessibility", () => import("./accessibility/page"), false],
   ["/contact", () => import("./contact/page"), false],
-  ["/database", () => import("./database/page"), true],
+  ["/database", () => import("./database/(hub)/page"), true],
   // The lists are generated: a filtered or sorted view is noindex. Their plain URL is checked here.
   ["/database/drops", async () => ({ metadata: await (await import("./database/drops/page")).generateMetadata({}) }), true],
   ["/database/factions", async () => ({ metadata: await (await import("./database/factions/page")).generateMetadata({}) }), true],
@@ -38,6 +38,8 @@ const routes: [string, () => Promise<{ metadata: Metadata }>, boolean][] = [
   ["/database/objects", async () => ({ metadata: await (await import("./database/objects/page")).generateMetadata({}) }), true],
   ["/database/quest-chains", async () => ({ metadata: await (await import("./database/quest-chains/page")).generateMetadata({}) }), true],
   ["/database/quests", async () => ({ metadata: await (await import("./database/quests/page")).generateMetadata({}) }), true],
+  // A spell page titles itself from the names file, or the id alone without it; no id is ruled out then, so 1 is checked here.
+  ["/database/spells/1", async () => ({ metadata: await (await import("./database/spells/[id]/page")).generateMetadata({ params: Promise.resolve({ id: "1" }) }) }), false],
   ["/database/titles", async () => ({ metadata: await (await import("./database/titles/page")).generateMetadata({}) }), true],
   ["/database/vendors", async () => ({ metadata: await (await import("./database/vendors/page")).generateMetadata({}) }), true],
   // A filtered list of guides is noindex; the plain list is checked here.
@@ -54,7 +56,7 @@ const routes: [string, () => Promise<{ metadata: Metadata }>, boolean][] = [
   ["/methodology", () => import("./methodology/page"), true],
   ["/players", async () => ({ metadata: await (await import("./players/page")).generateMetadata({ searchParams: Promise.resolve({}) }) }), false],
   ["/privacy", () => import("./privacy/page"), false],
-  ["/search", () => import("./search/page"), false],
+  ["/search", async () => ({ metadata: await (await import("./search/page")).generateMetadata({ searchParams: Promise.resolve({}) }) }), false],
   ["/security", () => import("./security/page"), false],
   ["/terms", () => import("./terms/page"), false],
   ["/tools/auctions", () => import("./tools/auctions/page"), true],
@@ -75,6 +77,8 @@ function checkComplete(path: string, m: Metadata, mustLead: boolean) {
   const title = text(m.title);
   expect(title, path).not.toBe("");
   if (mustLead) expect(title, path).toContain("WoW Forever");
+  // The layout template adds the brand, so a title that leads or ends with it would read "Everloot FAQ · Everloot".
+  expect(title, path).not.toMatch(/^Everloot\b|\bEverloot$/);
   expect(text(m.description).length, `${path} description: ${m.description}`).toBeGreaterThanOrEqual(DESCRIPTION_MIN);
   expect(text(m.description).length, `${path} description: ${m.description}`).toBeLessThanOrEqual(DESCRIPTION_MAX);
   expect(m.alternates?.canonical, path).toBe(path);
@@ -95,6 +99,19 @@ test.each(routes)("%s has a complete title, description, Open Graph and Twitter 
   checkComplete(path, (await load()).metadata, mustLead);
 });
 
+test("a search names its query in the title and stays out of the index", async () => {
+  const { generateMetadata } = await import("./search/page");
+  const m = await generateMetadata({ searchParams: Promise.resolve({ q: "  Thrall " }) });
+  expect(m.title).toBe("Search: Thrall");
+  expect(m.robots).toEqual({ index: false, follow: true });
+  expect((await generateMetadata({ searchParams: Promise.resolve({ q: ["Elwynn", "x"] }) })).title).toBe("Search: Elwynn");
+  expect((await generateMetadata({ searchParams: Promise.resolve({ q: "   " }) })).title).toBe("Search");
+  // The title names the query the page ran, which is cut at the same length as the search itself.
+  const { MAX_QUERY } = await import("@/lib/lore");
+  const long = (await generateMetadata({ searchParams: Promise.resolve({ q: "a".repeat(MAX_QUERY + 50) }) })).title;
+  expect(long).toBe(`Search: ${"a".repeat(MAX_QUERY)}`);
+});
+
 test("the map descriptions still fit when the game's map pictures are on", async () => {
   const { DESCRIPTION, continentDescription, withArt } = await import("./map/map-screen");
   const { CONTINENTS } = await import("@/lib/world-map");
@@ -113,6 +130,17 @@ test("every MCP tool page has a description that fits", async () => {
     const m = await generateMetadata({ params: Promise.resolve({ tool: slug }) });
     within(m.description, name);
   }
+});
+
+test("every record kind page has a description that fits", async () => {
+  const { generateMetadata } = await import("./docs/api/records/[kind]/page");
+  const { ALL_RECORD_KINDS } = await import("@everloot/protocol");
+  for (const kind of ALL_RECORD_KINDS) {
+    const m = await generateMetadata({ params: Promise.resolve({ kind }) });
+    within(m.description, kind);
+    expect(m.alternates?.canonical, kind).toBe(`/docs/api/records/${kind}`);
+  }
+  expect(await generateMetadata({ params: Promise.resolve({ kind: "nope" }) })).toEqual({});
 });
 
 test("every docs page without a dynamic segment is checked", () => {

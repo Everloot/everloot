@@ -1,6 +1,6 @@
 import { beforeEach, expect, test, vi } from "vitest";
-const store = vi.hoisted(() => ({ snapshotWork: vi.fn(), writeCronRun: vi.fn(), writeSnapshot: vi.fn(), writeMarket: vi.fn(), writeCompletion: vi.fn(), prune: vi.fn() }));
-vi.mock("@/lib/upload-store", () => ({ uploadStore: { snapshotWork: store.snapshotWork, writeCronRun: store.writeCronRun, writeSnapshot: store.writeSnapshot, writeMarket: store.writeMarket, writeCompletion: store.writeCompletion },
+const store = vi.hoisted(() => ({ snapshotWork: vi.fn(), writeCronRun: vi.fn(), writeSnapshot: vi.fn(), writeMarket: vi.fn(), writeCompletion: vi.fn(), writeCensus: vi.fn(), prune: vi.fn() }));
+vi.mock("@/lib/upload-store", () => ({ uploadStore: { snapshotWork: store.snapshotWork, writeCronRun: store.writeCronRun, writeSnapshot: store.writeSnapshot, writeMarket: store.writeMarket, writeCompletion: store.writeCompletion, writeCensus: store.writeCensus },
   sharingStore: { loadState: async () => ({ grants: [], suppressions: [] }) },
 }));
 vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { prune: store.prune } }));
@@ -14,6 +14,10 @@ const coverage = vi.hoisted(() => ({ writeCoverage: vi.fn() }));
 vi.mock("@/lib/coverage-store", () => ({ writeCoverage: coverage.writeCoverage }));
 const settled = vi.hoisted(() => ({ writeSettled: vi.fn(), week: vi.fn(() => "2026-W43") }));
 vi.mock("@/lib/settled-store", () => ({ writeSettled: settled.writeSettled, currentSettledWeek: settled.week }));
+const view = vi.hoisted(() => ({ writeItemView: vi.fn() }));
+vi.mock("@/lib/item-view-store", () => ({ writeItemView: view.writeItemView }));
+const aggregates = vi.hoisted(() => ({ writeAggregates: vi.fn() }));
+vi.mock("@/lib/aggregate-store", () => ({ writeAggregates: aggregates.writeAggregates }));
 import { GET } from "./route";
 beforeEach(() => {
   vi.stubEnv("CRON_SECRET", "synthetic-cron-key");
@@ -22,6 +26,9 @@ beforeEach(() => {
   store.writeSnapshot.mockReset().mockResolvedValue({ uploads: 0 });
   store.writeMarket.mockReset().mockResolvedValue({ added: 0, scans: 0 });
   store.writeCompletion.mockReset().mockResolvedValue({ added: 0, remaining: 0, trimmed: 0, rebuilding: false });
+  store.writeCensus.mockReset().mockResolvedValue({ added: 0, rows: 0, remaining: 0 });
+  view.writeItemView.mockReset().mockResolvedValue({ written: false });
+  aggregates.writeAggregates.mockReset().mockResolvedValue({ written: false });
   store.prune.mockReset().mockResolvedValue(undefined);
   keys.pruneKeys.mockReset().mockResolvedValue(undefined);
   players.prune.mockReset().mockResolvedValue(undefined);
@@ -221,4 +228,55 @@ test("a failed weekly settled refresh keeps the old week so the next run retries
   vi.spyOn(console, "error").mockImplementation(() => {});
   expect((await GET(req())).status).toBe(200);
   expect(store.writeCronRun).toHaveBeenCalledWith(false, "2026-10-01", "2026-W42");
+});
+
+test("the census snapshot folds on every run with uploads, skips on an idle one, and leftovers keep the run pending", async () => {
+  store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: "2026-W43" });
+  await GET(req());
+  expect(store.writeCensus).toHaveBeenLastCalledWith({ idle: true });
+  store.snapshotWork.mockResolvedValue({ idle: false, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: "2026-W43" });
+  store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 3, dataAsOf: "2026-10-02T00:00:00.000Z" });
+  store.writeCensus.mockResolvedValue({ added: 3, rows: 40, remaining: 5 });
+  expect(await (await GET(req())).json()).toMatchObject({ ok: true, census: { added: 3, rows: 40, remaining: 5 } });
+  expect(store.writeCensus).toHaveBeenLastCalledWith({ rebuild: false });
+  expect(store.writeCronRun).toHaveBeenLastCalledWith(true, "2026-10-02T00:00:00.000Z", "2026-W43");
+  await GET(req("Bearer synthetic-cron-key", "?rebuild=1"));
+  expect(store.writeCensus).toHaveBeenLastCalledWith({ rebuild: true });
+});
+
+test("the item view is written after the snapshot with what that run added; a census or view failure is logged and the run succeeds", async () => {
+  store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-10-02T00:00:00.000Z" });
+  view.writeItemView.mockResolvedValue({ written: true, items: 12 });
+  expect(await (await GET(req())).json()).toMatchObject({ ok: true, itemView: { written: true, items: 12 } });
+  expect(view.writeItemView).toHaveBeenCalledWith({ added: 2, rebuild: false, dataAsOf: "2026-10-02T00:00:00.000Z" });
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  store.writeCensus.mockRejectedValue(new Error("r2 down"));
+  view.writeItemView.mockRejectedValue(new Error("r2 down"));
+  const res = await GET(req());
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ ok: true, census: null, itemView: null });
+});
+
+test("the stored aggregates are written after the item view with what that run added; a failure is logged and the run succeeds", async () => {
+  const order: string[] = [];
+  store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-10-02T00:00:00.000Z" });
+  view.writeItemView.mockImplementation(async () => { order.push("itemView"); return { written: true, items: 12 }; });
+  aggregates.writeAggregates.mockImplementation(async () => { order.push("aggregates"); return { written: true, bytes: 4096 }; });
+  expect(await (await GET(req())).json()).toMatchObject({ ok: true, itemView: { written: true }, aggregates: { written: true, bytes: 4096 } });
+  expect(order).toEqual(["itemView", "aggregates"]);
+  expect(aggregates.writeAggregates).toHaveBeenCalledWith({ added: 2, rebuild: false, dataAsOf: "2026-10-02T00:00:00.000Z" });
+  await GET(req("Bearer synthetic-cron-key", "?rebuild=1"));
+  expect(aggregates.writeAggregates).toHaveBeenLastCalledWith(expect.objectContaining({ rebuild: true }));
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  aggregates.writeAggregates.mockRejectedValue(new Error("r2 down"));
+  const res = await GET(req());
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ ok: true, aggregates: null });
+  expect(store.writeCronRun).toHaveBeenCalled();
+});
+
+test("an idle run still asks for the stored aggregates, so a missing file is written", async () => {
+  store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: "2026-W43" });
+  await GET(req());
+  expect(aggregates.writeAggregates).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-10-01" });
 });

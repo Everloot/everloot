@@ -110,6 +110,8 @@ const SHOWS_ART = new Set([
   "web/src/app/database/vendors/[id]/page.tsx", "web/src/app/database/npcs/[id]/page.tsx", "web/src/app/database/quests/[id]/page.tsx", "web/src/app/changes/page.tsx", "web/src/app/changes/[post]/page.tsx", "web/src/app/lore/page.tsx", "web/src/lib/spell-mentions.ts", "web/src/app/wow-forever/page.tsx", "web/src/app/tools/talents/page.tsx",
   "kb/src/cli.ts", "web/scripts/upload-game-assets.mjs", "web/scripts/game-assets-upload.mjs",
   "web/src/app/database/zones/[zone]/page.tsx",
+  // The quest page's social card reads the quest titles under the page's rule. Text only, no art.
+  "web/src/app/database/quests/[id]/opengraph-image.tsx",
   // The dungeon and raid list's small loading screens, and the zone list's small map pictures.
   "web/src/app/database/instances/page.tsx", "web/src/app/database/zones/page.tsx",
   // The spell page: the spell's icon and its text come from the same manifest as the item's.
@@ -118,7 +120,7 @@ const SHOWS_ART = new Set([
   "web/src/app/database/spells/page.tsx",
   // The database index reads the spell names for the count beside the link, the way the sitemap reads
   // the item names only to know whether a category has enough to list. No art, no tooltip.
-  "web/src/app/database/page.tsx",
+  "web/src/app/database/(hub)/page.tsx",
   // The quest list's reward icons, under the item lists' rule (reported or wiki-named items only).
   "web/src/app/database/quests/page.tsx",
   // The site-wide credit (footer → /methodology#credits): reads only the manifest's build and label, no art.
@@ -127,12 +129,19 @@ const SHOWS_ART = new Set([
   "web/src/app/chat/page.tsx",
   // The item names shown from the game files and the Warcraft Wiki: read for the item pages, and by the sitemap
   // only to know whether a category has enough names to list.
-  "web/src/lib/shown-item-names.ts", "web/src/app/sitemap.ts", "web/scripts/upload-item-names.mjs",
+  "web/src/lib/shown-item-names.ts", "web/src/lib/site-sitemap.ts", "web/scripts/upload-item-names.mjs",
   // The same names and the quest titles for the site's own search (/search and /search/suggest), never /api/suggest.
   "web/src/lib/shown-search-names.ts",
   // The hover card on the site's own database links, one entity per request, under the pages' rules; and the
   // icons beside the item hits of /search and the type-ahead, for the items whose pages show them.
   "web/src/lib/site-card.ts", "web/src/lib/item-icons.ts",
+  // A character page's equipped items: names and icons under the same rule, for the gear the page shows.
+  "web/src/lib/showcase-gear-art.ts",
+  // The gear rankings check each ranked item's level against the tooltip facts, only for items whose pages show them,
+  // and print only the two averages: no item, icon or tooltip text reaches a board.
+  "web/src/lib/leaderboards.ts",
+  // The item lists' stored view: the same shown names as shown-item-names.ts, read from the cron's file instead of the corpus.
+  "web/src/lib/item-view.ts",
   // The same names and quest titles for the entity tokens on a wiki page.
   "web/src/lib/wiki-names.ts",
   // Dungeon wiki pages show loading-screen art under the approved page-banner extension.

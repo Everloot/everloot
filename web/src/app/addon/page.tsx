@@ -3,6 +3,7 @@ import Link from "next/link";
 import { pageMetadata } from "@/lib/seo";
 import { ADDON_LIVE_VERIFIED, latestAddonRelease } from "@/lib/addon-release";
 import { addonReleaseFor, fetchReleases, fileSize, newestDesktopRelease, RELEASES_PAGE, servedFile } from "@/lib/everloot-releases";
+import { showcaseOn } from "@/lib/character-showcase";
 import { guildsOn } from "@/lib/guild-switch";
 import { REPO_URL } from "@/lib/source";
 import JsonLd from "@/components/JsonLd";
@@ -19,6 +20,8 @@ export const revalidate = 3600;
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const EXT = "noopener noreferrer";
+/** The addon's CurseForge project (1762765): each tagged release uploads the same tested zip there (docs/RELEASING.md). */
+const CURSEFORGE_URL = "https://www.curseforge.com/wow/addons/everloot";
 
 /** The Desktop App files the page offers, in this order, matched by the end of the artifact name. */
 const DESKTOP_KINDS = [
@@ -47,10 +50,13 @@ export default async function AddonPage() {
   const zipName = addon ? `Everloot-${addon.version}.zip` : "";
   const zipHref = `/downloads/${encodeURIComponent(zipName)}`;
   const served = addon ? servedFile(zipHref) : null;
-  const releases = await fetchReleases();
+  let releases = await fetchReleases();
   // A failed refresh throws so the cache keeps serving the last good page; only the build, which has no
   // earlier page, renders the fallback.
   if (!releases && process.env.NEXT_PHASE !== "phase-production-build") throw new Error("GitHub unavailable: keep the last good page");
+  // At build, ask once more with a minute's lifetime. A page lives as long as its shortest fetch, so whatever the
+  // build renders now is rebuilt a minute after the deploy instead of an hour later.
+  if (!releases) releases = await fetchReleases(60);
   const addonRelease = addon ? addonReleaseFor(releases, addon.version) : null;
   const addonSums = served && addonRelease?.files.some((file) =>
     file.name === zipName && file.size === served.size && file.sha256 === served.sha256,
@@ -87,9 +93,14 @@ export default async function AddonPage() {
             </SectionHeading>
             {addon ? (
               <>
-                <TrackedDownload className="btn btn-primary" href={zipHref} addon="everloot" to="site" download>
-                  Download addon {addon.version}{served ? ` (.zip, ${fileSize(served.size)})` : ""}
-                </TrackedDownload>
+                <div className="flex flex-wrap items-center gap-2">
+                  <TrackedDownload className="btn btn-primary" href={zipHref} addon="everloot" to="site" download>
+                    Download addon {addon.version}{served ? ` (.zip, ${fileSize(served.size)})` : ""}
+                  </TrackedDownload>
+                  <TrackedDownload className="btn" href={CURSEFORGE_URL} addon="everloot" to="curseforge">
+                    Get it on CurseForge
+                  </TrackedDownload>
+                </div>
                 <p className="text-sm text-fg-2">{ADDON_LIVE_VERIFIED ? "" : "Live-client verification is pending. "}This Alpha includes website talent and raid plan imports; use <code className="font-mono">/everloot</code> to open the planners.</p>
                 <div>
                   <SectionHeading as="h3">Install</SectionHeading>
@@ -267,6 +278,7 @@ export default async function AddonPage() {
               {guildsOn()
                 ? " Those rows can appear on the site's player and guild pages, and any character or guild can be hidden without an account. "
                 : " The characters can appear on the site's player pages, and any character can be hidden without an account. The kills stay unpublished until the site turns its guild pages on. "}
+              {showcaseOn() && <>What your own character page looks like: see the <Link href="/showcase/character" className={link}>sample character</Link>, which is made-up data.{" "}</>}
               Read the{" "}
               <Link href="/privacy" className={link}>Privacy Policy</Link> and the{" "}
               <a className={link} href={`${REPO_URL}/blob/main/docs/DATA_POLICY.md`} rel={EXT}>data policy</a>.

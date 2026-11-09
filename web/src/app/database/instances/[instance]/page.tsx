@@ -3,16 +3,18 @@ import JsonLd from "@/components/JsonLd";
 import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { AgreementMeter, Badge, Card, Container, DataTable, DataTitle, EmptyState, filledColumns, SectionHeading, type Column, type SparseColumn } from "@/components/ui";
+import { AgreementMeter, Badge, Card, Container, DataTable, DataTitle, EmptyState, filledColumns, reportedLabel, SectionHeading, type Column, type SparseColumn } from "@/components/ui";
 import {
   bossRows, difficultyLabel, difficultyList, instanceDescription, instanceHref, instanceRows, instanceTitle, levelLabel, loadSightings, parseInstanceSegment,
   type BossRow, type InstancePlace, type InstanceRow,
 } from "@/lib/instances";
+import { entityTitle } from "@/lib/entity-meta";
 import { dayLabel } from "@/lib/report-labels";
 import { PLACEHOLDER } from "@/lib/item-names";
 import { mapHref } from "@/lib/map-view";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { wikiHref } from "@/lib/wiki";
 import { prepPage } from "@/lib/wiki-dungeon";
 import { zoneHref } from "@/lib/zones";
@@ -42,7 +44,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const title = instanceTitle(row);
   return {
     ...pageMetadata({
-      title: `${title} – WoW Forever ${row.raid === null ? "Instance" : row.raid ? "Raid" : "Dungeon"}: Entrance and Bosses`,
+      title: entityTitle(title, row.raid === null ? "instance" : row.raid ? "raid" : "dungeon"),
       description: instanceDescription(row),
       path: instanceHref(row.instanceMapId, row.name),
     }),
@@ -84,7 +86,8 @@ export default async function InstancePage(props: Props) {
       ? <span className="inline-flex items-baseline gap-1.5"><Badge tone="files" />{b.name}</span>
       : b.name ?? `Encounter ${b.encounterId}`) },
     { key: "kills", header: "Kills", numeric: true, blank: (b) => !b.boss, cell: (b) => (b.boss ? b.boss.kills.toLocaleString("en-US") : PLACEHOLDER) },
-    { key: "installs", header: "Installs", blank: (b) => !b.boss, cell: (b) => (b.boss ? <AgreementMeter count={b.boss.reporters} /> : PLACEHOLDER) },
+    // Short of 3, the count of installs that reported the encounter so far, beside the files' name: nothing else of theirs.
+    { key: "installs", header: "Installs", blank: (b) => !b.boss && !b.reported, cell: (b) => (b.boss ? <AgreementMeter count={b.boss.reporters} /> : b.reported ? <AgreementMeter count={b.reported} withText /> : PLACEHOLDER) },
     { key: "seen", header: "Last seen", numeric: true, blank: (b) => !b.boss, cell: (b) => (b.boss ? dayLabel(b.boss.lastSeen) : PLACEHOLDER) },
     { key: "npcs", header: "Creatures", blank: (b) => !b.boss?.npcIds.length, cell: (b) => (b.boss?.npcIds.length
       ? b.boss.npcIds.map((id, i) => <span key={id}>{i > 0 && ", "}<Link href={`/database/npcs/${id}`} className={link}>NPC {id}</Link></span>)
@@ -92,10 +95,11 @@ export default async function InstancePage(props: Props) {
   ];
   const shownBossColumns = filledColumns(bossColumns, bosses);
   const anyBossReported = bosses.some((b) => b.boss);
+  const anyReport = anyBossReported || bosses.some((b) => b.reported);
   // On a phone the dense table keeps the boss name and folds the report into one line under it.
   const bossMeta = (b: BossRow) => (b.boss
     ? `${b.boss.kills.toLocaleString("en-US")} kills · ${b.boss.reporters} ${b.boss.reporters === 1 ? "install" : "installs"} · ${dayLabel(b.boss.lastSeen)}`
-    : "Not confirmed yet");
+    : b.reported ? reportedLabel(b.reported) : "Not confirmed yet");
 
   const unconfirmed = row.reported > 0
     ? `No entrance is confirmed yet. ${row.reported} ${row.reported === 1 ? "install has" : "installs have"} zoned in, and 3 must agree on the place.`
@@ -103,6 +107,7 @@ export default async function InstancePage(props: Props) {
 
   return (
     <Container width="data">
+      <EdgeDegraded when={unreachable} />
       <JsonLd data={entityPageJsonLd({ name: title, path: canonical, identifier: `instance:${row.instanceMapId}` })} />
       <article>
         <DataTitle
@@ -177,10 +182,12 @@ export default async function InstancePage(props: Props) {
             </SectionHeading>
             <DataTable
               dense caption={`Bosses players reported in ${title}, and the ones the game files list`} columns={shownBossColumns} rows={bosses} rowKey={(b) => String(b.encounterId)}
-              meta={anyBossReported ? bossMeta : undefined}
+              meta={anyReport ? bossMeta : undefined}
               footer={bosses.length > 0 && !anyBossReported ? (unreachable
                 ? "Players' reports cannot be shown right now; this list is the game files' own."
-                : "No boss here has 3 installs reporting it yet. Kills, installs and last seen show once one does.") : undefined}
+                : anyReport
+                  ? "No boss here has 3 installs reporting it yet. Kills and last seen show once one does."
+                  : "No boss here has 3 installs reporting it yet. Kills, installs and last seen show once one does.") : undefined}
               empty={empty("No boss has 3 installs reporting it here yet, and the game files list none.")}
             />
           </section>

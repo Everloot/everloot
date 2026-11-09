@@ -8,6 +8,8 @@ import { playerStore } from "@/lib/player-store";
 import { pullStore } from "@/lib/pull-store";
 import { writeCoverage } from "@/lib/coverage-store";
 import { currentSettledWeek, writeSettled } from "@/lib/settled-store";
+import { writeItemView } from "@/lib/item-view-store";
+import { writeAggregates } from "@/lib/aggregate-store";
 
 /**
  * GET /api/cron/snapshot — the Worker's Cron Trigger (src/lib/cf-crons.ts, every 10 minutes) extends the corpus snapshot with new uploads,
@@ -74,6 +76,14 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("completion rollup failed", err);
     }
+    // The census snapshot keeps its own watermark too: pages read it instead of every upload (lib/upload-store.ts).
+    // A failure is logged and the pages keep the last snapshot; the next run retries the same uploads.
+    let census: { added: number; rows: number; remaining: number; skipped?: boolean } | null = null;
+    try {
+      census = await uploadStore.writeCensus(idle && !work.retryRollups ? { idle: true } : { rebuild });
+    } catch (err) {
+      console.error("census snapshot failed", err);
+    }
     if (!result) return NextResponse.json({ ok: false, error: "snapshot failed", rebuild, market, completion }, { status: 500 });
     if (!market) return NextResponse.json({ ok: false, error: "market rollup failed", rebuild, ...result, completion }, { status: 500 });
     if (!completion) return NextResponse.json({ ok: false, error: "completion rollup failed", rebuild, ...result, market }, { status: 500 });
@@ -99,13 +109,30 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("settled list failed", err);
     }
+    // What the item lists read (lib/item-view.ts), stored after the snapshot so a page never replays the corpus. Written
+    // only when this run added uploads, rebuilt, or finds no file; a failure is logged and the pages fall back.
+    let itemView: { written: boolean; items?: number } | null = null;
+    try {
+      itemView = await writeItemView({ added: result.added, rebuild, dataAsOf: result.dataAsOf });
+    } catch (err) {
+      console.error("item view failed", err);
+    }
+    // The tables the item, NPC, zone, instance, object, loot, edge and addon pages read (lib/aggregate-store.ts), stored so
+    // a new server instance reads one file instead of replaying the corpus. Same rule as the item view: written only when
+    // this run added uploads, rebuilt, or finds no file; a failure is logged and the pages work the tables out themselves.
+    let aggregates: { written: boolean; bytes?: number } | null = null;
+    try {
+      aggregates = await writeAggregates({ added: result.added, rebuild, dataAsOf: result.dataAsOf });
+    } catch (err) {
+      console.error("aggregates failed", err);
+    }
     // A rollup with uploads left over is pending: the next run folds them even when no new upload arrived.
     await uploadStore.writeCronRun(
-      completion.remaining > 0 || completion.rebuilding || (market.remaining ?? 0) > 0,
+      completion.remaining > 0 || completion.rebuilding || (market.remaining ?? 0) > 0 || (census?.remaining ?? 0) > 0,
       result.dataAsOf,
       settled?.written ? week : work.settledWeek ?? null,
     );
-    return NextResponse.json({ ok: true, rebuild, ...result, market, completion, coverage, settled });
+    return NextResponse.json({ ok: true, rebuild, ...result, market, completion, coverage, settled, census, itemView, aggregates });
   } catch (err) {
     console.error("snapshot failed", err);
     return NextResponse.json({ ok: false, error: "snapshot failed" }, { status: 500 });

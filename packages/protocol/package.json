@@ -1,6 +1,6 @@
 {
   "name": "@everloot/protocol",
-  "version": "1.25.0",
+  "version": "1.26.0",
   "description": "Everloot's upload record kinds, API response shapes and MCP tool schemas.",
   "license": "AGPL-3.0-only",
   "type": "module",
@@ -45,7 +45,7 @@
     "@types/node": "^22.20.4",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.2",
+    "vitest": "^5.1.0",
     "zod": "^4.6.5"
   }
 }

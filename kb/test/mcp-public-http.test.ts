@@ -107,7 +107,7 @@ test("a public mount serves its own path with no bearer, and only that path", as
 test("a host's extra tool is listed and answers only for the requests it is given to", async () => {
   const extra = {
     name: "my_test_tool",
-    def: { title: "Test", description: "Test tool", inputSchema: { slug: z.string().optional() }, annotations: { readOnlyHint: true, openWorldHint: false } } as const,
+    def: { title: "Test", description: "Test tool", inputSchema: { slug: z.string().optional() }, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } } as const,
     handler: (args: unknown) => `got ${JSON.stringify(args)}`,
   };
   const handle = await handler({ extraTools: (req: Request, body: string) => (req.headers.get("x-test") === "yes" && body.includes("tools/") ? [extra] : []) });

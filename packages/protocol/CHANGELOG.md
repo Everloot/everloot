@@ -6,7 +6,14 @@ required, or tightening a limit is a major release.
 
 ## [Unreleased]
 
+### Added
+- `dropsResponse.rates[].sourceName`: the NPC's or object's name, once 3 installs agree on it; absent until then.
+  Optional, so earlier readers are unaffected.
+
 ### Changed
+- Annotations only, no shape change: every MCP tool's `annotations` carry `destructiveHint: false` and
+  `idempotentHint: true` beside `readOnlyHint: true` and `openWorldHint: false`, and `schema/mcp/<tool>.json` shows all
+  four. The server used to add `destructiveHint` at registration; now the table and the schema files say it too.
 - Description text only, no shape change: every MCP tool description opens with what it returns, says when to use it and
   which sibling tool to use instead, and where its id comes from; the `limit` parameters of `guild_search`,
   `guild_rankings`, `recent_changes` and `ecosystem_projects` state what they cap. Written against the tool definition
@@ -22,9 +29,12 @@ required, or tightening a limit is a major release.
   without a key, 5,000 with one), and the corpus and client-layer routes and the market rule read in plain words.
 
 ### Added
-- 1.25.0 (record protocol 1.13.0): `census_seen.via` takes `nameplate`, a player the game drew a nameplate for
+- 1.26.0 (record protocol 1.13.0): `census_seen.via` takes `nameplate`, a player the game drew a nameplate for
   (`NAME_PLATE_UNIT_ADDED`), beside `target`, `mouseover` and `group`; any other value is still refused. The stored
-  census row accepts it too. Nothing else changes; the addon sends it from 0.3.16.
+  census row accepts it too. Nothing else changes; the addon sends it from its next release.
+- 1.25.0 (record protocol unchanged, 1.12.0): `marketRealmsResponse` gains an optional `pending`, the realms with scans but no
+  public values yet, each `{ realm, reporters, needed }`: the most reporters that scanned one item there on one day in
+  the last 7, out of the 3 that make a day public. A count only, never a value.
 - 1.24.0 (record protocol unchanged, 1.12.0): `KNOWLEDGE_KINDS` gains eight catalog kinds read from the game files
   (`achievement`, `faction`, `title`, `quest_chain`, `mount`, `legacy_perk`, `race`, `instance`) and a curated `build`
   kind for the team's starter talent builds; `knowledgeHit` and `fetchedDocument.metadata` gain an optional `confirmed`

@@ -3,7 +3,10 @@
 The settings page: registered with the Settings API when the client has it, else the older interface
 options, else shown as a window by /everloot options. One switch per module and the scan prompt; a switch
 with a /everloot command runs it (so off deletes rows exactly as in chat), the others set the toggle; the
-boxes show the saved state; Reload now reloads.
+boxes show the saved state; Reload now reloads. Every switch stays reachable in a scrolling list above the
+footer at any width. With the window's file loaded the page wears that window's look (a small crest heading,
+its fonts, the switches on a surface panel, its dark window when shown on its own) without building the
+window; without that file it keeps the game's own fonts and dialog.
 """
 from pathlib import Path
 from lupa.lua51 import LuaRuntime
@@ -25,27 +28,78 @@ Frame.__index = function(self, key)
   return function() end
 end
 function Frame.SetScript(self, script, f) self.scripts[script] = f; if script == 'OnEvent' then self.onEvent = f end end
-function Frame.HookScript(self, _, f) table.insert(self.hooks, f) end
+function Frame.HookScript(self, script, f) table.insert(self.hooks, f); self.hooks[script] = f end
+function Frame.SetSize(self, w, h) self.width = w; self.height = h end
+function Frame.SetWidth(self, w) self.width = w end
+function Frame.SetHeight(self, h) self.height = h end
+function Frame.GetWidth(self) return rawget(self, 'width') or 560 end
+function Frame.GetHeight(self) return rawget(self, 'height') or 220 end
+function Frame.SetPoint(self, point, ...) self.points = rawget(self, 'points') or {}; self.points[point] = { ... } end
+function Frame.GetStringHeight(self) return 12 * math.max(1, math.ceil(#(rawget(self, 'text') or '') * 6 / (rawget(self, 'width') or 560))) end
+function Frame.SetScrollChild(self, child) self.child = child end
+function Frame.GetVerticalScroll(self) return rawget(self, 'offset') or 0 end
+function Frame.SetVerticalScroll(self, value) self.offset = value end
 function Frame.SetText(self, t) self.text = t end
+function Frame.GetText(self) return rawget(self, 'text') end
 function Frame.SetChecked(self, v) self.checked = v and true or false end
 function Frame.GetChecked(self) return self.checked end
 function Frame.Show(self) self.shown = true end
 function Frame.Hide(self) self.shown = false end
 function Frame.SetParent(self, p) self.parentSet = p end
+function Frame.SetFont(self, path, size) self.font, self.size = path, size; return true end
+function Frame.SetTextColor(self, r, g, b, a) self.color = { r, g, b, a } end
+function Frame.SetTexture(self, path) self.path = path end
+function Frame.SetColorTexture(self, r, g, b, a) self.colorTexture = { r, g, b, a } end
+function Frame.SetBackdrop(self, b) self.backdrop = b end
+function Frame.SetBackdropColor(self, r, g, b, a) self.bg = { r, g, b, a } end
+function Frame.SetBackdropBorderColor(self, r, g, b, a) self.border = { r, g, b, a } end
 function Frame.CreateFontString(self) return setmetatable({ scripts = {}, hooks = {} }, Frame) end
+function Frame.CreateTexture(self)
+  local t = setmetatable({ scripts = {}, hooks = {} }, Frame)
+  self.textures = rawget(self, 'textures') or {}
+  table.insert(self.textures, t)
+  return t
+end
 function Frame.RegisterEvent(self, e) self.events[e] = true end
 CreateFrame = function(kind, name, parent, template)
   return setmetatable({ kind = kind, name = name, parent = parent, template = template, scripts = {}, hooks = {}, events = {} }, Frame)
 end
+
+-- Every switch stays reachable in a bounded viewport, including small panels and long descriptions.
+function checkRows(page)
+  local scroll = rawget(page, 'scroll')
+  assert(scroll and scroll.child, 'settings need a scrolling viewport, not controls spilling off the page')
+  for _, width in ipairs({ 560, 320 }) do
+    scroll.width, scroll.height = width, 220
+    scroll.hooks.OnSizeChanged(scroll, width, 220)
+    local child = scroll.child
+    local previousBottom = 0
+    for _, box in ipairs(page.boxes) do
+      local at = box.points.TOPLEFT
+      local top = -at[4]
+      assert(top >= previousBottom, 'wrapped row descriptions must not overlap the next control')
+      assert(at[3] >= 0 and at[3] + 38 + box.label.width <= width and at[3] + 38 + box.description.width <= width,
+        'labels and descriptions stay inside the list')
+      previousBottom = top + math.max(32, 4 + box.label:GetStringHeight() + 2 + box.description:GetStringHeight())
+    end
+    assert(child.height >= previousBottom, 'the last description must be inside scrollable content')
+    scroll.scripts.OnMouseWheel(scroll, -1000)
+    assert(scroll.offset == child.height - scroll.height, 'scrolling down reaches the last settings')
+    scroll.scripts.OnMouseWheel(scroll, 1000)
+    assert(scroll.offset == 0, 'scrolling back reaches the first settings')
+  end
+  assert(page.reload.parent == page and page.reload.points.BOTTOMLEFT, 'Reload remains at the fixed panel footer')
+end
 """
 
 
-def fresh(api: str, saved: str = "nil"):
+def fresh(api: str, saved: str = "nil", window: bool = False):
     lua = LuaRuntime()
     lua.execute(WORLD)
     lua.execute(api)
     lua.execute(f"EverlootDB = {saved}")
-    for file in ["core.lua", "modules/census.lua", "modules/options.lua"]:
+    # The TOC loads the window's file after this one; the page is built at ADDON_LOADED, once both are in.
+    for file in ["core.lua", "modules/census.lua", "modules/options.lua"] + (["modules/window.lua"] if window else []):
         lua.execute((root / file).read_text(encoding="utf-8"))
     lua.execute("Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')")
     return lua
@@ -77,6 +131,10 @@ for _, box in ipairs(O.page.boxes) do byKey[box.row.key] = box end
 assert(#O.page.boxes == #O.ROWS and byKey.auctions.checked and byKey.census.checked and byKey.scanPrompt.checked and not byKey.players.checked)
 assert(string.find(O.page.note.text, 'Everloot ' .. Everloot.VERSION, 1, true))
 
+-- Every switch stays reachable in a bounded viewport, including small panels and long descriptions.
+checkRows(O.page)
+assert(O.page.title.text == 'Everloot' and rawget(O.page, 'crest') == nil, "without the window file: the game's own heading")
+
 -- A command row runs its command: census off deletes the census rows, as in chat.
 EverlootDB.records.census_seen = { { guid = 'Player-1-0000000A' } }
 byKey.census.checked = false
@@ -102,6 +160,43 @@ O.page.reload.scripts.OnClick()
 assert(reloads == 1, 'Reload now reloads')
 """)
 
+# --- Every switch a module checks has a row on the page ---
+# The scan reads the sources: each IsEnabled("x") and each module registered under its own name is a switch
+# the player can need to turn off, so it needs an O.ROWS key (the rows come from this runtime, so a typo in
+# options.lua shows up here). The names below are the exceptions, each with its reason.
+import re
+rows = set(lua.eval("(function() local t = {} for _, r in ipairs(Everloot.Options.ROWS) do t[#t + 1] = r.key end return t end)()").values())
+OWN_SWITCH_OK = {
+    # Only in builds that carry the pulls module (E.RUN_RECORDS); options.lua appends its row under that gate.
+    "pulls",
+    # Registered under their own name but record nothing: displays, planners and tools. No row to stop.
+    "ask", "conveniences", "gph", "minimap", "plan", "planner", "prices", "raid", "options",
+    # Stores item facts, but its init returns "off" when the openworld switch is off, so that row is its switch.
+    "itemfacts",
+}
+sources = sorted((root / "modules").glob("*.lua")) + [root / "core.lua"]
+wanted = {}
+follows = {}  # module -> the switch it follows (the third RegisterModule argument, as `end, "completion")`)
+for path in sources:
+    text = path.read_text(encoding="utf-8")
+    for name in re.findall(r'IsEnabled\("(\w+)"\)', text):
+        wanted.setdefault(name, path.name)
+    own = re.findall(r'RegisterModule\("(\w+)"', text)
+    toggle = re.findall(r'^end, "(\w+)"\)', text, re.M)
+    for name in own:
+        if toggle:
+            follows[name] = toggle[0]
+        else:
+            wanted.setdefault(name, path.name)
+assert follows, "the scan found no module that follows another's switch; the pattern is stale"
+missing = sorted(name for name in wanted if name not in rows and name not in OWN_SWITCH_OK)
+assert not missing, "modules without a switch on the settings page (add an O.ROWS row, or allowlist with a reason): " + ", ".join(f"{n} ({wanted[n]})" for n in missing)
+assert all(t in rows for t in follows.values()), "a module follows a switch that has no row: " + ", ".join(f"{m} -> {t}" for m, t in follows.items())
+# The minimap button is a field row (EverlootDB.minimapButton), not a toggle, so no IsEnabled call names it.
+assert "minimapButton" in rows and "EverlootDB.minimapButton" in (root / "modules" / "minimap.lua").read_text(encoding="utf-8")
+assert 'key = "minimapButton", field = true' in (root / "modules" / "options.lua").read_text(encoding="utf-8")
+assert 'key = "pulls"' in (root / "modules" / "options.lua").read_text(encoding="utf-8"), "the pulls allowlist entry needs its gated row"
+
 # --- Older client: interface options ---
 lua = fresh("""
 added = nil; openCalls = 0
@@ -122,8 +217,254 @@ local O = Everloot.Options
 assert(O.how == 'window')
 SlashCmdList.EVERLOOT('settings')
 assert(O.page.shown and O.windowed and O.page.parentSet == UIParent and O.close, 'a window with a close button')
+assert(O.page.backdrop.bgFile == 'Interface\\\\DialogFrame\\\\UI-DialogBox-Background', "without the window file: the game's dialog")
 SlashCmdList.EVERLOOT('options')
 assert(O.page.shown, 'opening again shows the same window')
 """)
 
-print("Lua 5.1 options: Settings API, interface options or a window; one switch per module; command rows run their command; Reload now")
+# --- With the window's file: the Everloot look, and the window itself still built only when opened ---
+lua = fresh(SETTINGS, window=True)
+lua.execute("""
+local O = Everloot.Options
+local page = O.page
+assert(O.how == 'settings' and registered[1].frame == page, 'still an AddOns category')
+assert(page.crest and page.crest.path == 'Interface\\\\AddOns\\\\Everloot\\\\media\\\\crest' and page.crest.width <= 32, 'a modest crest heads the page')
+assert(page.title.text == 'Everloot' and page.title.color[2] > 0.9 and page.title.color[1] < 0.7 and page.title.color[3] < 0.3, 'Everloot in fel green')
+assert(Everloot.Window.frame == nil and EverlootWindow == nil, 'the page borrows the look without building the window')
+assert(page.scroll.textures and page.scroll.textures[1].colorTexture[1] < 0.1, 'the switches sit on a surface panel')
+for _, box in ipairs(page.boxes) do
+  assert(box.label.font:find('FRIZQT', 1, true) and box.description.font:find('FRIZQT', 1, true), "the window's fonts")
+  assert(box.label.size > box.description.size and box.label.color[1] > box.description.color[1], 'a label reads above its description')
+end
+assert(page.intro.font:find('FRIZQT', 1, true) and page.note.font:find('FRIZQT', 1, true), 'the introduction and the footer note too')
+page.scripts.OnShow()
+checkRows(page)
+
+-- What you've added: one line per kind of row in the saved file, filled when the page shows.
+assert(#page.added == #O.ADDED and #O.ADDED == 8, 'one line per kind')
+for i, a in ipairs(O.ADDED) do
+  assert(page.added[i].text == a[2] .. ': ' .. tostring(Everloot:Count(a[1])), page.added[i].text)
+end
+assert(page.addedHeading.text == "What you've added", 'the block has its title')
+-- The controls behave as before: a switch, the ask box, Reload now.
+local census
+for _, box in ipairs(page.boxes) do if box.row.key == 'census' then census = box end end
+census.checked = false
+census.scripts.OnClick(census)
+assert(EverlootDB.toggles.census == false and not census.checked, 'a switch still sets its module')
+local asked
+Everloot.Ask = function(_, question) asked = question end
+page.ask:SetText('  where is the frost book?  ')
+page.ask.scripts.OnEnterPressed(page.ask)
+assert(asked == 'where is the frost book?' and page.ask.text == '', 'the ask box sends the question and clears')
+page.reload.scripts.OnClick()
+assert(reloads == 1, 'Reload now reloads')
+""")
+
+# The same page on its own: the window's flat dark panel and bronze edge.
+lua = fresh("", window=True)
+lua.execute("""
+local O = Everloot.Options
+assert(O.how == 'window')
+SlashCmdList.EVERLOOT('options')
+local page = O.page
+assert(page.shown and O.close, 'a window with a close button')
+assert(page.backdrop and page.backdrop.bgFile == 'Interface\\\\Buttons\\\\WHITE8X8' and page.backdrop.edgeFile == 'Interface\\\\Tooltips\\\\UI-Tooltip-Border', 'the window backdrop')
+assert(page.bg[1] < 0.1 and page.border[1] > page.border[3], 'dark inside a bronze edge')
+""")
+
+# --- Player names: asked once, a few seconds after the loading screen, never in combat ---
+TIMERS = """
+timers = {}
+C_Timer = { After = function(seconds, f) timers[#timers + 1] = { seconds = seconds, f = f } end }
+combat = false
+InCombatLockdown = function() return combat end
+function runTimers() local due = timers; timers = {}; for _, t in ipairs(due) do t.f() end; return due end
+function said(text) for _, line in ipairs(printed) do if string.find(line, text, 1, true) then return true end end return false end
+"""
+
+lua = fresh(SETTINGS + TIMERS, window=True)
+lua.execute("""
+local O = Everloot.Options
+assert(EverlootDB.toggles.players == false and EverlootDB.playersAsked == nil, 'player names start off and unasked')
+local listen = O.askFrame
+assert(listen and listen.events.PLAYER_ENTERING_WORLD, 'a new install waits for the loading screen to end')
+assert(#timers == 0 and O.prompt == nil, 'nothing is asked at load')
+listen.onEvent(listen, 'PLAYER_ENTERING_WORLD')
+assert(#timers == 1 and timers[1].seconds == O.ASK_DELAY and O.ASK_DELAY >= 5, 'asked a few seconds after the loading screen')
+-- In combat the question waits.
+combat = true
+runTimers()
+assert(O.prompt == nil and #timers == 1 and timers[1].seconds == O.COMBAT_RETRY, 'never during combat; tried again later')
+combat = false
+runTimers()
+local p = O.prompt
+assert(p and p.shown and p.parent == UIParent, 'the question is shown out of combat')
+local text = p.body.text
+for _, part in ipairs({ 'name, realm, race, class, level and guild of your own characters and of players you target, mouse over or group with',
+  'bosses your guild kills', '/everloot players off', 'everloot.app/players/opt-out', 'asks this once', 'off until you choose' }) do
+  assert(string.find(text, part, 1, true), 'the question says: ' .. part)
+end
+assert(p.crest and p.title.text == 'Everloot' and p.backdrop.bgFile == 'Interface\\\\Buttons\\\\WHITE8X8', "the Everloot window's look")
+assert(p.on.text == 'Turn on' and p.off.text == 'Leave off', 'two answers')
+assert(p.height > 100 and p.body.width <= p.width - 32, 'the text sits inside the question')
+O.AskPlayers()
+assert(#timers == 0, 'a question already on screen is not asked again')
+
+-- Leave off: still off, never asked again.
+p.off.scripts.OnClick(p.off)
+assert(not p.shown and EverlootDB.toggles.players == false and EverlootDB.playersAsked == true, 'leave off keeps it off and is remembered')
+assert(said('player names stay off') and said('/everloot players on'), 'the answer is said in chat')
+O.AskPlayers()
+assert(not p.shown and #timers == 0, 'never asked again after an answer')
+""")
+
+# Turn on: the same as /everloot players on, with its full chat line.
+lua = fresh(SETTINGS + TIMERS, window=True)
+lua.execute("""
+local O = Everloot.Options
+O.askFrame.onEvent(O.askFrame, 'PLAYER_ENTERING_WORLD')
+runTimers()
+O.prompt.on.scripts.OnClick(O.prompt.on)
+assert(EverlootDB.toggles.players == true and EverlootDB.playersAsked == true and not O.prompt.shown, 'turn on sets the module on')
+assert(said('players on. It records the name, realm') and said('/reload to apply'), 'the players-on line is said')
+""")
+
+# A choice made by hand, before the question, answers it: chat or the settings switch.
+lua = fresh(SETTINGS + TIMERS, window=True)
+lua.execute("""
+local O = Everloot.Options
+SlashCmdList.EVERLOOT('players off')
+assert(EverlootDB.playersAsked == true, '/everloot players off answers the question')
+O.askFrame.onEvent(O.askFrame, 'PLAYER_ENTERING_WORLD')
+runTimers()
+assert(O.prompt == nil, 'not asked after a choice made by hand')
+""")
+lua = fresh(SETTINGS + TIMERS, window=True)
+lua.execute("""
+local O = Everloot.Options
+local players
+for _, box in ipairs(O.page.boxes) do if box.row.key == 'players' then players = box end end
+players.checked = true
+players.scripts.OnClick(players)
+assert(EverlootDB.toggles.players == true and EverlootDB.playersAsked == true, 'the settings switch answers it too')
+""")
+
+# Saved answers, and an install that already has players on, are never asked: no listener at all.
+for saved in ("{ installId = 'abcd-1234', toggles = { players = false }, playersAsked = true, records = {} }",
+              "{ installId = 'abcd-1234', toggles = { players = true }, records = {} }"):
+    lua = fresh(SETTINGS + TIMERS, saved=saved, window=True)
+    lua.execute("assert(Everloot.Options.askFrame == nil, 'nothing waits to ask')")
+# An install from before the question, with players off, is asked once.
+lua = fresh(SETTINGS + TIMERS, saved="{ installId = 'abcd-1234', toggles = { players = false }, records = {} }", window=True)
+lua.execute("assert(Everloot.Options.askFrame, 'an upgraded install with players off is asked')")
+
+# Without the window's file: the game's dialog and a plain heading.
+lua = fresh(TIMERS)
+lua.execute("""
+local O = Everloot.Options
+O.askFrame.onEvent(O.askFrame, 'PLAYER_ENTERING_WORLD')
+runTimers()
+assert(O.prompt.shown and O.prompt.backdrop.bgFile == 'Interface\\\\DialogFrame\\\\UI-DialogBox-Background', "the game's dialog")
+assert(O.prompt.title.text == 'Everloot: player names')
+""")
+
+# --- Turning off a row that deletes rows asks first when the click comes from the page ---
+POPUP = """
+StaticPopupDialogs = {}
+shown = nil
+StaticPopup_Show = function(which, ...) shown = { which, ... }; return {} end
+"""
+lua = fresh(POPUP + SETTINGS)
+lua.execute("""
+local O = Everloot.Options
+local byKey = {}
+for _, box in ipairs(O.page.boxes) do byKey[box.row.key] = box end
+local function census5()
+  EverlootDB.records.census_seen = { {}, {}, {}, {}, {} }
+  EverlootDB.toggles.census = true
+  shown = nil
+end
+local dialog = StaticPopupDialogs.EVERLOOT_TURN_OFF
+assert(dialog and dialog.timeout == 0 and dialog.whileDead == 1 and dialog.hideOnEscape == 1, 'the dialog is registered')
+assert(string.find(dialog.text, 'Turn off %s and delete %d recorded rows?', 1, true))
+
+-- Unticking asks, and deletes nothing yet.
+census5()
+byKey.census.checked = false
+byKey.census.scripts.OnClick(byKey.census)
+assert(shown and shown[1] == 'EVERLOOT_TURN_OFF' and shown[2] == 'Census' and shown[3] == 5, 'asks with the label and the row count')
+assert(#EverlootDB.records.census_seen == 5 and EverlootDB.toggles.census == true, 'nothing is deleted before the answer')
+assert(byKey.census.checked, 'the switch stays ticked while the question is open')
+-- Cancel leaves the rows and the tick.
+byKey.census.checked = false
+dialog.OnCancel()
+assert(#EverlootDB.records.census_seen == 5 and EverlootDB.toggles.census == true and byKey.census.checked, 'cancel keeps rows and re-ticks')
+-- Accept deletes and sets the toggle.
+byKey.census.checked = false
+byKey.census.scripts.OnClick(byKey.census)
+dialog.OnAccept()
+assert(EverlootDB.toggles.census == false and EverlootDB.records.census_seen == nil, 'accept turns it off and deletes the rows')
+assert(not byKey.census.checked)
+
+-- No rows: no question, the command runs.
+EverlootDB.records.census_seen = nil
+EverlootDB.toggles.census = true
+shown = nil
+byKey.census.checked = false
+byKey.census.scripts.OnClick(byKey.census)
+assert(shown == nil and EverlootDB.toggles.census == false, 'with no rows it turns off without asking')
+
+-- Turning on never asks.
+shown = nil
+byKey.census.checked = true
+byKey.census.scripts.OnClick(byKey.census)
+assert(shown == nil and EverlootDB.toggles.census == true)
+
+-- The slash command stays direct.
+census5()
+SlashCmdList.EVERLOOT('census off')
+assert(shown == nil and EverlootDB.records.census_seen == nil and EverlootDB.toggles.census == false, 'the slash command deletes without a question')
+
+-- Rows without a deleting command are unchanged.
+byKey.gold.checked = false
+byKey.gold.scripts.OnClick(byKey.gold)
+byKey.scanPrompt.checked = false
+byKey.scanPrompt.scripts.OnClick(byKey.scanPrompt)
+assert(shown == nil and EverlootDB.toggles.gold == false and EverlootDB.scanPrompt == false)
+
+-- The other deleting rows count their own kinds.
+EverlootDB.records.addon_seen = { {}, {} }
+EverlootDB.toggles.addons = true
+byKey.addons.checked = false
+byKey.addons.scripts.OnClick(byKey.addons)
+assert(shown and shown[2] == 'Installed addon list' and shown[3] == 2 and #EverlootDB.records.addon_seen == 2)
+dialog.OnCancel()
+shown = nil
+EverlootDB.records.player_seen, EverlootDB.records.guild_kill = { {} }, { {}, {} }
+EverlootDB.toggles.players = true
+byKey.players.checked = false
+byKey.players.scripts.OnClick(byKey.players)
+assert(shown and shown[3] == 3, 'players counts player rows and guild kills')
+dialog.OnCancel()
+shown = nil
+EverlootDB.records.achievement_owned, EverlootDB.records.pvp_owned = { {} }, { {} }
+EverlootDB.toggles.completion = true
+byKey.completion.checked = false
+byKey.completion.scripts.OnClick(byKey.completion)
+assert(shown and shown[3] == 2, 'completion counts every kind it deletes')
+""")
+
+# A client without the popup function runs the command directly, as before.
+lua = fresh(SETTINGS)
+lua.execute("""
+local O = Everloot.Options
+local census
+for _, box in ipairs(O.page.boxes) do if box.row.key == 'census' then census = box end end
+EverlootDB.records.census_seen = { {}, {} }
+census.checked = false
+census.scripts.OnClick(census)
+assert(EverlootDB.toggles.census == false and EverlootDB.records.census_seen == nil, 'no StaticPopup: the command runs')
+""")
+
+print("Lua 5.1 options: Settings API, interface options or a window; one switch per module; command rows run their command; every switch inside a scrolling list at any width; the window's crest heading, fonts, surface and dark window, or the game's own without its file; Reload now; player names asked once, after the loading screen and out of combat")

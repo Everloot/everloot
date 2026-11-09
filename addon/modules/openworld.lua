@@ -289,23 +289,50 @@ local function questTag(questId)
   return nil
 end
 
+--- One quest log row: title, level, suggested group, isHeader, quest id. Older clients have GetQuestLogTitle;
+--- Forever's client (mainline UI) has only C_QuestLog.GetInfo, which returns the same fields as a table.
+local function questLogRow(index)
+  if GetQuestLogTitle then
+    local ok, title, level, group, isHeader, _, _, _, logId = pcall(GetQuestLogTitle, index)
+    if ok then return title, level, group, isHeader, logId end
+    return nil
+  end
+  if not (C_QuestLog and C_QuestLog.GetInfo) then return nil end
+  local ok, info = pcall(C_QuestLog.GetInfo, index)
+  info = ok and E.Readable(info)
+  if type(info) ~= "table" then return nil end
+  return E.Readable(info.title), E.Readable(info.level), E.Readable(info.suggestedGroup), E.Readable(info.isHeader), E.Readable(info.questID)
+end
+
+local function canReadQuestLog()
+  return GetQuestLogTitle ~= nil or (C_QuestLog ~= nil and C_QuestLog.GetInfo ~= nil and C_QuestLog.GetLogIndexForQuestID ~= nil)
+end
+
 -- A quest the character just accepted, read from its own quest log row. Level is the quest's level as the log
 -- shows it; a row that is not this quest, or has no real level, records nothing.
-local function questCapture(index, questId)
-  if not GetQuestLogTitle or type(index) ~= "number" or type(questId) ~= "number" then return end
+-- QUEST_ACCEPTED gives (log index, quest id) on older clients and only the quest id on Forever's.
+local function questCapture(arg1, arg2)
+  local index, questId = arg1, arg2
+  if questId == nil then index, questId = nil, E.Readable(arg1) end
+  if not canReadQuestLog() or type(questId) ~= "number" then return end
+  if index == nil and C_QuestLog and C_QuestLog.GetLogIndexForQuestID then
+    local ok, found = pcall(C_QuestLog.GetLogIndexForQuestID, questId)
+    index = ok and E.Readable(found) or nil
+  end
+  if type(index) ~= "number" then return end
   local faction = UnitFactionGroup and UnitFactionGroup("player")
   faction = faction == "Alliance" and "alliance" or faction == "Horde" and "horde" or nil
   EverlootDB.questSeen = EverlootDB.questSeen or {}
   local seenKey = tostring(questId) .. ":" .. tostring(faction)
   if EverlootDB.questSeen[seenKey] then return end
-  local ok, title, level, group, isHeader, _, _, _, logId = pcall(GetQuestLogTitle, index)
-  if not ok or isHeader or logId ~= questId or type(title) ~= "string" or title == "" then return end
+  local title, level, group, isHeader, logId = questLogRow(index)
+  if isHeader or logId ~= questId or type(title) ~= "string" or title == "" then return end
   if type(level) ~= "number" or level < 1 or level ~= math.floor(level) then return end
   -- The category is the nearest header above the quest in the log.
   local category
   for i = index - 1, 1, -1 do
-    local okRow, name, _, _, header = pcall(GetQuestLogTitle, i)
-    if okRow and header and type(name) == "string" and name ~= "" then category = name:sub(1, 60); break end
+    local name, _, _, header = questLogRow(i)
+    if header and type(name) == "string" and name ~= "" then category = name:sub(1, 60); break end
   end
   local row = {
     installId = EverlootDB.installId,
@@ -331,23 +358,17 @@ local function rememberItem(itemId)
   local label = QUALITY[quality]
   -- An item the client has not cached yet answers with a stand-in name, which is not the item's name.
   if not name or not label or name:find("^Item %d+$") then return end
-  E:Store("item_seen", {
+  -- One row per item: the same item in another loot window or on another vendor adds nothing. A new row is
+  -- stored only when the client shows a different name or quality for it.
+  EverlootDB.itemSeenIds = EverlootDB.itemSeenIds or {}
+  local seen = label .. " " .. name
+  if EverlootDB.itemSeenIds[itemId] == seen then return end
+  local stored = E:Store("item_seen", {
     installId = EverlootDB.installId,
     capturedAt = date("!%Y-%m-%dT%H:%M:%SZ"),
     itemId = itemId, name = name, quality = label,
   })
-end
-
--- The game's own "N Gold", "N Silver" and "N Copper" strings, as patterns, so a coin slot's text reads in any
--- language; English where the client does not define them. A count may carry a thousands separator.
-local COIN_UNITS = { { "GOLD_AMOUNT", "%d Gold", 10000 }, { "SILVER_AMOUNT", "%d Silver", 100 }, { "COPPER_AMOUNT", "%d Copper", 1 } }
-local function coinPatterns()
-  local out = {}
-  for _, unit in ipairs(COIN_UNITS) do
-    local fmt = type(_G[unit[1]]) == "string" and _G[unit[1]] or unit[2]
-    out[#out + 1] = { fmt:gsub("[%^%$%(%)%.%[%]%*%+%-%?]", "%%%0"):gsub("%%d", "([%%d,%%.]+)"), unit[3] }
-  end
-  return out
+  if stored then EverlootDB.itemSeenIds[itemId] = seen end
 end
 
 -- The copper in loot slot i when it is the coin slot, read from the slot's text; nil for an item slot or a text
@@ -358,13 +379,8 @@ local function slotCopper(i, text)
   if slotType ~= (Enum and Enum.LootSlotType and Enum.LootSlotType.Money or LOOT_SLOT_MONEY or 2) or type(text) ~= "string" then
     return nil
   end
-  local total = 0
-  for _, unit in ipairs(coinPatterns()) do
-    local digits = text:match(unit[1])
-    local amount = digits and tonumber((digits:gsub("%D", "")))
-    if amount then total = total + amount * unit[2] end
-  end
-  return total >= 1 and total <= 10000000000 and total or nil
+  local total = E.CoinText(text)
+  return total and total <= 10000000000 and total or nil
 end
 
 -- The id of the item an item GUID names. The GUID itself does not hold it: the disenchant or lock cast read it
@@ -733,8 +749,23 @@ local function encounterEnd(encounterId, name, difficulty, size, success, units)
   })
 end
 
+--- A merchant slot's price and stock. Older clients have GetMerchantItemInfo; Forever's merchant window reads
+--- C_MerchantFrame.GetItemInfo, which returns them as fields.
+local function merchantPrice(index)
+  if GetMerchantItemInfo then
+    local ok, _, _, price, _, stock = pcall(GetMerchantItemInfo, index)
+    if ok then return price, stock end
+    return nil
+  end
+  local ok, info = pcall(C_MerchantFrame.GetItemInfo, index)
+  info = ok and E.Readable(info)
+  if type(info) ~= "table" then return nil end
+  return E.Readable(info.price), E.Readable(info.numAvailable)
+end
+
 local function vendorCapture()
-  if not GetMerchantNumItems or not GetMerchantItemLink or not GetMerchantItemInfo then return end
+  local canPrice = GetMerchantItemInfo or (C_MerchantFrame and C_MerchantFrame.GetItemInfo)
+  if not GetMerchantNumItems or not GetMerchantItemLink or not canPrice then return end
   local vendorNpcId = npcIdFromGuid(UnitGUID("npc")) or npcIdFromGuid(UnitGUID("target"))
   if not vendorNpcId then return end
   local okCount, count = pcall(GetMerchantNumItems)
@@ -744,8 +775,8 @@ local function vendorCapture()
     local okLink, link = pcall(GetMerchantItemLink, i)
     local itemId = okLink and type(link) == "string" and tonumber(link:match("item:(%d+)"))
     if itemId then
-      local okInfo, _, _, price, _, stock = pcall(GetMerchantItemInfo, i)
-      if okInfo and type(price) == "number" and price >= 0 and price == math.floor(price) then
+      local price, stock = merchantPrice(i)
+      if type(price) == "number" and price >= 0 and price == math.floor(price) then
         local row = { itemId = itemId, priceCopper = price }
         if type(stock) == "number" and stock > 0 and stock == math.floor(stock) then
           row.limitedStock = stock
@@ -756,12 +787,67 @@ local function vendorCapture()
     end
   end
   if #items == 0 then return end
-  E:Store("vendor", {
+  -- One row per vendor and UTC day: opening the same window again adds nothing unless an item, a price or a
+  -- limited stock changed. The hash is of the items as read, in the vendor's order.
+  EverlootDB.vendorSeen = EverlootDB.vendorSeen or {}
+  local parts = {}
+  for i, item in ipairs(items) do parts[i] = item.itemId .. ":" .. item.priceCopper .. ":" .. (item.limitedStock or "") end
+  local day, hash = date("!%Y-%m-%d"), E.Adler32(table.concat(parts, ","))
+  local seen = EverlootDB.vendorSeen[vendorNpcId]
+  if type(seen) == "table" and seen.day == day and seen.hash == hash then return end
+  local stored = E:Store("vendor", {
     installId = EverlootDB.installId,
     capturedAt = date("!%Y-%m-%dT%H:%M:%SZ"),
     vendorNpcId = vendorNpcId,
     items = items,
   })
+  if stored then EverlootDB.vendorSeen[vendorNpcId] = { day = day, hash = hash } end
+end
+
+-- Names of the sources this install has met, as this client showed them: NPCs from its sightings, objects from its
+-- sightings and from what it looted. Read from the rows already in the saved file, never written to it; each lookup
+-- reads only the rows stored since the last one. A source this install never met has no name here.
+local known = { npc = {}, object = {}, read = {} }
+local NAME_ROWS = {
+  { kind = "npc_sighting", id = "npcId", name = "name", into = "npc" },
+  { kind = "object_sighting", id = "objectId", name = "name", into = "object" },
+  { kind = "loot", id = "sourceObjectId", name = "sourceObjectName", into = "object" },
+}
+
+--- The name this install saw for a drop source (modules/drops.lua shows it) ("npc" or "object" and its id), or nil.
+function E:SourceName(kind, id)
+  local records = type(EverlootDB) == "table" and EverlootDB.records
+  if type(records) ~= "table" then return nil end
+  for _, source in ipairs(NAME_ROWS) do
+    local rows = records[source.kind]
+    if type(rows) == "table" then
+      local from = known.read[source.kind] or 0
+      if #rows < from then from = 0 end -- the rows were cleared: read them again
+      local into = known[source.into]
+      for i = from + 1, #rows do
+        local row = rows[i]
+        local rowId, name = type(row) == "table" and row[source.id], type(row) == "table" and row[source.name]
+        if type(rowId) == "number" and type(name) == "string" and name ~= "" then into[rowId] = name end
+      end
+      known.read[source.kind] = #rows
+    end
+  end
+  local name = known[kind] and known[kind][id]
+  -- A name is shown as written: a pipe would start a colour or texture escape.
+  return name and (name:gsub("|", "||")) or nil
+end
+
+-- A Lua error in one handler on the shared frame ends the dispatch, so the modules after it miss the event.
+-- The captures that read the game's own windows run inside this, and the first error of a session is said once.
+local failedOnce, failedFns = false, {}
+local function guarded(label, fn, ...)
+  local ok, err = pcall(fn, ...)
+  if ok or failedFns[label] then return end
+  failedFns[label] = true
+  E:SetNote("openworld", "error in " .. label .. ": " .. tostring(err))
+  if failedOnce then return end
+  failedOnce = true
+  print("Everloot: openworld hit an error and keeps running. Other modules are not affected. /everloot status says more.")
 end
 
 E:RegisterModule("openworld", function()
@@ -775,19 +861,18 @@ E:RegisterModule("openworld", function()
   -- 0.3.7 and earlier paused a whole kind; these kinds now pause one share at a time.
   if EverlootDB.paused then EverlootDB.paused.npc_sighting, EverlootDB.paused.loot = nil, nil end
   for event in pairs(WINDOW_ROLES) do pcall(function() f:RegisterEvent(event) end) end
-  for _, event in ipairs({ "PLAYER_INTERACTION_MANAGER_FRAME_SHOW", "UNIT_SPELLCAST_SENT", "UNIT_SPELLCAST_FAILED",
-    "UNIT_SPELLCAST_FAILED_QUIET", "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_INTERRUPTED", "LOOT_CLOSED", "VIGNETTE_MINIMAP_UPDATED", "VIGNETTES_UPDATED", "PLAYER_LEAVING_WORLD",
+  for _, event in ipairs({ "PLAYER_INTERACTION_MANAGER_FRAME_SHOW", "LOOT_CLOSED", "VIGNETTE_MINIMAP_UPDATED", "VIGNETTES_UPDATED", "PLAYER_LEAVING_WORLD",
     "PLAYER_ENTERING_WORLD", "ENCOUNTER_END" }) do
     pcall(function() f:RegisterEvent(event) end)
   end
   if E.RUN_RECORDS then
     for _, event in ipairs({ "ENCOUNTER_START", "CHAT_MSG_SYSTEM" }) do pcall(function() f:RegisterEvent(event) end) end
   end
-  f:HookScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4, arg5, arg6)
-    if event == "PLAYER_TARGET_CHANGED" then targetSighting("target")
-    elseif event == "UPDATE_MOUSEOVER_UNIT" then targetSighting("mouseover")
-    elseif event == "LOOT_OPENED" then lootCapture()
-    elseif event == "QUEST_ACCEPTED" then questCapture(arg1, arg2)
+  local function onEvent(_, event, arg1, arg2, arg3, arg4, arg5, arg6)
+    if event == "PLAYER_TARGET_CHANGED" then guarded("targetSighting", targetSighting, "target")
+    elseif event == "UPDATE_MOUSEOVER_UNIT" then guarded("targetSighting", targetSighting, "mouseover")
+    elseif event == "LOOT_OPENED" then guarded("lootCapture", lootCapture)
+    elseif event == "QUEST_ACCEPTED" then guarded("questCapture", questCapture, arg1, arg2)
     elseif event == "UNIT_SPELLCAST_SENT" then pcall(castSent, arg1, arg2, arg3, arg4)
     elseif (event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_FAILED_QUIET" or event == "UNIT_SPELLCAST_INTERRUPTED")
       and arg1 == "player" then
@@ -806,16 +891,25 @@ E:RegisterModule("openworld", function()
       local role = interactionRole(arg1)
       if role ~= nil then pcall(interactionSighting, role or nil) end
     end
-    if event == "MERCHANT_SHOW" then vendorCapture() end
+    if event == "MERCHANT_SHOW" then guarded("vendorCapture", vendorCapture) end
     local role = WINDOW_ROLES[event]
     if role == false then
       local ok, found = pcall(gossipRole)
       role = ok and found or false
     end
     if role ~= nil then pcall(interactionSighting, role or nil) end
-  end)
-  if not GetQuestLogTitle then
-    return "ready (target/mouseover/loot/merchant/NPC windows; quests off, this client has no GetQuestLogTitle)"
+  end
+  f:HookScript("OnEvent", onEvent)
+  -- Spell casts are the player's own only: a frame of its own, so they do not run through every module's handler.
+  local spellFrame = CreateFrame("Frame")
+  for _, event in ipairs({ "UNIT_SPELLCAST_SENT", "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_FAILED_QUIET",
+    "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_INTERRUPTED" }) do
+    if spellFrame.RegisterUnitEvent then pcall(spellFrame.RegisterUnitEvent, spellFrame, event, "player")
+    else pcall(spellFrame.RegisterEvent, spellFrame, event) end
+  end
+  spellFrame:SetScript("OnEvent", onEvent)
+  if not canReadQuestLog() then
+    return "ready (target/mouseover/loot/merchant/NPC windows; quests off, this client has no quest log reader)"
   end
   return "ready (target/mouseover/loot/merchant/NPC windows/quest accept)"
 end)

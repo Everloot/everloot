@@ -18,15 +18,17 @@ vi.mock("@/components/CookieConsent", () => ({ CookiePreferencesButton: () => nu
 vi.mock("@/components/ApiKeys", () => ({ default: () => <div data-testid="api-keys" /> }));
 
 import { CONNECT_EXAMPLES, CORPUS_URL, MCP_PROMPTS, MCP_RESOURCE_TEMPLATES, MCP_RESOURCES, MCP_TOOLS, MCP_URL, REQUESTS_PER_HOUR } from "./connect-data";
-import { API_ROUTES, MCP_PROMPT_NAMES, MCP_RESOURCE_TEMPLATE_URIS, MCP_RESOURCE_URIS, MCP_TOOL_NAMES, PROTOCOL_VERSION, PUBLIC_RECORD_KINDS } from "@everloot/protocol";
+import { ALL_RECORD_KINDS, API_ROUTES, MCP_PROMPT_NAMES, MCP_PROMPTS as PROMPT_DEFS, MCP_RESOURCE_TEMPLATE_URIS, MCP_RESOURCE_URIS, MCP_TOOL_NAMES, PROTOCOL_VERSION, PUBLIC_RECORD_KINDS } from "@everloot/protocol";
 import { liveToolNames } from "@/lib/guild-switch";
 import { createIntakeQuota } from "@/lib/intake-quota";
 import { ANON_PAGE, ANON_PER_HOUR, attribution, KEY_PAGE, KEY_PER_HOUR } from "@/lib/data-guard";
-import sitemap from "@/app/sitemap";
+import sitemap from "@/lib/site-sitemap";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import { allDocsPages, endpointSlug } from "./nav";
+import { FILE_SCHEMAS, PAGE_INTERNAL_ROUTES } from "./file-schemas";
 import { MY_BUILDS_REFUSAL } from "@/lib/saved-builds";
+import { promptText } from "../../../../kb/src/prompts";
 
 type PageModule = { default: (props: { params: Promise<Record<string, string>> }) => unknown };
 const modules = import.meta.glob<PageModule>("../../app/docs/**/page.tsx", { eager: true });
@@ -37,6 +39,7 @@ async function renderDocs(): Promise<string> {
   for (const [path, mod] of Object.entries(modules)) {
     const calls = path.includes("[endpoint]") ? API_ROUTES.map((r) => ({ endpoint: endpointSlug(r) }))
       : path.includes("[tool]") ? liveToolNames().map((n) => ({ tool: n.replaceAll("_", "-") }))
+      : path.includes("[kind]") ? ALL_RECORD_KINDS.map((kind) => ({ kind }))
       : [{}];
     for (const params of calls) out.push(renderToStaticMarkup((await mod.default({ params: Promise.resolve(params) })) as ReactNode));
   }
@@ -80,6 +83,31 @@ test("the resource and prompt lists are exactly what the protocol declares, in o
   expect(page).toContain("/schema/mcp/prompts.json");
 });
 
+test("the resources page gives each prompt a heading named after it, its arguments and the message the server returns, plus one read of a resource and of an entity", () => {
+  for (const name of MCP_PROMPT_NAMES) {
+    expect(page).toContain(`<h2 id="${name}"`);
+    expect(page).toContain(`href="#${name}"`);
+    const def = PROMPT_DEFS[name];
+    expect(decoded).toContain(def.title);
+    expect(decoded).toContain(def.description);
+    for (const [arg, a] of Object.entries(def.arguments)) {
+      expect(decoded).toContain(a.description);
+      expect(page).toContain(`>${arg}</code>`);
+    }
+  }
+  // The arguments the examples pass are the ones the page shows, and the message is the server's own, not retyped.
+  expect(text).toContain(promptText("review_talent_plan", { code: "YOUR-SHARE-CODE" }));
+  expect(text).toContain(promptText("what_changed", { game: "forever" }));
+  expect(text).toContain(promptText("answer_with_sources", { question: "Where does Hogger spawn?" }));
+  expect(text).toContain('"method": "prompts/get"');
+  expect(text).toContain('"name": "review_talent_plan"');
+  expect(text).toContain('"method": "resources/read"');
+  expect(text).toContain(`"uri": "${MCP_RESOURCE_URIS[0]}"`);
+  expect(text).toContain('"uri": "everloot://item/2589"');
+  expect(text).toContain('"itemId": 2589');
+  for (const field of ["gameFiles", "registry", "credit", "buildConfig", "firstSeen"]) expect(text).toContain(`"${field}"`);
+});
+
 test("the reference lists every tool with its arguments, every endpoint, the OpenAPI file and the schema index", () => {
   for (const name of liveToolNames()) expect(page).toContain(`/schema/mcp/${name}.json`);
   expect(page).not.toContain("/schema/mcp/guild_rankings.json");
@@ -89,6 +117,16 @@ test("the reference lists every tool with its arguments, every endpoint, the Ope
   for (const text of ["/api/openapi.json", "/schema/index.json", "/schema/upload.json", `@everloot/protocol`, PROTOCOL_VERSION, "gameData"]) {
     expect(decoded).toContain(text);
   }
+});
+
+test("the schemas page marks the file-only shapes, says reporters is installs, and the API page names the page-internal routes", () => {
+  const fileOnly = Object.keys(FILE_SCHEMAS);
+  expect(fileOnly.length).toBe(3);
+  for (const [name, file] of Object.entries(FILE_SCHEMAS)) expect(text).toContain(`/schema/api/${name}.json Describes a file, not an endpoint: ${file}.`);
+  expect(text.split("Describes a file, not an endpoint").length - 1).toBe(fileOnly.length);
+  expect(text).toContain("reporters, it is the count of installs that agree on that fact, the same number the open-data files call installs");
+  for (const path of PAGE_INTERNAL_ROUTES) expect(page).toContain(`>${path}</code>`);
+  expect(text).toContain("they are not part of the contract, the document leaves them out");
 });
 
 test("tells users how to add the server in Claude, Grok and any other assistant that takes a URL", () => {
@@ -102,6 +140,11 @@ test("the corpus kinds on the page are the kinds the API accepts, without addon 
   for (const kind of PUBLIC_RECORD_KINDS) expect(page).toContain(kind);
   // The schemas page lists every kind an upload may carry; addon lists are marked as never public.
   expect(decoded).toMatch(/addon_seen<\/code><\/a><\/td><td[^>]*>No</);
+  // Each row links the kind's page and keeps its schema file beside it.
+  for (const kind of ALL_RECORD_KINDS) {
+    expect(page).toContain(`href="/docs/api/records/${kind}"`);
+    expect(page).toContain(`href="/schema/records/${kind}.json"`);
+  }
 });
 
 test("the stated limit is the limit the public MCP quota enforces", async () => {
@@ -152,7 +195,7 @@ test("links the repository's policy files", () => {
 });
 
 test("every docs page is in the sitemap, the docs are in the header and the footer, and /connect redirects to them", async () => {
-  const paths = (await sitemap()).map((entry) => new URL(entry.url).pathname);
+  const paths = (await sitemap())!.map((entry) => new URL(entry.url).pathname);
   for (const { href } of allDocsPages()) expect(paths, href).toContain(href);
   expect(paths).not.toContain("/connect");
   expect(renderToStaticMarkup(<Header />)).toContain('href="/docs"');
@@ -269,6 +312,25 @@ test("the upload guide has a Recorder section, and no docs page says the Desktop
   expect(text).toContain("Send the player pages with the uploads");
   expect(text).not.toContain("The Desktop App never sends them");
   expect(text).not.toMatch(/named data \(guild, gear, gold, collection\), player\s+rows/);
+});
+
+test("the wiki guide quotes the wiki README's rules and check word for word, and says how a page is proposed", () => {
+  const readme = readFileSync(new URL("../../../../kb/wiki/README.md", import.meta.url), "utf8");
+  const words = (s: string) => s.replace(/\*\*|`/g, "").replace(/\s+/g, " ").trim();
+  const prose = words(text);
+  const rules = readme.slice(readme.indexOf("## Rules"), readme.indexOf("## Check a page"));
+  const bullets = rules.split(/\n(?=- )/).slice(1).map((b) => words(b.replace(/^- /, "")));
+  expect(bullets).toHaveLength(8);
+  for (const rule of bullets) expect(prose, rule).toContain(rule);
+  for (const sentence of [
+    "Each page is a short piece of writing in Everloot's own words wrapped around live data.",
+    "One file per page, <slug>.md, Markdown with YAML front matter. Not MDX: a page holds text and references, never code.",
+    "npm run kb -- wiki-check",
+    "CI runs the same check on every pull request. Every content change is reviewed like code: the check passes, a maintainer reads the page and approves it.",
+    "a draft is not built on the site",
+  ]) expect(prose).toContain(sentence);
+  expect(page).toContain('href="https://github.com/Everloot/everloot/tree/main/kb/wiki"');
+  expect(page).toContain('href="https://github.com/Everloot/everloot/pulls"');
 });
 
 test("the docs name no internal path and no AI as an author", () => {

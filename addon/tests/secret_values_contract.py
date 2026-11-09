@@ -184,6 +184,73 @@ local before = rows('item_seen')
 guid = 'Creature-0-1-2-3-998-0000002'
 event('LOOT_OPENED')
 assert(rows('item_seen') == before + 1, 'a real name is')
+guid = 'Creature-0-1-2-3-997-0000003'
+event('LOOT_OPENED')
+assert(rows('item_seen') == before + 1, 'and once: the same item in another window adds no row')
+""")
+
+# --- An item tooltip reads the item's vendor price: a secret price or link is unknown, and the prices still show ---
+lua = fresh(["modules/auctions.lua", "modules/prices.lua", "modules/drops.lua"])
+lua.execute((root / "tests" / "fixtures" / "EverlootPrices.lua").read_text(encoding="utf-8"))
+lua.execute("""
+GetRealmName = function() return 'Forever' end
+date = function() return '2026-10-20T10:00:00Z' end
+Enum = { TooltipDataType = { Item = 0 } }
+TooltipDataProcessor = { AddTooltipPostCall = function(_, f) hook = f end }
+Everloot:InitModules()
+function tooltip(id)
+ local rows = {}
+ hook({
+  AddLine = function(_, text) rows[#rows + 1] = text end,
+  AddDoubleLine = function(_, left, right) rows[#rows + 1] = left .. ' = ' .. right end,
+ }, { id = id })
+ return table.concat(rows, '\\n')
+end
+local sell, link = 13, 'item:2589'
+GetItemInfo = function() return 'Linen Cloth', link, 1, 5, 0, 'Trade Goods', 'Cloth', 20, '', 1, sell end
+assert(tooltip(2589):find('Vendor = 13', 1, true), 'a plain sell price shows')
+-- On the client a secret number is still of type number; only reading it raises. The test's stand-in is a table.
+local realType = type
+type = function(v) if rawequal(v, secretNumber) then return 'number' end return realType(v) end
+sell = secretNumber
+local shown = tooltip(2589)
+type = realType
+assert(shown:find('Market value', 1, true) and not shown:find('Vendor', 1, true), 'a secret sell price is unknown: ' .. shown)
+sell, link = 13, secretText
+shown = tooltip(2589)
+assert(shown:find('Market value', 1, true) and not shown:find('Vendor', 1, true), 'a secret link cannot show the item loaded: ' .. shown)
+""")
+
+# --- /everloot raid: an aura name or spell id the client hides is never a table key, and a unit with only those is unreadable ---
+lua = fresh(["modules/raid_data.lua", "modules/raid.lua"])
+lua.execute("""
+IsInGroup = function() return true end
+IsInRaid = function() return true end
+GetNumGroupMembers = function() return 2 end
+GetRaidRosterInfo = function(i) return 'Member' .. i, 0, 1, 60, 'Warrior', 'WARRIOR' end
+UnitExists = function() return true end
+UnitIsConnected = function() return true end
+UnitIsVisible = function() return true end
+UnitClass = function() return 'Warrior', 'WARRIOR' end
+local shown = {}
+print = function(line) shown[#shown + 1] = line end
+local secretAura = true
+C_UnitAuras = { GetAuraDataByIndex = function(unit, i)
+ if unit == 'raid1' then
+  if i == 1 then return { name = secretAura and secretText or 'Battle Shout', spellId = secretAura and secretNumber or 6673 } end
+  return nil
+ end
+ if i == 1 then return { name = 'Battle Shout', spellId = 6673 } end
+ return nil
+end }
+local members = Everloot.Raid.ReadGroup()
+assert(members[1].readable == false, 'a unit with only secret auras is unreadable')
+assert(not holds(members[1].auras, secretText) and not holds(members[1].auras, secretNumber), 'a secret aura is not stored as a key')
+assert(members[2].readable == true and members[2].auras['Battle Shout'], 'a plain unit reads as before')
+Everloot:InitModules()
+SlashCmdList.EVERLOOT('raid')
+local text = table.concat(shown, '\\n')
+assert(text:find('1 member(s) could not be read', 1, true), 'the secret unit is counted as unreadable: ' .. text)
 """)
 
 print("secret values contract ok")

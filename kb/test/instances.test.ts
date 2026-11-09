@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { agreedDifficulties, confirmedEntrances, instanceBosses, instanceFactsFromRecords } from "../src/instances.js";
+import { agreedDifficulties, confirmedEntrances, instanceBosses, instanceFactsFromRecords, reportedBosses } from "../src/instances.js";
 import { objectSightingRowsFromRecords, objectSpawns } from "../src/object-spawns.js";
 
 // SYNTHETIC records; ids, names and times are made up.
@@ -43,6 +43,29 @@ describe("when an agreed instance fact was last seen", () => {
     expect(instanceBosses(facts.encounters, asOf).get(36)).toEqual([
       { encounterId: 9, name: "Foreman", kills: 3, npcIds: [77], reporters: 3, lastSeen: "2026-10-20T22:00:00.000Z" },
     ]);
+  });
+});
+
+describe("reportedBosses", () => {
+  test("an encounter short of 3 installs is a count of the installs that reported it; one with 3 is left to instanceBosses", () => {
+    const facts = instanceFactsFromRecords([
+      encounter("a", "2026-10-18T10:00:00Z"), encounter("a", "2026-10-18T11:00:00Z", false), encounter("b", "2026-10-19T10:00:00Z"),
+      encounter("a", "2026-10-18T10:00:00Z", true, { encounterId: 10, name: "Other" }),
+      ...["a", "b", "c"].map((i) => encounter(i, "2026-10-18T10:00:00Z", true, { encounterId: 11 })),
+      encounter("d", "2026-10-18T10:00:00Z", true, { instanceMapId: 409, encounterId: 663 }),
+    ]);
+    expect([...reportedBosses(facts.encounters)].map(([id, m]) => [id, [...m]])).toEqual([[36, [[9, 2], [10, 1]]], [409, [[663, 1]]]]);
+    expect(instanceBosses(facts.encounters, asOf).get(36)!.map((b) => b.encounterId)).toEqual([11]);
+  });
+
+  test("a boss agreed before a recheck scope's date counts only the rows after it, as the bar counts them", () => {
+    const facts = instanceFactsFromRecords([
+      encounter("a", "2026-10-10T10:00:00Z"), encounter("b", "2026-10-11T10:00:00Z"), encounter("c", "2026-10-12T10:00:00Z"),
+      encounter("d", "2026-10-20T10:00:00Z"),
+    ]);
+    const scope = [{ since: "2026-10-15T00:00:00Z", source: "test", ids: [9] }];
+    expect(instanceBosses(facts.encounters, asOf, scope).get(36)).toBeUndefined();
+    expect(reportedBosses(facts.encounters, scope).get(36)).toEqual(new Map([[9, 1]]));
   });
 });
 

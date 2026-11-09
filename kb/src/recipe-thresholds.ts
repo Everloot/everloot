@@ -6,9 +6,17 @@
  * installs contributed and their colours do not contradict each other. Unbounded sides stay null.
  * Reagents follow the same bar: a list is shown when three installs saw the same one. Its cost per
  * craft uses the profession path's agreed prices, and stays unrecorded while any reagent has none.
+ *
+ * Observations agree on the recipe id the window reported, so every client language counts toward one
+ * recipe. A recipe the game files list (client-recipes.json) is published under the files' profession
+ * name, with the recipe name and reagents English clients showed: the rows under that profession name.
  */
+import recipesJson from "../../web/src/data/game-data/client-recipes.json" with { type: "json" };
 import { INDEPENDENT_INSTALLS } from "./drop-rollup.js";
 import { agreePrices, formatCopper, median, mergeVendorPrices, professionFactsFromRecords, reagentKey, type AgreedRecipe, type PriceSighting, type Reagent } from "./profession-path.js";
+
+/** Recipe spell id (the trade-skill recipe id) to the profession the game files list it under, by the files' English name. */
+const FILE_PROFESSIONS = new Map(recipesJson.professions.flatMap((p) => p.recipes.map((r) => [r[0] as number, p.name] as const)));
 
 const ORDER = ["optimal", "medium", "easy", "trivial"] as const;
 type Colour = (typeof ORDER)[number];
@@ -67,6 +75,8 @@ const recipeKey = (profession: string, recipe: string) => `${profession.trim().t
  * Orange-only steps (design note 2026-10-10, option B): a published recipe with agreed reagents pays
  * one point per craft from its learn rank up to yellow.min, the first rank not known to be orange.
  * The learn rank is the trainer's, when three installs agree on one; else the lowest rank seen orange.
+ * Trainer rows carry no recipe id, so they match the published profession and recipe name: English
+ * trainer rows match a game-file recipe, other languages' rows match nothing and are left out.
  */
 export function derivedSteps(observations: RecipeObservation[], trainers: TrainerRow[]): DerivedStep[] {
   const trained = new Map<string, Map<number, Set<string>>>();
@@ -80,13 +90,13 @@ export function derivedSteps(observations: RecipeObservation[], trainers: Traine
     if (row.costCopper !== undefined) costs.set(key, (costs.get(key) ?? new Map<string, number>()).set(row.installId, row.costCopper));
   }
   const out: DerivedStep[] = [];
-  for (const t of inferThresholds(observations)) {
+  for (const { thresholds: t, rows } of published(observations)) {
     if (!t.reagents || t.yellow.min === null) continue;
     const key = recipeKey(t.profession, t.recipe);
     const [best, next] = [...(trained.get(key) ?? [])].sort((a, b) => b[1].size - a[1].size);
     const skillMin = best && best[1].size >= INDEPENDENT_INSTALLS && next?.[1].size !== best[1].size
       ? best[0]
-      : Math.min(...observations.filter((o) => o.difficulty === "optimal" && recipeKey(o.profession, o.recipe) === key).map((o) => o.rank));
+      : Math.min(...rows.filter((o) => o.difficulty === "optimal").map((o) => o.rank));
     if (!(skillMin < t.yellow.min)) continue;
     const prices = [...(costs.get(key)?.values() ?? [])];
     const trainingCopper = prices.length >= INDEPENDENT_INSTALLS ? median(prices) : null;
@@ -130,24 +140,56 @@ function bound(rows: RecipeObservation[], step: number): Range {
 
 const contradicts = (r: Range) => r.min !== null && r.max !== null && r.min > r.max;
 
-export function inferThresholds(observations: RecipeObservation[]): RecipeThresholds[] {
-  const groups = new Map<string, RecipeObservation[]>();
+/** The name the most installs showed; a tie goes to the first alphabetically. */
+function commonName(rows: RecipeObservation[]): string {
+  const names = new Map<string, Set<string>>();
+  for (const r of rows) names.set(r.recipe.trim(), (names.get(r.recipe.trim()) ?? new Set<string>()).add(r.installId));
+  return [...names].sort(([a, x], [b, y]) => y.size - x.size || a.localeCompare(b))[0]![0];
+}
+
+/** Each published recipe with the observations it was agreed from. */
+function published(observations: RecipeObservation[]): { thresholds: RecipeThresholds; rows: RecipeObservation[] }[] {
+  // A row without a recipe id (older addons) joins the id its profession and name were seen with, when
+  // there is one; seen with several, it is ambiguous and left out; seen with none, it groups by name.
+  const idsByName = new Map<string, Set<number>>();
   for (const o of observations) {
-    const key = `${o.profession.trim().toLowerCase()}|${o.recipe.trim().toLowerCase()}`;
-    groups.set(key, [...(groups.get(key) ?? []), o]);
+    if (o.recipeId !== undefined) idsByName.set(recipeKey(o.profession, o.recipe), (idsByName.get(recipeKey(o.profession, o.recipe)) ?? new Set<number>()).add(o.recipeId));
   }
-  const out: RecipeThresholds[] = [];
-  for (const rows of groups.values()) {
-    // The published ranges and trainer links still use names. Withhold an ambiguous name rather
-    // than combine distinct API recipes into a false agreement or a craft recommendation.
-    if (new Set(rows.flatMap((r) => r.recipeId === undefined ? [] : [r.recipeId])).size > 1) continue;
+  const groups = new Map<string, { recipeId?: number; rows: RecipeObservation[] }>();
+  for (const o of observations) {
+    const ids = o.recipeId !== undefined ? [o.recipeId] : [...(idsByName.get(recipeKey(o.profession, o.recipe)) ?? [])];
+    if (ids.length > 1) continue;
+    const key = ids.length === 1 ? `#${ids[0]}` : recipeKey(o.profession, o.recipe);
+    const group = groups.get(key) ?? { recipeId: ids[0], rows: [] };
+    group.rows.push(o);
+    groups.set(key, group);
+  }
+  const out: { thresholds: RecipeThresholds; rows: RecipeObservation[] }[] = [];
+  for (const { recipeId, rows } of groups.values()) {
     const installs = new Set(rows.map((r) => r.installId)).size;
     if (installs < INDEPENDENT_INSTALLS) continue;
     const [yellow, green, grey] = [bound(rows, 1), bound(rows, 2), bound(rows, 3)];
     if ([yellow, green, grey].some(contradicts)) continue;
-    out.push({ profession: rows[0].profession, recipe: rows[0].recipe, installs, observations: rows.length, yellow, green, grey, reagents: agreedReagents(rows) });
+    // A game-file recipe: the files' profession name, and the name and reagents its English rows showed. With no
+    // English row the name is the most common one seen, and the reagents stay unrecorded.
+    const fileProfession = recipeId === undefined ? undefined : FILE_PROFESSIONS.get(recipeId);
+    const english = fileProfession === undefined ? rows : rows.filter((r) => r.profession.trim().toLowerCase() === fileProfession.toLowerCase());
+    const thresholds = {
+      profession: fileProfession ?? rows[0].profession, recipe: commonName(english.length > 0 ? english : rows),
+      installs, observations: rows.length, yellow, green, grey, reagents: agreedReagents(english),
+    };
+    out.push({ thresholds, rows });
   }
-  return out.sort((a, b) => a.profession.localeCompare(b.profession) || a.recipe.localeCompare(b.recipe));
+  // The published ranges and trainer links use names. Two recipes agreed under one name cannot be told apart,
+  // so neither is published rather than one standing in for the other in a range or a craft recommendation.
+  const named = new Map<string, number>();
+  for (const { thresholds: t } of out) named.set(recipeKey(t.profession, t.recipe), (named.get(recipeKey(t.profession, t.recipe)) ?? 0) + 1);
+  return out.filter(({ thresholds: t }) => named.get(recipeKey(t.profession, t.recipe)) === 1)
+    .sort((a, b) => a.thresholds.profession.localeCompare(b.thresholds.profession) || a.thresholds.recipe.localeCompare(b.thresholds.recipe));
+}
+
+export function inferThresholds(observations: RecipeObservation[]): RecipeThresholds[] {
+  return published(observations).map((p) => p.thresholds);
 }
 
 function range(r: Range): string {

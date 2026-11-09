@@ -40,8 +40,9 @@ select check_name, ok from (values
       unnest(array[to_regclass('public.link_codes'), to_regclass('public.character_links'), to_regclass('public.character_visibility')]) t
       where t is not null), false)),
   ('the hide list the links check exists', to_regclass('public.character_suppressions') is not null),
+  -- 9 switches; 13 once 20261106120000_private_sync.sql has added the four section switches.
   ('every visibility switch starts off',
-    (select count(*) = 9 and bool_and(column_default = 'false') from information_schema.columns
+    (select count(*) in (9, 13) and bool_and(column_default = 'false') from information_schema.columns
       where table_schema = 'public' and table_name = 'character_visibility' and data_type = 'boolean')),
   ('the server can call the six site functions',
     coalesce((select count(*) = 6 and bool_and(has_function_privilege('service_role', f, 'EXECUTE')) from unnest(array[

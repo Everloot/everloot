@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
-import { objectList } from "../../../../kb/src/object-page";
+import { objectList } from "../../../../../kb/src/object-page";
 import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
 import { CLIENT_TAXONOMY as T, itemsHref, subclassLabel } from "@/lib/items";
 import { npcRows, publicQuests, publicVendors } from "@/lib/world-lists";
@@ -77,12 +78,20 @@ export default async function DatabasePage() {
     "/database/zones": n(publicZones().length),
     // The instances the game files place in a released zone, like the zone count: it reads the files, not the uploads.
     "/database/instances": n(instanceRows().size),
-    "/tools/guild-board": "uploads",
+    // A form, not a list: a verb where the others carry a count.
+    "/tools/guild-board": "look up",
   };
   const players = DATABASE_HUBS.map((h) => ({ href: h.href, label: h.label, count: counts[h.href] }));
+  // Retired and unnamed buckets ("Trade Goods (OBSOLETE)", "Subclass 0") stay on the class page only, and a class
+  // whose one subclass is itself ("Quest › Quest") lists none: the heading already says it.
+  const subclassLinks = (c: (typeof classes)[number]) => {
+    const links = T.subclasses.filter((s) => s.classId === c.id && s.items > 0 && !subclassLabel(s).retired).map((s) => ({ href: itemsHref(c.slug, s.slug), label: subclassLabel(s).label, count: n(s.items) }));
+    return links.length === 1 && links[0]!.label === c.label ? [] : links;
+  };
 
   return (
     <Container width="data">
+      <EdgeDegraded when={stats.unreachable || world.unreachable} />
       <article>
         <JsonLd data={datasetJsonLd({ uploads: stats.unreachable ? 0 : stats.uploads, name: DATASET_NAME, description, path: "/database", corpusPath: "/api/corpus/public", dataAsOf: stats.unreachable ? null : stats.dataAsOf })} />
         <DataTitle
@@ -111,8 +120,7 @@ export default async function DatabasePage() {
               heading={c.label}
               href={itemsHref(c.slug)}
               count={n(c.items)}
-              // Retired and unnamed buckets ("Trade Goods (OBSOLETE)", "Subclass 0") stay on the class page only.
-              links={T.subclasses.filter((s) => s.classId === c.id && s.items > 0 && !subclassLabel(s).retired).map((s) => ({ href: itemsHref(c.slug, s.slug), label: subclassLabel(s).label, count: n(s.items) }))}
+              links={subclassLinks(c)}
             />
           ))}
         </nav>

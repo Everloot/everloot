@@ -30,7 +30,7 @@ and each section says which it is:
 No section invents a number. A section with nothing to show says so once, as an `EmptyState`, and sections the data
 cannot ever fill are left out rather than shown empty.
 
-## 2. The page (`/players/<ruleset>/<realm>/<name>`)
+## 2. The page (`/players/<ruleset>/<realm>/<name>`; since 2026-11-05 `/characters/...`, #773)
 
 - `Container width="wide"`. `PageHeader`: trail Home > Players > realm; title = the name; lede = "Level 60 Orc
   Shaman"; meta = guild (a link when guilds are on), realm, "Last seen <day>".
@@ -43,6 +43,25 @@ cannot ever fill are left out rather than shown empty.
     members of <guild>; the whole guild's progress, not this character's attendance."
   - **Progress**: the completionist explanation and a link to the tool; nothing else until a public opt-in exists.
 - The hide-this-character card and the privacy link stay at the foot. noindex rules unchanged.
+
+**As built (2026-11-05).** No tab row: one column of parts, each with its own source line, and a rail (contents and
+the date of each source). Order: the owner's showcase (when linked and public), the sighting (now with the faction its
+race plays on; none for Skyborne), the guild the sighting names (link, size, the guild's agreed progress with the
+guild page's own instance cards, up to eight other characters seen in it; read only with `EVERLOOT_GUILDS=1`), then
+"Plan a level N <class>": the class-context links (`contextLinks`), the same for every character of the class. The
+officers' rank, loot and attendance for the one character are built behind `EVERLOOT_CHARACTER_GUILD_FACTS` (off):
+each is public on the guild page, but the privacy guide lists the places a name appears, and gathering them on the
+character page needs the owner's word first (decision d below). Talents from a profile matched by name (b) are not
+built.
+
+The showcase's sections (2026-11-05, stacked on #794): a header band (name in class colour, title, line, guild,
+realm, faction, upload date, and item level and achievement points when those sections are shown); gear as a paper
+doll in the game's slot order, empty slots drawn, the same rows in a table under a disclosure, icons and names only
+under the item lists' rule; a `stats` section, `unsupported` on real pages ("The Everloot addon does not record this
+yet."); talents as points per tree with bars (the calculator has no read-only tree view that runs without its
+client state, so the trees themselves stay on the calculator); raids with a boss strip and reset day; Progress
+(counts, recent achievements, category bars, titles, quests); reputations grouped by standing; professions as rank
+bars. The sample page uses the same one-column layout and rail as the real page; no tab row, for the reasons above.
 
 ## 3. The showcase (`EVERLOOT_SHOWCASE=1`)
 
@@ -74,6 +93,9 @@ b. Whether the character page may show a build whose public profile names a char
    (a match by name, not a verified link; the page would say "shared by @handle").
 c. Whether the Progress tab should offer an owner opt-in to publish completion on the public page later (a new
    grant category); not built here.
+d. Whether a character's page may gather the officers' facts that name it (roster rank, loot received, present at
+   the last raid), which the guild page already shows. **Answered yes, 2026-11-06:** `EVERLOOT_CHARACTER_GUILD_FACTS=1`
+   in `web/wrangler.jsonc`, and the privacy policy, privacy guide and data policy name the character page.
 
 ## 5. Testing
 

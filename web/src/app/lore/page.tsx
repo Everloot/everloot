@@ -110,6 +110,9 @@ export default async function LoreLanding() {
             <p className="text-sm text-muted">
               This archive predates WoW: Forever. For collected gameplay facts see the{" "}
               <Link href="/database" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Forever database</Link>.
+              Everloot&apos;s own <Link href="/wiki" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">wiki</Link> is
+              written around that data; anyone can{" "}
+              <Link href="/docs/guides/wiki" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">propose a page</Link>.
             </p>
           </div>
         ) : (

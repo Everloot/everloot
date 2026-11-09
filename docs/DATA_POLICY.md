@@ -87,7 +87,9 @@ installs report the same guild and boss, timed at the earliest of their reports;
 the open data export's `guild-kills.ndjson` and `guilds.ndjson` hold only those, and only while the guild pages are on. A guild's page lists its agreed kills, its officers'
 publication when they made one, and the characters the addon saw in that guild: these are player rows, each
 already public on its own page, grouped by the guild the game showed, and the page says they are sightings, not
-the game's member list. Anyone can hide a guild with the guild hide form, without an account or proof of office:
+the game's member list. A character's page shows the guild the addon last saw it in as that guild's page shows it, and
+what the guild's officers published about that one character: its rank on their roster, the loot they gave it and
+whether it was at their last raid. A hidden character is left out of all of it. Anyone can hide a guild with the guild hide form, without an account or proof of office:
 the guild leaves the pages, the ladder, the search and the export at once, and its kill rows are dropped at
 intake from then on. Its characters keep their own pages, which the character hide form governs.
 
@@ -178,6 +180,19 @@ complete market snapshot or listing distribution. The fallback records no seller
 The addon's gold-per-hour sessions (`/everloot gph`) are personal: they stay in your SavedVariables
 file, outside the records an upload reads, and are never sent to the site.
 
+The addon's window keeps two more tables that are local in the same way. `EverlootDB.ledger` holds your money events,
+your auction sales and each character's closing gold per day, and
+`EverlootDB.roster` holds one row per character you log in with. Neither is a record, neither is read by an
+upload, and neither is sent to the site. A money event keeps `at` (its time), `key` (the opaque character key),
+`category`, `copper` and, when there is one, `itemName` and `count`, plus `ownAlt` when the gold went to or came from
+one of the player's own characters. An auction sale is read from the mailbox invoice and keeps `itemName`, `count`,
+`unit`, `total` (after the cut), `deposit` and `cut` when the letter carries them, and `status` (`pending` from the
+game's sold notice until the letter is collected, then `paid`; `unmatched` when no letter came within 48 hours), with
+its time and the character key; the buyer's name is never read into the file. To mark a trade or a letter as gold moved
+between the player's own characters, the addon reads the trade partner's name, the name a letter is sent to and the
+sender of a letter with money, compares each with the player's own characters on the same realm, and drops it: none of
+these names is ever kept. The completion tracker's rows are unchanged.
+
 Completion tracking (addon 0.3.3, off until `/everloot completion on`) follows the same split.
 Four catalog kinds (`achievement_catalog`, `reputation_catalog`, `title_catalog`,
 `quest_chain_catalog`) hold only game facts the addon read from the game's own calls: ids, names,
@@ -199,6 +214,18 @@ which address hash and install created each catalog entry, so it links an addres
 id. The link lasts until the rollup is rebuilt (`?rebuild=1`), which drops everything from uploads that
 were deleted; deleting a player's uploads therefore takes a rebuild to remove the link. Turning the
 module off deletes every one of these rows from the file.
+
+With the same switch the addon also keeps five kinds for the Desktop App: `profession_owned` (each
+profession's name, rank and max rank), `lockout_owned` (each raid the character is saved to this week: instance,
+difficulty, bosses killed of total, reset time) and `talent_owned` (the active talent build: tree, spec if known,
+points spent, talent node ids and ranks), `stats_owned` (the character sheet's attributes, attack power, hit, crit,
+haste, expertise, spell power, healing, armor, defense, dodge, parry and block, as the game's character window shows them) and
+`pvp_owned` (PvP rank, rank points toward the next rank, top rank, season, lifetime honorable kills), under the same
+opaque key and holding only the latest state. These kinds stay on
+the player's computer except for private sync (see *Private sync and owner-published sections*): every uploader holds
+them back, the site's intake has no schema for them and refuses them, and the Desktop App's Chat does not pass them to a
+model provider. Only the Desktop App's sync sends them, and only for a character the player linked. Turning the module
+off deletes them with the rest.
 
 The census counts who plays what. It is on in a new install of the addon, which says so once in chat; an
 install from before the census keeps it off until `/everloot census on`. It leaves the player's computer
@@ -621,6 +648,21 @@ maintainer has checked and added to `kb/curated/ecosystem.json`.
   for listings and WoWInterface's terms forbid automated access, so we read none of them.
 - *Opt-out.* An author can ask to be removed with the ecosystem issue form or at hello@everloot.app.
 
+**Addon pages and the usage board.** Two surfaces use addon names, and only one of them publishes a catalog entry.
+
+- *The usage board counts.* `/addons/popular` lists an addon once three installs report it, with its share, as an
+  anonymous aggregate. For an addon nobody approved, the title is the plain title installs agree on and labels the
+  count only: the row has no page, no download links and no repository facts.
+- *The catalog is approved by the owner.* An addon gets a page at `/addons/<name>`, a title, repository facts and
+  download links only when it is named in the curated source map (`web/src/data/addon-repos.ts`) or by a project in
+  `kb/curated/ecosystem.json`. Both change through a reviewed commit, never through an upload. An unapproved addon
+  answers 404 however many installs report it, the page reads nothing from the upload store to decide that, and no
+  upload field (title, name spelling, version) reaches an approved page's title, link or source. Install counts are
+  joined to an approved page as usage only.
+- *Approving one.* Add it to the registry (or the curated map) with its repository and the page that shows it is
+  for Forever. The deploy that ships the change starts a new edge cache version for the addon pages, so a page
+  built from the old list is not served after it.
+
 **Open sources.** The lore archive is built from the Warcraft Wiki dump of 2023-11-13
 (CC BY-SA 4.0). We may add other openly licensed datasets later. Each one goes in the
 [source ledger](sources/LEDGER.md) with its licence and exact version before any of it ships.
@@ -782,6 +824,146 @@ data, not game data and not an observation.
   and a few more) cannot be taken.
 - **Deletion.** The player changes or clears any of it, or turns the public profile off, on
   /settings at any time. Deleting the account (write to hello@everloot.app) deletes the profile.
+
+## Public character pages
+
+A signed-in player who has linked one of their characters (Linked characters, on /account) can give it a public
+page at `/characters/<ruleset>/<realm>/<name>`. The player's part of that page holds the player's own data from
+their own addon file and nothing about anyone else. The same address also shows, in their own parts, what the
+player pages and guild pages hold about the character (see "What players see in the game").
+
+- **What a page shows.** The character's name, level, race, class, faction and realm, as the addon file sent them
+  when the character was last linked, and the date of that upload, worded "From the player's own addon upload,
+  <date>". Nothing comes from the player pages, the census, other players' uploads or Blizzard. Gear, talents,
+  professions, reputations, raids and collections are not shown.
+- **What it never shows.** The BattleTag, the email address, the account, a profile handle, API keys, the
+  character's game id, or the hashes a link is stored under.
+- **Off until the player turns it on.** A new link is private. The player's part shows only while the player has
+  "Public page" on for that character. Turning it off, unlinking the character or deleting the account removes that
+  part and its share cards at once; the address then shows only what the player pages hold about the character, or
+  answers 404 like any unknown character when they hold nothing.
+- **A link is not proof.** A link shows that the account holder also had an addon file in which the character typed
+  a code. It is not checked with Blizzard, and the row can be written by hand. The page says the data is
+  self-reported and not checked against Blizzard, and it never calls the character verified or owned.
+- **Disputes.** When a second account links the same character, the character is frozen on every account that
+  holds it and has no public page until we settle it. To settle it, write to hello@everloot.app: we reply within 7
+  days, and the character stays frozen until it is settled.
+- **Hiding.** Anyone can hide a character through the player-page hide form, without an account. A hidden character
+  cannot be linked and has no public page, whoever linked it. Each character page links to the form.
+- **Share cards.** Each page has two images, 1200x630 for link previews and 1080x1080 to download, drawn from the
+  same fields as the page. Text and shapes only: no game art and no Blizzard marks.
+- **Search engines.** Every character page asks search engines not to index it. Players cannot change this yet.
+- **Caching.** Everloot draws the page and cards fresh on each request and keeps no copy. A copy that a link-preview
+  service (Discord, X and others) has already fetched is outside our control and may stay with that service.
+- **One page, separate parts.** A character's page shows the linked player's part first, then what other
+  players' addons saw of the character, then the guild it was seen in, each under its own source line and date.
+  Neither adds data to the other, and the share cards draw only on the player's part.
+
+## Private sync and owner-published sections
+
+In effect from 6 November 2026, accepted by the maintainer that day (`EVERLOOT_PRIVATE_SYNC`, migration
+`20261106120000_private_sync.sql`). The active talent build syncs as the addon's keyed `talent_owned` row, which names
+its character by the same opaque key as the other synced rows, under the talents switch; there is no separate category.
+The public `talent_snapshot` row carries no character and is never synced.
+
+Amended 6 November 2026, accepted by the maintainer that day: the active talent build (`talent_owned`).
+Amended 7 November 2026: character-sheet stats and PvP standing (migration
+`20261107140000_private_sync_stats_pvp.sql`); to be accepted by the maintainer in PR review.
+
+A signed-in player can sync their own linked characters' progress to their account and choose which parts of it
+their character's public page shows. Like saved builds and profiles, this is the player's own data, not an
+observation of anyone else, and none of it is published as a dataset.
+
+- **What is synced.** For each linked character the Desktop App sends the categories below, and the site keeps only the
+  ones the player has turned on for that character: equipped gear (slot, item id, item level), the active talent build (talent node ids and ranks),
+  professions (name and rank), reputations (faction id and standing), this week's raid lockouts (instance,
+  difficulty, bosses killed, reset), achievements this character earned and titles held, the character sheet's stats
+  (attributes, attack power, hit, crit, haste, expertise, spell power, healing, armor, defense, dodge, parry, block, as the
+  game's character window shows them) and PvP standing (rank, rank points toward the next rank, top rank, season,
+  lifetime honorable kills). Each category has its own switch and every category starts off. The
+  Desktop App sends these with a key made with "Sync my linked characters" (`sync:own`); that key can send and
+  nothing else. It cannot turn a category on, change what the page shows, or list anything.
+- **The link decides, not the computer.** A synced row is kept only when the account that sent it holds a live
+  link to that character and has turned that category on. It may come from any computer. A row for a character
+  the account has not linked, or whose link is frozen, is dropped. Another account's link never receives it.
+- **Only the latest state is kept.** For each character and category the site keeps one capture: the newest. The
+  same capture sent again changes nothing, and an older one never replaces a newer one. No history is kept.
+- **What is stored.** The character's link, the category, the capture's time, the values above, and a keyed
+  one-way hash of the install id that sent it, so everything one install sent can be found and deleted. The install
+  id, the addon's character key and the character's name are not stored with a synced row.
+- **Private by default.** Synced data is shown only to the player, on a signed-in preview of the character. It
+  appears on the public page only when the page is on and the player has also switched that section on: gear,
+  stats, talents, PvP, professions, reputations, raids, and achievements and titles (under Collections), each on
+  its own switch, all off by default. A frozen or hidden character shows none of it, to anyone. The page says the data is
+  self-reported through the Everloot addon and not checked against Blizzard; it never says verified.
+- **Names on the page.** An item is named only when three installs agree on its name; otherwise it reads
+  "Item <id>". Factions, achievements and titles are named only when the catalog's three-install rule agrees on
+  them, and a faction or title it does not list is left out.
+- **Deletion.** Turning a category off deletes what was synced for it at once. Turning a section's switch off
+  takes it off the public page on the next request. Unlinking the character or deleting the account (write to
+  hello@everloot.app) deletes everything synced for it at once. A copy a link-preview service has already fetched
+  stays with that service.
+
+## Gear rankings
+
+In effect from 6 November 2026, accepted by the maintainer that day (`EVERLOOT_LEADERBOARDS`, migration
+`20261107120000_gear_board.sql`). With the switch off, `/rankings/item-level` and `/rankings/gear-score` answer 404
+and the switch below is refused. The stored boards and the daily history below (migration
+`20261107150000_profile_pipeline.sql`) are proposed: they take effect once the maintainer accepts them and applies
+that migration.
+
+Two public boards rank linked characters by the gear their owner synced: average item level and Everloot Gear
+Score. This is the ranking contract the owned-character identity ADR asks for, for gear only. Achievements, gold
+and the Everloot Score are not ranked by it.
+
+- **Who is on them.** Only a linked character whose owner made its page public, turned gear sync on and turned
+  "Rank my gear" on (`ranked_gear`, off by default). Nobody else: no sighting, inspect, census row, other site or
+  Blizzard data puts a character on a board. A frozen or hidden character is never on them. Gear older than 30 days
+  is left off.
+- **What is shown.** The character's name, realm, level, race and class, its item level and Gear Score, its rank,
+  and the date of the gear. The items themselves appear only on the character page, and only when the owner shows
+  gear there. The character page shows its own rank on each board.
+- **How the numbers are made.** Both are averages over the same 17 equipment slots (shirt and tabard left out), an
+  empty slot counting 0, a two-handed weapon filling both hands. Item level is the plain average. Gear Score v1
+  weighs each slot by its stat budget at item level 60 from the game's `RandPropPoints` table (the Epic column), read
+  from the Forever client files and labelled found in game files, unconfirmed: 44 for head, chest and legs; 33 for
+  shoulders, hands, waist, feet and trinkets; 25 for neck, back, wrists, rings and off hand; 18 for the main hand; 14
+  for the ranged slot. Which slot falls in which budget group is the long-documented classic mapping, not something
+  the files state. These five numbers are the only thing taken from that table, and they are published in full on
+  `/methodology`. A change to a weight is a new version.
+- **Checked against the game files.** Every item level counted is the game files' level for that item. Gear holding
+  an item the files do not list, or one a page may not show yet (not reported by players and not named under the
+  item name rule, so possibly unreleased), an item level that differs from the files, or an item in a slot it cannot
+  go in, is not counted at all, and the board says how many characters were left out. The gear is still the
+  player's own upload: the board says it is not checked with Blizzard.
+- **What is stored, and for how long.** Every 30 minutes the site scores the boards and keeps the result in one
+  private file (the rows above, with each character's link id). Each page view filters that file against who is on
+  the boards right now, so turning "Rank my gear", the page or gear sync off, a hide request or unlinking takes the
+  character off on the next request, not at the next scoring. While a character is ranked, its level, item level and
+  Gear Score are also kept as a history, at most one value of each per day (the day the gear was captured), and its
+  character page draws that history as a chart once there are two days. The history is shown only while the
+  character is ranked, kept while it is not, and deleted with the link: unlinking or deleting the account removes it,
+  as it removes the gear.
+- **Search engines.** The boards are `noindex` until indexing of character pages is accepted.
+
+## Armory (Blizzard data)
+
+The armory gives Forever characters and guilds their own pages from the Blizzard Developer API.
+These pages are separate from the addon sightings and the linked-character gear rankings above.
+
+- **No ads.** Armory pages carry no ad slots. The site's consent message may still appear.
+- **Free, on this site only.** Blizzard data stays in the armory pages. It never enters the addon tables,
+  CC BY-SA dataset, public corpus, open-data snapshots, MCP tools, API answers or exports.
+- **Thirty days.** Characters and guilds are checked again within 20 days. Stored data not refreshed for more
+  than 30 days is deleted. A Blizzard response confirming that data has not changed (304) counts as a refresh.
+  When Blizzard answers that a character or guild no longer exists (404), its stored row is deleted at once.
+- **Credit.** Every armory page says "Data from Blizzard Entertainment" and shows the time of the newest
+  read. Nothing on it claims Blizzard endorses Everloot.
+- **One client.** The crawler uses one Blizzard API client. Its client id, client secret and the database
+  service key stay in GitHub Actions secrets, never in a file, a test or a log.
+- **Hiding.** Anyone can hide a character at `/armory/hide` with its region, name and surname. Its character
+  row, roster memberships and queued character requests are deleted. The hide is kept so later API
+  reads and rosters cannot put the character back.
 
 ## Chat
 

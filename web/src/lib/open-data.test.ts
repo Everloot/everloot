@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
 import { writeOpenData } from "../../../kb/src/open-data/write";
+import { readOpenDataGameFiles } from "../../../kb/src/open-data/game-data";
 import { loadOpenData } from "./open-data";
 
 const BASE = "https://data.example.test";
@@ -22,6 +23,7 @@ function manifest(): unknown {
     gameFiles: {
       build: { version: "1.60.1.70450", extractedAt: at }, edges: [], taxonomy: { classes: [], subclasses: [], items: [] },
       map: { schema: "everloot.world-map/1", source: { name: "x", status: "found in game files, unconfirmed", licence: "x", licenceUrl: "x", product: "x", buildId: 1, version: "1", buildConfig: "x", definitions: null, extractedAt: at, tables: [] }, continents: [{ id: 0, name: "K", bounds }], zones: [], heldBackZones: [], entrances: [], flightNodes: [], flightPaths: [], warnings: [] },
+      catalogs: readOpenDataGameFiles(join(__dirname, "..", "data", "game-data")),
     },
   });
   return JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8"));

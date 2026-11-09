@@ -17,6 +17,7 @@ import { bossLine, entranceLinks, instanceHref, loadSightings } from "@/lib/inst
 import { confirmedLine, dayLabel } from "@/lib/report-labels";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { WORLD_MAP } from "@/lib/world-map";
 import {
   hasConfirmed, hasContent, parseZoneSegment, zoneByMapId, zoneContents, zoneHref, zoneMapHref,
@@ -137,6 +138,7 @@ export default async function ZonePage(props: Props) {
 
   return (
     <Container width="data">
+      <EdgeDegraded when={facts.unreachable || seen.unreachable} />
       <JsonLd data={entityPageJsonLd({ name: zone.name, path: canonical, identifier: `zone:${zone.mapId}` })} />
       <article>
         {/* The database title row: name, continent, and the map link as a quiet control (the header keeps the one filled button). */}

@@ -14,7 +14,8 @@ fixture = (Path(__file__).parent / "fixtures" / "EverlootPrices.lua").read_text(
 
 # The slot file's shape, as the addon reads it: one checksummed string beside the realms, rows grouped by item
 # and best rate first, every row from three installs or more, and a data date.
-block = re.search(r'\["drops"\] = \{ \["data"\] = "([^"]*)", \["sum"\] = (\d+), \["dataAsOf"\] = "([^"]*)", \["fetchedAt"\] = "([^"]*)" \}', fixture)
+block = re.search(r'\["drops"\] = \{ \["data"\] = "([^"]*)", \["sum"\] = (\d+), \["dataAsOf"\] = "([^"]*)", \["fetchedAt"\] = "([^"]*)"'
+                  r'(?:, \["names"\] = "(?:[^"\\]|\\.)*")? \}', fixture)
 assert block, "the drops block is in the slot file, data first"
 data, dates = block.group(1), (block.group(3), block.group(4))
 rows = [r.split(",") for r in data.split(";")]
@@ -25,6 +26,13 @@ assert items == sorted(items), "rows are grouped by item"
 linen = [int(r[3]) / int(r[4]) for r in rows if r[0] == "2589"]
 assert linen == sorted(linen, reverse=True) and len(linen) == 4, "an item's sources come best rate first"
 assert all(re.fullmatch(r"\d{4}-\d\d-\d\dT[\d:.]+Z", d) for d in dates), dates
+# The sources block follows the drops: one checksummed "itemId,npcId/npcId,reagentOf" row per item, items ascending.
+sources = re.search(r'\["sources"\] = \{ \["data"\] = "([^"]*)", \["sum"\] = (\d+), \["dataAsOf"\] = "([^"]*)", \["fetchedAt"\] = "([^"]*)"'
+                    r'(?:, \["names"\] = "(?:[^"\\]|\\.)*")? \}', fixture)
+assert sources and fixture.index('["drops"]') < sources.start(), "the sources block is in the slot file, after the drops"
+source_rows = [r.split(",") for r in sources.group(1).split(";")]
+assert all(re.fullmatch(r"\d+,(\d+(/\d+)*)?,\d+", ",".join(r)) for r in source_rows), source_rows
+assert [int(r[0]) for r in source_rows] == sorted({int(r[0]) for r in source_rows}), "one row per item, items ascending"
 
 toc = (root / "Everloot.toc").read_text(encoding="utf-8")
 assert "modules\\drops.lua" in toc and "EverlootPrices" in toc, "drops module in the TOC, the slot addon an optional dependency"
@@ -54,9 +62,13 @@ tooltipCalls = {}
 Enum = { TooltipDataType = { Item = 0 } }
 TooltipDataProcessor = { AddTooltipPostCall = function(kind, f) table.insert(tooltipCalls, { kind = kind, f = f }) end }
 function tooltipFor(itemId)
-  local tip = { lines = {} }
-  tip.AddLine = function(self, text) table.insert(self.lines, text) end
+  local tip = { lines = {}, details = {} }
+  tip.AddLine = function(self, text, r, g, b, wrap)
+    table.insert(self.lines, text)
+    table.insert(self.details, { text = text, r = r, g = g, b = b, wrap = wrap })
+  end
   for _, c in ipairs(tooltipCalls) do c.f(tip, { id = itemId }) end
+  lastTooltip = tip
   return table.concat(tip.lines, '\\n'), #tip.lines
 end
 
@@ -96,9 +108,20 @@ Everloot:ResetPrices()
 
 -- A price and a drop source: the price is labelled market, each rate has its loot windows, installs and date.
 local linen = tooltipFor(2589)
+local wrapped = 0
+for _, line in ipairs(lastTooltip.details) do
+  if line.text:find('Everloot drop:', 1, true) or line.text:find('drop rates from uploads', 1, true) then
+    assert(line.wrap == true, 'drop details wrap within the compact price tooltip: ' .. line.text)
+    wrapped = wrapped + 1
+  end
+  if line.text:find('drop rates from uploads', 1, true) then
+    assert(line.r >= 0.75 and line.g >= 0.75, 'drop evidence is as readable as the price metadata')
+  end
+end
+assert(wrapped == 4, 'all three source rows and their evidence wrap')
 assert(linen:find('Everloot market 2s 5c'), 'the price is labelled a market price: ' .. linen)
-assert(linen:find('Everloot drop: NPC 116 · 12%.4%% %(42 of 340 loot windows%) · 5 installs'), linen)
-assert(linen:find('NPC 94 · 6%.0%% %(12 of 200 loot windows%) · 3 installs'), linen)
+assert(linen:find('Everloot drop: Defias Bandit %(NPC 116%) · 12%.4%% %(42 of 340 loot windows%) · 5 installs'), linen)
+assert(linen:find('(NPC 94) · 6.0% (12 of 200 loot windows) · 3 installs', 1, true), linen)
 assert(linen:find('NPC 474 · 4%.2%%'), 'three sources shown, best rate first: ' .. linen)
 assert(not linen:find('NPC 6 '), 'the fourth source is counted, not listed: ' .. linen)
 assert(linen:find('drop rates from uploads as of 2026%-10%-20 · 1 more source'), linen)
@@ -108,19 +131,49 @@ assert(a < b, 'prices first, then drops')
 
 -- A price, no drop source: the missing drop says so.
 local herb = tooltipFor(765)
-assert(herb:find('Everloot market unrecorded') and herb:find('Everloot: no drop source reported by 3 installs'), herb)
+assert(herb:find('Everloot market unrecorded') and herb:find('No drop source reported by 3 installs'), herb)
 assert(not herb:find('Everloot drop:'), herb)
 
 -- A drop source, no price: the missing price says so, and the object kind is named.
 local drop = tooltipFor(12345)
 assert(drop:find('Everloot drop: NPC 61 · 1%.2%% %(1 of 80 loot windows%) · 3 installs'), drop)
-assert(drop:find('Everloot: no price on Forever yet') and not drop:find('Everloot market'), drop)
-assert(tooltipFor(2770):find('Everloot drop: object 1731 · 96%.8%% %(300 of 310 loot windows%) · 6 installs'))
+assert(drop:find('No price on Forever yet') and not drop:find('Everloot market'), drop)
+assert(tooltipFor(2770):find('Everloot drop: Copper Vein %(object 1731%) · 96%.8%% %(300 of 310 loot windows%) · 6 installs'))
 
 -- Neither: one grey line under the header names both gaps; no number is shown that the file does not hold.
 local none, lines = tooltipFor(424242)
-assert(none:match('|t Everloot\\nEverloot: no price on Forever yet · no drop source reported by 3 installs$') and lines == 2, none)
+assert(none:match('|t Everloot\\nNo price on Forever yet · no drop source reported by 3 installs$') and lines == 2, none)
 assert(not tooltipFor(258):find('Everloot drop'), '258 does not match 2589: rows are matched whole')
+
+-- The file's sources block: who sells the item on the site's public rows (the first named, the rest counted) and how
+-- many recipes it is a reagent of, muted, after the drop lines. An item without a row gets neither line.
+local sold = tooltipFor(2589)
+assert(sold:find('Sold by Fixture Supplier and 1 more\\nReagent for 7 recipes$'), sold)
+assert(not sold:find('your sighting'), 'a public vendor is not this install\\'s sighting: ' .. sold)
+for _, line in ipairs(lastTooltip.details) do
+  if line.text:find('^Sold by') or line.text:find('^Reagent for') then
+    assert(line.r < 0.8 and line.g < 0.8 and line.wrap == true, 'source lines are muted and wrap: ' .. line.text)
+  end
+end
+assert(herb:find('Reagent for 2 recipes$') and not herb:find('Sold by'), 'a row without vendors says only the count: ' .. herb)
+assert(not drop:find('Sold by') and not drop:find('Reagent'), 'no row, no line: ' .. drop)
+assert(tooltipFor(258):find('Everloot\\nNo price') and not tooltipFor(258):find('Sold by'), '258 does not match 2589 here either')
+
+-- A file from an app that does not write the block draws today's lines unchanged, and a tampered block hides
+-- only itself and says so.
+local block = EverlootPricesDB.sources
+EverlootPricesDB.sources = nil
+Everloot:ResetPrices()
+assert(tooltipFor(2589) == sold:gsub('\\nSold by Fixture Supplier and 1 more\\nReagent for 7 recipes', ''), tooltipFor(2589))
+EverlootPricesDB.sources = block
+EverlootPricesDB.sources.sum = 5
+Everloot:ResetPrices()
+printed = {}
+local tampered = tooltipFor(2589)
+assert(said('item sources failed their checksum'), 'a bad sources checksum is reported')
+assert(tampered:find('Everloot drop: Defias Bandit') and not tampered:find('Sold by'), tampered)
+EverlootPricesDB.sources.sum = Everloot.Adler32(block.data)
+Everloot:ResetPrices()
 """)
 
 # A drop row under three installs is never shown, whatever the file says; a bad checksum hides drops only.
@@ -138,13 +191,13 @@ Everloot:ResetPrices()
 printed = {}
 local tampered = tooltipFor(2589)
 assert(said('drop sources failed their checksum'), 'a bad checksum is reported')
-assert(tampered:find('Everloot market 2s 5c') and not tampered:find('Everloot drop:') and tampered:find('Everloot: drop sources failed their checksum'), tampered)
+assert(tampered:find('Everloot market 2s 5c') and not tampered:find('Everloot drop:') and tampered:find('Drop sources failed their checksum'), tampered)
 
 -- A file from an app that does not write drops yet: prices show, and the drop gap is named as the file's.
 EverlootPricesDB.drops = nil
 Everloot:ResetPrices()
 local old = tooltipFor(2589)
-assert(old:find('Everloot market') and old:find('Everloot: drop sources not in the price file yet'), old)
+assert(old:find('Everloot market') and old:find('Drop sources not in the price file yet'), old)
 """)
 
 # A large drops block is checked a slice per frame; until it passes, no drop line and no "missing" line.
@@ -179,10 +232,39 @@ Everloot:ResetPrices()
 GetItemInfo = function() return nil end
 printed = {}
 SlashCmdList.EVERLOOT('price 2589'); drain()
-assert(said('Everloot market 2s 5c') and said('Everloot drop: NPC 116'), table.concat(printed, '\\n'))
+assert(said('Everloot market 2s 5c') and said('Everloot drop: Defias Bandit %(NPC 116%)'), table.concat(printed, '\\n'))
 printed = {}
 SlashCmdList.EVERLOOT('price 424242'); drain()
 assert(said('No price for this item on this realm yet') and said('No drop source reported by 3 installs'), table.concat(printed, '\\n'))
+
+-- The slot file names the sources the site knows (its `names` block): chat keeps the id beside the name, the tooltip
+-- row shows the name. A source the file has no name for keeps its id. A name never brings its own colour codes: a
+-- pipe is doubled, so the game prints it instead of reading it as a colour.
+local function rowsFor(itemId)
+  local left = {}
+  for _, line in ipairs(Everloot:DropLines(itemId) or {}) do if line.left then left[#left + 1] = line.left .. ' = ' .. line.right end end
+  return table.concat(left, ' | ')
+end
+assert(rowsFor(2589) == 'Drops from Defias Bandit = 12.4% | Drops from Bad "||cffff0000Name||r" n6=Forged = 6.0% | Drops from NPC 474 = 4.2%', rowsFor(2589))
+assert(rowsFor(2770) == 'Drops from Copper Vein = 96.8%', rowsFor(2770))
+printed = {}
+SlashCmdList.EVERLOOT('price 2589'); drain()
+assert(said('Everloot drop: Defias Bandit %(NPC 116%) · 12%.4%% %(42 of 340 loot windows%) · 5 installs'), table.concat(printed, '\\n'))
+assert(said('Everloot drop: NPC 474 · 4%.2%%'), 'an unnamed source keeps its id: ' .. table.concat(printed, '\\n'))
+
+-- A source this install met is named as this client showed it (modules/openworld.lua's E:SourceName, tested in
+-- collection_contract.py), before the file's name.
+Everloot.SourceName = function(_, kind, id) if kind == 'npc' and id == 116 then return 'Defias Bandit (met)' end end
+assert(rowsFor(2589):find('Drops from Defias Bandit %(met%) = 12%.4%%'), rowsFor(2589))
+Everloot.SourceName = nil
+
+-- A file from before names, or with a broken names value, shows ids as before.
+EverlootPricesDB.drops.names = nil
+Everloot:ResetDrops(); rowsFor(2589); drain()
+assert(rowsFor(2589):find('^Drops from NPC 116 = 12%.4%%'), rowsFor(2589))
+EverlootPricesDB.drops.names = 42
+Everloot:ResetDrops(); rowsFor(2589); drain()
+assert(rowsFor(2589):find('^Drops from NPC 116 = 12%.4%%'), rowsFor(2589))
 
 -- The SavedVariables cost of all of the above: none. Tooltips and the command read the slot file and write nothing.
 svAfter = serialize(EverlootDB)

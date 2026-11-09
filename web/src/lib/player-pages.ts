@@ -83,8 +83,18 @@ export function realmSlug(realm: string): string {
   return realm.trim().toLowerCase().replace(/\s+/g, "-");
 }
 
+/**
+ * A character's one page, `/characters/<ruleset>/<realm>/<name>`: the realm as realmSlug spells it and the name
+ * in lower case, each encoded. The page shows what the addon saw of the character and, when its owner published
+ * it, the owner's showcase. The old `/players/<ruleset>/<realm>/<name>` address redirects here.
+ */
+export function characterPath(ruleset: string, realm: string, name: string): string {
+  return `/characters/${ruleset}/${encodeURIComponent(realmSlug(realm))}/${encodeURIComponent(name.toLowerCase())}`;
+}
+
+/** A seen player's page: the character's one page, the same address the showcase uses. */
 export function playerPath(p: Pick<Player, "ruleset" | "realm" | "name">): string {
-  return `/players/${p.ruleset}/${encodeURIComponent(realmSlug(p.realm))}/${encodeURIComponent(p.name.toLowerCase())}`;
+  return characterPath(p.ruleset, p.realm, p.name);
 }
 
 /** The letters of a search the form may run: a name prefix of 2 to 12 letters, or null when it is not one. */

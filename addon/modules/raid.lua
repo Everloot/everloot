@@ -215,23 +215,29 @@ end
 
 --- The names and spell ids of the helpful auras on a unit. Prefers C_UnitAuras, falls back to UnitAura.
 local function readAuras(unit)
-  local set = {}
+  local set, seen, readable = {}, false, false
   local byIndex = C_UnitAuras and C_UnitAuras.GetAuraDataByIndex
   for i = 1, 40 do
     if byIndex then
       local aura = call(byIndex, unit, i, "HELPFUL")
       if type(aura) ~= "table" then break end
-      if aura.name then set[aura.name] = true end
-      if aura.spellId then set[aura.spellId] = true end
+      seen = true
+      local name, spellId = E.Readable(aura.name), E.Readable(aura.spellId)
+      if name then set[name] = true; readable = true end
+      if spellId then set[spellId] = true; readable = true end
     elseif UnitAura then
       local name, _, _, _, _, _, _, _, _, spellId = call(UnitAura, unit, i, "HELPFUL")
       if not name then break end
-      set[name] = true
-      if type(spellId) == "number" then set[spellId] = true end
+      seen = true
+      name, spellId = E.Readable(name), E.Readable(spellId)
+      if name then set[name] = true; readable = true end
+      if type(spellId) == "number" then set[spellId] = true; readable = true end
     else
       return nil
     end
   end
+  -- Auras were present but every one was secret: nothing could be read.
+  if seen and not readable then return nil end
   return set
 end
 
@@ -293,22 +299,50 @@ end
 R.Report = report
 
 local function showCode(url)
-  -- A window with the link selected for copying. Any missing frame function falls back to chat.
+  -- A small window with a title, the link selected for copying, a Ctrl+C hint and a Close button. It wears the
+  -- Everloot window's look when that file is loaded. Any missing frame function falls back to chat.
   local ok = pcall(function()
     local frame = R.frame
     if not frame then
-      frame = CreateFrame("Frame", "EverlootRaidCode", UIParent)
-      frame:SetSize(520, 60)
+      local U = E.Window
+      frame = CreateFrame("Frame", "EverlootRaidCode", UIParent, "BackdropTemplate")
+      frame:SetSize(520, 130)
       frame:SetPoint("CENTER")
       frame:SetFrameStrata("DIALOG")
+      if U and U.Backdrop then U.Backdrop(frame)
+      elseif frame.SetBackdrop then
+        frame:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+          edgeSize = 14, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+        frame:SetBackdropColor(0.055, 0.059, 0.051, 0.97)
+      end
       R.frame = frame
-      local box = CreateFrame("EditBox", nil, frame)
-      box:SetAllPoints(frame)
+      local function label(string, point, x, y, color)
+        local fs
+        if U and U.Text then fs = U.Text(frame, 12, nil, color)
+        else
+          fs = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+          if color then fs:SetTextColor(unpack(color)) end
+        end
+        fs:SetPoint(point, x, y)
+        fs:SetText(string)
+        return fs
+      end
+      local colors = U and U.COLORS or {}
+      label("Everloot raid link", "TOPLEFT", 16, -14, colors.accent)
+      label("Press Ctrl+C to copy the link, then paste it into your browser.", "TOPLEFT", 16, -40, colors.muted)
+      local box = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
+      box:SetPoint("TOPLEFT", 22, -64)
+      box:SetSize(476, 30)
       box:SetAutoFocus(true)
       box:SetFontObject(ChatFontNormal)
       box:SetScript("OnEscapePressed", function() frame:Hide() end)
       box:SetScript("OnEnterPressed", function() frame:Hide() end)
       frame.box = box
+      local close = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+      close:SetSize(80, 24)
+      close:SetPoint("BOTTOMRIGHT", -16, 12)
+      close:SetText("Close")
+      close:SetScript("OnClick", function() frame:Hide() end)
     end
     frame:Show()
     frame.box:SetText(url)

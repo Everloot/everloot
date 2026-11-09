@@ -4,10 +4,12 @@ import { sendResponse } from "next/dist/server/send-response";
 import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
 import { afterEach, expect, test, vi } from "vitest";
 import nextConfig from "../../next.config.js";
+import { GET as root } from "../app/sitemap.xml/route";
 import { GET as databaseIndex } from "../app/database-sitemap.xml/route";
 import { GET as databaseChunk } from "../app/database-sitemap/[n]/route";
 import { GET as auctionsIndex } from "../app/auctions-sitemap.xml/route";
 import { GET as auctionsChunk } from "../app/auctions-sitemap/[n]/route";
+import * as site from "./site-sitemap";
 import * as database from "./database-sitemap";
 import * as auctions from "./auctions-sitemap";
 import { databaseUnavailable } from "./database-sitemap";
@@ -34,6 +36,7 @@ async function effectiveHeaders(path: string, response: Response) {
 
 const chunk = (get: typeof databaseChunk, n: string) => get(new Request("https://everloot.app/"), { params: Promise.resolve({ n }) });
 const routes = [
+  { path: "/sitemap.xml", get: root },
   { path: "/database-sitemap.xml", get: databaseIndex },
   { path: "/database-sitemap/0.xml", get: () => chunk(databaseChunk, "0.xml") },
   { path: "/auctions-sitemap.xml", get: auctionsIndex },
@@ -41,6 +44,7 @@ const routes = [
 ];
 
 test("successful XML indexes and chunks retain their CDN policy through Next's Node sender", async () => {
+  vi.spyOn(site, "default").mockResolvedValue([{ url: "https://everloot.app/", lastModified: new Date("2026-10-20") }]);
   vi.spyOn(database, "databasePaths").mockResolvedValue(["/database/items/2589"]);
   vi.spyOn(auctions, "auctionPaths").mockResolvedValue(["/auctions"]);
   for (const { path, get } of routes) {
@@ -57,6 +61,7 @@ test("successful XML indexes and chunks retain their CDN policy through Next's N
 });
 
 test("unavailable indexes and chunks keep all three no-store headers after static config and Next's Node sender", async () => {
+  vi.spyOn(site, "default").mockResolvedValue(null);
   vi.spyOn(database, "databasePaths").mockResolvedValue(null);
   vi.spyOn(auctions, "auctionPaths").mockResolvedValue(null);
   for (const { path, get } of routes) {

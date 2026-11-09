@@ -170,7 +170,7 @@ test("/wow-forever: the page is about the VideoGame it names, published by Blizz
 });
 
 test("/database: no Dataset while nothing is uploaded, a Dataset with its licence once something is, and no licence text on the page", async () => {
-  const { default: Page } = await import("./database/page");
+  const { default: Page } = await import("./database/(hub)/page");
   const empty = renderToStaticMarkup(await Page());
   expect(blocks(empty)).toEqual([]);
   mocks.stats = { uploads: 2, lootWindows: 5, unreachable: false, dataAsOf: "2026-10-17T18:20:27.999Z" };

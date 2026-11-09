@@ -7,7 +7,7 @@ import { loadEcosystem } from "@/lib/ecosystem";
 import { addonGithubSummary, type AddonGithubSummaryResult } from "@/lib/addon-github";
 import { initials } from "@/lib/addon-board";
 import { leaderRows, liveRepos, rateLimited, sparkPoints, SPARK, type LeaderRow } from "@/lib/addon-leaderboard";
-import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
+import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT } from "@/lib/upload-store";
 import { trailFor } from "@/lib/breadcrumbs";
 import { LAUNCH, longDate } from "@/data/wow-forever";
 import { Card, Container, DataTable, EmptyState, Explainer, PageHeader, type Column } from "@/components/ui";
@@ -85,7 +85,12 @@ const columns = (reportingInstalls: number): Column<LeaderRow>[] => [
         <RankBadge rank={a.rank} />
         <Logo row={a} />
         <span className="min-w-0">
-          <Link href={`/addons/${encodeURIComponent(a.name)}`} className={`block font-medium ${link}`}>{a.title}</Link>
+          {/* Usage is public for any addon three installs report; a page and the owner's title exist only for an approved one. */}
+          {a.page ? (
+            <Link href={a.page} className={`block font-medium ${link}`}>{a.title}</Link>
+          ) : (
+            <span className="block font-medium">{a.title}</span>
+          )}
           {a.owner && <span className="text-cell-2 text-muted">{a.owner}</span>}
         </span>
       </span>
@@ -149,7 +154,7 @@ export default async function PopularAddonsPage() {
           meta={
             <span className="font-mono text-xs">
               {unreachable
-                ? "Storage unreachable"
+                ? STORAGE_UNREACHABLE_SHORT
                 : `${plural(reportingInstalls, "reporting install", "reporting installs")} · ${plural(addons.length, "addon listed", "addons listed")} · ${dataAgeLabel(dataAsOf)}`}
             </span>
           }
@@ -182,6 +187,10 @@ export default async function PopularAddonsPage() {
           <p>
             An addon is listed once three installs report it, so a rare setup cannot be picked out. Everloot itself is left
             out. An install is one copy of the Everloot addon, not proof of one person.
+          </p>
+          <p>
+            This board counts what players run; it is not a directory. Everloot gives an addon its own page, title and
+            download links only after we have checked it by hand, so a listed addon with no link has not been checked yet.
           </p>
           <p>
             Share is the installs that had the addon loaded, out of every install that reported its addons. The counts are

@@ -71,6 +71,7 @@ describe("instance rows", () => {
         { encounterId: 1, name: "Warden", kills: 3, npcIds: [10], reporters: 3, lastSeen: "2026-10-18T11:00:00.000Z" },
         { encounterId: 2, name: "Hogger", kills: 4, npcIds: [20], reporters: 3, lastSeen: "2026-10-21T11:00:00.000Z" },
       ],
+      reportedBosses: new Map(),
       encounters: [],
     });
     expect(bossLine(stockade.bosses[1]!)).toBe("Hogger (4 kills) from 3 installs, last seen 2026-10-21");
@@ -90,6 +91,23 @@ describe("instance rows", () => {
     expect(rowsWith(seen, data, { "777": [{ id: 9, name: "Nobody's Boss" }] }).has(777)).toBe(false);
     // Without a files list the table is the reports alone, named as reported.
     expect(bossRows({ ...stockade, encounters: [] }).map((r) => [r.name, r.filesName])).toEqual([["Warden", false], ["Hogger", false]]);
+  });
+
+  test("an encounter the files list that fewer than 3 installs report carries how many did; a confirmed boss and an unlisted one do not", () => {
+    const files = { "34": [{ id: 1, name: "Files Warden" }, { id: 3, name: "Synthetic Jailer" }, { id: 4, name: "Synthetic Cook" }] };
+    const short = { ...seen, instances: { ...seen.instances!, encounters: [
+      ...seen.instances!.encounters,
+      kill("install-a", 3, "Jailer", "2026-10-20T11:00:00Z"), kill("install-a", 3, "Jailer", "2026-10-20T12:00:00Z"), kill("install-b", 3, "Jailer", "2026-10-20T11:00:00Z"),
+      // Encounter 5 is in no files list: one install's report never adds a row, not even a count.
+      kill("install-c", 5, "Nobody", "2026-10-20T11:00:00Z"),
+    ] } };
+    const stockade = rowsWith(short, data, files).get(34)!;
+    expect(stockade.reportedBosses).toEqual(new Map([[3, 2], [5, 1]]));
+    expect(bossRows(stockade).map((r) => [r.encounterId, r.boss !== null, r.reported])).toEqual([
+      [1, true, 0], [2, true, 0], [3, false, 2], [4, false, 0],
+    ]);
+    // Storage down or nothing reported: every files row is at 0.
+    expect(bossRows({ bosses: [], encounters: files["34"], reportedBosses: new Map() }).map((r) => r.reported)).toEqual([0, 0, 0]);
   });
 
   test("an instance with an entrance nobody confirmed lists the files' entrance and no confirmed one", () => {

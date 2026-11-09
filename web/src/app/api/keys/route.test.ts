@@ -273,6 +273,18 @@ test("the list offers only the scopes that exist now", async () => {
   expect(JSON.parse(auth.authQuery.mock.calls.at(-1)![1].body).p_scopes).toEqual(["read:public", "link:own"]);
 });
 
+test("sync:own is offered only with private sync on, and only through the form (never the Desktop App's older call)", async () => {
+  vi.stubEnv("EVERLOOT_CHARACTER_LINKS", "1");
+  auth.authQuery.mockResolvedValue([]);
+  expect((await (await GET(call("GET"))).json()).scopes).toEqual(["read:public", "link:own"]);
+  expect((await POST(call("POST", "", { ...FORM, scopes: ["sync:own"] }))).status).toBe(400);
+  vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1");
+  expect((await (await GET(call("GET"))).json()).scopes).toEqual(["read:public", "link:own", "sync:own"]);
+  auth.authQuery.mockResolvedValue([{ key_ref: KEY_ID, refusal: null }]);
+  expect((await POST(call("POST", "", { ...FORM, scopes: ["sync:own"] }))).status).toBe(201);
+  expect(JSON.parse(auth.authQuery.mock.calls.at(-1)![1].body).p_scopes).toEqual(["read:public", "sync:own"]);
+});
+
 test("storage trouble is a 503, never a silent success", async () => {
   auth.authQuery.mockRejectedValue(new Error("down"));
   expect((await POST(call("POST", "", {}))).status).toBe(503);

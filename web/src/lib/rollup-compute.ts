@@ -1,16 +1,15 @@
-import { addonRowsFromRecords, addonTrends, popularAddonsFromRecords, type AddonRollup, type AddonTrend } from "../../../kb/src/addon-rollup";
+import type { AddonRollup, AddonTrend } from "../../../kb/src/addon-rollup";
 import { censusFromRows, type CensusView } from "../../../kb/src/census";
-import { itemFactsFromRecords, recheckLootRecords } from "../../../kb/src/drop-rollup";
-import { observedEdges, type Edge } from "../../../kb/src/edges";
-import { itemFactProgress, itemFactRowsFromRecords, reportedItemFacts, type ItemFactProgress, type ItemFactState } from "../../../kb/src/item-facts";
+import type { Edge } from "../../../kb/src/edges";
+import { itemFactProgress, reportedItemFacts, type ItemFactProgress, type ItemFactState } from "../../../kb/src/item-facts";
 import type { ItemFacts } from "../../../kb/src/item-page";
-import { craftedItemsFromRecords } from "../../../kb/src/item-source";
-import { instanceFactsFromRecords, type InstanceFacts } from "../../../kb/src/instances";
-import { lootTablesFromRecords, type LootTables } from "../../../kb/src/loot-tables";
-import { objectSightingRowsFromRecords, type ObjectSpawnRow } from "../../../kb/src/object-spawns";
-import { worldFactsFromRecords, type WorldFacts } from "../../../kb/src/world-pages";
-import { RECHECK_SCOPES } from "./recheck-scopes";
-import { lootWindowsFromRecords, rollupDrops, type RollupResult } from "./rollups";
+import type { InstanceFacts } from "../../../kb/src/instances";
+import type { LootTables } from "../../../kb/src/loot-tables";
+import type { ObjectSpawnRow } from "../../../kb/src/object-spawns";
+import type { WorldFacts } from "../../../kb/src/world-pages";
+import { buildAggregates, corpusKey, type AggregateSet } from "./aggregate-set";
+import { loadStoredAggregates } from "./aggregate-store";
+import type { RollupResult } from "./rollups";
 import { uploadStore, type CensusRead, type Corpus } from "./upload-store";
 
 export interface CorpusStats {
@@ -25,33 +24,6 @@ export interface CorpusStats {
 
 const UNREAD: CorpusStats = { uploads: 0, lootWindows: 0, records: 0, unreachable: true, dataAsOf: null };
 
-interface AggregateSet {
-  key: string;
-  uploads: number;
-  records: number;
-  windows: number;
-  dataAsOf: string | null;
-  drops: { rates: RollupResult["rates"]; measuredZeros: RollupResult["measuredZeros"]; rejected: RollupResult["rejected"] };
-  items: ItemFacts;
-  world: WorldFacts;
-  /** Entrances players zoned in from and the encounters inside, and objects seen on the minimap. */
-  instances: InstanceFacts;
-  sightings: ObjectSpawnRow[];
-  /** Item tooltip numbers players reported (`item_fact`), by item id. */
-  itemFacts: ReturnType<typeof itemFactRowsFromRecords>;
-  /** Items 3 installs saw a recipe make. */
-  crafted: Set<number>;
-  addons: AddonRollup;
-  /**
-   * Each listed addon's weekly history, by folder name. Only /addons/popular shows it, so it is worked out
-   * on that page's first read of this corpus, not for every caller of these aggregates.
-   */
-  addonTrends: () => Record<string, AddonTrend>;
-  edges: Edge[];
-  /** The NPC loot and item-source tables, with each source's windows, installs and dates. */
-  loot: LootTables;
-}
-
 /**
  * One aggregation set per corpus version, shared by every answer below. Item and NPC
  * answers used to rescan the whole public corpus each (the NPC page scanned it twice:
@@ -61,56 +33,19 @@ interface AggregateSet {
 let memoized: AggregateSet | null = null;
 
 /**
- * Corpus version marker. Uploads, snapshot time and record count all move whenever the
- * store reloads (writes invalidate its cache, reads stamp a fresh time), so a matching
- * key means these aggregates are for this exact corpus. A miss rebuilds all three sets
- * together, so one request warms the other answers.
+ * The aggregates the answers below read. With no `read`, the set the snapshot cron stored (aggregate-store.ts), so a new
+ * server instance reads one file instead of downloading and replaying the whole corpus; when there is no stored set
+ * yet, or it cannot be read, the same set is worked out from the corpus as before. `read` is a corpus the caller
+ * already loaded, so a page that needs the records too reads the store once: that set is always worked out from it.
  */
-function corpusKey(corpus: { uploads: number; records: readonly unknown[]; dataAsOf?: string | null }): string {
-  return `${corpus.uploads}|${corpus.dataAsOf ?? ""}|${corpus.records.length}`;
-}
-
-/** The value worked out on the first call and kept for the next. */
-function once<T>(make: () => T): () => T {
-  let value: { v: T } | null = null;
-  return () => (value ??= { v: make() }).v;
-}
-
-/** `read` is a corpus the caller already loaded, so a page that needs the records too reads the store once. */
 async function loadAggregates(read?: Corpus): Promise<AggregateSet | null> {
+  if (!read) {
+    const stored = await loadStoredAggregates();
+    if (stored) return stored;
+  }
   const corpus = read ?? await uploadStore.loadCorpus();
   if (corpus.unreachable) return null;
-  const key = corpusKey(corpus);
-  if (memoized === null || memoized.key !== key) {
-    const windows = lootWindowsFromRecords(corpus.records);
-    // A loot source under a recheck scope counts only the windows after its date; the corpus count stays whole.
-    const lootRecords = recheckLootRecords(corpus.records, RECHECK_SCOPES);
-    const counted = lootRecords === corpus.records ? windows : lootWindowsFromRecords(lootRecords);
-    const items = itemFactsFromRecords(corpus.records, RECHECK_SCOPES);
-    const { records } = corpus;
-    const asOf = corpus.dataAsOf ?? new Date();
-    memoized = {
-      key,
-      uploads: corpus.uploads,
-      records: corpus.records.length,
-      windows: windows.length,
-      dataAsOf: corpus.dataAsOf ?? null,
-      drops: rollupDrops(counted),
-      items,
-      // The NPC page reads the pending loot count with the world facts: the same count the item facts hold.
-      // The readers count only new reports for a fact under a recheck scope (kb/curated/recheck.json).
-      world: { ...worldFactsFromRecords(corpus.records), pending: items.pending, recheck: RECHECK_SCOPES },
-      instances: instanceFactsFromRecords(corpus.records),
-      sightings: objectSightingRowsFromRecords(corpus.records),
-      itemFacts: itemFactRowsFromRecords(corpus.records),
-      crafted: craftedItemsFromRecords(corpus.records),
-      // Addon rows dated after the corpus was current are ignored, so one forged clock cannot set "last seen".
-      addons: popularAddonsFromRecords(corpus.records, corpus.dataAsOf ?? new Date()),
-      addonTrends: once(() => addonTrends(addonRowsFromRecords(records), asOf)),
-      edges: observedEdges(corpus.records, corpus.dataAsOf ?? new Date(), RECHECK_SCOPES),
-      loot: lootTablesFromRecords(lootRecords, corpus.dataAsOf ?? null),
-    };
-  }
+  if (memoized === null || memoized.key !== corpusKey(corpus)) memoized = buildAggregates(corpus);
   return memoized;
 }
 
@@ -133,8 +68,8 @@ export async function computeRollups(read?: Corpus): Promise<RollupResult & { st
 }
 
 /** Names, pins, and public rates from the same uploads the drop table reads. */
-export async function loadItemFacts(): Promise<ItemFacts & { unreachable: boolean }> {
-  const agg = await loadAggregates();
+export async function loadItemFacts(read?: Corpus): Promise<ItemFacts & { unreachable: boolean }> {
+  const agg = await loadAggregates(read);
   if (!agg) return { rates: [], names: [], npcs: [], unreachable: true };
   return { ...agg.items, unreachable: false };
 }
@@ -161,8 +96,8 @@ export async function loadReportedItemFacts(itemId: number): Promise<ItemFactSta
 }
 
 /** Items players have seen a recipe make (3 installs), for the item lists' Source column. */
-export async function loadCraftedItems(): Promise<{ items: Set<number>; unreachable: boolean }> {
-  const agg = await loadAggregates();
+export async function loadCraftedItems(read?: Corpus): Promise<{ items: Set<number>; unreachable: boolean }> {
+  const agg = await loadAggregates(read);
   return agg ? { items: agg.crafted, unreachable: false } : { items: new Set(), unreachable: true };
 }
 

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { curatedAddon } from "@/data/addon-repos";
-import { BADGES, buildBoards, loadEcosystem, type BadgeId, type ProjectView } from "@/lib/ecosystem";
+import { approvedAddon } from "@/data/addon-repos";
+import { BADGES, buildBoards, loadEcosystem, staleNote, type BadgeId, type ProjectView } from "@/lib/ecosystem";
 import { pageMetadata } from "@/lib/seo";
 import { REPO_URL } from "@/lib/source";
 import { trailFor } from "@/lib/breadcrumbs";
@@ -33,7 +33,9 @@ const BADGE_LABEL: Record<BadgeId, string> = {
 function profileHref(project: ProjectView): string | null {
   const name = project.addonNames[0];
   if (!name) return null;
-  return project.installs !== null || curatedAddon(name) ? `/addons/${encodeURIComponent(name)}` : null;
+  // Only an owner-approved folder has a page; the link uses the owner's spelling.
+  const approved = approvedAddon(name);
+  return approved ? `/addons/${encodeURIComponent(approved.name)}` : null;
 }
 
 /** One project's repository facts, label beside value, as a line that wraps. */
@@ -89,6 +91,7 @@ function Project({ project }: { project: ProjectView }) {
 export default async function EcosystemPage() {
   const view = await loadEcosystem();
   const boards = buildBoards(view, new Date());
+  const stale = staleNote(view.refreshedAt);
   const issueUrl = `${REPO_URL}/issues/new?template=ecosystem-project.yml`;
   return (
     <Container width="data">
@@ -97,7 +100,7 @@ export default async function EcosystemPage() {
           trail={trailFor("/addons/ecosystem")!}
           title="Forever addons and projects"
           lede="A community list of addons and tools made for WoW: Forever, each checked by a maintainer."
-          meta={<span className="font-mono text-xs">{plural(view.projects.length, "project", "projects")} · {refreshed(view.refreshedAt)}</span>}
+          meta={<span className="font-mono text-xs">{plural(view.projects.length, "project", "projects")} · {refreshed(view.refreshedAt)}{stale && ` · ${stale}`}</span>}
         />
 
         <div className="space-y-12">

@@ -12,6 +12,22 @@ vi.mock("next/navigation", () => ({
 }));
 const auth = vi.hoisted(() => ({ getUser: vi.fn(), authQuery: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ getUser: auth.getUser, authQuery: auth.authQuery, siteUrl: () => "https://everloot.app" }));
+// Vitest loads React's client build, whose cache() is a passthrough; the server build remembers a call for the
+// request. This stand-in remembers by arguments until the next request, so a test can see the store read once.
+const request = vi.hoisted(() => ({ memos: [] as Map<string, unknown>[], next() { for (const m of this.memos) m.clear(); } }));
+vi.mock("react", async (importOriginal) => {
+  const react = await importOriginal<typeof import("react")>();
+  const cache = <A extends unknown[], R>(fn: (...args: A) => R) => {
+    const memo = new Map<string, R>();
+    request.memos.push(memo);
+    return (...args: A): R => {
+      const key = JSON.stringify(args);
+      if (!memo.has(key)) memo.set(key, fn(...args));
+      return memo.get(key)!;
+    };
+  };
+  return { ...react, cache };
+});
 
 import SharedBuildPage, { generateMetadata } from "./page";
 import { GET as card } from "@/app/tools/talents/[class]/card/route";
@@ -32,6 +48,7 @@ beforeEach(async () => {
   code = encodeBuild({ classSlug: "mage", specId: 0, build: catalog.build, ranks: { [first.id]: { rank: 1 } } });
   auth.getUser.mockReset().mockResolvedValue(null);
   auth.authQuery.mockReset().mockImplementation(async () => shared({ game_build: catalog.build }));
+  request.next();
 });
 afterEach(() => { vi.unstubAllEnvs(); });
 
@@ -82,6 +99,7 @@ test("the game build's badge says older only when it is older, newer when it is 
   const older = [...parts.slice(0, -1), String(Number(parts.at(-1)) - 1)].join(".");
   const newer = [...parts.slice(0, -1), String(Number(parts.at(-1)) + 1)].join(".");
   const badges = async (gameBuild: string) => {
+    request.next();
     auth.authQuery.mockResolvedValue(shared({ game_build: gameBuild }));
     const html = renderToStaticMarkup(await SharedBuildPage(params()));
     return [/made on an older game build/.test(html), /made on a newer game build/.test(html)];
@@ -101,8 +119,15 @@ test("not indexed, canonical to the class page, with the saved build's own card"
   expect(meta.title).toBe("Raid frost · WoW Forever Mage build");
   expect(meta.description).toBe("Two sets. Swap for heroics.");
   expect((meta.openGraph as { images: { url: string }[] }).images[0].url).toBe("/tools/talents/mage/card?s=AbCd1234");
+  request.next();
   auth.authQuery.mockResolvedValue([]);
   expect((await generateMetadata(params())).robots).toEqual({ index: false, follow: false });
+});
+
+test("the metadata and the page share one read of the store", async () => {
+  await generateMetadata(params());
+  renderToStaticMarkup(await SharedBuildPage(params()));
+  expect(auth.authQuery.mock.calls.filter(([path]) => path === "rpc/shared_build")).toHaveLength(1);
 });
 
 test("the card takes the codes and the name from the database, and is never cached", async () => {

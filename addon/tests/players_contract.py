@@ -173,8 +173,10 @@ lua.execute("assert(EverlootDB.toggles.players == false and EverlootDB.toggles.c
 # --- On: your own character and the players you see ---
 lua = fresh()
 lua.execute("""
+assert(EverlootDB.playersAsked == nil, 'a new install has not answered the one-time question')
 SlashCmdList.EVERLOOT('players on')
 assert(EverlootDB.toggles.players == true, '/everloot players on turns it on')
+assert(EverlootDB.playersAsked == true, 'a choice made by hand answers the one-time question (options_contract.py)')
 local said = printed[#printed]
 assert(string.find(said, 'name, realm, race, class, level and guild', 1, true) and string.find(said, 'upload page', 1, true)
   and string.find(said, 'Never where they are', 1, true) and string.find(said, 'hidden', 1, true), said)

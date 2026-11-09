@@ -1,5 +1,14 @@
 import { describe, expect, test } from "vitest";
+import { realmSlugOf } from "../lib/player-store";
 import { FAMILIES, figureLabel, getFamily } from "./families";
+import { REALMS } from "./realms";
+
+// /guilds/<slug> serves a family first and a realm's guild list otherwise, so a family named like a realm would hide
+// that realm's list. realmSlugOf is the realm slug realmPath writes and the realm page is found by.
+test("no family slug is the slug of a realm the site knows", () => {
+  const realmSlugs = new Set(REALMS.map((r) => realmSlugOf(r.name)));
+  for (const family of FAMILIES) expect(realmSlugs.has(family.slug), family.slug).toBe(false);
+});
 
 describe("guild family record", () => {
   test("Olympus is a sourced record, and an unknown slug is absent", () => {

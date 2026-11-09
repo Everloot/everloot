@@ -9,10 +9,23 @@ export interface ListedLink {
   status: "linked" | "frozen"; linked_at: string; last_upload_at: string;
   /**
    * Listed only while the character pages are on (EVERLOOT_SHOWCASE=1). `label` only while planned builds are on too
-   * (EVERLOOT_SHOWCASE_BUILDS=1): the build label whose shared builds the page lists, or null.
+   * (EVERLOOT_SHOWCASE_BUILDS=1): the build label whose shared builds the page lists, or null. `sections` only while
+   * private sync is on too (EVERLOOT_PRIVATE_SYNC=1): each category's section switch. `ranked` only while the gear
+   * rankings are on (EVERLOOT_LEADERBOARDS=1): the "Rank my gear" switch.
    */
-  page?: { public: boolean; path: string; label?: { id: string; name: string } | null };
+  page?: { public: boolean; path: string; label?: { id: string; name: string } | null; sections?: Record<SyncCategory, boolean>; ranked?: boolean };
+  /** Listed only while private sync is on: each category's sync, in page order. */
+  sync?: { category: SyncCategory; on: boolean; capturedAt: string | null }[];
 }
+/** SYNC_CATEGORIES in web/src/lib/private-sync.ts, which is server code and cannot be imported here. */
+type SyncCategory = "gear" | "stats" | "talents" | "pvp" | "professions" | "reputations" | "raids" | "achievements";
+/** Each category's name here, and the visibility switch that shows it (SHOW_SWITCH in private-sync.ts). */
+const CATEGORY: Record<SyncCategory, { name: string; show: string }> = {
+  gear: { name: "Gear", show: "show_gear" }, stats: { name: "Stats", show: "show_stats" },
+  talents: { name: "Talents", show: "show_talents" }, pvp: { name: "PvP", show: "show_pvp" },
+  professions: { name: "Professions", show: "show_professions" }, reputations: { name: "Reputations", show: "show_reputations" },
+  raids: { name: "Raids", show: "show_raids" }, achievements: { name: "Achievements and titles", show: "show_collections" },
+};
 /** A build label as GET /api/me/builds lists it. */
 interface Label { id: string; name: string; classSlug: string }
 type State = { status: "loading" } | { status: "signed-out" } | { status: "off" } | { status: "error"; message: string } | { status: "ready"; links: ListedLink[] };
@@ -33,12 +46,33 @@ export const PAGE_TEXT = "The public page shows this character's name, level, ra
 /** What attaching a build label does, said next to its picker. */
 export const LABEL_TEXT = "Planned builds: the page can list the shared builds you filed under one of your build labels on My builds. Only the build's name and link show; unshared builds never do.";
 
+/** What private sync does, said above a character's sync switches. */
+export const SYNC_TEXT = "Sync: the Everloot Desktop App sends what you turn on here, with a key made with \"Sync my linked characters\". Every part starts off, and only you see what is synced. Turning a part's sync off deletes what was synced for it.";
+
+/** What ranking a character's gear does, said next to its switch. */
+export const RANK_TEXT = "Rank my gear: the character's name, realm, level, race and class, with its item level and Gear Score from the synced gear, show on the item level and Gear Score rankings. Never the items themselves unless you show gear on the page. Off by default; turning it off takes the character off the rankings at once.";
+
+/** Why a character's gear is not ranked yet, or null when it can be. */
+function notRankedBecause(pagePublic: boolean, gearSync: boolean): string | null {
+  if (!pagePublic && !gearSync) return "Ranks only once the page is public and gear sync is on.";
+  if (!pagePublic) return "Ranks only once the page is public.";
+  if (!gearSync) return "Ranks only once gear sync is on.";
+  return null;
+}
+
+/** Why a section switch does nothing yet, or null when its section can show. */
+function notShownBecause(pagePublic: boolean, syncOn: boolean): string | null {
+  if (!pagePublic && !syncOn) return "Shows only once the page is public and sync is on.";
+  if (!pagePublic) return "Shows only once the page is public.";
+  if (!syncOn) return "Shows only once sync is on.";
+  return null;
+}
+
 /**
  * What a frozen link says to its owner. It tells them another account linked the character too, and nothing about
- * that account. How to reach us about it is the owner's decision (D8 in the identity ADR), so no contact or promise
- * of review is made here yet.
+ * that account. The contact and reply time are D8 in the identity ADR; /privacy and the data policy say the same.
  */
-export const FROZEN_TEXT = "Frozen: another account has linked this character too, so it is frozen on both accounts and shows nowhere until that is settled. Unlinking it here does not unfreeze the other account's link.";
+export const FROZEN_TEXT = "Frozen: another account has linked this character too, so it is frozen on both accounts and shows nowhere until that is settled. To settle it, write to hello@everloot.app; we reply within 7 days. Unlinking it here does not unfreeze the other account's link.";
 
 /**
  * The account page's linked characters: make a code to type in game, the account's own links with their status, and
@@ -114,6 +148,26 @@ export default function LinkedCharacters() {
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error ?? "That did not work. Try again.");
       setSaid(on ? `${link.name}'s page is public.` : `${link.name}'s page is private again.`);
+      await load();
+    } catch (e) {
+      setSaid(e instanceof Error ? e.message : "That did not work. Try again.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** One sync or section switch: POSTs `body` to the link's `route`, says `done`, and reads the list again. */
+  async function setSwitch(link: ListedLink, key: string, route: "sync" | "visibility", body: Record<string, boolean>, done: string) {
+    setBusy(key);
+    setSaid(null);
+    try {
+      const response = await fetch(`/api/me/characters/links/${encodeURIComponent(link.id)}/${route}`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error ?? "That did not work. Try again.");
+      setSaid(done);
+      setConfirm(null);
       await load();
     } catch (e) {
       setSaid(e instanceof Error ? e.message : "That did not work. Try again.");
@@ -199,6 +253,33 @@ export default function LinkedCharacters() {
                       </>
                     )}
                   </div>
+                  {link.page.ranked !== undefined && (() => {
+                    const ranked = link.page!.ranked!;
+                    const gearSync = link.sync?.find((s) => s.category === "gear")?.on === true;
+                    const why = notRankedBecause(link.page!.public, gearSync);
+                    const whyId = `rank-why-${link.id}`;
+                    return (
+                      <div className="space-y-1">
+                        <p className="text-fg-2">{RANK_TEXT}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-fg">Rank my gear: {ranked && !why ? "on" : ranked ? "on, not ranked yet" : "off"}</span>
+                          <button
+                            type="button"
+                            className={button}
+                            aria-label={ranked ? `Take ${link.name} off the gear rankings` : `Rank ${link.name}'s gear`}
+                            aria-describedby={why ? whyId : undefined}
+                            onClick={() => void setSwitch(link, `${link.id}:rank`, "visibility", { ranked_gear: !ranked },
+                              ranked ? `${link.name} is off the gear rankings.` : `${link.name}'s gear is ranked.`)}
+                            // On can always be turned off; off turns on only when the character would rank.
+                            disabled={busy !== null || (!ranked && why !== null)}
+                          >
+                            {busy === `${link.id}:rank` ? "Saving…" : ranked ? "Stop ranking" : "Rank it"}
+                          </button>
+                          {why && <span id={whyId} className="text-fg-2">{why}</span>}
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {link.page.label !== undefined && (
                     <div className="space-y-1">
                       <p className="text-fg-2">{LABEL_TEXT}</p>
@@ -216,6 +297,69 @@ export default function LinkedCharacters() {
                       </label>
                     </div>
                   )}
+                </div>
+              )}
+              {link.sync && (
+                <div className="space-y-2">
+                  <p className="text-fg-2">
+                    {SYNC_TEXT}{link.page?.sections ? " A part shows on the public page only while the page is public, its sync is on and you show it." : ""}
+                  </p>
+                  {link.status === "linked" && <a href={`/me/characters/links/${encodeURIComponent(link.id)}`} className={button}>See what&apos;s synced</a>}
+                  <ul className="space-y-2">
+                    {link.sync.map(({ category, on }) => {
+                      const { name, show } = CATEGORY[category];
+                      const lower = name.toLowerCase();
+                      const frozen = link.status !== "linked";
+                      const key = `${link.id}:${category}`;
+                      const shown = link.page?.sections?.[category];
+                      const why = link.page && !frozen ? notShownBecause(link.page.public, on) : null;
+                      const whyId = `sync-why-${key}`;
+                      return (
+                        <li key={category} className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="min-w-44 text-fg">{name}</span>
+                            <span className="text-fg-2">Sync {on ? "on" : "off"}</span>
+                            <button
+                              type="button"
+                              className={button}
+                              aria-label={`Turn ${on ? "off" : "on"} ${lower} sync for ${link.name}`}
+                              onClick={() => (on ? setConfirm(key) : void setSwitch(link, `${key}:sync`, "sync", { [category]: true }, `${name} sync is on for ${link.name}.`))}
+                              disabled={busy !== null || frozen}
+                            >
+                              {busy === `${key}:sync` ? "Saving…" : on ? "Turn off" : "Turn on"}
+                            </button>
+                            {shown !== undefined && (
+                              <>
+                                <span className="text-fg-2">Page: {shown && !why && !frozen ? "shown" : "not shown"}</span>
+                                <button
+                                  type="button"
+                                  className={button}
+                                  aria-label={shown ? `Hide ${lower} from ${link.name}'s page` : `Show ${lower} on ${link.name}'s page`}
+                                  aria-describedby={why ? whyId : undefined}
+                                  onClick={() => void setSwitch(link, `${key}:show`, "visibility", { [show]: !shown },
+                                    shown ? `${name} is off ${link.name}'s page.` : `${name} shows on ${link.name}'s page.`)}
+                                  // A switch that is on can always be turned off; one that is off turns on only when it would show.
+                                  disabled={busy !== null || frozen || (!shown && why !== null)}
+                                >
+                                  {busy === `${key}:show` ? "Saving…" : shown ? "Hide" : "Show"}
+                                </button>
+                              </>
+                            )}
+                            {why && <span id={whyId} className="text-fg-2">{why}</span>}
+                          </div>
+                          {confirm === key && (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-fg">Turn off {lower} sync? What was synced for it is deleted now.</span>
+                              <button type="button" className={button} onClick={() => void setSwitch(link, `${key}:sync`, "sync", { [category]: false }, `${name} sync is off for ${link.name}, and what was synced for it is deleted.`)} disabled={busy !== null}>
+                                {busy === `${key}:sync` ? "Deleting…" : "Turn off and delete"}
+                              </button>
+                              <button type="button" className={button} onClick={() => setConfirm(null)} disabled={busy !== null}>Keep it</button>
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
               )}
               {confirm === link.id ? (

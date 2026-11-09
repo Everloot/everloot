@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
+import { edgeDegraded } from "@/lib/cf-edge-cache";
 
 const store = vi.hoisted(() => ({ loadCorpus: vi.fn() }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
@@ -13,7 +14,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-import DatabasePage from "./page";
+import DatabasePage from "./(hub)/page";
 import DropsPage from "./drops/page";
 
 const loot = (install: string, npc: number, items: { itemId: number; count: number }[], n: number) => ({
@@ -33,6 +34,8 @@ test("unreadable storage reads unrecorded, never zero", async () => {
   const db = await html(DatabasePage);
   expect(db).toContain("unrecorded");
   expect(db).not.toMatch(/>0<\/div>/);
+  // Marked for the edge cache, so this render is kept a minute rather than the page's hour.
+  expect(edgeDegraded(db)).toBe(true);
 });
 
 test("the database page is search first: the search, its scopes and a text index of every category, no prose", async () => {

@@ -4,8 +4,9 @@ import { ago, answerSuggestion, clock, companionStatus, copyLabel, esc, gold, kb
 import { JOBS, NO_SOURCED_ANSWER, type AddonInfo, type AppState, type AskInfo, type BackupInfo, type ChangeItem, type CharacterRow, type CharactersInfo, type ChatInfo, type ChatProgress, type DataPart, type DataUsage, type EverlootApi, type PriceLookup, type FileSummary, type GameFolderCandidate, type Job, type JobStatus, type MarketInfo, type MoneyDay } from "../shared/types";
 import { PROVIDER_PRESETS, assistantSource, keptModelPick, manualModelShown, presetFor, removalNotice, type ModelChoice, type ProviderKind } from "../shared/providers";
 import { inkOn } from "../../../web/src/lib/chat/catalogue";
+import { LOCAL_ONLY_CATEGORIES } from "../shared/ledger";
 import { WEBSITE_LINKS, websiteUrl } from "../shared/website";
-import { emptyCause, emptyState, ghostProfile, jobOfLine, statePill, threadLines, watchPill, workingStrip } from "./parts";
+import { emptyCause, emptyState, ghostProfile, jobOfLine, ownedLockouts, ownedProfessions, statePill, threadLines, watchPill, workingStrip } from "./parts";
 
 declare global { interface Window { everloot: EverlootApi } }
 const api = window.everloot;
@@ -532,7 +533,7 @@ function weekBars(days: MoneyDay[]): string {
 
 /** One keyed progress row set, listed apart from the named characters by design. */
 function keyedRows(c: CharactersInfo | undefined): string {
-  return (c?.progress ?? []).map((p) => `<tr><td><span class="mono">${esc(p.key)}</span></td><td>${esc(p.class.toLowerCase())} ${p.level}</td><td class="num">${p.achievements}${p.achievementsInProgress ? `<span class="muted"> +${p.achievementsInProgress} in progress</span>` : ""}</td><td class="num">${p.reputations}${p.exalted ? `<span class="muted"> · ${p.exalted} exalted</span>` : ""}</td><td class="num">${p.titles}</td><td class="num">${p.quests}</td></tr>`).join("");
+  return (c?.progress ?? []).map((p) => `<tr><td><span class="mono">${esc(p.key)}</span></td><td>${esc(p.class.toLowerCase())} ${p.level}</td><td class="num">${p.achievements}${p.achievementsInProgress ? `<span class="muted"> +${p.achievementsInProgress} in progress</span>` : ""}</td><td class="num">${p.reputations}${p.exalted ? `<span class="muted"> · ${p.exalted} exalted</span>` : ""}</td><td class="num">${p.titles}</td><td class="num">${p.quests}</td><td>${ownedProfessions(p.professions)}</td><td>${ownedLockouts(p.lockouts)}</td></tr>`).join("");
 }
 
 function characters(): string {
@@ -580,7 +581,8 @@ function characters(): string {
       <div class="tablewrap"><table class="roster"><thead><tr><th>Character</th><th class="num">Gold</th><th class="num">7 days</th><th class="num">Item level</th><th class="num">Last seen</th></tr></thead><tbody>${rows}</tbody></table></div>
     </section>` : c ? `${emptyState(emptyCause("characters", state!), icon("characters"))}${ghostProfile()}` : `<section class="panel"><p class="muted">Loading…</p></section>`}
     <section class="panel" id="keyed" tabindex="-1"><h2>Progress · keyed</h2>
-      ${prog ? `<div class="tablewrap"><table><thead><tr><th>Key</th><th>Class</th><th class="num">Achievements</th><th class="num">Reputations</th><th class="num">Titles</th><th class="num">Quests done</th></tr></thead><tbody>${prog}</tbody></table></div>` : `<p class="muted">${c ? "Nothing yet. The completion tracker is off until <code>/everloot completion on</code> in game." : "Loading…"}</p>`}
+      ${prog ? `<div class="tablewrap"><table><thead><tr><th>Key</th><th>Class</th><th class="num">Achievements</th><th class="num">Reputations</th><th class="num">Titles</th><th class="num">Quests done</th><th>Professions</th><th>Raid lockouts</th></tr></thead><tbody>${prog}</tbody></table></div>
+        <p class="muted small">Professions and raid lockouts never go in an upload, and Chat does not read them. Private sync sends them only for a character you linked, and everloot.app keeps only the categories you switched on.</p>` : `<p class="muted">${c ? "Nothing yet. The completion tracker is off until <code>/everloot completion on</code> in game." : "Loading…"}</p>`}
       ${c?.talents.length ? `<p class="muted small">Active talent builds: ${c.talents.map((x) => `${esc(x.class.toLowerCase())} ${x.level} (${x.points} points)`).join(", ")}. Not linked to a name.</p>` : ""}
     </section>
   </div>
@@ -612,7 +614,7 @@ function drawerOverview(c: CharacterRow, onPage = false): string {
   }).join("");
   const catCol = (dir: "in" | "out") => {
     const rows = Object.entries(dir === "in" ? c.earned : c.spent).sort((a, b) => b[1] - a[1]).slice(0, 8);
-    return rows.length ? rows.map(([k, v]) => `<div class="cat"><span>${esc(k.replace(/_/g, " "))}</span><span class="num">${gold(v)}</span></div>`).join("") : '<p class="muted small">Nothing recorded.</p>';
+    return rows.length ? rows.map(([k, v]) => `<div class="cat"><span>${esc(k.replace(/_/g, " "))}${LOCAL_ONLY_CATEGORIES.includes(k) ? ' <span class="muted small">local only</span>' : ""}</span><span class="num">${gold(v)}</span></div>`).join("") : '<p class="muted small">Nothing recorded.</p>';
   };
   return `
     <div class="dw-stats">
@@ -626,6 +628,7 @@ function drawerOverview(c: CharacterRow, onPage = false): string {
     </section>
     <section class="dw-sec"><div class="row between"><h3>Money by category</h3><span class="muted small">all time in this file</span></div>
       <div class="cat-cols"><div><h4>Earned</h4>${catCol("in")}</div><div><h4>Spent</h4>${catCol("out")}</div></div>
+      <p class="muted small">Repairs, trades and mail are read from the local ledger and are never uploaded.</p>
     </section>
     ${onPage ? "" : `<section class="dw-sec"><h3>Progress</h3>
       <p class="muted small">Achievements, reputations, titles and quests are keyed by an opaque identifier, never a name, so they stay listed apart from this character. <button type="button" class="link" id="gotoKeyed">Show the keyed rows</button></p>
@@ -982,6 +985,8 @@ function settings(s: AppState): string {
         <div class="field"><label for="gameFolder">Game folder <span class="hint">the product folder that holds <code>WTF</code>: for WoW: Forever, <code>World of Warcraft\\_forever_</code></span></label>
           ${foreverCallout(s)}
           <div class="row"><input class="grow" type="text" id="gameFolder" name="gameFolder" value="${esc(st.gameFolder ?? "")}"><button type="button" class="btn" id="browse">Browse…</button></div></div>
+        <label class="switch"><input type="checkbox" name="autoUpdateAddon" ${st.autoUpdateAddon ? "checked" : ""}> Keep the addon up to date</label>
+        <p class="muted small">New versions of the Everloot addon install on their own and load at the next <code>/reload</code> or login.</p>
       </div></section>
       <section class="panel set-sec"><div class="set-lead"><h2>Startup</h2></div><div class="set-body">
         ${s.platform === "linux" ? "" : `<label class="switch"><input type="checkbox" name="launchAtLogin" ${st.launchAtLogin ? "checked" : ""}> Start when I sign in</label>`}
@@ -1038,6 +1043,7 @@ function dataPanel(s: AppState): string {
       <h3>What stays here</h3>
       <ul class="plain fg2 small">
         <li>Guild, gear, gold, collection and your installed addon list.</li>
+        <li>Your professions and raid lockouts. No upload sends them.</li>
         <li>Your settings, chat, upload history and backups, in the data folder.</li>
       </ul>
       <p class="small fg2">If you configure a model for Chat, it receives your questions and any local character details it uses to answer. Rules: ${ext("https://everloot.app/privacy", "everloot.app/privacy")}</p>
@@ -1818,7 +1824,7 @@ async function onSubmit(ev: SubmitEvent): Promise<void> {
   let note = "Saved.";
   if (form.id === "settings") {
     const endpoint = text("endpoint");
-    state = await api.saveSettings({ gameFolder: text("gameFolder") || null, endpoint, launchAtLogin: f.get("launchAtLogin") === "on", startInTray: f.get("startInTray") === "on", census: f.get("census") === "on", players: f.get("players") === "on" });
+    state = await api.saveSettings({ gameFolder: text("gameFolder") || null, endpoint, launchAtLogin: f.get("launchAtLogin") === "on", startInTray: f.get("startInTray") === "on", autoUpdateAddon: f.get("autoUpdateAddon") === "on", census: f.get("census") === "on", players: f.get("players") === "on" });
     note = savedNote({ endpoint }, state.settings);
   } else if (form.id === "askForm") {
     const mcpUrl = text("mcpUrl");

@@ -73,13 +73,13 @@ local function showAnswers()
     local verified = type(a) == "table" and type(a.answer) == "string" and a.sum == E.Adler32(a.answer)
     if verified and a.retry == true then
       if not ask.toldRetry then
-        print("Everloot — " .. ask.question)
+        print("Everloot: " .. ask.question)
         print("  " .. a.answer)
         ask.toldRetry = true
       end
       waiting[#waiting + 1] = ask
     elseif verified then
-      print("Everloot — " .. ask.question)
+      print("Everloot: " .. ask.question)
       local source = (type(a.source) == "string" and a.source ~= "none") and (" (Source: " .. a.source .. ")") or ""
       print("  " .. a.answer .. source)
     else

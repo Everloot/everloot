@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
-import { createCloudPlayerStore, createMemoryPlayerStore, playerHideKey, playerStoreFrom } from "./player-store";
+import { createCloudPlayerStore, createMemoryPlayerStore, missingFunction, playerHideKey, playerStoreFrom, realmSlugOf } from "./player-store";
 import { optOutPath, playerDateProblem, playerIndexingOn, playerPagesOn, playerPath, playerUpsert, realmSlug, searchPrefix, type PlayerRow } from "./player-pages";
+import { characterPath } from "./character-showcase";
 
 const row = (name: string, extra: object = {}) => ({ name, realm: "Forever Pioneer", race: "Orc", class: "SHAMAN", level: 24, seen: "2026-10-20", ...extra });
 
@@ -33,8 +34,13 @@ describe("what a row becomes", () => {
 
   test("addresses are lower case with hyphens, and a search is 2 to 12 letters", () => {
     expect(realmSlug("Forever Pioneer")).toBe("forever-pioneer");
-    expect(playerPath({ ruleset: "forever", realm: "Forever Pioneer", name: "Thrallina" })).toBe("/players/forever/forever-pioneer/thrallina");
+    expect(playerPath({ ruleset: "forever", realm: "Forever Pioneer", name: "Thrallina" })).toBe("/characters/forever/forever-pioneer/thrallina");
     expect(optOutPath({ realm: "Forever Pioneer", name: "Thrallina" })).toBe("/players/opt-out?realm=Forever%20Pioneer&name=Thrallina");
+    // A sighting and a linked character have one address, however the realm and name are spelled.
+    for (const [realm, name] of [["Forever Pioneer", "Thrallina"], ["  Forever   Pioneer ", "THRALLINA"], ["Mal'Ganis", "Zoë"], ["Ébène/Two", "Ørn"]]) {
+      expect(playerPath({ ruleset: "forever", realm, name })).toBe(characterPath("forever", realm, name));
+    }
+    expect(playerPath({ ruleset: "forever", realm: "Ébène/Two", name: "Ørn" })).toBe("/characters/forever/%C3%A9b%C3%A8ne%2Ftwo/%C3%B8rn");
     expect(searchPrefix(" Thr ")).toBe("Thr");
     for (const bad of ["T", "", "th%", "a_b", "x1", "abcdefghijklm", undefined, 5]) expect(searchPrefix(bad)).toBeNull();
   });
@@ -67,6 +73,34 @@ describe("the development store follows the same rules as the table", () => {
     expect(await store.get("forever", "forever-pioneer", "thrallina")).toBeNull();
     await store.upsert([row("Thrallina", { seen: "2026-10-22" })]);
     expect(await store.search("th")).toEqual([]);
+  });
+
+  test("realms count their visible guilds once, and a realm's guilds come most members first, hidden guilds left out", async () => {
+    const store = createMemoryPlayerStore();
+    await store.upsert([
+      row("Aa", { guild: "Night Watch" }), row("Bb", { guild: "night watch", seen: "2026-10-23" }), row("Cc", { guild: "Ember" }),
+      row("Dd", { guild: "Quiet" }), row("Ee"), row("Ff", { realm: "Forever Nomad", guild: "Night Watch" }),
+    ]);
+    await store.suppress("Forever Pioneer", "Dd");
+    expect(await store.guildRealms()).toEqual([{ realm: "Forever Pioneer", guilds: 2, characters: 3 }, { realm: "Forever Nomad", guilds: 1, characters: 1 }]);
+    const guilds = await store.realmGuilds("forever-pioneer");
+    expect(guilds.map((g) => [g.guild, g.members])).toEqual([["Night Watch", 2], ["Ember", 1]]);
+    expect(guilds[0]!.lastSeen).toBe("2026-10-23");
+    await store.suppressGuild("Forever Pioneer", "Night Watch");
+    expect((await store.realmGuilds("forever-pioneer")).map((g) => g.guild)).toEqual(["Ember"]);
+    expect(await store.guildRealms()).toEqual([{ realm: "Forever Nomad", guilds: 1, characters: 1 }, { realm: "Forever Pioneer", guilds: 1, characters: 1 }]);
+    // A realm is found by its slug only, apostrophes dropped as public.realm_slug drops them.
+    expect(await store.realmGuilds("Forever Pioneer")).toEqual([]);
+    expect(await store.realmGuilds("nowhere")).toEqual([]);
+    await store.upsert([row("Gg", { realm: "Mal’Ganis", guild: "Dawn" })]);
+    expect((await store.realmGuilds("malganis")).map((g) => g.guild)).toEqual(["Dawn"]);
+  });
+
+  test("a realm's slug is the slug of its key, whatever the spelling", () => {
+    expect(realmSlugOf("Forever Pioneer")).toBe("forever-pioneer");
+    expect(realmSlugOf("forever-pioneer")).toBe("forever-pioneer");
+    expect(realmSlugOf("Mal'Ganis")).toBe("malganis");
+    expect(realmSlugOf("Mal’Ganis")).toBe("malganis");
   });
 
   test("rows not seen for 90 days are pruned", async () => {
@@ -105,6 +139,32 @@ describe("the Supabase store", () => {
     const { store } = call([{ name: "Thrallina", realm: "Forever Pioneer", race: "Orc", class: "SHAMAN", level: 24, guild: null, last_seen: "2026-10-20" }]);
     expect(await store.get("forever", "forever-pioneer", "thrallina")).toEqual({ name: "Thrallina", realm: "Forever Pioneer", ruleset: "forever", race: "Orc", class: "SHAMAN", level: 24, guild: null, lastSeen: "2026-10-20" });
     expect(await call([]).store.get("forever", "x", "yy")).toBeNull();
+  });
+
+  test("the realm reads call their functions with the realm key and a hard limit, and map the counts", async () => {
+    const { send, store } = call([{ realm: "Forever Pioneer", guilds: "3", characters: "12" }]);
+    expect(await store.guildRealms()).toEqual([{ realm: "Forever Pioneer", guilds: 3, characters: 12 }]);
+    const [url, init] = send.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://db.example/rest/v1/rpc/guild_realms");
+    expect(JSON.parse(init.body as string)).toEqual({ p_ruleset: "forever" });
+    const guilds = call([{ realm: "Forever Pioneer", guild: "Night Watch", members: "2", last_seen: "2026-10-23" }]);
+    expect(await guilds.store.realmGuilds("forever-pioneer")).toEqual([{ realm: "Forever Pioneer", guild: "Night Watch", members: 2, lastSeen: "2026-10-23" }]);
+    const [guildUrl, guildInit] = guilds.send.mock.calls[0] as unknown as [string, RequestInit];
+    expect(guildUrl).toBe("https://db.example/rest/v1/rpc/realm_guilds");
+    expect(JSON.parse(guildInit.body as string)).toEqual({ p_ruleset: "forever", p_realm_slug: "forever-pioneer", p_limit: 1000 });
+  });
+
+  test("a function the migration has not made yet is told apart from an outage", async () => {
+    const answer = (status: number, body: unknown) => {
+      const send = vi.fn(async () => new Response(JSON.stringify(body), { status }));
+      return createCloudPlayerStore("https://db.example", "k", send as unknown as typeof fetch).guildRealms().catch((err: unknown) => err);
+    };
+    expect(missingFunction(await answer(404, { code: "PGRST202", message: "Could not find the function public.guild_realms(p_ruleset) in the schema cache" }))).toBe(true);
+    expect(missingFunction(await answer(404, { code: "42883", message: "function public.guild_realms(p_ruleset => text) does not exist" }))).toBe(true);
+    expect(missingFunction(await answer(500, { code: "PGRST202" }))).toBe(false);
+    expect(missingFunction(await answer(503, { message: "down" }))).toBe(false);
+    expect(missingFunction(await answer(404, { code: "PGRST205" }))).toBe(false);
+    expect(missingFunction(new Error("Player storage unavailable (404)"))).toBe(false);
   });
 
   test("a failed request throws, so the caller can tell the player to retry", async () => {

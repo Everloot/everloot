@@ -241,11 +241,29 @@ function formatCopper(copper: number): string {
   return parts.join(" ");
 }
 
-export function npcPage(npcId: number, facts: WorldFacts): NpcPage {
+/** One NPC's sighting rows and scope, with its name's votes and their recheck cut-off, as `npcPage` reads them. */
+function npcRows(npcId: number, facts: WorldFacts) {
   const rows = facts.npcs.filter((row) => row.npcId === npcId && row.installId.trim());
   const scopes = facts.recheck ?? NO_SCOPES;
   const scope = scopes.length ? npcScope(npcId, rows, zonesOf(rows).get(npcId) ?? null) : null;
-  const name = agreedLabel(rows.map((row) => ({ installId: row.installId, label: row.name, ...at(row) })), scope && scopeSince(scopes, scope.npc));
+  const names = rows.map((row) => ({ installId: row.installId, label: row.name, ...at(row) }));
+  return { rows, scopes, scope, names, since: scope && scopeSince(scopes, scope.npc) };
+}
+
+/**
+ * How many installs reported the leading name of an NPC with no agreed name, counted as `npcPage` counts them: the
+ * count short of 3. 0 when none did, when a name is agreed, and when two names each have 3. A count only, never the name.
+ */
+export function npcNameReporters(npcId: number, facts: WorldFacts): number {
+  const { names, since } = npcRows(npcId, facts);
+  const tally = tallyVotes(names.map((row) => ({ installId: row.installId, value: row.label, ...at(row) })), since ? { recheckSince: since } : {});
+  const most = Math.max(0, ...tally.groups.map((group) => group.voters.size));
+  return most < WORLD_AGREEMENT ? most : 0;
+}
+
+export function npcPage(npcId: number, facts: WorldFacts): NpcPage {
+  const { rows, scopes, scope, names, since } = npcRows(npcId, facts);
+  const name = agreedLabel(names, since);
   const placed = groupRows(rows.filter((row) => isPinPosition(row.positionKind) && Number.isInteger(row.mapId) && row.mapId >= 0
     && row.x >= 0 && row.x <= 100 && row.y >= 0 && row.y <= 100), (row) => row.mapId);
   const grouped = new Map<number, Map<string, NpcSightingRow>>();

@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { unstable_cache } from "next/cache";
+import { armoryOn } from "@/lib/armory";
 import { pageMetadata } from "@/lib/seo";
 import { trailFor } from "@/lib/breadcrumbs";
 import { optOutPath, playerPagesOn, playerPath, searchPrefix, type Player } from "@/lib/player-pages";
-import { playerStore } from "@/lib/player-store";
+import { searchPlayers } from "@/lib/people-search";
 import { Container, DataTable, Input, PageHeader, SectionHeading, type Column } from "@/components/ui";
-import { className, classText, describePlayer, PLAYER_SEARCH_TAG, playerRobots, raceName } from "./player-view";
+import { className, classText, describePlayer, playerRobots, raceName } from "./player-view";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +18,6 @@ export async function generateMetadata(props: { searchParams: Promise<{ q?: stri
     robots: playerRobots(Boolean(params.q)),
   };
 }
-
-/** One search per prefix is kept five minutes, so a repeated search never reaches the database again. */
-const search = unstable_cache((prefix: string) => playerStore().search(prefix), ["player-search"], { revalidate: 300, tags: [PLAYER_SEARCH_TAG] });
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -50,7 +47,7 @@ export default async function PlayersPage(props: { searchParams: Promise<{ q?: s
   const params = await props.searchParams;
   const q = (first(params.q) ?? "").trim().slice(0, 40);
   const prefix = q ? searchPrefix(q) : null;
-  const results = prefix ? await search(prefix.toLowerCase()) : null;
+  const results = prefix ? await searchPlayers(prefix.toLowerCase()) : null;
 
   return (
     <Container width="reading">
@@ -61,6 +58,8 @@ export default async function PlayersPage(props: { searchParams: Promise<{ q?: s
           lede="Characters the Everloot addon has seen, by the start of their name. Each page shows what the addon last saw: race, class, level, guild and the day. Not where they were, what they wear or what they did."
           meta={<span>To have a character removed, use the hide link on its page or the <Link href="/players/opt-out" className={link}>hide form</Link>.</span>}
         />
+
+        {armoryOn() && <p className="text-sm text-fg-2">Characters read from Blizzard&apos;s API, with their gear, are in the <Link href="/armory" className={link}>armory</Link>.</p>}
 
         <form action="/players" method="get" role="search" className="flex max-w-xl flex-col gap-2 sm:flex-row">
           <label htmlFor="player-q" className="sr-only">Character name</label>

@@ -7,6 +7,7 @@ import { loadSiteAssets } from "@/lib/game-assets";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { WORLD_MAP } from "@/lib/world-map";
 import { hasConfirmed, publicZones, zoneContents, zoneHref, type ZoneContents, type ZoneSummary } from "@/lib/zones";
 
@@ -54,6 +55,7 @@ export default async function ZonesPage() {
 
   return (
     <Container width="data">
+      <EdgeDegraded when={facts.unreachable} />
       <article>
         <DataTitle title="Zones" meta={`${zones.length} zones`} trail={trailFor("/database/zones") ?? undefined} />
         {facts.unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE}</p>}

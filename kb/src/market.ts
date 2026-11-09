@@ -28,10 +28,14 @@
  * cuts, so they are separate markets. Every scan still feeds the realm-wide view (`realms`, what every
  * reader got before houses were recorded). A scan that names its house, or failing that its scanner's
  * faction, also feeds that house's own view (`houses`), with the same 3-reporter rule per house.
+ *
+ * Trusted installs (trusted-source.ts): while few players upload, a scan from one of Everloot's own installs
+ * is folded with TRUSTED_REPORTER as its reporter, and a day with that reporter in it is public under 3.
  */
 import { AUCTION_HOUSES, UPLOAD_LIMITS, validRealm, type AuctionHouse } from "@everloot/protocol";
 import { z } from "zod";
 import { AUCTION_AGREEMENT } from "./auction-history.js";
+import { TRUSTED_REPORTER, TRUSTED_SOURCE_LABEL } from "./trusted-source.js";
 
 export const MARKET_WINDOW_DAYS = 14;
 export const HISTORY_DAYS = 60;
@@ -198,9 +202,16 @@ function reporterGroups(installs: Record<string, InstallScan>): InstallScan[][] 
   return [...groups.values()];
 }
 
+/** A day is public at AUCTION_AGREEMENT reporters, or with Everloot's own installs among them (trusted-source.ts). */
+export function agreed(reporters: readonly string[]): boolean {
+  return reporters.length >= AUCTION_AGREEMENT || reporters.includes(TRUSTED_REPORTER);
+}
+
+const groupKeys = (groups: InstallScan[][]) => groups.map((g) => g[0]![5]);
+
 function publicOf(installs: Record<string, InstallScan>): ClosedDay | null {
   const groups = reporterGroups(installs);
-  if (groups.length < AUCTION_AGREEMENT) return null;
+  if (!agreed(groupKeys(groups))) return null;
   const per = (index: number) => median(groups.map((g) => median(g.map((s) => s[index] as number))));
   return [per(0), per(1), per(2), groups.length];
 }
@@ -234,8 +245,9 @@ export interface FoldStats {
  * would exceed a cap (new realm, new item, an install past the day's limit, or an entry past the total)
  * is dropped and counted in `stats`; scans from installs already counted still update. Every scan is folded
  * into the realm-wide view before any is folded into a house's view, so the caps favour the realm-wide view.
+ * A scan from a `trusted` install, and any open scan already stored from one, gets TRUSTED_REPORTER as its reporter.
  */
-export function foldMarket(previous: MarketState, records: readonly unknown[], now: Date, limits: Partial<typeof MARKET_LIMITS> = {}, stats?: FoldStats): MarketState {
+export function foldMarket(previous: MarketState, records: readonly unknown[], now: Date, limits: Partial<typeof MARKET_LIMITS> = {}, stats?: FoldStats, trusted: ReadonlySet<string> = new Set()): MarketState {
   const cap = { ...MARKET_LIMITS, ...limits };
   const state: MarketState = structuredClone(previous);
   let entries = entryCount(state);
@@ -283,7 +295,8 @@ export function foldMarket(previous: MarketState, records: readonly unknown[], n
         const scan = scanItem.safeParse(row.items[i]);
         if (!scan.success) continue;
         const [itemId, auctions, quantity, minUnit, marketUnit] = scan.data;
-        const values: InstallScan = [minUnit, marketUnit, quantity, auctions, at, row.reporter ?? ""];
+        const reporter = trusted.has(row.installId) ? TRUSTED_REPORTER : row.reporter ?? "";
+        const values: InstallScan = [minUnit, marketUnit, quantity, auctions, at, reporter];
         if (!place(map, key, maxKeys, row.realm.trim(), day, itemId, row.installId, values)) { drop(row.items.length - i); break; }
       }
     }
@@ -292,6 +305,7 @@ export function foldMarket(previous: MarketState, records: readonly unknown[], n
     for (const [key, realm] of Object.entries(map)) {
       for (const [itemId, days] of Object.entries(realm.items)) {
         for (const [day, installs] of Object.entries(days.open)) {
+          for (const [installId, scan] of Object.entries(installs)) if (trusted.has(installId)) scan[5] = TRUSTED_REPORTER;
           const n = dayNumber(day)!;
           if (isOpen(n, now) && inHistory(n, now)) continue;
           delete days.open[day];
@@ -410,7 +424,7 @@ export function itemListings(state: MarketState, realm: string, itemId: number, 
   for (const [day, installs] of Object.entries(bucketOf(state, realm, house)?.items[String(itemId)]?.open ?? {})) {
     if (!inHistory(dayNumber(day)!, now)) continue;
     const groups = reporterGroups(installs);
-    if (groups.length >= AUCTION_AGREEMENT) out[day] = median(groups.map((g) => median(g.map((s) => s[3]))));
+    if (agreed(groupKeys(groups))) out[day] = median(groups.map((g) => median(g.map((s) => s[3]))));
   }
   return out;
 }
@@ -477,8 +491,14 @@ export function formatCopper(value: number): string {
 }
 
 export const MARKET_RULE =
-  "A day is public when 3 reporters scanned this item on this realm with a full scan (installs behind one upload address count once); each value is the median of their last scans that day. " +
+  "A day is public when 3 reporters scanned this item on this realm with a full scan (installs behind one upload address count once); each value is the median of their last scans that day. While few players upload, a day Everloot's own installs scanned is public with fewer, and its reporters say so. " +
   "Market value is a weighted mean of the public days up to 14 calendar days old, newer days weighing more, skipping thin days (5 units listed or fewer) and days far from the historical value. Historical is the median of the public days in the last 60 calendar days, of those that are not thin when there are any.";
+
+/** "3 reporters", or "1 reporter (includes Everloot's own scans)" for a day public under 3 because a trusted install scanned it. */
+export function reportersText(reporters: number): string {
+  const count = `${reporters} reporter${reporters === 1 ? "" : "s"}`;
+  return reporters < AUCTION_AGREEMENT ? `${count} (${TRUSTED_SOURCE_LABEL})` : count;
+}
 
 export function handleMarketValue(args: { realm: string; itemId: number }, state: MarketState | null, now: Date): string {
   if (!args.realm.trim()) return "Name a realm.";
@@ -492,11 +512,11 @@ export function handleMarketValue(args: { realm: string; itemId: number }, state
   }
   lines.push(
     `Market value: ${value.market === null ? "unrecorded (no solid public day in the last 14)" : formatCopper(value.market)}`,
-    `Minimum buyout: ${formatCopper(value.min)} (${value.day}, ${value.ageDays} days ago, ${value.reporters} reporters)`,
+    `Minimum buyout: ${formatCopper(value.min)} (${value.day}, ${value.ageDays} days ago, ${reportersText(value.reporters)})`,
     `Historical: ${formatCopper(value.historical)}`,
     `Units listed: ${value.quantity}${value.thin ? " (thin: not counted in the market value)" : ""}`,
     "History:",
-    ...points.map((p) => `${p.day}  value ${formatCopper(p.market)}  min ${formatCopper(p.min)}  ${p.quantity} units${p.thin ? " (thin)" : ""}  ${p.reporters} reporters`),
+    ...points.map((p) => `${p.day}  value ${formatCopper(p.market)}  min ${formatCopper(p.min)}  ${p.quantity} units${p.thin ? " (thin)" : ""}  ${reportersText(p.reporters)}`),
   );
   return lines.join("\n");
 }

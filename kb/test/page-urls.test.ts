@@ -7,7 +7,7 @@ import { openDb, type DB } from "../src/db.js";
 import { replaceSourceRows, type EntityInput } from "../src/entities.js";
 import { emptyMarket, foldMarket } from "../src/market.js";
 import { createKnowledgeServer, SOME_WORDS, type ToolOptions } from "../src/mcp-server.js";
-import { changesUrl, collectionsUrl, marketItemUrl, withMore } from "../src/page-urls.js";
+import { changesUrl, collectionsUrl, marketItemUrl, professionsUrl, withMore } from "../src/page-urls.js";
 import { WORLD_MAP_DATA } from "../src/world-map-file.js";
 
 /**
@@ -102,8 +102,8 @@ test("each tool built on uploads links its page last before the data age and cre
     ["entity_relations", { kind: "item", id: 1234 }, "https://everloot.app/database/items/1234"],
     ["world_map_near", { npcId: 456 }, "https://everloot.app/database/npcs/456"],
     ["world_map_near", { zone: zone.name, x: 50.04, y: 49.96 }, `https://everloot.app/map?zone=${zone.uiMapId}&x=50&y=50`],
-    ["profession_path", { profession: "Alchemy", fromSkill: 1, toSkill: 10 }, "https://everloot.app/tools/professions?profession=Alchemy&from=1&to=10"],
-    ["recipe_thresholds", { profession: "Alchemy" }, "https://everloot.app/tools/professions?profession=Alchemy"],
+    ["profession_path", { profession: "Alchemy", fromSkill: 1, toSkill: 10 }, "https://everloot.app/tools/professions/171-alchemy?from=1&to=10"],
+    ["recipe_thresholds", { profession: "Alchemy" }, "https://everloot.app/tools/professions/171-alchemy"],
     ["collection_gap", { collection: "Mounts", ownerInstallId: "owner" }, "https://everloot.app/tools/collections?collection=Mounts&install=owner"],
     ["guild_board", { guildName: "Olympus", realm: "Forever" }, "https://everloot.app/tools/guild-board?guild=Olympus&realm=Forever"],
     ["gold_ledger", { character: "bigz", realm: "forever" }, "https://everloot.app/tools/gold-ledger?character=Bigz&realm=Forever"],
@@ -206,6 +206,11 @@ test("page links are absolute, encoded like the site's own, and the More line si
   // The single place market links are built: an item on a realm whose name has a space.
   expect(marketItemUrl(" Mirage Raceway ", 2589)).toBe("https://everloot.app/tools/auctions?realm=Mirage%20Raceway&item=2589");
   expect(collectionsUrl({ install: "a b", collection: "Mounts & Pets" })).toBe("https://everloot.app/tools/collections?collection=Mounts%20%26%20Pets&install=a%20b");
+  // A profession link carries the skill line id when the caller has it (the site resolves the id and lands on the
+  // slug page); without one it is the hub's name form.
+  expect(professionsUrl("First Aid", 1, 75, 129)).toBe("https://everloot.app/tools/professions/129-first-aid?from=1&to=75");
+  expect(professionsUrl("Alchemy", undefined, undefined, 171)).toBe("https://everloot.app/tools/professions/171-alchemy");
+  expect(professionsUrl("Alchemy", 1, 10)).toBe("https://everloot.app/tools/professions?profession=Alchemy&from=1&to=10");
   expect(changesUrl("all", "forever")).toBe("https://everloot.app/changes");
   expect(changesUrl("hotfixes", "classic")).toBe("https://everloot.app/changes?show=hotfixes&game=all");
   expect(withMore("Body.", undefined)).toBe("Body.");

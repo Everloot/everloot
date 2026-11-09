@@ -5,7 +5,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { buildCatalogIndex, catalogId, getCatalogByName, readCatalogFiles, type CatalogIndex } from "../src/catalog-index.js";
 import { openDb, type DB } from "../src/db.js";
 import { replaceSourceRows, type EntityInput } from "../src/entities.js";
-import { createToolHandlers, type ToolAnswer } from "../src/mcp-server.js";
+import { createToolHandlers, SOURCE_TEXT_NOTE, type ToolAnswer } from "../src/mcp-server.js";
 
 const fixtureRoot = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "game-files");
 const index: CatalogIndex = buildCatalogIndex(readCatalogFiles(fixtureRoot).files);
@@ -167,6 +167,8 @@ test("a release-only question with the catalog present gives the release's some-
   expect(text).toBe([
     "No page has every word you asked for. Pages with some of them:",
     "",
+    SOURCE_TEXT_NOTE,
+    "",
     "[lore_page/lore] Thunderfury, Blessed Blade",
     "A legendary sword.",
     "Source: https://example.test/10 (CC-BY-SA-4.0, retrieved 2023-11-13)",
@@ -184,6 +186,8 @@ test("stopwords match no catalog name, so a question full of them still gets the
   const text = textOf(await withCatalog.search_knowledge(query));
   expect(text).toBe([
     SOME_WORDS_LINE,
+    "",
+    SOURCE_TEXT_NOTE,
     "",
     "[lore_page/lore] Gold farming",
     "Ways to earn gold.",

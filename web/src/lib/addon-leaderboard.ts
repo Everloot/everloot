@@ -1,6 +1,6 @@
 import type { AddonPopularity, AddonTrend } from "../../../kb/src/addon-rollup";
 import type { ProjectView } from "../../../kb/src/ecosystem";
-import { curatedAddon } from "@/data/addon-repos";
+import { approvedAddon } from "@/data/addon-repos";
 import type { AddonGithubSummaryResult } from "./addon-github";
 import { logoUrl, repoOwner } from "./addon-board";
 
@@ -19,7 +19,10 @@ export type Movement = { kind: "up" | "down" | "same"; by: number } | { kind: "n
 export interface LeaderRow {
   rank: number;
   name: string;
+  /** The owner's title for an approved addon; for any other, the plain title installs agree on, shown as a usage label only. */
   title: string;
+  /** The addon's page on this site: only an owner-approved addon has one. */
+  page: string | null;
   share: number;
   loadedInstalls: number;
   lastSeen: string;
@@ -55,7 +58,7 @@ function snapshotFacts(project: ProjectView | null) {
 export function liveRepos(addons: readonly AddonPopularity[], projects: readonly ProjectView[]): string[] {
   const repos: string[] = [];
   for (const addon of addons) {
-    const repo = curatedAddon(addon.name)?.source.repo;
+    const repo = approvedAddon(addon.name)?.source.repo;
     if (repo && !snapshotFacts(trackedProject(addon.name, projects)) && !repos.includes(repo)) repos.push(repo);
   }
   return repos.slice(0, LIVE_LIMIT);
@@ -79,14 +82,16 @@ export function leaderRows(
   return addons.map((addon, i): LeaderRow => {
     const rank = i + 1;
     const project = trackedProject(addon.name, projects);
-    const curated = curatedAddon(addon.name)?.source ?? null;
+    const approved = approvedAddon(addon.name);
+    const curated = approved?.source ?? null;
     const repo = curated?.repo ?? project?.repo ?? null;
     const fromLive = curated ? live[curated.repo] : undefined;
     const facts = snapshotFacts(project) ?? (fromLive?.status === "ok" || fromLive?.status === "partial" ? fromLive.data : null);
     return {
       rank,
       name: addon.name,
-      title: addon.title,
+      title: approved?.title ?? addon.title,
+      page: approved ? `/addons/${encodeURIComponent(approved.name)}` : null,
       share: addon.share,
       loadedInstalls: addon.loadedInstalls,
       lastSeen: addon.lastSeen,

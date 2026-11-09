@@ -8,6 +8,7 @@ import { linkSummary, sendLinks } from "../../../companion/src/link-sender";
 import { findEverlootFiles } from "../../../companion/src/savedvariables";
 import { createSentState } from "../../../companion/src/sent-state";
 import { createSiteCollects } from "../../../companion/src/site-collects";
+import { sendSync, syncSummary } from "../../../companion/src/sync-sender";
 import { uploadFile } from "../../../companion/src/uploader";
 import { watchFile } from "../../../companion/src/watch-file";
 import { appSettledList } from "../../../web/src/lib/settled-cache";
@@ -64,7 +65,14 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
         const said = linkSummary(await sendLinks(file, { endpoint, key: accountKeyForSite(dataFolder, endpoint), state }));
         if (said) links = `; ${said}`;
       } catch (err) { links = `; character links not sent: ${err instanceof Error ? err.message : String(err)}`; }
-      return `sent ${r.sent} new events in ${r.batches} batch(es)${rejected}; skipped ${r.skipped} already settled; kept ${r.heldNamed} named, ${r.heldAddons} installed-addon, ${r.heldCensus} census and ${r.heldLegacy} legacy rows here${runs}${links}${backup}`;
+      // Linked characters' own rows go to the account's sync endpoint with the same key, after the links so a code
+      // typed this session is linked first. Each category is kept only where the player turned its sync on.
+      let sync = "";
+      try {
+        const said = syncSummary(await sendSync(file, { endpoint, key: accountKeyForSite(dataFolder, endpoint), state }));
+        if (said) sync = `; ${said}`;
+      } catch (err) { sync = `; characters not synced: ${err instanceof Error ? err.message : String(err)}`; }
+      return `sent ${r.sent} new events in ${r.batches} batch(es)${rejected}; skipped ${r.skipped} already settled; kept ${r.heldNamed} named, ${r.heldAddons} installed-addon, ${r.heldCensus} census and ${r.heldLegacy} legacy rows here${runs}${links}${sync}${backup}`;
     },
     async prices(files) {
       const s = current();

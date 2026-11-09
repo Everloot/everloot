@@ -1,9 +1,9 @@
 # Public character pages: draft DATA_POLICY section
 
-Date: 2026-11-01. Status: **draft, not in effect.** Written for slice S3 of the
-[character showcase plan](2026-11-01-character-showcase-plan.md). Nothing here applies until the maintainer accepts
-it and moves the section below into [DATA_POLICY](../DATA_POLICY.md), after "Profiles". The code it describes is
-behind `EVERLOOT_SHOWCASE`, which is off in production.
+Date: 2026-11-01. Status: **accepted.** Written for slice S3 of the
+[character showcase plan](2026-11-01-character-showcase-plan.md). The section below is now in
+[DATA_POLICY](../DATA_POLICY.md), after "Profiles", with the D8 answer in place of the placeholder; that copy is the
+one in effect. The go-live PR turns on `EVERLOOT_SHOWCASE` with it.
 
 The [owned-character identity ADR](specs/2026-10-28-owned-character-identity.md) (section 5) says no route sets or
 reads `character_visibility` until a public-profile contract is accepted. The S3 code does both, behind the flag.
@@ -26,7 +26,8 @@ holds nothing about anyone else.
   character's game id, or the hashes a link is stored under.
 - **Off until the player turns it on.** A new link is private. The page exists only while the player has "Public
   page" on for that character. Turning it off, unlinking the character or deleting the account removes the page and
-  its share cards at once; the address answers 404 like any unknown character.
+  its share cards at once. Since 2026-11-05 (#773) the address then shows only the public sighting, if there is
+  one, and otherwise answers 404 like any unknown character.
 - **A link is not proof.** A link shows that the account holder also had an addon file in which the character typed
   a code. It is not checked with Blizzard, and the row can be written by hand. The page says the data is
   self-reported and not checked against Blizzard, and it never calls the character verified or owned.
@@ -39,8 +40,8 @@ holds nothing about anyone else.
 - **Search engines.** Every character page asks search engines not to index it. Players cannot change this yet.
 - **Caching.** Everloot draws the page and cards fresh on each request and keeps no copy. A copy that a link-preview
   service (Discord, X and others) has already fetched is outside our control and may stay with that service.
-- **Player pages are separate.** A player page (`/players/...`) shows what other players' addons saw. A character
-  page shows what the linked player sent. Neither adds data to the other.
+- **One page, two parts (2026-11-05, #773).** `/characters/...` shows what the linked player sent and, under it, what
+  other players' addons saw; `/players/...` redirects there. Neither part adds data to the other.
 
 ---
 
@@ -51,8 +52,7 @@ holds nothing about anyone else.
    the account page offers no such switch, and every page is noindex whatever the column holds.
 3. **D8.** The dispute contact and response time for frozen characters (the placeholder above).
 4. **D6.** No handle or account shows on a page. Change only if D6 is accepted.
-5. **Player-page link.** Whether `/players/...` and `/characters/...` link to each other. Today the character page
-   links only to the hide form.
+5. **Player-page link.** Decided 2026-11-05 (#773): one address per character, `/characters/<ruleset>/<realm>/<name>`, with the owner's showcase and the sighting as separate sections; `/players/...` redirects there.
 6. **Caching.** Pages and cards are rendered per request with `no-store`, so switching a page off leaves no warm
    copy. Revisit once Cloudflare tag purge (CF-09) is proven, if the rendering cost matters.
 7. **Privacy page.** /privacy needs a matching paragraph when this section is accepted.

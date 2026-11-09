@@ -15,14 +15,25 @@ export type CoverageSort = (typeof COVERAGE_SORTS)[number];
 
 const pct = (share: number | null) => (share === null ? PLACEHOLDER : `${Math.floor(share * 100)}%`);
 
-/** "12% / 40%": settled share, then confirmed share; `[?]` where there is no denominator. Rounded down, so 100% is all of it. */
+/**
+ * Nothing of this type is expected in the zone and nobody has reported one: a zero denominator (an expected count
+ * of 0, or an open-world zone's entrances, which the game files list none of). There is nothing to score.
+ */
+const noneExpected = (cell: CoverageCell): boolean => cell.denominator === 0 && cell.observed === 0 && cell.reported === 0;
+
+/**
+ * "12% / 40%": settled share, then confirmed share; `[?]` where there is no denominator. Rounded down, so 100% is all of it.
+ * A dash where the zone expects none and holds none, such as an open-world zone's bosses.
+ */
 export function shareText(cell: CoverageCell): string {
+  if (noneExpected(cell)) return "–";
   const s = coverageShares(cell);
   return `${pct(s.settled)} / ${pct(s.confirmed)}`;
 }
 
 /** The counts behind a share, for its tooltip and screen readers. */
 export function cellDetail(cell: CoverageCell): string {
+  if (noneExpected(cell)) return "none expected in this zone";
   const of = cell.denominator === null ? `no expected count (${cell.observed} reported)` : `of ${cell.denominator}`;
   return `${cell.settled} settled, ${cell.confirmed} confirmed, ${cell.reported} reported${cell.recheck ? `, ${cell.recheck} to recheck` : ""}, ${of}`;
 }

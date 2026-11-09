@@ -13,6 +13,7 @@ E.SCAN_CHUNK = 1000       -- replicate rows read per frame, so a large house doe
 E.SCAN_COOLDOWN = 900     -- seconds between full scans: Retail's limit; Forever's is unverified
 E.SCAN_PART_ITEMS = 1000  -- items per auction_snapshot record, the intake maximum
 E.SCANS_KEPT = 3          -- full scans kept per realm in SavedVariables
+E.SAMPLES_KEPT = 2        -- partial price samples kept per realm: the newest earlier one beside the one being taken
 E.SCAN_WAIT_SECONDS = 30  -- how long a scan waits for REPLICATE_ITEM_LIST_UPDATE before giving up
 local RETRY_SECONDS = 2   -- one more read for rows whose item data had not loaded
 
@@ -130,13 +131,33 @@ local function finishFallback(s)
   scan = nil
   if s.stored == 0 then EverlootDB.lastScanAt = s.previousScanAt end
   say(string.format("partial price sample: stored %d search rows; this is not a full market scan. %s",
-    s.stored, s.stored > 0 and "Upload with the companion." or "The auction house sent no data with usable buyouts. Try again."))
+    s.stored, s.stored > 0 and "Upload with the Everloot Desktop App." or "The auction house sent no data with usable buyouts. Try again."))
 end
 
 local function nextFallbackItem(s)
   s.index = s.index + 1
   s.pages, s.awaiting, s.pending = 0, false, "search"
   if s.index > #s.keys then finishFallback(s) end
+end
+
+--- Just before a partial sample stores its first row (a sample that finds nothing prunes nothing): keep the newest E.SAMPLES_KEPT - 1 earlier samples of this realm
+--- (a sample is the rows sharing one capturedAt), so up to 1,000 new rows fit under the per-kind cap. Without this,
+--- two samples filled the cap and every later one reported "stored 0". Another realm's rows are not touched.
+local function pruneSamples(realm)
+  local rows = EverlootDB.records.auction_scan or {}
+  local order, seen = {}, {}
+  for _, r in ipairs(rows) do
+    if r.realm == realm and not seen[r.capturedAt] then seen[r.capturedAt] = true; order[#order + 1] = r.capturedAt end
+  end
+  table.sort(order)
+  local keep = E.SAMPLES_KEPT - 1
+  if #order <= keep then return end
+  local drop = {}
+  for i = 1, #order - keep do drop[order[i]] = true end
+  local kept = {}
+  for _, r in ipairs(rows) do if r.realm ~= realm or not drop[r.capturedAt] then kept[#kept + 1] = r end end
+  EverlootDB.records.auction_scan = kept
+  if EverlootDB.paused then EverlootDB.paused.auction_scan = nil end
 end
 
 local function storeFallbackItem(s)
@@ -158,6 +179,7 @@ local function storeFallbackItem(s)
       price = math.floor(s.commodity and price or price / count)
       if price < 1 then return end
       seen[id] = true
+      if not s.pruned then s.pruned = true; pruneSamples(s.realm) end
       if E:Store("auction_scan", { installId = EverlootDB.installId, capturedAt = s.at,
         realm = s.realm, itemId = key.itemID, count = count, copper = price, priceBasis = "unit" }) then
         s.stored = s.stored + 1
@@ -329,14 +351,14 @@ local function finish()
       faction = s.faction, house = s.house,
       scanId = scanId, part = p, parts = parts, items = items,
     }) then
-      return say("the scan could not be stored. Upload your file with the companion, then scan again.")
+      return say("the scan could not be stored. Upload your file with the Everloot Desktop App, then scan again.")
     end
   end
   pruneScans(s.realm)
   EverlootDB.lastScans = EverlootDB.lastScans or {}
   EverlootDB.lastScans[s.realm] = { scanId = scanId, at = s.startedAt }
   E.ownScanCache = nil
-  return say(string.format("scanned %d items on %s (%d rows skipped, %d not loaded). Upload with the companion.",
+  return say(string.format("scanned %d items on %s (%d rows skipped, %d not loaded). Upload with the Everloot Desktop App.",
     #ids, s.realm, s.skipped, s.incomplete))
 end
 
@@ -425,8 +447,8 @@ local function addButton()
   if E.AuctionTab and E.AuctionTab.Attach(AuctionHouseFrame) then return end
   local button = CreateFrame("Button", "EverlootScanButton", AuctionHouseFrame, "UIPanelButtonTemplate")
   button:SetSize(120, 22)
-  -- Placement still needs checking in the Forever client.
-  button:SetPoint("TOPRIGHT", AuctionHouseFrame, "TOPRIGHT", -30, -28)
+  -- Keep the fallback below the window, away from the house's Search and Filter controls.
+  button:SetPoint("TOPRIGHT", AuctionHouseFrame, "BOTTOMRIGHT", -12, -4)
   button:SetText("Everloot scan")
   button:SetScript("OnClick", function() E:StartScan() end)
   E.scanButton = button
@@ -446,23 +468,25 @@ local function showPrompt()
     local ok, frame = pcall(CreateFrame, "Frame", "EverlootScanPrompt", AuctionHouseFrame, "BackdropTemplate")
     if not ok or not frame then return end
     local built = pcall(function()
-      frame:SetSize(230, 74)
+      frame:SetWidth(280)
       frame:SetPoint("TOPLEFT", AuctionHouseFrame, "TOPRIGHT", 4, 0)
+      frame:SetClampedToScreen(true)
       if frame.SetBackdrop then
         frame:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
           tile = true, tileSize = 16, edgeSize = 16, insets = { left = 4, right = 4, top = 4, bottom = 4 } })
       end
       local text = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-      text:SetPoint("TOPLEFT", 12, -10)
-      text:SetWidth(190)
+      text:SetPoint("TOPLEFT", 12, -12)
+      text:SetWidth(232)
       text:SetJustifyH("LEFT")
       text:SetText("Share this house's prices with Everloot? One scan, every 15 min at most. /everloot scanprompt off hides this.")
       local button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-      button:SetSize(180, 22)
-      button:SetPoint("BOTTOMLEFT", 10, 8)
+      button:SetSize(220, 22)
+      button:SetPoint("TOPLEFT", text, "BOTTOMLEFT", 0, -12)
       button:SetText("Scan prices for Everloot")
       button:SetScript("OnClick", function() frame:Hide(); E:StartScan() end)
       frame.button = button
+      frame:SetHeight(12 + text:GetStringHeight() + 12 + 22 + 12)
       local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
       close:SetPoint("TOPRIGHT", -2, -2)
       close:SetScript("OnClick", function() frame:Hide() end)

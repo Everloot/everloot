@@ -3,7 +3,10 @@ import Link from "next/link";
 import { pageMetadata } from "@/lib/seo";
 import { REVOKED_KEPT_DAYS, USAGE_KEPT_DAYS } from "@/lib/api-keys";
 import { OPERATOR } from "@/lib/jsonld";
+import { longDate } from "@/data/wow-forever";
 import { trailFor } from "@/lib/breadcrumbs";
+import { ARMORY_KEPT_DAYS, armoryOn } from "@/lib/armory";
+import { leaderboardsOn } from "@/lib/leaderboard-switch";
 import { pullSummariesOn } from "@/lib/pull-summaries";
 import { Container, PageHeader, Prose, SectionHeading, ReadingLayout, type TocItem } from "@/components/ui";
 
@@ -35,14 +38,19 @@ function Section({ id, children }: { id: string; children: React.ReactNode }) {
 }
 
 export default function PrivacyPage() {
-  // The boss pulls item shows only once the site collects them (EVERLOOT_PULL_SUMMARIES). The census paragraph
-  // gained nameplates on 4 November 2026, which dates the page either way.
+  // The boss pulls item shows only once the site collects them (EVERLOOT_PULL_SUMMARIES), and dates the page with it.
   const pulls = pullSummariesOn();
-  const updated = "4 November 2026";
+  // The gear rankings item shows only once the boards are on (EVERLOOT_LEADERBOARDS); the switch-on change dates the page.
+  const ranked = leaderboardsOn();
+  // The armory item shows only once the armory pages are on (EVERLOOT_ARMORY).
+  const armory = armoryOn();
+  // Linked characters, public character pages, the guild item's character page and private sync: 6 November.
+  // The census paragraph gained nameplates on 9 November, which dates the page.
+  const updated = "2026-11-09";
   return (
     <article>
       <Container width="reading">
-        <PageHeader trail={trailFor("/privacy")!} title="Privacy Policy" meta={<span>Last updated: {updated}</span>} />
+        <PageHeader trail={trailFor("/privacy")!} title="Privacy Policy" meta={<span>Last updated: {longDate(updated)}</span>} />
       </Container>
       <ReadingLayout items={SECTIONS}>
         <Prose>
@@ -157,6 +165,59 @@ export default function PrivacyPage() {
                 search engines index it only while it is public. Turning it off hides it at once.
                 Deleting your account deletes your profile with it.
               </li>
+              <li id="linked-characters">
+                <strong>Linked characters (optional):</strong> on your account page you can link a character
+                you play to your account. The site gives you a short code; you type it on the character with{" "}
+                <code>/everloot link &lt;code&gt;</code>, and the Everloot Desktop App, signed in to your account,
+                sends the row it writes. Link rows never go in an upload. We store the character&apos;s name,
+                realm, race, class, faction and level, when it was linked and last sent, and two keyed one-way
+                hashes: one of the game&apos;s id for the character, and one of your install id with the
+                addon&apos;s key for the character. Neither the game&apos;s id nor the install id is stored. We
+                store a code only as a hash; it works once, for 15 minutes. If our census rows for that character
+                disagree on its race, class or faction, the link is refused. A link shows that someone with this
+                account also had an addon file in which the character typed the code. We don&apos;t check it with
+                Blizzard. If a second account links the same character, it is frozen on both and shown nowhere
+                until we settle it: write to{" "}
+                <a href="mailto:hello@everloot.app">hello@everloot.app</a> and we reply within 7 days. A linked
+                character is private: only you see it, unless you give it a public page.
+              </li>
+              <li>
+                <strong>Public character page (optional):</strong> for each linked character you can turn on your
+                part of its page at <code>/characters/&lt;ruleset&gt;/&lt;realm&gt;/&lt;name&gt;</code>. Anyone can
+                open it and sees the character&apos;s name, level, race, class, faction and realm as you sent them,
+                the day they were last sent, and a share image drawn from the same fields. Your part sits above,
+                and apart from, what the player pages already show of the character. It never shows your BattleTag,
+                your email, your account, your handle or the hashes. It says the details are self-reported and not
+                checked against Blizzard. Search engines are asked not to index it. Turning the page off,
+                unlinking the character or deleting your account removes your part and its images at once. A copy
+                a link-preview service (Discord, X and others) has already fetched stays with that service. Anyone
+                can hide a character on the <Link href="/players/opt-out">hide form</Link>, without an account; a
+                hidden character cannot be linked and has no public page.
+              </li>
+              <li id="private-sync">
+                <strong>Private sync (optional):</strong> with an API key made with <em>Sync my linked
+                characters</em>, the Everloot Desktop App sends your linked characters&apos; own progress from your
+                addon file: equipped gear, the character sheet&apos;s stats, the active talent build, PvP rank and
+                honorable kills, this week&apos;s raid lockouts, the achievements that character earned and the titles
+                it holds, reputations and professions. You choose, per character, which of these
+                are kept. Every category starts off. A synced row is kept only when your account holds a live link to
+                that character and that category is on, whichever computer sent it; anything else is dropped. We keep
+                only the newest capture of each category, with a keyed one-way hash of the install that sent it so it
+                can be found and deleted, never the install id itself. You see it on a signed-in preview of the
+                character. Nothing synced is public until you turn your page on and that section on. The page says
+                it is self-reported and not checked against Blizzard. Turning a category&apos;s sync off deletes what
+                was synced for it at once; unlinking the character or deleting your account deletes all of it.
+              </li>
+              {ranked && <li id="gear-rankings">
+                <strong>Gear rankings (optional):</strong> if you turn on <em>Rank my gear</em> for a linked
+                character whose page is public and whose gear sync is on, its name, realm, level, race and class, its
+                item level and Gear Score worked out from that synced gear, its rank and the gear&apos;s date show on the
+                public item level and Gear Score rankings. The items themselves show only if you show gear on the page.
+                The rankings are scored every 30 minutes, and while the character is ranked its level, item level and
+                Gear Score are kept as a daily history that its page shows as a chart. Turning the switch, the page or
+                gear sync off takes the character off the rankings and hides the chart on the next request; unlinking
+                deletes the history. It is off by default.
+              </li>}
               <li id="chat-projects">
                 <strong>Chat projects (optional):</strong> while signed in, Chat can keep your
                 conversations, projects, notes and saved entries in your account so they follow
@@ -242,11 +303,25 @@ export default function PrivacyPage() {
                 {" "}The same module also records your own guild&apos;s boss kills: the guild, the realm, your
                 faction, the boss and the time, with no names. If the site has guild pages on, a kill is shown on
                 the guild&apos;s page once two players&apos; uploads report it, and a guild page lists the
-                characters seen in that guild, labelled as sightings, not the game&apos;s member list. Anyone can
+                characters seen in that guild, labelled as sightings, not the game&apos;s member list. A
+                character&apos;s page shows its guild the same way, with what the guild&apos;s officers published
+                about that character: its rank, the loot they gave it and whether it was at their last raid. Anyone can
                 hide a guild, without an account or an officer rank, on the{" "}
                 <Link href="/guilds/hide">guild hide form</Link>; its kills are then not kept. Its characters
                 keep their own pages, which the character hide form covers.
               </li>
+              {armory && <li id="armory">
+                <strong>Armory (public, from Blizzard):</strong> the armory pages show WoW: Forever characters and guilds as
+                Blizzard&apos;s API gives them: a character&apos;s name and surname, level, race, class, faction, ruleset,
+                guild, last login day, equipped items, item level, honorable kills and PvP rank, and a guild&apos;s name,
+                faction, size and member list. We work out an item level and a Gear Score from the gear. We find characters
+                through the guild names the addon has seen, guild rosters and the add form. Each row is read again within
+                20 days, deleted when Blizzard no longer knows the character or guild, and never kept more than{" "}
+                {ARMORY_KEPT_DAYS} days after its last read. It is shown only on our armory pages: it is not in the public
+                records, the API or any export. The players it names have not been asked. Anyone can hide a character,
+                without an account, on the <Link href="/armory/hide">armory hide form</Link>: it is deleted at once and not
+                read again.
+              </li>}
               {pulls && <li id="boss-pulls">
                 <strong>Boss pulls (on for uploaders, private):</strong> after each boss pull in a dungeon or raid,
                 the addon records each member of your group by name and realm, with their class, their role (the
@@ -379,6 +454,14 @@ export default function PrivacyPage() {
                 <strong>Your profile</strong> is changed, cleared or made private again on Settings.
               </li>
               <li>
+                <strong>Linked characters</strong> are unlinked, and their public pages turned on or off, on
+                your account page.
+              </li>
+              <li>
+                <strong>Synced data</strong> is turned on and off, and each section shown or hidden, on your
+                account page.
+              </li>
+              <li>
                 <strong>Chat projects and account chats</strong> are downloaded or deleted in
                 Chat&apos;s All chats view.
               </li>
@@ -399,6 +482,8 @@ export default function PrivacyPage() {
               <li><strong>Saved builds and characters:</strong> until you delete them or your account.</li>
               <li><strong>Chat projects, account chats, notes and saved entries:</strong> until you delete them, clear them in Chat or delete your account.</li>
               <li><strong>Handle, display name, status and profile choices:</strong> until you change them or delete your account. A status with a clear-after time stops showing at that time.</li>
+              <li><strong>Linked characters and their page settings:</strong> until you unlink the character or delete your account. Used and expired link codes are cleared when you make a new code a day or more later, and with your account.</li>
+              <li><strong>Synced character data:</strong> the newest capture of each category, until you turn that category off, unlink the character or delete your account.</li>
               <li><strong>Rate-limit hashes:</strong> a short time, long enough to enforce the limit (a day for Chat&apos;s free model), then discarded.</li>
               <li><strong>Uploads:</strong> until you ask us to remove them. They are the public database.</li>
               <li><strong>Census rows:</strong> as long as the upload they came in, and removed with it. They hold the character&apos;s hash, never its id, and a one-way hash of the address they came from, never the address. They are only ever published as counts.</li>

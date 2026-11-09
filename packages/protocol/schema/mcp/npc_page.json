@@ -4,6 +4,8 @@
   "description": "Returns one Forever NPC's page by NPC id: the agreed name, the agreed map pins, and the loot windows reported for it that are not yet in the drop rates. A name or pin needs 3 installs agreeing; a pin does not require a drop. No copied spawn list. Use it to name or place an NPC when you have its id, from a search_knowledge hit, a drop row or entity_relations; use vendor_page for what an NPC sells, item_page for one drop's rate, entity_relations for every typed link, and world_map_near for what stands around it. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
   "annotations": {
     "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
     "openWorldHint": false
   },
   "inputSchema": {

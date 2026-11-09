@@ -1,6 +1,6 @@
 import { describePlayer } from "@/app/players/player-view";
 import { CLASSES } from "@/design/tokens";
-import { realmSlug } from "@/lib/player-pages";
+import { characterPath } from "@/lib/player-pages";
 import { savedBuildsOn } from "@/lib/saved-builds";
 
 /**
@@ -25,12 +25,10 @@ export function showcaseBuildsOn(env: Record<string, string | undefined> = proce
 }
 
 /**
- * A linked character's public page: /characters/<ruleset>/<realm>/<name>, slugged as the player pages are. A
- * separate address from /players, because a link never adds data to a sighting page (identity ADR).
+ * A linked character's public page: the character's one page, the same address a sighting links to. The page
+ * keeps the two apart: the showcase draws only from the link row, never from a sighting.
  */
-export function characterPath(ruleset: string, realm: string, name: string): string {
-  return `/characters/${ruleset}/${encodeURIComponent(realmSlug(realm))}/${encodeURIComponent(name.toLowerCase())}`;
-}
+export { characterPath };
 
 /** A section older than this says it may be out of date. */
 export const STALE_DAYS = 14;
@@ -43,7 +41,47 @@ export const STALE_DAYS = 14;
 export type SectionState = "shown" | "empty" | "private" | "unsupported";
 export type Section<T> = { state: "shown"; asOf: string; data: T } | { state: Exclude<SectionState, "shown"> };
 
-export interface GearRow { slot: string; itemId: number; /** Null until 3 installs agree on the name: shown as "Item <id>". */ name: string | null; itemLevel: number }
+/**
+ * The equipment slots in the game's own order: the character window's left column, its right column, then the
+ * weapons row. A slot with no row is drawn empty, never left out.
+ */
+export const GEAR_SLOTS = {
+  head: "Head", neck: "Neck", shoulders: "Shoulders", back: "Back", chest: "Chest", shirt: "Shirt", tabard: "Tabard", wrists: "Wrists",
+  hands: "Hands", waist: "Waist", legs: "Legs", feet: "Feet", finger1: "Finger 1", finger2: "Finger 2", trinket1: "Trinket 1", trinket2: "Trinket 2",
+  mainHand: "Main hand", offHand: "Off hand", ranged: "Ranged or relic",
+} as const;
+export type GearSlot = keyof typeof GEAR_SLOTS;
+export const PAPER_DOLL: { left: GearSlot[]; right: GearSlot[]; weapons: GearSlot[] } = {
+  left: ["head", "neck", "shoulders", "back", "chest", "shirt", "tabard", "wrists"],
+  right: ["hands", "waist", "legs", "feet", "finger1", "finger2", "trinket1", "trinket2"],
+  weapons: ["mainHand", "offHand", "ranged"],
+};
+
+export interface GearRow {
+  slot: GearSlot;
+  itemId: number;
+  /** Null until the item rules allow a name (3 installs, or the item name rule): shown as "Item <id>". */
+  name: string | null;
+  /** The game files' quality, 0 poor to 5 legendary, for the name's colour; null when not known. */
+  quality: number | null;
+  itemLevel: number;
+  /** The item's game icon, only where the item lists would show it (docs/ASSETS.md); the page fills it. */
+  icon?: string | null;
+}
+
+/** Every slot in the game's order, with the row equipped there or null for an empty slot. */
+export function paperDoll(rows: readonly GearRow[]): Record<GearSlot, GearRow | null> {
+  const by = Object.fromEntries((Object.keys(GEAR_SLOTS) as GearSlot[]).map((k) => [k, null])) as Record<GearSlot, GearRow | null>;
+  for (const r of rows) by[r.slot] = r;
+  return by;
+}
+
+/**
+ * The character sheet's numbers, grouped as the game groups them. No collector records them yet, so real pages
+ * hold this `unsupported`; only the sample fills it.
+ */
+export const STAT_GROUPS = ["Attributes", "Melee", "Ranged", "Spell", "Defense"] as const;
+export type StatsData = { group: (typeof STAT_GROUPS)[number]; stats: { label: string; value: string }[] }[];
 export interface TalentsData {
   /** The active spec's trees and points, as the snapshot holds them. */
   trees: { name: string; points: number }[];
@@ -52,16 +90,63 @@ export interface TalentsData {
   /** Saved builds the owner attached to the character (/b/<slug>). */
   planned: { name: string; slug: string }[];
 }
+/** One linked character's PvP standing. A number the game did not report is null, and its line is not drawn. */
+export interface PvpData {
+  rank: number | null;
+  rankPoints: number | null;
+  rankThreshold: number | null;
+  rankMax: number | null;
+  season: number | null;
+  honorableKills: number | null;
+}
 export interface ProfessionRow { name: string; rank: number; maxRank: number }
 /** A faction the catalog agrees on. A renown faction has ranks, not standings, and is not supported yet. */
 export type ReputationRow = { faction: string; standing: string; value: number; max: number } | { faction: string; renown: true };
 export interface RaidsData {
   /** This character's lockouts this week. */
-  lockouts: { instance: string; difficulty: string; killed: number; total: number; resets: string }[];
+  lockouts: {
+    instance: string; difficulty: string; killed: number; total: number;
+    /** The reset day, YYYY-MM-DD. */
+    resets: string;
+    /** Each boss in encounter order, for the strip; empty when the lockout names none. */
+    bosses: { name: string; killed: boolean }[];
+  }[];
   /** The guild's agreed kills: the guild's progress, not this character's attendance. Null when the guild is not shown. */
   guildKills: { instance: string; killed: number; total: number }[] | null;
 }
-export interface CollectionsData { achievements: number; points: number; titles: string[] }
+/** The order the game lists standings in, best first: the reputation list is grouped by it. */
+export const STANDINGS = ["Exalted", "Revered", "Honored", "Friendly", "Neutral", "Unfriendly", "Hostile", "Hated"] as const;
+
+/**
+ * The factions grouped by standing, best first, as the game's reputation window orders them. A standing the list
+ * does not know comes after the known ones; renown factions come last, in a group of their own.
+ */
+export function reputationGroups(rows: readonly ReputationRow[]): { standing: string; rows: ReputationRow[] }[] {
+  const rank = (r: ReputationRow) => {
+    if ("renown" in r) return STANDINGS.length + 1;
+    const i = (STANDINGS as readonly string[]).indexOf(r.standing);
+    return i < 0 ? STANDINGS.length : i;
+  };
+  const groups = new Map<string, ReputationRow[]>();
+  for (const r of [...rows].sort((a, b) => rank(a) - rank(b))) {
+    const key = "renown" in r ? "Renown" : r.standing;
+    groups.set(key, [...(groups.get(key) ?? []), r]);
+  }
+  return [...groups].map(([standing, list]) => ({ standing, rows: list }));
+}
+
+/** The progress the completion rows hold: achievements, titles and quests. */
+export interface CollectionsData {
+  achievements: number;
+  points: number;
+  /** The newest achievements first, with the day each was earned. */
+  recent: { name: string; date: string }[];
+  /** Achievements earned out of those the catalog lists, per category. */
+  categories: { name: string; done: number; total: number }[];
+  titles: string[];
+  /** Quests completed; null when the rows hold no count, drawn as a line, never a zero. */
+  quests: number | null;
+}
 
 export interface ShowcaseInput {
   /** Fixtures only: the page and card say so. */
@@ -76,32 +161,41 @@ export interface ShowcaseInput {
   /** Null for a race with no side (Skyborne). */
   faction: "Alliance" | "Horde" | null;
   realm: string;
+  /** The title the character wears, as the game writes it; null for none or none synced. */
+  title: string | null;
   /** Null unless the owner shows it. `path` only when the guild's page is public. */
   guild: { name: string; path: string | null } | null;
   /** The newest upload any shown section came from, YYYY-MM-DD. */
   lastUpload: string;
   gear: Section<GearRow[]>;
+  stats: Section<StatsData>;
   talents: Section<TalentsData>;
+  pvp: Section<PvpData>;
   professions: Section<ProfessionRow[]>;
   reputations: Section<ReputationRow[]>;
   raids: Section<RaidsData>;
   collections: Section<CollectionsData>;
 }
 
-export type SectionKey = "gear" | "talents" | "professions" | "reputations" | "raids" | "collections";
+export type SectionKey = "gear" | "stats" | "talents" | "pvp" | "raids" | "collections" | "reputations" | "professions";
+/** Page order: the character sheet first, then what the character has done, then its standing and trades. */
 export const SECTION_TITLES: Record<SectionKey, string> = {
   gear: "Gear",
+  stats: "Stats",
   talents: "Talents",
-  professions: "Professions",
-  reputations: "Reputations",
+  pvp: "PvP",
   raids: "Raids",
-  collections: "Collections",
+  collections: "Progress",
+  reputations: "Reputations",
+  professions: "Professions",
 };
 
 /** The lines each state stands for; nothing is estimated in their place. */
 export const EMPTY_LINE = "Nothing synced for this yet.";
 export const PRIVATE_LINE = "Hidden from the public page.";
 export const UNSUPPORTED_LINE = "The game does not report this to addons yet.";
+/** The stats are there in game; what is missing is a collector, so their line says that instead. */
+export const NOT_RECORDED_LINE = "The Everloot addon does not record this yet.";
 export const STALE_LINE = "May be out of date.";
 /** Under the planned builds: saved in the calculator, so a plan, not what the character runs in game. */
 export const PLANNED_LINE = "Saved in the talent calculator by this character's linked player. A plan, not a record of play.";
@@ -110,6 +204,9 @@ export const FOOTER_LINE = "Self-reported by this character's linked player thro
 export interface ShownSection { key: SectionKey; title: string; section: Section<unknown>; asOf: string | null; stale: boolean }
 
 export interface CardBlock { label: string; value: string }
+
+/** A number the header shows beside the name, only from a section in the `shown` state. */
+export interface Headline { label: string; value: number }
 
 export interface Showcase {
   input: ShowcaseInput;
@@ -126,6 +223,8 @@ export interface Showcase {
   sections: ShownSection[];
   /** Up to three stat blocks for the share card, only from shown sections. */
   blocks: CardBlock[];
+  /** The header's numbers: average item level and achievement points, each only when its section is shown. */
+  headlines: Headline[];
 }
 
 const DAY = 86_400_000;
@@ -166,6 +265,14 @@ function cardBlocks(input: ShowcaseInput): CardBlock[] {
   return blocks.slice(0, 3);
 }
 
+function headlines(input: ShowcaseInput): Headline[] {
+  const out: Headline[] = [];
+  const avg = input.gear.state === "shown" ? averageItemLevel(input.gear.data) : null;
+  if (avg !== null) out.push({ label: "Item level", value: avg });
+  if (input.collections.state === "shown") out.push({ label: "Achievement points", value: input.collections.data.points });
+  return out;
+}
+
 export function buildShowcase(input: ShowcaseInput, now: Date): Showcase {
   const slug = input.class.toLowerCase();
   const sections = (Object.keys(SECTION_TITLES) as SectionKey[]).map((key): ShownSection => {
@@ -180,5 +287,6 @@ export function buildShowcase(input: ShowcaseInput, now: Date): Showcase {
     freshness: freshnessLabel(input.lastUpload, now),
     sections,
     blocks: cardBlocks(input),
+    headlines: headlines(input),
   };
 }

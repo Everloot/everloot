@@ -1,6 +1,6 @@
 // Pieces of the page that need no DOM: each returns HTML for app.ts to place, so a test can read the markup.
-import type { EngineState, Job, JobStatus, LogLine, Settings } from "../shared/types";
-import { clock, esc } from "./format";
+import type { EngineState, Job, JobStatus, LogLine, ProgressRow, Settings } from "../shared/types";
+import { clock, esc, when } from "./format";
 
 /** A pill's look and the word it carries, per job state. `paused` wins for every job that is on. */
 export type PillKind = "working" | "failed" | "ok" | "off" | "waiting" | "paused";
@@ -120,4 +120,14 @@ export function watchPill(e: Pick<EngineState, "files" | "paused">): string {
   if (e.paused) return '<span class="pill-s pill-paused">Paused</span>';
   const n = e.files.length;
   return n ? `<span class="pill-s pill-ok">Watching ${n} file${n === 1 ? "" : "s"}</span>` : '<span class="pill-s pill-off">Not watching</span>';
+}
+
+/** A keyed character's professions, rank of max rank; – when the addon has none for it. */
+export function ownedProfessions(list: ProgressRow["professions"]): string {
+  return list.length ? list.map((x) => `<div>${esc(x.name)} <span class="muted">${x.rank}/${x.maxRank}</span></div>`).join("") : '<span class="muted">–</span>';
+}
+
+/** A keyed character's raid lockouts this week: bosses killed of total and when each resets; – when it has none. */
+export function ownedLockouts(list: ProgressRow["lockouts"]): string {
+  return list.length ? list.map((l) => `<div>${esc(l.instance)} <span class="muted">${l.difficulty ? `${esc(l.difficulty)} · ` : ""}${l.killed}/${l.total} · resets ${esc(when(l.resetAt))}</span></div>`).join("") : '<span class="muted">–</span>';
 }

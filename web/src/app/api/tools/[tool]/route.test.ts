@@ -4,10 +4,21 @@ import { z } from "zod";
 import { openDb } from "../../../../../../kb/src/db";
 import { replaceSourceRows } from "../../../../../../kb/src/entities";
 
-const store = vi.hoisted(() => ({ api: vi.fn(), mcp: vi.fn(), loadCorpus: vi.fn(), loadMarket: vi.fn(), release: { db: null as unknown } }));
+const store = vi.hoisted(() => ({ fail: null as Error | null, api: vi.fn(), mcp: vi.fn(), loadCorpus: vi.fn(), loadMarket: vi.fn(), release: { db: null as unknown } }));
 vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { api: store.api, mcp: store.mcp } }));
 vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: store.loadCorpus, loadMarket: store.loadMarket } }));
 vi.mock("@/lib/release", () => ({ getRelease: () => (store.release.db ? store.release : null) }));
+// A handler whose store read throws (the real handlers degrade most of those to "unrecorded"), set per test.
+vi.mock("../../../../../../kb/src/mcp-server", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../../../../../../kb/src/mcp-server")>();
+  return {
+    ...real,
+    createToolHandlers: (...args: Parameters<typeof real.createToolHandlers>) => {
+      const handlers = real.createToolHandlers(...args);
+      return new Proxy(handlers, { get: (target, key) => (store.fail ? async () => { throw store.fail; } : Reflect.get(target, key)) });
+    },
+  };
+});
 const auth = vi.hoisted(() => ({ getUser: vi.fn(), authQuery: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ getUser: auth.getUser, authQuery: auth.authQuery, siteUrl: () => "https://everloot.app" }));
 
@@ -26,6 +37,7 @@ for (const [i, installId] of ["a", "b", "c"].entries()) {
 const get = (tool: string, query = "") => GET(new Request(`https://everloot.app/api/tools/${tool}${query}`), { params: Promise.resolve({ tool }) });
 
 beforeEach(async () => {
+  store.fail = null;
   store.api.mockReset().mockResolvedValue({ allowed: true, retryAfter: 0 });
   store.mcp.mockReset().mockResolvedValue({ allowed: true, retryAfter: 0 });
   store.loadCorpus.mockResolvedValue({ uploads: 3, records, dataAsOf: AS_OF, unreachable: false });
@@ -82,6 +94,23 @@ test("a wrong argument is a 400 that names it, an unknown tool a 404 that lists 
   const gone = await get("everloot_plan");
   expect(gone.status).toBe(503);
   expect((await gone.json()).error).toContain("unrecorded, not zero");
+});
+
+test("a bad argument the handler refuses is a 400 with its message; a store failure is a 503 with fixed text, no-store and Retry-After, and none of the internal text", async () => {
+  const bad = await get("profession_path", "?profession=Basketweaving&fromSkill=1&toSkill=10");
+  expect(bad.status).toBe(400);
+  expect((await bad.json()).error).toContain('No profession named "Basketweaving"');
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
+  store.fail = new Error("Pull storage unavailable (500)");
+  const res = await get("item_page", "?itemId=1234");
+  expect(res.status).toBe(503);
+  expect(res.headers.get("cache-control")).toBe("no-store");
+  expect(res.headers.get("retry-after")).toBe("60");
+  const text = await res.text();
+  expect(JSON.parse(text)).toEqual({ ok: false, error: "Everloot's data store is unavailable; try again in a minute." });
+  expect(text).not.toContain("Pull storage");
+  expect(log).toHaveBeenCalled();
+  log.mockRestore();
 });
 
 test("the guild ladder's tools are unknown with EVERLOOT_GUILDS off, and answer under their schema with it on", async () => {

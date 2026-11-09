@@ -9,6 +9,10 @@ including each account's own authenticated private progress, until support resol
 the freeze policy in D0 and private-read behavior in D2, not the remaining ADR or activation requirements.
 No data is shared between accounts. The owner list still shows the frozen state so each account can seek support.
 
+Owner decision, 2026-11-06: D1 accepted and D9 resolved by following the link, not the machine (see the decisions
+list). Owners may also publish their own synced sections on a live link with per-section switches, all off by default
+(showcase plan S6). Built behind `EVERLOOT_PRIVATE_SYNC`; the migration is not applied.
+
 Parent documents: [unified player platform](2026-10-28-unified-player-platform.md),
 [gap register](../../2026-10-28-platform-gap-register.md) and
 [readiness plan](../../superpowers/plans/2026-10-28-platform-readiness.md).
@@ -94,7 +98,7 @@ Aliases attach other identifiers to a root. Each records its kind, source and ti
 | `completion_ref` | Server, proposed `character_link_sources` (new) | Authenticated private sync presents the install id and completion key for an already consented link | Weaker than the link: install id and key are supplied in the row, not attested | Today one column holds one ref, so linking from a second machine **replaces** the first machine's ref. Proposed authenticated sources are separate; legacy refs do not create them |
 | Build label | Server, proposed nullable `build_characters.link_id` | Owner explicitly attaches a label to a link | Owner's own statement | Never inferred from matching names. Deleting the label never unlinks; unlinking sets `link_id` to null and keeps the label, its builds and profile references |
 | Local alt | Device only, optional `LocalAlt.linkId` | Owner confirms a suggested match | Owner's own statement | Never uploaded. A name/realm match is a suggestion, not an automatic join |
-| Public sighting | Not stored as an alias | — | None | Shown only through the existing public policy. A link never adds data to a sighting page, and a sighting never adds data to a private dashboard |
+| Public sighting | Not stored as an alias | — | None | Shown only through the existing public policy. A link never adds data to a sighting page, and a sighting never adds data to a private dashboard. Since 2026-11-05 (#773) both appear on one address, `/characters/...`, as separate sections that never mix rows |
 
 The local name/key map (COL-C03) stays in the addon file and on the device. It never enters a public upload.
 
@@ -271,8 +275,10 @@ Acceptance tests (each must fail before the change where the path is new):
 - **D0 (freeze policy accepted 2026-10-28; activation details outstanding):** freeze both links and linked
   dashboards pending support review. Review account-link-existence disclosure wording and establish the
   minimum D8 support policy before enabling Step 1. Code can be prepared behind its flag.
-- **D1 (blocks Step 2):** accept the proposed source/consent tables and separate `sync:own` write scope.
-  Do not repurpose the existing `read:own` scope for writes.
+- **D1 (accepted 2026-11-06):** the private sync model of section 4: consent per link and category, and a separate
+  `sync:own` write scope. `read:own` is not reused for writes. Built behind `EVERLOOT_PRIVATE_SYNC` (off) with
+  `supabase/migrations/20261106120000_private_sync.sql`, not applied. As built, there is no separate sources table:
+  following D9, the install is a keyed hash (`source:` prefix) on each stored fact, for provenance and deletion only.
 - **D2 (accepted 2026-10-28):** a frozen link's owner cannot view its linked dashboard or private progress,
   even from their own authenticated active sources, until support resolves the dispute. The freeze never
   grants either account access to the other's data. D1 and D9 still gate Step 2.
@@ -286,8 +292,14 @@ Acceptance tests (each must fail before the change where the path is new):
 - **D7:** session-only link listing is the technical default. API-key listing needs a separately accepted read contract.
 - **D8 (minimum blocks enabling Step 1):** operator dispute contact and response wording must exist before a route
   promises review. Accepted evidence and response-time targets remain part of that activation checklist.
-- **D9 (blocks Step 2):** contested install-id source policy and how an owner clears it. A copied file can make a
-  legitimate source contested, another denial-of-display tradeoff that needs an explicit product decision.
+- **D9 (resolved 2026-11-06: follow the link, not the machine):** any signed-in account may sync from any install.
+  A fact about a character is kept only when the sending account holds that character's live (linked, not frozen)
+  link and has consent for the category. A duplicate is dropped, and a newer capture of the same character and
+  category replaces the older one. There is no `contested` source state: a copied file lets the copier sync only
+  characters they linked themselves, and linking someone else's character freezes both links (D0). The install is
+  recorded per fact for provenance and deletion, never as an exclusive owner. This replaces the `contested` row in
+  section 3 and the "source the same account owns with status `active`" and `completion_ref` clauses of the
+  section 4 read rule.
 
 ## Out of scope
 

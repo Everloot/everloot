@@ -5,13 +5,16 @@ import { CURRENT_VERSION } from "@/lib/game-version";
 import { loadSiteAssets } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
 import { guildsOn } from "@/lib/guild-switch";
+import { leaderboardsOn } from "@/lib/leaderboard-switch";
 import { playerPagesOn } from "@/lib/player-pages";
 import { pageMetadata } from "@/lib/seo";
 import { REPO_URL } from "@/lib/source";
 import { CREDIT } from "@/lib/talents/assets";
 import { MAP_SOURCE } from "@/lib/world-map";
 import { PageHeader, ReadingLayout, SectionHeading, type TocItem } from "@/components/ui";
+import { GearSection } from "./gear";
 import { ScoreSection } from "./score";
+import { TRUSTED_SOURCE_LABEL } from "../../../../kb/src/trusted-source";
 
 const description =
   "How Everloot turns addon uploads into WoW Forever facts: three installs must agree, addresses are never published, and names only on the player pages.";
@@ -28,6 +31,7 @@ const SECTIONS: TocItem[] = [
   { id: "population", label: "Population numbers" },
   { id: "guilds", label: "How guilds are counted" },
   { id: "score", label: "The Everloot Score" },
+  { id: "gear-rankings", label: "Item level and Gear Score" },
   { id: "credits", label: "Credits" },
 ];
 
@@ -35,7 +39,7 @@ export default async function MethodologyPage() {
   // The art's build comes from the asset manifest, only when the asset URL is set.
   const assets = await loadSiteAssets();
   return (
-    <ReadingLayout items={SECTIONS.filter((s) => s.id !== "guilds" || guildsOn())}>
+    <ReadingLayout items={SECTIONS.filter((s) => (s.id !== "guilds" || guildsOn()) && (s.id !== "gear-rankings" || leaderboardsOn()))}>
       <PageHeader
         title="How we count"
         lede="Every fact on Everloot comes from players running the Everloot addon and choosing to upload what it recorded."
@@ -59,6 +63,11 @@ export default async function MethodologyPage() {
             <p className="text-fg-2">
               A fact that comes from a Polestar Recorder file needs three different characters uploading from three different
               addresses, and a player&apos;s alts or connections never confirm each other.
+            </p>
+            <p className="text-fg-2">
+              While few players upload, Everloot&apos;s own installs can make an auction price or a census count public on their own.
+              A price that rests on them says &ldquo;{TRUSTED_SOURCE_LABEL}&rdquo; beside its reporters, and the census says when its
+              numbers include them. Everyone else still needs three. A census count still needs 10 characters and is still rounded.
             </p>
             {playerPagesOn() && (
               <p className="text-fg-2">
@@ -180,6 +189,8 @@ export default async function MethodologyPage() {
         </section>}
 
         <ScoreSection />
+
+        {leaderboardsOn() && <GearSection />}
 
         {/* The full attribution. Pages carry none of their own; the footer's one line links here (docs/DATA_POLICY.md). */}
         <section aria-labelledby="credits">

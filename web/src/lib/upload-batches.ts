@@ -5,8 +5,11 @@ export type SharingChoices = Partial<Record<SharingCategory, boolean>>;
 export interface BatchReceipt { ok: boolean; persisted?: boolean; uploadId?: string; accepted?: { index: number; kind: string }[]; rejected?: { index: number; reason: string }[]; error?: string }
 export interface UploadSession {
   batches: string[]; next: number; receipts: BatchReceipt[];
-  /** `links`: character_link rows, which go only to the account's own link endpoint, never in an upload. */
-  counts: Record<string, number>; held: { legacy: number; named: number; invalid: number; links: number };
+  /**
+   * `links`: character_link rows, which go only to the account's own link endpoint, never in an upload.
+   * `local`: rows of `LOCAL_ONLY_KINDS`, which never leave the computer.
+   */
+  counts: Record<string, number>; held: { legacy: number; named: number; invalid: number; links: number; local: number };
   /** The installed addons this upload sends, one "Title (FolderName)" per folder, for the preview. */
   addons: string[];
   /** Distinct characters in the census rows this upload sends: players seen, and your own. */
@@ -17,6 +20,13 @@ export interface UploadSession {
 // census_self and census_seen are being added to @everloot/protocol by the census intake change, so the
 // kinds are plain strings here. Until the protocol has them, parseRecords rejects these rows as invalid.
 const CENSUS_SEEN = "census_seen", CENSUS_SELF = "census_self";
+
+/**
+ * Kinds the addon keeps for the Everloot Desktop App's own Characters page and that no uploader sends: the player's
+ * professions, raid lockouts, active talent build (addon/modules/owned.lua), character sheet stats (charstats.lua) and
+ * PvP standing (pvp.lua). The protocol has no schema for them, so the intake would refuse them anyway; they are held here by name so they never reach a batch and are not counted as invalid.
+ */
+export const LOCAL_ONLY_KINDS: readonly string[] = ["profession_owned", "lockout_owned", "talent_owned", "stats_owned", "pvp_owned"];
 
 /** Distinct characters per census kind. A row without a guid is not a character and is not counted. */
 export function censusCharacters(records: readonly { kind: string; guid?: unknown }[]): UploadSession["census"] {
@@ -47,8 +57,9 @@ export function prepareUpload(payload: unknown, sharing: SharingChoices, grantTo
   if (!envelope || typeof envelope.addonVersion !== "string" || envelope.addonVersion.length > UPLOAD_LIMITS.addonVersionMax || !Array.isArray(envelope.records)) throw new Error("Choose an Everloot file with a version and records array.");
   if (envelope.records.length > UPLOAD_LIMITS.recordsPerFile) throw new Error(`This file is too large. Keep the original and split it into files of at most ${UPLOAD_LIMITS.recordsPerFile.toLocaleString("en-US")} records.`);
   if (grantTokens.length > UPLOAD_LIMITS.grantTokensMax || grantTokens.some((token) => !/^[a-f0-9]{64}$/.test(token))) throw new Error("Verification grants must be 64 lowercase hexadecimal characters, one per line (at most four).");
-  const parsed = parseRecords(envelope.records, parse);
-  const held = { legacy: 0, named: 0, invalid: parsed.receipt.rejected.length, links: 0 };
+  const local = (r: unknown) => LOCAL_ONLY_KINDS.includes(String((r as { kind?: unknown } | null)?.kind));
+  const parsed = parseRecords(envelope.records.filter((r) => !local(r)), parse);
+  const held = { legacy: 0, named: 0, invalid: parsed.receipt.rejected.length, links: 0, local: envelope.records.filter(local).length };
   const counts: Record<string, number> = {};
   const addons = new Map<string, string>();
   const census: { kind: string; guid?: unknown }[] = [];

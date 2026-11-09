@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Card, DataTable, EmptyState, Explainer, type Column } from "@/components/ui";
 import { guildsOn } from "@/lib/guild-switch";
+import { leaderboardsOn } from "@/lib/leaderboard-switch";
+import { GEAR_BOARDS, gearBoardPath } from "@/lib/leaderboards";
 import { CENSUS_MIN_CHARACTERS, CENSUS_MIN_INSTALLS, CENSUS_MIN_REPORTERS, CENSUS_ROUND_TO, HIDDEN_LABEL } from "../../../../kb/src/census";
 import type { CensusCount, Faction } from "../../../../kb/src/census";
 import {
@@ -35,13 +37,17 @@ const CLASS_FILL: Record<string, string> = {
 /**
  * The list of rankings: a rail on wide screens, a bar of links that scrolls sideways on a phone. Plain links,
  * so it works without JavaScript. `row` keeps it a bar at every width (the hub puts it under the title). With
- * EVERLOOT_GUILDS on, Population ends with the guild ladder.
+ * EVERLOOT_GUILDS on, Population ends with the guild ladder; with EVERLOOT_LEADERBOARDS on, the gear boards lead.
  */
 export function RankingRail({ current, row = false }: { current?: string; row?: boolean }) {
   const col = row ? "" : "lg:block";
-  const groups = guildsOn()
+  const withGuilds = guildsOn()
     ? RAIL_GROUPS.map((g, i) => (i === 0 ? { ...g, links: [...g.links, { label: "Guilds by progression", href: "/guilds" }] } : g))
     : RAIL_GROUPS;
+  // With EVERLOOT_LEADERBOARDS on, the gear boards come first: named characters, each by its owner's choice.
+  const groups = leaderboardsOn()
+    ? [{ title: "Characters", links: (["item-level", "gear-score"] as const).map((m) => ({ label: GEAR_BOARDS[m].title, href: gearBoardPath(m) })) }, ...withGuilds]
+    : withGuilds;
   return (
     <nav aria-label="Rankings" data-rankings-rail className="min-w-0">
       <div className={`-mx-4 overflow-x-auto px-4 ${row ? "" : "lg:mx-0 lg:overflow-visible lg:px-0"}`}>
@@ -577,7 +583,8 @@ export function HowItCounts() {
       <p>
         A week runs from Monday to Sunday, UTC. Each character counts once a week, and a number shows only when it covers at
         least {CENSUS_MIN_CHARACTERS} characters reported by at least {CENSUS_MIN_INSTALLS} installs from at
-        least {CENSUS_MIN_REPORTERS} addresses, rounded to the nearest {CENSUS_ROUND_TO}.
+        least {CENSUS_MIN_REPORTERS} addresses, rounded to the nearest {CENSUS_ROUND_TO}. While few players upload,
+        Everloot&apos;s own installs also count on their own, so a week can come from one player&apos;s game.
       </p>
       <p>
         Ranks follow those rounded numbers, so equal numbers share a rank. Change compares a rank with the week before.

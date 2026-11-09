@@ -1,5 +1,6 @@
 import { itemNames } from "./names";
 import { loadCraftedItems, loadItemFacts, loadWorldFacts } from "./rollup-compute";
+import type { Corpus } from "./upload-store";
 import { publicQuests, publicVendors } from "./world-lists";
 import { SOURCES, type SourceSlug } from "./items";
 
@@ -39,9 +40,9 @@ export function buildItemSources(f: SourceFacts): Map<number, SourceSlug[]> {
 // The fact arrays are replaced whenever the corpus reloads, so they are the memo's key.
 let memo: { keys: unknown[]; value: ItemSeen } | null = null;
 
-/** For the item lists' Source column and filter, and "Seen by players". Built once per corpus version. */
-export async function loadItemSeen(): Promise<ItemSeen> {
-  const [items, world, crafted] = await Promise.all([loadItemFacts(), loadWorldFacts(), loadCraftedItems()]);
+/** For the item lists' Source column and filter, and "Seen by players". Built once per corpus version. `read` as in rollup-compute.ts. */
+export async function loadItemSeen(read?: Corpus): Promise<ItemSeen> {
+  const [items, world, crafted] = await Promise.all([loadItemFacts(read), loadWorldFacts(read), loadCraftedItems(read)]);
   if (items.unreachable || world.unreachable || crafted.unreachable) return { seen: new Set(), from: new Map(), unreachable: true };
   const keys = [items.rates, items.names, world.vendors, world.quests, crafted.items];
   if (memo && memo.keys.every((k, i) => k === keys[i])) return memo.value;

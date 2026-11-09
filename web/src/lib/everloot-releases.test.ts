@@ -72,6 +72,8 @@ test("the list is read once an hour, with GITHUB_TOKEN when it is set", async ()
   expect(url).toBe("https://api.github.com/repos/Everloot/everloot/releases?per_page=100");
   expect(init.next?.revalidate).toBe(3600);
   expect(init.headers).toMatchObject({ Authorization: "Bearer t0ken" });
+  await fetchReleases(60);
+  expect((fetch.mock.calls[1] as unknown as [string, { next?: { revalidate?: number } }])[1].next?.revalidate).toBe(60);
 });
 
 test("a GitHub error, an outage or an odd answer is null, never a throw", async () => {

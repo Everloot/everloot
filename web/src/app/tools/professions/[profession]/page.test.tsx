@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
+import { edgeDegraded } from "@/lib/cf-edge-cache";
 
 const store = vi.hoisted(() => ({ loadCorpus: vi.fn() }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
@@ -35,7 +36,10 @@ vi.mock("@/lib/shown-item-names", () => ({
 vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a>,
 }));
-vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
+vi.mock("next/navigation", () => ({
+  notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
+  permanentRedirect: (to: string) => { throw new Error(`308 ${to}`); },
+}));
 vi.mock("@/components/EmailCapture", () => ({ default: () => null }));
 
 import ProfessionPage from "./page";
@@ -78,6 +82,17 @@ test("on a phone the recipe tables scroll sideways instead of hiding what a reci
 test("an unknown profession is a 404", async () => {
   store.loadCorpus.mockResolvedValue(empty);
   await expect(render("riding")).rejects.toThrow("NEXT_NOT_FOUND");
+});
+
+test("the skill line id and the id-slug segments redirect for good to the slug page, keeping the query; an unknown id is a 404", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  await expect(render("171")).rejects.toThrow("308 /tools/professions/alchemy");
+  await expect(render("171-alchemy")).rejects.toThrow("308 /tools/professions/alchemy");
+  await expect(render("171-alchemy", { from: "1", to: "10" })).rejects.toThrow("308 /tools/professions/alchemy?from=1&to=10");
+  await expect(render("762")).rejects.toThrow("NEXT_NOT_FOUND");
+  await expect(render("762-riding")).rejects.toThrow("NEXT_NOT_FOUND");
+  // The slug itself does not redirect.
+  expect(await render("alchemy")).toContain("Alchemy recipes");
 });
 
 test("with no observations the player layer says ranges are unrecorded, not zero", async () => {
@@ -248,6 +263,7 @@ test("when the corpus reads but the world facts or the rollups do not, the secti
     for (const [profession, kind] of [["tailoring", "cloth"], ["first-aid", "cloth"], ["skinning", "leather"]]) {
       const part = section(await render(profession), kind)!;
       expect(part, `${which} ${profession}`).toContain("Storage unreachable");
+      expect(edgeDegraded(await render(profession)), `${which} ${profession}`).toBe(true);
       expect(part).not.toContain("zones yet");
       expect(part).not.toContain("<table");
     }

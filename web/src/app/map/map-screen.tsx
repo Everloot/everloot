@@ -8,6 +8,7 @@ import { mapBoundsFromRecords } from "../../../../kb/src/map-bounds";
 import { allZones } from "../../../../kb/src/world-map-near";
 import { zoneToMap } from "../../../../kb/src/world-coords";
 import { STORAGE_UNREACHABLE, uploadStore } from "@/lib/upload-store";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { dataAgeLabel } from "@/lib/data-age";
 import {
   categoryCounts, continentPath, parseDeepLink, parseMapUrl, parseViewState, parseZoneLink, visibleItems, type MapItems,
@@ -164,6 +165,7 @@ export async function renderMapScreen(query: MapQuery, pageContinent: number | n
 
   return (
     <article data-map-page>
+      <EdgeDegraded when={corpus.unreachable === true || sightings.unreachable === true} />
       <JsonLd data={webApplicationJsonLd({ name: title, path: pageContinent === null ? "/map" : path, description: art ? withArt(lead) : lead })} />
       {vb ? (
         <WorldMapView

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
 import EmailCapture from "@/components/EmailCapture";
 import ClassContextChip from "@/components/classes/ClassContextChip";
@@ -11,10 +11,11 @@ import { classContextParams, parseClassContext, withoutClassContext } from "@/li
 import { dataAgeLabel } from "@/lib/data-age";
 import { loadItemTips, loadSiteAssets, loadSpellNames, type ItemTip } from "@/lib/game-assets";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, shownItemName, type ShownItemName } from "@/lib/items";
-import { CLIENT_PROFESSIONS, professionBySlug, professionHref, RECIPES_BUILD, recipeGroups, recipeItemIds, type RecipeView } from "@/lib/professions";
+import { CLIENT_PROFESSIONS, professionBySegment, professionHref, RECIPES_BUILD, recipeGroups, recipeItemIds, type RecipeView } from "@/lib/professions";
 import { pageMetadata } from "@/lib/seo";
 import { loadShownNames } from "@/lib/shown-item-names";
-import { STORAGE_UNREACHABLE, uploadStore } from "@/lib/upload-store";
+import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT, uploadStore } from "@/lib/upload-store";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { formatCopper, handleProfessionPath } from "../../../../../../kb/src/profession-path";
 import { handleRecipeThresholds, pathFactsFromRecords, recipeThresholdsStructured, type Range } from "../../../../../../kb/src/recipe-thresholds";
 import { farmingAreas, gatherAreas, GATHERING, inLevels } from "@/lib/farming";
@@ -40,7 +41,7 @@ function skill(value: string, fallback: number): number {
 }
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
-  const p = professionBySlug((await props.params).profession);
+  const p = professionBySegment((await props.params).profession);
   if (!p) notFound();
   return {
     ...pageMetadata({
@@ -62,9 +63,16 @@ const rangeText = (r: Range) => (r.min === null && r.max === null ? "?" : r.min 
  * The two are labelled apart: the recipe list is found in game files, unconfirmed; the player facts need 3 installs.
  */
 export default async function ProfessionPage(props: Props) {
-  const p = professionBySlug((await props.params).profession);
+  const segment = (await props.params).profession;
+  const p = professionBySegment(segment);
   if (!p) notFound();
   const searchParams = (await props.searchParams) ?? {};
+  // The slug is the one canonical segment; the skill line id and `<id>-<slug>` forms land here and move on, keeping
+  // the range and class context they came with, as the hub's `?profession=` redirect does.
+  if (segment !== p.slug) {
+    const search = new URLSearchParams(Object.entries(searchParams).flatMap(([k, v]) => (Array.isArray(v) ? v : v === undefined ? [] : [v]).map((x) => [k, x]))).toString();
+    permanentRedirect(`${professionHref(p.slug)}${search ? `?${search}` : ""}`);
+  }
   const read = parseClassContext(searchParams);
   const context = read.ok ? read.context : null;
   const fromSkill = skill(one(searchParams.from), 1);
@@ -180,6 +188,7 @@ export default async function ProfessionPage(props: Props) {
 
   return (
     <Container width="data">
+      <EdgeDegraded when={corpus.unreachable === true || gathered.down} />
       <PageHeader
         trail={trail}
         title={`${p.name} recipes`}
@@ -188,7 +197,7 @@ export default async function ProfessionPage(props: Props) {
         meta={<>
           <span className="font-mono tabular-nums">{plural(p.recipes.length, "recipe")}</span>
           <span>Game files, build {RECIPES_BUILD}</span>
-          {corpus.unreachable ? <span>Storage unreachable</span> : <>
+          {corpus.unreachable ? <span>{STORAGE_UNREACHABLE_SHORT}</span> : <>
             {reports > 0 && <span className="font-mono tabular-nums">{plural(reports, "recipe report")}</span>}
             <span>{dataAgeLabel(corpus.dataAsOf)}</span>
           </>}
@@ -254,7 +263,7 @@ export default async function ProfessionPage(props: Props) {
                 : level && gathered.all > 0 ? <p data-empty-state className="py-3 text-cell text-fg-2">{`Nothing here for levels ${rangeParam(level)}.`}</p>
                 : <EmptyState message={gather.source === "herb" || gather.source === "ore"
                   ? `No ${gather.noun} zones yet: a zone shows once 3 installs gather from the same spot there.`
-                  : `No ${gather.noun} zones yet: a zone shows once 3 players upload loot from the same mobs there.`} />}
+                  : `No ${gather.noun} zones yet: a zone shows once 3 installs upload loot from the same mobs there.`} />}
           </section>
         )}
 

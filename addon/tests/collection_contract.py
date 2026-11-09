@@ -119,6 +119,86 @@ assert(#EverlootDB.records.quest == 2, 'a header, a level of zero and a differen
 GetQuestLogTitle = nil
 accept(2, 176)
 assert(#EverlootDB.records.quest == 2, 'no quest log call, no quest row')
+-- Forever's client (build 1.60.1.70790, mainline UI): QUEST_ACCEPTED carries only the quest id, and the log is
+-- read through C_QuestLog.GetLogIndexForQuestID and C_QuestLog.GetInfo (QuestLogDocumentation.lua in the build).
+modernLog = {
+ {title = 'Durotar', questID = 0, level = 0, suggestedGroup = 0, isHeader = true},
+ {title = 'Lazy Peons', questID = 180, level = 4, suggestedGroup = 0, isHeader = false},
+ {title = 'Vile Familiars', questID = 181, level = 3, suggestedGroup = 3, isHeader = false},
+ {title = 'No Level', questID = 182, level = 0, suggestedGroup = 0, isHeader = false},
+}
+C_QuestLog.GetInfo = function(i) return modernLog[i] end
+C_QuestLog.GetLogIndexForQuestID = function(id)
+ for i, q in ipairs(modernLog) do if q.questID == id and not q.isHeader then return i end end
+end
+local function acceptId(id) for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'QUEST_ACCEPTED', id) end end
+acceptId(180)
+local modern = EverlootDB.records.quest[3]
+assert(modern and modern.questId == 180 and modern.title == 'Lazy Peons' and modern.level == 4, 'the quest id alone finds the log row')
+assert(modern.category == 'Durotar' and modern.suggestedGroup == nil and modern.faction == 'alliance' and modern.giverNpcId == 999)
+acceptId(181)
+assert(EverlootDB.records.quest[4].suggestedGroup == 3 and EverlootDB.records.quest[4].category == 'Durotar')
+acceptId(180)
+acceptId(182)
+acceptId(999)
+assert(#EverlootDB.records.quest == 4, 'a repeat, a level of zero and a quest not in the log record nothing')
+C_QuestLog.GetInfo, C_QuestLog.GetLogIndexForQuestID = nil, nil
+-- Vendors on Forever's client: its merchant window reads prices with C_MerchantFrame.GetItemInfo
+-- (Mainline/MerchantFrame.lua in the build); the old GetMerchantItemInfo is not there.
+GetMerchantNumItems = function() return 3 end
+GetMerchantItemLink = function(i) return ({ '|cffffffff|Hitem:159::::::::4:::::|h[Refreshing Spring Water]|h|r', '|Hitem:4540|h[Tough Hunk of Bread]|h' })[i] end
+GetMerchantItemInfo = nil
+C_MerchantFrame = { GetItemInfo = function(i)
+ return ({ { name = 'Water', price = 25, stackCount = 1, numAvailable = -1 }, { name = 'Bread', price = 25, stackCount = 1, numAvailable = 5 },
+  { name = 'No Link', price = 10, numAvailable = -1 } })[i]
+end }
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'MERCHANT_SHOW') end
+local vendor = EverlootDB.records.vendor and EverlootDB.records.vendor[1]
+assert(vendor and vendor.vendorNpcId == 999 and #vendor.items == 2, 'the modern merchant reader records the vendor')
+assert(vendor.items[1].itemId == 159 and vendor.items[1].priceCopper == 25 and vendor.items[1].limitedStock == nil)
+assert(vendor.items[2].itemId == 4540 and vendor.items[2].limitedStock == 5)
+-- The same window opened again on the same day is one vendor row; an item seen in three windows is one item row.
+GetItemInfo = function(id) return ({ [159] = 'Refreshing Spring Water', [4540] = 'Tough Hunk of Bread' })[id], nil, 1 end
+for _ = 1, 3 do for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'MERCHANT_SHOW') end end
+assert(#EverlootDB.records.vendor == 1, 'the same vendor on the same day is one row')
+assert(#EverlootDB.records.item_seen == 2, 'each item on the vendor is one item_seen row')
+-- A price or stock change is a new vendor row; a day change is one too; an unchanged item still adds no item row.
+local bread = { name = 'Bread', price = 30, stackCount = 1, numAvailable = 5 }
+C_MerchantFrame.GetItemInfo = function(i)
+ return ({ { name = 'Water', price = 25, stackCount = 1, numAvailable = -1 }, bread, { name = 'No Link', price = 10, numAvailable = -1 } })[i]
+end
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'MERCHANT_SHOW') end
+assert(#EverlootDB.records.vendor == 2 and EverlootDB.records.vendor[2].items[2].priceCopper == 30, 'a changed price is a new row')
+bread.numAvailable = 2
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'MERCHANT_SHOW') end
+assert(#EverlootDB.records.vendor == 3 and EverlootDB.records.vendor[3].items[2].limitedStock == 2, 'a changed stock is a new row')
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'MERCHANT_SHOW') end
+assert(#EverlootDB.records.vendor == 3, 'unchanged again, no row')
+date = function() return '2026-10-09T00:00:00Z' end
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'MERCHANT_SHOW') end
+assert(#EverlootDB.records.vendor == 4, 'the next day records the vendor once more')
+assert(#EverlootDB.records.item_seen == 2, 'no item row for an item already seen')
+-- A different name or quality for a known item is a new item row (once); the same item looted three times is not.
+GetItemInfo = function(id) return ({ [159] = 'Agua de manantial', [4540] = 'Tough Hunk of Bread' })[id], nil, 1 end
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'MERCHANT_SHOW') end
+assert(#EverlootDB.records.item_seen == 3 and EverlootDB.records.item_seen[3].name == 'Agua de manantial', 'a new name is a new row')
+GetItemInfo = function() return 'Linen Cloth', nil, 1 end
+GetNumLootItems = function() return 1 end
+GetLootSourceInfo = function() return 'Creature-0-1-2-3-44-0000004', 1 end
+local items = #EverlootDB.records.item_seen
+for _ = 1, 3 do for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'LOOT_OPENED') end end
+assert(#EverlootDB.records.item_seen == items + 1, 'one looted item seen three times is one row')
+GetItemInfo = function() return 'Linen Cloth', nil, 2 end
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'LOOT_OPENED') end
+assert(#EverlootDB.records.item_seen == items + 2 and EverlootDB.records.item_seen[items + 2].quality == 'uncommon', 'a new quality is a new row')
+GetItemInfo, GetLootSourceInfo = nil, nil
+GetNumLootItems = function() return 0 end
+date = function() return '2026-10-08T00:00:00Z' end
+C_MerchantFrame = nil
+local vendors = #EverlootDB.records.vendor
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'MERCHANT_SHOW') end
+assert(#EverlootDB.records.vendor == vendors, 'no price reader, no vendor row')
+n = #EverlootDB.records.npc_sighting  -- the merchant windows above recorded the vendor as a sighting
 C_Map.GetPlayerMapPosition = function() return nil end
 for _, hook in ipairs(Everloot.frame.hooks) do hook(nil,'PLAYER_TARGET_CHANGED') end
 assert(#EverlootDB.records.npc_sighting == n, 'missing coordinates must not become zero')
@@ -126,6 +206,32 @@ for _, hook in ipairs(Everloot.frame.hooks) do hook(nil,'GUILD_ROSTER_UPDATE') e
 local member = EverlootDB.records.guild_snapshot[1].members[1]
 assert(member.rank == 'Officer' and member.level == 60 and member.class == 'MAGE')
 assert(member.lastOnlineDays == 0)
+""")
+# The names of drop sources this install met, for the tooltip's drop rows: read from its own sightings and loot, never
+# written; each lookup reads only rows stored since the last one, and a pipe in a name cannot start an escape.
+lua.execute("""
+local records = EverlootDB.records
+local function add(kind, row) records[kind] = records[kind] or {}; table.insert(records[kind], row) end
+local before = {}
+for kind, rows in pairs(records) do before[kind] = #rows end
+add('npc_sighting', { npcId = 990001, name = 'Defias Bandit' })
+add('object_sighting', { objectId = 990002, name = 'Copper Vein' })
+add('loot', { sourceObjectId = 990003, sourceObjectName = 'Battered Chest', items = {} })
+add('npc_sighting', { npcId = 990004, name = 4 })
+assert(Everloot:SourceName('npc', 990001) == 'Defias Bandit', 'an NPC this install saw')
+assert(Everloot:SourceName('object', 990002) == 'Copper Vein' and Everloot:SourceName('object', 990003) == 'Battered Chest', 'objects seen and looted')
+assert(Everloot:SourceName('npc', 990004) == nil and Everloot:SourceName('npc', 990002) == nil, 'no name, or the wrong kind, is nil')
+add('npc_sighting', { npcId = 990005, name = 'Mr. |cffff0000Red' })
+assert(Everloot:SourceName('npc', 990005) == 'Mr. ||cffff0000Red', 'a later row is read, its pipe shown as a pipe')
+for kind, rows in pairs(records) do
+  local n = (before[kind] or 0) + ((kind == 'npc_sighting' and 3) or ((kind == 'object_sighting' or kind == 'loot') and 1) or 0)
+  assert(#rows == n, 'looking up names stores nothing: ' .. kind)
+end
+-- Leave the rows as they were, for the schema check below.
+for kind, n in pairs({ npc_sighting = 3, object_sighting = 1, loot = 1 }) do
+  for _ = 1, n do table.remove(records[kind]) end
+  if #records[kind] == 0 and not before[kind] then records[kind] = nil end
+end
 """)
 # Every row the addon wrote is a record the site would accept (packages/protocol/schema).
 from protocol_schema import check_all  # noqa: E402

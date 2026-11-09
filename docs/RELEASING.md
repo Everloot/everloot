@@ -1,7 +1,7 @@
 # Releasing
 
-Four things ship from this repository, each differently. The protocol package has its own section
-below.
+Eight things ship from this repository, each differently: the four in the table, then the protocol
+package, the MCP server, the knowledge release and the bulk export, each with its own section below.
 
 | What | How it ships | Version |
 |---|---|---|
@@ -9,6 +9,7 @@ below.
 | The addon, tagged (Alpha or stable) | A `addon-v*` tag runs `.github/workflows/release.yml` and creates a GitHub release | `0.3.x` |
 | The addon, nightly | `.github/workflows/nightly.yml` makes a pre-release from `main` when it has changed | `0.3.x-nightly.<date>.<run>` |
 | The desktop app | A `desktop-v*` tag runs `.github/workflows/desktop-release.yml`, which builds Windows, macOS and Linux installers and publishes a GitHub release with `SHA256SUMS` ([`desktop/README.md`](../desktop/README.md#release)) | `0.1.x` |
+| The MCP server | A version bump in three files merges and deploys with the site; a maintainer then publishes that version to the MCP registry by hand ([MCP server](#mcp-server)). `.github/workflows/mcp-image.yml` builds its container image on demand | `0.9.x` |
 
 The site's download link (`web/public/downloads/`) points at the newest tagged-version zip committed to the
 repository. It can be an explicitly labelled Alpha. A nightly never changes it.
@@ -59,7 +60,8 @@ The workflow then:
    `addon-v*` tag.
 5. uploads that same tested archive to CurseForge project `1762765`, for Forever `1.60.1`.
    The `CF_API_KEY` repository secret authenticates the upload. The exact changelog line
-   `Release channel: Alpha` selects Alpha there too; otherwise the file is a Release.
+   `Release channel: Alpha` uploads the file as a Beta there ("Everloot <version> Beta"): CurseForge's Files tab hides
+   alpha files by default, so Alpha uploads left it reading "No Results". Otherwise the file is a Release.
    Nightlies stay on GitHub only. CurseForge approval may take time after upload.
 
 Only the last job holds `contents: write`; the build and test job is read only. If a run fails,
@@ -129,6 +131,62 @@ package: on a clean checkout of `main`, `cd packages/protocol && npm ci && npm r
 --exit-code && npm publish --access public`. Then, on npmjs.com, set the package's trusted publisher to
 GitHub Actions, organization `Everloot`, repository `everloot`, workflow `protocol-publish.yml`. From then
 on a tag is enough.
+
+## MCP server
+
+The public MCP server (`https://everloot.app/mcp/public`, code in `kb/src/mcp-server.ts`) is served by the
+site's Worker, so its code ships with every site deploy. Its version is a separate thing: it is what the
+server reports on `initialize`, what the server card at `/.well-known/mcp/server-card.json` says, and what
+the MCP registry lists. The version is written in three files, and all three must carry the same number:
+
+| File | Field |
+|---|---|
+| `server.json` (repository root, the registry's manifest) | `version` |
+| `web/public/.well-known/mcp/server-card.json` (served by the site, byte for byte the same as `server.json`) | `version` |
+| `kb/src/mcp-server.ts` | `SERVER_VERSION` |
+
+`web/src/lib/mcp-listing.test.ts` fails when they differ, so a bump that misses one does not pass checks.
+
+To release a version:
+
+1. On a branch, bump the three values together in one pull request (scope `mcp`), with the tool or
+   description change that earns the bump. Merge it. The merge touches `web/` and `kb/`, so
+   `deploy-worker.yml` deploys the site once the Release checks pass.
+2. Wait for that deploy. Registry versions are immutable, so do not publish a version the live server
+   does not report yet. Check the live card:
+
+   ```sh
+   curl -s https://everloot.app/.well-known/mcp/server-card.json | grep '"version"'
+   ```
+
+3. From a clean checkout of `main`, publish to the registry with the maintainer's key (an Ed25519 key kept
+   outside the repository; the public half is `web/public/.well-known/mcp-registry-auth`, which is how
+   the registry proves the `app.everloot` namespace):
+
+   ```sh
+   mcp-publisher validate
+   mcp-publisher login http --domain everloot.app --private-key <maintainer key, raw hex>
+   mcp-publisher publish
+   ```
+
+   `docs/2026-10-18-mcp-listings.md` (section 1) has the exact `login` line and the other listings
+   (connector directories, which the owner updates from their portals) that reuse the same text.
+
+Then verify:
+
+- The registry lists the new version:
+  `curl "https://registry.modelcontextprotocol.io/v0.1/servers?search=app.everloot"`.
+- The live server reports it: an `initialize` against `https://everloot.app/mcp/public` returns
+  `serverInfo.version` equal to the number in the three files, and `tools/list` still returns every tool.
+- The registry is in preview and may reset; a version already published cannot be changed, so a mistake
+  is fixed by the next bump, not by republishing.
+
+**Container image.** `.github/workflows/mcp-image.yml` is manual (Actions, MCP release image, Run
+workflow). It downloads the pinned knowledge release named in the workflow, checks its SHA-256, builds
+`kb/Dockerfile` as a knowledge-only image and pushes it to GitHub Container Registry as
+`everloot-mcp:<commit sha>` and `everloot-mcp:beta`. It does not touch the site, the registry or the
+version files. To ship a newer knowledge release in the image, update the release name and hash in the
+workflow first.
 
 ## Knowledge release (lore archive)
 
