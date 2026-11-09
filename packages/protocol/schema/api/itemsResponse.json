@@ -12,10 +12,153 @@
       "type": "array",
       "items": {
         "type": "object",
-        "propertyNames": {
-          "type": "string"
+        "properties": {
+          "itemId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "class": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "The client's name."
+                  },
+                  "label": {
+                    "type": "string",
+                    "description": "The plural label pages use."
+                  },
+                  "slug": {
+                    "type": "string",
+                    "description": "The value /api/items takes as class."
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "label",
+                  "slug"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "subclass": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "name": {
+                    "description": "The client's name; null when the client has none, then the slug is the id.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "slug": {
+                    "type": "string",
+                    "description": "The value /api/items takes as subclass."
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "slug"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "slot": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "inventoryType": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "description": "The game's inventory type number."
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "slug": {
+                    "type": "string",
+                    "description": "The value /api/items takes as slot."
+                  }
+                },
+                "required": [
+                  "inventoryType",
+                  "name",
+                  "slug"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for items that are not worn or held."
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "slug": {
+                    "type": "string",
+                    "description": "The value /api/items takes as quality."
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "slug"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
         },
-        "additionalProperties": {}
+        "required": [
+          "itemId",
+          "class",
+          "subclass",
+          "slot",
+          "quality"
+        ],
+        "additionalProperties": false
       }
     },
     "gameData": {

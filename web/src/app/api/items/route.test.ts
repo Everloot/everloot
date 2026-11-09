@@ -83,6 +83,15 @@ test("the category tree carries slugs, counts and the build", async () => {
 test("the bodies are the protocol's itemsResponse and itemCategoriesResponse", async () => {
   const body = await (await GET(req("?class=weapon"))).json();
   expect(() => itemsResponse.parse(body)).not.toThrow();
+  // Each item is the typed row, not an open object: the parsed copy keeps every field the route sent.
+  const one = await (await GET(req("?limit=1"))).json();
+  expect(one.items).toHaveLength(1);
+  expect(itemsResponse.parse(one).items).toEqual(one.items);
+  expect(itemsResponse.shape.items.element.safeParse({ itemId: 1, class: "weapons", subclass: null, slot: null, quality: null }).success).toBe(false);
+  // Every item of the build parses, nameless subclasses and unworn items included.
+  const all = await (await GET(req())).json();
+  expect(all.items).toHaveLength(CLIENT_TAXONOMY.items.length);
+  expect(() => itemsResponse.parse(all)).not.toThrow();
   const tree = itemCategoriesResponse.parse(await (await categoriesGET()).json());
   expect(tree.classes.length).toBeGreaterThan(0);
   expect(tree.classes.every((c) => c.subclasses.length > 0 || c.items === 0)).toBe(true);
