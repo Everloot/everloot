@@ -19,6 +19,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   titles, quest lines, mounts, encounters, recipes, class gear and its restrictions, class spells, races, legacy perks,
   talent nodes, raid buffs): ids, the names the files hold and each file's build, every row counted, with a schema each
   and a manifest line. The README and the download page no longer list the catalogs as missing. Nothing observed changes.
+- Site: every record kind has a docs page, `/docs/api/records/<kind>`, generated from its schema: each field with its type,
+  whether it is required and its description, nested fields included, whether the kind is in the public corpus, where it
+  goes, and the cross-field rules the server checks. The sidebar lists them and the schemas table links each kind to its page.
 - Site: the account guide and the addon page link the sample character page (/showcase/character), so a player can see
   what a character page holds before linking one. The sample stays out of search and the sitemap.
 - Addon: the Gold tab's Overview chart follows the period buttons (today, 7 days, 30 days, or all for the ledger's
