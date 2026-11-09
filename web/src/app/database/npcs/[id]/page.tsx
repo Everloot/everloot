@@ -5,7 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasCard } from "@/lib/tooltip";
 import { npcNameReporters, npcPage, npcTraits, type NpcPin, type NpcRank } from "../../../../../../kb/src/world-pages";
-import { pendingForNpc, pendingLine } from "../../../../../../kb/src/pending-loot";
+import { pendingLine } from "../../../../../../kb/src/pending-loot";
 import { npcLootTable } from "../../../../../../kb/src/loot-tables";
 import { computeRollups, loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
 import { pinLink, WORLD_MAP } from "@/lib/world-map";
@@ -14,6 +14,7 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, type Column } from "@/components/ui";
 import { EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, MapName, ShowOnMap, Unreachable } from "../../entity";
 import { NpcLootPanel } from "../../loot-tables";
+import { unknownNpc } from "../../unknown";
 import { entitySummary, observedLine } from "@/lib/evidence";
 import { loadItemFacts } from "@/lib/rollup-compute";
 import { itemNames } from "@/lib/names";
@@ -26,20 +27,6 @@ import { entityTitle, npcDescription } from "@/lib/entity-meta";
 
 export const dynamic = "force-dynamic";
 
-/**
- * An id no upload mentions: no sighting, no vendor or quest row naming it, no loot window from it, counted or not. The game
- * files the site reads hold no NPC table, so that is a 404, not an empty page. Unreachable storage rules nothing out.
- */
-function unknownNpc(npcId: number, facts: Awaited<ReturnType<typeof loadWorldFacts>>, rollup: Awaited<ReturnType<typeof computeRollups>>): boolean {
-  if (facts.unreachable || rollup.stats.unreachable) return false;
-  return !facts.npcs.some((r) => r.npcId === npcId)
-    && !facts.vendors.some((r) => r.vendorNpcId === npcId)
-    && !facts.quests.some((r) => r.giverNpcId === npcId || r.turnInNpcId === npcId)
-    && !rollup.rates.some((r) => r.sourceNpcId === npcId)
-    && !rollup.measuredZeros.some((r) => r.sourceNpcId === npcId)
-    && !pendingForNpc(facts.pending, npcId);
-}
-
 export async function generateMetadata(props: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const params = await props.params;
   if (!/^[1-9]\d*$/.test(params.id)) return { robots: { index: false, follow: true } };
@@ -49,7 +36,7 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
   const page = npcPage(npcId, facts);
   const name = !facts.unreachable && page.name ? page.name : `NPC ${npcId}`;
   return {
-    ...pageMetadata({ title: entityTitle(name, "NPC"), description: npcDescription({ name, id: npcId, positions: facts.unreachable ? 0 : page.pins.length }), path: `/database/npcs/${npcId}` }),
+    ...pageMetadata({ title: entityTitle(name, "NPC"), description: npcDescription({ name, id: npcId, positions: facts.unreachable ? 0 : page.pins.length }), path: `/database/npcs/${npcId}`, image: `/database/npcs/${npcId}/opengraph-image` }),
     robots: { index: npcIndexable(page, facts.unreachable), follow: true },
   };
 }
