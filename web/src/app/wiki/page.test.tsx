@@ -27,6 +27,8 @@ test("the hub lists published pages by type and the most recent first, with a ti
   const recent = html.slice(html.indexOf(">Recent pages<"), html.indexOf('id="wiki-q"'));
   expect(recent.indexOf("Test Dungeon")).toBeLessThan(recent.indexOf("Test Zone"));
   expect(html).toMatch(/>Lore archive, 2023<\/h2>[\s\S]*href="\/lore"/);
+  // How a page is proposed: a line under the index to the guide.
+  expect(html).toMatch(/<\/h2>[\s\S]*href="\/docs\/guides\/wiki"[^>]*>Write a page</);
   const meta = await generateMetadata();
   expect(meta.robots).toEqual({ index: true, follow: true });
   expect(meta.alternates?.canonical).toBe("/wiki");
