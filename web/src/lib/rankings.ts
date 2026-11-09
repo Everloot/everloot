@@ -2,6 +2,7 @@ import {
   CENSUS_CLASSES, CENSUS_LAUNCH, CENSUS_MIN_CHARACTERS, CENSUS_MIN_INSTALLS, CENSUS_MIN_REPORTERS, CENSUS_RACES, FACTIONS, rollupCensus,
   type CensusCount, type CensusRow, type CensusWindow, type Faction,
 } from "../../../kb/src/census";
+import { longDate } from "@/data/wow-forever";
 import { censusHref } from "./census-filter";
 import type { JsonLd } from "./jsonld";
 import { absoluteUrl } from "./seo";
@@ -84,10 +85,9 @@ export function firstWeek(launch: string = CENSUS_LAUNCH): number {
 }
 
 const isoDay = (t: number) => new Date(t).toISOString().slice(0, 10);
-const longDay = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", timeZone: "UTC" });
 
 /** What the rankings say before their first week: no numbers, only when they start. */
-export const START_LINE = `Rankings start with the first full week after ${longDay(CENSUS_LAUNCH)}.`;
+export const START_LINE = `Rankings start with the first full week after ${longDate(CENSUS_LAUNCH.slice(0, 10))}.`;
 
 export interface RankingWeek {
   /** Monday, YYYY-MM-DD: the week's id in URLs. */

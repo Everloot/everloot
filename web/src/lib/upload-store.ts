@@ -59,6 +59,7 @@ export interface SnapshotHealth {
 }
 
 export const STORAGE_UNREACHABLE = "Storage unreachable. These figures are unrecorded, not zero.";
+export const STORAGE_UNREACHABLE_SHORT = "Storage unreachable";
 
 interface Snapshot extends Corpus {
   conflictTombstones?: string[];

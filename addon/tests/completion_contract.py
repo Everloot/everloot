@@ -176,7 +176,7 @@ event('PLAYER_ENTERING_WORLD'); event('ACHIEVEMENT_EARNED')
 assert(drain() == 0, 'an off module schedules nothing')
 for _, kind in ipairs({'achievement_catalog','reputation_catalog','title_catalog','quest_chain_catalog','achievement_owned','reputation_owned','title_owned','quest_owned'}) do
  assert(#rows(kind) == 0, kind)
- assert(status():find('rows ' .. kind .. ': 0', 1, true), 'status lists ' .. kind)
+ assert(not status():find('rows ' .. kind, 1, true), 'status leaves out an empty ' .. kind)
 end
 """)
 

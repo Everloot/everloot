@@ -8,7 +8,7 @@ import {
   ANOTHER_CHARACTER_NOTE, COMPLETION_AGREEMENT, completionEmptyState, completionProgress, droppedCharactersNote, overviewOf,
 } from "../../../../../kb/src/completion";
 import { loadCompletion } from "@/lib/completion-store";
-import { STORAGE_UNREACHABLE, uploadStore } from "@/lib/upload-store";
+import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT, uploadStore } from "@/lib/upload-store";
 import { dataAgeLabel } from "@/lib/data-age";
 import CompletionView, { CharacterClosest } from "./CompletionView";
 import { CategoryDetail, OverviewBars, TotalBar } from "./OverviewView";
@@ -43,7 +43,7 @@ async function gapView({ collection, install }: { collection: string; install: s
   const pending = facts !== null && facts.catalog.length + facts.owned.length === 0;
   return (
     <>
-      <p className="text-meta text-muted">{corpus.unreachable ? "Storage unreachable" : dataAgeLabel(corpus.dataAsOf)}</p>
+      <p className="text-meta text-muted">{corpus.unreachable ? STORAGE_UNREACHABLE_SHORT : dataAgeLabel(corpus.dataAsOf)}</p>
       <Card>
         <form method="get" className="flex flex-wrap items-end gap-3">
           <input type="hidden" name="view" value={GAP_VIEW} />
@@ -68,7 +68,7 @@ async function mountsView() {
   const agreed = corpus.unreachable ? new Set<number>() : agreedCollectionItems("Mounts", collectionFactsFromRecords(corpus.records));
   return (
     <>
-      <p className="text-meta text-muted">{corpus.unreachable ? "Storage unreachable" : dataAgeLabel(corpus.dataAsOf)}</p>
+      <p className="text-meta text-muted">{corpus.unreachable ? STORAGE_UNREACHABLE_SHORT : dataAgeLabel(corpus.dataAsOf)}</p>
       <MountsView agreedSpellIds={agreed} unreachable={corpus.unreachable === true} />
     </>
   );

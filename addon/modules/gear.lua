@@ -9,16 +9,19 @@ local SLOTS = {
   "Trinket0Slot", "Trinket1Slot", "MainHandSlot", "SecondaryHandSlot",
 }
 
-local lastSample = 0
-
 local function sample()
   local now = time()
-  if now - lastSample < 3600 then return "sampled recently, skipping" end
+  local name = UnitName and E.Readable(UnitName("player"))
+  local realm = GetRealmName and E.Readable(GetRealmName())
+  -- The hour is kept per character in SavedVariables, so a /reload does not start it again.
+  local key = E.CharacterKey and E.CharacterKey()
+  if not key and name then key = name .. "-" .. (realm or "?") end
+  if type(EverlootDB.gearSampledAt) ~= "table" then EverlootDB.gearSampledAt = {} end
+  local last = key and tonumber(EverlootDB.gearSampledAt[key]) or 0
+  if now - last < 3600 then return "sampled recently, skipping" end
   if not (GetInventoryItemLink and GetDetailedItemLevelInfo) then
     return "inventory API unavailable in beta"
   end
-  local name = UnitName and E.Readable(UnitName("player"))
-  local realm = GetRealmName and E.Readable(GetRealmName())
   if not name then return "no player yet" end
   local equipped = {}
   for _, slotName in ipairs(SLOTS) do
@@ -34,7 +37,7 @@ local function sample()
     end
   end
   if #equipped == 0 then return "nothing equipped readable" end
-  lastSample = now
+  if key then EverlootDB.gearSampledAt[key] = now end
   E:Store("gear_snapshot", {
     installId = EverlootDB.installId,
     capturedAt = date("!%Y-%m-%dT%H:%M:%SZ"),

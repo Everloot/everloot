@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { approvedAddon, type ApprovedAddon } from "@/data/addon-repos";
 import { addonGithub, type AddonGithubResult } from "@/lib/addon-github";
 import { dataAgeLabel } from "@/lib/data-age";
 import { loadPopularAddons } from "@/lib/rollup-compute";
-import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
+import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT } from "@/lib/upload-store";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, EmptyState, Explainer, Facts, PageHeader, SectionHeading } from "@/components/ui";
 
@@ -56,12 +56,12 @@ async function find(params: Props["params"]): Promise<Found> {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const found = await find(params);
-  if (!found) return { title: "Addon not found" };
+  if (!found) return { title: "Page not found" };
   const { approved } = found;
   // The owner's title, never the one uploads report.
   const title = approved.title;
   return pageMetadata({
-    title: `${title}: addon for WoW: Forever`,
+    title: `${title} – WoW Forever Addon`,
     description: `How many Everloot installs run ${title}, where its author publishes it and what its repository shows. Counts appear once three installs report the addon.`,
     // Polestar has a dedicated guide page at the lowercase address.
     path: approved.name.toLowerCase() === "polestar" ? "/addons/polestar" : `/addons/${encodeURIComponent(approved.name)}`,
@@ -141,7 +141,7 @@ export default async function AddonProfilePage({ params }: Props) {
   const { approved, stats, usage } = found;
   const { name, source, title } = approved;
   const { reportingInstalls, unreachable, dataAsOf } = usage;
-  if (name !== decodeURIComponent((await params).name)) redirect(`/addons/${encodeURIComponent(name)}`);
+  if (name !== decodeURIComponent((await params).name)) permanentRedirect(`/addons/${encodeURIComponent(name)}`);
   const github = await addonGithub(source.repo);
   const repoUrl = `https://github.com/${source.repo}`;
   const path = `/addons/${encodeURIComponent(name)}`;
@@ -153,7 +153,7 @@ export default async function AddonProfilePage({ params }: Props) {
           trail={[...trailFor("/addons/popular")!, { name: title, path }]}
           title={title}
           lede="An addon for WoW: Forever, made by its own author. Everloot has not tested it, and neither Everloot nor the author of another addon vouches for it."
-          meta={<span className="font-mono text-xs">{unreachable ? "Storage unreachable" : dataAgeLabel(dataAsOf)}</span>}
+          meta={<span className="font-mono text-xs">{unreachable ? STORAGE_UNREACHABLE_SHORT : dataAgeLabel(dataAsOf)}</span>}
         />
 
         <div className="space-y-12">

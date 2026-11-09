@@ -3,11 +3,12 @@ import JsonLd from "@/components/JsonLd";
 import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { AgreementMeter, Badge, Card, Container, DataTable, DataTitle, EmptyState, filledColumns, SectionHeading, type Column, type SparseColumn } from "@/components/ui";
+import { AgreementMeter, Badge, Card, Container, DataTable, DataTitle, EmptyState, filledColumns, reportedLabel, SectionHeading, type Column, type SparseColumn } from "@/components/ui";
 import {
   bossRows, difficultyLabel, difficultyList, instanceDescription, instanceHref, instanceRows, instanceTitle, levelLabel, loadSightings, parseInstanceSegment,
   type BossRow, type InstancePlace, type InstanceRow,
 } from "@/lib/instances";
+import { entityTitle } from "@/lib/entity-meta";
 import { dayLabel } from "@/lib/report-labels";
 import { PLACEHOLDER } from "@/lib/item-names";
 import { mapHref } from "@/lib/map-view";
@@ -43,7 +44,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const title = instanceTitle(row);
   return {
     ...pageMetadata({
-      title: `${title} – WoW Forever ${row.raid === null ? "Instance" : row.raid ? "Raid" : "Dungeon"}: Entrance and Bosses`,
+      title: entityTitle(title, row.raid === null ? "instance" : row.raid ? "raid" : "dungeon"),
       description: instanceDescription(row),
       path: instanceHref(row.instanceMapId, row.name),
     }),
@@ -98,7 +99,7 @@ export default async function InstancePage(props: Props) {
   // On a phone the dense table keeps the boss name and folds the report into one line under it.
   const bossMeta = (b: BossRow) => (b.boss
     ? `${b.boss.kills.toLocaleString("en-US")} kills · ${b.boss.reporters} ${b.boss.reporters === 1 ? "install" : "installs"} · ${dayLabel(b.boss.lastSeen)}`
-    : b.reported ? `${b.reported} of 3 installs reported` : "Not confirmed yet");
+    : b.reported ? reportedLabel(b.reported) : "Not confirmed yet");
 
   const unconfirmed = row.reported > 0
     ? `No entrance is confirmed yet. ${row.reported} ${row.reported === 1 ? "install has" : "installs have"} zoned in, and 3 must agree on the place.`

@@ -93,6 +93,15 @@ fire('QUEST_TURNED_IN', 123, 100, 750)
 fire('MERCHANT_SHOW'); money = money + 300; fire('PLAYER_MONEY'); fire('MERCHANT_CLOSED')
 money = money + 9999; fire('PLAYER_MONEY')  -- a letter, a trade: not farming income
 assert(s.money.loot == 10703 and s.money.quest == 750 and s.money.vendor == 300, 'money split by source')
+-- A thousands separator belongs to the number, and a Spanish client's own coin words read too.
+local before = s.money.loot
+fire('CHAT_MSG_MONEY', 'You loot 1,234 Gold')
+assert(s.money.loot == before + 12340000, 'a thousands separator is part of the count, got ' .. (s.money.loot - before))
+GOLD_AMOUNT = '%d de oro'; SILVER_AMOUNT = '%d de plata'; COPPER_AMOUNT = '%d de cobre'
+fire('CHAT_MSG_MONEY', 'Recibes botin: 1.234 de oro, 5 de plata')
+assert(s.money.loot == before + 12340000 + 12340500, 'Spanish words and separator, got ' .. (s.money.loot - before))
+GOLD_AMOUNT = '%d Gold'; SILVER_AMOUNT = '%d Silver'; COPPER_AMOUNT = '%d Copper'
+s.money.loot = before
 
 -- Values: market (2589), the player's own scan (765, thin on the market), vendor (2592), none (999).
 assert(select(2, G.Value(2589)) == 'market' and G.Value(2589) == 205)

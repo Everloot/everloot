@@ -13,6 +13,8 @@ E.Options = O
 O.ROWS = {
   { key = "window", label = "Everloot window",
     text = "The window from the minimap button and /everloot window. It shows what this file holds and records nothing; off leaves recording as it is." },
+  { key = "minimapButton", field = true, label = "Minimap button",
+    text = "The Everloot button on the minimap: click it for the window, right-click for these settings, hover it for other addons' buttons. Off hides it after a reload; /everloot window still opens the window." },
   { key = "buttons", command = "buttons", label = "Addon buttons in the Everloot button",
     text = "Other addons' minimap buttons gather into the Everloot minimap button; hover it to use them. Records nothing; off puts them back after a reload." },
   { key = "auctions", command = "auctions", label = "Auction scans",
@@ -27,8 +29,14 @@ O.ROWS = {
     text = "Race, class, level and faction of your characters and of players you see. Never names, guilds, gear or places. Off deletes its rows." },
   { key = "openworld", label = "World",
     text = "NPCs, loot, quests, vendors and items you see, and where you stood at NPC windows and herbs, ore and chests. Anonymous: no character or guild names." },
+  { key = "professions", label = "Recipes and trainers",
+    text = "At profession and trainer windows you open: each recipe you know with its colour at your rank, product and reagents, and each trainer recipe's required rank and cost. Never crafts or trains. Stays in this file until it is sent." },
+  { key = "mapbounds", label = "Zone map corners",
+    text = "Each zone's corners in world coordinates, once per zone per game build, so the site can place zone coordinates on one map. Nothing about you. Stays in this file until it is sent." },
   { key = "gold", label = "Your gold",
     text = "Your own gold in and out, for gold per hour. Sent only if you share it on the upload page." },
+  { key = "roster", label = "Your characters",
+    text = "Name, realm, class, level, faction, gold and professions of each character you log in with, for the window's Home. Stays in this file; never uploaded." },
   { key = "gear", label = "Your gear",
     text = "Your equipped items and item levels, at most once an hour. Sent only if you share it on the upload page." },
   { key = "talents", label = "Your talents",
@@ -47,6 +55,12 @@ if E.Pulls then
   O.ROWS[#O.ROWS + 1] = { key = "pulls", command = "pulls", label = "Boss pulls",
     text = "After each boss pull: your group's names, classes, roles and the game's damage meter totals. Sent from the upload page or the Desktop App. Off deletes its rows." }
 end
+
+-- "What you've added": rows of each kind in the saved file now, shown under the switches.
+O.ADDED = {
+  { "loot", "Loot windows" }, { "npc_sighting", "NPC sightings" }, { "quest", "Quests" }, { "recipe_observed", "Recipe colours" },
+  { "item_fact", "Item facts" }, { "auction_scan", "Auction scans" }, { "census_seen", "Players seen" }, { "map_bounds", "Zones mapped" },
+}
 
 function O.IsOn(row)
   if row.field then
@@ -69,10 +83,67 @@ function O.Set(row, on)
   O.Refresh()
 end
 
+-- Kinds of rows each command deletes when it turns off (core.lua: the Withdraw of each module), for the
+-- confirmation the page asks first. The slash command stays direct.
+O.DELETES = {
+  census = { "census_self", "census_seen" },
+  players = { "player_seen", "guild_kill" },
+  addons = { "addon_seen" },
+  completion = { "achievement_catalog", "reputation_catalog", "title_catalog", "quest_chain_catalog",
+    "achievement_owned", "reputation_owned", "title_owned", "quest_owned",
+    "profession_owned", "lockout_owned", "talent_owned", "stats_owned", "pvp_owned" },
+}
+
+--- How many rows turning this row off would delete.
+function O.RowsToDelete(row)
+  local n = 0
+  for _, kind in ipairs(O.DELETES[row.key] or {}) do n = n + E:Count(kind) end
+  return n
+end
+
+if StaticPopupDialogs then
+  StaticPopupDialogs["EVERLOOT_TURN_OFF"] = {
+    text = "Turn off %s and delete %d recorded rows? They have not necessarily been uploaded.",
+    button1 = "Turn off and delete",
+    button2 = "Cancel",
+    OnAccept = function()
+      local row = O.pending
+      O.pending = nil
+      if row then O.Set(row, false) end
+    end,
+    OnCancel = function()
+      O.pending = nil
+      O.Refresh()
+    end,
+    timeout = 0, whileDead = 1, hideOnEscape = 1,
+  }
+end
+
+--- A click on a switch on the page. Turning off a row whose command deletes recorded rows asks first;
+--- everything else is O.Set as before.
+function O.Click(row, on)
+  if not on and O.DELETES[row.key] and StaticPopup_Show and StaticPopupDialogs and StaticPopupDialogs["EVERLOOT_TURN_OFF"] then
+    local n = O.RowsToDelete(row)
+    if n > 0 then
+      O.pending = row
+      local ok, shown = pcall(StaticPopup_Show, "EVERLOOT_TURN_OFF", row.label, n)
+      if ok and shown then
+        O.Refresh() -- the switch stays on until the answer
+        return
+      end
+      O.pending = nil
+    end
+  end
+  O.Set(row, on)
+end
+
 function O.Refresh()
   local page = O.page
   if not page then return end
   for _, box in ipairs(page.boxes or {}) do box:SetChecked(O.IsOn(box.row)) end
+  for i, a in ipairs(O.ADDED) do
+    if page.added and page.added[i] then page.added[i]:SetText(a[2] .. ": " .. tostring(E:Count(a[1]))) end
+  end
   if page.note then
     page.note:SetText(O.changed and "Changes apply after a reload." or ("Everloot " .. E.VERSION .. ". Changes apply after a reload."))
   end
@@ -152,9 +223,13 @@ local function build()
     text:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -2)
     text:SetText(row.text)
     box.label, box.description = label, text
-    box:SetScript("OnClick", function(self) O.Set(row, self:GetChecked() and true or false) end)
+    box:SetScript("OnClick", function(self) O.Click(row, self:GetChecked() and true or false) end)
     page.boxes[#page.boxes + 1] = box
   end
+  page.addedHeading = words(content, "GameFontNormal", 13, "text")
+  page.addedHeading:SetText("What you've added")
+  page.added = {}
+  for i = 1, #O.ADDED do page.added[i] = words(content, "GameFontHighlightSmall", 11, "muted") end
   local function layout(_, width)
     width = math.max(1, width or scroll:GetWidth())
     content:SetWidth(width)
@@ -165,7 +240,13 @@ local function build()
       box.description:SetWidth(math.max(1, width - 2 * PAD - 38))
       y = y + math.max(32, 4 + box.label:GetStringHeight() + 2 + box.description:GetStringHeight()) + 12
     end
-    content:SetHeight(y)
+    page.addedHeading:SetPoint("TOPLEFT", content, "TOPLEFT", PAD, -y)
+    y = y + 22
+    for _, line in ipairs(page.added) do
+      line:SetPoint("TOPLEFT", content, "TOPLEFT", PAD, -y)
+      y = y + 16
+    end
+    content:SetHeight(y + PAD)
     scroll:SetVerticalScroll(math.min(scroll:GetVerticalScroll(), math.max(0, y - scroll:GetHeight())))
   end
   scroll:HookScript("OnSizeChanged", layout)

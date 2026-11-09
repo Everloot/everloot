@@ -36,7 +36,10 @@ vi.mock("@/lib/shown-item-names", () => ({
 vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a>,
 }));
-vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
+vi.mock("next/navigation", () => ({
+  notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
+  permanentRedirect: (to: string) => { throw new Error(`308 ${to}`); },
+}));
 vi.mock("@/components/EmailCapture", () => ({ default: () => null }));
 
 import ProfessionPage from "./page";
@@ -79,6 +82,17 @@ test("on a phone the recipe tables scroll sideways instead of hiding what a reci
 test("an unknown profession is a 404", async () => {
   store.loadCorpus.mockResolvedValue(empty);
   await expect(render("riding")).rejects.toThrow("NEXT_NOT_FOUND");
+});
+
+test("the skill line id and the id-slug segments redirect for good to the slug page, keeping the query; an unknown id is a 404", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  await expect(render("171")).rejects.toThrow("308 /tools/professions/alchemy");
+  await expect(render("171-alchemy")).rejects.toThrow("308 /tools/professions/alchemy");
+  await expect(render("171-alchemy", { from: "1", to: "10" })).rejects.toThrow("308 /tools/professions/alchemy?from=1&to=10");
+  await expect(render("762")).rejects.toThrow("NEXT_NOT_FOUND");
+  await expect(render("762-riding")).rejects.toThrow("NEXT_NOT_FOUND");
+  // The slug itself does not redirect.
+  expect(await render("alchemy")).toContain("Alchemy recipes");
 });
 
 test("with no observations the player layer says ranges are unrecorded, not zero", async () => {

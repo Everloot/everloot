@@ -5,7 +5,8 @@ import { beforeEach, expect, test, vi } from "vitest";
 const store = vi.hoisted(() => ({ loadCompletion: vi.fn() }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
-  uploadStore: { loadCompletion: store.loadCompletion },
+  // The sitemap reads the census for the ranking pages and answers nothing while it is unreachable: readable and empty here.
+  uploadStore: { loadCompletion: store.loadCompletion, loadCensus: async () => ({ rows: [], dataAsOf: null, unreachable: false }) },
 }));
 // The game-file base the lists start from: unreadable (null, the wrapper throws) unless a test sets it, so the cases below
 // keep testing the rollup alone. An empty list is a file that was read and holds nothing.
@@ -28,6 +29,8 @@ vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
   permanentRedirect: (to: string) => { throw new Error(`REDIRECT ${to}`); },
 }));
+// The faction page asks the lore archive for its name; no release is open here, so the page shows no lore block.
+vi.mock("@/lib/release", () => ({ getRelease: () => null }));
 vi.mock("@/lib/rollup-compute", () => ({
   loadItemFacts: async () => ({ rates: [], names: [], npcs: [], unreachable: false }),
   loadWorldFacts: async () => ({ npcs: [], quests: [], vendors: [], unreachable: false }),
@@ -44,7 +47,7 @@ import TitleList, { generateMetadata as titleListMetadata } from "./titles/page"
 import TitlePage, { generateMetadata as titleMetadata } from "./titles/[id]/page";
 import ChainList, { generateMetadata as chainListMetadata } from "./quest-chains/page";
 import ChainPage, { generateMetadata as chainMetadata } from "./quest-chains/[id]/page";
-import sitemap from "../sitemap";
+import sitemap from "@/lib/site-sitemap";
 import { loadCatalog } from "@/lib/completion-lists";
 import { siteSearch } from "@/lib/site-search";
 import { emptyCompletion, foldCompletion } from "../../../../kb/src/completion-rollup";
@@ -171,10 +174,10 @@ test("the list captions and descriptions keep the game files and the players apa
     expect(out).not.toMatch(/three players reported:/);
   }
   const description = (await achievementListMetadata({ searchParams: Promise.resolve({}) })).description!;
-  expect(description).toContain("From the game files; confirmed once three players report each the same way.");
-  expect(description).not.toContain("is listed once three players");
+  expect(description).toContain("From the game files; confirmed once three installs report each the same way.");
+  expect(description).not.toContain("is listed once three installs");
   for (const meta of [factionListMetadata, titleListMetadata, chainListMetadata]) {
-    expect((await meta({ searchParams: Promise.resolve({}) })).description).toContain("From the game files; confirmed once three players");
+    expect((await meta({ searchParams: Promise.resolve({}) })).description).toContain("From the game files; confirmed once three installs");
   }
 });
 
@@ -218,7 +221,7 @@ test("before three players report anything, each list says so and shows no rows"
   for (const el of [AchievementList(search()), FactionList(search())]) {
     const out = await html(el);
     expect(out).toContain("data-empty-state");
-    expect(out).toContain("None is in the game files, and none has been confirmed by three players.");
+    expect(out).toContain("None is in the game files, and none has been confirmed by three installs.");
     expect(out).not.toContain("Ten Quests");
   }
 });
@@ -237,6 +240,7 @@ test("an achievement page has its facts and is indexed; an unlisted one is a 404
   expect(out).toContain("5");
   expect(out).not.toContain("Secret criterion text");
   expect((await achievementMetadata(page("4-ten-quests"))).robots).toMatchObject({ index: true });
+  expect((await achievementMetadata(page("4-ten-quests"))).title).toBe("Ten Quests – WoW Forever achievement");
   expect((await achievementMetadata(page("30-disputed"))).robots).toMatchObject({ index: false });
   await expect(AchievementPage(page("30-disputed"))).rejects.toThrow("NEXT_NOT_FOUND");
   await expect(AchievementPage(page("20"))).rejects.toThrow("NEXT_NOT_FOUND");
@@ -249,21 +253,48 @@ test("a bare id or a wrong slug redirects to the canonical address", async () =>
   await expect(FactionPage(page("69-wrong"))).rejects.toThrow("REDIRECT /database/factions/69-darnassus");
 });
 
-test("a faction page shows its header, and one with none says not reported", async () => {
-  expect(await html(FactionPage(page("69-darnassus")))).toContain("Alliance");
-  expect(await html(FactionPage(page("529-argent-dawn")))).toContain("Not reported");
+test("a faction page says whether it is a header, links the files' parent, and shows its id once", async () => {
+  game.factions = [{ id: 469, name: "Alliance", shown: true }, { id: 69, name: "Darnassus", shown: true, parentId: 469 }, { id: 529, name: "Argent Dawn", shown: true }];
+  const out = await html(FactionPage(page("69-darnassus")));
+  expect(out).toMatch(/>Header<\/dt><dd[^>]*>No<\/dd>/);
+  expect(out).toMatch(/>Parent faction<\/dt><dd[^>]*><a href="\/database\/factions\/469-alliance"[^>]*>Alliance<\/a><\/dd>/);
+  expect(out).not.toContain("Not reported");
+  expect(out).not.toMatch(/>ID<\/dt>/);
+  expect(out.match(/ID 69/g)).toHaveLength(1);
+  // A header the files name as other factions' parent, with no standing of its own: a page, but noindex.
+  const alliance = await html(FactionPage(page("469-alliance")));
+  expect(alliance).toMatch(/>Header<\/dt><dd[^>]*>Yes<\/dd>/);
+  expect(alliance).not.toContain("Parent faction");
+  expect((await factionMetadata(page("469-alliance"))).robots).toMatchObject({ index: false });
+  expect((await factionMetadata(page("69-darnassus"))).robots).toMatchObject({ index: true });
+  expect((await factionMetadata(page("69-darnassus"))).title).toBe("Darnassus – WoW Forever faction");
+  // Once three players report a standing for the header, it is a faction too, and indexed.
+  serve([...rows, ...from(3, rep(469, "Alliance"))]);
+  expect((await factionMetadata(page("469-alliance"))).robots).toMatchObject({ index: true });
   await expect(FactionPage(page("72-stormwind"))).rejects.toThrow("NEXT_NOT_FOUND");
 });
 
+test("without the game file, a faction page claims no header flag and keeps the header players saw it under", async () => {
+  const out = await html(FactionPage(page("69-darnassus")));
+  expect(out).not.toContain(">Header<");
+  expect(out).toMatch(/>Parent faction<\/dt><dd[^>]*>Alliance<\/dd>/);
+  expect(await html(FactionPage(page("529-argent-dawn")))).not.toContain("Not reported");
+});
+
 test("the sitemap lists both lists and only the entries that passed the gate", async () => {
-  const paths = (await sitemap()).map((e) => new URL(e.url).pathname);
+  const paths = (await sitemap())!.map((e) => new URL(e.url).pathname);
   expect(paths).toContain("/database/achievements");
   expect(paths).toContain("/database/factions");
   expect(paths).toContain("/database/achievements/4-ten-quests");
   expect(paths).toContain("/database/factions/69-darnassus");
   expect(paths.filter((p) => /^\/database\/(achievements|factions)\//.test(p)).sort()).toEqual(["/database/achievements/2-level-10", "/database/achievements/4-ten-quests", "/database/achievements/9-explore-elwynn-forest", "/database/factions/529-argent-dawn", "/database/factions/69-darnassus", "/database/factions/76-orgrimmar"]);
+  // A header-only faction from the files is left out, as its page says noindex; the factions under it are listed.
+  game.factions = [{ id: 469, name: "Alliance", shown: true }, { id: 72, name: "Stormwind", shown: true, parentId: 469 }];
+  const withFiles = (await sitemap())!.map((e) => new URL(e.url).pathname);
+  expect(withFiles).toContain("/database/factions/72-stormwind");
+  expect(withFiles).not.toContain("/database/factions/469-alliance");
   store.loadCompletion.mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });
-  const down = (await sitemap()).map((e) => new URL(e.url).pathname);
+  const down = (await sitemap())!.map((e) => new URL(e.url).pathname);
   expect(down).toContain("/database/achievements");
   expect(down.filter((p) => p.startsWith("/database/achievements/"))).toEqual([]);
 });
@@ -307,7 +338,7 @@ test("empty and unreadable states for titles and quest chains", async () => {
   serve(from(2, { kind: "title_catalog", titleId: 4, name: "Private" }));
   for (const el of [TitleList(search()), ChainList(search())]) {
     const out = await html(el);
-    expect(out).toContain("None is in the game files, and none has been confirmed by three players.");
+    expect(out).toContain("None is in the game files, and none has been confirmed by three installs.");
     expect(out).not.toContain("Private");
   }
   store.loadCompletion.mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });
@@ -315,7 +346,7 @@ test("empty and unreadable states for titles and quest chains", async () => {
 });
 
 test("sitemap and search include agreed titles and quest chains only", async () => {
-  const paths = (await sitemap()).map((e) => new URL(e.url).pathname);
+  const paths = (await sitemap())!.map((e) => new URL(e.url).pathname);
   for (const p of ["/database/titles", "/database/quest-chains", "/database/titles/5-corporal", "/database/quest-chains/900-the-defias"]) expect(paths).toContain(p);
   expect(paths.filter((p) => /two-titles|two-chain|split/.test(p))).toEqual([]);
   expect((await siteSearch("corporal")).find((g) => g.type === "title")!.results[0].href).toBe("/database/titles/5-corporal");
@@ -336,7 +367,7 @@ test("an achievement page lists its criteria once three players sent the same fu
   // A list cut short of the count is not shown, and the page says when it will be.
   const partial = await html(AchievementPage(page("4-ten-quests")));
   expect(partial).not.toContain("Secret criterion text");
-  expect(partial).toContain("The criteria show once three players report the same full list.");
+  expect(partial).toContain("The criteria show once three installs report the same full list.");
 });
 
 test("base is true when a game file was read and holds no eligible entry; null only when nothing is readable", async () => {
@@ -357,7 +388,7 @@ test("a base-only faction page says it is in the game files, unconfirmed, and ne
   const description = (await factionMetadata(page("72-stormwind"))).description;
   expect(description).toContain("Found in game files, unconfirmed");
   expect(description).not.toContain("three players");
-  expect((await factionMetadata(page("69-darnassus"))).description).toContain("as three players reported it");
+  expect((await factionMetadata(page("69-darnassus"))).description).toContain("as three installs reported it");
 });
 
 test("a base-only title page says it is in the game files, unconfirmed", async () => {
@@ -368,7 +399,7 @@ test("a base-only title page says it is in the game files, unconfirmed", async (
   const description = (await titleMetadata(page("8-s-champion"))).description;
   expect(description).toContain("Found in game files, unconfirmed");
   expect(description).not.toContain("three players");
-  expect((await titleMetadata(page("5-corporal"))).description).toContain("as three players reported it");
+  expect((await titleMetadata(page("5-corporal"))).description).toContain("as three installs reported it");
 });
 
 test("a base-only quest chain page says it is in the game files, unconfirmed", async () => {
@@ -379,7 +410,7 @@ test("a base-only quest chain page says it is in the game files, unconfirmed", a
   const description = (await chainMetadata(page("1-the-missing-diplomat"))).description;
   expect(description).toContain("Found in game files, unconfirmed");
   expect(description).not.toContain("three players");
-  expect((await chainMetadata(page("900-the-defias"))).description).toContain("as three players reported it");
+  expect((await chainMetadata(page("900-the-defias"))).description).toContain("as three installs reported it");
 });
 
 test("a base-only achievement page keeps the file-only presentation and the unconfirmed notice", async () => {

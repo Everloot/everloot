@@ -3,7 +3,7 @@ import Link from "next/link";
 import { pageMetadata } from "@/lib/seo";
 import { trailFor } from "@/lib/breadcrumbs";
 import { approvedAddon } from "@/data/addon-repos";
-import { loadEcosystem, starHistory } from "@/lib/ecosystem";
+import { loadEcosystem, staleNote, starGainLabel } from "@/lib/ecosystem";
 import {
   boardHref, boardQuery, boardRows, changeSince, initials, sortBoard, TAG_LABEL,
   type BoardQuery, type BoardRow, type BoardSort, type Search,
@@ -132,8 +132,9 @@ function AddonCard({ row, showChange, showInstalls }: { row: BoardRow; showChang
 export default async function AddonsPage(props: { searchParams?: Promise<Search> }) {
   const q = boardQuery((await props?.searchParams) ?? {});
   const view = await loadEcosystem();
-  const all = boardRows(view, starHistory);
+  const all = boardRows(view);
   const since = changeSince(all);
+  const stale = staleNote(view.refreshedAt);
   const showChange = since !== null;
   const showInstalls = view.installsAvailable;
   // A sort on a column this page is not showing falls back to the default ranking.
@@ -151,7 +152,7 @@ export default async function AddonsPage(props: { searchParams?: Promise<Search>
           trail={trailFor("/addons")!}
           title="Addons"
           lede="Addons and tools made for WoW: Forever, ranked by GitHub stars."
-          meta={<span className="font-mono text-xs">{plural(all.length, "project", "projects")}{view.refreshedAt && ` · updated ${day(view.refreshedAt)} ${view.refreshedAt.slice(11, 16)} UTC`}</span>}
+          meta={<span className="font-mono text-xs">{plural(all.length, "project", "projects")}{view.refreshedAt && ` · updated ${day(view.refreshedAt)} ${view.refreshedAt.slice(11, 16)} UTC`}{stale && ` · ${stale}`}</span>}
         />
 
         <div className="grid gap-4 lg:grid-cols-[11rem_minmax(0,1fr)] lg:gap-6">
@@ -222,7 +223,7 @@ export default async function AddonsPage(props: { searchParams?: Promise<Search>
                   meta={(r) => [
                     r.owner,
                     r.stars !== null ? plural(r.stars, "star", "stars") : null,
-                    showChange && r.change !== null ? `${signed(r.change)} since ${day(since!)}` : null,
+                    showChange && r.change !== null && r.changeSince ? starGainLabel({ change: r.change, since: r.changeSince }) : null,
                     r.updated ? `updated ${day(r.updated)}` : null,
                   ].filter(Boolean).join(" · ")}
                   empty={<EmptyState framed={false} message="No projects match this filter." />}
@@ -242,7 +243,8 @@ export default async function AddonsPage(props: { searchParams?: Promise<Search>
             <Explainer summary="How the ranking works">
               <p>
                 Projects are ranked by GitHub stars; ties go to more commits in the last 4 weeks, then to the name. Change
-                compares current stars with the oldest daily count from the last 7 days.
+                compares current stars with the oldest daily count kept from the 7 days before the newest one, so it is
+                counted from the last refresh, not from today. The addon tracker&apos;s Rising board shows the same change.
               </p>
               <p>Installs are copies of the Everloot addon that reported the addon, shown from 3. A dash means we do not have the number.</p>
             </Explainer>

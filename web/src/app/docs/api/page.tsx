@@ -5,6 +5,7 @@ import { C, Callout, H2, H3, List, P, Table, docLink } from "@/components/docs/b
 import { CodeGroup } from "@/components/docs/DocsClient";
 import DocPage from "@/components/docs/DocPage";
 import { ANON_PAGE, ANON_PER_HOUR, guardOn, KEY_PAGE, KEY_PER_HOUR } from "@/lib/data-guard";
+import { PAGE_INTERNAL_ROUTES } from "@/lib/docs/file-schemas";
 import { DOCS_TABS, endpointHref } from "@/lib/docs/nav";
 import { pageMetadata } from "@/lib/seo";
 import { REPO_URL } from "@/lib/source";
@@ -177,7 +178,10 @@ export default function ApiOverview() {
       <H2 id="openapi">OpenAPI document</H2>
       <P>
         The whole API in one file, OpenAPI 3.1, for client generators, request tools and assistants that read OpenAPI. It is
-        assembled from the same definitions the server uses, so it cannot describe an endpoint that does not exist.
+        assembled from the same definitions the server uses, so it cannot describe an endpoint that does not exist. The site
+        also has a few public GET routes its own pages fetch, {PAGE_INTERNAL_ROUTES.map((path, i) => (
+          <span key={path}>{i > 0 && " and "}<C>{path}</C></span>
+        ))}: they are not part of the contract, the document leaves them out, and they can change with the page.
       </P>
       <div className="mt-6">
         <CodeGroup title="List the endpoints" tabs={[{ label: "cURL", lang: "bash", code: `curl -s ${SITE}/api/openapi.json | jq '.paths | keys'` }]} />

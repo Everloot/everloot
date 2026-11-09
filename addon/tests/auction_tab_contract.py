@@ -239,7 +239,7 @@ end
 -- Price lines as the tooltip may give them: aligned pairs, plain lines, a long warning, a long localised label,
 -- native coin textures and a line with a label but no value.
 LONG = 'Precio de mercado de la comunidad en todas las casas de subastas del reino, por unidad'
-STALE = '  STALE: newest public day 2026-10-01 is 19 days old; the Desktop App or companion refreshes it, then /reload'
+STALE = '  STALE: newest public day 2026-10-01 is 19 days old; the Everloot Desktop App refreshes it, then /reload'
 STUB = {
   { text = 'Everloot market 2s 5c · per unit · all houses', left = 'Everloot market · per unit · all houses',
     right = '2|TInterface\\\\MoneyFrame\\\\UI-SilverIcon:0:0:2:0|t 5|TInterface\\\\MoneyFrame\\\\UI-CopperIcon:0:0:2:0|t', r = 0.9, g = 0.8, b = 0.5 },

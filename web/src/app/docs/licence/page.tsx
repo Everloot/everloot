@@ -8,7 +8,7 @@ import { pageMetadata } from "@/lib/seo";
 import { REPO_URL } from "@/lib/source";
 
 export const metadata: Metadata = pageMetadata({
-  title: "Everloot Licence and Credit",
+  title: "Licence and Credit",
   description: "What you may do with Everloot's data and code: CC BY-SA 4.0 data with a credit line, AGPL-3.0 code, and what belongs to Blizzard and others.",
   path: "/docs/licence",
 });

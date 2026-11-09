@@ -3,7 +3,9 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
+import { readCatalogFiles } from "../src/catalog-index.js";
 import { buildOpenData, OPEN_DATA_KINDS, type Dataset, type OpenDataInput } from "../src/open-data/build.js";
+import { readOpenDataGameFiles, type OpenDataCatalogs } from "../src/open-data/game-data.js";
 import { OpenDataManifest } from "../src/open-data/manifest.js";
 import { readRecordsFile } from "../src/open-data/read.js";
 import { renderReadme } from "../src/open-data/text.js";
@@ -49,9 +51,10 @@ const MAP: WorldMapData = {
   continents: [{ id: 0, name: "Eastern Kingdoms", bounds: BOUNDS }],
   zones: [{ uiMapId: 1429, name: "Elwynn Forest", continentId: 0, bounds: BOUNDS }],
   heldBackZones: [{ uiMapId: 2482, name: "Mount Hyjal", continentId: 1, bounds: { left: 9000, top: 9000, right: 8000, bottom: 8000 } }],
-  entrances: [{ mapId: 36, name: "The Deadmines", raid: false, continentId: 0, worldX: -11208, worldY: 1675 }],
+  // The committed map file carries a zone, a level range and difficulties per entrance, and a zone per flight master.
+  entrances: [{ mapId: 36, name: "The Deadmines", raid: false, continentId: 0, worldX: -11208, worldY: 1675, uiMapId: 1436, minLevel: 15, maxLevel: 25, difficultyIds: [1] }],
   flightNodes: [
-    { id: 2, name: "Stormwind, Elwynn", continentId: 0, worldX: 10, worldY: 10 },
+    { id: 2, name: "Stormwind, Elwynn", continentId: 0, worldX: 10, worldY: 10, uiMapId: 1429 },
     { id: 3, name: "Goldshire, Elwynn", continentId: 0, worldX: 20, worldY: 20 },
     { id: 99, name: "Nordrassil, Mount Hyjal", continentId: 1, worldX: 8500, worldY: 8500 },
   ],
@@ -62,6 +65,46 @@ const MAP: WorldMapData = {
   warnings: [],
 };
 const CLIENT_EDGE = (over: Partial<Edge> = {}): Edge => ({ fromKind: "item", fromId: 25, rel: "created_by", toKind: "spell", toId: 7, evidence: "client", build: "1.60.1.70450", installs: null, firstSeen: AT, lastSeen: AT, ...over });
+
+/**
+ * The catalog files: the eight catalog kinds from the fixture folder the catalog index is tested on, and one
+ * or two rows of each of the recipe, class, talent and raid files, with the stamp each file carries.
+ */
+const STAMP = { product: "wowf", buildId: 70790, version: "1.60.1.70790", buildConfig: "x", definitions: null, extractedAt: AT };
+const CREDIT = "Game data © Blizzard Entertainment, Inc.";
+const LABEL = "Found in game files, unconfirmed" as const;
+function catalogFixture(): OpenDataCatalogs {
+  const { files } = readCatalogFiles(join(__dirname, "fixtures", "game-files"));
+  return {
+    achievements: files.achievements!, factions: files.factions!, titles: files.titles!, questLines: files.questLines!,
+    mounts: files.mounts!, encounters: files.encounters!, races: files.races!, legacyPerks: files.legacyPerks!,
+    recipes: {
+      schema: "everloot.client-recipes/1", label: LABEL, credit: CREDIT, build: STAMP,
+      note: "ranks are SkillLineAbility's MinSkillLineRank, TrivialSkillLineRankLow (yellow) and TrivialSkillLineRankHigh (grey), 0 where the files give none; green is not stored",
+      professions: [{ id: 164, name: "Blacksmithing", otherSpells: 1, recipes: [[2660, 2862, 1, 25, 45, [[2840, 1]]], [3115, 0, 0, 0, 0, [[2835, 2]]]] }],
+    },
+    classGear: {
+      schema: "everloot.client-class-gear/1", label: LABEL, credit: CREDIT, build: STAMP,
+      classes: { warrior: { id: 1, gear: [[2, 7, 0], [4, 4, 40]] } }, restricted: { "17182": 1 },
+      note: "proficiencies and class masks are the game files'; races are not told apart",
+    },
+    classSpells: {
+      schema: "everloot.client-class-spells/1", label: LABEL, credit: CREDIT, build: STAMP,
+      classes: { warrior: { id: 1, spells: [78, 100] } }, note: "class skill lines and class masks are the game files'; races are not told apart",
+    },
+    talents: [{
+      schema: "everloot.talent-catalog/2", build: { version: "1.60.1.70790", extractedAt: AT }, classId: 8, className: "Mage",
+      trees: [{ id: 11582, name: "Arcane", order: 0, nodes: [
+        { id: 105798, x: 1620, y: 5730, row: 6, col: 1, kind: "single", maxRanks: 1, entries: [{ definitionId: 135328, spellId: 12042, name: "Arcane Power", maxRanks: 1 }], prereqs: [{ nodeId: 105801, rule: "any" }] },
+      ] }],
+    }],
+    raidBuffs: {
+      schema: "everloot.web-raid-data/1", build: "1.60.1.70790",
+      entries: [{ id: "arcane-intellect", label: "Arcane Intellect", kind: "buff", class: "mage", family: "arcane-intellect", scope: "single", tree: "baseline", names: ["Arcane Intellect"], spellIds: [1459, 1460] }],
+    },
+  };
+}
+
 const input = (records: unknown[] = corpus(), over: Partial<OpenDataInput> = {}): OpenDataInput => ({
   records, dataAsOf: AT, generatedAt: NOW,
   gameFiles: {
@@ -73,6 +116,7 @@ const input = (records: unknown[] = corpus(), over: Partial<OpenDataInput> = {})
       items: [[25, 2, 7, 13, 1], [26, 2, 7, 13, null]],
     },
     map: MAP,
+    catalogs: catalogFixture(),
   },
   ...over,
 });
@@ -184,7 +228,91 @@ test("the game-file layer carries the build's ids and relations and leaves out h
   expect(byName(datasets, "game-files", "zones").candidates).toBe(2);
   expect(rows(datasets, "game-files", "flight-masters").map((n) => n.id)).toEqual([2, 3]);
   expect(rows(datasets, "game-files", "flight-paths").map((p) => [p.from, p.to])).toEqual([[2, 3]]);
-  expect(rows(datasets, "game-files", "entrances")).toHaveLength(1);
+  expect(rows(datasets, "game-files", "entrances")).toEqual([{ mapId: 36, name: "The Deadmines", raid: false, continentId: 0, worldX: -11208, worldY: 1675 }]);
+  expect(rows(datasets, "game-files", "flight-masters")[0]).toEqual({ id: 2, name: "Stormwind, Elwynn", continentId: 0, worldX: 10, worldY: 10 });
+});
+
+test("every committed catalog is a game-files dataset: ids, the names the files hold and each file's own build, all rows counted", () => {
+  const { datasets } = buildOpenData(input());
+  const catalog = (name: string) => byName(datasets, "game-files", name);
+  expect(rows(datasets, "game-files", "achievements")).toEqual([
+    { achievementId: 1234, title: "Loremaster", points: 10, criteria: 2, statistic: false, build: "1.60.1.70707" },
+    { achievementId: 1300, title: "Creatures slain", points: 0, criteria: 0, statistic: true, build: "1.60.1.70707" },
+  ]);
+  expect(rows(datasets, "game-files", "factions")).toEqual([{ factionId: 1, name: "Stormwind", parentId: null, shown: true, build: "1.60.1.70755" }]);
+  expect(rows(datasets, "game-files", "titles")).toEqual([{ titleId: 7, name: "%s, Champion", build: expect.any(String) }]);
+  expect(rows(datasets, "game-files", "quest-lines")).toEqual([
+    { questLineId: 1, name: "The Missing Diplomat", questIds: [11, 10], build: expect.any(String) },
+    { questLineId: 2, name: "Lonely", questIds: [], build: expect.any(String) },
+  ]);
+  expect(rows(datasets, "game-files", "mounts")).toEqual([{ mountId: 5, name: "Gray Wolf", spellId: 6777, ridingSkill: 75, build: expect.any(String) }]);
+  expect(rows(datasets, "game-files", "encounters")).toEqual([
+    { instanceMapId: 36, encounterId: 1, name: "Rhahk'Zor", difficultyId: null, build: expect.any(String) },
+    { instanceMapId: 36, encounterId: 2, name: "Edwin VanCleef", difficultyId: 1, build: expect.any(String) },
+  ]);
+  // A recipe row is the file's tuple named: item 0 is null (makes none), rank 0 stays 0 (the files give none).
+  expect(rows(datasets, "game-files", "recipes")).toEqual([
+    { professionId: 164, professionName: "Blacksmithing", spellId: 2660, itemId: 2862, minRank: 1, yellowRank: 25, greyRank: 45, reagents: [{ itemId: 2840, count: 1 }], build: "1.60.1.70790" },
+    { professionId: 164, professionName: "Blacksmithing", spellId: 3115, itemId: null, minRank: 0, yellowRank: 0, greyRank: 0, reagents: [{ itemId: 2835, count: 2 }], build: "1.60.1.70790" },
+  ]);
+  expect(rows(datasets, "game-files", "class-gear")).toEqual([
+    { classId: 1, className: "warrior", itemClassId: 2, itemSubclassId: 7, level: 0, build: "1.60.1.70790" },
+    { classId: 1, className: "warrior", itemClassId: 4, itemSubclassId: 4, level: 40, build: "1.60.1.70790" },
+  ]);
+  expect(rows(datasets, "game-files", "class-gear-restrictions")).toEqual([{ itemId: 17182, classMask: 1, build: "1.60.1.70790" }]);
+  expect(rows(datasets, "game-files", "class-spells").map((r) => r.spellId)).toEqual([78, 100]);
+  // Races and talents carry names, never the trait text or spell descriptions.
+  const race = rows(datasets, "game-files", "races")[0]!;
+  expect(race).toMatchObject({ raceId: 2, name: "Orc", faction: "Horde", build: "1.60.1.70707" });
+  expect((race.traits as object[]).length).toBe(1);
+  expect(JSON.stringify(race)).not.toContain("description");
+  expect(rows(datasets, "game-files", "legacy-perks")).toEqual([{ treeId: 1187, nodeId: 110284, entryId: 136844, definitionId: 141607, spellId: 1225469, name: "Sturdy", maxRanks: 1, build: "1.60.1.70707" }]);
+  expect(rows(datasets, "game-files", "talent-nodes")).toEqual([{
+    classId: 8, className: "Mage", treeId: 11582, treeName: "Arcane", nodeId: 105798, x: 1620, y: 5730, row: 6, col: 1, kind: "single", maxRanks: 1,
+    entries: [{ definitionId: 135328, spellId: 12042, name: "Arcane Power", maxRanks: 1 }], prereqs: [{ nodeId: 105801, rule: "any" }], build: "1.60.1.70790",
+  }]);
+  expect(rows(datasets, "game-files", "raid-buffs")).toEqual([{
+    id: "arcane-intellect", label: "Arcane Intellect", kind: "buff", class: "mage", family: "arcane-intellect", scope: "single", tree: "baseline", treeProof: null,
+    names: ["Arcane Intellect"], spellIds: [1459, 1460], build: "1.60.1.70790",
+  }]);
+  // Every catalog dataset counts all its rows, labelled with the build of its own file, and every row is a row of its strict schema.
+  const names = ["achievements", "factions", "titles", "quest-lines", "mounts", "encounters", "recipes", "class-gear", "class-gear-restrictions", "class-spells", "races", "legacy-perks", "talent-nodes", "raid-buffs"];
+  for (const name of names) {
+    const d = catalog(name);
+    expect(d.candidates, name).toBe(d.rows.length);
+    expect(d.candidatesAre, name).toMatch(/^all rows of the build 1\.60\.1\.\d+$/);
+    for (const row of d.rows) {
+      expect(d.schema.safeParse(row).success, name).toBe(true);
+      expect(d.schema.safeParse({ ...(row as object), installId: "inst-3-0" }).success, name).toBe(false);
+      expect((row as { build: string }).build, name).toBe(d.candidatesAre.slice("all rows of the build ".length));
+    }
+  }
+  expect(catalog("factions").candidatesAre).toBe("all rows of the build 1.60.1.70755");
+});
+
+test("the manifest lists every catalog file with its rows and bytes, and the README no longer says the catalogs are missing", () => {
+  const { manifest } = writeOpenData(dir, input());
+  const file = (name: string) => manifest.files.find((f) => f.path === `game-files/${name}.ndjson`)!;
+  expect(file("achievements")).toMatchObject({ layer: "game-files", dataset: "achievements", rows: 2, candidates: 2, schema: "schema/game-files-achievements.schema.json" });
+  expect(file("talent-nodes")).toMatchObject({ rows: 1, candidates: 1, candidatesAre: "all rows of the build 1.60.1.70790" });
+  expect(file("raid-buffs").bytes).toBeGreaterThan(0);
+  for (const name of ["factions", "titles", "quest-lines", "mounts", "encounters", "recipes", "class-gear", "class-spells", "races", "legacy-perks"]) expect(file(name).rows, name).toBeGreaterThan(0);
+  expect(manifest.files.filter((f) => f.layer === "game-files")).toHaveLength(21);
+  const readme = readFileSync(join(dir, "README.md"), "utf8");
+  expect(readme).toContain("game-files/achievements.ndjson");
+  expect(readme).not.toContain("the achievement, faction, title and quest chain lists");
+  expect(manifest.notYet.join("\n")).not.toMatch(/achievement|faction|title|quest chain|recipe/);
+});
+
+test("the committed game-data folder reads as a full set of catalogs, and a folder missing one is refused", () => {
+  const root = join(__dirname, "..", "..", "web", "src", "data", "game-data");
+  const catalogs = readOpenDataGameFiles(root);
+  expect(catalogs.talents.length).toBe(9);
+  expect(catalogs.raidBuffs.entries.length).toBeGreaterThan(0);
+  const { datasets } = buildOpenData(input(corpus(), { gameFiles: { ...input().gameFiles, catalogs } }));
+  for (const d of datasets.filter((x) => x.layer === "game-files")) expect(d.rows.length, d.name).toBeGreaterThan(0);
+  // The fixture folder has the eight catalog kinds and nothing else: the first file not there stops the read.
+  expect(() => readOpenDataGameFiles(join(__dirname, "fixtures", "game-files"))).toThrow(/open-data: no talent files/);
 });
 
 test("the export writes a folder whose manifest matches its files, with the schema, README and licence", () => {

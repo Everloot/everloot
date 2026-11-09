@@ -371,18 +371,6 @@ local function rememberItem(itemId)
   if stored then EverlootDB.itemSeenIds[itemId] = seen end
 end
 
--- The game's own "N Gold", "N Silver" and "N Copper" strings, as patterns, so a coin slot's text reads in any
--- language; English where the client does not define them. A count may carry a thousands separator.
-local COIN_UNITS = { { "GOLD_AMOUNT", "%d Gold", 10000 }, { "SILVER_AMOUNT", "%d Silver", 100 }, { "COPPER_AMOUNT", "%d Copper", 1 } }
-local function coinPatterns()
-  local out = {}
-  for _, unit in ipairs(COIN_UNITS) do
-    local fmt = type(_G[unit[1]]) == "string" and _G[unit[1]] or unit[2]
-    out[#out + 1] = { fmt:gsub("[%^%$%(%)%.%[%]%*%+%-%?]", "%%%0"):gsub("%%d", "([%%d,%%.]+)"), unit[3] }
-  end
-  return out
-end
-
 -- The copper in loot slot i when it is the coin slot, read from the slot's text; nil for an item slot or a text
 -- that holds no amount.
 local function slotCopper(i, text)
@@ -391,13 +379,8 @@ local function slotCopper(i, text)
   if slotType ~= (Enum and Enum.LootSlotType and Enum.LootSlotType.Money or LOOT_SLOT_MONEY or 2) or type(text) ~= "string" then
     return nil
   end
-  local total = 0
-  for _, unit in ipairs(coinPatterns()) do
-    local digits = text:match(unit[1])
-    local amount = digits and tonumber((digits:gsub("%D", "")))
-    if amount then total = total + amount * unit[2] end
-  end
-  return total >= 1 and total <= 10000000000 and total or nil
+  local total = E.CoinText(text)
+  return total and total <= 10000000000 and total or nil
 end
 
 -- The id of the item an item GUID names. The GUID itself does not hold it: the disenchant or lock cast read it
@@ -854,6 +837,19 @@ function E:SourceName(kind, id)
   return name and (name:gsub("|", "||")) or nil
 end
 
+-- A Lua error in one handler on the shared frame ends the dispatch, so the modules after it miss the event.
+-- The captures that read the game's own windows run inside this, and the first error of a session is said once.
+local failedOnce, failedFns = false, {}
+local function guarded(label, fn, ...)
+  local ok, err = pcall(fn, ...)
+  if ok or failedFns[label] then return end
+  failedFns[label] = true
+  E:SetNote("openworld", "error in " .. label .. ": " .. tostring(err))
+  if failedOnce then return end
+  failedOnce = true
+  print("Everloot: openworld hit an error and keeps running. Other modules are not affected. /everloot status says more.")
+end
+
 E:RegisterModule("openworld", function()
   local f = E.frame
   f:RegisterEvent("PLAYER_TARGET_CHANGED")
@@ -865,19 +861,18 @@ E:RegisterModule("openworld", function()
   -- 0.3.7 and earlier paused a whole kind; these kinds now pause one share at a time.
   if EverlootDB.paused then EverlootDB.paused.npc_sighting, EverlootDB.paused.loot = nil, nil end
   for event in pairs(WINDOW_ROLES) do pcall(function() f:RegisterEvent(event) end) end
-  for _, event in ipairs({ "PLAYER_INTERACTION_MANAGER_FRAME_SHOW", "UNIT_SPELLCAST_SENT", "UNIT_SPELLCAST_FAILED",
-    "UNIT_SPELLCAST_FAILED_QUIET", "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_INTERRUPTED", "LOOT_CLOSED", "VIGNETTE_MINIMAP_UPDATED", "VIGNETTES_UPDATED", "PLAYER_LEAVING_WORLD",
+  for _, event in ipairs({ "PLAYER_INTERACTION_MANAGER_FRAME_SHOW", "LOOT_CLOSED", "VIGNETTE_MINIMAP_UPDATED", "VIGNETTES_UPDATED", "PLAYER_LEAVING_WORLD",
     "PLAYER_ENTERING_WORLD", "ENCOUNTER_END" }) do
     pcall(function() f:RegisterEvent(event) end)
   end
   if E.RUN_RECORDS then
     for _, event in ipairs({ "ENCOUNTER_START", "CHAT_MSG_SYSTEM" }) do pcall(function() f:RegisterEvent(event) end) end
   end
-  f:HookScript("OnEvent", function(_, event, arg1, arg2, arg3, arg4, arg5, arg6)
-    if event == "PLAYER_TARGET_CHANGED" then targetSighting("target")
-    elseif event == "UPDATE_MOUSEOVER_UNIT" then targetSighting("mouseover")
-    elseif event == "LOOT_OPENED" then lootCapture()
-    elseif event == "QUEST_ACCEPTED" then questCapture(arg1, arg2)
+  local function onEvent(_, event, arg1, arg2, arg3, arg4, arg5, arg6)
+    if event == "PLAYER_TARGET_CHANGED" then guarded("targetSighting", targetSighting, "target")
+    elseif event == "UPDATE_MOUSEOVER_UNIT" then guarded("targetSighting", targetSighting, "mouseover")
+    elseif event == "LOOT_OPENED" then guarded("lootCapture", lootCapture)
+    elseif event == "QUEST_ACCEPTED" then guarded("questCapture", questCapture, arg1, arg2)
     elseif event == "UNIT_SPELLCAST_SENT" then pcall(castSent, arg1, arg2, arg3, arg4)
     elseif (event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_FAILED_QUIET" or event == "UNIT_SPELLCAST_INTERRUPTED")
       and arg1 == "player" then
@@ -896,14 +891,23 @@ E:RegisterModule("openworld", function()
       local role = interactionRole(arg1)
       if role ~= nil then pcall(interactionSighting, role or nil) end
     end
-    if event == "MERCHANT_SHOW" then vendorCapture() end
+    if event == "MERCHANT_SHOW" then guarded("vendorCapture", vendorCapture) end
     local role = WINDOW_ROLES[event]
     if role == false then
       local ok, found = pcall(gossipRole)
       role = ok and found or false
     end
     if role ~= nil then pcall(interactionSighting, role or nil) end
-  end)
+  end
+  f:HookScript("OnEvent", onEvent)
+  -- Spell casts are the player's own only: a frame of its own, so they do not run through every module's handler.
+  local spellFrame = CreateFrame("Frame")
+  for _, event in ipairs({ "UNIT_SPELLCAST_SENT", "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_FAILED_QUIET",
+    "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_INTERRUPTED" }) do
+    if spellFrame.RegisterUnitEvent then pcall(spellFrame.RegisterUnitEvent, spellFrame, event, "player")
+    else pcall(spellFrame.RegisterEvent, spellFrame, event) end
+  end
+  spellFrame:SetScript("OnEvent", onEvent)
   if not canReadQuestLog() then
     return "ready (target/mouseover/loot/merchant/NPC windows; quests off, this client has no quest log reader)"
   end

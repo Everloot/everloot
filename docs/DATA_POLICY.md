@@ -180,6 +180,19 @@ complete market snapshot or listing distribution. The fallback records no seller
 The addon's gold-per-hour sessions (`/everloot gph`) are personal: they stay in your SavedVariables
 file, outside the records an upload reads, and are never sent to the site.
 
+The addon's window keeps two more tables that are local in the same way. `EverlootDB.ledger` holds your money events,
+your auction sales and each character's closing gold per day, and
+`EverlootDB.roster` holds one row per character you log in with. Neither is a record, neither is read by an
+upload, and neither is sent to the site. A money event keeps `at` (its time), `key` (the opaque character key),
+`category`, `copper` and, when there is one, `itemName` and `count`, plus `ownAlt` when the gold went to or came from
+one of the player's own characters. An auction sale is read from the mailbox invoice and keeps `itemName`, `count`,
+`unit`, `total` (after the cut), `deposit` and `cut` when the letter carries them, and `status` (`pending` from the
+game's sold notice until the letter is collected, then `paid`; `unmatched` when no letter came within 48 hours), with
+its time and the character key; the buyer's name is never read into the file. To mark a trade or a letter as gold moved
+between the player's own characters, the addon reads the trade partner's name, the name a letter is sent to and the
+sender of a letter with money, compares each with the player's own characters on the same realm, and drops it: none of
+these names is ever kept. The completion tracker's rows are unchanged.
+
 Completion tracking (addon 0.3.3, off until `/everloot completion on`) follows the same split.
 Four catalog kinds (`achievement_catalog`, `reputation_catalog`, `title_catalog`,
 `quest_chain_catalog`) hold only game facts the addon read from the game's own calls: ids, names,
@@ -931,6 +944,25 @@ and the Everloot Score are not ranked by it.
   character is ranked, kept while it is not, and deleted with the link: unlinking or deleting the account removes it,
   as it removes the gear.
 - **Search engines.** The boards are `noindex` until indexing of character pages is accepted.
+
+## Armory (Blizzard data)
+
+The armory gives Forever characters and guilds their own pages from the Blizzard Developer API.
+These pages are separate from the addon sightings and the linked-character gear rankings above.
+
+- **No ads.** Armory pages carry no ad slots. The site's consent message may still appear.
+- **Free, on this site only.** Blizzard data stays in the armory pages. It never enters the addon tables,
+  CC BY-SA dataset, public corpus, open-data snapshots, MCP tools, API answers or exports.
+- **Thirty days.** Characters and guilds are checked again within 20 days. Stored data not refreshed for more
+  than 30 days is deleted. A Blizzard response confirming that data has not changed (304) counts as a refresh.
+  When Blizzard answers that a character or guild no longer exists (404), its stored row is deleted at once.
+- **Credit.** Every armory page says "Data from Blizzard Entertainment" and shows the time of the newest
+  read. Nothing on it claims Blizzard endorses Everloot.
+- **One client.** The crawler uses one Blizzard API client. Its client id, client secret and the database
+  service key stay in GitHub Actions secrets, never in a file, a test or a log.
+- **Hiding.** Anyone can hide a character at `/armory/hide` with its region, name and surname. Its character
+  row, roster memberships and queued character requests are deleted. The hide is kept so later API
+  reads and rosters cannot put the character back.
 
 ## Chat
 

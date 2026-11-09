@@ -1,18 +1,20 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { tools } from "@/data/tools";
-import sitemap from "@/app/sitemap";
+import sitemap from "@/lib/site-sitemap";
 
 describe("working feature discovery", () => {
   it("links directly to the working database and upload", () => {
     expect(tools.find((tool) => tool.slug === "database")).toMatchObject({ href: "/database", status: "collecting" });
     expect(tools.find((tool) => tool.slug === "upload")).toMatchObject({ href: "/upload", status: "live" });
   });
-  it("describes routes that are still planned honestly", () => {
-    expect(tools.find((tool) => tool.slug === "farming-routes")?.status).toBe("coming-soon");
+  it("describes the farming tool as live now that its page is", () => {
+    expect(tools.find((tool) => tool.slug === "farming-routes")?.status).toBe("collecting");
   });
   it("lists canonical routes once without redirect or waitlist duplicates", async () => {
-    const urls = (await sitemap()).map((entry) => new URL(entry.url).pathname);
+    const urls = (await sitemap())!.map((entry) => new URL(entry.url).pathname);
     expect(new Set(urls).size).toBe(urls.length);
     expect(urls).toContain("/database");
     expect(urls).toContain("/upload");
@@ -22,7 +24,7 @@ describe("working feature discovery", () => {
     expect(urls).not.toContain("/tools/profession-planner");
   });
   it("exposes a contact page linked from the footer and sitemap", async () => {
-    const urls = (await sitemap()).map((entry) => new URL(entry.url).pathname);
+    const urls = (await sitemap())!.map((entry) => new URL(entry.url).pathname);
     expect(urls).toContain("/about");
     expect(urls).toContain("/privacy");
     expect(urls).toContain("/contact");
@@ -32,9 +34,15 @@ describe("working feature discovery", () => {
     expect(contact).toContain("mailto:hello@everloot.app");
   });
   it("claims no feature the addon or server does not have", () => {
-    const page = (path: string) => readFileSync(new URL(`../app/${path}`, import.meta.url), "utf8");
+    // A page may stand in a (group) folder of its route, as a hub with a loading.tsx of its own does.
+    const page = (path: string) => {
+      const file = fileURLToPath(new URL(`../app/${path}`, import.meta.url));
+      const dir = dirname(file);
+      const inGroup = existsSync(dir) ? readdirSync(dir).filter((n) => /^\(.+\)$/.test(n)).map((n) => join(dir, n, basename(file))) : [];
+      return readFileSync([file, ...inGroup].find((f) => existsSync(f)) ?? file, "utf8");
+    };
     const professions = page("tools/professions/page.tsx");
-    // No recipe emitter or perk record kind exists, and farming routes are planned.
+    // No recipe emitter or perk record kind exists.
     expect(professions).not.toMatch(/perk tracking|We track which perks|recipe sightings and material drops flow|plug straight into/);
     expect(tools.find((tool) => tool.slug === "professions")?.description).not.toMatch(/perk/i);
     // Opt-out needs a verified character grant; not any character.

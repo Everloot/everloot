@@ -21,7 +21,7 @@ export const tools: Tool[] = [
     shortTitle: "Talents",
     tagline: "Plan a build, share it with its game build attached.",
     description:
-      "Plan WoW: Forever talents for any class: point rules, two talent sets, undo and reset, and a share link that names the game build. Trees and rules are unconfirmed beta data.",
+      "Plan WoW: Forever talents for any class: point rules, two talent sets, undo and reset, and a share link that names the game build. Trees and rules are unconfirmed, read from build 1.60.1.",
     status: "live",
     keywords: [
       "wow forever talent calculator",
@@ -100,7 +100,7 @@ export const tools: Tool[] = [
     tagline: "Gold and reputation areas from uploads.",
     description:
       "Gold and reputation farming areas from what players upload. Gathering is on the profession pages, and dungeons have their own list.",
-    status: "coming-soon",
+    status: "collecting",
     keywords: [
       "wow forever farming",
       "wow forever gold farm",

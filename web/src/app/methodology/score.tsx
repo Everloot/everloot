@@ -82,7 +82,7 @@ export function ScoreSection() {
             kill reports, or the guild&apos;s kill that day, mark a kill &quot;reported, not confirmed&quot; and add nothing.
           </li>
           <li>
-            Wipes count for nothing, and so do bosses not on the list three players agree on, difficulties the instance does not have,
+            Wipes count for nothing, and so do bosses not on the list three installs agree on, difficulties the instance does not have,
             kills before the season, kills dated after they were uploaded (beyond {CLOCK_SKEW_MINUTES} minutes of clock difference), kills
             more than {KILL_DAYS_BACK} days old when uploaded, and kills by a character more than {LEVEL_SLACK} levels under the instance.
             When the character&apos;s level or the instance&apos;s level is unknown, the kill does not count.
@@ -93,7 +93,7 @@ export function ScoreSection() {
           <li>
             <span className="text-fg">Completion</span> is achievement points divided by {WEIGHTS.achievementPointsPer} (rounded down),{" "}
             {WEIGHTS.exalted} for each faction at Exalted, {WEIGHTS.title} for each title and 1 for every {WEIGHTS.questsPerPoint} completed
-            quests, counting only what is on the lists three players agree on. An achievement the account earned on another character
+            quests, counting only what is on the lists three installs agree on. An achievement the account earned on another character
             counts for that character only, and one earned before launch counts for nothing. Completion is self-reported: it is ranked,
             if at all, only on its own board with that label, never together with Progress.
           </li>

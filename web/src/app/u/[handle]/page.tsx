@@ -26,7 +26,7 @@ async function load(handle: string): Promise<PublicProfile | null> {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const profile = await load((await params).handle);
-  if (!profile) return { title: "Not found", robots: { index: false, follow: false } };
+  if (!profile) return { title: "Page not found", robots: { index: false, follow: false } };
   const name = profile.displayName ?? `@${profile.handle}`;
   // Indexed only while public: an off or unknown profile is a 404 with noindex.
   return pageMetadata({ title: `${name} (@${profile.handle})`, description: `${name}'s characters and shared talent builds on Everloot.`, path: `/u/${profile.handle}` });

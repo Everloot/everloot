@@ -4,6 +4,8 @@
 
 Everloot = Everloot or {}
 local E = Everloot
+-- The game passes the folder name as the first argument of each file; a folder extracted as Everloot-0.3.20 is still this addon.
+local addonName = ... or "Everloot"
 
 E.VERSION = "0.3.21"
 E.MAX_ROWS_PER_KIND = 2000
@@ -31,6 +33,32 @@ function E.Readable(value)
   return value
 end
 
+local function hex8(n)
+  return string.format("%04x%04x", math.floor(n / 65536) % 65536, n % 65536)
+end
+
+--- One guarded call to a global game function: its first two values, or nil on a missing function or an error.
+local function playerCall(name)
+  local fn = _G[name]
+  if type(fn) ~= "function" then return nil end
+  local ok, a, b = pcall(fn, "player")
+  if not ok then return nil end
+  return a, b
+end
+
+--- This character's opaque key (8 hex digits, never the name), class token and level, or nil, reason.
+--- The one formula every module shares: completion rows, the roster and the gold ledger join on it.
+function E.CharacterKey()
+  local guid = E.Readable(playerCall("UnitGUID"))
+  if type(guid) ~= "string" or guid == "" then return nil, "no player id" end
+  local _, token = playerCall("UnitClass")
+  token = E.Readable(token)
+  if type(token) ~= "string" or not token:find("^%a+$") or #token < 2 or #token > 20 then return nil, "no class" end
+  local level = tonumber(E.Readable((playerCall("UnitLevel"))))
+  if not level or level < 1 then return nil, "no level" end
+  return hex8(E.Adler32((EverlootDB.installId or "") .. ":" .. guid)), token, math.min(100, math.floor(level))
+end
+
 --- The NPC id in a creature GUID (Creature-0-server-instance-zone-NPCID-spawn); nil for anything else.
 function E.NpcIdFromGuid(guid)
   guid = E.Readable(guid)
@@ -50,10 +78,34 @@ function E.Coins(copper)
   return text .. coins .. "c"
 end
 
+-- The game's own "N Gold", "N Silver" and "N Copper" strings, as patterns, so coin text reads in any language;
+-- English where the client does not define them.
+local COIN_UNITS = {
+  { "GOLD_AMOUNT", "%d Gold", 10000 },
+  { "SILVER_AMOUNT", "%d Silver", 100 },
+  { "COPPER_AMOUNT", "%d Copper", 1 },
+}
+
+--- The copper a coin text names ("1 Gold, 20 Silver", "1,234 Gold", a money chat line), or nil when it holds no
+--- amount. A count may carry any thousands separator. Read each call: the client's globals can arrive late.
+function E.CoinText(text)
+  text = E.Readable(text)
+  if type(text) ~= "string" then return nil end
+  local total = 0
+  for _, unit in ipairs(COIN_UNITS) do
+    local format = type(_G[unit[1]]) == "string" and _G[unit[1]] or unit[2]
+    local p = format:gsub("[%^%$%(%)%.%[%]%*%+%-%?]", "%%%0"):gsub("%%d", "([%%d,%%.]+)")
+    local digits = text:match(p)
+    local amount = digits and tonumber((digits:gsub("%D", "")))
+    if amount then total = total + amount * unit[3] end
+  end
+  return total >= 1 and total or nil
+end
+
 local defaults = {
   version = E.VERSION,
   installId = nil,
-  toggles = { openworld = true, guild = true, gear = true, auctions = true, gold = true, addons = false, talents = true, completion = false, census = true, players = false },
+  toggles = { openworld = true, guild = true, gear = true, auctions = true, gold = true, roster = true, addons = false, talents = true, completion = false, census = true, players = false, professions = true },
   records = {},
 }
 
@@ -132,6 +184,11 @@ function E:Count(kind)
   return store and #store or 0
 end
 
+--- The rows of one kind as the saved file holds them; an empty list when there are none.
+function E:Rows(kind)
+  return (EverlootDB and EverlootDB.records and EverlootDB.records[kind]) or {}
+end
+
 local modules = {}
 
 --- `toggle`, when given, is another module's switch this one follows (its rows go with that module's).
@@ -175,8 +232,21 @@ function E:Status()
     "gold_snapshot", "money_event", "addon_seen", "map_bounds", "talent_snapshot",
     "achievement_catalog", "reputation_catalog", "title_catalog", "quest_chain_catalog",
     "achievement_owned", "reputation_owned", "title_owned", "quest_owned", "census_self", "census_seen", "player_seen", "character_link", "pull_summary" }) do
-    if E.RUN_RECORDS or not RUN_KINDS[kind] then lines[#lines + 1] = string.format("  rows %s: %d", kind, self:Count(kind)) end
+    local count = self:Count(kind)
+    if count > 0 and (E.RUN_RECORDS or not RUN_KINDS[kind]) then lines[#lines + 1] = string.format("  rows %s: %d", kind, count) end
   end
+  -- Any other kind a module wrote (guild_kill, for one) follows, by name.
+  local listed = {}
+  for _, line in ipairs(lines) do
+    local shown = line:match("^  rows (%S+):")
+    if shown then listed[shown] = true end
+  end
+  local extra = {}
+  for kind, store in pairs(EverlootDB and EverlootDB.records or {}) do
+    if not listed[kind] and (E.RUN_RECORDS or not RUN_KINDS[kind]) and type(store) == "table" and #store > 0 then extra[#extra + 1] = kind end
+  end
+  table.sort(extra)
+  for _, kind in ipairs(extra) do lines[#lines + 1] = string.format("  rows %s: %d", kind, self:Count(kind)) end
   return table.concat(lines, "\n")
 end
 
@@ -202,7 +272,7 @@ local PULLS_TEXT = "After each boss pull in a dungeon or raid it records your gr
 
 frame:RegisterEvent("ADDON_LOADED")
 frame:SetScript("OnEvent", function(_, event, arg1)
-  if event == "ADDON_LOADED" and arg1 == "Everloot" then
+  if event == "ADDON_LOADED" and arg1 == addonName then
     local upgraded = EverlootDB ~= nil
     EverlootDB = EverlootDB or {}
     for k, v in pairs(defaults) do if EverlootDB[k] == nil then EverlootDB[k] = v end end
@@ -340,7 +410,7 @@ SlashCmdList["EVERLOOT"] = function(msg)
   elseif msg == "addons on" or msg == "addons off" then
     EverlootDB.toggles.addons = (msg == "addons on")
     if EverlootDB.toggles.addons then
-      print("Everloot: installed addon list on. It is sent only from the everloot.app upload page, which lists the addons first; the companion never sends it. /reload to apply.")
+      print("Everloot: installed addon list on. It is sent only from the everloot.app upload page, which lists the addons first; the Everloot Desktop App never sends it. /reload to apply.")
     else
       -- Turning it off withdraws the list: every recorded addon row is deleted from this file.
       EverlootDB.records.addon_seen = nil
@@ -349,6 +419,6 @@ SlashCmdList["EVERLOOT"] = function(msg)
       print("Everloot: installed addon list off; all recorded addon rows were deleted from this file. /reload to apply.")
     end
   else
-    print("Everloot commands: /everloot window, /everloot options, /everloot buttons on|off, /everloot status, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], " .. (E.Pulls and "/everloot pulls [on|off], " or "") .. "/everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number], /everloot raid [code], /ask <question>")
+    print("Everloot commands: /everloot window, /everloot options, /everloot planner [talents|raid], /everloot buttons on|off, /everloot status, /everloot version, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|hide|cut on|off|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], " .. (E.Pulls and "/everloot pulls [on|off], " or "") .. "/everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number|hide|clear], /everloot raid [code], /ask <question>")
   end
 end

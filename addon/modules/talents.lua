@@ -208,7 +208,9 @@ local function record()
     local row = T.Snapshot(entry)
     -- A build with no spent points is not a build worth recording.
     if row and row.points > 0 then
-      local key = tostring(entry.group)
+      -- One seen-signature per character and group, so a second character's login does not store both again.
+      local charKey = E.CharacterKey and E.CharacterKey()
+      local key = (charKey and (charKey .. ":") or "") .. tostring(entry.group)
       local sig = signature(row)
       if EverlootDB.talentsSeen[key] ~= sig then
         row.installId = EverlootDB.installId

@@ -21,14 +21,19 @@ schema/           a JSON Schema for every file
 
 Observed files: `npcs`, `quests`, `vendor-offers`, `drop-rates`, `drop-measured-zeros`, `relations`, `entrances`,
 `bosses`, `objects`, `object-pins`, `item-names`. Game-file files: `item-categories`, `relations`, `zones`,
-`continents`, `entrances`, `flight-masters`, `flight-paths`. The builders and the row schemas are in
+`continents`, `entrances`, `flight-masters`, `flight-paths`, and one file per committed catalog under
+`web/src/data/game-data`: `achievements`, `factions`, `titles`, `quest-lines`, `mounts`, `encounters`, `recipes`,
+`class-gear`, `class-gear-restrictions`, `class-spells`, `races`, `legacy-perks`, `talent-nodes`, `raid-buffs`
+(ids, the names the files hold and each file's build; no descriptions, criteria text or tooltip text). The
+builders and the row schemas are in
 [`kb/src/open-data/build.ts`](../kb/src/open-data/build.ts); the words (licence, method, exclusions) are in
 [`text.ts`](../kb/src/open-data/text.ts), which the README, the licence text and the page all read.
 
 Every observed row carries how many installs agree (`installs`, at least 3) and no install id, no pseudonym and no
 name of a player. A value nobody has three installs on is `null`, on the page `[?]`, never a blank or a zero.
 Every count is rows out of how many were reported, with what that counts in words, the date the data was current and
-the method, so a number is never bare.
+the method, so a number is never bare. The JSON API and the MCP tools call the same count `reporters`: it is the same
+number, the installs that agree on the fact, under the name those shapes use.
 
 ## Make one
 

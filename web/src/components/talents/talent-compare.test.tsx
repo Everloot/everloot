@@ -16,11 +16,12 @@ vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NOT_FOUND
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
 }));
-// The sitemap reads the players' facts; none are needed to see which talent pages it lists.
+// The sitemap reads the players' facts; none are needed to see which talent pages it lists (it answers nothing while
+// they cannot be read, so the store is readable and empty here).
 vi.mock("@/lib/rollup-compute", () => ({
-  loadItemFacts: async () => ({ rates: [], names: [], npcs: [], unreachable: true }),
-  loadWorldFacts: async () => ({ npcs: [], quests: [], vendors: [], unreachable: true }),
-  loadInstanceFacts: async () => ({ entrances: [], encounters: [], sightings: [], unreachable: true, dataAsOf: null }),
+  loadItemFacts: async () => ({ rates: [], names: [], npcs: [], unreachable: false }),
+  loadWorldFacts: async () => ({ npcs: [], quests: [], vendors: [], unreachable: false }),
+  loadInstanceFacts: async () => ({ entrances: [], encounters: [], sightings: [], unreachable: false, dataAsOf: null }),
 }));
 
 // Plans on the made-up test tree (lib/talents/fixture.ts, not game data), its build moved to 1.0.0.5 so a plan can be
@@ -330,8 +331,8 @@ test("the compare pages are noindex, point at their class page and stay out of t
     expect(String(m.description).length, slug).toBeGreaterThanOrEqual(DESCRIPTION_MIN);
     expect(String(m.description).length, slug).toBeLessThanOrEqual(DESCRIPTION_MAX);
   }
-  const { default: sitemap } = await import("@/app/sitemap");
-  const paths = (await sitemap()).map((e) => new URL(e.url).pathname);
+  const { default: sitemap } = await import("@/lib/site-sitemap");
+  const paths = (await sitemap())!.map((e) => new URL(e.url).pathname);
   expect(paths).toContain("/tools/talents/mage");
   expect(paths.filter((p) => /^\/tools\/talents\/.*compare/.test(p))).toEqual([]);
 });

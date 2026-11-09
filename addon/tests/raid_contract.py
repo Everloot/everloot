@@ -228,4 +228,69 @@ SlashCmdList.EVERLOOT('raid code')
 local text = table.concat(printed, '\\n')
 assert(text:find('Everloot raid code: ELR1-10-' .. LAYER_BUILD .. '-', 1, true), text)
 """)
+
+# --- The link window: a titled, bordered box with the link selected, a Ctrl+C hint and a close button ---
+lua = fresh()
+lua.execute("""
+local Widget = {}
+Widget.__index = function(self, key) return rawget(Widget, key) or function() end end
+function Widget.SetText(self, t) self.text = t end
+function Widget.GetText(self) return self.text end
+function Widget.Show(self) self.shown = true end
+function Widget.Hide(self) self.shown = false end
+function Widget.SetBackdrop(self) self.backdropSet = true end
+function Widget.HighlightText(self) self.highlighted = true end
+function Widget.SetFocus(self) self.focused = true end
+function Widget.SetScript(self, name, f) self.scripts[name] = f end
+local function make(kind, name, template)
+  local w = setmetatable({ kind = kind, name = name, template = template, scripts = {}, children = {} }, Widget)
+  return w
+end
+function Widget.CreateFontString(self) local w = make('FontString'); table.insert(self.children, w); return w end
+function Widget.CreateTexture(self) local w = make('Texture'); table.insert(self.children, w); return w end
+UIParent = make('Frame', 'UIParent')
+ChatFontNormal = {}
+CreateFrame = function(kind, name, parent, template)
+  local w = make(kind, name, template)
+  w.parent = parent
+  if parent and parent.children then table.insert(parent.children, w) end
+  return w
+end
+local function find(frame, pred)
+  for _, c in ipairs(frame.children) do if pred(c) then return c end end
+end
+local url = 'https://everloot.app/tools/raid#raid=ELR1-10-X-AB'
+local R = Everloot.Raid
+-- Without the Everloot window loaded the box still has its parts, plainly dressed.
+Everloot.Window = nil
+printed = {}
+SlashCmdList.EVERLOOT('raid code')
+local frame = R.frame
+assert(frame and frame.shown, 'the window opens')
+assert(frame.box.text:find('^https://everloot.app/tools/raid#raid=ELR1%-10%-'), 'the link is in the box: ' .. tostring(frame.box.text))
+assert(frame.box.highlighted and frame.box.focused, 'the link is selected for Ctrl+C')
+local title = find(frame, function(c) return c.kind == 'FontString' and c.text and c.text:find('Everloot') end)
+assert(title, 'a title names what this is')
+local hint = find(frame, function(c) return c.kind == 'FontString' and c.text and c.text:find('Ctrl+C', 1, true) end)
+assert(hint, 'a Ctrl+C notice')
+local close = find(frame, function(c) return c.kind == 'Button' end)
+assert(close and close.text == 'Close' and close.scripts.OnClick, 'a close button')
+close.scripts.OnClick(close)
+assert(frame.shown == false, 'Close hides the window')
+-- With the window's look loaded, the box wears it.
+local dressed, headed = 0, 0
+Everloot.Window = { Backdrop = function(f) dressed = dressed + 1 end, COLORS = { accent = { 1, 1, 1, 1 }, muted = { 1, 1, 1, 1 } },
+  Text = function(parent) local w = parent:CreateFontString(); w.isWindowText = true; return w end }
+R.frame = nil
+SlashCmdList.EVERLOOT('raid code')
+assert(dressed == 1 and R.frame.shown, 'the window look is applied')
+assert(find(R.frame, function(c) return c.isWindowText end), 'its text helper is used')
+Everloot.Window = nil
+-- A frame call that is missing falls back to chat with the link.
+CreateFrame = function() error('no frames') end
+R.frame = nil
+printed = {}
+SlashCmdList.EVERLOOT('raid code')
+assert(table.concat(printed, ' '):find('Everloot raid link: https://', 1, true), 'chat fallback')
+""")
 print("raid contract ok")

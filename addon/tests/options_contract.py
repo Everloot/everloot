@@ -160,6 +160,43 @@ O.page.reload.scripts.OnClick()
 assert(reloads == 1, 'Reload now reloads')
 """)
 
+# --- Every switch a module checks has a row on the page ---
+# The scan reads the sources: each IsEnabled("x") and each module registered under its own name is a switch
+# the player can need to turn off, so it needs an O.ROWS key (the rows come from this runtime, so a typo in
+# options.lua shows up here). The names below are the exceptions, each with its reason.
+import re
+rows = set(lua.eval("(function() local t = {} for _, r in ipairs(Everloot.Options.ROWS) do t[#t + 1] = r.key end return t end)()").values())
+OWN_SWITCH_OK = {
+    # Only in builds that carry the pulls module (E.RUN_RECORDS); options.lua appends its row under that gate.
+    "pulls",
+    # Registered under their own name but record nothing: displays, planners and tools. No row to stop.
+    "ask", "conveniences", "gph", "minimap", "plan", "planner", "prices", "raid", "options",
+    # Stores item facts, but its init returns "off" when the openworld switch is off, so that row is its switch.
+    "itemfacts",
+}
+sources = sorted((root / "modules").glob("*.lua")) + [root / "core.lua"]
+wanted = {}
+follows = {}  # module -> the switch it follows (the third RegisterModule argument, as `end, "completion")`)
+for path in sources:
+    text = path.read_text(encoding="utf-8")
+    for name in re.findall(r'IsEnabled\("(\w+)"\)', text):
+        wanted.setdefault(name, path.name)
+    own = re.findall(r'RegisterModule\("(\w+)"', text)
+    toggle = re.findall(r'^end, "(\w+)"\)', text, re.M)
+    for name in own:
+        if toggle:
+            follows[name] = toggle[0]
+        else:
+            wanted.setdefault(name, path.name)
+assert follows, "the scan found no module that follows another's switch; the pattern is stale"
+missing = sorted(name for name in wanted if name not in rows and name not in OWN_SWITCH_OK)
+assert not missing, "modules without a switch on the settings page (add an O.ROWS row, or allowlist with a reason): " + ", ".join(f"{n} ({wanted[n]})" for n in missing)
+assert all(t in rows for t in follows.values()), "a module follows a switch that has no row: " + ", ".join(f"{m} -> {t}" for m, t in follows.items())
+# The minimap button is a field row (EverlootDB.minimapButton), not a toggle, so no IsEnabled call names it.
+assert "minimapButton" in rows and "EverlootDB.minimapButton" in (root / "modules" / "minimap.lua").read_text(encoding="utf-8")
+assert 'key = "minimapButton", field = true' in (root / "modules" / "options.lua").read_text(encoding="utf-8")
+assert 'key = "pulls"' in (root / "modules" / "options.lua").read_text(encoding="utf-8"), "the pulls allowlist entry needs its gated row"
+
 # --- Older client: interface options ---
 lua = fresh("""
 added = nil; openCalls = 0
@@ -202,6 +239,13 @@ end
 assert(page.intro.font:find('FRIZQT', 1, true) and page.note.font:find('FRIZQT', 1, true), 'the introduction and the footer note too')
 page.scripts.OnShow()
 checkRows(page)
+
+-- What you've added: one line per kind of row in the saved file, filled when the page shows.
+assert(#page.added == #O.ADDED and #O.ADDED == 8, 'one line per kind')
+for i, a in ipairs(O.ADDED) do
+  assert(page.added[i].text == a[2] .. ': ' .. tostring(Everloot:Count(a[1])), page.added[i].text)
+end
+assert(page.addedHeading.text == "What you've added", 'the block has its title')
 -- The controls behave as before: a switch, the ask box, Reload now.
 local census
 for _, box in ipairs(page.boxes) do if box.row.key == 'census' then census = box end end
@@ -323,6 +367,104 @@ O.askFrame.onEvent(O.askFrame, 'PLAYER_ENTERING_WORLD')
 runTimers()
 assert(O.prompt.shown and O.prompt.backdrop.bgFile == 'Interface\\\\DialogFrame\\\\UI-DialogBox-Background', "the game's dialog")
 assert(O.prompt.title.text == 'Everloot: player names')
+""")
+
+# --- Turning off a row that deletes rows asks first when the click comes from the page ---
+POPUP = """
+StaticPopupDialogs = {}
+shown = nil
+StaticPopup_Show = function(which, ...) shown = { which, ... }; return {} end
+"""
+lua = fresh(POPUP + SETTINGS)
+lua.execute("""
+local O = Everloot.Options
+local byKey = {}
+for _, box in ipairs(O.page.boxes) do byKey[box.row.key] = box end
+local function census5()
+  EverlootDB.records.census_seen = { {}, {}, {}, {}, {} }
+  EverlootDB.toggles.census = true
+  shown = nil
+end
+local dialog = StaticPopupDialogs.EVERLOOT_TURN_OFF
+assert(dialog and dialog.timeout == 0 and dialog.whileDead == 1 and dialog.hideOnEscape == 1, 'the dialog is registered')
+assert(string.find(dialog.text, 'Turn off %s and delete %d recorded rows?', 1, true))
+
+-- Unticking asks, and deletes nothing yet.
+census5()
+byKey.census.checked = false
+byKey.census.scripts.OnClick(byKey.census)
+assert(shown and shown[1] == 'EVERLOOT_TURN_OFF' and shown[2] == 'Census' and shown[3] == 5, 'asks with the label and the row count')
+assert(#EverlootDB.records.census_seen == 5 and EverlootDB.toggles.census == true, 'nothing is deleted before the answer')
+assert(byKey.census.checked, 'the switch stays ticked while the question is open')
+-- Cancel leaves the rows and the tick.
+byKey.census.checked = false
+dialog.OnCancel()
+assert(#EverlootDB.records.census_seen == 5 and EverlootDB.toggles.census == true and byKey.census.checked, 'cancel keeps rows and re-ticks')
+-- Accept deletes and sets the toggle.
+byKey.census.checked = false
+byKey.census.scripts.OnClick(byKey.census)
+dialog.OnAccept()
+assert(EverlootDB.toggles.census == false and EverlootDB.records.census_seen == nil, 'accept turns it off and deletes the rows')
+assert(not byKey.census.checked)
+
+-- No rows: no question, the command runs.
+EverlootDB.records.census_seen = nil
+EverlootDB.toggles.census = true
+shown = nil
+byKey.census.checked = false
+byKey.census.scripts.OnClick(byKey.census)
+assert(shown == nil and EverlootDB.toggles.census == false, 'with no rows it turns off without asking')
+
+-- Turning on never asks.
+shown = nil
+byKey.census.checked = true
+byKey.census.scripts.OnClick(byKey.census)
+assert(shown == nil and EverlootDB.toggles.census == true)
+
+-- The slash command stays direct.
+census5()
+SlashCmdList.EVERLOOT('census off')
+assert(shown == nil and EverlootDB.records.census_seen == nil and EverlootDB.toggles.census == false, 'the slash command deletes without a question')
+
+-- Rows without a deleting command are unchanged.
+byKey.gold.checked = false
+byKey.gold.scripts.OnClick(byKey.gold)
+byKey.scanPrompt.checked = false
+byKey.scanPrompt.scripts.OnClick(byKey.scanPrompt)
+assert(shown == nil and EverlootDB.toggles.gold == false and EverlootDB.scanPrompt == false)
+
+-- The other deleting rows count their own kinds.
+EverlootDB.records.addon_seen = { {}, {} }
+EverlootDB.toggles.addons = true
+byKey.addons.checked = false
+byKey.addons.scripts.OnClick(byKey.addons)
+assert(shown and shown[2] == 'Installed addon list' and shown[3] == 2 and #EverlootDB.records.addon_seen == 2)
+dialog.OnCancel()
+shown = nil
+EverlootDB.records.player_seen, EverlootDB.records.guild_kill = { {} }, { {}, {} }
+EverlootDB.toggles.players = true
+byKey.players.checked = false
+byKey.players.scripts.OnClick(byKey.players)
+assert(shown and shown[3] == 3, 'players counts player rows and guild kills')
+dialog.OnCancel()
+shown = nil
+EverlootDB.records.achievement_owned, EverlootDB.records.pvp_owned = { {} }, { {} }
+EverlootDB.toggles.completion = true
+byKey.completion.checked = false
+byKey.completion.scripts.OnClick(byKey.completion)
+assert(shown and shown[3] == 2, 'completion counts every kind it deletes')
+""")
+
+# A client without the popup function runs the command directly, as before.
+lua = fresh(SETTINGS)
+lua.execute("""
+local O = Everloot.Options
+local census
+for _, box in ipairs(O.page.boxes) do if box.row.key == 'census' then census = box end end
+EverlootDB.records.census_seen = { {}, {} }
+census.checked = false
+census.scripts.OnClick(census)
+assert(EverlootDB.toggles.census == false and EverlootDB.records.census_seen == nil, 'no StaticPopup: the command runs')
 """)
 
 print("Lua 5.1 options: Settings API, interface options or a window; one switch per module; command rows run their command; every switch inside a scrolling list at any width; the window's crest heading, fonts, surface and dark window, or the game's own without its file; Reload now; player names asked once, after the loading screen and out of combat")

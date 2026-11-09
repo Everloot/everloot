@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import {
   badgesFor, buildBoards, buildView, currentForeverInterface, foreverReady, interfaceFromVersion, handleEcosystemProjects, joinInstalls, maintenanceScore,
-  median, medianFirstResponse, parseRegistry, parseSnapshot, parseTocInterfaces, starGain,
+  median, medianFirstResponse, parseRegistry, parseSnapshot, parseTocInterfaces, starGain, starGainLabel,
   type ProjectMetrics, type Registry, type Snapshot,
 } from "../src/ecosystem.js";
 
@@ -97,11 +97,15 @@ describe("metrics math", () => {
   test("a reply dated before the issue is ignored", () => {
     expect(medianFirstResponse([{ createdAt: daysAgo(5), firstResponseAt: daysAgo(6) }], NOW).sample).toBe(0);
   });
-  test("star gain uses the newest point at least six days old, and needs one", () => {
-    const history = [{ at: daysAgo(20), stars: 1 }, { at: daysAgo(7), stars: 10 }, { at: daysAgo(3), stars: 14 }];
-    expect(starGain(history, 20, NOW)).toBe(10);
-    expect(starGain([{ at: daysAgo(2), stars: 5 }], 9, NOW)).toBeNull();
-    expect(starGain(history, null, NOW)).toBeNull();
+  test("star gain compares with the oldest count from the 7 days before the newest point, whatever the clock says", () => {
+    const history = [{ at: daysAgo(20), stars: 1 }, { at: daysAgo(9), stars: 10 }, { at: daysAgo(6), stars: 14 }, { at: daysAgo(3), stars: 16 }];
+    expect(starGain(history, 20)).toEqual({ change: 10, since: daysAgo(9) });
+    expect(starGain([...history].reverse(), 20)).toEqual({ change: 10, since: daysAgo(9) });
+    expect(starGain([{ at: daysAgo(2), stars: 5 }], 9)).toBeNull();
+    expect(starGain(undefined, 9)).toBeNull();
+    expect(starGain(history, null)).toBeNull();
+    expect(starGainLabel({ change: 10, since: daysAgo(9) })).toBe(`+10 since ${daysAgo(9).slice(0, 10)}`);
+    expect(starGainLabel({ change: -2, since: daysAgo(9) })).toBe(`-2 since ${daysAgo(9).slice(0, 10)}`);
   });
 });
 
@@ -204,7 +208,10 @@ describe("boards", () => {
       delta: metrics({ archived: true, commits4w: 99 }),
       old: { ...metrics(), status: "missing" },
     },
-    { alpha: [{ at: daysAgo(8), stars: 9 }], beta: [{ at: daysAgo(8), stars: 4 }], gamma: [{ at: daysAgo(8), stars: 49 }], delta: [{ at: daysAgo(8), stars: 0 }] },
+    {
+      alpha: [{ at: daysAgo(6), stars: 9 }, { at: daysAgo(0), stars: 10 }], beta: [{ at: daysAgo(6), stars: 4 }, { at: daysAgo(0), stars: 10 }],
+      gamma: [{ at: daysAgo(6), stars: 49 }, { at: daysAgo(0), stars: 50 }], delta: [{ at: daysAgo(6), stars: 0 }, { at: daysAgo(0), stars: 0 }],
+    },
   );
   const popular = [{ name: "alpha", installs: 4 }, { name: "beta", installs: 12 }, { name: "gamma", installs: 3 }, { name: "delta", installs: 50 }];
   const boards = Object.fromEntries(buildBoards(buildView(reg, snap, popular, NOW, FOREVER), NOW).map((b) => [b.id, b.rows.map((r) => r.project.id)]));

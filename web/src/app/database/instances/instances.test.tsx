@@ -14,7 +14,7 @@ vi.mock("@/lib/instances", async (importOriginal) => ({
 }));
 
 import InstancesPage from "./page";
-import InstancePage from "./[instance]/page";
+import InstancePage, { generateMetadata as instanceMetadata } from "./[instance]/page";
 
 const text = (html: string) => html.replace(/<[^>]+>/g, "|").replace(/\|+/g, "|");
 /** The cells of the list row that links to `href`, in column order. */
@@ -35,6 +35,12 @@ test("the list has a Level column and starts with the lowest level; a range the 
   expect(cells(html, "/database/instances/389-ragefire-chasm")[col]).toBe("13");
   expect(cells(html, "/database/instances/409-molten-core")[col]).toBe("60");
   expect(cells(html, "/database/instances/249-onyxia-s-lair")[col]).toBe("–");
+});
+
+test("an instance's page title is the database pages' own: the name, then WoW Forever and its kind", async () => {
+  const title = async (segment: string) => (await instanceMetadata({ params: Promise.resolve({ instance: segment }) })).title;
+  expect(await title("389-ragefire-chasm")).toBe("Ragefire Chasm – WoW Forever dungeon");
+  expect(await title("409-molten-core")).toBe("Molten Core – WoW Forever raid");
 });
 
 test("an instance's page lists its level in the facts, or a dash when the files give none", async () => {

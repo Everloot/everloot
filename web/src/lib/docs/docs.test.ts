@@ -1,20 +1,23 @@
 // @vitest-environment jsdom
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { API_ROUTES, MCP_TOOL_NAMES, MCP_TOOLS, SITE } from "@everloot/protocol";
+import { ALL_RECORD_KINDS, API_ROUTES, API_SCHEMAS, MCP_PROMPT_NAMES, MCP_TOOL_NAMES, MCP_TOOLS, SITE, type ApiSchemaName } from "@everloot/protocol";
 import { z } from "zod";
 import { expect, test } from "vitest";
 import { exampleUrl, requestSamples, sample, TOOL_ARGS, toolSamples } from "./examples";
 import { articleMarkdown } from "./markdown";
-import { allDocsPages, DOCS_TABS, endpointHref, endpointSlug, legacyAnchors, neighbours, tabFor, toolFromSlug, toolHref } from "./nav";
+import { FILE_SCHEMAS, PAGE_INTERNAL_ROUTES } from "./file-schemas";
+import { allDocsPages, docsPage, DOCS_TABS, endpointHref, endpointSlug, legacyAnchors, neighbours, tabFor, toolFromSlug, toolHref } from "./nav";
+import { recordHref } from "./records";
 import { liveToolNames } from "@/lib/guild-switch";
 
 const app = join(__dirname, "../../app");
 
-test("every public endpoint and every MCP tool has exactly one docs page in the sidebar", () => {
+test("every public endpoint, every MCP tool and every record kind has exactly one docs page in the sidebar", () => {
   const hrefs = DOCS_TABS.flatMap((tab) => tab.groups.flatMap((group) => group.pages.map((page) => page.href)));
   for (const route of API_ROUTES) expect(hrefs.filter((h) => h === endpointHref(route)), route.path).toHaveLength(1);
   for (const name of liveToolNames()) expect(hrefs.filter((h) => h === toolHref(name)), name).toHaveLength(1);
+  for (const kind of ALL_RECORD_KINDS) expect(hrefs.filter((h) => h === recordHref(kind)), kind).toHaveLength(1);
   expect(new Set(API_ROUTES.map(endpointSlug)).size).toBe(API_ROUTES.length);
 });
 
@@ -28,16 +31,38 @@ test("with EVERLOOT_GUILDS off the guild ladder's two tools have no docs page an
   expect(toolFromSlug("guild-board")).toBe("guild_board");
 });
 
+test("the wiki guide is in the Guides tab", () => {
+  const guides = DOCS_TABS.find((tab) => tab.id === "guides")!;
+  const page = guides.groups.flatMap((group) => group.pages).find((p) => p.href === "/docs/guides/wiki");
+  expect(page?.title).toBe("Write a wiki page");
+  expect(tabFor("/docs/guides/wiki").id).toBe("guides");
+});
+
 test("every page in the table of contents has a page file, and appears once", () => {
   const pages = allDocsPages();
   for (const { href } of pages) {
     const generated = /^\/docs\/api\/[a-z-]+$/.test(href) && API_ROUTES.some((r) => endpointHref(r) === href)
       ? "docs/api/[endpoint]/page.tsx"
-      : href.startsWith("/docs/mcp/tools/") ? "docs/mcp/tools/[tool]/page.tsx" : null;
+      : href.startsWith("/docs/mcp/tools/") ? "docs/mcp/tools/[tool]/page.tsx"
+      : href.startsWith("/docs/api/records/") ? "docs/api/records/[kind]/page.tsx" : null;
     expect(existsSync(join(app, generated ?? `${href.slice(1)}/page.tsx`)), href).toBe(true);
   }
   expect(new Set(pages.map((p) => p.href)).size).toBe(pages.length);
   for (const page of pages) expect(page.lede.length, page.href).toBeGreaterThan(3);
+});
+
+test("the MCP nav lists every prompt under the resources page, as an anchor of that page and not a page of its own", () => {
+  const resources = docsPage("/docs/mcp/resources")!;
+  expect(resources.tab.id).toBe("mcp");
+  expect(resources.children?.map((child) => child.href)).toEqual(MCP_PROMPT_NAMES.map((name) => `/docs/mcp/resources#${name}`));
+  for (const child of resources.children!) {
+    expect(child.title).toBe(child.href.split("#")[1]);
+    expect(child.lede.length, child.href).toBeGreaterThan(3);
+    expect(docsPage(child.href.split("#")[0]!), child.href).toBeDefined();
+  }
+  const pages = allDocsPages().map((page) => page.href);
+  expect(pages.some((href) => href.includes("#"))).toBe(false);
+  expect(neighbours("/docs/mcp/resources").next?.href).not.toContain("#");
 });
 
 test("tabs, previous and next follow the reading order", () => {
@@ -108,4 +133,15 @@ test("every anchor of the old /connect page leads to a docs page", () => {
   const pages = new Set(allDocsPages().map((p) => p.href));
   expect(targets).toMatchObject({ keys: "/docs/api/keys", "tool-get_by_name": "/docs/mcp/tools/get-by-name", "api-tooltip-{type}-{id}": "/docs/api/tooltip", "api-corpus-public": "/docs/api/corpus-public" });
   for (const [id, href] of Object.entries(targets)) expect(pages.has(href), `${id} -> ${href}`).toBe(true);
+});
+
+test("the file-only schemas are published shapes no route answers with, and the page-internal routes exist outside the contract", () => {
+  for (const name of Object.keys(FILE_SCHEMAS) as ApiSchemaName[]) {
+    expect(API_SCHEMAS).toHaveProperty(name);
+    expect(API_ROUTES.some((r) => r.requestBody === name || Object.values(r.responses).some((x) => x.schema === name)), name).toBe(false);
+  }
+  for (const path of PAGE_INTERNAL_ROUTES) {
+    expect(existsSync(join(app, `${path.slice(1)}/route.ts`)), path).toBe(true);
+    expect(API_ROUTES.some((r) => r.path === path), path).toBe(false);
+  }
 });

@@ -125,7 +125,7 @@ export function confirmedCell(entry: { confirmed: boolean }, confirmations: bool
 
 /** The sentence a list shows when it holds no entry at all: neither the files nor the players have given one. */
 export const noneListed = (noun: string): string =>
-  `No ${noun} is listed yet. None is in the game files, and none has been confirmed by three players.`;
+  `No ${noun} is listed yet. None is in the game files, and none has been confirmed by three installs.`;
 
 /** Shown when the player rollup could not be read: the entries below come from the game files alone. */
 export function ConfirmationsUnread() {

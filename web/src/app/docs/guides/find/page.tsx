@@ -92,7 +92,7 @@ export default function Page() {
         says which. A few to start with:
       </P>
       <Cards>
-        <LinkCard href="/tools/talents" title="Talent calculator">Plan a build and share it with its game build attached. Trees and rules are unconfirmed beta data.</LinkCard>
+        <LinkCard href="/tools/talents" title="Talent calculator">Plan a build and share it with its game build attached. Trees and rules are unconfirmed, read from build 1.60.1.</LinkCard>
         <LinkCard href="/tools/raid" title="Raid group builder">Plan a raid and see which buffs it covers.</LinkCard>
         <LinkCard href="/tools/auctions" title="Auction prices">Auction prices from full scans players started and uploaded.</LinkCard>
         <LinkCard href="/census" title="Census">Who plays what: race, class, level and faction counts from the addon&apos;s census.</LinkCard>

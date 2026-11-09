@@ -11,6 +11,7 @@ import { vendorPage, npcPage, questTraits, worldFactsFromRecords } from "../worl
 import { itemFactsFromRecords } from "../drop-rollup.js";
 import { placeFlights } from "../world-coords.js";
 import type { WorldMapData } from "../world-map-data.js";
+import { RAID_SCOPES, RAID_TREE_PROOFS, type OpenDataCatalogs } from "./game-data.js";
 import type { OpenDataLayer } from "./manifest.js";
 
 /**
@@ -396,6 +397,122 @@ export interface GameFilesInput {
   edges: readonly Edge[];
   taxonomy: Taxonomy;
   map: WorldMapData;
+  catalogs: OpenDataCatalogs;
+}
+
+// ---- the catalog files ----------------------------------------------------------------------------------------
+
+const BUILD = z.string().describe("The game build the file was read from.");
+const NONNEG = z.number().int().nonnegative();
+const RANK = NONNEG.describe("A skill rank; 0 where the files give none.");
+const achievementRow = z.object({
+  achievementId: ID, title: z.string(), points: NONNEG,
+  criteria: NONNEG.describe("How many criteria the files list for it; their text is not here."),
+  statistic: z.boolean().describe("True for a statistic, which the game counts and never awards."),
+  build: BUILD,
+}).strict();
+const factionRow = z.object({
+  factionId: ID, name: z.string(), parentId: NONNEG.nullable().describe("The parent faction; null when the files give none."),
+  shown: z.boolean().describe("Whether the reputation pane shows it."), build: BUILD,
+}).strict();
+const titleRow = z.object({ titleId: ID, name: z.string().describe("As the file holds it, with %s where the player's name goes."), build: BUILD }).strict();
+const questLineRow = z.object({ questLineId: ID, name: z.string(), questIds: z.array(ID).describe("The quests on the line, in the files' order."), build: BUILD }).strict();
+const mountRow = z.object({ mountId: ID, name: z.string(), spellId: ID.describe("The spell that teaches it."), ridingSkill: NONNEG.nullable().describe("The riding skill its type asks for; null when the files give none."), build: BUILD }).strict();
+const encounterRow = z.object({ instanceMapId: ID, encounterId: ID, name: z.string(), difficultyId: NONNEG.nullable().describe("Set only when the row is bound to one difficulty."), build: BUILD }).strict();
+const recipeRow = z.object({
+  professionId: ID.describe("The profession's skill line id."), professionName: z.string(), spellId: ID,
+  itemId: ID.nullable().describe("The item the spell makes; null when it makes none."),
+  minRank: RANK, yellowRank: RANK, greyRank: RANK,
+  reagents: z.array(z.object({ itemId: ID, count: z.number().int().positive() }).strict()),
+  build: BUILD,
+}).strict();
+const classGearRow = z.object({
+  classId: ID, className: z.string(), itemClassId: NONNEG, itemSubclassId: NONNEG,
+  level: NONNEG.describe("The level the class gets the proficiency at; 0 from the start."), build: BUILD,
+}).strict();
+const classGearRestrictionRow = z.object({ itemId: ID, classMask: z.number().int().describe("The item's own class mask as the files store it (a signed integer): bit (class id - 1) set for each class that may equip it."), build: BUILD }).strict();
+const classSpellRow = z.object({ classId: ID, className: z.string(), spellId: ID, build: BUILD }).strict();
+const raceRow = z.object({
+  raceId: ID, name: z.string(), faction: z.enum(["Alliance", "Horde", "Neutral"]),
+  classes: z.array(z.object({ classId: ID, name: z.string() }).strict()),
+  traits: z.array(z.object({ name: z.string(), kind: z.enum(["active", "passive"]), order: NONNEG }).strict()).describe("Racial traits; their text is not here."),
+  build: BUILD,
+}).strict();
+const legacyPerkRow = z.object({
+  treeId: ID, nodeId: ID, entryId: ID, definitionId: ID, spellId: NONNEG,
+  name: z.string().nullable().describe("null when the files hold no name row for it."),
+  maxRanks: z.number().int().nullable(), build: BUILD,
+}).strict();
+const talentNodeRow = z.object({
+  classId: ID, className: z.string(), treeId: ID, treeName: z.string().nullable(), nodeId: ID,
+  x: z.number().int(), y: z.number().int(), row: NONNEG, col: NONNEG,
+  kind: z.enum(["single", "tiered", "choice"]), maxRanks: NONNEG,
+  entries: z.array(z.object({ definitionId: ID, spellId: ID, name: z.string().nullable(), maxRanks: NONNEG }).strict()),
+  prereqs: z.array(z.object({ nodeId: ID, rule: z.enum(["any", "all"]) }).strict()),
+  build: BUILD,
+}).strict();
+const raidBuffRow = z.object({
+  id: z.string(), label: z.string(), kind: z.enum(["buff", "debuff"]), class: z.string(),
+  family: z.string().describe("Effects in one family do not stack. The grouping is Everloot's; everything else is the files'."),
+  scope: z.enum(RAID_SCOPES),
+  tree: z.union([z.literal("baseline"), z.literal("unknown"), z.literal(1), z.literal(2), z.literal(3)]).describe("The talent tree (1 to 3, client order) that gives the effect; baseline when no talent does."),
+  treeProof: z.enum(RAID_TREE_PROOFS).nullable(),
+  names: z.array(z.string()), spellIds: z.array(ID), build: BUILD,
+}).strict();
+
+function catalogs(c: OpenDataCatalogs): Dataset[] {
+  const label = (version: string) => `all rows of the build ${version}`;
+  const one = (name: string, about: string, schema: z.ZodType, rows: unknown[], version: string): Dataset =>
+    ({ name, layer: "game-files", about, schema, rows, candidates: rows.length, candidatesAre: label(version) });
+  const achievements = Object.entries(c.achievements.achievements).map(([id, a]) =>
+    ({ achievementId: Number(id), title: a.title, points: a.points, criteria: a.criteria.length, statistic: a.statistic === true, build: c.achievements.build.version }));
+  const factions = c.factions.factions.map((f) => ({ factionId: f.id, name: f.name, parentId: f.parentId ?? null, shown: f.shown, build: c.factions.build.version }));
+  const titles = c.titles.titles.map((t) => ({ titleId: t.id, name: t.name, build: c.titles.build.version }));
+  const questLines = c.questLines.questLines.map((q) => ({ questLineId: q.id, name: q.name, questIds: q.questIds, build: c.questLines.build.version }));
+  const mounts = Object.entries(c.mounts.mounts).map(([id, m]) => ({ mountId: Number(id), name: m.name, spellId: m.spellId, ridingSkill: m.ridingSkill ?? null, build: c.mounts.build.version }));
+  const encounters = Object.entries(c.encounters.instances).flatMap(([mapId, list]) =>
+    list.map((e) => ({ instanceMapId: Number(mapId), encounterId: e.id, name: e.name, difficultyId: e.difficultyId ?? null, build: c.encounters.build.version })));
+  const recipes = c.recipes.professions.flatMap((p) => p.recipes.map(([spellId, itemId, minRank, yellowRank, greyRank, reagents]) => ({
+    professionId: p.id, professionName: p.name, spellId, itemId: itemId === 0 ? null : itemId, minRank, yellowRank, greyRank,
+    reagents: reagents.map(([item, count]) => ({ itemId: item, count })), build: c.recipes.build.version,
+  })));
+  const classGear = Object.entries(c.classGear.classes).flatMap(([className, cls]) =>
+    cls.gear.map(([itemClassId, itemSubclassId, level]) => ({ classId: cls.id, className, itemClassId, itemSubclassId, level, build: c.classGear.build.version })));
+  const restrictions = Object.entries(c.classGear.restricted).map(([itemId, classMask]) => ({ itemId: Number(itemId), classMask, build: c.classGear.build.version }));
+  const classSpells = Object.entries(c.classSpells.classes).flatMap(([className, cls]) => cls.spells.map((spellId) => ({ classId: cls.id, className, spellId, build: c.classSpells.build.version })));
+  const races = c.races.races.map((r) => ({
+    raceId: r.id, name: r.name, faction: r.faction, classes: r.classes.map((k) => ({ classId: k.id, name: k.name })),
+    traits: r.traits.map((t) => ({ name: t.name, kind: t.kind, order: t.order })), build: c.races.build.version,
+  }));
+  const legacyPerks = c.legacyPerks.trees.flatMap((tree) => tree.nodes.flatMap((node) => node.entries.map((e) =>
+    ({ treeId: tree.id, nodeId: node.id, entryId: e.id, definitionId: e.definitionId, spellId: e.spellId, name: e.name, maxRanks: e.maxRanks, build: c.legacyPerks.build.version }))));
+  const talentNodes = c.talents.flatMap((file) => file.trees.flatMap((tree) => tree.nodes.map((n) => ({
+    classId: file.classId, className: file.className, treeId: tree.id, treeName: tree.name, nodeId: n.id,
+    x: n.x, y: n.y, row: n.row, col: n.col, kind: n.kind, maxRanks: n.maxRanks,
+    entries: n.entries.map((e) => ({ definitionId: e.definitionId, spellId: e.spellId, name: e.name, maxRanks: e.maxRanks })),
+    prereqs: n.prereqs.map((p) => ({ nodeId: p.nodeId, rule: p.rule })), build: file.build.version,
+  }))));
+  const talentBuild = c.talents[0]?.build.version ?? "";
+  const raidBuffs = c.raidBuffs.entries.map((e) => ({
+    id: e.id, label: e.label, kind: e.kind, class: e.class, family: e.family, scope: e.scope, tree: e.tree, treeProof: e.treeProof ?? null,
+    names: e.names, spellIds: e.spellIds, build: c.raidBuffs.build,
+  }));
+  return [
+    one("achievements", "Every achievement the build lists: title, points, how many criteria, and whether it is a statistic. No criteria text or description.", achievementRow, byNumber(achievements, (r) => r.achievementId), c.achievements.build.version),
+    one("factions", "Every faction the build lists: name, parent and whether the reputation pane shows it.", factionRow, byNumber(factions, (r) => r.factionId), c.factions.build.version),
+    one("titles", "Every character title the build lists, as the file holds it.", titleRow, byNumber(titles, (r) => r.titleId), c.titles.build.version),
+    one("quest-lines", "Every quest line the build lists, with its quest ids in order.", questLineRow, byNumber(questLines, (r) => r.questLineId), c.questLines.build.version),
+    one("mounts", "Every mount the build lists: name, the spell that teaches it and the riding skill it asks for.", mountRow, byNumber(mounts, (r) => r.mountId), c.mounts.build.version),
+    one("encounters", "The boss encounters the files list for each instance, by the instance's map id.", encounterRow, encounters, c.encounters.build.version),
+    one("recipes", "Every recipe on each profession's skill line: the spell, the item it makes, its ranks and its reagents. Ids and ranks; no names.", recipeRow, recipes, c.recipes.build.version),
+    one("class-gear", "The item class and subclass pairs each class's proficiencies allow, with the level it gets each at.", classGearRow, classGear, c.classGear.build.version),
+    one("class-gear-restrictions", "Items whose own class mask leaves a class out.", classGearRestrictionRow, byNumber(restrictions, (r) => r.itemId), c.classGear.build.version),
+    one("class-spells", "The spells on each class's own skill lines. Ranks, talents, passives and helper spells are mixed, as in the files.", classSpellRow, classSpells, c.classSpells.build.version),
+    one("races", "Each race a class can be made with: faction, the classes it can be and its racial traits by name. No trait text.", raceRow, byNumber(races, (r) => r.raceId), c.races.build.version),
+    one("legacy-perks", "WoW: Forever's Legacy perks: one row per perk entry with its tree, node, definition and spell ids, name and ranks.", legacyPerkRow, legacyPerks, c.legacyPerks.build.version),
+    one("talent-nodes", "One row per talent node of every class: tree, position, kind, ranks, entries (definition, spell, name, ranks) and prerequisites. No descriptions or icons.", talentNodeRow, talentNodes, talentBuild),
+    one("raid-buffs", "Raid buffs and debuffs: the spell ids and aura names of each, its reach, and the talent tree it needs where the files prove it.", raidBuffRow, raidBuffs, c.raidBuffs.build),
+  ];
 }
 
 function gameFiles(g: GameFilesInput): Dataset[] {
@@ -407,7 +524,9 @@ function gameFiles(g: GameFilesInput): Dataset[] {
   // Zones that may be unreleased stay out, and so do the flight masters and lines placed in or named for one.
   const flights = placeFlights({ flightNodes: g.map.flightNodes, flightPaths: g.map.flightPaths, zones: g.map.zones, heldBackZones: g.map.heldBackZones });
   const hidden = new Set(flights.masters.filter((m) => m.heldBack).map((m) => m.id));
-  const nodes = g.map.flightNodes.filter((n) => !hidden.has(n.id));
+  // The map file carries more per spot than the rows name (uiMapId, level ranges, difficulties); the rows keep their fields.
+  const entrances = g.map.entrances.map(({ mapId, name, raid, continentId, worldX, worldY }) => ({ mapId, name, raid, continentId, worldX, worldY }));
+  const nodes = g.map.flightNodes.filter((n) => !hidden.has(n.id)).map(({ id, name, continentId, worldX, worldY }) => ({ id, name, continentId, worldX, worldY }));
   const paths = g.map.flightPaths.filter((p) => !hidden.has(p.from) && !hidden.has(p.to));
   const label = `all rows of the build ${g.build.version}`;
   return [
@@ -415,9 +534,10 @@ function gameFiles(g: GameFilesInput): Dataset[] {
     { name: "relations", layer: "game-files", about: "Relations between ids the game files hold: created by, reagent for, part of set, same icon and profession.", schema: clientRelationRow, rows: relationsRows, candidates: relationsRows.length, candidatesAre: label },
     { name: "zones", layer: "game-files", about: "Zone rectangles in world yards, for the released zones.", schema: zoneRow, rows: g.map.zones, candidates: g.map.zones.length + g.map.heldBackZones.length, candidatesAre: "zones in the files, held-back ones included, which are left out" },
     { name: "continents", layer: "game-files", about: "Continents with their rectangles in world yards.", schema: continentRow, rows: g.map.continents, candidates: g.map.continents.length, candidatesAre: label },
-    { name: "entrances", layer: "game-files", about: "Dungeon and raid entrance points, in world yards.", schema: gameEntranceRow, rows: g.map.entrances, candidates: g.map.entrances.length, candidatesAre: label },
+    { name: "entrances", layer: "game-files", about: "Dungeon and raid entrance points, in world yards.", schema: gameEntranceRow, rows: entrances, candidates: g.map.entrances.length, candidatesAre: label },
     { name: "flight-masters", layer: "game-files", about: "Flight masters, in world yards.", schema: flightNodeRow, rows: nodes, candidates: g.map.flightNodes.length, candidatesAre: "flight masters in the files, those in held-back zones included, which are left out" },
     { name: "flight-paths", layer: "game-files", about: "One flight line per pair of flight masters, as points in world yards.", schema: flightPathRow, rows: paths, candidates: g.map.flightPaths.length, candidatesAre: "flight lines in the files, those ending at a held-back flight master included, which are left out" },
+    ...catalogs(g.catalogs),
   ];
 }
 

@@ -106,6 +106,18 @@ export function Contribute() {
   );
 }
 
+/**
+ * Why an item reads "Item N" (lib/items.ts shownItemName, as art.ts auctionNames applies it): no name three
+ * installs agree on, none the game files and the Warcraft Wiki agree on, and no tooltip from a scanned item.
+ */
+export const UNNAMED_REASON = "No agreed name yet: a name shows once three installs report the same one, or when the game files and the Warcraft Wiki agree on one. The prices are real.";
+
+/** The one line under the header of an unnamed item's price page; nothing for a named item. */
+export function UnnamedReason({ id, names }: { id: number; names: ItemNames }) {
+  if (names.has(id)) return null;
+  return <p className="text-cell text-fg-2" data-unnamed-reason>{UNNAMED_REASON}</p>;
+}
+
 /** How the counts in PendingRealms are made, in one sentence. */
 export const PENDING_RULE = "A player is counted when they scanned the same item there on one day in the last 7 days; installs behind one upload address count once.";
 

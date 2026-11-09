@@ -6,7 +6,7 @@ import GameIcon from "@/components/game/GameIcon";
 import { Container, DataTable, DataTitle, Entry, EntryList, filledColumns, LinkTabs, Pager, QUALITY_TEXT, SearchBar, qualityOf, type SparseColumn } from "@/components/ui";
 import { CC_BY_SA } from "@/lib/jsonld";
 import { BROWSE_HEADINGS, BROWSE_TYPES, hasTypes, loreSlug, MAX_QUERY, searchLore, UNAVAILABLE, UNAVAILABLE_COPY, type BrowseSlug, type LoreType } from "@/lib/lore";
-import { isScope, siteSearch, type Scope, type SearchGroup, type SearchResult } from "@/lib/site-search";
+import { HEADINGS, isScope, siteSearch, type Scope, type SearchGroup, type SearchResult, type SearchType } from "@/lib/site-search";
 import { loadShownSearchNames } from "@/lib/shown-search-names";
 import { loadShownNames } from "@/lib/shown-item-names";
 import { shownItemIcons } from "@/lib/item-icons";
@@ -21,10 +21,14 @@ function typeOf(raw: string | undefined): LoreType | undefined {
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  ...pageMetadata({ title: "Search Everloot", description: "Search WoW: Forever items, NPCs, quests, zones, lore archive pages and Everloot tools by name or id. An exact match comes first.", path: "/search" }),
-  robots: { index: false, follow: true },
-};
+/** The tab and history name what was searched; a results page is never indexed. */
+export async function generateMetadata(props: { searchParams: Promise<Params> }): Promise<Metadata> {
+  const q = (first((await props.searchParams).q) ?? "").trim().slice(0, MAX_QUERY);
+  return {
+    ...pageMetadata({ title: q ? `Search: ${q}` : "Search", description: "Search WoW: Forever items, NPCs, quests, zones, lore archive pages and Everloot tools by name or id. An exact match comes first.", path: "/search" }),
+    robots: { index: false, follow: true },
+  };
+}
 
 function pageNumber(raw: string | undefined): number {
   return raw && /^[1-9]\d*$/.test(raw) ? Number(raw) : 1;
@@ -46,6 +50,37 @@ const SCOPED_LIMIT = 50;
 
 /** The paginated database list that takes the same `?q=`, for the scopes that have one (objects have no list). */
 const DATABASE_LIST = { item: "items", npc: "npcs", quest: "quests" } as const;
+
+/** What the search covers, each with the list it opens; shown before a query, under the field. No count: a count would read a store on every request. */
+const KINDS: { type: SearchType; href: string }[] = [
+  { type: "item", href: "/database/items" }, { type: "npc", href: "/database/npcs" }, { type: "quest", href: "/database/quests" },
+  { type: "zone", href: "/database/zones" }, { type: "object", href: "/database/objects" }, { type: "lore", href: "/lore" },
+  { type: "tool", href: "/tools" }, { type: "doc", href: "/docs" },
+];
+/** Four queries to try: the lookup /chat opens with (ChatWelcome), then the field's own placeholder. */
+const EXAMPLES = ["Linen Cloth", "Thrall", "Elwynn Forest", "6948"];
+
+/** The empty page's hint: the kinds a search finds and four queries to try. */
+function SearchStart() {
+  return (
+    <section aria-labelledby="search-start" className="max-w-reading space-y-3 py-4 text-cell">
+      <h2 id="search-start" className="font-semibold text-fg">What you can search</h2>
+      <ul className="flex flex-wrap gap-x-4 gap-y-1">
+        {KINDS.map((k) => <li key={k.type}><Link href={k.href} className={link}>{HEADINGS[k.type]}</Link></li>)}
+      </ul>
+      <p className="text-fg-2">
+        A name or an id, and an exact match comes first. Try{" "}
+        {EXAMPLES.map((q, i) => (
+          <span key={q}>
+            {i > 0 && (i === EXAMPLES.length - 1 ? " or " : ", ")}
+            <Link href={`/search?q=${encodeURIComponent(q)}`} className={link}>{q}</Link>
+          </span>
+        ))}
+        .
+      </p>
+    </section>
+  );
+}
 
 export default async function SearchPage(props: { searchParams: Promise<Params> }) {
   const params = await props.searchParams;
@@ -92,12 +127,12 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
         <div className="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2">
           <div className="[&>header]:mb-0"><DataTitle title="Search" /></div>
           <div className="w-full max-w-xl sm:flex-1">
-            <SearchBar action="/search" id="search-page" label="Search Everloot" placeholder="A name or an id: Thrall, Elwynn Forest, 6948" defaultValue={q} defaultScope={scope ?? ""} compact />
+            <SearchBar action="/search" id="search-page" label="Search Everloot" placeholder={`A name or an id: ${EXAMPLES.slice(1).join(", ")}`} defaultValue={q} defaultScope={scope ?? ""} compact />
           </div>
           {tabs && <LinkTabs label="Result types" tabs={tabs} />}
         </div>
 
-        {groups === null ? null : groups.length === 0 ? (
+        {groups === null ? <SearchStart /> : groups.length === 0 ? (
           people ? <PeopleResults q={q} empty={nothing} /> : nothing
         ) : (
           // Characters and guilds sit after the database groups, above the lore archive, tools and docs.

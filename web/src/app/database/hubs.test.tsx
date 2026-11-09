@@ -16,7 +16,7 @@ vi.mock("@/lib/database-hubs", async (importOriginal) => {
 
 import { DATABASE_HUBS } from "@/lib/database-hubs";
 import { instanceRows } from "@/lib/instances";
-import DatabasePage from "./page";
+import DatabasePage from "./(hub)/page";
 
 beforeEach(() => store.loadCorpus.mockReset());
 
@@ -30,6 +30,20 @@ test("the database page links every hub in the list, the dungeon and raid index 
   const total = instanceRows().size;
   expect(total).toBeGreaterThan(0);
   expect(row(page, "/database/instances")).toContain(`Dungeons and raids</span><span class="shrink-0 tabular-nums text-muted">${total}</span>`);
+});
+
+test("the Guilds tile carries a short verb where the others carry a count, never a stray noun", async () => {
+  store.loadCorpus.mockResolvedValue({ uploads: 3, dataAsOf: "2026-10-10T00:00:00.000Z", records: [] });
+  const page = renderToStaticMarkup(await DatabasePage());
+  expect(row(page, "/tools/guild-board")).toContain('Guilds</span><span class="shrink-0 tabular-nums text-muted">look up</span>');
+  expect(row(page, "/tools/guild-board")).not.toContain("uploads");
+});
+
+test("a class whose only subclass repeats its own name lists no subclass under it", async () => {
+  store.loadCorpus.mockResolvedValue({ uploads: 3, dataAsOf: "2026-10-10T00:00:00.000Z", records: [] });
+  const page = renderToStaticMarkup(await DatabasePage());
+  expect(page).toContain('<a href="/database/items/quest"');
+  expect(page).not.toContain('<a href="/database/items/quest/quest"');
 });
 
 test("a hub with no count of its own is linked without one, not with a blank or a zero", async () => {

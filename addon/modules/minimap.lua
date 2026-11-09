@@ -5,9 +5,27 @@ local E = Everloot
 local M = {}
 E.Minimap = M
 
---- The button, once. Returns the frame or nil when the client has no minimap to sit on.
+--- A click: the Everloot window, or the plan workspace when the window is off or has failed this session.
+--- A right click opens the options page.
+function M.Click(mouseButton)
+  if mouseButton ~= "RightButton" and E.Window and E:IsEnabled("window") and not E.Window.failed and E.Window.Toggle() then return end
+  if mouseButton ~= "RightButton" and E.Planner then E.Planner.Open()
+  elseif E.Options and E.Options.Open then E.Options.Open() end
+end
+
+-- The game's addon compartment (the TOC's AddonCompartmentFunc) reaches players who hide minimap buttons.
+-- The one global this file adds; the compartment calls it by name.
+function Everloot_OnAddonCompartmentClick(_, buttonName) M.Click(buttonName) end
+
+--- False when the player turned the button off on the settings page (applies at load).
+function M.Enabled()
+  return not (EverlootDB and EverlootDB.minimapButton == false)
+end
+
+--- The button, once. Returns the frame or nil when the client has no minimap to sit on or the button is off.
 function M.Button()
   if M.button then return M.button end
+  if not M.Enabled() then return nil end
   if type(Minimap) ~= "table" or type(Minimap) == "userdata" then return nil end
   if type(Minimap) == "table" and type(Minimap.IsObjectType) == "function" and not Minimap:IsObjectType("Frame") then return nil end
   local button = CreateFrame("Button", "EverlootMinimapButton", Minimap)
@@ -25,11 +43,23 @@ function M.Button()
   end
   -- The game's own round glow for minimap buttons on hover.
   if button.SetHighlightTexture then button:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight", "ADD") end
-  button:SetScript("OnClick", function(_, mouseButton)
-    -- Left: the Everloot window, or the plan workspace when the window is off or has failed this session.
-    if mouseButton ~= "RightButton" and E.Window and E:IsEnabled("window") and not E.Window.failed and E.Window.Toggle() then return end
-    if mouseButton ~= "RightButton" and E.Planner then E.Planner.Open()
-    elseif E.Options and E.Options.Open then E.Options.Open() end
+  button:SetScript("OnClick", function(_, mouseButton) M.Click(mouseButton) end)
+  -- What the three actions do. Hooked, not set: the drawer hooks the same hover to open, and both must run.
+  button:HookScript("OnEnter", function(self)
+    if type(GameTooltip) ~= "table" then return end
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT") -- the drawer opens to the left
+    GameTooltip:AddLine("Everloot")
+    -- Each line says what the click does now: the window, or the plan workspace when the window is off or failed.
+    local window = E.Window and E:IsEnabled("window") and not E.Window.failed
+    GameTooltip:AddLine(window and "Left-click: open the Everloot window" or "Left-click: open the plan workspace")
+    GameTooltip:AddLine("Right-click: open the settings")
+    if E:IsEnabled("buttons") and E.Drawer and E.Drawer.collected and #E.Drawer.collected > 0 then
+      GameTooltip:AddLine("Hover: show other addons' buttons")
+    end
+    GameTooltip:Show()
+  end)
+  button:HookScript("OnLeave", function()
+    if type(GameTooltip) == "table" then GameTooltip:Hide() end
   end)
   if button.RegisterForClicks then button:RegisterForClicks("LeftButtonUp", "RightButtonUp") end
   M.button = button
@@ -37,6 +67,7 @@ function M.Button()
 end
 
 E:RegisterModule("minimap", function()
+  if not M.Enabled() then return "off (the minimap button is switched off; /everloot window opens the window)" end
   if M.Button() then return "ready (a button at the top-left of the minimap)" end
   return "no minimap on this client; /everloot options still opens the panel"
 end)

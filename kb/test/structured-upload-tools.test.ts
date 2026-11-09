@@ -49,17 +49,17 @@ test("profession_path and recipe_thresholds answer with the path and the ranges 
   const c = await client({ corpus });
   const facts = pathFactsFromRecords(records);
   const path = OUT.profession_path.parse((await c.callTool({ name: "profession_path", arguments: { profession: "Alchemy", fromSkill: 1, toSkill: 10 } })).structuredContent);
-  expect(path).toEqual({ connected: true, dataAsOf: AS_OF, url: "https://everloot.app/tools/professions?profession=Alchemy&from=1&to=10", page: professionPath(facts.sightings, facts.prices, { profession: "Alchemy", fromSkill: 1, toSkill: 10 }, facts.derived, facts.vendorPrices) });
+  expect(path).toEqual({ connected: true, dataAsOf: AS_OF, url: "https://everloot.app/tools/professions/171-alchemy?from=1&to=10", page: professionPath(facts.sightings, facts.prices, { profession: "Alchemy", fromSkill: 1, toSkill: 10 }, facts.derived, facts.vendorPrices) });
   expect(path.page!.steps).toMatchObject([{ recipe: "Minor Healing Potion", fromSkill: 1, toSkill: 10, crafts: 9, reporters: 3, copper: 99 }]);
   expect(path.page!.copper).toBe(99);
 
   const rf = recipeFactsFromRecords(records);
   const result = await c.callTool({ name: "recipe_thresholds", arguments: { profession: "Alchemy" } });
   const ranges = OUT.recipe_thresholds.parse(result.structuredContent);
-  expect(ranges).toEqual({ connected: true, dataAsOf: AS_OF, url: "https://everloot.app/tools/professions?profession=Alchemy", page: recipeThresholdsStructured({ profession: "Alchemy" }, rf.observations, rf.prices, rf.vendorPrices) });
+  expect(ranges).toEqual({ connected: true, dataAsOf: AS_OF, url: "https://everloot.app/tools/professions/171-alchemy", page: recipeThresholdsStructured({ profession: "Alchemy" }, rf.observations, rf.prices, rf.vendorPrices) });
   expect(ranges.page!.ranges).toMatchObject([{ recipe: "Minor Healing Potion", installs: 3, yellow: { min: 51, max: 55 }, reagents: [{ item: "Peacebloom", count: 1 }], costCopper: 11, missingPrices: [] }]);
   expect(JSON.stringify(result.content)).toContain("Estimated cost per craft: 11c");
-  expect(JSON.stringify(result.content)).toContain("More: https://everloot.app/tools/professions?profession=Alchemy");
+  expect(JSON.stringify(result.content)).toContain("More: https://everloot.app/tools/professions/171-alchemy");
   const none = OUT.recipe_thresholds.parse((await c.callTool({ name: "recipe_thresholds", arguments: { profession: "Tailoring" } })).structuredContent);
   expect(none.page).toEqual({ profession: "Tailoring", ranges: [] });
   // Nothing agreed for Tailoring: its hub would be empty, so no link.

@@ -702,17 +702,32 @@ async function entityPageUrl(
   return undefined;
 }
 
+/** A tool call the caller got wrong (a name that matches nothing, a blank argument): the HTTP route answers 400 with its message. Any other throw is a server failure. */
+export class ToolArgumentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ToolArgumentError";
+  }
+}
+
 /** The game's professions, from the build's SkillLine names; its "[DNT]" test lines are not one. */
 const PROFESSION_NAMES = [...CLIENT_SKILLS.values()].filter((name) => !name.includes("[DNT]")).sort();
 
 /** A blank or unknown profession is refused before any read: an error, not a connected page about no profession. */
 function professionArg(profession: string): string {
   const trimmed = profession.trim();
-  if (!trimmed) throw new Error("Name a profession.");
+  if (!trimmed) throw new ToolArgumentError("Name a profession.");
   if (!PROFESSION_NAMES.some((name) => name.toLowerCase() === trimmed.toLowerCase())) {
-    throw new Error(`No profession named "${trimmed}". The professions are ${PROFESSION_NAMES.join(", ")}.`);
+    throw new ToolArgumentError(`No profession named "${trimmed}". The professions are ${PROFESSION_NAMES.join(", ")}.`);
   }
   return trimmed;
+}
+
+/** The skill line id of a profession the files list, by its name in any case; undefined for a name they do not. */
+function professionSkillLineId(profession: string): number | undefined {
+  const wanted = profession.trim().toLowerCase();
+  for (const [id, name] of CLIENT_SKILLS) if (name.toLowerCase() === wanted) return id;
+  return undefined;
 }
 
 /** The readers a host lends the tools: the site's store in process, or nothing for a standalone server. */
@@ -808,7 +823,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
         }
       }
       const doc = numeric !== undefined && !isCatalogId(numeric) ? await getDocument(db, numeric) : undefined;
-      if (!doc) throw new Error(`No record with id "${args.id}". Ids come from search results.`);
+      if (!doc) throw new ToolArgumentError(`No record with id "${args.id}". Ids come from search results.`);
       const { text, ...read } = fetchedText(args, doc.data, () => doc.body);
       return jsonAnswer({
         id: String(doc.id), title: doc.name, text, url: recordUrl(doc, SITE),
@@ -830,7 +845,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
       const query = { profession: professionArg(args.profession), fromSkill: args.fromSkill ?? 1, toSkill: args.toSkill ?? args.fromSkill ?? 1 };
       return readPageIn("profession_path", (facts: ReturnType<typeof pathFactsFromRecords>) => {
         const page = professionPath(facts.sightings, facts.prices, query, facts.derived, facts.vendorPrices);
-        const url = page.steps.length ? professionsUrl(query.profession, query.fromSkill, query.toSkill) : undefined;
+        const url = page.steps.length ? professionsUrl(query.profession, query.fromSkill, query.toSkill, professionSkillLineId(query.profession)) : undefined;
         return { text: formatProfessionPath(page), page, url };
       });
     },
@@ -841,7 +856,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
         return {
           text: handleRecipeThresholds(args, facts.observations, facts.prices, facts.vendorPrices),
           page,
-          url: page.ranges.length ? professionsUrl(profession) : undefined,
+          url: page.ranges.length ? professionsUrl(profession, undefined, undefined, professionSkillLineId(profession)) : undefined,
         };
       });
     },

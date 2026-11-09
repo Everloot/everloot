@@ -1,10 +1,10 @@
 """Run with: uv run --with lupa --with jsonschema python addon/tests/gold_contract.py"""
 from pathlib import Path
 from lupa.lua51 import LuaRuntime
+from protocol_schema import check_all
 
-lua = LuaRuntime()
-lua.execute("""
-date = function() return '2026-10-09T00:00:00Z' end
+STUBS = """
+date = function(fmt) if fmt == '!%Y-%m-%d' then return '2026-10-09' end return '2026-10-09T00:00:00Z' end
 local clock = 1000
 time = function() clock = clock + 1; return clock end
 print = function() end
@@ -15,6 +15,9 @@ CreateFrame = function() return {
  HookScript=function(self, _, f) self.hooks=self.hooks or {}; table.insert(self.hooks,f) end
 } end
 UnitName = function() return 'Thrall' end
+UnitGUID = function() return 'Player-4242-0ABCDEF1' end
+UnitClass = function() return 'Shaman', 'SHAMAN', 7 end
+UnitLevel = function() return 60 end
 GetRealmName = function() return 'Test Realm' end
 money = 1000
 GetMoney = function() return money end
@@ -52,15 +55,26 @@ C_AuctionHouse = {
 timers = {}
 C_Timer = { After = function(seconds, f) table.insert(timers, { seconds = seconds, f = f }) end }
 function runTimers() local list = timers; timers = {}; for _, t in ipairs(list) do t.f() end end
-""")
-root = Path(__file__).parents[1]
-for file in ["core.lua", "modules/gold.lua"]:
-    lua.execute((root / file).read_text(encoding="utf-8"))
-lua.execute("""
-Everloot.frame.onEvent(nil,'ADDON_LOADED','Everloot')
-local function event(name, ...)
+function event(name, ...)
  for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, name, ...) end
 end
+"""
+root = Path(__file__).parents[1]
+
+
+def runtime(before_load=""):
+    """A fresh client: core, roster, ledger and gold loaded, then ADDON_LOADED. Gold finds the ledger at call time."""
+    lua = LuaRuntime()
+    lua.execute(STUBS)
+    for file in ["core.lua", "modules/roster.lua", "modules/ledger.lua", "modules/gold.lua"]:
+        lua.execute((root / file).read_text(encoding="utf-8"))
+    lua.execute(before_load)
+    lua.execute("Everloot.frame.onEvent(nil,'ADDON_LOADED','Everloot')")
+    return lua
+
+
+lua = runtime()
+lua.execute("""
 local function events(category)
  local list = {}
  for _, row in ipairs(EverlootDB.records.money_event or {}) do
@@ -70,7 +84,7 @@ local function events(category)
 end
 event('PLAYER_ENTERING_WORLD')
 
--- A sale at an open merchant is vendor income; a purchase there is not recorded.
+-- A sale at an open merchant is vendor income; a purchase there is a vendor purchase, kept in the local ledger only.
 event('MERCHANT_SHOW')
 money = 1500; event('PLAYER_MONEY')
 money = 1200; event('PLAYER_MONEY')
@@ -229,6 +243,396 @@ for _, row in ipairs(events()) do
  for _, value in pairs(row) do assert(value ~= 'Jaina' and value ~= 'Player-1-AAAA', 'buyers, sellers and recipients are other players and are never stored') end
 end
 """)
+
+# The local ledger: an auction sale is kept by item once the money change confirms the letter. Forever's invoice
+# returns invoiceType, itemName, playerName, bid, buyout, deposit, consignmentFee, moneyDelay, etaDay, etaHour,
+# count, commerceAuction. The buyer's name is never kept anywhere in the saved file.
+ledger = runtime()
+ledger.execute("""
+local function events(category)
+ local list = {}
+ for _, row in ipairs(EverlootDB.records.money_event or {}) do
+  if category == nil or row.category == category then list[#list + 1] = row end
+ end
+ return list
+end
+event('PLAYER_ENTERING_WORLD')
+local key = Everloot.CharacterKey()
+assert(key, 'the test character has a key')
+assert(EverlootDB.ledger.daily[key]['2026-10-09'] == 1000, 'entering the world writes the daily close')
+invoiceCount = 20
+GetInboxInvoiceInfo = function()
+ return 'seller', 'Linen Cloth', 'Buyerperson', 4000, 4000, 100, 200, 0, 0, 0, invoiceCount, true
+end
+GetInboxHeaderInfo = function() return 'icon', 'paper', 'Auction House', 'Auction successful', 3900 end
+TakeInboxMoney(1)
+money = money + 3900; event('PLAYER_MONEY')
+assert(#events() == 1 and events('auction')[1].copper == 3800, 'one money_event, auction 3800')
+assert(events()[1].itemName == nil and events()[1].count == nil, 'the uploaded money_event keeps its shape')
+local sale = EverlootDB.ledger.sales[1]
+assert(#EverlootDB.ledger.sales == 1 and sale.key == key, 'one sale under the character key')
+assert(sale.itemName == 'Linen Cloth' and sale.count == 20 and sale.total == 3800 and sale.unit == 190
+ and sale.deposit == 100 and sale.cut == 200 and sale.status == 'paid', 'the sale by item')
+local row = EverlootDB.ledger.events[1]
+assert(#EverlootDB.ledger.events == 1 and row.key == key and row.category == 'auction' and row.copper == 3800
+ and row.itemName == 'Linen Cloth' and row.count == 20, 'the ledger event names the item')
+assert(EverlootDB.ledger.daily[key]['2026-10-09'] == 4900, 'PLAYER_MONEY writes the daily close')
+
+-- A money change that does not match the letter: no sale, no event; the close still follows the purse.
+TakeInboxMoney(1)
+money = money + 3901; event('PLAYER_MONEY')
+assert(#EverlootDB.ledger.sales == 1 and #EverlootDB.ledger.events == 1 and #events() == 1, 'a mismatched delta records nothing')
+assert(EverlootDB.ledger.daily[key]['2026-10-09'] == 8801, 'the close follows the purse')
+
+-- An invoice without a count is one item.
+invoiceCount = nil
+TakeInboxMoney(1)
+money = money + 3900; event('PLAYER_MONEY')
+local single = EverlootDB.ledger.sales[2]
+assert(single and single.count == 1 and single.unit == 3800 and EverlootDB.ledger.events[2].count == 1, 'no count is count 1')
+
+-- Every stored money event reaches the ledger, not only sales.
+event('QUEST_TURNED_IN', 123, 450, 250)
+local quest = EverlootDB.ledger.events[3]
+assert(quest and quest.key == key and quest.category == 'quest' and quest.copper == 250, 'a quest reward in the ledger')
+
+local function walk(value, path)
+ if type(value) == 'string' then
+  assert(not value:find('Buyerperson', 1, true), 'a buyer name was saved at ' .. path)
+ elseif type(value) == 'table' then
+  for k, v in pairs(value) do walk(k, path .. '[key]'); walk(v, path .. '.' .. tostring(k)) end
+ end
+end
+walk(EverlootDB, 'EverlootDB')
+""")
+check_all(ledger)
+
+# The sold notice: a system line with the client's own text and only the item. It adds a pending sale; the invoice
+# flow fills the same row. A secret line, another system line, and a client without the global record nothing.
+SOLD = "ERR_AUCTION_SOLD_S = 'A buyer has been found for your auction of %s.'"
+pending = runtime(SOLD + "\n" + "issecretvalue = function(v) return v == 'SECRET LINE' end")
+pending.execute("""
+event('PLAYER_ENTERING_WORLD')
+local key = Everloot.CharacterKey()
+local sales = EverlootDB.ledger.sales
+event('CHAT_MSG_SYSTEM', 'SECRET LINE')
+event('CHAT_MSG_SYSTEM', 'Your auction of Linen Cloth has expired.')
+event('CHAT_MSG_SYSTEM', 42)
+assert(#sales == 0, 'a secret, unrelated or non-string line records nothing')
+event('CHAT_MSG_SYSTEM', string.format(ERR_AUCTION_SOLD_S, 'Linen Cloth'))
+assert(#sales == 1 and sales[1].key == key and sales[1].itemName == 'Linen Cloth' and sales[1].status == 'pending', 'one pending sale')
+assert(sales[1].total == nil and sales[1].count == nil and sales[1].unit == nil, 'no gold is known yet')
+assert(#(EverlootDB.records.money_event or {}) == 0 and #EverlootDB.ledger.events == 0, 'the notice moves no money and uploads nothing')
+GetInboxInvoiceInfo = function() return 'seller', 'Linen Cloth', 'Buyerperson', 4000, 4000, 100, 200, 0, 0, 0, 20, true end
+GetInboxHeaderInfo = function() return 'icon', 'paper', 'Auction House', 'Auction successful', 3900 end
+TakeInboxMoney(1)
+money = money + 3900; event('PLAYER_MONEY')
+assert(#sales == 1, 'the invoice fills the pending row, it does not add one')
+local sale = sales[1]
+assert(sale.status == 'paid' and sale.count == 20 and sale.unit == 190 and sale.total == 3800 and sale.deposit == 100 and sale.cut == 200, 'the same row, paid')
+-- With nothing pending, a sale still appends as before.
+TakeInboxMoney(1)
+money = money + 3900; event('PLAYER_MONEY')
+assert(#sales == 2 and sales[2].status == 'paid', 'a sale without a notice appends')
+""")
+check_all(pending)
+
+missing = runtime("ERR_AUCTION_SOLD_S = nil")
+missing.execute("""
+event('PLAYER_ENTERING_WORLD')
+event('CHAT_MSG_SYSTEM', 'A buyer has been found for your auction of Linen Cloth.')
+assert(#EverlootDB.ledger.sales == 0, 'no global, no pending sale')
+assert(Everloot:Status():find('sold notice: no ERR_AUCTION_SOLD_S', 1, true), Everloot:Status())
+""")
+check_all(missing)
+
+# Without the ledger file, gold records its money_event as before.
+plain = runtime("Everloot.Ledger = nil")
+plain.execute("""
+event('PLAYER_ENTERING_WORLD')
+GetInboxInvoiceInfo = function() return 'seller', 'Linen Cloth', 'Buyerperson', 4000, 4000, 100, 200, 0, 0, 0, 20, true end
+GetInboxHeaderInfo = function() return 'icon', 'paper', 'Auction House', 'Auction successful', 3900 end
+TakeInboxMoney(1)
+money = money + 3900; event('PLAYER_MONEY')
+local rows = EverlootDB.records.money_event
+assert(#rows == 1 and rows[1].category == 'auction' and rows[1].copper == 3800, 'money_event without the ledger')
+local store = EverlootDB.ledger or {}
+assert(#(store.events or {}) == 0 and #(store.sales or {}) == 0 and next(store.daily or {}) == nil, 'gold writes no ledger rows without E.Ledger')
+""")
+check_all(plain)
+
+# Slice two: repairs, vendor purchases, trades and mail. These categories go to the local ledger only; the uploaded
+# money_event keeps the schema's nine. An own alt is a roster name on the player's realm; no other name is kept.
+# The repair hooks are installed at init, so the repair functions exist before the module starts.
+two = runtime("RepairAllItems = function() end\nRepairItem = function() end\n"
+              "GetPlayerTradeMoney = function() return tradeOut end\nGetTargetTradeMoney = function() return tradeIn end\n"
+              "sendMoney = 0\nGetSendMailMoney = function() return sendMoney end\n"
+              "SendMailNameEditBox = { GetText = function() return recipient end }\n"
+              "UnitName = function(unit) if unit == 'NPC' then return partner, partnerRealm end return 'Thrall' end\n")
+two.execute("""
+local function uploaded() return #(EverlootDB.records.money_event or {}) end
+local function last() local rows = EverlootDB.ledger.events; return rows[#rows] end
+money = 100000
+event('PLAYER_ENTERING_WORLD')
+EverlootDB.roster.alt00001 = { name = 'Altperson', realm = 'Test Realm' }
+EverlootDB.roster.alt00002 = { name = 'Farperson', realm = 'Other Realm' }
+local key = Everloot.CharacterKey()
+local events = EverlootDB.ledger.events
+
+-- A repair at an open merchant, one item repaired, a purchase, an expired repair. A sale there stays vendor income.
+event('MERCHANT_SHOW')
+RepairAllItems(false)
+money = money - 1200; event('PLAYER_MONEY')
+assert(#events == 1 and last().category == 'repair' and last().copper == 1200 and last().key == key, 'repair 1200')
+assert(uploaded() == 0, 'a repair adds no money_event row')
+money = money - 500; event('PLAYER_MONEY')
+assert(#events == 2 and last().category == 'vendor_spend' and last().copper == 500, 'purchase 500 is a vendor purchase')
+RepairItem()
+money = money - 80; event('PLAYER_MONEY')
+assert(#events == 3 and last().category == 'repair' and last().copper == 80, 'one item repaired')
+RepairAllItems(false)
+runTimers()
+money = money - 90; event('PLAYER_MONEY')
+assert(#events == 4 and last().category == 'vendor_spend', 'an expired repair is a purchase')
+money = money + 300; event('PLAYER_MONEY')
+assert(#events == 5 and last().category == 'vendor' and uploaded() == 1, 'a sale at a merchant stays vendor income')
+event('MERCHANT_CLOSED')
+money = money - 40; event('PLAYER_MONEY')
+assert(#events == 5, 'no merchant, nothing recorded')
+
+-- A trade with an own alt: both sides accepted, then the money matches.
+money = money + 100000; event('PLAYER_MONEY')
+partner, partnerRealm, tradeOut, tradeIn = 'Altperson', nil, 0, 2500
+event('TRADE_SHOW')
+event('TRADE_ACCEPT_UPDATE', 1, 0)
+event('TRADE_ACCEPT_UPDATE', 1, 1)
+event('TRADE_CLOSED')
+money = money + 2500; event('PLAYER_MONEY')
+assert(#events == 6 and last().category == 'trade_in' and last().copper == 2500 and last().ownAlt == true, 'trade in from an alt')
+-- A trade with another player, money both ways.
+partner, tradeOut, tradeIn = 'Partnerperson', 1000, 300
+event('TRADE_SHOW')
+event('TRADE_ACCEPT_UPDATE', 1, 1)
+event('TRADE_CLOSED')
+money = money - 700; event('PLAYER_MONEY')
+assert(#events == 8 and events[7].category == 'trade_in' and events[7].copper == 300 and events[8].category == 'trade_out'
+ and events[8].copper == 1000 and events[7].ownAlt == nil and events[8].ownAlt == nil, 'trade both ways, not an alt')
+-- The money change can come before the window closes.
+partner, tradeOut, tradeIn = 'Partnerperson', 0, 120
+event('TRADE_SHOW')
+event('TRADE_ACCEPT_UPDATE', 1, 1)
+money = money + 120; event('PLAYER_MONEY')
+event('TRADE_CLOSED')
+assert(#events == 9 and last().category == 'trade_in' and last().copper == 120, 'money before TRADE_CLOSED')
+-- A roster name on another realm is not the alt.
+partner, partnerRealm, tradeOut, tradeIn = 'Farperson', 'Other Realm', 50, 0
+event('TRADE_SHOW')
+event('TRADE_ACCEPT_UPDATE', 1, 1)
+event('TRADE_CLOSED')
+money = money - 50; event('PLAYER_MONEY')
+assert(#events == 10 and last().category == 'trade_out' and last().ownAlt == nil, 'a cross-realm partner is not an own alt')
+-- A money change that does not match records nothing, and the trade is gone after it.
+partner, partnerRealm, tradeOut, tradeIn = 'Altperson', nil, 400, 0
+event('TRADE_SHOW')
+event('TRADE_ACCEPT_UPDATE', 1, 1)
+event('TRADE_CLOSED')
+money = money - 399; event('PLAYER_MONEY')
+money = money - 400; event('PLAYER_MONEY')
+assert(#events == 10, 'a mismatched delta records nothing')
+-- A trade the partner never accepted, with no money change seen, moves nothing.
+event('TRADE_SHOW')
+event('TRADE_ACCEPT_UPDATE', 1, 0)
+event('TRADE_CLOSED')
+money = money - 400; event('PLAYER_MONEY')
+assert(#events == 10, 'an unaccepted trade records nothing')
+-- The player accepts second: only (0, 1) is seen, and the matching money still records the trade.
+event('TRADE_SHOW')
+event('TRADE_ACCEPT_UPDATE', 0, 1)
+event('TRADE_CLOSED')
+money = money - 400; event('PLAYER_MONEY')
+assert(#events == 11 and last().category == 'trade_out' and last().copper == 400 and last().ownAlt == true, 'partner accepted first')
+-- A money change in the trade window is snapshotted too.
+partner, tradeOut, tradeIn = 'Partnerperson', 0, 250
+event('TRADE_SHOW')
+event('TRADE_MONEY_CHANGED')
+event('TRADE_CLOSED')
+money = money + 250; event('PLAYER_MONEY')
+assert(#events == 12 and last().category == 'trade_in' and last().copper == 250 and last().ownAlt == nil, 'TRADE_MONEY_CHANGED snapshot')
+-- A closed trade waits a few seconds for its money: within the window it is recorded; once the timer has run (a
+-- cancelled trade), loot of the same amount is not a trade.
+timers = {}
+event('TRADE_SHOW')
+event('TRADE_MONEY_CHANGED')
+event('TRADE_CLOSED')
+assert(#timers == 1 and timers[1].seconds == 3, 'closing starts a 3 second expiry')
+money = money + 250; event('PLAYER_MONEY')
+runTimers()
+assert(#events == 13 and last().category == 'trade_in' and last().copper == 250, 'money within the window is the trade')
+event('TRADE_SHOW')
+event('TRADE_MONEY_CHANGED')
+event('TRADE_CLOSED')
+runTimers()
+money = money + 250; event('PLAYER_MONEY')
+assert(#events == 13, 'a cancelled trade expires: later money of the same amount records nothing')
+-- An older close's timer does not clear a newer trade.
+event('TRADE_SHOW')
+event('TRADE_MONEY_CHANGED')
+event('TRADE_CLOSED')
+local older = timers[#timers]
+timers = {}
+event('TRADE_SHOW')
+event('TRADE_MONEY_CHANGED')
+event('TRADE_CLOSED')
+older.f()
+money = money + 250; event('PLAYER_MONEY')
+assert(#events == 14 and last().category == 'trade_in', 'a stale timer leaves the newer trade armed')
+timers = {}
+
+-- Mail out: to a non-alt, and to an alt whatever the case.
+sendPrice, sendMoney, recipient = 30, 5000, 'Strangerperson'
+SendMail('Strangerperson', 'Hi', '')
+event('MAIL_SEND_SUCCESS')
+assert(#events == 16 and events[15].category == 'postage' and events[16].category == 'mail_out' and events[16].copper == 5000
+ and events[16].ownAlt == nil, 'mail out to a non-alt')
+recipient = 'altperson'
+SendMail('altperson', 'Hi', '')
+event('MAIL_SEND_SUCCESS')
+assert(#events == 18 and last().category == 'mail_out' and last().ownAlt == true, 'mail out to an alt')
+sendMoney = 0
+SendMail('Strangerperson', 'Hi', '')
+event('MAIL_SEND_SUCCESS')
+assert(#events == 19 and last().category == 'postage', 'a letter without money is postage only')
+sendMoney = 700
+SendMail('Strangerperson', 'Hi', '')
+event('MAIL_FAILED')
+event('MAIL_SEND_SUCCESS')
+assert(#events == 19, 'a failed send moves nothing')
+
+-- Mail in: only a letter from one of the player's own characters is recorded. Another player's gold, an outbid
+-- refund or a system letter stays unrecorded; an auction sale is still a sale.
+mailFrom, mailMoney = 'Altperson', 900
+GetInboxInvoiceInfo = function() return nil end
+GetInboxHeaderInfo = function() return 'icon', 'paper', mailFrom, 'Hi', mailMoney end
+TakeInboxMoney(1)
+money = money + 900; event('PLAYER_MONEY')
+assert(#events == 20 and last().category == 'mail_in' and last().copper == 900 and last().ownAlt == true, 'mail in from an alt')
+mailFrom, mailMoney = 'Partnerperson', 600
+TakeInboxMoney(1)
+money = money + 600; event('PLAYER_MONEY')
+assert(#events == 20, 'mail from another player stays unrecorded')
+mailFrom, mailMoney = 'Auction House', 5000
+TakeInboxMoney(1)
+money = money + 5000; event('PLAYER_MONEY')
+assert(#events == 20, 'an outbid refund stays unrecorded')
+mailFrom, mailMoney = 'Altperson', 600
+TakeInboxMoney(1)
+money = money + 599; event('PLAYER_MONEY')
+assert(#events == 20, 'a mismatched letter records nothing')
+GetInboxInvoiceInfo = function() return 'seller', 'Linen Cloth', 'Partnerperson', 4000, 4000, 100, 200, 0, 0, 0, 20, true end
+mailFrom, mailMoney = 'Auction House', 3900
+TakeInboxMoney(1)
+money = money + 3900; event('PLAYER_MONEY')
+assert(#events == 21 and last().category == 'auction', 'a sale letter is not plain mail')
+-- A COD payment at the open mailbox stays unrecorded.
+money = money - 1000; event('PLAYER_MONEY')
+assert(#events == 21, 'a COD payment is unrecorded')
+
+-- A guild-bank repair takes none of the player's gold: the next drop at the merchant is a purchase.
+event('MERCHANT_SHOW')
+RepairAllItems(true)
+money = money - 600; event('PLAYER_MONEY')
+assert(#events == 22 and last().category == 'vendor_spend' and last().copper == 600, 'a guild repair is not pending')
+event('MERCHANT_CLOSED')
+
+-- money_event never carries a new category.
+local known = { loot = true, quest = true, vendor = true, auction = true, flight = true, postage = true, barber = true, respec = true, auction_spend = true }
+for _, row in ipairs(EverlootDB.records.money_event) do assert(known[row.category], 'money_event carries ' .. tostring(row.category)) end
+assert(uploaded() == 5, 'vendor, postage three times and the auction sale uploaded; got ' .. uploaded())
+
+-- No partner, recipient or sender name is saved; the alts' names live only in the roster.
+local function walk(value, path, name)
+ if type(value) == 'string' then
+  assert(not value:lower():find(name:lower(), 1, true), name .. ' was saved at ' .. path)
+ elseif type(value) == 'table' then
+  for k, v in pairs(value) do
+   if not (path == 'EverlootDB' and k == 'roster') then walk(k, path .. '[key]', name); walk(v, path .. '.' .. tostring(k), name) end
+  end
+ end
+end
+for _, name in ipairs({ 'Partnerperson', 'Strangerperson', 'Altperson', 'Farperson' }) do walk(EverlootDB, 'EverlootDB', name) end
+""")
+check_all(two)
+
+# Looted gold: Forever's money slot carries its amount in the slot text, not in the quantity field.
+loot = runtime("GOLD_AMOUNT = '%d Gold'; SILVER_AMOUNT = '%d Silver'; COPPER_AMOUNT = '%d Copper'\n"
+               "slot = { type = 2, name = '1 Gold\\n20 Silver', quantity = 0 }\n"
+               "GetNumLootItems = function() return 1 end\n"
+               "GetLootSlotType = function() return slot.type end\n"
+               "GetLootSlotInfo = function() return 'icon', slot.name, slot.quantity end\n")
+loot.execute("""
+event('PLAYER_ENTERING_WORLD')
+local rows = EverlootDB.records.money_event
+local before = #(rows or {})
+event('LOOT_OPENED')
+rows = EverlootDB.records.money_event
+assert(#rows == before + 1 and rows[#rows].category == 'loot' and rows[#rows].copper == 12000, 'text-only money slot is 12000')
+local ledger = EverlootDB.ledger.events
+assert(ledger[#ledger].category == 'loot' and ledger[#ledger].copper == 12000, 'the ledger has the loot event')
+-- A thousands separator belongs to the number.
+slot.name = '1,234 Gold'
+event('LOOT_OPENED')
+rows = EverlootDB.records.money_event
+assert(rows[#rows].copper == 12340000, '1,234 Gold is 12340000, got ' .. tostring(rows[#rows].copper))
+-- A Spanish client's own coin words.
+GOLD_AMOUNT = '%d de oro'; SILVER_AMOUNT = '%d de plata'; COPPER_AMOUNT = '%d de cobre'
+slot.name = '1.234 de oro\\n5 de plata'
+event('LOOT_OPENED')
+rows = EverlootDB.records.money_event
+assert(rows[#rows].copper == 12340500, 'Spanish words and separator, got ' .. tostring(rows[#rows].copper))
+-- A name with no amount falls back to the numeric field; an item slot is not income.
+slot.name, slot.quantity = nil, 77
+event('LOOT_OPENED')
+rows = EverlootDB.records.money_event
+assert(rows[#rows].copper == 77, 'the numeric field is the fallback')
+local n = #rows
+slot.type, slot.name = 1, '5 Gold'
+event('LOOT_OPENED')
+assert(#EverlootDB.records.money_event == n, 'an item slot is not income')
+""")
+check_all(loot)
+
+# One gold_snapshot a minute, kept in the saved file: a loading screen inside the minute with the same balance writes
+# nothing, on a /reload too; a changed balance still writes at once.
+snap = runtime()
+snap.execute("""
+event('PLAYER_ENTERING_WORLD')
+assert(Everloot:Count('gold_snapshot') == 1, 'login writes a snapshot')
+event('PLAYER_ENTERING_WORLD')
+assert(Everloot:Count('gold_snapshot') == 1, 'a loading screen inside the minute with the same balance writes nothing')
+money = 1600; event('PLAYER_ENTERING_WORLD')
+assert(Everloot:Count('gold_snapshot') == 2, 'a changed balance inside the minute still writes')
+function dump(v)
+ local t = type(v)
+ if t == 'number' then return string.format('%.17g', v) end
+ if t == 'string' then return string.format('%q', v) end
+ if t == 'boolean' then return tostring(v) end
+ if t == 'table' then
+  local parts = {}
+  for k, x in pairs(v) do parts[#parts + 1] = '[' .. dump(k) .. ']=' .. dump(x) end
+  return '{' .. table.concat(parts, ',') .. '}'
+ end
+ return 'nil'
+end
+""")
+reloaded = runtime("money = 1600\nEverlootDB = " + snap.eval("dump(EverlootDB)"))
+reloaded.execute("""
+event('PLAYER_ENTERING_WORLD')
+assert(Everloot:Count('gold_snapshot') == 2, 'a /reload inside the minute with the same balance writes nothing')
+money = 1700; event('PLAYER_MONEY')
+assert(Everloot:Count('gold_snapshot') == 2, 'a money change inside the minute waits for the minute')
+""")
+check_all(reloaded)
+
 # No addon source may call, index by string, or alias a buy, bid, post or craft function.
 import re
 names = (r"PostItem|PostCommodity|PlaceBid|PlaceAuctionBid|StartAuction|PostAuction|StartCommoditiesPurchase|"
@@ -250,6 +654,5 @@ for source in sorted(root.rglob("*.lua")):
         found = re.search(pattern, code)
         assert not found, f"{source.name} has {what} of a buy, bid, post or craft API: {found.group(0)}"
 # Every row the addon wrote is a record the site would accept (packages/protocol/schema).
-from protocol_schema import check_all  # noqa: E402
 check_all(lua)
-print("Lua 5.1 gold: vendor sales, flights, quest rewards, net auction sales, postage and buyouts (legacy and C_AuctionHouse, items and commodities) attributed; other purchases and unknown income unrecorded")
+print("Lua 5.1 gold: vendor sales, flights, quest rewards, net auction sales, postage and buyouts (legacy and C_AuctionHouse, items and commodities) attributed; auction sales by item and daily closes in the local ledger; repairs, vendor purchases, trades and mail money in the ledger only, own-alt transfers marked; unknown income unrecorded")

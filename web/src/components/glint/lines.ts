@@ -8,11 +8,12 @@ export type GlintLine = { id: string; text: string; when?: string };
 export const LOOT_GET: GlintLine = { id: "loot-get", text: "Loot get!" };
 
 /**
- * The home hero's speech bubble, in order. `now` is null on the server and before hydration: the line then names
- * the date, so it is right without JavaScript. Once Forever is out the lines are about looting it.
+ * The home hero's speech bubble, in order. `now` is null on the server and before hydration: before launch the line
+ * then names the date, so it is right without JavaScript, and after launch the server's own clock picks the live lines.
+ * Once Forever is out the lines are about looting it.
  */
 export function heroLines(now: number | null, at = Date.parse(LAUNCH_AT)): GlintLine[] {
-  const left = now === null ? undefined : timeLeft(now, at);
+  const left = now === null ? (Date.now() >= at ? null : undefined) : timeLeft(now, at);
   if (left === null) {
     return [
       { id: "live", text: "Forever is live. Show me what you looted!" },
@@ -34,7 +35,7 @@ export function heroLines(now: number | null, at = Date.parse(LAUNCH_AT)): Glint
 export const FOOTER_LINES: GlintLine[] = [
   LOOT_GET,
   { id: "remember", text: "I remember every drop." },
-  { id: "agree", text: "Three players agree, then it's a fact." },
+  { id: "agree", text: "Three installs agree, then it's a fact." },
   { id: "satchel", text: "Room in the satchel for one more." },
 ];
 

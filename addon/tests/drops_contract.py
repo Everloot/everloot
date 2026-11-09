@@ -26,6 +26,13 @@ assert items == sorted(items), "rows are grouped by item"
 linen = [int(r[3]) / int(r[4]) for r in rows if r[0] == "2589"]
 assert linen == sorted(linen, reverse=True) and len(linen) == 4, "an item's sources come best rate first"
 assert all(re.fullmatch(r"\d{4}-\d\d-\d\dT[\d:.]+Z", d) for d in dates), dates
+# The sources block follows the drops: one checksummed "itemId,npcId/npcId,reagentOf" row per item, items ascending.
+sources = re.search(r'\["sources"\] = \{ \["data"\] = "([^"]*)", \["sum"\] = (\d+), \["dataAsOf"\] = "([^"]*)", \["fetchedAt"\] = "([^"]*)"'
+                    r'(?:, \["names"\] = "(?:[^"\\]|\\.)*")? \}', fixture)
+assert sources and fixture.index('["drops"]') < sources.start(), "the sources block is in the slot file, after the drops"
+source_rows = [r.split(",") for r in sources.group(1).split(";")]
+assert all(re.fullmatch(r"\d+,(\d+(/\d+)*)?,\d+", ",".join(r)) for r in source_rows), source_rows
+assert [int(r[0]) for r in source_rows] == sorted({int(r[0]) for r in source_rows}), "one row per item, items ascending"
 
 toc = (root / "Everloot.toc").read_text(encoding="utf-8")
 assert "modules\\drops.lua" in toc and "EverlootPrices" in toc, "drops module in the TOC, the slot addon an optional dependency"
@@ -137,6 +144,36 @@ assert(tooltipFor(2770):find('Everloot drop: Copper Vein %(object 1731%) · 96%.
 local none, lines = tooltipFor(424242)
 assert(none:match('|t Everloot\\nNo price on Forever yet · no drop source reported by 3 installs$') and lines == 2, none)
 assert(not tooltipFor(258):find('Everloot drop'), '258 does not match 2589: rows are matched whole')
+
+-- The file's sources block: who sells the item on the site's public rows (the first named, the rest counted) and how
+-- many recipes it is a reagent of, muted, after the drop lines. An item without a row gets neither line.
+local sold = tooltipFor(2589)
+assert(sold:find('Sold by Fixture Supplier and 1 more\\nReagent for 7 recipes$'), sold)
+assert(not sold:find('your sighting'), 'a public vendor is not this install\\'s sighting: ' .. sold)
+for _, line in ipairs(lastTooltip.details) do
+  if line.text:find('^Sold by') or line.text:find('^Reagent for') then
+    assert(line.r < 0.8 and line.g < 0.8 and line.wrap == true, 'source lines are muted and wrap: ' .. line.text)
+  end
+end
+assert(herb:find('Reagent for 2 recipes$') and not herb:find('Sold by'), 'a row without vendors says only the count: ' .. herb)
+assert(not drop:find('Sold by') and not drop:find('Reagent'), 'no row, no line: ' .. drop)
+assert(tooltipFor(258):find('Everloot\\nNo price') and not tooltipFor(258):find('Sold by'), '258 does not match 2589 here either')
+
+-- A file from an app that does not write the block draws today's lines unchanged, and a tampered block hides
+-- only itself and says so.
+local block = EverlootPricesDB.sources
+EverlootPricesDB.sources = nil
+Everloot:ResetPrices()
+assert(tooltipFor(2589) == sold:gsub('\\nSold by Fixture Supplier and 1 more\\nReagent for 7 recipes', ''), tooltipFor(2589))
+EverlootPricesDB.sources = block
+EverlootPricesDB.sources.sum = 5
+Everloot:ResetPrices()
+printed = {}
+local tampered = tooltipFor(2589)
+assert(said('item sources failed their checksum'), 'a bad sources checksum is reported')
+assert(tampered:find('Everloot drop: Defias Bandit') and not tampered:find('Sold by'), tampered)
+EverlootPricesDB.sources.sum = Everloot.Adler32(block.data)
+Everloot:ResetPrices()
 """)
 
 # A drop row under three installs is never shown, whatever the file says; a bad checksum hides drops only.

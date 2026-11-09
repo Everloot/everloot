@@ -378,6 +378,17 @@ local capped = table.concat(printed, '\\n')
 assert(capped:find('keeps only the 2,000 items') and capped:find('website'), 'a full file says it is capped: ' .. capped)
 assert(not capped:find('no public day') and not capped:find('No price for this item'), 'a full file cannot say nothing is public: ' .. capped)
 assert(capped:find('everloot.app/tools/auctions%?realm=Bigrealm&item=3001'), 'and links the page that can tell: ' .. capped)
+
+-- The link percent-encodes the realm byte by byte: spaces, apostrophes and non-ASCII letters never break the URL.
+GetRealmName = function() return "Old Blanchy's Realm" end
+Everloot:ResetPrices()
+assert(ask('2589'):find('realm=Old%20Blanchy%27s%20Realm&item=2589', 1, true), 'apostrophe and spaces are encoded')
+GetRealmName = function() return 'Caf\\195\\169 Ru\\208\\177' end
+Everloot:ResetPrices()
+assert(ask('2589'):find('realm=Caf%C3%A9%20Ru%D0%B1&item=2589', 1, true), 'non-ASCII bytes are encoded upper-case')
+GetRealmName = function() return 'Az-er_o.th~1' end
+Everloot:ResetPrices()
+assert(ask('2589'):find('realm=Az-er_o.th~1&item=2589', 1, true), 'unreserved characters stay as they are')
 GetRealmName = function() return 'Forever' end
 Everloot:ResetPrices()
 """)
@@ -619,6 +630,67 @@ rows = nativeTooltipFor(2589)
 assert(rows[1].right:find('CAMWOW US1 Realm 4|r |cffff4c4cPvP|r', 1, true) and wordOf(rows[1].right) == 'CAMWOW US1 Realm 4 PvP · per unit', rows[1].right)
 GetRealmName = savedRealm
 EverlootDB.lastScans['CAMWOW US1 Realm 4 PvP'] = nil
+""")
+lua.execute((Path(__file__).parent / "fixtures" / "EverlootPrices.lua").read_text(encoding="utf-8"))
+lua.execute("Everloot:ResetPrices()")
+
+# This install's own rows in the tooltip, after the drop lines, muted and one line each: the vendor it saw selling
+# the item (named from its own NPC sighting), the known recipes the item is a basic reagent of, and the zone it met a
+# drop source in. Read from the saved file, never written to it; without the rows the file's public lines show
+# instead, and without either the tooltip is as it was.
+lua.execute("""
+GetRealmName = function() return 'Forever' end
+C_Item = nil
+GetItemInfo = function(id) if id == 2589 then return 'Linen Cloth', '|Hitem:2589::::::::60:::::|h[Linen Cloth]|h', 1, 5, 0, 'Trade Goods', 'Cloth', 20, '', 132889, 25 end end
+C_Map = { GetMapInfo = function(id) if id == 37 then return { name = 'Elwynn Forest', mapID = 37 } elseif id == 52 then return { name = 'Westfall', mapID = 52 } end end }
+Everloot.SourceName = function(_, kind, id) if kind == 'npc' and id == 66 then return 'Thurman Agamand' end end
+local records = EverlootDB.records
+local function row(fields) fields.installId = EverlootDB.installId; fields.capturedAt = '2026-10-20T10:00:00Z'; return fields end
+records.vendor = { row({ vendorNpcId = 66, items = { { itemId = 2589, priceCopper = 50 }, { itemId = 159, priceCopper = 25 } } }) }
+records.npc_sighting = {
+  row({ npcId = 66, name = 'Thurman Agamand', mapId = 37, x = 1, y = 1, positionKind = 'interaction', level = 30, reaction = 'friendly' }),
+  row({ npcId = 116, name = 'Defias Bandit', mapId = 52, x = 2, y = 2, positionKind = 'player', level = 10, reaction = 'hostile' }),
+  row({ npcId = 94, name = 'Kobold Tunneler', mapId = 37, x = 3, y = 3, positionKind = 'player', level = 7, reaction = 'hostile' }),
+}
+records.recipe_observed = {
+  row({ profession = 'Tailoring', rank = 10, recipeId = 2963, recipe = 'Bolt of Linen Cloth', learned = true, difficulty = 'orange', reagents = { { item = 'Linen Cloth', count = 2 } } }),
+  row({ profession = 'Tailoring', rank = 30, recipeId = 2963, recipe = 'Bolt of Linen Cloth', learned = true, difficulty = 'yellow', reagents = { { item = 'Linen Cloth', count = 2 } } }),
+  row({ profession = 'Tailoring', rank = 30, recipeId = 3915, recipe = 'Brown Linen Shirt', learned = true, difficulty = 'yellow', reagents = { { item = 'Bolt of Linen Cloth', count = 1 }, { item = 'Linen Cloth', count = 1 } } }),
+  row({ profession = 'Tailoring', rank = 30, recipeId = 7623, recipe = 'Brown Linen Robe', learned = false, difficulty = 'orange', reagents = { { item = 'Linen Cloth', count = 3 } } }),
+}
+Everloot:ResetPrices()
+local tip = tooltipFor(2589)
+assert(tip:find('Sold by Thurman Agamand %(your sighting%)\\nReagent for 2 recipes you know\\nSeen in Westfall and 1 more zone$'), tip)
+assert(not tip:find('Fixture Supplier') and not tip:find('7 recipes'), 'own rows come before the file: ' .. tip)
+local drop = tip:find('Everloot drop:', 1, true)
+assert(drop and drop < tip:find('Sold by', 1, true), 'the source lines follow the drop lines: ' .. tip)
+rows = nativeTooltipFor(2589)
+for _, line in ipairs(rows) do
+  if line.text and (line.text:find('^Sold by') or line.text:find('^Reagent for') or line.text:find('^Seen in')) then
+    assert(line.r < 0.8 and line.g < 0.8 and line.wrap == true, 'source lines are muted and wrap: ' .. line.text)
+  end
+end
+-- A second vendor is counted, not listed, and a row stored after the first look is read.
+records.vendor[#records.vendor + 1] = row({ vendorNpcId = 67, items = { { itemId = 2589, priceCopper = 55 } } })
+assert(tooltipFor(2589):find('Sold by Thurman Agamand and 1 more %(your sighting%)'), tooltipFor(2589))
+-- The command prints the same lines.
+printed = {}
+SlashCmdList.EVERLOOT('price 2589'); drain()
+assert(said('Sold by Thurman Agamand and 1 more %(your sighting%)') and said('Reagent for 2 recipes you know') and said('Seen in Westfall and 1 more zone'), table.concat(printed, '\\n'))
+-- Without own rows the file's public vendors and count show; a zone needs a sighting this install made.
+records.vendor, records.recipe_observed, records.npc_sighting = {}, {}, {}
+local public = tooltipFor(2589)
+assert(public:find('Sold by Fixture Supplier and 1 more\\nReagent for 7 recipes$'), public)
+assert(not public:find('your sighting') and not public:find('you know') and not public:find('Seen in'), public)
+-- A file without the block and no own rows: the tooltip is as it was.
+EverlootPricesDB.sources = nil
+Everloot:ResetPrices()
+local plain = tooltipFor(2589)
+assert(not plain:find('Sold by') and not plain:find('Reagent') and not plain:find('Seen in'), plain)
+assert(plain:find('Everloot market 2s 5c') and plain:find('Everloot drop: Defias Bandit'), plain)
+records.vendor, records.recipe_observed, records.npc_sighting = nil, nil, nil
+Everloot.SourceName = nil
+C_Map = nil
 """)
 lua.execute((Path(__file__).parent / "fixtures" / "EverlootPrices.lua").read_text(encoding="utf-8"))
 lua.execute("Everloot:ResetPrices()")

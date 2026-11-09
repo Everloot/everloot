@@ -34,6 +34,7 @@ end
 CreateFrame = function()
  local f = widget()
  f.RegisterEvent = function(_, name) registered[name] = (registered[name] or 0) + 1 end
+ f.RegisterUnitEvent = function(_, name) registered[name] = (registered[name] or 0) + 1 end
  f.SetScript = function(self, _, fn) self.onEvent = fn end
  f.HookScript = function(self, _, fn) rawset(self, "hooks", rawget(self, "hooks") or {}); table.insert(self.hooks, fn) end
  return f

@@ -10,7 +10,7 @@ import {
   sortParam, sortRows, Unreadable, type ListQuery, type Search,
 } from "../list-parts";
 
-const META = { title: "WoW Forever Quest Chain List", description: "Quest chains in WoW: Forever by quest count and quest line ID. From the game files; confirmed once three players report each the same way.", path: "/database/quest-chains" };
+const META = { title: "WoW Forever Quest Chain List", description: "Quest chains in WoW: Forever by quest count and quest line ID. From the game files; confirmed once three installs report each the same way.", path: "/database/quest-chains" };
 export const dynamic = "force-dynamic";
 
 const SORTS = ["name", "quests", "id"] as const;

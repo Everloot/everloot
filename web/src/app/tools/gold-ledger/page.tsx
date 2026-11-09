@@ -4,7 +4,7 @@ import { webApplicationJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { goldFactsFromRecords, handleGoldLedger } from "../../../../../kb/src/gold-ledger";
-import { STORAGE_UNREACHABLE, uploadStore } from "@/lib/upload-store";
+import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT, uploadStore } from "@/lib/upload-store";
 import { dataAgeLabel } from "@/lib/data-age";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, Disclosure, EmptyState, Field, PageHeader, SectionHeading } from "@/components/ui";
@@ -45,7 +45,7 @@ export default async function GoldLedgerPage(
         trail={trailFor("/tools/gold-ledger")!}
         title={HEADING}
         lede={lede}
-        meta={<span>{corpus.unreachable ? "Storage unreachable" : dataAgeLabel(corpus.dataAsOf)}</span>}
+        meta={<span>{corpus.unreachable ? STORAGE_UNREACHABLE_SHORT : dataAgeLabel(corpus.dataAsOf)}</span>}
         actions={<>
           <Link href="/tools/auctions" className="btn">Auction House</Link>
         </>}
@@ -76,7 +76,8 @@ export default async function GoldLedgerPage(
             Addon 0.2.4 records loot, quest rewards, vendor sales, flight costs, auction sales taken from the mailbox
             (after the house cut), postage and auction buyouts. Bids, deposits, other mail, other spending, and gameplay
             stay unrecorded until an event is seen. The difference is unrecorded. This is the same answer as the
-            gold_ledger tool.
+            gold_ledger tool. The upload carries nine categories in all, barber and respec costs included; the addon&apos;s window shows six more
+            (repairs, vendor purchases, trades in and out, mail in and out) from a ledger that stays on your computer.
           </p>
         </Disclosure>
       </div>

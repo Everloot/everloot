@@ -23,13 +23,13 @@ export const OPEN_DATA_EXCLUDED: readonly string[] = [
   "The local Classic baseline: pfQuest's database and the emulator databases it is built from, which are GPL. It stays on a maintainer's machine. No row, name or id from it is in these files. A count whose denominator comes from it appears only on the site's coverage page.",
   "Anything a player's name is attached to: character names, guild data, player pages, census rows and addon lists. Rows carry no install id and no pseudonym either, only how many installs agree.",
   "The individual upload records. They are public as anonymous records, with one pseudonym per install, through the corpus API (/docs/api/corpus-public), not in this export.",
-  "Names, titles and text read from the game files or the Warcraft Wiki (item names, quest titles, spell and item set names, tooltip facts), and icons and art. They are on the site's pages only. An item, NPC or object name is in the observed files only when three installs reported the same one.",
+  "Item names, quest titles, spell and item set names, descriptions and tooltip text read from the game files or the Warcraft Wiki, and icons and art. They are on the site's pages only. An item, NPC or object name is in the observed files only when three installs reported the same one; the game-files folder names only what its catalogs name (achievements, factions, titles, quest lines, mounts, encounters, races, perks, talents, raid buffs).",
   "Zones, flight masters and flight lines the game files hold that may not be released yet.",
 ];
 
 /** What a reader might expect and this version does not carry. */
 export const OPEN_DATA_NOT_YET: readonly string[] = [
-  "Market prices, census counts, the achievement, faction, title and quest chain lists, recipe and trainer facts, and the zone bounds players measured. Some are on the site or in its API; none are in these files yet.",
+  "Market prices, census counts, trainer facts, and the zone bounds players measured. Some are on the site or in its API; none are in these files yet.",
   "The loot windows behind each drop rate, source by source.",
 ];
 

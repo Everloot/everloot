@@ -7,12 +7,14 @@ import { ClassContextLink } from "@/components/classes/ClassContextChip";
 import UseClassButton from "@/components/classes/UseClassButton";
 import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
 import { Container, PageHeader, SectionHeading } from "@/components/ui";
+import { censusHref } from "@/lib/census-filter";
 import { classLabel, contextLinks, type ContextDestination, type ContextLink } from "@/lib/class-context";
 import { classGuides, classRaces, hubIndexable } from "@/lib/class-hub";
 import { guideHref } from "@/lib/guides";
 import { RACE_TABLE, RACIAL_NOTES, traitsFor } from "@/lib/race-traits";
 import { pageMetadata } from "@/lib/seo";
 import { TALENT_CLASSES, isTalentClass } from "@/lib/talents/catalogs";
+import { CENSUS_CLASSES } from "../../../../../kb/src/census";
 import type { GuideActivity, GuideRole } from "../../../../../kb/src/guides/guide";
 
 // Built once per deploy, one page per class; `dynamic = "error"` fails the build if the page ever reads the request.
@@ -79,6 +81,8 @@ export default async function ClassHubPage({ params }: Params) {
   const guides = classGuides(slug);
   const races = classRaces(slug);
   const links = contextLinks({ classSlug: slug }).filter((l): l is ContextLink & { key: Destination } => l.key !== "hub");
+  // The census keys a class by UnitClass's token, the talent catalog by its slug; the nine are the same names.
+  const census = CENSUS_CLASSES.find((c) => c.name === name)!;
 
   return (
     <Container>
@@ -117,6 +121,22 @@ export default async function ClassHubPage({ params }: Params) {
                 <span className="text-fg-2">{` ${NOTES[l.key](name)}`}</span>
               </li>
             ))}
+          </ul>
+        </section>
+
+        {/* The live counts stay on the census and rankings pages: this page is built once per deploy, so a number
+            printed here would be the deploy's, not the week's. The census page shows a count from 10 characters. */}
+        <section aria-labelledby="forever">
+          <SectionHeading id="forever">{`${name} on Forever`}</SectionHeading>
+          <ul className="space-y-2 text-sm">
+            <li>
+              <Link href={censusHref({ class: census.token })} className={LINK}>{`How many characters are a ${name}`}</Link>
+              <span className="text-fg-2">{` The census, narrowed to the ${name}: characters counted this week and their share of everyone counted, shown from 10 characters.`}</span>
+            </li>
+            <li>
+              <Link href="/rankings/classes" className={LINK}>{`Where ${name} ranks this week`}</Link>
+              <span className="text-fg-2"> Every class by characters active in the week, with the change against last week.</span>
+            </li>
           </ul>
         </section>
 
