@@ -1,5 +1,5 @@
-import { parseEverlootLua } from "../../../web/src/lib/sv-parse";
-import { SPENDING_CATEGORIES } from "../../../kb/src/gold-ledger";
+import { parseEverlootLua, parseEverlootTable } from "../../../web/src/lib/sv-parse";
+import { directionOf } from "../shared/ledger";
 import type { CharacterRow, CharactersInfo, ProgressRow } from "../shared/types";
 
 /**
@@ -12,11 +12,11 @@ const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v)
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
 
 export const HISTORY_POINTS = 60;
-// In and out follow the server ledger (kb/src/gold-ledger.ts): `vendor` is money in, since the addon writes it only
-// for gold gained at a merchant (addon/modules/gold.lua). The website ledger reads the same list.
-const SPENT: readonly string[] = SPENDING_CATEGORIES;
-const WEEK_MS = 7 * 24 * 3600 * 1000;
+// In and out follow the addon's ledger (addon/modules/ledger.lua, mirrored in shared/ledger.ts): `vendor` is money
+// in, since the addon writes it only for gold gained at a merchant (addon/modules/gold.lua); `vendor_spend` is out.
+// The nine uploaded categories read the same way on the website ledger (kb/src/gold-ledger.ts).
 const DAY_MS = 24 * 3600 * 1000;
+const WEEK_DAYS = 7;
 const MONEY_DAYS = 30;
 const RECEIPTS = 12;
 
@@ -28,7 +28,8 @@ export function thin<T>(points: T[], max = HISTORY_POINTS): T[] {
 }
 
 export function summarizeCharacters(text: string, now = Date.now()): CharactersInfo {
-  return charactersAt(collectCharacters(parseEverlootLua(text).records), now);
+  const { ledger, roster } = parseEverlootTable(text);
+  return charactersAt(collectCharacters(parseEverlootLua(text).records, { ledger, roster }), now);
 }
 
 type MoneyEvent = { at: string; ms: number; category: string; copper: number; direction: "in" | "out" };
@@ -39,8 +40,49 @@ type MoneyEvent = { at: string; ms: number; category: string; copper: number; di
  */
 export interface CharacterBase extends CharactersInfo { money: Map<string, MoneyEvent[]> }
 
-/** Everything in the summary but the last seven days, the 30 days and the receipts, from records already read. */
-export function collectCharacters(records: Array<Record<string, unknown>>): CharacterBase {
+/**
+ * The two local-only tables beside the records (addon/README.md, "The Gold tab and the character list on Home"):
+ * `EverlootDB.ledger`, the window's money events keyed by the opaque character key, and `EverlootDB.roster`, which
+ * names each key. Either may be missing from a file written before they existed.
+ */
+export interface LocalTables { ledger?: unknown; roster?: unknown }
+
+type LedgerEvent = MoneyEvent & { character: string; realm: string };
+
+const whole = (v: unknown, least: number): v is number => typeof v === "number" && Number.isInteger(v) && v >= least;
+
+/**
+ * The ledger's money events as the rows the Gold tab counts, each with its character's name and realm from the
+ * roster. A row the roster cannot name, or that does not read cleanly, is left out, as the addon leaves out an
+ * uploaded row it cannot key (addon/modules/ledger.lua, recordRows).
+ */
+function ledgerEvents({ ledger, roster }: LocalTables): LedgerEvent[] {
+  const events = ledger && typeof ledger === "object" ? (ledger as { events?: unknown }).events : undefined;
+  if (!Array.isArray(events) || !roster || typeof roster !== "object" || Array.isArray(roster)) return [];
+  const rows = roster as Record<string, unknown>;
+  const out: LedgerEvent[] = [];
+  for (const e of events as unknown[]) {
+    if (!e || typeof e !== "object") continue;
+    const { key, at, category, copper } = e as Record<string, unknown>;
+    const who = typeof key === "string" ? rows[key] : undefined;
+    const character = who && typeof who === "object" ? str((who as Record<string, unknown>).name) : "";
+    const realm = who && typeof who === "object" ? str((who as Record<string, unknown>).realm) : "";
+    if (!character || !realm || !whole(at, 0) || !whole(copper, 1) || !str(category)) continue;
+    const ms = at * 1000;
+    const cat = str(category);
+    out.push({ character, realm, at: new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z"), ms, category: cat, copper, direction: directionOf(cat) });
+  }
+  return out;
+}
+
+/**
+ * Everything in the summary but the last seven days, the 30 days and the receipts, from records already read.
+ * Money comes from the ledger when the file has one; `money_event` records count only from before the ledger's
+ * oldest event, the way the Gold tab reads them, so a file from before the ledger still shows its money.
+ */
+export function collectCharacters(records: Array<Record<string, unknown>>, local: LocalTables = {}): CharacterBase {
+  const ledger = ledgerEvents(local);
+  const ledgerFrom = ledger.reduce((min, e) => Math.min(min, e.ms), Infinity);
   const named = new Map<string, CharacterRow>();
   const keyed = new Map<string, ProgressRow>();
   const gearAt = new Map<string, string>();
@@ -84,16 +126,18 @@ export function collectCharacters(records: Array<Record<string, unknown>>): Char
         break;
       }
       case "money_event": {
+        const at = Date.parse(str(r.capturedAt));
+        // With a ledger, an uploaded row counts only when it is dated before the ledger's first event.
+        if (ledger.length && !(Number.isFinite(at) && at < ledgerFrom)) break;
         const c = row(r); if (!c) break;
         const cat = str(r.category), copper = num(r.copper);
-        const out = SPENT.includes(cat);
-        const bucket = out ? c.spent : c.earned;
+        const direction = directionOf(cat);
+        const bucket = direction === "out" ? c.spent : c.earned;
         bucket[cat] = (bucket[cat] ?? 0) + copper;
-        const at = Date.parse(str(r.capturedAt));
         if (Number.isFinite(at)) {
           const id = `${c.character}-${c.realm}`;
           const list = money.get(id) ?? [];
-          list.push({ at: str(r.capturedAt), ms: at, category: cat, copper, direction: out ? "out" : "in" });
+          list.push({ at: str(r.capturedAt), ms: at, category: cat, copper, direction });
           money.set(id, list);
         }
         break;
@@ -122,6 +166,15 @@ export function collectCharacters(records: Array<Record<string, unknown>>): Char
       default: break;
     }
   }
+  for (const e of ledger) {
+    const c = row(e); if (!c) continue;
+    const bucket = e.direction === "out" ? c.spent : c.earned;
+    bucket[e.category] = (bucket[e.category] ?? 0) + e.copper;
+    const id = `${c.character}-${c.realm}`;
+    const list = money.get(id) ?? [];
+    list.push({ at: e.at, ms: e.ms, category: e.category, copper: e.copper, direction: e.direction });
+    money.set(id, list);
+  }
   for (const [key, p] of keyed) {
     const a = achievements.get(key);
     if (a) { p.achievements = [...a.values()].filter(Boolean).length; p.achievementsInProgress = [...a.values()].filter((v) => !v).length; }
@@ -148,8 +201,10 @@ export function charactersAt(base: CharacterBase, now = Date.now()): CharactersI
   const start = end - (MONEY_DAYS - 1) * DAY_MS;
   const characters = base.characters.map((c) => {
     const all = base.money.get(`${c.character}-${c.realm}`) ?? [];
+    // The Gold tab's "7 days": today and the six whole UTC days before it (addon/modules/ledger.lua, L.Period).
+    const weekStart = end - (WEEK_DAYS - 1) * DAY_MS;
     const week = { earned: 0, spent: 0 };
-    for (const e of all) if (now - e.ms <= WEEK_MS) week[e.direction === "out" ? "spent" : "earned"] += e.copper;
+    for (const e of all) if (e.ms >= weekStart && e.ms <= now) week[e.direction === "out" ? "spent" : "earned"] += e.copper;
     const events = all.filter((e) => e.ms >= start && e.ms <= now).sort((a, b) => a.ms - b.ms);
     const days = Array.from({ length: MONEY_DAYS }, (_, i) => ({ date: new Date(start + i * DAY_MS).toISOString().slice(0, 10), earned: 0, spent: 0 }));
     const where = new Map(days.map((d, i) => [d.date, i]));

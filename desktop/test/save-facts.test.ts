@@ -57,7 +57,7 @@ test("the Overview, the Market page and the Characters page take the characters 
   // The order the Characters page lists them in.
   const listed = summarizeCharacters(text).characters.map((c) => c.realm);
   expect(listed).toEqual(["Nightslayer", "Doomhowl", "Skull Rock"]);
-  lua.mockClear();
+  table.mockClear(); lua.mockClear();
   for (let i = 0; i < 3; i++) {
     expect(characterRealms([sv])).toEqual(listed);
     expect(ownRealms([sv])).toEqual(["Nightslayer"]);

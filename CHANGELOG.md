@@ -20,11 +20,21 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Addon: the Gold tab's Overview chart follows the period buttons (today, 7 days, 30 days, or all for the ledger's
   90 days), one bar a day; Sales shows the auction house's cut beside each sale's deposit, and the by-item rows show
   sales per day over the period and the last sold day. Display only; nothing recorded or uploaded changes.
+- Site: a profession page answers to its skill line id, `/tools/professions/171` or `/tools/professions/171-alchemy`, and
+  redirects for good to the slug page it already had, keeping the skill range and class context in the query; an unknown id
+  is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
 
 ### Fixed
+- Desktop App: the Characters page reads the addon's local ledger (`EverlootDB.ledger`) from the save file beside the
+  `money_event` rows, so its 7-day net is the Gold tab's "7 days" for the same character (today and the six UTC days
+  before it) and repairs, vendor purchases, trades and mail appear in money by category, marked local only. Uploaded
+  rows count only from before the ledger's first event, as the Gold tab reads them. Nothing recorded or uploaded changes.
 - Site: a database address with an id nothing knows (an item or NPC such as /database/items/999999) answers its 404 with a
   body again: the heading, "No report for this id yet; three installs make it public" with the addon link, and a search box
   prefilled with the id. The site 404 leads with the same search box, prefilled with the last part of the address tried.
+- Site: an Auction House price page for an item with no public name says why under its title: a name shows once
+  three installs report the same one, or when the game files and the Warcraft Wiki agree on one. The title stays
+  "Item N" and the prices stand. Before, the page gave the id and the prices with no reason.
 - Site: the achievement, title, faction and quest chain lists, the farming and profession pages and the scoring method say
   a fact is confirmed by three installs, not three players, as the upload guide has it; the install count is one column,
   "Installs", on every table (it was "Install IDs" on objects and drops and "Reporters" on NPCs, items and vendors); and
@@ -134,6 +144,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and the other from the clock, so they disagreed. Both pages say when the GitHub facts are older than 26 hours.
 
 ### Added
+- Site: a "Write a wiki page" guide under Docs › Guides says how a wiki page is proposed and reviewed, with the page
+  types, the front matter, the rules and the check from the wiki README; the wiki hub and the lore archive link to it.
 - Site: a faction page and a title page carry In short, Copy for AI, a "Player reports" fact that stays an empty meter
   until three installs agree, a "Track this" link to the collections tool and a relation tab ("Reputation from" on a
   faction, "Earned by" on a title) whose empty state names the 3-install rule and says what no game file read so far
@@ -141,6 +153,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: `/docs/mcp` tables the record kinds the knowledge tools cover, where each kind comes from and the tool that
   reads it on its own, and says how a record id is formed: a catalog record's stable synthetic id against the in-game
   id the page tools take.
+- Site: the limits and keys page has a Scopes section: a table of every scope a key can carry (read:public on every
+  key; read:own, link:own and sync:own opt-in on the key form), what each allows and which routes check it. A test
+  keeps the table at one row per scope the code defines.
 - Site: the MCP resources page gives each prompt its own section (title, arguments with their allowed values, the
   `prompts/get` call and the message the server returns), shows one `resources/read` of the builds resource with the
   shape of its document and one entity read that equals the `item_page` answer, and the MCP sidebar lists the three
