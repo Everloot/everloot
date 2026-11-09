@@ -16,6 +16,10 @@ Everloot is built from what players see, so you can help without touching any co
   what you saw in the game, and where (zone and coordinates if you have them).
 - **Report a bug.** Use the **Bug report** form. For addon problems, paste the output of
   `/everloot status`.
+- **List your addon.** An addon page at everloot.app/addons/<name> exists only for an addon the owner approved.
+  Ask for one with the **Addon listing request** form.
+- **Offer a guide.** Read [`docs/GUIDES.md`](docs/GUIDES.md), then use the **Guide submission** form with
+  your sources and a link to your draft.
 - **Fix the lore archive.** The lore pages come from the 2023 Warcraft Wiki dump. If the importer
   turns a page into nonsense (broken templates, missing text), an issue with the page link helps us
   fix the importer for every page like it.
