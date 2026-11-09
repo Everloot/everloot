@@ -7,6 +7,7 @@ architecture map.
 
 | File | What it is |
 |---|---|
+| [`WORKFLOWS.md`](WORKFLOWS.md) | Every GitHub Actions workflow: what starts it, what it writes, what a failure means |
 | [`RELEASING.md`](RELEASING.md) | Addon (stable and nightly), desktop app and protocol releases, and the pull request title convention |
 | [`2026-10-08-beta-client-checklist.md`](2026-10-08-beta-client-checklist.md) | What gets checked in the live client before an addon release |
 | [`2026-10-18-addon-0.3.2-beta-checklist.md`](2026-10-18-addon-0.3.2-beta-checklist.md), [`2026-10-19-addon-0.3.3-beta-checklist.md`](2026-10-19-addon-0.3.3-beta-checklist.md) | The in-client checks for the 0.3.2 profession and auction reads and the 0.3.3 completion tracker |
