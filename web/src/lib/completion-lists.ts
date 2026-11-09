@@ -103,7 +103,12 @@ function segment(id: number, name: string): string {
 }
 export const achievementHref = (id: number, name: string) => `/database/achievements/${segment(id, name)}`;
 export const factionHref = (id: number, name: string) => `/database/factions/${segment(id, name)}`;
-export const titleHref = (id: number, name: string) => `/database/titles/${segment(id, name)}`;
+/** The `%s` in a game-file title name: where the game puts the character's name. */
+const NAME_SLOT = /%s/g;
+/** A title as the database shows it: `%s` becomes `<Name>`, as the game fills it with the character's name. */
+export const titleDisplayName = (name: string) => name.replace(NAME_SLOT, "<Name>").trim();
+/** The slug leaves the name slot out: `144-bloodsail-admiral`, not `144-bloodsail-admiral-s`. */
+export const titleHref = (id: number, name: string) => `/database/titles/${segment(id, name.replace(NAME_SLOT, " "))}`;
 export const chainHref = (id: number, name: string) => `/database/quest-chains/${segment(id, name)}`;
 
 /**

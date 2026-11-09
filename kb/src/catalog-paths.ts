@@ -14,7 +14,8 @@ export function catalogPath(kind: string, extId: string, name: string): string |
   switch (kind) {
     case "achievement": return `/database/achievements/${segment(extId, name)}`;
     case "faction": return `/database/factions/${segment(extId, name)}`;
-    case "title": return `/database/titles/${segment(extId, name)}`;
+    // The game's `%s` name slot stays out of the slug, as on the site (web/src/lib/completion-lists.ts titleHref).
+    case "title": return `/database/titles/${segment(extId, name.replace(/%s/g, " "))}`;
     case "quest_chain": return `/database/quest-chains/${segment(extId, name)}`;
     case "instance": return `/database/instances/${segment(extId, name)}`;
     case "mount": return "/tools/collections";

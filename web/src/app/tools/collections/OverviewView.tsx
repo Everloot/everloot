@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Card, DataTable, LinkTabs, type Column } from "@/components/ui";
-import { achievementHref, chainHref, factionHref, titleHref } from "@/lib/completion-lists";
+import { achievementHref, chainHref, factionHref, titleDisplayName, titleHref } from "@/lib/completion-lists";
 import type { CompletionFacts, CompletionKind, Overview, OverviewCategory, OwnedCharacter } from "../../../../../kb/src/completion";
 import { Bar } from "./CompletionView";
 import { SHOWS, categoryRows, filterRows, viewHref, type CategoryRow, type Show, type ViewQuery } from "./overview";
@@ -97,7 +97,7 @@ function status(row: CategoryRow): string {
 function columnsFor(cat: OverviewCategory, measured: boolean): Column<CategoryRow>[] {
   const name: Column<CategoryRow> = {
     key: "name", header: "Name",
-    cell: (row) => <Link href={nameHref(row)} className="text-fg hover:text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{row.entry.name}</Link>,
+    cell: (row) => <Link href={nameHref(row)} className="text-fg hover:text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{row.kind === "titles" ? titleDisplayName(row.entry.name) : row.entry.name}</Link>,
   };
   const cols: Column<CategoryRow>[] = [name];
   if (cat.kind === "achievements") {

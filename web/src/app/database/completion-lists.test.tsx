@@ -393,10 +393,10 @@ test("a base-only faction page says it is in the game files, unconfirmed, and ne
 
 test("a base-only title page says it is in the game files, unconfirmed", async () => {
   game.titles = [{ id: 8, name: "%s, Champion" }];
-  const out = await html(TitlePage(page("8-s-champion")));
+  const out = await html(TitlePage(page("8-champion")));
   expect(out).toContain("found in game files, unconfirmed");
   expect(out).not.toContain("as players reported it");
-  const description = (await titleMetadata(page("8-s-champion"))).description;
+  const description = (await titleMetadata(page("8-champion"))).description;
   expect(description).toContain("Found in game files, unconfirmed");
   expect(description).not.toContain("three players");
   expect((await titleMetadata(page("5-corporal"))).description).toContain("as three installs reported it");

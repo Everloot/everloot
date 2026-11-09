@@ -3,7 +3,7 @@ import { allDocsPages } from "@/lib/docs/nav";
 import { entityHref } from "@/components/EntityLink";
 import { describe } from "../../../kb/src/item-taxonomy";
 import { objectList } from "../../../kb/src/object-page";
-import { achievementHref, chainHref, factionHref, loadCatalog, titleHref } from "./completion-lists";
+import { achievementHref, chainHref, factionHref, loadCatalog, titleDisplayName, titleHref } from "./completion-lists";
 import { CLIENT_TAXONOMY } from "./items";
 import type { SearchHit } from "../../../kb/src/search";
 import { classLabel } from "./class-context";
@@ -141,11 +141,11 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names
       }
       found.set("achievement", { results: achievements, total: achievements.length });
       found.set("faction", { results: factions, total: factions.length });
-      const titles = byName(catalog.titles, q).map(({ entry, exact }) => hit(entry.name, titleHref(entry.titleId, entry.name), entry.titleId, exact));
+      const titles = byName(catalog.titles, q).map(({ entry, exact }) => hit(titleDisplayName(entry.name), titleHref(entry.titleId, entry.name), entry.titleId, exact));
       const chains = byName(catalog.chains, q).map(({ entry, exact }) => hit(entry.name, chainHref(entry.questLineId, entry.name), entry.questLineId, exact));
       if (id !== null) {
         const t = catalog.titles.find((x) => x.titleId === id), c = catalog.chains.find((x) => x.questLineId === id);
-        if (t && !titles.some((r) => r.id === id)) titles.unshift(hit(t.name, titleHref(id, t.name), id, true));
+        if (t && !titles.some((r) => r.id === id)) titles.unshift(hit(titleDisplayName(t.name), titleHref(id, t.name), id, true));
         if (c && !chains.some((r) => r.id === id)) chains.unshift(hit(c.name, chainHref(id, c.name), id, true));
       }
       found.set("title", { results: titles, total: titles.length });

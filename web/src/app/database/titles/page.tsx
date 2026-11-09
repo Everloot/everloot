@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { TitleEntry } from "../../../../../kb/src/completion";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
-import { loadCatalog, titleHref, type Listed } from "@/lib/completion-lists";
+import { loadCatalog, titleDisplayName, titleHref, type Listed } from "@/lib/completion-lists";
 import { LINK } from "../entity";
 import {
   confirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, nextSort, NoMatches, noneListed, NoObservations, PER_PAGE,
@@ -43,7 +43,7 @@ export default async function TitleListPage(props: { searchParams?: Promise<Sear
   const here = (over: Partial<ListQuery<Sort>>) => href({ ...q, page: 1, ...over });
 
   const columns: Column<Listed<TitleEntry>>[] = [
-    { key: "name", header: "Name", sortable: true, cell: (x) => <Link href={titleHref(x.titleId, x.name)} className={LINK}>{x.name}</Link> },
+    { key: "name", header: "Name", sortable: true, cell: (x) => <Link href={titleHref(x.titleId, x.name)} className={LINK}>{titleDisplayName(x.name)}</Link> },
     { key: "confirmed", header: "Confirmed", cell: (x) => confirmedCell(x, confirmations) },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.titleId },
   ];

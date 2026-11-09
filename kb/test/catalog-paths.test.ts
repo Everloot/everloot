@@ -7,7 +7,8 @@ import type { ReleaseDb } from "../src/release-db.js";
 test.each([
   ["achievement", "12", "Ten Quests", "/database/achievements/12-ten-quests"],
   ["faction", "1", "Stormwind", "/database/factions/1-stormwind"],
-  ["title", "7", "%s, Champion", "/database/titles/7-s-champion"],
+  ["title", "7", "%s, Champion", "/database/titles/7-champion"],
+  ["title", "144", "Bloodsail Admiral %s", "/database/titles/144-bloodsail-admiral"],
   ["quest_chain", "3", "***", "/database/quest-chains/3"],
   ["instance", "36", "Deadmines", "/database/instances/36-deadmines"],
   ["mount", "5", "Gray Wolf", "/tools/collections"],
