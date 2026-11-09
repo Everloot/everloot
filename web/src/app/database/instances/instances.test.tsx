@@ -205,16 +205,16 @@ test("the loot section says what is missing when no boss has 3 installs, and tha
   expect(down).not.toContain("<table");
 });
 
-test("the list labels an instance the game files give no name, with the reason in the name cell's title", async () => {
-  // SYNTHETIC: three installs killed a boss in instance 2999, which the files place and name nowhere.
+test("the list labels an instance the game files place no entrance for, with the reason in the name cell's title", async () => {
+  // SYNTHETIC: three installs killed a boss in instance 2999, for which the files place no entrance.
   state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters: killed(2999, 3353, 1) } };
   try {
     const html = renderToStaticMarkup(await InstancesPage());
     const row = html.split("<tr").find((r) => r.includes('href="/database/instances/2999"')) ?? "";
-    expect(text(row)).toContain("|Instance 2999|no name in the game files|");
-    expect(row).toMatch(/title="The game files give this instance no name[^"]*"/);
+    expect(text(row)).toContain("|Instance 2999|no entrance in the game files|");
+    expect(row).toMatch(/title="The game files place no entrance for this instance[^"]*"/);
     // A named instance carries no such label.
-    expect(html.split("<tr").find((r) => r.includes('href="/database/instances/389-ragefire-chasm"'))).not.toContain("no name in the game files");
+    expect(html.split("<tr").find((r) => r.includes('href="/database/instances/389-ragefire-chasm"'))).not.toContain("no entrance in the game files");
   } finally {
     state.seen = { unreachable: true };
   }

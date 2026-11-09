@@ -23,7 +23,7 @@ export const metadata: Metadata = pageMetadata({
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
-const NO_NAME = "The game files give this instance no name, and 3 installs have not agreed on one. It is listed by its id because players reported an entrance or a boss there.";
+const NO_NAME = "The game files place no entrance for this instance, so the site has no name for it, and 3 installs have not confirmed one. It is listed by its id because players reported an entrance or a boss there.";
 
 /** One row per instance: the entrance's zone, its confirmation, and the bosses players report. */
 export default async function InstancesPage() {
@@ -40,7 +40,7 @@ export default async function InstancesPage() {
       const named = <Link href={instanceHref(r.instanceMapId, r.name)} className={link}>{instanceTitle(r)}</Link>;
       // An instance with no name is listed by its id, with a line saying why.
       const name = r.name !== null ? named : (
-        <span className="inline-flex flex-wrap items-baseline gap-x-2" title={NO_NAME}>{named}<span className="text-meta text-muted">no name in the game files</span></span>
+        <span className="inline-flex flex-wrap items-baseline gap-x-2" title={NO_NAME}>{named}<span className="text-meta text-muted">no entrance in the game files</span></span>
       );
       return src ? <span className="flex min-w-0 items-center gap-2"><ArtThumb src={src} />{name}</span> : name;
     } },
