@@ -37,6 +37,13 @@ vi.mock("@/lib/news", async (importOriginal) => {
   return { ...real, loadNews: () => news.posts };
 });
 
+// The private names bucket, which names the item categories: down, it leaves them unnamed the same way the item facts do.
+const privateNames = vi.hoisted(() => ({ down: false }));
+vi.mock("@/lib/game-assets", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/game-assets")>();
+  return { ...real, loadItemNames: async (...args: Parameters<typeof real.loadItemNames>) => (privateNames.down ? real.PRIVATE_UNREACHABLE : real.loadItemNames(...args)) };
+});
+
 const entries = (await sitemap())!;
 const byPath = new Map(entries.map((e) => [new URL(e.url).pathname, e]));
 
@@ -157,11 +164,11 @@ test("the zone index is listed; a zone page only once something is on it, and ne
   }
 });
 
-test("the sitemap answers 503, uncached, while the world facts or the census cannot be read, instead of one without the zone and ranking pages", async () => {
+test("the sitemap answers 503, uncached, while the world facts, the census, the instance store or the item facts cannot be read, instead of one without the zone, ranking, dungeon or item category pages", async () => {
   const text = await (await GET()).text();
   expect(text).toContain("<loc>https://everloot.app/database/zones/1436-westfall</loc>");
   expect(text).toContain(`<lastmod>${new Date(LAUNCH.checkedOn).toISOString()}</lastmod>`);
-  for (const down of [world, rankings]) {
+  for (const down of [world, rankings, instances, facts]) {
     try {
       down.unreachable = true;
       expect(await sitemap()).toBeNull();
@@ -171,6 +178,15 @@ test("the sitemap answers 503, uncached, while the world facts or the census can
     } finally {
       down.unreachable = false;
     }
+  }
+  try {
+    privateNames.down = true;
+    expect(await sitemap()).toBeNull();
+    const res = await GET();
+    expect(res.status).toBe(503);
+    expect(res.headers.get("CDN-Cache-Control")).toBe("no-store");
+  } finally {
+    privateNames.down = false;
   }
   const ok = await GET();
   expect(ok.status).toBe(200);
@@ -227,7 +243,7 @@ test("each dungeon and raid page is listed, once, as many as the instance index 
   expect(byPath.get("/database/instances/36-deadmines")?.lastModified).toBeUndefined();
 });
 
-test("an instance page is listed only while storage is readable, and one entered only from a held-back zone has none", async () => {
+test("an instance page entered only from a held-back zone is not listed", async () => {
   const paths = async () => (await sitemap())!.map((e) => new URL(e.url).pathname);
   const zoned = (mapId: number) => ["a", "b", "c"].map((installId) => ({ installId, instanceMapId: 9999, name: "Secret Vault", instanceType: "party", mapId, x: 40, y: 40, capturedAt: "2026-10-10T00:00:00.000Z" }));
   try {
@@ -235,14 +251,8 @@ test("an instance page is listed only while storage is readable, and one entered
     expect(await paths()).not.toContain("/database/instances/9999-secret-vault");
     instances.entrances = zoned(1436);
     expect(await paths()).toContain("/database/instances/9999-secret-vault");
-    instances.unreachable = true;
-    const down = await paths();
-    expect(down.filter((p) => p.startsWith("/database/instances/"))).toEqual([]);
-    // The index stays: it shows the files' entrances without storage.
-    expect(down).toContain("/database/instances");
   } finally {
     instances.entrances = [];
-    instances.unreachable = false;
   }
 });
 
