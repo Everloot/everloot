@@ -21,6 +21,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   the coverage, instance and item pages count "n of 3 installs" from the meter's own labels instead of a written 3.
 - Site: a spell page's tab reads "Spell 1 · Everloot" once; its title went around the shared page metadata, so the
   layout added the brand a second time, and it had no Open Graph or Twitter card. The title check now covers the route.
+- Site: a named spell page is titled "Blizzard – WoW Forever spell" with a description that names it, and its Creates,
+  Costs and Taught by sections no longer say "Get the addon" or show the agreement meter: those relations are the game
+  files' own, so an empty one is left out and a spell the files relate to nothing gets one line naming the build read.
 - Site: every public database list and detail page (NPCs, quests, objects, vendors, spells, achievements, titles, factions,
   quest chains, drops, coverage), the census and the rankings are kept at the CDN for five minutes like the profession pages,
   and the database index, zones and instances come down from an hour to the same five minutes, so a page drawn while

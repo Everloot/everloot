@@ -17,6 +17,7 @@ vi.mock("@/lib/edges", async (importOriginal) => {
 
 import SpellPage, { generateMetadata } from "./page";
 import { CLIENT_EDGES } from "@/lib/edges";
+import { DESCRIPTION_MAX, DESCRIPTION_MIN } from "@/lib/seo";
 
 afterEach(() => { files.spells = null; files.unreachable = true; });
 
@@ -82,9 +83,43 @@ test("Creates and Costs list the items whose edges point at the spell", async ()
   expect(reagents.length).toBeGreaterThan(0);
   const page = await render(String(crafted));
   for (const item of [...made, ...reagents]) expect(page).toContain(`href="/database/items/${item}"`);
-  expect(page).not.toContain("The files say it creates nothing.");
-  expect(page).not.toContain("The files say it costs nothing.");
+  expect(page).toContain('data-tab-panel="creates"');
+  expect(page).toContain('data-tab-panel="costs"');
+  // Nothing teaches it in the files, and no player report could: the empty tab is left out rather than shown empty.
+  expect(page).not.toContain('data-tab-panel="taught-by"');
   expect(page).toContain(`The files say it creates ${made.length} ${made.length === 1 ? "item" : "items"} and costs ${reagents.length}`);
+});
+
+test("a spell the files relate to nothing gets one plain line naming the build, never the addon link or the meter", async () => {
+  known([[1234, "Name Only"]]);
+  const page = await render("1234");
+  expect(page).toMatch(/The game files list nothing here \(build 1\.60\.1\.\d+\)\./);
+  expect(page).not.toContain('role="tab"');
+  expect(page).not.toContain("Get the addon");
+  expect(page).not.toContain("data-agreement");
+  // The quick facts count from the files too: a zero, not a meter waiting on a report.
+  expect(page).toContain(">0</span>");
+});
+
+test("a named spell is titled like the other database pages, with the brand added once by the layout", async () => {
+  // Without a name the title stays the id, as before.
+  expect((await generateMetadata(props("1234"))).title).toBe("Spell 1234");
+  known([[taught, "Some Craft"]]);
+  const m = await generateMetadata(props(String(taught)));
+  expect(m.title).toBe("Some Craft – WoW Forever spell");
+  expect(m.description).toContain("Some Craft is a spell in WoW: Forever.");
+  expect(m.description).toContain(`Spell ID ${taught}.`);
+  expect((m.openGraph as { title?: string }).title).toBe("Some Craft – WoW Forever spell · Everloot");
+  expect((m.twitter as { card?: string }).card).toBe("summary_large_image");
+});
+
+test("a long spell name still leaves a description within the limits", async () => {
+  const long = "Greater Blessing of the Ancient Watchers of the Emerald Dream";
+  known([[taught, long]]);
+  const description = String((await generateMetadata(props(String(taught)))).description);
+  expect(description.length).toBeLessThanOrEqual(DESCRIPTION_MAX);
+  expect(description.length).toBeGreaterThanOrEqual(DESCRIPTION_MIN);
+  expect(description).toContain(long);
 });
 
 test("a named spell whose only relations are what it creates and costs is indexed", async () => {
