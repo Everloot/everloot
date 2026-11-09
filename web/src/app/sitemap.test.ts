@@ -37,6 +37,13 @@ vi.mock("@/lib/news", async (importOriginal) => {
   return { ...real, loadNews: () => news.posts };
 });
 
+// The private names bucket, which names the item categories: down, it leaves them unnamed the same way the item facts do.
+const privateNames = vi.hoisted(() => ({ down: false }));
+vi.mock("@/lib/game-assets", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/game-assets")>();
+  return { ...real, loadItemNames: async (...args: Parameters<typeof real.loadItemNames>) => (privateNames.down ? real.PRIVATE_UNREACHABLE : real.loadItemNames(...args)) };
+});
+
 const entries = (await sitemap())!;
 const byPath = new Map(entries.map((e) => [new URL(e.url).pathname, e]));
 
@@ -171,6 +178,15 @@ test("the sitemap answers 503, uncached, while the world facts, the census, the 
     } finally {
       down.unreachable = false;
     }
+  }
+  try {
+    privateNames.down = true;
+    expect(await sitemap()).toBeNull();
+    const res = await GET();
+    expect(res.status).toBe(503);
+    expect(res.headers.get("CDN-Cache-Control")).toBe("no-store");
+  } finally {
+    privateNames.down = false;
   }
   const ok = await GET();
   expect(ok.status).toBe(200);
