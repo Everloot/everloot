@@ -121,6 +121,49 @@ How the fields are derived, and what is not confirmed:
 
 Nodes are sorted by id, which is the order the client writes them in a loadout string.
 
+## What `talent_tree` returns
+
+The MCP tool `talent_tree` (and the same answer at `/api/tools/talent_tree`, under `answer`) does not
+return the file above. It returns the calculator's shape: the class file goes through
+`web/src/lib/talents/adapter.ts` (`normalizeCatalog`, the shape in `web/src/lib/talents/types.ts`), and
+`kb/src/talent-tools.ts` (`nodeOut`) copies each node from there. The output schema is `talentNode` in
+`packages/protocol/src/mcp.ts`; `talent_plan` reads the same adapted catalog but returns ranks per node,
+not nodes. Field by field, for one node:
+
+| File field (`everloot.talent-catalog/2`) | Tool field | Note |
+| --- | --- | --- |
+| `id` | `id` | Same number, the id a share code names. |
+| the `Tree.id` the node sits under | `treeId` | The file nests nodes in `trees[].nodes`; the tool flattens them into one `nodes[]` and names the tree on each. |
+| `row` (from 0) | `row` (from 1) | `row + 1`. |
+| `col` (from 0) | `col` (from 1) | `col + 1`. |
+| `x`, `y`, `positionRepaired` | not returned | |
+| `kind` | `kind` | Same values. |
+| `maxRanks` | `maxRanks` | Same number. |
+| `entries[]` | `talents[]` | Same order. |
+| `entries[].name` | `talents[].name` | A `null` name becomes `Talent <spellId>`. |
+| `entries[].spellId` | `talents[].spellId` | Same number. |
+| `entries[].maxRanks` | `talents[].maxRanks` | Same number. |
+| `entries[].definitionId` | not returned | The adapter keeps it; `nodeOut` leaves it out. |
+| `entries[].iconFileId`, `iconFile`, `description`, `auraDescription`, `effects`, `durationMs` | not returned | Not in the trimmed site copy either. |
+| `prereqs[]` with `rule: "all"` | `prereqs: number[]` | The node ids only, in file order. |
+| `prereqs[]` with `rule: "any"` | `anyOf: number[]` | The node ids only. Absent when the node has no `any` prerequisite. |
+| `unlock.spentRequired.amount` with `scope: "tree"` or `"unconfirmed"` | `gate.pointsInTree` | `gate.scope` keeps the file's value, so an unconfirmed gate is still marked as such. |
+| `unlock.spentRequired.amount` with `scope: "class"` | `gate.pointsTotal` | |
+| `unlock.spentRequired.scope` | `gate.scope` | Same value. Absent when there is no gate. |
+| `unlock.spentRequired.gateGroupId`, `currencyId`, `traitTreeId`, `companionGroupId` | not returned | |
+| `unlock.ranksInNodes[]` | `gate.ranksInNodes[]` | Same objects, `{ nodeId, ranks }`. Absent when the array is empty. |
+| `unlock` with no gate and no ranks, or an `amount` of 0 | no `gate` | |
+
+The nodes come out in the adapter's order: trees by `order`, then `row`, `col`, `id`. The file is sorted
+by id. In the tool's text answer the `row N:` lines use the 1-based rows.
+
+Outside the node, the answer carries `label` and `build` (the file's `label` and `build.version`),
+`class` (the slug asked for), `className`, `specId` (the file's, or 0 when it is `null`), `points`
+(`firstPointLevel` and `maxLevel` are the first and last of the sorted `pointLevels`, `total` their
+count, `pointLevels` the sorted list), `trees` (`id`, `name` and a node count; a `null` tree name becomes
+`Tree <order + 1>`), `credit` and `url`. `warnings`, `traitTreeId`, `pointCurrencyId`, `skillLineId` and
+`edges` are not returned; the edges are already folded into `prereqs` and `anyOf` by the extractor.
+
 ## Raid buff table
 
 `raid-buffs.json` (`RaidBuffTable` in `kb/src/raid-buffs.ts`, schema `everloot.raid-buffs/2`). The list
