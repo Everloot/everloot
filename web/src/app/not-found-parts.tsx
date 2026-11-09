@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import Glint from "@/components/glint/Glint";
 import { SearchBar } from "@/components/ui";
 
@@ -19,14 +20,31 @@ export function lastSegment(path: string): string {
 }
 
 /**
+ * The address the browser shows, read after mount. The site 404 for an address that matches no route is prerendered
+ * at build time under Next's own address, `/_not-found`, so on the server `usePathname` names that and not the address
+ * tried; and a server value that differs from the client's would leave the field's text where the server put it,
+ * since hydration does not rewrite an input's live value. Empty on the server and on the first client render, then
+ * the real path.
+ */
+function useTriedPath(): string {
+  const [tried, setTried] = useState("");
+  useEffect(() => {
+    setTried(window.location.pathname);
+  }, []);
+  return tried;
+}
+
+/**
  * The 404 body every not-found page shows: sad Glint, the heading, a search box prefilled with the last segment of
  * the address tried (search-first, like the rest of the site), and the two links. Under a database detail address
  * with an id (`/database/<kind>/<digits>`), `database` adds the line that says why there is no page yet: no install
- * has reported that id, and three installs make a fact public.
+ * has reported that id, and three installs make a fact public. That 404 is thrown by the page per request, so
+ * `usePathname` holds the real address on the server as well as in the browser.
  */
 export default function NotFoundBody({ database = false }: { database?: boolean }) {
   const path = usePathname() ?? "";
   const unreported = database && isDatabaseIdPath(path);
+  const tried = useTriedPath();
   return (
     <div className="max-w-xl mx-auto text-center py-16 space-y-4">
       {/* Sad Glint: an empty satchel. */}
@@ -44,7 +62,8 @@ export default function NotFoundBody({ database = false }: { database?: boolean 
         </p>
       )}
       <div className="pt-2 text-left">
-        <SearchBar action="/search" id="not-found-search" label="Search the site" placeholder="A name or an id" defaultValue={lastSegment(path)} />
+        {/* Keyed on the address so the field takes its prefill once the browser has said what was tried. */}
+        <SearchBar key={tried} action="/search" id="not-found-search" label="Search the site" placeholder="A name or an id" defaultValue={lastSegment(tried)} />
       </div>
       <div className="flex items-center justify-center gap-3 pt-2">
         <Link href="/" className="btn btn-primary">

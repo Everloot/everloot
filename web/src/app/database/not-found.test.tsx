@@ -20,18 +20,18 @@ test("an unknown item or NPC id gets a body: the heading, the 3-install line, th
     expect(html).toContain("No report for this id yet; three installs make it public.");
     expect(html).toContain('href="/addon"');
     expect(html).toContain('action="/search"');
-    expect(html).toContain('value="999999"');
+    // Empty on the server; the browser fills in the id after mount (not-found-parts.test.tsx).
+    expect(html).toContain('value=""');
     expect(html).toContain('href="/database"');
   }
 });
 
-test("a database address without an id keeps the generic copy", () => {
-  mocks.path = "/database/no-such-list";
+test("a database address without a numeric id (the page throws for /database/items/abc) keeps the generic copy", () => {
+  mocks.path = "/database/items/abc";
   const html = renderToStaticMarkup(<DatabaseNotFound />);
   expect(html).toContain("The URL doesn");
   expect(html).not.toContain("three installs make it public");
   expect(html).not.toContain('href="/addon"');
-  expect(html).toContain('value="no-such-list"');
 });
 
 test("the database not-found keeps the site 404's metadata rule, so the answer stays a plain 404 with Next's own noindex (#815)", () => {
