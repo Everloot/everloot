@@ -25,8 +25,22 @@ the owner can do. Written after the 2026-10-17 audit.
 - **llms.txt and llms-full.txt** are route handlers built from the tool catalog, the MCP tool list in
   `web/src/lib/docs/connect-data.ts` and the changes data. A test fails if an MCP tool registered in
   `kb/src/mcp-server.ts` is missing from either.
-- **Sitemap.** `lastModified` only where one is known: newest change entry for /changes, the build extraction
-  date for the talent, raid and map pages, the checked-on date for /wow-forever.
+- **Sitemap.** `/sitemap.xml` is rendered per request from `web/src/lib/site-sitemap.ts`. It lists the static
+  pages (including `/chat`), the addon pages (`/addon`, `/addons`, its hubs and one profile per owner-approved
+  addon in `web/src/data/addon-repos.ts`), the talent, profession, class, item category, zone, dungeon, raid,
+  completion, ranking, guild family, wiki, news, guide, docs and reviewed blue post pages. Since #906 it answers 503
+  (uncached, like the database sitemap) while the item names, the world facts, the instance sightings or the ranking
+  weeks cannot be read, so a crawler keeps its last copy instead of a shorter list the CDN would hold for an hour.
+  `lastModified` only where one is known: newest change entry for /changes, the build extraction date for the
+  talent, raid, map, item category, legacy and profession pages, the checked-on date for /wow-forever, the review
+  date for guides, blue posts and wiki pages.
+- **robots.txt.** `web/public/robots.txt` is served as is (there is no `robots.ts`). Three rule groups: every
+  agent may read everything except `/database/items?*` and `/database/items/*?*`, so the named category and subclass
+  pages are crawled and the filter permutations are not; the training crawlers (GPTBot, ClaudeBot, CCBot,
+  Bytespider, Amazonbot, Meta-ExternalAgent, Google-Extended, Applebot-Extended) are disallowed everywhere,
+  matching the Cloudflare training policy, while AI search and user-requested fetches (OAI-SearchBot, ChatGPT-User,
+  Claude-SearchBot, Claude-User, PerplexityBot) follow the public rules; and `Mediapartners-Google`, the AdSense
+  crawler, is kept off `/lore`, where no ads run. The file names the three sitemaps.
 - **Database sitemap.** `/database-sitemap.xml` indexes chunks of up to 40,000 item, NPC, quest, object and
   vendor detail pages. It lists a page by the same function its robots metadata calls
   (`web/src/lib/indexable.ts`), so it never lists a noindex page. It answers 503 when upload storage cannot be
@@ -75,26 +89,16 @@ the owner can do. Written after the 2026-10-17 audit.
 
 ## Steps for Carlos
 
-1. **Worker secret.** Add `INDEXNOW_KEY` with `npx wrangler secret put INDEXNOW_KEY` from `web/`. Generate one,
-   for example 32 random hex characters. Then open `https://everloot.app/indexnow.txt` and confirm it shows the key.
-2. **www redirect.** `www.everloot.app/*` is a route of the Worker, and the site answers 301 itself when a request
-   reaches it on `www.everloot.app`. After the deploy, `curl -I https://www.everloot.app/about`
-   should show a 301 to `https://everloot.app/about`.
-3. **Google Search Console.** Add the property for `everloot.app`. Either verify by DNS, or set `GSC_VERIFICATION`
-   (the content value of the meta tag) as a var in `web/wrangler.jsonc`. Submit `https://everloot.app/sitemap.xml`,
-   `https://everloot.app/database-sitemap.xml` and `https://everloot.app/auctions-sitemap.xml`. If the lore
-   sitemap was submitted before, remove it: it no longer exists.
-4. **Bing Webmaster Tools.** Add the site, or import it from Search Console. Set `BING_VERIFICATION` if you
-   verify by meta tag. Submit the same three sitemaps. IndexNow submissions show under "IndexNow" once the key
-   works.
-5. **MCP registry.** Publish the public server (`https://everloot.app/mcp/public`) to the official MCP
-   registry as `io.github.Everloot/everloot`, then to Glama, Smithery and mcp.so. The server must have
-   `EVERLOOT_MCP_PUBLIC=1` in the `vars` of `web/wrangler.jsonc`, or the endpoint answers 404.
-6. **Bot protection (policy confirmed 2026-11-02).** Keep AI training blocked in Cloudflare and in
-   `web/public/robots.txt`. Allow AI search and user-requested fetches (OAI-SearchBot, ChatGPT-User,
-   Claude-SearchBot, Claude-User and PerplexityBot), as well as Googlebot and Bingbot. Check actual verified
-   crawler events as well as user-agent probes; a spoofed user agent alone does not prove crawler access.
-   Keep Bot Preference Sync off while the repository owns robots.txt. API and discovery clients should not
-   receive browser challenges; preserve endpoint authentication, quotas and rate limits.
-7. **Decided 2026-10-20:** the Warcraft Wiki copies under /lore are noindex and out of the sitemaps; /about names
-   R21 Media Group, LLC.
+Each row states what the repository shows on the date given. A step is Done only when a tracked file proves it;
+everything else stays Open, including steps whose code is merged but whose account-side check is not recorded here.
+
+| # | Step | State | Date |
+|---|---|---|---|
+| 1 | **Worker secret.** Add `INDEXNOW_KEY` with `npx wrangler secret put INDEXNOW_KEY` from `web/`. Generate one, for example 32 random hex characters. Then open `https://everloot.app/indexnow.txt` and confirm it shows the key. | Open | checked 2026-11-09 |
+| 2 | **www redirect.** `www.everloot.app/*` is a route of the Worker, and the site answers 301 itself when a request reaches it on `www.everloot.app`. After the deploy, `curl -I https://www.everloot.app/about` should show a 301 to `https://everloot.app/about`. | Open | checked 2026-11-09 |
+| 3 | **Google Search Console.** Add the property for `everloot.app`. Either verify by DNS, or set `GSC_VERIFICATION` (the content value of the meta tag) as a var in `web/wrangler.jsonc`. Submit `https://everloot.app/sitemap.xml`, `https://everloot.app/database-sitemap.xml` and `https://everloot.app/auctions-sitemap.xml`. If the lore sitemap was submitted before, remove it: it no longer exists. | Open | checked 2026-11-09 |
+| 4 | **Bing Webmaster Tools.** Add the site, or import it from Search Console. Set `BING_VERIFICATION` if you verify by meta tag. Submit the same three sitemaps. IndexNow submissions show under "IndexNow" once the key works. | Open | checked 2026-11-09 |
+| 5 | **MCP registry.** The public server (`https://everloot.app/mcp/public`) is published to the official MCP registry as `app.everloot/knowledge` (first published 2026-10-19; `server.json` is at version 0.9.1 since 2026-11-06, and the listing text is in `docs/2026-10-18-mcp-listings.md`). `EVERLOOT_MCP_PUBLIC` is `1` in the `vars` of `web/wrangler.jsonc`; without it the endpoint answers 404. | Done | 2026-11-06 |
+| 6 | **Directories.** Glama is claimed by a DNS TXT record (`_glama-claim.everloot.app`, must stay) and ingests the registry entry. Smithery and mcp.so: check whether the registry publish reached them, submit by hand if not (`docs/2026-10-18-mcp-listings.md`). | Glama done; Smithery and mcp.so open | 2026-11-03 |
+| 7 | **Bot protection (policy confirmed 2026-11-02).** Keep AI training blocked in Cloudflare and in `web/public/robots.txt`. Allow AI search and user-requested fetches (OAI-SearchBot, ChatGPT-User, Claude-SearchBot, Claude-User and PerplexityBot), as well as Googlebot and Bingbot. Check actual verified crawler events as well as user-agent probes; a spoofed user agent alone does not prove crawler access. Keep Bot Preference Sync off while the repository owns robots.txt. API and discovery clients should not receive browser challenges; preserve endpoint authentication, quotas and rate limits. | Open (standing policy) | 2026-11-02 |
+| 8 | **Decided 2026-10-20:** the Warcraft Wiki copies under /lore are noindex and out of the sitemaps; /about names R21 Media Group, LLC. | Done | 2026-10-20 |

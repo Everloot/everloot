@@ -56,6 +56,20 @@ updates:
       # Major versions are planned upgrades (Next, ESLint, Tailwind, Node types), done by hand.
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+  - package-ecosystem: npm
+    directory: /desktop
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(desktop)"
+    groups:
+      desktop-dependencies:
+        patterns: ["*"]
+    ignore:
+      # Major versions are planned upgrades (Electron, the MCP SDK, Node types), done by hand.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:

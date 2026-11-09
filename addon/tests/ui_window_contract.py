@@ -56,7 +56,17 @@ API = ("UnitGUID = function() return 'Player-1-0001' end\n"
        "RAID_CLASS_COLORS.ROGUE = { r = 1, g = 0.96, b = 0.41 }\n")
 SAVED = f"""{{ installId = 'abcd-1234', toggles = {{}}, records = {{
     recipe_observed = {{ {{ profession = 'Cooking' }}, {{ profession = 'Cooking' }} }},
-    lockout_owned = {{ {{ characterKey = 'bbbb0002', instance = 'Karazhan', resetAt = '2030-01-01T00:00:00Z' }}, {{ characterKey = 'bbbb0002', instance = 'Gruul', resetAt = '2030-01-02T00:00:00Z' }}, {{ characterKey = 'bbbb0002', instance = 'Magtheridon', resetAt = '1970-01-02T00:00:00Z' }}, {{ characterKey = 'zzzz', instance = 'Other' }} }} }},
+    lockout_owned = {{ {{ characterKey = 'bbbb0002', instance = 'Karazhan', resetAt = '2030-01-01T00:00:00Z' }}, {{ characterKey = 'bbbb0002', instance = 'Gruul', resetAt = '2030-01-02T00:00:00Z' }}, {{ characterKey = 'bbbb0002', instance = 'Magtheridon', resetAt = '1970-01-02T00:00:00Z' }}, {{ characterKey = 'zzzz', instance = 'Other' }},
+      {{ characterKey = '{ME}', instance = 'Molten Core', bossesKilledCount = 3, bossesTotal = 10, resetAt = '2030-01-01T00:00:00Z' }},
+      {{ characterKey = '{ME}', instance = 'Onyxia', bossesKilledCount = 1, bossesTotal = 1, resetAt = '2030-01-01T00:00:00Z' }},
+      {{ characterKey = '{ME}', instance = 'Zul Gurub', bossesKilledCount = 0, bossesTotal = 10, resetAt = '1970-01-02T00:00:00Z' }} }},
+    achievement_catalog = {{ {{ achievementId = 1, name = 'Level 10' }}, {{ achievementId = 2, name = 'Explore Durotar' }}, {{ achievementId = 3, name = 'Journeyman Fisherman' }}, {{ achievementId = 4, name = 'Zul Farrak' }} }},
+    achievement_owned = {{ {{ characterKey = '{ME}', achievementId = 1, completed = true }}, {{ characterKey = '{ME}', achievementId = 2, completed = true }},
+      {{ characterKey = '{ME}', achievementId = 3, completed = false }}, {{ characterKey = 'zzzz9999', achievementId = 4, completed = true }} }},
+    reputation_catalog = {{ {{ factionId = 76, name = 'Orgrimmar' }}, {{ factionId = 530, name = 'Darkspear Trolls' }}, {{ factionId = 2600, name = 'A Major Faction', major = true }} }},
+    reputation_owned = {{ {{ characterKey = '{ME}', factionId = 76, reaction = 8 }}, {{ characterKey = '{ME}', factionId = 530, reaction = 5 }}, {{ characterKey = 'zzzz9999', factionId = 530, reaction = 8 }} }},
+    title_catalog = {{ {{ titleId = 1, name = 'Private' }}, {{ titleId = 2, name = 'Corporal' }}, {{ titleId = 3, name = 'Scout' }} }},
+    title_owned = {{ {{ characterKey = '{ME}', titleIds = {{ 2 }} }}, {{ characterKey = 'zzzz9999', titleIds = {{ 1, 3 }} }} }} }},
   ledger = {{ events = {{
     {{ at = 1000000 - 3600, key = '{ME}', category = 'quest', copper = 12345 }},
     {{ at = 1000000 - 7200, key = '{ME}', category = 'flight', copper = 77 }},
@@ -102,6 +112,17 @@ local U0 = Everloot.Window
 -- The seeded events (12345 in, 77 out) plus the vendor sale, quest reward and flight the gold module just recorded live.
 assert(f.week.text == 'This week: +' .. U0.Money(12345 + 41000 + 67500) .. ' / -' .. U0.Money(77 + 55), 'this character, last 7 days only: ' .. f.week.text)
 assert(rawget(f, 'ledger') == nil, 'the Recorded line is the week line now')
+-- The account line sums every roster key (Alt's 999 quest reward joins); the character line above does not.
+assert(f.weekAccount.text == 'Account this week: +' .. U0.Money(12345 + 41000 + 67500 + 999) .. ' / -' .. U0.Money(77 + 55), 'every character, last 7 days: ' .. f.weekAccount.text)
+
+-- The Missing strip with the tracker off: the recipes line alone (Mining and Fishing have no recipe recorded), then
+-- the note and the Turn on button Collection has.
+local m = f.missing
+assert(m.title.text == 'Missing' and #m.lines == 5, 'five counts')
+assert(m.lines[4].shown and m.lines[4].label.text == 'Recipes to read: 2', m.lines[4].label.text)
+assert(not m.lines[1].shown and not m.lines[2].shown and not m.lines[3].shown and not m.lines[5].shown, 'tracker counts wait for the tracker')
+assert(m.off.shown and m.off.text:find('tracker is off') and m.turnOn.shown and m.turnOn.text == 'Turn on', m.off.text)
+assert(m.lines[4].point[3] == -206 and m.off.point[3] == -224, 'the shown line packs to the top, the note under it')
 assert(f.perHour.text == '-' and f.session.text:find('not running') and f.gphButton.text == 'Start', 'no session, no number')
 
 local rows = f.profRows
@@ -130,13 +151,30 @@ assert(r.rows[3].lockouts.text == '-' and r.rows[5].lockouts.text == '-', 'locko
 assert(r.rows[3].seen.text == '1970-01-12' and r.rows[2].seen.text == '-', r.rows[3].seen.text)
 EverlootDB.toggles.completion = true
 Everloot.Window.Refresh()
--- Magtheridon's reset time has passed: two live lockouts, as the Collection view counts them.
-assert(r.rows[5].lockouts.text == '2 raids' and r.rows[3].lockouts.text == '-' and r.rows[2].lockouts.text == '-', r.rows[5].lockouts.text)
+-- Magtheridon's and Zul Gurub's reset times have passed: live lockouts only, as the Collection view counts them.
+assert(r.rows[5].lockouts.text == '2 raids' and r.rows[3].lockouts.text == '2 raids' and r.rows[2].lockouts.text == '-', r.rows[5].lockouts.text)
 EverlootDB.records.lockout_owned[2].resetAt = '1970-01-03T00:00:00Z'
 Everloot.Window.Refresh()
 assert(r.rows[5].lockouts.text == '1 raid', 'one live, two past their reset: ' .. r.rows[5].lockouts.text)
+
+-- The Missing strip with the tracker on: this character's counts from the same owned and catalog rows Collection
+-- reads; the other character's rows never count. Onyxia is cleared, Molten Core has bosses left, Zul Gurub reset.
+local function line(i) return m.lines[i].label.text end
+assert(line(1) == 'Achievements left: 2' and line(2) == 'Factions not exalted: 1' and line(3) == 'Titles not held: 2'
+  and line(4) == 'Recipes to read: 2' and line(5) == 'Raids not cleared: 1', line(1) .. ' / ' .. line(2) .. ' / ' .. line(3) .. ' / ' .. line(5))
+for i = 1, 5 do assert(m.lines[i].shown and m.lines[i].point[3] == -206 - (i - 1) * 16, 'line ' .. i .. ' in order') end
+assert(not m.off.shown and not m.turnOn.shown, 'the note and button leave with the tracker on')
+-- A line opens the tab that lists it: the Collection view for the tracker counts, Professions for the recipes.
+m.lines[2].scripts.OnClick(m.lines[2])
+assert(f.home.shown == false and f.views.collection and f.views.collection.shown and f.subtitle.text == 'Collection', 'a factions line opens Collection')
+f.nav.home.scripts.OnClick(f.nav.home)
+m.lines[4].scripts.OnClick(m.lines[4])
+assert(f.home.shown == false and f.views.professions and f.views.professions.shown and f.subtitle.text == 'Professions', 'the recipes line opens Professions')
+f.nav.home.scripts.OnClick(f.nav.home)
+assert(f.home.shown and m.lines[1].shown and not f.views.collection.shown and not f.views.professions.shown)
 EverlootDB.toggles.completion = false
 Everloot.Window.Refresh()
+assert(not m.lines[1].shown and m.lines[4].shown and m.off.shown, 'off again: the recipes line stays, the rest wait')
 
 -- Paging: more than 10 lines show Down only; Down moves a page and clamps at the end; Up goes back.
 assert(r.up.shown == false and r.down.shown == false, 'a short list pages nowhere')
@@ -162,6 +200,9 @@ assert(EverlootDB.gph.current.runningSince == nil and f.gphButton.text == 'Resum
 -- Sidebar: Home, Gold, Collection, Professions, Settings. A view registers by key; one that did not load says so.
 assert(f.nav.ask == nil and f.nav.plan == nil and f.nav.auctions == nil, 'Ask, Build plan and Auctions left the sidebar')
 assert(f.nav.gold and f.nav.collection and f.nav.professions and f.nav.settings, 'Home, Gold, Collection, Professions, Settings')
+-- The strip's click built the real Collection view above; a stub in its place checks that a view is built once, on
+-- its first open, and refreshed on each.
+f.views.collection = nil
 Everloot.Window.Views.collection = { build = function(f, parent) parent.built = true end, refresh = function(f) local v = f.views.collection; v.refreshed = (rawget(v, 'refreshed') or 0) + 1 end }
 f.nav.collection.scripts.OnClick(f.nav.collection)
 assert(f.home.shown == false and f.views.collection.shown and rawget(f.views.collection, 'built') and f.views.collection.refreshed == 1 and f.subtitle.text == 'Collection')
@@ -235,7 +276,25 @@ local f = EverlootWindow
 assert(f.name.text == '-' and f.onHand.text == '-' and f.peak.text == '-' and f.perHour.text == '-', 'dashes, not numbers')
 assert(f.profRows[1].name.text == '-' and f.profRows[1].bar.shown == false, 'no profession book, no bars')
 assert(f.week.text == 'This week: -', f.week.text)
+assert(f.weekAccount.text == 'Account this week: -', f.weekAccount.text)
 assert(f.roster.accountTotal.text == 'Account: -' and not f.roster.rows[1].shown, 'no characters, no rows')
+assert(f.missing.lines[4].label.text == 'Recipes to read: -', 'no profession book, no recipe count: ' .. f.missing.lines[4].label.text)
+EverlootDB.toggles.completion = true
+Everloot.Window.Refresh()
+for i = 1, 5 do assert(f.missing.lines[i].label.text:find(': %-$'), 'no rows read yet, a dash: ' .. f.missing.lines[i].label.text) end
+""")
+
+# --- The strip's Turn on button runs /everloot completion on, as Collection's does, and says to /reload ---
+lua = fresh("{ installId = 'abcd-1234', toggles = {}, records = {} }", API)
+lua.execute("""
+assert(Everloot.Window.Open())
+local m = EverlootWindow.missing
+assert(EverlootDB.toggles.completion == false and m.turnOn.shown)
+m.turnOn.scripts.OnClick(m.turnOn)
+assert(EverlootDB.toggles.completion == true, 'Turn on runs /everloot completion on')
+assert(m.off.shown and m.off.text == 'Turned on. /reload to start reading.' and not m.turnOn.shown, m.off.text)
+assert(m.lines[1].shown and m.lines[1].label.text == 'Achievements left: -', 'the tracker lines show, with nothing read yet')
+assert(EverlootWindow.shown and not Everloot.Window.failed)
 """)
 
 # --- A forced error inside the window never stops an event from being recorded ---

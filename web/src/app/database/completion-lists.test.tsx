@@ -29,6 +29,8 @@ vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
   permanentRedirect: (to: string) => { throw new Error(`REDIRECT ${to}`); },
 }));
+// The faction page asks the lore archive for its name; no release is open here, so the page shows no lore block.
+vi.mock("@/lib/release", () => ({ getRelease: () => null }));
 vi.mock("@/lib/rollup-compute", () => ({
   loadItemFacts: async () => ({ rates: [], names: [], npcs: [], unreachable: false }),
   loadWorldFacts: async () => ({ npcs: [], quests: [], vendors: [], unreachable: false }),

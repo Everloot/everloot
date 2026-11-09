@@ -1,6 +1,7 @@
--- Everloot window: a home for what this file already holds. The character, gold on hand and where the gold
--- module saw it come from, gold per hour from the gph session, professions with their skill bars and every
--- character the roster holds. Built the first time it opens (minimap button or /everloot window), never at
+-- Everloot window: a home for what this file already holds. The character and what it is missing, gold on hand and
+-- where the gold module saw it come from, this character's and the account's week from the ledger, gold per hour
+-- from the gph session, professions with their skill bars and every character the roster holds. Built the first
+-- time it opens (minimap button or /everloot window), never at
 -- load, and it registers no events: recording runs whether this window exists, works or is turned off.
 -- Every build and refresh runs inside pcall; an error closes this window for the session, not the addon.
 -- Display only: it reads, the buttons call the commands the player could type, and nothing here records.
@@ -132,6 +133,70 @@ function U.Professions()
   return out
 end
 
+-- This character's rows of one owned kind, by the catalog id in `field`, as the Collection view reads them.
+local function ownedById(kind, key, field)
+  local out = {}
+  for _, r in ipairs(E:Rows(kind)) do
+    if type(r) == "table" and r.characterKey == key and r[field] ~= nil then out[r[field]] = r end
+  end
+  return out
+end
+
+--- What this character has not done yet, counted from the rows Collection and Professions already read: catalog
+--- achievements not completed, catalog factions not exalted, catalog titles not held, professions in the book with
+--- no recipe recorded, and this week's raid lockouts with bosses left. A count the file cannot give is nil: the
+--- tracker counts while the completion tracker is off, a catalog with no rows yet, the recipes without a profession
+--- book. Nil when the character cannot be identified. Nothing here estimates or records.
+function U.MissingData()
+  local ok, key = pcall(E.CharacterKey)
+  if not (ok and key) then return nil end
+  local d = {}
+  local profs = U.Professions()
+  if profs then
+    local read = {}
+    for _, r in ipairs(E:Rows("recipe_observed")) do
+      if type(r) == "table" and type(r.profession) == "string" then read[r.profession] = true end
+    end
+    d.recipes = 0
+    for _, p in ipairs(profs) do if not read[p.name] then d.recipes = d.recipes + 1 end end
+  end
+  if not E:IsEnabled("completion") then return d end
+
+  local done = ownedById("achievement_owned", key, "achievementId")
+  for _, a in ipairs(E:Rows("achievement_catalog")) do
+    if type(a) == "table" then
+      local o = done[a.achievementId]
+      d.achievements = (d.achievements or 0) + ((o and o.completed == true) and 0 or 1)
+    end
+  end
+  local standing = ownedById("reputation_owned", key, "factionId")
+  for _, r in ipairs(E:Rows("reputation_catalog")) do
+    if type(r) == "table" and not r.major then
+      local o = standing[r.factionId]
+      d.factions = (d.factions or 0) + ((o and type(o.reaction) == "number" and o.reaction >= 8) and 0 or 1)
+    end
+  end
+  local held = {}
+  for _, r in ipairs(E:Rows("title_owned")) do
+    if type(r) == "table" and r.characterKey == key and type(r.titleIds) == "table" then
+      for _, id in ipairs(r.titleIds) do held[id] = true end
+    end
+  end
+  for _, t in ipairs(E:Rows("title_catalog")) do
+    if type(t) == "table" then d.titles = (d.titles or 0) + (held[t.titleId] and 0 or 1) end
+  end
+  -- A lockout whose reset time has passed is gone in the game too; one with every boss down is not missing.
+  local now = date("!%Y-%m-%dT%H:%M:%SZ", time())
+  d.raids = 0
+  for _, r in ipairs(E:Rows("lockout_owned")) do
+    if type(r) == "table" and r.characterKey == key and type(r.resetAt) == "string" and r.resetAt > now then
+      local cleared = type(r.bossesKilledCount) == "number" and type(r.bossesTotal) == "number" and r.bossesKilledCount >= r.bossesTotal
+      if not cleared then d.raids = d.raids + 1 end
+    end
+  end
+  return d
+end
+
 -- Widgets ---------------------------------------------------------------------------------------------------
 
 local function fill(frame, color, layer)
@@ -227,6 +292,19 @@ end
 
 local W, H, SIDE, MAIN = 800, 450, 160, 184
 
+-- The Missing strip on Home: { key in U.MissingData, the line's label, the sidebar item a click opens }, in order.
+-- The recipes line comes from the professions module and shows with the tracker off; the rest need it on.
+U.MISSING = {
+  { key = "achievements", label = "Achievements left", view = "collection" },
+  { key = "factions", label = "Factions not exalted", view = "collection" },
+  { key = "titles", label = "Titles not held", view = "collection" },
+  { key = "recipes", label = "Recipes to read", view = "professions", tracker = false },
+  { key = "raids", label = "Raids not cleared", view = "collection" },
+}
+local MISSING_TOP, MISSING_LINE = 190, 16
+local TRACKER_OFF = "The completion tracker is off: achievements, factions, titles and raid lockouts are not read."
+local TRACKER_TURNED_ON = "Turned on. /reload to start reading."
+
 -- The roster list on Home: { field, x, width, right aligned, heading }.
 U.ROSTER_ROWS = 10
 U.ROSTER_COLUMNS = {
@@ -257,14 +335,51 @@ local function buildHome(f)
   f.realm:SetPoint("TOPLEFT", f.class, "BOTTOMLEFT", 0, -3)
   f.realm:SetWidth(130)
 
-  -- Gold: on hand, per hour, the peak this install saw; where it came from; the gph session.
-  local gold = box(home, 160, 0, 444, 100)
+  -- What this character is missing, under the realm line: one line per count, each opening the tab that lists it.
+  -- The lines are packed from the top at each refresh, the tracker-off note and its button after them.
+  local m = { lines = {} }
+  f.missing = m
+  m.title = text(who, 12)
+  m.title:SetPoint("TOPLEFT", 10, -MISSING_TOP)
+  m.title:SetText("Missing")
+  for i, item in ipairs(U.MISSING) do
+    local b = CreateFrame("Button", nil, who)
+    b:SetSize(138, MISSING_LINE)
+    b:SetHighlightTexture("Interface\\Buttons\\WHITE8X8")
+    local highlight = b.GetHighlightTexture and b:GetHighlightTexture()
+    if highlight then highlight:SetVertexColor(1, 1, 1, 0.05) end
+    b.label = text(b, 11, NARROW)
+    b.label:SetPoint("LEFT", 4, 0)
+    b.label:SetWidth(130)
+    if b.label.SetWordWrap then b.label:SetWordWrap(false) end
+    b:SetScript("OnClick", function() U.Select(item.view) end)
+    m.lines[i] = b
+  end
+  m.off = text(who, 11, FRIZ, COLORS.muted)
+  m.off:SetWidth(130)
+  m.off:SetJustifyV("TOP")
+  m.turnOn = CreateFrame("Button", nil, who, "UIPanelButtonTemplate")
+  m.turnOn:SetSize(90, 20)
+  m.turnOn:SetPoint("TOPLEFT", m.off, "BOTTOMLEFT", 0, -6)
+  m.turnOn:SetText("Turn on")
+  m.turnOn:SetScript("OnClick", function()
+    pcall(SlashCmdList.EVERLOOT, "completion on")
+    if E:IsEnabled("completion") then m.turnedOn = true end
+    local ok, err = pcall(U.Refresh)
+    if not ok then U.Fail(err) end
+  end)
+
+  -- Gold: on hand, per hour, the peak this install saw; this character's week and the account's; the gph session.
+  local gold = box(home, 160, 0, 444, 104)
   f.onHand = stat(gold, 10, "INV_Misc_Coin_02", "On hand")
   f.perHour = stat(gold, 158, "INV_Misc_PocketWatch_01", "Gold per hour")
   f.peak = stat(gold, 306, "INV_Misc_Coin_04", "Peak on install")
   f.week = text(gold, 12, FRIZ, COLORS.muted)
   f.week:SetPoint("TOPLEFT", 10, -50)
   f.week:SetWidth(424)
+  f.weekAccount = text(gold, 12, FRIZ, COLORS.muted)
+  f.weekAccount:SetPoint("TOPLEFT", f.week, "BOTTOMLEFT", 0, -2)
+  f.weekAccount:SetWidth(424)
   f.session = text(gold, 12, FRIZ, COLORS.muted)
   f.session:SetPoint("BOTTOMLEFT", 10, 10)
   local toggle = CreateFrame("Button", nil, gold, "UIPanelButtonTemplate")
@@ -458,15 +573,59 @@ function U.RefreshLive()
   end
 end
 
+-- "<label>: +<in> / -<out>" for the keys over the last seven days, or "<label>: -" without keys or the ledger.
+local function weekText(label, keys)
+  local L = E.Ledger
+  if not (type(keys) == "table" and #keys > 0 and L and L.Summary and L.Period) then return label .. ": -" end
+  local ok, sum = pcall(function() return L.Summary(keys, L.Period("7d")) end)
+  if not ok or type(sum) ~= "table" or type(sum.totalIn) ~= "number" or type(sum.totalOut) ~= "number" then return label .. ": -" end
+  return label .. ": +" .. U.Money(sum.totalIn) .. " / -" .. U.Money(sum.totalOut)
+end
+
 --- "This week: +<in> / -<out>" for this character over the last seven days, or "This week: -" when the key or
 --- the ledger is missing.
 function U.WeekLine()
-  local L = E.Ledger
   local key = E.Roster and E.Roster.Current()
-  if not (key and L and L.Summary and L.Period) then return "This week: -" end
-  local ok, sum = pcall(function() return L.Summary({ key }, L.Period("7d")) end)
-  if not ok or type(sum) ~= "table" or type(sum.totalIn) ~= "number" or type(sum.totalOut) ~= "number" then return "This week: -" end
-  return "This week: +" .. U.Money(sum.totalIn) .. " / -" .. U.Money(sum.totalOut)
+  return weekText("This week", key and { key } or nil)
+end
+
+--- "Account this week: +<in> / -<out>" over every character in the roster, as the Gold tab's Account scope sums
+--- them, or "Account this week: -" when the roster is empty or the ledger is missing.
+function U.AccountWeekLine()
+  local ok, rows = false, nil
+  if E.Roster and E.Roster.Rows then ok, rows = pcall(E.Roster.Rows) end
+  local keys = {}
+  for _, r in ipairs(ok and type(rows) == "table" and rows or {}) do keys[#keys + 1] = r.key end
+  return weekText("Account this week", keys)
+end
+
+--- The Missing strip: the lines the file can count, packed from the top, then the tracker-off note and its button.
+function U.RefreshMissing()
+  local f = U.frame
+  local m = f.missing
+  local d = U.MissingData()
+  local on = E:IsEnabled("completion")
+  local slot = 0
+  for i, item in ipairs(U.MISSING) do
+    local b = m.lines[i]
+    if item.tracker == false or on then
+      local n = d and d[item.key]
+      b.label:SetText(item.label .. ": " .. (type(n) == "number" and tostring(n) or "-"))
+      b:SetPoint("TOPLEFT", 6, -(MISSING_TOP + MISSING_LINE + slot * MISSING_LINE))
+      b:Show()
+      slot = slot + 1
+    else
+      b:Hide()
+    end
+  end
+  if on and not m.turnedOn then
+    m.off:Hide(); m.turnOn:Hide()
+    return
+  end
+  m.off:SetPoint("TOPLEFT", 10, -(MISSING_TOP + MISSING_LINE + slot * MISSING_LINE + 2))
+  m.off:SetText(m.turnedOn and TRACKER_TURNED_ON or TRACKER_OFF)
+  m.off:Show()
+  if m.turnedOn then m.turnOn:Hide() else m.turnOn:Show() end
 end
 
 -- Raid lockouts exist only while the completion tracker is on; "-" when it is off or the character has none. A
@@ -575,6 +734,8 @@ function U.Refresh()
 
   f.peak:SetText(d.peak and U.Money(d.peak) or "-")
   f.week:SetText(U.WeekLine())
+  f.weekAccount:SetText(U.AccountWeekLine())
+  U.RefreshMissing()
 
   local profs = d.professions
   for i, row in ipairs(f.profRows) do

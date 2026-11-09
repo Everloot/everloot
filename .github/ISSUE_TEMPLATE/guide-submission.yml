@@ -1,0 +1,37 @@
+name: Guide submission
+description: Offer a guide for everloot.app/guides, or a revision of one.
+title: "Guide: "
+labels: ["kb", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A guide is Everloot's own advice on one talent plan for one class. It is reviewed before it is published. The contract every guide meets is docs/GUIDES.md, and the file format is in kb/guides/README.md.
+  - type: input
+    id: topic
+    attributes:
+      label: Topic
+      description: Class, activity and levels, for example "Mage leveling, 10 to 60".
+    validations:
+      required: true
+  - type: textarea
+    id: sources
+    attributes:
+      label: Sources
+      description: One per line, with the day you checked each. Sources are Blizzard's own posts; each must already be in docs/sources/LEDGER.md or allowed by docs/DATA_POLICY.md. Other sites' guides are not sources.
+    validations:
+      required: true
+  - type: input
+    id: draft
+    attributes:
+      label: Link to a draft
+      description: A pull request, a gist or a Discussion holding the draft.
+    validations:
+      required: true
+  - type: checkboxes
+    id: read
+    attributes:
+      label: Before you send
+      options:
+        - label: I read docs/GUIDES.md.
+          required: true

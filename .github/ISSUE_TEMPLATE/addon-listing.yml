@@ -1,0 +1,59 @@
+name: Addon listing request
+description: Ask for a page for your WoW Forever addon at everloot.app/addons/<name>.
+title: "Addon listing: "
+labels: ["ecosystem", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        An addon page, its title and its download links exist only for an addon the owner approved. This form is how an author asks for one. A maintainer reads every request and adds the addon by hand; listing is at the maintainer's discretion. An approved addon gets a page at everloot.app/addons/<name>. The board at everloot.app/addons ranks projects by GitHub stars, with views for stars gained and installs; everloot.app/addons/popular ranks by the share of Everloot installs that run the addon, and links only the approved ones. Nothing here changes that ranking.
+  - type: input
+    id: name
+    attributes:
+      label: Addon name
+      description: The AddOns folder name, as the in-game addon list shows it.
+    validations:
+      required: true
+  - type: input
+    id: repo
+    attributes:
+      label: Repository URL
+      description: The full link, for example https://github.com/owner/name.
+    validations:
+      required: true
+  - type: input
+    id: page
+    attributes:
+      label: CurseForge or other download page
+      description: Optional. Where players download the addon, if not only from the repository.
+  - type: input
+    id: version
+    attributes:
+      label: Which WoW Forever version it runs on
+      description: The "## Interface" number from the .toc, or the client build you tested on.
+    validations:
+      required: true
+  - type: dropdown
+    id: clients
+    attributes:
+      label: Forever-only, or also Retail or Classic?
+      options:
+        - Forever only
+        - Forever and Retail
+        - Forever and Classic
+        - Forever, Retail and Classic
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: One paragraph about the addon, in your own words
+    validations:
+      required: true
+  - type: checkboxes
+    id: who
+    attributes:
+      label: About you
+      options:
+        - label: I am the author of this addon, or I have the author's permission to ask for this listing.
+          required: true
