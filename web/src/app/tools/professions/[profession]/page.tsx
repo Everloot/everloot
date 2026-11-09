@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
 import EmailCapture from "@/components/EmailCapture";
 import ClassContextChip from "@/components/classes/ClassContextChip";
@@ -11,7 +11,7 @@ import { classContextParams, parseClassContext, withoutClassContext } from "@/li
 import { dataAgeLabel } from "@/lib/data-age";
 import { loadItemTips, loadSiteAssets, loadSpellNames, type ItemTip } from "@/lib/game-assets";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, shownItemName, type ShownItemName } from "@/lib/items";
-import { CLIENT_PROFESSIONS, professionBySlug, professionHref, RECIPES_BUILD, recipeGroups, recipeItemIds, type RecipeView } from "@/lib/professions";
+import { CLIENT_PROFESSIONS, professionBySegment, professionHref, RECIPES_BUILD, recipeGroups, recipeItemIds, type RecipeView } from "@/lib/professions";
 import { pageMetadata } from "@/lib/seo";
 import { loadShownNames } from "@/lib/shown-item-names";
 import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT, uploadStore } from "@/lib/upload-store";
@@ -41,7 +41,7 @@ function skill(value: string, fallback: number): number {
 }
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
-  const p = professionBySlug((await props.params).profession);
+  const p = professionBySegment((await props.params).profession);
   if (!p) notFound();
   return {
     ...pageMetadata({
@@ -63,9 +63,16 @@ const rangeText = (r: Range) => (r.min === null && r.max === null ? "?" : r.min 
  * The two are labelled apart: the recipe list is found in game files, unconfirmed; the player facts need 3 installs.
  */
 export default async function ProfessionPage(props: Props) {
-  const p = professionBySlug((await props.params).profession);
+  const segment = (await props.params).profession;
+  const p = professionBySegment(segment);
   if (!p) notFound();
   const searchParams = (await props.searchParams) ?? {};
+  // The slug is the one canonical segment; the skill line id and `<id>-<slug>` forms land here and move on, keeping
+  // the range and class context they came with, as the hub's `?profession=` redirect does.
+  if (segment !== p.slug) {
+    const search = new URLSearchParams(Object.entries(searchParams).flatMap(([k, v]) => (Array.isArray(v) ? v : v === undefined ? [] : [v]).map((x) => [k, x]))).toString();
+    permanentRedirect(`${professionHref(p.slug)}${search ? `?${search}` : ""}`);
+  }
   const read = parseClassContext(searchParams);
   const context = read.ok ? read.context : null;
   const fromSkill = skill(one(searchParams.from), 1);
