@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Fragment } from "react";
 import { buildsResource, MCP_PROMPTS as PROMPT_DEFS, MCP_PROMPT_NAMES, MCP_RESOURCE_TEMPLATE_LIST, MCP_RESOURCE_URIS, MCP_RESOURCES as RESOURCE_DEFS, type McpPromptName } from "@everloot/protocol";
 import { z } from "zod";
 import { C, H2, P, Table, docLink } from "@/components/docs/blocks";
@@ -105,7 +106,7 @@ export default function ResourcesPage() {
         const def = PROMPT_DEFS[name];
         const args = Object.entries(def.arguments) as [string, { description: string; required: boolean; values?: readonly string[] }][];
         return (
-          <section key={name}>
+          <Fragment key={name}>
             <H2 id={name}><span className="font-mono">{name}</span></H2>
             <P><strong className="text-fg">{def.title}.</strong> {def.description}</P>
             <Table
@@ -122,7 +123,7 @@ export default function ResourcesPage() {
               title; the text in the second tab is <C>messages[0].content.text</C>.
             </P>
             <CodeGroup title="prompts/get" tabs={promptExample(name)} className="mt-4" />
-          </section>
+          </Fragment>
         );
       })}
     </DocPage>
