@@ -97,7 +97,7 @@ it("uses the 17 slot weights", () => {
     "LEGS",
     "FEET",
     "WRIST",
-    "HAND",
+    "HANDS",
     "FINGER_1",
     "FINGER_2",
     "TRINKET_1",
@@ -232,6 +232,7 @@ it.each([
   ["LEGS", "LEGS", 5],
   ["FEET", "FEET", 3],
   ["WRIST", "WRIST", 2],
+  ["HANDS", "HAND", 3],
   ["HAND", "HAND", 3],
   ["FINGER_1", "FINGER", 2],
   ["FINGER_2", "FINGER", 2],
@@ -253,9 +254,29 @@ it.each([
 it.each([
   ["SHIRT", "BODY"],
   ["TABARD", "TABARD"],
+  ["AMMO", "AMMO"],
 ])("ignores unranked slot %s", (slot, type) => {
   expect(gearNumbers([item(slot, type)])).toEqual({
     item_level: null,
     gear_score: null,
+  });
+});
+
+it("uses the slot for scoring, with the sole two-handed main-hand exception", () => {
+  expect(gearNumbers([item("RANGED", "RELIC")])).toEqual({
+    item_level: 3,
+    gear_score: 1,
+  });
+  expect(gearNumbers([item("RANGED", "UNRECOGNISED")])).toEqual({
+    item_level: 3,
+    gear_score: 1,
+  });
+  expect(gearNumbers([item("HANDS", "RELIC")])).toEqual({
+    item_level: 3,
+    gear_score: 3,
+  });
+  expect(gearNumbers([item("MAIN_HAND", "TWOHWEAPON")])).toEqual({
+    item_level: 7,
+    gear_score: 5,
   });
 });

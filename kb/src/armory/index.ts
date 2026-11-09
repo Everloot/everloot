@@ -37,6 +37,7 @@ export async function armoryCrawl(flags: Map<string, string>): Promise<void> {
           ? [{ slug: seed, stored: false, tries: 0 }]
           : [],
       character: async () => [],
+      guild: async () => [],
       seedFromPlayers: noWrite,
       upsertCharacters: noWrite,
       upsertGuild: noWrite,

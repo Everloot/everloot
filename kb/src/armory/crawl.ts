@@ -16,20 +16,30 @@ import {
 export interface Summary {
   region: Region;
   calls: number;
-  guilds: { fetched: number; missing: number; retried: number };
+  guilds: {
+    fetched: number;
+    unchanged: number;
+    missing: number;
+    retried: number;
+  };
   characters: {
     fetched: number;
     unchanged: number;
     missing: number;
     retried: number;
   };
-  skipped: { no_surname: number; invalid_slug: number; slug_mismatch: number };
+  skipped: {
+    rows: { no_surname: number; invalid_slug: number; slug_mismatch: number };
+    members: { no_surname: number; invalid_slug: number };
+  };
   invalid: number;
+  rejected: number;
   enqueued: number;
   purged: number;
 }
 const transient = (error: unknown) =>
   (error instanceof ApiError || error instanceof StoreError) && error.transient;
+/** Stored rows need an extra armory_character/armory_guild read; a future armory_take last_modified column could remove it. */
 export async function runCrawl(cfg: {
   region: Region;
   budget: number;
@@ -46,30 +56,54 @@ export async function runCrawl(cfg: {
   const summary: Summary = {
     region,
     calls: 0,
-    guilds: { fetched: 0, missing: 0, retried: 0 },
+    guilds: { fetched: 0, unchanged: 0, missing: 0, retried: 0 },
     characters: { fetched: 0, unchanged: 0, missing: 0, retried: 0 },
-    skipped: { no_surname: 0, invalid_slug: 0, slug_mismatch: 0 },
+    skipped: {
+      rows: { no_surname: 0, invalid_slug: 0, slug_mismatch: 0 },
+      members: { no_surname: 0, invalid_slug: 0 },
+    },
     invalid: 0,
+    rejected: 0,
     enqueued: 0,
     purged: 0,
   };
   let fatal: Error | undefined;
   const logged = new Set<string>();
+  function reason(error: unknown): string {
+    return error instanceof ApiError || error instanceof StoreError
+      ? error.message
+      : error instanceof ZodError || error instanceof SyntaxError
+        ? "Armory response schema validation failure"
+        : error instanceof URIError
+          ? "Armory malformed guild href"
+          : "Armory unexpected failure";
+  }
+  function logError(prefix: string, error: unknown) {
+    const message = reason(error);
+    if (!logged.has(`${prefix}:${message}`)) {
+      logged.add(`${prefix}:${message}`);
+      cfg.log?.(`armory ${prefix}: ${message}`);
+    }
+  }
   function fail(error: unknown) {
     if (error === fatal) return;
-    const reason =
-      error instanceof ApiError || error instanceof StoreError
-        ? error.message
-        : error instanceof ZodError || error instanceof SyntaxError
-          ? "Armory response schema validation failure"
-          : "Armory unexpected failure";
-    if (error instanceof ZodError || error instanceof SyntaxError)
-      summary.invalid++;
-    if (!logged.has(reason)) {
-      logged.add(reason);
-      cfg.log?.(`armory fatal: ${reason}`);
-    }
-    fatal ??= new Error(reason);
+    logError("fatal", error);
+    fatal ??= new Error(reason(error));
+  }
+  const authenticationFailure = (error: unknown) =>
+    (error instanceof ApiError && error.phase === "oauth") ||
+    ((error instanceof ApiError || error instanceof StoreError) &&
+      (error.status === 401 || error.status === 403));
+  async function defer(
+    kind: Kind,
+    slug: string,
+    error: unknown,
+    rejected = false,
+  ) {
+    if (!dryRun) await store.retry(region, kind, slug, "7 days");
+    if (rejected) summary.rejected++;
+    else summary.invalid++;
+    logError(rejected ? "storage row rejected" : "row failure", error);
   }
   let reserved = 0;
   const starts: number[] = [];
@@ -106,59 +140,65 @@ export async function runCrawl(cfg: {
   async function skip(
     kind: Kind,
     slug: string,
-    reason: keyof Summary["skipped"],
+    reason: keyof Summary["skipped"]["rows"],
   ) {
-    summary.skipped[reason]++;
+    summary.skipped.rows[reason]++;
     // Age out the original queue row without scheduling a transient retry.
     if (!dryRun) await store.missing(region, kind, slug);
   }
-  const seen = new Set<string>();
-  const pending: CharacterRow[] = [],
-    touches: string[] = [];
+  const pending: CharacterRow[] = [];
+  const touches: Record<Kind, string[]> = { character: [], guild: [] };
+  async function retryRows(rows: CharacterRow[]) {
+    for (const row of rows) await retry("character", row.slug);
+  }
   async function flush() {
     if (!pending.length) return;
     const rows = pending.splice(0, 100);
     try {
-      if (!dryRun) await store.upsertCharacters(region, rows);
-      summary.characters.fetched += rows.length;
-    } catch (error) {
-      if (
-        !(error instanceof StoreError) ||
-        error.status === 401 ||
-        error.status === 403
-      )
-        throw error;
-      // A rejected batch must not discard otherwise valid rows.
-      for (const row of rows) {
+      try {
+        if (!dryRun) await store.upsertCharacters(region, rows);
+        summary.characters.fetched += rows.length;
+        return;
+      } catch (error) {
+        if (authenticationFailure(error) || !(error instanceof StoreError))
+          throw error;
+        if (transient(error)) {
+          await retryRows(rows);
+          return;
+        }
+      }
+      // Split only a row-rejected batch. Stop sending single writes if storage fails.
+      for (let index = 0; index < rows.length; index++) {
+        const row = rows[index];
         try {
           if (!dryRun) await store.upsertCharacters(region, [row]);
           summary.characters.fetched++;
-        } catch (single) {
-          if (transient(single)) await retry("character", row.slug);
-          else if (
-            single instanceof StoreError &&
-            (single.status === 400 || single.status === 422)
-          ) {
-            summary.invalid++;
-            if (!dryRun) await store.missing(region, "character", row.slug);
-            if (!logged.has("row constraint")) {
-              logged.add("row constraint");
-              cfg.log?.("armory skipped: row constraint failure");
-            }
-          } else throw single;
+        } catch (error) {
+          if (authenticationFailure(error)) throw error;
+          if (transient(error)) {
+            await retryRows(rows.slice(index));
+            return;
+          }
+          await defer("character", row.slug, error, true);
         }
       }
+    } catch (error) {
+      fail(error);
     }
   }
-  async function flushTouches() {
-    if (!touches.length) return;
-    const slugs = touches.splice(0, 100);
+  async function flushTouches(kind: Kind) {
+    if (!touches[kind].length) return;
+    const slugs = touches[kind].splice(0, 100);
     try {
-      if (!dryRun) await store.touch(region, "character", slugs);
-      summary.characters.unchanged += slugs.length;
+      if (!dryRun) await store.touch(region, kind, slugs);
+      summary[kind === "guild" ? "guilds" : "characters"].unchanged +=
+        slugs.length;
     } catch (error) {
-      if (!transient(error)) throw error;
-      for (const slug of slugs) await retry("character", slug);
+      if (authenticationFailure(error)) throw error;
+      for (const slug of slugs) {
+        if (transient(error)) await retry(kind, slug);
+        else await defer(kind, slug, error, error instanceof StoreError);
+      }
     }
   }
   async function row(kind: Kind, q: QueueRow, cost: number) {
@@ -172,13 +212,14 @@ export async function runCrawl(cfg: {
         kind === "guild"
           ? `/data/wow/guild/${encodeURIComponent(q.slug)}`
           : `/profile/wow/character/${encodeURIComponent(q.slug)}`;
-      const stored =
-        kind === "character" && q.stored
+      const stored = q.stored
+        ? kind === "character"
           ? await store.character(region, q.slug)
-          : [];
+          : await store.guild(region, q.slug)
+        : [];
       const modified = stored[0]?.last_modified;
       const result = await read(
-        base,
+        kind === "guild" ? `${base}/roster` : base,
         modified ? { ifModifiedSince: modified } : undefined,
       );
       if (result.status === 404) {
@@ -186,25 +227,19 @@ export async function runCrawl(cfg: {
         return;
       }
       if (result.status === 304) {
-        if (kind !== "character" || !q.stored) throw Error("unexpected 304");
-        touches.push(q.slug);
-        if (touches.length >= 100) await flushTouches();
+        if (!q.stored) throw Error("unexpected 304");
+        touches[kind].push(q.slug);
+        if (touches[kind].length >= 100) await flushTouches(kind);
         return;
       }
       if (kind === "guild") {
-        const roster = await read(`${base}/roster`);
-        if (roster.status === 404) {
+        const guild = await read(base);
+        if (guild.status === 404) {
           await missing(kind, q.slug);
           return;
         }
-        if (roster.status !== 200) throw Error("unexpected roster status");
-        const parsed = parseGuild(
-          result.body,
-          roster.body,
-          result.lastModified,
-        );
-        summary.skipped.no_surname += parsed.skipped.no_surname;
-        summary.skipped.invalid_slug += parsed.skipped.invalid_slug;
+        if (guild.status !== 200) throw Error("unexpected guild status");
+        const parsed = parseGuild(guild.body, result.body, result.lastModified);
         if (parsed.guild.slug !== q.slug) {
           await skip(kind, q.slug, "slug_mismatch");
           return;
@@ -216,6 +251,8 @@ export async function runCrawl(cfg: {
             parsed.members,
           );
         summary.guilds.fetched++;
+        summary.skipped.members.no_surname += parsed.skipped.no_surname;
+        summary.skipped.members.invalid_slug += parsed.skipped.invalid_slug;
       } else {
         const equipment = await read(`${base}/equipment`);
         if (equipment.status === 404) {
@@ -241,17 +278,17 @@ export async function runCrawl(cfg: {
           await skip(kind, q.slug, "slug_mismatch");
           return;
         }
-        if (!seen.has(parsed.slug)) {
-          seen.add(parsed.slug);
-          pending.push(parsed);
-        }
+        // armory_take returns distinct queued identities; the equality check above preserves that.
+        pending.push(parsed);
         if (pending.length >= 100) await flush();
       }
     } catch (error) {
+      if (error === fatal) return; // A worker cancelled by authentication failure is not a bad row.
       try {
         if (error instanceof SkippedRow) await skip(kind, q.slug, error.reason);
+        else if (authenticationFailure(error)) fail(error);
         else if (transient(error)) await retry(kind, q.slug);
-        else fail(error);
+        else await defer(kind, q.slug, error, error instanceof StoreError);
       } catch (storeError) {
         fail(storeError);
       }
@@ -293,7 +330,8 @@ export async function runCrawl(cfg: {
       fail(error);
     }
     try {
-      await flushTouches();
+      await flushTouches("character");
+      await flushTouches("guild");
     } catch (error) {
       fail(error);
     }
@@ -305,5 +343,9 @@ export async function runCrawl(cfg: {
   }
   cfg.log?.(JSON.stringify(summary));
   if (fatal) throw fatal;
+  if (summary.invalid + summary.rejected)
+    throw Error(
+      `${summary.invalid + summary.rejected} armory row failures deferred for 7 days`,
+    );
   return summary;
 }

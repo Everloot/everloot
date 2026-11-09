@@ -10,6 +10,7 @@ it("uses the exact contract names, arguments and service authentication", async 
   await store.seedFromPlayers();
   await store.take("eu", "guild", 8);
   await store.character("eu", "ember-vale");
+  await store.guild("eu", "copper-owls");
   await store.upsertCharacters("eu", []);
   await store.touch("eu", "character", ["ember-vale"]);
   await store.missing("eu", "guild", "copper-owls");
@@ -29,6 +30,7 @@ it("uses the exact contract names, arguments and service authentication", async 
       name: "armory_character",
       args: { p_region: "eu", p_slug: "ember-vale" },
     },
+    { name: "armory_guild", args: { p_region: "eu", p_slug: "copper-owls" } },
     { name: "armory_upsert_characters", args: { p_region: "eu", p_rows: [] } },
     {
       name: "armory_touch",

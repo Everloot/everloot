@@ -31,53 +31,51 @@ const slots: Record<string, RankedSlot | null> = {
   OFF_HAND: "SecondaryHandSlot",
   RANGED: "RangedSlot",
 };
-const inventory: Record<string, number> = {
-  HEAD: 1,
-  NECK: 2,
-  SHOULDER: 3,
-  BODY: 4,
-  CHEST: 5,
-  WAIST: 6,
-  LEGS: 7,
-  FEET: 8,
-  WRIST: 9,
-  HAND: 10,
-  FINGER: 11,
-  TRINKET: 12,
-  WEAPON: 13,
-  SHIELD: 14,
-  RANGED: 15,
-  CLOAK: 16,
-  TWOHWEAPON: 17,
-  TABARD: 19,
-  ROBE: 20,
-  WEAPONMAINHAND: 21,
-  WEAPONOFFHAND: 22,
-  HOLDABLE: 23,
-  THROWN: 25,
-  RANGEDRIGHT: 26,
-  RELIC: 28,
+// The API's slot is authoritative, even for e.g. RELIC in RANGED.
+// These representative inventory types let the shared scorer apply its slot budgets.
+const slotInventory: Record<RankedSlot, number> = {
+  HeadSlot: 1,
+  NeckSlot: 2,
+  ShoulderSlot: 3,
+  ChestSlot: 5,
+  WaistSlot: 6,
+  LegsSlot: 7,
+  FeetSlot: 8,
+  WristSlot: 9,
+  HandsSlot: 10,
+  Finger0Slot: 11,
+  Finger1Slot: 11,
+  Trinket0Slot: 12,
+  Trinket1Slot: 12,
+  BackSlot: 16,
+  MainHandSlot: 21,
+  SecondaryHandSlot: 22,
+  RangedSlot: 28,
 };
 export function gearNumbers(equipped: EquipmentItem[]): {
   item_level: number | null;
   gear_score: number | null;
 } {
-  const facts = new Map(
-    equipped.map((e) => [
-      e.item.id,
-      {
-        level: e.level.value,
-        inventoryType: inventory[e.inventory_type.type] ?? -1,
-      },
-    ]),
-  );
   const result = score(
-    equipped.map((e) => ({
+    equipped.map((e, index) => ({
       slot: slots[e.slot.type] ?? e.slot.type,
-      itemId: e.item.id,
+      itemId: index,
       itemLevel: e.level.value,
     })),
-    (id) => facts.get(id),
+    (index) => {
+      const e = equipped[index],
+        slot = slots[e.slot.type];
+      return slot
+        ? {
+            level: e.level.value,
+            inventoryType:
+              e.slot.type === "MAIN_HAND" &&
+              e.inventory_type.type === "TWOHWEAPON"
+                ? 17
+                : slotInventory[slot],
+          }
+        : undefined;
+    },
   );
   const levels = new Map(
     equipped

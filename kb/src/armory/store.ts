@@ -73,6 +73,12 @@ export class ArmoryStore {
       p_slug: slug,
     });
   }
+  guild(region: Region, slug: string) {
+    return this.rpc<{ last_modified: string | null }[]>("armory_guild", {
+      p_region: region,
+      p_slug: slug,
+    });
+  }
   upsertCharacters(region: Region, rows: CharacterRow[]) {
     return this.rpc<number>("armory_upsert_characters", {
       p_region: region,
@@ -117,6 +123,7 @@ export type CrawlStore = Pick<
   | "seedFromPlayers"
   | "take"
   | "character"
+  | "guild"
   | "upsertCharacters"
   | "upsertGuild"
   | "touch"
