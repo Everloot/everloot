@@ -3,6 +3,7 @@ import Link from "next/link";
 import { pageMetadata } from "@/lib/seo";
 import { ADDON_LIVE_VERIFIED, latestAddonRelease } from "@/lib/addon-release";
 import { addonReleaseFor, fetchReleases, fileSize, newestDesktopRelease, RELEASES_PAGE, servedFile } from "@/lib/everloot-releases";
+import { showcaseOn } from "@/lib/character-showcase";
 import { guildsOn } from "@/lib/guild-switch";
 import { REPO_URL } from "@/lib/source";
 import JsonLd from "@/components/JsonLd";
@@ -276,6 +277,7 @@ export default async function AddonPage() {
               {guildsOn()
                 ? " Those rows can appear on the site's player and guild pages, and any character or guild can be hidden without an account. "
                 : " The characters can appear on the site's player pages, and any character can be hidden without an account. The kills stay unpublished until the site turns its guild pages on. "}
+              {showcaseOn() && <>What your own character page looks like: see the <Link href="/showcase/character" className={link}>sample character</Link>, which is made-up data.{" "}</>}
               Read the{" "}
               <Link href="/privacy" className={link}>Privacy Policy</Link> and the{" "}
               <a className={link} href={`${REPO_URL}/blob/main/docs/DATA_POLICY.md`} rel={EXT}>data policy</a>.

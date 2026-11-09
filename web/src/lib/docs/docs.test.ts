@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { API_ROUTES, API_SCHEMAS, MCP_TOOL_NAMES, MCP_TOOLS, SITE, type ApiSchemaName } from "@everloot/protocol";
+import { API_ROUTES, API_SCHEMAS, MCP_PROMPT_NAMES, MCP_TOOL_NAMES, MCP_TOOLS, SITE, type ApiSchemaName } from "@everloot/protocol";
 import { z } from "zod";
 import { expect, test } from "vitest";
 import { exampleUrl, requestSamples, sample, TOOL_ARGS, toolSamples } from "./examples";
 import { articleMarkdown } from "./markdown";
 import { FILE_SCHEMAS, PAGE_INTERNAL_ROUTES } from "./file-schemas";
-import { allDocsPages, DOCS_TABS, endpointHref, endpointSlug, legacyAnchors, neighbours, tabFor, toolFromSlug, toolHref } from "./nav";
+import { allDocsPages, docsPage, DOCS_TABS, endpointHref, endpointSlug, legacyAnchors, neighbours, tabFor, toolFromSlug, toolHref } from "./nav";
 import { liveToolNames } from "@/lib/guild-switch";
 
 const app = join(__dirname, "../../app");
@@ -39,6 +39,20 @@ test("every page in the table of contents has a page file, and appears once", ()
   }
   expect(new Set(pages.map((p) => p.href)).size).toBe(pages.length);
   for (const page of pages) expect(page.lede.length, page.href).toBeGreaterThan(3);
+});
+
+test("the MCP nav lists every prompt under the resources page, as an anchor of that page and not a page of its own", () => {
+  const resources = docsPage("/docs/mcp/resources")!;
+  expect(resources.tab.id).toBe("mcp");
+  expect(resources.children?.map((child) => child.href)).toEqual(MCP_PROMPT_NAMES.map((name) => `/docs/mcp/resources#${name}`));
+  for (const child of resources.children!) {
+    expect(child.title).toBe(child.href.split("#")[1]);
+    expect(child.lede.length, child.href).toBeGreaterThan(3);
+    expect(docsPage(child.href.split("#")[0]!), child.href).toBeDefined();
+  }
+  const pages = allDocsPages().map((page) => page.href);
+  expect(pages.some((href) => href.includes("#"))).toBe(false);
+  expect(neighbours("/docs/mcp/resources").next?.href).not.toContain("#");
 });
 
 test("tabs, previous and next follow the reading order", () => {
