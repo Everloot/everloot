@@ -114,6 +114,8 @@ const SHOWS_ART = new Set([
   "web/src/app/database/quests/[id]/opengraph-image.tsx",
   // The dungeon and raid list's small loading screens, and the zone list's small map pictures.
   "web/src/app/database/instances/page.tsx", "web/src/app/database/zones/page.tsx",
+  // A dungeon or raid page's boss loot: the item names and icons of the drop rows, as the NPC page shows them.
+  "web/src/app/database/instances/[instance]/page.tsx",
   // The spell page: the spell's icon and its text come from the same manifest as the item's.
   "web/src/app/database/spells/[id]/page.tsx",
   // The spell list reads the spell names to list them, under the quest list's rule. No art, no tooltip.

@@ -7,7 +7,12 @@ import { edgeDegraded } from "@/lib/cf-edge-cache";
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 // Storage is down unless a test hands in sightings: the pages are then built from the game files alone, which is
 // where the level comes from.
-const state = vi.hoisted(() => ({ seen: { unreachable: true } as Record<string, unknown> }));
+const state = vi.hoisted(() => ({ seen: { unreachable: true } as Record<string, unknown>, loot: new Map<string, unknown>() }));
+vi.mock("@/lib/rollup-compute", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/rollup-compute")>()),
+  loadLootTables: async () => ({ tables: { sources: state.loot, leftOut: 0 }, unreachable: false, dataAsOf: "2026-11-05T00:00:00Z" }),
+  loadItemFacts: async () => ({ rates: [], names: [], npcs: [], unreachable: false }),
+}));
 vi.mock("@/lib/instances", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/instances")>()),
   loadSightings: async () => state.seen,
@@ -137,5 +142,80 @@ test("the list's Guide column links a published prep page and, for a raid, the r
     expect(row("/database/instances/389-ragefire-chasm")).not.toContain("/wiki/");
   } finally {
     vi.unstubAllEnvs();
+  }
+});
+
+// SYNTHETIC: three installs killed one Ragefire Chasm encounter and tie the same creature to it.
+const INSTALLS = ["install-a", "install-b", "install-c"];
+const killed = (instanceMapId: number, encounterId: number, npcId: number) =>
+  INSTALLS.map((installId) => ({ installId, encounterId, name: "Oggleflint", instanceMapId, success: true, npcIds: [npcId], capturedAt: "2026-11-04T20:00:00Z" }));
+/** Loot windows on one creature: `windows` from each install, every one holding item 14149. */
+const looted = (npcId: number, installs: string[], windows: number) => new Map([[`npc:${npcId}`, {
+  windows: windows * installs.length, installs: new Set(installs), first: "2026-11-03T20:00:00Z", last: "2026-11-04T20:00:00Z",
+  items: new Map([[14149, { windows: windows * installs.length, installs: new Set(installs) }]]),
+}]]);
+const lootOf = async (segment: string) => (renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: segment }) })).split('id="loot"')[1] ?? "");
+
+test("an instance's page lists each boss's loot: the creature's own loot table, linked to the items", async () => {
+  state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters: killed(389, 2732, 11517) } };
+  state.loot = looted(11517, INSTALLS, 2);
+  try {
+    const loot = await lootOf("389-ragefire-chasm");
+    expect(text(loot)).toContain("|Oggleflint|");
+    expect(loot).toContain('href="/database/npcs/11517"');
+    const row = loot.split("<tr").find((r) => r.includes('href="/database/items/14149"')) ?? "";
+    // Six windows, all six holding the item, from 3 installs.
+    expect(text(row)).toMatch(/\|6\|6\|100(\.0)?%\|3\|/);
+    expect(text(loot)).toContain("Data as of 2026-11-05.");
+  } finally {
+    state.seen = { unreachable: true };
+    state.loot = new Map();
+  }
+});
+
+test("a boss whose creature fewer than 3 installs looted shows how many did and no item; one nobody looted says so", async () => {
+  state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters: killed(389, 2732, 11517) } };
+  state.loot = looted(11517, ["install-a"], 2);
+  try {
+    const short = await lootOf("389-ragefire-chasm");
+    expect(short).toContain('data-agreement="1"');
+    expect(text(short)).toContain("A rate needs windows from 3 installs: 2 more.");
+    expect(short).not.toContain("/database/items/");
+    state.loot = new Map();
+    expect(text(await lootOf("389-ragefire-chasm"))).toContain("Nobody has looted this NPC in Forever yet.");
+  } finally {
+    state.seen = { unreachable: true };
+    state.loot = new Map();
+  }
+});
+
+test("the loot section says what is missing when no boss has 3 installs, and that storage is down when it is", async () => {
+  state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters: killed(389, 2732, 11517).slice(0, 1) } };
+  state.loot = looted(11517, INSTALLS, 2);
+  try {
+    const none = await lootOf("389-ragefire-chasm");
+    expect(text(none)).toContain("No loot to show yet: no boss here has a creature 3 installs agree on.");
+    expect(none).not.toContain("/database/items/");
+  } finally {
+    state.seen = { unreachable: true };
+    state.loot = new Map();
+  }
+  const down = await lootOf("389-ragefire-chasm");
+  expect(text(down)).toContain("Storage unreachable.");
+  expect(down).not.toContain("<table");
+});
+
+test("the list labels an instance the game files place no entrance for, with the reason in the name cell's title", async () => {
+  // SYNTHETIC: three installs killed a boss in instance 2999, for which the files place no entrance.
+  state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters: killed(2999, 3353, 1) } };
+  try {
+    const html = renderToStaticMarkup(await InstancesPage());
+    const row = html.split("<tr").find((r) => r.includes('href="/database/instances/2999"')) ?? "";
+    expect(text(row)).toContain("|Instance 2999|no entrance in the game files|");
+    expect(row).toMatch(/title="The game files place no entrance for this instance[^"]*"/);
+    // A named instance carries no such label.
+    expect(html.split("<tr").find((r) => r.includes('href="/database/instances/389-ragefire-chasm"'))).not.toContain("no entrance in the game files");
+  } finally {
+    state.seen = { unreachable: true };
   }
 });
