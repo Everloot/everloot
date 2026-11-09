@@ -110,6 +110,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   CDN kept for an hour.
 
 ### Added
+- Site: an item, NPC or quest page shared on Discord or X shows its own card: the name, its type and how many of
+  the 3 installs agree on the name, as text on the brand canvas. Before, every database page showed the site card.
 - Addon: the Everloot window's sidebar is now Home, Gold, Collection, Professions and Settings. Ask, Build plan and
   Auctions left the sidebar; `/ask` and `/everloot plan` still work.
 - Addon: Home lists every character this install has seen (gold, level, professions, raid lockouts, last seen) with

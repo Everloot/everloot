@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { agreementLabel } from "@/components/ui/AgreementMeter";
 import { tokens, type CLASSES } from "@/design/tokens";
 import type { Showcase } from "@/lib/character-showcase";
 // The cards are drawn on each request on the Worker, which has no node_modules to read, so the bundler inlines
@@ -94,6 +95,20 @@ export async function renderCard(card: { label: string; title: string; subtitle:
     ),
     { ...CARD_SIZE, fonts: [...FONTS] },
   );
+}
+
+/**
+ * A database entity page's card (an item, NPC or quest): the name as the title, its type and the page's own
+ * "N of 3 installs agree" line under it. Text only, like the card above: no icon from the game files. The
+ * installs line is left off while upload storage is out of reach, as the page leaves its meter off. The count
+ * changes as players report, so the card is kept as long as the site's own hover card, not for a year as the
+ * other cards are.
+ */
+export async function renderEntityCard(card: { title: string; type: string; installs: number | null }): Promise<ImageResponse> {
+  const subtitle = card.installs === null ? card.type : `${card.type} · ${agreementLabel(card.installs)}`;
+  const image = await renderCard({ label: "Everloot database", title: card.title, subtitle, fit: true });
+  image.headers.set("Cache-Control", "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400");
+  return image;
 }
 
 /** The two share card sizes: the link preview, and the square one for Discord and social posts. */
