@@ -15,6 +15,9 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Site: a database address with an id nothing knows (an item or NPC such as /database/items/999999) answers its 404 with a
+  body again: the heading, "No report for this id yet; three installs make it public" with the addon link, and a search box
+  prefilled with the id. The site 404 leads with the same search box, prefilled with the last part of the address tried.
 - Site: the achievement, title, faction and quest chain lists, the farming and profession pages and the scoring method say
   a fact is confirmed by three installs, not three players, as the upload guide has it; the install count is one column,
   "Installs", on every table (it was "Install IDs" on objects and drops and "Reporters" on NPCs, items and vendors); and
