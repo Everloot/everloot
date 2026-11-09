@@ -376,9 +376,9 @@ Release channel: Alpha
 
 The Everloot window is rebuilt around Home, Gold, Collection, Professions and Settings, with a gold ledger that
 stays on your computer. Tooltips can say who sells an item, what it is a reagent for and where it drops. The census
-also counts players the game shows a nameplate for (race, class, level and faction only). The public vendors and
-reagent counts in tooltips need Desktop App 0.1.21 or later to write them into the price file. Not yet seen in the
-Forever client: the window, the ledger's mailbox, repair, trade and mail reads, and the nameplate census pass the
+also counts players the game shows a nameplate for (race, class, level and faction only). The tooltip lines come
+from this install's own sightings; public vendors and reagent counts show once a Desktop App writes them into the
+price file, which none does yet. Not yet seen in the Forever client: the window, the ledger's mailbox, repair, trade and mail reads, and the nameplate census pass the
 addon's tests only.
 
 ### Added
