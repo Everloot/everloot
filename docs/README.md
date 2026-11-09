@@ -91,9 +91,9 @@ Notes directly under [`design/`](design/):
 
 | Folder | What it holds |
 |---|---|
-| [`superpowers/plans/`](superpowers/plans/) | Implementation plans. The Chat workspace plan opens with its goal and the specs it follows; the armory plan opens the same way |
-| [`superpowers/specs/`](superpowers/specs/) | Design notes for Chat dictation, item cards and projects, a sharper Desktop, MCP parity, the sign-in card, and the addon window's gold ledger |
-| [`evals/`](evals/) | Question evals and written-answer evals. A question eval counts how names resolved; a written-answer eval scores a reply against an answer key |
+| [`superpowers/plans/`](superpowers/plans/) | Implementation plans. The Chat workspace plan opens with its goal and the specs it follows; the armory plan opens the same way. Listed by the folder, not file by file |
+| [`superpowers/specs/`](superpowers/specs/) | Design notes for Chat dictation, item cards and projects, a sharper Desktop, MCP parity, the sign-in card, and the addon window's gold ledger. Listed by the folder, not file by file |
+| [`evals/`](evals/) | Question evals and written-answer evals. A question eval counts how names resolved; a written-answer eval scores a reply against an answer key. Listed by the folder, not file by file |
 | [`fixtures/`](fixtures/) | Shared test vectors for the talent spend-order token and the plan-link fragment, in `talent-order-v1.json` |
 | [`media/`](media/) | Images the README and the notes embed: the logos, the home, talent, raid, map and changes captures, the Desktop App overview, and three Chat key-card shots |
 
