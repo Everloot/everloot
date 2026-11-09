@@ -11,7 +11,8 @@ required, or tightening a limit is a major release.
   Optional, so earlier readers are unaffected.
 
 ### Changed
-- 1.27.0 (record protocol unchanged, 1.13.0): `itemsResponse.items` is typed with the row `GET /api/items` already returns:
+- 2.0.0 (record protocol unchanged, 1.13.0), a major release because an item row's five fields are now required
+  where the open object took anything: `itemsResponse.items` is typed with the row `GET /api/items` already returns:
   `itemId`, then `class`, `subclass`, `slot` and `quality`, each an object with its id, name and slug (and `label` on the
   class, `inventoryType` on the slot) or null when the build does not name it. It was an open object, so a generated
   client got `any` for every item. The answers do not change. Exported type: `ItemCategoryRow`.

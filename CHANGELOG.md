@@ -293,7 +293,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 ### Changed
 - Protocol: `itemsResponse.items` is typed with the row `GET /api/items` returns (item id, then class, subclass, slot
   and quality, each null when the build does not name it), so a client generated from `schema/api/itemsResponse.json`
-  gets fields instead of `any`. Protocol package 1.27.0; the answers do not change.
+  gets fields instead of `any`. Protocol package 2.0.0 (the row's fields are now required); the answers do not change.
 - Companion: the command line's `main` takes its uploader, price refresher, file watcher and console as an optional argument,
   with the real ones as defaults, so the watch and prices loop is tested with fakes (upload then prices on each settled
   write, prices alone, a failed refresh that keeps the previous file, upload never writing prices). Nothing it sends changes.
