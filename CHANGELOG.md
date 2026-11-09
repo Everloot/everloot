@@ -141,6 +141,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   carries; a faction page also shows its lore archive page when the archive has one under the same name.
 - Site: an item, NPC or quest page shared on Discord or X shows its own card: the name, its type and how many of
   the 3 installs agree on the name, as text on the brand canvas. Before, every database page showed the site card.
+- Addon: each Professions block lists the next recipes a trainer teaches at or above the current rank (up to three,
+  lowest rank first) with the cost and the trainer's name, from the trainer rows the install already has, or says to
+  open a trainer's window; under the blocks, "Other characters" lists every other character's professions and ranks
+  from the local roster. Display only: nothing recorded or uploaded changes.
 - Addon: the Everloot window's sidebar is now Home, Gold, Collection, Professions and Settings. Ask, Build plan and
   Auctions left the sidebar; `/ask` and `/everloot plan` still work.
 - Addon: Home lists every character this install has seen (gold, level, professions, raid lockouts, last seen) with
