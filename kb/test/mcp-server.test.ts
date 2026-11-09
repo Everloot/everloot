@@ -141,7 +141,7 @@ test("the server registers under the Everloot name", async () => {
 
 test("public corpus reads enforce the actual byte ceiling even with a false content length", async () => {
   vi.stubEnv("EVERLOOT_PUBLIC_CORPUS_URL", "https://everloot.example/api/corpus/public");
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ ok: true, records: [], padding: "x".repeat(2_000_001) },
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ ok: true, records: [], padding: "x".repeat(8_000_001) },
     { headers: { "content-length": "1" } })));
   try {
     expect(await fromUploads(() => "renderer must not run")).toMatch(/unavailable/i);
@@ -192,6 +192,36 @@ const pageOf = (n: number, dataAsOf: string, next: string | null) => Response.js
   records: [{ kind: "gold_snapshot", installId: "install-one", eventId: `snap:${n}`, capturedAt: "2026-10-07T00:00:00Z",
     realm: "Moon Guard", character: "Thrall", currentCopper: n, peakCopper: n }] });
 const SECOND = "https://everloot.example/api/corpus/public?offset=1";
+
+test("a feed longer than 50 pages and 2 MB in all is read to the end", async () => {
+  vi.stubEnv("EVERLOOT_PUBLIC_CORPUS_URL", "https://everloot.example/api/corpus/public");
+  // 120 pages of about 30 KB each: more pages and more bytes than the reader used to allow in all.
+  const PAGES = 120;
+  const send = vi.fn((url: string) => {
+    const n = Number(new URL(url).searchParams.get("offset") ?? 0);
+    return Promise.resolve(Response.json({ ok: true, dataAsOf: "2026-11-09T19:40:17.995Z",
+      next: n + 1 < PAGES ? `https://everloot.example/api/corpus/public?offset=${n + 1}` : null,
+      records: [{ kind: "gold_snapshot", installId: "install-one", eventId: `long:${n}`, capturedAt: "2026-10-07T00:00:00Z",
+        realm: "Moon Guard", character: "Thrall", currentCopper: n, peakCopper: n }],
+      padding: "x".repeat(30_000) }));
+  });
+  vi.stubGlobal("fetch", send);
+  try {
+    expect(await fromUploads((records) => `records:${records.length}`)).toBe("records:120\nData as of 2026-11-09 19:40 UTC.");
+    expect(send).toHaveBeenCalledTimes(PAGES);
+  } finally { vi.unstubAllEnvs(); vi.unstubAllGlobals(); }
+});
+
+test("a rate-limited read without a key says to set EVERLOOT_API_KEY", async () => {
+  vi.stubEnv("EVERLOOT_PUBLIC_CORPUS_URL", "https://everloot.example/api/corpus/public");
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(pageOf(1, "2026-10-09T10:00:00.000Z", SECOND))
+    .mockResolvedValueOnce(Response.json({ ok: false, error: "Too many requests" }, { status: 429 })));
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    expect(await fromUploads(() => "renderer must not run")).toBe(UNAVAILABLE_TEXT);
+    expect(warn.mock.calls.flat().join(" ")).toContain("rate limited after 1 pages; set EVERLOOT_API_KEY");
+  } finally { warn.mockRestore(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); }
+});
 
 test("a failed later page makes the answer unavailable", async () => {
   vi.stubEnv("EVERLOOT_PUBLIC_CORPUS_URL", "https://everloot.example/api/corpus/public");

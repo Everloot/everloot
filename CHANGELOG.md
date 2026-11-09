@@ -42,6 +42,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
 
 ### Fixed
+- Knowledge base: a self-hosted MCP server and `coverage-report` read the whole public corpus again. The reader stopped
+  at 50 pages and 2 MB in all, and the feed is now about 98 pages and 13 MB; the limits are per page with a high total
+  guard. Without a key the site allows 30 requests an hour, so a rate-limited read now says to set `EVERLOOT_API_KEY`.
 - Site: title pages and lists no longer show the game's raw `%s`: the name reads "Bloodsail Admiral <Name>", the address
   drops the trailing `-s` (`/database/titles/144-bloodsail-admiral`) and the old address redirects to the new one.
 - Site: the schemas page marks the three shapes that describe a bulk-export file rather than an endpoint and says that
