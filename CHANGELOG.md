@@ -123,6 +123,11 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   Auctions left the sidebar; `/ask` and `/everloot plan` still work.
 - Addon: Home lists every character this install has seen (gold, level, professions, raid lockouts, last seen) with
   realm and account totals and a "This week" line. "What you've added" moved to the Settings page.
+- Addon: Home says what this character is missing, under the portrait: achievements left, factions not exalted, titles
+  not held, professions with no recipe read and this week's raids with bosses left, counted from the rows Collection
+  and Professions already show; each line opens that tab. With the completion tracker off the strip says so and offers
+  Collection's Turn on button. The gold box adds "Account this week: +in / -out" over every character under this
+  character's own week line.
 - Addon: the Gold tab has Overview (gold by character and realm, the last 30 days as bars), Ledger (by category, day or
   receipt), Sales and Session. It reads a new local ledger, `EverlootDB.ledger` (5,000 events or 90 days, 2,000 sales,
   400 daily closes per character), and a local roster, `EverlootDB.roster` (options row "Your characters"). Neither is uploaded.
