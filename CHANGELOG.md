@@ -15,6 +15,9 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: a dungeon or raid page gains a Loot section after Bosses: for each boss 3 installs report, the loot table of
+  its creature, the same rows its NPC page shows, or how many installs have looted it so far. In the list, an instance
+  the game files place no entrance for says so beside its id, with the reason on hover.
 - Site: the armory opens at `/armory`: a page for every WoW Forever character and guild that Blizzard's API returns,
   read hourly, with guild rosters, three boards (item level, gear score, honorable kills), a form to hide a character
   and a form to ask for one. Each page says "Data from Blizzard Entertainment", carries no ad and is not indexed yet.
