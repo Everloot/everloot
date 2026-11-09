@@ -103,6 +103,16 @@ test("install steps, the upload page, privacy, data policy and source are linked
   }
 });
 
+test("with the showcase on, the privacy section links the sample character page; off, the page never points at a 404", async () => {
+  vi.stubEnv("EVERLOOT_SHOWCASE", "1");
+  const on = await render(() => Promise.resolve(Response.json(releases)));
+  expect(on).toContain('href="/showcase/character"');
+  expect(visible(on)).toContain("What your own character page looks like: see the sample character");
+  vi.stubEnv("EVERLOOT_SHOWCASE", "");
+  const off = await render(() => Promise.resolve(Response.json(releases)));
+  expect(off).not.toContain("/showcase/character");
+});
+
 test("at build, when GitHub cannot be read the addon still downloads and the app points at the releases page", async () => {
   vi.stubEnv("NEXT_PHASE", "phase-production-build");
   const html = await render(() => Promise.reject(new Error("offline")));

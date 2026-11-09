@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Callout, C, H2, List, P, docLink } from "@/components/docs/blocks";
 import DocPage from "@/components/docs/DocPage";
 import { KEYS_PER_ACCOUNT } from "@/lib/api-keys";
+import { showcaseOn } from "@/lib/character-showcase";
 import { guardOn } from "@/lib/data-guard";
 import { profilesOn } from "@/lib/profiles";
 import { savedBuildsOn } from "@/lib/saved-builds";
@@ -19,6 +20,7 @@ export default function Page() {
   const builds = savedBuildsOn();
   const profiles = profilesOn();
   const keys = guardOn();
+  const showcase = showcaseOn();
   return (
     <DocPage href="/docs/guides/account">
       <P>
@@ -76,6 +78,12 @@ export default function Page() {
         </li>
         <li><strong>Data and privacy.</strong> What we keep, where you delete each part, and how to delete your account.</li>
       </List>
+      {showcase && (
+        <P>
+          What your character page looks like once you link a character: see the{" "}
+          <Link href="/showcase/character" className={docLink}>sample character</Link>, which is made-up data.
+        </P>
+      )}
 
       <H2 id="api-keys">API keys</H2>
       <P>
