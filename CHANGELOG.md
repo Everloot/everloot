@@ -28,6 +28,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: a database address with an id nothing knows (an item or NPC such as /database/items/999999) answers its 404 with a
   body again: the heading, "No report for this id yet; three installs make it public" with the addon link, and a search box
   prefilled with the id. The site 404 leads with the same search box, prefilled with the last part of the address tried.
+- Site: an Auction House price page for an item with no public name says why under its title: a name shows once
+  three installs report the same one, or when the game files and the Warcraft Wiki agree on one. The title stays
+  "Item N" and the prices stand. Before, the page gave the id and the prices with no reason.
 - Site: the achievement, title, faction and quest chain lists, the farming and profession pages and the scoring method say
   a fact is confirmed by three installs, not three players, as the upload guide has it; the install count is one column,
   "Installs", on every table (it was "Install IDs" on objects and drops and "Reporters" on NPCs, items and vendors); and
