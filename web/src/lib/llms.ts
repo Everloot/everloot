@@ -70,7 +70,7 @@ function toolLines(): { live: string[]; collecting: string[] } {
   const seen = new Set(PAGES.map((p) => p.path));
   const lines = (status: "live" | "collecting") =>
     tools
-      .filter((t) => t.status === status)
+      .filter((t) => !t.private && t.status === status)
       .filter((t) => !seen.has(toolHref(t)) && seen.add(toolHref(t)))
       .map((t) => bullet(t.title, toolHref(t), t.tagline));
   const live = lines("live");

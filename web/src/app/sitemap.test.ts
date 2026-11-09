@@ -47,9 +47,12 @@ vi.mock("@/lib/game-assets", async (importOriginal) => {
 const entries = (await sitemap())!;
 const byPath = new Map(entries.map((e) => [new URL(e.url).pathname, e]));
 
-test("every catalogue tool that is not coming-soon is in the sitemap, farming included (#826)", () => {
+test("public catalogue tools that are not coming-soon are in the sitemap, with rankings subject to its row count", () => {
   expect(byPath.has("/tools/farming-routes")).toBe(true);
-  for (const tool of tools) expect(byPath.has(toolHref(tool)), tool.slug).toBe(tool.status !== "coming-soon");
+  for (const tool of tools.filter((t) => toolHref(t) !== "/rankings")) {
+    expect(byPath.has(toolHref(tool)), tool.slug).toBe(!tool.private && tool.status !== "coming-soon");
+  }
+  expect(byPath.has("/rankings")).toBe(false);
 });
 
 test("/changes is dated by its newest entry", async () => {

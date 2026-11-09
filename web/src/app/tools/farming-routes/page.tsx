@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import EmailCapture from "@/components/EmailCapture";
 import { Card, Container, Contribute, DataTitle, Disclosure, EmptyState, FilterBar, LinkTabs, SectionHeading, type FilterControl } from "@/components/ui";
 import { FARM_CATEGORIES, farmingAreas, inLevels, MOVED_CATEGORIES, type FarmCategory } from "@/lib/farming";
 import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
@@ -152,9 +151,6 @@ export default async function FarmingRoutesPage(props: { searchParams?: Promise<
               </p>
             </Disclosure>
           </div>
-          <Card className="max-w-xl">
-            <EmailCapture toolSlug="farming-routes" />
-          </Card>
         </div>
       </article>
     </Container>

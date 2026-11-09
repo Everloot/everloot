@@ -27,6 +27,16 @@ test("an empty query finds nothing", async () => {
   expect(await search("   ")).toEqual([]);
 });
 
+test("tools use their current names and leave device-only lists out of search", async () => {
+  for (const [q, href] of [["Collections", "/tools/collections"], ["Guild board", "/tools/guild-board"], ["Legacy perks", "/tools/legacy"]]) {
+    const results = (await search(q)).find((g) => g.type === "tool")!.results;
+    expect(results).toContainEqual(expect.objectContaining({ label: q, href }));
+  }
+  for (const q of ["Plans on this device", "Alts on this device"]) {
+    expect((await search(q)).find((g) => g.type === "tool")).toBeUndefined();
+  }
+});
+
 test("items, NPCs and quests are grouped by type, exact name first, then prefix, then contains", async () => {
   mocks.names.items = new Map([[1, "Thrall's Cloak"], [2, "Thrall"], [3, "Old Thrall"]]);
   mocks.names.npcs = new Map([[77, "Thrall"]]);

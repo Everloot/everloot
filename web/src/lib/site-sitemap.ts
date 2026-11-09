@@ -81,7 +81,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap | null> {
   const classRoutes = classesIndexable(guides) ? ["/classes", ...TALENT_CLASSES.filter((slug) => classHubIndexable(slug, guides)).map((slug) => `/classes/${slug}`)] : [];
   // Each profession the game files list, with its recipes.
   const professionRoutes = CLIENT_PROFESSIONS.map((p) => professionHref(p.slug));
-  const paths = [...new Set([...staticRoutes, ...addonRoutes, ...rankingRoutes, ...talentRoutes, ...professionRoutes, ...classRoutes, ...itemRoutes, ...zoneRoutes, ...instanceRoutes, ...catalogRoutes, ...tools.filter((tool) => tool.status !== "coming-soon").map(toolHref), ...allDocsPages().map((page) => page.href)])];
+  const toolRoutes = tools.filter((tool) => !tool.private && tool.status !== "coming-soon").map(toolHref)
+    .filter((path) => path !== "/rankings" || hubIndexable(rankings.weeks));
+  const paths = [...new Set([...staticRoutes, ...addonRoutes, ...rankingRoutes, ...talentRoutes, ...professionRoutes, ...classRoutes, ...itemRoutes, ...zoneRoutes, ...instanceRoutes, ...catalogRoutes, ...toolRoutes, ...allDocsPages().map((page) => page.href)])];
 
   const timeline = await loadTimeline();
   const newestChange = timeline[0]?.at;
