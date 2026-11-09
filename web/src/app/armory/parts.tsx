@@ -53,7 +53,7 @@ export function CharacterFields({ region, name, surname }: { region?: string; na
       </div>
       <div className="space-y-1">
         <label htmlFor="armory-name" className="text-sm text-fg">Name</label>
-        <input id="armory-name" name="name" required minLength={2} maxLength={12} pattern={NAME_PATTERN} autoComplete="off" defaultValue={name ?? ""} className={field} />
+        <input id="armory-name" name="name" required minLength={2} maxLength={24} pattern={NAME_PATTERN} autoComplete="off" defaultValue={name ?? ""} className={field} />
       </div>
       <div className="space-y-1">
         <label htmlFor="armory-surname" className="text-sm text-fg">Surname</label>

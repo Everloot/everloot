@@ -219,7 +219,7 @@ test("the forms keep their fields, confirm, and say what went wrong", async () =
   expect(hide).toContain('action="/armory/hide/send"');
   expect(hide).toContain('value="Velkara"');
   expect(hide).toContain("not read it from Blizzard again");
-  expect(hide).toContain('pattern="[\\p{L}\\p{M}]{2,12}"');
+  expect(hide).toContain('pattern="[\\p{L}\\p{M}]{2,24}"');
   expect(await html(pages.hide({ done: "1" }))).toContain("Done. That character is hidden");
   expect(await html(pages.hide({ error: "storage" }))).toContain("We could not save that");
   const submit = await html(pages.submit({ done: "1" }));

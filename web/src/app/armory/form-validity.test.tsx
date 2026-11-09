@@ -25,6 +25,14 @@ test("a decomposed accent (a letter and a combining mark) passes, as a composed 
   expect(valid("armory-name", "Ольга")).toBe(true);
 });
 
+test("a 12-letter name with five decomposed accents (17 code points) fits the browser's limits", () => {
+  const name = "A\u0301e\u0301i\u0301o\u0301u\u0301bcdefgh";
+  expect([...name].length).toBe(17);
+  expect(field("armory-name").maxLength).toBe(24);
+  expect(valid("armory-name", name)).toBe(true);
+  expect(field("armory-name").validity.tooLong).toBe(false);
+});
+
 test("digits, spaces, hyphens and one letter are refused before the form is sent", () => {
   for (const bad of ["Vel1", "Vel kara", "Vel-kara", "V", ""]) expect(valid("armory-name", bad)).toBe(false);
   expect(valid("armory-surname", "Dusk'mantle")).toBe(false);

@@ -75,6 +75,17 @@ test("a name with accents is accepted and its slug is composed and in lower case
   expect(mocks.enqueue).toHaveBeenLastCalledWith("eu", "character", "élodie-brún", "website");
 });
 
+test("the server keeps 2 to 12 letters after composing: a decomposed 12 is accepted, a composed 13 is refused", async () => {
+  await submit(form({ region: "eu", name: "A\u0301e\u0301i\u0301o\u0301u\u0301bcdefgh", surname: "Dusk" }));
+  expect(mocks.enqueue).toHaveBeenLastCalledWith("eu", "character", "áéíóúbcdefgh-dusk", "website");
+  for (const POST of [hide, submit]) {
+    const r = await POST(form({ region: "eu", name: "Abcdefghijklm", surname: "Dusk" }));
+    expect(where(r).searchParams.get("error")).toBe("invalid");
+  }
+  expect(mocks.hide).not.toHaveBeenCalled();
+  expect(mocks.enqueue).toHaveBeenCalledTimes(1);
+});
+
 test("a combining mark with no composed letter passes the browser but not the server", async () => {
   const r = await hide(form({ region: "eu", name: "Saq\u0301ra", surname: "Dusk" }));
   expect(where(r).searchParams.get("error")).toBe("invalid");

@@ -51,7 +51,8 @@ export function slugFromSegment(segment: string): string | null {
  * marks alike. The server then composes the text (NFC) and checks letters only, so a mark that does not compose into
  * its letter is refused there and never reaches a slug.
  */
-export const NAME_PATTERN = "[\\p{L}\\p{M}]{2,12}";
+// Room for combining marks: 24 code points in the browser and in the first check; the letter limits come after NFC.
+export const NAME_PATTERN = "[\\p{L}\\p{M}]{2,24}";
 export const SURNAME_PATTERN = "[\\p{L}\\p{M}]{2,24}";
 export const NAME_INPUT_RULE = new RegExp(`^${NAME_PATTERN}$`, "u");
 export const SURNAME_INPUT_RULE = new RegExp(`^${SURNAME_PATTERN}$`, "u");
