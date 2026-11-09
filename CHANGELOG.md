@@ -20,6 +20,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   sales per day over the period and the last sold day. Display only; nothing recorded or uploaded changes.
 
 ### Fixed
+- Desktop App: the Characters page reads the addon's local ledger (`EverlootDB.ledger`) from the save file beside the
+  `money_event` rows, so its 7-day net is the Gold tab's "7 days" for the same character (today and the six UTC days
+  before it) and repairs, vendor purchases, trades and mail appear in money by category, marked local only. Uploaded
+  rows count only from before the ledger's first event, as the Gold tab reads them. Nothing recorded or uploaded changes.
 - Site: a database address with an id nothing knows (an item or NPC such as /database/items/999999) answers its 404 with a
   body again: the heading, "No report for this id yet; three installs make it public" with the addon link, and a search box
   prefilled with the id. The site 404 leads with the same search box, prefilled with the last part of the address tried.
