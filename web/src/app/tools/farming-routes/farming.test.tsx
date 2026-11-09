@@ -14,7 +14,6 @@ vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
   permanentRedirect: (to: string) => { throw new Error(`NEXT_REDIRECT ${to}`); },
 }));
-vi.mock("@/components/EmailCapture", () => ({ default: () => null }));
 
 import FarmingPage, { generateMetadata } from "./page";
 
@@ -43,6 +42,15 @@ const section = (page: string, slug: string) => {
 const zonesIn = (part: string | null) => [...(part ?? "").matchAll(/href="\/database\/zones\/(\d+)-/g)].map((m) => Number(m[1]));
 
 beforeEach(() => store.loadCorpus.mockReset().mockResolvedValue({ uploads: 3, records, dataAsOf: `2026-10-10T00:00:${String(n++ % 60).padStart(2, "0")}.000Z` }));
+
+test("farming has no pre-launch signup, with or without uploads", async () => {
+  for (const uploads of [3, 0]) {
+    store.loadCorpus.mockResolvedValue({ uploads, records: uploads ? records : [], dataAsOf: null });
+    const page = await html(FarmingPage(search()));
+    expect(page).not.toContain("Notify me");
+    expect(page).not.toContain("when this launches");
+  }
+});
 
 test("gold lists the zones its mobs back, with levels, the zone page and the map; reputation says why it is empty", async () => {
   const page = await html(FarmingPage(search()));

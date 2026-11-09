@@ -187,7 +187,7 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names
       }
     }
 
-    const matches = tools.flatMap((t) => {
+    const matches = tools.filter((t) => !t.private).flatMap((t) => {
       const hay = [t.title, t.shortTitle, ...t.keywords].map((s) => s.toLowerCase());
       const r = rank(t.title.toLowerCase(), q) ?? (hay.some((s) => s.includes(q)) ? 2 : null);
       return r === null ? [] : [{ label: t.title, href: toolHref(t), note: t.tagline, exact: r === 0 }];

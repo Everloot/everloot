@@ -52,7 +52,7 @@ test("both files list every MCP resource and prompt the protocol declares", asyn
 
 test("both files list every live and collecting tool, the changes pages, connect and the open endpoints", async () => {
   for (const text of [llmsTxt(), await llmsFullTxt()]) {
-    for (const tool of tools.filter((t) => t.status === "live" || t.status === "collecting")) {
+    for (const tool of tools.filter((t) => !t.private && (t.status === "live" || t.status === "collecting"))) {
       expect(text).toContain(`https://everloot.app${toolHref(tool)})`);
     }
     for (const needle of ["https://everloot.app/changes)", "https://everloot.app/changes/feed.xml", "https://everloot.app/docs)", "https://everloot.app/api/corpus/public", "https://everloot.app/mcp/public", "https://everloot.app/wow-forever", "https://everloot.app/map)", "https://everloot.app/addon)"]) {
@@ -118,5 +118,11 @@ test("both files give the page addresses to cite, the credit line and the operat
     expect(section).toContain("Credit line for Everloot's own data: Data from Everloot (https://everloot.app), CC BY-SA 4.0.");
     expect(text).toContain("Everloot is run by R21 Media Group, LLC.");
     expect(text).not.toContain("run by its maintainer");
+  }
+});
+
+test("device-only lists stay out of both files", async () => {
+  for (const text of [llmsTxt(), await llmsFullTxt([])]) {
+    for (const tool of tools.filter((t) => t.private)) expect(text).not.toContain(`https://everloot.app${toolHref(tool)})`);
   }
 });
