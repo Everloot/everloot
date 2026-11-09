@@ -15,6 +15,9 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Site: an Auction House price page for an item with no public name says why under its title: a name shows once
+  three installs report the same one, or when the game files and the Warcraft Wiki agree on one. The title stays
+  "Item N" and the prices stand. Before, the page gave the id and the prices with no reason.
 - Site: the achievement, title, faction and quest chain lists, the farming and profession pages and the scoring method say
   a fact is confirmed by three installs, not three players, as the upload guide has it; the install count is one column,
   "Installs", on every table (it was "Install IDs" on objects and drops and "Reporters" on NPCs, items and vendors); and
