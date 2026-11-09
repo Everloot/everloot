@@ -15,6 +15,8 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Site: a spell page's tab reads "Spell 1 · Everloot" once; its title went around the shared page metadata, so the
+  layout added the brand a second time, and it had no Open Graph or Twitter card. The title check now covers the route.
 - Addon: a loading screen inside the minute after the last gold snapshot writes no new row unless the balance changed;
   the last snapshot's time is kept in the saved file, so a /reload no longer adds a row each.
 - Addon: the button drawer leaves the minimap buttons to MinimapButtonButton when that addon is loaded, and to any

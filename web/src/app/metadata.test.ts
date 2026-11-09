@@ -38,6 +38,8 @@ const routes: [string, () => Promise<{ metadata: Metadata }>, boolean][] = [
   ["/database/objects", async () => ({ metadata: await (await import("./database/objects/page")).generateMetadata({}) }), true],
   ["/database/quest-chains", async () => ({ metadata: await (await import("./database/quest-chains/page")).generateMetadata({}) }), true],
   ["/database/quests", async () => ({ metadata: await (await import("./database/quests/page")).generateMetadata({}) }), true],
+  // A spell page builds its title from the id alone; without the names file no id is ruled out, so 1 is checked here.
+  ["/database/spells/1", async () => ({ metadata: await (await import("./database/spells/[id]/page")).generateMetadata({ params: Promise.resolve({ id: "1" }) }) }), false],
   ["/database/titles", async () => ({ metadata: await (await import("./database/titles/page")).generateMetadata({}) }), true],
   ["/database/vendors", async () => ({ metadata: await (await import("./database/vendors/page")).generateMetadata({}) }), true],
   // A filtered list of guides is noindex; the plain list is checked here.
@@ -76,7 +78,7 @@ function checkComplete(path: string, m: Metadata, mustLead: boolean) {
   expect(title, path).not.toBe("");
   if (mustLead) expect(title, path).toContain("WoW Forever");
   // The layout template adds the brand, so a title that leads or ends with it would read "Everloot FAQ · Everloot".
-  expect(title, path).not.toMatch(/^Everloot|Everloot$/);
+  expect(title, path).not.toMatch(/^Everloot\b|\bEverloot$/);
   expect(text(m.description).length, `${path} description: ${m.description}`).toBeGreaterThanOrEqual(DESCRIPTION_MIN);
   expect(text(m.description).length, `${path} description: ${m.description}`).toBeLessThanOrEqual(DESCRIPTION_MAX);
   expect(m.alternates?.canonical, path).toBe(path);

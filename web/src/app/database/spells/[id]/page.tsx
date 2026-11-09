@@ -11,6 +11,7 @@ import { edgesFrom, edgesTo, type Edge, type Rel } from "../../../../../../kb/sr
 import { entityLabel } from "../../../../../../kb/src/edges";
 import { trailFor } from "@/lib/breadcrumbs";
 import { spellIndexable } from "@/lib/indexable";
+import { pageMetadata } from "@/lib/seo";
 
 /**
  * A spell page. The spell is the game's own data: its name, its text and its relations all come
@@ -76,9 +77,11 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const { all, name, tip, unknown } = await loadSpell(Number(params.id));
   if (unknown) notFound();
   return {
-    title: `Spell ${params.id} · Everloot`,
-    description: `Spell ${params.id} from the WoW: Forever client files: what it creates, what it costs and which talent teaches it, with the build it was read from.`,
-    alternates: { canonical: `/database/spells/${params.id}` },
+    ...pageMetadata({
+      title: `Spell ${params.id}`,
+      description: `Spell ${params.id} from the WoW: Forever client files: what it creates, what it costs and which talent teaches it, with the build it was read from.`,
+      path: `/database/spells/${params.id}`,
+    }),
     robots: { index: spellIndexable({ named: Boolean(name ?? tip?.name), text: Boolean(tip?.text), relations: all.length }), follow: true },
   };
 }
