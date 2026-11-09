@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { fieldLabel, type CoverageNeed, type FieldCell } from "../../../../../../kb/src/coverage";
-import { Container, DataTable, DataTitle, type SparseColumn } from "@/components/ui";
+import { Container, DataTable, DataTitle, agreementLabel, type SparseColumn } from "@/components/ui";
 import { loadCoverage } from "@/lib/coverage-compute";
 import { cellDetail, measuredLine, shareText, TYPE_LABEL, zoneCoverageHref } from "@/lib/coverage-view";
 import { pageMetadata } from "@/lib/seo";
@@ -73,7 +73,7 @@ export default async function ZoneCoveragePage(props: Props) {
               </h2>
               {here.needs.length === 0 ? <p className="py-4 text-cell text-fg-2">No reported fact here is one or two installs short.</p> : (
                 <>
-                  <DataTable dense caption={`Facts in ${zone.name} that need more installs`} columns={needColumns} rows={here.needs.map((n, i) => ({ ...n, i }))} rowKey={(n) => String(n.i)} meta={(n) => `${TYPE_LABEL[n.type]} ${n.field} · ${n.voters} of 3 installs`} />
+                  <DataTable dense caption={`Facts in ${zone.name} that need more installs`} columns={needColumns} rows={here.needs.map((n, i) => ({ ...n, i }))} rowKey={(n) => String(n.i)} meta={(n) => `${TYPE_LABEL[n.type]} ${n.field} · ${agreementLabel(n.voters)}`} />
                   {here.needsTotal > here.needs.length && <p className="mt-2 text-meta text-muted">The {here.needs.length} closest of {here.needsTotal.toLocaleString("en-US")}.</p>}
                 </>
               )}

@@ -40,14 +40,14 @@ const columns: Column<ObjectDrop>[] = [
   { key: "windows", header: "Loot windows", numeric: true, cell: (d) => d.kills },
   { key: "drops", header: "Drops", numeric: true, cell: (d) => d.drops },
   { key: "rate", header: FREQUENCY, numeric: true, cell: (d) => percent(d.rate) },
-  { key: "installs", header: "Install IDs", numeric: true, cell: (d) => d.reporters },
+  { key: "installs", header: "Installs", numeric: true, cell: (d) => d.reporters },
 ];
 
 type ObjectPin = NonNullable<ObjectFactsPage["pins"]>[number];
 const pinColumns: Column<ObjectPin>[] = [
   { key: "map", header: "Map", cell: (p) => <MapName mapId={p.mapId} /> },
   { key: "at", header: "Position", numeric: true, cell: (p) => `${p.x}, ${p.y}` },
-  { key: "installs", header: "Reporters", numeric: true, cell: (p) => p.reporters },
+  { key: "installs", header: "Installs", numeric: true, cell: (p) => p.reporters },
   { key: "show", header: MAP_LINK_HEADER, cell: (p) => { const href = pinLink(p.mapId, p.x, p.y); return href ? <ShowOnMap href={href} mapId={p.mapId} x={p.x} y={p.y} /> : null; } },
 ];
 

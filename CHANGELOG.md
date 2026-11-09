@@ -15,6 +15,10 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Fixed
+- Site: the achievement, title, faction and quest chain lists, the farming and profession pages and the scoring method say
+  a fact is confirmed by three installs, not three players, as the upload guide has it; the install count is one column,
+  "Installs", on every table (it was "Install IDs" on objects and drops and "Reporters" on NPCs, items and vendors); and
+  the coverage, instance and item pages count "n of 3 installs" from the meter's own labels instead of a written 3.
 - Site: a spell page's tab reads "Spell 1 · Everloot" once; its title went around the shared page metadata, so the
   layout added the brand a second time, and it had no Open Graph or Twitter card. The title check now covers the route.
 - Site: every public database list and detail page (NPCs, quests, objects, vendors, spells, achievements, titles, factions,

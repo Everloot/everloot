@@ -172,10 +172,10 @@ test("the list captions and descriptions keep the game files and the players apa
     expect(out).not.toMatch(/three players reported:/);
   }
   const description = (await achievementListMetadata({ searchParams: Promise.resolve({}) })).description!;
-  expect(description).toContain("From the game files; confirmed once three players report each the same way.");
-  expect(description).not.toContain("is listed once three players");
+  expect(description).toContain("From the game files; confirmed once three installs report each the same way.");
+  expect(description).not.toContain("is listed once three installs");
   for (const meta of [factionListMetadata, titleListMetadata, chainListMetadata]) {
-    expect((await meta({ searchParams: Promise.resolve({}) })).description).toContain("From the game files; confirmed once three players");
+    expect((await meta({ searchParams: Promise.resolve({}) })).description).toContain("From the game files; confirmed once three installs");
   }
 });
 
@@ -219,7 +219,7 @@ test("before three players report anything, each list says so and shows no rows"
   for (const el of [AchievementList(search()), FactionList(search())]) {
     const out = await html(el);
     expect(out).toContain("data-empty-state");
-    expect(out).toContain("None is in the game files, and none has been confirmed by three players.");
+    expect(out).toContain("None is in the game files, and none has been confirmed by three installs.");
     expect(out).not.toContain("Ten Quests");
   }
 });
@@ -308,7 +308,7 @@ test("empty and unreadable states for titles and quest chains", async () => {
   serve(from(2, { kind: "title_catalog", titleId: 4, name: "Private" }));
   for (const el of [TitleList(search()), ChainList(search())]) {
     const out = await html(el);
-    expect(out).toContain("None is in the game files, and none has been confirmed by three players.");
+    expect(out).toContain("None is in the game files, and none has been confirmed by three installs.");
     expect(out).not.toContain("Private");
   }
   store.loadCompletion.mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });
@@ -337,7 +337,7 @@ test("an achievement page lists its criteria once three players sent the same fu
   // A list cut short of the count is not shown, and the page says when it will be.
   const partial = await html(AchievementPage(page("4-ten-quests")));
   expect(partial).not.toContain("Secret criterion text");
-  expect(partial).toContain("The criteria show once three players report the same full list.");
+  expect(partial).toContain("The criteria show once three installs report the same full list.");
 });
 
 test("base is true when a game file was read and holds no eligible entry; null only when nothing is readable", async () => {
@@ -358,7 +358,7 @@ test("a base-only faction page says it is in the game files, unconfirmed, and ne
   const description = (await factionMetadata(page("72-stormwind"))).description;
   expect(description).toContain("Found in game files, unconfirmed");
   expect(description).not.toContain("three players");
-  expect((await factionMetadata(page("69-darnassus"))).description).toContain("as three players reported it");
+  expect((await factionMetadata(page("69-darnassus"))).description).toContain("as three installs reported it");
 });
 
 test("a base-only title page says it is in the game files, unconfirmed", async () => {
@@ -369,7 +369,7 @@ test("a base-only title page says it is in the game files, unconfirmed", async (
   const description = (await titleMetadata(page("8-s-champion"))).description;
   expect(description).toContain("Found in game files, unconfirmed");
   expect(description).not.toContain("three players");
-  expect((await titleMetadata(page("5-corporal"))).description).toContain("as three players reported it");
+  expect((await titleMetadata(page("5-corporal"))).description).toContain("as three installs reported it");
 });
 
 test("a base-only quest chain page says it is in the game files, unconfirmed", async () => {
@@ -380,7 +380,7 @@ test("a base-only quest chain page says it is in the game files, unconfirmed", a
   const description = (await chainMetadata(page("1-the-missing-diplomat"))).description;
   expect(description).toContain("Found in game files, unconfirmed");
   expect(description).not.toContain("three players");
-  expect((await chainMetadata(page("900-the-defias"))).description).toContain("as three players reported it");
+  expect((await chainMetadata(page("900-the-defias"))).description).toContain("as three installs reported it");
 });
 
 test("a base-only achievement page keeps the file-only presentation and the unconfirmed notice", async () => {

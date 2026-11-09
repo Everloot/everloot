@@ -35,7 +35,7 @@ export function heroLines(now: number | null, at = Date.parse(LAUNCH_AT)): Glint
 export const FOOTER_LINES: GlintLine[] = [
   LOOT_GET,
   { id: "remember", text: "I remember every drop." },
-  { id: "agree", text: "Three players agree, then it's a fact." },
+  { id: "agree", text: "Three installs agree, then it's a fact." },
   { id: "satchel", text: "Room in the satchel for one more." },
 ];
 

@@ -64,7 +64,7 @@ export default async function DropsPage(props: { searchParams?: Promise<Search> 
     { key: "windows", header: "Loot windows", numeric: true, sortable: true, cell: (r) => r.kills },
     { key: "drops", header: "Item observations", numeric: true, sortable: true, cell: (r) => r.drops },
     { key: "rate", header: "Observed frequency", numeric: true, sortable: true, cell: (r) => (r.rate === null ? "0 observed" : percent(r.rate)) },
-    { key: "installs", header: "Install IDs", numeric: true, sortable: true, cell: (r) => r.reporters },
+    { key: "installs", header: "Installs", numeric: true, sortable: true, cell: (r) => r.reporters },
   ];
 
   const strip = stats.unreachable ? null
