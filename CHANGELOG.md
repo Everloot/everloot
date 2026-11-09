@@ -42,6 +42,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
 
 ### Fixed
+- Site: title pages and lists no longer show the game's raw `%s`: the name reads "Bloodsail Admiral <Name>", the address
+  drops the trailing `-s` (`/database/titles/144-bloodsail-admiral`) and the old address redirects to the new one.
 - Site: the schemas page marks the three shapes that describe a bulk-export file rather than an endpoint and says that
   `reporters` in the API and MCP shapes is the count the open-data files call `installs`; the API page names the routes
   its own pages fetch (/api/map/pins, /api/suggest) as outside the OpenAPI contract. The open-data notes say the same.

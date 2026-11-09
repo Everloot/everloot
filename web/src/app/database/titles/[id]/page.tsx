@@ -4,7 +4,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { Container, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
 import { CLIENT_TITLES } from "@/data/game-data/client-titles";
 import { trailFor } from "@/lib/breadcrumbs";
-import { loadCatalog, parseSegment, titleHref } from "@/lib/completion-lists";
+import { loadCatalog, parseSegment, titleDisplayName, titleHref } from "@/lib/completion-lists";
 import { entitySummary } from "@/lib/evidence";
 import { pageMetadata } from "@/lib/seo";
 import { CLIENT_LABEL } from "../../../../../../kb/src/edges";
@@ -30,8 +30,9 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const entry = id === null ? undefined : (await loadCatalog())?.titles.find((t) => t.titleId === id);
   // A listed entry is a page, from the game files or three players' reports; nothing listed says noindex rather than cache a thin page.
   if (!entry) return { robots: { index: false, follow: true } };
+  const name = titleDisplayName(entry.name);
   return {
-    ...pageMetadata({ title: `${entry.name} (title)`, description: `The ${entry.name} title in WoW: Forever${entry.confirmed ? ", as three installs reported it." : `. ${CLIENT_LABEL}.`}`, path: titleHref(entry.titleId, entry.name) }),
+    ...pageMetadata({ title: `${name} (title)`, description: `The ${name} title in WoW: Forever${entry.confirmed ? ", as three installs reported it." : `. ${CLIENT_LABEL}.`}`, path: titleHref(entry.titleId, entry.name) }),
     robots: { index: true, follow: true },
   };
 }
@@ -47,7 +48,7 @@ export default async function TitlePage(props: Props) {
     const canonical = titleHref(entry.titleId, entry.name);
     if (`/database/titles/${segment}` !== canonical) permanentRedirect(canonical);
   }
-  const title = entry?.name ?? `Title ${id}`;
+  const title = entry ? titleDisplayName(entry.name) : `Title ${id}`;
   const trail = [...trailFor("/database/titles")!, { name: title, path: `/database/titles/${segment}` }];
   // The page in a few lines: what it is, who reported it, what the files say, and where the name came from.
   const [what, observed, name] = entry
@@ -69,11 +70,11 @@ export default async function TitlePage(props: Props) {
         {entry ? (
           <>
             <EntityTop
-              box={<TooltipFrame name={entry.name} label={entry.confirmed ? `${entry.name}, as players reported it` : `${entry.name}, ${CLIENT_LABEL.toLowerCase()}`} />}
+              box={<TooltipFrame name={title} label={entry.confirmed ? `${title}, as players reported it` : `${title}, ${CLIENT_LABEL.toLowerCase()}`} />}
               facts={
                 <Facts
                   layout="list"
-                  label={`${entry.name}: quick facts`}
+                  label={`${title}: quick facts`}
                   items={[
                     // Short of three installs: the meter with how many have reported, never the words "not reported".
                     { label: "Player reports", value: known(entry.confirmed ? REPORTED : null, entry.reporters) },
@@ -84,9 +85,9 @@ export default async function TitlePage(props: Props) {
               }
             />
             <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-            <OpenData text={[`${entry.name} (title ${id})`, ...summary, `Source: https://everloot.app${titleHref(entry.titleId, entry.name)}`].join("\n")} />
+            <OpenData text={[`${title} (title ${id})`, ...summary, `Source: https://everloot.app${titleHref(entry.titleId, entry.name)}`].join("\n")} />
             <Tabs
-              label={`${entry.name}: relations`}
+              label={`${title}: relations`}
               tabs={[
                 {
                   id: "earned-by", label: "Earned by", count: 0,
