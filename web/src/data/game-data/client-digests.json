@@ -1,4 +1,4 @@
-{"schema":"everloot.client-digests/1","label":"found in game files, unconfirmed","hashVersion":1,"build":{"product":"wowf","buildId":70862,"version":"1.60.1.70862","buildConfig":"5ada954223f7c409ea172361f5c9e565","definitions":"fb58b5b8ea8c","extractedAt":"2026-11-07T09:10:45.080Z"},"tables":{
+{"schema":"everloot.client-digests/1","label":"found in game files, unconfirmed","hashVersion":1,"build":{"product":"wowf","buildId":70862,"version":"1.60.1.70862","buildConfig":"5ada954223f7c409ea172361f5c9e565","definitions":"fb58b5b8ea8c","extractedAt":"2026-11-09T19:39:19.744Z"},"tables":{
   "Achievement": {"rows":440,"hash":"ed72f783240d"},
   "Achievement_Category": {"rows":56,"hash":"6484849bef14"},
   "AnimKit": {"rows":808,"hash":"24587ab8fc06"},

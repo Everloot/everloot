@@ -312,8 +312,8 @@
   },
   "source": {
     "definitions": "fb58b5b8ea8c",
-    "library": "@rhyster/wow-casc-dbc@2.16.19",
-    "extractedAt": "2026-11-07T09:10:45.080Z"
+    "library": "@rhyster/wow-casc-dbc@2.16.21",
+    "extractedAt": "2026-11-09T19:39:19.744Z"
   },
   "catalog": {
     "classes": 9,
