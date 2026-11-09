@@ -1,6 +1,7 @@
 -- Blizzard Forever armory: isolated API data, never part of addon data or exports.
 -- Apply 20261021130000_players.sql and 20261022160000_players_realm_key.sql first (guild seeds).
 -- Safe to apply twice: tables/indexes are conditional, functions and privileges are replaced.
+set lock_timeout = '3s';
 
 create table if not exists public.armory_characters (
   region text check (region in ('us','eu')),
@@ -139,7 +140,10 @@ returns table (slug text, tries smallint, stored boolean)
 language sql stable security definer set search_path = '' set lock_timeout = '3s'
 as $$
 with candidates as (
-    select q.slug, q.tries, false as stored, 0 as priority, q.added_at as at
+    select q.slug, q.tries,
+      case q.kind when 'character' then exists(select 1 from public.armory_characters c where c.region=q.region and c.slug=q.slug)
+        else exists(select 1 from public.armory_guilds g where g.region=q.region and g.slug=q.slug) end as stored,
+      0 as priority, q.added_at as at
     from public.armory_queue q where q.region=p_region and q.kind=p_kind and q.next_at<=now()
       and (p_kind<>'character' or not exists(select 1 from public.armory_hides h where h.region=q.region and h.slug=q.slug))
     union all
@@ -159,6 +163,8 @@ grant execute on function public.armory_take(text, text, integer) to service_rol
 
 
 -- At most 500 API characters; preserve first_seen and refuse every hidden slug.
+-- The crawler validates API fields before calling. Invalid typed values or constraints abort the batch;
+-- duplicate slugs are collapsed here so repeated discovery cannot abort a valid batch.
 create or replace function public.armory_upsert_characters(p_region text, p_rows jsonb)
 returns integer
 language plpgsql security definer set search_path = '' set lock_timeout = '3s'
@@ -170,7 +176,7 @@ begin
   if p_rows is null or jsonb_typeof(p_rows)<>'array' or jsonb_array_length(p_rows)>500 then raise exception 'Invalid armory character batch'; end if;
   with written_rows as (
     insert into public.armory_characters(region,slug,character_id,name,surname,level,ruleset_id,ruleset,race_id,race,class_id,class,faction,gender,guild_slug,guild_name,guild_id,last_login,equipped_item_level,average_item_level,item_level,gear_score,honorable_kills,pvp_rank,equipment,last_modified,fetched_at,checked_at)
-    select p_region,r.slug,r.character_id,r.name,r.surname,r.level,r.ruleset_id,r.ruleset,r.race_id,r.race,r.class_id,r.class,r.faction,r.gender,r.guild_slug,r.guild_name,r.guild_id,r.last_login,r.equipped_item_level,r.average_item_level,r.item_level,r.gear_score,r.honorable_kills,r.pvp_rank,coalesce(r.equipment,'[]'::jsonb),r.last_modified,now(),now()
+    select distinct on (r.slug) p_region,r.slug,r.character_id,r.name,r.surname,r.level,r.ruleset_id,r.ruleset,r.race_id,r.race,r.class_id,r.class,r.faction,r.gender,r.guild_slug,r.guild_name,r.guild_id,r.last_login,r.equipped_item_level,r.average_item_level,r.item_level,r.gear_score,r.honorable_kills,r.pvp_rank,coalesce(r.equipment,'[]'::jsonb),r.last_modified,now(),now()
     from jsonb_to_recordset(p_rows) as r(slug text,character_id bigint,name text,surname text,level smallint,ruleset_id smallint,ruleset text,race_id smallint,race text,class_id smallint,class text,faction text,gender text,guild_slug text,guild_name text,guild_id bigint,last_login timestamptz,equipped_item_level smallint,average_item_level smallint,item_level numeric,gear_score numeric,honorable_kills integer,pvp_rank smallint,equipment jsonb,last_modified text)
     where not exists (select 1 from public.armory_hides h where h.region=p_region and h.slug=r.slug) -- hide write guard
     on conflict(region,slug) do update set
@@ -188,6 +194,7 @@ grant execute on function public.armory_upsert_characters(text, jsonb) to servic
 
 
 -- Replace one roster and queue unknown or stale members, leaving hidden members out.
+-- The crawler validates typed guild/member fields; malformed member slug guesses are skipped.
 create or replace function public.armory_upsert_guild(p_region text, p_guild jsonb, p_members jsonb)
 returns integer
 language plpgsql security definer set search_path = '' set lock_timeout = '3s'
@@ -203,9 +210,11 @@ begin
     ruleset_id=excluded.ruleset_id,ruleset=excluded.ruleset,member_count=excluded.member_count,created_at=excluded.created_at,
     last_modified=excluded.last_modified,fetched_at=now(),checked_at=now();
   delete from public.armory_members existing where existing.region=p_region and existing.guild_slug=v_guild_slug;
-  for m in select * from jsonb_to_recordset(p_members) as r(character_slug text,name text,surname text,level smallint,class_id smallint,race_id smallint,rank smallint) loop
+  for m in select * from jsonb_to_recordset(p_members) as r(character_slug text,name text,surname text,level smallint,class_id smallint,race_id smallint,rank smallint)
+    where r.character_slug ~ '^[[:alnum:]]+(-[[:alnum:]]+)*$'
+      and r.character_slug=lower(r.character_slug) and char_length(r.character_slug)<=64 loop
     if not exists(select 1 from public.armory_hides h where h.region=p_region and h.slug=m.character_slug) then
-      insert into public.armory_members values(p_region,v_guild_slug,m.character_slug,m.name,m.surname,m.level,m.class_id,m.race_id,m.rank,now());
+      insert into public.armory_members(region,guild_slug,character_slug,name,surname,level,class_id,race_id,rank,fetched_at) values(p_region,v_guild_slug,m.character_slug,m.name,m.surname,m.level,m.class_id,m.race_id,m.rank,now());
       if public.armory_enqueue(p_region,'character',m.character_slug,'roster') then enqueued:=enqueued+1; end if;
     end if;
   end loop;
@@ -217,7 +226,7 @@ revoke all on function public.armory_upsert_guild(text, jsonb, jsonb) from publi
 grant execute on function public.armory_upsert_guild(text, jsonb, jsonb) to service_role;
 
 
--- 304 confirms freshness without extending the lifetime of the fetched payload.
+-- 304 confirms current data under the retention policy: refresh both timestamps.
 create or replace function public.armory_touch(p_region text, p_kind text, p_slugs text[])
 returns integer
 language plpgsql security definer set search_path = '' set lock_timeout = '3s'
@@ -225,9 +234,9 @@ as $$
 declare written integer;
 begin
   if p_kind='character' then
-    update public.armory_characters set checked_at=now() where region=p_region and slug=any(p_slugs);
+    update public.armory_characters set fetched_at=now(),checked_at=now() where region=p_region and slug=any(p_slugs);
   elsif p_kind='guild' then
-    update public.armory_guilds set checked_at=now() where region=p_region and slug=any(p_slugs);
+    update public.armory_guilds set fetched_at=now(),checked_at=now() where region=p_region and slug=any(p_slugs);
   else raise exception 'Invalid armory kind'; end if;
   get diagnostics written = row_count;
   delete from public.armory_queue where region=p_region and kind=p_kind and slug=any(p_slugs);
@@ -238,7 +247,7 @@ revoke all on function public.armory_touch(text, text, text[]) from public, anon
 grant execute on function public.armory_touch(text, text, text[]) to service_role;
 
 
--- 404 deletes stored data immediately; an unconfirmed guess gets three attempts, seven days apart.
+-- 404 deletes stored data; guesses back off seven days, then remain tombstoned for a quarter.
 create or replace function public.armory_missing(p_region text, p_kind text, p_slug text)
 returns void
 language plpgsql security definer set search_path = '' set lock_timeout = '3s'
@@ -248,7 +257,9 @@ begin
   if p_kind='character' then
     delete from public.armory_characters where region=p_region and slug=p_slug;
     get diagnostics removed = row_count;
-    delete from public.armory_members where region=p_region and character_slug=p_slug;
+    if removed>0 then
+      delete from public.armory_members where region=p_region and character_slug=p_slug;
+    end if;
   elsif p_kind='guild' then
     delete from public.armory_guilds where region=p_region and slug=p_slug;
     get diagnostics removed = row_count;
@@ -256,8 +267,9 @@ begin
   if removed>0 then
     delete from public.armory_queue where region=p_region and kind=p_kind and slug=p_slug;
   else
-    update public.armory_queue set tries=tries+1,next_at=now()+interval '7 days' where region=p_region and kind=p_kind and slug=p_slug;
-    delete from public.armory_queue where region=p_region and kind=p_kind and slug=p_slug and tries>=3;
+    update public.armory_queue set tries=tries+1,
+      next_at=now()+case when tries+1>=3 then interval '90 days' else interval '7 days' end
+    where region=p_region and kind=p_kind and slug=p_slug;
   end if;
 end;
 $$;
@@ -283,7 +295,8 @@ revoke all on function public.armory_retry(text, text, text, interval) from publ
 grant execute on function public.armory_retry(text, text, text, interval) to service_role;
 
 
--- Thirty-day retention is based on fetched_at, never the 304 check time. Return deleted characters, guilds and queue rows.
+-- Thirty-day retention follows the newest fetch or 304 refresh. Failed guesses stay for 90 days.
+-- Return deleted characters, guilds and queue rows.
 create or replace function public.armory_purge()
 returns integer
 language plpgsql security definer set search_path = '' set lock_timeout = '3s'
@@ -295,7 +308,7 @@ begin
   get diagnostics removed = row_count; n:=n+removed;
   delete from public.armory_guilds where fetched_at<now()-interval '30 days';
   get diagnostics removed = row_count; n:=n+removed;
-  delete from public.armory_queue where tries>=3 and added_at<now()-interval '30 days';
+  delete from public.armory_queue where tries>=3 and added_at<now()-interval '90 days';
   get diagnostics removed = row_count;
   return n+removed;
 end;
@@ -406,21 +419,35 @@ revoke all on function public.armory_board(text, text, smallint, integer) from p
 grant execute on function public.armory_board(text, text, smallint, integer) to service_role;
 
 
--- Full population ranks, including characters outside the top 100, within their region and ruleset.
+-- Count strictly greater values within the target's region/ruleset. Ties share rank; no population sort.
 create or replace function public.armory_rank(p_region text, p_slug text)
 returns table (metric text, rank integer, "of" integer)
 language sql stable security definer set search_path = '' set lock_timeout = '3s'
 as $$
-with scores as (
-  select c.region,c.slug,c.ruleset_id,c.last_login,v.metric,v.value from public.armory_characters c
-  cross join lateral (values ('item_level',c.item_level),('gear_score',c.gear_score),('honorable_kills',c.honorable_kills::numeric)) v(metric,value)
-  where c.region=p_region and v.value is not null
-    and not exists(select 1 from public.armory_hides h where h.region=c.region and h.slug=c.slug)
-), ranks as (
-  select s.*,row_number() over(partition by s.region,s.ruleset_id,s.metric order by s.value desc,s.last_login desc nulls last,s.region,s.slug)::integer as position,
-    count(*) over(partition by s.region,s.ruleset_id,s.metric)::integer as total from scores s
+with target as (
+  select t.* from public.armory_characters t where t.region=p_region and t.slug=p_slug
+    and not exists(select 1 from public.armory_hides h where h.region=t.region and h.slug=t.slug)
 )
-select r.metric,r.position,r.total from ranks r where r.slug=p_slug;
+select 'item_level'::text,
+  (1+(select count(*) from public.armory_characters c where c.region=t.region and c.ruleset_id=t.ruleset_id
+    and not exists(select 1 from public.armory_hides h where h.region=c.region and h.slug=c.slug) and c.item_level>t.item_level))::integer,
+  (select count(*) from public.armory_characters c where c.region=t.region and c.ruleset_id=t.ruleset_id
+    and not exists(select 1 from public.armory_hides h where h.region=c.region and h.slug=c.slug) and c.item_level is not null)::integer
+from target t where t.item_level is not null
+union all
+select 'gear_score'::text,
+  (1+(select count(*) from public.armory_characters c where c.region=t.region and c.ruleset_id=t.ruleset_id
+    and not exists(select 1 from public.armory_hides h where h.region=c.region and h.slug=c.slug) and c.gear_score>t.gear_score))::integer,
+  (select count(*) from public.armory_characters c where c.region=t.region and c.ruleset_id=t.ruleset_id
+    and not exists(select 1 from public.armory_hides h where h.region=c.region and h.slug=c.slug) and c.gear_score is not null)::integer
+from target t where t.gear_score is not null
+union all
+select 'honorable_kills'::text,
+  (1+(select count(*) from public.armory_characters c where c.region=t.region and c.ruleset_id=t.ruleset_id
+    and not exists(select 1 from public.armory_hides h where h.region=c.region and h.slug=c.slug) and c.honorable_kills>t.honorable_kills))::integer,
+  (select count(*) from public.armory_characters c where c.region=t.region and c.ruleset_id=t.ruleset_id
+    and not exists(select 1 from public.armory_hides h where h.region=c.region and h.slug=c.slug) and c.honorable_kills is not null)::integer
+from target t where t.honorable_kills is not null;
 $$;
 revoke all on function public.armory_rank(text, text) from public, anon, authenticated;
 grant execute on function public.armory_rank(text, text) to service_role;
@@ -444,3 +471,42 @@ grant execute on function public.armory_counts() to service_role;
 
 
 notify pgrst, 'reload schema';
+
+reset lock_timeout;
+
+-- Owner readback before rollout (the non-ASCII rule needs a Unicode-aware database ctype):
+-- select datctype from pg_database where datname=current_database();
+-- select relname,relrowsecurity from pg_class where oid in
+--   ('public.armory_characters'::regclass,'public.armory_guilds'::regclass,
+--    'public.armory_members'::regclass,'public.armory_queue'::regclass,'public.armory_hides'::regclass);
+-- select p.oid::regprocedure,p.prosecdef,p.proconfig,p.proacl from pg_proc p
+--   join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'armory_%';
+-- select table_name,grantee,privilege_type from information_schema.role_table_grants
+--   where table_schema='public' and table_name like 'armory_%'
+--     and grantee in ('anon','authenticated','service_role','PUBLIC'); -- expect no rows
+
+-- Rollback by hand only: deletes all armory data and opt-outs.
+-- drop function if exists public.armory_counts();
+-- drop function if exists public.armory_rank(text, text);
+-- drop function if exists public.armory_board(text, text, smallint, integer);
+-- drop function if exists public.armory_search_guilds(text, integer);
+-- drop function if exists public.armory_search(text, integer);
+-- drop function if exists public.armory_roster(text, text);
+-- drop function if exists public.armory_guild(text, text);
+-- drop function if exists public.armory_character(text, text);
+-- drop function if exists public.armory_hide(text, text);
+-- drop function if exists public.armory_purge();
+-- drop function if exists public.armory_retry(text, text, text, interval);
+-- drop function if exists public.armory_missing(text, text, text);
+-- drop function if exists public.armory_touch(text, text, text[]);
+-- drop function if exists public.armory_upsert_guild(text, jsonb, jsonb);
+-- drop function if exists public.armory_upsert_characters(text, jsonb);
+-- drop function if exists public.armory_take(text, text, integer);
+-- drop function if exists public.armory_seed_from_players();
+-- drop function if exists public.armory_enqueue(text, text, text, text);
+-- drop table if exists public.armory_members;
+-- drop table if exists public.armory_guilds;
+-- drop table if exists public.armory_characters;
+-- drop table if exists public.armory_queue;
+-- drop table if exists public.armory_hides;
+-- notify pgrst, 'reload schema';

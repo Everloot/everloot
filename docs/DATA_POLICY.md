@@ -953,9 +953,9 @@ These pages are separate from the addon sightings and the linked-character gear 
 - **No ads.** Armory pages carry no ad slots. The site's consent message may still appear.
 - **Free, on this site only.** Blizzard data stays in the armory pages. It never enters the addon tables,
   CC BY-SA dataset, public corpus, open-data snapshots, MCP tools, API answers or exports.
-- **Thirty days.** Characters and guilds are checked again within 20 days. Stored data fetched more than
-  30 days ago is deleted, even if a later check said it had not changed. When Blizzard answers that a
-  character or guild no longer exists (404), its stored row is deleted at once.
+- **Thirty days.** Characters and guilds are checked again within 20 days. Stored data not refreshed for more
+  than 30 days is deleted. A Blizzard response confirming that data has not changed (304) counts as a refresh.
+  When Blizzard answers that a character or guild no longer exists (404), its stored row is deleted at once.
 - **Credit.** Every armory page says "Data from Blizzard Entertainment" and shows the time of the newest
   read. Nothing on it claims Blizzard endorses Everloot.
 - **One client.** The crawler uses one Blizzard API client. Its client id, client secret and the database

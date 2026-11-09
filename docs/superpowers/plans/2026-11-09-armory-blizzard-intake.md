@@ -26,14 +26,14 @@
 
 1. Armory pages carry **no ad slot** (no `AdSlot`, no ad component). The AdSense script in `layout.tsx` only serves the consent message; that is fine.
 2. Free, our pages only: no armory row reaches `kb/src` exporters, the open-data snapshot, MCP tools, `/api/*` answers or the public corpus. The web store is read by pages only.
-3. **30 days**: every stored character and guild is re-checked at most 20 days after `checked_at`; `armory_purge` deletes rows whose `fetched_at` is older than 30 days; a 404 deletes the row at once.
+3. **30 days**: every stored character and guild is re-checked at most 20 days after `checked_at`; `armory_purge` deletes rows whose `fetched_at` is older than 30 days (a 304 refreshes both `fetched_at` and `checked_at`); a 404 deletes the row at once.
 4. Every armory page shows the line **"Data from Blizzard Entertainment"** and the time of the newest read; nothing says or looks endorsed.
 5. One client. Secrets only in GitHub Actions secrets (`BNET_CLIENT_ID`, `BNET_CLIENT_SECRET`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`); never in a file, a test or a log line.
 6. A person can hide a character at `/armory/hide` (region, name, surname): the row is deleted and never written again.
 
 ### Identity and addresses
 
-- Region `us | eu`. Character slug: `name-surname` from the API, lower case, as the API spells it in `slug`. Guild slug: the API's `slug` (last path segment of `guild.key.href`; for seeds from addon data, `kb/src/guilds.ts guildSlug(name)` is the first guess; a 404 on a guess is recorded, not retried for 7 days, dropped after 3 tries).
+- Region `us | eu`. Character slug: `name-surname` from the API, lower case, as the API spells it in `slug`. Guild slug: the API's `slug` (last path segment of `guild.key.href`; for seeds from addon data, lower-case the name, replace spaces with hyphens and drop straight apostrophes; skip guesses that fail the slug check; a 404 on a guess is recorded, not retried for 7 days, deferred for 90 days after 3 tries).
 - Pages: `/armory` (hub + search), `/armory/{region}/{slug}` (character), `/armory/{region}/guilds/{slug}` (guild + roster), `/armory/rankings/{metric}` with `metric ∈ item-level | gear-score | honorable-kills` and filters `?ruleset=1|2|3|15&region=us|eu`, `/armory/hide`, `/armory/submit`.
 - The addon-sourced pages (`/characters/…`, `/guilds/…`, `/players`) are not changed except for one link each to the armory; names without surnames are never joined to armory rows (ambiguous).
 
@@ -62,7 +62,7 @@ Seeds: `armory_seed_from_players()` enqueues a guild for every distinct guild na
 Tables (all `public.`):
 
 ```
-armory_characters (region text check (region in ('us','eu')), slug text check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)+$' and char_length(slug) <= 64),
+armory_characters (region text check (region in ('us','eu')), slug text check (slug ~ '^[[:alnum:]]+(-[[:alnum:]]+)*$' and slug = lower(slug) and char_length(slug) <= 64),
   character_id bigint not null, name text not null, surname text not null, level smallint not null check (level between 1 and 60),
   ruleset_id smallint not null, ruleset text not null, race_id smallint not null, race text not null, class_id smallint not null, class text not null,
   faction text not null check (faction in ('Alliance','Horde')), gender text, guild_slug text, guild_name text, guild_id bigint,
@@ -79,6 +79,8 @@ armory_queue (region, kind text check (kind in ('character','guild')), slug, sou
 armory_hides (region, slug, hidden_at timestamptz default now(), primary key (region, slug))
 ```
 
+Slug checks on characters, guilds, queue and hides use the lowercase POSIX alphanumeric rule above. Single words and non-ASCII letters are valid; the crawler validates whether a character has a surname. Invalid seed guesses are skipped.
+
 Indexes: `armory_characters (checked_at)`, `(region, ruleset_id, item_level desc)`, `(region, ruleset_id, gear_score desc)`, `(region, ruleset_id, honorable_kills desc)`, `(lower(name) text_pattern_ops)`, `(region, guild_slug)`; `armory_guilds (checked_at)`, `(lower(name) text_pattern_ops)`; `armory_queue (next_at, added_at)`.
 
 Functions (exact signatures; jsonb shapes in the comments):
@@ -87,7 +89,7 @@ Functions (exact signatures; jsonb shapes in the comments):
 armory_enqueue(p_region text, p_kind text, p_slug text, p_source text) returns boolean      -- true when inserted; false when present, stored and fresh (<20 days), or hidden
 armory_seed_from_players() returns integer                                                   -- guild queue rows from distinct public.players.guild (slug via lower/replace spaces→'-', drop apostrophes); region by realm prefix; skips existing guilds/queue rows
 armory_take(p_region text, p_kind text, p_limit integer) returns table (slug text, tries smallint, stored boolean)
-                                                                                             -- queue rows with next_at <= now() oldest first, then stored rows with checked_at < now() - interval '20 days' oldest first, up to p_limit; stored=true for the latter
+                                                                                             -- queue rows with next_at <= now() oldest first, then stored rows with checked_at < now() - interval '20 days' oldest first, up to p_limit; stored=true whenever the character or guild already exists, including queue rows
 armory_upsert_characters(p_region text, p_rows jsonb) returns integer
    -- rows: [{slug,character_id,name,surname,level,ruleset_id,ruleset,race_id,race,class_id,class,faction,gender,guild_slug,guild_name,guild_id,
    --         last_login (ISO or null),equipped_item_level,average_item_level,item_level,gear_score,honorable_kills,pvp_rank,equipment:[{slot,item_id,name,level,quality,inventory_type}],last_modified}]
@@ -95,11 +97,11 @@ armory_upsert_characters(p_region text, p_rows jsonb) returns integer
 armory_upsert_guild(p_region text, p_guild jsonb, p_members jsonb) returns integer
    -- guild: {slug,guild_id,name,faction,ruleset_id,ruleset,member_count,created_at,last_modified}; members: [{character_slug,name,surname,level,class_id,race_id,rank}]
    -- replaces the member rows; enqueues each member character that is not stored or is stale, source 'roster'; deletes the queue row (kind guild); returns members enqueued
-armory_touch(p_region text, p_kind text, p_slugs text[]) returns integer                     -- 304: checked_at = now() on stored rows
+armory_touch(p_region text, p_kind text, p_slugs text[]) returns integer                     -- 304: fetched_at = checked_at = now() on stored rows; confirmation counts as a refresh
 armory_missing(p_region text, p_kind text, p_slug text) returns void                          -- 404: delete the stored row (members cascade; a character's membership rows too) and the queue row when stored;
-                                                                                             --      a never-stored queue row gets tries+1 and next_at = now() + 7 days, deleted at tries >= 3
+                                                                                             --      a never-stored queue row gets tries+1 and next_at = now() + 7 days; at tries >= 3 keep it with next_at = now() + 90 days
 armory_retry(p_region text, p_kind text, p_slug text, p_delay interval) returns void           -- transient error: next_at = now() + p_delay, tries + 1
-armory_purge() returns integer                                                                -- delete characters and guilds with fetched_at < now() - 30 days, queue rows with tries >= 3 and added_at < now() - 30 days
+armory_purge() returns integer                                                                -- delete characters and guilds with fetched_at < now() - 30 days, queue rows with tries >= 3 and added_at < now() - 90 days
 armory_hide(p_region text, p_slug text) returns void                                          -- insert hide, delete character row, its membership rows and queue rows
 armory_character(p_region text, p_slug text) returns setof armory_characters                   -- one row or none (hidden rows have no row)
 armory_guild(p_region text, p_slug text) returns setof armory_guilds
@@ -111,7 +113,7 @@ armory_search_guilds(p_prefix text, p_limit integer) returns table (region text,
 armory_board(p_metric text, p_region text, p_ruleset_id smallint, p_limit integer)
    returns table (rank integer, region text, slug text, name text, surname text, level smallint, class text, race text, faction text, ruleset text, ruleset_id smallint, guild_name text, value numeric, fetched_at timestamptz)
    -- p_metric in ('item_level','gear_score','honorable_kills'); null p_region / p_ruleset_id = all; value non-null only; order value desc, last_login desc nulls last
-armory_rank(p_region text, p_slug text) returns table (metric text, rank integer, of integer)   -- the character's rank per metric within its own (region, ruleset)
+armory_rank(p_region text, p_slug text) returns table (metric text, rank integer, of integer)   -- rank = 1 + count of strictly greater non-null values within its own (region, ruleset); of = count of non-null values; ties share rank
 armory_counts() returns table (region text, ruleset_id smallint, ruleset text, characters integer, guilds integer, newest timestamptz)
 ```
 
@@ -134,7 +136,7 @@ armory_counts() returns table (region text, ruleset_id smallint, ruleset text, c
 
 **Interfaces:** the SQL contract above, verbatim. Follow the comment style and privilege block of `20261021130000_players.sql` and `20261107150000_profile_pipeline.sql`.
 
-- [ ] **Step 1: Write the failing test** `supabase/tests/armory.sql` (begin/rollback, same shape as `supabase/tests/players.sql`): privilege block over every table and function; enqueue → take returns it; upsert two characters (invented names) with equipment; `armory_character` finds one; `armory_board('item_level', null, null, 10)` ranks them; `armory_rank` gives rank 1 of 2 and 2 of 2; `armory_upsert_guild` with three members enqueues the two not stored; `armory_roster` joins the stored one's item_level; `armory_hide` deletes and a later upsert writes 0 and the row stays absent; `armory_missing` on a stored character deletes it and its membership row; `armory_missing` on a queued guess bumps tries and after 3 deletes the queue row; `armory_touch` moves checked_at; `armory_purge` removes a row whose fetched_at is set to 31 days ago (update it directly in the test); `armory_seed_from_players` enqueues a guild from a `public.players` row (insert via `upsert_players`) with region from the realm prefix.
+- [ ] **Step 1: Write the failing test** `supabase/tests/armory.sql` (begin/rollback, same shape as `supabase/tests/players.sql`): privilege block over every table and function; enqueue → take returns it; upsert two characters (invented names) with equipment; `armory_character` finds one; `armory_board('item_level', null, null, 10)` ranks them; `armory_rank` gives rank 1 of 2 and 2 of 2; `armory_upsert_guild` with three members enqueues the two not stored; `armory_roster` joins the stored one's item_level; `armory_hide` deletes and a later upsert writes 0 and the row stays absent; `armory_missing` on a stored character deletes it and its membership row; `armory_missing` on a queued guess bumps tries and after 3 retains the queue row with a 90-day deferral; seeding cannot reset it; `armory_touch` moves both fetched_at and checked_at, and the refreshed row survives purge; `armory_purge` removes a row whose fetched_at is set to 31 days ago (update it directly in the test); `armory_seed_from_players` enqueues a guild from a `public.players` row (insert via `upsert_players`) with region from the realm prefix.
 - [ ] **Step 2: Run it on PGlite** and watch it fail: install `@electric-sql/pglite@0.2.17` in a `%TEMP%` folder (never in the repo), a short Node script that creates roles `anon, authenticated, service_role`, runs every file of `supabase/migrations` in sorted order, then `supabase/tests/armory.sql`. Keep the script outside the repo.
 - [ ] **Step 3: Write the migration** to the contract. Header comment says what it is for, what to apply first (`20261021130000_players.sql` and `20261022160000_players_realm_key.sql` for the seed function), and that it is safe to apply twice.
 - [ ] **Step 4: Run all SQL tests** (every file in `supabase/tests`) on PGlite; all pass. Mutation check: comment out the hide check in `armory_upsert_characters`, rerun, the test fails; restore.
