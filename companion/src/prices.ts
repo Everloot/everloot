@@ -86,10 +86,9 @@ function nameLine(name: string): string {
   return name.replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, 100);
 }
 
-/** "n116=Defias Bandit\no1731=Copper Vein": a name for each source in the rows that has one, in key order. */
-export function dropNames(drops: DropSources): string {
-  const keys = new Set(drops.rows.map((r) => `${r[1]}${r[2]}`));
-  return Object.entries(drops.names ?? {})
+/** "n116=Defias Bandit\no1731=Copper Vein": a name for each key in `keys` that has one, in key order. */
+function namesBlock(keys: Set<string>, names: Record<string, string> | undefined): string {
+  return Object.entries(names ?? {})
     .filter(([key]) => keys.has(key))
     .map(([key, name]) => [key, nameLine(name)] as const)
     .filter(([, name]) => name)
@@ -98,16 +97,52 @@ export function dropNames(drops: DropSources): string {
     .join("\n");
 }
 
+/** The names block of the drops table: a name for each source in the rows that has one. */
+export function dropNames(drops: DropSources): string {
+  return namesBlock(new Set(drops.rows.map((r) => `${r[1]}${r[2]}`)), drops.names);
+}
+
+/** [itemId, vendor NPC ids, reagent-of count]: the public sources of one item, from the site's rollups. */
+export type SourceRow = [number, number[], number];
+/**
+ * The public item sources in the file, beside the drops: the NPCs that sell an item and the number of recipes it is
+ * a basic reagent of, each public by the site's three-installs rule. `names` holds the vendors' names, keyed "n<npcId>".
+ */
+export interface ItemSources { dataAsOf: string | null; fetchedAt: string; rows: SourceRow[]; names?: Record<string, string> }
+
+/** One row per item, items ascending, each row's vendors ascending and once; a second row for an item is dropped. */
+export function sortSourceRows(rows: SourceRow[]): SourceRow[] {
+  const seen = new Set<number>();
+  return [...rows].sort((a, b) => a[0] - b[0])
+    .filter((r) => (seen.has(r[0]) ? false : (seen.add(r[0]), true)))
+    .map((r) => [r[0], [...new Set(r[1])].sort((a, b) => a - b), r[2]] as SourceRow);
+}
+
+/** The names block of the sources table: a name for each vendor in the rows the file keeps that has one. */
+export function sourceNames(sources: ItemSources): string {
+  return namesBlock(new Set(sortSourceRows(sources.rows).flatMap((r) => r[1].map((id) => `n${id}`))), sources.names);
+}
+
 /** Rows grouped by item (ascending), each item's sources best rate first, so the addon reads one run per item. */
 export function sortDropRows(rows: DropRow[]): DropRow[] {
   return [...rows].sort((a, b) => a[0] - b[0] || b[3] / b[4] - a[3] / a[4] || b[4] - a[4] || a[2] - b[2]);
 }
 
+/** A checksummed block of the file. `data` comes first, so a reader looking for realm tables never takes it for one. */
+function block(key: string, data: string, dates: { dataAsOf: string | null; fetchedAt: string }, names: string): string {
+  // Names come last, outside the checksummed data, so addons that predate them read the rows as before.
+  return `["${key}"] = { ["data"] = ${luaString(data)}, ["sum"] = ${adler32(data)}, ` +
+    `["dataAsOf"] = ${luaString(dates.dataAsOf ?? "")}, ["fetchedAt"] = ${luaString(dates.fetchedAt)}` +
+    `${names ? `, ["names"] = ${luaString(names)}` : ""} }`;
+}
+
 /**
  * The slot addon: per lower-cased realm, one "id,market,min,historical,quantity,day,reporters;..." string and its
- * Adler-32; with `drops`, one "itemId,kind,sourceId,drops,windows,installs;..." string and its Adler-32 beside them.
+ * Adler-32; with `drops`, one "itemId,kind,sourceId,drops,windows,installs;..." string and its Adler-32 beside them;
+ * with `sources`, one "itemId,npcId/npcId,reagentOf;..." string and its Adler-32 after the drops. Each block is
+ * optional: an addon reading a file without one shows what it showed before the block existed.
  */
-export function renderPricesAddon(realms: RealmPrices[], drops?: DropSources): { toc: string; lua: string } {
+export function renderPricesAddon(realms: RealmPrices[], drops?: DropSources, sources?: ItemSources): { toc: string; lua: string } {
   const toc = [
     `## Interface: ${INTERFACE}`,
     "## Title: Everloot Prices",
@@ -122,15 +157,13 @@ export function renderPricesAddon(realms: RealmPrices[], drops?: DropSources): {
     return `  [${luaString(realmKey(r.realm))}] = { ["dataAsOf"] = ${luaString(r.dataAsOf ?? "")}, ` +
       `["data"] = ${luaString(data)}, ["sum"] = ${adler32(data)} },`;
   });
-  // `data` comes first in the drops table, so a reader looking for realm tables ({ ["dataAsOf"] = ...) never takes it for one.
-  const dropData = drops ? sortDropRows(drops.rows).map((r) => r.join(",")).join(";") : "";
-  // Names come last, outside the checksummed data, so addons that predate them read the rates as before.
-  const names = drops ? dropNames(drops) : "";
-  const close = drops
-    ? `}, ["drops"] = { ["data"] = ${luaString(dropData)}, ["sum"] = ${adler32(dropData)}, ` +
-      `["dataAsOf"] = ${luaString(drops.dataAsOf ?? "")}, ["fetchedAt"] = ${luaString(drops.fetchedAt)}` +
-      `${names ? `, ["names"] = ${luaString(names)}` : ""} } }`
-    : "} }";
+  const blocks: string[] = [];
+  if (drops) blocks.push(block("drops", sortDropRows(drops.rows).map((r) => r.join(",")).join(";"), drops, dropNames(drops)));
+  if (sources) {
+    const data = sortSourceRows(sources.rows).map((r) => `${r[0]},${r[1].join("/")},${r[2]}`).join(";");
+    blocks.push(block("sources", data, sources, sourceNames(sources)));
+  }
+  const close = blocks.length ? `}, ${blocks.join(", ")} }` : "} }";
   const lua = [
     "-- Written by the Everloot companion. Do not edit: the next refresh replaces this file.",
     "EverlootPricesDB = { [\"realms\"] = {",
@@ -141,10 +174,10 @@ export function renderPricesAddon(realms: RealmPrices[], drops?: DropSources): {
   return { toc, lua };
 }
 
-export function writePricesAddon(addonsDir: string, realms: RealmPrices[], drops?: DropSources): void {
+export function writePricesAddon(addonsDir: string, realms: RealmPrices[], drops?: DropSources, sources?: ItemSources): void {
   const dir = join(addonsDir, PRICES_ADDON);
   mkdirSync(dir, { recursive: true });
-  const { toc, lua } = renderPricesAddon(realms, drops);
+  const { toc, lua } = renderPricesAddon(realms, drops, sources);
   for (const [name, text] of [[`${PRICES_ADDON}.toc`, toc], [`${PRICES_ADDON}.lua`, lua]] as const) {
     writeFileSync(join(dir, `${name}.tmp`), text);
     renameSync(join(dir, `${name}.tmp`), join(dir, name));

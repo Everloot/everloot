@@ -4,7 +4,7 @@
  */
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
-import { renderPricesAddon, type DropSources, type RealmPrices } from "../src/prices";
+import { renderPricesAddon, type DropSources, type ItemSources, type RealmPrices } from "../src/prices";
 
 const HOSTILE = 'x"] = 1 } os.execute("calc") --[[\n]]\\\0\r\t';
 
@@ -25,6 +25,13 @@ export const FIXTURE_DROPS: DropSources = {
   names: { n116: "Defias Bandit", o1731: "Copper Vein", n94: 'Bad "|cffff0000Name|r"\nn6=Forged', n6: "Kobold Vermin", n9999: "Not In Any Row" },
 };
 
+/** Linen (2589) sold by two public vendors (one named) and a reagent of 7 recipes, with a second row the writer drops; the herb (765) a reagent only. */
+export const FIXTURE_SOURCES: ItemSources = {
+  dataAsOf: "2026-10-20T06:00:00.000Z", fetchedAt: "2026-10-20T06:30:00.000Z",
+  rows: [[765, [], 2], [2589, [5678, 1234], 7], [2589, [999], 1]],
+  names: { n1234: "Fixture Supplier", n999: "Not In Any Row" },
+};
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  writeFileSync(new URL("../../addon/tests/fixtures/EverlootPrices.lua", import.meta.url), renderPricesAddon(FIXTURE_REALMS, FIXTURE_DROPS).lua);
+  writeFileSync(new URL("../../addon/tests/fixtures/EverlootPrices.lua", import.meta.url), renderPricesAddon(FIXTURE_REALMS, FIXTURE_DROPS, FIXTURE_SOURCES).lua);
 }
