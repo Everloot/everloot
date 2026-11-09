@@ -137,10 +137,35 @@ export const edgesResponse = z.object({
     attribution: attributionSchema,
     gameData: gameDataNoticeSchema.nullable().describe("Present when the page holds at least one game-file edge."),
 }).extend(pageSchema.shape);
+/** One item of /api/items: its id and what the game files say it is. A part the build does not name is null. */
+const itemCategoryRow = z.object({
+    itemId: z.number().int().positive(),
+    class: z.object({
+        id: z.number().int(),
+        name: z.string().describe("The client's name."),
+        label: z.string().describe("The plural label pages use."),
+        slug: z.string().describe("The value /api/items takes as class."),
+    }).nullable(),
+    subclass: z.object({
+        id: z.number().int(),
+        name: z.string().nullable().describe("The client's name; null when the client has none, then the slug is the id."),
+        slug: z.string().describe("The value /api/items takes as subclass."),
+    }).nullable(),
+    slot: z.object({
+        inventoryType: z.number().int().describe("The game's inventory type number."),
+        name: z.string(),
+        slug: z.string().describe("The value /api/items takes as slot."),
+    }).nullable().describe("Null for items that are not worn or held."),
+    quality: z.object({
+        id: z.number().int(),
+        name: z.string(),
+        slug: z.string().describe("The value /api/items takes as quality."),
+    }).nullable(),
+});
 /** GET /api/items: items of the current build with class, subclass, slot and quality. Game-file data. */
 export const itemsResponse = z.object({
     generatedAt: ISO_TIME,
-    items: z.array(z.record(z.string(), z.unknown())),
+    items: z.array(itemCategoryRow),
     gameData: gameDataNoticeSchema,
 }).extend(pageSchema.shape);
 /** GET /api/items/categories: the class and subclass tree of the current build, with the slot and quality slugs /api/items takes. */

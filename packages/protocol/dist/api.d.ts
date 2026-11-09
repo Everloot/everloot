@@ -260,6 +260,32 @@ export declare const edgesResponse: z.ZodObject<{
     }, z.core.$loose>>;
 }, z.core.$strip>;
 export type EdgesResponse = z.infer<typeof edgesResponse>;
+/** One item of /api/items: its id and what the game files say it is. A part the build does not name is null. */
+declare const itemCategoryRow: z.ZodObject<{
+    itemId: z.ZodNumber;
+    class: z.ZodNullable<z.ZodObject<{
+        id: z.ZodNumber;
+        name: z.ZodString;
+        label: z.ZodString;
+        slug: z.ZodString;
+    }, z.core.$strip>>;
+    subclass: z.ZodNullable<z.ZodObject<{
+        id: z.ZodNumber;
+        name: z.ZodNullable<z.ZodString>;
+        slug: z.ZodString;
+    }, z.core.$strip>>;
+    slot: z.ZodNullable<z.ZodObject<{
+        inventoryType: z.ZodNumber;
+        name: z.ZodString;
+        slug: z.ZodString;
+    }, z.core.$strip>>;
+    quality: z.ZodNullable<z.ZodObject<{
+        id: z.ZodNumber;
+        name: z.ZodString;
+        slug: z.ZodString;
+    }, z.core.$strip>>;
+}, z.core.$strip>;
+export type ItemCategoryRow = z.infer<typeof itemCategoryRow>;
 /** GET /api/items: items of the current build with class, subclass, slot and quality. Game-file data. */
 export declare const itemsResponse: z.ZodObject<{
     offset: z.ZodNumber;
@@ -267,7 +293,30 @@ export declare const itemsResponse: z.ZodObject<{
     total: z.ZodNumber;
     next: z.ZodNullable<z.ZodString>;
     generatedAt: z.ZodString;
-    items: z.ZodArray<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
+    items: z.ZodArray<z.ZodObject<{
+        itemId: z.ZodNumber;
+        class: z.ZodNullable<z.ZodObject<{
+            id: z.ZodNumber;
+            name: z.ZodString;
+            label: z.ZodString;
+            slug: z.ZodString;
+        }, z.core.$strip>>;
+        subclass: z.ZodNullable<z.ZodObject<{
+            id: z.ZodNumber;
+            name: z.ZodNullable<z.ZodString>;
+            slug: z.ZodString;
+        }, z.core.$strip>>;
+        slot: z.ZodNullable<z.ZodObject<{
+            inventoryType: z.ZodNumber;
+            name: z.ZodString;
+            slug: z.ZodString;
+        }, z.core.$strip>>;
+        quality: z.ZodNullable<z.ZodObject<{
+            id: z.ZodNumber;
+            name: z.ZodString;
+            slug: z.ZodString;
+        }, z.core.$strip>>;
+    }, z.core.$strip>>;
     gameData: z.ZodObject<{
         label: z.ZodString;
         build: z.ZodString;
@@ -1485,7 +1534,30 @@ export declare const API_SCHEMAS: {
         total: z.ZodNumber;
         next: z.ZodNullable<z.ZodString>;
         generatedAt: z.ZodString;
-        items: z.ZodArray<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
+        items: z.ZodArray<z.ZodObject<{
+            itemId: z.ZodNumber;
+            class: z.ZodNullable<z.ZodObject<{
+                id: z.ZodNumber;
+                name: z.ZodString;
+                label: z.ZodString;
+                slug: z.ZodString;
+            }, z.core.$strip>>;
+            subclass: z.ZodNullable<z.ZodObject<{
+                id: z.ZodNumber;
+                name: z.ZodNullable<z.ZodString>;
+                slug: z.ZodString;
+            }, z.core.$strip>>;
+            slot: z.ZodNullable<z.ZodObject<{
+                inventoryType: z.ZodNumber;
+                name: z.ZodString;
+                slug: z.ZodString;
+            }, z.core.$strip>>;
+            quality: z.ZodNullable<z.ZodObject<{
+                id: z.ZodNumber;
+                name: z.ZodString;
+                slug: z.ZodString;
+            }, z.core.$strip>>;
+        }, z.core.$strip>>;
         gameData: z.ZodObject<{
             label: z.ZodString;
             build: z.ZodString;

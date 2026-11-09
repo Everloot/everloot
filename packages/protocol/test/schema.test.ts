@@ -48,6 +48,14 @@ describe("schema files", () => {
     expect(index.publicKinds).toEqual([...PUBLIC_RECORD_KINDS].sort());
   });
 
+  test("the items response file types each item, so a generated client gets fields, not any", () => {
+    const file = JSON.parse(readFileSync(join(out, "api", "itemsResponse.json"), "utf8")) as { properties: { items: { items: { properties: Record<string, unknown>; required: string[]; additionalProperties: unknown } } } };
+    const item = file.properties.items.items;
+    expect(Object.keys(item.properties)).toEqual(["itemId", "class", "subclass", "slot", "quality"]);
+    expect(item.required).toEqual(["itemId", "class", "subclass", "slot", "quality"]);
+    expect(item.additionalProperties).toBe(false);
+  });
+
   test("every MCP tool file has its input schema, and an output schema exactly where the tool declares one", () => {
     for (const name of MCP_TOOL_NAMES) {
       const file = JSON.parse(readFileSync(join(out, "mcp", `${name}.json`), "utf8")) as { inputSchema: { type: string }; outputSchema?: { properties: Record<string, unknown> } };
