@@ -455,8 +455,6 @@ addon's tests only.
 - A partial price sample (the search-based fallback when a full scan cannot run) keeps only the newest earlier
   sample of that realm before it stores, so two samples no longer fill the 2,000-row `auction_scan` cap and later samples no
   longer report "stored 0". Another realm's rows stay.
-- When `/ask` cannot be answered (the Desktop App offline, no model set up), the reason is shown once and the question
-  stays queued, so a later answer still reaches the game. After each `/reload` the addon says how many are waiting.
 
 ## [desktop-v0.1.20] - 2026-11-06
 
