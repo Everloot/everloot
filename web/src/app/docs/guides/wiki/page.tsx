@@ -10,7 +10,7 @@ const REPO = "https://github.com/Everloot/everloot";
 
 export const metadata: Metadata = pageMetadata({
   title: "Write a wiki page",
-  description: "How a page of the WoW: Forever wiki is proposed and reviewed: the page types and their sections, the front matter, the rules on numbers and sources, the check and the pull request.",
+  description: "How a WoW: Forever wiki page is proposed and reviewed: page types and sections, front matter, rules on numbers and sources, the check and the pull request.",
   path: "/docs/guides/wiki",
 });
 
