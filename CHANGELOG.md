@@ -292,6 +292,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and the snapshot is read again only after a minute. The route itself is unchanged.
 
 ### Changed
+- Docs: the docs index lists the backlog, the open-data export, the live-client probes, and the dated notes and folders it had left out.
 - Companion: the command line's `main` takes its uploader, price refresher, file watcher and console as an optional argument,
   with the real ones as defaults, so the watch and prices loop is tested with fakes (upload then prices on each settled
   write, prices alone, a failed refresh that keeps the previous file, upload never writing prices). Nothing it sends changes.
