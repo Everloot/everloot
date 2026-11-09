@@ -9,7 +9,7 @@ export {
   type Board, type BadgeId, type EcosystemView, type ProjectView,
 } from "../../../kb/src/ecosystem";
 
-/** The refresh runs daily; past this many hours the addon pages say the GitHub facts are old. */
+/** The refresh keeps one count per day; past this many hours the addon pages say the GitHub facts are old. */
 export const STALE_AFTER_HOURS = 26;
 
 /** "older than 26 hours" when the snapshot is that old by `now`; null when it is fresh or there is none. */

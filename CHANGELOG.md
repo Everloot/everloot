@@ -112,6 +112,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: /addons and the addon tracker's Rising board count a star change over the same window, the 7 days before
   the newest daily count, and print it the same way ("+21 since 2026-10-28"); before, one counted from the snapshot
   and the other from the clock, so they disagreed. Both pages say when the GitHub facts are older than 26 hours.
+
 ### Added
 - Addon: the Everloot window's sidebar is now Home, Gold, Collection, Professions and Settings. Ask, Build plan and
   Auctions left the sidebar; `/ask` and `/everloot plan` still work.
