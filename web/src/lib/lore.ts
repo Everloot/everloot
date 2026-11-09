@@ -196,7 +196,7 @@ const MATCHES = new WeakMap<object, Map<string, LoreMatch | null>>();
  * names would scan the whole file; the name lookup uses the (type, name) index. Answers are kept per opened
  * release, so a page never asks twice for the same name.
  */
-export async function loreForEntity(type: "npc" | "item" | "quest" | "zone", name: string): Promise<LoreMatch | null | Unavailable> {
+export async function loreForEntity(type: LoreType, name: string): Promise<LoreMatch | null | Unavailable> {
   const release = await getRelease();
   if (!release) return UNAVAILABLE;
   const clean = name.trim();

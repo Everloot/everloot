@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
-import { debounce, defaultStatePath, parseArgs, sharesInstallWith, uploadNotice, uploadSummary } from "../src/cli";
+import { debounce, defaultStatePath, main, parseArgs, sharesInstallWith, uploadNotice, uploadSummary, type MainDeps } from "../src/cli";
 import { loopbackSite } from "./loopback-mcp";
 
 test("arguments name a command, a file or a game folder, and an endpoint", () => {
@@ -158,4 +158,85 @@ describe("the bridge command, started as a real process", () => {
     expect(run.stderr).toMatch(/ENOENT|gone\.txt/);
     expect(site.since(from)).toEqual([]);
   }, 60_000);
+});
+
+describe("the upload, watch and prices loop, with a fake uploader and price writer", () => {
+  const dirs: string[] = [];
+  afterEach(() => { vi.useRealTimers(); for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }); });
+
+  const UPLOAD = { sent: 1, batches: 1, skipped: 0, heldNamed: 0, heldLegacy: 0, heldAddons: 0, heldCensus: 0, heldPlayers: 0, heldRuns: 0, invalid: 0, rejected: 0 };
+  /** A game folder with one account file; the state file sits beside it so nothing is written to the user's app data. */
+  function game() {
+    const d = mkdtempSync(join(tmpdir(), "everloot-loop-"));
+    dirs.push(d);
+    const file = join(d, "WTF", "Account", "TEST", "SavedVariables", "Everloot.lua");
+    mkdirSync(join(d, "WTF", "Account", "TEST", "SavedVariables"), { recursive: true });
+    writeFileSync(file, 'EverlootDB = {["version"] = "0.3.4", ["installId"] = "abcd-1234-ef56-7890", ["records"] = {}}\n');
+    return { d, file, args: ["--game", d, "--endpoint", "http://localhost:1", "--state", join(d, "sent.json")] };
+  }
+  /** Fakes that record each call in order, plus the watcher's listener so a test can deliver a file event. */
+  function fakes(pricesFail = false) {
+    const calls: string[] = [];
+    const out: string[] = [], errors: string[] = [];
+    const listeners = new Map<string, () => void>();
+    const deps: MainDeps = {
+      uploadFile: async (file) => { calls.push(`upload ${file}`); return UPLOAD; },
+      refreshPrices: async () => { calls.push("prices"); if (pricesFail) throw new Error("site unreachable"); return { realms: 1, items: 2 }; },
+      watchFile: (file, onChange) => { listeners.set(file, onChange); return () => {}; },
+      console: { log: (line: string) => { out.push(line); }, error: (line: string) => { errors.push(line); } },
+    };
+    return { deps, calls, out, errors, listeners };
+  }
+
+  test("watch uploads each file once at start, then refreshes prices, and does both again after a settled write", async () => {
+    vi.useFakeTimers();
+    const { file, args } = game();
+    const f = fakes();
+    await main(["watch", ...args], f.deps);
+    expect(f.calls).toEqual([`upload ${file}`, "prices"]);
+    expect(f.out).toContain(uploadNotice());
+    expect(f.out.some((l) => l.startsWith(`${file}: sent 1 new events`))).toBe(true);
+    expect(f.out.some((l) => l.startsWith("Prices: 2 items on 1 realm(s) written to "))).toBe(true);
+    expect(f.out).toContain("Watching 1 file(s). Leave this running while you play; Ctrl+C stops it.");
+    expect([...f.listeners.keys()]).toEqual([file]);
+    f.listeners.get(file)!();
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(f.calls).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(f.calls).toEqual([`upload ${file}`, "prices", `upload ${file}`, "prices"]);
+    expect(f.errors).toEqual([]);
+  });
+
+  test("prices runs the price writer alone, with no upload and no watcher", async () => {
+    const { args } = game();
+    const f = fakes();
+    await main(["prices", ...args], f.deps);
+    expect(f.calls).toEqual(["prices"]);
+    expect(f.listeners.size).toBe(0);
+    expect(f.out).not.toContain(uploadNotice());
+    expect(f.errors).toEqual([]);
+  });
+
+  test("a price refresh that throws says the previous ones stay, and the loop keeps running", async () => {
+    vi.useFakeTimers();
+    const { file, args } = game();
+    const f = fakes(true);
+    await main(["watch", ...args], f.deps);
+    expect(f.errors).toEqual(["Prices not updated (the previous ones stay): site unreachable"]);
+    expect(f.out).toContain("Watching 1 file(s). Leave this running while you play; Ctrl+C stops it.");
+    f.listeners.get(file)!();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(f.calls).toEqual([`upload ${file}`, "prices", `upload ${file}`, "prices"]);
+    expect(f.errors).toHaveLength(2);
+  });
+
+  test("upload sends each file and never calls the price writer or the watcher", async () => {
+    const { file, args } = game();
+    const f = fakes();
+    await main(["upload", ...args], f.deps);
+    expect(f.calls).toEqual([`upload ${file}`]);
+    expect(f.listeners.size).toBe(0);
+    expect(f.out.some((l) => l.startsWith("Watching"))).toBe(false);
+    expect(f.errors).toEqual([]);
+  });
 });

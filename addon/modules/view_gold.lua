@@ -1,4 +1,4 @@
--- Everloot window, Gold: every character's gold by realm with the last 30 days as bars, the ledger by category,
+-- Everloot window, Gold: every character's gold by realm with the period's days as bars, the ledger by category,
 -- day and receipt, auction sales one by one or by item, and the gold per hour session. It reads the roster
 -- (roster.lua), the ledger store (ledger.lua) and the gph session (gph.lua) and displays them.
 -- Display only: it reads, the session buttons run the gph commands the player could type, and nothing here
@@ -13,6 +13,12 @@ local W = 604          -- the view frame window.lua gives every view (W - MAIN -
 local ROWS, ROW_H = 12, 18
 local TABS = { { "overview", "Overview" }, { "ledger", "Ledger" }, { "sales", "Sales" }, { "session", "Session" } }
 local PERIODS = { { "today", "Today" }, { "7d", "7 days" }, { "30d", "30 days" }, { "all", "All" } }
+-- The days each period covers: the chart draws one bar per day, and the by-item rate divides by it. "All" is the
+-- ledger's own 90-day window.
+local PERIOD_DAYS = { today = 1, ["7d"] = 7, ["30d"] = 30, all = 90 }
+local PERIOD_CAPTION = { today = "Today", ["7d"] = "Last 7 days", ["30d"] = "Last 30 days", all = "Last 90 days" }
+local MAX_BARS = 90
+local CHART_LEFT, CHART_WIDTH = 10, 288   -- the bars' left edge and the width they share inside the 308 px chart
 local SCOPES = { { "character", "This character", 110 }, { "account", "Account", 80 } }
 local NO_EVENTS = "Nothing recorded in this period."
 local NO_SALES = "No auction sales recorded yet. Collect an auction letter at the mailbox and it appears here."
@@ -132,20 +138,31 @@ local function drawOverview(g, keys)
   end, "No characters recorded yet.")
   g.total:SetText(#items > 0 and ("All characters  " .. U.Money(account)) or "")
 
-  local series = E.Ledger.Series(keys, 30)
+  -- One bar per day of the period, sharing the chart's width; the bars past the period stay hidden.
+  local days = PERIOD_DAYS[g.period] or 30
+  local series = E.Ledger.Series(keys, days)
   local high
   for _, d in ipairs(series) do
     if d.copper and (not high or d.copper > high) then high = d.copper end
   end
   local max = high and high > 0 and high or 1
+  local step = CHART_WIDTH / days
+  local width = math.max(1, step - (step >= 6 and 2 or 1))
   for i, bar in ipairs(g.bars) do
-    local copper = series[i] and series[i].copper
-    bar:SetMinMaxValues(0, max)
-    bar:SetValue(copper or 0)
-    bar:SetStatusBarColor(unpack(copper and COLORS.accent or COLORS.muted))
+    if i <= days then
+      local copper = series[i] and series[i].copper
+      bar:SetPoint("BOTTOMLEFT", CHART_LEFT + (i - 1) * step, 40)
+      bar:SetSize(width, 220)
+      bar:SetMinMaxValues(0, max)
+      bar:SetValue(copper or 0)
+      bar:SetStatusBarColor(unpack(copper and COLORS.accent or COLORS.muted))
+      bar:Show()
+    else
+      bar:Hide()
+    end
   end
   g.chartHigh:SetText("Highest  " .. U.Money(high))
-  g.chartCaption:SetText("Last 30 days · " .. (g.scope == "account" and "Account" or "This character"))
+  g.chartCaption:SetText((PERIOD_CAPTION[g.period] or "Last 30 days") .. " · " .. (g.scope == "account" and "Account" or "This character"))
 end
 
 local function drawLedger(g, keys)
@@ -192,9 +209,18 @@ end
 
 local STATUS_TEXT = { paid = "paid", pending = "sold, gold pending", unmatched = "unmatched" }
 
+-- By item, each row's rate is its paid sales over the period's days and its last sold day; the sales list is
+-- newest first, so the first paid sale of an item is its last.
 local function drawSales(g, keys)
   local from, to = E.Ledger.Period(g.period)
   local sales = g.grouped and E.Ledger.SalesByItem(keys, from, to) or E.Ledger.Sales(keys, from, to)
+  local lastSold = {}
+  if g.grouped then
+    for _, s in ipairs(E.Ledger.Sales(keys, from, to)) do
+      if s.status == "paid" and not lastSold[s.itemName] then lastSold[s.itemName] = s.at end
+    end
+  end
+  local days = PERIOD_DAYS[g.period] or 30
   show(g.sales, sales, function(row, s)
     local priced = type(s.count) == "number" and type(s.total) == "number"
     row.item:SetText(s.itemName)
@@ -203,14 +229,18 @@ local function drawSales(g, keys)
     row.total:SetText(priced and U.MoneyShort(s.total) or "-")
     if g.grouped then
       row.deposit:SetText("")
+      row.cut:SetText("")
       row.when:SetText(s.sales .. (s.sales == 1 and " sale" or " sales"))
-      row.status:SetText("")
+      local last = lastSold[s.itemName]
+      row.status:SetText(string.format("%.1f/day", s.sales / days) .. (last and (" · " .. date("!%m-%d", last)) or ""))
     else
       row.deposit:SetText(type(s.deposit) == "number" and U.MoneyShort(s.deposit) or "-")
+      row.cut:SetText(type(s.cut) == "number" and U.MoneyShort(s.cut) or "-")
       row.when:SetText(date("!%m-%d %H:%M", s.at))
       row.status:SetText(STATUS_TEXT[s.status] or "-")
     end
   end, NO_SALES)
+  g.sales.head:SetText(g.grouped and "Auction sales by item  |cffc9c3b0sales, per day · last sold|r" or "Auction sales")
   g.groupButton:SetText(g.grouped and "Each sale" or "By item")
 end
 
@@ -232,11 +262,11 @@ function refresh(f)
     lit(g.tabs[t[1]], t[1] == g.tab)
     if t[1] == g.tab then g.pages[t[1]]:Show() else g.pages[t[1]]:Hide() end
   end
-  -- The period counts for the ledger and sales; the session has neither period nor scope.
+  -- The period counts for the overview chart, the ledger and sales; the session has neither period nor scope.
   for _, p in ipairs(PERIODS) do
     local b = g.periods[p[1]]
     lit(b, p[1] == g.period)
-    if g.tab == "ledger" or g.tab == "sales" then b:Show() else b:Hide() end
+    if g.tab ~= "session" then b:Show() else b:Hide() end
   end
   for _, s in ipairs(SCOPES) do
     local b = g.scopes[s[1]]
@@ -280,7 +310,8 @@ local function build(f, parent)
     right = right + s[3] + 4
   end
 
-  -- Overview: characters by realm, and the scope's closing gold for the last 30 days.
+  -- Overview: characters by realm, and the scope's closing gold over the period, one bar a day. The bars are
+  -- built once for the longest period; drawOverview places the period's own and hides the rest.
   local o = g.pages.overview
   local roster
   g.rows, roster = list(o, 0, 0, 290, 300, "Characters", { { "name", 0, 150 }, { "gold", 150, 132, true } })
@@ -289,10 +320,11 @@ local function build(f, parent)
   local chart = box(o, 296, 0, 308, 300)
   g.chartHigh = text(chart, 11, nil, COLORS.muted)
   g.chartHigh:SetPoint("TOPLEFT", 10, -8)
-  for i = 1, 30 do
+  for i = 1, MAX_BARS do
     local bar = CreateFrame("StatusBar", nil, chart)
-    bar:SetPoint("BOTTOMLEFT", 19 + (i - 1) * 9, 40)
-    bar:SetSize(7, 220)
+    bar:SetPoint("BOTTOMLEFT", CHART_LEFT, 40)
+    bar:SetSize(1, 220)
+    bar:Hide()
     bar:SetOrientation("VERTICAL")
     bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
     local back = bar:CreateTexture(nil, "BACKGROUND")
@@ -320,11 +352,11 @@ local function build(f, parent)
   g.moved = text(l, 12, nil, COLORS.muted)
   g.moved:SetPoint("TOPLEFT", 4, -314)
 
-  -- Sales, newest first, or one row per item.
+  -- Sales, newest first, or one row per item; the cut is the auction house's, from the invoice.
   local salesBox
   g.sales, salesBox = list(g.pages.sales, 0, 0, W, 300, "Auction sales",
-    { { "item", 0, 184 }, { "count", 184, 34 }, { "unit", 218, 70, true }, { "total", 288, 70, true },
-      { "deposit", 358, 56, true }, { "when", 420, 76 }, { "status", 496, 100 } })
+    { { "item", 0, 150 }, { "count", 150, 34 }, { "unit", 184, 68, true }, { "total", 252, 68, true },
+      { "deposit", 320, 50, true }, { "cut", 370, 50, true }, { "when", 426, 70 }, { "status", 496, 100 } })
   g.groupButton = button(salesBox, "By item", 90, function() g.grouped = not g.grouped; g.sales.offset = 0 end)
   g.groupButton:SetPoint("BOTTOMLEFT", 6, 6)
 
