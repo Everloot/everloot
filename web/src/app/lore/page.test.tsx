@@ -32,6 +32,8 @@ test("the landing page states the archive's size, date, licence and notice from 
   expect(html).toContain('name="q"');
   expect(html).toContain("predates WoW: Forever");
   expect(html).toContain('href="/database"');
+  expect(html).toContain('href="/wiki"');
+  expect(html).toContain('href="/docs/guides/wiki"');
   expect(html).toContain('href="/lore/npcs"');
   expect(html).toContain('href="/lore/coverage"');
 });

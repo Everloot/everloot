@@ -4,6 +4,7 @@ import { ago, answerSuggestion, clock, companionStatus, copyLabel, esc, gold, kb
 import { JOBS, NO_SOURCED_ANSWER, type AddonInfo, type AppState, type AskInfo, type BackupInfo, type ChangeItem, type CharacterRow, type CharactersInfo, type ChatInfo, type ChatProgress, type DataPart, type DataUsage, type EverlootApi, type PriceLookup, type FileSummary, type GameFolderCandidate, type Job, type JobStatus, type MarketInfo, type MoneyDay } from "../shared/types";
 import { PROVIDER_PRESETS, assistantSource, keptModelPick, manualModelShown, presetFor, removalNotice, type ModelChoice, type ProviderKind } from "../shared/providers";
 import { inkOn } from "../../../web/src/lib/chat/catalogue";
+import { LOCAL_ONLY_CATEGORIES } from "../shared/ledger";
 import { WEBSITE_LINKS, websiteUrl } from "../shared/website";
 import { emptyCause, emptyState, ghostProfile, jobOfLine, ownedLockouts, ownedProfessions, statePill, threadLines, watchPill, workingStrip } from "./parts";
 
@@ -613,7 +614,7 @@ function drawerOverview(c: CharacterRow, onPage = false): string {
   }).join("");
   const catCol = (dir: "in" | "out") => {
     const rows = Object.entries(dir === "in" ? c.earned : c.spent).sort((a, b) => b[1] - a[1]).slice(0, 8);
-    return rows.length ? rows.map(([k, v]) => `<div class="cat"><span>${esc(k.replace(/_/g, " "))}</span><span class="num">${gold(v)}</span></div>`).join("") : '<p class="muted small">Nothing recorded.</p>';
+    return rows.length ? rows.map(([k, v]) => `<div class="cat"><span>${esc(k.replace(/_/g, " "))}${LOCAL_ONLY_CATEGORIES.includes(k) ? ' <span class="muted small">local only</span>' : ""}</span><span class="num">${gold(v)}</span></div>`).join("") : '<p class="muted small">Nothing recorded.</p>';
   };
   return `
     <div class="dw-stats">
@@ -627,6 +628,7 @@ function drawerOverview(c: CharacterRow, onPage = false): string {
     </section>
     <section class="dw-sec"><div class="row between"><h3>Money by category</h3><span class="muted small">all time in this file</span></div>
       <div class="cat-cols"><div><h4>Earned</h4>${catCol("in")}</div><div><h4>Spent</h4>${catCol("out")}</div></div>
+      <p class="muted small">Repairs, trades and mail are read from the local ledger and are never uploaded.</p>
     </section>
     ${onPage ? "" : `<section class="dw-sec"><h3>Progress</h3>
       <p class="muted small">Achievements, reputations, titles and quests are keyed by an opaque identifier, never a name, so they stay listed apart from this character. <button type="button" class="link" id="gotoKeyed">Show the keyed rows</button></p>

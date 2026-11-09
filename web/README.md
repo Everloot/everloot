@@ -15,7 +15,8 @@ Rollback: `npx wrangler rollback` from `web/`.
 
 Open http://localhost:3000. Without a `.env.local` the site still runs: storage-backed pages say
 storage is unavailable, and the lore pages say the archive is unavailable. `.env.example` lists the
-server variables production uses; none are needed to work on most pages.
+server variables production uses; none are needed to work on most pages. Every name the project reads, and
+where each is set, is in [docs/ENVIRONMENT.md](../docs/ENVIRONMENT.md).
 
 ## Test it
 
