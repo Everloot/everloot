@@ -1,5 +1,6 @@
-import { API_ROUTES, MCP_PROMPT_NAMES, MCP_PROMPTS, MCP_TOOLS, type ApiRoute, type McpToolName } from "@everloot/protocol";
+import { ALL_RECORD_KINDS, API_ROUTES, MCP_PROMPT_NAMES, MCP_PROMPTS, MCP_TOOLS, type ApiRoute, type McpToolName } from "@everloot/protocol";
 import { liveToolNames } from "@/lib/guild-switch";
+import { recordHref } from "@/lib/docs/records";
 
 /**
  * The docs' one table of contents: tabs, their sidebar groups and pages, in reading order. The tab bar,
@@ -149,6 +150,10 @@ export const DOCS_TABS: DocsTab[] = [
           { href: "/docs/api/schemas", title: "Schemas and the protocol", lede: "Every response shape and record kind, and the protocol version." },
           { href: "/docs/api/data-files", title: "Data files", lede: "Bulk downloads of the open data, and what they hold." },
         ],
+      },
+      {
+        title: "Record kinds", icon: "upload",
+        pages: ALL_RECORD_KINDS.map((kind) => ({ href: recordHref(kind), title: kind, lede: `The fields of one ${kind} upload record, their types, and what the server checks.` })),
       },
     ],
   },

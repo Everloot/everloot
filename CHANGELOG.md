@@ -15,6 +15,9 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: every record kind has a docs page, `/docs/api/records/<kind>`, generated from its schema: each field with its type,
+  whether it is required and its description, nested fields included, whether the kind is in the public corpus, where it
+  goes, and the cross-field rules the server checks. The sidebar lists them and the schemas table links each kind to its page.
 - Site: the account guide and the addon page link the sample character page (/showcase/character), so a player can see
   what a character page holds before linking one. The sample stays out of search and the sitemap.
 - Addon: the Gold tab's Overview chart follows the period buttons (today, 7 days, 30 days, or all for the ledger's
@@ -154,6 +157,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   query lists what a search finds (items, NPCs, quests, zones, objects, the lore archive, tools and docs), each
   linked to its list, with four queries to try. Before, the class page stopped at the database links and an empty
   search page showed the field alone.
+- Site: `/docs/mcp` tables the record kinds the knowledge tools cover, where each kind comes from and the tool that
+  reads it on its own, and says how a record id is formed: a catalog record's stable synthetic id against the in-game
+  id the page tools take.
 - Site: the limits and keys page has a Scopes section: a table of every scope a key can carry (read:public on every
   key; read:own, link:own and sync:own opt-in on the key form), what each allows and which routes check it. A test
   keeps the table at one row per scope the code defines.
