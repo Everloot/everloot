@@ -9,7 +9,7 @@ Two documents hold the detail. The architecture is described in
 in-game ID, a player-data pipeline, a public read API with access tiers, community data packs, an addon
 directory, a shared visual kit, then ads and apps. The backlog is in
 [`docs/2026-10-28-platform-gap-register.md`](docs/2026-10-28-platform-gap-register.md), with an ID per
-item (`REL-`, `CF-`, `SEC-`, `HUB-`, `COL-`, `HIST-`, `ECON-`, `PVE-`, `PVP-`, `LOG-`, `COMBAT-`, `OPS-`).
+item (`REL-01`, `CF-04`, `HUB-P01` and so on) that issues and pull requests can cite.
 What has shipped is in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Now: after the launch (WoW: Forever, 2026-11-04)
@@ -46,9 +46,9 @@ In the order [#57](https://github.com/Everloot/everloot/issues/57) sets:
 3. **The public read API and its tiers.** The free tier (site, apps, MCP) stays read-only and rate limited;
    partner keys get higher limits and extra endpoints, issued and revoked by the maintainer.
 4. **Community data packs.** A documented format, submitted by pull request or upload, validated
-   automatically and approved by a maintainer before anything goes public. Sharing data with
-   [Polestar](https://github.com/fitzforge/polestar) is the first case
-   ([#9](https://github.com/Everloot/everloot/issues/9)).
+   automatically and approved by a maintainer before anything goes public. Sharing observed data with
+   [Polestar](https://github.com/fitzforge/polestar) ([#9](https://github.com/Everloot/everloot/issues/9))
+   fits here: its guides could use Forever data, and its players could add to ours.
 5. **The addon directory.** Open-source Forever addons ranked by public traction, with public rules and no
    paid placement; the ranking and listing rules still need a page
    ([#988](https://github.com/Everloot/everloot/issues/988)) and a listing form
