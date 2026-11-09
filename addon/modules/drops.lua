@@ -7,11 +7,12 @@ local E = Everloot
 E.DROP_INSTALLS = 3        -- as the site: a rate is public once three installs looted its source
 E.DROP_SOURCES_SHOWN = 3   -- tooltip lines per item; the rest are counted
 
--- The drops block: { status = "absent" | "verifying" | "ready" | "bad", data, asOf, names }.
-local drops
+-- The drops block and the sources block (public vendors and reagent-of counts, beside the drops), each
+-- { status = "absent" | "verifying" | "ready" | "bad", data, asOf, names }.
+local drops, sources
 
 function E:ResetDrops()
-  drops = nil
+  drops, sources = nil, nil
 end
 
 --- The block's `names`, one "n116=Defias Bandit" or "o1731=Copper Vein" line each, as { n116 = name }: the names
@@ -24,30 +25,60 @@ local function sourceNames(text)
   return names
 end
 
+--- One checksummed block of EverlootPricesDB (`key`), read once: absent when the file has no such table, verifying
+--- while its Adler-32 `sum` is checked a slice per frame, then ready or bad. `what` names it in the chat warning.
+--- `set` stores the entry in the module before the check starts (a small block passes within the call) and `current`
+--- reads it back, so a reset while checking is seen.
+local function loadBlock(key, what, set, current)
+  local db = type(EverlootPricesDB) == "table" and EverlootPricesDB[key]
+  if type(db) ~= "table" then
+    set({ status = "absent" })
+  elseif type(db.data) ~= "string" or type(db.sum) ~= "number" then
+    set({ status = "bad" })
+    print("Everloot: " .. what .. " failed their checksum and are not shown.")
+  else
+    local entry = { status = "verifying", data = ";" .. db.data .. ";", asOf = db.dataAsOf, names = sourceNames(db.names) }
+    set(entry)
+    E.VerifyChecksum(db.data, db.sum, function(ok)
+      if current() ~= entry then return end -- reset while checking
+      entry.status = ok and "ready" or "bad"
+      if not ok then
+        entry.data = nil
+        print("Everloot: " .. what .. " failed their checksum and are not shown.")
+      end
+    end)
+  end
+  return current()
+end
+
 --- The drops block of EverlootPricesDB: "itemId,kind,sourceId,drops,windows,installs;..." grouped by item, best
 --- rate first, with an Adler-32 `sum`. Searched, not parsed, like the prices: a tooltip reads its item's run only.
 local function dropFile()
-  if drops == nil then
-    local db = type(EverlootPricesDB) == "table" and EverlootPricesDB.drops
-    if type(db) ~= "table" then
-      drops = { status = "absent" }
-    elseif type(db.data) ~= "string" or type(db.sum) ~= "number" then
-      drops = { status = "bad" }
-      print("Everloot: drop sources failed their checksum and are not shown.")
-    else
-      local entry = { status = "verifying", data = ";" .. db.data .. ";", asOf = db.dataAsOf, names = sourceNames(db.names) }
-      drops = entry
-      E.VerifyChecksum(db.data, db.sum, function(ok)
-        if drops ~= entry then return end -- reset while checking
-        entry.status = ok and "ready" or "bad"
-        if not ok then
-          entry.data = nil
-          print("Everloot: drop sources failed their checksum and are not shown.")
-        end
-      end)
-    end
-  end
+  if drops == nil then loadBlock("drops", "drop sources", function(entry) drops = entry end, function() return drops end) end
   return drops
+end
+
+--- The sources block: "itemId,npcId/npcId,reagentOf;..." one row per item, items ascending, with an Adler-32 `sum`.
+--- The vendors are the NPCs the site has public rows selling the item, the count is how many recipes it is a basic
+--- reagent of, by the site's own three-installs rule. A file from an app that does not write the block is "absent".
+local function sourceFile()
+  if sources == nil then loadBlock("sources", "item sources", function(entry) sources = entry end, function() return sources end) end
+  return sources
+end
+
+--- One item's public sources from the file: { vendors = { npcId, ... }, reagentOf = n, names = { n116 = name } }.
+--- Nil while the block is missing, being checked or failed, and when the file has no row for the item.
+function E:PublicSources(itemId)
+  local entry = sourceFile()
+  if entry.status ~= "ready" then return nil end
+  local at = entry.data:find(";" .. itemId .. ",", 1, true)
+  if not at then return nil end
+  local text = entry.data:match("^;([^;]+)", at)
+  local id, vendors, reagentOf = text:match("^(%d+),([%d/]*),(%d+)$")
+  if tonumber(id) ~= itemId then return nil end
+  local ids = {}
+  for npcId in vendors:gmatch("%d+") do ids[#ids + 1] = tonumber(npcId) end
+  return { vendors = ids, reagentOf = tonumber(reagentOf), names = entry.names }
 end
 
 --- One item's public sources, best rate first: { { kind = "npc" | "object", id, drops, windows, installs } }.

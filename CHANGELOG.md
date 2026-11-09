@@ -19,6 +19,13 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   titles, quest lines, mounts, encounters, recipes, class gear and its restrictions, class spells, races, legacy perks,
   talent nodes, raid buffs): ids, the names the files hold and each file's build, every row counted, with a schema each
   and a manifest line. The README and the download page no longer list the catalogs as missing. Nothing observed changes.
+- Addon: item tooltips and `/everloot price` end with up to three muted lines from this install's own rows: "Sold by
+  <NPC> (your sighting)" from the vendor windows it opened, "Reagent for n recipes you know" from its recipe colours,
+  and "Seen in <zone>" for a drop source it met. Without own rows the price file's public vendors and reagent count
+  show instead, when the file carries them. Display only; nothing recorded or uploaded changes.
+- Companion: the EverlootPrices slot file can carry a `sources` block after the drops (public vendor NPC ids and a
+  reagent-of count per item, checksummed like the drops, with the vendors' names outside the checksum). The block is
+  optional: a file without it is read as before. The Desktop App does not write it yet.
 - Site: every record kind has a docs page, `/docs/api/records/<kind>`, generated from its schema: each field with its type,
   whether it is required and its description, nested fields included, whether the kind is in the public corpus, where it
   goes, and the cross-field rules the server checks. The sidebar lists them and the schemas table links each kind to its page.
