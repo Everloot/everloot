@@ -95,7 +95,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: a saved build's short link (`/b/<slug>`) reads the store once per visit, for the page and its metadata together,
   instead of twice. The short "Storage unreachable" notice on the collections, guild board, gold ledger, census, addon,
   popular addons and profession pages is one shared constant beside the long one.
-
+- Site: `/sitemap.xml` answers 503, uncached, while the instance store or the item names cannot be read, as it already
+  did for the world facts and the census, instead of a sitemap without the dungeon pages and item categories that the
+  CDN kept for an hour.
 ### Added
 - Addon: the Everloot window's sidebar is now Home, Gold, Collection, Professions and Settings. Ask, Build plan and
   Auctions left the sidebar; `/ask` and `/everloot plan` still work.
