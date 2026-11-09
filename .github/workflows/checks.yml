@@ -52,6 +52,8 @@ jobs:
         run: python scripts/test_check_internal_paths.py && python scripts/check_internal_paths.py
       - name: Relative links in Markdown files resolve
         run: python scripts/check_md_links.py
+      - name: docs/ENVIRONMENT.md lists every variable and secret the project reads
+        run: python scripts/test_check_env_names.py && python scripts/check_env_names.py
       - name: The data pull request merges itself only for its two data files
         run: python scripts/test_check_changes_files.py
       - name: The Discord bridge maps posts, issues and feeds correctly

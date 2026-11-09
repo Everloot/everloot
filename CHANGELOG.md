@@ -15,6 +15,8 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: the account guide and the addon page link the sample character page (/showcase/character), so a player can see
+  what a character page holds before linking one. The sample stays out of search and the sitemap.
 - Addon: the Gold tab's Overview chart follows the period buttons (today, 7 days, 30 days, or all for the ledger's
   90 days), one bar a day; Sales shows the auction house's cut beside each sale's deposit, and the by-item rows show
   sales per day over the period and the last sold day. Display only; nothing recorded or uploaded changes.
@@ -139,6 +141,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the limits and keys page has a Scopes section: a table of every scope a key can carry (read:public on every
   key; read:own, link:own and sync:own opt-in on the key form), what each allows and which routes check it. A test
   keeps the table at one row per scope the code defines.
+- Site: the MCP resources page gives each prompt its own section (title, arguments with their allowed values, the
+  `prompts/get` call and the message the server returns), shows one `resources/read` of the builds resource with the
+  shape of its document and one entity read that equals the `item_page` answer, and the MCP sidebar lists the three
+  prompts under the page.
 - Site: an item, NPC or quest page shared on Discord or X shows its own card: the name, its type and how many of
   the 3 installs agree on the name, as text on the brand canvas. Before, every database page showed the site card.
 - Addon: each Professions block lists the next recipes a trainer teaches at or above the current rank (up to three,
