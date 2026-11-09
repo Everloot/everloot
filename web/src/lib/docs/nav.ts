@@ -122,6 +122,7 @@ export const DOCS_TABS: DocsTab[] = [
           { href: "/docs/guides/find", title: "Find things on the site", lede: "Search, the database, zone pages, the world map and the tools." },
           { href: "/docs/guides/account", title: "Your account", lede: "Sign in, and manage your API keys." },
           { href: "/docs/guides/privacy", title: "Privacy and your data", lede: "What an upload carries, what is published, and how to take it back." },
+          { href: "/docs/guides/wiki", title: "Write a wiki page", lede: "How a wiki page is proposed, checked and reviewed: types, front matter and the rules." },
         ],
       },
     ],

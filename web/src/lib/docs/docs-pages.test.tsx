@@ -271,6 +271,25 @@ test("the upload guide has a Recorder section, and no docs page says the Desktop
   expect(text).not.toMatch(/named data \(guild, gear, gold, collection\), player\s+rows/);
 });
 
+test("the wiki guide quotes the wiki README's rules and check word for word, and says how a page is proposed", () => {
+  const readme = readFileSync(new URL("../../../../kb/wiki/README.md", import.meta.url), "utf8");
+  const words = (s: string) => s.replace(/\*\*|`/g, "").replace(/\s+/g, " ").trim();
+  const prose = words(text);
+  const rules = readme.slice(readme.indexOf("## Rules"), readme.indexOf("## Check a page"));
+  const bullets = rules.split(/\n(?=- )/).slice(1).map((b) => words(b.replace(/^- /, "")));
+  expect(bullets).toHaveLength(8);
+  for (const rule of bullets) expect(prose, rule).toContain(rule);
+  for (const sentence of [
+    "Each page is a short piece of writing in Everloot's own words wrapped around live data.",
+    "One file per page, <slug>.md, Markdown with YAML front matter. Not MDX: a page holds text and references, never code.",
+    "npm run kb -- wiki-check",
+    "CI runs the same check on every pull request. Every content change is reviewed like code: the check passes, a maintainer reads the page and approves it.",
+    "a draft is not built on the site",
+  ]) expect(prose).toContain(sentence);
+  expect(page).toContain('href="https://github.com/Everloot/everloot/tree/main/kb/wiki"');
+  expect(page).toContain('href="https://github.com/Everloot/everloot/pulls"');
+});
+
 test("the docs name no internal path and no AI as an author", () => {
   // The words are joined so this file does not trip scripts/check_internal_paths.py itself.
   const internal = new RegExp(["R21", "Brain"].join("-") + "|" + ["_sec", "rets"].join("") + "|" + ["Us", "ers[\\/]+car", "li"].join(""), "i");
