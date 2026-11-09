@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { approvedAddon, type ApprovedAddon } from "@/data/addon-repos";
 import { addonGithub, type AddonGithubResult } from "@/lib/addon-github";
 import { dataAgeLabel } from "@/lib/data-age";
@@ -141,7 +141,7 @@ export default async function AddonProfilePage({ params }: Props) {
   const { approved, stats, usage } = found;
   const { name, source, title } = approved;
   const { reportingInstalls, unreachable, dataAsOf } = usage;
-  if (name !== decodeURIComponent((await params).name)) redirect(`/addons/${encodeURIComponent(name)}`);
+  if (name !== decodeURIComponent((await params).name)) permanentRedirect(`/addons/${encodeURIComponent(name)}`);
   const github = await addonGithub(source.repo);
   const repoUrl = `https://github.com/${source.repo}`;
   const path = `/addons/${encodeURIComponent(name)}`;
