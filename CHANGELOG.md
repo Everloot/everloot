@@ -35,6 +35,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
 
 ### Fixed
+- Site: the schemas page marks the three shapes that describe a bulk-export file rather than an endpoint and says that
+  `reporters` in the API and MCP shapes is the count the open-data files call `installs`; the API page names the routes
+  its own pages fetch (/api/map/pins, /api/suggest) as outside the OpenAPI contract. The open-data notes say the same.
 - Desktop App: the Characters page reads the addon's local ledger (`EverlootDB.ledger`) from the save file beside the
   `money_event` rows, so its 7-day net is the Gold tab's "7 days" for the same character (today and the six UTC days
   before it) and repairs, vendor purchases, trades and mail appear in money by category, marked local only. Uploaded
@@ -160,6 +163,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   until three installs agree, a "Track this" link to the collections tool and a relation tab ("Reputation from" on a
   faction, "Earned by" on a title) whose empty state names the 3-install rule and says what no game file read so far
   carries; a faction page also shows its lore archive page when the archive has one under the same name.
+- Site: a class page links the census narrowed to its class and the classes ranking, and the search page with no
+  query lists what a search finds (items, NPCs, quests, zones, objects, the lore archive, tools and docs), each
+  linked to its list, with four queries to try. Before, the class page stopped at the database links and an empty
+  search page showed the field alone.
 - Site: `/docs/mcp` tables the record kinds the knowledge tools cover, where each kind comes from and the tool that
   reads it on its own, and says how a record id is formed: a catalog record's stable synthetic id against the in-game
   id the page tools take.
