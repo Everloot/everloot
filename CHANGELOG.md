@@ -21,6 +21,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   quest chains, drops, coverage), the census and the rankings are kept at the CDN for five minutes like the profession pages,
   and the database index, zones and instances come down from an hour to the same five minutes, so a page drawn while
   storage was unreachable is replaced within minutes. Items and the map keep their hour.
+- Web: the accessibility page describes the motion the site has, Glint included, instead of only 150 ms fades, and the
+  accessibility, terms, privacy and rankings dates use the site's one date format (November 4, 2026).
 - Addon: a loading screen inside the minute after the last gold snapshot writes no new row unless the balance changed;
   the last snapshot's time is kept in the saved file, so a /reload no longer adds a row each.
 - Addon: the button drawer leaves the minimap buttons to MinimapButtonButton when that addon is loaded, and to any

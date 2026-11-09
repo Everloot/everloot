@@ -40,7 +40,7 @@ test("weeks are ISO weeks from Monday 00:00 UTC, and the first ranked week is th
   expect(new Date(weekStart(Date.parse("2026-11-16T00:00:00.000Z"))).toISOString()).toBe("2026-11-16T00:00:00.000Z");
   expect(new Date(firstWeek()).toISOString()).toBe("2026-11-09T00:00:00.000Z");
   expect(new Date(firstWeek("2026-11-09T00:00:00.000Z")).toISOString()).toBe("2026-11-09T00:00:00.000Z");
-  expect(START_LINE).toBe("Rankings start with the first full week after 4 November.");
+  expect(START_LINE).toBe("Rankings start with the first full week after November 4, 2026.");
 });
 
 test("before the first full week there are no weeks, so no numbers, even with rows from launch week", () => {

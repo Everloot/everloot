@@ -3,6 +3,7 @@ import Link from "next/link";
 import { pageMetadata } from "@/lib/seo";
 import { REVOKED_KEPT_DAYS, USAGE_KEPT_DAYS } from "@/lib/api-keys";
 import { OPERATOR } from "@/lib/jsonld";
+import { longDate } from "@/data/wow-forever";
 import { trailFor } from "@/lib/breadcrumbs";
 import { leaderboardsOn } from "@/lib/leaderboard-switch";
 import { pullSummariesOn } from "@/lib/pull-summaries";
@@ -41,11 +42,11 @@ export default function PrivacyPage() {
   // The gear rankings item shows only once the boards are on (EVERLOOT_LEADERBOARDS); the switch-on change dates the page.
   const ranked = leaderboardsOn();
   // Linked characters, public character pages, the guild item's character page and private sync: 6 November.
-  const updated = "6 November 2026";
+  const updated = "2026-11-06";
   return (
     <article>
       <Container width="reading">
-        <PageHeader trail={trailFor("/privacy")!} title="Privacy Policy" meta={<span>Last updated: {updated}</span>} />
+        <PageHeader trail={trailFor("/privacy")!} title="Privacy Policy" meta={<span>Last updated: {longDate(updated)}</span>} />
       </Container>
       <ReadingLayout items={SECTIONS}>
         <Prose>
