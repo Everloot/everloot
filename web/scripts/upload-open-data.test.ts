@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { writeOpenData } from "../../kb/src/open-data/write";
+import { readOpenDataGameFiles } from "../../kb/src/open-data/game-data";
 import { plan, uploadOpenData } from "./upload-open-data.mjs";
 
 const ENV = { R2_ACCOUNT_ID: "acct", R2_ACCESS_KEY_ID: "id", R2_SECRET_ACCESS_KEY: "secret", BULK_BUCKET: "everloot-bulk", R2_BUCKET: "everloot-uploads" };
@@ -86,6 +87,7 @@ test("a folder the real exporter wrote passes the plan, every file of it uploade
     gameFiles: {
       build: { version: "1.60.1.70450", extractedAt: at }, edges: [], taxonomy: { classes: [], subclasses: [], items: [] },
       map: { schema: "everloot.world-map/1", source: { name: "x", status: "found in game files, unconfirmed", licence: "x", licenceUrl: "x", product: "x", buildId: 1, version: "1", buildConfig: "x", definitions: null, extractedAt: at, tables: [] }, continents: [{ id: 0, name: "K", bounds }], zones: [], heldBackZones: [], entrances: [], flightNodes: [], flightPaths: [], warnings: [] },
+      catalogs: readOpenDataGameFiles(join(__dirname, "..", "src", "data", "game-data")),
     },
   });
   const p = plan(out, readFileSync(join(out, "manifest.json"), "utf8"));
@@ -93,7 +95,7 @@ test("a folder the real exporter wrote passes the plan, every file of it uploade
   expect(names.at(-1)).toBe("manifest.json");
   expect(names).toEqual(expect.arrayContaining(["observed/npcs.ndjson", "game-files/zones.ndjson", "schema/observed-npcs.schema.json", "README.md", "LICENCE.md"]));
   // 18 data files and their 18 schemas, README, LICENCE and the manifest.
-  expect(names).toHaveLength(39);
+  expect(names).toHaveLength(67);
 });
 
 test("an existing folder is never overwritten, and the uploads bucket is refused as the target", async () => {

@@ -15,6 +15,10 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Knowledge base: the open data export's game-files folder gains one file per committed catalog (achievements, factions,
+  titles, quest lines, mounts, encounters, recipes, class gear and its restrictions, class spells, races, legacy perks,
+  talent nodes, raid buffs): ids, the names the files hold and each file's build, every row counted, with a schema each
+  and a manifest line. The README and the download page no longer list the catalogs as missing. Nothing observed changes.
 - Addon: item tooltips and `/everloot price` end with up to three muted lines from this install's own rows: "Sold by
   <NPC> (your sighting)" from the vendor windows it opened, "Reagent for n recipes you know" from its recipe colours,
   and "Seen in <zone>" for a drop source it met. Without own rows the price file's public vendors and reagent count

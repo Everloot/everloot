@@ -21,7 +21,11 @@ schema/           a JSON Schema for every file
 
 Observed files: `npcs`, `quests`, `vendor-offers`, `drop-rates`, `drop-measured-zeros`, `relations`, `entrances`,
 `bosses`, `objects`, `object-pins`, `item-names`. Game-file files: `item-categories`, `relations`, `zones`,
-`continents`, `entrances`, `flight-masters`, `flight-paths`. The builders and the row schemas are in
+`continents`, `entrances`, `flight-masters`, `flight-paths`, and one file per committed catalog under
+`web/src/data/game-data`: `achievements`, `factions`, `titles`, `quest-lines`, `mounts`, `encounters`, `recipes`,
+`class-gear`, `class-gear-restrictions`, `class-spells`, `races`, `legacy-perks`, `talent-nodes`, `raid-buffs`
+(ids, the names the files hold and each file's build; no descriptions, criteria text or tooltip text). The
+builders and the row schemas are in
 [`kb/src/open-data/build.ts`](../kb/src/open-data/build.ts); the words (licence, method, exclusions) are in
 [`text.ts`](../kb/src/open-data/text.ts), which the README, the licence text and the page all read.
 
