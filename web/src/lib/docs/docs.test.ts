@@ -28,6 +28,13 @@ test("with EVERLOOT_GUILDS off the guild ladder's two tools have no docs page an
   expect(toolFromSlug("guild-board")).toBe("guild_board");
 });
 
+test("the wiki guide is in the Guides tab", () => {
+  const guides = DOCS_TABS.find((tab) => tab.id === "guides")!;
+  const page = guides.groups.flatMap((group) => group.pages).find((p) => p.href === "/docs/guides/wiki");
+  expect(page?.title).toBe("Write a wiki page");
+  expect(tabFor("/docs/guides/wiki").id).toBe("guides");
+});
+
 test("every page in the table of contents has a page file, and appears once", () => {
   const pages = allDocsPages();
   for (const { href } of pages) {
