@@ -29,9 +29,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   <NPC> (your sighting)" from the vendor windows it opened, "Reagent for n recipes you know" from its recipe colours,
   and "Seen in <zone>" for a drop source it met. Without own rows the price file's public vendors and reagent count
   show instead, when the file carries them. Display only; nothing recorded or uploaded changes.
-- Companion: the EverlootPrices slot file can carry a `sources` block after the drops (public vendor NPC ids and a
-  reagent-of count per item, checksummed like the drops, with the vendors' names outside the checksum). The block is
-  optional: a file without it is read as before. The Desktop App does not write it yet.
 - Site: every record kind has a docs page, `/docs/api/records/<kind>`, generated from its schema: each field with its type,
   whether it is required and its description, nested fields included, whether the kind is in the public corpus, where it
   goes, and the cross-field rules the server checks. The sidebar lists them and the schemas table links each kind to its page.
@@ -56,10 +53,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   `reporters` in the API and MCP shapes is the count the open-data files call `installs`; the API page names the routes
   its own pages fetch (/api/map/pins, /api/suggest) as outside the OpenAPI contract. The open-data notes say the same.
 - Site: the tools catalogue supplies the menu, uses Collections and Guild board, and farming no longer asks for a launch notification.
-- Desktop App: the Characters page reads the addon's local ledger (`EverlootDB.ledger`) from the save file beside the
-  `money_event` rows, so its 7-day net is the Gold tab's "7 days" for the same character (today and the six UTC days
-  before it) and repairs, vendor purchases, trades and mail appear in money by category, marked local only. Uploaded
-  rows count only from before the ledger's first event, as the Gold tab reads them. Nothing recorded or uploaded changes.
 - Site: a database address with an id nothing knows (an item or NPC such as /database/items/999999) answers its 404 with a
   body again: the heading, "No report for this id yet; three installs make it public" with the addon link, and a search box
   prefilled with the id. The site 404 leads with the same search box, prefilled with the last part of the address tried.
@@ -444,6 +437,22 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
+
+## [desktop-v0.1.21] - 2026-11-09
+
+The Characters page's week matches the Gold tab, and the price file reader accepts the optional `sources` block
+addon 0.3.22 can show (the app does not write it yet). Builds are still unsigned.
+
+### Added
+- The EverlootPrices slot file can carry a `sources` block after the drops (public vendor NPC ids and a
+  reagent-of count per item, checksummed like the drops, with the vendors' names outside the checksum). The block is
+  optional: a file without it is read as before. The Desktop App does not write it yet.
+
+### Fixed
+- The Characters page reads the addon's local ledger (`EverlootDB.ledger`) from the save file beside the
+  `money_event` rows, so its 7-day net is the Gold tab's "7 days" for the same character (today and the six UTC days
+  before it) and repairs, vendor purchases, trades and mail appear in money by category, marked local only. Uploaded
+  rows count only from before the ledger's first event, as the Gold tab reads them. Nothing recorded or uploaded changes.
 
 ## [desktop-v0.1.20] - 2026-11-06
 
