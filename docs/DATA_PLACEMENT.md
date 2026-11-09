@@ -4,8 +4,8 @@ Decided 2026-10-18. Everloot keeps three tiers, each for one kind of data, and e
 placed by the rule below before any code is written for it. The point is that when data starts arriving
 (uploads, game builds, market scans, the census, keys) nobody has to guess where it lives, who may
 write it, who may read it, and how it is protected. Companion to [architecture.md](architecture.md)
-(how the parts fit), [DATA_POLICY.md](DATA_POLICY.md) (what we publish) and [ASSETS.md](ASSETS.md)
-(the game-file buckets).
+(how the parts fit), [DATA_POLICY.md](DATA_POLICY.md) (what we publish), [ASSETS.md](ASSETS.md)
+(the game-file buckets) and [ENVIRONMENT.md](ENVIRONMENT.md) (the names of the variables and secrets each tier is reached with).
 
 ## The three tiers
 
