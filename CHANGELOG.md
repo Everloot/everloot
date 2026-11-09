@@ -14,6 +14,11 @@ build that has a zip in the repository. Earlier builds have none.
 
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
+### Added
+- Addon: the Gold tab's Overview chart follows the period buttons (today, 7 days, 30 days, or all for the ledger's
+  90 days), one bar a day; Sales shows the auction house's cut beside each sale's deposit, and the by-item rows show
+  sales per day over the period and the last sold day. Display only; nothing recorded or uploaded changes.
+
 ### Fixed
 - Site: the achievement, title, faction and quest chain lists, the farming and profession pages and the scoring method say
   a fact is confirmed by three installs, not three players, as the upload guide has it; the install count is one column,
