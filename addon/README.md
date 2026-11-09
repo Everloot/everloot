@@ -91,6 +91,39 @@ When scans are on, the cooldown is over and no scan is running, opening the auct
 the next visit. It never scans by itself. `/everloot scanprompt off` turns it off (the **Everloot scan**
 button and `/everloot scan` still work). With scans off, the first visit prints one line saying how to opt in.
 
+## Commands
+
+Every command the addon answers. This table is the source for the in-game help line (`core.lua`) and the
+guide at everloot.app/docs/guides/addon; `addon/tests/commands_contract.py` fails when the three drift.
+`/everloot` on its own opens the planner workspace.
+
+| Command | What it does |
+|---|---|
+| `/everloot window` | Opens or closes the Everloot window (left-click on the minimap button does the same). |
+| `/everloot options` | Opens the settings page, one switch per module (right-click on the minimap button does the same). |
+| `/everloot planner [talents\|raid]` | Opens the planner workspace on the named tab, where a website plan is pasted and imported. |
+| `/everloot buttons on\|off` | Gathers other addons' minimap buttons into the Everloot button, or leaves them on the minimap; `/reload` to apply. |
+| `/everloot status` | Prints the version, each module and how many rows it holds, and any paused collection. |
+| `/everloot version` | Prints the addon version. |
+| `/everloot auctions on\|off` | Auction scans, on in a new install; `/reload` to apply. |
+| `/everloot scan` | At the auction house, starts a full scan, like the **Scan this house** button; at most one every 15 minutes. |
+| `/everloot scanprompt on\|off` | The scan prompt shown when the auction house opens; the button and `/everloot scan` still work with it off. |
+| `/everloot vendor on\|off` | At a merchant, sell grey items and repair with your own gold; never the guild bank. |
+| `/everloot mail on\|off` | The **Collect all** button at the mailbox, for auction letters only. |
+| `/everloot price [item]` | Prints the price of an item from the files already in the game: shift-click the item into the command, or give its id. |
+| `/everloot gph [start\|pause\|stop\|reset\|show\|hide\|cut on\|off\|history]` | Gold per hour: start, pause or stop a session, reset it, show or hide its window, take the 5% auction cut or not, or list the last five. The sessions stay in your file. |
+| `/everloot addons on\|off` | The installed addon list, off until enabled; off deletes every recorded addon row. |
+| `/everloot completion [on\|off]` | The completion tracker, off until enabled; bare reads now, off deletes every row it wrote. |
+| `/everloot census [on\|off]` | The census, on in a new install; bare says whether it is on and how many rows it holds, off deletes them. |
+| `/everloot players [on\|off]` | The players module, off until enabled; bare says whether it is on and how many characters it holds, off deletes them. |
+| `/everloot pulls [on\|off]` | Boss pull summaries, in the builds that carry them; bare says whether it is on, off deletes every pull. |
+| `/everloot link [code\|clear]` | Links this character to your everloot.app account with the code the site shows; bare counts the links, clear deletes them. |
+| `/everloot selftest` | Checks the talent calls the addon relies on and prints PASS, FAIL, SKIP and INFO lines. |
+| `/everloot talents` | Prints your talent build per spec group, with a share code. |
+| `/everloot plan [share code\|number\|hide\|clear]` | Loads a talent plan from a share code or from your saved list by number and shows it beside the talent window; bare reopens the panel, hide closes it, clear forgets it. |
+| `/everloot raid [code]` | Lists the raid buffs missing from each group; code gives a link that opens the raid in the site's raid builder. |
+| `/ask <question>` | Stores a question of up to 500 characters; the answer shows in chat after `/reload`, once the Desktop App has fetched it. |
+
 ## NPC and quest facts
 
 When you target an NPC the addon also notes its creature type and rank, and when you accept a quest it
@@ -496,27 +529,41 @@ addon/
 │   ├── openworld.lua   target/mouseover sightings, NPC window places, loot windows, merchant windows
 │   ├── itemfacts.lua   armor, stats and resistances from the item tooltips you see, once per item and build
 │   ├── guild.lua       roster, attendance, saved lockouts (published only through an officer)
+│   ├── roster.lua      your own characters for the window's Home: name, realm, class, level, gold, professions; local only
+│   ├── ledger.lua      the gold ledger's local store for the window's Gold tab; never uploaded
 │   ├── gear.lua        equipped item level sample, at most once an hour
 │   ├── auctions.lua    full auction-house scans you start (Forever); listed buyouts on older clients; on in a new install
 │   ├── gold.lua        your own gold: loot, quests, vendors, flights, mailed auction sales, postage, buyouts
 │   ├── professions.lua recipe colours at your rank (C_TradeSkillUI); required rank and cost from trainer windows
 │   ├── ask.lua         /ask stores a question; the Everloot Desktop App's answers show after /reload
+│   ├── link.lua        /everloot link: ties the character you play to your everloot.app account
+│   ├── options.lua     the settings page (Esc > Options > AddOns > Everloot, or /everloot options)
+│   ├── minimap.lua     the minimap button: left-click the window, right-click the settings
+│   ├── drawer.lua      the button drawer: other addons' minimap buttons gathered into the Everloot button
+│   ├── auctiontab.lua  the Everloot tab at the auction house: scan, cooldown, Share now, price lookup
 │   ├── addons.lua      your installed addons' names, titles and versions; off until enabled
 │   ├── mapbounds.lua   each zone's corners in world coordinates, once per zone per build
 │   ├── talents.lua     your talent build per spec group, plus the game's own loadout string
 │   ├── completion.lua  achievements, reputation, titles, quest chains: catalogs and your progress; off until enabled
+│   ├── owned.lua       this character's professions, raid lockouts and talent build; runs with the completion tracker
+│   ├── charstats.lua   this character's sheet numbers as the paper doll shows them; runs with the completion tracker
+│   ├── pvp.lua         this character's PvP rank and honorable kills; runs with the completion tracker
 │   ├── census.lua      race, class, level and faction of your characters and players you see; on in a new install
 │   ├── players.lua     name, realm, race, class, level and guild of your characters and players you see; off until enabled
 │   ├── pulls.lua       each boss pull: your group's names, classes, roles and damage meter totals; on once released
 │   ├── selftest.lua    /everloot selftest and /everloot talents
 │   ├── plan.lua        share code reader and the display-only plan panel
+│   ├── planner.lua     the planner workspace: website talent and raid plans beside your character; /everloot planner
 │   ├── raid_data.lua   raid buff list generated from web/src/data/game-data/raid-*.json
 │   ├── raid.lua        /everloot raid: buffs missing per group, and a raid share code; display only
 │   ├── prices.lua      item tooltips: your latest scan and the Everloot Desktop App's community prices
 │   ├── drops.lua       item tooltips: where an item drops, from the public rates in the same file
 │   ├── gph.lua         gold per hour sessions, kept in your file only
 │   ├── conveniences.lua  sell greys and repair at a merchant, Collect all at the mailbox; each off until enabled, no records
-│   └── window.lua      the Everloot window: Home from what the file holds; built on first open, no records
+│   ├── window.lua      the Everloot window: Home from what the file holds; built on first open, no records
+│   ├── view_gold.lua   the window's Gold tab: gold by realm, the ledger, auction sales, the gph session; display only
+│   ├── view_collection.lua  the window's Collection tab: achievements, reputation, titles, lockouts; display only
+│   └── view_professions.lua  the window's Professions tab: each profession, its rank and recorded recipes; display only
 ├── media/crest.tga     the crest, 128 px, packaged beside the code
 └── tests/              Lua 5.1 contract tests and their fixtures
 ```
