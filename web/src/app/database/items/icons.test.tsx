@@ -53,7 +53,7 @@ beforeEach(() => { state.assets = null; state.names = []; state.tipCalls = []; s
 test("a below-threshold item fact shows report progress even without a game-file tooltip", async () => {
   state.progress = [{ fact: "armor", reporters: 1, build: "1.60.1.70450" }];
   const page = await html(ItemPage(props(String(made.fromId))));
-  expect(page).toContain("Armor: 1 of 3 installs reported");
+  expect(page).toContain("Armor: 1 of 3 installs agree");
   expect(page).toContain("Not yet confirmed");
   expect(state.tipCalls).toEqual([]);
 });

@@ -256,7 +256,7 @@ export default async function ProfessionPage(props: Props) {
                 : level && gathered.all > 0 ? <p data-empty-state className="py-3 text-cell text-fg-2">{`Nothing here for levels ${rangeParam(level)}.`}</p>
                 : <EmptyState message={gather.source === "herb" || gather.source === "ore"
                   ? `No ${gather.noun} zones yet: a zone shows once 3 installs gather from the same spot there.`
-                  : `No ${gather.noun} zones yet: a zone shows once 3 players upload loot from the same mobs there.`} />}
+                  : `No ${gather.noun} zones yet: a zone shows once 3 installs upload loot from the same mobs there.`} />}
           </section>
         )}
 

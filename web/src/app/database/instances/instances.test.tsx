@@ -82,7 +82,7 @@ test("on night one, each boss one install reported shows 1 of 3, and nothing it 
     const row = bosses.split("<tr").find((r) => r.includes("Oggleflint")) ?? "";
     expect(row).toContain('data-agreement="1"');
     expect(text(row)).toContain("|1 of 3|");
-    expect(text(row)).toContain("1 of 3 installs reported");
+    expect(text(row)).toContain("1 of 3 installs agree");
     expect(text(bosses)).toContain("No boss here has 3 installs reporting it yet. Kills and last seen show once one does.");
     expect(text(html)).toMatch(/\|Bosses reported\|0\|/);
   } finally {

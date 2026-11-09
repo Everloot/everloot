@@ -91,7 +91,7 @@ export default async function FarmingRoutesPage(props: { searchParams?: Promise<
 
   const shown = FARM_CATEGORIES.filter((c) => !q.category || q.category === c.slug);
   const quiet = (text: string) => <p data-empty-state className="py-3 text-cell text-fg-2">{text}</p>;
-  const emptyFor = (noun: string) => <EmptyState message={`No ${noun} areas yet: a zone shows once 3 players upload loot from the same mobs there.`} />;
+  const emptyFor = (noun: string) => <EmptyState message={`No ${noun} areas yet: a zone shows once 3 installs upload loot from the same mobs there.`} />;
 
   return (
     <Container width="data">
@@ -136,7 +136,7 @@ export default async function FarmingRoutesPage(props: { searchParams?: Promise<
           <Contribute
             id="farm-contribute"
             title="Add your farming areas"
-            note="Loot mobs with the addon on. The Desktop App uploads what dropped and where when you log out; a zone is listed once 3 players agree on its mobs."
+            note="Loot mobs with the addon on. The Desktop App uploads what dropped and where when you log out; a zone is listed once 3 installs agree on its mobs."
           />
           <div>
             <Disclosure summary="Where do these areas come from?">

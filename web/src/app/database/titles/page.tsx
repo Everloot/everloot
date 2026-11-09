@@ -10,7 +10,7 @@ import {
   sortParam, sortRows, Unreadable, type ListQuery, type Search,
 } from "../list-parts";
 
-const META = { title: "WoW Forever Title List", description: "Player titles in WoW: Forever by name and ID. From the game files; confirmed once three players report each the same way.", path: "/database/titles" };
+const META = { title: "WoW Forever Title List", description: "Player titles in WoW: Forever by name and ID. From the game files; confirmed once three installs report each the same way.", path: "/database/titles" };
 export const dynamic = "force-dynamic";
 
 const SORTS = ["name", "id"] as const;

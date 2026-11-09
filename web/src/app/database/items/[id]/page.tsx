@@ -15,7 +15,7 @@ import { itemSourceValue } from "./item-source";
 import { RelationTarget, SameIcon } from "@/components/EntityRelations";
 import { pinLink } from "@/lib/world-map";
 import { gameNameFor, loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
-import { Badge, Container, DataTable, EvidenceLine, Facts, InShort, OpenData, QUALITY_TEXT, Tabs, TooltipFrame, qualityOf, type Column, type Fact, type TabItem } from "@/components/ui";
+import { Badge, Container, DataTable, EvidenceLine, Facts, InShort, OpenData, QUALITY_TEXT, Tabs, TooltipFrame, agreementLabel, qualityOf, type Column, type Fact, type TabItem } from "@/components/ui";
 import { isDevelopmentItemName } from "../../../../../../kb/src/dev-item-names";
 import { categoryOf } from "../../../../../../kb/src/item-taxonomy";
 import { edgesFrom, evidenceLabel, type Edge, type Rel } from "../../../../../../kb/src/edges";
@@ -165,7 +165,7 @@ export default async function ItemPage(props: Props) {
     { key: "npc", header: "NPC", cell: (p) => <EntityLink kind="npc" id={p.npcId} name={p.name ?? names.npcs.get(p.npcId)} /> },
     { key: "map", header: "Map", cell: (p) => <MapName mapId={p.mapId} /> },
     { key: "at", header: "Position", numeric: true, cell: (p) => `${p.x}, ${p.y}` },
-    { key: "installs", header: "Reporters", numeric: true, cell: (p) => p.reporters },
+    { key: "installs", header: "Installs", numeric: true, cell: (p) => p.reporters },
     { key: "show", header: MAP_LINK_HEADER, cell: (p) => { const href = pinLink(p.mapId, p.x, p.y); return href ? <ShowOnMap href={href} mapId={p.mapId} x={p.x} y={p.y} /> : null; } },
   ];
 
@@ -302,7 +302,7 @@ export default async function ItemPage(props: Props) {
           <section aria-label="Item report progress" className="mt-3 space-y-1 text-meta text-fg-2">
             <p>Not yet confirmed. Each value needs 3 installs to agree.</p>
             <ul>
-              {reported.progress!.map((p) => <li key={p.fact}>{`${FACT_WORD[p.fact]}: ${p.reporters} of 3 installs reported (build ${p.build}).`}</li>)}
+              {reported.progress!.map((p) => <li key={p.fact}>{`${FACT_WORD[p.fact]}: ${agreementLabel(p.reporters)} (build ${p.build}).`}</li>)}
             </ul>
           </section>
         )}
