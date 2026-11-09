@@ -15,6 +15,10 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Knowledge base: the open data export's game-files folder gains one file per committed catalog (achievements, factions,
+  titles, quest lines, mounts, encounters, recipes, class gear and its restrictions, class spells, races, legacy perks,
+  talent nodes, raid buffs): ids, the names the files hold and each file's build, every row counted, with a schema each
+  and a manifest line. The README and the download page no longer list the catalogs as missing. Nothing observed changes.
 - Addon: the Gold tab's Overview chart follows the period buttons (today, 7 days, 30 days, or all for the ledger's
   90 days), one bar a day; Sales shows the auction house's cut beside each sale's deposit, and the by-item rows show
   sales per day over the period and the last sold day. Display only; nothing recorded or uploaded changes.

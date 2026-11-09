@@ -40,6 +40,7 @@ import { writeCatalogs } from "./client-catalog.js";
 import { buildClientAssets } from "./client-assets.js";
 import { CLIENT_EDGES, CLIENT_LAYER, CLIENT_TAXONOMY } from "./client-layer-file.js";
 import { OPEN_DATA_KINDS } from "./open-data/build.js";
+import { readOpenDataGameFiles } from "./open-data/game-data.js";
 import { readRecordsFile } from "./open-data/read.js";
 import { writeOpenData } from "./open-data/write.js";
 import { writeWorldMapData } from "./world-map-data.js";
@@ -263,9 +264,10 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     out of the settled list, and the spot-checked facts that got a conflicting report since their week began,
     added to kb/curated/recheck.json as scopes that raise their zone's rate. The week defaults to the current
     UTC week; the pick is a hash of each fact's key and the week, so a rerun picks the same facts)
-  open-data <folder> [--records <file>]
+  open-data <folder> [--records <file>] [--game-data <dir>]
     (the open data export: the published data as NDJSON files under CC BY-SA 4.0, plus the game-file layer
-    as Blizzard's, with a manifest, a README, the licence and a JSON Schema per file. Only facts that 3
+    as Blizzard's (the item layer, the map and every committed catalog under --game-data, by default
+    ../web/src/data/game-data), with a manifest, a README, the licence and a JSON Schema per file. Only facts that 3
     installs agree on leave the records; it refuses a row under that and an install id in any row. The
     records come from EVERLOOT_PUBLIC_CORPUS_URL (EVERLOOT_API_KEY for the whole feed) or EVERLOOT_UPLOADS,
     or from --records, a saved corpus answer. The folder must be new or empty. See docs/OPEN_DATA.md)
@@ -996,7 +998,7 @@ async function main(): Promise<number> {
       if (!corpus) throw new Error("open-data: no records. Set EVERLOOT_PUBLIC_CORPUS_URL (and EVERLOOT_API_KEY for the whole feed) or EVERLOOT_UPLOADS, or pass --records <file>");
       const { manifest, paths } = writeOpenData(args[0], {
         records: corpus.records, dataAsOf: corpus.dataAsOf, generatedAt: new Date().toISOString(),
-        gameFiles: { build: CLIENT_LAYER.build, edges: CLIENT_EDGES, taxonomy: CLIENT_TAXONOMY, map: WORLD_MAP_DATA },
+        gameFiles: { build: CLIENT_LAYER.build, edges: CLIENT_EDGES, taxonomy: CLIENT_TAXONOMY, map: WORLD_MAP_DATA, catalogs: readOpenDataGameFiles(flags.get("game-data") || "../web/src/data/game-data") },
       });
       for (const f of manifest.files) console.log(`${f.path}: ${f.rows} rows${f.candidates === null ? "" : ` of ${f.candidates} (${f.candidatesAre})`}`);
       console.log(`${manifest.source.records} records from ${manifest.source.installs} installs; data as of ${manifest.dataAsOf ?? "[?]"}; game build ${manifest.gameFiles.version}`);
