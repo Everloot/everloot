@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { BLIZZARD_CREDIT } from "@/lib/armory";
 import { armoryCharacter, armoryGuild } from "@/lib/armory.fixture";
-import { createMemoryArmoryStore, type ArmoryStore, type MemoryArmoryStore } from "@/lib/armory-store";
+import { createCloudArmoryStore, createMemoryArmoryStore, type ArmoryStore, type MemoryArmoryStore } from "@/lib/armory-store";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 
 vi.mock("next/link", () => ({
@@ -156,6 +156,21 @@ describe("the guild page", () => {
     expect(out).toContain("Read time unrecorded");
   });
 
+  test("a member stored without names shows the names its slug gives, and the roster stands", async () => {
+    const guild = { region: "eu", slug: "ember-wardens", guild_id: 77, name: "Ember Wardens", faction: "Horde", ruleset_id: 2, ruleset: "Normal",
+      member_count: 2, created_at: null, fetched_at: "2026-11-09T09:00:00+00:00", checked_at: "2026-11-09T09:00:00+00:00" };
+    const roster = [
+      { character_slug: "brannoc-tide", name: null, surname: null, level: 41, class_id: 1, race_id: 2, rank: 2, item_level: null, gear_score: null, stored: false },
+      { character_slug: "velkara-duskmantle", name: "Velkara", surname: null, level: 60, class_id: 3, race_id: 8, rank: 1, item_level: 57.41, gear_score: null, stored: true },
+    ];
+    holder.store = createCloudArmoryStore((async (path: string) => (path === "rpc/armory_guild" ? [guild] : path === "rpc/armory_roster" ? roster : [])) as never);
+    const out = await html(pages.guild("eu", "ember-wardens"));
+    expect(out).not.toContain(STORAGE_UNREACHABLE);
+    expect(out).toContain(">Brannoc Tide<");
+    expect(out).toContain('href="/armory/eu/velkara-duskmantle"');
+    expect(out).toContain(">Velkara Duskmantle<");
+  });
+
   test("a single-word guild slug has a page, and the hub finds it", async () => {
     mem.putGuild(armoryGuild({ slug: "wardens", name: "Wardens" }), []);
     expect(await html(pages.guild("eu", "wardens"))).toContain("Wardens");
@@ -204,7 +219,7 @@ test("the forms keep their fields, confirm, and say what went wrong", async () =
   expect(hide).toContain('action="/armory/hide/send"');
   expect(hide).toContain('value="Velkara"');
   expect(hide).toContain("not read it from Blizzard again");
-  expect(hide).toContain('pattern="\\p{L}{2,12}"');
+  expect(hide).toContain('pattern="[\\p{L}\\p{M}]{2,12}"');
   expect(await html(pages.hide({ done: "1" }))).toContain("Done. That character is hidden");
   expect(await html(pages.hide({ error: "storage" }))).toContain("We could not save that");
   const submit = await html(pages.submit({ done: "1" }));

@@ -49,9 +49,12 @@ function rosterColumns(region: string): Column<ArmoryMember>[] {
     { key: "rank", header: "Rank", numeric: true, cell: (m) => m.rank ?? muted(UNKNOWN) },
     {
       key: "name", header: "Character",
-      cell: (m) => (m.stored
-        ? <Link href={armoryCharacterPath(region, m.characterSlug)} className={`${link} font-medium`}>{m.name} {m.surname}</Link>
-        : <span className="font-medium">{m.name} {m.surname}</span>),
+      cell: (m) => {
+        const full = [m.name, m.surname].filter(Boolean).join(" ");
+        return m.stored
+          ? <Link href={armoryCharacterPath(region, m.characterSlug)} className={`${link} font-medium`}>{full}</Link>
+          : <span className="font-medium">{full}</span>;
+      },
     },
     { key: "level", header: "Level", numeric: true, cell: (m) => m.level ?? muted(UNKNOWN) },
     {

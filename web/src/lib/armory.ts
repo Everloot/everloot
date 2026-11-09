@@ -45,15 +45,35 @@ export function slugFromSegment(segment: string): string | null {
   try { return decodeURIComponent(segment).normalize("NFC"); } catch { return null; }
 }
 
-/** The form fields: a first name and a surname, letters of any script. The browser patterns are the same rules. */
+/**
+ * The form fields: a first name and a surname, letters of any script. What a person types or pastes may be decomposed
+ * (a letter and a combining accent), so the browser patterns and the server's first check take letters and combining
+ * marks alike. The server then composes the text (NFC) and checks letters only, so a mark that does not compose into
+ * its letter is refused there and never reaches a slug.
+ */
+export const NAME_PATTERN = "[\\p{L}\\p{M}]{2,12}";
+export const SURNAME_PATTERN = "[\\p{L}\\p{M}]{2,24}";
+export const NAME_INPUT_RULE = new RegExp(`^${NAME_PATTERN}$`, "u");
+export const SURNAME_INPUT_RULE = new RegExp(`^${SURNAME_PATTERN}$`, "u");
+/** After composing: letters only, 2 to 12 and 2 to 24 of them. */
 export const NAME_RULE = /^\p{L}{2,12}$/u;
 export const SURNAME_RULE = /^\p{L}{2,24}$/u;
-export const NAME_PATTERN = "\\p{L}{2,12}";
-export const SURNAME_PATTERN = "\\p{L}{2,24}";
 /** `name-surname` composed (NFC) and in lower case, as the API's `slug`; null when either part is not letters only. */
 export function characterSlugOf(name: string, surname: string): string | null {
-  const n = name.trim().normalize("NFC"), s = surname.trim().normalize("NFC");
+  const rawName = name.trim(), rawSurname = surname.trim();
+  if (!NAME_INPUT_RULE.test(rawName) || !SURNAME_INPUT_RULE.test(rawSurname)) return null;
+  const n = rawName.normalize("NFC"), s = rawSurname.normalize("NFC");
   return NAME_RULE.test(n) && SURNAME_RULE.test(s) ? `${n}-${s}`.toLowerCase() : null;
+}
+
+/**
+ * A name and surname read off a character slug, each part with a capital: for a roster member stored without its
+ * names, which the roster allows. `ølvir-stål` reads "Ølvir" and "Stål"; a single-word slug has no surname.
+ */
+export function namesFromSlug(slug: string): { name: string; surname: string } {
+  const cap = (w: string) => (w ? w.charAt(0).toLocaleUpperCase() + w.slice(1) : w);
+  const [first = "", ...rest] = slug.split("-");
+  return { name: cap(first), surname: rest.map(cap).join(" ") };
 }
 
 /** A search prefix: 2 to 24 letters of any script. */

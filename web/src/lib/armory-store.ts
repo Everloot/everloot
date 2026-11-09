@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ARMORY_RECHECK_DAYS, SEARCH_RULE, type ArmoryMetricKey } from "./armory";
+import { ARMORY_RECHECK_DAYS, namesFromSlug, SEARCH_RULE, type ArmoryMetricKey } from "./armory";
 import { authQuery } from "./supabase/server";
 
 /**
@@ -96,13 +96,18 @@ const GuildRow = z.object({
   memberCount: r.member_count, createdAt: r.created_at, fetchedAt: r.fetched_at, checkedAt: r.checked_at,
 }));
 
+// armory_members allows null names (and null level, class, race and rank); a member without names reads them off its
+// slug rather than taking the whole roster down.
 const MemberRow = z.object({
-  character_slug: z.string(), name: z.string(), surname: z.string(), level: numOrNull, class_id: numOrNull, race_id: numOrNull,
+  character_slug: z.string(), name: textOrNull, surname: textOrNull, level: numOrNull, class_id: numOrNull, race_id: numOrNull,
   rank: numOrNull, item_level: numOrNull, gear_score: numOrNull, stored: z.boolean(),
-}).transform((r): ArmoryMember => ({
-  characterSlug: r.character_slug, name: r.name, surname: r.surname, level: r.level, classId: r.class_id, raceId: r.race_id,
-  rank: r.rank, itemLevel: r.item_level, gearScore: r.gear_score, stored: r.stored,
-}));
+}).transform((r): ArmoryMember => {
+  const fallback = namesFromSlug(r.character_slug);
+  return {
+    characterSlug: r.character_slug, name: r.name ?? fallback.name, surname: r.surname ?? fallback.surname, level: r.level,
+    classId: r.class_id, raceId: r.race_id, rank: r.rank, itemLevel: r.item_level, gearScore: r.gear_score, stored: r.stored,
+  };
+});
 
 const HitRow = z.object({
   region: z.string(), slug: z.string(), name: z.string(), surname: z.string(), level: num, class: z.string(), race: z.string(),
@@ -151,10 +156,15 @@ export function createCloudArmoryStore(query: Query = authQuery): ArmoryStore {
   };
 }
 
+/** Why each unavailable store has nothing behind it, so the process can say so once. */
+const unavailableReason = new WeakMap<ArmoryStore, string>();
+
 /** A store with nothing behind it: every call fails, so each page shows storage as out of reach. */
 export function createUnavailableArmoryStore(reason: string): ArmoryStore {
   const fail = async (): Promise<never> => { throw new Error(reason); };
-  return { character: fail, guild: fail, roster: fail, search: fail, searchGuilds: fail, board: fail, rank: fail, counts: fail, hide: fail, enqueue: fail };
+  const store = { character: fail, guild: fail, roster: fail, search: fail, searchGuilds: fail, board: fail, rank: fail, counts: fail, hide: fail, enqueue: fail };
+  unavailableReason.set(store, reason);
+  return store;
 }
 
 /** A development store, with the writes the crawler would make so tests and a local server can fill it. */
@@ -270,18 +280,40 @@ export function createMemoryArmoryStore(now: () => Date = () => new Date()): Mem
  */
 export function armoryStoreFrom(env: Record<string, string | undefined> = process.env, query?: Query): ArmoryStore {
   if (env.SUPABASE_URL?.trim() && env.SUPABASE_SERVICE_ROLE_KEY?.trim()) return createCloudArmoryStore(query);
-  if (env.NODE_ENV === "production") return createUnavailableArmoryStore("Armory storage is not configured");
+  if (env.NODE_ENV === "production") return createUnavailableArmoryStore("Armory storage is not configured (SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not set)");
   return createMemoryArmoryStore();
 }
 
-const held = globalThis as typeof globalThis & { __everlootArmory?: ArmoryStore };
-/** One store per server process, so the development store keeps its rows between requests. Never throws. */
-export function armoryStore(build: () => ArmoryStore = armoryStoreFrom): ArmoryStore {
-  if (held.__everlootArmory) return held.__everlootArmory;
+/** How long a store with nothing behind it is kept before the next call builds one again. */
+export const ARMORY_STORE_RETRY_MS = 60_000;
+
+const held = globalThis as typeof globalThis & {
+  __everlootArmory?: { store: ArmoryStore; retryAt: number | null };
+  __everlootArmoryLogged?: boolean;
+};
+
+/**
+ * One store per server process, so the development store keeps its rows between requests. Never throws. When there is
+ * no store to build (no Supabase variables in production, or a builder that throws), the pages get one whose calls
+ * fail, the process logs it once, and the next call after a minute builds again. The log line names the cause, never
+ * a value.
+ */
+export function armoryStore(build: () => ArmoryStore = armoryStoreFrom, now: () => number = Date.now): ArmoryStore {
+  const have = held.__everlootArmory;
+  if (have && (have.retryAt === null || now() < have.retryAt)) return have.store;
+  let store: ArmoryStore;
+  let problem: string | undefined;
   try {
-    return (held.__everlootArmory = build());
+    store = build();
+    problem = unavailableReason.get(store);
   } catch (err) {
-    // Not kept, so the next request tries again.
-    return createUnavailableArmoryStore(err instanceof Error ? err.message : "Armory storage is unavailable");
+    problem = `the store could not be built (${err instanceof Error ? err.name : "unknown error"})`;
+    store = createUnavailableArmoryStore("Armory storage is unavailable");
   }
+  if (problem && !held.__everlootArmoryLogged) {
+    held.__everlootArmoryLogged = true;
+    console.error(`armory: storage unavailable: ${problem}. Armory pages show it as unreachable; trying again every ${ARMORY_STORE_RETRY_MS / 1000} s.`);
+  }
+  held.__everlootArmory = { store, retryAt: problem ? now() + ARMORY_STORE_RETRY_MS : null };
+  return store;
 }

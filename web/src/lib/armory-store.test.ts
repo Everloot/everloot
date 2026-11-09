@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { armoryCharacter, armoryGuild } from "./armory.fixture";
 import { armoryStore, armoryStoreFrom, createCloudArmoryStore, createMemoryArmoryStore } from "./armory-store";
 
@@ -57,6 +57,14 @@ describe("the Supabase store", () => {
     await expect(fake("yes").store.enqueue("eu", "character", "a-b", "website")).rejects.toThrow();
   });
 
+  test("a roster member stored without names reads them off its slug; the rest of the roster stands", async () => {
+    const roster = await fake([
+      { character_slug: "brannoc-tide", name: null, surname: null, level: null, class_id: null, race_id: null, rank: null, item_level: null, gear_score: null, stored: false },
+      { character_slug: "velkara-duskmantle", name: "Velkara", surname: null, level: 60, class_id: 3, race_id: 8, rank: 1, item_level: "57.41", gear_score: null, stored: true },
+    ]).store.roster("eu", "ember-wardens");
+    expect(roster.map((m) => [m.name, m.surname, m.level, m.itemLevel])).toEqual([["Brannoc", "Tide", null, null], ["Velkara", "Duskmantle", 60, 57.41]]);
+  });
+
   test("no row is null, and only a true enqueue answer counts as queued", async () => {
     expect(await fake([]).store.character("eu", "a-b")).toBeNull();
     expect(await fake([]).store.guild("eu", "a-b")).toBeNull();
@@ -78,15 +86,51 @@ describe("the Supabase store", () => {
   });
 });
 
-test("armoryStore never throws: a factory that fails gives a store whose calls fail, and is tried again next time", async () => {
-  const held = globalThis as { __everlootArmory?: unknown };
-  delete held.__everlootArmory;
-  const failing = armoryStore(() => { throw new Error("no key"); });
-  await expect(failing.counts()).rejects.toThrow("no key");
-  expect(held.__everlootArmory).toBeUndefined();
-  const memory = createMemoryArmoryStore();
-  expect(armoryStore(() => memory)).toBe(memory);
-  delete held.__everlootArmory;
+describe("armoryStore", () => {
+  const held = globalThis as { __everlootArmory?: unknown; __everlootArmoryLogged?: boolean };
+  const reset = () => { delete held.__everlootArmory; delete held.__everlootArmoryLogged; };
+  beforeEach(reset);
+  afterEach(() => { reset(); vi.restoreAllMocks(); });
+
+  test("never throws: a builder that throws gives a store whose calls fail, logged once without the error's text", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    let t = 0;
+    const failing = armoryStore(() => { throw new TypeError("https://secret.example key=abc"); }, () => t);
+    await expect(failing.counts()).rejects.toThrow("unavailable");
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(String(log.mock.calls[0]![0])).toBe(
+      "armory: storage unavailable: the store could not be built (TypeError). Armory pages show it as unreachable; trying again every 60 s.",
+    );
+    t = 59_999;
+    armoryStore(() => { throw new Error("again"); }, () => t);
+    expect(log).toHaveBeenCalledTimes(1);
+  });
+
+  test("missing credentials in production log one line naming the variables, never their values, and retry after a minute", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const build = vi.fn(() => armoryStoreFrom({ NODE_ENV: "production", SUPABASE_URL: "https://x.supabase.co", SUPABASE_SERVICE_ROLE_KEY: " " }));
+    let t = 1_000;
+    const first = armoryStore(build, () => t);
+    await expect(first.counts()).rejects.toThrow("not configured");
+    expect(log).toHaveBeenCalledTimes(1);
+    const line = String(log.mock.calls[0]![0]);
+    expect(line).toContain("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not set");
+    expect(line).not.toContain("x.supabase.co");
+    // Kept for a minute, then built again; the line is not repeated.
+    t = 60_999;
+    expect(armoryStore(build, () => t)).toBe(first);
+    expect(build).toHaveBeenCalledTimes(1);
+    t = 61_000;
+    armoryStore(build, () => t);
+    expect(build).toHaveBeenCalledTimes(2);
+    expect(log).toHaveBeenCalledTimes(1);
+    // Once the variables are there, the working store is built and kept.
+    const memory = createMemoryArmoryStore();
+    t = 121_000;
+    expect(armoryStore(() => memory, () => t)).toBe(memory);
+    t = 10_000_000;
+    expect(armoryStore(() => { throw new Error("not called"); }, () => t)).toBe(memory);
+  });
 });
 
 describe("the memory store", () => {

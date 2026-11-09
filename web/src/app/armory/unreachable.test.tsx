@@ -15,16 +15,19 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/armory", useRouter: () => ({ push: () => {} }), useSearchParams: () => new URLSearchParams(),
 }));
 
-const held = globalThis as { __everlootArmory?: unknown };
+const held = globalThis as { __everlootArmory?: unknown; __everlootArmoryLogged?: boolean };
+let log: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   delete held.__everlootArmory;
+  delete held.__everlootArmoryLogged;
+  log = vi.spyOn(console, "error").mockImplementation(() => {});
   vi.stubEnv("EVERLOOT_ARMORY", "1");
   vi.stubEnv("NODE_ENV", "production");
   vi.stubEnv("SUPABASE_URL", "");
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
 });
-afterEach(() => { delete held.__everlootArmory; vi.unstubAllEnvs(); vi.resetModules(); });
+afterEach(() => { delete held.__everlootArmory; delete held.__everlootArmoryLogged; vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.resetModules(); });
 
 test("with no store the hub, a board and both forms render the unreachable line, the credit and the forms", async () => {
   const hub = renderToStaticMarkup(await (await import("./page")).default({ searchParams: Promise.resolve({ q: "vel" }) }));
@@ -37,6 +40,9 @@ test("with no store the hub, a board and both forms render the unreachable line,
     expect(out).toContain("Read time unrecorded");
   }
   expect(hide).toContain('action="/armory/hide/send"');
+  // Four pages, one line in the log, naming the variables and nothing else.
+  expect(log).toHaveBeenCalledTimes(1);
+  expect(String(log.mock.calls[0]![0])).toContain("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not set");
   expect(submit).toContain('action="/armory/submit/send"');
 });
 

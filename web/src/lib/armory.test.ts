@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import {
   armoryBoardHref, armoryBoardQuery, armoryCharacterPath, armoryGuildPath, armoryHidePath, armoryOn, characterSlugOf, classTokenOfId, classTokenOfName,
-  metricValue, raceOfId, readLine, slotLabel, slugFromSegment, validArmorySlug,
+  metricValue, namesFromSlug, raceOfId, readLine, slotLabel, slugFromSegment, validArmorySlug,
 } from "./armory";
 
 test("the switch is on only for EVERLOOT_ARMORY=1", () => {
@@ -15,9 +15,20 @@ test("a character slug is name-surname in lower case, letters of any script", ()
   // A decomposed é (e + combining accent) is composed first, as the API spells it.
   expect(characterSlugOf("Ve\u0301lkara", "Dusk")).toBe("vélkara-dusk");
   expect(characterSlugOf("Ølvir", "Stål")).toBe("ølvir-stål");
+  expect(characterSlugOf("E\u0301lodie", "Bru\u0301n")).toBe("élodie-brún");
   for (const [n, s] of [["V", "Duskmantle"], ["Velkara", ""], ["Vel1", "Dusk"], ["Vel kara", "Dusk"], ["Velkara", "Dusk-mantle"], ["Velkara", "Dusk'mantle"]]) {
     expect(characterSlugOf(n!, s!)).toBeNull();
   }
+  // The browser lets a combining mark through; one with no composed letter (q + acute) is refused here, never stored.
+  expect(characterSlugOf("Saq\u0301ra", "Dusk")).toBeNull();
+  expect(characterSlugOf("\u0301\u0301", "Dusk")).toBeNull();
+});
+
+test("a member stored without names reads them off its slug", () => {
+  expect(namesFromSlug("velkara-duskmantle")).toEqual({ name: "Velkara", surname: "Duskmantle" });
+  expect(namesFromSlug("ølvir-stål")).toEqual({ name: "Ølvir", surname: "Stål" });
+  expect(namesFromSlug("wardens")).toEqual({ name: "Wardens", surname: "" });
+  expect(namesFromSlug("a-b-c")).toEqual({ name: "A", surname: "B C" });
 });
 
 test("a slug is one or more lower-case words of letters and digits joined by hyphens, 64 characters at most", () => {
