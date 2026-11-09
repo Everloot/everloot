@@ -17,7 +17,7 @@
   "dependencies": {
     "@everloot/protocol": "file:../packages/protocol",
     "@modelcontextprotocol/sdk": "^1.32.2",
-    "@rhyster/wow-casc-dbc": "2.16.19",
+    "@rhyster/wow-casc-dbc": "2.16.21",
     "better-sqlite3": "^13.0.3",
     "js-yaml": "^4.1.0",
     "sax": "^1.6.1",
@@ -34,6 +34,6 @@
     "luaparse": "^0.3.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   }
 }
