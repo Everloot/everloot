@@ -29,6 +29,9 @@ required, or tightening a limit is a major release.
   without a key, 5,000 with one), and the corpus and client-layer routes and the market rule read in plain words.
 
 ### Added
+- 1.26.0 (record protocol 1.13.0): `census_seen.via` takes `nameplate`, a player the game drew a nameplate for
+  (`NAME_PLATE_UNIT_ADDED`), beside `target`, `mouseover` and `group`; any other value is still refused. The stored
+  census row accepts it too. Nothing else changes; the addon sends it from its next release.
 - 1.25.0 (record protocol unchanged, 1.12.0): `marketRealmsResponse` gains an optional `pending`, the realms with scans but no
   public values yet, each `{ realm, reporters, needed }`: the most reporters that scanned one item there on one day in
   the last 7, out of the 3 that make a day public. A count only, never a value.

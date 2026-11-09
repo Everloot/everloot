@@ -64,7 +64,7 @@ export interface CensusRow {
   /** census_self only: GetRealmName(). */
   realm?: string;
   /** census_seen only: how the player was seen. */
-  via?: "target" | "mouseover" | "group";
+  via?: "target" | "mouseover" | "group" | "nameplate";
 }
 
 export const CENSUS_CLASSES = [

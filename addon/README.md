@@ -313,8 +313,10 @@ stops it at once and deletes every row it wrote.
 - **Your own characters** (`census_self`): at login and at each level-up, your character's game id
   (GUID), race and class tokens (`UnitRace` and `UnitClass` second return, e.g. `Scourge`, `HUNTER`),
   level, faction and realm.
-- **Players you see** (`census_seen`): the same fields, without the realm, for players you target, mouse
-  over or group with, plus how you first saw them that day (`target`, `mouseover` or `group`). Units
+- **Players you see** (`census_seen`): the same fields, without the realm, for players near you: ones you
+  target, mouse over or group with, and ones the game shows a nameplate for (`NAME_PLATE_UNIT_ADDED`; your
+  own nameplate settings decide which players get one). Each row says how you first saw the player that day
+  (`target`, `mouseover`, `group` or `nameplate`). Units
   with a hidden level, no race, class or faction, or a GUID that is not a player's are skipped, and so
   are you.
 - Nothing else is read about another player: no name, guild, gear or position.
@@ -322,7 +324,8 @@ stops it at once and deletes every row it wrote.
   every call the module may make.
 - One row per character per UTC day, with the latest level that day. At most 2,000 rows of each kind;
   the oldest days go first. A player already recorded today at the same level costs no new memory, so
-  mouseover in a busy city stays cheap.
+  mouseover and nameplates in a busy city stay cheap. New players are read from nameplates at most 10 a
+  second; the rest are read when their nameplate shows again.
 - The rows are sent from the upload page, which counts them first ("312 characters seen, 2 of your
   own"), or by the Desktop App if you allowed the census on its setup screen or in its settings. The
   command-line uploader never sends them. The server replaces each GUID with a keyed hash before it

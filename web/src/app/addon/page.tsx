@@ -216,7 +216,7 @@ export default async function AddonPage() {
                 <li>What a creature, chest or herb gave you, and what vendors sell and trainers teach.</li>
                 <li>Prices on the items you look at in the auction house. A full scan runs only when you ask for one.</li>
                 <li>Where you stood when an NPC&apos;s window opened (a vendor, a quest giver, a trainer, a flight master), so that NPC can get a place on the map.</li>
-                <li>The census: the race, class, level and faction of characters, never a name. It is on in a new install and says so once in chat.</li>
+                <li>The census: the race, class, level and faction of your characters and of players near you, including the ones the game shows a nameplate for. Never a name. It is on in a new install and says so once in chat.</li>
               </ul>
             </Card>
             <Card as="section" aria-labelledby="why-gives" className="space-y-3">
@@ -269,8 +269,9 @@ export default async function AddonPage() {
             <p>
               The addon only writes a file on your computer. Uploads, from the upload page or the app, carry anonymous
               observations; named data stays on your computer unless you choose to share it. The census is on in a new
-              install and says so once in chat: it counts the race, class, level and faction of characters you see, never a
-              name. <code>/everloot census off</code> turns it off and deletes its rows. The players module is off
+              install and says so once in chat: it counts the race, class, level and faction of characters near you, never a
+              name. Near you means players you target, mouse over or group with, and players the game shows a nameplate
+              for, so your own nameplate settings decide which of those it sees. <code>/everloot census off</code> turns it off and deletes its rows. The players module is off
               until you type <code>/everloot players on</code>; when you turn it on, the addon records the name, realm,
               race, class, level and guild of your own characters and of players you target, mouse over or group with,
               and your own guild&apos;s boss kills (the guild, the boss and the time, no names).

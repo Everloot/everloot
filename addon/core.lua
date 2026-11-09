@@ -289,7 +289,7 @@ frame:SetScript("OnEvent", function(_, event, arg1)
     print(E:LoginLine())
     -- Said once per install, so a player never records other players without having been told.
     if EverlootDB.toggles.census and not EverlootDB.censusNotice then
-      print("Everloot: census on. It records the race, class, level and faction of your characters and of players you target, mouse over or group with. Never their names, guilds, gear or where they are. It stays in this file unless the Everloot Desktop App, if you allowed the census there, or the everloot.app upload page sends it. /everloot census off stops it and deletes the rows.")
+      print("Everloot: census on. It records the race, class, level and faction of your characters and of players near you: ones you target, mouse over or group with, and ones the game shows a nameplate for (your nameplate settings decide which). Never their names, guilds, gear or where they are. It stays in this file unless the Everloot Desktop App, if you allowed the census there, or the everloot.app upload page sends it. /everloot census off stops it and deletes the rows.")
       EverlootDB.censusNotice = true
     end
     -- Pull summaries name the group, so they are announced once per install too, in the builds that carry them.
@@ -362,7 +362,7 @@ SlashCmdList["EVERLOOT"] = function(msg)
   elseif msg == "census on" or msg == "census off" then
     EverlootDB.toggles.census = (msg == "census on")
     if EverlootDB.toggles.census then
-      print("Everloot: census on. It records the race, class, level and faction of your characters and of players you target, mouse over or group with. Never their names, guilds, gear or where they are. It stays in this file unless the Everloot Desktop App, if you allowed the census there, or the everloot.app upload page sends it. /reload to apply.")
+      print("Everloot: census on. It records the race, class, level and faction of your characters and of players near you: ones you target, mouse over or group with, and ones the game shows a nameplate for (your nameplate settings decide which). Never their names, guilds, gear or where they are. It stays in this file unless the Everloot Desktop App, if you allowed the census there, or the everloot.app upload page sends it. /reload to apply.")
     else
       -- Turning it off withdraws what it wrote: every census row is deleted from this file.
       if E.Census then E.Census.Withdraw() end

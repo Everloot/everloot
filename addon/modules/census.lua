@@ -3,7 +3,9 @@
 --
 -- Two kinds of rows, written in the shape the upload sends:
 --   census_self  your own character, at login and level-up: guid, race, class, level, faction, realm
---   census_seen  a player you target, mouse over or group with: guid, race, class, level, faction, via
+--   census_seen  a player near you: one you target, mouse over or group with, or one the game shows a nameplate
+--                for (NAME_PLATE_UNIT_ADDED, so the player's own nameplate settings decide which): guid, race,
+--                class, level, faction, via
 -- Race and class are the game's tokens (UnitRace and UnitClass second return), not display names.
 --
 -- Nothing else is read about another player: no name, guild, gear or position. The contract test
@@ -16,8 +18,9 @@
 -- new level changes it (level, capturedAt and a new event id, so the upload sends the row again and the
 -- server, which keys a row by character and day, takes the new level). At most 2,000 rows per kind; the
 -- oldest days go first.
--- Mouseover fires constantly, so a player already recorded today at the same level costs a few table
--- reads and no new strings or tables.
+-- Mouseover and nameplates fire constantly, so a player already recorded today at the same level costs a few
+-- table reads and no new strings or tables. A crowd of new nameplates (arriving in a city) is read at most
+-- PLATE_PER_SECOND new players a second; the rest are read when their nameplate shows again.
 
 local E = Everloot
 local C = {}
@@ -26,12 +29,14 @@ E.Census = C
 local MAX_ROWS = 2000
 local MAX_LEVEL = 60
 local DAY_SECONDS = 86400
+local PLATE_PER_SECOND = 10                -- new players read from nameplates in one second, at most
 local KINDS = { "census_self", "census_seen" }
 local GUID = "^Player%-%d+%-[%dA-F]+$"   -- upper-case hex only, as the intake requires
 local RACE = "^%a+$"                       -- 2 to 24 letters, e.g. Scourge, Skyborne
 local CLASS = "^%u+$"                      -- 3 to 16 capitals, e.g. HUNTER
 
--- Every call this module makes to the game. A test scans the source against this list.
+-- Every call this module makes to the game. A test scans the source against this list. Nameplates add none:
+-- NAME_PLATE_UNIT_ADDED hands over the unit token, which the calls below read like "mouseover".
 C.API = { "UnitIsPlayer", "UnitGUID", "UnitLevel", "UnitRace", "UnitClass", "UnitFactionGroup", "GetRealmName", "IsInRaid" }
 
 local PARTY, RAID = {}, {}
@@ -41,6 +46,7 @@ for i = 1, 40 do RAID[i] = "raid" .. i end
 local active = false
 local selfGuid
 local day, dayEnds = nil, 0
+local plateSecond, plateCount = 0, 0
 local today = { census_self = {}, census_seen = {} }   -- guid -> today's row, for the current UTC day
 
 local function rows(kind)
@@ -125,6 +131,12 @@ local function seen(unit, via)
     return
   end
   if type(guid) ~= "string" or not guid:find(GUID) then return end
+  if via == "nameplate" then
+    local now = time()
+    if now ~= plateSecond then plateSecond, plateCount = now, 0 end
+    if plateCount >= PLATE_PER_SECOND then return end
+    plateCount = plateCount + 1
+  end
   local race = E.Readable((select(2, UnitRace(unit))))
   local class = E.Readable((select(2, UnitClass(unit))))
   local faction = factionOf(E.Readable((UnitFactionGroup(unit))))
@@ -201,13 +213,18 @@ E:RegisterModule("census", function()
   f:RegisterEvent("PLAYER_TARGET_CHANGED")
   f:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
   f:RegisterEvent("GROUP_ROSTER_UPDATE")
+  f:RegisterEvent("NAME_PLATE_UNIT_ADDED")
   f:HookScript("OnEvent", function(_, event, arg1)
     if not active then return end
     if event == "UPDATE_MOUSEOVER_UNIT" then pcall(seen, "mouseover", "mouseover")
+    elseif event == "NAME_PLATE_UNIT_ADDED" then
+      -- Only a nameplate unit token ("nameplate1" and on); anything else the event might carry is ignored.
+      local unit = E.Readable(arg1)
+      if type(unit) == "string" and unit:find("^nameplate%d+$") then pcall(seen, unit, "nameplate") end
     elseif event == "PLAYER_TARGET_CHANGED" then pcall(seen, "target", "target")
     elseif event == "GROUP_ROSTER_UPDATE" then pcall(group)
     elseif event == "PLAYER_LOGIN" then pcall(recordSelf); pcall(group)
     elseif event == "PLAYER_LEVEL_UP" then pcall(recordSelf, arg1) end
   end)
-  return "ready (your characters, and players you target, mouse over or group with; /everloot census off deletes the rows)"
+  return "ready (your characters, and players near you: ones you target, mouse over, group with or see a nameplate for; /everloot census off deletes the rows)"
 end)

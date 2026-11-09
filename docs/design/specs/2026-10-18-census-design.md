@@ -35,7 +35,7 @@ first number goes up.
 | | Source | What it gives | When |
 |---|---|---|---|
 | A | **Your own characters** (`census_self`) | race, class, level, faction, realm string, for each character you log in | next addon release |
-| B | **Players you see** (`census_seen`) | the same fields for player units you target or mouse over, or that are in your group | next addon release |
+| B | **Players you see** (`census_seen`) | the same fields for player units you target or mouse over, or that are in your group; from the next addon release also players the game shows a nameplate for (§10) | next addon release |
 | C | **Progress the addon already records** | completion module (achievements, reputations, titles, quests) for your own characters | exists (0.3.3) |
 | D | **Blizzard profile API** | verified gear, level and achievements for a *named* character | only if Blizzard ships a Forever namespace; none exists (checked 2026-10-18) |
 
@@ -58,7 +58,7 @@ census_self | census_seen
   level       1..60
   faction     "Alliance" | "Horde"
   realm       GetRealmName() for self; for seen, nothing: the server id inside the GUID says where they're from
-  via         census_seen only: "target" | "mouseover" | "group"
+  via         census_seen only: "target" | "mouseover" | "group" | "nameplate" (§10)
 ```
 
 - No `UnitName`, guild, gear or position is read for other players. Ever.
@@ -145,3 +145,26 @@ step 2's in-game check has to happen before then or on launch day.
 2. **Opt-in.** Census is off until the player runs `/everloot census on`, like every other module. The
    privacy promise doesn't change.
 3. **Small-cell threshold: 10 characters**, reported by at least 3 installs from at least 3 addresses.
+
+## 10. Nameplates (Carlos, 2026-11-04)
+
+The census also counts players the game shows a nameplate for (`NAME_PLATE_UNIT_ADDED`), not only the ones
+you target, mouse over or group with. The game draws nameplates by the player's own settings (friendly and
+enemy plates on or off, and how far away), so those settings decide which players this adds.
+
+- **Same row, same fields.** A nameplate player is read like a mouseover: `UnitIsPlayer`, `UnitGUID`,
+  `UnitLevel`, `UnitRace`, `UnitClass` and `UnitFactionGroup` on the `nameplateN` unit the event names, and
+  `via` is `"nameplate"`. Hostile and other-faction players count as they do on mouseover. No call was added
+  to the census list, and the contract test forbids `C_NamePlate` (reading every plate at once).
+- **Load.** One row per player per UTC day and the 2,000-row cap are unchanged. A player already recorded
+  today costs a few table reads and allocates nothing. New players are read from nameplates at most 10 a
+  second, so arriving in a city spreads the reads out; a plate that waited is read when it shows again.
+  Target, mouseover and the group are not throttled.
+- **Names stay out.** The players module (`players.lua`, names and guilds) does not read nameplates, as its
+  design says (`2026-10-20-player-pages-design.md`, what was left out), and its contract test still fails on
+  any nameplate event, call or unit.
+- **Server.** The protocol's `via` takes `"nameplate"` (protocol 1.26.0, record protocol 1.13.0); any other
+  value is still refused. Census rows are stored in the upload store, not in a database table, so there is
+  no migration. Nothing on the site breaks the counts down by `via`.
+- **Bias.** Seen rows now lean further toward busy places, cities above all, where many nameplates show at
+  once, so §6's bias note applies more strongly.

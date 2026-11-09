@@ -231,7 +231,8 @@ The census counts who plays what. It is on in a new install of the addon, which 
 install from before the census keeps it off until `/everloot census on`. It leaves the player's computer
 only from the upload page or from the Desktop App, if the player allowed the census there. It
 records race, class, level and faction for your own characters as you log in, plus the realm name, and
-for players you target, mouse over or group with. For other players it reads those four things only,
+for players near you: ones you target, mouse over or group with, and ones the game shows a nameplate for
+(`NAME_PLATE_UNIT_ADDED`, so the player's own nameplate settings decide which). For other players it reads those four things only,
 never their name, guild, gear or position. The addon keeps one row per character per day. Each row
 carries the character's GUID, the game's id for it, only on the way to us: before anything is stored,
 the site replaces it with a keyed hash (HMAC-SHA256 under a server secret) and keeps the server id, the

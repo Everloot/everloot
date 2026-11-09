@@ -45,7 +45,8 @@ export default function PrivacyPage() {
   // The armory item shows only once the armory pages are on (EVERLOOT_ARMORY).
   const armory = armoryOn();
   // Linked characters, public character pages, the guild item's character page and private sync: 6 November.
-  const updated = "2026-11-06";
+  // The census paragraph gained nameplates on 9 November, which dates the page.
+  const updated = "2026-11-09";
   return (
     <article>
       <Container width="reading">
@@ -269,7 +270,9 @@ export default function PrivacyPage() {
                 Desktop App (a box on its setup screen and a switch in its settings) or
                 send your file from the upload page. It records race, class,
                 level and faction for your own characters, with the realm name, and for
-                players you target, mouse over or group with. It never reads another
+                players near you: ones you target, mouse over or group with, and ones the
+                game shows a nameplate for (your own nameplate settings decide which
+                players get one). It never reads another
                 player&apos;s name, guild, gear or position. Before anything is stored,
                 the game&apos;s id for each character is replaced with a keyed one-way
                 hash, and only the number of the server the character is on is kept

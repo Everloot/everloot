@@ -279,6 +279,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the header search box suggests dungeons and raids as you type, from the same rows as full search, with or without
   the leading "The": "deadm" offers the Deadmines, labelled "Dungeon, level 16". A box scoped to items, NPCs, quests or
   objects keeps to that type.
+- Addon and site: the census also counts players the game shows a nameplate for (`via: "nameplate"`, protocol 1.26.0),
+  at most 10 new ones a second; still race, class, level and faction only, and the players module still never reads
+  nameplates. Needs the next addon release; no migration.
 - Site: `/api/health` has a route test: a fresh heartbeat answers 200, any other 503, both `Cache-Control: no-store`,
   and the snapshot is read again only after a minute. The route itself is unchanged.
 

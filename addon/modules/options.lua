@@ -26,7 +26,7 @@ O.ROWS = {
   { key = "mailCollect", command = "mail", field = true, defaultOff = true, label = "Collect all at the mailbox",
     text = "A button that takes money and items from auction letters only, one at a time. Skips cash on delivery and other letters." },
   { key = "census", command = "census", label = "Census",
-    text = "Race, class, level and faction of your characters and of players you see. Never names, guilds, gear or places. Off deletes its rows." },
+    text = "Race, class, level and faction of your characters and of players near you, nameplates included. Never names, guilds, gear or places. Off deletes its rows." },
   { key = "openworld", label = "World",
     text = "NPCs, loot, quests, vendors and items you see, and where you stood at NPC windows and herbs, ore and chests. Anonymous: no character or guild names." },
   { key = "professions", label = "Recipes and trainers",

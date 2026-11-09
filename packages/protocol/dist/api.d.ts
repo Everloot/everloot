@@ -969,6 +969,7 @@ export declare const intakeRequest: z.ZodObject<{
         via: z.ZodEnum<{
             group: "group";
             mouseover: "mouseover";
+            nameplate: "nameplate";
             target: "target";
         }>;
         realm: z.ZodOptional<z.ZodNever>;
@@ -2265,6 +2266,7 @@ export declare const API_SCHEMAS: {
             via: z.ZodEnum<{
                 group: "group";
                 mouseover: "mouseover";
+                nameplate: "nameplate";
                 target: "target";
             }>;
             realm: z.ZodOptional<z.ZodNever>;

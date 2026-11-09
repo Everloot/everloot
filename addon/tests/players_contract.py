@@ -43,6 +43,10 @@ for name in FORBIDDEN:
 # No nameplate or inspect events: they would read far more players than the player is looking at.
 for event in ("NAME_PLATE_UNIT_ADDED", "INSPECT_READY", "GUILD_ROSTER_UPDATE", "WHO_LIST_UPDATE", "CHAT_MSG"):
     assert event not in source, f"players.lua listens to {event}"
+# The census counts nameplates (anonymous: race, class, level, faction); names never come from them. No
+# nameplate event, call or unit token anywhere in this file, comments included
+# (docs/design/specs/2026-10-20-player-pages-design.md, what was left out).
+assert not re.search(r"name_?plate", source, re.IGNORECASE), "players.lua must not read nameplates"
 
 # Every game call in the code (comments stripped) is on the module's own list, and the list holds only these.
 code = "\n".join(line.split("--")[0] for line in source.splitlines())
@@ -538,6 +542,20 @@ units.mouseover = player(1); units.party1 = player(2)
 event('PLAYER_LOGIN'); event('UPDATE_MOUSEOVER_UNIT')
 assert(nameCalls == 0, 'the census never reads a name')
 assert(#rows() == 0, 'and writes no player row')
+""")
+
+# --- Nameplates are the census's alone (2026-11-04): with both modules on, the census registers
+# --- NAME_PLATE_UNIT_ADDED on the shared frame, and this module still reads no name from it ---
+lua = fresh("{ installId = 'abcd-1234', toggles = { census = true, players = true }, records = {} }",
+            "UnitFactionGroup = function(unit) if units[unit] then return 'Horde', 'Horde' end end",
+            files=("core.lua", "modules/census.lua", "modules/players.lua"))
+lua.execute("""
+event('PLAYER_LOGIN')
+assert(registered.NAME_PLATE_UNIT_ADDED, 'the census listens to nameplates')
+local before, names = #rows(), nameCalls
+for i = 1, 5 do GT = GT + 1; units['nameplate' .. i] = player(500 + i); event('NAME_PLATE_UNIT_ADDED', 'nameplate' .. i) end
+assert(#EverlootDB.records.census_seen == 5 and EverlootDB.records.census_seen[1].via == 'nameplate', 'the census counts them')
+assert(#rows() == before and nameCalls == names, 'players reads no name and writes no row from a nameplate')
 """)
 
 # --- A client that answers every unit with a realm, ours included, still gives us the player: only a

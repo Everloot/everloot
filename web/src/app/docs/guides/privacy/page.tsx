@@ -61,8 +61,9 @@ export default function Page() {
       <P>
         The census counts who plays what. It is on in a new install of the addon, which says so once in chat; an install
         from before the census keeps it off until you type <C>/everloot census on</C>. It records
-        race, class, level and faction for your own characters (with the realm name) and for players you target, mouse
-        over or group with. It never reads another player&apos;s name, guild, gear or position.
+        race, class, level and faction for your own characters (with the realm name) and for players near you: ones you
+        target, mouse over or group with, and ones the game shows a nameplate for (your nameplate settings decide which
+        players get one). It never reads another player&apos;s name, guild, gear or position.
       </P>
       <P>
         Before anything is stored, the game&apos;s id for each character is replaced with a keyed one-way hash. You can turn

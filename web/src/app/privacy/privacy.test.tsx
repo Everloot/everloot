@@ -40,13 +40,22 @@ test("the census paragraph says how it starts and leaves, what is kept, what is 
     "/everloot census off",
     "only if you allowed it in the Everloot Desktop App",
     "race, class, level and faction for your own characters, with the realm name",
-    "players you target, mouse over or group with",
+    "players near you: ones you target, mouse over or group with, and ones the game shows a nameplate for",
+    "your own nameplate settings decide which players get one",
     "never reads another player's name, guild, gear or position",
     "keyed one-way hash",
     "number of the server",
     "never published one by one",
     "at least 10 characters reported by at least 3 installs",
   ]) expect(text).toContain(claim);
+});
+
+test("nameplates are named for the census only: the player pages item never reads them", () => {
+  const playerPages = html.slice(html.indexOf('id="player-pages"'));
+  const item = playerPages.slice(0, playerPages.indexOf("</li>"));
+  expect(item).toContain("target, mouse over or group with");
+  expect(item).not.toMatch(/nameplate/i);
+  expect(text).toContain("Last updated: November 9, 2026");
 });
 
 test("saved builds: what is kept, that characters are typed labels, that a shared link is public, and deletion", () => {
