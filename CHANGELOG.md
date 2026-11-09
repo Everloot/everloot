@@ -20,6 +20,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Addon: the Gold tab's Overview chart follows the period buttons (today, 7 days, 30 days, or all for the ledger's
   90 days), one bar a day; Sales shows the auction house's cut beside each sale's deposit, and the by-item rows show
   sales per day over the period and the last sold day. Display only; nothing recorded or uploaded changes.
+- Site: a profession page answers to its skill line id, `/tools/professions/171` or `/tools/professions/171-alchemy`, and
+  redirects for good to the slug page it already had, keeping the skill range and class context in the query; an unknown id
+  is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
 
 ### Fixed
 - Site: a database address with an id nothing knows (an item or NPC such as /database/items/999999) answers its 404 with a

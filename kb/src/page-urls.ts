@@ -2,6 +2,7 @@ import { SITE, type ChangeFilter, type TalentClass } from "@everloot/protocol";
 import { previewPath } from "../../web/src/lib/talents/summary";
 import { catalogPath } from "./catalog-paths.js";
 import { guildSlug } from "./guilds.js";
+import { slugify } from "./item-taxonomy.js";
 import { INDEXABLE_MIN_BODY, lorePath } from "./lore-slug.js";
 import { releaseDb, type ReleaseSource } from "./release-db.js";
 import { SOURCES } from "./sources.js";
@@ -92,7 +93,12 @@ export function mapSpotUrl(mapId: number, x: number, y: number): string {
   return abs(`/map?zone=${mapId}&x=${r(x)}&y=${r(y)}`);
 }
 
-export function professionsUrl(profession: string, fromSkill?: number, toSkill?: number): string {
+/**
+ * A profession's page. With its skill line id the path form, `/tools/professions/<id>-<slug>`, which the site
+ * resolves by the id and sends to the slug page; without one the hub's `?profession=` form, resolved by name.
+ */
+export function professionsUrl(profession: string, fromSkill?: number, toSkill?: number, skillLineId?: number): string {
+  if (skillLineId !== undefined) return abs(`/tools/professions/${skillLineId}-${slugify(profession.trim())}${query({ from: fromSkill, to: toSkill })}`);
   return abs(`/tools/professions${query({ profession, from: fromSkill, to: toSkill })}`);
 }
 
