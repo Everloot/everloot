@@ -28,7 +28,8 @@ Observed files: `npcs`, `quests`, `vendor-offers`, `drop-rates`, `drop-measured-
 Every observed row carries how many installs agree (`installs`, at least 3) and no install id, no pseudonym and no
 name of a player. A value nobody has three installs on is `null`, on the page `[?]`, never a blank or a zero.
 Every count is rows out of how many were reported, with what that counts in words, the date the data was current and
-the method, so a number is never bare.
+the method, so a number is never bare. The JSON API and the MCP tools call the same count `reporters`: it is the same
+number, the installs that agree on the fact, under the name those shapes use.
 
 ## Make one
 

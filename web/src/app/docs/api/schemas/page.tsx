@@ -5,6 +5,7 @@ import { C, H2, H3, List, P, Params, Table, docLink } from "@/components/docs/bl
 import DocPage from "@/components/docs/DocPage";
 import { endpointHref } from "@/lib/docs/nav";
 import { schemaFields } from "@/lib/docs/examples";
+import { FILE_SCHEMAS } from "@/lib/docs/file-schemas";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
@@ -100,10 +101,13 @@ export default function SchemasPage() {
       <H2 id="response-shapes">Response shapes</H2>
       <P>
         One section per shape. The fields are the top-level ones; the full shape, with everything nested, is in the JSON Schema
-        file named under each heading.
+        file named under each heading. Three shapes describe a file of the bulk export rather than an endpoint&apos;s answer,
+        and say so. Wherever a shape carries <C>reporters</C>, it is the count of installs that agree on that fact, the same
+        number the open-data files call <C>installs</C>.
       </P>
       {names.map((name) => {
         const routes = usedBy(name);
+        const file = FILE_SCHEMAS[name];
         return (
           <section key={name}>
             <H3 id={name}>{name}</H3>
@@ -120,6 +124,8 @@ export default function SchemasPage() {
                   ))}
                   .
                 </>
+              ) : file ? (
+                <> Describes a file, not an endpoint: {file}.</>
               ) : (
                 <> A part of other answers.</>
               )}

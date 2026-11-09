@@ -20,6 +20,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   sales per day over the period and the last sold day. Display only; nothing recorded or uploaded changes.
 
 ### Fixed
+- Site: the schemas page marks the three shapes that describe a bulk-export file rather than an endpoint and says that
+  `reporters` in the API and MCP shapes is the count the open-data files call `installs`; the API page names the routes
+  its own pages fetch (/api/map/pins, /api/suggest) as outside the OpenAPI contract. The open-data notes say the same.
 - Site: a database address with an id nothing knows (an item or NPC such as /database/items/999999) answers its 404 with a
   body again: the heading, "No report for this id yet; three installs make it public" with the addon link, and a search box
   prefilled with the id. The site 404 leads with the same search box, prefilled with the last part of the address tried.

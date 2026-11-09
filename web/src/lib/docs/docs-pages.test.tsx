@@ -26,6 +26,7 @@ import sitemap from "@/lib/site-sitemap";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import { allDocsPages, endpointSlug } from "./nav";
+import { FILE_SCHEMAS, PAGE_INTERNAL_ROUTES } from "./file-schemas";
 import { MY_BUILDS_REFUSAL } from "@/lib/saved-builds";
 
 type PageModule = { default: (props: { params: Promise<Record<string, string>> }) => unknown };
@@ -89,6 +90,16 @@ test("the reference lists every tool with its arguments, every endpoint, the Ope
   for (const text of ["/api/openapi.json", "/schema/index.json", "/schema/upload.json", `@everloot/protocol`, PROTOCOL_VERSION, "gameData"]) {
     expect(decoded).toContain(text);
   }
+});
+
+test("the schemas page marks the file-only shapes, says reporters is installs, and the API page names the page-internal routes", () => {
+  const fileOnly = Object.keys(FILE_SCHEMAS);
+  expect(fileOnly.length).toBe(3);
+  for (const [name, file] of Object.entries(FILE_SCHEMAS)) expect(text).toContain(`/schema/api/${name}.json Describes a file, not an endpoint: ${file}.`);
+  expect(text.split("Describes a file, not an endpoint").length - 1).toBe(fileOnly.length);
+  expect(text).toContain("reporters, it is the count of installs that agree on that fact, the same number the open-data files call installs");
+  for (const path of PAGE_INTERNAL_ROUTES) expect(page).toContain(`>${path}</code>`);
+  expect(text).toContain("they are not part of the contract, the document leaves them out");
 });
 
 test("tells users how to add the server in Claude, Grok and any other assistant that takes a URL", () => {
