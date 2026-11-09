@@ -1,20 +1,22 @@
 // @vitest-environment jsdom
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { API_ROUTES, MCP_TOOL_NAMES, MCP_TOOLS, SITE } from "@everloot/protocol";
+import { ALL_RECORD_KINDS, API_ROUTES, MCP_TOOL_NAMES, MCP_TOOLS, SITE } from "@everloot/protocol";
 import { z } from "zod";
 import { expect, test } from "vitest";
 import { exampleUrl, requestSamples, sample, TOOL_ARGS, toolSamples } from "./examples";
 import { articleMarkdown } from "./markdown";
 import { allDocsPages, DOCS_TABS, endpointHref, endpointSlug, legacyAnchors, neighbours, tabFor, toolFromSlug, toolHref } from "./nav";
+import { recordHref } from "./records";
 import { liveToolNames } from "@/lib/guild-switch";
 
 const app = join(__dirname, "../../app");
 
-test("every public endpoint and every MCP tool has exactly one docs page in the sidebar", () => {
+test("every public endpoint, every MCP tool and every record kind has exactly one docs page in the sidebar", () => {
   const hrefs = DOCS_TABS.flatMap((tab) => tab.groups.flatMap((group) => group.pages.map((page) => page.href)));
   for (const route of API_ROUTES) expect(hrefs.filter((h) => h === endpointHref(route)), route.path).toHaveLength(1);
   for (const name of liveToolNames()) expect(hrefs.filter((h) => h === toolHref(name)), name).toHaveLength(1);
+  for (const kind of ALL_RECORD_KINDS) expect(hrefs.filter((h) => h === recordHref(kind)), kind).toHaveLength(1);
   expect(new Set(API_ROUTES.map(endpointSlug)).size).toBe(API_ROUTES.length);
 });
 
@@ -33,7 +35,8 @@ test("every page in the table of contents has a page file, and appears once", ()
   for (const { href } of pages) {
     const generated = /^\/docs\/api\/[a-z-]+$/.test(href) && API_ROUTES.some((r) => endpointHref(r) === href)
       ? "docs/api/[endpoint]/page.tsx"
-      : href.startsWith("/docs/mcp/tools/") ? "docs/mcp/tools/[tool]/page.tsx" : null;
+      : href.startsWith("/docs/mcp/tools/") ? "docs/mcp/tools/[tool]/page.tsx"
+      : href.startsWith("/docs/api/records/") ? "docs/api/records/[kind]/page.tsx" : null;
     expect(existsSync(join(app, generated ?? `${href.slice(1)}/page.tsx`)), href).toBe(true);
   }
   expect(new Set(pages.map((p) => p.href)).size).toBe(pages.length);

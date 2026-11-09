@@ -5,6 +5,7 @@ import { C, H2, H3, List, P, Params, Table, docLink } from "@/components/docs/bl
 import DocPage from "@/components/docs/DocPage";
 import { endpointHref } from "@/lib/docs/nav";
 import { schemaFields } from "@/lib/docs/examples";
+import { recordHref } from "@/lib/docs/records";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
@@ -67,13 +68,14 @@ export default function SchemasPage() {
       <H2 id="record-kinds">Record kinds</H2>
       <P>
         The addon writes records, and each has a <C>kind</C>. The public corpus holds the kinds marked below; the rest stay
-        private to the upload. Each kind has its own schema file.
+        private to the upload. Each kind has a page with its fields, and its own schema file.
       </P>
       <Table
-        head={["Kind", "In the public corpus"]}
+        head={["Kind", "In the public corpus", "Schema file"]}
         rows={ALL_RECORD_KINDS.map((kind) => [
-          <a key="k" href={`/schema/records/${kind}.json`} className={docLink}><C>{kind}</C></a>,
+          <Link key="k" href={recordHref(kind)} className={docLink}><C>{kind}</C></Link>,
           PUBLIC_RECORD_KINDS.includes(kind) ? "Yes" : "No",
+          <a key="f" href={`/schema/records/${kind}.json`} className={docLink}><C>{`${kind}.json`}</C></a>,
         ])}
       />
 

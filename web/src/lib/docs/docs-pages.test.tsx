@@ -18,7 +18,7 @@ vi.mock("@/components/CookieConsent", () => ({ CookiePreferencesButton: () => nu
 vi.mock("@/components/ApiKeys", () => ({ default: () => <div data-testid="api-keys" /> }));
 
 import { CONNECT_EXAMPLES, CORPUS_URL, MCP_PROMPTS, MCP_RESOURCE_TEMPLATES, MCP_RESOURCES, MCP_TOOLS, MCP_URL, REQUESTS_PER_HOUR } from "./connect-data";
-import { API_ROUTES, MCP_PROMPT_NAMES, MCP_RESOURCE_TEMPLATE_URIS, MCP_RESOURCE_URIS, MCP_TOOL_NAMES, PROTOCOL_VERSION, PUBLIC_RECORD_KINDS } from "@everloot/protocol";
+import { ALL_RECORD_KINDS, API_ROUTES, MCP_PROMPT_NAMES, MCP_RESOURCE_TEMPLATE_URIS, MCP_RESOURCE_URIS, MCP_TOOL_NAMES, PROTOCOL_VERSION, PUBLIC_RECORD_KINDS } from "@everloot/protocol";
 import { liveToolNames } from "@/lib/guild-switch";
 import { createIntakeQuota } from "@/lib/intake-quota";
 import { ANON_PAGE, ANON_PER_HOUR, attribution, KEY_PAGE, KEY_PER_HOUR } from "@/lib/data-guard";
@@ -37,6 +37,7 @@ async function renderDocs(): Promise<string> {
   for (const [path, mod] of Object.entries(modules)) {
     const calls = path.includes("[endpoint]") ? API_ROUTES.map((r) => ({ endpoint: endpointSlug(r) }))
       : path.includes("[tool]") ? liveToolNames().map((n) => ({ tool: n.replaceAll("_", "-") }))
+      : path.includes("[kind]") ? ALL_RECORD_KINDS.map((kind) => ({ kind }))
       : [{}];
     for (const params of calls) out.push(renderToStaticMarkup((await mod.default({ params: Promise.resolve(params) })) as ReactNode));
   }
@@ -102,6 +103,11 @@ test("the corpus kinds on the page are the kinds the API accepts, without addon 
   for (const kind of PUBLIC_RECORD_KINDS) expect(page).toContain(kind);
   // The schemas page lists every kind an upload may carry; addon lists are marked as never public.
   expect(decoded).toMatch(/addon_seen<\/code><\/a><\/td><td[^>]*>No</);
+  // Each row links the kind's page and keeps its schema file beside it.
+  for (const kind of ALL_RECORD_KINDS) {
+    expect(page).toContain(`href="/docs/api/records/${kind}"`);
+    expect(page).toContain(`href="/schema/records/${kind}.json"`);
+  }
 });
 
 test("the stated limit is the limit the public MCP quota enforces", async () => {
