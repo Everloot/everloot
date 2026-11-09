@@ -95,6 +95,7 @@ characters at most.
 - Keep a pull request to one change. Say what changed and how you tested it.
 
 CI also scans every pull request for leaked secrets and for private file paths.
+[`docs/WORKFLOWS.md`](docs/WORKFLOWS.md) describes every workflow.
 
 ## How releases work
 
