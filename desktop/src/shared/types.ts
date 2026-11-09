@@ -211,12 +211,12 @@ export interface CharacterRow {
   itemLevel: number | null;
   /** The latest gear snapshot's slots, in the game's order. */
   equipped: GearSlot[];
-  /** Copper by category, from money events this file holds. */
+  /** Copper by category, from the file's local ledger and the money events from before it (shared/ledger.ts names the categories). */
   spent: Record<string, number>;
   earned: Record<string, number>;
   /** Dated gold snapshots in time order, thinned to at most sixty points for a sparkline. */
   history: { at: string; copper: number }[];
-  /** Money events from the last seven days. */
+  /** Money events from today and the six UTC days before it, the Gold tab's "7 days". */
   week: { earned: number; spent: number };
   /** The last thirty UTC days of money events, oldest first. */
   days: MoneyDay[];

@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { SITE } from "@everloot/protocol";
 import ApiKeys from "@/components/ApiKeys";
 import { C, Callout, H2, List, P, Table, docLink } from "@/components/docs/blocks";
 import { CodeGroup } from "@/components/docs/DocsClient";
 import DocPage from "@/components/docs/DocPage";
+import { KEY_SCOPES, type KeyScope } from "@/lib/api-key-policy";
 import { KEYS_MADE_PER_DAY, KEYS_PER_ACCOUNT, REVOKED_KEPT_DAYS, USAGE_KEPT_DAYS } from "@/lib/api-keys";
 import { ANON_PAGE, ANON_PER_HOUR, guardOn, KEY_PAGE, KEY_PER_HOUR } from "@/lib/data-guard";
 import { REQUESTS_PER_HOUR } from "@/lib/docs/connect-data";
@@ -16,6 +18,17 @@ export const metadata: Metadata = pageMetadata({
   description: "How much you can read from Everloot's API and MCP server without a key, how a free API key raises the limits, and how to send it.",
   path: "/docs/api/keys",
 });
+
+/**
+ * Where each scope is checked, for the scopes table. Keyed by every scope in KEY_SCOPES, so a scope added to the
+ * code without a line here does not compile; the page's test reads each named route to see that it checks the scope.
+ */
+const CHECKED_BY: Record<KeyScope, ReactNode> = {
+  "read:public": "Every public endpoint and the MCP server, which count the key's requests instead of your address's.",
+  "read:own": <><C>GET /api/me/builds</C> and the MCP server&apos;s <C>my_builds</C> tool.</>,
+  "link:own": <><C>POST /api/me/characters/links</C>, which the Desktop App calls to link a character.</>,
+  "sync:own": <><C>POST /api/me/characters/sync</C>, which the Desktop App calls to send a linked character&apos;s data.</>,
+};
 
 export default function KeysPage() {
   // Read at build time; turning the guard on takes a redeploy, which rebuilds this page too.
@@ -119,6 +132,22 @@ export default function KeysPage() {
               tied to it, write to <a href="mailto:hello@everloot.app" className={docLink}>hello@everloot.app</a>.
             </li>
           </List>
+
+          <H2 id="scopes">Scopes</H2>
+          <P>
+            A key&apos;s permissions are its scopes. <C>read:public</C> is on every key. The rest are opt-in: the key form
+            offers each one the site has switched on, and you tick the ones the key needs. A key without the scope a
+            route needs gets <C>403</C>.
+          </P>
+          <Table
+            head={["Scope", "On the key form", "What it allows", "Checked by"]}
+            rows={KEY_SCOPES.map((s) => [
+              <C key={s.id}>{s.id}</C>,
+              s.always ? <>{s.label} <span className="text-muted">(on every key)</span></> : s.label,
+              s.note,
+              CHECKED_BY[s.id],
+            ])}
+          />
 
           {builds && (
             <>

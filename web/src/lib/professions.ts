@@ -50,6 +50,17 @@ export function professionBySlug(slug: string): ProfessionInfo | undefined {
   return CLIENT_PROFESSIONS.find((p) => p.slug === slug);
 }
 
+/**
+ * The profession a URL segment names: the skill line id ("171"), the id with a slug ("171-alchemy", any slug), or
+ * the slug alone ("alchemy", the canonical page). The id wins where the segment starts with one, so a client that
+ * holds the skill line id from a trainer or recipe row needs no English slug.
+ */
+export function professionBySegment(segment: string): ProfessionInfo | undefined {
+  const id = /^(\d+)(?:-|$)/.exec(segment);
+  if (id) return CLIENT_PROFESSIONS.find((p) => p.id === Number(id[1]));
+  return professionBySlug(segment);
+}
+
 /** A profession by its name in any case ("first aid"), for the old `?profession=` links. */
 export function professionByName(name: string): ProfessionInfo | undefined {
   const wanted = name.trim().toLowerCase();

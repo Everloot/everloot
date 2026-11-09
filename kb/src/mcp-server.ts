@@ -723,6 +723,13 @@ function professionArg(profession: string): string {
   return trimmed;
 }
 
+/** The skill line id of a profession the files list, by its name in any case; undefined for a name they do not. */
+function professionSkillLineId(profession: string): number | undefined {
+  const wanted = profession.trim().toLowerCase();
+  for (const [id, name] of CLIENT_SKILLS) if (name.toLowerCase() === wanted) return id;
+  return undefined;
+}
+
 /** The readers a host lends the tools: the site's store in process, or nothing for a standalone server. */
 export interface ToolOptions { catalog?: CatalogLoader; corpus?: CorpusLoader; market?: MarketLoader; gameData?: GameDataLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; coverage?: CoverageLoader; settledSummary?: SettledSummaryLoader; guilds?: GuildReader; recheck?: readonly RecheckScope[] }
 
@@ -838,7 +845,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
       const query = { profession: professionArg(args.profession), fromSkill: args.fromSkill ?? 1, toSkill: args.toSkill ?? args.fromSkill ?? 1 };
       return readPageIn("profession_path", (facts: ReturnType<typeof pathFactsFromRecords>) => {
         const page = professionPath(facts.sightings, facts.prices, query, facts.derived, facts.vendorPrices);
-        const url = page.steps.length ? professionsUrl(query.profession, query.fromSkill, query.toSkill) : undefined;
+        const url = page.steps.length ? professionsUrl(query.profession, query.fromSkill, query.toSkill, professionSkillLineId(query.profession)) : undefined;
         return { text: formatProfessionPath(page), page, url };
       });
     },
@@ -849,7 +856,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
         return {
           text: handleRecipeThresholds(args, facts.observations, facts.prices, facts.vendorPrices),
           page,
-          url: page.ranges.length ? professionsUrl(profession) : undefined,
+          url: page.ranges.length ? professionsUrl(profession, undefined, undefined, professionSkillLineId(profession)) : undefined,
         };
       });
     },
