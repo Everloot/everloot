@@ -117,6 +117,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and the other from the clock, so they disagreed. Both pages say when the GitHub facts are older than 26 hours.
 
 ### Added
+- Site: `/docs/mcp` tables the record kinds the knowledge tools cover, where each kind comes from and the tool that
+  reads it on its own, and says how a record id is formed: a catalog record's stable synthetic id against the in-game
+  id the page tools take.
 - Site: an item, NPC or quest page shared on Discord or X shows its own card: the name, its type and how many of
   the 3 installs agree on the name, as text on the brand canvas. Before, every database page showed the site card.
 - Addon: the Everloot window's sidebar is now Home, Gold, Collection, Professions and Settings. Ask, Build plan and
