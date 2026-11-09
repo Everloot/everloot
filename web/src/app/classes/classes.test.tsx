@@ -198,6 +198,23 @@ describe("class hubs", () => {
     expect(visible(page)).toContain("Items a Mage can use by its proficiencies in the game files");
   });
 
+  test("the hub links the census narrowed to its class and the class ranking, and prints no count of its own", async () => {
+    for (const [slug, name] of [["mage", "Mage"], ["druid", "Druid"]] as const) {
+      const html = await hub(slug);
+      const page = section(html, "forever");
+      expect(visible(page), slug).toContain(`${name} on Forever`);
+      expect(page, slug).toContain(`href="/census?class=${slug}"`);
+      expect(page, slug).toContain('href="/rankings/classes"');
+      expect(visible(page), slug).toContain(`Where ${name} ranks this week`);
+      // Built once per deploy, the page cannot carry the week's count; the census page shows it, from 10 characters.
+      expect(visible(page), slug).not.toMatch(/\d+%/);
+      expect(visible(page), slug).toContain("from 10 characters");
+      expect(page, slug).not.toContain("/census?class=warrior");
+      expect(html.indexOf('id="plan"'), slug).toBeLessThan(html.indexOf('id="forever"'));
+      expect(html.indexOf('id="forever"'), slug).toBeLessThan(html.indexOf('id="races"'));
+    }
+  });
+
   test("the hub's links carry the level and role of its address, added in the browser since the page is built once", async () => {
     const hrefs = () => [...container!.querySelectorAll('[aria-labelledby="plan"] a')].map((a) => a.getAttribute("href"));
     const destinations = (context: Parameters<typeof contextLinks>[0]) => contextLinks(context).filter((l) => l.key !== "hub").map((l) => l.href);

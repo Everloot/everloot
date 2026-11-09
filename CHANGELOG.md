@@ -117,6 +117,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and the other from the clock, so they disagreed. Both pages say when the GitHub facts are older than 26 hours.
 
 ### Added
+- Site: a class page links the census narrowed to its class and the classes ranking, and the search page with no
+  query lists what a search finds (items, NPCs, quests, zones, objects, the lore archive, tools and docs), each
+  linked to its list, with four queries to try. Before, the class page stopped at the database links and an empty
+  search page showed the field alone.
 - Site: an item, NPC or quest page shared on Discord or X shows its own card: the name, its type and how many of
   the 3 installs agree on the name, as text on the brand canvas. Before, every database page showed the site card.
 - Addon: the Everloot window's sidebar is now Home, Gold, Collection, Professions and Settings. Ask, Build plan and
