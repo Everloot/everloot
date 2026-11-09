@@ -7,7 +7,7 @@ import { loadEcosystem } from "@/lib/ecosystem";
 import { addonGithubSummary, type AddonGithubSummaryResult } from "@/lib/addon-github";
 import { initials } from "@/lib/addon-board";
 import { leaderRows, liveRepos, rateLimited, sparkPoints, SPARK, type LeaderRow } from "@/lib/addon-leaderboard";
-import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
+import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT } from "@/lib/upload-store";
 import { trailFor } from "@/lib/breadcrumbs";
 import { LAUNCH, longDate } from "@/data/wow-forever";
 import { Card, Container, DataTable, EmptyState, Explainer, PageHeader, type Column } from "@/components/ui";
@@ -154,7 +154,7 @@ export default async function PopularAddonsPage() {
           meta={
             <span className="font-mono text-xs">
               {unreachable
-                ? "Storage unreachable"
+                ? STORAGE_UNREACHABLE_SHORT
                 : `${plural(reportingInstalls, "reporting install", "reporting installs")} · ${plural(addons.length, "addon listed", "addons listed")} · ${dataAgeLabel(dataAsOf)}`}
             </span>
           }

@@ -14,7 +14,7 @@ import { CLIENT_LAYER, CLIENT_TAXONOMY, shownItemName, type ShownItemName } from
 import { CLIENT_PROFESSIONS, professionBySlug, professionHref, RECIPES_BUILD, recipeGroups, recipeItemIds, type RecipeView } from "@/lib/professions";
 import { pageMetadata } from "@/lib/seo";
 import { loadShownNames } from "@/lib/shown-item-names";
-import { STORAGE_UNREACHABLE, uploadStore } from "@/lib/upload-store";
+import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT, uploadStore } from "@/lib/upload-store";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { formatCopper, handleProfessionPath } from "../../../../../../kb/src/profession-path";
 import { handleRecipeThresholds, pathFactsFromRecords, recipeThresholdsStructured, type Range } from "../../../../../../kb/src/recipe-thresholds";
@@ -190,7 +190,7 @@ export default async function ProfessionPage(props: Props) {
         meta={<>
           <span className="font-mono tabular-nums">{plural(p.recipes.length, "recipe")}</span>
           <span>Game files, build {RECIPES_BUILD}</span>
-          {corpus.unreachable ? <span>Storage unreachable</span> : <>
+          {corpus.unreachable ? <span>{STORAGE_UNREACHABLE_SHORT}</span> : <>
             {reports > 0 && <span className="font-mono tabular-nums">{plural(reports, "recipe report")}</span>}
             <span>{dataAgeLabel(corpus.dataAsOf)}</span>
           </>}

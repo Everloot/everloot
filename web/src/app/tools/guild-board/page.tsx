@@ -4,7 +4,7 @@ import { webApplicationJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { guildFactsFromRecords, handleGuildBoard } from "../../../../../kb/src/guild-board";
-import { STORAGE_UNREACHABLE, uploadStore } from "@/lib/upload-store";
+import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT, uploadStore } from "@/lib/upload-store";
 import { officerBoardState } from "@/lib/guilds";
 import { dataAgeLabel } from "@/lib/data-age";
 import { trailFor } from "@/lib/breadcrumbs";
@@ -48,7 +48,7 @@ export default async function GuildBoardPage(
         trail={trailFor("/tools/guild-board")!}
         title={HEADING}
         lede={lede}
-        meta={<span>{corpus.unreachable ? "Storage unreachable" : dataAgeLabel(corpus.dataAsOf)}</span>}
+        meta={<span>{corpus.unreachable ? STORAGE_UNREACHABLE_SHORT : dataAgeLabel(corpus.dataAsOf)}</span>}
         actions={<Link href="/guilds/olympus" className="btn">Olympus family record</Link>}
       />
 
