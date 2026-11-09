@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { armoryOn } from "@/lib/armory";
 import { pageMetadata } from "@/lib/seo";
 import { trailFor } from "@/lib/breadcrumbs";
 import { optOutPath, playerPagesOn, playerPath, searchPrefix, type Player } from "@/lib/player-pages";
@@ -57,6 +58,8 @@ export default async function PlayersPage(props: { searchParams: Promise<{ q?: s
           lede="Characters the Everloot addon has seen, by the start of their name. Each page shows what the addon last saw: race, class, level, guild and the day. Not where they were, what they wear or what they did."
           meta={<span>To have a character removed, use the hide link on its page or the <Link href="/players/opt-out" className={link}>hide form</Link>.</span>}
         />
+
+        {armoryOn() && <p className="text-sm text-fg-2">Characters read from Blizzard&apos;s API, with their gear, are in the <Link href="/armory" className={link}>armory</Link>.</p>}
 
         <form action="/players" method="get" role="search" className="flex max-w-xl flex-col gap-2 sm:flex-row">
           <label htmlFor="player-q" className="sr-only">Character name</label>
