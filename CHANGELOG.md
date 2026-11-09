@@ -17,6 +17,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 ### Fixed
 - Site: a spell page's tab reads "Spell 1 · Everloot" once; its title went around the shared page metadata, so the
   layout added the brand a second time, and it had no Open Graph or Twitter card. The title check now covers the route.
+- Site: every public database list and detail page (NPCs, quests, objects, vendors, spells, achievements, titles, factions,
+  quest chains, drops, coverage), the census and the rankings are kept at the CDN for five minutes like the profession pages,
+  and the database index, zones and instances come down from an hour to the same five minutes, so a page drawn while
+  storage was unreachable is replaced within minutes. Items and the map keep their hour.
 - Addon: a loading screen inside the minute after the last gold snapshot writes no new row unless the balance changed;
   the last snapshot's time is kept in the saved file, so a /reload no longer adds a row each.
 - Addon: the button drawer leaves the minimap buttons to MinimapButtonButton when that addon is loaded, and to any
