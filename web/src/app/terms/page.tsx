@@ -4,6 +4,7 @@ import { pageMetadata } from "@/lib/seo";
 import { KEYS_PER_ACCOUNT } from "@/lib/api-keys";
 import { CC_BY_SA, CONTACT_EMAIL, NON_AFFILIATION, OPERATOR, TRADEMARK_LINE } from "@/lib/jsonld";
 import { REPO_URL } from "@/lib/source";
+import { longDate } from "@/data/wow-forever";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Container, PageHeader, Prose, SectionHeading, ReadingLayout, type TocItem } from "@/components/ui";
 
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
   ...pageMetadata({ title: "Terms of Use", description, path: "/terms" }),
 };
 
-const UPDATED = "24 October 2026";
+const UPDATED = "2026-10-24";
 const HISTORY_URL = `${REPO_URL}/commits/main/web/src/app/terms/page.tsx`;
 
 const SECTIONS: TocItem[] = [
@@ -45,7 +46,7 @@ export default function TermsPage() {
   return (
     <article>
       <Container width="reading">
-        <PageHeader trail={trailFor("/terms")!} title="Terms of Use" meta={<span>Last updated: {UPDATED}</span>} />
+        <PageHeader trail={trailFor("/terms")!} title="Terms of Use" meta={<span>Last updated: {longDate(UPDATED)}</span>} />
       </Container>
       <ReadingLayout items={SECTIONS}>
         <Prose>

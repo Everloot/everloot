@@ -23,7 +23,7 @@ test("/terms covers uploads, keys, trademarks, takedown, warranty and governing 
   expect(text).toContain("run by R21 Media Group, LLC");
   expect(text).toContain("hello@everloot.app");
   expect(text).toContain("Not affiliated with or endorsed by Blizzard Entertainment.");
-  expect(text).toContain("Last updated");
+  expect(text).toMatch(/Last updated: \w+ \d{1,2}, 20\d\d/);
   expect(html).not.toMatch(/TODO|TBD|\[date\]/i);
 });
 
@@ -44,7 +44,7 @@ test("/privacy names who is responsible, lists your rights, keeps retention peri
   expect(text).toContain(`${USAGE_KEPT_DAYS} days`);
   expect(text).toContain(`${REVOKED_KEPT_DAYS} days`);
   expect(text).toContain("30 days");
-  expect(text).toMatch(/Last updated: \d{1,2} \w+ 20\d\d/);
+  expect(text).toMatch(/Last updated: \w+ \d{1,2}, 20\d\d/);
   expect(html).toContain('href="/terms"');
 });
 
@@ -88,7 +88,11 @@ test("/accessibility says what is in place, what was checked and when, what was 
   const text = visible(html);
   expect(text).toContain("WCAG");
   expect(text).toContain("do not claim full conformance");
-  expect(text).toMatch(/On \d{1,2} \w+ 20\d\d we ran an automated axe-core audit/);
+  expect(text).toMatch(/Last updated: \w+ \d{1,2}, 20\d\d/);
+  expect(text).toMatch(/On \w+ \d{1,2}, 20\d\d we ran an automated axe-core audit/);
+  expect(text).toContain("Glint");
+  expect(text).toContain("stops when your system asks for reduced motion");
+  expect(text).not.toContain("Motion is limited to");
   expect(text).toContain("have not checked yet");
   expect(text).toContain("hello@everloot.app");
   expect(html).toContain(`${REPO_URL}/issues/new/choose`);
