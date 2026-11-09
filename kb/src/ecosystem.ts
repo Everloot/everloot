@@ -222,14 +222,23 @@ export function medianFirstResponse(issues: readonly IssueSample[], now: Date): 
   return { hours: m === null ? null : Math.round(m * 10) / 10, sample: hours.length };
 }
 
-/** Stars gained over the last week, from the newest point at least 6 days old; null without such a point. */
-export function starGain(history: readonly StarPoint[], current: number | null, now: Date): number | null {
-  if (current === null) return null;
-  const cutoff = now.getTime() - 6 * DAY;
-  const base = [...history].reverse().find((p) => Date.parse(p.at) <= cutoff);
-  if (!base) return null;
-  return current - base.stars;
+export interface StarGain { change: number; since: string }
+
+/**
+ * Stars gained against the oldest daily count kept in the 7 days before the newest one. Anchored on the
+ * snapshot, not the clock, so a page built from an older snapshot still compares like with like, and both
+ * addon pages print the same change. Null without a current count or without an older point.
+ */
+export function starGain(history: readonly StarPoint[] | undefined, current: number | null): StarGain | null {
+  if (current === null || !history || history.length < 2) return null;
+  const points = [...history].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  const newest = Date.parse(points[points.length - 1].at);
+  const base = points.find((p) => Date.parse(p.at) >= newest - 7 * DAY && Date.parse(p.at) < newest);
+  return base ? { change: current - base.stars, since: base.at } : null;
 }
+
+/** The one label for a star change on the addon pages: "+21 since 2026-10-28". */
+export const starGainLabel = (gain: StarGain) => `${gain.change > 0 ? "+" : ""}${gain.change} since ${gain.since.slice(0, 10)}`;
 
 const ageDays = (iso: string | null, now: Date) => (iso ? (now.getTime() - Date.parse(iso)) / DAY : null);
 
@@ -379,7 +388,7 @@ export interface ProjectView {
   foreverReady: ForeverReady;
   badges: BadgeId[];
   maintenanceScore: number | null;
-  starGain7d: number | null;
+  starGain7d: StarGain | null;
 }
 
 export interface EcosystemView {
@@ -404,7 +413,7 @@ export function buildView(registry: Registry, snapshot: Snapshot, popular: reado
       foreverReady: ready,
       badges: badgesFor(metrics, ready, now),
       maintenanceScore: maintenanceScore(metrics, now),
-      starGain7d: metrics?.status === "ok" ? starGain(snapshot.history[p.id] ?? [], metrics.stars, now) : null,
+      starGain7d: metrics?.status === "ok" ? starGain(snapshot.history[p.id], metrics.stars) : null,
     };
   });
   return { refreshedAt: snapshot.refreshedAt, forever, projects, installsAvailable: popular !== null };
@@ -441,8 +450,8 @@ export function buildBoards(view: EcosystemView, now: Date): Board[] {
     },
     {
       id: "rising", title: "Rising",
-      rule: "Stars gained over the last 7 days, from the daily star counts we keep. Needs a week of history.",
-      rows: rank(live.filter((v) => (v.starGain7d ?? 0) > 0), (v) => v.starGain7d!, (v) => `+${plural(v.starGain7d!, "star", "stars")} in 7 days`),
+      rule: "Stars gained since the oldest daily count we keep from the 7 days before the newest one. Needs two days of history.",
+      rows: rank(live.filter((v) => (v.starGain7d?.change ?? 0) > 0), (v) => v.starGain7d!.change, (v) => starGainLabel(v.starGain7d!)),
     },
     {
       id: "active", title: "Most active",

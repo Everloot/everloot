@@ -5,9 +5,17 @@ import { buildView, currentForeverInterface, parseRegistry, parseSnapshot, type 
 import { loadPopularAddons } from "./rollup-compute";
 
 export {
-  BADGES, BOARD_IDS, buildBoards,
+  BADGES, BOARD_IDS, buildBoards, starGainLabel,
   type Board, type BadgeId, type EcosystemView, type ProjectView,
 } from "../../../kb/src/ecosystem";
+
+/** The refresh runs daily; past this many hours the addon pages say the GitHub facts are old. */
+export const STALE_AFTER_HOURS = 26;
+
+/** "older than 26 hours" when the snapshot is that old by `now`; null when it is fresh or there is none. */
+export function staleNote(refreshedAt: string | null, now: Date = new Date()): string | null {
+  return refreshedAt && now.getTime() - Date.parse(refreshedAt) > STALE_AFTER_HOURS * 3_600_000 ? `older than ${STALE_AFTER_HOURS} hours` : null;
+}
 
 /**
  * The registry (kb/curated/ecosystem.json) and the GitHub snapshot (kb/changes/ecosystem.json) are bundled
@@ -16,8 +24,6 @@ export {
  */
 const registry = parseRegistry(registryFile);
 const snapshot = parseSnapshot(snapshotFile);
-/** The daily star counts the refresh keeps, by project id; /addons compares against them for its change column. */
-export const starHistory = snapshot.history;
 // The newest Forever build the version service reported (kb/changes/builds.json, kept fresh by the changes
 // workflow), so Forever-ready moves with the build instead of a number someone typed in.
 const forever = currentForeverInterface((buildsFile as unknown as { builds: { product: string; version: string; buildId: number }[] }).builds);

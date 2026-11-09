@@ -11,7 +11,11 @@ vi.mock("../../lib/rollup-compute", () => rollup);
 const history = vi.hoisted(() => ({ none: false }));
 vi.mock("@/lib/ecosystem", async (load) => {
   const real = await load<typeof import("@/lib/ecosystem")>();
-  return { ...real, get starHistory() { return history.none ? {} : real.starHistory; } };
+  const loadEcosystem: typeof real.loadEcosystem = async (now) => {
+    const view = await real.loadEcosystem(now);
+    return history.none ? { ...view, projects: view.projects.map((p) => ({ ...p, starGain7d: null })) } : view;
+  };
+  return { ...real, loadEcosystem };
 });
 vi.mock("@/components/AccountControls", () => ({ default: () => null }));
 vi.mock("next/link", () => ({
@@ -21,11 +25,12 @@ vi.mock("next/link", () => ({
 }));
 
 import AddonsPage, { metadata as addonsMeta } from "./page";
+import EcosystemPage from "./ecosystem/page";
 import PolestarPage, { metadata as polestarMeta } from "./polestar/page";
 import PacksPage, { metadata as packsMeta } from "./polestar/packs/page";
 import WantedPage, { metadata as wantedMeta } from "./polestar/wanted/page";
 import sitemap from "@/lib/site-sitemap";
-import { loadEcosystem, starHistory } from "@/lib/ecosystem";
+import { loadEcosystem, starGainLabel } from "@/lib/ecosystem";
 import { boardRows } from "@/lib/addon-board";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
@@ -44,10 +49,11 @@ beforeEach(() => {
   popular([]);
   history.none = false;
   vi.unstubAllEnvs();
+  vi.useRealTimers();
 });
 
 test("/addons is a leaderboard ranked by GitHub stars, with logos and a change column from the star history", async () => {
-  const expected = boardRows(await loadEcosystem(), starHistory).map((r) => r.project.id);
+  const expected = boardRows(await loadEcosystem()).map((r) => r.project.id);
   const page = await addons();
   expect(ascending(order(page, expected))).toBe(true);
   expect(page).toMatch(/aria-sort="descending"[^>]*><a[^>]*>Stars</);
@@ -96,6 +102,28 @@ test("Everloot is one entry among the others, and the page links the other addon
   expect(page).toContain("listed like any other");
   expect(page).toContain('href="/addons/popular"');
   expect(page).toContain('href="/addons/ecosystem"');
+});
+
+test("/addons and the tracker's Rising board print the same change for the same project", async () => {
+  const gains = (await loadEcosystem()).projects.filter((p) => (p.starGain7d?.change ?? 0) > 0);
+  expect(gains.length).toBeGreaterThan(0);
+  const leaderboard = await addons();
+  const tracker = await html(EcosystemPage);
+  for (const p of gains) {
+    const label = starGainLabel(p.starGain7d!);
+    expect(label).toMatch(/^\+\d+ since \d{4}-\d{2}-\d{2}$/);
+    expect(leaderboard).toContain(label);
+    expect(tracker).toContain(label);
+  }
+  expect(tracker).not.toContain("in 7 days");
+});
+
+test("the page says when the GitHub facts are older than 26 hours, and not before", async () => {
+  const refreshedAt = Date.parse((await loadEcosystem()).refreshedAt!);
+  vi.useFakeTimers({ toFake: ["Date"], now: refreshedAt + 27 * 3_600_000 });
+  expect(await addons()).toMatch(/UTC · older than 26 hours</);
+  vi.useFakeTimers({ toFake: ["Date"], now: refreshedAt + 25 * 3_600_000 });
+  expect(await addons()).not.toContain("older than");
 });
 
 test("without star history the change column and ranking are left out, and the page says so", async () => {
