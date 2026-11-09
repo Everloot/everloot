@@ -98,6 +98,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: `/sitemap.xml` answers 503, uncached, while the instance store or the item names cannot be read, as it already
   did for the world facts and the census, instead of a sitemap without the dungeon pages and item categories that the
   CDN kept for an hour.
+
 ### Added
 - Addon: the Everloot window's sidebar is now Home, Gold, Collection, Professions and Settings. Ask, Build plan and
   Auctions left the sidebar; `/ask` and `/everloot plan` still work.
