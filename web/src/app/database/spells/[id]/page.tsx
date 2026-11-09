@@ -80,7 +80,9 @@ function spellDescription(name: string | undefined, id: number): string {
   const lead = `${name} is a spell in WoW: Forever.`;
   const full = `${lead} What it creates, what it costs and which profession teaches it, from the game files. Spell ID ${id}.`;
   if (full.length <= DESCRIPTION_MAX) return full;
-  const short = `${lead} What it creates, costs and who teaches it. Spell ID ${id}.`;
+  // Eight characters shorter than the full form at most is not enough: the short form must still clear DESCRIPTION_MIN
+  // at the name length where the full one first fails, so it keeps "what it costs" and drops only the source clause.
+  const short = `${lead} What it creates, what it costs and who teaches it. Spell ID ${id}.`;
   return short.length <= DESCRIPTION_MAX ? short : `${short.slice(0, DESCRIPTION_MAX - 1).replace(/\s+\S*$/, "")}…`;
 }
 

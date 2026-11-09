@@ -120,6 +120,13 @@ test("a long spell name still leaves a description within the limits", async () 
   expect(description.length).toBeLessThanOrEqual(DESCRIPTION_MAX);
   expect(description.length).toBeGreaterThanOrEqual(DESCRIPTION_MIN);
   expect(description).toContain(long);
+  // At the name length where the full form first overruns, the short form must still clear the minimum.
+  const boundary = "Enchant Weapon - Lesser Strikingxxxxx".slice(0, 37 - String(taught).length);
+  known([[taught, boundary]]);
+  const edge = String((await generateMetadata(props(String(taught)))).description);
+  expect(edge).not.toContain("from the game files");
+  expect(edge.length).toBeLessThanOrEqual(DESCRIPTION_MAX);
+  expect(edge.length).toBeGreaterThanOrEqual(DESCRIPTION_MIN);
 });
 
 test("a named spell whose only relations are what it creates and costs is indexed", async () => {
