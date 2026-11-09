@@ -15,7 +15,7 @@ import { itemSourceValue } from "./item-source";
 import { RelationTarget, SameIcon } from "@/components/EntityRelations";
 import { pinLink } from "@/lib/world-map";
 import { gameNameFor, loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
-import { Badge, Container, DataTable, EvidenceLine, Facts, InShort, OpenData, QUALITY_TEXT, Tabs, TooltipFrame, agreementLabel, qualityOf, type Column, type Fact, type TabItem } from "@/components/ui";
+import { Badge, Container, DataTable, EvidenceLine, Facts, InShort, OpenData, QUALITY_TEXT, Tabs, TooltipFrame, qualityOf, reportedLabel, type Column, type Fact, type TabItem } from "@/components/ui";
 import { isDevelopmentItemName } from "../../../../../../kb/src/dev-item-names";
 import { categoryOf } from "../../../../../../kb/src/item-taxonomy";
 import { edgesFrom, evidenceLabel, type Edge, type Rel } from "../../../../../../kb/src/edges";
@@ -302,7 +302,7 @@ export default async function ItemPage(props: Props) {
           <section aria-label="Item report progress" className="mt-3 space-y-1 text-meta text-fg-2">
             <p>Not yet confirmed. Each value needs 3 installs to agree.</p>
             <ul>
-              {reported.progress!.map((p) => <li key={p.fact}>{`${FACT_WORD[p.fact]}: ${agreementLabel(p.reporters)} (build ${p.build}).`}</li>)}
+              {reported.progress!.map((p) => <li key={p.fact}>{`${FACT_WORD[p.fact]}: ${reportedLabel(p.reporters)} (build ${p.build}).`}</li>)}
             </ul>
           </section>
         )}
