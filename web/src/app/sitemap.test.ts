@@ -22,7 +22,7 @@ vi.mock("@/lib/rollup-compute", () => ({ loadItemFacts: async () => facts, loadW
 // Two hubs a later lane might add: one that asks to be indexed and one that does not.
 vi.mock("@/lib/database-hubs", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/database-hubs")>();
-  const hubs = [...real.DATABASE_HUBS, { href: "/database/example-listed", label: "Example" }, { href: "/database/example-unlisted", label: "Example, noindex", unlisted: true as const }];
+  const hubs = [...real.DATABASE_HUBS, { href: "/database/example-listed", label: "Example", source: "players" as const }, { href: "/database/example-unlisted", label: "Example, noindex", source: "players" as const, unlisted: true as const }];
   return { ...real, DATABASE_HUBS: hubs, DATABASE_HUB_PATHS: ["/database", "/database/items", ...hubs.filter((h) => !("unlisted" in h && h.unlisted)).map((h) => h.href)] };
 });
 const blue = vi.hoisted(() => ({ writeups: new Map<string, { postId: string; reviewed: { by: string; on: string }; body: string }>() }));
