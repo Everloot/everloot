@@ -18,6 +18,7 @@ architecture map.
 | [`TRACKER.md`](TRACKER.md) | The build list, generated from `kb/src/bridge-plan.ts` (a test keeps it in sync) |
 | [`ASSETS.md`](ASSETS.md) | How Blizzard's icons, tooltip text and interface art get onto the site, and the rules for them |
 | [`SEO.md`](SEO.md) | What the site does so search engines and AI assistants can find and quote it |
+| [`ENVIRONMENT.md`](ENVIRONMENT.md) | Every variable and secret the project reads, names only, and which surface sets each |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md), [`../ROADMAP.md`](../ROADMAP.md), [`../CHANGELOG.md`](../CHANGELOG.md) | How to contribute, what is planned, what has shipped |
 
 ## Data policy
