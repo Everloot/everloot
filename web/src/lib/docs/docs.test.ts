@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { ALL_RECORD_KINDS, API_ROUTES, MCP_PROMPT_NAMES, MCP_TOOL_NAMES, MCP_TOOLS, SITE } from "@everloot/protocol";
+import { ALL_RECORD_KINDS, API_ROUTES, API_SCHEMAS, MCP_PROMPT_NAMES, MCP_TOOL_NAMES, MCP_TOOLS, SITE, type ApiSchemaName } from "@everloot/protocol";
 import { z } from "zod";
 import { expect, test } from "vitest";
 import { exampleUrl, requestSamples, sample, TOOL_ARGS, toolSamples } from "./examples";
 import { articleMarkdown } from "./markdown";
+import { FILE_SCHEMAS, PAGE_INTERNAL_ROUTES } from "./file-schemas";
 import { allDocsPages, docsPage, DOCS_TABS, endpointHref, endpointSlug, legacyAnchors, neighbours, tabFor, toolFromSlug, toolHref } from "./nav";
 import { recordHref } from "./records";
 import { liveToolNames } from "@/lib/guild-switch";
@@ -132,4 +133,15 @@ test("every anchor of the old /connect page leads to a docs page", () => {
   const pages = new Set(allDocsPages().map((p) => p.href));
   expect(targets).toMatchObject({ keys: "/docs/api/keys", "tool-get_by_name": "/docs/mcp/tools/get-by-name", "api-tooltip-{type}-{id}": "/docs/api/tooltip", "api-corpus-public": "/docs/api/corpus-public" });
   for (const [id, href] of Object.entries(targets)) expect(pages.has(href), `${id} -> ${href}`).toBe(true);
+});
+
+test("the file-only schemas are published shapes no route answers with, and the page-internal routes exist outside the contract", () => {
+  for (const name of Object.keys(FILE_SCHEMAS) as ApiSchemaName[]) {
+    expect(API_SCHEMAS).toHaveProperty(name);
+    expect(API_ROUTES.some((r) => r.requestBody === name || Object.values(r.responses).some((x) => x.schema === name)), name).toBe(false);
+  }
+  for (const path of PAGE_INTERNAL_ROUTES) {
+    expect(existsSync(join(app, `${path.slice(1)}/route.ts`)), path).toBe(true);
+    expect(API_ROUTES.some((r) => r.path === path), path).toBe(false);
+  }
 });
