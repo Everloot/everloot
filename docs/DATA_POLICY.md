@@ -945,6 +945,25 @@ and the Everloot Score are not ranked by it.
   as it removes the gear.
 - **Search engines.** The boards are `noindex` until indexing of character pages is accepted.
 
+## Armory (Blizzard data)
+
+The armory gives Forever characters and guilds their own pages from the Blizzard Developer API.
+These pages are separate from the addon sightings and the linked-character gear rankings above.
+
+- **No ads.** Armory pages carry no ad slots. The site's consent message may still appear.
+- **Free, on this site only.** Blizzard data stays in the armory pages. It never enters the addon tables,
+  CC BY-SA dataset, public corpus, open-data snapshots, MCP tools, API answers or exports.
+- **Thirty days.** Characters and guilds are checked again within 20 days. Stored data not refreshed for more
+  than 30 days is deleted. A Blizzard response confirming that data has not changed (304) counts as a refresh.
+  When Blizzard answers that a character or guild no longer exists (404), its stored row is deleted at once.
+- **Credit.** Every armory page says "Data from Blizzard Entertainment" and shows the time of the newest
+  read. Nothing on it claims Blizzard endorses Everloot.
+- **One client.** The crawler uses one Blizzard API client. Its client id, client secret and the database
+  service key stay in GitHub Actions secrets, never in a file, a test or a log.
+- **Hiding.** Anyone can hide a character at `/armory/hide` with its region, name and surname. Its character
+  row, roster memberships and queued character requests are deleted. The hide is kept so later API
+  reads and rosters cannot put the character back.
+
 ## Chat
 
 /chat answers questions about the game from Everloot's data. Everloot search needs no model and sends
