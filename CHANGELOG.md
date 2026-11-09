@@ -40,6 +40,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Web: the accessibility page describes the motion the site has, Glint included, instead of only 150 ms fades, and the
 - Site: the accessibility page describes the motion the site has, Glint included, instead of only 150 ms fades, and the
   accessibility, terms, privacy and rankings dates use the site's one date format (November 4, 2026).
+- Addon: the in-game help line, the README's command table and the site's addon guide list the same commands, with
+  `version`, `planner`, `gph hide`, `gph cut on|off`, `plan hide|clear`, `window`, `vendor`, `mail`, `link` and
+  `plan <number>` where one list had left them out; the guide says a left-click on the minimap button opens the window;
+  the README's file tree names every module; and a contract test fails when the three lists drift.
 - Addon: a loading screen inside the minute after the last gold snapshot writes no new row unless the balance changed;
   the last snapshot's time is kept in the saved file, so a /reload no longer adds a row each.
 - Addon: the button drawer leaves the minimap buttons to MinimapButtonButton when that addon is loaded, and to any
