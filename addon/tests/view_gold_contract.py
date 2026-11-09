@@ -1,7 +1,8 @@
 """Run with: uv run --with lupa python addon/tests/view_gold_contract.py
 
-The window's Gold view (modules/view_gold.lua): every character's gold by realm and a 30-day chart, the ledger by
-category, day and receipt, auction sales one by one or by item, and the gold per hour session. It reads the
+The window's Gold view (modules/view_gold.lua): every character's gold by realm and a chart with one bar per day of
+the period picked (today, 7 days, 30 days, all = the ledger's 90), the ledger by category, day and receipt, auction
+sales one by one (with the house's cut) or by item (with sales per day and the last sold day), and the gold per hour session. It reads the
 roster, the ledger store and the gph session and displays them; the buttons run the commands the player could type.
 A saved file without a roster or ledger shows each section's empty line, never an error.
 """
@@ -87,7 +88,7 @@ end
 assert(filled(g.rows))
 for _, tab in ipairs({{ 'ledger', 'sales' }}) do click(g.tabs[tab]) end
 for _, rows in ipairs({{ g.categories, g.days, g.receipts, g.sales }}) do assert(filled(rows)) end
-assert(g.sales[1].status.width == 100 and g.sales[1].deposit.width == 56 and g.sales[1].when.width == 76, 'the sales columns')
+assert(g.sales[1].status.width == 100 and g.sales[1].deposit.width == 50 and g.sales[1].cut.width == 50 and g.sales[1].when.width == 70, 'the sales columns')
 assert(g.days[1].date.width == 70 and g.days[1]['in'].width == 76 and g.days[1].out.width == 76 and g.days[1].net.width == 76, 'the day columns')
 click(g.tabs.overview)
 
@@ -98,12 +99,28 @@ assert(rows[1].name.text == 'Forever' and rows[2].name.text == 'Samplechar' and 
 assert(rows[3].name.text == 'Nightfall' and rows[4].name.text == 'Samplechar' and money(rows[4].gold.text, {{25, 'Gold'}}, {{0, 'Silver'}}), rows[4].gold.text)
 assert(g.realmTotals.Forever == 1312745 and g.realmTotals.Nightfall == 250000)
 assert(g.accountTotal == 1312745 + 250000, 'the account total is every character summed')
-assert(#g.bars == 30 and g.bars[30].value == 1312745 and g.bars[30].hi == 1312745 and g.bars[29].value == 1200000, 'today is the last bar')
+assert(#g.bars == 90 and shown(g.bars) == 30, 'thirty bars for 30 days, the rest built and hidden')
+assert(g.bars[30].value == 1312745 and g.bars[30].hi == 1312745 and g.bars[29].value == 1200000, 'today is the last bar')
 assert(g.bars[1].value == 0 and g.bars[1].lo == 0, 'a day before any close draws nothing')
 assert(g.chartCaption.text == 'Last 30 days · This character', g.chartCaption.text)
 click(g.scopes.account)
 assert(g.scope == 'account' and g.bars[30].value == 1312745 + 250000 and g.chartCaption.text == 'Last 30 days · Account')
 click(g.scopes.character)
+-- The period row is on the Overview and the chart follows it: 7 days draws seven bars, All draws the ledger's 90.
+for _, p in ipairs({{ 'today', '7d', '30d', 'all' }}) do assert(g.periods[p].shown, p .. ' shows on the overview') end
+click(g.periods['7d'])
+assert(g.period == '7d' and shown(g.bars) == 7 and g.bars[7].shown and not g.bars[8].shown, 'seven bars')
+assert(g.bars[7].value == 1312745 and g.bars[6].value == 1200000 and g.bars[5].value == 1000000 and g.bars[4].value == 0, 'today is the seventh')
+assert(g.bars[1].point[2] == 10 and g.bars[7].width > g.bars[7].height / 10, 'the seven share the chart width')
+assert(g.chartCaption.text == 'Last 7 days · This character', g.chartCaption.text)
+click(g.periods.all)
+assert(g.period == 'all' and shown(g.bars) == 90 and g.bars[90].value == 1312745 and g.bars[1].value == 0, 'ninety bars, today last')
+assert(g.bars[90].point[2] + g.bars[90].width <= 298 and g.bars[90].width >= 1, 'the ninetieth stays inside the chart')
+assert(g.chartCaption.text == 'Last 90 days · This character', g.chartCaption.text)
+click(g.periods.today)
+assert(shown(g.bars) == 1 and g.bars[1].value == 1312745 and g.chartCaption.text == 'Today · This character', g.chartCaption.text)
+click(g.periods['30d'])
+assert(shown(g.bars) == 30 and g.bars[30].value == 1312745)
 
 -- Ledger: categories largest first, one day, its receipts newest first, the gold the events do not explain.
 click(g.tabs.ledger)
@@ -125,18 +142,27 @@ click(g.tabs.sales)
 assert(shown(g.sales) == 3, 'paid, pending and unmatched rows are listed')
 -- Newest first: the pending notice, the paid sale, the unmatched notice.
 assert(g.sales[1].item.text == 'Linen Cloth' and g.sales[1].status.text == 'sold, gold pending', g.sales[1].status.text)
-assert(g.sales[1].count.text == '-' and g.sales[1].unit.text == '-' and g.sales[1].total.text == '-' and g.sales[1].deposit.text == '-', 'a pending row has no price yet')
+assert(g.sales[1].count.text == '-' and g.sales[1].unit.text == '-' and g.sales[1].total.text == '-' and g.sales[1].deposit.text == '-' and g.sales[1].cut.text == '-', 'a pending row has no price yet')
 assert(g.sales[2].item.text .. ' ' .. g.sales[2].count.text == 'Linen Cloth × 20')
 assert(money(g.sales[2].unit.text, {{1, 'Silver'}}, {{90, 'Copper'}}) and money(g.sales[2].total.text, {{38, 'Silver'}}, {{0, 'Copper'}}), g.sales[2].unit.text)
 assert(money(g.sales[2].deposit.text, {{60, 'Copper'}}), 'the deposit the letter returned: ' .. g.sales[2].deposit.text)
+assert(money(g.sales[2].cut.text, {{2, 'Silver'}}, {{0, 'Copper'}}), "the auction house's cut from the invoice: " .. g.sales[2].cut.text)
 assert(g.sales[2].when.text == '11-07 11:00' and g.sales[2].status.text == 'paid')
 assert(g.sales[3].item.text == 'Copper Ore' and g.sales[3].status.text == 'unmatched' and g.sales[3].total.text == '-')
+assert(g.sales.head.text == 'Auction sales')
 click(g.scopes.account)
 assert(shown(g.sales) == 4 and g.sales[2].count.text == '× 20' and g.sales[3].count.text == '× 10', 'newest first')
+assert(g.sales[3].cut.text == '-', 'a sale recorded without a cut shows none')
 assert(g.groupButton.text == 'By item')
 click(g.groupButton)
 assert(g.grouped and shown(g.sales) == 1 and g.sales[1].count.text == '× 30' and g.sales[1].when.text == '2 sales', 'grouped view counts paid sales only')
 assert(money(g.sales[1].total.text, {{57, 'Silver'}}, {{0, 'Copper'}}) and g.groupButton.text == 'Each sale')
+-- The period is Today (one day): two sales a day, last sold today; the cut and deposit cells are blank by item.
+assert(g.sales[1].status.text == '2.0/day · 11-07' and g.sales[1].cut.text == '' and g.sales[1].deposit.text == '', g.sales[1].status.text)
+assert(g.sales.head.text:find('^Auction sales by item'), g.sales.head.text)
+click(g.periods['30d'])
+assert(g.grouped and g.sales[1].status.text == '0.1/day · 11-07', 'two sales over thirty days: ' .. g.sales[1].status.text)
+click(g.periods.today)
 
 -- Session: the gph lines and the commands' own buttons.
 click(g.tabs.session)
@@ -214,4 +240,4 @@ g.scopes.account.scripts.OnClick(g.scopes.account)
 assert(g.moved.shown and g.moved.text == 'Moved between your characters: -', g.moved.text)
 """)
 
-print("Lua 5.1 Gold view: characters by realm with a 30-day chart, ledger by category, day and receipt, sales each or by item, the gph session; empty lines for a fresh file")
+print("Lua 5.1 Gold view: characters by realm with a chart that follows the period, ledger by category, day and receipt, sales each (with the cut) or by item (per day, last sold), the gph session; empty lines for a fresh file")

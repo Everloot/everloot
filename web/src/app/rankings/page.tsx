@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import JsonLd from "@/components/JsonLd";
 import { Card, Container, EmptyState, PageHeader, SectionHeading } from "@/components/ui";
+import { armoryOn } from "@/lib/armory";
 import { dataAgeLabel } from "@/lib/data-age";
 import {
   COLLECTING_LINE, RANKINGS, hubIndexable, hubMetrics, itemListJsonLd, loadRankingWeeks, rankingPath, rankingView, topMovers, weeklyCharacters,
@@ -40,6 +42,12 @@ export default async function RankingsHub() {
         />
         <div className="space-y-6">
           <RankingRail row />
+          {armoryOn() && (
+            <p className="text-sm text-fg-2">
+              Characters ranked by item level, Gear Score and honorable kills from Blizzard&apos;s API are in the{" "}
+              <Link href="/armory/rankings/item-level" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">armory rankings</Link>.
+            </p>
+          )}
           {unreachable ? (
             <Card><p className="text-fg-2">{STORAGE_UNREACHABLE}</p></Card>
           ) : weeks.length === 0 ? (

@@ -1,8 +1,9 @@
 # How Everloot fits together
 
-Four parts share one repository: the **addon** collects what players see, the **site** publishes
-only corroborated facts, the **knowledge base** holds the lore and answers questions over MCP, and
-the **companion** uploads and runs the `/ask` bridge on the player's computer.
+Twelve pieces share one repository, listed in the table below. In short: the **addon** collects what
+players see, the **site** publishes only corroborated facts, the **knowledge base** holds the lore and
+answers questions over MCP, and the **companion** and the **Desktop App** upload and run the `/ask`
+bridge on the player's computer.
 
 ## Where each thing lives
 
@@ -15,6 +16,8 @@ the **companion** uploads and runs the `/ask` bridge on the player's computer.
 | Site and APIs | `web/` | The Cloudflare Worker `everloot-web` (`web/wrangler.jsonc`), at everloot.app; every merge to `main` that touches the site deploys production through `.github/workflows/deploy-worker.yml` once the Release checks pass on that commit |
 | Raw uploads | `web/src/lib/upload-store.ts` | Cloudflare R2 (`uploads/<date>/<id>.json`), indexed in Supabase |
 | Public corpus | `web/src/app/api/cron/snapshot` | A Cloudflare Cron Trigger every 10 minutes extends `snapshots/corpus.json` in R2; pages read that one object |
+| Aggregates snapshot | `web/src/lib/aggregate-store.ts` | `snapshots/aggregates.json` in R2, written by the same cron after a run that added uploads: the item lists' agreed names, public drops and the items players have seen, built from anonymous rows only. Pages read it once per instance and again after five minutes instead of replaying every upload; with no file yet they build the set from the corpus |
+| Edge page cache | `web/src/lib/cf-edge-cache.ts`, used by `web/scripts/cf-entry.mjs` | The Worker's Cache API, holding public pages that read no cookies for the lifetime their `CDN-Cache-Control` header names. Its versions are computed from the build itself (the rendering source, the dependencies, the files a page names under `_next/static`, the Worker's switches) and ship inside the Worker bundle, so a deploy that changes nothing a page shows keeps the cache. Sign-in, sign-up, password-reset, `/me` and auth routes are never cached |
 | Sessions, grants, quotas, waitlist | `supabase/` | Supabase Postgres, server-side only, row-level security on every table |
 | Knowledge release (lore) | `kb/` | Built offline into a SQLite file plus a hashed manifest, kept in R2, imported into the D1 database `KNOWLEDGE_D1`, served only when it matches the SHA-256 pinned in `web/wrangler.jsonc` |
 | MCP server | `kb/src/mcp-server.ts`, mounted by `web/src/app/mcp/` | `/mcp` (bearer token) and `/mcp/public` (no sign-in, per-IP quota) on the site |
@@ -81,7 +84,9 @@ Where each kind of data goes, who may write it and how each tier is protected is
   newer dump is allowed.
 - Blizzard's API answers for WoW: Forever since launch (`*-forever-{region}` namespaces, checked
   2026-11-06), but nothing on the site reads it yet: character data still comes only from the addon.
-- Addon 0.2.6 passes its automated tests but has not yet been checked in the live client.
+- The addon's in-game capability checks are listed in
+  [`2026-10-28-live-client-capability-checklist.md`](2026-10-28-live-client-capability-checklist.md); the ones still
+  marked `UNVERIFIED` there have not been run in the live client.
 - The companion is an unsigned command-line tool.
 - The standalone MCP server (`kb/src/mcp-http-main.ts`) reads the public corpus URL, which has no
   install ids, so it cannot corroborate on its own. Only the MCP endpoints on the site are deployed.
