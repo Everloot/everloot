@@ -11,7 +11,7 @@ test("public item subclasses and pagination are crawlable while filter permutati
     const matching = rules.filter((rule) => {
       const pattern = rule.path.replace(/\$$/, "").split("*").map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(".*");
       return new RegExp(`^${pattern}${rule.path.endsWith("$") ? "$" : ""}`).test(path);
-    }).sort((a, b) => b.path.replace(/[*$]/g, "").length - a.path.replace(/[*$]/g, "").length || Number(b.allow) - Number(a.allow));
+    }).sort((a, b) => b.path.length - a.path.length || Number(b.allow) - Number(a.allow));
     return matching.length > 0 && !matching[0].allow;
   };
   expect(publicRules).toContain("Allow: /database/items?page=*$\n");
