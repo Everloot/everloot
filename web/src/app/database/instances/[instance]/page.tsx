@@ -8,6 +8,7 @@ import {
   bossRows, difficultyLabel, difficultyList, instanceDescription, instanceHref, instanceRows, instanceTitle, levelLabel, loadSightings, parseInstanceSegment,
   type BossRow, type InstancePlace, type InstanceRow,
 } from "@/lib/instances";
+import { entityTitle } from "@/lib/entity-meta";
 import { dayLabel } from "@/lib/report-labels";
 import { PLACEHOLDER } from "@/lib/item-names";
 import { mapHref } from "@/lib/map-view";
@@ -43,7 +44,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const title = instanceTitle(row);
   return {
     ...pageMetadata({
-      title: `${title} – WoW Forever ${row.raid === null ? "Instance" : row.raid ? "Raid" : "Dungeon"}: Entrance and Bosses`,
+      title: entityTitle(title, row.raid === null ? "instance" : row.raid ? "raid" : "dungeon"),
       description: instanceDescription(row),
       path: instanceHref(row.instanceMapId, row.name),
     }),

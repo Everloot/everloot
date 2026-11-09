@@ -22,6 +22,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: an addon page typed in the wrong case, and the four retired tool addresses (/tools/database, /tools/completionist,
   /tools/guild-tracker, /tools/profession-planner), answer a permanent 308 like every other moved address on the site.
   Before, they answered a temporary 307, so a crawler kept asking for the old address.
+- Site: a faction page says whether the faction is a header of the reputation pane (Yes or No) and names its parent
+  faction from the game files, with the id shown once; a header with no standing of its own is noindex and out of the
+  sitemap. Faction, achievement and instance pages take the item pages' title, "Ironforge – WoW Forever faction".
 - Site: a spell page's tab reads "Spell 1 · Everloot" once; its title went around the shared page metadata, so the
   layout added the brand a second time, and it had no Open Graph or Twitter card. The title check now covers the route.
 - Site: every public database list and detail page (NPCs, quests, objects, vendors, spells, achievements, titles, factions,

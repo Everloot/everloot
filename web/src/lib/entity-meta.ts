@@ -6,7 +6,7 @@ import { DESCRIPTION_MAX } from "./seo";
  * with no build, source or confirmation wording (that stays on the page, beside the value it qualifies).
  */
 
-export type EntityKind = "item" | "NPC" | "quest" | "object" | "vendor";
+export type EntityKind = "item" | "NPC" | "quest" | "object" | "vendor" | "faction" | "achievement" | "dungeon" | "raid" | "instance";
 
 /** "Linen Cloth – WoW Forever item"; the layout's template adds "· Everloot". */
 export const entityTitle = (name: string, kind: EntityKind): string => `${name} – WoW Forever ${kind}`;
