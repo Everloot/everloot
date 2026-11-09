@@ -88,6 +88,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   dozen questions. A key is counted as before.
 - Site: `/addon` links the CurseForge project beside the zip download ("Get it on CurseForge"), counted as an
   `addon_download` to CurseForge like the other download links. The same tested zip is uploaded there on each release.
+- Site: a saved build's short link (`/b/<slug>`) reads the store once per visit, for the page and its metadata together,
+  instead of twice. The short "Storage unreachable" notice on the collections, guild board, gold ledger, census, addon,
+  popular addons and profession pages is one shared constant beside the long one.
 
 ### Added
 - Addon: the Everloot window's sidebar is now Home, Gold, Collection, Professions and Settings. Ask, Build plan and

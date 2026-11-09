@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import SaveCopy from "@/components/builds/SaveCopy";
 import TalentClassView from "@/components/talents/TalentClassView";
@@ -20,9 +21,9 @@ export const dynamic = "force-dynamic";
 type Params = { params: Promise<{ slug: string }> };
 type Found = { build: SharedBuild & { classSlug: TalentClassSlug } } | { unavailable: true } | null;
 
-async function find(params: Params["params"]): Promise<Found> {
+// Metadata and the page share one read per request: cache() keys on the slug, so the store is asked once.
+const find = cache(async (slug: string): Promise<Found> => {
   if (!savedBuildsOn()) return null;
-  const { slug } = await params;
   if (!SLUG_PATTERN.test(slug)) return null;
   try {
     const build = await sharedBuild(slug);
@@ -30,10 +31,10 @@ async function find(params: Params["params"]): Promise<Found> {
   } catch {
     return { unavailable: true };
   }
-}
+});
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
-  const found = await find(params);
+  const found = await find((await params).slug);
   if (!found || "unavailable" in found) return { robots: { index: false, follow: false } };
   const { build } = found;
   const catalog = await loadCatalog(build.classSlug);
@@ -49,7 +50,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 }
 
 export default async function SharedBuildPage({ params }: Params) {
-  const found = await find(params);
+  const found = await find((await params).slug);
   if (!found) notFound();
   if ("unavailable" in found) {
     return (

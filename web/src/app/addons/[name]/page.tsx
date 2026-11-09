@@ -6,7 +6,7 @@ import { approvedAddon, type ApprovedAddon } from "@/data/addon-repos";
 import { addonGithub, type AddonGithubResult } from "@/lib/addon-github";
 import { dataAgeLabel } from "@/lib/data-age";
 import { loadPopularAddons } from "@/lib/rollup-compute";
-import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
+import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT } from "@/lib/upload-store";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, EmptyState, Explainer, Facts, PageHeader, SectionHeading } from "@/components/ui";
 
@@ -153,7 +153,7 @@ export default async function AddonProfilePage({ params }: Props) {
           trail={[...trailFor("/addons/popular")!, { name: title, path }]}
           title={title}
           lede="An addon for WoW: Forever, made by its own author. Everloot has not tested it, and neither Everloot nor the author of another addon vouches for it."
-          meta={<span className="font-mono text-xs">{unreachable ? "Storage unreachable" : dataAgeLabel(dataAsOf)}</span>}
+          meta={<span className="font-mono text-xs">{unreachable ? STORAGE_UNREACHABLE_SHORT : dataAgeLabel(dataAsOf)}</span>}
         />
 
         <div className="space-y-12">
