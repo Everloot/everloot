@@ -125,7 +125,7 @@ export default async function ClassHubPage({ params }: Params) {
         </section>
 
         {/* The live counts stay on the census and rankings pages: this page is built once per deploy, so a number
-            printed here would be the deploy's, not the week's. The census page applies its own from-10 rule. */}
+            printed here would be the deploy's, not the week's. The census page shows a count from 10 characters. */}
         <section aria-labelledby="forever">
           <SectionHeading id="forever">{`${name} on Forever`}</SectionHeading>
           <ul className="space-y-2 text-sm">
