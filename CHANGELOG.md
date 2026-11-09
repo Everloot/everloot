@@ -172,6 +172,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the header search box suggests dungeons and raids as you type, from the same rows as full search, with or without
   the leading "The": "deadm" offers the Deadmines, labelled "Dungeon, level 16". A box scoped to items, NPCs, quests or
   objects keeps to that type.
+- Site: `/api/health` has a route test: a fresh heartbeat answers 200, any other 503, both `Cache-Control: no-store`,
+  and the snapshot is read again only after a minute. The route itself is unchanged.
 
 ### Changed
 - Site: the item lists, the census, the rankings and the MCP `population` tool read stored files the snapshot cron
