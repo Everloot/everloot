@@ -53,6 +53,9 @@ test("public catalogue tools that are not coming-soon are in the sitemap, with r
     expect(byPath.has(toolHref(tool)), tool.slug).toBe(!tool.private && tool.status !== "coming-soon");
   }
   expect(byPath.has("/rankings")).toBe(false);
+  // Device-only lists never reach the sitemap.
+  for (const path of tools.filter((t) => t.private).map(toolHref)) expect(byPath.has(path), path).toBe(false);
+  expect(tools.some((t) => t.private)).toBe(true);
 });
 
 test("/changes is dated by its newest entry", async () => {

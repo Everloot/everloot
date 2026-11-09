@@ -5,7 +5,7 @@ export type ToolStatus = "live" | "collecting" | "coming-soon";
 
 export interface Tool {
   slug: string;
-  group: "Plan" | "Look up" | "Track";
+  group?: "Plan" | "Look up" | "Track"; // None: the tool sits in the top bar (Database), not the Tools menu.
   line: string;
   private?: boolean; // Device-only lists stay out of the sitemap and search.
   href?: string;
@@ -179,7 +179,6 @@ export const tools: Tool[] = [
   },
   {
     slug: "database",
-    group: "Look up",
     line: "Browse uploaded observations and agreed facts.",
     href: "/database",
     title: "Forever Database",

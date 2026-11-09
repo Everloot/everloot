@@ -23,10 +23,10 @@ test("the catalogue keeps the old slugs with the current names and destinations"
   expect(getTool("guild-tracker")).toMatchObject({ title: "Guild board", shortTitle: "Guild board", href: "/tools/guild-board" });
 });
 
-test("every catalogue tool is listed under its group on /tools", async () => {
+test("every catalogue tool with a group is listed under it on /tools", async () => {
   const { default: ToolsPage } = await import("./page");
   const html = renderToStaticMarkup(await ToolsPage());
-  for (const tool of tools) {
+  for (const tool of tools.filter((t) => t.group)) {
     const group = TOOL_GROUPS.find((g) => g.title === tool.group)!;
     expect(group.links).toContainEqual({ label: tool.shortTitle, href: toolHref(tool) });
     expect(html).toContain(`>${tool.shortTitle}</a>`);

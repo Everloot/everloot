@@ -83,13 +83,16 @@ test("Alts on this device is in the Plan group, after Plans on this device, and 
   expect(tools.find((t) => toolHref(t) === "/tools/alts")).toMatchObject({ private: true });
 });
 
-test("every tool in the catalogue is in the Tools menu", () => {
+test("every grouped tool in the catalogue is in the Tools menu, and Database stays in the top bar only", () => {
   const menu = TOOL_GROUPS.flatMap((g) => g.links.map((l) => l.href));
-  for (const tool of tools) {
+  const grouped = tools.filter((t) => t.group);
+  for (const tool of grouped) {
     expect(menu, tool.slug).toContain(toolHref(tool));
     expect(html, tool.slug).toContain(`href="${toolHref(tool)}"`);
   }
-  expect(menu).toHaveLength(tools.length);
+  expect(menu).toHaveLength(grouped.length);
+  expect(menu).not.toContain("/database");
+  expect(tools.filter((t) => !t.group).map((t) => t.slug)).toEqual(["database"]);
   expect(new Set(menu).size).toBe(menu.length);
 });
 
