@@ -18,7 +18,7 @@ vi.mock("@/components/CookieConsent", () => ({ CookiePreferencesButton: () => nu
 vi.mock("@/components/ApiKeys", () => ({ default: () => <div data-testid="api-keys" /> }));
 
 import { CONNECT_EXAMPLES, CORPUS_URL, MCP_PROMPTS, MCP_RESOURCE_TEMPLATES, MCP_RESOURCES, MCP_TOOLS, MCP_URL, REQUESTS_PER_HOUR } from "./connect-data";
-import { ALL_RECORD_KINDS, API_ROUTES, MCP_PROMPT_NAMES, MCP_RESOURCE_TEMPLATE_URIS, MCP_RESOURCE_URIS, MCP_TOOL_NAMES, PROTOCOL_VERSION, PUBLIC_RECORD_KINDS } from "@everloot/protocol";
+import { ALL_RECORD_KINDS, API_ROUTES, MCP_PROMPT_NAMES, MCP_PROMPTS as PROMPT_DEFS, MCP_RESOURCE_TEMPLATE_URIS, MCP_RESOURCE_URIS, MCP_TOOL_NAMES, PROTOCOL_VERSION, PUBLIC_RECORD_KINDS } from "@everloot/protocol";
 import { liveToolNames } from "@/lib/guild-switch";
 import { createIntakeQuota } from "@/lib/intake-quota";
 import { ANON_PAGE, ANON_PER_HOUR, attribution, KEY_PAGE, KEY_PER_HOUR } from "@/lib/data-guard";
@@ -27,6 +27,7 @@ import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import { allDocsPages, endpointSlug } from "./nav";
 import { MY_BUILDS_REFUSAL } from "@/lib/saved-builds";
+import { promptText } from "../../../../kb/src/prompts";
 
 type PageModule = { default: (props: { params: Promise<Record<string, string>> }) => unknown };
 const modules = import.meta.glob<PageModule>("../../app/docs/**/page.tsx", { eager: true });
@@ -79,6 +80,31 @@ test("the resource and prompt lists are exactly what the protocol declares, in o
   expect(MCP_PROMPTS.map((prompt) => prompt.name)).toEqual(MCP_PROMPT_NAMES);
   for (const prompt of MCP_PROMPTS) expect(page).toContain(`>${prompt.name}</code>`);
   expect(page).toContain("/schema/mcp/prompts.json");
+});
+
+test("the resources page gives each prompt a heading named after it, its arguments and the message the server returns, plus one read of a resource and of an entity", () => {
+  for (const name of MCP_PROMPT_NAMES) {
+    expect(page).toContain(`<h2 id="${name}"`);
+    expect(page).toContain(`href="#${name}"`);
+    const def = PROMPT_DEFS[name];
+    expect(decoded).toContain(def.title);
+    expect(decoded).toContain(def.description);
+    for (const [arg, a] of Object.entries(def.arguments)) {
+      expect(decoded).toContain(a.description);
+      expect(page).toContain(`>${arg}</code>`);
+    }
+  }
+  // The arguments the examples pass are the ones the page shows, and the message is the server's own, not retyped.
+  expect(text).toContain(promptText("review_talent_plan", { code: "YOUR-SHARE-CODE" }));
+  expect(text).toContain(promptText("what_changed", { game: "forever" }));
+  expect(text).toContain(promptText("answer_with_sources", { question: "Where does Hogger spawn?" }));
+  expect(text).toContain('"method": "prompts/get"');
+  expect(text).toContain('"name": "review_talent_plan"');
+  expect(text).toContain('"method": "resources/read"');
+  expect(text).toContain(`"uri": "${MCP_RESOURCE_URIS[0]}"`);
+  expect(text).toContain('"uri": "everloot://item/2589"');
+  expect(text).toContain('"itemId": 2589');
+  for (const field of ["gameFiles", "registry", "credit", "buildConfig", "firstSeen"]) expect(text).toContain(`"${field}"`);
 });
 
 test("the reference lists every tool with its arguments, every endpoint, the OpenAPI file and the schema index", () => {

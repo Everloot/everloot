@@ -1,4 +1,4 @@
-import { ALL_RECORD_KINDS, API_ROUTES, MCP_TOOLS, type ApiRoute, type McpToolName } from "@everloot/protocol";
+import { ALL_RECORD_KINDS, API_ROUTES, MCP_PROMPT_NAMES, MCP_PROMPTS, MCP_TOOLS, type ApiRoute, type McpToolName } from "@everloot/protocol";
 import { liveToolNames } from "@/lib/guild-switch";
 import { recordHref } from "@/lib/docs/records";
 
@@ -20,6 +20,8 @@ export interface DocsPage {
   lede: string;
   /** Shown before the title in the sidebar: an HTTP method for endpoint pages. */
   method?: ApiRoute["method"];
+  /** Sections of this page the sidebar lists under it, each an anchor of `href`. Not pages of their own. */
+  children?: DocsPage[];
 }
 
 export interface DocsGroup {
@@ -77,6 +79,9 @@ function endpointPages(paths: string[]): DocsPage[] {
     return route ? [{ href: endpointHref(route), title: route.path.replace(/^\/api/, ""), lede: route.summary, method: route.method }] : [];
   });
 }
+
+/** The resources page's prompts, one sidebar entry each, pointing at the prompt's heading on the page. */
+const PROMPT_SECTIONS: DocsPage[] = MCP_PROMPT_NAMES.map((name) => ({ href: `/docs/mcp/resources#${name}`, title: name, lede: MCP_PROMPTS[name].title }));
 
 function toolPages(names: McpToolName[]): DocsPage[] {
   const live = liveToolNames();
@@ -159,7 +164,7 @@ export const DOCS_TABS: DocsTab[] = [
         pages: [
           { href: "/docs/mcp", title: "MCP overview", lede: "Give an AI assistant Everloot's data, with the source on every answer." },
           { href: "/docs/mcp/clients", title: "Connect a client", lede: "Claude, ChatGPT, Grok, Claude Code and any client that speaks streamable HTTP." },
-          { href: "/docs/mcp/resources", title: "Resources and prompts", lede: "The documents and ready-made prompts the server offers beside its tools." },
+          { href: "/docs/mcp/resources", title: "Resources and prompts", lede: "The documents and ready-made prompts the server offers beside its tools.", children: PROMPT_SECTIONS },
         ],
       },
       ...TOOL_GROUPS.map((g) => ({ title: g.title, icon: g.icon, pages: toolPages(g.names) })),
@@ -183,7 +188,7 @@ export const DOCS_TABS: DocsTab[] = [
   },
 ];
 
-/** Every docs page in reading order, each once. */
+/** Every docs page in reading order, each once. A page's children are its sections, not pages, so they are left out. */
 export function allDocsPages(): (DocsPage & { tab: DocsTab; group: DocsGroup })[] {
   const seen = new Set<string>();
   return DOCS_TABS.flatMap((tab) => tab.groups.flatMap((group) => group.pages.flatMap((page) => {
