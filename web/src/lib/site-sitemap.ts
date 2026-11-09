@@ -15,7 +15,7 @@ import { DATABASE_HUB_PATHS } from "@/lib/database-hubs";
 import { instancePaths } from "@/lib/database-sitemap";
 import { loadSightings } from "@/lib/instances";
 import { loadListNames } from "@/lib/item-view";
-import { achievementHref, chainHref, factionHref, loadCatalog, titleHref } from "@/lib/completion-lists";
+import { achievementHref, chainHref, factionHeaderOnly, factionHref, loadCatalog, titleHref } from "@/lib/completion-lists";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { RANKINGS, hubIndexable, loadRankingWeeks, rankingIndexable, rankingPath, rankingView } from "@/lib/rankings";
 import { hasContent, publicZones, zoneContents, zoneHref } from "@/lib/zones";
@@ -59,7 +59,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap | null> {
   const instanceRoutes = instancePaths(seen);
   // Achievement, faction, title and quest chain pages exist only for entries three players reported, so each listed one has content.
   const catalog = await loadCatalog();
-  const catalogRoutes = catalog ? [...catalog.achievements.map((a) => achievementHref(a.achievementId, a.name)), ...catalog.factions.map((f) => factionHref(f.factionId, f.name)), ...catalog.titles.map((t) => titleHref(t.titleId, t.name)), ...catalog.chains.map((c) => chainHref(c.questLineId, c.name))] : [];
+  const catalogRoutes = catalog ? [...catalog.achievements.map((a) => achievementHref(a.achievementId, a.name)), ...catalog.factions.filter((f) => !factionHeaderOnly(f)).map((f) => factionHref(f.factionId, f.name)), ...catalog.titles.map((t) => titleHref(t.titleId, t.name)), ...catalog.chains.map((c) => chainHref(c.questLineId, c.name))] : [];
   // The rankings hub and each unfiltered ranking, once it asks to be indexed (10 ranked rows).
   const rankings = await loadRankingWeeks();
   if (rankings.unreachable) return null;

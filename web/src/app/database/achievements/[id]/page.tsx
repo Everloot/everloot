@@ -3,6 +3,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { Badge, Container, DataTable, Facts, TooltipFrame } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { achievementHref, loadCatalog, parseSegment } from "@/lib/completion-lists";
+import { entityTitle } from "@/lib/entity-meta";
 import { pageMetadata } from "@/lib/seo";
 import { CLIENT_LABEL } from "../../../../../../kb/src/edges";
 import { CLIENT_ACHIEVEMENTS } from "@/data/game-data/client-achievements";
@@ -31,7 +32,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const name = listed?.name ?? files?.title ?? `Achievement ${id}`;
   const criteria = entry?.criteria ? "reported criteria" : files?.criteria.length ? "the criteria from the game files" : "criteria count";
   return {
-    ...pageMetadata({ title: `${name} (achievement)`, description: `The ${name} achievement in WoW: Forever: category, points and ${criteria}, ${entry ? "from player reports and the build's own game files as each has them." : `from the build's own game files. ${CLIENT_LABEL}.`}`, path: achievementHref(id!, name) }),
+    ...pageMetadata({ title: entityTitle(name, "achievement"), description: `The ${name} achievement in WoW: Forever: category, points and ${criteria}, ${entry ? "from player reports and the build's own game files as each has them." : `from the build's own game files. ${CLIENT_LABEL}.`}`, path: achievementHref(id!, name) }),
     robots: { index: true, follow: true },
   };
 }
