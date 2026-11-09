@@ -157,6 +157,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   until three installs agree, a "Track this" link to the collections tool and a relation tab ("Reputation from" on a
   faction, "Earned by" on a title) whose empty state names the 3-install rule and says what no game file read so far
   carries; a faction page also shows its lore archive page when the archive has one under the same name.
+- Site: `/docs/mcp` tables the record kinds the knowledge tools cover, where each kind comes from and the tool that
+  reads it on its own, and says how a record id is formed: a catalog record's stable synthetic id against the in-game
+  id the page tools take.
 - Site: the limits and keys page has a Scopes section: a table of every scope a key can carry (read:public on every
   key; read:own, link:own and sync:own opt-in on the key form), what each allows and which routes check it. A test
   keeps the table at one row per scope the code defines.
