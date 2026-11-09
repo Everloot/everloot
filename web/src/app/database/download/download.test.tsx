@@ -84,7 +84,7 @@ test("with no export the page says so and prints no count; unreachable reads [?]
 });
 
 test("the page is listed with the other data surfaces and asks to be indexed", () => {
-  expect(DATABASE_HUBS).toContainEqual({ href: "/database/download", label: "Download the data" });
+  expect(DATABASE_HUBS).toContainEqual({ href: "/database/download", label: "Download the data", source: "players" });
   const description = metadata.description as string;
   expect(description.length).toBeGreaterThanOrEqual(DESCRIPTION_MIN);
   expect(description.length).toBeLessThanOrEqual(DESCRIPTION_MAX);
