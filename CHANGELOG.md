@@ -120,6 +120,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and the other from the clock, so they disagreed. Both pages say when the GitHub facts are older than 26 hours.
 
 ### Added
+- Site: a faction page and a title page carry In short, Copy for AI, a "Player reports" fact that stays an empty meter
+  until three installs agree, a "Track this" link to the collections tool and a relation tab ("Reputation from" on a
+  faction, "Earned by" on a title) whose empty state names the 3-install rule and says what no game file read so far
+  carries; a faction page also shows its lore archive page when the archive has one under the same name.
 - Site: an item, NPC or quest page shared on Discord or X shows its own card: the name, its type and how many of
   the 3 installs agree on the name, as text on the brand canvas. Before, every database page showed the site card.
 - Addon: the Everloot window's sidebar is now Home, Gold, Collection, Professions and Settings. Ask, Build plan and
