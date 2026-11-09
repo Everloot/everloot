@@ -123,3 +123,9 @@ the gaps backlog in `../docs/sources/source-catalog.md`, never into an importer.
 ## Code licence
 
 AGPL-3.0-only, like the rest of Everloot (see `LICENSE` at the repository root). Data licence: CC BY-SA 4.0.
+
+## Armory crawl
+
+`npm run kb -- armory-crawl --region us|eu [--budget 6000] [--dry-run]` reads Forever guilds, rosters, characters, equipment and PvP summaries into the separate Supabase armory. Credentials come from `BNET_CLIENT_ID`, `BNET_CLIENT_SECRET`, `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. It uses eight workers and starts at most 50 Blizzard reads per rolling second. It reserves the full row cost before starting, so it can leave up to two calls unused.
+
+For a write-free live probe, set `ARMORY_DRY_RUN_GUILD` to a known guild name or slug and use `--dry-run --budget 2`. This reads that guild and roster in memory, needs no Supabase credentials and prints counts without names. Normal runs seed addon guild guesses, read queued then stale rows, defer transient failures for one hour and bad rows for seven days, and purge expired data. The run stops after ten non-transient bad rows. The hourly workflow skips with a notice until all four secrets are configured. Both migrations, `20261109120000_armory.sql` and `20261109130000_armory_touch_members.sql`, must be applied together, in that order, before the first crawl and before enabling those secrets.

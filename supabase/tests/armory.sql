@@ -233,4 +233,29 @@ begin
   if not rejected then raise exception '501-row batch accepted'; end if;
 end $$;
 
+-- A roster 304 refreshes retained members, scoped to the requested guild and region.
+do $$ begin
+  perform public.armory_upsert_guild('us','{"slug":"quiet-owls","guild_id":9001,"name":"Quiet Owls","faction":"Alliance","ruleset_id":1,"ruleset":"PvP","member_count":2}',
+    '[{"character_slug":"ember-vale","name":"Ember","surname":"Vale"},{"character_slug":"willow-stone","name":"Willow","surname":"Stone"}]');
+  perform public.armory_upsert_guild('eu','{"slug":"quiet-owls","guild_id":9002,"name":"Quiet Owls","faction":"Alliance","ruleset_id":1,"ruleset":"PvP"}',
+    '[{"character_slug":"maple-ridge","name":"Maple","surname":"Ridge"}]');
+  perform public.armory_upsert_guild('us','{"slug":"distant-owls","guild_id":9003,"name":"Distant Owls","faction":"Alliance","ruleset_id":1,"ruleset":"PvP"}',
+    '[{"character_slug":"hazel-vale","name":"Hazel","surname":"Vale"}]');
+  update public.armory_members set fetched_at=now()-interval '31 days' where guild_slug in ('quiet-owls','distant-owls');
+  if public.armory_touch('us','guild',array['quiet-owls'])<>1 then raise exception 'touch must count guilds, not members'; end if;
+  if (select count(*) from public.armory_members where region='us' and guild_slug='quiet-owls' and fetched_at=now())<>2 then
+    raise exception 'roster 304 did not refresh member timestamps';
+  end if;
+  if exists(select 1 from public.armory_members where (region='eu' or guild_slug='distant-owls') and fetched_at=now()) then
+    raise exception 'roster 304 refreshed unrelated members';
+  end if;
+  perform public.armory_purge();
+  if (select count(*) from public.armory_members where region='us' and guild_slug='quiet-owls')<>2 then
+    raise exception 'roster 304 members lost to retention purge';
+  end if;
+  if exists(select 1 from public.armory_members where (region='eu' and guild_slug='quiet-owls') or guild_slug='distant-owls') then
+    raise exception 'unrefreshed members escaped retention purge';
+  end if;
+end $$;
+
 rollback;
