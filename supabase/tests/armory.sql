@@ -92,10 +92,33 @@ do $$ begin
   if exists(select 1 from public.armory_characters) or exists(select 1 from public.armory_members) then raise exception 'purge left data'; end if;
 end $$;
 
-select public.upsert_players('forever','[{"name":"Qevra","realm":"US Test","race":"Human","class":"MAGE","level":60,"guild":"Fable Seed","seen":"2026-11-08"},{"name":"Revra","realm":"EU Test","race":"Human","class":"MAGE","level":60,"guild":"Fable East","seen":"2026-11-08"},{"name":"Sevra","realm":"Unknown Test","race":"Human","class":"MAGE","level":60,"guild":"Fable Both","seen":"2026-11-08"}]');
+select public.upsert_players('forever','[{"name":"Qevra","realm":"US Test","race":"Human","class":"MAGE","level":60,"guild":"Fable Seed","seen":"2026-11-08"},{"name":"Revra","realm":"EU Test","race":"Human","class":"MAGE","level":60,"guild":"Fable East","seen":"2026-11-08"},{"name":"Sevra","realm":"Unknown Test","race":"Human","class":"MAGE","level":60,"guild":"Fable Both","seen":"2026-11-08"},{"name":"Tevra","realm":"US Test","race":"Human","class":"MAGE","level":60,"guild":"Olympus","seen":"2026-11-08"},{"name":"Uevra","realm":"EU Test","race":"Human","class":"MAGE","level":60,"guild":"Éclat","seen":"2026-11-08"},{"name":"Vevra","realm":"US Test","race":"Human","class":"MAGE","level":60,"guild":"Invalid!","seen":"2026-11-08"}]');
 do $$ begin
-  if public.armory_seed_from_players()<>4 or public.armory_seed_from_players()<>0 then raise exception 'seed counts'; end if;
+  if public.armory_seed_from_players()<>6 or public.armory_seed_from_players()<>0 then raise exception 'seed counts'; end if;
   if not exists(select 1 from public.armory_queue where region='us' and kind='guild' and slug='fable-seed') or exists(select 1 from public.armory_queue where region='eu' and slug='fable-seed') then raise exception 'seed region'; end if;
+  if not exists(select 1 from public.armory_queue where region='us' and kind='guild' and slug='olympus') then raise exception 'single-word guild not seeded'; end if;
+  if not exists(select 1 from public.armory_queue where region='eu' and kind='guild' and slug='éclat') then raise exception 'non-ASCII guild not seeded'; end if;
+  if exists(select 1 from public.armory_queue where slug='invalid!') then raise exception 'invalid guild seeded'; end if;
+end $$;
+
+-- The shared slug format applies to stored characters/guilds and hide records as well as seeds.
+do $$
+begin
+  if public.armory_upsert_characters('us',jsonb_build_array((select rows->0 from armory_fixture) || '{"slug":"évara"}'::jsonb))<>1 then raise exception 'single-word non-ASCII character'; end if;
+  if public.armory_upsert_guild('us','{"slug":"olympus","guild_id":2,"name":"Olympus","faction":"Alliance","ruleset_id":1,"ruleset":"PvP"}','[]')<>0 then raise exception 'single-word guild write'; end if;
+  if public.armory_upsert_guild('eu','{"slug":"éclat","guild_id":3,"name":"Éclat","faction":"Alliance","ruleset_id":1,"ruleset":"PvP"}','[]')<>0 then raise exception 'non-ASCII guild write'; end if;
+  perform public.armory_hide('us','évara');
+  if exists(select 1 from public.armory_character('us','évara')) then raise exception 'non-ASCII hide'; end if;
+  perform public.armory_missing('us','guild','olympus');
+  perform public.armory_missing('eu','guild','éclat');
+  begin
+    perform public.armory_enqueue('us','guild','Olympus','submit');
+    raise exception 'uppercase slug accepted';
+  exception when check_violation then null; end;
+  begin
+    perform public.armory_enqueue('us','guild','invalid--slug','submit');
+    raise exception 'empty slug segment accepted';
+  exception when check_violation then null; end;
 end $$;
 
 -- A later roster must not restore a hidden character. Replacements remove departed members.

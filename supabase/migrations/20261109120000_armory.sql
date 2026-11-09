@@ -4,7 +4,7 @@
 
 create table if not exists public.armory_characters (
   region text check (region in ('us','eu')),
-  slug text check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)+$' and char_length(slug) <= 64),
+  slug text,
   character_id bigint not null, name text not null, surname text not null,
   level smallint not null check (level between 1 and 60),
   ruleset_id smallint not null, ruleset text not null, race_id smallint not null, race text not null,
@@ -18,7 +18,7 @@ create table if not exists public.armory_characters (
 );
 create table if not exists public.armory_guilds (
   region text check (region in ('us','eu')),
-  slug text check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)+$' and char_length(slug) <= 64),
+  slug text,
   guild_id bigint not null, name text not null, faction text not null, ruleset_id smallint not null, ruleset text not null,
   member_count integer not null default 0, created_at timestamptz, last_modified text,
   first_seen timestamptz not null default now(), fetched_at timestamptz not null, checked_at timestamptz not null,
@@ -33,15 +33,30 @@ create table if not exists public.armory_members (
 );
 create table if not exists public.armory_queue (
   region text check (region in ('us','eu')), kind text check(kind in ('character','guild')),
-  slug text check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)+$' and char_length(slug) <= 64),
+  slug text,
   source text not null, added_at timestamptz not null default now(), tries smallint not null default 0,
   next_at timestamptz not null default now(), primary key(region,kind,slug)
 );
 create table if not exists public.armory_hides (
   region text check (region in ('us','eu')),
-  slug text check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)+$' and char_length(slug) <= 64),
+  slug text,
   hidden_at timestamptz not null default now(), primary key(region,slug)
 );
+
+-- Replace the checks on reapply too; character surname validation belongs to the crawler.
+alter table public.armory_characters drop constraint if exists armory_characters_slug_check;
+alter table public.armory_characters add constraint armory_characters_slug_check
+  check (slug ~ '^[[:alnum:]]+(-[[:alnum:]]+)*$' and slug = lower(slug) and char_length(slug) <= 64);
+alter table public.armory_guilds drop constraint if exists armory_guilds_slug_check;
+alter table public.armory_guilds add constraint armory_guilds_slug_check
+  check (slug ~ '^[[:alnum:]]+(-[[:alnum:]]+)*$' and slug = lower(slug) and char_length(slug) <= 64);
+alter table public.armory_queue drop constraint if exists armory_queue_slug_check;
+alter table public.armory_queue add constraint armory_queue_slug_check
+  check (slug ~ '^[[:alnum:]]+(-[[:alnum:]]+)*$' and slug = lower(slug) and char_length(slug) <= 64);
+alter table public.armory_hides drop constraint if exists armory_hides_slug_check;
+alter table public.armory_hides add constraint armory_hides_slug_check
+  check (slug ~ '^[[:alnum:]]+(-[[:alnum:]]+)*$' and slug = lower(slug) and char_length(slug) <= 64);
+
 create index if not exists armory_characters_checked on public.armory_characters(checked_at);
 create index if not exists armory_characters_item_level on public.armory_characters(region,ruleset_id,item_level desc);
 create index if not exists armory_characters_gear_score on public.armory_characters(region,ruleset_id,gear_score desc);
@@ -106,7 +121,7 @@ begin
     cross join lateral unnest(case when p.realm like 'US%' then array['us'] when p.realm like 'EU%' then array['eu'] else array['us','eu'] end) region
     where p.guild is not null
   loop
-    if r.slug ~ '^[a-z0-9]+(-[a-z0-9]+)+$' and char_length(r.slug)<=64
+    if r.slug ~ '^[[:alnum:]]+(-[[:alnum:]]+)*$' and r.slug = lower(r.slug) and char_length(r.slug)<=64
       and not exists(select 1 from public.armory_guilds g where g.region=r.region and g.slug=r.slug) then
       if public.armory_enqueue(r.region,'guild',r.slug,'players') then written:=written+1; end if;
     end if;
