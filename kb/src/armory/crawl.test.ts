@@ -536,7 +536,7 @@ it("stops a rejected-batch fallback after ten failures, leaving the rest untouch
   }
 });
 it.each(["character", "guild"] as const)(
-  "logs a rejected %s touch batch without deferring or deleting rows",
+  "fails at the end for a rejected %s touch batch without deferring or deleting rows",
   async (kind) => {
     const { store, api } = setup(kind === "character" ? 20 : 0);
     if (kind === "guild")
@@ -546,7 +546,10 @@ it.each(["character", "guild"] as const)(
     const log = vi.fn();
     api.get.mockResolvedValue({ status: 304, body: null, lastModified: null });
     store.touch.mockRejectedValue(new StoreError(400));
-    const s = await runCrawl({ region: "eu", budget: 60, store, api, log });
+    await expect(
+      runCrawl({ region: "eu", budget: 60, store, api, log }),
+    ).rejects.toThrow("touch updates failed");
+    const s = JSON.parse(log.mock.calls.at(-1)![0]);
     expect(store.retry).not.toHaveBeenCalled();
     expect(store.missing).not.toHaveBeenCalled();
     expect(s[kind === "guild" ? "guilds" : "characters"].unchanged).toBe(0);
@@ -556,3 +559,39 @@ it.each(["character", "guild"] as const)(
     expect(store.purge).toHaveBeenCalled();
   },
 );
+
+it("reserves each bad-row count before awaiting slow retry storage", async () => {
+  vi.useFakeTimers();
+  try {
+    const { store, api } = setup(40);
+    const log = vi.fn();
+    let completed = 0;
+    api.get.mockRejectedValue(new ApiError(400, "api"));
+    store.retry.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      completed++;
+    });
+    const pending = runCrawl({ region: "eu", budget: 120, store, api, log });
+    const rejection = expect(pending).rejects.toThrow(
+      "10 non-transient row failures",
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect(store.retry).toHaveBeenCalledTimes(8);
+    expect(completed).toBe(0);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(store.retry).toHaveBeenCalledTimes(10);
+    expect(completed).toBe(8);
+    expect(log.mock.calls.flat().join(" ")).toContain(
+      "10 non-transient row failures",
+    );
+    await vi.runAllTimersAsync();
+    await rejection;
+    expect(store.retry).toHaveBeenCalledTimes(10);
+    expect(completed).toBe(10);
+    expect(store.retry.mock.calls.every((c) => c[3] === "7 days")).toBe(true);
+    expect(JSON.parse(log.mock.calls.at(-1)![0]).invalid).toBe(10);
+    expect(store.purge).toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
+});

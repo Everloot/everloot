@@ -357,5 +357,9 @@ export async function runCrawl(cfg: {
     throw Error(
       `${summary.invalid + summary.rejected} armory row failures deferred for 7 days`,
     );
+  const failedTouches =
+    summary.touch_failed.character + summary.touch_failed.guild;
+  if (failedTouches)
+    throw Error(`${failedTouches} armory touch updates failed`);
   return summary;
 }
