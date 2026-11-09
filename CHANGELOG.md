@@ -112,6 +112,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   did for the world facts and the census, instead of a sitemap without the dungeon pages and item categories that the
   CDN kept for an hour.
 
+- Site: /addons and the addon tracker's Rising board count a star change over the same window, the 7 days before
+  the newest daily count, and print it the same way ("+21 since 2026-10-28"); before, one counted from the snapshot
+  and the other from the clock, so they disagreed. Both pages say when the GitHub facts are older than 26 hours.
+
 ### Added
 - Site: an item, NPC or quest page shared on Discord or X shows its own card: the name, its type and how many of
   the 3 installs agree on the name, as text on the brand canvas. Before, every database page showed the site card.
