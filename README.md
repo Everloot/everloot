@@ -132,7 +132,7 @@ flowchart LR
 | [`desktop/`](desktop/) | The Everloot Desktop App: the same jobs as a tray app with an installer |
 | [`packages/protocol/`](packages/protocol/) | The upload contract: record kinds, envelope, limits and their JSON Schema, shared by the site, the knowledge base, the uploaders and the addon tests |
 | [`supabase/`](supabase/) | The site's database schema |
-| [`integrations/`](integrations/) | The OpenAI connector manifest for the public MCP server (`openai/plugin.json`, `openai/mcp.json`); published to that directory, not shipped with the site |
+| [`integrations/`](integrations/) | The portable OpenAI connector package for the public MCP server (`openai/plugin.json`, `openai/mcp.json`, see [`docs/2026-10-18-mcp-listings.md`](docs/2026-10-18-mcp-listings.md)); not shipped with the site |
 | [`research/`](research/) | Dated research notes on competitors, sources and the Forever ecosystem; reference only, nothing ships |
 | [`scripts/`](scripts/) | Repository-level tools: the addon packager, the CI guards (DCO, PR title, internal paths, Markdown links, changelog files), the Discord bridge and maintainer scripts; run by CI and maintainers, not shipped. See [`scripts/README.md`](scripts/README.md) |
 
