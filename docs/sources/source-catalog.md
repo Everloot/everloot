@@ -7,6 +7,8 @@ What Everloot actually used, linked or only read is recorded in [`LEDGER.md`](LE
 This is the **candidate** list. A source enters the live source map only when its row has an access
 type decided from its terms, a last-verified date, and confirmed version coverage.
 
+The armory crawler reads Blizzard's Forever character profiles, equipment, PvP summaries, guilds and rosters through the official API. It keeps these only in the separate Supabase armory for credited, ad-free pages: recheck within 20 days, purge after 30 days, delete on 404 or a hide request. Armory data never enters addon tables, exports, the CC BY-SA corpus or MCP answers.
+
 ## Read this first
 
 - **WoW: Forever is in beta** (since 2026-09-17). Full launch is **2026-11-04**. All "Forever: yes"

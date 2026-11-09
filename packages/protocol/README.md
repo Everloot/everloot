@@ -8,8 +8,9 @@ base, the Desktop App and the command-line uploader, the addon's contract tests 
 
 ## Status
 
-Package 1.15.0, used by everloot.app. It carries a second number, `PROTOCOL_VERSION` (record protocol
-1.8.0): the upload contract an uploader stamps on every envelope. The two move separately. Not yet
+Used by everloot.app. The package version lives in `package.json` and is the only place it is stated. It
+carries a second number, `PROTOCOL_VERSION` in `src/version.ts`: the upload contract an uploader stamps
+on every envelope. The two move separately; read them from those two files, not from this page. Not yet
 published to npm; the parts of this repository install it from the folder. After editing it, `npm run build` here, then in each consumer delete
 `node_modules/@everloot/protocol` and `npm install` (npm keeps the packed copy while the version is the same).
 

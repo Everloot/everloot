@@ -4,6 +4,8 @@ When Blizzard ships a new WoW: Forever build, a GitHub Actions workflow
 (`.github/workflows/build-watch.yml`) notices within about half an hour, regenerates the game data in
 [`web/src/data/game-data/`](../web/src/data/game-data/changes/README.md) and opens a pull request titled `data(game-data): build <version>`.
 A maintainer reviews it. Nothing merges itself.
+The steps that stay by hand after that, from the review to the site showing the build, are in
+[BUILD_REFRESH.md](BUILD_REFRESH.md).
 
 ## What it does
 
