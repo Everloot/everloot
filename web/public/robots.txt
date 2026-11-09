@@ -4,6 +4,10 @@ Allow: /
 # Named category and subclass pages are indexable; keep filter permutations out.
 Disallow: /database/items?*
 Disallow: /database/items/*?*
+Allow: /database/items?page=*$
+Allow: /database/items/*?page=*$
+Disallow: /database/items?page=*&*
+Disallow: /database/items/*?page=*&*
 
 # AI search and user-requested fetches follow the public rules above.
 # Training crawlers are blocked, matching the Cloudflare training policy.

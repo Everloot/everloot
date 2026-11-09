@@ -36,7 +36,9 @@ the owner can do. Written after the 2026-10-17 audit.
   date for guides, blue posts and wiki pages.
 - **robots.txt.** `web/public/robots.txt` is served as is (there is no `robots.ts`). Three rule groups: every
   agent may read everything except `/database/items?*` and `/database/items/*?*`, so the named category and subclass
-  pages are crawled and the filter permutations are not; the training crawlers (GPTBot, ClaudeBot, CCBot,
+  pages are crawled and the filter permutations are not; a lone `?page=N` stays open (`Allow` lines one character
+  shorter than the `&*` Disallows that close a page number combined with a filter), because each later page is its
+  own canonical; the training crawlers (GPTBot, ClaudeBot, CCBot,
   Bytespider, Amazonbot, Meta-ExternalAgent, Google-Extended, Applebot-Extended) are disallowed everywhere,
   matching the Cloudflare training policy, while AI search and user-requested fetches (OAI-SearchBot, ChatGPT-User,
   Claude-SearchBot, Claude-User, PerplexityBot) follow the public rules; and `Mediapartners-Google`, the AdSense
