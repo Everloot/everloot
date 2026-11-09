@@ -53,6 +53,10 @@ export default function WikiHub() {
             <WikiIndex groups={groups} />
           </>
         )}
+        <p className="text-sm text-fg-2">
+          Pages are proposed as pull requests and reviewed before they are published.{" "}
+          <Link href="/docs/guides/wiki" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Write a page</Link>
+        </p>
         <section aria-labelledby="archive">
           <SectionHeading id="archive">Lore archive, 2023</SectionHeading>
           <p className="text-sm text-fg-2">

@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { CLIENT_RECIPES } from "@/data/game-data/client-recipes";
-import { CLIENT_PROFESSIONS, professionByName, professionBySlug, professionHrefById, recipeGroups, recipeItemIds, type RecipeView } from "./professions";
+import { CLIENT_PROFESSIONS, professionByName, professionBySegment, professionBySlug, professionHrefById, recipeGroups, recipeItemIds, type RecipeView } from "./professions";
 
 const recipe = (spellId: number, yellow: number | null, grey: number | null = null, extra: Partial<RecipeView> = {}): RecipeView =>
   ({ spellId, itemId: null, learn: null, yellow, grey, reagents: [], ...extra });
@@ -25,6 +25,18 @@ test("a recipe keeps the files' item, reagents and ranks; MinSkillLineRank shows
   expect(professionBySlug("riding")).toBeUndefined();
   expect(professionHrefById(171)).toBe("/tools/professions/alchemy");
   expect(professionHrefById(762)).toBeNull();
+});
+
+test("a URL segment resolves by the skill line id first, then by the slug", () => {
+  expect(professionBySegment("171")?.slug).toBe("alchemy");
+  expect(professionBySegment("171-alchemy")?.slug).toBe("alchemy");
+  // The id wins over a slug that disagrees with it, so a stale or foreign slug still lands on the right page.
+  expect(professionBySegment("171-mining")?.slug).toBe("alchemy");
+  expect(professionBySegment("first-aid")?.id).toBe(129);
+  // Riding (762) is a skill line the files do not list as a profession; an unknown slug is nothing either.
+  expect(professionBySegment("762")).toBeUndefined();
+  expect(professionBySegment("762-riding")).toBeUndefined();
+  expect(professionBySegment("riding")).toBeUndefined();
 });
 
 test("recipeGroups: brackets by the yellow rank, lowest first, unranked last, empty brackets left out", () => {

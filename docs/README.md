@@ -14,9 +14,11 @@ architecture map.
 | [`2026-10-08-release-checklist.md`](2026-10-08-release-checklist.md) | What gets checked before a site release |
 | [`LAUNCH_DAY.md`](LAUNCH_DAY.md) | The launch-day sequence for 2026-11-04: the `/beta` to Live switch, the build upload, the smoke list, who does each step |
 | [`BUILD_WATCH.md`](BUILD_WATCH.md) | How a new game build becomes a reviewed data pull request |
+| [`BUILD_REFRESH.md`](BUILD_REFRESH.md) | The hand steps after that pull request: tests, perks, art, names, counts, the asset URL, the exports |
 | [`TRACKER.md`](TRACKER.md) | The build list, generated from `kb/src/bridge-plan.ts` (a test keeps it in sync) |
 | [`ASSETS.md`](ASSETS.md) | How Blizzard's icons, tooltip text and interface art get onto the site, and the rules for them |
 | [`SEO.md`](SEO.md) | What the site does so search engines and AI assistants can find and quote it |
+| [`ENVIRONMENT.md`](ENVIRONMENT.md) | Every variable and secret the project reads, names only, and which surface sets each |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md), [`../ROADMAP.md`](../ROADMAP.md), [`../CHANGELOG.md`](../CHANGELOG.md) | How to contribute, what is planned, what has shipped |
 
 ## Data policy

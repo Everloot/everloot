@@ -22,9 +22,14 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Companion: the EverlootPrices slot file can carry a `sources` block after the drops (public vendor NPC ids and a
   reagent-of count per item, checksummed like the drops, with the vendors' names outside the checksum). The block is
   optional: a file without it is read as before. The Desktop App does not write it yet.
+- Site: the account guide and the addon page link the sample character page (/showcase/character), so a player can see
+  what a character page holds before linking one. The sample stays out of search and the sitemap.
 - Addon: the Gold tab's Overview chart follows the period buttons (today, 7 days, 30 days, or all for the ledger's
   90 days), one bar a day; Sales shows the auction house's cut beside each sale's deposit, and the by-item rows show
   sales per day over the period and the last sold day. Display only; nothing recorded or uploaded changes.
+- Site: a profession page answers to its skill line id, `/tools/professions/171` or `/tools/professions/171-alchemy`, and
+  redirects for good to the slug page it already had, keeping the skill range and class context in the query; an unknown id
+  is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
 
 ### Fixed
 - Site: a database address with an id nothing knows (an item or NPC such as /database/items/999999) answers its 404 with a
@@ -139,12 +144,22 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and the other from the clock, so they disagreed. Both pages say when the GitHub facts are older than 26 hours.
 
 ### Added
+- Site: a "Write a wiki page" guide under Docs › Guides says how a wiki page is proposed and reviewed, with the page
+  types, the front matter, the rules and the check from the wiki README; the wiki hub and the lore archive link to it.
 - Site: a faction page and a title page carry In short, Copy for AI, a "Player reports" fact that stays an empty meter
   until three installs agree, a "Track this" link to the collections tool and a relation tab ("Reputation from" on a
   faction, "Earned by" on a title) whose empty state names the 3-install rule and says what no game file read so far
   carries; a faction page also shows its lore archive page when the archive has one under the same name.
+- Site: the MCP resources page gives each prompt its own section (title, arguments with their allowed values, the
+  `prompts/get` call and the message the server returns), shows one `resources/read` of the builds resource with the
+  shape of its document and one entity read that equals the `item_page` answer, and the MCP sidebar lists the three
+  prompts under the page.
 - Site: an item, NPC or quest page shared on Discord or X shows its own card: the name, its type and how many of
   the 3 installs agree on the name, as text on the brand canvas. Before, every database page showed the site card.
+- Addon: each Professions block lists the next recipes a trainer teaches at or above the current rank (up to three,
+  lowest rank first) with the cost and the trainer's name, from the trainer rows the install already has, or says to
+  open a trainer's window; under the blocks, "Other characters" lists every other character's professions and ranks
+  from the local roster. Display only: nothing recorded or uploaded changes.
 - Addon: the Everloot window's sidebar is now Home, Gold, Collection, Professions and Settings. Ask, Build plan and
   Auctions left the sidebar; `/ask` and `/everloot plan` still work.
 - Addon: Home lists every character this install has seen (gold, level, professions, raid lockouts, last seen) with

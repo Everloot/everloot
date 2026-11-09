@@ -49,6 +49,17 @@ function SidebarLinks({ tab, path, onNavigate }: { tab: DocsTab; path: string; o
                     )}
                     <span className={`min-w-0 [overflow-wrap:anywhere] ${page.method || tab.id === "mcp" && page.href.includes("/tools/") ? "font-mono text-[13px]" : ""}`}>{page.title}</span>
                   </Link>
+                  {page.children && (
+                    <ul className="ml-4 border-l border-line">
+                      {page.children.map((child) => (
+                        <li key={child.href}>
+                          <Link href={child.href} onClick={onNavigate} className="flex min-h-9 items-center rounded-control px-3 py-1.5 font-mono text-[13px] text-fg-2 transition-colors hover:bg-panel hover:text-fg">
+                            {child.title}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               );
             })}

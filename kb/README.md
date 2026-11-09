@@ -86,7 +86,9 @@ Then, in Git Bash or PowerShell (no leading slash: Git Bash rewrites paths that 
 
     npm run kb -- blizzard-get data/wow/playable-class/index --game classic1x --kind static
 
-WoW: Forever has no API namespace yet; `--game forever` answers "not published yet".
+`--game forever` works: Blizzard's API has had the `static-forever-{region}`, `dynamic-forever-{region}`
+and `profile-forever-{region}` namespaces since the 2026-11-04 launch (checked 2026-11-06, US and EU).
+Forever has no realm index; rulesets replace realms. See `docs/sources/source-catalog.md` for the ruleset note.
 
 ## Test it
 
