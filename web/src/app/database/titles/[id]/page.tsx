@@ -16,6 +16,8 @@ type Props = { params: Promise<{ id: string }> };
 
 /** The quick-facts line that says whether three installs reported holding the title. */
 const REPORTED = "3 of 3 installs agree";
+/** The name line of a page whose name is the game files', in the words the item pages use for it. */
+const FILES_NAME = "The name is shown from the game files; players have not reported it yet.";
 
 /** Whether the game files list the title; null when the file could not be read. */
 function titleInFiles(id: number): boolean | null {
@@ -55,8 +57,10 @@ export default async function TitlePage(props: Props) {
       named: entry.confirmed,
     })
     : [];
-  const inFiles = titleInFiles(id) ? "The game files list it." : "No game file read so far lists it.";
-  const summary = entry ? [what, observed, inFiles, "No achievement is linked to it yet.", name] : [];
+  const listed = titleInFiles(id);
+  const inFiles = listed ? "The game files list it." : "No game file read so far lists it.";
+  // The name on an unconfirmed page is the files' own, so the name line says so instead of "no agreed name".
+  const summary = entry ? [what, observed, inFiles, "No achievement is linked to it yet.", !entry.confirmed && listed ? FILES_NAME : name] : [];
 
   return (
     <Container width="data">
@@ -71,8 +75,8 @@ export default async function TitlePage(props: Props) {
                   layout="list"
                   label={`${entry.name}: quick facts`}
                   items={[
-                    // Empty until three installs report holding it: the meter, never the words "not reported".
-                    { label: "Player reports", value: known(entry.confirmed ? REPORTED : null) },
+                    // Short of three installs: the meter with how many have reported, never the words "not reported".
+                    { label: "Player reports", value: known(entry.confirmed ? REPORTED : null, entry.reporters) },
                     { label: "Track this", value: <Link href="/tools/collections" className={LINK}>Collections tool</Link> },
                     { label: "ID", value: entry.titleId, numeric: true },
                   ]}
@@ -86,8 +90,8 @@ export default async function TitlePage(props: Props) {
               tabs={[
                 {
                   id: "earned-by", label: "Earned by", count: 0,
-                  // The achievement that rewards a title is in none of the game files read so far; a player-reported link needs 3 installs.
-                  panel: <EmptyTab action={null} message="No achievement is linked to this title yet. The game files read so far name no title rewards, and a link from player reports needs 3 installs agreeing." />,
+                  // The achievement that rewards a title is in none of the game files read so far, and no report carries it: a plain line, no meter.
+                  panel: <EmptyTab players={false} action={null} message="No achievement is linked to this title yet. The game files read so far name no title rewards; an achievement shows once 3 installs report it." />,
                 },
               ]}
             />

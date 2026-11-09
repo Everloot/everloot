@@ -18,6 +18,8 @@ type Props = { params: Promise<{ id: string }> };
 
 /** The quick-facts line that says whether three installs reported the faction in their reputation pane. */
 const REPORTED = "3 of 3 installs agree";
+/** The name line of a page whose name is the game files', in the words the item pages use for it. */
+const FILES_NAME = "The name is shown from the game files; players have not reported it yet.";
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const { id: segment } = await props.params;
@@ -62,7 +64,8 @@ export default async function FactionPage(props: Props) {
   const inFiles = files
     ? `The game files list it${files.parent ? ` under ${files.parent.name}` : ""}${files.header ? " and name it as other factions' parent" : ""}.`
     : "No game file read so far lists it.";
-  const summary = entry ? [what, observed, inFiles, "No quest is linked to it yet.", name] : [];
+  // The name on an unconfirmed page is the files' own, so the name line says so instead of "no agreed name".
+  const summary = entry ? [what, observed, inFiles, "No quest is linked to it yet.", !entry.confirmed && files ? FILES_NAME : name] : [];
   // The archive files a faction under no type of its own, so its page is one of the "other" pages.
   const lore = entry ? await loreForEntity("other", entry.name) : null;
 
@@ -87,8 +90,8 @@ export default async function FactionPage(props: Props) {
                     ...(files ? [{ label: "Header", value: files.header ? "Yes" : "No" }] : []),
                     ...(parent ? [{ label: "Parent faction", value: parent }] : []),
                     ...(entry.major ? [{ label: "Kind", value: "Major faction" }] : []),
-                    // Empty until three installs report a standing: the meter, never the words "not reported".
-                    { label: "Player reports", value: known(entry.confirmed ? REPORTED : null) },
+                    // Short of three installs: the meter with how many have reported, never the words "not reported".
+                    { label: "Player reports", value: known(entry.confirmed ? REPORTED : null, entry.reporters) },
                     { label: "Track this", value: <Link href="/tools/collections" className={LINK}>Collections tool</Link> },
                   ]}
                 />

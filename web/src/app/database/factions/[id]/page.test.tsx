@@ -106,11 +106,23 @@ test("a faction only the game files know keeps an empty meter for player reports
   expect(out).not.toContain("3 of 3 installs agree");
   expect(out).toContain("No player has reported it in a reputation pane yet.");
   expect(out).toContain("The game files list it.");
-  expect(out).toContain("It has no agreed name yet: that needs three installs reporting the same one.");
+  expect(out).toContain("The name is shown from the game files; players have not reported it yet.");
+  expect(out).not.toContain("It has no agreed name yet");
   expect(out).toContain("found in game files, unconfirmed");
   expect(out).not.toContain("Not reported");
   expect(factOf(out, "Track this")).toContain('href="/tools/collections"');
   expect((await meta("529-argent-dawn")).description).toContain("Found in game files, unconfirmed");
+});
+
+test("a faction two installs reported shows a meter at two, and stays unconfirmed", async () => {
+  const two = ["one", "two"].map((i) => rep(`reporter-${i}`, 529, "Argent Dawn"));
+  const state = foldCompletion(emptyCompletion(), [{ records: [...agreed(21, "Booty Bay", "Steamwheedle Cartel"), ...two], grants: [] }]);
+  store.loadCompletion.mockResolvedValue({ state, dataAsOf: at });
+  const out = await html("529-argent-dawn");
+  expect(factOf(out, "Player reports")).toContain('data-agreement="2"');
+  expect(factOf(out, "Player reports")).toContain("2 of 3");
+  expect(out).toContain("found in game files, unconfirmed");
+  expect(out).not.toContain("3 of 3 installs agree");
 });
 
 test("a header the files name as other factions' parent says so in short", async () => {

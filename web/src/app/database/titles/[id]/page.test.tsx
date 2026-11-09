@@ -73,8 +73,9 @@ test("a confirmed title page has the header meta, the facts, In short, Open data
   // The relation tab is there, empty, and names the 3-install rule without sending anyone to the addon for a fact it cannot change.
   expect(out).toContain("Earned by");
   expect(out).toContain("data-empty-state");
-  expect(out).toContain("No achievement is linked to this title yet. The game files read so far name no title rewards");
-  expect(out).toContain("3 installs agreeing");
+  expect(out).toContain("No achievement is linked to this title yet. The game files read so far name no title rewards; an achievement shows once 3 installs report it.");
+  // No meter on this tab: no report carries the link, so nothing counts towards it.
+  expect(/data-tab-panel="earned-by"[\s\S]*?<\/div>/.exec(out)?.[0]).not.toContain("data-agreement");
   expect(out).not.toContain("Get the addon");
   expect(out).not.toContain("Not reported");
 });
@@ -85,10 +86,22 @@ test("a title only the game files know keeps an empty meter for player reports a
   expect(out).not.toContain("3 of 3 installs agree");
   expect(out).toContain("No player has reported holding it yet.");
   expect(out).toContain("The game files list it.");
-  expect(out).toContain("It has no agreed name yet: that needs three installs reporting the same one.");
+  expect(out).toContain("The name is shown from the game files; players have not reported it yet.");
+  expect(out).not.toContain("It has no agreed name yet");
   expect(out).toContain("found in game files, unconfirmed");
   expect(out).toContain("Earned by");
   expect((await meta("8-s-champion")).description).toContain("Found in game files, unconfirmed");
+});
+
+test("a title two installs reported shows a meter at two, and stays unconfirmed", async () => {
+  const two = ["one", "two"].map((i) => title(`reporter-${i}`, 8, "%s, Champion"));
+  const state = foldCompletion(emptyCompletion(), [{ records: [...agreed(144, "Bloodsail Admiral %s"), ...two], grants: [] }]);
+  store.loadCompletion.mockResolvedValue({ state, dataAsOf: at });
+  const out = await html("8-s-champion");
+  expect(factOf(out, "Player reports")).toContain('data-agreement="2"');
+  expect(factOf(out, "Player reports")).toContain("2 of 3");
+  expect(out).toContain("found in game files, unconfirmed");
+  expect(out).not.toContain("3 of 3 installs agree");
 });
 
 test("a title three installs reported that the files do not list says so", async () => {
