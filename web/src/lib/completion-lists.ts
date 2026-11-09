@@ -100,7 +100,8 @@ export function factionInFiles(id: number): { parent: { id: number; name: string
   let factions: typeof CLIENT_FACTIONS.factions;
   try { factions = CLIENT_FACTIONS.factions; } catch { return null; }
   const row = factions.find((f) => f.id === id);
-  const parent = row?.parentId === undefined ? undefined : factions.find((f) => f.id === row.parentId);
+  if (!row) return null;
+  const parent = row.parentId === undefined ? undefined : factions.find((f) => f.id === row.parentId);
   return { parent: parent ? { id: parent.id, name: parent.name } : null, header: factions.some((f) => f.parentId === id) };
 }
 
