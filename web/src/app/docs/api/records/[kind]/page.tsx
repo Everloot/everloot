@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: { params: Promise<{ kind: str
   return pageMetadata({ title: `${kind} · Record kind`, description: recordMetaDescription(kind), path: recordHref(kind) });
 }
 
-export function recordMetaDescription(kind: RecordKind): string {
+function recordMetaDescription(kind: RecordKind): string {
   return `The ${kind} upload record in Everloot's protocol: every field with its type, whether it is required and what it means, from the JSON Schema.`;
 }
 

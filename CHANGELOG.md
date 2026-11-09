@@ -15,7 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
-- Site: every record kind has a docs page, /docs/api/records/&lt;kind&gt;, generated from its schema: each field with its type,
+- Site: every record kind has a docs page, `/docs/api/records/<kind>`, generated from its schema: each field with its type,
   whether it is required and its description, nested fields included, whether the kind is in the public corpus, where it
   goes, and the cross-field rules the server checks. The sidebar lists them and the schemas table links each kind to its page.
 - Addon: the Gold tab's Overview chart follows the period buttons (today, 7 days, 30 days, or all for the ledger's
