@@ -19,6 +19,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   a fact is confirmed by three installs, not three players, as the upload guide has it; the install count is one column,
   "Installs", on every table (it was "Install IDs" on objects and drops and "Reporters" on NPCs, items and vendors); and
   the coverage, instance and item pages count "n of 3 installs" from the meter's own labels instead of a written 3.
+- Site: an addon page typed in the wrong case, and the four retired tool addresses (/tools/database, /tools/completionist,
+  /tools/guild-tracker, /tools/profession-planner), answer a permanent 308 like every other moved address on the site.
+  Before, they answered a temporary 307, so a crawler kept asking for the old address.
 - Site: a spell page's tab reads "Spell 1 · Everloot" once; its title went around the shared page metadata, so the
   layout added the brand a second time, and it had no Open Graph or Twitter card. The title check now covers the route.
 - Site: a named spell page is titled "Blizzard – WoW Forever spell" with a description that names it, and its Creates,
