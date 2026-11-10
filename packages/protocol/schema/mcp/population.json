@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/population.json",
   "title": "Who plays what: population by race, class, faction and level",
-  "description": "Counts how many characters play each race, class, race and class, faction and level band on WoW: Forever, from the census players turned on in the Everloot addon. Each character counts once. A count shows only when it covers at least 10 characters reported by at least 3 installs from at least 3 addresses, rounded to the nearest 5; a count that could be worked out from the others is hidden too. When census data is available, every answer states its window: active in the last 7 days (default) or since launch; when it is not, the answer says so instead of giving a zero. With no arguments, the overview, most played class first. Use it for how many play a race or class; use class_races for which races can be a class. No names, ever. Missing or unavailable data is reported explicitly.",
+  "description": "Counts observed Forever characters by race, class, faction and level band from opt-in addon census uploads, not the whole realm population. Each character counts once. Normally counts need 10 characters, 3 installs and 3 addresses, rounded to 5, with inferable small counts hidden. While few players upload, Everloot's own installs also count on their own, though the 10-character minimum still applies; preserve that label because counts can come from one player's game. The window is active in 7 days by default, or since launch. No names. Missing census data is unrecorded, not zero. Use class_races for which races can be a class; use this tool for observed counts.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
