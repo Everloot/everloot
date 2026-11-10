@@ -15,7 +15,8 @@ import { entitySummary, observedLine } from "@/lib/evidence";
 import EntityLink from "@/components/EntityLink";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
 import ItemTip from "@/components/game/ItemTip";
-import { Container, DataTable, Facts, InShort, Tabs, TooltipFrame } from "@/components/ui";
+import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
+import { hasCard } from "@/lib/tooltip";
 import { EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, MapName, ShowOnMap, Unreachable, zoneName } from "../../entity";
 import { vendorIndexable } from "@/lib/indexable";
 import { entityTitle, vendorDescription } from "@/lib/entity-meta";
@@ -59,7 +60,8 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
   const page = vendorPage(Number(params.id), facts);
   if (unknownVendor(page.vendorNpcId, facts)) notFound();
   // Where players saw this vendor stand: the NPC pins that 3 installs agree on, as links to the map.
-  const places: Place[] = facts.unreachable ? [] : npcPage(page.vendorNpcId, facts).pins.flatMap((pin) => {
+  const npc = facts.unreachable ? null : npcPage(page.vendorNpcId, facts);
+  const places: Place[] = !npc ? [] : npc.pins.flatMap((pin) => {
     const href = pinLink(pin.mapId, pin.x, pin.y);
     return href ? [{ href, mapId: pin.mapId, x: pin.x, y: pin.y }] : [];
   });
@@ -104,6 +106,11 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
           )}
         />
         <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
+        <OpenData
+          text={[`${vendorName ?? `Vendor NPC ${page.vendorNpcId}`} (vendor ${page.vendorNpcId})`, ...summary, `Source: https://everloot.app/database/vendors/${page.vendorNpcId}`].join("\n")}
+          // The vendor is an NPC: its hover card is the public JSON there is, once players have reported the NPC.
+          jsonHref={npc && hasCard.npc(npc) ? `/api/tooltip/npc/${page.vendorNpcId}` : undefined}
+        />
         <Tabs
           label={`${title}: relations`}
           tabs={[

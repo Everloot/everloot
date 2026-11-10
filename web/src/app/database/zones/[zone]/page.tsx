@@ -7,9 +7,10 @@ import { notFound, permanentRedirect } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
 import ZonePreview from "@/components/ZonePreview";
 import {
-  AgreementMeter, Badge, Card, Container, DataTable, DataTitle, EmptyState, SectionHeading, Tabs,
+  AgreementMeter, Badge, Card, Container, DataTable, DataTitle, EmptyState, InShort, OpenData, SectionHeading, Tabs,
   type Column, type TabItem,
 } from "@/components/ui";
+import { observedLine } from "@/lib/evidence";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
 import { loadQuestNames, loadSiteAssets } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
@@ -82,6 +83,20 @@ export default async function ZonePage(props: Props) {
   const entrances = here?.entrances ?? [];
   const treasures = here?.treasures ?? [];
   const nameOf = (n: ZoneNpc) => n.name ?? `NPC ${n.npcId}`;
+  // The page in a few lines, from the lists below only: what it is, what players reported with its agreement and date,
+  // and what the game files give. Storage down: the player line says unrecorded, never zero.
+  const count = (n: number, one: string, many: string) => (n ? `${n} ${n === 1 ? one : many}` : null);
+  const lastSeen = [...treasures, ...entrances].map((x) => x.lastSeen).filter((t): t is string => t !== null).sort().at(-1) ?? null;
+  const reported = [count(npcs.length, "NPC position", "NPC positions"), count(vendors.length, "vendor", "vendors"), count(quests.length, "quest", "quests"), count(treasures.length, "treasure", "treasures")];
+  const observed = observedLine(reported, lastSeen, Date.now());
+  const fromFiles = entrances.filter((e) => e.files).length, zonedIn = entrances.filter((e) => e.confirmed !== null).length;
+  const summary = [
+    `A zone in ${zone.continentName}; its name and outline are from the game files.`,
+    facts.unreachable ? STORAGE_UNREACHABLE : reported.some(Boolean) ? `${observed} Each has three installs agreeing.` : observed,
+    entrances.length
+      ? `${entrances.length} ${entrances.length === 1 ? "dungeon or raid entrance" : "dungeon and raid entrances"}${fromFiles ? `, ${fromFiles} read from the game files` : ""}${zonedIn ? `, ${zonedIn} confirmed by three installs zoning in` : ""}.`
+      : "No dungeon or raid is entered from this zone.",
+  ];
   // An empty list is one muted line. The addon call is made once, in the notice above the tabs.
   const empty = (message: string) => <div className="px-4 sm:px-6"><EmptyTab message={message} players={false} action={null} /></div>;
 
@@ -154,6 +169,10 @@ export default async function ZonePage(props: Props) {
         />
 
         {facts.unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} The lists below cannot be shown until it is back.</p>}
+
+        <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={link}>How to read these numbers</Link>} />
+        {/* No per-zone JSON is served, so no Raw JSON link: the copy text is the record. */}
+        <OpenData className="mb-6" text={[`${zone.name} (zone ${zone.mapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
 
         <div className="space-y-6">
           <ZonePreview
