@@ -333,6 +333,11 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Protocol: `itemsResponse.items` is typed with the row `GET /api/items` returns (item id, then class, subclass, slot
   and quality, each null when the build does not name it), so a client generated from `schema/api/itemsResponse.json`
   gets fields instead of `any`. Protocol package 2.0.0 (the row's fields are now required); the answers do not change.
+- Site: item icons have quality-coloured borders, and an item without its own icon shows the game's question mark from the
+  same asset files (no icon without them); an item page's name uses the quality colour token of the theme, and a shared
+  item card colours the name only when one is shown;
+  empty tabs say when 3 installs must agree; the tooltip embed's icon border takes the quality colour, and the tooltip docs
+  list the class and quality colours for both themes; the SVG and Apple touch icons are linked.
 - Docs: the docs index lists the backlog, the open-data export, the live-client probes, and the dated notes and folders it had left out.
 - Site: item tooltips read like the game's: the item level first and in yellow, slot and armour or weapon type in two
   columns, damage left and speed right, Equip, Use and Chance on hit lines in green, a named set and the flavour text in

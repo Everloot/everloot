@@ -116,6 +116,8 @@ export const assetUrl = (base: string, file: string) => `${base}/${file}`;
 export const iconUrl = (base: string, name: string) => assetUrl(base, `icons/${name}`);
 /** An item's icon by the file data id its record carries. */
 export const itemIconUrl = (base: string, fileId: number) => iconUrl(base, `${fileId}.webp`);
+/** The game's question mark (INV_Misc_QuestionMark) in the same folder: the icon of an item whose own is missing. */
+export const unknownItemIcon = (base: string) => itemIconUrl(base, 134400);
 /** The shard that holds an item. */
 export const itemShard = (itemId: number, shardSize: number) => Math.floor(itemId / shardSize);
 /** The build folder, the last part of the asset URL ("wow_classic_beta-70450-84bea423"); the private bucket uses the same name. */
@@ -337,6 +339,8 @@ export interface MatchedName {
   name: string;
   /** Name colour by quality; common when only the wiki names the item. */
   color: string;
+  /** The quality id `color` is for. */
+  quality: number;
   /** The wiki article that gives this name; null for a name from the game files alone. */
   wikiPage: string | null;
   source: "wiki" | "files";
@@ -372,7 +376,7 @@ export async function loadItemNames(version: string, base: string | null = asset
       wiki: { name: f.data.wiki.name, url: f.data.wiki.url },
       // The rule is applied again here, so a file written before a change to it cannot show what it now holds back.
       names: new Map(Object.entries(f.data.names).filter(([id, x]) => mayShowName(Number(id), x.n)).map(([id, x]) => [Number(id), {
-        name: x.n, color: qualityColor(x.q ?? 1), wikiPage: x.w ? `${WIKI_PAGE_PREFIX}${x.w}` : null, source: x.w ? "wiki" : "files",
+        name: x.n, color: qualityColor(x.q ?? 1), quality: x.q ?? 1, wikiPage: x.w ? `${WIKI_PAGE_PREFIX}${x.w}` : null, source: x.w ? "wiki" : "files",
       } satisfies MatchedName])),
     } : null);
   }

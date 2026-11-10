@@ -130,11 +130,12 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
         <JsonLd data={entityPageJsonLd({ name: title, path: `/database/npcs/${npcId}`, identifier: `npc:${npcId}` })} />
         <EntityHeader trail={trail} title={title} meta={["NPC", zone?.name, named ? <span key="id" className="tabular-nums">ID {npcId}</span> : null]} />
         <EntityTop
-          box={(firstPin && zone && <MapThumb pin={firstPin} zone={zone.name} art={art?.smallUrl ?? art?.url ?? null} />) || (
+          // No box without an agreed position: the Map tab says why, and a frame with only the name would repeat the title.
+          box={firstPin && (zone ? <MapThumb pin={firstPin} zone={zone.name} art={art?.smallUrl ?? art?.url ?? null} /> : (
             <TooltipFrame name={title} label={`${title}, as players saw it`}>
-              {firstPin && <p>Map {firstPin.mapId} at {firstPin.x}, {firstPin.y}</p>}
+              <p>Map {firstPin.mapId} at {firstPin.x}, {firstPin.y}</p>
             </TooltipFrame>
-          )}
+          ))}
           facts={!unreachable && (
             <Facts
               layout="list"
@@ -204,7 +205,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
               id: "map", label: "Map", count: unreachable ? undefined : page.pins.length,
               panel: unreachable ? <Unreachable />
                 : page.pins.length ? <DataTable dense caption={`Where ${title} stands`} columns={pinColumns} rows={page.pins} rowKey={(p) => String(p.mapId)} />
-                : <EmptyTab message="No agreed position yet." />,
+                : <EmptyTab message="No agreed position yet. A pin needs 3 installs at the same spot." />,
             },
           ]}
         />

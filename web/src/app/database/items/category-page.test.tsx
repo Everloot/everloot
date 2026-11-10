@@ -157,7 +157,7 @@ test("a plain category page is indexed once half the rows it shows have a name, 
   }
 });
 
-test("an item page shows its category path, slot and quality; unconfirmed is a quiet marker, with no source line or build", async () => {
+test("an item page shows its category path, slot and quality, with no source line or build", async () => {
   const row = CLIENT_TAXONOMY.items.find((r) => r[1] === 4 && r[2] === 1 && r[4] === 4)!;
   const page = await html(ItemPage(props(String(row[0]))));
   expect(page).toContain('href="/database/items/armor"');
@@ -166,7 +166,8 @@ test("an item page shows its category path, slot and quality; unconfirmed is a q
   expect(page).not.toContain("data-source-line");
   expect(page).not.toMatch(/game files, unconfirmed/i);
   expect(page).not.toContain(CLIENT_LAYER.build.version);
-  expect(page).toMatch(/data-unconfirmed[^>]*title="From the game files, not yet confirmed by players"/);
+  // Without the asset files the header has no icon, so no icon frame either (the marker is on the icon: item-quality.test.tsx).
+  expect(page).not.toContain("data-game-icon");
   // No breadcrumb on screen; the trail stays as JSON-LD.
   expect(page).not.toContain('aria-label="Breadcrumb"');
   expect(page).toContain('"@type":"BreadcrumbList"');
@@ -262,7 +263,8 @@ test("items no source names are one line above the list, sort last when shown, a
     expect(open.indexOf("Linen Cap")).toBeLessThan(open.indexOf(`>Item ${first}<`));
     expect(open).toContain(`>${total.toLocaleString("en-US")}</span> items`);
     expect(open).toContain(`Hide the ${(total - 1).toLocaleString("en-US")} unnamed items`);
-    expect(open).toContain(">?</span>");
+    // Without the asset files there is no icon, not even the question mark.
+    expect(open).not.toContain("<img");
     const m = await subclassMetadata(sub("armor", "cloth", { unnamed: "1" }));
     expect(m.robots).toMatchObject({ index: false });
     expect(m.alternates?.canonical).toBe("/database/items/armor/cloth");

@@ -6,6 +6,18 @@ import { CURRENT_BUILD } from "@/data/game-data/raid";
 import { emptySlots, encodeRaid } from "@/lib/raid";
 import { loadCatalog } from "@/lib/talents/catalogs";
 import { encodeBuild } from "@/lib/talents/share";
+import sharp from "sharp";
+import { tokens } from "@/design/tokens";
+
+test.each(["epic", "rare"] as const)("an item PNG paints its title with the %s quality token", async (quality) => {
+  const { renderEntityCard } = await import("@/lib/og-card");
+  const image = await renderEntityCard({ title: "Lionheart Helm", type: "Armor", installs: 0, quality, omitZero: true });
+  const { data, info } = await sharp(Buffer.from(await image.arrayBuffer())).raw().toBuffer({ resolveWithObject: true });
+  const rgb = tokens.dark[`q-${quality}`].slice(1).match(/../g)!.map((s) => parseInt(s, 16));
+  let colored = 0;
+  for (let i = 0; i < data.length; i += info.channels) if (rgb.every((v, c) => data[i + c] === v)) colored++;
+  expect(colored).toBeGreaterThan(1000);
+});
 
 // The link previews are drawn on each request on the Worker, which has no repository files: reading the fonts from
 // node_modules there answered 500 for every shared build and raid (found live 11/01). Run from an empty folder, as

@@ -21,6 +21,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   return renderEntityCard({
     title: !facts.unreachable && page.name ? page.name : `NPC ${npcId}`,
     type: "NPC",
+    omitZero: true,
     installs: facts.unreachable ? null : page.name ? AGREEMENT_NEEDED : npcNameReporters(npcId, facts),
   });
 }

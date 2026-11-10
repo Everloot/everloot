@@ -1,3 +1,4 @@
+import { qualityOf } from "@/components/ui/quality";
 import { notFound } from "next/navigation";
 import { edgesFrom } from "../../../../../../kb/src/edges";
 import { itemNameReporters, itemPage } from "../../../../../../kb/src/item-page";
@@ -26,9 +27,14 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const page = itemPage(itemId, facts);
   const category = categoryOf(CLIENT_TAXONOMY, itemId);
   const type = [category?.class?.label, category?.subclass ? subclassLabel(category.subclass).label : null].filter(Boolean).join(" · ") || "Item";
+  const name = shownItemName(itemId, agreed, matched?.names);
+  // As the page's heading: the quality colour only on a shown name, from the taxonomy, else the names file.
+  const nameQuality = category?.quality?.id ?? matched?.names.get(itemId)?.quality;
   return renderEntityCard({
-    title: shownItemName(itemId, agreed, matched?.names)?.name ?? `Item ${itemId}`,
+    title: name?.name ?? `Item ${itemId}`,
     type,
+    quality: name && nameQuality !== undefined && nameQuality <= 5 ? qualityOf(nameQuality) : undefined,
+    omitZero: true,
     installs: facts.unreachable ? null : page.name ? AGREEMENT_NEEDED : itemNameReporters(itemId, facts),
   });
 }
