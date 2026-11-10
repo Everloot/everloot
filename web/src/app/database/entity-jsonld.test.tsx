@@ -91,3 +91,11 @@ test.each(cases)("$kind page opens with the shared entity header, and lists its 
   // Quick facts, where the page has them, are the label-left, value-right list: never the card or the grid.
   for (const m of html.matchAll(/data-facts="(\w+)"/g)) expect(m[1]).toBe("list");
 });
+
+
+test.each(cases.filter(({ kind }) => ["item", "npc", "quest", "object", "spell", "zone"].includes(kind)))("$kind wide layout reuses the existing summary and data controls exactly once", async ({ page }) => {
+  const html = renderToStaticMarkup(await page());
+  expect(html.match(/data-entity-sidebar/g)).toHaveLength(1);
+  expect(html.match(/aria-label="In short"/g)).toHaveLength(1);
+  expect(html.match(/>Copy for AI</g)).toHaveLength(1);
+});

@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, expect, test } from "vitest";
+import { afterAll, beforeAll, expect, test, vi } from "vitest";
 import { CURRENT_BUILD } from "@/data/game-data/raid";
 import { emptySlots, encodeRaid } from "@/lib/raid";
 import { loadCatalog } from "@/lib/talents/catalogs";
@@ -72,4 +72,21 @@ test("a raid plan's card, and the planner's own without a raid, draw without rea
 test("the site-wide preview, and X's copy of it, draw without reading a file", async () => {
   await expectPng(await siteImage());
   await expectPng(await twitterImage());
+});
+
+
+test.each([true, false])("an asset-host WebP icon (lossless: %s) is visible in the PNG, fetched only once", async (lossless) => {
+  const { renderEntityCard } = await import("@/lib/og-card");
+  const bytes = await sharp({ create: { width: 64, height: 64, channels: 3, background: "#ff0000" } }).webp({ lossless }).toBuffer();
+  const fetcher = vi.fn().mockResolvedValue(new Response(bytes, { headers: { "content-type": "image/webp" } }));
+  vi.stubGlobal("fetch", fetcher);
+  vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", "https://assets.example/build");
+  try {
+    const image = await renderEntityCard({ title: "Helm", type: "Item", installs: null, icon: "https://assets.example/build/icons/1.webp" });
+    const { data, info } = await sharp(Buffer.from(await image.arrayBuffer())).raw().toBuffer({ resolveWithObject: true });
+    let red = 0;
+    for (let i = 0; i < data.length; i += info.channels) if (data[i] > 240 && data[i+1] < 10 && data[i+2] < 10) red++;
+    expect(red).toBeGreaterThan(5000);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  } finally { vi.unstubAllGlobals(); vi.unstubAllEnvs(); }
 });

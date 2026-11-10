@@ -35,7 +35,7 @@ import {
 } from "@/lib/zones";
 import { zoneLore } from "@/lib/zone-lore";
 import { UNAVAILABLE } from "@/lib/lore";
-import { EmptyTab, EntityHeader, FREQUENCY, percent } from "../../entity";
+import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, FREQUENCY, percent } from "../../entity";
 import { listQuery, PER_PAGE, type Search } from "../../list-parts";
 
 export const dynamic = "force-dynamic";
@@ -237,7 +237,7 @@ export default async function ZonePage(props: Props) {
     <Container width="data">
       <EdgeDegraded when={facts.unreachable || seen.unreachable || loot.unreachable || gathering?.unreachable === true || lore === UNAVAILABLE} />
       <JsonLd data={entityPageJsonLd({ name: zone.name, path: canonical, identifier: `zone:${zone.mapId}` })} />
-      <article>
+      <EntityLayout>
         {/* The entity title row: name, continent, and the map link as a quiet control (the header keeps the one filled button). */}
         <EntityHeader
           title={zone.name}
@@ -255,20 +255,23 @@ export default async function ZonePage(props: Props) {
 
         {facts.unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} The lists below cannot be shown until it is back.</p>}
 
-        <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={link}>How to read these numbers</Link>} />
-        {/* No per-zone JSON is served, so no Raw JSON link: the copy text is the record. */}
-        <OpenData className="mb-6" text={[`${zone.name} (zone ${zone.mapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
+        <EntitySidebar>
+          <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={link}>How to read these numbers</Link>} />
+          {/* No per-zone JSON is served, so no Raw JSON link: the copy text is the record. */}
+          <OpenData className="mb-6" text={[`${zone.name} (zone ${zone.mapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
+          <div className="mb-6">
+            <ZonePreview
+              name={zone.name}
+              width={shape.bounds.left - shape.bounds.right}
+              height={shape.bounds.top - shape.bounds.bottom}
+              art={art?.url ?? null}
+              npcs={here?.npcs ?? []}
+              entrances={entrances}
+            />
+          </div>
+        </EntitySidebar>
 
         <div className="space-y-6">
-          <ZonePreview
-            name={zone.name}
-            width={shape.bounds.left - shape.bounds.right}
-            height={shape.bounds.top - shape.bounds.bottom}
-            art={art?.url ?? null}
-            npcs={here?.npcs ?? []}
-            entrances={entrances}
-          />
-
           {lore && lore !== UNAVAILABLE && (
             <section aria-labelledby="lore">
               <SectionHeading id="lore">Lore</SectionHeading>
@@ -304,7 +307,7 @@ export default async function ZonePage(props: Props) {
           </section>
         </div>
         {!facts.unreachable && hasContent(here) && <AdSlot slot="inContent" />}
-      </article>
+      </EntityLayout>
     </Container>
   );
 }

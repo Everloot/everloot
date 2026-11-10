@@ -19,6 +19,10 @@ cannot be read in 2.5 seconds, every page shows the text it always had, with no 
 image box and no credit line (the credit is there only when the art is). Without the private bucket
 variables (`GAME_DATA_*`), item links stay plain while the other art still shows.
 
+Item social previews may also show the same item icon as the page (approved 2026-11-10). They
+respect the asset configuration and item visibility rule, embed one fetched icon, and keep the
+text card when art is disabled, missing or unreadable. Other share cards stay text-only.
+
 ## Where the art shows
 
 | Page | What appears |

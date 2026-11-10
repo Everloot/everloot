@@ -357,3 +357,21 @@ input[type="number"]::-webkit-inner-spin-button {
 input[type="number"] {
   -moz-appearance: textfield;
 }
+
+/* Wide entity rails rearrange existing blocks without client-side measurement. */
+@media (min-width: 1280px) {
+  .entity-layout { align-items: start; }
+  .entity-layout > * { grid-column: 1; min-width: 0; }
+  .entity-layout > [data-entity-header] { grid-column: 1 / -1; }
+  .entity-layout > .entity-sidebar { grid-column: 2; grid-row: 3 / span 30; }
+  .entity-layout > .entity-sidebar > section:first-child { margin-top: 0; }
+  .entity-layout [data-facts="list"] { columns: 1; }
+  .entity-layout > .entity-facts { grid-column: 2; grid-row: 2; max-width: none; }
+  .entity-layout > .entity-top { display: contents; }
+  .entity-layout > .entity-top > .entity-box { grid-column: 1; grid-row: 2; margin-bottom: 24px; max-width: 320px; }
+  .entity-layout > .entity-top > section { grid-column: 2; grid-row: 2; margin-bottom: 24px; }
+  .entity-layout:not(:has(> .entity-top, > .entity-facts)) > .entity-sidebar { grid-row: 2 / span 30; }
+  .entity-layout > .entity-top-map > .entity-box { grid-column: 2; grid-row: 2; }
+  .entity-layout > .entity-top-map > section { grid-column: 2; grid-row: 3; }
+  .entity-layout:has(> .entity-top-map) > .entity-sidebar { grid-row: 4 / span 30; }
+}

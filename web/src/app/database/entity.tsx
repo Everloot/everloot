@@ -78,11 +78,11 @@ export function EntityHeader({ trail, title, quality, icon, meta = [], aside }: 
  * of them on a wide screen, so the band stays short); stacked on a phone. No box (a tooltip with no lines to
  * show) leaves the facts alone at the same width.
  */
-export function EntityTop({ box, facts }: { box: ReactNode; facts: ReactNode }) {
-  if (!box) return facts ? <section aria-label="Quick facts" className="mb-6 min-w-0 sm:max-w-[280px] lg:max-w-[584px]">{facts}</section> : null;
+export function EntityTop({ box, facts, railMap = false }: { box: ReactNode; facts: ReactNode; railMap?: boolean }) {
+  if (!box) return facts ? <section aria-label="Quick facts" className="entity-facts mb-6 min-w-0 sm:max-w-[280px] lg:max-w-[584px]">{facts}</section> : null;
   return (
-    <div className="mb-6 grid items-start gap-4 sm:grid-cols-[minmax(0,320px)_minmax(0,280px)] sm:gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,584px)]">
-      <div className="min-w-0">{box}</div>
+    <div className={`${railMap ? "entity-top-map " : ""}entity-top mb-6 grid items-start gap-4 sm:grid-cols-[minmax(0,320px)_minmax(0,280px)] sm:gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,584px)]`}>
+      <div className="entity-box min-w-0">{box}</div>
       <section aria-label="Quick facts" className="min-w-0">{facts}</section>
     </div>
   );
@@ -135,4 +135,14 @@ export const MAP_LINK_HEADER = <span className="sr-only">Map link</span>;
 /** A pin table's link to the map. Each one says where it goes (WCAG 2.4.4), since every row's link reads the same. */
 export function ShowOnMap({ href, mapId, x, y }: { href: string; mapId: number; x: number; y: number }) {
   return <Link href={href} className={LINK} aria-label={`Show ${zoneName(mapId)} at ${x}, ${y} on the map`}>Show on the map</Link>;
+}
+
+/** A CSS-only wide rail; its tracks exist on the first server render. */
+export function EntityLayout({ children }: { children: ReactNode }) {
+  return <article className="entity-layout xl:grid xl:grid-cols-[minmax(0,1fr)_320px] xl:gap-x-8">{children}</article>;
+}
+
+/** Existing page blocks keep their DOM order below xl, without duplicate maps or links. */
+export function EntitySidebar({ children }: { children: ReactNode }) {
+  return <div data-entity-sidebar className="entity-sidebar contents xl:block xl:min-w-0 xl:[overflow-wrap:anywhere]">{children}</div>;
 }
