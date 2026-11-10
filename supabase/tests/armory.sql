@@ -9,6 +9,10 @@ begin
     foreach r in array array['anon','authenticated','service_role'] loop
       if has_table_privilege(r, 'public.' || t, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') then raise exception 'direct table access: % %', r,t; end if;
     end loop;
+    if exists (select 1 from pg_roles where rolname = 'backup_exporter') then
+      if not has_table_privilege('backup_exporter', 'public.' || t, 'SELECT') then raise exception 'backup_exporter cannot select %', t; end if;
+      if has_table_privilege('backup_exporter', 'public.' || t, 'INSERT,UPDATE,DELETE') then raise exception 'backup_exporter can write %', t; end if;
+    end if;
   end loop;
   for f in select p.oid::regprocedure from pg_proc p join pg_namespace ns on ns.oid=p.pronamespace
     where ns.nspname='public' and p.proname like 'armory_%' loop

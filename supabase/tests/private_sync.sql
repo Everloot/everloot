@@ -2,7 +2,8 @@
 -- that has the roles anon, authenticated and service_role. Everything is rolled back at the end.
 begin;
 
--- Only the server's role may call the functions; the two tables are closed to every role, the server's included.
+-- Only the server's role may call the functions; the two tables stay closed to anon, authenticated and
+-- service_role. backup_exporter (20261110180000) may SELECT only, once that migration has been applied.
 do $$
 declare role_name text; tbl text; fn text;
 begin
@@ -22,6 +23,12 @@ begin
     end loop;
     if not (select relrowsecurity from pg_class where oid = tbl::regclass) then raise exception 'RLS disabled on %', tbl; end if;
   end loop;
+  if exists (select 1 from pg_roles where rolname = 'backup_exporter') then
+    foreach tbl in array array['public.character_sync_consent', 'public.character_facts'] loop
+      if not has_table_privilege('backup_exporter', tbl, 'SELECT') then raise exception 'backup_exporter cannot select %', tbl; end if;
+      if has_table_privilege('backup_exporter', tbl, 'INSERT,UPDATE,DELETE') then raise exception 'backup_exporter can write %', tbl; end if;
+    end loop;
+  end if;
   -- No column can hold an install id, a character key, a GUID or a raw name.
   if exists (select 1 from information_schema.columns where table_schema = 'public'
       and table_name in ('character_sync_consent', 'character_facts')

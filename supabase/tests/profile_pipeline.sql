@@ -12,6 +12,14 @@ begin
       raise exception '% can touch character_track directly', role_name;
     end if;
   end loop;
+  if exists (select 1 from pg_roles where rolname = 'backup_exporter') then
+    if not has_table_privilege('backup_exporter', 'public.character_track', 'SELECT') then
+      raise exception 'backup_exporter cannot select character_track';
+    end if;
+    if has_table_privilege('backup_exporter', 'public.character_track', 'INSERT,UPDATE,DELETE') then
+      raise exception 'backup_exporter can write character_track';
+    end if;
+  end if;
   foreach fn in array array['public.ranked_gear_links(uuid)', 'public.ranked_gear_board(timestamptz, uuid[])',
       'public.record_character_track(jsonb)', 'public.character_track_points(uuid)'] loop
     foreach role_name in array array['anon', 'authenticated'] loop
