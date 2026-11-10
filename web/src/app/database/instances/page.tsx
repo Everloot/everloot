@@ -29,7 +29,7 @@ const DEFAULT_SORT = { key: "level" as Sort, desc: false };
 
 const href = (q: Partial<ListQuery<Sort>>) => listHref(META.path, [["q", q.q], ["sort", sortParam(q.sort)], ["page", q.page && q.page > 1 ? String(q.page) : undefined]]);
 
-export async function generateMetadata(props: { searchParams?: Promise<Search> } = {}): Promise<Metadata> {
+export async function generateMetadata(props: { searchParams?: Promise<Search> }): Promise<Metadata> {
   const q = listQuery((await props.searchParams) ?? {}, SORTS);
   return listMetadata(META, Boolean(q) && !q!.q && !q!.sort, q?.page);
 }
@@ -39,7 +39,7 @@ const link = "text-fg underline decoration-edge underline-offset-4 hover:decorat
 const NO_NAME = "The game files place no entrance for this instance, so the site has no name for it, and 3 installs have not confirmed one. It is listed by its id because players reported an entrance or a boss there.";
 
 /** One row per instance: the entrance's zone, its confirmation, and the bosses players report. */
-export default async function InstancesPage(props: { searchParams?: Promise<Search> } = {}) {
+export default async function InstancesPage(props: { searchParams?: Promise<Search> }) {
   const q = listQuery((await props.searchParams) ?? {}, SORTS);
   if (!q) notFound();
   const seen = await loadSightings();

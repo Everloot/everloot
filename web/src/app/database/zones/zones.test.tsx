@@ -37,18 +37,18 @@ beforeEach(() => store.loadCorpus.mockReset());
 
 test("the index groups released zones by continent and links each one; held-back zones are left out", async () => {
   store.loadCorpus.mockResolvedValue(corpus(three(100, "Guard Orin", 1436, 40, 50)));
-  const page = await html(ZonesPage());
+  const page = await html(ZonesPage({}));
   expect(page).toContain("Eastern Kingdoms");
   expect(page).toContain("Kalimdor");
   expect(page).toContain('href="/database/zones/1436-westfall"');
   expect(page).toContain('href="/database/zones/1411-durotar"');
   for (const held of ["Mount Hyjal", "Riverglades", "Shen&#x27;dralas"]) expect(page).not.toContain(held);
-  expect((await zonesMetadata()).alternates?.canonical).toBe("/database/zones");
+  expect((await zonesMetadata({})).alternates?.canonical).toBe("/database/zones");
 });
 
 test("the index is a database list: data width, zones A to Z, a dash for a count nobody reported, no all-zero column", async () => {
   store.loadCorpus.mockResolvedValue(corpus(three(100, "Guard Orin", 1436, 40, 50)));
-  const page = await html(ZonesPage());
+  const page = await html(ZonesPage({}));
   expect(page).toContain('data-container="data"');
   expect(page.indexOf(">Duskwood<")).toBeLessThan(page.indexOf(">Elwynn Forest<"));
   expect(page.indexOf(">Elwynn Forest<")).toBeLessThan(page.indexOf(">Westfall<"));
@@ -126,14 +126,14 @@ test("an empty zone page makes one addon call; its empty lists are single muted 
 
 test("the zone index says a dash is unrecorded, not none, and says so plainly when no zone has anything", async () => {
   store.loadCorpus.mockResolvedValue(corpus(three(100, "Guard Orin", 1436, 40, 50)));
-  const some = await html(ZonesPage());
+  const some = await html(ZonesPage({}));
   expect(some).toContain("A dash means nobody has confirmed anything of that kind in the zone yet. It does not mean there is none.");
   store.loadCorpus.mockResolvedValue(corpus([]));
-  const none = await html(ZonesPage());
+  const none = await html(ZonesPage({}));
   expect(none).toContain("Players have not confirmed anything in any zone yet");
   expect(none).not.toContain("A dash means");
   store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], unreachable: true });
-  const down = await html(ZonesPage());
+  const down = await html(ZonesPage({}));
   expect(down).not.toContain("Players have not confirmed anything in any zone yet");
   expect(edgeDegraded(down)).toBe(true);
   expect(edgeDegraded(none)).toBe(false);

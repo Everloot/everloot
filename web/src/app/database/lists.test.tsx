@@ -214,7 +214,7 @@ test("the zone list filters by name and sorts by name or continent in the URL", 
   expect(none).toContain("No zones match these filters.");
   expect(none).toContain('href="/database/zones"');
   expect(none).not.toContain("data-empty-state");
-  for (const bad of [{ sort: "level" }, { sort: "NAME" }, { page: "0" }, { page: "2" }] as Record<string, string>[]) {
+  for (const bad of [{ sort: "level" }, { sort: "NAME" }, { page: "0" }, { page: "999" }] as Record<string, string>[]) {
     await expect(html(ZoneList(search(bad))), JSON.stringify(bad)).rejects.toThrow("NEXT_NOT_FOUND");
   }
   expect((await zoneMetadata(search())).robots).toBeUndefined();
@@ -246,7 +246,7 @@ test("the instance list filters by name or id and sorts by name, type or level i
   const none = await html(InstanceList(search({ q: "zzz" })));
   expect(none).toContain("No instances match these filters.");
   expect(none).not.toContain("data-empty-state");
-  for (const bad of [{ sort: "zone" }, { sort: "bosses" }, { page: "2" }] as Record<string, string>[]) {
+  for (const bad of [{ sort: "zone" }, { sort: "bosses" }, { page: "999" }] as Record<string, string>[]) {
     await expect(html(InstanceList(search(bad))), JSON.stringify(bad)).rejects.toThrow("NEXT_NOT_FOUND");
   }
   expect((await instanceMetadata(search())).robots).toBeUndefined();

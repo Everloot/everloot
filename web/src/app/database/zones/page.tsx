@@ -26,14 +26,14 @@ const DEFAULT_SORT = { key: "continent" as Sort, desc: false };
 
 const href = (q: Partial<ListQuery<Sort>>) => listHref(META.path, [["q", q.q], ["sort", sortParam(q.sort)], ["page", q.page && q.page > 1 ? String(q.page) : undefined]]);
 
-export async function generateMetadata(props: { searchParams?: Promise<Search> } = {}): Promise<Metadata> {
+export async function generateMetadata(props: { searchParams?: Promise<Search> }): Promise<Metadata> {
   const q = listQuery((await props.searchParams) ?? {}, SORTS);
   return listMetadata(META, Boolean(q) && !q!.q && !q!.sort, q?.page);
 }
 
 type Row = ZoneSummary & { contents: ZoneContents | null };
 
-export default async function ZonesPage(props: { searchParams?: Promise<Search> } = {}) {
+export default async function ZonesPage(props: { searchParams?: Promise<Search> }) {
   const q = listQuery((await props.searchParams) ?? {}, SORTS);
   if (!q) notFound();
   const facts = await loadWorldFacts();
