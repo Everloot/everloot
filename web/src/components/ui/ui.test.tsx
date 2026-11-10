@@ -16,7 +16,7 @@ import Badge from "./Badge";
 import Card from "./Card";
 import Container from "./Container";
 import DataTable, { filledColumns, type Column, type SparseColumn } from "./DataTable";
-import EmptyState from "./EmptyState";
+import EmptyState, { installsNeeded } from "./EmptyState";
 import Facts from "./Facts";
 import Pager, { pageWindow } from "./Pager";
 import PageHeader from "./PageHeader";
@@ -168,6 +168,14 @@ describe("EmptyState", () => {
 
   test("fills its action only when asked, for a page where it is the one thing to do", () => {
     expect(render(<EmptyState message="No uploads this week." primary />)).toContain("btn shrink-0 btn-primary");
+  });
+
+  test("the line every empty player-data tab ends on says how many installs it takes, and counts what has reported", () => {
+    expect(installsNeeded()).toBe("It shows once 3 installs report it.");
+    expect(installsNeeded(1)).toBe("1 of 3 installs reported; it shows once 3 do.");
+    expect(installsNeeded(9)).toBe("3 of 3 installs reported; it shows once 3 do.");
+    const html = render(<EmptyState message={`Nobody has looted this in Forever yet. ${installsNeeded()}`} />);
+    expect(text(html)).toBe("Nobody has looted this in Forever yet. It shows once 3 installs report it. Get the addon");
   });
 
   test("takes a better action when the page has one", () => {

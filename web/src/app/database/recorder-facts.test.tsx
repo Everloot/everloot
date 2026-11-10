@@ -56,7 +56,7 @@ test("an NPC page shows the agreed rank and level, a vignette pin, and the repor
   expect(page).toMatch(/Level[\s\S]*?11/);
   expect(page).toContain("70.1, 79.2");
   expect(page).toContain("3 more loot windows reported, not yet in the rates.");
-  expect(page).toContain("Nobody has looted this NPC in Forever yet.");
+  expect(page).toContain("Nobody has looted this NPC in Forever yet. It shows once 3 installs report it.");
   expect(page).not.toContain("Polestar");
 });
 

@@ -15,7 +15,7 @@ import { loadObjectFacts } from "@/lib/objects";
 import { loreFor } from "@/lib/lore-links";
 import LoreSection from "@/components/LoreSection";
 import { pageMetadata } from "@/lib/seo";
-import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, type Column } from "@/components/ui";
+import { Container, DataTable, Facts, InShort, installsNeeded, OpenData, Tabs, TooltipFrame, type Column } from "@/components/ui";
 import type { Crumb } from "@/lib/jsonld";
 import { EmptyTab, EntityHeader, EntityTop, FREQUENCY, known, LINK, MAP_LINK_HEADER, MapName, percent, ShowOnMap, Unreachable } from "../../entity";
 import { entitySummary, observedLine } from "@/lib/evidence";
@@ -116,7 +116,7 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
               : <>
                 {page.drops.length ? <DataTable dense caption={`What players looted from ${title}`} columns={columns} rows={page.drops} rowKey={(d) => String(d.itemId)} />
                   : page.zero ? <p className="py-3 text-meta text-fg">{formatMeasuredZero(page.zero.kills)} · {page.zero.reporters} install IDs.</p>
-                  : <EmptyTab message={page.queued ? "Observed, not yet public: fewer than 3 installs so far." : "Nobody has looted this object in Forever yet."} />}
+                  : <EmptyTab message={page.queued ? "Observed, not yet public: fewer than 3 installs so far." : `Nobody has looted this object in Forever yet. ${installsNeeded()}`} />}
                 {pending}
               </>,
           }, {

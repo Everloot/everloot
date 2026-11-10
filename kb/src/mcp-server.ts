@@ -65,9 +65,13 @@ export const SERVER_ICONS = [
   { src: `${SITE}/icon-512.png`, mimeType: "image/png", sizes: ["512x512"] },
 ];
 
-/** Sent to every client on connect: where each answer's page is, and what stays whose. */
+/** The site's one promise, in one sentence and with no number in it: a count here would go stale. */
+export const PROMISE =
+  "Every fact from player reports shows how many players saw it, and when: give the reader that count and date with the fact.";
+
+/** Sent to every client on connect: the promise, where each answer's page is, and what stays whose. */
 export const SERVER_INSTRUCTIONS =
-  "Everloot answers questions about WoW: Forever. Each answer names its sources, and one with a page on " +
+  "Everloot answers questions about WoW: Forever. " + PROMISE + " Each answer names its sources, and one with a page on " +
   `${SITE} ends with a More: line holding it: give the reader that link. The link credits the facts built on player uploads, ` +
   `which are Everloot's data under ${LICENCE}; there is no need to print the licence. ` +
   "Lore hits carry their own source and licence; keep them with the text. Game-file facts and Blizzard's posts stay Blizzard's. " +

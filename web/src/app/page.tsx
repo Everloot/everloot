@@ -6,6 +6,8 @@ import JsonLd from "@/components/JsonLd";
 import GlintHero from "@/components/glint/GlintHero";
 import LoreSearchForm from "@/components/LoreSearchForm";
 import HomeAsk from "@/components/HomeAsk";
+import HomeTrust from "@/components/HomeTrust";
+import { loadCoverageSummary } from "@/lib/coverage-summary";
 import { AgreementMeter, Banner, Card, CodeBlock, SectionHeading, type Agreement } from "@/components/ui";
 import { TOOL_GROUPS, tools, toolHref } from "@/data/tools";
 import { CLASSES } from "@/design/tokens";
@@ -24,6 +26,9 @@ import { CONNECT_EXAMPLES, liveMcpTools } from "@/lib/docs/connect-data";
 export const metadata: Metadata = {
   alternates: { canonical: "/", types: FEED },
 };
+
+// The promise's numbers come from the stored coverage score, so the page is rebuilt at most every five minutes.
+export const revalidate = 300;
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
@@ -68,6 +73,7 @@ export default async function Home() {
   // What's new: the newest entries the site's own timeline holds, newest first.
   // One line per announcement: loadTimeline already folds the regional copies together.
   const newest = (await loadTimeline()).slice(0, 4);
+  const coverage = await loadCoverageSummary();
   const status = new Map(tools.map((t) => [toolHref(t), t.status]));
   const groups = TOOL_GROUPS.map((g) => ({ ...g, links: g.links.filter((l) => l.href !== "/tools/talents") }));
 
@@ -106,6 +112,9 @@ export default async function Home() {
           </div>
         </Banner>
       </section>
+
+      {/* The promise with its live numbers, from the stored coverage score. */}
+      <HomeTrust summary={coverage} />
 
       {/* What's new: the site's own clock, dated. The game builds and posts Everloot has seen, and the
           addon that reads them. */}
