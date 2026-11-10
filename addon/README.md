@@ -110,6 +110,7 @@ guide at everloot.app/docs/guides/addon; `addon/tests/commands_contract.py` fail
 | `/everloot scanprompt on\|off` | The scan prompt shown when the auction house opens; the button and `/everloot scan` still work with it off. |
 | `/everloot vendor on\|off` | At a merchant, sell grey items and repair with your own gold; never the guild bank. |
 | `/everloot mail on\|off` | The **Collect all** button at the mailbox, for auction letters only. |
+| `/everloot where [item link\|item id\|NPC name]` | Lists drops, vendors and NPC locations from your own saved sightings only. Shift-click an item link, give its id, or an exact NPC name (case-insensitive). Counts are recorded loot windows, not item quantities or drop rates. |
 | `/everloot price [item]` | Prints the price of an item from the files already in the game: shift-click the item into the command, or give its id. |
 | `/everloot gph [start\|pause\|stop\|reset\|show\|hide\|cut on\|off\|history]` | Gold per hour: start, pause or stop a session, reset it, show or hide its window, take the 5% auction cut or not, or list the last five. The sessions stay in your file. |
 | `/everloot addons on\|off` | The installed addon list, off until enabled; off deletes every recorded addon row. |

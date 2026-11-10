@@ -25,6 +25,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   titles, quest lines, mounts, encounters, recipes, class gear and its restrictions, class spells, races, legacy perks,
   talent nodes, raid buffs): ids, the names the files hold and each file's build, every row counted, with a schema each
   and a manifest line. The README and the download page no longer list the catalogs as missing. Nothing observed changes.
+- Addon: `/everloot where` finds an item's drops and vendors or an NPC's locations in your own saved sightings, with counts and a site link.
 - Site: every record kind has a docs page, `/docs/api/records/<kind>`, generated from its schema: each field with its type,
   whether it is required and its description, nested fields included, whether the kind is in the public corpus, where it
   goes, and the cross-field rules the server checks. The sidebar lists them and the schemas table links each kind to its page.
