@@ -5,6 +5,7 @@ import { expect, test, vi } from "vitest";
 import { openDb } from "../src/db.js";
 import { replaceSourceRows, type EntityInput } from "../src/entities.js";
 import {
+  PROMISE,
   SERVER_INSTRUCTIONS,
   SERVER_NAME,
   cachePublicCorpus,
@@ -158,6 +159,15 @@ test("the server tells every client to link each answer's page, and what stays B
   // The link is the credit: no answer ends with a licence line, and the client is not asked to print one.
   expect(SERVER_INSTRUCTIONS).toContain("https://everloot.app");
   expect(SERVER_INSTRUCTIONS).not.toContain(CREDIT_LINE);
+});
+
+test("the server states the site's promise in one sentence, with no number that could go stale", () => {
+  expect(PROMISE).toBe("Every fact from player reports shows how many players saw it, and when: give the reader that count and date with the fact.");
+  expect(PROMISE).not.toMatch(/\d/);
+  expect(PROMISE.match(/\./g)).toHaveLength(1);
+  // It is sent on connect, ahead of the sources and the licence.
+  expect(SERVER_INSTRUCTIONS).toContain(PROMISE);
+  expect(SERVER_INSTRUCTIONS.indexOf(PROMISE)).toBeLessThan(SERVER_INSTRUCTIONS.indexOf("More: line"));
 });
 
 test("a paged public corpus is read to the end, with EVERLOOT_API_KEY sent as a bearer key", async () => {

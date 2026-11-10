@@ -1,5 +1,5 @@
 import Link from "next/link";
-import AgreementMeter from "./AgreementMeter";
+import AgreementMeter, { AGREEMENT_NEEDED, clampAgreement, reportedLabel } from "./AgreementMeter";
 
 export interface EmptyStateProps {
   /** One sentence: what is missing and why it will come. "Nobody has looted this in Forever yet." */
@@ -18,6 +18,15 @@ export interface EmptyStateProps {
 }
 
 export const GET_THE_ADDON = { href: "/addon", label: "Get the addon" } as const;
+
+/**
+ * The line an empty player-data tab ends on: how many installs it takes. A page that already says so ("A pin needs
+ * 3 installs at the same spot.") keeps its own words and does not add this.
+ */
+export function installsNeeded(reported = 0): string {
+  const n = clampAgreement(reported);
+  return n === 0 ? `It shows once ${AGREEMENT_NEEDED} installs report it.` : `${reportedLabel(n)}; it shows once ${AGREEMENT_NEEDED} do.`;
+}
 
 /**
  * Every empty dataset looks like this: the agreement meter at its count, one sentence and one

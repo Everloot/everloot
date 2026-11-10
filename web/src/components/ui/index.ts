@@ -11,7 +11,7 @@ export { default as DataTable, filledColumns, type Column, type DataTableProps, 
 export { default as DataTitle } from "./DataTitle";
 export { default as FilterBar, type FilterBarProps, type FilterControl, type FilterOption } from "./FilterBar";
 export { default as Disclosure } from "./Disclosure";
-export { default as EmptyState, GET_THE_ADDON, type EmptyStateProps } from "./EmptyState";
+export { default as EmptyState, GET_THE_ADDON, installsNeeded, type EmptyStateProps } from "./EmptyState";
 export { EntryList, Entry, type EntryProps } from "./EntryList";
 export { default as Explainer } from "./Explainer";
 export { default as EvidenceLine } from "./EvidenceLine";

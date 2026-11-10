@@ -1,9 +1,10 @@
 import { AwsClient } from "aws4fetch";
 import { COVERAGE_BUILD, coverageFor, loadCoverageExpected } from "./coverage-compute";
+import { coverageKey } from "./coverage-summary";
 import { cloudConfig, uploadStore, type CloudConfig } from "./upload-store";
 
-/** Where the cron keeps the score for a client build: counts only, beside the corpus snapshot. */
-export const coverageKey = (build: string): string => `coverage/${build}.json`;
+// The key lives in coverage-summary.ts, which the home page reads without this file's corpus code.
+export { coverageKey };
 
 /**
  * Computes the coverage score from the current corpus and writes it to R2 as `coverage/<build>.json`. The snapshot
