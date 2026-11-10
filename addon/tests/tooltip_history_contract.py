@@ -145,6 +145,21 @@ clock = clock + 61
 assert(hover(4306) == '' and L.indexBuilds == before + 1, 'an expired waiting sale drops out')
 clock = NOW
 
+-- The exact second a waiting sale turns 48 hours old: still waiting (as ExpirePending counts it), and ten hovers
+-- build the index once. One second later it drops out with a single rebuild.
+-- (The clock went back to a time before the last build, so a ledger write stands in for a fresh store.)
+clock = NOW - 600 + 48 * 3600
+L.revision = L.revision + 1
+assert(hover(4306):find('Your sales: 1 sale', 1, true), 'still waiting at exactly 48 hours')
+local edge = L.indexBuilds
+for _ = 1, 10 do hover(4306) end
+assert(L.indexBuilds == edge, 'ten hovers at the exact second rebuild nothing; got ' .. L.indexBuilds - edge)
+clock = clock + 1
+assert(hover(4306) == '' and L.indexBuilds == edge + 1, 'one second later it drops out with one rebuild')
+for _ = 1, 10 do hover(4306) end
+assert(L.indexBuilds == edge + 1, 'and stays built')
+clock = NOW
+
 -- Wool: the average paid from the one purchase that names its item and count; the alt transfer, the purchase
 -- without an item and the vendor sale do not count.
 text = hover(2592)
@@ -180,6 +195,23 @@ assert(L.indexBuilds == built + 1, 'and only once')
 -- Rows added outside the writers (a fresh store) are seen too.
 EverlootDB.ledger = { events = {}, sales = {}, daily = {} }
 assert(hover(2589) == '' and L.indexBuilds == built + 2, 'an emptied ledger empties the history')
+-- The roster feeds each key's realm: forgetting a character drops its sales on the next hover, once.
+EverlootDB.ledger.sales = {
+  { at = NOW - DAY, key = me, itemName = 'Linen Cloth', count = 2, total = 400, unit = 200, status = 'paid' },
+  { at = NOW - DAY, key = 'alt0001', itemName = 'Linen Cloth', count = 3, total = 900, unit = 300, status = 'paid' },
+}
+assert(hover(2589):find('5 units sold in 2 sales, last 90 days', 1, true), 'both characters count before the forget')
+local beforeForget = L.indexBuilds
+E.Roster.Forget('alt0001')
+text = hover(2589)
+assert(text:find('2 units sold in 1 sale, last 90 days', 1, true) and not text:find('5 units', 1, true), 'a forgotten character leaves the history: ' .. text)
+assert(L.indexBuilds == beforeForget + 1, 'the forget rebuilds once; got ' .. L.indexBuilds - beforeForget)
+hover(2589); hover(2589)
+assert(L.indexBuilds == beforeForget + 1, 'and only once')
+-- A character that changes realm moves its sales with it.
+EverlootDB.roster.alt0001 = { name = 'Bert', realm = 'Forever' }
+E.Roster.revision = E.Roster.revision + 1
+assert(hover(2589):find('5 units sold in 2 sales', 1, true), 'a returning character counts again')
 -- A new UTC day moves the window: the index is built again, so an aged row drops out.
 EverlootDB.ledger.sales = { { at = NOW - 89 * DAY + 3600, key = me, itemName = 'Linen Cloth', count = 1, total = 100, unit = 100, status = 'paid' } }
 assert(hover(2589):find('1 unit sold in 1 sale, last 90 days', 1, true))

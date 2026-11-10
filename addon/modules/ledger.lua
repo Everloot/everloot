@@ -404,7 +404,8 @@ end
 
 -- What the store says about one item on one realm, for the item tooltip: { [realm] = { [itemName] = history } }.
 -- Built in one pass over the store, and again only when it changed (a write, rows added or dropped, a new store), a
--- new UTC day moved the window or a waiting sale passed its 48 hours; a hover reads one entry.
+-- new UTC day moved the window, a waiting sale passed its 48 hours or the roster changed (it supplies each key's
+-- realm); a hover reads one entry.
 local items = nil
 L.indexBuilds = 0
 
@@ -454,7 +455,8 @@ local function buildItems(s)
         local h = entry(row.key, row.itemName)
         if h then
           h.pending = h.pending + 1
-          expires = math.min(expires, row.at + PENDING_SECONDS)
+          -- Still waiting at exactly 48 hours (the check above is inclusive, as ExpirePending is), gone a second later.
+          expires = math.min(expires, row.at + PENDING_SECONDS + 1)
         end
       end
     end
@@ -482,9 +484,12 @@ function L.ItemHistory(realm, itemName)
   if type(realm) ~= "string" or not validName(itemName) then return nil end
   local s = store()
   local today = midnight()
+  local rosterRevision = E.Roster and E.Roster.revision or 0
   if not (items and items.sales == s.sales and items.events == s.events and items.nSales == #s.sales
-    and items.nEvents == #s.events and items.revision == L.revision and items.day == today and time() < items.expires) then
-    items = { sales = s.sales, events = s.events, nSales = #s.sales, nEvents = #s.events, revision = L.revision, day = today }
+    and items.nEvents == #s.events and items.revision == L.revision and items.roster == rosterRevision
+    and items.day == today and time() < items.expires) then
+    items = { sales = s.sales, events = s.events, nSales = #s.sales, nEvents = #s.events, revision = L.revision,
+      roster = rosterRevision, day = today }
     items.byRealm, items.expires = buildItems(s)
   end
   local h = items.byRealm[realm] and items.byRealm[realm][itemName]
