@@ -4,9 +4,11 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { fieldLabel, type CoverageNeed, type FieldCell } from "../../../../../../kb/src/coverage";
 import { Container, DataTable, DataTitle, agreementLabel, type SparseColumn } from "@/components/ui";
 import { loadCoverage } from "@/lib/coverage-compute";
+import { loadSightings } from "@/lib/instances";
+import { loadWorldFacts } from "@/lib/rollup-compute";
 import { cellDetail, measuredLine, shareText, TYPE_LABEL, zoneCoverageHref } from "@/lib/coverage-view";
 import { pageMetadata } from "@/lib/seo";
-import { parseZoneSegment, zoneByMapId, zoneHref } from "@/lib/zones";
+import { hasConfirmed, parseZoneSegment, zoneByMapId, zoneContents, zoneHref } from "@/lib/zones";
 import { LINK } from "../../entity";
 import { Unreadable } from "../../list-parts";
 
@@ -21,13 +23,26 @@ async function zoneOf(props: Props) {
   return { zone, segment };
 }
 
+/**
+ * Indexed once players have confirmed something in the zone (`hasConfirmed`, the test the sitemap lists these pages
+ * by): before that the page has no field to show. Read from the stored aggregates the zone page reads, not the corpus
+ * the score is worked out from, so the sitemap asks the same question cheaply. Storage down: noindex.
+ */
+async function indexable(mapId: number): Promise<boolean> {
+  const [facts, seen] = await Promise.all([loadWorldFacts(), loadSightings()]);
+  return !facts.unreachable && !seen.unreachable && hasConfirmed(zoneContents(facts, undefined, seen).get(mapId));
+}
+
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const { zone } = await zoneOf(props);
-  return pageMetadata({
-    title: `${zone.name} Coverage`,
-    description: `How much of ${zone.name} WoW: Forever players have confirmed and settled, field by field, and the facts that need one or two more installs.`,
-    path: zoneCoverageHref(zone),
-  });
+  return {
+    ...pageMetadata({
+      title: `${zone.name} Coverage`,
+      description: `How much of ${zone.name} WoW: Forever players have confirmed and settled, field by field, and the facts that need one or two more installs.`,
+      path: zoneCoverageHref(zone),
+    }),
+    robots: { index: await indexable(zone.mapId), follow: true },
+  };
 }
 
 export default async function ZoneCoveragePage(props: Props) {

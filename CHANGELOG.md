@@ -15,6 +15,11 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: search engines and AI assistants now find more of the site: spell pages that create, cost or teach
+  something or sit in a talent tree, each zone's coverage page once players have confirmed something there, the
+  class chooser once it is reviewed, and the lore pages about an NPC, item or quest players have named in WoW:
+  Forever are in the sitemaps, and llms.txt names every database list, from spells to quest chains. A talent
+  spell's page now shows its class, tree, row and ranks.
 - Site: a dungeon or raid page gains a Loot section after Bosses: for each boss 3 installs report, the loot table of
   its creature, the same rows its NPC page shows, or how many installs have looted it so far. In the list, an instance
   the game files place no entrance for says so beside its id, with the reason on hover.
@@ -189,6 +194,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Docs: a page for addon authors at `/docs/addon-authors`: the licences and the credit line, the records API, a free key and
   the files as three ways to get the data, a skinning loot recipe in curl, JavaScript and Python, why the site's drop
   rates leave skinning out, and how to build an offline pack.
+- Site: download shortcuts (`/download`, `/downloads`, `/desktop`, `/curseforge`), CurseForge install choices and a
+  Desktop App button for your operating system make downloads easier to find, including on phones.
 
 ### Fixed
 - Site: the header shows the build whose files the site reads and the newest build seen, each linked to what it means.

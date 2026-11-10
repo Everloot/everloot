@@ -6,6 +6,8 @@ import { allDocsPages } from "@/lib/docs/nav";
 import { MAP_DATA_EXTRACTED_AT, TALENT_DATA_EXTRACTED_AT } from "@/lib/build-stamp";
 import { loadTimeline, loadWriteups, postPath, writeupFor } from "@/lib/changes";
 import { classesIndexable, hubIndexable as classHubIndexable } from "@/lib/class-hub";
+import { chooserIndexable, loadChooser } from "@/lib/class-chooser-file";
+import { zoneCoverageHref } from "@/lib/coverage-view";
 import { guideFreshness, guideIndexable } from "@/lib/guide-freshness";
 import { guideHref, loadGuides, publishedGuides } from "@/lib/guides";
 import { TALENT_CLASSES, loadCatalog as loadTalentCatalog } from "@/lib/talents/catalogs";
@@ -18,7 +20,7 @@ import { loadListNames } from "@/lib/item-view";
 import { achievementHref, chainHref, factionHeaderOnly, factionHref, loadCatalog, titleHref } from "@/lib/completion-lists";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { RANKINGS, hubIndexable, loadRankingWeeks, rankingIndexable, rankingPath, rankingView } from "@/lib/rankings";
-import { hasContent, publicZones, zoneContents, zoneHref } from "@/lib/zones";
+import { hasConfirmed, hasContent, publicZones, zoneContents, zoneHref } from "@/lib/zones";
 import { loadNews, newsSitemapPaths } from "@/lib/news";
 import { wikiSitemapPaths } from "@/lib/wiki";
 import { LEGACY_PERKS } from "@/data/game-data/legacy-perks";
@@ -57,6 +59,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap | null> {
   if (world.unreachable || seen.unreachable) return null;
   const contents = zoneContents(world, undefined, seen);
   const zoneRoutes = publicZones().filter((z) => hasContent(contents.get(z.mapId))).map((z) => zoneHref(z.mapId, z.name));
+  // A zone's coverage page once players have confirmed something there, as its own robots ask.
+  const coverageRoutes = publicZones().filter((z) => hasConfirmed(contents.get(z.mapId))).map(zoneCoverageHref);
   // Each dungeon and raid page, under the rule its page states (lib/database-sitemap.ts).
   const instanceRoutes = instancePaths(seen);
   // Achievement, faction, title and quest chain pages exist only for entries three players reported, so each listed one has content.
@@ -79,11 +83,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap | null> {
   }))).flat();
   const guideRoutes: { path: string; lastModified?: Date }[] = indexedGuides.length ? [{ path: "/guides" }, ...indexedGuides.map((g) => ({ path: guideHref(g.slug), lastModified: g.reviewed ? new Date(g.reviewed.on) : undefined }))] : [];
   const classRoutes = classesIndexable(guides) ? ["/classes", ...TALENT_CLASSES.filter((slug) => classHubIndexable(slug, guides)).map((slug) => `/classes/${slug}`)] : [];
+  // The class chooser once both its files are reviewed, as its robots say. The group planner says noindex as built.
+  const chooserRoutes = chooserIndexable(loadChooser()) ? ["/classes/choose"] : [];
   // Each profession the game files list, with its recipes.
   const professionRoutes = CLIENT_PROFESSIONS.map((p) => professionHref(p.slug));
   const toolRoutes = tools.filter((tool) => !tool.private && tool.status !== "coming-soon").map(toolHref)
     .filter((path) => path !== "/rankings" || hubIndexable(rankings.weeks));
-  const paths = [...new Set([...staticRoutes, ...addonRoutes, ...rankingRoutes, ...talentRoutes, ...professionRoutes, ...classRoutes, ...itemRoutes, ...zoneRoutes, ...instanceRoutes, ...catalogRoutes, ...toolRoutes, ...allDocsPages().map((page) => page.href)])];
+  const paths = [...new Set([...staticRoutes, ...addonRoutes, ...rankingRoutes, ...talentRoutes, ...professionRoutes, ...classRoutes, ...chooserRoutes, ...itemRoutes, ...zoneRoutes, ...coverageRoutes, ...instanceRoutes, ...catalogRoutes, ...toolRoutes, ...allDocsPages().map((page) => page.href)])];
 
   const timeline = await loadTimeline();
   const newestChange = timeline[0]?.at;

@@ -28,3 +28,4 @@ Disallow: /lore
 Sitemap: https://everloot.app/sitemap.xml
 Sitemap: https://everloot.app/database-sitemap.xml
 Sitemap: https://everloot.app/auctions-sitemap.xml
+Sitemap: https://everloot.app/lore-sitemap.xml

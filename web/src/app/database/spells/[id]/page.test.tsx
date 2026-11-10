@@ -133,3 +133,21 @@ test("a named spell whose only relations are what it creates and costs is indexe
   known([[crafted, "Some Recipe"]]);
   expect((await generateMetadata(props(String(crafted)))).robots).toMatchObject({ index: true, follow: true });
 });
+
+test("a spell only the talent trees hold shows where it sits, says index, and links its class's calculator", async () => {
+  // Arcane Power: a Mage talent no item, skill line or report relates to.
+  const { loadSpellTalents } = await import("@/lib/talents/spell-talents");
+  const [talent] = (await loadSpellTalents()).get(12042)!;
+  expect(CLIENT_EDGES.some((e) => (e.fromKind === "spell" && e.fromId === 12042) || (e.toKind === "spell" && e.toId === 12042))).toBe(false);
+  known([[12042, "Arcane Power"]]);
+  const page = await render("12042");
+  expect(page).toContain('data-tab-panel="talent"');
+  expect(page).toContain('href="/tools/talents/mage"');
+  expect(page).toContain(`>${talent!.tree}<`);
+  expect(page).toContain(`From the talent catalog, build ${talent!.build}`);
+  expect(page).not.toContain("The game files list nothing here");
+  expect((await generateMetadata(props("12042"))).robots).toMatchObject({ index: true, follow: true });
+  // Without a name it stays noindex, as every other spell does.
+  known([]);
+  expect((await generateMetadata(props("12042"))).robots).toMatchObject({ index: false });
+});
