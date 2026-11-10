@@ -1109,6 +1109,18 @@ export type FetchedDocumentOut = z.infer<typeof fetchedDocument>;
 /** One knowledge record as search_knowledge, get_entity and get_by_name return it. */
 export declare const knowledgeHit: z.ZodObject<{
     id: z.ZodNumber;
+    recordId: z.ZodOptional<z.ZodNumber>;
+    gameId: z.ZodOptional<z.ZodNumber>;
+    sourceKind: z.ZodOptional<z.ZodEnum<{
+        "game-files": "game-files";
+        lore: "lore";
+        observed: "observed";
+        reference: "reference";
+    }>>;
+    build: z.ZodOptional<z.ZodString>;
+    observed: z.ZodOptional<z.ZodObject<{
+        asOf: z.ZodNullable<z.ZodString>;
+    }, z.core.$strip>>;
     extId: z.ZodString;
     kind: z.ZodEnum<{
         achievement: "achievement";
@@ -1217,7 +1229,7 @@ export interface McpToolDef {
 export declare const MCP_TOOLS: {
     readonly search_knowledge: {
         readonly title: "Search the Everloot knowledge base";
-        readonly description: "Searches WoW lore, Forever reference data and the game-file catalogs (achievements, factions, titles, quest chains, mounts, legacy perks, races, instances) by names, keywords or a question. Exact-name matches rank first. Every hit carries its id, kind, source, licence and date, and a game-file hit says when player uploads confirm it. Use it to find a record from a name or a topic, then pass the hit's id to get_entity for its summary, or to fetch as a string for the whole text. Use get_by_name when you already know the exact full name, and answer_sources when you need cited evidence for a question rather than records. search is the same search in the ChatGPT connector shape.";
+        readonly description: "Searches agreed gameplay names (items, NPCs, objects, quests), released zones, WoW lore, Forever reference data and the game-file catalogs (achievements, factions, titles, quest chains, mounts, legacy perks, races, instances) by names, keywords or a question. Exact-name matches rank first. Hits separate recordId (alias of id, for get_entity/fetch) from gameId (for gameplay tools; stringify a zone gameId for world_map_near.zone). Lore ids are archive records, never game ids. Metadata carries sourceKind, build when from files, and observed snapshot support when players agree. Every hit carries its id, kind, source, licence and date, and a game-file hit says when player uploads confirm it. Use it to find a record from a name or a topic, then pass the hit's id to get_entity for its summary, or to fetch as a string for the whole text. Use get_by_name when you already know the exact full name, and answer_sources when you need cited evidence for a question rather than records. search is the same search in the ChatGPT connector shape.";
         readonly inputSchema: {
             query: z.ZodString;
             kind: z.ZodOptional<z.ZodEnum<{
@@ -1251,6 +1263,18 @@ export declare const MCP_TOOLS: {
         readonly outputSchema: {
             readonly hits: z.ZodArray<z.ZodObject<{
                 id: z.ZodNumber;
+                recordId: z.ZodOptional<z.ZodNumber>;
+                gameId: z.ZodOptional<z.ZodNumber>;
+                sourceKind: z.ZodOptional<z.ZodEnum<{
+                    "game-files": "game-files";
+                    lore: "lore";
+                    observed: "observed";
+                    reference: "reference";
+                }>>;
+                build: z.ZodOptional<z.ZodString>;
+                observed: z.ZodOptional<z.ZodObject<{
+                    asOf: z.ZodNullable<z.ZodString>;
+                }, z.core.$strip>>;
                 extId: z.ZodString;
                 kind: z.ZodEnum<{
                     achievement: "achievement";
@@ -1299,7 +1323,7 @@ export declare const MCP_TOOLS: {
     };
     readonly get_entity: {
         readonly title: "Get one knowledge record by id";
-        readonly description: "Returns one knowledge record's summary, by the numeric id a search_knowledge or get_by_name hit gave: title, a short excerpt in the source's words, the URL to cite, source, licence and date. A game-file record carries its build and says when player uploads confirm it. Use it to read one hit again by its id; for the whole text, call fetch with the same id as a string. An id no record has returns a null hit, not an error. Give field, a JSON pointer such as /questIds, to read one value of the record's data instead of the excerpt; an array comes in pages of up to 48 rows, and nextOffset says where the next page starts. A pointer that leads nowhere answers with the keys it could have used, not an error.";
+        readonly description: "Returns one knowledge record's summary, by the numeric id a search_knowledge or get_by_name hit gave: title, a short excerpt in the source's words, the URL to cite, source, licence and date. Gameplay metadata separates recordId from gameId and labels sourceKind, build or observed snapshot support. A game-file record carries its build and says when player uploads confirm it. Use it to read one hit again by its id; for the whole text, call fetch with the same id as a string. An id no record has returns a null hit, not an error. Give field, a JSON pointer such as /questIds, to read one value of the record's data instead of the excerpt; an array comes in pages of up to 48 rows, and nextOffset says where the next page starts. A pointer that leads nowhere answers with the keys it could have used, not an error.";
         readonly inputSchema: {
             readonly field: z.ZodOptional<z.ZodString>;
             readonly offset: z.ZodOptional<z.ZodNumber>;
@@ -1315,6 +1339,18 @@ export declare const MCP_TOOLS: {
             readonly keys: z.ZodOptional<z.ZodArray<z.ZodString>>;
             readonly hit: z.ZodNullable<z.ZodObject<{
                 id: z.ZodNumber;
+                recordId: z.ZodOptional<z.ZodNumber>;
+                gameId: z.ZodOptional<z.ZodNumber>;
+                sourceKind: z.ZodOptional<z.ZodEnum<{
+                    "game-files": "game-files";
+                    lore: "lore";
+                    observed: "observed";
+                    reference: "reference";
+                }>>;
+                build: z.ZodOptional<z.ZodString>;
+                observed: z.ZodOptional<z.ZodObject<{
+                    asOf: z.ZodNullable<z.ZodString>;
+                }, z.core.$strip>>;
                 extId: z.ZodString;
                 kind: z.ZodEnum<{
                     achievement: "achievement";
@@ -1363,7 +1399,7 @@ export declare const MCP_TOOLS: {
     };
     readonly get_by_name: {
         readonly title: "Get records by exact name";
-        readonly description: "Returns the records whose full name matches exactly, case-insensitively, optionally narrowed to one record kind. Use it to disambiguate when you know the exact name and want the id without a ranked search; use search_knowledge for partial names, keywords or questions. Several records can share a name across kinds, so check each hit's kind. Empty hits mean no record has that exact name.";
+        readonly description: "Returns the records whose full name matches exactly, case-insensitively, optionally narrowed to one record kind. Use it to disambiguate when you know the exact name and want the id without a ranked search; use search_knowledge for partial names, keywords or questions. Several records can share a name across kinds, so check each hit's kind and sourceKind. Use gameId for gameplay tools and recordId for get_entity; lore hits have no gameId. Empty hits mean no record has that exact name.";
         readonly inputSchema: {
             readonly name: z.ZodString;
             readonly kind: z.ZodOptional<z.ZodEnum<{
@@ -1390,6 +1426,18 @@ export declare const MCP_TOOLS: {
         readonly outputSchema: {
             readonly hits: z.ZodArray<z.ZodObject<{
                 id: z.ZodNumber;
+                recordId: z.ZodOptional<z.ZodNumber>;
+                gameId: z.ZodOptional<z.ZodNumber>;
+                sourceKind: z.ZodOptional<z.ZodEnum<{
+                    "game-files": "game-files";
+                    lore: "lore";
+                    observed: "observed";
+                    reference: "reference";
+                }>>;
+                build: z.ZodOptional<z.ZodString>;
+                observed: z.ZodOptional<z.ZodObject<{
+                    asOf: z.ZodNullable<z.ZodString>;
+                }, z.core.$strip>>;
                 extId: z.ZodString;
                 kind: z.ZodEnum<{
                     achievement: "achievement";
@@ -3082,7 +3130,7 @@ export declare const MCP_TOOL_NAMES: McpToolName[];
 /** The list form, for clients that iterate. */
 export declare const MCP_TOOL_LIST: ({
     title: "Search the Everloot knowledge base";
-    description: "Searches WoW lore, Forever reference data and the game-file catalogs (achievements, factions, titles, quest chains, mounts, legacy perks, races, instances) by names, keywords or a question. Exact-name matches rank first. Every hit carries its id, kind, source, licence and date, and a game-file hit says when player uploads confirm it. Use it to find a record from a name or a topic, then pass the hit's id to get_entity for its summary, or to fetch as a string for the whole text. Use get_by_name when you already know the exact full name, and answer_sources when you need cited evidence for a question rather than records. search is the same search in the ChatGPT connector shape.";
+    description: "Searches agreed gameplay names (items, NPCs, objects, quests), released zones, WoW lore, Forever reference data and the game-file catalogs (achievements, factions, titles, quest chains, mounts, legacy perks, races, instances) by names, keywords or a question. Exact-name matches rank first. Hits separate recordId (alias of id, for get_entity/fetch) from gameId (for gameplay tools; stringify a zone gameId for world_map_near.zone). Lore ids are archive records, never game ids. Metadata carries sourceKind, build when from files, and observed snapshot support when players agree. Every hit carries its id, kind, source, licence and date, and a game-file hit says when player uploads confirm it. Use it to find a record from a name or a topic, then pass the hit's id to get_entity for its summary, or to fetch as a string for the whole text. Use get_by_name when you already know the exact full name, and answer_sources when you need cited evidence for a question rather than records. search is the same search in the ChatGPT connector shape.";
     inputSchema: {
         query: z.ZodString;
         kind: z.ZodOptional<z.ZodEnum<{
@@ -3116,6 +3164,18 @@ export declare const MCP_TOOL_LIST: ({
     outputSchema: {
         readonly hits: z.ZodArray<z.ZodObject<{
             id: z.ZodNumber;
+            recordId: z.ZodOptional<z.ZodNumber>;
+            gameId: z.ZodOptional<z.ZodNumber>;
+            sourceKind: z.ZodOptional<z.ZodEnum<{
+                "game-files": "game-files";
+                lore: "lore";
+                observed: "observed";
+                reference: "reference";
+            }>>;
+            build: z.ZodOptional<z.ZodString>;
+            observed: z.ZodOptional<z.ZodObject<{
+                asOf: z.ZodNullable<z.ZodString>;
+            }, z.core.$strip>>;
             extId: z.ZodString;
             kind: z.ZodEnum<{
                 achievement: "achievement";
@@ -3164,7 +3224,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Get one knowledge record by id";
-    description: "Returns one knowledge record's summary, by the numeric id a search_knowledge or get_by_name hit gave: title, a short excerpt in the source's words, the URL to cite, source, licence and date. A game-file record carries its build and says when player uploads confirm it. Use it to read one hit again by its id; for the whole text, call fetch with the same id as a string. An id no record has returns a null hit, not an error. Give field, a JSON pointer such as /questIds, to read one value of the record's data instead of the excerpt; an array comes in pages of up to 48 rows, and nextOffset says where the next page starts. A pointer that leads nowhere answers with the keys it could have used, not an error.";
+    description: "Returns one knowledge record's summary, by the numeric id a search_knowledge or get_by_name hit gave: title, a short excerpt in the source's words, the URL to cite, source, licence and date. Gameplay metadata separates recordId from gameId and labels sourceKind, build or observed snapshot support. A game-file record carries its build and says when player uploads confirm it. Use it to read one hit again by its id; for the whole text, call fetch with the same id as a string. An id no record has returns a null hit, not an error. Give field, a JSON pointer such as /questIds, to read one value of the record's data instead of the excerpt; an array comes in pages of up to 48 rows, and nextOffset says where the next page starts. A pointer that leads nowhere answers with the keys it could have used, not an error.";
     inputSchema: {
         readonly field: z.ZodOptional<z.ZodString>;
         readonly offset: z.ZodOptional<z.ZodNumber>;
@@ -3180,6 +3240,18 @@ export declare const MCP_TOOL_LIST: ({
         readonly keys: z.ZodOptional<z.ZodArray<z.ZodString>>;
         readonly hit: z.ZodNullable<z.ZodObject<{
             id: z.ZodNumber;
+            recordId: z.ZodOptional<z.ZodNumber>;
+            gameId: z.ZodOptional<z.ZodNumber>;
+            sourceKind: z.ZodOptional<z.ZodEnum<{
+                "game-files": "game-files";
+                lore: "lore";
+                observed: "observed";
+                reference: "reference";
+            }>>;
+            build: z.ZodOptional<z.ZodString>;
+            observed: z.ZodOptional<z.ZodObject<{
+                asOf: z.ZodNullable<z.ZodString>;
+            }, z.core.$strip>>;
             extId: z.ZodString;
             kind: z.ZodEnum<{
                 achievement: "achievement";
@@ -3228,7 +3300,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Get records by exact name";
-    description: "Returns the records whose full name matches exactly, case-insensitively, optionally narrowed to one record kind. Use it to disambiguate when you know the exact name and want the id without a ranked search; use search_knowledge for partial names, keywords or questions. Several records can share a name across kinds, so check each hit's kind. Empty hits mean no record has that exact name.";
+    description: "Returns the records whose full name matches exactly, case-insensitively, optionally narrowed to one record kind. Use it to disambiguate when you know the exact name and want the id without a ranked search; use search_knowledge for partial names, keywords or questions. Several records can share a name across kinds, so check each hit's kind and sourceKind. Use gameId for gameplay tools and recordId for get_entity; lore hits have no gameId. Empty hits mean no record has that exact name.";
     inputSchema: {
         readonly name: z.ZodString;
         readonly kind: z.ZodOptional<z.ZodEnum<{
@@ -3255,6 +3327,18 @@ export declare const MCP_TOOL_LIST: ({
     outputSchema: {
         readonly hits: z.ZodArray<z.ZodObject<{
             id: z.ZodNumber;
+            recordId: z.ZodOptional<z.ZodNumber>;
+            gameId: z.ZodOptional<z.ZodNumber>;
+            sourceKind: z.ZodOptional<z.ZodEnum<{
+                "game-files": "game-files";
+                lore: "lore";
+                observed: "observed";
+                reference: "reference";
+            }>>;
+            build: z.ZodOptional<z.ZodString>;
+            observed: z.ZodOptional<z.ZodObject<{
+                asOf: z.ZodNullable<z.ZodString>;
+            }, z.core.$strip>>;
             extId: z.ZodString;
             kind: z.ZodEnum<{
                 achievement: "achievement";

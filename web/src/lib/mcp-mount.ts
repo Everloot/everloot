@@ -52,6 +52,7 @@ export function toolLoaders(): ToolOptions {
     gameData: () => filesIndex(),
     // The game-file catalogs the knowledge tools search beside the release: achievements, factions, titles and more.
     catalog: () => catalogIndex(),
+    // Shared by page tools and generic discovery: only names passing the existing agreement rules are indexed.
     // Same deployment as the store: read the public records in process, no HTTP self-fetch or byte ceiling.
     corpus: async () => {
       const loaded = await uploadStore.loadCorpus();

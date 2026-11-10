@@ -30,7 +30,7 @@ export function MarketBox({ itemId, rows }: { itemId: number; rows: MarketRow[] 
     { key: "min", header: "Min buyout", numeric: true, cell: (r) => formatCopper(r.value.min) },
   ];
   return (
-    <section aria-labelledby="item-auction-house" data-market-box className="mb-6 max-w-[584px]">
+    <section aria-labelledby="item-auction-house" data-market-box className="mt-6 mb-6 max-w-[584px]">
       <div className="mb-1 flex items-baseline justify-between gap-3">
         <h2 id="item-auction-house" className="text-control font-medium text-fg">Auction House</h2>
         <Link href={crossRealmHref(itemId)} className="text-meta text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">All prices</Link>

@@ -54,8 +54,15 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   redirects for good to the slug page it already had, keeping the skill range and class context in the query; an unknown id
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
 - Addon: the Gold Overview shows earned, spent and profit for the selected period and character or account, with daily averages, top items and pending sales.
+- Site: vendor, achievement, quest chain, zone and instance pages carry In short and Copy for AI like the other database
+  pages, each line saying how many installs agree and when, or that nobody has reported it yet; a vendor links its NPC's
+  card as Raw JSON. An achievement page also links the Collections tool and says under its criteria what Confirmed means
+  and whether this one is.
 - Site: a "Write a wiki page" guide under Docs › Guides says how a wiki page is proposed and reviewed, with the page
   types, the front matter, the rules and the check from the wiki README; the wiki hub and the lore archive link to it.
+- MCP: generic search and exact-name lookup discover agreed gameplay names and zone ids, with separate record and
+  game ids and source labels.
+- Protocol: 2.1.0 adds optional gameplay identity and provenance fields to MCP knowledge hits.
 - Site: a faction page and a title page carry In short, Copy for AI, a "Player reports" fact that stays an empty meter
   until three installs agree, a "Track this" link to the collections tool and a relation tab ("Reputation from" on a
   faction, "Earned by" on a title) whose empty state names the 3-install rule and says what no game file read so far
@@ -323,10 +330,14 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Changed
 - Docs: the launch-day page is marked historical, and day-to-day operation of the site is in docs/OPERATIONS.md.
+- Site: pages no longer jump when the footer arrives while a page is still loading, the Auction House table scrolls inside its own frame on a tablet instead of pushing the page sideways, the header's keyboard focus rings are no longer cut off at the top of the window, quick facts are one column on a phone, item, NPC, quest and spell pages keep an even gap above their auction and relation sections, the unavailable page arrows are readable, and the Auction House line under the title has spaces around its dot.
 - Protocol: `itemsResponse.items` is typed with the row `GET /api/items` returns (item id, then class, subclass, slot
   and quality, each null when the build does not name it), so a client generated from `schema/api/itemsResponse.json`
   gets fields instead of `any`. Protocol package 2.0.0 (the row's fields are now required); the answers do not change.
 - Docs: the docs index lists the backlog, the open-data export, the live-client probes, and the dated notes and folders it had left out.
+- Site: item tooltips read like the game's: the item level first and in yellow, slot and armour or weapon type in two
+  columns, damage left and speed right, Equip, Use and Chance on hit lines in green, a named set and the flavour text in
+  yellow, and the sell price as gold, silver and copper coins. Every line keeps its words, so no colour is the only cue.
 - Companion: the command line's `main` takes its uploader, price refresher, file watcher and console as an optional argument,
   with the real ones as defaults, so the watch and prices loop is tested with fakes (upload then prices on each settled
   write, prices alone, a failed refresh that keeps the previous file, upload never writing prices). Nothing it sends changes.

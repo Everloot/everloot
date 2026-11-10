@@ -478,7 +478,7 @@ export type PlanRowOut = z.infer<typeof planRow>;
 
 /** The kind filter of search_knowledge and get_by_name. */
 const KIND_FILTER =
-  "Narrow to one record kind. achievement, faction, title, quest_chain, mount, legacy_perk, race and instance come from the game files (found in game files, unconfirmed); item, npc, object, quest, zone, spell, lore_page, creator and realm from the knowledge release; build is an Everloot team starter talent build, not observed. Without it, every kind.";
+  "Narrow to one record kind. item, npc, object and quest include names 3 installs agree on; zone uses released UiMap ids from the game files. achievement, faction, title, quest_chain, mount, legacy_perk, race and instance come from the game files (found in game files, unconfirmed); spell, lore_page, creator and realm come from the knowledge release; build is an Everloot team starter talent build, not observed. Without it, every kind.";
 
 const searchArgs = {
   query: z.string().max(1000).describe("What to look up: names, questions, keywords. Question words are ignored."),
@@ -536,6 +536,11 @@ export type FetchedDocumentOut = z.infer<typeof fetchedDocument>;
 /** One knowledge record as search_knowledge, get_entity and get_by_name return it. */
 export const knowledgeHit = z.object({
   id: z.number().int().describe("The record id, for get_entity."),
+  recordId: z.number().int().optional().describe("Alias of id. Pass to get_entity or fetch, never a gameplay tool."),
+  gameId: z.number().int().optional().describe("Gameplay id: itemId for item_page, npcId for npc_page, questId for quest_page, objectId for object_page; a zone is a UiMap id for world_map_near.zone. Absent for lore, reference and other catalog kinds (including instances, whose extId is a Map.db map id, not a UiMap id)."),
+  sourceKind: z.enum(["observed", "game-files", "lore", "reference"]).optional().describe("Observed names are agreed by 3 installs; game-files facts remain unconfirmed. Lore is historical archive text, not current gameplay evidence."),
+  build: z.string().optional().describe("Game-file build this metadata was read from; not inferred for observed names."),
+  observed: z.object({ asOf: z.string().nullable() }).optional().describe("Name agreed by 3 or more installs. asOf is the corpus snapshot time, not the last observation time."),
   extId: z.string().describe("The source's own id, such as a wiki page title."),
   kind: z.enum(KNOWLEDGE_KINDS),
   name: z.string(),
@@ -600,21 +605,21 @@ export const MCP_TOOLS = {
   search_knowledge: {
     title: "Search the Everloot knowledge base",
     description:
-      "Searches WoW lore, Forever reference data and the game-file catalogs (achievements, factions, titles, quest chains, mounts, legacy perks, races, instances) by names, keywords or a question. Exact-name matches rank first. Every hit carries its id, kind, source, licence and date, and a game-file hit says when player uploads confirm it. Use it to find a record from a name or a topic, then pass the hit's id to get_entity for its summary, or to fetch as a string for the whole text. Use get_by_name when you already know the exact full name, and answer_sources when you need cited evidence for a question rather than records. search is the same search in the ChatGPT connector shape.",
+      "Searches agreed gameplay names (items, NPCs, objects, quests), released zones, WoW lore, Forever reference data and the game-file catalogs (achievements, factions, titles, quest chains, mounts, legacy perks, races, instances) by names, keywords or a question. Exact-name matches rank first. Hits separate recordId (alias of id, for get_entity/fetch) from gameId (for gameplay tools; stringify a zone gameId for world_map_near.zone). Lore ids are archive records, never game ids. Metadata carries sourceKind, build when from files, and observed snapshot support when players agree. Every hit carries its id, kind, source, licence and date, and a game-file hit says when player uploads confirm it. Use it to find a record from a name or a topic, then pass the hit's id to get_entity for its summary, or to fetch as a string for the whole text. Use get_by_name when you already know the exact full name, and answer_sources when you need cited evidence for a question rather than records. search is the same search in the ChatGPT connector shape.",
     inputSchema: searchArgs,
     outputSchema: { hits: z.array(knowledgeHit) },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   get_entity: {
     title: "Get one knowledge record by id",
-    description: "Returns one knowledge record's summary, by the numeric id a search_knowledge or get_by_name hit gave: title, a short excerpt in the source's words, the URL to cite, source, licence and date. A game-file record carries its build and says when player uploads confirm it. Use it to read one hit again by its id; for the whole text, call fetch with the same id as a string. An id no record has returns a null hit, not an error. Give field, a JSON pointer such as /questIds, to read one value of the record's data instead of the excerpt; an array comes in pages of up to 48 rows, and nextOffset says where the next page starts. A pointer that leads nowhere answers with the keys it could have used, not an error.",
+    description: "Returns one knowledge record's summary, by the numeric id a search_knowledge or get_by_name hit gave: title, a short excerpt in the source's words, the URL to cite, source, licence and date. Gameplay metadata separates recordId from gameId and labels sourceKind, build or observed snapshot support. A game-file record carries its build and says when player uploads confirm it. Use it to read one hit again by its id; for the whole text, call fetch with the same id as a string. An id no record has returns a null hit, not an error. Give field, a JSON pointer such as /questIds, to read one value of the record's data instead of the excerpt; an array comes in pages of up to 48 rows, and nextOffset says where the next page starts. A pointer that leads nowhere answers with the keys it could have used, not an error.",
     inputSchema: { id: z.number().int().describe("The numeric id of a search_knowledge or get_by_name hit."), ...fieldReadInput },
     outputSchema: { hit: knowledgeHit.nullable(), ...fieldReadOutput },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   get_by_name: {
     title: "Get records by exact name",
-    description: "Returns the records whose full name matches exactly, case-insensitively, optionally narrowed to one record kind. Use it to disambiguate when you know the exact name and want the id without a ranked search; use search_knowledge for partial names, keywords or questions. Several records can share a name across kinds, so check each hit's kind. Empty hits mean no record has that exact name.",
+    description: "Returns the records whose full name matches exactly, case-insensitively, optionally narrowed to one record kind. Use it to disambiguate when you know the exact name and want the id without a ranked search; use search_knowledge for partial names, keywords or questions. Several records can share a name across kinds, so check each hit's kind and sourceKind. Use gameId for gameplay tools and recordId for get_entity; lore hits have no gameId. Empty hits mean no record has that exact name.",
     inputSchema: {
       name: z.string().max(200).describe("The full record name, any case, up to 200 characters."),
       kind: z.enum(KNOWLEDGE_KINDS).optional().describe(KIND_FILTER),

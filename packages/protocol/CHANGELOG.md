@@ -13,6 +13,7 @@ required, or tightening a limit is a major release.
   `market_value` lists in its history. The `realm` input of `market_value` and `auction_history` and both
   descriptions say how a name is read and that Everloot's own installs make a day public under 3. Optional, so
   earlier readers are unaffected.
+- 2.1.0: MCP knowledge hits optionally carry recordId, gameId, sourceKind, build and observed snapshot support for gameplay discovery. Existing tool names and ids are preserved.
 - `dropsResponse.rates[].sourceName`: the NPC's or object's name, once 3 installs agree on it; absent until then.
   Optional, so earlier readers are unaffected.
 

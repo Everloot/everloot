@@ -128,13 +128,14 @@ export default function DataTable<Row>(props: DataTableProps<Row>) {
  * on the sorted column, with aria-sort. On a phone the first column carries the row; the others hide.
  */
 function DenseTable<Row>({ columns, rows, rowKey, caption, sort, sortHref, empty, footer, toolbar, meta }: DataTableProps<Row>) {
-  // Without a phone line the other columns cannot fold away; the table then scrolls inside itself on a phone.
+  // Without a phone line the other columns cannot fold away. Either way a table too wide for its column scrolls inside
+  // itself below 1024 px (the sticky header needs the page as its scroll parent, so it applies from `lg`).
   const folds = Boolean(meta);
   const phoneHidden = (i: number) => (folds && i > 0 ? "hidden sm:table-cell" : "");
   return (
     <div data-table data-dense className="min-w-0">
       {toolbar}
-      <div role="region" aria-label={caption} tabIndex={0} className={`relative max-w-full ${folds ? "" : "overflow-x-auto sm:overflow-visible"}`}>
+      <div role="region" aria-label={caption} tabIndex={0} className="relative max-w-full overflow-x-auto lg:overflow-visible">
         <table className="w-full border-collapse text-cell">
           <caption className="sr-only">{caption}</caption>
           <thead>
@@ -148,9 +149,9 @@ function DenseTable<Row>({ columns, rows, rowKey, caption, sort, sortHref, empty
                     key={col.key}
                     scope="col"
                     aria-sort={sorted ? ariaSort(sorted) : undefined}
-                    // Sticky under the site header from 640 px up only: below that a table that scrolls sideways is its
-                    // own sticky box, so the offset pushed the header down onto the rows.
-                    className={`z-10 h-th sm:sticky sm:top-header whitespace-nowrap border-b border-line bg-canvas px-3 text-th ${sorted ? "text-fg" : "text-muted"} ${col.numeric ? "text-right" : "text-left"} ${phoneHidden(i)}`}
+                    // Sticky under the site header from 1024 px up only: below that the table scrolls sideways inside
+                    // its own box, which is then the sticky parent, so the offset pushed the header down onto the rows.
+                    className={`z-10 h-th lg:sticky lg:top-header whitespace-nowrap border-b border-line bg-canvas px-3 text-th ${sorted ? "text-fg" : "text-muted"} ${col.numeric ? "text-right" : "text-left"} ${phoneHidden(i)}`}
                   >
                     {col.sortable && sortHref ? (
                       // Block-level, so the link fills the 32 px cell without a line box around it.
