@@ -1,5 +1,8 @@
 # Launch day: 2026-11-04
 
+Historical, 2026-11-04. The launch happened on this date. This page is that day's order of work.
+How the site is run now is [OPERATIONS.md](OPERATIONS.md).
+
 WoW: Forever launches globally on November 4, 2026, at 3:00 p.m. PST, which is 23:00 UTC (Blizzard's
 sentence, kept in `web/src/data/wow-forever.ts` as `LAUNCH` and `LAUNCH_AT`; last read 2026-10-17). Times
 below are relative to that hour, "L".

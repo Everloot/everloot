@@ -97,3 +97,25 @@ test("each continent's answer stays under 150 KB gzipped, with spoilers on and w
   // The game-file part alone is small: a fraction of the budget.
   expect(Math.max(sizes[0]!, sizes[2]!)).toBeLessThan(BUDGET / 5);
 });
+
+test("stored facts give the same answer with zero corpus reads", async () => {
+  const { buildMapPins, encodeMapPins, forgetStoredMapPins } = await import("@/lib/map-pins-store");
+  const { buildAggregates } = await import("@/lib/aggregate-set");
+  const { encodeAggregates, forgetStoredAggregates } = await import("@/lib/aggregate-store");
+  const corpus = { uploads: 3, records: sightings(7, 1429, 40, 60, "Guard Marlow"), dataAsOf: "2026-11-09" };
+  store.loadCorpus.mockResolvedValue(corpus);
+  const before = await (await GET(req("?continent=0"))).json();
+  store.loadCorpus.mockClear();
+  forgetStoredMapPins();
+  forgetStoredAggregates();
+  for (const [key, value] of Object.entries({ R2_ACCOUNT_ID: "acct", R2_ACCESS_KEY_ID: "id", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "uploads" })) vi.stubEnv(key, value);
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+    const url = (input as Request).url;
+    return new Response(url.endsWith("snapshots/aggregates.json")
+      ? encodeAggregates(buildAggregates(corpus as unknown as import("@/lib/upload-store").Corpus), "now")
+      : url.endsWith("snapshots/map-pins.json")
+        ? encodeMapPins(buildMapPins(corpus), "now") : "{}" );
+  }));
+  expect(await (await GET(req("?continent=0"))).json()).toEqual(before);
+  expect(store.loadCorpus).not.toHaveBeenCalled();
+});

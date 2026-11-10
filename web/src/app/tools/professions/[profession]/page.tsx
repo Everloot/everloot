@@ -13,16 +13,16 @@ import { loadItemTips, loadSiteAssets, loadSpellNames, type ItemTip } from "@/li
 import { CLIENT_LAYER, CLIENT_TAXONOMY, shownItemName, type ShownItemName } from "@/lib/items";
 import { CLIENT_PROFESSIONS, professionBySegment, professionHref, RECIPES_BUILD, recipeGroups, recipeItemIds, type RecipeView } from "@/lib/professions";
 import { pageMetadata } from "@/lib/seo";
-import { loadShownNames } from "@/lib/shown-item-names";
-import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT, uploadStore } from "@/lib/upload-store";
+import { loadListNames } from "@/lib/item-view";
+import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT } from "@/lib/upload-store";
+import { loadProfessions } from "@/lib/profession-store";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { formatCopper, handleProfessionPath } from "../../../../../../kb/src/profession-path";
-import { handleRecipeThresholds, pathFactsFromRecords, recipeThresholdsStructured, type Range } from "../../../../../../kb/src/recipe-thresholds";
+import { handleRecipeThresholds, recipeThresholdsStructured, type Range } from "../../../../../../kb/src/recipe-thresholds";
 import { farmingAreas, gatherAreas, GATHERING, inLevels } from "@/lib/farming";
 import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
 import { npcRows } from "@/lib/world-lists";
 import { publicZones } from "@/lib/zones";
-import { objectSpawnRowsFromRecords } from "../../../../../../kb/src/object-spawns";
 import { LINK } from "../../../database/entity";
 import { LEVEL_BRACKETS, listHref, range, rangeParam } from "../../../database/list-parts";
 import FarmAreaTable from "../../farming-routes/area-table";
@@ -86,8 +86,8 @@ export default async function ProfessionPage(props: Props) {
   const level = mobFarm ? range(searchParams, "mobs") : undefined;
   if (level === null) notFound();
 
-  const [corpus, assets, shown, spellNames] = await Promise.all([
-    uploadStore.loadCorpus(), loadSiteAssets(), loadShownNames(), loadSpellNames(CLIENT_LAYER.build.version),
+  const [view, assets, shown, spellNames] = await Promise.all([
+    loadProfessions(), loadSiteAssets(), loadListNames(), loadSpellNames(CLIENT_LAYER.build.version),
   ]);
   // Names, icons and qualities of the items the recipes make and use, under the item name rule (shown-item-names.ts).
   const ids = recipeItemIds(p.recipes).filter(shown.showsTip);
@@ -96,21 +96,21 @@ export default async function ProfessionPage(props: Props) {
   const fileQuality = new Map(CLIENT_TAXONOMY.items.map((row) => [row[0], row[4]]));
 
   // The player layer, as before: three agreeing installs or nothing.
-  const facts = corpus.unreachable ? { sightings: [], prices: [], observations: [], derived: [] } : pathFactsFromRecords(corpus.records);
-  const answer = corpus.unreachable ? STORAGE_UNREACHABLE : handleProfessionPath({ profession: p.name, fromSkill, toSkill }, facts.sightings, facts.prices, facts.derived);
-  const rangesText = corpus.unreachable ? STORAGE_UNREACHABLE : handleRecipeThresholds({ profession: p.name }, facts.observations, facts.prices);
-  const agreed = corpus.unreachable ? [] : recipeThresholdsStructured({ profession: p.name }, facts.observations, facts.prices).ranges;
+  const facts = view.facts;
+  const answer = view.unreachable ? STORAGE_UNREACHABLE : handleProfessionPath({ profession: p.name, fromSkill, toSkill }, facts.sightings, facts.prices, facts.derived);
+  const rangesText = view.unreachable ? STORAGE_UNREACHABLE : handleRecipeThresholds({ profession: p.name }, facts.observations, facts.prices);
+  const agreed = view.unreachable ? [] : recipeThresholdsStructured({ profession: p.name }, facts.observations, facts.prices).ranges;
   const byRecipe = new Map(agreed.map((t) => [t.recipe.trim().toLowerCase(), t]));
   const reports = facts.sightings.length + facts.observations.length;
-  const pending = !corpus.unreachable && reports === 0;
+  const pending = !view.unreachable && reports === 0;
 
   // Where to gather, for the gathering professions and the ones that use cloth: from the same uploads, at 3 installs.
-  // The mob areas reuse the corpus read above; any read that fails makes the section say storage is unreachable.
-  const gathered = !gather || corpus.unreachable ? { rows: [], all: 0, down: corpus.unreachable === true }
+  // The mob areas read the stored aggregates, or reuse the fallback corpus; a failed read stays unrecorded.
+  const gathered = !gather || view.unreachable ? { rows: [], all: 0, down: view.unreachable === true }
     : !mobFarm
-      ? (() => { const rows = gatherAreas(objectSpawnRowsFromRecords(corpus.records), gather.source as "herb" | "ore", publicZones()); return { rows, all: rows.length, down: false }; })()
+      ? (() => { const rows = gatherAreas(view.sightings, gather.source as "herb" | "ore", publicZones()); return { rows, all: rows.length, down: false }; })()
       : await (async () => {
-        const [world, rollups] = await Promise.all([loadWorldFacts(corpus), computeRollups(corpus)]);
+        const [world, rollups] = await Promise.all([loadWorldFacts(view.corpus), computeRollups(view.corpus)]);
         const down = world.unreachable || rollups.stats.unreachable;
         const all = down ? [] : farmingAreas(npcRows(world, rollups.rates), rollups.rates)[mobFarm];
         return { rows: level ? all.filter((a) => inLevels(a, level)) : all, all: all.length, down };
@@ -188,7 +188,7 @@ export default async function ProfessionPage(props: Props) {
 
   return (
     <Container width="data">
-      <EdgeDegraded when={corpus.unreachable === true || gathered.down} />
+      <EdgeDegraded when={view.unreachable === true || gathered.down} />
       <PageHeader
         trail={trail}
         title={`${p.name} recipes`}
@@ -197,9 +197,9 @@ export default async function ProfessionPage(props: Props) {
         meta={<>
           <span className="font-mono tabular-nums">{plural(p.recipes.length, "recipe")}</span>
           <span>Game files, build {RECIPES_BUILD}</span>
-          {corpus.unreachable ? <span>{STORAGE_UNREACHABLE_SHORT}</span> : <>
+          {view.unreachable ? <span>{STORAGE_UNREACHABLE_SHORT}</span> : <>
             {reports > 0 && <span className="font-mono tabular-nums">{plural(reports, "recipe report")}</span>}
-            <span>{dataAgeLabel(corpus.dataAsOf)}</span>
+            <span>{dataAgeLabel(view.dataAsOf)}</span>
           </>}
         </>}
       />
