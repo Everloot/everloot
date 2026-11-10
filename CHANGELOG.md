@@ -35,6 +35,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
 
 ### Fixed
+- Site: Build labels distinguish files read from the newest build seen, link to build details, and date older wiki and Legacy reads.
 - Site: /api/suggest spends the per-IP quota and shares one edge cache entry for `Thunder` and `thunder `, the coverage 400 and waitlist 503 are `no-store` (the 503 adds `Retry-After`), and the docs list every route that sends CORS from one file.
 - Site: item list pagination is crawlable while filter URLs stay blocked.
 - Site: /database splits its rows into "Seen by players" and "From the game files", says after launch that a row fills when 3 installs agree, and drops the Guilds lookup row (the Tools menu has it).

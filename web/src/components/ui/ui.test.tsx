@@ -123,6 +123,7 @@ describe("Card", () => {
 describe("Badge", () => {
   test("the files badge is a quiet hollow diamond, not a pill or a dotted ring: a tooltip and a screen-reader label", () => {
     const html = render(<Badge tone="files" />);
+    expect(html).toContain('href="/methodology#files"');
     expect(html).toContain("rotate-45");
     expect(html).not.toContain("border-dashed");
     expect(html).not.toContain("rounded-full");

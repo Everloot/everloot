@@ -347,7 +347,7 @@ test("the card: Copy link for the pin, and Open page by kind", async () => {
   card = await pick("ex");
   expect(card.querySelector('a[href="/database/zones/1411-durotar"]')!.textContent).toBe("Open zone page");
   card = await pick("f1");
-  expect(Array.from(card.querySelectorAll("a")).map((a) => a.textContent)).toEqual([]);
+  expect(Array.from(card.querySelectorAll("a")).map((a) => a.getAttribute("href"))).toEqual(["/methodology#files"]);
   expect(button("Copy link", card)).toBeDefined();
 });
 

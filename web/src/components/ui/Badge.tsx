@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { QUALITY_LABEL, QUALITY_TEXT, type Quality } from "./quality";
 
 /** The tooltip on the unconfirmed marker. */
@@ -15,7 +16,7 @@ export const UNCONFIRMED_TITLE = "From the game files, not yet confirmed by play
  * - `quality`: an item quality in its own colour.
  */
 export type BadgeProps =
-  | { tone: "files"; children?: ReactNode; title?: string }
+  | { tone: "files"; children?: ReactNode; title?: string; href?: string }
   | { tone: "confirmed"; children?: ReactNode }
   | { tone: "neutral"; children: ReactNode }
   | { tone: "quality"; quality: Quality; children?: ReactNode };
@@ -24,13 +25,16 @@ const BASE = "inline-flex h-6 max-w-full items-center gap-1.5 whitespace-nowrap 
 
 export default function Badge(props: BadgeProps) {
   switch (props.tone) {
-    case "files":
-      return (
+    case "files": {
+      // A custom title can describe a saved talent build rather than a game-file source.
+      const marker = (
         <span data-badge="files" title={props.title ?? UNCONFIRMED_TITLE} className="inline-flex h-2.5 w-2.5 shrink-0 items-center justify-center align-middle">
           <span aria-hidden="true" className="block h-2 w-2 rotate-45 rounded-[1px] border-[1.5px] border-edge" />
           <span className="sr-only">{props.children ?? "unconfirmed"}</span>
         </span>
       );
+      return props.title && !props.href ? marker : <Link href={props.href ?? "/methodology#files"}>{marker}</Link>;
+    }
     case "confirmed":
       return <span data-badge="confirmed" className={`${BASE} border-accent text-accent`}>{props.children ?? "Confirmed by 3 installs"}</span>;
     case "neutral":
