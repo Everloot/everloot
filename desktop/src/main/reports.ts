@@ -5,6 +5,7 @@ import type { LocalTables } from "./characters";
 interface Bucket { at: number; day: number; key: string; category: string; item: string; ownAlt: boolean; sale: boolean; total: number; units: number | null }
 export interface LedgerIndex { present: boolean; characters: { key: string; name: string }[]; buckets: Bucket[] }
 const obj = (v: unknown): Record<string, unknown> => v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {};
+const CATEGORIES = new Set<string>([...LEDGER_INCOME, ...LEDGER_SPENDING]);
 const positive = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v > 0;
 
 /** Index by timestamp/character/category/item once per file write, inside the existing save reader. */
@@ -19,7 +20,7 @@ export function indexLedger(local: LocalTables): LedgerIndex {
   for (const sale of [false, true]) for (const raw of (Array.isArray(ledger[sale ? "sales" : "events"]) ? ledger[sale ? "sales" : "events"] : []) as unknown[]) {
     const r = obj(raw), total = sale ? r.total : r.copper;
     if (typeof r.key !== "string" || !keys.has(r.key) || !positive(total) || typeof r.at !== "number" || !Number.isSafeInteger(r.at) || r.at < 0 || r.at > 8640000000000) continue;
-    if (sale ? r.status !== "paid" || !positive(r.count) : typeof r.category !== "string" || ![...LEDGER_INCOME, ...LEDGER_SPENDING].includes(r.category)) continue;
+    if (sale ? r.status !== "paid" || !positive(r.count) : typeof r.category !== "string" || !CATEGORIES.has(r.category)) continue;
     const b: Bucket = { at: r.at * 1000, day: utcDay(r.at * 1000), key: r.key, category: sale ? "auction" : r.category as string, item: typeof r.itemName === "string" ? r.itemName : "", ownAlt: r.ownAlt === true, sale, total, units: positive(r.count) ? r.count : null };
     const id = JSON.stringify([b.at, b.key, b.category, b.item, b.ownAlt, sale]);
     const old = groups.get(id);
@@ -71,8 +72,5 @@ export function reportAt(files: { account: string; index: LedgerIndex }[], raw: 
     r.average = r.units ? Math.floor(r.total / r.units) : null;
     r.change = r.previous ? (r.total - r.previous) / Math.abs(r.previous) * 100 : null;
   }
-  return { hasLedger: selected.some(f => f.index.present), unreadable: 0, accounts, items: [...items].sort(), from: days[0].date, to: days[days.length - 1].date, previousComplete: selected.length > 0 && selected.every(f => {
-    const first = f.index.buckets.reduce((min, b) => Math.min(min, b.day), Infinity);
-    return Math.max(floor, first) <= previousStart;
-  }), total, days, rows: [...groups.values()].sort((a, b) => b.total - a.total || a.item.localeCompare(b.item)), categories: [...categories].map(([category, total]) => ({ category, total })).sort((a, b) => b.total - a.total) };
+  return { hasLedger: selected.some(f => f.index.present), unreadable: 0, accounts, items: [...items].sort(), from: days[0].date, to: days[days.length - 1].date, previousComplete: selected.length > 0 && Math.max(floor, buckets.reduce((min, b) => Math.min(min, b.day), Infinity)) <= previousStart, total, days, rows: [...groups.values()].sort((a, b) => b.total - a.total || a.item.localeCompare(b.item)), categories: [...categories].map(([category, total]) => ({ category, total })).sort((a, b) => b.total - a.total) };
 }

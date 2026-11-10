@@ -28,3 +28,13 @@ test("empty filter result keeps controls and offers reset", () => {
   expect(reportsView(info, {})).toContain('data-page="reports-reset"');
   expect(reportsView(info, {})).toContain('id="reportPeriod"');
 });
+
+test("expense categories carry the addon's names, with an unknown category shown as written", () => {
+  const events = [{ key: "a", at: Date.parse("2026-11-10") / 1000, category: "vendor_spend", copper: 300 }, { key: "a", at: Date.parse("2026-11-10") / 1000, category: "mail_out", copper: 200 }, { key: "a", at: Date.parse("2026-11-10") / 1000, category: "auction_spend", copper: 100 }];
+  const info = reportAt([{ account: "Account", index: indexLedger({ roster: { a: { name: "Hero", realm: "Realm" } }, ledger: { events } }) }], { metric: "expenses" }, Date.parse("2026-11-10T12:00Z"));
+  const html = reportsView(info, { metric: "expenses" });
+  for (const label of ["Vendor purchases", "Mail out", "Auction purchases"]) expect(html).toContain(`<td>${label}</td>`);
+  expect(html).not.toContain("vendor spend");
+  expect(html).toContain('<div class="head"><h1>Reports</h1></div>');
+  expect(reportsView({ ...info, categories: [{ category: "future_kind", total: 5 }] }, { metric: "expenses" })).toContain("<td>future kind</td>");
+});

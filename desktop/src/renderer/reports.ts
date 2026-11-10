@@ -1,4 +1,5 @@
 import type { ReportInfo, ReportQuery } from "../shared/reports";
+import { categoryLabel } from "../shared/ledger";
 import { esc, gold } from "./format";
 import { emptyState } from "./parts";
 
@@ -6,7 +7,7 @@ const money = (n: number | null) => n === null ? "—" : `${n < 0 ? "−" : ""}$
 const option = (value: string, label: string, selected: string) => `<option value="${esc(value)}" ${value === selected ? "selected" : ""}>${esc(label)}</option>`;
 
 export function reportsView(info: ReportInfo | undefined, q: ReportQuery, rowPage = 0): string {
-  const head = '<div class="page reports"><h1>Reports</h1><p class="muted">Your local ledger in Everloot Desktop App. Nothing from this report is uploaded.</p>';
+  const head = '<div class="page reports"><div class="head"><h1>Reports</h1></div><p class="muted">Your local ledger in Everloot Desktop App. Nothing from this report is uploaded.</p>';
   if (!info) return `${head}<p role="status">Reading the local ledger…</p></div>`;
   const warning = info.unreadable ? '<p role="status">Some account save files could not be read. Open Upload to inspect them.</p>' : "";
   if (!info.hasLedger) return `${head}${warning}${emptyState({ cause: "No local ledger yet", step: "Play with the addon 0.3.22+; it records locally. Log out or /reload to write the save file.", action: { label: "Open Addon", page: "addon" } }, "")}</div>`;
@@ -34,7 +35,7 @@ export function reportsView(info: ReportInfo | undefined, q: ReportQuery, rowPag
     ${info.days.map((d, i) => `<circle cx="${x(i)}" cy="${y(d.total)}" r="3"><title>${d.date}: ${esc(money(d.total))}</title></circle>`).join("")}
     <text x="70" y="205">${info.from}</text><text x="710" y="205" text-anchor="end">${info.to}</text></svg>
     <details><summary>Daily values</summary><table><thead><tr><th>UTC day</th><th>Total</th></tr></thead><tbody>${info.days.map(d => `<tr><td>${d.date}</td><td>${money(d.total)}</td></tr>`).join("")}</tbody></table></details></figure>`;
-  const categories = q.metric === "expenses" ? `<h2>Expenses by category</h2><table><thead><tr><th>Category</th><th>Total</th></tr></thead><tbody>${info.categories.map(c => `<tr><td>${esc(c.category.replace(/_/g, " "))}</td><td>${money(c.total)}</td></tr>`).join("")}</tbody></table>` : "";
+  const categories = q.metric === "expenses" ? `<h2>Expenses by category</h2><table><thead><tr><th>Category</th><th>Total</th></tr></thead><tbody>${info.categories.map(c => `<tr><td>${esc(categoryLabel(c.category))}</td><td>${money(c.total)}</td></tr>`).join("")}</tbody></table>` : "";
   const offset = Math.min(rowPage, Math.floor((info.rows.length - 1) / 100)) * 100;
   const rows = info.rows.slice(offset, offset + 100).map(r => `<tr><td>${esc(r.item || "No item recorded")}</td><td>${r.units ?? "—"}</td><td>${money(r.total)}</td><td>${money(r.average)}</td><td>${money(r.previous)}</td><td>${r.change === null ? "—" : `${r.change > 0 ? "+" : ""}${r.change.toFixed(1)}%`}</td></tr>`).join("");
   return `${head}${warning}${controls}${notes}${chart}${categories}<h2>By item</h2><div class="report-table"><table><thead><tr><th>Item</th><th>Units</th><th>Total</th><th>Average per unit</th><th>Previous total</th><th>Change</th></tr></thead><tbody>${rows}</tbody></table></div>

@@ -62,3 +62,13 @@ test("both own-alt transfer legs disappear from multi-character spending and pro
   expect(reportAt(f, { metric: "expenses" }, now).total).toBe(0);
   expect(reportAt(f, { account: "A", character: "b" }, now).total).toBe(50);
 });
+
+test("previous period completeness follows the selected scope's own records, not each file's first record", () => {
+  const old = indexLedger(local([event("2026-10-28T00:00:00Z", "vendor", 100, "a"), event("2026-11-08T00:00:00Z", "vendor", 100, "a")]));
+  const recent = indexLedger(local([event("2026-11-08T00:00:00Z", "vendor", 100, "a")]));
+  const f = [{ account: "Old", index: old }, { account: "Recent", index: recent }];
+  expect(reportAt(f, { period: 7 }, now).previousComplete).toBe(true);
+  expect(reportAt(f, { period: 7, account: "Old" }, now).previousComplete).toBe(true);
+  expect(reportAt(f, { period: 7, account: "Recent" }, now).previousComplete).toBe(false);
+  expect(reportAt(f, { period: 7, account: "Recent", character: "b" }, now).previousComplete).toBe(false);
+});

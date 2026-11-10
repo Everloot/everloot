@@ -3,7 +3,7 @@ import type { ReportQuery } from "../shared/reports";
 import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, net, powerMonitor, screen, session, shell } from "electron";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { join } from "node:path";
 import { loadProviders } from "../../../companion/src/providers/config";
 import type { AddonInfo, AppState, AskInfo, DataUsage, Job, MarketInfo, PriceLookup, Settings } from "../shared/types";
 import { JOBS } from "../shared/types";
@@ -17,7 +17,7 @@ import { fetchChanges } from "./changes";
 import { createChat } from "./chat";
 import { DATA_NOTICE_BYTES, dataUsage, deleteLocalData } from "./data-folder";
 import { localTools } from "./local-tools";
-import { createEngine } from "./engine";
+import { accountOf, createEngine } from "./engine";
 import { connectInBrowser } from "./connect";
 import { allowedExternal } from "./external";
 import { candidateRoots, detectGameFolders, foreverSuggestion, realFs, resolvePickedFolder } from "./game-folder";
@@ -569,7 +569,7 @@ if (!app.requestSingleInstanceLock()) {
     await readyFacts(files);
     let unreadable = 0;
     const indexes = files.flatMap(file => {
-      try { return [{ account: basename(dirname(dirname(file))), index: saveFacts(file).reports }]; }
+      try { return [{ account: accountOf(file), index: saveFacts(file).reports }]; }
       catch { unreadable++; return []; }
     });
     return { ...reportAt(indexes, query), unreadable };

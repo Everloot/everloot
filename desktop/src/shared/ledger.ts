@@ -8,6 +8,16 @@ import { MONEY_CATEGORIES } from "../../../kb/src/gold-ledger";
 export const LEDGER_INCOME: readonly string[] = ["loot", "quest", "vendor", "auction", "trade_in", "mail_in"];
 export const LEDGER_SPENDING: readonly string[] = ["flight", "postage", "barber", "respec", "auction_spend", "repair", "vendor_spend", "trade_out", "mail_out"];
 
+/** The addon's own names for the categories (addon/modules/ledger.lua, L.LABELS). */
+export const LEDGER_LABELS: Readonly<Record<string, string>> = {
+  loot: "Loot", quest: "Quest rewards", vendor: "Vendor sales", auction: "Auction sales",
+  trade_in: "Trades in", mail_in: "Mail in",
+  flight: "Flight paths", postage: "Postage", barber: "Barber", respec: "Respecs", auction_spend: "Auction purchases",
+  repair: "Repairs", vendor_spend: "Vendor purchases", trade_out: "Trades out", mail_out: "Mail out",
+};
+/** The category's name as the addon shows it; a category it has no name for is shown as it is written. */
+export const categoryLabel = (category: string): string => LEDGER_LABELS[category] ?? category.replace(/_/g, " ");
+
 /** The ledger categories a money_event record never carries: repairs, vendor purchases, trades and mail. */
 export const LOCAL_ONLY_CATEGORIES: readonly string[] = [...LEDGER_INCOME, ...LEDGER_SPENDING].filter((c) => !(MONEY_CATEGORIES as readonly string[]).includes(c));
 
