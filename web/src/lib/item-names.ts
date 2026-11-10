@@ -8,6 +8,7 @@ import type { ItemRecord } from "../../../kb/src/assets/items";
 import { checkedDamageRange, CHECKED_WEAPONS, type CheckedDamageRange, type CheckedWeapon } from "../../../kb/src/assets/weapon-damage";
 import type { ItemFactName, ItemFactState } from "../../../kb/src/item-facts";
 import { PLACEHOLDER } from "./placeholder";
+import { ARMOR, PAIR, SLOT, WEAPON } from "./tip-line";
 
 export { PLACEHOLDER };
 
@@ -22,17 +23,6 @@ export function qualityColor(q: number): string {
 
 const BINDING: Record<number, string> = { 1: "Binds when picked up", 2: "Binds when equipped", 3: "Binds when used", 4: "Quest Item" };
 
-const SLOT: Record<number, string> = {
-  1: "Head", 2: "Neck", 3: "Shoulder", 4: "Shirt", 5: "Chest", 6: "Waist", 7: "Legs", 8: "Feet", 9: "Wrist", 10: "Hands",
-  11: "Finger", 12: "Trinket", 13: "One-Hand", 14: "Off Hand", 15: "Ranged", 16: "Back", 17: "Two-Hand", 18: "Bag", 19: "Tabard",
-  20: "Chest", 21: "Main Hand", 22: "Off Hand", 23: "Held In Off-hand", 24: "Projectile", 25: "Thrown", 26: "Ranged", 28: "Relic",
-};
-
-const WEAPON: Record<number, string> = {
-  0: "Axe", 1: "Axe", 2: "Bow", 3: "Gun", 4: "Mace", 5: "Mace", 6: "Polearm", 7: "Sword", 8: "Sword", 10: "Staff",
-  13: "Fist Weapon", 14: "Miscellaneous", 15: "Dagger", 16: "Thrown", 18: "Crossbow", 19: "Wand", 20: "Fishing Pole",
-};
-const ARMOR: Record<number, string> = { 1: "Cloth", 2: "Leather", 3: "Mail", 4: "Plate", 6: "Shield", 7: "Libram", 8: "Idol", 9: "Totem" };
 /** Armor subclasses that carry an armor value (cloth to plate, shields), and the slots that never do (shirt, tabard). */
 const ARMORED = new Set([1, 2, 3, 4, 6]);
 const NO_ARMOR_SLOT = new Set([4, 19]);
@@ -103,7 +93,7 @@ export function itemTipText(r: ItemRecord, checked: readonly CheckedWeapon[] = C
   else if (r.u === 1) lines.push("Unique");
   const slot = SLOT[r.s];
   const k = kind(r.c, r.sc);
-  if (slot || k) lines.push([slot, k].filter(Boolean).join(" · "));
+  if (slot || k) lines.push([slot, k].filter(Boolean).join(PAIR));
   // A weapon's damage is not in the 1.60.1 item tables (the client works it out from ItemDamage*), so its
   // damage line carries the placeholder until the range the files give is confirmed against the game's own
   // tooltip (CHECKED_WEAPONS); the per-second line is a player-reported number, never the files'. The speed sits
@@ -113,7 +103,7 @@ export function itemTipText(r: ItemRecord, checked: readonly CheckedWeapon[] = C
   const school = r.w ? SCHOOL[r.w.ds] : undefined;
   const range = weapon && school !== undefined ? checkedDamageRange(r, checked) : null;
   const damage = range ? `${range.min} - ${range.max} ${school}Damage` : `${PLACEHOLDER} - ${PLACEHOLDER} Damage`;
-  if (weapon) lines.push(`${damage} · ${speed}`, `(${PLACEHOLDER} damage per second)`);
+  if (weapon) lines.push(`${damage}${PAIR}${speed}`, `(${PLACEHOLDER} damage per second)`);
   else if (speed) lines.push(speed);
   // Cloth, leather, mail, plate and shields always carry armor in the game; its amount is not in the tables either.
   const armor = r.c === 4 && r.sc !== null && ARMORED.has(r.sc) && !NO_ARMOR_SLOT.has(r.s);
