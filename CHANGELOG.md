@@ -56,6 +56,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the schemas page marks the three shapes that describe a bulk-export file rather than an endpoint and says that
   `reporters` in the API and MCP shapes is the count the open-data files call `installs`; the API page names the routes
   its own pages fetch (/api/map/pins, /api/suggest) as outside the OpenAPI contract. The open-data notes say the same.
+- Site: profession pages and map pins read files the snapshot cron writes instead of replaying the corpus on each request.
 - Site: the tools catalogue supplies the menu, uses Collections and Guild board, and farming no longer asks for a launch notification.
 - Desktop App: the Characters page reads the addon's local ledger (`EverlootDB.ledger`) from the save file beside the
   `money_event` rows, so its 7-day net is the Gold tab's "7 days" for the same character (today and the six UTC days
@@ -64,6 +65,11 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: a database address with an id nothing knows (an item or NPC such as /database/items/999999) answers its 404 with a
   body again: the heading, "No report for this id yet; three installs make it public" with the addon link, and a search box
   prefilled with the id. The site 404 leads with the same search box, prefilled with the last part of the address tried.
+- Site: the zones list and the dungeons and raids list take a name in the box and sort from their column headers
+  (`/database/zones?q=dur&sort=name`, `/database/instances?sort=-level`), as the NPC list does; the zones are one
+  table with a Continent column. The objects list sorts by name first, and an object with no agreed name says
+  "no agreed name yet" beside its id. A spell list whose names were not read says so for its build, with no addon
+  link. The coverage list and the item lists read the same query and page size as the other lists.
 - Site: an Auction House price page for an item with no public name says why under its title: a name shows once
   three installs report the same one, or when the game files and the Warcraft Wiki agree on one. The title stays
   "Item N" and the prices stand. Before, the page gave the id and the prices with no reason.
@@ -301,6 +307,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and the snapshot is read again only after a minute. The route itself is unchanged.
 
 ### Changed
+- Docs: the launch-day page is marked historical, and day-to-day operation of the site is in docs/OPERATIONS.md.
 - Protocol: `itemsResponse.items` is typed with the row `GET /api/items` returns (item id, then class, subclass, slot
   and quality, each null when the build does not name it), so a client generated from `schema/api/itemsResponse.json`
   gets fields instead of `any`. Protocol package 2.0.0 (the row's fields are now required); the answers do not change.

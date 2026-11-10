@@ -71,6 +71,8 @@ test("sorting by a column keeps the lowest first and the header links flip it", 
   const page = await html(CoveragePage(search({ sort: "-entrances" })));
   expect(page).toContain('aria-sort="descending"');
   await expect(CoveragePage(search({ sort: "bogus" }))).rejects.toThrow("NEXT_NOT_FOUND");
+  // The zones fit one page: a later one, or a malformed one, is a 404 as on the other lists.
+  for (const page of ["2", "x"]) await expect(CoveragePage(search({ page }))).rejects.toThrow("NEXT_NOT_FOUND");
 });
 
 test("the search finds the zone an NPC id is counted in", async () => {

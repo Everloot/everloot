@@ -60,6 +60,8 @@ You need Node 22, Python 3.12 and Git. Each part's README says how to run and te
   `node_modules/@everloot/protocol` and run `npm install`: they install a packed copy, and npm keeps the
   old one while the version number is unchanged. Commit the regenerated `dist/` and `schema/`.
 
+How the live site is run day to day is [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
+
 To catch lint and type errors before CI does, turn on the pre-push check once per clone:
 `git config core.hooksPath .githooks`. It lints and typechecks only the packages your push changes.
 

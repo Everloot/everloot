@@ -42,6 +42,10 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/components/EmailCapture", () => ({ default: () => null }));
 
+vi.mock("@/lib/item-view", async () => {
+  const { loadShownNames } = await import("@/lib/shown-item-names");
+  return { loadListNames: loadShownNames };
+});
 import ProfessionPage from "./page";
 
 const obs = (installId: string, rank: number, difficulty: string, recipe = "Lesser Healing Potion") => ({
@@ -274,4 +278,30 @@ test("when the corpus reads but the world facts or the rollups do not, the secti
   for (const [profession, kind] of [["tailoring", "cloth"], ["herbalism", "herb"]]) {
     expect(section(await render(profession), kind), profession).toContain("Storage unreachable");
   }
+});
+
+test.each(["alchemy", "herbalism", "mining", "tailoring", "skinning"])("stored %s facts give the same answer with zero corpus reads", async (profession) => {
+  const { buildProfessions, encodeProfessions, forgetStoredProfessions } = await import("@/lib/profession-store");
+  const { buildAggregates } = await import("@/lib/aggregate-set");
+  const { encodeAggregates, forgetStoredAggregates } = await import("@/lib/aggregate-store");
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+  forgetStoredProfessions();
+  forgetStoredAggregates();
+  const corpus = { ...clothAndLeather(), records: [...clothAndLeather().records, obs("a", 1, "optimal"), obs("b", 1, "optimal"), obs("c", 1, "optimal")] };
+  store.loadCorpus.mockResolvedValue(corpus);
+  const before = await render(profession);
+  store.loadCorpus.mockClear();
+  forgetStoredProfessions();
+  forgetStoredAggregates();
+  for (const [key, value] of Object.entries({ R2_ACCOUNT_ID: "acct", R2_ACCESS_KEY_ID: "id", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "uploads" })) vi.stubEnv(key, value);
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+    const url = (input as Request).url;
+    return new Response(url.endsWith("snapshots/aggregates.json")
+      ? encodeAggregates(buildAggregates(corpus as unknown as import("@/lib/upload-store").Corpus), "now")
+      : url.endsWith("snapshots/professions.json")
+        ? encodeProfessions(buildProfessions(corpus), "now") : "{}" );
+  }));
+  expect(await render(profession)).toEqual(before);
+  expect(store.loadCorpus).not.toHaveBeenCalled();
 });
