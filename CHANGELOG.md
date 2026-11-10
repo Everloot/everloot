@@ -205,6 +205,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: download shortcuts (`/download`, `/downloads`, `/desktop`, `/curseforge`), CurseForge install choices and a
   Desktop App button for your operating system make downloads easier to find, including on phones.
 - Site: Zone pages have an Items tab with the items players looted from the NPCs and objects confirmed there, each with its source, observed frequency and installs (an item two sources drop is one row with its sources under it, 50 items a page), and an empty zone says a rate needs loot windows from 3 installs. The header links the zone's coverage page and its wiki page when one is published, and a line under the tabs links the farming and gathering pages that list the zone. When the loot tables cannot be read the tab says so instead of vanishing.
+- Site: dungeon and raid pages list the quests players filed under the instance in their quest log (matched by the quest-log header 3 installs agree on), with installs and last seen, and every boss under Loot says when no creature is tied to it yet. Instance 2999 shows as Ruins of Lordaeron, a name taken from the game files and marked as such.
 - Site: object, instance, faction, title, achievement and vendor pages now link the Warcraft Wiki lore page of the same name, item pages do too when the name shown is the wiki's, and lore pages link back to the database page (zone, instance, object, faction, title, achievement, NPC, item or quest). A link needs an exact name that only one page has on each side; a name two pages share gets no link. Zone pages follow the same rule, and a Warcraft Wiki copy is indexed and listed in the lore sitemap exactly when it links back.
 
 ### Fixed
@@ -216,6 +217,13 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   deploy that changes either shows at once; an idle cron run rewrites a view built from an older snapshot, and the
   cron reads the corpus once for all the stored views it writes.
 - Site: /database splits its rows into "Seen by players" and "From the game files", says after launch that a row fills when 3 installs agree, and drops the Guilds lookup row (the Tools menu has it).
+- MCP: `market_value` and `auction_history` read a realm the same way. A name that is the end of exactly one realm's
+  full name (`US1 Realm 4 PvP`) answers for that realm (`CAMWOW US1 Realm 4 PvP`) and says so; a name that ends several,
+  or that no scan uses, answers ambiguous or unknown with the closest realms to ask with, instead of "No public market
+  value"; an ambiguous name returns no price at all, not even from browsing history stored under the name as typed.
+  `auction_history` lists the public full-scan days `market_value` values the item by, and its browsing days follow the
+  market's rule, so a day Everloot's own installs scanned is public under 3 and says so. Before, it answered "Price
+  unrecorded" for days `market_value` listed.
 - Knowledge base: a self-hosted MCP server and `coverage-report` read the whole public corpus again. The reader stopped
   at 50 pages and 2 MB in all, and the feed is now about 98 pages and 13 MB; the limits are per page with a high total
   guard. Without a key the site allows 30 requests an hour, so a rate-limited read now says to set `EVERLOOT_API_KEY`.

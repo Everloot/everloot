@@ -1,6 +1,7 @@
 import { AwsClient } from "aws4fetch";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
 import { auctionHistories, auctionHistoryKey, auctionSightingsFromRecords, type AuctionPoint } from "../../../kb/src/auction-history";
+import { trustedInstalls } from "../../../kb/src/trusted-source";
 import { uploadStore, type Corpus, type R2Config } from "./upload-store";
 
 /**
@@ -35,14 +36,17 @@ function r2FromEnv(env: Record<string, string | undefined> = process.env): R2Con
 const r2Url = (cloud: R2Config) => `https://${cloud.r2AccountId}.r2.cloudflarestorage.com/${cloud.r2Bucket}/${AUCTION_HISTORY_KEY}`;
 const r2 = (cloud: R2Config) => new AwsClient({ accessKeyId: cloud.r2AccessKeyId, secretAccessKey: cloud.r2SecretAccessKey, service: "s3", region: "auto" });
 
-/** The file from a corpus read, dated by the corpus. Throws when the corpus is out of reach. */
-export function buildAuctionHistory(corpus: Corpus, now = new Date()): AuctionHistoryFile {
+/**
+ * The file from a corpus read, dated by the corpus. Throws when the corpus is out of reach. A day one of Everloot's own
+ * installs scanned is public under 3, as in the market rollup (kb/src/trusted-source.ts).
+ */
+export function buildAuctionHistory(corpus: Corpus, now = new Date(), trusted: ReadonlySet<string> = trustedInstalls(process.env.EVERLOOT_TRUSTED_INSTALLS)): AuctionHistoryFile {
   if (corpus.unreachable) throw new Error("corpus unreachable");
   return {
     version: 1,
     generatedAt: now.toISOString(),
     dataAsOf: corpus.dataAsOf ?? null,
-    histories: auctionHistories(auctionSightingsFromRecords(corpus.records)),
+    histories: auctionHistories(auctionSightingsFromRecords(corpus.records), trusted),
   };
 }
 
