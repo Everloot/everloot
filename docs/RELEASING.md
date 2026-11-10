@@ -198,7 +198,7 @@ database `KNOWLEDGE_D1` (imported from the SQL that `web/scripts/cf-release-d1.m
 
 ## Bulk export
 
-The published data as files (ROADMAP: "an open data export"), built from the same loaders the JSON
+The published data as files (see [`ROADMAP.md`](../ROADMAP.md) and the separate [open data export](OPEN_DATA.md)), built from the same loaders the JSON
 API uses, so every row is one the API serves: the public corpus with per-install pseudonyms in place of install ids, drop rates and
 measured zeros under the three-install rule, relations (observed and game-file, each labelled) and the
 items of the build. One NDJSON file per dataset plus `index.json`, whose shape is `bulkIndex` in the
