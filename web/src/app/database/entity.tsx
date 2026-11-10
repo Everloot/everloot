@@ -28,20 +28,19 @@ export function Unconfirmed({ children, className = "" }: { children: ReactNode;
 }
 
 /**
- * The header's icon: the game icon, or an empty frame of the same size when there is none to show. An item's icon
+ * The header's icon: omitted when game art is unavailable. An item's icon
  * (the page passes the game's question mark where its own is missing) has its quality border and no frame; with no
  * asset files an item has no icon at all.
  */
 export function EntityIcon({ src, quality, unconfirmed = false, item = false }: { src?: string | null; quality?: Quality; unconfirmed?: boolean; item?: boolean }) {
-  if (item) return src ? (
+  if (!src) return null;
+  if (item) return (
     <span className="shrink-0" data-unconfirmed={unconfirmed || undefined} title={unconfirmed ? UNCONFIRMED_TITLE : undefined}>
       <GameIcon src={src} quality={quality} size={40} className="rounded-[3px]" />
       {unconfirmed && <span className="sr-only"> unconfirmed</span>}
     </span>
-  ) : null;
-  const icon = src
-    ? <GameIcon src={src} size={40} className="rounded-[3px]" />
-    : <span aria-hidden="true" className="block h-10 w-10 rounded-[3px] bg-panel" />;
+  );
+  const icon = <GameIcon src={src} quality={quality} size={40} className="rounded-[3px]" />;
   return unconfirmed ? <Unconfirmed className="shrink-0 p-px">{icon}</Unconfirmed> : <span className="shrink-0">{icon}</span>;
 }
 

@@ -27,7 +27,7 @@ const rows = (root: HTMLElement) => [...root.querySelectorAll<HTMLElement>("[dat
 /** What a screen reader says for a line: a coin by its metal's name. */
 function spoken(p: HTMLElement): string {
   const copy = p.cloneNode(true) as HTMLElement;
-  copy.querySelectorAll("[role=img]").forEach((img) => img.replaceWith(` ${img.getAttribute("aria-label")}`));
+  copy.querySelectorAll('[aria-hidden="true"]').forEach((img) => img.remove());
   return copy.textContent!.replace(/\s+/g, " ").trim();
 }
 const row = (root: HTMLElement, start: string) => rows(root).find((p) => p.textContent!.startsWith(start))!;
@@ -38,10 +38,10 @@ describe("item tooltip lines", () => {
     const root = card(lines);
     // One element per line, in the game's order (the item level moved up under the name, nothing else), reading the
     // same as the text (a pair's halves joined for screen readers).
-    expect(rows(root).map((p) => p.textContent)).toEqual(gameOrder(lines).map((l) => l.replace(" · ", ", ")));
-    expect(rows(root).map((p) => p.textContent)).toEqual([
+    expect(rows(root).map(spoken)).toEqual(gameOrder(lines).map((l) => l.replace(" · ", ", ").replace("1s 10c", "1 silver 10 copper")));
+    expect(rows(root).map(spoken)).toEqual([
       "Item Level 9", "Binds when equipped", "Main Hand, Mace", "[?] - [?] Damage, Speed 2.10", "([?] damage per second)",
-      "Requires Level 4", "Chance on hit: Synthetic effect.", "Sell Price: 1s 10c",
+      "Requires Level 4", "Chance on hit: Synthetic effect.", "Sell Price: 1 silver 10 copper",
     ]);
     expect(rows(root)[0].className).toBe("text-tip-yellow");
     const pairs = [...root.querySelectorAll("[data-tip-pair]")].map((p) => [...p.children].filter((c) => !c.classList.contains("sr-only")).map((c) => c.textContent));
@@ -54,18 +54,16 @@ describe("item tooltip lines", () => {
 
   test("armor: requirements neutral, Equip green, the set and the flavour text yellow, the price in three coins", () => {
     const root = card(itemTipText(ARMOR).lines);
-    expect(rows(root).map((p) => p.textContent).slice(0, 3)).toEqual(["Item Level 61", "Binds when equipped", "Head, Plate"]);
+    expect(rows(root).map(spoken).slice(0, 3)).toEqual(["Item Level 61", "Binds when equipped", "Head, Plate"]);
     for (const neutral of ["Binds when equipped", "Classes: Warrior", "Requires Level 56", "+[?] Strength"]) expect(row(root, neutral).className, neutral).toBe("");
     expect(row(root, "Equip:").className).toBe("text-q-uncommon");
     expect(row(root, "Set: Synthetic Battlegear").className).toBe("text-tip-yellow");
     expect(row(root, '"Synthetic."').className).toBe("text-tip-yellow");
     const price = row(root, "Sell Price:");
-    // The letters stay on the coins, so the metal is never told by colour alone.
-    expect(price.textContent).toBe("Sell Price: 2g 18s 94c");
     expect(spoken(price)).toBe("Sell Price: 2 gold 18 silver 94 copper");
-    expect([...price.querySelectorAll("[role=img]")].map((c) => [c.getAttribute("aria-label"), c.className.match(/bg-coin-\w+/)![0]]))
-      .toEqual([["gold", "bg-coin-gold"], ["silver", "bg-coin-silver"], ["copper", "bg-coin-copper"]]);
-    expect([...price.querySelectorAll(".text-coin-gold, .text-coin-silver, .text-coin-copper")].map((c) => c.textContent)).toEqual(["2", "18", "94"]);
+    expect([...price.querySelectorAll("svg")].map((c) => c.getAttribute("class")))
+      .toEqual(expect.arrayContaining([expect.stringContaining("text-coin-gold"), expect.stringContaining("text-coin-silver"), expect.stringContaining("text-coin-copper")]));
+    expect(price.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(3);
   });
 
   test("the site moves the item level under the name and leaves the lines it is given in the order it got them", () => {
@@ -85,7 +83,7 @@ describe("item tooltip lines", () => {
 
   test("a consumable: its Use line green, a copper-only price, no columns", () => {
     const root = card(itemTipText(CONSUMABLE).lines);
-    expect(rows(root).map((p) => p.textContent)).toEqual(["Item Level 5", "Use: Restores [?] health over 18 sec.", "Sell Price: 1c"]);
+    expect(rows(root).map(spoken)).toEqual(["Item Level 5", "Use: Restores [?] health over 18 sec.", "Sell Price: 1 copper"]);
     expect(row(root, "Use:").className).toBe("text-q-uncommon");
     expect(root.querySelector("[data-tip-pair]")).toBeNull();
     expect(spoken(row(root, "Sell Price:"))).toBe("Sell Price: 1 copper");

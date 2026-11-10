@@ -1,19 +1,5 @@
-import { gameOrder, tipLine, type Metal } from "@/lib/tip-line";
-
-const COIN_TEXT: Record<Metal, string> = { gold: "text-coin-gold", silver: "text-coin-silver", copper: "text-coin-copper" };
-const COIN_FILL: Record<Metal, string> = { gold: "bg-coin-gold", silver: "bg-coin-silver", copper: "bg-coin-copper" };
-
-/**
- * A coin after its amount: a disc in the metal's colour with its letter (g, s, c) on it, so the metal reads without
- * the colour. Screen readers hear the metal's name.
- */
-function Coin({ metal }: { metal: Metal }) {
-  return (
-    <span role="img" aria-label={metal} className={`ml-0.5 inline-flex size-3 items-center justify-center rounded-full align-[-1px] text-[9px] font-bold leading-none text-tooltip ${COIN_FILL[metal]}`}>
-      {metal[0]}
-    </span>
-  );
-}
+import { CoinText } from "./Coins";
+import { gameOrder, tipLine } from "@/lib/tip-line";
 
 /**
  * An item tooltip's lines laid out as the game draws them (lib/tip-line.ts): slot and kind, and damage and speed, in
@@ -40,13 +26,7 @@ export default function TooltipLines({ lines }: { lines: readonly string[] }) {
           return (
             <p key={i}>
               {t.label}
-              {t.coins.map((c) => (
-                <span key={c.metal} className="tabular-nums">
-                  {" "}
-                  <span className={COIN_TEXT[c.metal]}>{c.amount}</span>
-                  <Coin metal={c.metal} />
-                </span>
-              ))}
+              {" "}<CoinText text={line.slice(t.label.length).trim()} />
             </p>
           );
         }
