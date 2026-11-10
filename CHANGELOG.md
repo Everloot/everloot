@@ -348,6 +348,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   `/reload`: the 0.3.22 addon release or earlier shows no community prices from the new price file.
 - Desktop App: the price file is fetched and written per auction house, and the Market page lists each realm's houses
   apart. The Characters page keeps two characters with the same name and realm apart.
+- Site: the home page banner no longer makes the page a few pixels wider than the window on a computer with a
+  scrollbar, so the page has nothing to scroll sideways at any width.
 
 ### Changed
 - Site: hover cards on item, NPC, quest and object links open faster. The card's frame shows at once with the name
