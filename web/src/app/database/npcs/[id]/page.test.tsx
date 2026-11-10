@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { WorldFacts } from "../../../../../../kb/src/world-pages";
 
 const mocks = vi.hoisted(() => ({ world: vi.fn(), rollup: vi.fn(), items: vi.fn() }));
@@ -25,8 +25,11 @@ const html = async () => renderToStaticMarkup(await NpcPage({ params: Promise.re
 const panel = (out: string, id: string) => out.split(`data-tab-panel="${id}"`)[1]?.split('role="tabpanel"')[0] ?? "";
 const fact = (out: string, name: string) => new RegExp(`>${name}</dt><dd[^>]*>(.*?)</dd>`).exec(out)?.[1];
 
+afterEach(() => vi.restoreAllMocks());
+
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-10T12:00:00Z"));
   facts = {
     npcs: installs.map((installId) => ({ installId, npcId: 1125, name: installId, mapId: 0, x: 0, y: 0, level: 55, reaction: "friendly", creatureType: "Humanoid", rank: "normal", capturedAt: at })),
     quests: [], vendors: [], unreachable: false,
@@ -49,9 +52,12 @@ test("four tabs link agreed goods and giver/turn-in quests with their evidence",
   expect(panel(out, "quests")).toContain("Giver");
   expect(panel(out, "quests")).toContain("Turn-in");
   for (const id of ["goods", "quests"]) {
-    expect(panel(out, id)).toContain("3 installs agree");
-    expect(panel(out, id)).toContain(`last reported ${at}`);
+    expect(panel(out, id)).toContain("3 of 3 installs agree");
+    expect(panel(out, id)).toContain(`last seen 2 days ago`);
   }
+  expect(panel(out, "goods")).not.toContain(">Installs<");
+  expect(out).toContain("1 goods and 3 quests");
+  expect(panel(out, "goods")).toContain("This NPC sells goods.");
   expect(mocks.world).toHaveBeenCalledTimes(1);
   expect(mocks.items).toHaveBeenCalledTimes(1);
 });
@@ -63,6 +69,8 @@ test("empty and below-threshold tabs explain the three-install rule without publ
     const out = await html();
     expect(panel(out, "goods")).toContain("No agreed goods yet. A price needs 3 installs.");
     expect(panel(out, "quests")).toContain("No agreed quest yet. A quest needs its giver or turn-in from 3 installs.");
+    expect(panel(out, "goods")).toContain(`data-agreement="${count}"`);
+    expect(panel(out, "quests")).toContain(`data-agreement="${count}"`);
     expect(panel(out, "goods")).not.toContain("12345");
     expect(panel(out, "quests")).not.toContain('href="/database/quests/10"');
   }
@@ -105,8 +113,8 @@ test("named NPC uses only agreed quest names and counts each install once per re
   const out = await html();
   expect(out).toMatch(/<h1[^>]*>A shopkeeper<\/h1>/);
   expect(panel(out, "quests")).toContain('href="/database/quests/10"');
-  expect(panel(out, "quests")).toContain("4 installs agree");
-  expect(panel(out, "quests")).toContain("last reported 2026-11-10T00:00:00Z");
+  expect(panel(out, "quests")).toContain("3 of 3 installs agree");
+  expect(panel(out, "quests")).toContain("last seen 12 h ago");
   expect(panel(out, "quests")).not.toContain(">one<");
 });
 
@@ -126,8 +134,8 @@ test("rechecks hide old agreements until three fresh installs agree", async () =
   facts.vendors.push(...goods().map((r) => ({ ...r, capturedAt: fresh })));
   facts.quests.push(...quest(10, "giverNpcId").map((r) => ({ ...r, capturedAt: fresh })));
   const out = await html();
-  expect(panel(out, "goods")).toContain(`last reported ${fresh}`);
-  expect(panel(out, "quests")).toContain(`last reported ${fresh}`);
+  expect(panel(out, "goods")).toContain(`last seen 12 h ago`);
+  expect(panel(out, "quests")).toContain(`last seen 12 h ago`);
 });
 
 test("unreachable storage shows unavailable panels rather than empty agreements", async () => {
@@ -143,4 +151,22 @@ test("vendor page keeps the same goods table after sharing it with NPC pages", a
   expect(out).toContain('href="/database/items/117"');
   expect(out).toContain("1g 23s 45c");
   expect(out).toContain("Installs");
+});
+
+test("short meters count agreement on one offer or relation, not unrelated reports", async () => {
+  facts.vendors = goods(2).map((r, i) => ({ ...r, priceCopper: i + 1 }));
+  facts.quests = [quest(10, "giverNpcId", 1)[0], quest(11, "giverNpcId", 2)[1]];
+  const out = await html();
+  expect(panel(out, "goods")).toContain('data-agreement="1"');
+  expect(panel(out, "quests")).toContain('data-agreement="1"');
+});
+
+test("zone rechecks reset goods and quest relations at the NPC's reported zone", async () => {
+  facts.npcs = facts.npcs.map((r) => ({ ...r, mapId: 1426, positionKind: "npc" }));
+  facts.vendors = goods();
+  facts.quests = quest(10, "giverNpcId");
+  facts.recheck = [{ source: "test", zones: [1426], since: "2026-11-09T00:00:00Z" }];
+  const out = await html();
+  expect(panel(out, "goods")).toContain('data-agreement="0"');
+  expect(panel(out, "quests")).toContain('data-agreement="0"');
 });

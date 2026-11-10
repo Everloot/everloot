@@ -87,7 +87,8 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
   const unreachable = facts.unreachable || rollup.stats.unreachable;
   const page = npcPage(npcId, facts);
   const goods = vendorPage(npcId, facts).offers;
-  const { quests, goodsEvidence } = npcRelations(npcId, facts);
+  const now = Date.now();
+  const { quests, goodsEvidence, goodsReported, questsReported } = npcRelations(npcId, facts, now);
   // The same traits as the NPC list, each shown when 3 installs agree.
   const traits = npcTraits(facts.npcs.filter((r) => r.npcId === npcId), facts.recheck);
   const pending = !unreachable && page.pendingLoot ? <p className="py-2 text-meta text-fg-2">{pendingLine(page.pendingLoot)}</p> : null;
@@ -109,7 +110,6 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
   const trail = [...trailFor("/database/npcs")!, { name: title, path: `/database/npcs/${npcId}` }];
   const named = title !== `NPC ${npcId}`;
   // The page in three lines: where it is, what players reported, and where the name came from.
-  const now = Date.now();
   const summary = entitySummary({
     identity: zone
       ? `Seen in ${zone.name}`
@@ -117,7 +117,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
         ? `Seen at map ${firstPin.mapId}, ${firstPin.x}, ${firstPin.y}`
         : "No position has been reported yet",
     observed: observedLine(
-      [dropped.length ? `${dropped.length} ${dropped.length === 1 ? "item drops" : "item drops"}` : null, page.pins.length ? `${page.pins.length} ${page.pins.length === 1 ? "map position" : "map positions"}` : null],
+      [dropped.length ? `${dropped.length} ${dropped.length === 1 ? "item drops" : "item drops"}` : null, page.pins.length ? `${page.pins.length} ${page.pins.length === 1 ? "map position" : "map positions"}` : null, goods.length ? `${goods.length} goods` : null, quests.length ? `${new Set(quests.map((q) => q.questId)).size} quests` : null],
       null,
       now,
     ),
@@ -178,10 +178,10 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
               id: "goods", label: "Goods", count: unreachable ? undefined : goods.length,
               panel: unreachable ? <Unreachable />
                 : goods.length ? <>
-                  <p className="py-2 text-meta text-fg-2">Sells: <Link href={`/database/vendors/${npcId}`} className={LINK}>Vendor goods</Link></p>
+                  <p className="py-2 text-meta text-fg-2">This NPC sells goods. <Link href={`/database/vendors/${npcId}`} className={LINK}>Open the vendor page</Link></p>
                   <VendorGoods title={title} offers={goods} tips={tips} items={names} evidence={goodsEvidence} />
                 </>
-                : <EmptyTab message="No agreed goods yet. A price needs 3 installs." />,
+                : <EmptyTab reported={goodsReported} message="No agreed goods yet. A price needs 3 installs." />,
             },
             {
               id: "quests", label: "Quests", count: unreachable ? undefined : quests.length,
@@ -197,7 +197,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
                   rows={quests}
                   rowKey={(q) => `${q.questId}-${q.role}`}
                 />
-                : <EmptyTab message="No agreed quest yet. A quest needs its giver or turn-in from 3 installs." />,
+                : <EmptyTab reported={questsReported} message="No agreed quest yet. A quest needs its giver or turn-in from 3 installs." />,
             },
             {
               id: "map", label: "Map", count: unreachable ? undefined : page.pins.length,

@@ -2,8 +2,7 @@ import EntityLink from "@/components/EntityLink";
 import ItemTip from "@/components/game/ItemTip";
 import { DataTable } from "@/components/ui";
 import { stockLabel, type VendorOffer } from "../../../../../kb/src/world-pages";
-import type { loadItemTips } from "@/lib/game-assets";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 
 function formatCopper(copper: number): string {
   const gold = Math.floor(copper / 10000);
@@ -18,7 +17,7 @@ function formatCopper(copper: number): string {
 
 export function VendorGoods({ title, offers, tips, items, evidence }: {
   title: string; offers: VendorOffer[];
-  tips: Awaited<ReturnType<typeof loadItemTips>>; items: Map<number, string>;
+  tips: Map<number, NonNullable<ComponentProps<typeof ItemTip>["tip"]>>; items: Map<number, string>;
   evidence?: (offer: VendorOffer) => ReactNode;
 }) {
   return (
@@ -29,8 +28,9 @@ export function VendorGoods({ title, offers, tips, items, evidence }: {
         { key: "item", header: "Item", cell: (o: VendorOffer) => <ItemTip tip={tips.get(o.itemId)}><EntityLink kind="item" id={o.itemId} name={items.get(o.itemId) ?? tips.get(o.itemId)?.name} /></ItemTip> },
         { key: "price", header: "Price", numeric: true, cell: (o: VendorOffer) => formatCopper(o.priceCopper) },
         { key: "stock", header: "Stock", numeric: true, cell: (o: VendorOffer) => stockLabel(o) },
-        ...(evidence ? [{ key: "reported", header: "Reported", cell: evidence }] : []),
-        { key: "installs", header: "Installs", numeric: true, cell: (o: VendorOffer) => o.reporters },
+        ...(evidence ? [{ key: "reported", header: "Reported", cell: evidence }] : [
+          { key: "installs", header: "Installs", numeric: true, cell: (o: VendorOffer) => o.reporters },
+        ]),
       ]}
       rows={offers}
       rowKey={(o) => `${o.itemId}-${o.priceCopper}`}
