@@ -20,7 +20,13 @@ const WEEK_MS = 7 * DAY_MS;
 
 export type Direction = "in" | "out";
 
+/**
+ * Every summary row keeps the install it came from: one name and realm on two installs (two accounts, or two
+ * computers) are two characters. The name and realm are labels. `install` numbers the file's installs 1, 2, ... in the
+ * order they first appear; the install id itself is never kept, so a remembered summary does not hold it.
+ */
 export interface RosterRow {
+  install: number;
   character: string;
   realm: string;
   /** Gold in the newest snapshot, in copper; null when the file has money events but no snapshot. */
@@ -49,6 +55,7 @@ export interface CategoryTotal {
 
 export interface Receipt {
   at: string;
+  install: number;
   character: string;
   realm: string;
   category: string;
@@ -57,6 +64,7 @@ export interface Receipt {
 }
 
 export interface GoldSeries {
+  install: number;
   character: string;
   realm: string;
   points: { at: string; copper: number }[];
@@ -85,8 +93,13 @@ export interface MoneyLedger {
 /** The parts of a ledger that change when it is narrowed to one character; the roster does not. */
 export type CharacterMoney = Pick<MoneyLedger, "river" | "week" | "categories" | "receipts" | "eventCount" | "history">;
 
-/** One character's key in byCharacter: name and realm. */
-export const characterKey = (r: { character: string; realm: string }) => `${r.character}-${r.realm}`;
+type Who = { install: number; character: string; realm: string };
+
+/** One character's key in byCharacter: install, name and realm ("1:Thrall-Moon Guard"). */
+export const characterKey = (r: Who) => `${r.install}:${r.character}-${r.realm}`;
+
+/** The same character on the same install: never by name and realm alone. */
+const sameCharacter = (a: Who, b: Who) => a.install === b.install && a.character === b.character && a.realm === b.realm;
 
 export function directionOf(category: string): Direction {
   return (SPENDING_CATEGORIES as readonly string[]).includes(category) ? "out" : "in";
@@ -137,7 +150,7 @@ function summarizeFlows(money: MoneyEvent[], series: GoldSeries[], now: number):
     eventCount: events.length,
     history: series
       .map((s) => ({ ...s, points: thin([...s.points].sort((a, b) => Date.parse(a.at) - Date.parse(b.at))) }))
-      .sort((a, b) => a.character.localeCompare(b.character)),
+      .sort((a, b) => a.character.localeCompare(b.character) || a.realm.localeCompare(b.realm) || a.install - b.install),
   };
 }
 
@@ -146,13 +159,17 @@ export function summarizeMoney(records: ReadonlyArray<Record<string, unknown>>, 
   const roster = new Map<string, RosterRow>();
   const series = new Map<string, GoldSeries>();
   const money: MoneyEvent[] = [];
+  const installs = new Map<string, number>();
 
   const rosterRow = (r: Record<string, unknown>): RosterRow | null => {
     const character = str(r.character), realm = str(r.realm);
     if (!character || !realm) return null;
-    const id = characterKey({ character, realm });
+    const raw = str(r.installId);
+    const install = installs.get(raw) ?? installs.size + 1;
+    installs.set(raw, install);
+    const id = characterKey({ install, character, realm });
     let row = roster.get(id);
-    if (!row) { row = { character, realm, copper: null, peakCopper: null, at: null }; roster.set(id, row); }
+    if (!row) { row = { install, character, realm, copper: null, peakCopper: null, at: null }; roster.set(id, row); }
     return row;
   };
 
@@ -167,7 +184,7 @@ export function summarizeMoney(records: ReadonlyArray<Record<string, unknown>>, 
       row.peakCopper = Math.max(row.peakCopper ?? 0, num(r.peakCopper), num(r.currentCopper));
       if (dated) {
         const id = characterKey(row);
-        const s = series.get(id) ?? { character: row.character, realm: row.realm, points: [] };
+        const s = series.get(id) ?? { install: row.install, character: row.character, realm: row.realm, points: [] };
         s.points.push({ at, copper: num(r.currentCopper) });
         series.set(id, s);
       }
@@ -177,18 +194,18 @@ export function summarizeMoney(records: ReadonlyArray<Record<string, unknown>>, 
       if (!row || !category || copper <= 0) continue;
       const at = str(r.capturedAt), ms = Date.parse(at);
       // Undated events count in the category totals only.
-      money.push({ at, ms: Number.isFinite(ms) ? ms : null, character: row.character, realm: row.realm, category, direction: directionOf(category), copper });
+      money.push({ at, ms: Number.isFinite(ms) ? ms : null, install: row.install, character: row.character, realm: row.realm, category, direction: directionOf(category), copper });
     }
   }
 
   const byCharacter: Record<string, CharacterMoney> = {};
   for (const [id, row] of roster) {
     const own = series.get(id);
-    byCharacter[id] = summarizeFlows(money.filter((e) => e.character === row.character && e.realm === row.realm), own ? [own] : [], now);
+    byCharacter[id] = summarizeFlows(money.filter((e) => sameCharacter(e, row)), own ? [own] : [], now);
   }
   return {
     madeAt: new Date(now).toISOString(),
-    roster: [...roster.values()].sort((a, b) => (b.copper ?? -1) - (a.copper ?? -1) || a.character.localeCompare(b.character)),
+    roster: [...roster.values()].sort((a, b) => (b.copper ?? -1) - (a.copper ?? -1) || a.character.localeCompare(b.character) || a.install - b.install),
     ...summarizeFlows(money, [...series.values()], now),
     byCharacter,
   };
@@ -203,6 +220,18 @@ export function narrowLedger(ledger: MoneyLedger, key: string | null): MoneyLedg
   return own ? { ...ledger, ...own } : ledger;
 }
 
+/** A roster row's label: name and realm, and when another row has the same name and realm, which install it is. */
+export function rosterLabel(row: RosterRow, roster: readonly RosterRow[]): string {
+  const hint = installHint(row, roster);
+  return `${row.character} (${row.realm}${hint ? `, ${hint}` : ""})`;
+}
+
+/** "install 2" when another row shares this row's name and realm, else "". */
+export function installHint(row: Who, rows: readonly Who[]): string {
+  const twin = rows.some((r) => r.install !== row.install && r.character === row.character && r.realm === row.realm);
+  return twin ? `install ${row.install}` : "";
+}
+
 /** A category as the page shows it: the record's own name, underscores as spaces ("auction_spend" → "auction spend"). */
 export const categoryLabel = (category: string) => category.replaceAll("_", " ");
 
@@ -210,7 +239,9 @@ export const categoryLabel = (category: string) => category.replaceAll("_", " ")
 export function isMoneyLedger(value: unknown): value is MoneyLedger {
   if (typeof value !== "object" || value === null) return false;
   const v = value as Record<string, unknown>;
-  return typeof v.madeAt === "string" && Array.isArray(v.roster) && Array.isArray(v.river) && Array.isArray(v.categories)
+  // A summary saved before rows kept their install has none: it is read again from the file rather than merged by name.
+  return typeof v.madeAt === "string" && Array.isArray(v.roster) && v.roster.every((r) => typeof (r as { install?: unknown })?.install === "number")
+    && Array.isArray(v.river) && Array.isArray(v.categories)
     && Array.isArray(v.receipts) && Array.isArray(v.history) && typeof v.eventCount === "number"
     && typeof v.week === "object" && v.week !== null && typeof v.byCharacter === "object" && v.byCharacter !== null;
 }

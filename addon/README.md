@@ -46,8 +46,11 @@ recipes are written (the status counts the others). For each recipe and colour t
 highest rank it was seen at: the highest is written when the colour changes, or at the first logout or reload on a
 new UTC day, so levelling a profession adds a few rows per recipe, not one per skill point or per reload. Disabling professions stops queued chunks.
 Tooltip prices show the item's newest public observation day separately from when the price file was built,
-and warn when either is old. Community values combine all auction houses on the realm; they are recorded
-asking-price estimates, not live listings or guaranteed sale prices.
+and warn when either is old. Community values are one auction house's: the character's faction house, or the open
+auctioneer's (a goblin house is the neutral one), named on the line; another house's price is never shown, and an older
+price file keyed by realm alone is not read, since its values may mix both factions. They are recorded asking-price
+estimates, not live listings or guaranteed sale prices. Your own latest scan of each house is kept per realm and house
+(`EverlootDB.houseScans`); a scan whose auctioneer could not be read says its house was not recorded.
 Below the prices, the tooltip shows where the item drops when three installs looted the source: each rate as
 drops of loot windows, with its installs and the date of the uploads behind it, from the drop rates the Desktop
 App writes into the same `EverlootPrices` file. Once that file is in the game, a missing price or drop source is

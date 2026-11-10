@@ -20,7 +20,7 @@ import { formatItemPage, itemPage } from "./item-page.js";
 import { formatItemNumbers, itemToolFactsFromRecords } from "./item-page-tool.js";
 import { reportedItemFacts } from "./item-facts.js";
 import { formatObjectPage, objectFactsFromRecords, objectPage, type ObjectFacts } from "./object-page.js";
-import { handleMarketValue, itemMarket, type MarketState } from "./market.js";
+import { handleMarketValue, itemMarketByHouse, type MarketState } from "./market.js";
 import { loadUploadRecords } from "./load-uploads.js";
 import { KNOWLEDGE_KINDS, MCP_PROMPT_NAMES, MCP_PROMPTS, MCP_RESOURCE_TEMPLATE_URIS, MCP_RESOURCE_TEMPLATES, MCP_RESOURCE_URIS, MCP_RESOURCES, MCP_TOOL_NAMES, MCP_TOOLS, parseRecords, type McpToolArgs, type McpToolDef, type McpToolName } from "@everloot/protocol";
 import { z } from "zod";
@@ -241,8 +241,11 @@ export async function marketValueAnswer(args: { realm: string; itemId: number },
   }
   if (!market) return notRead("Market values unavailable. They are unrecorded, not zero.");
   const now = new Date();
-  const { value, points } = itemMarket(market.state, args.realm, args.itemId, now);
-  const url = value || points.length ? marketItemUrl(args.realm, args.itemId) : undefined;
+  // The text names every house; the page carries the house with the most units listed, which the text names too.
+  const busiest = itemMarketByHouse(market.state, args.realm, args.itemId, now).sort((a, b) => b.value.quantity - a.value.quantity)[0];
+  const value = busiest?.value ?? null;
+  const points = busiest?.points ?? [];
+  const url = value ? marketItemUrl(args.realm, args.itemId) : undefined;
   return {
     text: `${withMore(handleMarketValue(args, market.state, now), url)}\n${answerFooter(market.dataAsOf)}`,
     structured: { connected: true, dataAsOf: market.dataAsOf, ...(url ? { url } : {}), page: { realm: args.realm.trim(), itemId: args.itemId, value, history: points } },

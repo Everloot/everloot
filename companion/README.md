@@ -34,15 +34,19 @@ npx tsx src/cli.ts prices --game "<World of Warcraft folder>"
 ```
 
 Reads the realms of your own auction scans in `Everloot.lua` (`lastScans` and the auction record kinds
-only; the realm of a guild or gold record is never sent), fetches each one from `/api/market/prices`, and writes
-the `EverlootPrices` slot addon under `Interface/AddOns`. Item tooltips show the community market
+only; the realm of a guild or gold record is never sent), fetches each realm's Alliance and Horde auction houses
+from `/api/market/prices` (and its neutral house when your scans read one), and writes the `EverlootPrices` slot
+addon under `Interface/AddOns`. Each house is its own market, so the file keys every block by realm and house
+(`"forever|horde"`); the addon reads the house of the character you play, or the auctioneer's while the auction
+house is open. Item tooltips show the community market
 value, minimum and historical price after the next `/reload`. `watch --game` refreshes them after
 every upload.
 
 - Prices are public market values only: a day counts when 3 reporters (distinct upload addresses) scanned the item
   (`kb/src/market.ts`). A realm's file holds at most 2,000 items, the ones with the most units listed. Your own latest scan shows in tooltips without the companion.
-- Each realm is one Lua-escaped string with an Adler-32 `sum`; the addon ignores a realm whose sum
-  fails. `addon/tests/market_contract.py` loads the golden file
+- Each house of a realm is one Lua-escaped string with an Adler-32 `sum`; the addon ignores a block whose sum
+  fails. A block keyed by the realm alone, from an older companion, may mix both factions: the addon does not show
+  it, and the next refresh replaces it. `addon/tests/market_contract.py` loads the golden file
   (`companion/scripts/write-prices-fixture.ts`) in real Lua 5.1.
 - A failed fetch keeps the previous file; it is never replaced with an empty list.
 

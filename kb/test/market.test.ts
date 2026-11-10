@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import {
   MARKET_LIMITS, MARKET_MAX_BYTES, MAX_PRICE_ROWS, OPEN_DAYS, THIN_UNITS, emptyMarket, foldMarket, handleMarketValue, itemListings, itemMarket,
-  marketBytes, marketHouses, marketPrices, marketRealms, parseHouse, realmMarket, trimMarket, uploadScans, validRealm,
+  marketBytes, marketHouses, marketPrices, marketRealms, parseHouse, realmMarket, trimMarket, uploadScans, validRealm, type MarketState,
 } from "../src/market.js";
 
 const NOW = new Date("2026-10-20T12:00:00Z");
@@ -324,7 +324,9 @@ test("a thin day is labelled and kept out of the market value", () => {
   const onlyThin = itemMarket(thinState, "Forever", 2589, NOW).value!;
   expect(onlyThin.market).toBeNull();
   expect(onlyThin).toMatchObject({ min: 100, thin: true });
-  const text = handleMarketValue({ realm: "Forever", itemId: 2589 }, thinState, NOW);
+  const thinHorde = foldMarket(emptyMarket(), trio("2026-10-20", 100, 2589, { house: "Horde" }, 1), NOW);
+  const text = handleMarketValue({ realm: "Forever", itemId: 2589 }, thinHorde, NOW);
+  expect(text).toContain("Horde auction house:");
   expect(text).toContain("unrecorded");
   expect(text).toContain("(thin");
 });
@@ -359,7 +361,7 @@ test("a realm's price file carries at most the requested rows, the items with th
 
 // --- Auction houses ---
 
-test("scans that name their house also make that house's own market; the realm-wide view blends every house", () => {
+test("scans that name their house make that house's own market and never a realm-wide blend", () => {
   const day = "2026-10-20";
   const rows = [
     ...trio(day, 100, 2589, { house: "Horde", faction: "Horde" }),
@@ -369,17 +371,24 @@ test("scans that name their house also make that house's own market; the realm-w
   expect(itemMarket(state, "Forever", 2589, NOW, "Horde").value).toMatchObject({ market: 100, reporters: 3 });
   expect(itemMarket(state, "forever", 2589, NOW, "Alliance").value).toMatchObject({ market: 300, reporters: 3 });
   expect(itemMarket(state, "Forever", 2589, NOW, "Neutral")).toEqual({ value: null, points: [] });
-  // The realm-wide view is what every reader got before houses: all six reporters, every house.
-  expect(itemMarket(state, "Forever", 2589, NOW).value).toMatchObject({ reporters: 6, market: 200 });
+  // The realm-wide view holds only scans whose house is unknown: none here, so nothing mixes the two houses.
+  expect(itemMarket(state, "Forever", 2589, NOW).value).toBeNull();
+  expect(state.realms).toEqual({});
   expect(marketPrices(state, "Forever", NOW, MAX_PRICE_ROWS, "Horde")).toMatchObject({ realm: "Forever", house: "Horde", items: [[2589, 100, 100, 100, 100, day, 3]] });
-  expect(marketPrices(state, "Forever", NOW)).not.toHaveProperty("house");
+  expect(marketPrices(state, "Forever", NOW)).toEqual({ realm: "Forever", items: [] });
   expect(marketHouses(state, NOW)).toEqual({ Forever: ["Alliance", "Horde"] });
+  expect(marketRealms(state, NOW)).toEqual(["Forever"]);
+  // market_value names each house and its own value.
+  const text = handleMarketValue({ realm: "Forever", itemId: 2589 }, state, NOW);
+  expect(text).toMatch(/Alliance auction house:\nMarket value: 3s 0c[\s\S]*Horde auction house:\nMarket value: 1s 0c/);
+  expect(text).toContain("No public value yet in the Neutral auction house.");
 });
 
-test("a scan without a house counts for its scanner's faction; one without either stays realm-wide only", () => {
+test("a scan without a house counts for its scanner's faction only; one without either stays in the house-unknown view", () => {
   const day = "2026-10-20";
   const byFaction = foldMarket(emptyMarket(), trio(day, 100, 2589, { faction: "Horde" }), NOW);
   expect(itemMarket(byFaction, "Forever", 2589, NOW, "Horde").value).toMatchObject({ reporters: 3 });
+  expect(itemMarket(byFaction, "Forever", 2589, NOW).value).toBeNull();
   const neutral = foldMarket(emptyMarket(), trio(day, 100, 2589, { faction: "Horde", house: "Neutral" }), NOW);
   expect(itemMarket(neutral, "Forever", 2589, NOW, "Horde").value).toBeNull();
   expect(itemMarket(neutral, "Forever", 2589, NOW, "Neutral").value).toMatchObject({ reporters: 3 });
@@ -387,22 +396,47 @@ test("a scan without a house counts for its scanner's faction; one without eithe
   expect(old.houses).toBeUndefined();
   expect(marketHouses(old, NOW)).toEqual({});
   expect(itemMarket(old, "Forever", 2589, NOW).value).toMatchObject({ reporters: 3 });
+  // A house-unknown value is never presented as a house's price.
+  expect(handleMarketValue({ realm: "Forever", itemId: 2589 }, old, NOW)).toContain("No public market value yet in any auction house");
+  expect(marketRealms(old, NOW)).toEqual(["Forever"]);
 });
 
 test("a house needs its own 3 reporters, and closed house days collapse like realm days", () => {
   const day = dayBefore(OPEN_DAYS + 1);
   const rows = [...trio(day, 100).slice(0, 1), ...trio(day, 100, 2589, { house: "Horde" }).slice(1)];
   const state = foldMarket(emptyMarket(), rows, NOW);
-  expect(itemMarket(state, "Forever", 2589, NOW).points).toMatchObject([{ day, reporters: 3 }]);
+  expect(itemMarket(state, "Forever", 2589, NOW).points).toEqual([]);
   expect(itemMarket(state, "Forever", 2589, NOW, "Horde").points).toEqual([]);
-  expect(state.houses).toBeUndefined();
+  expect(state).toEqual(emptyMarket());
+  const horde = foldMarket(emptyMarket(), trio(day, 100, 2589, { house: "Horde" }), NOW);
+  expect(itemMarket(horde, "Forever", 2589, NOW, "Horde").points).toMatchObject([{ day, reporters: 3 }]);
+  expect(horde.houses!["forever|horde"]!.items["2589"]!.open).toEqual({});
 });
 
-test("house scans count against the same entry cap, after the realm-wide view", () => {
-  const rows = trio("2026-10-20", 100, 2589, { house: "Horde" });
+test("each scan is stored once, in its house: house scans and house-unknown scans share the entry cap", () => {
+  const rows = [...trio("2026-10-20", 100, 2589, { house: "Horde" }), ...trio("2026-10-20", 100, 765)];
   const state = foldMarket(emptyMarket(), rows, NOW, { entries: 4 });
-  expect(itemMarket(state, "Forever", 2589, NOW).value).toMatchObject({ reporters: 3 });
-  expect(Object.keys(state.houses!["forever|horde"]!.items["2589"]!.open["2026-10-20"]!)).toHaveLength(1);
+  expect(itemMarket(state, "Forever", 2589, NOW, "Horde").value).toMatchObject({ reporters: 3 });
+  expect(Object.keys(state.realms.forever!.items["765"]!.open["2026-10-20"]!)).toHaveLength(1);
+});
+
+test("a realm's houses share one place under the realm cap", () => {
+  const rows = [
+    ...trio("2026-10-20", 100, 2589, { house: "Horde" }), ...trio("2026-10-20", 100, 2589, { house: "Alliance" }),
+    ...trio("2026-10-20", 100, 2589, { realm: "Nightfall", house: "Horde" }),
+  ];
+  const stats = { dropped: 0 };
+  const state = foldMarket(emptyMarket(), rows, NOW, { realms: 1 }, stats);
+  expect(Object.keys(state.houses!).sort()).toEqual(["forever|alliance", "forever|horde"]);
+  expect(stats.dropped).toBe(3);
+});
+
+test("a fold over a stored realm-wide day from before houses were kept apart adds no new scan to it", () => {
+  const day = "2026-10-20";
+  const before: MarketState = { version: 3, realms: { forever: { name: "Forever", items: { "2589": { open: {}, closed: { "2026-10-12": [100, 200, 40, 6] } } } } } };
+  const state = foldMarket(before, trio(day, 100, 2589, { house: "Horde" }), NOW);
+  expect(state.realms.forever!.items["2589"]).toEqual({ open: {}, closed: { "2026-10-12": [100, 200, 40, 6] } });
+  expect(itemMarket(state, "Forever", 2589, NOW, "Horde").value).toMatchObject({ reporters: 3, day });
 });
 
 test("uploadScans keeps the faction and house, and a house is named in any case", () => {
@@ -423,7 +457,8 @@ test("a trusted install makes a day public on its own, labelled; strangers still
   const state = foldMarket(emptyMarket(), own, NOW, {}, undefined, trusted);
   expect(itemMarket(state, "Forever", 2589, NOW).value).toMatchObject({ min: 100, reporters: 1 });
   expect(itemListings(state, "Forever", 2589, NOW)).toEqual({ [day]: 4 });
-  expect(handleMarketValue({ realm: "Forever", itemId: 2589 }, state, NOW)).toContain("1 reporter (includes Everloot's own scans)");
+  const ownHorde = foldMarket(emptyMarket(), own.map((r) => ({ ...r, house: "Horde" })), NOW, {}, undefined, trusted);
+  expect(handleMarketValue({ realm: "Forever", itemId: 2589 }, ownHorde, NOW)).toContain("1 reporter (includes Everloot's own scans)");
   // A scan stored before the install was trusted is re-marked by the next trusted fold, so its day survives closing.
   const closing = new Date("2026-10-30T12:00:00Z");
   const untrusted = foldMarket(emptyMarket(), own, NOW);

@@ -56,7 +56,7 @@ export function HousePrices({ rows, caption, now }: { rows: MarketRow[]; caption
     { key: "units", header: "Units", numeric: true, cell: (r) => r.value.quantity.toLocaleString("en-US") },
     { key: "updated", header: "Updated", numeric: true, cell: (r) => (r.updatedAt !== null ? <TimeAgo at={r.updatedAt} renderedAt={now.getTime()} /> : r.value.day) },
   ];
-  return <DataTable dense caption={caption} columns={columns} rows={rows} rowKey={(r) => r.house ?? "all"} />;
+  return <DataTable dense caption={caption} columns={columns} rows={rows} rowKey={(r) => r.house} />;
 }
 
 /**
@@ -207,6 +207,7 @@ export function RealmPrices({ rows, caption, empty }: { rows: MarketRow[]; capti
       key: "realm", header: "Realm", nowrap: true,
       cell: (r) => <Link href={itemHref(r.realm, r.value.itemId)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg"><RealmName name={r.realm.name} /></Link>,
     },
+    { key: "house", header: "House", nowrap: true, cell: (r) => r.house },
     { key: "market", header: "Market value", numeric: true, cell: (r) => <span className={r.value.market === null ? "text-muted" : undefined}>{money(r.value.market)}</span> },
     { key: "min", header: "Min buyout", numeric: true, cell: (r) => formatCopper(r.value.min) },
     { key: "historical", header: "Historical", numeric: true, cell: (r) => formatCopper(r.value.historical) },
@@ -214,7 +215,7 @@ export function RealmPrices({ rows, caption, empty }: { rows: MarketRow[]; capti
     { key: "reporters", header: "Reporters", numeric: true, cell: (r) => reporterCell(r.value.reporters) },
     { key: "day", header: "Day", numeric: true, cell: (r) => r.value.day },
   ];
-  return <DataTable caption={caption} columns={columns} rows={rows} rowKey={(r) => r.realm.key} empty={<EmptyState framed={false} message={empty} />} />;
+  return <DataTable caption={caption} columns={columns} rows={rows} rowKey={(r) => `${r.realm.key}:${r.house}`} empty={<EmptyState framed={false} message={empty} />} />;
 }
 
 /** The public days behind one price, newest first. */

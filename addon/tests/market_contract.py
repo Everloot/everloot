@@ -48,6 +48,9 @@ for _, name in ipairs({ 'PlaceAuctionBid', 'StartAuction', 'PostAuction', 'Cance
 end
 
 GetRealmName = function() return 'Forever' end
+-- An Alliance character: community prices are read from the Alliance house of the realm. No auctioneer unit is
+-- readable here (no UnitExists), so these scans record their faction but not their house.
+UnitFactionGroup = function() return 'Alliance', 'Alliance' end
 
 -- Replicate rows: name, texture, count, quality, usable, level, levelType, minBid, minIncrement,
 -- buyoutPrice, bidAmount, highBidder, bidderFullName, owner, ownerFullName, saleStatus, itemID, hasAllInfo
@@ -174,7 +177,8 @@ assert(Everloot:Status():find('auction_snapshot'), 'status counts the snapshot r
 lua.execute("""
 local own = tooltipFor(2589)
 assert(own:find('Your scan: min 1s 0c') and own:find('value 1s 10c') and own:find('100 units listed, scanned under 1 h ago'), own)
-assert(not own:find('all houses'), 'an own scan is not an all-house price: ' .. own)
+assert(own:find('scanned under 1 h ago, house not recorded'), 'a scan whose auctioneer was not read says its house is unknown: ' .. own)
+assert(not own:find('Alliance house'), 'an own scan is not the community price: ' .. own)
 assert(tooltipFor(424242) == '', 'no line for an item with no price')
 tripped = false
 os = { execute = function() tripped = true end }
@@ -186,14 +190,15 @@ Everloot:ResetPrices()
 local both = tooltipFor(2589)
 assert(both:find('Everloot market 2s 5c') and both:find('min 2s 0c') and both:find('historical 1s 90c'), both)
 assert(both:find('3 reporters'), both)
-assert(both:find('Everloot market 2s 5c · per unit · all houses\\n  min 2s 0c\\n  historical 1s 90c\\n', 1, true),
+assert(both:find('Everloot market 2s 5c · per unit · Alliance house\\n  min 2s 0c\\n  historical 1s 90c\\n', 1, true),
   'the community prices say their unit and scope, with min and historical under them: ' .. both)
-assert(both:find('Your scan: min 1s 0c') and not both:find('Your scan[^\\n]*all houses'), 'the own scan keeps its own label: ' .. both)
+assert(both:find('Your scan: min 1s 0c') and not both:find('Your scan[^\\n]*Alliance house'), 'the own scan keeps its own label: ' .. both)
+assert(not both:find('9s 0c'), 'the Horde house of the same realm is another market, never shown to an Alliance character: ' .. both)
 local herb = tooltipFor(765)
 assert(herb:find('market unrecorded'), 'a null market value is unrecorded, never zero: ' .. herb)
-assert(herb:find('all houses'), 'a thin or unrecorded row still says its scope: ' .. herb)
+assert(herb:find('Alliance house'), 'a thin or unrecorded row still says its house: ' .. herb)
 
-EverlootPricesDB.realms.forever.sum = 1
+EverlootPricesDB.realms['forever|alliance'].sum = 1
 Everloot:ResetPrices()
 printed = {}
 local tampered = tooltipFor(2589)
@@ -246,7 +251,7 @@ assert(Everloot.DayNumber('nope') == nil)
 local rowsText = {}
 for id = 1, 3000 do rowsText[#rowsText + 1] = string.format('%d,%s,%d,%d,%d,2026-10-20,3', id, (id == 2 and '' or '500'), 400, 450, (id == 2 and 2 or 50)) end
 local data = table.concat(rowsText, ';')
-EverlootPricesDB.realms.bigrealm = { dataAsOf = '2026-10-20T06:30:00.000Z', data = data, sum = Everloot.Adler32(data) }
+EverlootPricesDB.realms['bigrealm|alliance'] = { dataAsOf = '2026-10-20T06:30:00.000Z', data = data, sum = Everloot.Adler32(data) }
 GetRealmName = function() return 'Bigrealm' end
 Everloot:ResetPrices()
 timers = {}
@@ -265,7 +270,7 @@ local thin = tooltipFor(2)
 assert(thin:find('unrecorded %(thin%)'), thin)
 
 -- A tampered large file never shows, and is reported once checked.
-EverlootPricesDB.realms.bigrealm.sum = 5
+EverlootPricesDB.realms['bigrealm|alliance'].sum = 5
 Everloot:ResetPrices()
 printed = {}
 tooltipFor(7); drain()
@@ -282,7 +287,7 @@ assert(tooltipFor(424242):find('No price on Forever yet'), 'a small file that la
 lua.execute("""
 local function priceFile(asOf, day)
   local data = '2589,205,200,190,40,' .. day .. ',3'
-  EverlootPricesDB = { realms = { forever = { dataAsOf = asOf, data = data, sum = Everloot.Adler32(data) } } }
+  EverlootPricesDB = { realms = { ['forever|alliance'] = { dataAsOf = asOf, data = data, sum = Everloot.Adler32(data) } } }
   Everloot:ResetPrices()
   return tooltipFor(2589)
 end
@@ -322,9 +327,9 @@ local linen = ask(LINK)
 assert(linen:find('Everloot price: ' .. LINK:gsub('%p', '%%%0') .. ' on Forever'), linen)
 assert(linen:find('Everloot market 2s 5c') and linen:find('min 2s 0c') and linen:find('historical 1s 90c'), 'same numbers as the tooltip: ' .. linen)
 local at
-for i, p in ipairs(printed) do if p:find('Everloot market 2s 5c · per unit · all houses', 1, true) then at = i end end
+for i, p in ipairs(printed) do if p:find('Everloot market 2s 5c · per unit · Alliance house', 1, true) then at = i end end
 assert(at and printed[at + 1]:find('  min 2s 0c', 1, true) and printed[at + 2]:find('  historical 1s 90c', 1, true),
-  'the command says the community prices are per-unit and all-house too, min and historical under them: ' .. linen)
+  'the command says the community prices are per-unit and which house too, min and historical under them: ' .. linen)
 assert(linen:find('Your scan: min 1s 0c'), 'the player\\'s own scan too: ' .. linen)
 assert(linen:find('everloot.app/tools/auctions%?realm=Forever&item=2589'), 'the full history is on the site: ' .. linen)
 assert(ask('2589'):find('Everloot market 2s 5c'), 'an item id works')
@@ -333,11 +338,12 @@ assert(ask('765'):find('market unrecorded'), 'a null market value is unrecorded,
 assert(ask(''):find('shift%-click'), 'no item says how to give one')
 assert(ask('Never Seen Sword'):find('shift%-click'), 'a name the client has not loaded says how to give one')
 assert(ask('424242'):find('No price for this item on this realm yet'), 'an item without a price says so')
+assert(ask('424242'):find('on Forever, Alliance auction house', 1, true), 'the command names the house it read')
 
 GetRealmName = function() return 'Nowhere' end
 Everloot:ResetPrices()
 local noRealm = ask('2589')
-assert(noRealm:find('has no data for Nowhere') and noRealm:find('/reload'), 'a file without this realm says so: ' .. noRealm)
+assert(noRealm:find('has no data for the Alliance auction house on Nowhere') and noRealm:find('/reload'), 'a file without this realm says so: ' .. noRealm)
 assert(not noRealm:find('failed') and not noRealm:find('No price for this item'), noRealm)
 local savedPrices = EverlootPricesDB
 EverlootPricesDB = nil
@@ -348,20 +354,20 @@ EverlootPricesDB = savedPrices
 
 -- A failed checksum is said so, and is not a missing price.
 GetRealmName = function() return 'Forever' end
-EverlootPricesDB.realms.forever.sum = 1
+EverlootPricesDB.realms['forever|alliance'].sum = 1
 Everloot:ResetPrices()
 printed = {}
 local refused = ask('2589')
 assert(refused:find('failed their checksum') and refused:find('not used'), 'a command says the checksum failed: ' .. refused)
 assert(not refused:find('No price for this item'), 'a failed file is not a missing price: ' .. refused)
-EverlootPricesDB.realms.forever.sum = 1634601863
+EverlootPricesDB.realms['forever|alliance'].sum = 1634601863
 Everloot:ResetPrices()
 
 -- A large file still being checked: the answer waits for the checksum, then prints.
 local big = {}
 for id = 1, 3000 do big[#big + 1] = string.format('%d,500,400,450,50,2026-10-20,3', id) end
 local data = table.concat(big, ';')
-EverlootPricesDB.realms.bigrealm = { dataAsOf = '2026-10-20T06:30:00.000Z', data = data, sum = Everloot.Adler32(data) }
+EverlootPricesDB.realms['bigrealm|alliance'] = { dataAsOf = '2026-10-20T06:30:00.000Z', data = data, sum = Everloot.Adler32(data) }
 GetRealmName = function() return 'Bigrealm' end
 Everloot:ResetPrices()
 timers = {}; printed = {}
@@ -454,7 +460,7 @@ assert(wordOf(rows[1].right) == 'Forever · per unit', 'the realm and the unit a
 -- the rows under it are indented.
 local values = valueRows(rows)
 local want = {
-  { 'Market value · all houses', '2s 5c', '' }, { 'Min buyout', '2s 0c', '  ' }, { 'Historical', '1s 90c', '  ' },
+  { 'Market value · Alliance house', '2s 5c', '' }, { 'Min buyout', '2s 0c', '  ' }, { 'Historical', '1s 90c', '  ' },
   { 'Your scan · min buyout', '1s 0c', '' }, { 'Value', '1s 10c', '  ' }, { 'Vendor', '13c', '' },
 }
 assert(#values == #want, 'one aligned row per value, got ' .. #values)
@@ -541,7 +547,7 @@ for _, unknown in ipairs({
 }) do
   GetItemInfo = unknown or nil
   rows = nativeTooltipFor(2589)
-  assert(labelled(rows, 'Market value · all houses') and not labelled(rows, 'Vendor'), 'an unknown vendor price has no row')
+  assert(labelled(rows, 'Market value · Alliance house') and not labelled(rows, 'Vendor'), 'an unknown vendor price has no row')
   for _, line in ipairs(Everloot.PriceLines('Forever', 2589)) do assert(not line.text:find('Vendor', 1, true), line.text) end
 end
 -- The modern reader comes first where the client has it.
@@ -561,22 +567,22 @@ assert(rows[2].wrap == true, 'the long missing note wraps instead of widening th
 -- community evidence and wraps.
 GetItemInfo = function() return nil end
 rows = nativeTooltipFor(765)
-assert(wordOf(labelled(rows, 'Market value · all houses').right) == 'unrecorded', 'unrecorded, not zero')
+assert(wordOf(labelled(rows, 'Market value · Alliance house').right) == 'unrecorded', 'unrecorded, not zero')
 assert(coinsOf(labelled(rows, 'Min buyout').right) == '30c' and coinsOf(labelled(rows, 'Historical').right) == '33c')
 local evidence, stale = lineAt(rows, '  900 units listed, 4 reporters on 2026-10-05'), lineAt(rows, 'STALE: newest public day 2026-10-05 is 15 days old')
 assert(evidence and stale == evidence + 1 and rows[stale].wrap == true, 'the stale day sits under its evidence and wraps')
 
 -- Thin markets (5 units or fewer on the newest day) are marked on their units, as the site marks them.
 local function priceFile(data, asOf)
-  EverlootPricesDB = { realms = { forever = { dataAsOf = asOf or '2026-10-20T06:30:00.000Z', data = data, sum = Everloot.Adler32(data) } } }
+  EverlootPricesDB = { realms = { ['forever|alliance'] = { dataAsOf = asOf or '2026-10-20T06:30:00.000Z', data = data, sum = Everloot.Adler32(data) } } }
   Everloot:ResetPrices()
 end
 priceFile('2,,400,450,2,2026-10-20,3;3,500,400,450,4,2026-10-20,3;4,10005,10000,123456,50,2026-10-20,3')
 rows = nativeTooltipFor(2)
-assert(wordOf(labelled(rows, 'Market value · all houses').right) == 'unrecorded (thin)', 'a thin unrecorded market')
+assert(wordOf(labelled(rows, 'Market value · Alliance house').right) == 'unrecorded (thin)', 'a thin unrecorded market')
 assert(lineAt(rows, '  2 units listed (thin), 3 reporters on 2026-10-20'), 'thin units are marked')
 rows = nativeTooltipFor(3)
-assert(coinsOf(labelled(rows, 'Market value · all houses').right) == '5s 0c' and lineAt(rows, '  4 units listed (thin), 3 reporters on 2026-10-20'),
+assert(coinsOf(labelled(rows, 'Market value · Alliance house').right) == '5s 0c' and lineAt(rows, '  4 units listed (thin), 3 reporters on 2026-10-20'),
   'a market value over a thin newest day keeps its value and marks the day thin')
 -- Gold keeps its silver and copper, as E.Coins writes them, and the plain line says the same amount.
 local gold = {}
@@ -595,15 +601,15 @@ rows = nativeTooltipFor(2589)
 local listed = lineAt(rows, '  40 units listed, 3 reporters on 2026-10-20')
 local itemStale, fileOld = lineAt(rows, 'STALE: newest public day 2026-10-20 is 10 days old'), lineAt(rows, 'OLD FILE: built 2026-10-20')
 assert(listed and itemStale == listed + 1 and fileOld == listed + 2 and fileOld < select(2, labelled(rows, 'Your scan · min buyout')), 'warnings beside the community values')
-assert(rows[itemStale].wrap and rows[fileOld].wrap and coinsOf(labelled(rows, 'Market value · all houses').right) == '2s 5c', 'they wrap, and the values stay')
+assert(rows[itemStale].wrap and rows[fileOld].wrap and coinsOf(labelled(rows, 'Market value · Alliance house').right) == '2s 5c', 'they wrap, and the values stay')
 date = function() return '2026-10-20T10:00:00Z' end
 
 -- The player's own scan alone: its rows and evidence, and no all-house label anywhere.
 EverlootPricesDB = nil
 Everloot:ResetPrices()
 rows = nativeTooltipFor(2589)
-assert(labelled(rows, 'Your scan · min buyout') and labelled(rows, 'Value') and lineAt(rows, '  100 units listed, scanned under 1 h ago'), 'the own scan alone')
-for _, row in ipairs(rows) do assert(not (row.left or row.text):find('all houses', 1, true), 'an own scan is not an all-house price') end
+assert(labelled(rows, 'Your scan · min buyout') and labelled(rows, 'Value') and lineAt(rows, '  100 units listed, scanned under 1 h ago, house not recorded'), 'the own scan alone')
+for _, row in ipairs(rows) do assert(not (row.left or row.text):find('Alliance house', 1, true), 'an own scan is not a community price') end
 assert(wordOf(rows[1].right) == 'Forever · per unit', 'its values are per unit too')
 
 -- A realm named for its ruleset shows the ruleset split off in its own colour, legible on the tooltip background.
@@ -887,12 +893,15 @@ for _, ending in ipairs({ 'PVE', 'PVP', 'RP', 'RPPVP', 'Hardcore' }) do
   end
 end
 
--- Community lookup must use the full name, never the display base without its ruleset.
+-- Community lookup must use the full name, never the display base without its ruleset. A Horde character away from
+-- the auction house reads its faction's house.
+fire('AUCTION_HOUSE_CLOSED')
+UnitFactionGroup = function() return 'Horde', 'Horde' end
 EverlootPricesDB = { realms = {} }
 for i, ending in ipairs({ 'PVE', 'PVP', 'RP', 'RPPVP', 'Hardcore' }) do
   local realm = 'CAMWOW US1 Realm 4 ' .. ending
   local data = '2589,' .. (100 + i) .. ',100,100,40,2026-11-10,3'
-  EverlootPricesDB.realms[realm:lower()] = { data = data, sum = Everloot.Adler32(data) }
+  EverlootPricesDB.realms[realm:lower() .. '|horde'] = { data = data, sum = Everloot.Adler32(data) }
 end
 Everloot:ResetPrices()
 for i, ending in ipairs({ 'PVE', 'PVP', 'RP', 'RPPVP', 'Hardcore' }) do
@@ -903,16 +912,111 @@ assert(Everloot:CommunityPrice('CAMWOW US1 Realm 4', 2589) == nil, 'no base-name
 assert(Everloot:CommunityPrice('CAMWOW EU1 Realm 4 PVP', 2589) == nil, 'no other-region fallback')
 """)
 
-# These are executable isolation requirements, not fixes. Their expected failures remain visible
-# until the owner approves a house-qualified price file and variant-qualified snapshot items.
+# Each auction house is its own market: the reader takes the character's house (the open auctioneer's when known),
+# an older realm-only file is never read as a house's price, and the player's own scans are kept per realm and house.
+lua.execute("""
+local realm = 'CAMWOW US1 Realm 4 PVP'
+local function block(price) local data = '2589,' .. price .. ',' .. price .. ',' .. price .. ',40,2026-11-10,3'; return { dataAsOf = '2026-11-10T06:00:00.000Z', data = data, sum = Everloot.Adler32(data) } end
+GetRealmName = function() return realm end
+EverlootPricesDB = { realms = { [realm:lower() .. '|alliance'] = block(100), [realm:lower() .. '|horde'] = block(900), [realm:lower() .. '|neutral'] = block(500) } }
+local faction = 'Alliance'
+UnitFactionGroup = function(unit) if unit == 'npc' then return nil end return faction, faction end
+Everloot:ResetPrices()
+assert(Everloot:MarketHouse() == 'Alliance' and Everloot:CommunityPrice(realm, 2589).market == 100, 'an Alliance character reads the Alliance house')
+faction = 'Horde'
+assert(Everloot:MarketHouse() == 'Horde' and Everloot:CommunityPrice(realm, 2589).market == 900, 'a Horde character reads the Horde house')
+-- At a goblin auctioneer the open house is the neutral one, whatever the character's faction.
+Everloot.auctionHouseKind = 'Neutral'
+assert(Everloot:MarketHouse() == 'Neutral' and Everloot:CommunityPrice(realm, 2589).market == 500, 'at a goblin auctioneer, the neutral house')
+local tip = tooltipFor(2589)
+assert(tip:find('Everloot market 5s 0c · per unit · Neutral house', 1, true), 'the tooltip names the house its price is for: ' .. tip)
+Everloot.auctionHouseKind = nil
+assert(Everloot:CommunityPrice(realm, 2589, 'Alliance').market == 100, 'a house can be asked for by name')
+-- A character whose faction cannot be read gets no community price rather than a guess.
+faction = nil
+assert(Everloot:MarketHouse() == nil and Everloot:CommunityPrice(realm, 2589) == nil, 'no house, no community price')
+assert(Everloot:PriceFile(realm).noHouse, 'and the file state says why')
+""")
+
+# An older price file keyed by realm alone: it still loads (the drops and sources beside it keep working), but its values
+# may mix both factions, so they are never read as a house's price. Ignoring them is the safer choice: a blended price can
+# sit far from what this house charges and nothing in the file says which house it came from, while a missing price is
+# already shown as unrecorded, never zero. The tooltip and /everloot price say why and how to refresh.
+lua.execute("""
+local realm = 'CAMWOW US1 Realm 8 PVP'
+GetRealmName = function() return realm end
+local data = '2589,700,700,700,40,2026-11-10,3'
+local drops = '2589,n,116,42,340,5'
+EverlootPricesDB = { realms = { [realm:lower()] = { dataAsOf = '2026-11-10T06:00:00.000Z', data = data, sum = Everloot.Adler32(data) } },
+  drops = { data = drops, sum = Everloot.Adler32(drops), dataAsOf = '2026-11-10T06:00:00.000Z' } }
+UnitFactionGroup = function(unit) if unit == 'npc' then return nil end return 'Horde', 'Horde' end
+Everloot:ResetPrices()
+assert(Everloot:CommunityPrice(realm, 2589) == nil, 'a realm-only price is not this house\\'s')
+local file = Everloot:PriceFile(realm)
+assert(file.legacy and file.status == 'bad' and file.silent, 'the file says it holds an older realm-only block')
+local tip = tooltipFor(2589)
+assert(not tip:find('7s 0c') and tip:find('from before houses were kept apart', 1, true), 'the tooltip says why there is no price: ' .. tip)
+assert(tip:find('Everloot drop: NPC 116', 1, true), 'the rest of an older file still reads: ' .. tip)
+printed = {}
+Everloot.PriceCommand('2589')
+local said = table.concat(printed, '\\n')
+assert(said:find('from before auction houses were kept apart', 1, true) and said:find('Desktop App') and not said:find('7s 0c'), said)
+""")
+
+# The player's own scans are indexed by realm and house: the Horde scan answers a Horde character, the Alliance scan an
+# Alliance one, and an older scan that recorded no house says so and never stands in for another house's scan.
+lua.execute("""
+local realm = 'CAMWOW US1 Realm 7 PVE'
+GetRealmName = function() return realm end
+EverlootPricesDB = nil
+Everloot:ResetPrices()
+UnitExists = function(unit) return unit == 'npc' end
+local house = 'Horde'
+UnitFactionGroup = function(unit) if unit == 'npc' then return house end return house, house end
+local function scanAt(h, price)
+  house = h
+  rows = {}; row(2589, 10, price * 10, true)
+  timers = {}; now = now + 901
+  fire('AUCTION_HOUSE_CLOSED'); fire('AUCTION_HOUSE_SHOW')
+  SlashCmdList.EVERLOOT('scan'); fire('REPLICATE_ITEM_LIST_UPDATE'); drain()
+  fire('AUCTION_HOUSE_CLOSED')
+end
+scanAt('Horde', 900)
+scanAt('Alliance', 100)
+assert(EverlootDB.houseScans[realm].Horde and EverlootDB.houseScans[realm].Alliance, 'one latest scan per house')
+assert(EverlootDB.houseScans[realm].Horde.scanId ~= EverlootDB.houseScans[realm].Alliance.scanId)
+house = 'Horde'
+local horde = Everloot:OwnScan(realm)
+assert(horde and horde.house == 'Horde' and horde.items[2589][4] == 900, 'a Horde character sees its own Horde scan, not the newer Alliance one')
+house = 'Alliance'
+assert(Everloot:OwnScan(realm).items[2589][4] == 100, 'an Alliance character sees the Alliance scan')
+assert(Everloot:OwnScan(realm, 'Neutral') == nil, 'no scan of the neutral house: none shown')
+assert(tooltipFor(2589):find('scanned under 1 h ago, Alliance house', 1, true), 'the own scan line names its house')
+-- Three more Alliance scans: the Horde scan is older than the three kept, and stays as that house's latest.
+for _ = 1, 3 do scanAt('Alliance', 120) end
+house = 'Horde'
+assert(Everloot:OwnScan(realm).items[2589][4] == 900, 'each house keeps its latest scan through pruning')
+-- An older scan with no house recorded: shown with that label, and only when it is the realm's latest scan.
+local old = 'old-scan'
+table.insert(EverlootDB.records.auction_snapshot, { realm = 'Old Realm', scanId = old, items = { { 2589, 1, 10, 333, 333 } } })
+EverlootDB.lastScans['Old Realm'] = { scanId = old, at = now }
+local legacy = Everloot:OwnScan('Old Realm')
+assert(legacy and legacy.house == nil and legacy.items[2589][4] == 333, 'an older scan without a house still answers')
+GetRealmName = function() return 'Old Realm' end
+assert(tooltipFor(2589):find('house not recorded', 1, true), 'and says its house was not recorded')
+GetRealmName = function() return realm end
+-- A realm whose latest scan read another house gives nothing for this one.
+EverlootDB.houseScans[realm].Horde = nil
+assert(Everloot:OwnScan(realm) == nil, 'the Alliance scan never stands in for the Horde house')
+UnitExists = nil
+""")
+
+# The item-variant requirement stays an executable expected failure: separating suffixes needs a protocol change,
+# which is the owner's call.
 import unittest
 
 
 class MarketIdentityGaps(unittest.TestCase):
-    @unittest.expectedFailure
-    def test_community_file_without_a_house_must_not_supply_a_faction_price(self):
-        lua.execute("UnitFactionGroup = function() return 'Horde' end")
-        self.assertIsNone(lua.eval("Everloot:CommunityPrice('CAMWOW US1 Realm 4 PVP', 2589)"))
 
     @unittest.expectedFailure
     def test_scan_must_keep_different_item_suffixes_separate(self):

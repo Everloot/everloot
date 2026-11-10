@@ -130,14 +130,15 @@ test("completion_progress and market_value answer from their own loaders, and sa
 
   const now = new Date();
   const scans = ["a-install", "b-install", "c-install"].map((installId, i) => ({
-    kind: "auction_snapshot", installId, eventId: `e:${i}`, capturedAt: now.toISOString(), realm: "Forever",
+    kind: "auction_snapshot", installId, eventId: `e:${i}`, capturedAt: now.toISOString(), realm: "Forever", faction: "Alliance",
     scanId: `s-${i}`, part: 1, parts: 1, items: [[2589, 2, 40, 100, 110]],
   }));
   const state = foldMarket(emptyMarket(), scans, now);
   const marketClient = await client({ market: async () => ({ state, dataAsOf: AS_OF }) });
   const marketResult = await marketClient.callTool({ name: "market_value", arguments: { realm: "Forever", itemId: 2589 } });
   const market = OUT.market_value.parse(marketResult.structuredContent);
-  const expected = itemMarket(state, "Forever", 2589, now);
+  // The page carries one house's value (the busiest); these scans read the Alliance house.
+  const expected = itemMarket(state, "Forever", 2589, now, "Alliance");
   expect(market).toEqual({ connected: true, dataAsOf: AS_OF, url: "https://everloot.app/tools/auctions?realm=Forever&item=2589", page: { realm: "Forever", itemId: 2589, value: expected.value, history: expected.points } });
   expect(market.page!.value).toMatchObject({ itemId: 2589, market: 110, reporters: 3 });
   expect(JSON.stringify(marketResult.content)).toContain("More: https://everloot.app/tools/auctions?realm=Forever&item=2589");

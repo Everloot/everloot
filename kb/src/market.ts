@@ -25,9 +25,11 @@
  * rollup fits, so history shortens before prices stop.
  *
  * Auction houses: the game files list Alliance, Horde and neutral (Blackwater) houses with different
- * cuts, so they are separate markets. Every scan still feeds the realm-wide view (`realms`, what every
- * reader got before houses were recorded). A scan that names its house, or failing that its scanner's
- * faction, also feeds that house's own view (`houses`), with the same 3-reporter rule per house.
+ * cuts, so they are separate markets. A scan that names its house, or failing that its scanner's faction,
+ * feeds that house's own view (`houses`), with the 3-reporter rule per house. Only a scan that names
+ * neither feeds the realm-wide view (`realms`): older scans whose house is unknown. Folds before houses
+ * were kept apart put every scan there too, so its stored days may mix houses until they leave the 60-day
+ * window; nothing can split them now. Readers ask for a house; the realm-wide view is never a house's price.
  *
  * Trusted installs (trusted-source.ts): while few players upload, a scan from one of Everloot's own installs
  * is folded with TRUSTED_REPORTER as its reporter, and a day with that reporter in it is public under 3.
@@ -82,9 +84,12 @@ export interface RealmDays { name: string; items: Record<string, ItemDays> }
 
 export interface MarketState {
   version: 3;
-  /** Keyed by the trimmed realm with ASCII letters lower-cased (as Lua's string.lower does); `name` is the first spelling seen. Every house blended. */
+  /**
+   * Keyed by the trimmed realm with ASCII letters lower-cased (as Lua's string.lower does); `name` is the first spelling seen.
+   * Scans whose house is unknown, and days folded before houses were kept apart: these may mix houses.
+   */
   realms: Record<string, RealmDays>;
-  /** One auction house of a realm, keyed by `houseKey`. Only scans that named a house or a faction; absent until one did. */
+  /** One auction house of a realm, keyed by `houseKey`. Every scan that named a house or a faction; absent until one did. */
   houses?: Record<string, RealmDays>;
 }
 
@@ -216,7 +221,7 @@ function publicOf(installs: Record<string, InstallScan>): ClosedDay | null {
   return [per(0), per(1), per(2), groups.length];
 }
 
-/** Every bucket of the state: the realm-wide views, then the per-house views. */
+/** Every bucket of the state: the house-unknown realm views, then the per-house views. */
 const buckets = (state: MarketState): Record<string, RealmDays>[] => [state.realms, state.houses ?? {}];
 
 /** Open install scans in the state: what MARKET_LIMITS.entries bounds. */
@@ -243,8 +248,9 @@ export interface FoldStats {
  * Fold auction_snapshot records into the state, then close days that left the open window and prune
  * days that left the 60-day window. A scan for a day that is already closed is ignored. A record that
  * would exceed a cap (new realm, new item, an install past the day's limit, or an entry past the total)
- * is dropped and counted in `stats`; scans from installs already counted still update. Every scan is folded
- * into the realm-wide view before any is folded into a house's view, so the caps favour the realm-wide view.
+ * is dropped and counted in `stats`; scans from installs already counted still update. A scan goes to one bucket
+ * only: its house's, or the realm-wide one when it names no house, so a new fold never mixes houses. The realm cap
+ * counts realms, not buckets: a realm's houses share its place.
  * A scan from a `trusted` install, and any open scan already stored from one, gets TRUSTED_REPORTER as its reporter.
  */
 export function foldMarket(previous: MarketState, records: readonly unknown[], now: Date, limits: Partial<typeof MARKET_LIMITS> = {}, stats?: FoldStats, trusted: ReadonlySet<string> = new Set()): MarketState {
@@ -254,12 +260,15 @@ export function foldMarket(previous: MarketState, records: readonly unknown[], n
   const itemCounts = new Map<RealmDays, number>();
   const countOf = (realm: RealmDays) => itemCounts.get(realm) ?? Object.keys(realm.items).length;
   const drop = (n = 1) => { if (stats) stats.dropped += n; };
-  /** One install's scan of one item into one bucket. False when the bucket is new and the map is full. */
-  const place = (map: Record<string, RealmDays>, key: string, maxKeys: number, name: string, day: string, itemId: number, installId: string, scan: InstallScan): boolean => {
+  const realmsHeld = new Set(Object.keys(state.realms));
+  for (const key of Object.keys(state.houses ?? {})) realmsHeld.add(key.slice(0, key.lastIndexOf("|")));
+  /** One install's scan of one item into one bucket. False when the bucket is new and the realm cap is reached. */
+  const place = (map: Record<string, RealmDays>, key: string, realmId: string, name: string, day: string, itemId: number, installId: string, scan: InstallScan): boolean => {
     const existing = map[key]?.items[String(itemId)];
     if (existing?.closed[day]) return true;
     if (!map[key]) {
-      if (Object.keys(map).length >= maxKeys) return false;
+      if (!realmsHeld.has(realmId) && realmsHeld.size >= cap.realms) return false;
+      realmsHeld.add(realmId);
       map[key] = { name, items: {} };
     }
     const realm = map[key]!;
@@ -283,22 +292,17 @@ export function foldMarket(previous: MarketState, records: readonly unknown[], n
     const n = Math.floor(at / DAY_MS);
     if (inHistory(n, now)) scans.push({ row: parsed.data, at, day: dayString(n) });
   }
-  // Realm-wide first, for every record, so a full cap never trades a realm-wide entry for a house entry.
-  for (const byHouse of [false, true]) {
-    for (const { row, at, day } of scans) {
-      const house = houseOf(row);
-      if (byHouse && (!house || !state.realms[realmKey(row.realm)])) continue;
-      const map = byHouse ? (state.houses ??= {}) : state.realms;
-      const key = byHouse ? houseKey(row.realm, house!) : realmKey(row.realm);
-      const maxKeys = byHouse ? cap.realms * AUCTION_HOUSES.length : cap.realms;
-      for (let i = 0; i < row.items.length; i++) {
-        const scan = scanItem.safeParse(row.items[i]);
-        if (!scan.success) continue;
-        const [itemId, auctions, quantity, minUnit, marketUnit] = scan.data;
-        const reporter = trusted.has(row.installId) ? TRUSTED_REPORTER : row.reporter ?? "";
-        const values: InstallScan = [minUnit, marketUnit, quantity, auctions, at, reporter];
-        if (!place(map, key, maxKeys, row.realm.trim(), day, itemId, row.installId, values)) { drop(row.items.length - i); break; }
-      }
+  for (const { row, at, day } of scans) {
+    const house = houseOf(row);
+    const map = house ? (state.houses ??= {}) : state.realms;
+    const key = house ? houseKey(row.realm, house) : realmKey(row.realm);
+    for (let i = 0; i < row.items.length; i++) {
+      const scan = scanItem.safeParse(row.items[i]);
+      if (!scan.success) continue;
+      const [itemId, auctions, quantity, minUnit, marketUnit] = scan.data;
+      const reporter = trusted.has(row.installId) ? TRUSTED_REPORTER : row.reporter ?? "";
+      const values: InstallScan = [minUnit, marketUnit, quantity, auctions, at, reporter];
+      if (!place(map, key, realmKey(row.realm), row.realm.trim(), day, itemId, row.installId, values)) { drop(row.items.length - i); break; }
     }
   }
   for (const map of buckets(state)) {
@@ -403,7 +407,7 @@ function valueOf(itemId: number, points: PublicDay[], now: Date): MarketValue | 
   };
 }
 
-/** The realm-wide view, or one house's view when `house` is given. */
+/** One house's view when `house` is given; without it, the realm-wide view of scans whose house is unknown (may mix houses). */
 function bucketOf(state: MarketState, realm: string, house?: AuctionHouse | null): RealmDays | undefined {
   return house ? state.houses?.[houseKey(realm, house)] : state.realms[realmKey(realm)];
 }
@@ -429,7 +433,7 @@ export function itemListings(state: MarketState, realm: string, itemId: number, 
   return out;
 }
 
-/** Every item with a public value on the realm (or on one of its houses), most units first. */
+/** Every item with a public value in one house of the realm (or, without `house`, in its house-unknown view), most units first. */
 export function realmMarket(state: MarketState, realm: string, now: Date, house?: AuctionHouse | null): MarketValue[] {
   const items = bucketOf(state, realm, house)?.items ?? {};
   return Object.entries(items)
@@ -438,14 +442,17 @@ export function realmMarket(state: MarketState, realm: string, now: Date, house?
     .sort((a, b) => b.quantity - a.quantity || a.itemId - b.itemId);
 }
 
-/** Realms that hold any public value, by display name. */
+/** Realms that hold any public value, in a house or in the house-unknown view, by display name. */
 export function marketRealms(state: MarketState, now: Date = new Date()): string[] {
   // A realm name is free text from an upload; it is published only if it passes the realm rules and
   // 3 reporters made a value public there.
-  return Object.values(state.realms)
-    .filter((r) => validRealm(r.name) && Object.values(r.items).some((days) => publicDays(days, now).length > 0))
-    .map((r) => r.name)
-    .sort((a, b) => a.localeCompare(b));
+  const names = new Map<string, string>();
+  for (const r of buckets(state).flatMap((map) => Object.values(map))) {
+    if (!validRealm(r.name) || !Object.values(r.items).some((days) => publicDays(days, now).length > 0)) continue;
+    const name = realmName(state, r.name);
+    names.set(realmKey(name), name);
+  }
+  return [...names.values()].sort((a, b) => a.localeCompare(b));
 }
 
 /** Per realm (display name), the houses that hold a public value of their own, in AUCTION_HOUSES order. */
@@ -460,9 +467,18 @@ export function marketHouses(state: MarketState, now: Date = new Date()): Record
   return out;
 }
 
-/** The realm's display name: the first spelling seen, or the name as asked. */
+/** The realm's display name: the first spelling seen (the house-unknown view's, else a house's), or the name as asked. */
 export function realmName(state: MarketState, realm: string): string {
-  return state.realms[realmKey(realm)]?.name ?? realm.trim();
+  const key = realmKey(realm);
+  return state.realms[key]?.name ?? AUCTION_HOUSES.map((h) => state.houses?.[houseKey(key, h)]?.name).find(Boolean) ?? realm.trim();
+}
+
+/** One item in each house of a realm that has a public value for it, in AUCTION_HOUSES order. The house-unknown view is not one. */
+export function itemMarketByHouse(state: MarketState, realm: string, itemId: number, now: Date): { house: AuctionHouse; value: MarketValue; points: PublicDay[] }[] {
+  return AUCTION_HOUSES.flatMap((house) => {
+    const { value, points } = itemMarket(state, realm, itemId, now, house);
+    return value ? [{ house, value, points }] : [];
+  });
 }
 
 /**
@@ -491,7 +507,7 @@ export function formatCopper(value: number): string {
 }
 
 export const MARKET_RULE =
-  "A day is public when 3 reporters scanned this item on this realm with a full scan (installs behind one upload address count once); each value is the median of their last scans that day. While few players upload, a day Everloot's own installs scanned is public with fewer, and its reporters say so. " +
+  "Each auction house of a realm (Alliance, Horde, neutral) is its own market. A day is public when 3 reporters scanned this item in that house with a full scan (installs behind one upload address count once); each value is the median of their last scans that day. While few players upload, a day Everloot's own installs scanned is public with fewer, and its reporters say so. " +
   "Market value is a weighted mean of the public days up to 14 calendar days old, newer days weighing more, skipping thin days (5 units listed or fewer) and days far from the historical value. Historical is the median of the public days in the last 60 calendar days, of those that are not thin when there are any.";
 
 /** "3 reporters", or "1 reporter (includes Everloot's own scans)" for a day public under 3 because a trusted install scanned it. */
@@ -500,23 +516,29 @@ export function reportersText(reporters: number): string {
   return reporters < AUCTION_AGREEMENT ? `${count} (${TRUSTED_SOURCE_LABEL})` : count;
 }
 
+/** Each house of the realm with a public value for the item, one block per house, named; never a mix of houses. */
 export function handleMarketValue(args: { realm: string; itemId: number }, state: MarketState | null, now: Date): string {
   if (!args.realm.trim()) return "Name a realm.";
   if (!Number.isInteger(args.itemId) || args.itemId < 1) return "Name an item id.";
   if (!state) return "Market values are unavailable. They are unrecorded, not zero.";
-  const { value, points } = itemMarket(state, args.realm, args.itemId, now);
+  const houses = itemMarketByHouse(state, args.realm, args.itemId, now);
   const lines = [`${args.realm.trim()} item ${args.itemId}`, MARKET_RULE];
-  if (!value) {
-    lines.push("No public market value yet. A day becomes public when 3 reporters scanned this item.");
+  if (!houses.length) {
+    lines.push("No public market value yet in any auction house. A day becomes public when 3 reporters scanned this item in one house.");
     return lines.join("\n");
   }
-  lines.push(
-    `Market value: ${value.market === null ? "unrecorded (no solid public day in the last 14)" : formatCopper(value.market)}`,
-    `Minimum buyout: ${formatCopper(value.min)} (${value.day}, ${value.ageDays} days ago, ${reportersText(value.reporters)})`,
-    `Historical: ${formatCopper(value.historical)}`,
-    `Units listed: ${value.quantity}${value.thin ? " (thin: not counted in the market value)" : ""}`,
-    "History:",
-    ...points.map((p) => `${p.day}  value ${formatCopper(p.market)}  min ${formatCopper(p.min)}  ${p.quantity} units${p.thin ? " (thin)" : ""}  ${reportersText(p.reporters)}`),
-  );
+  for (const { house, value, points } of houses) {
+    lines.push(
+      `${house} auction house:`,
+      `Market value: ${value.market === null ? "unrecorded (no solid public day in the last 14)" : formatCopper(value.market)}`,
+      `Minimum buyout: ${formatCopper(value.min)} (${value.day}, ${value.ageDays} days ago, ${reportersText(value.reporters)})`,
+      `Historical: ${formatCopper(value.historical)}`,
+      `Units listed: ${value.quantity}${value.thin ? " (thin: not counted in the market value)" : ""}`,
+      "History:",
+      ...points.map((p) => `${p.day}  value ${formatCopper(p.market)}  min ${formatCopper(p.min)}  ${p.quantity} units${p.thin ? " (thin)" : ""}  ${reportersText(p.reporters)}`),
+    );
+  }
+  const missing = AUCTION_HOUSES.filter((h) => !houses.some((x) => x.house === h));
+  if (missing.length) lines.push(`No public value yet in the ${missing.join(" or ")} auction house.`);
   return lines.join("\n");
 }

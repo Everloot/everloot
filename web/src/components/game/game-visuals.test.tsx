@@ -63,7 +63,7 @@ const loot = (install: string) => ({
 });
 const today = new Date();
 const market = foldMarket(emptyMarket(), ["install-a", "install-b", "install-c"].map((installId, i) => ({
-  kind: "auction_snapshot", installId, eventId: `${installId}:s`, capturedAt: today.toISOString(), realm: "Forever",
+  kind: "auction_snapshot", faction: "Horde", installId, eventId: `${installId}:s`, capturedAt: today.toISOString(), realm: "Forever",
   scanId: `${installId}-s`, part: 1, parts: 1, items: [[9, 2, 40 + i, 10, 12]],
 })), today);
 

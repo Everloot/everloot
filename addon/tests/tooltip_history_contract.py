@@ -34,6 +34,8 @@ CreateFrame = function() return {
   SetScript = function(self, _, f) self.onEvent = f end, HookScript = function() end,
 } end
 GetRealmName = function() return 'Forever' end
+-- An Alliance character: community prices are read from the realm's Alliance auction house.
+UnitFactionGroup = function() return 'Alliance', 'Alliance' end
 UnitGUID = function() return 'Player-1-0000000A' end
 UnitClass = function() return 'Mage', 'MAGE' end
 UnitLevel = function() return 60 end

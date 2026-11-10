@@ -34,9 +34,7 @@ test("reporters in different houses cannot jointly publish a house price", () =>
   expect(itemMarket(state, realm, 2589, now, "Horde").value).toBeNull();
 });
 
-// Owner review required: the realm-wide stored bucket blends houses. Keep the isolation requirement
-// executable without changing the rollup shape or silently treating this audit as a fix.
-test.fails("owner review: a realm-only query must not publish agreement pooled across houses", () => {
+test("a realm-only query never publishes agreement pooled across houses", () => {
   const state = foldMarket(emptyMarket(), [scans(realm, "Alliance", 100)[0], ...scans(realm, "Horde", 900).slice(1)], now);
   expect(itemMarket(state, realm, 2589, now).value).toBeNull();
 });

@@ -231,7 +231,7 @@ describe("a price question in /ask", () => {
     const m = market({ lookup: async () => ({ ...FIXTURE_STRUCTURED, page: { ...FIXTURE_STRUCTURED.page, value: { ...FIXTURE_STRUCTURED.page.value, ageDays: 30 } } }) });
     const reply = await withMarket(searchEngine(), m).answer("price of Linen Cloth on Forever");
     expect(reply.answer.length).toBeLessThanOrEqual(600);
-    expect(reply.answer.startsWith("Linen Cloth (item 2589) on Forever, all houses: market 3s 10c")).toBe(true);
+    expect(reply.answer.startsWith("Linen Cloth (item 2589) on Forever, busiest auction house: market 3s 10c")).toBe(true);
   });
 
   test("reaches the game: asked, parsed with its realm, looked up once, answered with a checksum, shown from the store after", async () => {
@@ -269,7 +269,7 @@ describe("polite and malformed price questions in /ask", () => {
     const m = market();
     const next = searchEngine();
     const reply = await withMarket(next, m).answer(question);
-    expect(reply.answer.startsWith("Linen Cloth (item 2589) on Forever, all houses:") || reply.answer.startsWith("Item 2589 on Forever, all houses:")).toBe(true);
+    expect(reply.answer.startsWith("Linen Cloth (item 2589) on Forever, busiest auction house:") || reply.answer.startsWith("Item 2589 on Forever, busiest auction house:")).toBe(true);
     expect(m.lookup).toHaveBeenCalledTimes(1);
     expect(next.answer).not.toHaveBeenCalled();
   });
