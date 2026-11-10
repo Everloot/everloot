@@ -438,7 +438,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
 
-## [desktop-v0.1.21] - 2026-11-09
+## [desktop-v0.1.21] - 2026-11-10
 
 The Characters page's week matches the Gold tab, and the price file reader accepts the optional `sources` block
 addon 0.3.22 can show (the app does not write it yet). Builds are still unsigned.
