@@ -15,12 +15,19 @@
 local E = Everloot
 local L = {}
 E.Ledger = L
+-- In-memory invalidation for views; never saved or uploaded.
+L.revision = 0
+
+local function changed()
+  L.revision = L.revision + 1
+end
 
 local DAY = 86400
 local MAX_EVENTS = 5000
 local MAX_AGE = 90 * DAY
 local MAX_SALES = 2000
 local PENDING_SECONDS = 48 * 3600
+L.PENDING_SECONDS = PENDING_SECONDS
 local MAX_CLOSES = 400
 local MAX_ITEM_NAME = 80
 local SERIES_DAYS = 30
@@ -125,6 +132,7 @@ function L.Record(key, category, copper, extra)
     ownAlt = extra.ownAlt == true or nil,
   }
   evict(s)
+  changed()
   return true
 end
 
@@ -134,6 +142,7 @@ function L.RecordPending(key, itemName)
   local s = store()
   s.sales[#s.sales + 1] = { at = time(), key = key, itemName = itemName, status = "pending" }
   evict(s)
+  changed()
   return true
 end
 
@@ -151,7 +160,10 @@ end
 function L.ExpirePending(now)
   now = tonumber(now) or time()
   for _, row in ipairs(store().sales) do
-    if row.status == "pending" and type(row.at) == "number" and row.at < now - PENDING_SECONDS then row.status = "unmatched" end
+    if row.status == "pending" and type(row.at) == "number" and row.at < now - PENDING_SECONDS then
+      row.status = "unmatched"
+      changed()
+    end
   end
 end
 
@@ -172,6 +184,7 @@ function L.RecordSale(key, sale)
   row.at, row.key, row.itemName, row.count = time(), key, sale.itemName, sale.count
   row.unit, row.total, row.deposit, row.cut, row.status = math.floor(sale.total / sale.count), sale.total, sale.deposit, sale.cut, "paid"
   evict(s)
+  changed()
   return true
 end
 
@@ -181,7 +194,9 @@ function L.Close(key, copper)
   local daily = store().daily
   local closes = daily[key]
   if type(closes) ~= "table" then closes = {}; daily[key] = closes end
-  closes[day(time())] = copper
+  local today = day(time())
+  if closes[today] ~= copper then changed() end
+  closes[today] = copper
   local dates = {}
   for d in pairs(closes) do dates[#dates + 1] = d end
   if #dates > MAX_CLOSES then
@@ -252,11 +267,14 @@ function L.Summary(keys, fromTs, toTs)
   toTs = tonumber(toTs) or time()
   local totals, byDay, rows = {}, {}, {}
   local totalIn, totalOut, moved = 0, 0, 0
+  local items = { ["in"] = {}, out = {} }
   local netted = #keys > 1
   local events = store().events
+  local firstAt
 
   local function count(i, e)
     if not (wanted[e.key] and type(e.at) == "number" and e.at >= fromTs and e.at <= toTs) then return end
+    if not firstAt or e.at < firstAt then firstAt = e.at end
     local dir = L.Direction(e.category)
     local ymd = day(e.at)
     rows[#rows + 1] = { i = i, e = e, ymd = ymd, direction = dir }
@@ -267,6 +285,10 @@ function L.Summary(keys, fromTs, toTs)
       -- One transfer has an out row and an in row; only the out side counts, so it is not counted twice.
       if dir == "out" then moved = moved + e.copper end
       if netted then return end
+    end
+    if e.itemName then
+      local group = items[dir]
+      group[e.itemName] = (group[e.itemName] or 0) + e.copper
     end
     local t = totals[e.category]
     if not t then t = { category = e.category, direction = dir, copper = 0, events = 0 }; totals[e.category] = t end
@@ -320,7 +342,17 @@ function L.Summary(keys, fromTs, toTs)
     return list
   end
 
-  return { categories = categories, days = days, receipts = receipts, totalIn = totalIn, totalOut = totalOut, unrecorded = unrecorded, moved = moved }
+  local function top(group)
+    local best
+    for name, copper in pairs(group) do
+      if not best or copper > best.copper or (copper == best.copper and name < best.itemName) then
+        best = { itemName = name, copper = copper }
+      end
+    end
+    return best
+  end
+  return { categories = categories, days = days, receipts = receipts, totalIn = totalIn, totalOut = totalOut, firstAt = firstAt,
+    unrecorded = unrecorded, moved = moved, topEarned = top(items["in"]), topSpent = top(items.out) }
 end
 
 --- The keys' auction sales between two times (both included; nil means all), newest first.
