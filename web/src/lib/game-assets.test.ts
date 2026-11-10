@@ -5,6 +5,7 @@ import {
   instanceThumbs, itemIconUrl, itemShard, itemTip, gameNameFor, launchArt, loadingArt, loadItemNames, loadItemSetNames, loadItemTips, loadQuestNames, loadSpellNames, loadSiteAssets, parseSiteManifest, poiIcons, PRIVATE_UNREACHABLE, privateStoreFromEnv, raidArt, readItemTips, readQuestNames, type ItemNames,
 } from "./game-assets";
 import { itemTipText, qualityColor, tipLines, WHY } from "./item-names";
+import { readSpellNames } from "./game-assets";
 import { cameraBox, zoneArtShown, ZONE_ART_ZOOM, type Box, type Camera } from "./map-view";
 import { itemIndex, memoryStore, shard0, siteManifest } from "./game-assets.fixture";
 
@@ -389,6 +390,15 @@ const questFile = {
 };
 const setFile = { schema: "everloot.item-set-names/1", build: { version: "1.60.1.70450" }, count: 2, names: { 1: "The Gladiator", 1570: "Twilight Invoker's Vestments" } };
 const spellFile = { schema: "everloot.spell-names/1", build: { version: "1.60.1.70450" }, count: 3, names: { 3275: "Linen Bandage", 16633: "Create Item Visual (DND)", 1316597: "Stock Crate" } };
+
+test("the card's spell name reader distinguishes failed reads and rejects malformed or wrong-build catalogs", async () => {
+  expect(await readSpellNames("1.60.1.70450", BASE, { read: async () => PRIVATE_UNREACHABLE })).toBe(PRIVATE_UNREACHABLE);
+  for (const file of [null, {}, { ...spellFile, build: { version: "other" } }]) {
+    expect(await readSpellNames("1.60.1.70450", BASE, { read: async () => file })).toBeNull();
+  }
+  const read = await readSpellNames("1.60.1.70450", BASE, memoryStore({ [`${FOLDER}/spell-names.json`]: spellFile }));
+  expect(read !== PRIVATE_UNREACHABLE && read?.names.get(3275)).toBe("Linen Bandage");
+});
 
 test("quest titles, set names and spell names each come from their own private file, every id the file names", async () => {
   const store = memoryStore({ [`${FOLDER}/quest-names.json`]: questFile, [`${FOLDER}/item-set-names.json`]: setFile, [`${FOLDER}/spell-names.json`]: spellFile });

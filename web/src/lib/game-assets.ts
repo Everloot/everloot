@@ -467,6 +467,10 @@ export const loadItemSetNames = (version: string, base: string | null = assetsBa
 export const loadSpellNames = (version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()) =>
   loadNamesFile("spell-names.json", version, base, store, fileNames(SpellNamesSchema, mayShowSpellName));
 
+/** The spell names with a failed bucket read distinguished from an absent catalog, for complete hover cards. */
+export const readSpellNames = (version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()) =>
+  readNamesFile("spell-names.json", version, base, store, fileNames(SpellNamesSchema, mayShowSpellName));
+
 /** A relation target's name from these files, and where it comes from: the wiki (quest titles) or the game files alone. */
 export interface GameName { name: string; source: "wiki" | "files" }
 
