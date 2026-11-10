@@ -8,6 +8,7 @@ vi.mock("./game-assets", () => ({
   PRIVATE_UNREACHABLE: Symbol("private bucket unreachable"),
   loadQuestNames: async () => null,
   loadSiteAssets: async () => ({ base: "https://assets.everloot.app/b" }),
+  unknownItemIcon: (base: string) => `${base}/icons/134400.webp`,
   loadItemTips: reads.tips,
 }));
 vi.mock("./completion-lists", async (original) => ({ ...await original<object>(), loadCatalog: async () => null }));

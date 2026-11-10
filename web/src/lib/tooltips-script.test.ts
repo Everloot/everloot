@@ -117,6 +117,8 @@ test("an icon from https and a link back to everloot.app are drawn; a link back 
   next = card({ icon: "https://assets.everloot.app/b/icons/1.webp", url: "https://everloot.app/database/items/401" });
   await hover(link("https://everloot.app/database/items/401"));
   expect(shadow()!.querySelector("img")!.getAttribute("src")).toBe("https://assets.everloot.app/b/icons/1.webp");
+  // The icon's border takes the name's quality colour (card(): #ff8000).
+  expect((shadow()!.querySelector("img") as HTMLElement).style.borderColor).toBe("rgb(255, 128, 0)");
   const back = shadow()!.querySelector("a")!;
   expect(back.getAttribute("href")).toBe("https://everloot.app/database/items/401");
   expect(back.getAttribute("rel")).toBe("noopener");

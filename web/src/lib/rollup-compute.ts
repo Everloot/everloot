@@ -95,6 +95,19 @@ export async function loadReportedItemFacts(itemId: number): Promise<ItemFactSta
   return { ...reportedItemFacts(agg.itemFacts.get(itemId), agg.dataAsOf ? new Date(agg.dataAsOf) : new Date()), progress: itemFactProgress(agg.itemFacts.get(itemId)), unreachable: false };
 }
 
+/** `loadReportedItemFacts` for every item with an agreed or a disputed line, for the cron's stored item view. */
+export async function loadAllReportedItemFacts(read?: Corpus): Promise<{ reported: Map<number, ItemFactState>; unreachable: boolean }> {
+  const agg = await loadAggregates(read);
+  if (!agg) return { reported: new Map(), unreachable: true };
+  const asOf = agg.dataAsOf ? new Date(agg.dataAsOf) : new Date();
+  const reported = new Map<number, ItemFactState>();
+  for (const [itemId, rows] of agg.itemFacts) {
+    const state = reportedItemFacts(rows, asOf);
+    if (state.shown.length || state.contested.length) reported.set(itemId, state);
+  }
+  return { reported, unreachable: false };
+}
+
 /** Items players have seen a recipe make (3 installs), for the item lists' Source column. */
 export async function loadCraftedItems(read?: Corpus): Promise<{ items: Set<number>; unreachable: boolean }> {
   const agg = await loadAggregates(read);

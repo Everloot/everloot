@@ -52,6 +52,8 @@ export const metadata: Metadata = {
     description:
       "WoW: Forever observations from addon uploads, guild tools and auction house prices.",
   },
+  // app/favicon.ico is linked by the file convention already.
+  icons: { icon: [{ url: "/icon.svg", type: "image/svg+xml" }], apple: "/apple-icon.png" },
   alternates: { types: FEED },
   robots: { index: true, follow: true },
   // Search Console and Bing Webmaster Tools ownership tags. Each is emitted only when its variable is set.

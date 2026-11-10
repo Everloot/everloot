@@ -24,7 +24,7 @@ vi.mock("@/lib/shown-item-names", () => ({ loadShownNames: async () => ({
 }) }));
 vi.mock("@/lib/shown-search-names", () => ({ loadShownSearchNames: () => namesRead.pending ?? Promise.resolve({ items: new Map(), npcs: new Map(), quests: new Map() }) }));
 const icons = vi.hoisted(() => ({ asked: [] as number[][], map: new Map<number, string>() }));
-vi.mock("@/lib/item-icons", () => ({ shownItemIcons: async (ids: number[]) => { icons.asked.push(ids); return icons.map; } }));
+vi.mock("@/lib/item-icons", () => ({ shownItemIcons: async (ids: number[]) => { icons.asked.push(ids); return { icons: icons.map, unknown: icons.map.size ? "https://assets.everloot.app/b/icons/134400.webp" : null }; } }));
 // The Characters and Guilds groups load in the browser; here a marker shows where they would sit, and the fallback.
 vi.mock("./PeopleResults", () => ({ default: ({ q, empty }: { q: string; empty?: ReactNode }) => <div data-people={q}>{empty}</div> }));
 
@@ -112,8 +112,9 @@ test("item hits lead with the game icon and the quality colour, and no hit carri
   const html = await render({ q: "thunderfury" });
   expect(icons.asked).toEqual([[19019, 5]]);
   expect(html).toMatch(/<img src="https:\/\/assets\.everloot\.app\/b\/icons\/1\.webp"[^>]*>(<!-- -->)?<a href="\/database\/items\/19019" class="text-q-legendary/);
-  // An item without an icon keeps the place of one.
-  expect(html).toMatch(/<span aria-hidden="true" class="h-5 w-5[^"]*"><\/span><a href="\/database\/items\/5"/);
+  // An item without an icon uses the game's question mark from the same asset folder, with its quality border.
+  expect(html).toMatch(/<img src="https:\/\/assets\.everloot\.app\/b\/icons\/134400\.webp"[^>]*border-q-common[^>]*>(<!-- -->)?<a href="\/database\/items\/5"/);
+  expect(html).toContain("border-q-legendary");
   expect(html.indexOf('id="results-item"')).toBeLessThan(html.indexOf('id="results-lore"'));
   expect(html).not.toMatch(/<a [^>]*title=/);
   icons.map = new Map();

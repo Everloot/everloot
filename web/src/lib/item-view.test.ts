@@ -5,16 +5,21 @@ const reads = vi.hoisted(() => ({
   facts: { unreachable: false, rates: [{ itemId: 20, public: true }, { itemId: 30, public: false }], names: [{ itemId: 10, name: "Linen Cloth" }], npcs: [] } as Record<string, unknown>,
   seen: { seen: new Set([10, 20, 40]), from: new Map([[20, ["drop"]], [40, ["vendor"]]]), unreachable: false } as Record<string, unknown>,
   names: { names: new Map([[50, { name: "Wiki Item" }]]) } as unknown,
+  reported: { reported: new Map([[20, { shown: [{ fact: "strength", value: 7, reporters: 3, build: "1.60.1.70862", lastSeen: null }], contested: [] }]]), unreachable: false } as Record<string, unknown>,
   cloud: null as unknown,
   /** The corpus each reader was handed, if any. */
   passed: [] as unknown[],
 }));
-vi.mock("./rollup-compute", () => ({ loadItemFacts: async (read?: unknown) => { reads.passed.push(read); return reads.facts; } }));
+vi.mock("./rollup-compute", () => ({
+  loadItemFacts: async (read?: unknown) => { reads.passed.push(read); return reads.facts; },
+  loadAllReportedItemFacts: async (read?: unknown) => { reads.passed.push(read); return reads.reported; },
+  loadReportedItemFacts: async () => { throw new Error("a card with a stored view must not read the aggregates"); },
+}));
 vi.mock("./item-seen", () => ({ loadItemSeen: async (read?: unknown) => { reads.passed.push(read); return reads.seen; } }));
 vi.mock("../../../kb/src/item-page", () => ({ agreedItemNames: (f: { names: { itemId: number; name: string }[] }) => new Map(f.names.map((n) => [n.itemId, n.name])) }));
 vi.mock("./game-assets", () => ({ PRIVATE_UNREACHABLE: Symbol.for("unreachable"), loadItemNames: async () => reads.names }));
 
-import { loadListNames, loadListSeen } from "./item-view";
+import { loadCardFacts, loadListNames, loadListSeen } from "./item-view";
 import { buildItemView, forgetItemView, ITEM_VIEW_KEY, loadItemView, parseItemView, writeItemView } from "./item-view-store";
 import { loadShownNames } from "./shown-item-names";
 import { uploadStore } from "./upload-store";
@@ -29,6 +34,7 @@ test("the view holds exactly what the pages computed: agreed names, public drops
   expect(await buildItemView("2026-11-06T11:50:00Z", AT)).toEqual({
     version: 1, generatedAt: AT.toISOString(), dataAsOf: "2026-11-06T11:50:00Z",
     agreed: [[10, "Linen Cloth"]], dropped: [20], seen: [10, 20, 40], from: [[20, ["drop"]], [40, ["vendor"]]],
+    reported: [[20, { shown: [{ fact: "strength", value: 7, reporters: 3, build: "1.60.1.70862", lastSeen: null }], contested: [] }]],
   });
   reads.facts = { ...reads.facts, unreachable: true };
   await expect(buildItemView(null, AT)).rejects.toThrow(/unreachable/);
@@ -59,14 +65,17 @@ test("the cron's view is worked out from the corpus it reads, never from stored 
   const put = vi.fn(async () => new Response(null, { status: 200 }));
   expect(await writeItemView({ added: 1, dataAsOf: corpus.dataAsOf }, { cloud: CLOUD, fetch: put as unknown as typeof fetch })).toEqual({ written: true, items: 3 });
   expect(load).toHaveBeenCalledOnce();
-  expect(reads.passed).toEqual([corpus, corpus]);
+  expect(reads.passed).toEqual([corpus, corpus, corpus]);
   load.mockRestore();
 });
 
 test("a file of an unknown shape is no view", async () => {
   const view = await buildItemView(null, AT);
   expect(parseItemView(view)).toEqual(view);
-  for (const bad of [null, {}, { ...view, version: 2 }, { ...view, seen: ["x"] }, { ...view, from: [[1, ["teleport"]]] }, { ...view, agreed: [[1]] }]) {
+  const { reported: _reported, ...older } = view;
+  expect(parseItemView(older)).toEqual(older);
+  for (const bad of [null, {}, { ...view, version: 2 }, { ...view, seen: ["x"] }, { ...view, from: [[1, ["teleport"]]] }, { ...view, agreed: [[1]] },
+    { ...view, reported: [[1, { shown: [{ fact: "luck", value: 1, reporters: 3, build: "b", lastSeen: null }], contested: [] }]] }, { ...view, reported: [[1, { shown: [] }]] }]) {
     expect(parseItemView(bad)).toBeNull();
   }
 });
@@ -110,4 +119,12 @@ test("the stored names and seen items answer exactly as the corpus path does, an
   const seen = await loadListSeen();
   expect([...seen.seen]).toEqual([10, 20, 40]);
   expect(seen.from.get(40)).toEqual(["vendor"]);
+});
+
+test("a hover card reads an item's reported numbers from the stored view; an item it does not list has none", async () => {
+  const view = await buildItemView(null, AT);
+  useCloud();
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(view), { status: 200 })));
+  expect((await loadCardFacts(20)).shown).toEqual([{ fact: "strength", value: 7, reporters: 3, build: "1.60.1.70862", lastSeen: null }]);
+  expect(await loadCardFacts(10)).toEqual({ shown: [], contested: [], unreachable: false });
 });
