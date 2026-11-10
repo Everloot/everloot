@@ -209,6 +209,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: Quest pages link their chain, previous and next quests, and reported zone; chain lists explain quests whose names are not reported yet.
 - Site: object, instance, faction, title, achievement and vendor pages now link the Warcraft Wiki lore page of the same name, item pages do too when the name shown is the wiki's, and lore pages link back to the database page (zone, instance, object, faction, title, achievement, NPC, item or quest). A link needs an exact name that only one page has on each side; a name two pages share gets no link. Zone pages follow the same rule, and a Warcraft Wiki copy is indexed and listed in the lore sitemap exactly when it links back.
 - Site: spell and vendor links show hover cards, with the spell text and build or the vendor's agreed goods count.
+- Addon: shopping lists. The Everloot tab at the auction house has a Shopping list page: named lists of items with a wanted count and an optional max price per unit, each beside the price file's market value and its age, and a Search button that sends one auction-house search per press when the client's throttle allows (the lowest buyout found shows in the row; you buy from the Buy tab yourself). The Professions tab's what-to-buy list adds a recipe's reagents. Saved in your file only, up to 10 lists of 50 items; bags and bank are not read.
 
 ### Fixed
 - Site: the header shows the build whose files the site reads and the newest build seen, each linked to what it means.
@@ -462,6 +463,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Docs: each gap in DATA_PLACEMENT.md carries a dated state, and the WAF row now describes the Cloudflare rules that apply on /database/*.
 - Docs: CONTRIBUTING.md and the pull request template describe the changelog line, the labels in use and the addon install link.
 - Site: zone and instance pages open with the same title row as the other database pages (name, type line, quiet controls at its end), and the instance and spell-talent facts use the same label-and-value list.
+- Site: the web-font swap no longer moves the page. Geist and Geist Mono now fall back to Arial and Courier New resized per weight to Geist's widths (the Arial fallback was 4% too wide at regular), and a screen of height is reserved only while the database hub streams, so a 404 or an empty result keeps its footer in view.
 - MCP: clarify tool choice, name and id discovery, realm aliases, evidence limits and price methods, with three example journeys.
 
 ## [desktop-v0.1.21] - 2026-11-10

@@ -41,6 +41,7 @@ modules\raid_data.lua
 modules\raid.lua
 modules\prices.lua
 modules\drops.lua
+modules\shopping.lua
 modules\auctiontab.lua
 modules\gph.lua
 modules\conveniences.lua
