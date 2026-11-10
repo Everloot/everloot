@@ -140,8 +140,8 @@ test("the file-only schemas are published shapes no route answers with, and the 
     expect(API_SCHEMAS).toHaveProperty(name);
     expect(API_ROUTES.some((r) => r.requestBody === name || Object.values(r.responses).some((x) => x.schema === name)), name).toBe(false);
   }
-  for (const path of PAGE_INTERNAL_ROUTES) {
-    expect(existsSync(join(app, `${path.slice(1)}/route.ts`)), path).toBe(true);
+  for (const { path, file } of PAGE_INTERNAL_ROUTES) {
+    expect(existsSync(join(app, `${file}/route.ts`)), path).toBe(true);
     expect(API_ROUTES.some((r) => r.path === path), path).toBe(false);
   }
 });

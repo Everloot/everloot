@@ -17,6 +17,27 @@ const scans = ["install-secret-1", "install-secret-2", "install-secret-3"].map((
 const state = foldMarket(emptyMarket(), scans, NOW);
 const req = (query = "") => new Request(`https://everloot.app/api/market/prices${query}`);
 
+test("explicit price requests isolate region, ruleset and all three houses", async () => {
+  const realms = ["CAMWOW US1 Realm 4 PVE", "CAMWOW US1 Realm 4 PVP", "CAMWOW US1 Realm 4 RP",
+    "CAMWOW US1 Realm 4 RPPVP", "CAMWOW US1 Realm 4 Hardcore", "CAMWOW EU1 Realm 4 PVP"];
+  const houses = ["Alliance", "Horde", "Neutral"];
+  const rows = realms.flatMap((realm, r) => houses.flatMap((house, h) => scans.map((s) => ({
+    ...s, realm, house, faction: house === "Neutral" ? "Alliance" : house,
+    items: [[2589, 2, 40, 100 + r * 10 + h, 100 + r * 10 + h]],
+  }))));
+  store.loadMarket.mockResolvedValue({ state: foldMarket(emptyMarket(), rows, NOW), dataAsOf: NOW.toISOString() });
+  for (const [r, realm] of realms.entries()) for (const [h, house] of houses.entries()) {
+    const body = await (await GET(req(`?realm=${encodeURIComponent(realm)}&house=${house}`))).json();
+    expect(body).toMatchObject({ realm, house, items: [[2589, 100 + r * 10 + h, 100 + r * 10 + h, 100 + r * 10 + h, 40, day, 3]] });
+  }
+});
+
+test.fails("owner review: realm-only price requests must not publish a cross-house consensus", async () => {
+  const rows = scans.map((s, i) => ({ ...s, house: i ? "Horde" : "Alliance", items: [[2589, 2, 40, 100 + i, 100 + i]] }));
+  store.loadMarket.mockResolvedValue({ state: foldMarket(emptyMarket(), rows, NOW), dataAsOf: NOW.toISOString() });
+  expect((await (await GET(req("?realm=Forever"))).json()).items).toEqual([]);
+});
+
 beforeEach(() => {
   store.market.mockReset().mockResolvedValue({ allowed: true, retryAfter: 0 });
   store.loadMarket.mockReset().mockResolvedValue({ state, dataAsOf: "2026-10-20T12:00:00.000Z" });

@@ -301,6 +301,128 @@ frame:SetScript("OnEvent", function(_, event, arg1)
 end)
 
 SLASH_EVERLOOT1 = "/everloot"
+-- This lookup uses retained rows only. Counts are loot windows, never stack sizes or drop rates.
+function E.WhereCommand(query)
+  local records = type(EverlootDB) == "table" and EverlootDB.records or {}
+  records = type(records) == "table" and records or {}
+  local function rows(kind) return type(records[kind]) == "table" and records[kind] or {} end
+  local function text(value) return (tostring(value):gsub("|", "||")) end
+  local MAX_SOURCES, MAX_PLACES = 8, 3
+  local mapNames = {}
+  local function location(row)
+    if not row.mapId then return "location not recorded" end
+    local zone = mapNames[row.mapId]
+    if not zone then
+      -- GetMapInfo is also used by prices.lua; it reads the client's map label, not an observation.
+      local name
+      if C_Map and C_Map.GetMapInfo then
+        local ok, info = pcall(C_Map.GetMapInfo, row.mapId)
+        if ok and type(info) == "table" then name = info.name end
+      end
+      zone = text(name or ("zone " .. row.mapId))
+      mapNames[row.mapId] = zone
+    end
+    if type(row.x) == "number" and type(row.y) == "number" then
+      return zone .. string.format(" (%d, %d)", math.floor(row.x + 0.5), math.floor(row.y + 0.5))
+    end
+    return zone .. " (coordinates not recorded)"
+  end
+  -- Each sighting kind is read once per command into id -> { name, places }, so a large saved file costs one pass.
+  local sightingIndex = {}
+  local function sightings(kind, id)
+    local index = sightingIndex[kind]
+    if not index then
+      index = {}
+      local field = kind == "npc" and "npcId" or "objectId"
+      for _, row in ipairs(rows(kind .. "_sighting")) do
+        local key = type(row) == "table" and row[field]
+        if key then
+          local entry = index[key] or { places = {} }
+          entry.name = row.name or entry.name
+          entry.places[location(row)] = true
+          index[key] = entry
+        end
+      end
+      sightingIndex[kind] = index
+    end
+    local entry = index[id]
+    local places = {}
+    if entry then for place in pairs(entry.places) do places[place] = true end end
+    return entry and entry.name, places
+  end
+  local function placesText(places)
+    local sorted = {}
+    for place in pairs(places) do sorted[#sorted + 1] = place end
+    table.sort(sorted)
+    if #sorted == 0 then return "location not recorded" end
+    local shown = {}
+    for i = 1, math.min(#sorted, MAX_PLACES) do shown[i] = sorted[i] end
+    local line = table.concat(shown, "; ")
+    if #sorted > MAX_PLACES then line = line .. "; " .. (#sorted - MAX_PLACES) .. " more" end
+    return line
+  end
+  local id = tonumber(query:match("^%d+$") or query:match("|Hitem:(%d+):"))
+  local found = false
+  if id then
+    for _, source in ipairs({ { kind = "loot", label = "Drop" }, { kind = "vendor", label = "Vendor" } }) do
+      local groups, order = {}, {}
+      for _, row in ipairs(rows(source.kind)) do
+        local matches = false
+        local items = type(row) == "table" and type(row.items) == "table" and row.items or {}
+        for _, item in ipairs(items) do
+          if type(item) == "table" and item.itemId == id then matches = true; break end
+        end
+        local kind = row.sourceObjectId and "object" or "npc"
+        local sourceId = row.vendorNpcId or row.sourceNpcId or row.sourceObjectId
+        if matches and sourceId then
+          local key = kind .. ":" .. sourceId
+          if not groups[key] then
+            local name, places = sightings(kind, sourceId)
+            groups[key] = { name = name or row.sourceObjectName or (kind .. " " .. sourceId), places = places, count = 0 }
+            order[#order + 1] = key
+          end
+          local group = groups[key]
+          group.count = group.count + 1
+          if row.mapId then group.places[location(row)] = true end
+        end
+      end
+      -- Most-seen sources first; chat gets at most MAX_SOURCES lines per kind.
+      table.sort(order, function(a, b)
+        if groups[a].count ~= groups[b].count then return groups[a].count > groups[b].count end
+        return a < b
+      end)
+      for i = 1, math.min(#order, MAX_SOURCES) do
+        local group = groups[order[i]]
+        local unit = source.kind == "loot" and " loot window" or " vendor record"
+        print("Everloot: " .. source.label .. " - " .. text(group.name) .. ": " .. placesText(group.places)
+          .. " - " .. group.count .. unit .. (group.count == 1 and "" or "s"))
+        found = true
+      end
+      if #order > MAX_SOURCES then
+        print("Everloot: and " .. (#order - MAX_SOURCES) .. " more " .. string.lower(source.label) .. " sources")
+      end
+    end
+  elseif query ~= "" then
+    local places = {}
+    for _, row in ipairs(rows("npc_sighting")) do
+      if type(row.name) == "string" and row.name:lower() == query:lower() then
+        places[location(row)] = true
+      end
+    end
+    if next(places) then
+      print("Everloot: " .. text(query) .. ": " .. placesText(places))
+      found = true
+    end
+  else
+    print("Everloot: /everloot where <item link, item id, or NPC name>")
+    return
+  end
+  if not found and query ~= "" then print("Everloot: nothing recorded yet") end
+  local url = id and ("everloot.app/database/items/" .. string.format("%.0f", id))
+    or ("everloot.app/search?q=" .. query:gsub("([^%w%-._~])", function(c) return string.format("%%%02X", c:byte()) end))
+  print("Everloot: your own sightings only - " .. url)
+end
+
 SlashCmdList["EVERLOOT"] = function(msg)
   -- A question keeps its case, so it is routed before the command is lowercased.
   local question = type(msg) == "string" and msg:match("^%s*[Aa][Ss][Kk]%s+(.+)$")
@@ -311,6 +433,8 @@ SlashCmdList["EVERLOOT"] = function(msg)
   -- An item name or link keeps its case too: the price of an item, from the files already in the game.
   local item = type(msg) == "string" and msg:match("^%s*[Pp][Rr][Ii][Cc][Ee]%s*(.-)%s*$")
   if item and E.PriceCommand and msg:lower():match("^%s*price%f[%s%z]") then return E.PriceCommand(item) end
+  local where = type(msg) == "string" and msg:match("^%s*[Ww][Hh][Ee][Rr][Ee]%s*(.-)%s*$")
+  if where and msg:lower():match("^%s*where%f[%s%z]") then return E.WhereCommand(where) end
   local workspace = type(msg) == "string" and msg:lower():match("^%s*planner%f[%s%z]%s*(.-)%s*$")
   if workspace and E.Planner then return E.Planner.Open(workspace) end
   msg = msg and msg:lower():gsub("^%s+", "") or ""
@@ -419,6 +543,6 @@ SlashCmdList["EVERLOOT"] = function(msg)
       print("Everloot: installed addon list off; all recorded addon rows were deleted from this file. /reload to apply.")
     end
   else
-    print("Everloot commands: /everloot window, /everloot options, /everloot planner [talents|raid], /everloot buttons on|off, /everloot status, /everloot version, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot gph [start|pause|stop|reset|show|hide|cut on|off|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], " .. (E.Pulls and "/everloot pulls [on|off], " or "") .. "/everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number|hide|clear], /everloot raid [code], /ask <question>")
+    print("Everloot commands: /everloot window, /everloot options, /everloot planner [talents|raid], /everloot buttons on|off, /everloot status, /everloot version, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot where [item link|item id|NPC name], /everloot gph [start|pause|stop|reset|show|hide|cut on|off|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], " .. (E.Pulls and "/everloot pulls [on|off], " or "") .. "/everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number|hide|clear], /everloot raid [code], /ask <question>")
   end
 end

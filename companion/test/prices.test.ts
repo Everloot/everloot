@@ -8,6 +8,27 @@ import { FIXTURE_DROPS, FIXTURE_REALMS, FIXTURE_SOURCES } from "../scripts/write
 
 const FIXTURE = new URL("../../addon/tests/fixtures/EverlootPrices.lua", import.meta.url);
 
+test("price discovery and output keep region and ruleset endings in separate realm blocks", () => {
+  const names = ["PVE", "PVP", "RP", "RPPVP", "Hardcore"].map((s) => `CAMWOW US1 Realm 4 ${s}`);
+  names.push("CAMWOW EU1 Realm 4 PVP");
+  const sv = `EverlootDB = { records = { auction_snapshot = { ${names.map((realm) => `{ realm = "${realm}" }`).join(",")} } } }`;
+  expect(readRealms(sv)).toEqual(names);
+  const { lua } = renderPricesAddon(names.map((realm, i) => ({ realm, dataAsOf: null,
+    items: [[2589, 100 + i, 100 + i, 100 + i, 40, "2026-11-10", 3]] })));
+  for (const [i, name] of names.entries()) {
+    expect(lua).toContain(`["${name.toLowerCase()}"]`);
+    expect(lua).toContain(`2589,${100 + i},${100 + i},${100 + i},40,2026-11-10,3`);
+  }
+});
+
+test.fails("owner review: a price file must not overwrite one house with another on the same realm", () => {
+  const realms = ["Alliance", "Horde"].map((house, i) => ({ realm: "CAMWOW US1 Realm 4 PVP", house,
+    dataAsOf: null, items: [[2589, 100 + i, 100, 100, 40, "2026-11-10", 3] as import("../src/prices").PriceRow] }));
+  const { lua } = renderPricesAddon(realms);
+  const keys = [...lua.matchAll(/^  \["([^"]+)"\]/gm)].map((m) => m[1]);
+  expect(new Set(keys).size).toBe(2);
+});
+
 const SV = `EverlootDB = {
 ["installId"] = "abcd-1234-ef56-7890",
 ["lastScans"] = { ["Forever"] = { ["scanId"] = "abcd-1", ["at"] = 1 } },
