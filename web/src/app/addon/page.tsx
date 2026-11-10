@@ -9,6 +9,7 @@ import { guildsOn } from "@/lib/guild-switch";
 import { REPO_URL } from "@/lib/source";
 import JsonLd from "@/components/JsonLd";
 import TrackedDownload from "@/components/TrackedDownload";
+import DesktopDownload from "./DesktopDownload";
 import { softwareApplicationJsonLd } from "@/lib/jsonld";
 import { Badge, Card, Container, Disclosure, PageHeader, SectionHeading } from "@/components/ui";
 
@@ -94,13 +95,18 @@ export default async function AddonPage() {
             </SectionHeading>
             {addon ? (
               <>
-                <div className="flex flex-wrap items-center gap-2">
-                  <TrackedDownload className="btn btn-primary" href={zipHref} addon="everloot" to="site" download>
-                    Download addon {addon.version}{served ? ` (.zip, ${fileSize(served.size)})` : ""}
+                <div className="flex flex-col items-start gap-3">
+                  <TrackedDownload className="btn btn-primary min-h-11" href={CURSEFORGE_URL} addon="everloot" to="curseforge">
+                    Install with the CurseForge app
                   </TrackedDownload>
-                  <TrackedDownload className="btn" href={CURSEFORGE_URL} addon="everloot" to="curseforge">
-                    Get it on CurseForge
+                  <p className="text-sm text-fg-2">Opens the CurseForge page. Press Install there to add it in the app.</p>
+                  <TrackedDownload className="btn min-h-11" href={CURSEFORGE_URL} addon="everloot" to="curseforge">
+                    CurseForge website
                   </TrackedDownload>
+                  <TrackedDownload className="btn min-h-11" href={zipHref} addon="everloot" to="site" download>
+                    Download the zip
+                  </TrackedDownload>
+                  <p className="text-sm text-fg-2">Addon {addon.version}{served ? ` (.zip, ${fileSize(served.size)})` : ""}</p>
                 </div>
                 <p className="text-sm text-fg-2">{ADDON_LIVE_VERIFIED ? "" : "Live-client verification is pending. "}This Alpha includes website talent and raid plan imports; use <code className="font-mono">/everloot</code> to open the planners.</p>
                 <div>
@@ -150,16 +156,19 @@ export default async function AddonPage() {
               questions in game if you turn that on. It shows what leaves your computer and runs nothing until you press Start.
             </p>
             {desktopFiles.length > 0 ? (
-              <ul className="space-y-3">
-                {desktopFiles.map(({ label, needs, file }) => (
-                  <li key={file.name} className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                    <a className="btn text-sm" href={file.url} rel={EXT}>
-                      {label} ({fileSize(file.size)})
-                    </a>
-                    <span className="text-xs text-muted">{needs}.</span>
-                  </li>
-                ))}
-              </ul>
+              <div className="space-y-4">
+                <DesktopDownload files={desktopFiles} />
+                <ul id="desktop-files" className="scroll-mt-20 space-y-3">
+                  {desktopFiles.map(({ label, needs, file }) => (
+                    <li key={file.name} className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                      <a className="btn text-sm" href={file.url} rel={EXT}>
+                        {label} ({fileSize(file.size)})
+                      </a>
+                      <span className="text-xs text-muted">{needs}.</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ) : (
               <p className="text-fg-2">
                 The download list could not be loaded right now. The files are on the{" "}

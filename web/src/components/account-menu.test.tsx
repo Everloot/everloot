@@ -83,10 +83,12 @@ describe("signed in without a shell (EVERLOOT_PROFILES off)", () => {
     await act(async () => { window.dispatchEvent(new Event(SHELL_CHANGED_EVENT)); });
   });
 
-  it("shows the + menu and the avatar instead of Sign in and Get the addon", async () => {
+  it("shows the + menu, avatar and download link without Sign in", async () => {
     await act(async () => root.render(<Header savedBuilds />));
     expect(container.querySelector('a[href="/sign-in"]')).toBeNull();
-    expect(Array.from(container.querySelectorAll("a")).some((a) => a.textContent === "Get the addon")).toBe(false);
+    const download = container.querySelector('a.btn[href="/addon"]');
+    expect(download?.querySelector("span")?.textContent).toBe("Download");
+    expect(download?.textContent).toContain("Get the addon");
     expect(avatarButton().textContent).toBe("T");
     expect(avatarButton().querySelector("span")!.className).toContain("bg-accent");
     const create = Array.from(container.querySelectorAll("#create-menu a")).map((a) => [a.textContent, a.getAttribute("href")]);

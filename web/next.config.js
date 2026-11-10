@@ -137,6 +137,10 @@ const nextConfig = {
   async redirects() {
     return [
       { source: "/:path*", has: [{ type: "host", value: "www.everloot.app" }], destination: "https://everloot.app/:path*", statusCode: 301 },
+      { source: "/download", destination: "/addon", permanent: true },
+      { source: "/downloads", destination: "/addon", permanent: true },
+      { source: "/desktop", destination: "/addon#desktop", permanent: true },
+      { source: "/curseforge", destination: "https://www.curseforge.com/wow/addons/everloot", permanent: true },
       { source: "/lore/forever-launch-date", destination: "/wow-forever", permanent: true },
       { source: "/lore/browse/:type(npcs|items|quests|zones|spells)", destination: "/lore/:type", permanent: true },
       { source: "/tools/gold-per-hour", destination: "/addon#gold-per-hour", statusCode: 301 },
