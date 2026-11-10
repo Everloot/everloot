@@ -94,8 +94,18 @@ test("ecosystem_projects: the ranked rows with GitHub facts flattened, and not c
   expect(off).toEqual({ connected: false, refreshedAt: null, installsAvailable: false, forever: null, board: "all", projects: [] });
 });
 
-test("everloot_plan: every tracker row with its status and proof, and the counts add up", async () => {
-  const plan = planOut.parse((await (await client()).callTool({ name: "everloot_plan", arguments: {} })).structuredContent);
+test("everloot_plan: every tracker row with its status and proof across detail pages, and the counts add up", async () => {
+  const c = await client();
+  const rows = [];
+  let plan: z.infer<typeof planOut> | undefined;
+  for (let offset: number | undefined = 0; offset !== undefined; offset = plan.nextOffset) {
+    plan = planOut.parse((await c.callTool({ name: "everloot_plan", arguments: { detail: true, offset } })).structuredContent);
+    rows.push(...plan.rows);
+  }
+  const byStatus = (["live", "next", "waiting", "shape"] as const).flatMap((s) => BRIDGE_PLAN.filter((r) => r.status === s));
+  expect(rows).toEqual(byStatus);
+  plan = planOut.parse((await c.callTool({ name: "everloot_plan", arguments: {} })).structuredContent);
+  // No arguments is the whole tracker, as before paging.
   expect(plan.rows).toEqual(BRIDGE_PLAN);
   expect(plan.counts.live + plan.counts.next + plan.counts.waiting + plan.counts.shape).toBe(BRIDGE_PLAN.length);
   expect(plan.counts.live).toBe(BRIDGE_PLAN.filter((r) => r.status === "live").length);

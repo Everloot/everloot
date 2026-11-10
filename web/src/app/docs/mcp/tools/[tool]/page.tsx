@@ -46,7 +46,8 @@ const TOOL_NOTES: Partial<Record<McpToolName, ReactNode>> = {
       grain, with its own snapshot date. That list stores no install count, so its installs read <C>[?]</C>.
       An undated or unavailable list is unknown. A dated empty list is measured zero.
       Type-filtered counts of fields needing one or two installs read <C>[?]</C> when the page&apos;s cap prevents a full count.
-      Baseline data contributes counts only. Unknown values read <C>[?]</C>. The answer is text only.
+      Baseline data contributes counts only. Unknown values read <C>[?]</C>. Without a zone the answer is a summary,
+      one line per zone; pass <C>detail</C> for per-field counts and <C>nextOffset</C> as <C>offset</C> for the rest.
     </>
   ),
   guild_board: (

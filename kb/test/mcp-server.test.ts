@@ -318,7 +318,7 @@ test("tools/list is exactly the protocol's tool table, in order, with its input 
   await client.close();
 });
 
-test("structured tools declare output schemas; coverage answers with text only", async () => {
+test("every tool declares an output schema; coverage says it is not connected in both forms", async () => {
   const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
   const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
   const { MCP_TOOL_NAMES, STRUCTURED_TOOLS } = await import("@everloot/protocol");
@@ -328,10 +328,10 @@ test("structured tools declare output schemas; coverage answers with text only",
   await server.connect(serverSide);
   const client = new Client({ name: "test", version: "0" });
   await client.connect(clientSide);
-  expect(STRUCTURED_TOOLS).toEqual(MCP_TOOL_NAMES.filter((name) => name !== "coverage"));
+  expect(STRUCTURED_TOOLS).toEqual(MCP_TOOL_NAMES);
   const coverage = await client.callTool({ name: "coverage", arguments: {} });
   expect(coverage.isError).not.toBe(true);
-  expect(coverage.structuredContent).toBeUndefined();
+  expect(coverage.structuredContent).toMatchObject({ connected: false, dataAsOf: null, scope: { zone: null, type: null } });
   expect(coverage.content).toEqual([{ type: "text", text: expect.stringContaining("not connected") }]);
   const listed = (await client.listTools()).tools;
   for (const tool of listed) expect(tool.outputSchema !== undefined).toBe(STRUCTURED_TOOLS.includes(tool.name as (typeof STRUCTURED_TOOLS)[number]));

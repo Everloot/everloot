@@ -474,6 +474,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   one the home page counts, so both show the same installs and facts and no answer replays the corpus. Only when
   that report is missing, for another build, or not confirmed by storage in the last five minutes (a failed refresh
   no longer keeps it) does it compute the score live; the answer's date line says which.
+- MCP: `coverage` and `everloot_plan` answer with a summary first and page the rest, so a broad question stays under 12 KB (the audit measured 82 KB for every zone's quests and 38 KB for the plan). `coverage` without a zone gives the totals, each type and one line per zone, 20 zones at a time, now with structured totals and denominators; `everloot_plan` with any argument names each row, 40 at a time, and states the tracker's revision (it records no date). `detail`, `offset` and `limit` read the rest, every page stays under 12,000 bytes even at the largest `limit`, and says how many it shows of how many and gives `nextOffset`. One zone answers as before, and `everloot_plan` with no arguments still returns the whole tracker. A zone filter that matches no released zone is unmeasured, not zeros.
 
 ## [desktop-v0.1.21] - 2026-11-10
 

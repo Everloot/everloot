@@ -31,7 +31,10 @@ test("the tool and the home page read the same stored report, so the numbers agr
   const loaded = await loadCoverageForTool({ stored: () => loadStoredCoverage(deps(fetcher)), live: replay });
   expect(summary!.confirmed).toBeGreaterThan(0);
   expect(summary!.waiting).toBeGreaterThan(0);
-  const text = await answerCoverage({}, async () => loaded);
+  const answer = await answerCoverage({}, async () => loaded);
+  const text = answer.text;
+  // The structured answer carries the same stored report: connected, its date, no live replay.
+  expect(answer.structured).toMatchObject({ connected: true, dataAsOf: summary!.dataAsOf });
   expect(text).toContain(`${summary!.installs} distinct folded installs`);
   expect(text).toContain(`${summary!.confirmed} confirmed (includes settled)`);
   expect(text).toContain(`Fields needing one or two more installs: ${summary!.waiting} `);
@@ -51,7 +54,7 @@ test("with no usable stored report the tool computes the score live and says so"
     const loaded = await loadCoverageForTool({ stored: () => loadStoredCoverage(deps(fetcher)), live: replay });
     expect(replay).toHaveBeenCalledOnce();
     expect(loaded).toMatchObject({ source: "live", dataAsOf: "2026-11-09T00:00:00.000Z" });
-    expect(await answerCoverage({}, async () => loaded)).toContain("Data as of 2026-11-09T00:00:00.000Z (computed from the corpus now");
+    expect((await answerCoverage({}, async () => loaded)).text).toContain("Data as of 2026-11-09T00:00:00.000Z (computed from the corpus now");
   }
 });
 
@@ -93,7 +96,7 @@ test("a warmed cache whose refresh fails is not served as stored: the tool compu
   const during = await loadCoverageForTool({ stored: () => loadStoredCoverage(at(fetcher, 400_000)), live: replay });
   expect(during).toMatchObject({ source: "live", dataAsOf: "2026-11-09T00:00:00.000Z" });
   expect(replay).toHaveBeenCalledOnce();
-  expect(await answerCoverage({}, async () => during)).toContain("(computed from the corpus now");
+  expect((await answerCoverage({}, async () => during)).text).toContain("(computed from the corpus now");
   // still down a minute later, and the retry has not turned the old report into a fresh one
   expect(await loadStoredCoverage(at(fetcher, 400_000 + 61_000))).toBeNull();
 

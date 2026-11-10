@@ -14,11 +14,11 @@ test("every tool gets a parameter table in declaration order, with required flag
   expect(docs.find((d) => d.name === "item_page")!.playerData).toBe(true);
   expect(search.structured).toBe(true);
   expect(docs.find((d) => d.name === "item_page")!.structured).toBe(true);
-  expect(docs.filter((d) => !d.structured).map((d) => d.name)).toEqual(["coverage"]);
-  // The answer table: structured tools have fields; coverage returns text only.
-  for (const d of docs.filter((d) => d.structured)) expect(d.output.length, d.name).toBeGreaterThan(0);
-  expect(toolOutput("coverage")).toEqual([]);
-  expect(toolParams("coverage").map((p) => [p.name, p.required])).toEqual([["zone", false], ["type", false]]);
+  expect(docs.filter((d) => !d.structured).map((d) => d.name)).toEqual([]);
+  // The answer table: every tool has fields.
+  for (const d of docs) expect(d.output.length, d.name).toBeGreaterThan(0);
+  expect(toolOutput("coverage").map((f) => f.name)).toEqual(["connected", "dataAsOf", "reason", "url", "scope", "page"]);
+  expect(toolParams("coverage").map((p) => [p.name, p.required])).toEqual([["zone", false], ["type", false], ["detail", false], ["offset", false], ["limit", false]]);
   const item = toolOutput("item_page");
   expect(item.map((f) => f.name)).toEqual(["connected", "dataAsOf", "reason", "url", "page"]);
   expect(item[0]).toMatchObject({ type: "boolean", required: true });
@@ -26,8 +26,8 @@ test("every tool gets a parameter table in declaration order, with required flag
   expect(item[3]).toMatchObject({ type: "string", required: false });
   expect(item[4]).toMatchObject({ type: "object", required: false });
   expect(toolOutput("search_knowledge")[0]).toMatchObject({ name: "hits", type: "array of objects", required: true });
-  expect(toolOutput("everloot_plan").map((f) => f.name)).toEqual(["rows", "counts"]);
-  expect(toolParams("everloot_plan")).toEqual([]);
+  expect(toolOutput("everloot_plan").map((f) => f.name)).toEqual(["rows", "index", "counts", "total", "offset", "nextOffset", "revision", "dataAsOf", "url"]);
+  expect(toolParams("everloot_plan").map((p) => [p.name, p.required])).toEqual([["status", false], ["detail", false], ["offset", false], ["limit", false]]);
 });
 
 test("type labels read as plain words", () => {
