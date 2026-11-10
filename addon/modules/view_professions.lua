@@ -4,7 +4,8 @@
 -- the trainer's name (trainer_seen rows, the name from the matching npc_sighting row). Under the blocks, every other
 -- character in the roster (roster.lua) with its professions and ranks. A button at the bottom swaps the blocks for
 -- the crafting costs: each recorded recipe of the character's professions with its reagents' cost, its product's
--- market value and an estimated profit, and what to buy for a chosen recipe and count. Display only: it registers no events and
+-- market value and an estimated profit, and what to buy for a chosen recipe and count, which a button adds to the active
+-- shopping list (modules/shopping.lua, saved in this install's file). Otherwise display only: it registers no events and
 -- records nothing; the window builds it the first time Professions is opened.
 
 local E = Everloot
@@ -42,6 +43,7 @@ local CHECKING = "Checking the price file..."
 local FAILED = "The price file failed its checksum and is not used. Vendor prices you saw still count."
 local NO_REALM = "The price file has no market values for this realm yet. Vendor prices you saw still count."
 local WARN = { 1, 0.4, 0.4, 1 }  -- the tooltip's warning red (prices.lua)
+local TO_LIST = "Add to shopping list"
 
 local refresh, buildCrafting
 
@@ -284,7 +286,7 @@ local function pricer(realm)
   return P
 end
 
--- One recipe at these prices: its reagents ({ item, count, unit, vendor, ambiguous }), the cost (nil when a reagent
+-- One recipe at these prices: its reagents ({ item, id, count, unit, vendor, ambiguous }), the cost (nil when a reagent
 -- has no price, with `unpriced` saying how many), the product's market value and, when both are known, the profit:
 -- an estimate, because it sets one item's value against a whole craft's cost.
 local function evaluate(recipe, P)
@@ -294,7 +296,7 @@ local function evaluate(recipe, P)
     local id, ambiguous = P.id(g.item)
     local unit, vendor
     if id then unit, vendor = P.unit(id) end
-    out.parts[#out.parts + 1] = { item = g.item, count = g.count, unit = unit, vendor = vendor, ambiguous = ambiguous }
+    out.parts[#out.parts + 1] = { item = g.item, id = id, count = g.count, unit = unit, vendor = vendor, ambiguous = ambiguous }
     if unit then cost = cost + unit * g.count else out.unpriced = out.unpriced + 1 end
   end
   if out.unpriced == 0 then out.cost = cost end
@@ -370,10 +372,12 @@ local function drawBuy(c, row)
   if not row then
     b.title:SetText("What to buy")
     for _, line in ipairs(b.lines) do line:Hide() end
-    b.up:Hide(); b.down:Hide()
+    b.up:Hide(); b.down:Hide(); b.add:Hide()
     b.total:SetText("Choose a recipe in the list.")
     return
   end
+  if E.Shopping then b.add:Show() else b.add:Hide() end
+  b.row = row
   b.title:SetText("What to buy: " .. c.count .. " × " .. row.name)
   if row.key ~= b.key then b.key = row.key; b.offset = 0 end
   local n = #row.parts
@@ -413,6 +417,9 @@ local function refreshCrafting(c)
   local age, color = ageLine(realm)
   c.age:SetText(age)
   c.age:SetTextColor(unpack(color))
+  -- What the last Add to shopping list did, until another recipe is chosen; else what the values mean.
+  c.note:SetText(c.added or PER_ITEM)
+  c.note:SetTextColor(unpack(c.added and COLORS.accent or COLORS.muted))
   if age == CHECKING and not c.waiting and C_Timer and C_Timer.After then
     -- A large file is checked a slice per frame; draw again once it can be read.
     c.waiting = true
@@ -548,7 +555,7 @@ buildCrafting = function(parent)
       line[col[1]] = s
     end
     line:SetScript("OnClick", function()
-      if line.row then c.selected = line.row.key; redraw() end
+      if line.row then c.selected = line.row.key; c.added = nil; redraw() end
     end)
     rows[i] = line
   end
@@ -565,7 +572,8 @@ buildCrafting = function(parent)
   local b = { lines = {}, steps = {}, offset = 0 }
   b.title = text(buy, 12)
   b.title:SetPoint("TOPLEFT", 8, -9)
-  b.title:SetWidth(W - 16 - 4 * 40)
+  -- The title leaves the top right to Add to shopping list and the four count buttons.
+  b.title:SetWidth(W - 16 - 4 * 40 - 150)
   if b.title.SetWordWrap then b.title:SetWordWrap(false) end
   for i, step in ipairs({ -10, -1, 1, 10 }) do
     local s = button(buy, (step > 0 and "+" or "") .. step, 36, function()
@@ -585,6 +593,13 @@ buildCrafting = function(parent)
   b.total = text(buy, 12)
   b.total:SetPoint("TOPLEFT", 8, -30 - BUY_LINES * LINE_H - 2)
   b.total:SetWidth(W - 16 - 110)
+  -- Adds this recipe's reagents for the chosen count to the active shopping list; the outcome shows under the age.
+  b.add = button(buy, TO_LIST, 146, function()
+    if not (E.Shopping and b.row) then return end
+    local _, _, _, said = E.Shopping.AddReagents(b.row.parts, c.count)
+    c.added = said
+  end)
+  b.add:SetPoint("TOPRIGHT", -6 - 4 * 40, -6)
   b.up = button(buy, "Up", 48, function() b.offset = math.max(0, b.offset - BUY_LINES) end)
   b.up:SetPoint("BOTTOMRIGHT", -58, 6)
   b.down = button(buy, "Down", 48, function() b.offset = b.offset + BUY_LINES end)

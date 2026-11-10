@@ -119,6 +119,13 @@ export default function Page() {
         and a price lookup. If the tab cannot be added, an <strong>Everloot scan</strong> button takes its place.
       </P>
       <P>
+        The <strong>Shopping list</strong> button on the tab shows your shopping lists: items with how many you want and
+        the most you will pay each. Add items by name, id or shift-click, or a recipe&apos;s reagents from the
+        Professions tab of the Everloot window. Each row shows the market value from your price file and how old it is.{" "}
+        <strong>Search</strong> looks up one item each time you press it, and you buy from Blizzard&apos;s Buy tab
+        yourself. Lists stay in your save file, up to 10 lists of 50 items, and are never uploaded.
+      </P>
+      <P>
         When a scan is allowed, opening the auction house also shows a small <strong>Scan prices for Everloot</strong>{" "}
         prompt, once per visit. One click scans. It never scans by itself, and <C>/everloot scanprompt off</C> hides it
         for good.
