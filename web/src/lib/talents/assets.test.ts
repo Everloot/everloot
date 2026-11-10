@@ -125,6 +125,8 @@ const SHOWS_ART = new Set([
   "web/src/app/database/(hub)/page.tsx",
   // The quest list's reward icons, under the item lists' rule (reported or wiki-named items only).
   "web/src/app/database/quests/page.tsx",
+  // Chain quests read the same quest names as the quest list; no art or tooltip.
+  "web/src/app/database/quest-chains/[id]/page.tsx",
   // The site-wide credit (footer → /methodology#credits): reads only the manifest's build and label, no art.
   "web/src/app/methodology/page.tsx",
   // The chat's suggestion cards: the warrior and Tailoring icons, as the home page shows the class and profession icons.
