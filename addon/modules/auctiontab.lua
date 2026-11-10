@@ -270,7 +270,7 @@ local function addFromBoxes(shop)
   local item, why = S.Set(id, want, max, S.ItemName(id))
   if not item then return say(why) end
   shop.itemBox:SetText(""); shop.wantBox:SetText(""); shop.maxBox:SetText("")
-  say("Saved " .. (S.ItemName(id, item.name) or ("item " .. id)) .. ": want " .. item.want
+  say("Saved " .. S.Shown(S.ItemName(id, item.name) or ("item " .. id)) .. ": want " .. item.want
     .. (item.max and (", max " .. E.Coins(item.max) .. " each.") or ", no max."))
 end
 
@@ -278,7 +278,7 @@ end
 local function drawShopRow(line, item)
   local S = E.Shopping
   line.item = item
-  line.name:SetText(S.ItemName(item.itemId, item.name) or ("Item " .. item.itemId))
+  line.name:SetText(S.Shown(S.ItemName(item.itemId, item.name) or ("Item " .. item.itemId)))
   line.name:SetTextColor(unpack(tone("text")))
   line.want:SetText(tostring(item.want))
   line.max:SetText(item.max and S.Money(item.max) or "no limit")
@@ -421,7 +421,7 @@ local function buildShop(panel)
     end)
     line.search:SetPoint("LEFT", line, "LEFT", 600, 0)
     line.remove = shopButton(line, "x", 22, function()
-      if line.item and S.Remove(line.item.itemId) then say("Removed " .. (S.ItemName(line.item.itemId, line.item.name) or "the item") .. ".") end
+      if line.item and S.Remove(line.item.itemId) then say("Removed " .. S.Shown(S.ItemName(line.item.itemId, line.item.name) or "the item") .. ".") end
     end)
     line.remove:SetPoint("LEFT", line, "LEFT", 664, 0)
     shop.rows[i] = line

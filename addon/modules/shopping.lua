@@ -33,6 +33,10 @@ end
 
 local function clamp(n, lo, hi) return math.max(lo, math.min(hi, n)) end
 
+--- A name as text on screen: its pipes doubled, so a name never starts a colour or texture escape. Searches and item
+--- lookups keep the name as it is.
+function S.Shown(text) return (tostring(text):gsub("|", "||")) end
+
 local function cleanName(name)
   if type(name) ~= "string" then return nil end
   name = name:gsub("|", ""):gsub("^%s+", ""):gsub("%s+$", "")
@@ -49,8 +53,8 @@ local function cleanItem(it)
   return { itemId = it.itemId, want = want, max = max, name = name }
 end
 
---- The saved lists, checked once per session against the caps (a hand-edited file is trimmed, never trusted):
---- { lists = { { name, items = { { itemId, want, max, name } } } }, active }.
+--- The saved lists, checked against the caps when the saved file loads and whenever it is replaced (a hand-edited
+--- file is trimmed, never trusted): { lists = { { name, items = { { itemId, want, max, name } } } }, active }.
 function S.DB()
   if type(EverlootDB) ~= "table" then return { lists = {}, active = 0 } end
   local db = EverlootDB.shopping
@@ -256,10 +260,12 @@ function S.FileLine()
   local file = E:PriceFile(realm)
   if file.status == "verifying" then return "Market: checking the price file...", false end
   if file.status == "bad" then
-    if file.silent then return "Market: the price file has no values for " .. realm .. " yet.", false end
+    -- No block for this house, an older realm-only file, or a character whose house is unknown: said as the price
+    -- command says it (prices.lua). An older file needs the player to refresh it, so it warns.
+    if file.silent then return "Market: " .. E.PriceMissingNote(realm, file), file.legacy == true end
     return "Market: the price file failed its checksum and is not used.", true
   end
-  local where = type(file.house) == "string" and (file.house .. " auction house") or "all houses"
+  local where = (type(file.house) == "string" and file.house or "this") .. " auction house"
   local today, built = E.DayNumber(date("!%Y-%m-%d")), E.DayNumber(file.asOf or "")
   if not today or not built then return "Market: from the price file, " .. where .. "; when it was built is unknown.", true end
   local days = math.max(0, today - built)
@@ -321,7 +327,7 @@ function S.Search(itemId, saved)
     pending = nil
     return false, say("The search could not be sent. Try again.")
   end
-  return true, say("Searching for " .. name .. "...")
+  return true, say("Searching for " .. S.Shown(name) .. "...")
 end
 
 local function number(v)
@@ -347,29 +353,35 @@ local function readResults()
   end
   if min then
     found[s.itemId] = { min = min, quantity = quantity, at = time() }
-    say(s.name .. ": lowest " .. E.Coins(min) .. " each, " .. quantity .. " listed.")
+    say(S.Shown(s.name) .. ": lowest " .. E.Coins(min) .. " each, " .. quantity .. " listed.")
   else
     found[s.itemId] = { none = true, at = time() }
     local more = type(C_AuctionHouse.HasFullBrowseResults) == "function"
       and readable(select(2, pcall(C_AuctionHouse.HasFullBrowseResults))) == false
-    say(s.name .. (more and ": not in the first page of results. The Buy tab shows them all." or ": none listed with a buyout."))
+    say(S.Shown(s.name) .. (more and ": not in the first page of results. The Buy tab shows them all." or ": none listed with a buyout."))
   end
 end
 
 --- Clears a search the house never answered, so the next press can send another. The panel calls it every second.
 function S.Tick()
   if pending and time() - pending.at >= S.WAIT then
-    say("No answer from the auction house for " .. pending.name .. ": press Search again.")
+    say("No answer from the auction house for " .. S.Shown(pending.name) .. ": press Search again.")
     pending = nil
     return true
   end
 end
 
-local function onEvent(_, event)
+local function onEvent(_, event, arg1)
+  -- The saved file is read once it loads, so a hand-edited one is held to the caps before anything else sees it. A
+  -- new install has no lists and nothing is written for it.
+  if event == "ADDON_LOADED" then
+    if arg1 == "Everloot" and type(EverlootDB) == "table" and EverlootDB.shopping ~= nil then S.DB() end
+    return
+  end
   if event == "AUCTION_HOUSE_CLOSED" then pending = nil; return end
   if not pending then return end
   if event == "AUCTION_HOUSE_BROWSE_FAILURE" then
-    say("The auction house refused the search for " .. pending.name .. ": try again in a moment.")
+    say("The auction house refused the search for " .. S.Shown(pending.name) .. ": try again in a moment.")
     pending = nil
   elseif event == "AUCTION_HOUSE_BROWSE_RESULTS_UPDATED" then
     if not pcall(readResults) then pending = nil; say("The search results could not be read.") end
@@ -380,7 +392,7 @@ local function onEvent(_, event)
 end
 
 S.frame = CreateFrame("Frame")
-for _, event in ipairs({ "AUCTION_HOUSE_BROWSE_RESULTS_UPDATED", "AUCTION_HOUSE_BROWSE_FAILURE", "AUCTION_HOUSE_CLOSED" }) do
+for _, event in ipairs({ "ADDON_LOADED", "AUCTION_HOUSE_BROWSE_RESULTS_UPDATED", "AUCTION_HOUSE_BROWSE_FAILURE", "AUCTION_HOUSE_CLOSED" }) do
   pcall(S.frame.RegisterEvent, S.frame, event)
 end
 S.frame:SetScript("OnEvent", onEvent)

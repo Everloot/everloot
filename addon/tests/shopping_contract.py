@@ -4,7 +4,8 @@ Shopping lists (modules/shopping.lua): named lists of items with a wanted count 
 saved in this install's file only and capped (10 lists of 50 items, names of 24 characters), and trimmed to those caps
 when a hand-edited file holds more. The Professions tab's what-to-buy list adds a recipe's reagents for the chosen
 count. At the auction house the Everloot panel shows the active list with each item's market value and its age from
-the price file, and a Search button that sends at most one browse query per press, only when the house is open, no
+the price file's block for this character's auction house (an older realm-only file is refused, said as the price
+command says it), and a Search button that sends at most one browse query per press, only when the house is open, no
 price scan or earlier search is waiting and the client's throttle is ready. No other auction house call is made:
 nothing is posted, bid on or bought, and nothing is stored as a record or uploaded.
 """
@@ -80,7 +81,7 @@ C_Timer = { After = function(seconds, f) table.insert(timers, f) end }
 function drain() while #timers > 0 do table.remove(timers, 1)() end end
 function fire(event, arg1) for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, event, arg1) end end
 -- The shopping module listens on its own frame.
-function shopEvent(event) Everloot.Shopping.frame.onEvent(Everloot.Shopping.frame, event) end
+function shopEvent(event, arg1) Everloot.Shopping.frame.onEvent(Everloot.Shopping.frame, event, arg1) end
 
 GetRealmName = function() return 'Forever' end
 UnitFactionGroup = function() return 'Horde', 'Horde' end
@@ -194,24 +195,40 @@ for _, bad in ipairs({ 'cheap', '1x', '0', '-2', '5g lots' }) do
 end
 """)
 
-lua = fresh(FILES, saved="""{ installId = 'x', toggles = {}, records = {}, shopping = { active = 99, lists = {
-  { name = 'ok', items = { { itemId = 1, want = 0 }, { itemId = 1, want = 3 }, { itemId = 'bad' }, { itemId = 2, want = 2, max = 50, name = 'Two' } } },
-  { name = '', items = {} }, 'junk',
-  { name = 'big', items = (function() local t = {} for i = 1, 80 do t[i] = { itemId = i, want = 1 } end return t end)() },
-  (function() local t = {} return t end)(),
-} } }""")
+HAND_EDITED = """{ installId = 'x', toggles = {}, records = {}, shopping = { active = 99, lists = (function()
+  local lists = {
+    { name = 'ok', items = { { itemId = 1, want = 0 }, { itemId = 1, want = 3 }, { itemId = 'bad' }, { itemId = 2, want = 2, max = 50, name = 'Two' } } },
+    { name = '', items = {} }, 'junk',
+    { name = 'big', items = (function() local t = {} for i = 1, 80 do t[i] = { itemId = i, want = 1 } end return t end)() },
+    {},
+  }
+  for i = 1, 15 do lists[#lists + 1] = { name = 'extra ' .. i, items = {} } end
+  return lists
+end)() } }"""
+lua = fresh(FILES, saved=HAND_EDITED)
 lua.execute("""
+-- The game hands every frame ADDON_LOADED; nothing asks for the lists before the saved file is checked.
 Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')
-local S = Everloot.Shopping
-local more = EverlootDB.shopping.lists
-for i = 1, 15 do more[#more + 1] = { name = 'extra ' .. i, items = {} } end
-local db = S.DB()
-assert(#db.lists == 10, 'a hand-edited file keeps at most 10 lists: ' .. #db.lists)
+shopEvent('ADDON_LOADED', 'Everloot')
+local db = EverlootDB.shopping
+assert(#db.lists == 10, 'a hand-edited file keeps at most 10 lists from the moment it loads: ' .. #db.lists)
 assert(db.lists[1].name == 'ok' and #db.lists[1].items == 2, 'bad and repeated items are dropped')
 assert(db.lists[1].items[1].want == 1 and db.lists[1].items[2].max == 50 and db.lists[1].items[2].name == 'Two')
 assert(db.lists[2].name == 'big' and #db.lists[2].items == 50, 'at most 50 items a list')
 assert(db.active == 10, 'an active index past the end points at the last list')
-assert(EverlootDB.shopping == db, 'the trimmed lists are what is saved')
+assert(Everloot.Shopping.DB() == db, 'the trimmed lists are what is saved')
+""")
+# Another addon loading checks nothing, and a new install gets no shopping table it never used.
+lua = fresh(FILES, saved=HAND_EDITED)
+lua.execute("""
+shopEvent('ADDON_LOADED', 'Blizzard_AuctionHouseUI')
+assert(#EverlootDB.shopping.lists == 20, 'only Everloot loading checks its file')
+""")
+lua = fresh(FILES)
+lua.execute("""
+Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')
+shopEvent('ADDON_LOADED', 'Everloot')
+assert(EverlootDB.shopping == nil, 'a new install writes no lists on load')
 """)
 
 # --- Add from a recipe: reagents for the chosen count, merged into the active list, unknown ids skipped ---
@@ -309,12 +326,25 @@ def panel_world(files, prices: str | None):
     return lua
 
 
-PRICE_ROWS = "2589,205,200,190,40,2026-10-20,3;765,,30,33,900,2026-10-05,4;2770,30,25,35,80,2026-10-16,5"
+# Each auction house is its own market: the Horde and Alliance blocks of one realm hold different values.
+PRICE_ROWS = {
+    "horde": "2589,205,200,190,40,2026-10-20,3;765,,30,33,900,2026-10-05,4;2770,30,25,35,80,2026-10-16,5",
+    "alliance": "2589,999,950,900,12,2026-10-20,3;2770,77,70,75,40,2026-10-20,4",
+}
 
 
-def price_file(as_of: str) -> str:
-    return (f"EverlootPricesDB = {{ realms = {{ forever = {{ data = '{PRICE_ROWS}', sum = {zlib.adler32(PRICE_ROWS.encode())}, "
-            f"dataAsOf = '{as_of}' }} }} }}\n")
+def block(rows: str, as_of: str) -> str:
+    return f"{{ data = '{rows}', sum = {zlib.adler32(rows.encode())}, dataAsOf = '{as_of}' }}"
+
+
+def price_file(as_of: str, houses=("horde", "alliance")) -> str:
+    blocks = ", ".join(f"['forever|{h}'] = {block(PRICE_ROWS[h], as_of)}" for h in houses)
+    return f"EverlootPricesDB = {{ realms = {{ {blocks} }} }}\n"
+
+
+def legacy_price_file(as_of: str) -> str:
+    """A file from before auction houses were kept apart: one block for the realm alone."""
+    return f"EverlootPricesDB = {{ realms = {{ forever = {block(PRICE_ROWS['horde'], as_of)} }} }}\n"
 
 
 for files in (STYLED, FILES):
@@ -330,7 +360,7 @@ assert(shop.page.shown and not p.lookup.shown and not p.results.shown and not p.
 assert(p.modeButton.text == 'Price lookup')
 assert(shop.listName.text == 'No list yet' and shop.empty.shown and not shop.rows[1].shown, 'an empty start says how to begin')
 assert(shop.caps.text:find('10 lists of 50 items', 1, true) and shop.caps.text:find('Nothing is uploaded, bought or posted', 1, true))
-assert(shop.file.text == 'Market: price file built 2026-10-19 (1 day ago), all houses; each value\\'s age beside it.', shop.file.text)
+assert(shop.file.text == 'Market: price file built 2026-10-19 (1 day ago), Horde auction house; each value\\'s age beside it.', shop.file.text)
 
 -- Add through the boxes: an id, a count and a max price.
 shop.itemBox:SetText('2589'); shop.wantBox:SetText('20'); shop.maxBox:SetText('2s 50c')
@@ -339,7 +369,7 @@ assert(shop.message.text == 'Saved Linen Cloth: want 20, max 2s 50c each.', shop
 assert(shop.itemBox.text == '' and shop.listName.text:find('Shopping', 1, true), 'the first item makes a list')
 local r = shop.rows[1]
 assert(r.shown and r.name.text == 'Linen Cloth' and r.want.text == '20', tostring(r.name.text))
-assert(r.max.text == S.Money(250) and r.market.text == S.Money(205) .. ' · today', r.market.text)
+assert(r.max.text == S.Money(250) and r.market.text == S.Money(205) .. ' · today', 'the Horde value, not the Alliance one: ' .. r.market.text)
 assert(r.found.text == '-', 'nothing searched yet')
 -- A shift-clicked item goes into the Item box while it has focus; an unpriced, stale item says so.
 shop.itemBox.focus = true
@@ -414,14 +444,76 @@ T.SetMode('shop')
 local file = T.panel.shop.file
 assert(file.text:find('OLD FILE', 1, true) and file.text:find('10 days ago', 1, true) and file.color[2] == 0.4, file.text)
 """)
-# A house-keyed price file (prices.lua names the house in E:PriceFile): the line names the house, not all houses.
-lua = panel_world(STYLED, price_file("2026-10-20T06:00:00Z"))
+# An Alliance character on the same realm reads the Alliance block, and the line names that house.
+lua = panel_world(STYLED, price_file("2026-10-20T06:00:00Z") + "UnitFactionGroup = function() return 'Alliance', 'Alliance' end\n")
+lua.execute("""
+local T, S = Everloot.AuctionTab, Everloot.Shopping
+S.Set(2589, 1); S.Set(765, 1)
+T.SetMode('shop')
+local shop = T.panel.shop
+assert(shop.file.text:find('(today), Alliance auction house;', 1, true), shop.file.text)
+assert(shop.rows[1].market.text == S.Money(999) .. ' · today', 'the Alliance value: ' .. shop.rows[1].market.text)
+assert(shop.rows[2].market.text == 'no price', 'an item only the Horde block prices has none here')
+""")
+# A realm-only file from before houses were kept apart is refused, in the price command's words, and warns.
+lua = panel_world(STYLED, legacy_price_file("2026-10-20T06:00:00Z"))
+lua.execute("""
+local T, S = Everloot.AuctionTab, Everloot.Shopping
+S.Set(2589, 1)
+T.SetMode('shop')
+local shop = T.panel.shop
+local note = Everloot.PriceMissingNote('Forever', Everloot:PriceFile('Forever'))
+assert(note:find('from before auction houses were kept apart', 1, true)
+  and note:find('Refresh it with the Everloot Desktop App, then /reload', 1, true), note)
+assert(shop.file.text == 'Market: ' .. note, shop.file.text)
+assert(shop.file.color[2] == 0.4, 'an older file asks the player to refresh it, in warning red')
+assert(shop.rows[1].market.text == 'no price', 'its values are never shown as this house: ' .. shop.rows[1].market.text)
+""")
+# A file without this house's block, and a character whose house cannot be told, are said as the price command says.
+lua = panel_world(STYLED, price_file("2026-10-20T06:00:00Z", houses=("alliance",)))
 lua.execute("""
 local T = Everloot.AuctionTab
-local real = Everloot.PriceFile
-Everloot.PriceFile = function(self, realm) local f = real(self, realm); f.house = 'Horde'; return f end
 T.SetMode('shop')
-assert(T.panel.shop.file.text:find('(today), Horde auction house;', 1, true), T.panel.shop.file.text)
+local file = T.panel.shop.file
+assert(file.text == 'Market: The Everloot price file has no data for the Horde auction house on Forever yet: '
+  .. 'scan its auction house or follow it in the Desktop App, then /reload.', file.text)
+assert(file.color[2] ~= 0.4, 'no block yet is not a warning')
+""")
+lua = panel_world(STYLED, price_file("2026-10-20T06:00:00Z") + "UnitFactionGroup = function() return nil end\n")
+lua.execute("""
+local T = Everloot.AuctionTab
+T.SetMode('shop')
+local file = T.panel.shop.file
+assert(file.text:find('cannot tell this character', 1, true), file.text)
+""")
+
+# --- Item names are shown as written: a pipe in a name never starts an escape; searches use the name as it is ---
+lua = panel_world(STYLED, None)
+lua.execute("""
+local T, S = Everloot.AuctionTab, Everloot.Shopping
+NAMES[4242] = 'Bad|cffff0000Name|r'
+T.SetMode('shop')
+local shop = T.panel.shop
+shop.itemBox:SetText('4242'); shop.wantBox:SetText(''); shop.maxBox:SetText(''); click(shop.addButton)
+assert(shop.message.text == 'Saved Bad||cffff0000Name||r: want 1, no max.', shop.message.text)
+assert(shop.rows[1].name.text == 'Bad||cffff0000Name||r', shop.rows[1].name.text)
+assert(S.DB().lists[1].items[1].name == 'Bad|cffff0000Name|r', 'the list keeps the name as the client has it')
+click(shop.rows[1])
+assert(shop.itemBox.text == 'Bad|cffff0000Name|r', 'the Item box gets the name to look up, not the shown one')
+click(shop.rows[1].search)
+assert(queries[1].searchString == 'Bad|cffff0000Name|r', 'the search sends the name as it is')
+assert(shop.message.text == 'Searching for Bad||cffff0000Name||r...', shop.message.text)
+browse = { { itemKey = { itemID = 4242, itemLevel = 1, itemSuffix = 0, battlePetSpeciesID = 0 }, minPrice = 240, totalQuantity = 2 } }
+shopEvent('AUCTION_HOUSE_BROWSE_RESULTS_UPDATED')
+assert(shop.message.text:find('Bad||cffff0000Name||r: lowest', 1, true) == 1, shop.message.text)
+click(shop.rows[1].search)
+shopEvent('AUCTION_HOUSE_BROWSE_FAILURE')
+assert(shop.message.text:find('search for Bad||cffff0000Name||r:', 1, true), shop.message.text)
+click(shop.rows[1].search)
+now = now + 10; T.Refresh()
+assert(shop.message.text:find('for Bad||cffff0000Name||r: press', 1, true), shop.message.text)
+click(shop.rows[1].remove)
+assert(shop.message.text == 'Removed Bad||cffff0000Name||r.', shop.message.text)
 """)
 
 # --- Professions: Add to shopping list adds the chosen recipe's reagents for the chosen count ---
@@ -465,4 +557,6 @@ assert(not p.craft.buy.add.shown and not Everloot.Window.failed)
 print("Lua 5.1 shopping lists: create, rename, choose, two-press delete; caps of 10 lists, 50 items and 24-character "
       "names, said in the UI and enforced on a hand-edited file; max price parsing; reagents added from the Professions "
       "tab for the chosen count; one browse query per press, throttle, pending, timeout, failure, scan and closed house "
-      "respected, no other auction house call; market value with its age from the price file, stale and house wording")
+      "respected, no other auction house call; market value with its age from this house's block of the price file; a "
+      "stale file, an older realm-only file, a missing block and an unknown house said as the price command says them; "
+      "caps held from the moment the saved file loads; pipes in item names doubled on screen, kept for searches")
