@@ -59,10 +59,10 @@ test("the addon choices lead with the app, then website, then zip; desktop start
   expect(visible(html)).toContain("Choose your download");
 });
 
-test("the download is clearly labelled Alpha with live-client checks pending", async () => {
+test("the download is clearly labelled Alpha, without the pending note once checked in the live client", async () => {
   const html = await render(() => Promise.resolve(Response.json(releases)));
   expect(visible(html)).toContain("Alpha");
-  expect(visible(html)).toContain("Live-client verification is pending");
+  expect(visible(html)).not.toContain("Live-client verification is pending");
 });
 
 test.each([

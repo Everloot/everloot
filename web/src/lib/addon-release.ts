@@ -11,7 +11,8 @@ export interface AddonRelease {
  * Whether the addon has been checked in the live Forever client. Only a person who ran it there can say so, so this
  * is flipped by hand, never by date; the home page and the addon page both read it.
  */
-export const ADDON_LIVE_VERIFIED = false;
+// Checked by the owner in the live Forever client on 0.3.22 (2026-11-10): window, minimap button, drawer, shopping list.
+export const ADDON_LIVE_VERIFIED = true;
 
 const NAME = /^Everloot-(\d+)\.(\d+)\.(\d+)\.zip$/;
 
