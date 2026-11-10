@@ -25,10 +25,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   titles, quest lines, mounts, encounters, recipes, class gear and its restrictions, class spells, races, legacy perks,
   talent nodes, raid buffs): ids, the names the files hold and each file's build, every row counted, with a schema each
   and a manifest line. The README and the download page no longer list the catalogs as missing. Nothing observed changes.
-- Addon: item tooltips and `/everloot price` end with up to three muted lines from this install's own rows: "Sold by
-  <NPC> (your sighting)" from the vendor windows it opened, "Reagent for n recipes you know" from its recipe colours,
-  and "Seen in <zone>" for a drop source it met. Without own rows the price file's public vendors and reagent count
-  show instead, when the file carries them. Display only; nothing recorded or uploaded changes.
 - Companion: the EverlootPrices slot file can carry a `sources` block after the drops (public vendor NPC ids and a
   reagent-of count per item, checksummed like the drops, with the vendors' names outside the checksum). The block is
   optional: a file without it is read as before. The Desktop App does not write it yet.
@@ -37,9 +33,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   goes, and the cross-field rules the server checks. The sidebar lists them and the schemas table links each kind to its page.
 - Site: the account guide and the addon page link the sample character page (/showcase/character), so a player can see
   what a character page holds before linking one. The sample stays out of search and the sitemap.
-- Addon: the Gold tab's Overview chart follows the period buttons (today, 7 days, 30 days, or all for the ledger's
-  90 days), one bar a day; Sales shows the auction house's cut beside each sale's deposit, and the by-item rows show
-  sales per day over the period and the last sold day. Display only; nothing recorded or uploaded changes.
 - Site: a profession page answers to its skill line id, `/tools/professions/171` or `/tools/professions/171-alchemy`, and
   redirects for good to the slug page it already had, keeping the skill range and class context in the query; an unknown id
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
@@ -99,20 +92,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Web: the accessibility page describes the motion the site has, Glint included, instead of only 150 ms fades, and the
 - Site: the accessibility page describes the motion the site has, Glint included, instead of only 150 ms fades, and the
   accessibility, terms, privacy and rankings dates use the site's one date format (November 4, 2026).
-- Addon: the in-game help line, the README's command table and the site's addon guide list the same commands, with
-  `version`, `planner`, `gph hide`, `gph cut on|off`, `plan hide|clear`, `window`, `vendor`, `mail`, `link` and
-  `plan <number>` where one list had left them out; the guide says a left-click on the minimap button opens the window;
-  the README's file tree names every module; and a contract test fails when the three lists drift.
-- Addon: a loading screen inside the minute after the last gold snapshot writes no new row unless the balance changed;
-  the last snapshot's time is kept in the saved file, so a /reload no longer adds a row each.
-- Addon: the button drawer leaves the minimap buttons to MinimapButtonButton when that addon is loaded, and to any
-  addon that takes a button after Everloot did. Before, both gathered the same buttons and hovering the crest opened
-  an empty Everloot panel over the other addon's, which dimmed every icon under it. The drawer's cells also leave
-  room for a LibDBIcon ring, each button draws above the one before it, and the panel is the window's own canvas and
-  bronze edge with a thin bar in the window's green down the side that faces the crest.
-- Addon: the PvP row keeps a character's last honorable kill count when a read comes before the Statistics tab has
-  loaded, and skips a statistic the game flags to skip. A talent choice past the site's range is left off that node
-  instead of failing the whole talent row on sync.
 - Site: an addon page, title and download links exist only for an addon the owner approved (the curated source map or the
   ecosystem registry). Before, any addon three installs reported got a page, and its title came from the uploads. The
   usage board at /addons/popular still counts what players run, and links only the approved ones.
@@ -121,29 +100,17 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   Worker's switches) and ship inside the Worker bundle; an API-only or test-only change keeps the cache, and a changed
   script, style or page starts a new one. A name repeated in the query keeps its order in the cache key, and the
   sign-in, sign-up, password-reset, `/me` and auth routes are never read from or stored in it.
-- Addon: an item's name and quality are recorded once, not again in every loot window and on every vendor that sells
-  it, and a vendor is recorded once per UTC day unless an item, a price or a limited stock changed. Before, about ten
-  vendor visits filled the 2,000-row cap for item names and every new name after that was lost.
 - Site and MCP: chat search reads a misspelled place or word as its common spelling and says so: "does thunderbluff have
   a zeppeling?" is read as "thunder bluff" and "zeppelin" and finds The Zephyr instead of unrelated lore. Names from the
   game files are never respelled. "learn mining in orgrimmar" finds the trainer, "what dungeon at level 30" lists the
   dungeons near that level from the map entrances, a page named in the question opens with its first sentence, and
   flight masters show only when the question is about flying or that place. Spanish price questions ("cuánto cuesta
   linen cloth") go to the price lookup, and the chat no longer opens with the archive note meant for AI clients.
-- Addon: the Everloot price block shows once per hover. Comparing an item opens the game's comparison tooltips beside
-  the main one, and each of them carried the block too, so one hover read it up to three times.
 - CurseForge: an Alpha release uploads as a CurseForge Beta, named "Everloot <version> Beta". CurseForge's Files tab hides
   alpha files unless a visitor ticks "Show alpha files", so with every file an Alpha it read "No Results". GitHub still marks
   the release a pre-release, and the site still calls the addon an Alpha.
-- Addon: a guild roster snapshot is stored at most once every six hours, and not when the roster reads the same as
-  the last one; a raid lockout is stored once until a boss goes down or the week resets, and an expired one not at
-  all; attendance is stored once per set of people in a raid run. Before, every guildmate's login or logout stored a
-  whole snapshot (about 50 KB for a 500-member guild) and every loading screen stored the lockouts again.
 - Site: a realm whose name ends in RP-PvP written as one word ("CAMWOW US1 Realm 9 RPPVP", as players copied Forever's
   realm list) is filed under RP-PvP on the Auction House instead of "Realms not mapped yet".
-- Addon: a partial price sample (the search-based fallback when a full scan cannot run) keeps only the newest earlier
-  sample of that realm before it stores, so two samples no longer fill the 2,000-row `auction_scan` cap and later samples no
-  longer report "stored 0". Another realm's rows stay.
 - Site: the separator between the facts under an Auction House title reads "·", not "Â·".
 - Site and MCP: recipe skill ranges agree on the recipe id the trade-skill window reports, not the recipe's name, so an
   install on a Spanish client ("Peletería") counts toward the same range as English ones. A recipe the game files list
@@ -208,33 +175,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   prompts under the page.
 - Site: an item, NPC or quest page shared on Discord or X shows its own card: the name, its type and how many of
   the 3 installs agree on the name, as text on the brand canvas. Before, every database page showed the site card.
-- Addon: each Professions block lists the next recipes a trainer teaches at or above the current rank (up to three,
-  lowest rank first) with the cost and the trainer's name, from the trainer rows the install already has, or says to
-  open a trainer's window; under the blocks, "Other characters" lists every other character's professions and ranks
-  from the local roster. Display only: nothing recorded or uploaded changes.
-- Addon: the Everloot window's sidebar is now Home, Gold, Collection, Professions and Settings. Ask, Build plan and
-  Auctions left the sidebar; `/ask` and `/everloot plan` still work.
-- Addon: Home lists every character this install has seen (gold, level, professions, raid lockouts, last seen) with
-  realm and account totals and a "This week" line. "What you've added" moved to the Settings page.
-- Addon: Home says what this character is missing, under the portrait: achievements left, factions not exalted, titles
-  not held, professions with no recipe read and this week's raids with bosses left, counted from the rows Collection
-  and Professions already show; each line opens that tab. With the completion tracker off the strip says so and offers
-  Collection's Turn on button. The gold box adds "Account this week: +in / -out" over every character under this
-  character's own week line.
-- Addon: the Gold tab has Overview (gold by character and realm, the last 30 days as bars), Ledger (by category, day or
-  receipt), Sales and Session. It reads a new local ledger, `EverlootDB.ledger` (5,000 events or 90 days, 2,000 sales,
-  400 daily closes per character), and a local roster, `EverlootDB.roster` (options row "Your characters"). Neither is uploaded.
-- Addon: each auction sale is recorded by item from the mailbox invoice (item name, count, price after the cut,
-  deposit) when you collect the letter. The buyer's name is not read.
-- Addon: Sales lists a sale as "sold, gold pending" from the moment the game says a buyer was found, and the same row
-  turns "paid" when you collect the letter. A letter collected after 48 hours still fills its row.
-- Addon: the ledger records repairs and vendor purchases at an open merchant (a guild-bank repair costs you nothing and
-  is left out), gold traded with another player, gold sent with a letter, and gold in a letter from one of your own
-  characters. With the account selected, gold moved between your own characters leaves the totals and shows on its own
-  line, "Moved between your characters". These categories stay in the local ledger and are not uploaded.
-- Addon: the Gold tab's Today, 7 days and 30 days start at UTC midnight, so the first day is a whole day.
-- Addon: Collection tab for achievements, reputation, titles and raid lockouts (needs the completion tracker on) and a
-  Professions tab with each profession's rank and recorded recipe colours.
 - Site: the gear rankings are scored every 30 minutes by a new cron (`/api/cron/profiles`) and stored, instead of on
   every page view; the boards say how long ago. Each view still filters the stored boards against who is ranked right
   now, so a switch turned off takes a character off on the next request. Ranked characters get a daily history of
@@ -266,11 +206,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   max rank) and this week's raid lockouts (bosses killed of total, reset time) under the completion key, latest state
   only, and the Desktop App's Characters page shows them on the keyed rows. They stay on your computer: no upload, the
   upload page included, sends them, and the Desktop App's Chat does not read them. Not yet checked in game.
-- Addon: player names stay off by default, and the addon now asks once, in game, whether to turn them on. The question
-  comes a few seconds after the first loading screen, never in combat, and says what is recorded (name, realm, race,
-  class, level and guild of your characters and of players you target, mouse over or group with), how to turn it off
-  (`/everloot players off`) and where to hide a character (everloot.app/players/opt-out). After an answer, or a choice
-  made with `/everloot players on|off` or the settings page, it is never asked again.
 - Site: the Auction House lists each realm that has scans but no public prices yet, with how many of the 3 players needed
   have scanned there ("1 of 3 players have scanned; prices go public at 3"). A player is counted once per upload address,
   on the item with the most players on one day in the last 7. `/api/market/prices` without a realm returns the same counts
@@ -456,6 +391,92 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
+
+## [0.3.22] - 2026-11-10
+
+Release channel: Alpha
+
+The Everloot window is rebuilt around Home, Gold, Collection, Professions and Settings, with a gold ledger that
+stays on your computer. Tooltips can say who sells an item, what it is a reagent for and where it drops. The census
+also counts players the game shows a nameplate for (race, class, level and faction only). The tooltip lines come
+from this install's own sightings; public vendors and reagent counts show once a Desktop App writes them into the
+price file, which none does yet. Not yet seen in the Forever client: the window, the ledger's mailbox, repair, trade and mail reads, and the nameplate census pass the
+addon's tests only.
+
+### Added
+- Item tooltips and `/everloot price` end with up to three muted lines from this install's own rows: "Sold by
+  <NPC> (your sighting)" from the vendor windows it opened, "Reagent for n recipes you know" from its recipe colours,
+  and "Seen in <zone>" for a drop source it met. Without own rows the price file's public vendors and reagent count
+  show instead, when the file carries them. Display only; nothing recorded or uploaded changes.
+- The Gold tab's Overview chart follows the period buttons (today, 7 days, 30 days, or all for the ledger's
+  90 days), one bar a day; Sales shows the auction house's cut beside each sale's deposit, and the by-item rows show
+  sales per day over the period and the last sold day. Display only; nothing recorded or uploaded changes.
+- Each Professions block lists the next recipes a trainer teaches at or above the current rank (up to three,
+  lowest rank first) with the cost and the trainer's name, from the trainer rows the install already has, or says to
+  open a trainer's window; under the blocks, "Other characters" lists every other character's professions and ranks
+  from the local roster. Display only: nothing recorded or uploaded changes.
+- The Everloot window's sidebar is now Home, Gold, Collection, Professions and Settings. Ask, Build plan and
+  Auctions left the sidebar; `/ask` and `/everloot plan` still work.
+- Home lists every character this install has seen (gold, level, professions, raid lockouts, last seen) with
+  realm and account totals and a "This week" line. "What you've added" moved to the Settings page.
+- Home says what this character is missing, under the portrait: achievements left, factions not exalted, titles
+  not held, professions with no recipe read and this week's raids with bosses left, counted from the rows Collection
+  and Professions already show; each line opens that tab. With the completion tracker off the strip says so and offers
+  Collection's Turn on button. The gold box adds "Account this week: +in / -out" over every character under this
+  character's own week line.
+- The Gold tab has Overview (gold by character and realm, the last 30 days as bars), Ledger (by category, day or
+  receipt), Sales and Session. It reads a new local ledger, `EverlootDB.ledger` (5,000 events or 90 days, 2,000 sales,
+  400 daily closes per character), and a local roster, `EverlootDB.roster` (options row "Your characters"). Neither is uploaded.
+- Each auction sale is recorded by item from the mailbox invoice (item name, count, price after the cut,
+  deposit) when you collect the letter. The buyer's name is not read.
+- Sales lists a sale as "sold, gold pending" from the moment the game says a buyer was found, and the same row
+  turns "paid" when you collect the letter. A letter collected after 48 hours still fills its row.
+- The ledger records repairs and vendor purchases at an open merchant (a guild-bank repair costs you nothing and
+  is left out), gold traded with another player, gold sent with a letter, and gold in a letter from one of your own
+  characters. With the account selected, gold moved between your own characters leaves the totals and shows on its own
+  line, "Moved between your characters". These categories stay in the local ledger and are not uploaded.
+- The Gold tab's Today, 7 days and 30 days start at UTC midnight, so the first day is a whole day.
+- Collection tab for achievements, reputation, titles and raid lockouts (needs the completion tracker on) and a
+  Professions tab with each profession's rank and recorded recipe colours.
+- Player names stay off by default, and the addon now asks once, in game, whether to turn them on. The question
+  comes a few seconds after the first loading screen, never in combat, and says what is recorded (name, realm, race,
+  class, level and guild of your characters and of players you target, mouse over or group with), how to turn it off
+  (`/everloot players off`) and where to hide a character (everloot.app/players/opt-out). After an answer, or a choice
+  made with `/everloot players on|off` or the settings page, it is never asked again.
+- The census also counts players the game shows a nameplate for, at most 10 new ones a second: still race, class,
+  level and faction only, never names. The players module still never reads nameplates.
+- With the completion tracker on, the addon keeps each of your characters' professions (rank of max rank) and this
+  week's raid lockouts, latest state only, for Home and the Desktop App's Characters page. They stay on your computer.
+- A linked character's active talent build is kept as a local row the Desktop App can sync to its page; the
+  anonymous talent snapshot is never synced. `/everloot completion off` deletes it.
+
+### Fixed
+- The in-game help line, the README's command table and the site's addon guide list the same commands, with
+  `version`, `planner`, `gph hide`, `gph cut on|off`, `plan hide|clear`, `window`, `vendor`, `mail`, `link` and
+  `plan <number>` where one list had left them out; the guide says a left-click on the minimap button opens the window;
+  the README's file tree names every module; and a contract test fails when the three lists drift.
+- A loading screen inside the minute after the last gold snapshot writes no new row unless the balance changed;
+  the last snapshot's time is kept in the saved file, so a /reload no longer adds a row each.
+- The button drawer leaves the minimap buttons to MinimapButtonButton when that addon is loaded, and to any
+  addon that takes a button after Everloot did. Before, both gathered the same buttons and hovering the crest opened
+  an empty Everloot panel over the other addon's, which dimmed every icon under it. The drawer's cells also leave
+  room for a LibDBIcon ring, each button draws above the one before it, and the panel is the window's own canvas and
+  bronze edge with a thin bar in the window's green down the side that faces the crest.
+- The PvP row keeps a character's last honorable kill count when a read comes before the Statistics tab has
+  loaded, and skips a statistic the game flags to skip. A talent choice past the site's range is left off that node
+  instead of failing the whole talent row on sync.
+- An item's name and quality are recorded once, not again in every loot window and on every vendor that sells
+  it, and a vendor is recorded once per UTC day unless an item, a price or a limited stock changed. Before, about ten
+  vendor visits filled the 2,000-row cap for item names and every new name after that was lost.
+- The Everloot price block shows once per hover. Comparing an item opens the game's comparison tooltips beside
+  the main one, and each of them carried the block too, so one hover read it up to three times.
+- A guild roster snapshot is stored at most once every six hours, and not when the roster reads the same as
+  the last one; a raid lockout is stored once until a boss goes down or the week resets, and an expired one not at
+  all; attendance is stored once per set of people in a raid run. Before, every guildmate's login or logout stored a
+  whole snapshot (about 50 KB for a 500-member guild) and every loading screen stored the lockouts again.
+- A partial price sample (the search-based fallback when a full scan cannot run) keeps only the newest earlier
+  sample of that realm before it stores, so two samples no longer fill the 2,000-row `auction_scan` cap and later samples no
+  longer report "stored 0". Another realm's rows stay.
 
 ## [desktop-v0.1.20] - 2026-11-06
 
