@@ -18,6 +18,8 @@ const view = vi.hoisted(() => ({ writeItemView: vi.fn() }));
 vi.mock("@/lib/item-view-store", () => ({ writeItemView: view.writeItemView }));
 const aggregates = vi.hoisted(() => ({ writeAggregates: vi.fn() }));
 vi.mock("@/lib/aggregate-store", () => ({ writeAggregates: aggregates.writeAggregates }));
+const auctions = vi.hoisted(() => ({ writeAuctionHistory: vi.fn() }));
+vi.mock("@/lib/auction-history-store", () => ({ writeAuctionHistory: auctions.writeAuctionHistory }));
 const professions = vi.hoisted(() => ({ writeProfessions: vi.fn() }));
 vi.mock("@/lib/profession-store", () => professions);
 const mapPins = vi.hoisted(() => ({ writeMapPins: vi.fn() }));
@@ -35,6 +37,7 @@ beforeEach(() => {
   store.writeCensus.mockReset().mockResolvedValue({ added: 0, rows: 0, remaining: 0 });
   view.writeItemView.mockReset().mockResolvedValue({ written: false });
   aggregates.writeAggregates.mockReset().mockResolvedValue({ written: false });
+  auctions.writeAuctionHistory.mockReset().mockResolvedValue({ written: false });
   store.prune.mockReset().mockResolvedValue(undefined);
   keys.pruneKeys.mockReset().mockResolvedValue(undefined);
   players.prune.mockReset().mockResolvedValue(undefined);
@@ -285,6 +288,25 @@ test("an idle run still asks for the stored aggregates, so a missing file is wri
   store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: "2026-W43" });
   await GET(req());
   expect(aggregates.writeAggregates).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-10-01" });
+});
+
+test("the stored auction history is written after the snapshot with what that run added; a failure is logged and the run succeeds", async () => {
+  store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-10-02T00:00:00.000Z" });
+  auctions.writeAuctionHistory.mockResolvedValue({ written: true, items: 7 });
+  expect(await (await GET(req())).json()).toMatchObject({ ok: true, auctionHistory: { written: true, items: 7 } });
+  expect(auctions.writeAuctionHistory).toHaveBeenCalledWith({ added: 2, rebuild: false, dataAsOf: "2026-10-02T00:00:00.000Z" });
+  await GET(req("Bearer synthetic-cron-key", "?rebuild=1"));
+  expect(auctions.writeAuctionHistory).toHaveBeenLastCalledWith(expect.objectContaining({ rebuild: true }));
+  // An idle run still asks with the snapshot's time, so a missing file or one built from an older snapshot is written.
+  store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: "2026-W43" });
+  await GET(req());
+  expect(auctions.writeAuctionHistory).toHaveBeenLastCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-10-01" });
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  auctions.writeAuctionHistory.mockRejectedValue(new Error("r2 down"));
+  const res = await GET(req());
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ ok: true, auctionHistory: null });
+  expect(store.writeCronRun).toHaveBeenCalled();
 });
 
 test("profession and map views follow aggregates, including idle runs and rebuilds; failures are logged", async () => {

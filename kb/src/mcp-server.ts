@@ -6,7 +6,7 @@ import { CREDIT_LINE, DATA_AGE, GAME_DATA_CREDIT, LICENCE, SITE, type EntityKind
 import { answerSources, answerSourcesFactsFromRecords, formatAnswerSources, type AnswerSourcesFacts } from "./answer-sources.js";
 import type { RecheckScope } from "./coverage.js";
 import type { FilesIndex } from "./files-evidence.js";
-import { auctionHistory, auctionSightingsFromRecords, handleAuctionHistory } from "./auction-history.js";
+import { auctionHistory, auctionSightingsFromRecords, handleAuctionHistory, handleStoredAuctionHistory, type AuctionPoint } from "./auction-history.js";
 import { handlePlan, planStructured } from "./bridge-plan.js";
 import { handleRecentChanges, recentChangesStructured, type ChangeEntry } from "./changes.js";
 import { ecosystemProjectsStructured, handleEcosystemProjects, type EcosystemView } from "./ecosystem.js";
@@ -185,6 +185,12 @@ function tooledFacts<T>(
 export type CorpusLoader = () => Promise<{ records: unknown[]; dataAsOf?: string | null } | null>;
 
 const UNAVAILABLE = "Public corpus unavailable. These figures are unrecorded, not zero.";
+
+/**
+ * The site's stored auction history (web/src/lib/auction-history-store.ts): one realm and item's public days, read
+ * without the corpus. Null when there is no stored file to read; auction_history then works the days out from the corpus.
+ */
+export type AuctionHistoryLoader = (realm: string, itemId: number) => Promise<{ points: AuctionPoint[]; dataAsOf: string | null } | null>;
 
 /** The site's market rollup, read in process by the web /mcp routes. Null means it was unreadable. */
 export type MarketLoader = () => Promise<{ state: MarketState; dataAsOf: string | null } | null>;
@@ -681,10 +687,14 @@ export async function readPage<T>(
     const reason = uploadsConfigured(loader) ? UNAVAILABLE : UPLOADS_UNSET;
     return { text: reason, structured: { connected: false, dataAsOf: null, reason } };
   }
-  const built = page(read.facts, read.dataAsOf);
+  return pageAnswer(page(read.facts, read.dataAsOf), read.dataAsOf);
+}
+
+/** A page tool's answer once its data was read: the text with the data's age and the credit, and the page beside it. */
+function pageAnswer(built: { text: string; page: object; url?: string }, dataAsOf: string | null): StructuredAnswer {
   return {
-    text: `${withMore(built.text, built.url)}\n${answerFooter(read.dataAsOf)}`,
-    structured: { connected: true, dataAsOf: read.dataAsOf, ...(built.url ? { url: built.url } : {}), page: built.page },
+    text: `${withMore(built.text, built.url)}\n${answerFooter(dataAsOf)}`,
+    structured: { connected: true, dataAsOf, ...(built.url ? { url: built.url } : {}), page: built.page },
   };
 }
 
@@ -740,7 +750,7 @@ function professionSkillLineId(profession: string): number | undefined {
 }
 
 /** The readers a host lends the tools: the site's store in process, or nothing for a standalone server. */
-export interface ToolOptions { catalog?: CatalogLoader; corpus?: CorpusLoader; market?: MarketLoader; gameData?: GameDataLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; coverage?: CoverageLoader; settledSummary?: SettledSummaryLoader; guilds?: GuildReader; recheck?: readonly RecheckScope[] }
+export interface ToolOptions { catalog?: CatalogLoader; corpus?: CorpusLoader; market?: MarketLoader; auctionHistory?: AuctionHistoryLoader; gameData?: GameDataLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; coverage?: CoverageLoader; settledSummary?: SettledSummaryLoader; guilds?: GuildReader; recheck?: readonly RecheckScope[] }
 
 /** The guild ladder's tools: registered only when the host lends a guild reader (EVERLOOT_GUILDS on the site). */
 export const GUILD_TOOLS: readonly McpToolName[] = ["guild_search", "guild_rankings"];
@@ -988,10 +998,20 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
         },
       };
     },
-    auction_history: (args) => readPageIn("auction_history", (facts: ReturnType<typeof auctionSightingsFromRecords>) => {
-      const page = auctionHistory(args.realm, args.itemId, facts);
-      return { text: handleAuctionHistory(args, facts), page, url: page.points.length ? marketItemUrl(args.realm, args.itemId) : undefined };
-    }),
+    auction_history: async (args) => {
+      // The site's stored days when it lends them, so an answer does not replay the corpus; without them, the corpus.
+      let stored: Awaited<ReturnType<AuctionHistoryLoader>> = null;
+      try { stored = (await options.auctionHistory?.(args.realm, args.itemId)) ?? null; } catch { stored = null; }
+      if (stored) {
+        const page = { realm: args.realm.trim(), itemId: args.itemId, points: stored.points };
+        const url = page.points.length ? marketItemUrl(args.realm, args.itemId) : undefined;
+        return pageAnswer({ text: handleStoredAuctionHistory(args, stored.points), page, url }, stored.dataAsOf);
+      }
+      return readPageIn("auction_history", (facts: ReturnType<typeof auctionSightingsFromRecords>) => {
+        const page = auctionHistory(args.realm, args.itemId, facts);
+        return { text: handleAuctionHistory(args, facts), page, url: page.points.length ? marketItemUrl(args.realm, args.itemId) : undefined };
+      });
+    },
     market_value: (args) => marketValueAnswer(args, options.market),
     gold_ledger: (args) => readPageIn("gold_ledger", (facts: ReturnType<typeof goldFactsFromRecords>) => {
       const page = goldLedger(args.character, args.realm, facts.snapshots, facts.events);

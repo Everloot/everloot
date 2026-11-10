@@ -10,6 +10,7 @@ import { writeCoverage } from "@/lib/coverage-store";
 import { currentSettledWeek, writeSettled } from "@/lib/settled-store";
 import { writeItemView } from "@/lib/item-view-store";
 import { writeAggregates } from "@/lib/aggregate-store";
+import { writeAuctionHistory } from "@/lib/auction-history-store";
 import { writeProfessions } from "@/lib/profession-store";
 import { writeMapPins } from "@/lib/map-pins-store";
 
@@ -128,6 +129,14 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("aggregates failed", err);
     }
+    // Every realm and item's public auction days (lib/auction-history-store.ts), stored so the history page and the
+    // auction_history tool never replay the corpus. Same rule as the item view; a failure is logged and they read the corpus.
+    let auctionHistory: { written: boolean; items?: number } | null = null;
+    try {
+      auctionHistory = await writeAuctionHistory({ added: result.added, rebuild, dataAsOf: result.dataAsOf });
+    } catch (err) {
+      console.error("auction history failed", err);
+    }
     // The profession and map views follow the same write rule as the aggregates.
     let professions: { written: boolean; bytes?: number } | null = null;
     let mapPins: { written: boolean; bytes?: number } | null = null;
@@ -147,7 +156,7 @@ export async function GET(req: Request) {
       result.dataAsOf,
       settled?.written ? week : work.settledWeek ?? null,
     );
-    return NextResponse.json({ ok: true, rebuild, ...result, market, completion, coverage, settled, census, itemView, aggregates, professions, mapPins });
+    return NextResponse.json({ ok: true, rebuild, ...result, market, completion, coverage, settled, census, itemView, aggregates, auctionHistory, professions, mapPins });
   } catch (err) {
     console.error("snapshot failed", err);
     return NextResponse.json({ ok: false, error: "snapshot failed" }, { status: 500 });

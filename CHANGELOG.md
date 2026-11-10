@@ -89,6 +89,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: a named spell page is titled "Blizzard – WoW Forever spell" with a description that names it, and its Creates,
   Costs and Taught by sections no longer say "Get the addon" or show the agreement meter: those relations are the game
   files' own, so an empty one is left out and a spell the files relate to nothing gets one line naming the build read.
+- Site: an Auction House item page and the MCP `auction_history` tool read the daily prices from a file the snapshot
+  cron writes, instead of replaying the whole corpus on each request. The values are the same; with no file yet (the
+  first minutes after a deploy) they read the corpus as before, and with neither readable they still say unrecorded.
 - Site: every public database list and detail page (NPCs, quests, objects, vendors, spells, achievements, titles, factions,
   quest chains, drops, coverage), the census and the rankings are kept at the CDN for five minutes like the profession pages,
   and the database index, zones and instances come down from an hour to the same five minutes, so a page drawn while

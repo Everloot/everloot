@@ -88,10 +88,45 @@ export function formatAuctionHistory(history: AuctionHistory): string {
   return lines.join("\n");
 }
 
-export function handleAuctionHistory(args: { realm: string; itemId: number }, sightings: AuctionSighting[] = []): string {
+function askedWrong(args: { realm: string; itemId: number }): string | null {
   if (!args.realm.trim()) return "Name a realm.";
   if (!Number.isInteger(args.itemId) || args.itemId < 1) return "Name an item id.";
-  return formatAuctionHistory(auctionHistory(args.realm, args.itemId, sightings));
+  return null;
+}
+
+export function handleAuctionHistory(args: { realm: string; itemId: number }, sightings: AuctionSighting[] = []): string {
+  return askedWrong(args) ?? formatAuctionHistory(auctionHistory(args.realm, args.itemId, sightings));
+}
+
+/** The same answer from one realm and item's public days, as auctionHistories keeps them. */
+export function handleStoredAuctionHistory(args: { realm: string; itemId: number }, points: AuctionPoint[]): string {
+  return askedWrong(args) ?? formatAuctionHistory({ realm: args.realm.trim(), itemId: args.itemId, points });
+}
+
+/** How auctionHistories files a realm and item: the realm as auctionHistory matches it, trimmed and in lower case. */
+export function auctionHistoryKey(realm: string, itemId: number): string {
+  return `${clean(realm)}|${itemId}`;
+}
+
+/**
+ * Every realm and item's public days at once, keyed by auctionHistoryKey: what auctionHistory gives for each pair,
+ * worked out in one pass so a page can look one up instead of reading every scan. A pair with no public day is left
+ * out; it answers the same empty history either way.
+ */
+export function auctionHistories(sightings: AuctionSighting[]): [string, AuctionPoint[]][] {
+  const groups = new Map<string, AuctionSighting[]>();
+  for (const row of sightings) {
+    const key = auctionHistoryKey(row.realm, row.itemId);
+    const list = groups.get(key) ?? [];
+    list.push(row);
+    groups.set(key, list);
+  }
+  const out: [string, AuctionPoint[]][] = [];
+  for (const [key, rows] of groups) {
+    const { points } = auctionHistory(rows[0]!.realm, rows[0]!.itemId, rows);
+    if (points.length) out.push([key, points]);
+  }
+  return out.sort((a, b) => a[0].localeCompare(b[0]));
 }
 
 export function auctionSightingsFromRecords(records: unknown[]): AuctionSighting[] {

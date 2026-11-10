@@ -3,8 +3,9 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { pageMetadata } from "@/lib/seo";
 import { formatCopper, MARKET_RULE, reportersText } from "../../../../../../../kb/src/market";
-import { auctionSightingsFromRecords, handleAuctionHistory } from "../../../../../../../kb/src/auction-history";
+import { auctionSightingsFromRecords, handleAuctionHistory, handleStoredAuctionHistory } from "../../../../../../../kb/src/auction-history";
 import { STORAGE_UNREACHABLE, uploadStore } from "@/lib/upload-store";
+import { storedAuctionHistory } from "@/lib/auction-history-store";
 import { marketDatasetJsonLd } from "@/lib/jsonld";
 import JsonLd from "@/components/JsonLd";
 import GameIcon from "@/components/game/GameIcon";
@@ -59,8 +60,10 @@ export default async function RealmItemPage(props: Props) {
   if (decodeURIComponent(raw.realm) !== slug) permanentRedirect(itemHref({ slug }, itemId));
   const state = market.state;
   const quality = itemQuality(itemId, tip, names.has(itemId)) ?? undefined;
-  const corpus = row ? await uploadStore.loadCorpus() : null;
-  const browse = corpus && (corpus.unreachable
+  // The cron's stored days; the corpus only when there is no stored file to read.
+  const stored = row ? await storedAuctionHistory(realm, itemId) : null;
+  const corpus = row && !stored ? await uploadStore.loadCorpus() : null;
+  const browse = stored ? handleStoredAuctionHistory({ realm, itemId }, stored.points) : corpus && (corpus.unreachable
     ? STORAGE_UNREACHABLE
     : handleAuctionHistory({ realm, itemId }, auctionSightingsFromRecords(corpus.records)));
   const path = itemHref({ slug }, itemId);
