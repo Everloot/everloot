@@ -2,7 +2,15 @@ import { expect, test, vi } from "vitest";
 
 const quota = vi.hoisted(() => ({ mcp: vi.fn() }));
 const mocks = vi.hoisted(() => ({ names: { items: new Map([[2, "Thrall's Blade"]]), npcs: new Map([[77, "Thrall"]]), quests: new Map<number, string>() } }));
-vi.mock("@/lib/names", () => ({ loadNames: async () => mocks.names }));
+const loadNames = vi.hoisted(() => vi.fn(async () => mocks.names));
+vi.mock("@/lib/names", () => ({ loadNames }));
+// The real search, watched, so a test can tell whether one ran.
+const search = vi.hoisted(() => ({ suggest: null as unknown as ReturnType<typeof vi.fn> }));
+vi.mock("@/lib/site-search", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/site-search")>();
+  search.suggest = vi.fn(real.suggest);
+  return { ...real, suggest: search.suggest };
+});
 vi.mock("@/lib/objects", () => ({ loadObjectFacts: async () => ({ rates: [], measuredZeros: [], names: [], unreachable: false }) }));
 
 vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { mcp: quota.mcp, api: vi.fn(), market: vi.fn() } }));
@@ -10,7 +18,11 @@ vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { mcp: quota.mcp, api: vi.fn
 import { beforeEach } from "vitest";
 import { GET } from "./route";
 
-beforeEach(() => { quota.mcp.mockReset().mockResolvedValue({ allowed: true, retryAfter: 0 }); });
+beforeEach(() => {
+  quota.mcp.mockReset().mockResolvedValue({ allowed: true, retryAfter: 0 });
+  loadNames.mockClear();
+  search.suggest.mockClear();
+});
 
 const get = (query: string) => GET(new Request(`https://everloot.app/api/suggest${query}`));
 
@@ -44,4 +56,11 @@ test("a caller over the per-IP quota gets a 429 with Retry-After that is not cac
   expect(res.status).toBe(429);
   expect(res.headers.get("retry-after")).toBe("90");
   expect(res.headers.get("cache-control")).toBe("no-store");
+  expect(search.suggest).not.toHaveBeenCalled();
+  expect(loadNames).not.toHaveBeenCalled();
+  // The same query admitted does search, so the spies are wired to what the route calls.
+  quota.mcp.mockResolvedValue({ allowed: true, retryAfter: 0 });
+  expect((await get("?q=thrall")).status).toBe(200);
+  expect(search.suggest).toHaveBeenCalledWith("thrall", undefined);
+  expect(loadNames).toHaveBeenCalled();
 });

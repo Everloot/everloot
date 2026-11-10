@@ -127,22 +127,26 @@ in DATA_POLICY. Security reports go through the private channel in SECURITY.md.
 
 1. **Game buckets are not in the nightly mirror.** The backup token covers `everloot-uploads` only.
    Add read-only scope for `everloot-game-data` and `everloot-assets`, or accept that both are
-   re-creatable from the client and document that.
+   re-creatable from the client and document that. State (2026-11-08): open; needs an owner check.
 2. **The backup's schema capture fails** (management token rejected), so dumps are rows only. Fix the
    token; a restore today would need the migrations folder to rebuild the schema, which works but is a
-   manual step.
+   manual step. State (2026-11-08): open; needs an owner check.
 3. **Branch protection on `main`** (required checks, no force push) is assumed, not verified in this
-   document. Confirm it in the repository settings.
+   document. Confirm it in the repository settings. State (2026-11-08): open; needs an owner check.
 4. **No billing alert on Cloudflare yet.** The Worker runs on the Workers Paid plan. A budget alert in the
-   Cloudflare dashboard is still to be set (Carlos).
+   Cloudflare dashboard is still to be set (Carlos). State (2026-11-08): open; needs an owner check.
 5. **The CSP enforces only the plugin, base-tag and framing rules.** Script, connect and frame sources are
    report-only: AdSense supports a nonce-based CSP only, and there is no report endpoint to collect reports.
-6. **No WAF or bot rules of our own.** The zone is proxied through Cloudflare and the Worker serves it, so
-   Cloudflare's WAF and bot settings are available if abuse appears. The data guard is the current control.
+   State (2026-11-10): open, unchanged. `web/src/lib/seo-lib.test.ts` asserts the enforced policy is
+   `object-src 'none'; base-uri 'self'; frame-ancestors 'self'` and the rest is report-only.
+6. **Cloudflare challenge and rate-limit rules apply on `/database/*`; the deploy's warm step and the health
+   check carry a bypass header** (`.github/workflows/deploy-worker.yml`, `web/scripts/cf-warm.mjs`, #894). The
+   data guard remains the control inside the Worker. State (2026-11-10): changed; the row used to say the zone
+   had no rules of its own.
 7. **No rotation schedule for tokens.** Write one: R2 tokens, the cron secret, the MCP bearer token, the
-   backup keys, with a date each.
+   backup keys, with a date each. State (2026-11-08): open; needs an owner check.
 8. **R2 versioning or object lock is not enabled** (unverified). Create-only writes protect the release;
-   raw uploads rely on the nightly mirror.
+   raw uploads rely on the nightly mirror. State (2026-11-08): open; needs an owner check.
 
 ## What this costs
 

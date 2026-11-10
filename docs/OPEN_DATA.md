@@ -1,7 +1,8 @@
 # Open data export
 
-The published data as files anyone can download and build on (ROADMAP, "Next"). A maintainer makes one with
-`npm run kb -- open-data`, uploads it by hand, and the page at
+The published data as files anyone can download and build on (see [`ROADMAP.md`](../ROADMAP.md)). The export tooling is
+in place: a maintainer makes one with `npm run kb -- open-data`, uploads it by hand, and `open-data/latest.json` points at
+the newest upload. The page at
 [`/database/download`](https://everloot.app/database/download) lists it with its date, its counts and its licence.
 
 It is not the [bulk export](RELEASING.md#bulk-export). The bulk export writes what the JSON API serves, including

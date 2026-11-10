@@ -21,13 +21,19 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the armory opens at `/armory`: a page for every WoW Forever character and guild that Blizzard's API returns,
   read hourly, with guild rosters, three boards (item level, gear score, honorable kills), a form to hide a character
   and a form to ask for one. Each page says "Data from Blizzard Entertainment", carries no ad and is not indexed yet.
+- Addon: the Collection tab gains a Quests section, each quest chain you have started with how many of its quests are
+  done, and a This character / Account switch. Account counts every character you log in with and names the one that
+  has each achievement, title, reputation, lockout or chain. It reads what the completion tracker already keeps;
+  nothing new is recorded or uploaded.
 - Knowledge base: the open data export's game-files folder gains one file per committed catalog (achievements, factions,
   titles, quest lines, mounts, encounters, recipes, class gear and its restrictions, class spells, races, legacy perks,
   talent nodes, raid buffs): ids, the names the files hold and each file's build, every row counted, with a schema each
   and a manifest line. The README and the download page no longer list the catalogs as missing. Nothing observed changes.
+- Addon: `/everloot where` finds an item's drops and vendors or an NPC's locations in your own saved sightings, with counts and a site link.
 - Site: every record kind has a docs page, `/docs/api/records/<kind>`, generated from its schema: each field with its type,
   whether it is required and its description, nested fields included, whether the kind is in the public corpus, where it
   goes, and the cross-field rules the server checks. The sidebar lists them and the schemas table links each kind to its page.
+- Site: the API docs list the site-internal routes, `/api/suggest` and `/api/map/pins`, with a note that they serve the site's pages, may change without notice and are not part of the protocol.
 - Site: the account guide and the addon page link the sample character page (/showcase/character), so a player can see
   what a character page holds before linking one. The sample stays out of search and the sitemap.
 - Addon: item tooltips show your own history with the item on this realm, from the gold ledger in your saved file:
@@ -37,14 +43,155 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: a profession page answers to its skill line id, `/tools/professions/171` or `/tools/professions/171-alchemy`, and
   redirects for good to the slug page it already had, keeping the skill range and class context in the query; an unknown id
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
+- Site: a "Write a wiki page" guide under Docs › Guides says how a wiki page is proposed and reviewed, with the page
+  types, the front matter, the rules and the check from the wiki README; the wiki hub and the lore archive link to it.
+- Site: a faction page and a title page carry In short, Copy for AI, a "Player reports" fact that stays an empty meter
+  until three installs agree, a "Track this" link to the collections tool and a relation tab ("Reputation from" on a
+  faction, "Earned by" on a title) whose empty state names the 3-install rule and says what no game file read so far
+  carries; a faction page also shows its lore archive page when the archive has one under the same name.
+- Site: a class page links the census narrowed to its class and the classes ranking, and the search page with no
+  query lists what a search finds (items, NPCs, quests, zones, objects, the lore archive, tools and docs), each
+  linked to its list, with four queries to try. Before, the class page stopped at the database links and an empty
+  search page showed the field alone.
+- Site: `/docs/mcp` tables the record kinds the knowledge tools cover, where each kind comes from and the tool that
+  reads it on its own, and says how a record id is formed: a catalog record's stable synthetic id against the in-game
+  id the page tools take.
+- Site: the limits and keys page has a Scopes section: a table of every scope a key can carry (read:public on every
+  key; read:own, link:own and sync:own opt-in on the key form), what each allows and which routes check it. A test
+  keeps the table at one row per scope the code defines.
+- Site: the MCP resources page gives each prompt its own section (title, arguments with their allowed values, the
+  `prompts/get` call and the message the server returns), shows one `resources/read` of the builds resource with the
+  shape of its document and one entity read that equals the `item_page` answer, and the MCP sidebar lists the three
+  prompts under the page.
+- Site: an item, NPC or quest page shared on Discord or X shows its own card: the name, its type and how many of
+  the 3 installs agree on the name, as text on the brand canvas. Before, every database page showed the site card.
+- Site: the gear rankings are scored every 30 minutes by a new cron (`/api/cron/profiles`) and stored, instead of on
+  every page view; the boards say how long ago. Each view still filters the stored boards against who is ranked right
+  now, so a switch turned off takes a character off on the next request. Ranked characters get a daily history of
+  level, item level and Gear Score, drawn as a chart on their page from the second day. Behind `EVERLOOT_LEADERBOARDS`
+  (off; needs migration `20261107150000_profile_pipeline.sql`). Design: `docs/design/2026-11-07-profile-pipeline.md`.
+- Site: item level and Gear Score rankings for linked characters at /rankings/item-level and /rankings/gear-score
+  (`EVERLOOT_LEADERBOARDS`, migration `20261107120000_gear_board.sql`, the data policy's "Gear rankings"). A character
+  is on them only while its player made the page public, turned gear sync on and chose "Rank my gear" on the account page.
+  Both numbers are averages over 17 slots with each item at the game files' item level; Gear Score v1 weighs each slot by
+  its stat budget in the game's `RandPropPoints` table. Filters by ruleset and region, and the character page shows its
+  place on each board.
+- Addon, Desktop App and site: a linked character's active talent build syncs to its page. The addon keeps it as a
+  keyed `talent_owned` row (local only, deleted by `/everloot completion off`), the Desktop App sends it with the other
+  synced categories, and the site keeps it under the talents switch. The anonymous `talent_snapshot` is never synced.
+- Site and MCP: while few players upload, Everloot's own installs (Worker secret `EVERLOOT_TRUSTED_INSTALLS`) make an
+  Auction House day or a census count public on their own. Everyone else still needs 3 reporters, and a census count
+  still needs 10 characters, the hiding of small counts and rounding to 5. A value that rests on them says "includes
+  Everloot's own scans" on the Auction House pages, in chat price answers and `market_value`, and the census and
+  `population` say when their numbers include them. Scans already waiting for a third reporter count from the next
+  rollup run.
+- Site, behind `EVERLOOT_PRIVATE_SYNC` (off; its migration is not applied): private sync of your own linked characters.
+  A key with the new `sync:own` scope sends a character's gear, active talents, professions, reputations, raid lockouts,
+  and achievements and titles. Each category is kept only when you hold that character's live link and turned its sync
+  on, and only its newest capture is kept. You see it all on a signed-in preview, and each section shows on the
+  character's public page only when you switch it on. Turning a category's sync off or unlinking deletes what was synced.
+- Site, behind `EVERLOOT_PRIVATE_SYNC` (off): /account turns each linked character's sync and page sections on and off,
+  and links to the preview. A sync key may send 20 times an hour, and achievements count only those the character earned.
+- Addon and Desktop App: with the completion tracker on, the addon keeps each of your characters' professions (rank of
+  max rank) and this week's raid lockouts (bosses killed of total, reset time) under the completion key, latest state
+  only, and the Desktop App's Characters page shows them on the keyed rows. They stay on your computer: no upload, the
+  upload page included, sends them, and the Desktop App's Chat does not read them. Not yet checked in game.
+- Site: the Auction House lists each realm that has scans but no public prices yet, with how many of the 3 players needed
+  have scanned there ("1 of 3 players have scanned; prices go public at 3"). A player is counted once per upload address,
+  on the item with the most players on one day in the last 7. `/api/market/prices` without a realm returns the same counts
+  in `pending`. Counts only: no price or quantity below 3 players is shown.
+- Desktop App and site, behind `EVERLOOT_CHARACTER_LINKS` (off): the addon's `/everloot link <code>` (0.3.15) writes one
+  link row for the character you are playing, with a code made on the account page. The Desktop App, signed in, sends it only
+  to the account's own link endpoint; uploads never carry link rows. The account page lists your linked characters,
+  linked or frozen, and unlinks them. A link is a claim from the addon file, not proof of ownership.
+- Site and MCP: racial traits from the game files (build-stamped `races.json`, found in game files, unconfirmed).
+  Each class page lists, under "Who can be a {Class}", every race's traits with active or passive and the short
+  text; `/wow-forever` adds a trait table per faction. New MCP tool `class_races` (protocol 1.20.0): the races that
+  can be a class per faction, with trait names and no game text; the chat uses it for builds questions.
+- Site: **Copy for addon** on both planners, exporting the selected talent set or planned raid code.
+- Site: a news section. Posts are Markdown files under `kb/news/` with front matter (`npm run kb -- news-check`
+  runs in CI), written in the wiki's syntax so they link database entities and wiki pages the same way. Published
+  posts appear at `/news` and `/news/<slug>` with Article structured data, in the `/news/feed.xml` RSS feed, in the
+  sitemap and in llms.txt; a draft is built nowhere. Blizzard's own posts stay on `/changes`, which the hub links.
+- Site, behind `EVERLOOT_GUILDS` (off): `/guilds`, a ladder per raid from the kills two members' installs agree on
+  (bosses killed, then first to the latest kill; no score), with guild search and realm and faction filters;
+  `/guilds/<realm>/<guild>` with progression per instance, the officers' roster and the characters seen in the guild
+  (labelled as sightings), activity and a hide form that works without an account. MCP `guild_search` and
+  `guild_rankings`, and `guild_board` gains the ladder side; the open data export gains `guild-kills.ndjson` and
+  `guilds.ndjson`. Migration `20261025120000_guilds.sql`, applied by hand before the switch goes on.
+- Site: `/tools/collections` opens on a completionist overview, a "Total complete" bar and one bar per category
+  from the agreed lists, with done, missing and started views and a "remember this character" helper on the browser.
+- Site: `/tools/gold-ledger` reads `Everloot.lua` in the browser, nothing sent: characters, the last 30 days of money
+  in and out, this week, categories, receipts and gold history. The published ledgers stay below.
+- Site: the header search box suggests dungeons and raids as you type, from the same rows as full search, with or without
+  the leading "The": "deadm" offers the Deadmines, labelled "Dungeon, level 16". A box scoped to items, NPCs, quests or
+  objects keeps to that type.
+- Addon and site: the census also counts players the game shows a nameplate for (`via: "nameplate"`, protocol 1.26.0),
+  at most 10 new ones a second; still race, class, level and faction only, and the players module still never reads
+  nameplates. Needs the next addon release; no migration.
+- Site: `/api/health` has a route test: a fresh heartbeat answers 200, any other 503, both `Cache-Control: no-store`,
+  and the snapshot is read again only after a minute. The route itself is unchanged.
+- Site: the open data export, at `/database/download`. The published data as NDJSON files anyone can download
+  and build on, under CC BY-SA 4.0: what three installs agree on, and the game files' own layer, with a
+  manifest that says the build, the date the data was current, the method, the row count of every file and
+  what each one counts. The local Classic baseline is never in it — it is GPL-derived and stays on the
+  maintainer's machine — and a fact fewer than three installs agree on is not in it either. The page says so
+  in the same words as the policy.
+- Site: `/database/coverage` says how much of the game three players have agreed on, per zone, per type and
+  per field, with the confirmed share beside the settled one, and the zones that need players first. A type is
+  at its plateau when 90% of its expected facts are confirmed, 75% are settled, and under 0.5% became confirmed
+  in the 28 days before the data date; about 2% of the settled facts are left out each week, picked by a hash
+  of the fact and the week, so every settled fact is looked at again about once a year and the load stays
+  flat. A fact a patch may have changed counts as neither confirmed nor settled.
+- Knowledge base: `npm run kb -- coverage-report`, a local report of the facts that are missing, reported,
+  contested or spread, by zone and level, with the expected counts written beside it. Local only: the counts
+  are uploaded, never the rows.
+- Knowledge base: the settled list, one list per client build of the facts three players confirmed and two
+  more agreed on, and the uploaders that stop sending what is already settled. The site's copy is served at
+  `/api/coverage/settled`. The server-side tally of the extra agreement is behind a switch that stays off
+  until the data policy says how it is published.
+- Site and MCP server: a `coverage` tool, the same counts as the coverage page as text, per zone and per
+  type. The public tool list is 29 tools; the directory submissions carry the older count until they are
+  updated.
+- Site: a page per dungeon and raid, with the entrance players confirmed, the bosses and their kill counts,
+  and the treasure markers on the map, all read from the same readers the zone and object pages use, so a
+  marker on the map and a row on a page cannot disagree. The pages are in the sitemap and `/database` links
+  the index.
+- Knowledge base: `npm run kb -- name-gaps` opens with the counts: how many items, quests, item sets and
+  spells carry a name today, and which source each name came from — the game files, the Warcraft Wiki, the
+  local baseline, or the players. A source that was not read says so instead of printing a zero.
+- Knowledge base: `npm run kb -- name-gaps`, a local report of the items, quests, item sets and spells that
+  still print as an id, each with the reason and what would fill it (a rule decision, the addon's uploads, or no
+  source yet). Ids only, never names.
+- Site: the data layer for linking a character to an account, off by default. A signed-in player gets a code
+  (live 15 minutes, good once), and a `character_link` row with that code is sent to `/api/me/characters/links`
+  from the site or with an API key that has the new `link:own` scope. The GUID is replaced by a keyed hash, the
+  census must agree on race, class and faction, hidden characters are refused, and a character claimed by a second
+  account is frozen on both. Nothing is public and there is no page for it yet. Off until the migration is applied
+  and `EVERLOOT_CHARACTER_LINKS=1` is set; intake never stores link rows.
+- Site: rankings at `/rankings`. Classes, races and faction balance by ISO week, from the census under its
+  usual rule, with a weekly chart and each rank's change against the week before. They start with the first
+  full week after launch.
+- Site: an achievement's page lists its criteria, with how many each needs, once three players sent the same complete list; the list is agreed apart from the entry itself. Lists and search still show no criteria wording. Run the completion rebuild (`?rebuild=1`) once to fill it from uploads already stored.
+- Knowledge base: an NPC seen at its window places a pin like a spawn position (three installs on one map);
+  a targeting position still never does. Object spawn points are clustered per object and zone, become a pin
+  at three installs with a key that stays put once published, and an object's name needs three installs to
+  agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
+  that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
+  instead of withdrawing the event as a conflict. The map shows none of this yet.
 
 ### Fixed
 - Site: /api/suggest spends the per-IP quota and shares one edge cache entry for `Thunder` and `thunder `, the coverage 400 and waitlist 503 are `no-store` (the 503 adds `Retry-After`), and the docs list every route that sends CORS from one file.
+- Site: when a database or tools page can't be read, you now get a "Database unavailable" or "Tool unavailable" page that says it could not be read, not that it is empty, with a Try again button and a link back to the section, instead of the generic error page.
 - Site: item list pagination is crawlable while filter URLs stay blocked.
+- Site: the stored profession and map views work out the derived profession steps and the recheck list on read, so a
+  deploy that changes either shows at once; an idle cron run rewrites a view built from an older snapshot, and the
+  cron reads the corpus once for all the stored views it writes.
 - Site: /database splits its rows into "Seen by players" and "From the game files", says after launch that a row fills when 3 installs agree, and drops the Guilds lookup row (the Tools menu has it).
 - Knowledge base: a self-hosted MCP server and `coverage-report` read the whole public corpus again. The reader stopped
   at 50 pages and 2 MB in all, and the feed is now about 98 pages and 13 MB; the limits are per page with a high total
   guard. Without a key the site allows 30 requests an hour, so a rate-limited read now says to set `EVERLOOT_API_KEY`.
+- Desktop App: the guide covers every page and signing in, setup points to `_forever_`, and empty Addon and Market panels offer Open Settings or Refresh prices.
 - Site: title pages and lists no longer show the game's raw `%s`: the name reads "Bloodsail Admiral <Name>", the address
   drops the trailing `-s` (`/database/titles/144-bloodsail-admiral`) and the old address redirects to the new one.
 - Site: the schemas page marks the three shapes that describe a bulk-export file rather than an endpoint and says that
@@ -149,96 +296,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   the newest daily count, and print it the same way ("+21 since 2026-10-28"); before, one counted from the snapshot
   and the other from the clock, so they disagreed. Both pages say when the GitHub facts are older than 26 hours.
 
-### Added
-- Site: a "Write a wiki page" guide under Docs › Guides says how a wiki page is proposed and reviewed, with the page
-  types, the front matter, the rules and the check from the wiki README; the wiki hub and the lore archive link to it.
-- Site: a faction page and a title page carry In short, Copy for AI, a "Player reports" fact that stays an empty meter
-  until three installs agree, a "Track this" link to the collections tool and a relation tab ("Reputation from" on a
-  faction, "Earned by" on a title) whose empty state names the 3-install rule and says what no game file read so far
-  carries; a faction page also shows its lore archive page when the archive has one under the same name.
-- Site: a class page links the census narrowed to its class and the classes ranking, and the search page with no
-  query lists what a search finds (items, NPCs, quests, zones, objects, the lore archive, tools and docs), each
-  linked to its list, with four queries to try. Before, the class page stopped at the database links and an empty
-  search page showed the field alone.
-- Site: `/docs/mcp` tables the record kinds the knowledge tools cover, where each kind comes from and the tool that
-  reads it on its own, and says how a record id is formed: a catalog record's stable synthetic id against the in-game
-  id the page tools take.
-- Site: the limits and keys page has a Scopes section: a table of every scope a key can carry (read:public on every
-  key; read:own, link:own and sync:own opt-in on the key form), what each allows and which routes check it. A test
-  keeps the table at one row per scope the code defines.
-- Site: the MCP resources page gives each prompt its own section (title, arguments with their allowed values, the
-  `prompts/get` call and the message the server returns), shows one `resources/read` of the builds resource with the
-  shape of its document and one entity read that equals the `item_page` answer, and the MCP sidebar lists the three
-  prompts under the page.
-- Site: an item, NPC or quest page shared on Discord or X shows its own card: the name, its type and how many of
-  the 3 installs agree on the name, as text on the brand canvas. Before, every database page showed the site card.
-- Site: the gear rankings are scored every 30 minutes by a new cron (`/api/cron/profiles`) and stored, instead of on
-  every page view; the boards say how long ago. Each view still filters the stored boards against who is ranked right
-  now, so a switch turned off takes a character off on the next request. Ranked characters get a daily history of
-  level, item level and Gear Score, drawn as a chart on their page from the second day. Behind `EVERLOOT_LEADERBOARDS`
-  (off; needs migration `20261107150000_profile_pipeline.sql`). Design: `docs/design/2026-11-07-profile-pipeline.md`.
-- Site: item level and Gear Score rankings for linked characters at /rankings/item-level and /rankings/gear-score
-  (`EVERLOOT_LEADERBOARDS`, migration `20261107120000_gear_board.sql`, the data policy's "Gear rankings"). A character
-  is on them only while its player made the page public, turned gear sync on and chose "Rank my gear" on the account page.
-  Both numbers are averages over 17 slots with each item at the game files' item level; Gear Score v1 weighs each slot by
-  its stat budget in the game's `RandPropPoints` table. Filters by ruleset and region, and the character page shows its
-  place on each board.
-- Addon, Desktop App and site: a linked character's active talent build syncs to its page. The addon keeps it as a
-  keyed `talent_owned` row (local only, deleted by `/everloot completion off`), the Desktop App sends it with the other
-  synced categories, and the site keeps it under the talents switch. The anonymous `talent_snapshot` is never synced.
-- Site and MCP: while few players upload, Everloot's own installs (Worker secret `EVERLOOT_TRUSTED_INSTALLS`) make an
-  Auction House day or a census count public on their own. Everyone else still needs 3 reporters, and a census count
-  still needs 10 characters, the hiding of small counts and rounding to 5. A value that rests on them says "includes
-  Everloot's own scans" on the Auction House pages, in chat price answers and `market_value`, and the census and
-  `population` say when their numbers include them. Scans already waiting for a third reporter count from the next
-  rollup run.
-- Site, behind `EVERLOOT_PRIVATE_SYNC` (off; its migration is not applied): private sync of your own linked characters.
-  A key with the new `sync:own` scope sends a character's gear, active talents, professions, reputations, raid lockouts,
-  and achievements and titles. Each category is kept only when you hold that character's live link and turned its sync
-  on, and only its newest capture is kept. You see it all on a signed-in preview, and each section shows on the
-  character's public page only when you switch it on. Turning a category's sync off or unlinking deletes what was synced.
-- Site, behind `EVERLOOT_PRIVATE_SYNC` (off): /account turns each linked character's sync and page sections on and off,
-  and links to the preview. A sync key may send 20 times an hour, and achievements count only those the character earned.
-- Addon and Desktop App: with the completion tracker on, the addon keeps each of your characters' professions (rank of
-  max rank) and this week's raid lockouts (bosses killed of total, reset time) under the completion key, latest state
-  only, and the Desktop App's Characters page shows them on the keyed rows. They stay on your computer: no upload, the
-  upload page included, sends them, and the Desktop App's Chat does not read them. Not yet checked in game.
-- Site: the Auction House lists each realm that has scans but no public prices yet, with how many of the 3 players needed
-  have scanned there ("1 of 3 players have scanned; prices go public at 3"). A player is counted once per upload address,
-  on the item with the most players on one day in the last 7. `/api/market/prices` without a realm returns the same counts
-  in `pending`. Counts only: no price or quantity below 3 players is shown.
-- Desktop App and site, behind `EVERLOOT_CHARACTER_LINKS` (off): the addon's `/everloot link <code>` (0.3.15) writes one
-  link row for the character you are playing, with a code made on the account page. The Desktop App, signed in, sends it only
-  to the account's own link endpoint; uploads never carry link rows. The account page lists your linked characters,
-  linked or frozen, and unlinks them. A link is a claim from the addon file, not proof of ownership.
-- Site and MCP: racial traits from the game files (build-stamped `races.json`, found in game files, unconfirmed).
-  Each class page lists, under "Who can be a {Class}", every race's traits with active or passive and the short
-  text; `/wow-forever` adds a trait table per faction. New MCP tool `class_races` (protocol 1.20.0): the races that
-  can be a class per faction, with trait names and no game text; the chat uses it for builds questions.
-- Site: **Copy for addon** on both planners, exporting the selected talent set or planned raid code.
-- Site: a news section. Posts are Markdown files under `kb/news/` with front matter (`npm run kb -- news-check`
-  runs in CI), written in the wiki's syntax so they link database entities and wiki pages the same way. Published
-  posts appear at `/news` and `/news/<slug>` with Article structured data, in the `/news/feed.xml` RSS feed, in the
-  sitemap and in llms.txt; a draft is built nowhere. Blizzard's own posts stay on `/changes`, which the hub links.
-- Site, behind `EVERLOOT_GUILDS` (off): `/guilds`, a ladder per raid from the kills two members' installs agree on
-  (bosses killed, then first to the latest kill; no score), with guild search and realm and faction filters;
-  `/guilds/<realm>/<guild>` with progression per instance, the officers' roster and the characters seen in the guild
-  (labelled as sightings), activity and a hide form that works without an account. MCP `guild_search` and
-  `guild_rankings`, and `guild_board` gains the ladder side; the open data export gains `guild-kills.ndjson` and
-  `guilds.ndjson`. Migration `20261025120000_guilds.sql`, applied by hand before the switch goes on.
-- Site: `/tools/collections` opens on a completionist overview, a "Total complete" bar and one bar per category
-  from the agreed lists, with done, missing and started views and a "remember this character" helper on the browser.
-- Site: `/tools/gold-ledger` reads `Everloot.lua` in the browser, nothing sent: characters, the last 30 days of money
-  in and out, this week, categories, receipts and gold history. The published ledgers stay below.
-- Site: the header search box suggests dungeons and raids as you type, from the same rows as full search, with or without
-  the leading "The": "deadm" offers the Deadmines, labelled "Dungeon, level 16". A box scoped to items, NPCs, quests or
-  objects keeps to that type.
-- Addon and site: the census also counts players the game shows a nameplate for (`via: "nameplate"`, protocol 1.26.0),
-  at most 10 new ones a second; still race, class, level and faction only, and the players module still never reads
-  nameplates. Needs the next addon release; no migration.
-- Site: `/api/health` has a route test: a fresh heartbeat answers 200, any other 503, both `Cache-Control: no-store`,
-  and the snapshot is read again only after a minute. The route itself is unchanged.
-
 ### Changed
 - Docs: the launch-day page is marked historical, and day-to-day operation of the site is in docs/OPERATIONS.md.
 - Protocol: `itemsResponse.items` is typed with the row `GET /api/items` returns (item id, then class, subclass, slot
@@ -338,56 +395,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   share images. A new link is private, every page is noindex, and the hide form takes a page down without an
   account. A character two accounts link stays frozen until it is settled: write to hello@everloot.app, we reply
   within 7 days. The data policy, /privacy and the account page say so.
-
-### Added
-- Site: the open data export, at `/database/download`. The published data as NDJSON files anyone can download
-  and build on, under CC BY-SA 4.0: what three installs agree on, and the game files' own layer, with a
-  manifest that says the build, the date the data was current, the method, the row count of every file and
-  what each one counts. The local Classic baseline is never in it — it is GPL-derived and stays on the
-  maintainer's machine — and a fact fewer than three installs agree on is not in it either. The page says so
-  in the same words as the policy.
-- Site: `/database/coverage` says how much of the game three players have agreed on, per zone, per type and
-  per field, with the confirmed share beside the settled one, and the zones that need players first. A type is
-  at its plateau when 90% of its expected facts are confirmed, 75% are settled, and under 0.5% became confirmed
-  in the 28 days before the data date; about 2% of the settled facts are left out each week, picked by a hash
-  of the fact and the week, so every settled fact is looked at again about once a year and the load stays
-  flat. A fact a patch may have changed counts as neither confirmed nor settled.
-- Knowledge base: `npm run kb -- coverage-report`, a local report of the facts that are missing, reported,
-  contested or spread, by zone and level, with the expected counts written beside it. Local only: the counts
-  are uploaded, never the rows.
-- Knowledge base: the settled list, one list per client build of the facts three players confirmed and two
-  more agreed on, and the uploaders that stop sending what is already settled. The site's copy is served at
-  `/api/coverage/settled`. The server-side tally of the extra agreement is behind a switch that stays off
-  until the data policy says how it is published.
-- Site and MCP server: a `coverage` tool, the same counts as the coverage page as text, per zone and per
-  type. The public tool list is 29 tools; the directory submissions carry the older count until they are
-  updated.
-- Site: a page per dungeon and raid, with the entrance players confirmed, the bosses and their kill counts,
-  and the treasure markers on the map, all read from the same readers the zone and object pages use, so a
-  marker on the map and a row on a page cannot disagree. The pages are in the sitemap and `/database` links
-  the index.
-- Knowledge base: `npm run kb -- name-gaps` opens with the counts: how many items, quests, item sets and
-  spells carry a name today, and which source each name came from — the game files, the Warcraft Wiki, the
-  local baseline, or the players. A source that was not read says so instead of printing a zero.
-- Knowledge base: `npm run kb -- name-gaps`, a local report of the items, quests, item sets and spells that
-  still print as an id, each with the reason and what would fill it (a rule decision, the addon's uploads, or no
-  source yet). Ids only, never names.
-- Site: the data layer for linking a character to an account, off by default. A signed-in player gets a code
-  (live 15 minutes, good once), and a `character_link` row with that code is sent to `/api/me/characters/links`
-  from the site or with an API key that has the new `link:own` scope. The GUID is replaced by a keyed hash, the
-  census must agree on race, class and faction, hidden characters are refused, and a character claimed by a second
-  account is frozen on both. Nothing is public and there is no page for it yet. Off until the migration is applied
-  and `EVERLOOT_CHARACTER_LINKS=1` is set; intake never stores link rows.
-- Site: rankings at `/rankings`. Classes, races and faction balance by ISO week, from the census under its
-  usual rule, with a weekly chart and each rank's change against the week before. They start with the first
-  full week after launch.
-- Site: an achievement's page lists its criteria, with how many each needs, once three players sent the same complete list; the list is agreed apart from the entry itself. Lists and search still show no criteria wording. Run the completion rebuild (`?rebuild=1`) once to fill it from uploads already stored.
-- Knowledge base: an NPC seen at its window places a pin like a spawn position (three installs on one map);
-  a targeting position still never does. Object spawn points are clustered per object and zone, become a pin
-  at three installs with a key that stays put once published, and an object's name needs three installs to
-  agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
-  that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
-  instead of withdrawing the event as a conflict. The map shows none of this yet.
+- Docs: OPEN_DATA.md and RELEASING.md no longer say the open data export sits in the roadmap's Next section; they point to ROADMAP.md.
+- Docs: each gap in DATA_PLACEMENT.md carries a dated state, and the WAF row now describes the Cloudflare rules that apply on /database/*.
 
 ## [desktop-v0.1.21] - 2026-11-10
 
