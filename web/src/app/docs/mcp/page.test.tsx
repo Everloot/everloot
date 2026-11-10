@@ -49,3 +49,11 @@ test("the page renders every kind and names the id scheme", () => {
   expect(text).toContain("1,010,000,072");
   expect(html).toContain('href="/docs/mcp/tools/item_page"');
 });
+
+test("the page keeps a space where an element ends a line of prose", () => {
+  // Tags are dropped without a replacement space, so a space lost between a <code> and the next word shows up here.
+  const text = renderToStaticMarkup(<McpOverview />).replace(/<[^>]+>/g, "").replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, " ");
+  expect(text).toContain("name Elwynn Forest and kind zone");
+  expect(text).toContain("other gameplay facts. guild_board needs");
+  expect(text).toContain("in their own SavedVariables/Everloot.lua");
+});

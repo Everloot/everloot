@@ -59,7 +59,7 @@ Use the same words everywhere, so the listings match the site and each other.
 > never zero. Market tools accept full realm names or unique whole-word suffixes of at least two words;
 > ambiguous or unknown names return candidates. Keep scan dates: an old minimum is not a live offer.
 > Market text separates houses; structured content and full-scan history use the house with most units,
-> named in the text (ties: Alliance, Horde, Neutral). Browsing sightings are separate and unscoped.
+> named in the text (ties: Alliance, Horde, Neutral). Browsing sightings are separate and not split by house.
 > Profession estimates use unscoped median prices, not a current realm minimum.
 >
 > Tools also cover professions, talents, maps, guilds, owned progress, coverage, population, official changes
@@ -243,5 +243,6 @@ Execution on 2026-10-18, using the maintainer's existing accounts:
 - ChatGPT directory: business publisher verified, Everloot project and plugin draft created, portable package accepted. Domain verification and final submission still pending.
 - ChatGPT directory, 2026-11-02: OpenAI emailed that the plugin submission (version 1.0.1) is approved. That version carries the tool descriptions it was submitted with, before the 32-tool list above.
 - Grok Bot marketplace: form prepared; final submission still pending.
+- Long description, 2026-11-10: the text above changed in #1094 (tool choice, name and id discovery, realm aliases, house handling and price methods; 1,920 of 2,000 characters). It goes out with the next listing update, after the deploy serves the new tool descriptions.
 
 The portable OpenAI package is in [`integrations/openai/`](../integrations/openai/). The reviewer demo is a recording of the actual ChatGPT connector test conversation at `/review/everloot-chatgpt-demo.mp4`. A connected custom server and a public marketplace approval are separate states. This document does not claim approval before a platform reports it.

@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/profession_path.json",
   "title": "Profession leveling path",
-  "description": "Returns a Forever profession leveling route between skill levels: agreed steps, summed reagents and estimated cost, leaving uncovered ranges as gaps. A reported recipe or orange skill range needs 3 agreeing installs. Costs use median reagent prices from at least 3 distinct installs: unscoped observations without realm, build or observation time, not matching prices or a current realm minimum. Agreed vendor prices may supply reagent costs; training is listed separately. Use recipe_thresholds for colour-change ranges. Use market_value with a verified item gameId and full realm name for a dated realm price. Missing prices stay unknown, never free.",
+  "description": "Returns a Forever profession leveling route between skill levels: agreed steps, summed reagents and estimated cost, leaving uncovered ranges as gaps. A reported recipe or orange skill range needs 3 agreeing installs. Costs use median reagent prices from at least 3 distinct installs: unscoped observations without realm, build or observation time, not one listing's price or a current realm minimum. Agreed vendor prices may supply reagent costs; training is listed separately. Use recipe_thresholds for colour-change ranges. Use market_value with a verified item gameId and full realm name for a dated realm price. Missing prices stay unknown, never free.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,

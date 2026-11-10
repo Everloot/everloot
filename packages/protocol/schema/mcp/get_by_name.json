@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/get_by_name.json",
   "title": "Get records by exact name",
-  "description": "Returns records matching a known exact full name, case-insensitively, optionally narrowed by kind. Use search_knowledge for partial names or when this exact lookup misses; no exact match does not mean no gameplay facts exist. Check kind, version and sourceKind before choosing: lore is archive background and has no gameId. Pass recordId (also id) to get_entity or fetch as a string; pass the separate verified gameId to item_page, npc_page, object_page or quest_page. A zone gameId, as a string, goes to world_map_near.zone. Several kinds can share a name; never guess a game id from a lore record.",
+  "description": "Returns records matching a known exact full name, case-insensitively, optionally narrowed by kind. Use search_knowledge for partial names or when this exact lookup misses; no exact match does not mean no gameplay facts exist. Check kind, gameVersion and sourceKind before choosing: lore is archive background and has no gameId. Pass recordId (also id) to get_entity or fetch as a string; pass the separate verified gameId to item_page, npc_page, object_page or quest_page. A zone gameId, as a string, goes to world_map_near.zone. Several kinds can share a name; never guess a game id from a lore record.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,

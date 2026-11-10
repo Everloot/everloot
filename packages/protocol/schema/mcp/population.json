@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/population.json",
   "title": "Who plays what: population by race, class, faction and level",
-  "description": "Counts observed Forever characters by race, class, faction and level band from opt-in addon census uploads, not the whole realm population. Each character counts once. Normally counts need 10 characters, 3 installs and 3 addresses, rounded to 5, with inferable small counts hidden. While few players upload, Everloot's own installs also count on their own; preserve that label because counts can come from one player's game. The window is active in 7 days by default, or since launch. No names. Missing census data is unrecorded, not zero. Use class_races for which races can be a class; use this tool for observed counts.",
+  "description": "Counts observed Forever characters by race, class, faction and level band from opt-in addon census uploads, not the whole realm population. Each character counts once. Normally counts need 10 characters, 3 installs and 3 addresses, rounded to 5, with inferable small counts hidden. While few players upload, Everloot's own installs also count on their own, though the 10-character minimum still applies; preserve that label because counts can come from one player's game. The window is active in 7 days by default, or since launch. No names. Missing census data is unrecorded, not zero. Use class_races for which races can be a class; use this tool for observed counts.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
