@@ -7,21 +7,21 @@ const link = "text-fg underline decoration-edge underline-offset-4 hover:decorat
 const count = (value: number) => value.toLocaleString("en-US");
 
 /**
- * The site's one promise with its numbers beside it: how many installs have reported, how many facts they have
- * confirmed and how many wait on one or two more installs, and when the data was current. Each figure says what it
- * counts. A score that cannot be read says "unrecorded" for every figure, never zero.
+ * The site's one promise with its numbers beside it: how many installs have uploaded (overall), how many facts in the
+ * released zones are confirmed and how many wait on one or two more installs, and when the data was current. Each
+ * figure says what it counts and the block says where the numbers come from: the stored coverage report. A score that cannot be read says "unrecorded" for every figure, never zero.
  */
 export default function HomeTrust({ summary }: { summary: CoverageSummary | null }) {
   const figures = [
-    { id: "installs", label: summary?.installs === 1 ? "install reporting" : "installs reporting", value: summary?.installs, note: "Distinct installs behind the facts counted here." },
-    { id: "confirmed", label: "confirmed facts", value: summary?.confirmed, note: "Facts that 3 or more installs agree on." },
-    { id: "waiting", label: "facts waiting", value: summary?.waiting, note: "Seen by 1 or 2 installs; each needs 1 or 2 more to agree." },
+    { id: "installs", label: summary?.installs === 1 ? "install that uploaded" : "installs that uploaded", value: summary?.installs, note: "Overall: every install that uploaded, in any zone." },
+    { id: "confirmed", label: "confirmed facts", value: summary?.confirmed, note: "In released zones: facts that 3 or more installs agree on." },
+    { id: "waiting", label: "facts waiting", value: summary?.waiting, note: "In released zones: seen by 1 or 2 installs; each needs 1 or 2 more to agree." },
   ];
   return (
     <section aria-labelledby="promise" data-home-trust>
       <SectionHeading
         id="promise"
-        note="Counted across the released zones, from the same score the MCP coverage tool reads."
+        note="From the coverage report the snapshot job stores. Confirmed and waiting count the released zones; installs count every zone."
         action={<Link href="/database/coverage" className={link}>Coverage by zone →</Link>}
       >
         Every fact shows how many players saw it, and when.
@@ -42,9 +42,7 @@ export default function HomeTrust({ summary }: { summary: CoverageSummary | null
           {summary ? `${dataAgeLabel(summary.dataAsOf)}${summary.build ? `, build ${summary.build}` : ""}.` : "Data age unrecorded: the coverage score could not be read just now."}
         </p>
         <p className="text-sm text-fg-2">
-          {summary && summary.waiting > 0
-            ? "Every install that uploads moves facts from waiting to confirmed."
-            : "A fact shows once 3 installs agree on it."}{" "}
+          Uploads help confirm facts once 3 installs agree.{" "}
           <Link href={GET_THE_ADDON.href} className={link}>{GET_THE_ADDON.label}</Link>
         </p>
       </Card>

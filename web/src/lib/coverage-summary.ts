@@ -8,7 +8,7 @@ export const coverageKey = (build: string): string => `coverage/${build}.json`;
 
 /**
  * The four numbers the home page shows, taken from the stored score (`coverage/<build>.json`) the cron already
- * writes, so no page view reads the corpus. They are the ones the MCP `coverage` tool reports overall.
+ * writes, so no page view reads the corpus. Installs count every shown fact; confirmed and waiting count the released zones only.
  */
 export interface CoverageSummary {
   /** Distinct folded installs behind every counted fact, as the score counts them. */

@@ -17,10 +17,13 @@ const data = { installs: 14, confirmed: 2785, waiting: 12250, dataAsOf: "2026-11
 test("the promise, the three numbers each saying what it counts, and the data date", () => {
   const html = render(data);
   expect(text(html)).toContain("Every fact shows how many players saw it, and when.");
-  expect(figure(html, "installs")).toBe("installs reporting 14 Distinct installs behind the facts counted here.");
-  expect(figure(html, "confirmed")).toBe("confirmed facts 2,785 Facts that 3 or more installs agree on.");
-  expect(figure(html, "waiting")).toBe("facts waiting 12,250 Seen by 1 or 2 installs; each needs 1 or 2 more to agree.");
+  expect(figure(html, "installs")).toBe("installs that uploaded 14 Overall: every install that uploaded, in any zone.");
+  expect(figure(html, "confirmed")).toBe("confirmed facts 2,785 In released zones: facts that 3 or more installs agree on.");
+  expect(figure(html, "waiting")).toBe("facts waiting 12,250 In released zones: seen by 1 or 2 installs; each needs 1 or 2 more to agree.");
   expect(text(html)).toContain("Data as of 2026-11-10 07:50 UTC, build 1.60.1.70862.");
+  expect(text(html)).toContain("From the coverage report the snapshot job stores.");
+  expect(text(html)).toContain("Uploads help confirm facts once 3 installs agree.");
+  expect(text(html)).not.toMatch(/same score|MCP|every install that uploads moves|every upload confirms/i);
   expect(html).not.toContain("unrecorded");
 });
 
@@ -33,7 +36,7 @@ test("it links Get the addon and the coverage page, and fills no button", () => 
 
 test("one install reads as one install, and a measured zero is shown as 0", () => {
   const html = render({ ...data, installs: 1, confirmed: 0, waiting: 0 });
-  expect(figure(html, "installs")).toMatch(/^install reporting 1 /);
+  expect(figure(html, "installs")).toMatch(/^install that uploaded 1 /);
   expect(figure(html, "confirmed")).toMatch(/^confirmed facts 0 /);
   expect(html).not.toContain("unrecorded");
 });
