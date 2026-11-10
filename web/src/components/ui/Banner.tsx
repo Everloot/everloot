@@ -33,7 +33,7 @@ export const BANNER_CAPTION = "Art © Blizzard Entertainment";
  * `children` (the page's title, from PageHeader) sit on its bottom-left in the page's
  * column, over the art at every width. The caption is a tiny, quiet line in the bottom-right corner at
  * every width, never a block. Use it as the first thing in the layout's `<main>`, not inside a Container:
- * it cancels the main's top padding so it meets the site header. Body clips the sideways bleed (globals.css).
+ * it cancels the main's top padding so it meets the site header. The art is 100vw wide, a scrollbar wider than the page; html and body clip that bleed (globals.css).
  *
  * `hero` is the home page's taller version: at least 432 px on a phone and 544 px from `lg`. `aside` sits on
  * the art at the bottom-right on a wide screen, above the caption, and under `children` on a narrow one.
