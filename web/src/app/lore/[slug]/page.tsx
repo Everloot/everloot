@@ -5,7 +5,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { Card, Explainer, Facts, PageHeader, Prose, ReadingLayout, SectionHeading, type TocItem } from "@/components/ui";
 import LoreSource from "@/components/LoreSource";
 import { trailFor } from "@/lib/breadcrumbs";
-import { agreedKind, databaseHref, KIND_LABEL, loreStandingFor } from "@/lib/lore-links";
+import { agreedKind, databaseHref, KIND_LABEL, loreStandingFor, type LoreStanding } from "@/lib/lore-links";
 import { BROWSE_HEADINGS, BROWSE_TYPES, CONVERSION_NOTE, FACET_KEYS, firstSentence, loreByExtId, loreSlug, parseLoreSlug, renderBody, UNAVAILABLE, UNAVAILABLE_COPY, type BrowseSlug, type LorePage as Lore } from "@/lib/lore";
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
@@ -21,14 +21,26 @@ function browseSlug(type: Lore["type"]): BrowseSlug | null {
 // The archive is a fixed 2023 dump that only changes with a new release, so each page is rendered once
 // on first request and then served from the cache, refreshed at most once a day. Building every page
 // up front is not worth it (about 78k indexable pages from a 338 MB file), hence no prerendered params.
-// Next does not cache a failed render, so when the release cannot be opened the page throws (a 500)
-// instead of rendering the "unavailable" copy: a cached 200 would keep that answer, and its noindex, for a day.
+// Next does not cache a failed render, so when the release cannot be opened, or the page's database link cannot be
+// worked out (lib/lore-links.ts `loreStandingFor`: names or the archive lookup unreadable), the page and its metadata
+// throw (a 500, shown by error.tsx) instead of rendering: a cached 200 would keep the outage's answer, a missing link
+// and a noindex, for a day. A 500 also leaves the robots state search engines last saw as it was.
 export const revalidate = 86400;
 export function generateStaticParams() {
   return [];
 }
 
 const UNAVAILABLE_TITLE = "Lore archive unavailable";
+
+function unavailable(): never {
+  throw new Error(`${UNAVAILABLE_TITLE}: ${UNAVAILABLE_COPY}`);
+}
+
+/** The page's link and robots, or the outage thrown (see the note on `revalidate`). */
+async function standing(page: Lore): Promise<LoreStanding> {
+  const found = await loreStandingFor(page);
+  return found === UNAVAILABLE ? unavailable() : found;
+}
 
 function label(page: Lore): string {
   return page.sourceId === "warcraft-wiki-2023" ? "Lore archive · Warcraft Wiki, 2023 dump" : `Lore archive · ${page.sourceId} · ${page.gameVersion}`;
@@ -42,7 +54,7 @@ async function lookup(slug: string): Promise<Lore | null | typeof UNAVAILABLE> {
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await props.params;
   const page = await lookup(slug);
-  if (page === UNAVAILABLE) return { title: UNAVAILABLE_TITLE, robots: { index: false, follow: true } };
+  if (page === UNAVAILABLE) unavailable();
   if (!page) return { robots: { index: false, follow: true } };
   const description = firstSentence(page.body);
   const url = `/lore/${loreSlug(page)}`;
@@ -53,7 +65,7 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
     // A Warcraft Wiki copy stays readable (and linked to its original) but out of search, the wiki being the source to
     // rank, unless it links its Forever database page (lib/lore-links.ts `loreStanding`, the rule behind the link below
     // and /lore-sitemap.xml). Everloot's own entries follow the length rule.
-    robots: { index: (await loreStandingFor(page)).index, follow: true },
+    robots: { index: (await standing(page)).index, follow: true },
     openGraph: { type: "article", title: page.name, description, url, siteName: "Everloot", images: [IMAGE] },
     twitter: { card: "summary", title: page.name, description, images: [TWITTER_IMAGE] },
   };
@@ -64,7 +76,7 @@ export default async function LorePage(props: { params: Promise<{ slug: string }
   const parsed = parseLoreSlug(slug);
   if (!parsed) notFound();
   const page = await loreByExtId(parsed.extId);
-  if (page === UNAVAILABLE) throw new Error(`${UNAVAILABLE_TITLE}: ${UNAVAILABLE_COPY}`);
+  if (page === UNAVAILABLE) unavailable();
   if (!page) notFound();
   if (slug !== loreSlug(page)) permanentRedirect(`/lore/${loreSlug(page)}`);
 
@@ -78,7 +90,7 @@ export default async function LorePage(props: { params: Promise<{ slug: string }
   const infoboxEntries = page.infobox ? Object.entries(page.infobox.fields) : [];
   const trail = [...(typeSlug ? trailFor(`/lore/${typeSlug}`)! : trailFor("/lore")!), { name: page.name, path: `/lore/${loreSlug(page)}` }];
   // The database page for the same thing (lib/lore-links.ts): the one page whose name is exactly this page's.
-  const db = (await loreStandingFor(page)).link;
+  const db = (await standing(page)).link;
   // The archive has no source headings; link to its text and the metadata sections without inventing story sections.
   const sections: TocItem[] = [
     { id: "lore-text", label: "Article text" },

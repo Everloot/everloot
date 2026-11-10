@@ -161,19 +161,23 @@ describe("a lore page leads to its database page", () => {
     expect(await loreFor("zone", 1436, "Westfall", instances)).toBeNull();
   });
 
-  test("a kind whose names cannot be read stops every link of its lore type until it can", async () => {
-    const { databaseLink, loreFor } = await links();
+  test("a kind whose names cannot be read stops every link of its lore type until it can, as an outage", async () => {
+    const { databaseLink, loreFor, loreForShownItem } = await links();
     // The agreed object names are unreadable: the faction might share its name with an object nobody can see.
     const noObjects = sets({ objects: null });
     expect(databaseLink(page("other", "Argent Dawn"), noObjects)).toBeNull();
     expect(databaseLink(page("other", "Jenkins"), noObjects)).toBeNull();
-    expect(await loreFor("faction", 529, "Argent Dawn", noObjects)).toBeNull();
-    expect(await loreFor("title", 200, "Jenkins", noObjects)).toBeNull();
+    // The database page hears "unavailable", not "no link", so it can keep the answer out of the caches.
+    expect(await loreFor("faction", 529, "Argent Dawn", noObjects)).toBe("unavailable");
+    expect(await loreFor("title", 200, "Jenkins", noObjects)).toBe("unavailable");
     // Other types do not wait on it.
     expect(databaseLink(page("zone", "Westfall"), noObjects)).toMatchObject({ kind: "zone", id: 1436 });
     // The instance list is unreadable: no zone links.
     expect(databaseLink(page("zone", "Westfall"), sets({ instances: null }))).toBeNull();
-    expect(await loreFor("zone", 1436, "Westfall", sets({ instances: null }))).toBeNull();
+    expect(await loreFor("zone", 1436, "Westfall", sets({ instances: null }))).toBe("unavailable");
+    // An item shown by its wiki name, while the agreed item names cannot be read, is unavailable too.
+    const wiki = new Map([[9, { name: "Warchief's Blade", source: "wiki" as const }]]);
+    expect(await loreForShownItem(9, { name: "Warchief's Blade", source: "wiki" }, wiki, sets({ items: null }))).toBe("unavailable");
   });
 
   test("storage down: the names players agreed on are unreadable, not empty", async () => {

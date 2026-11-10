@@ -92,11 +92,12 @@ test("lore pages are cached for a day and built on first request, not at build t
   expect(mod.generateStaticParams()).toEqual([]);
 });
 
-test("an unavailable release fails the render, which Next never caches, and is not indexed", async () => {
+test("an unavailable release fails the render and the metadata, which Next never caches, and sends no noindex", async () => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   const { default: LorePage, generateMetadata } = await page(join(tmpdir(), "missing.sqlite"));
   await expect(LorePage(params("1-thrall"))).rejects.toThrow("Lore archive unavailable");
-  expect((await generateMetadata(params("1-thrall"))).robots).toMatchObject({ index: false });
+  // An outage must not de-index the page: the 500 leaves the robots search engines last saw as they were.
+  await expect(generateMetadata(params("1-thrall"))).rejects.toThrow("Lore archive unavailable");
 });
 
 test("type and facets link to the browse views and the infobox renders as a definition list", async () => {

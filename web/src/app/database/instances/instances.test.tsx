@@ -14,6 +14,8 @@ vi.mock("@/lib/rollup-compute", async (importOriginal) => ({
   loadItemFacts: async () => ({ rates: [], names: [], npcs: [], unreachable: false }),
   loadWorldFacts: async () => (state.worldDown ? { unreachable: true } : { npcs: [], quests: state.quests, vendors: [], unreachable: false }),
 }));
+// No lore archive here: the lookup answers "no page" (a missing release is an outage, which marks the page degraded).
+vi.mock("@/lib/lore", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/lore")>()), loreForEntity: async () => null }));
 vi.mock("@/lib/instances", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/instances")>()),
   loadSightings: async () => state.seen,

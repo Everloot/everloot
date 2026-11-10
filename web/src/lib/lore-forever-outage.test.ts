@@ -32,10 +32,23 @@ test("a lore lookup that fails after the release opens is unavailable (no link, 
   release.db.all.mockReset().mockRejectedValue(new Error("D1_ERROR: network"));
   await expect(loreForEntity("npc", "Hogger")).resolves.toBe("unavailable");
   await expect(loreFor("npc", 448, "Hogger")).resolves.toBe("unavailable");
-  await expect(zoneLore(1436, "Westfall")).resolves.toBeNull();
+  await expect(zoneLore(1436, "Westfall")).resolves.toBe("unavailable");
   // The failure was not kept: once the release answers, the same name links.
   const body = `Hogger is a gnoll. ${"He raids farms. ".repeat(30)}`;
   release.db.all.mockReset().mockResolvedValue([{ extId: "310", name: "Hogger", body, sourceId: "warcraft-wiki-2023" }]);
   await expect(loreForEntity("npc", "Hogger")).resolves.toMatchObject({ extId: "310" });
   await expect(loreFor("npc", 448, "Hogger")).resolves.toMatchObject({ extId: "310" });
+});
+
+test("a lore page whose archive lookup fails has no standing (unavailable), not a 'no link, noindex' one; it recovers", async () => {
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  // Fresh modules: the test above left Hogger's answer in the lookup cache.
+  vi.resetModules();
+  const { loreStandingFor } = await import("./lore-links");
+  const body = `Hogger is a gnoll. ${"He raids farms. ".repeat(30)}`;
+  const page = { extId: "310", sourceId: "warcraft-wiki-2023", type: "npc" as const, name: "Hogger", body };
+  release.db.all.mockReset().mockRejectedValue(new Error("D1_ERROR: network"));
+  await expect(loreStandingFor(page)).resolves.toBe("unavailable");
+  release.db.all.mockReset().mockResolvedValue([{ extId: "310", name: "Hogger", body, sourceId: "warcraft-wiki-2023" }]);
+  await expect(loreStandingFor(page)).resolves.toEqual({ link: { kind: "npc", id: 448, name: "Hogger" }, index: true });
 });

@@ -1,7 +1,10 @@
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest";
 import { buildLoreRelease } from "@/test/lore-release";
+import { cacheCopy, DEGRADED_TTL, edgeDegraded } from "@/lib/cf-edge-cache";
 
 // The database pages and the lore pages link each other under one rule (lib/lore-links.ts). The archive is the
 // fixture release with its link pages; the corpus, the names file and the game files' lists are set per test.
@@ -60,7 +63,7 @@ beforeEach(() => {
   wikiItems.names = null;
   extra.instanceNamed = null;
 });
-afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
+afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); vi.restoreAllMocks(); });
 
 // The pages take different route params (id, instance, slug); one loose helper builds them all.
 const props = (key: string, value: string) => ({ params: Promise.resolve({ [key]: value }) }) as never;
@@ -242,4 +245,65 @@ test("an item shown by its Warcraft Wiki name links its lore page; the lore page
   const back = await lore("304-worn-shortsword");
   expect(back).toContain('href="/database/items/25"');
   expect(back).toContain("Players have recorded Worn Shortsword in WoW: Forever.");
+});
+
+// An outage is not an answer: neither side may be kept saying "no link" (or "noindex") because names or the archive
+// could not be read. The lore page fails its render and its metadata (Next never caches a failed render, and a 500
+// leaves the robots search engines saw as they were); a database page renders without the lore block, marked degraded,
+// so the edge keeps it DEGRADED_TTL seconds instead of its own lifetime.
+const STORAGE_DOWN = { uploads: 0, records: [], unreachable: true };
+/** Seconds the Worker's edge cache would keep this page, as cf-edge-cache stores it under the five-minute header. */
+const edgeSeconds = async (html: string) =>
+  Number((await cacheCopy(new Response(html, { headers: { "content-type": "text/html" } }), 300)).headers.get("cache-control")!.match(/max-age=(\d+)/)![1]);
+
+test("storage down: the lore page is not cached or noindexed, the faction page drops the link and is marked degraded; both recover", async () => {
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  store.loadCorpus.mockResolvedValue(STORAGE_DOWN);
+  // The agreed object names are unreadable, so the faction's name might be an object's too: an outage, not "no link".
+  await expect(lore("301-argent-dawn")).rejects.toThrow("Lore archive unavailable");
+  await expect(loreRobots("301-argent-dawn")).rejects.toThrow("Lore archive unavailable");
+  const down = await database("factions/[id]", "id", "529-argent-dawn");
+  expect(down).not.toContain('id="lore"');
+  expect(edgeDegraded(down)).toBe(true);
+  expect(await edgeSeconds(down)).toBe(DEGRADED_TTL);
+
+  store.loadCorpus.mockResolvedValue(corpus([]));
+  expect(await lore("301-argent-dawn")).toContain('href="/database/factions/529-argent-dawn"');
+  expect((await loreRobots("301-argent-dawn")).index).toBe(true);
+  const up = await database("factions/[id]", "id", "529-argent-dawn");
+  expect(up).toContain('href="/lore/301-argent-dawn"');
+  expect(edgeDegraded(up)).toBe(false);
+  expect(await edgeSeconds(up)).toBe(300);
+});
+
+test("storage down: an NPC's lore page fails its render too, and a copy that never needs storage is unaffected", async () => {
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  store.loadCorpus.mockResolvedValue(STORAGE_DOWN);
+  await expect(lore("1-thrall")).rejects.toThrow("Lore archive unavailable");
+  await expect(loreRobots("1-thrall")).rejects.toThrow("Lore archive unavailable");
+  // A zone copy reads only the game files' names: it still links and stays indexed.
+  expect(await lore("303-westfall")).toContain('href="/database/zones/1436-westfall"');
+  expect((await loreRobots("303-westfall")).index).toBe(true);
+  store.loadCorpus.mockResolvedValue(corpus(npc(77, "Thrall")));
+  expect(await lore("1-thrall")).toContain('href="/database/npcs/77"');
+  expect((await loreRobots("1-thrall")).index).toBe(true);
+});
+
+test("the archive cannot be opened: title and zone pages drop the lore block and are marked degraded; the lore comes back with it", async () => {
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  vi.stubEnv("KB_SNAPSHOT_PATH", join(tmpdir(), "everloot-missing-lore.sqlite"));
+  const title = await database("titles/[id]", "id", "200-jenkins");
+  expect(title).not.toContain('id="lore"');
+  expect(edgeDegraded(title)).toBe(true);
+  const zone = await database("zones/[zone]", "zone", "1436-westfall");
+  expect(zone).not.toContain('id="lore"');
+  expect(zone).toContain('name="everloot-degraded"');
+
+  // A new instance (the release is opened again): both link.
+  vi.resetModules();
+  vi.stubEnv("KB_SNAPSHOT_PATH", release);
+  const back = await database("titles/[id]", "id", "200-jenkins");
+  expect(back).toContain('href="/lore/308-jenkins"');
+  expect(edgeDegraded(back)).toBe(false);
+  expect(await database("zones/[zone]", "zone", "1436-westfall")).toContain('href="/lore/303-westfall"');
 });

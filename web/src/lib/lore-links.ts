@@ -15,7 +15,10 @@ import { publicZones, zoneHref } from "./zones";
  * archive for the copy and links it only if the copy, read the other way (`databaseLink`), points back at the
  * same page, so the two directions cannot disagree. A name two database pages share, or one that fits two kinds
  * under the same archive type, is no link: a wrong link is worse than none. Nor is any name while one of the kinds
- * that could claim it cannot be read: the kind left out might hold it too.
+ * that could claim it cannot be read: the kind left out might hold it too. That, and an archive lookup that fails,
+ * is an outage (`UNAVAILABLE`), not an answer: callers render without the link and keep the result out of every cache
+ * (a database page marks itself degraded, a lore page fails its render), so no cached copy says "no link" or
+ * "noindex" because of it.
  *
  * Every kind uses the same exact-name test over its own names: NPCs, items, quests and objects over the names players
  * agreed on (3 installs), zones and instances over the names the game files give them, factions, titles and
@@ -165,11 +168,16 @@ export function loreStanding(page: StandingPage, only: string | null, sets: Link
   return { link, index: loreIndexable(page, link !== null) };
 }
 
-/** `loreStanding` for a lore page being served: names and the archive are read only when it could link. */
-export async function loreStandingFor(page: StandingPage): Promise<LoreStanding> {
+/**
+ * `loreStanding` for a lore page being served: names and the archive are read only when it could link. Unavailable
+ * when a kind of its type cannot be read or the archive lookup fails, never a "no link, noindex" standing.
+ */
+export async function loreStandingFor(page: StandingPage): Promise<LoreStanding | Unavailable> {
   const sets = kindsOf(page).length > 0 ? await loadLinkNames(page.type) : null;
+  if (sets && page.type && namesOfType(page.type, sets) === null) return UNAVAILABLE;
   const only = sets && page.type && databaseLink(page, sets) ? await loreForEntity(page.type, page.name) : null;
-  return loreStanding(page, only && only !== UNAVAILABLE ? only.extId : null, sets);
+  if (only === UNAVAILABLE) return UNAVAILABLE;
+  return loreStanding(page, only?.extId ?? null, sets);
 }
 
 /** Where a database page is. Zones, instances, factions, titles and achievements carry their name in the path. */
@@ -190,13 +198,15 @@ export function databaseHref(link: DatabaseLink): string {
 /**
  * The lore page a database page may link, or null. The name must be this page's alone (no other page of its kind
  * shares it) before the archive is asked, the archive must have exactly one page of that name and type, and that
- * page must lead back here. `sets` is for callers that already hold the names.
+ * page must lead back here. `sets` is for callers that already hold the names. Unavailable when a kind of the type
+ * cannot be read or the archive lookup fails.
  */
 export async function loreFor(kind: DatabaseKind, id: number, name: string | null | undefined, sets?: LinkNames): Promise<LoreMatch | null | Unavailable> {
   const clean = name?.trim();
   if (!clean) return null;
   const type = LORE_TYPE[kind];
   const names = sets ?? await loadLinkNames(type);
+  if (namesOfType(type, names) === null) return UNAVAILABLE;
   // The archive is asked only for a name that stands for this page, read from the wiki's side (`databaseLink`).
   const own = databaseLink({ sourceId: WIKI_SOURCE, type, name: clean }, names);
   if (own?.kind !== kind || own.id !== id) return null;
@@ -224,6 +234,7 @@ function wikiItemNames(matched: WikiNames): Map<number, string> {
  * Warcraft Wiki (nobody has reported the item yet) links the page of exactly that name when no item has it as an
  * agreed name and no other item carries it from the wiki; the lore page does not link back until players agree on
  * the name, since it would say players recorded an item nobody has reported. A name from the game files links nothing.
+ * Unavailable when the agreed item names cannot be read or the archive lookup fails.
  */
 export async function loreForShownItem(
   id: number,
@@ -236,7 +247,8 @@ export async function loreForShownItem(
   if (!matched) return null;
   const names = sets ?? await loadLinkNames("item");
   const wiki = matchName(wikiItemNames(matched), shown.name);
-  if (!names.items || matchName(names.items, shown.name).kind !== "missing" || wiki.kind !== "unique" || wiki.id !== id) return null;
+  if (!names.items) return UNAVAILABLE;
+  if (matchName(names.items, shown.name).kind !== "missing" || wiki.kind !== "unique" || wiki.id !== id) return null;
   const match = await loreForEntity("item", shown.name);
   return match !== null && match !== UNAVAILABLE && match.sourceId !== WIKI_SOURCE ? null : match;
 }

@@ -34,6 +34,7 @@ import {
   type ZoneEntrance, type ZoneNpc, type ZoneQuest, type ZoneTreasure,
 } from "@/lib/zones";
 import { zoneLore } from "@/lib/zone-lore";
+import { UNAVAILABLE } from "@/lib/lore";
 import { EmptyTab, FREQUENCY, percent } from "../../entity";
 import { listQuery, PER_PAGE, type Search } from "../../list-parts";
 
@@ -234,7 +235,7 @@ export default async function ZonePage(props: Props) {
 
   return (
     <Container width="data">
-      <EdgeDegraded when={facts.unreachable || seen.unreachable || loot.unreachable || gathering?.unreachable === true} />
+      <EdgeDegraded when={facts.unreachable || seen.unreachable || loot.unreachable || gathering?.unreachable === true || lore === UNAVAILABLE} />
       <JsonLd data={entityPageJsonLd({ name: zone.name, path: canonical, identifier: `zone:${zone.mapId}` })} />
       <article>
         {/* The database title row: name, continent, and the map link as a quiet control (the header keeps the one filled button). */}
@@ -271,7 +272,7 @@ export default async function ZonePage(props: Props) {
             entrances={entrances}
           />
 
-          {lore && (
+          {lore && lore !== UNAVAILABLE && (
             <section aria-labelledby="lore">
               <SectionHeading id="lore">Lore</SectionHeading>
               <Card as="div">

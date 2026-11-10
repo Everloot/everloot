@@ -11,7 +11,16 @@ import { LINKED_TYPES, loadLinkNames, loreStanding, namesOfType, WIKI_SOURCE } f
 
 /** Lore URLs per sitemap file, under the protocol's 50,000. */
 export const LORE_CHUNK = 40_000;
-/** Names per release query: one JSON parameter, well inside D1's statement and value limits. */
+/**
+ * Names per release query: one JSON parameter, well inside D1's statement and value limits. A sitemap build asks
+ * Σ ceil(unique names of the type / NAME_BATCH) queries over the five archive types (lib/lore-sitemap-budget.test.ts).
+ * From the game files' lists as committed (src/data/game-data, lib/zones.ts, lib/instances.ts): zone is 46 zones and
+ * 25 instances, 71 names, 1 query; other is 75 shown factions, 40 titles and 233 achievements (348 names before case
+ * folding) plus the objects players agreed on. The npc, item, quest and object names are the ones 3 installs agreed
+ * on, read from storage, so that part moves with the corpus. Live total: 1 + ceil((objects + 348) / 2,000) +
+ * ceil(npcs / 2,000) + ceil(items / 2,000) + ceil(quests / 2,000); 5 queries while npcs, items and quests each hold
+ * 1 to 2,000 names and objects at most 1,652.
+ */
 const NAME_BATCH = 2_000;
 
 /**
