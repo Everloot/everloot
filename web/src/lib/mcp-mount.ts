@@ -5,6 +5,7 @@ import { loadTimeline } from "./changes";
 import { loadCoverage } from "./coverage-compute";
 import { loadCompletion } from "./completion-store";
 import { attributionHeaders } from "./data-guard";
+import { storedAuctionHistory } from "./auction-history-store";
 import { loadEcosystem } from "./ecosystem";
 import { filesIndex } from "./files-index";
 import { guildReader, guildsOn } from "./guilds";
@@ -55,6 +56,8 @@ export function toolLoaders(): ToolOptions {
       const loaded = await uploadStore.loadCorpus();
       return loaded.unreachable ? null : { records: loaded.records, dataAsOf: loaded.dataAsOf ?? null };
     },
+    // auction_history reads the cron's stored days (auction-history-store.ts); with no file it reads the corpus above.
+    auctionHistory: (realm, itemId) => storedAuctionHistory(realm, itemId),
     completion: (installId) => loadCompletion(installId),
     market: async () => {
       const loaded = await uploadStore.loadMarket();

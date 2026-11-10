@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, DataTable, PageHeader, ResultStrip, SectionHeading, type Column } from "@/components/ui";
 import { dataAgeLabel } from "@/lib/data-age";
 import { guildPath, loadRealmPage, REALM_PAGE, realmPath } from "@/lib/guilds";
@@ -53,7 +54,7 @@ export async function RealmGuilds({ slug, search }: { slug: string; search: Reco
     return (
       <Container width="data">
         <article className="space-y-6">
-          <PageHeader trail={[{ name: "Home", path: "/" }, { name: "Guilds", path: "/guilds" }]} title={UNREACHABLE_TITLE} />
+          <PageHeader trail={trailFor("/guilds")!} title={UNREACHABLE_TITLE} />
           <Card><p className="text-fg-2">{STORAGE_UNREACHABLE}</p></Card>
         </article>
       </Container>
@@ -69,7 +70,7 @@ export async function RealmGuilds({ slug, search }: { slug: string; search: Reco
     <Container width="data">
       <article>
         <PageHeader
-          trail={[{ name: "Home", path: "/" }, { name: "Guilds", path: "/guilds" }, { name: realm, path: realmPath(realm) }]}
+          trail={[...trailFor("/guilds")!, { name: realm, path: realmPath(realm) }]}
           title={`Guilds on ${realm}`}
           lede="Every guild the Everloot addon has seen on this realm, from members' uploads and officer boards."
           meta={<span>{dataAgeLabel(loaded.dataAsOf)}</span>}

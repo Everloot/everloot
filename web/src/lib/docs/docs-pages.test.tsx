@@ -26,6 +26,7 @@ import sitemap from "@/lib/site-sitemap";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import { allDocsPages, endpointSlug } from "./nav";
+import corsPrerenderedPaths from "@/data/cors-prerendered-paths.json";
 import { FILE_SCHEMAS, PAGE_INTERNAL_ROUTES } from "./file-schemas";
 import { MY_BUILDS_REFUSAL } from "@/lib/saved-builds";
 import { promptText } from "../../../../kb/src/prompts";
@@ -127,6 +128,7 @@ test("the schemas page marks the file-only shapes, says reporters is installs, a
   expect(text).toContain("reporters, it is the count of installs that agree on that fact, the same number the open-data files call installs");
   for (const path of PAGE_INTERNAL_ROUTES) expect(page).toContain(`>${path}</code>`);
   expect(text).toContain("they are not part of the contract, the document leaves them out");
+  for (const path of corsPrerenderedPaths) expect(page).toContain(`>${path}</code>`);
 });
 
 test("tells users how to add the server in Claude, Grok and any other assistant that takes a URL", () => {

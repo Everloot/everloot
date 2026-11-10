@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { trailFor } from "@/lib/breadcrumbs";
 import ShowcaseSections, { ShowcaseHeader } from "@/components/showcase/ShowcaseSections";
 import { Card, Container, PageHeader, SectionHeading } from "@/components/ui";
 import { signInPath } from "@/lib/auth/return-to";
@@ -70,7 +71,7 @@ export default async function LinkPreviewPage({ params }: Params) {
   } catch {
     return (
       <Container width="reading">
-        <PageHeader trail={[{ name: "Home", path: "/" }]} title="Character preview" />
+        <PageHeader trail={trailFor("/account")!.slice(0, 1)} title="Character preview" />
         <p role="alert" className="text-fg-2">Your character is unavailable right now. Try again in a minute.</p>
       </Container>
     );
@@ -89,7 +90,7 @@ export default async function LinkPreviewPage({ params }: Params) {
   return (
     <Container width="reading">
       <article className="space-y-8">
-        <ShowcaseHeader showcase={showcase} trail={[{ name: "Home", path: "/" }, { name: "Account", path: "/account" }, { name: c.name, path: `/me/characters/links/${id}` }]} />
+        <ShowcaseHeader showcase={showcase} trail={[...trailFor("/account")!, { name: c.name, path: `/me/characters/links/${id}` }]} />
         <Card className="space-y-2 text-sm text-fg-2">
           <p>
             Only you see this preview. It shows everything synced for this character. The public page,{" "}

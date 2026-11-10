@@ -34,7 +34,8 @@ import SubclassPage, { generateMetadata as subclassMetadata } from "./[id]/[subc
 import { NAME_TITLE } from "./category-page";
 import { CREDIT } from "@/lib/talents/assets";
 import { CLIENT_EDGES } from "@/lib/edges";
-import { CLIENT_TAXONOMY, ITEMS_PER_PAGE, NAME_SOURCE } from "@/lib/items";
+import { CLIENT_TAXONOMY, NAME_SOURCE } from "@/lib/items";
+import { PER_PAGE } from "../list-parts";
 import sitemap from "@/lib/site-sitemap";
 
 const BASE = "https://assets.example.test/b";
@@ -142,7 +143,7 @@ test("without the names file a category shows Item N and no wiki credit", async 
 
 test("wiki-matched names count toward the half a category needs to be indexed and listed in the sitemap", async () => {
   const ids = clothIds();
-  const half = Math.ceil(Math.min(ids.length, ITEMS_PER_PAGE) / 2);
+  const half = Math.ceil(Math.min(ids.length, PER_PAGE) / 2);
   state.matched = matchedNames(ids.slice(0, half - 1));
   expect((await subclassMetadata({ params: Promise.resolve({ id: "armor", subclass: "cloth" }), searchParams: Promise.resolve({}) })).robots).toMatchObject({ index: false });
   expect((await sitemap())!.map((e) => new URL(e.url).pathname)).not.toContain("/database/items/armor/cloth");
@@ -248,7 +249,7 @@ test("the pager and the other filters' links keep the level and binding filters"
   state.matched = matchedNames(ids);
   for (const id of ids) state.levels.set(id, { level: 15, required: 10, binding: 2 });
   const { page, rows } = await clothRows({ ilvl: "11-20", bind: "equip" });
-  expect(rows).toHaveLength(ITEMS_PER_PAGE);
+  expect(rows).toHaveLength(PER_PAGE);
   expect(page).toContain('href="/database/items/armor/cloth?ilvl=11-20&amp;bind=equip&amp;page=2"');
   expect(page).toContain('href="/database/items/armor/cloth?quality=poor&amp;ilvl=11-20&amp;bind=equip"');
   // The name box keeps them as hidden fields.

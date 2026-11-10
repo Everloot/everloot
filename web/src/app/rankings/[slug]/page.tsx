@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { trailFor } from "@/lib/breadcrumbs";
 import JsonLd from "@/components/JsonLd";
 import { Card, Container, EmptyState, FilterBar, PageHeader, type FilterControl } from "@/components/ui";
 import { dataAgeLabel } from "@/lib/data-age";
@@ -73,7 +74,7 @@ export default async function RankingPage({ params, searchParams }: Props) {
     <Container width="data">
       <article>
         <PageHeader
-          trail={[{ name: "Home", path: "/" }, { name: "Rankings", path: "/rankings" }, { name: def.title, path }]}
+          trail={[...trailFor("/rankings")!, { name: def.title, path }]}
           title={def.title}
           lede={def.lede}
           meta={!unreachable && <span>{dataAgeLabel(dataAsOf)}</span>}

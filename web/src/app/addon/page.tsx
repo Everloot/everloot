@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { trailFor } from "@/lib/breadcrumbs";
 import { pageMetadata } from "@/lib/seo";
 import { ADDON_LIVE_VERIFIED, latestAddonRelease } from "@/lib/addon-release";
 import { addonReleaseFor, fetchReleases, fileSize, newestDesktopRelease, RELEASES_PAGE, servedFile } from "@/lib/everloot-releases";
@@ -78,7 +79,7 @@ export default async function AddonPage() {
       <PageHeader
         title="Everloot addon and Desktop App"
         lede={`${ADDON_TEXT} ${DESKTOP_TEXT}`}
-        trail={[{ name: "Home", path: "/" }, { name: "Get the addon", path: "/addon" }]}
+        trail={trailFor("/addon")!}
         meta={<><Badge tone="neutral">AGPL-3.0</Badge><span>Free and open source</span></>}
       />
 

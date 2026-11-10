@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { trailFor } from "@/lib/breadcrumbs";
 import { Container, DataTable, FilterBar, LinkTabs, PageHeader, type Column, type FilterControl } from "@/components/ui";
 import {
-  ARMORY_BOARDS, ARMORY_METRICS, ARMORY_PATH, ARMORY_REGIONS, ARMORY_RULESETS, armoryBoardHref, armoryBoardPath, armoryBoardQuery,
+  ARMORY_BOARDS, ARMORY_METRICS, ARMORY_REGIONS, ARMORY_RULESETS, armoryBoardHref, armoryBoardPath, armoryBoardQuery,
   armoryCharacterPath, armoryOn, classTokenOfName, isArmoryMetric, metricValue, regionLabel, type ArmoryBoardQuery, type ArmoryMetric,
 } from "@/lib/armory";
 import { armoryStore, type ArmoryBoardRow } from "@/lib/armory-store";
@@ -76,7 +77,7 @@ export default async function ArmoryBoardPage(props: { params: Promise<{ metric:
     <Container width="data">
       <article className="space-y-4">
         <PageHeader
-          trail={[{ name: "Home", path: "/" }, { name: "Armory", path: ARMORY_PATH }, { name: def.title, path }]}
+          trail={[...trailFor("/armory")!, { name: def.title, path }]}
           title={`${def.title} rankings`}
           lede={def.lede}
           meta={<ArmoryCredit at={rows ? newest(rows.map((r) => r.fetchedAt)) : null} />}

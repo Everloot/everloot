@@ -31,7 +31,11 @@ test("a build the server has not looked at gets the empty list the store returns
 });
 
 test("a malformed build is refused before storage is read, and unreachable storage is not an empty list", async () => {
-  for (const q of ["", "?build=latest", "?build=../coverage/1", `?build=${"1.".repeat(20)}1`]) expect((await GET(req(q))).status).toBe(400);
+  for (const q of ["", "?build=latest", "?build=../coverage/1", `?build=${"1.".repeat(20)}1`]) {
+    const res = await GET(req(q));
+    expect(res.status).toBe(400);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+  }
   expect(read.list).not.toHaveBeenCalled();
   read.list.mockRejectedValue(new Error("r2 down"));
   const res = await GET(req(`?build=${BUILD}`));

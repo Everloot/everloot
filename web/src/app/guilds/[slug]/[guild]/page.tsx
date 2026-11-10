@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, DataTable, PageHeader, SectionHeading, type Column } from "@/components/ui";
 import { dataAgeLabel } from "@/lib/data-age";
 import { factionLabel, guildPath, guildsOn, hideGuildPath, loadGuildPage, realmPath, type GuildMember } from "@/lib/guilds";
@@ -87,7 +88,7 @@ export default async function GuildPage(props: Params) {
       <article>
         <PageHeader
           trail={[
-            { name: "Home", path: "/" }, { name: "Guilds", path: "/guilds" }, { name: summary.realm, path: realmPath(summary.realm) },
+            ...trailFor("/guilds")!, { name: summary.realm, path: realmPath(summary.realm) },
             { name: summary.guildName, path: guildPath(summary.realm, summary.guildName) },
           ]}
           title={summary.guildName}

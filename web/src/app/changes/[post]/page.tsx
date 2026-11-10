@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
+import { trailFor } from "@/lib/breadcrumbs";
 import JsonLd from "@/components/JsonLd";
 import { Badge, Card, Container, SectionHeading } from "@/components/ui";
 import { longDate } from "@/data/wow-forever";
@@ -138,7 +139,7 @@ export default async function BluePostPage(props: Props) {
   return (
     <Container width="wide" className="grid gap-12 lg:grid-cols-[minmax(0,48rem)_minmax(0,1fr)]">
       <article data-blue-post className="min-w-0">
-        <JsonLd data={breadcrumbJsonLd([{ name: "Home", path: "/" }, { name: "Patch notes and Blizzard posts", path: "/changes" }, { name: entry.title, path }])} />
+        <JsonLd data={breadcrumbJsonLd([...trailFor("/changes")!, { name: entry.title, path }])} />
         {writeup && (
           <JsonLd data={blueWriteupJsonLd({ title: entry.title, description: describe(found), path, reviewedOn: writeup.reviewed.on, original: { url: entry.url, at: entry.at } })} />
         )}

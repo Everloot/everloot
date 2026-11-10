@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { trailFor } from "@/lib/breadcrumbs";
 import { cache } from "react";
 import { Card, Container, DataTable, Facts, PageHeader, SectionHeading, type Column, type Fact } from "@/components/ui";
 import { QUALITY_TEXT, type Quality } from "@/components/ui/quality";
 import {
-  ARMORY_PATH, armoryBoardHref, armoryCharacterPath, armoryGuildPath, armoryHidePath, armoryOn, classTokenOfName, isArmoryRegion,
+  armoryBoardHref, armoryCharacterPath, armoryGuildPath, armoryHidePath, armoryOn, classTokenOfName, isArmoryRegion,
   metricOfKey, metricValue, regionLabel, slotLabel, slugFromSegment, validArmorySlug, ARMORY_BOARDS,
 } from "@/lib/armory";
 import { armoryStore, type ArmoryCharacter, type ArmoryItem, type ArmoryRank } from "@/lib/armory-store";
@@ -64,7 +65,7 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
   if (c === "unreachable") {
     return (
       <Container width="reading">
-        <PageHeader trail={[{ name: "Home", path: "/" }, { name: "Armory", path: ARMORY_PATH }]} title="Character" />
+        <PageHeader trail={trailFor("/armory")!} title="Character" />
         <div className="space-y-3">
           <Unreachable />
           <ArmoryCredit at={null} />
@@ -90,7 +91,7 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
     <Container width="reading">
       <article className="space-y-8">
         <PageHeader
-          trail={[{ name: "Home", path: "/" }, { name: "Armory", path: ARMORY_PATH }, { name: fullName, path }]}
+          trail={[...trailFor("/armory")!, { name: fullName, path }]}
           title={<span className={classText(classTokenOfName(c.class))}>{fullName}</span>}
           lede={`Level ${c.level} ${c.race} ${c.class}`}
           meta={

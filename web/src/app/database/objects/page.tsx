@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { trailFor } from "@/lib/breadcrumbs";
 import { objectList } from "../../../../../kb/src/object-page";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
-import type { Crumb } from "@/lib/jsonld";
 import { loadObjectFacts } from "@/lib/objects";
 import { objectNames } from "@/lib/names";
 import { LINK } from "../entity";
@@ -16,11 +16,12 @@ const META = {
 };
 export const dynamic = "force-dynamic";
 
-const TRAIL: Crumb[] = [{ name: "Home", path: "/" }, { name: "Database", path: "/database" }, { name: "Objects", path: "/database/objects" }];
-const SORTS = ["id", "windows", "items", "installs"] as const;
+// "id" has no column of its own: it is kept so a link to the list sorted by id still opens.
+const SORTS = ["name", "id", "windows", "items", "installs"] as const;
 type Sort = (typeof SORTS)[number];
-// Most-looted first, as the list has always read.
-const DEFAULT_SORT = { key: "windows" as Sort, desc: true };
+// A to Z by the name players agree on; an object with no agreed name yet comes after the named ones.
+const DEFAULT_SORT = { key: "name" as Sort, desc: false };
+const NO_NAME = "No agreed name yet. A name needs 3 installs reporting the same one.";
 
 const href = (q: Partial<ListQuery<Sort>>) => listHref("/database/objects", [["q", q.q], ["sort", sortParam(q.sort)], ["page", q.page && q.page > 1 ? String(q.page) : undefined]]);
 
@@ -41,14 +42,21 @@ export default async function ObjectsPage(props: { searchParams?: Promise<Search
   const id = q.q && /^#?\d+$/.test(q.q) ? Number(q.q.replace("#", "")) : null;
   const matched = q.q ? all.filter((o) => o.objectId === id) : all;
   const sort = q.sort ?? DEFAULT_SORT;
-  const rows = sortRows(matched, (o) => (sort.key === "windows" ? o.windows : sort.key === "items" ? o.items : sort.key === "installs" ? o.reporters : o.objectId), sort.desc, (o) => o.objectId);
+  const key = (o: Row): string | number | null => sort.key === "name" ? names.get(o.objectId)?.toLowerCase() ?? null
+    : sort.key === "windows" ? o.windows : sort.key === "items" ? o.items : sort.key === "installs" ? o.reporters : o.objectId;
+  const rows = sortRows(matched, key, sort.desc, (o) => o.objectId);
   const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
   if (q.page > pages) notFound();
   const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
   const here = (over: Partial<ListQuery<Sort>>) => href({ ...q, page: 1, ...over });
 
   const columns: Column<Row>[] = [
-    { key: "id", header: "Object", sortable: true, cell: (o) => <Link href={`/database/objects/${o.objectId}`} className={LINK}>{names.get(o.objectId) ?? `Object ${o.objectId}`}</Link> },
+    { key: "name", header: "Object", sortable: true, cell: (o) => {
+      const name = names.get(o.objectId);
+      const link = <Link href={`/database/objects/${o.objectId}`} className={LINK}>{name ?? `Object ${o.objectId}`}</Link>;
+      // An object with no agreed name is listed by its id, with a line saying why.
+      return name ? link : <span className="inline-flex flex-wrap items-baseline gap-x-2" title={NO_NAME}>{link}<span className="text-meta text-muted">no agreed name yet</span></span>;
+    } },
     { key: "windows", header: "Loot windows", numeric: true, sortable: true, cell: (o) => o.windows },
     { key: "items", header: "Items seen", numeric: true, sortable: true, cell: (o) => o.items },
     { key: "installs", header: "Installs", numeric: true, sortable: true, cell: (o) => o.reporters },
@@ -65,7 +73,7 @@ export default async function ObjectsPage(props: { searchParams?: Promise<Search
   return (
     <Container width="data">
       <article>
-        <DataTitle title="Objects" trail={TRAIL} aside={strip} />
+        <DataTitle title="Objects" trail={trailFor("/database/objects")!} aside={strip} />
         <FilterBar
           label="Object filters"
           search={{ action: "/database/objects", value: q.q, placeholder: "Object id", label: "Find an object by id", keep }}

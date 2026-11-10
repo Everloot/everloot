@@ -47,7 +47,7 @@ export interface PublicMcpConfig extends ToolOptions {
  * list lacks, and the mount's own settings (its bearer token, origins, limits) never reach the tool layer.
  */
 const TOOL_OPTION_KEYS = {
-  catalog: true, corpus: true, market: true, gameData: true, completion: true, changes: true, ecosystem: true, census: true,
+  catalog: true, corpus: true, market: true, auctionHistory: true, gameData: true, completion: true, changes: true, ecosystem: true, census: true,
   coverage: true, settledSummary: true, guilds: true, recheck: true,
 } as const satisfies Record<keyof ToolOptions, true>;
 

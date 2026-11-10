@@ -1,3 +1,4 @@
+import { trailFor } from "@/lib/breadcrumbs";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Metadata } from "next";
@@ -61,7 +62,7 @@ export default function ChooserPage() {
   return (
     <Container>
       <PageHeader
-        trail={[{ name: "Home", path: "/" }, { name: "Classes", path: "/classes" }, { name: "Class chooser", path: PATH }]}
+        trail={[...trailFor("/classes")!, { name: "Class chooser", path: PATH }]}
         title="Find a class"
         lede="Say what you like about playing, and the chooser names the classes that fit your answers, with the reasons and a link to each class."
       />

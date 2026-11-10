@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { trailFor } from "@/lib/breadcrumbs";
 import JsonLd from "@/components/JsonLd";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { entityPageJsonLd } from "@/lib/jsonld";
@@ -123,9 +124,7 @@ export default async function ItemPage(props: Props) {
   const gameName = gameNameFor({ quests: questNames, sets: setNames, spells: spellNames });
 
   const trail: Crumb[] = [
-    { name: "Home", path: "/" },
-    { name: "Database", path: "/database" },
-    { name: "Items", path: "/database/items" },
+    ...trailFor("/database/items")!,
     ...(category?.class ? [{ name: category.class.label, path: itemsHref(category.class.slug) }] : []),
     ...(category?.class && category.subclass ? [{ name: category.subclass.name ?? `Subclass ${category.subclass.id}`, path: itemsHref(category.class.slug, category.subclass.slug) }] : []),
     { name: title, path: `/database/items/${itemId}` },

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { trailFor } from "@/lib/breadcrumbs";
 import { Container, PageHeader } from "@/components/ui";
 import { ARMORY_HIDE_PATH, ARMORY_PATH, armoryOn } from "@/lib/armory";
 import { armoryStore } from "@/lib/armory-store";
@@ -33,7 +34,7 @@ export default async function ArmoryHidePage(props: { searchParams: Promise<Sear
     <Container width="reading">
       <article className="max-w-xl space-y-6">
         <PageHeader
-          trail={[{ name: "Home", path: "/" }, { name: "Armory", path: ARMORY_PATH }, { name: "Hide a character", path: ARMORY_HIDE_PATH }]}
+          trail={[...trailFor("/armory")!, { name: "Hide a character", path: ARMORY_HIDE_PATH }]}
           title="Hide a character"
           lede="Enter the character's region, name and surname. Its armory page, its rankings and its place on its guild's roster are deleted as soon as you send it, and Everloot does not read it from Blizzard again. You do not need an account, and we do not ask who you are."
           meta={<ArmoryCredit at={counts ? newest(counts.map((c) => c.newest)) : null} />}

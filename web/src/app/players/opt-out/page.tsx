@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { pageMetadata } from "@/lib/seo";
+import JsonLd from "@/components/JsonLd";
+import { absoluteUrl, pageMetadata } from "@/lib/seo";
 import { playerPagesOn } from "@/lib/player-pages";
 import { pullSummariesOn } from "@/lib/pull-summaries";
 
@@ -24,6 +25,7 @@ export default async function OptOutPage(props: { searchParams: Promise<{ name?:
 
   return (
     <article className="space-y-6 max-w-xl">
+      <JsonLd data={{ "@context": "https://schema.org", "@type": "WebPage", name: "Hide a character", url: absoluteUrl("/players/opt-out") }} />
       <header className="space-y-3">
         <p className="font-mono text-xs text-muted">WoW: Forever · players</p>
         <h1 className="text-3xl font-bold text-fg tracking-tight">Hide a character</h1>

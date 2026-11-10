@@ -29,8 +29,9 @@ const cells = (html: string, href: string) => {
 };
 
 test("the list has a Level column and starts with the lowest level; a range the files lack is a dash", async () => {
-  const html = renderToStaticMarkup(await InstancesPage());
-  const headers = [...html.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => text(m[1]!).replace(/\|/g, ""));
+  const html = renderToStaticMarkup(await InstancesPage({}));
+  // A sortable header carries the arrow of the order the list is in.
+  const headers = [...html.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => text(m[1]!).replace(/[|▲▼]/g, ""));
   expect(headers).toEqual(expect.arrayContaining(["Name", "Type", "Level", "Entered from"]));
   const rows = [...html.matchAll(/href="\/database\/instances\/(\d+)-[a-z0-9-]*"/g)].map((m) => Number(m[1]));
   expect(rows[0]).toBe(389); // Ragefire Chasm, level 13 in the files
@@ -70,7 +71,7 @@ test("with storage down, an instance's page lists the bosses the game files give
   // The entrance the files give is labelled as such, beside the line saying none is confirmed.
   expect(text(html.split('id="entrance"')[1] ?? "")).toContain("in the game files, not confirmed by players");
   expect(text(html)).toMatch(/\|Bosses reported\|\[\?\]\|unconfirmed\|in the files, 11\|/);
-  const list = renderToStaticMarkup(await InstancesPage());
+  const list = renderToStaticMarkup(await InstancesPage({}));
   const col = [...list.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => text(m[1]!).replace(/\|/g, "")).indexOf("Bosses");
   expect(cells(list, "/database/instances/409-molten-core")[col]).toMatch(/unconfirmed\|11$/);
   // Both renders are marked for the edge cache, which keeps them a minute rather than an hour.
@@ -129,7 +130,7 @@ test("with the wiki unreadable, an instance's page still renders, with no prep l
 test("the list's Guide column links a published prep page and, for a raid, the raid builder; a draft gets no link", async () => {
   vi.stubEnv("WIKI_DIR", fileURLToPath(new URL("../../../test/wiki", import.meta.url)));
   try {
-    const html = renderToStaticMarkup(await InstancesPage());
+    const html = renderToStaticMarkup(await InstancesPage({}));
     const headers = [...html.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => text(m[1]!).replace(/\|/g, ""));
     const col = headers.indexOf("Guide");
     expect(col).toBeGreaterThan(-1);
@@ -209,7 +210,7 @@ test("the list labels an instance the game files place no entrance for, with the
   // SYNTHETIC: three installs killed a boss in instance 2999, for which the files place no entrance.
   state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters: killed(2999, 3353, 1) } };
   try {
-    const html = renderToStaticMarkup(await InstancesPage());
+    const html = renderToStaticMarkup(await InstancesPage({}));
     const row = html.split("<tr").find((r) => r.includes('href="/database/instances/2999"')) ?? "";
     expect(text(row)).toContain("|Instance 2999|no entrance in the game files|");
     expect(row).toMatch(/title="The game files place no entrance for this instance[^"]*"/);

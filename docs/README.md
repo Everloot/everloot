@@ -12,7 +12,8 @@ architecture map.
 | [`2026-10-08-beta-client-checklist.md`](2026-10-08-beta-client-checklist.md) | What gets checked in the live client before an addon release |
 | [`2026-10-18-addon-0.3.2-beta-checklist.md`](2026-10-18-addon-0.3.2-beta-checklist.md), [`2026-10-19-addon-0.3.3-beta-checklist.md`](2026-10-19-addon-0.3.3-beta-checklist.md) | The in-client checks for the 0.3.2 profession and auction reads and the 0.3.3 completion tracker |
 | [`2026-10-08-release-checklist.md`](2026-10-08-release-checklist.md) | What gets checked before a site release |
-| [`LAUNCH_DAY.md`](LAUNCH_DAY.md) | The launch-day runbook (historical) for 2026-11-04: the `/beta` to Live switch, the build upload, the smoke list, who does each step |
+| [`OPERATIONS.md`](OPERATIONS.md) | How the live site is deployed, warmed, checked and rolled back, what the Worker crons write, and where the other scheduled workflows write |
+| [`LAUNCH_DAY.md`](LAUNCH_DAY.md) | Historical. The launch happened on 2026-11-04: the `/beta` to Live switch, the build upload, the smoke list, who does each step. Day-to-day operation is [`OPERATIONS.md`](OPERATIONS.md) |
 | [`2026-10-28-live-client-capability-checklist.md`](2026-10-28-live-client-capability-checklist.md) | The current in-game probe list. Prepared on 2026-10-28 and not run, so every row stays unverified until someone runs it in the client |
 | [`2026-10-28-platform-gap-register.md`](2026-10-28-platform-gap-register.md) | The long-form backlog: platform gaps in the approved order, and which of them wait on a live check |
 | [`BUILD_WATCH.md`](BUILD_WATCH.md) | How a new game build becomes a reviewed data pull request |
