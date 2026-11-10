@@ -1,11 +1,13 @@
 import { beforeEach, expect, test, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ assets: vi.fn(), names: vi.fn(), stored: vi.fn(), corpus: vi.fn() }));
+const mocks = vi.hoisted(() => ({ assets: vi.fn(), names: vi.fn(), stored: vi.fn(), corpus: vi.fn(), talents: vi.fn() }));
 vi.mock("@/lib/game-assets", async (original) => ({ ...await original<typeof import("@/lib/game-assets")>(), loadSiteAssets: mocks.assets, readSpellNames: mocks.names }));
 vi.mock("@/lib/aggregate-store", () => ({ loadStoredAggregates: mocks.stored }));
 vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: mocks.corpus } }));
 
-import { PRIVATE_UNREACHABLE } from "@/lib/game-assets";
+vi.mock("@/lib/talents/spell-talents", () => ({ loadSpellTalents: mocks.talents }));
+
+import { PRIVATE_MALFORMED, PRIVATE_UNREACHABLE } from "@/lib/game-assets";
 import { edgeTtl } from "@/lib/cf-edge-cache";
 import { GET } from "./route";
 
@@ -16,8 +18,9 @@ beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", "https://assets.everloot.app/b");
   mocks.assets.mockReset().mockResolvedValue({ version: "70450", label: "Found in game files, unconfirmed", spellTips: new Map([[10, { name: "Blizzard", text: "Deals [?] damage.", partial: true }]]), spellIcons: new Map([[10, "https://assets.everloot.app/b/icons/10.webp"]]) });
   mocks.names.mockReset().mockResolvedValue({ version: "70450", names: new Map([[10, "Blizzard"]]) });
-  mocks.stored.mockReset().mockResolvedValue({ world: {
-    npcs: three((installId) => ({ installId, npcId: 10, name: "Vendor", positionKind: "npc", mapId: 1, x: 40, y: 50 })),
+  mocks.talents.mockReset().mockResolvedValue(new Map());
+  mocks.stored.mockReset().mockResolvedValue({ edges: [], world: {
+    npcs: three((installId) => ({ installId, npcId: 10, name: "Vendor", positionKind: "npc", mapId: 1429, x: 40, y: 50 })),
     quests: [], vendors: three((installId) => ({ installId, vendorNpcId: 10, itemId: 5, priceCopper: 100 })),
   } });
   mocks.corpus.mockReset().mockRejectedValue(new Error("cards must never read the corpus"));
@@ -49,7 +52,7 @@ test.each(["manifest", "names", "malformed names", "thrown manifest", "thrown na
   let type = "spell";
   if (path === "manifest") mocks.assets.mockResolvedValue(null);
   if (path === "names") mocks.names.mockResolvedValue(PRIVATE_UNREACHABLE);
-  if (path === "malformed names") mocks.names.mockResolvedValue(null);
+  if (path === "malformed names") mocks.names.mockResolvedValue(PRIVATE_MALFORMED);
   if (path === "thrown manifest") mocks.assets.mockRejectedValue(new Error("down"));
   if (path === "thrown names") mocks.names.mockRejectedValue(new Error("down"));
   if (path === "stored view") { type = "vendor"; mocks.stored.mockResolvedValue(null); }
@@ -62,14 +65,61 @@ test.each(["manifest", "names", "malformed names", "thrown manifest", "thrown na
   expect(mocks.corpus).not.toHaveBeenCalled();
 });
 
-test("an unnamed vendor has no card even with agreed goods", async () => {
+test("an unnamed vendor has a card with agreed goods", async () => {
   const set = await mocks.stored();
   set.world.npcs = [];
-  expect((await call("vendor")).status).toBe(404);
+  const res = await call("vendor");
+  expect(res.status).toBe(200);
+  expect((await res.json()).card.title).toBe("Vendor NPC 10");
 });
 
 test("goods without three agreeing installs never increase the vendor count", async () => {
   const set = await mocks.stored();
   set.world.vendors.push({ installId: "a", vendorNpcId: 10, itemId: 6, priceCopper: 200 });
   expect((await (await call("vendor")).json()).card.lines.at(-1)).toBe("1 price, agreed by 3 or more installs.");
+});
+
+test("a named NPC without vendor rows has no vendor card", async () => {
+  (await mocks.stored()).world.vendors = [];
+  expect((await call("vendor")).status).toBe(404);
+});
+
+test("an absent spell names file falls back to the tooltip name", async () => {
+  mocks.names.mockResolvedValue(null);
+  const res = await call("spell");
+  expect(res.status).toBe(200);
+  expect((await res.json()).card.title).toBe("Blizzard");
+});
+
+test.each(["from", "to", "talent"])("a spell with only a %s relation or talent has a card", async (source) => {
+  const assets = await mocks.assets();
+  assets.spellTips.clear();
+  (await mocks.names()).names.clear();
+  if (source === "talent") (await mocks.talents()).set(10, [{}]);
+  else (await mocks.stored()).edges.push(source === "from"
+    ? { fromKind: "spell", fromId: 10, toKind: "skill", toId: 1 }
+    : { fromKind: "item", fromId: 1, toKind: "spell", toId: 10 });
+  const res = await call("spell");
+  expect(res.status).toBe(200);
+  expect((await res.json()).card.title).toBe("Spell 10");
+  expect(mocks.corpus).not.toHaveBeenCalled();
+});
+
+test("only positions with a map link count on the vendor card", async () => {
+  (await mocks.stored()).world.npcs.push(...three((installId) => ({ installId, npcId: 10, name: "Vendor", positionKind: "npc", mapId: 999999, x: 40, y: 50 })));
+  expect((await (await call("vendor")).json()).card.lines[0]).toBe("Seen on 1 map, agreed by 3 or more installs.");
+});
+
+test("unread spell relations cannot produce a cached card", async () => {
+  mocks.stored.mockResolvedValue(null);
+  const res = await call("spell");
+  expect(res.status).toBe(503);
+  expect(edgeTtl(res)).toBeNull();
+});
+
+test("without a spell names catalog an otherwise unknown spell is not ruled out", async () => {
+  mocks.names.mockResolvedValue(null);
+  const res = await call("spell", "999");
+  expect(res.status).toBe(200);
+  expect((await res.json()).card.title).toBe("Spell 999");
 });

@@ -2,10 +2,9 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { CURRENT_BUILD, TABLES } from "@/data/game-data/raid";
 import {
   assetUrl, BANNER_MAP, buildFolder, classAndProfessionIcons, continentArt, creditWhat, emblems, FETCH_TIMEOUT_MS, forgetPrivateReads, iconUrl,
-  instanceThumbs, itemIconUrl, itemShard, itemTip, gameNameFor, launchArt, loadingArt, loadItemNames, loadItemSetNames, loadItemTips, loadQuestNames, loadSpellNames, loadSiteAssets, parseSiteManifest, poiIcons, PRIVATE_UNREACHABLE, privateStoreFromEnv, raidArt, readItemTips, readQuestNames, type ItemNames,
+  instanceThumbs, itemIconUrl, itemShard, itemTip, gameNameFor, launchArt, loadingArt, loadItemNames, loadItemSetNames, loadItemTips, loadQuestNames, loadSpellNames, loadSiteAssets, parseSiteManifest, poiIcons, PRIVATE_MALFORMED, PRIVATE_UNREACHABLE, privateStoreFromEnv, raidArt, readItemTips, readQuestNames, readSpellNames, type ItemNames,
 } from "./game-assets";
 import { itemTipText, qualityColor, tipLines, WHY } from "./item-names";
-import { readSpellNames } from "./game-assets";
 import { cameraBox, zoneArtShown, ZONE_ART_ZOOM, type Box, type Camera } from "./map-view";
 import { itemIndex, memoryStore, shard0, siteManifest } from "./game-assets.fixture";
 
@@ -393,11 +392,15 @@ const spellFile = { schema: "everloot.spell-names/1", build: { version: "1.60.1.
 
 test("the card's spell name reader distinguishes failed reads and rejects malformed or wrong-build catalogs", async () => {
   expect(await readSpellNames("1.60.1.70450", BASE, { read: async () => PRIVATE_UNREACHABLE })).toBe(PRIVATE_UNREACHABLE);
-  for (const file of [null, {}, { ...spellFile, build: { version: "other" } }]) {
+  for (const file of [null, { ...spellFile, build: { version: "other" } }]) {
     expect(await readSpellNames("1.60.1.70450", BASE, { read: async () => file })).toBeNull();
   }
+  for (const file of [{}, "broken", { ...spellFile, names: { 10: null } }]) {
+    expect(await readSpellNames("1.60.1.70450", BASE, { read: async () => file })).toBe(PRIVATE_MALFORMED);
+  }
+  expect(await readSpellNames("1.60.1.70450", BASE, null)).toBeNull();
   const read = await readSpellNames("1.60.1.70450", BASE, memoryStore({ [`${FOLDER}/spell-names.json`]: spellFile }));
-  expect(read !== PRIVATE_UNREACHABLE && read?.names.get(3275)).toBe("Linen Bandage");
+  expect(read !== PRIVATE_UNREACHABLE && read !== PRIVATE_MALFORMED && read?.names.get(3275)).toBe("Linen Bandage");
 });
 
 test("quest titles, set names and spell names each come from their own private file, every id the file names", async () => {

@@ -2,11 +2,14 @@ import type { TooltipType } from "@everloot/protocol";
 import { npcPage, vendorPage } from "../../../kb/src/world-pages";
 import { loadStoredAggregates } from "./aggregate-store";
 import { categoryOf } from "../../../kb/src/item-taxonomy";
-import { loadSiteAssets, PRIVATE_UNREACHABLE, readItemTips, readQuestNames, readSpellNames, tipLabel } from "./game-assets";
+import { loadSiteAssets, PRIVATE_MALFORMED, PRIVATE_UNREACHABLE, readItemTips, readQuestNames, readSpellNames, tipLabel } from "./game-assets";
 import { withReported } from "./item-names";
 import { loadCardFacts, loadListNames } from "./item-view";
 import { splitWhy } from "./placeholder";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, NAME_FROM, shownItemName } from "./items";
+import { CLIENT_EDGES } from "../../../kb/src/client-layer-file";
+import { loadSpellTalents } from "./talents/spell-talents";
+import { pinLink } from "./world-map";
 import { assetsBaseUrl } from "./talents/assets";
 import { loadTooltip, NO_QUEST_TITLE } from "./tooltip";
 
@@ -71,18 +74,23 @@ export async function loadSiteCard(type: SiteCardType, id: number): Promise<Site
 }
 
 async function spellCard(id: number): Promise<SiteCardResult> {
-  const [assets, names] = await Promise.all([loadSiteAssets(), readSpellNames(CLIENT_LAYER.build.version)]);
+  const [assets, names, set, talents] = await Promise.all([
+    loadSiteAssets(), readSpellNames(CLIENT_LAYER.build.version), loadStoredAggregates({ strict: true }), loadSpellTalents(),
+  ]);
   // A configured catalog that cannot be read must not turn into a cached, incomplete card.
-  if (names === PRIVATE_UNREACHABLE || (assetsBaseUrl() && (!assets || !names))) return UNAVAILABLE;
+  if (names === PRIVATE_UNREACHABLE || names === PRIVATE_MALFORMED || !assets || !set) return UNAVAILABLE;
   const tip = assets?.spellTips.get(id);
-  const title = names?.names.get(id) ?? tip?.name;
-  if (!title) return { status: 404, error: NOT_FOUND };
+  const name = names?.names.get(id);
+  const related = [...set.edges, ...CLIENT_EDGES].some((edge) =>
+    (edge.fromKind === "spell" && edge.fromId === id) || (edge.toKind === "spell" && edge.toId === id));
+  if (names !== null && name === undefined && !tip && !related && !talents.get(id)?.length) return { status: 404, error: NOT_FOUND };
+  const title = name ?? tip?.name ?? `Spell ${id}`;
   return {
     status: 200,
     body: {
       type: "spell", id, title, quality: null, color: null, icon: assets?.spellIcons.get(id) ?? null,
       lines: [tip?.text || "No text for this spell in the client files."],
-      foot: assets ? tipLabel(assets) : `Found in game files, unconfirmed · build ${CLIENT_LAYER.build.version}`,
+      foot: tipLabel(assets!),
     },
   };
 }
@@ -92,10 +100,11 @@ async function vendorCard(id: number): Promise<SiteCardResult> {
   const set = await loadStoredAggregates({ strict: true });
   if (!set) return UNAVAILABLE;
   const npc = npcPage(id, set.world);
-  if (!npc.name) return { status: 404, error: NOT_FOUND };
+  if (!set.world.vendors.some((row) => row.vendorNpcId === id)) return { status: 404, error: NOT_FOUND };
+  const places = npc.pins.filter((pin) => pinLink(pin.mapId, pin.x, pin.y)).length;
   const goods = vendorPage(id, set.world).offers.length;
-  return plain("vendor", id, npc.name, [
-    npc.pins.length ? `Seen on ${npc.pins.length} ${npc.pins.length === 1 ? "map" : "maps"}, agreed by 3 or more installs.` : "No agreed position. A pin needs 3 installs on the same map.",
+  return plain("vendor", id, npc.name ?? `Vendor NPC ${id}`, [
+    places ? `Seen on ${places} ${places === 1 ? "map" : "maps"}, agreed by 3 or more installs.` : "No agreed position. A pin needs 3 installs on the same map.",
     goods ? `${goods} ${goods === 1 ? "price" : "prices"}, agreed by 3 or more installs.` : "No agreed goods yet. An item shows once 3 installs see it for sale.",
   ]);
 }
