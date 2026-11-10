@@ -105,7 +105,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
       if (searchOpen) { setSearchOpen(false); searchButton.current?.focus(); }
     }}>
       {/* The data column's width and gutters (globals.css), so the logo lines up with the data tables. */}
-      <div className="mx-auto flex h-header max-w-data items-center gap-3 px-4 lg:gap-4 lg:px-6">
+      <div className="mx-auto flex h-header max-w-data items-center gap-1 px-2 sm:gap-3 sm:px-4 lg:gap-4 lg:px-6">
         <Link href="/" className="inline-flex min-h-11 shrink-0 items-center gap-2 text-lg font-bold tracking-tight text-fg" onClick={closeAll}>
           {/* The favicon's diamond, outlined in the accent green. */}
           <svg aria-hidden="true" viewBox="8 8 48 48" width="16" height="16" className="text-accent">
@@ -167,7 +167,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
           </form>
         </div>
 
-        <div className="ml-auto flex shrink-0 items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-0 sm:gap-2">
           <button
             ref={searchButton}
             type="button"
