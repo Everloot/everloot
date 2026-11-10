@@ -128,6 +128,8 @@ test("the schemas page marks the file-only shapes, says reporters is installs, a
   expect(text).toContain("reporters, it is the count of installs that agree on that fact, the same number the open-data files call installs");
   for (const path of PAGE_INTERNAL_ROUTES) expect(page).toContain(`>${path}</code>`);
   expect(text).toContain("they are not part of the contract, the document leaves them out");
+  expect(page).toContain('id="site-internal-routes"');
+  expect(page).toContain("may change without notice and are not part of the protocol");
   for (const path of corsPrerenderedPaths) expect(page).toContain(`>${path}</code>`);
 });
 

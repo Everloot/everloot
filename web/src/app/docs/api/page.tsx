@@ -189,6 +189,16 @@ export default function ApiOverview() {
         <CodeGroup title="List the endpoints" tabs={[{ label: "cURL", lang: "bash", code: `curl -s ${SITE}/api/openapi.json | jq '.paths | keys'` }]} />
       </div>
 
+      <H2 id="site-internal-routes">Site-internal routes</H2>
+      <P>
+        These routes serve the site&apos;s own pages. They may change without notice and are not part of the protocol: the
+        package, the OpenAPI document and the schema files do not describe them, so do not build on them.
+      </P>
+      <List>
+        <li><C>/api/suggest</C>: the search box&apos;s as-you-type suggestions.</li>
+        <li><C>/api/map/pins</C>: the pins the map draws on a continent.</li>
+      </List>
+
       <H2 id="json-schemas">JSON Schemas</H2>
       <P>
         Every response shape, every record kind and every MCP tool input is also a JSON Schema file. The list is at{" "}
