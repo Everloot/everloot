@@ -4,11 +4,11 @@
  "credit": "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.",
  "build": {
   "product": "wowf",
-  "buildId": 70862,
-  "version": "1.60.1.70862",
-  "buildConfig": "5ada954223f7c409ea172361f5c9e565",
-  "definitions": "fb58b5b8ea8c",
-  "extractedAt": "2026-11-09T19:39:19.744Z"
+  "buildId": 70888,
+  "version": "1.60.1.70888",
+  "buildConfig": "0597e74b01a3f779d849ffe9b3270196",
+  "definitions": "86c0801007bb",
+  "extractedAt": "2026-11-10T17:17:03.601Z"
  },
  "counts": {
   "created_by": 3335,
@@ -47945,7 +47945,7 @@
  "classes": [
   {"id":0,"name":"Consumable","label":"Consumables","slug":"consumables","items":2480},
   {"id":1,"name":"Container","label":"Containers","slug":"containers","items":156},
-  {"id":2,"name":"Weapon","label":"Weapons","slug":"weapons","items":3869},
+  {"id":2,"name":"Weapon","label":"Weapons","slug":"weapons","items":3870},
   {"id":3,"name":"Jewelry(OBSOLETE)","label":"Jewelry","slug":"jewelry","items":0},
   {"id":4,"name":"Armor","label":"Armor","slug":"armor","items":15193},
   {"id":5,"name":"Reagent","label":"Reagents","slug":"reagents","items":50},
@@ -47955,10 +47955,10 @@
   {"id":9,"name":"Recipe","label":"Recipes","slug":"recipes","items":2975},
   {"id":10,"name":"Money(OBSOLETE)","label":"Money","slug":"money","items":0},
   {"id":11,"name":"Quiver","label":"Quivers","slug":"quivers","items":41},
-  {"id":12,"name":"Quest","label":"Quest","slug":"quest","items":4069},
+  {"id":12,"name":"Quest","label":"Quest","slug":"quest","items":4068},
   {"id":13,"name":"Key","label":"Keys","slug":"keys","items":150},
   {"id":14,"name":"Permanent(OBSOLETE)","label":"Permanent","slug":"permanent","items":0},
-  {"id":15,"name":"Miscellaneous","label":"Miscellaneous","slug":"miscellaneous","items":2285},
+  {"id":15,"name":"Miscellaneous","label":"Miscellaneous","slug":"miscellaneous","items":2286},
   {"id":18,"name":"WoW Token","label":"WoW Tokens","slug":"wow-tokens","items":2}
  ],
  "subclasses": [
@@ -47988,7 +47988,7 @@
   {"classId":2,"id":0,"name":"One-Handed Axes","slug":"one-handed-axes","items":251},
   {"classId":2,"id":1,"name":"Two-Handed Axes","slug":"two-handed-axes","items":255},
   {"classId":2,"id":2,"name":"Bows","slug":"bows","items":190},
-  {"classId":2,"id":3,"name":"Guns","slug":"guns","items":157},
+  {"classId":2,"id":3,"name":"Guns","slug":"guns","items":158},
   {"classId":2,"id":4,"name":"One-Handed Maces","slug":"one-handed-maces","items":422},
   {"classId":2,"id":5,"name":"Two-Handed Maces","slug":"two-handed-maces","items":281},
   {"classId":2,"id":6,"name":"Polearms","slug":"polearms","items":145},
@@ -48051,7 +48051,7 @@
   {"classId":11,"id":1,"name":"Quiver(OBSOLETE)","slug":"quiver-obsolete-1","items":0},
   {"classId":11,"id":2,"name":"Quiver","slug":"quiver","items":28},
   {"classId":11,"id":3,"name":"Ammo Pouch","slug":"ammo-pouch","items":13},
-  {"classId":12,"id":0,"name":"Quest","slug":"quest","items":4069},
+  {"classId":12,"id":0,"name":"Quest","slug":"quest","items":4068},
   {"classId":13,"id":0,"name":"Key","slug":"key","items":144},
   {"classId":13,"id":1,"name":"Lockpick","slug":"lockpick","items":6},
   {"classId":14,"id":0,"name":"Permanent","slug":"permanent","items":0},
@@ -48059,7 +48059,7 @@
   {"classId":15,"id":1,"name":"Reagent","slug":"reagent","items":54},
   {"classId":15,"id":2,"name":"Pet","slug":"pet","items":88},
   {"classId":15,"id":3,"name":"Holiday","slug":"holiday","items":127},
-  {"classId":15,"id":4,"name":"Other","slug":"other","items":122},
+  {"classId":15,"id":4,"name":"Other","slug":"other","items":123},
   {"classId":15,"id":5,"name":"Mount","slug":"mount","items":123},
   {"classId":18,"id":0,"name":null,"slug":"0","items":2}
  ],
@@ -75671,7 +75671,7 @@
   [271625,15,4,0,2],
   [271626,15,4,0,2],
   [271627,15,4,0,2],
-  [271629,12,0,0,1],
+  [271629,15,4,0,1],
   [271630,12,0,0,1],
   [271639,12,0,0,1],
   [271646,15,0,0,0],
@@ -80059,6 +80059,7 @@
   [289439,15,0,0,3],
   [289555,12,0,0,null],
   [289559,0,6,0,1],
-  [289560,9,8,0,2]
+  [289560,9,8,0,2],
+  [290333,2,3,26,2]
  ]
 }
