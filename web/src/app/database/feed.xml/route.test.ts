@@ -14,7 +14,7 @@ test("valid RSS carries public entity, agreement count, date and escaped name wi
   expect(doc.querySelector("pubDate")?.textContent).toBe("Mon, 09 Nov 2026 00:00:00 GMT");
   expect(text).toContain("3 installs agree");
   expect(text).not.toMatch(/private-install|Private Player|reporter|installId/);
-  expect(res.headers.get("CDN-Cache-Control")).toContain("max-age=3600");
+  expect(res.headers.get("CDN-Cache-Control")).toContain("max-age=600");
 });
 test("empty is valid RSS; unreadable is 503 and never cached as success", async () => {
   read.mockResolvedValue({ generatedAt: "2026-11-10T12:00:00Z", entries: [] });

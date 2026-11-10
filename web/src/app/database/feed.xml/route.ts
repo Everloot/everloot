@@ -21,6 +21,6 @@ export async function GET(): Promise<Response> {
   return new Response(renderRssChannel(items, { baseUrl: SITE_URL, now: new Date(file.generatedAt), path: "/database", title: "Everloot: new public database facts", description: "Entities whose facts reached three installs in the last 30 days." }), { headers: {
     "Content-Type": "application/rss+xml; charset=utf-8",
     "Cache-Control": "public, max-age=0, must-revalidate",
-    "CDN-Cache-Control": "max-age=3600, stale-while-revalidate=86400",
+    "CDN-Cache-Control": "max-age=600, stale-while-revalidate=86400",
   } });
 }

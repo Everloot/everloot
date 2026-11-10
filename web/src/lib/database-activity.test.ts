@@ -49,3 +49,26 @@ test("public pins, givers, loot, entrances and bosses use the existing publicati
   expect(JSON.stringify(file)).not.toContain("Private Player");
   expect(() => buildDatabaseActivity({ ...corpus, unreachable: true })).toThrow("unreachable");
 });
+
+test("an entity is never re-announced after losing and regaining public status", () => {
+  const now = new Date("2026-11-10");
+  const records = [1, 2, 3].map((n) => ({ kind: "item_seen", itemId: 42, name: "Thread", installId: String(n), capturedAt: now.toISOString() }));
+  const corpus = { records, uploads: 3 } as Corpus;
+  const first = buildDatabaseActivity(corpus, now);
+  const gone = buildDatabaseActivity({ records: [], uploads: 0 } as Corpus, now, first);
+  expect(gone.publicKeys).toEqual([]);
+  expect(gone.everPublic).toEqual(["item:42"]);
+  expect(buildDatabaseActivity(corpus, now, gone).entries).toEqual([]);
+});
+
+test("a publication code version change baselines new gates without new entries", () => {
+  const now = new Date("2026-11-10");
+  const previous = buildDatabaseActivity({ records: [], uploads: 0 } as Corpus, now);
+  const records = [1, 2, 3].map((n) => ({ kind: "item_seen", itemId: 42, name: "Thread", installId: String(n), capturedAt: now.toISOString() }));
+  const corpus = { records, uploads: 3 } as Corpus;
+  expect(buildDatabaseActivity(corpus, now, previous).entries).toHaveLength(1);
+  const baseline = buildDatabaseActivity(corpus, now, { ...previous, codeVersion: 0 });
+  expect(baseline.publicKeys).toEqual(["item:42"]);
+  expect(baseline.entries).toEqual([]);
+  expect(buildDatabaseActivity(corpus, now, baseline).entries).toEqual([]);
+});

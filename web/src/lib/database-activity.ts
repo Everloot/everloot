@@ -18,7 +18,11 @@ export interface PublicFact {
   /** Historical corpus rows have capture times, not the time the server first published them. */
   estimated?: boolean;
 }
+// Bump whenever publication gates widen or a new entity kind is added.
+export const DATABASE_ACTIVITY_CODE_VERSION = 1;
 export interface DatabaseActivity {
+  codeVersion?: number;
+  everPublic?: string[];
   version: 1;
   generatedAt: string;
   dataAsOf: string | null;
@@ -30,22 +34,36 @@ export const recentFacts = (entries: PublicFact[], now = new Date()) => entries.
 type Candidate = Omit<PublicFact, "publicAt" | "estimated">;
 const key = (e: Candidate) => `${e.kind}:${e.id}`;
 
+function byId<T>(rows: T[], id: (row: T) => number): Map<number, T[]> {
+  const groups = new Map<number, T[]>();
+  for (const row of rows) {
+    const key = id(row), group = groups.get(key) ?? [];
+    group.push(row);
+    groups.set(key, group);
+  }
+  return groups;
+}
 /** Uses the same public gates as the entity pages. Named/player records never enter the groups below. */
 function candidates(records: Corpus["records"], now: Date): Candidate[] {
   const out: Candidate[] = [];
   const items = itemFactsFromRecords(records, RECHECK_SCOPES);
   const itemNames = agreedItemNames(items);
-  for (const [id, name] of itemNames) out.push({ kind: "item", id, name, path: `/database/items/${id}`, installs: new Set(items.names.filter((r) => r.itemId === id && r.name === name).map((r) => r.installId)).size });
+  const itemInstalls = new Map<number, Set<string>>();
+  for (const r of items.names) if (r.name === itemNames.get(r.itemId)) {
+    const installs = itemInstalls.get(r.itemId) ?? new Set<string>();
+    installs.add(r.installId);
+    itemInstalls.set(r.itemId, installs);
+  }
+  for (const [id, name] of itemNames) out.push({ kind: "item", id, name, path: `/database/items/${id}`, installs: itemInstalls.get(id)!.size });
   const world = { ...worldFactsFromRecords(records), recheck: RECHECK_SCOPES };
   const names = agreedNpcNames(world);
-  for (const id of new Set(world.npcs.map((r) => r.npcId))) {
-    const pins = npcPage(id, world).pins;
+  for (const [id, rows] of byId(world.npcs, (r) => r.npcId)) {
+    const pins = npcPage(id, { ...world, npcs: rows }).pins;
     if (pins.length) out.push({ kind: "npc", id, name: names.get(id) ?? `NPC #${id}`, path: `/database/npcs/${id}`, installs: Math.max(...pins.map((p) => p.reporters)) });
   }
   const questNames = agreedQuestTitles(world), zones = zonesFor(world.npcs);
-  for (const id of new Set(world.quests.map((r) => r.questId))) {
-    const giver = questPage(id, world).giverNpcId;
-    const rows = world.quests.filter((r) => r.questId === id);
+  for (const [id, rows] of byId(world.quests, (r) => r.questId)) {
+    const giver = questPage(id, { ...world, quests: rows }, zones).giverNpcId;
     const since = scopeSince(RECHECK_SCOPES, questScope(id, rows, zones));
     if (giver !== null) out.push({ kind: "quest", id, name: questNames.get(id) ?? `Quest #${id}`, path: `/database/quests/${id}`, installs: new Set(recheckRows(rows, since).rows.filter((r) => r.giverNpcId === giver).map((r) => r.installId)).size });
   }
@@ -87,8 +105,12 @@ export function buildDatabaseActivity(corpus: Corpus, now = new Date(), previous
   // runs never replay history. Facts that aged out or fell beyond the 500-row limit are not announced again.
   if (current.size > 100_000) throw new Error("database activity inventory exceeds 100000 entities");
   const publicKeys = [...current.keys()].sort();
+  const everPublic = [...new Set([...(previous?.everPublic ?? previous?.publicKeys ?? []), ...publicKeys])].sort();
+  if (everPublic.length > 100_000) throw new Error("database activity inventory exceeds 100000 entities");
+  const inventory = { codeVersion: DATABASE_ACTIVITY_CODE_VERSION, everPublic, publicKeys };
   if (previous) {
-    const known = new Set(previous.publicKeys);
+    // A gate change establishes a new baseline rather than announcing existing facts as new.
+    const known = new Set(previous.codeVersion === DATABASE_ACTIVITY_CODE_VERSION ? previous.everPublic ?? previous.publicKeys : everPublic);
     const old = new Map(previous.entries.map((e) => [key(e), e]));
     const entries = [...current].flatMap(([id, e]): PublicFact[] => {
       const saved = old.get(id);
@@ -96,7 +118,7 @@ export function buildDatabaseActivity(corpus: Corpus, now = new Date(), previous
       return known.has(id) ? [] : [{ ...e, publicAt: now.toISOString() }];
     });
     entries.sort((a, b) => b.publicAt.localeCompare(a.publicAt) || key(a).localeCompare(key(b)));
-    return { version: 1, generatedAt: now.toISOString(), dataAsOf: corpus.dataAsOf ?? null, publicKeys, entries: recentFacts(entries, now) };
+    return { version: 1, generatedAt: now.toISOString(), dataAsOf: corpus.dataAsOf ?? null, ...inventory, entries: recentFacts(entries, now) };
   }
   const groups = new Map<string, Corpus["records"]>();
   const add = (id: string, r: Corpus["records"][number]) => { const rows = groups.get(id) ?? []; rows.push(r); groups.set(id, rows); };
@@ -107,6 +129,8 @@ export function buildDatabaseActivity(corpus: Corpus, now = new Date(), previous
     if (r.kind === "loot") add(`loot:${r.sourceNpcId ? `npc:${r.sourceNpcId}` : `object:${r.sourceObjectId}`}`, r);
     if (r.kind === "instance_entrance" || r.kind === "encounter") add(`instance:${r.instanceMapId}`, r);
   }
+  // These subsets lack other groups' zone context (for example a quest giver's sightings).
+  // Their capture-day crossings are estimates only; the full corpus above decides publication.
   const dates = new Map<string, string>();
   const cutoff = +now - 30 * 86400_000;
   for (const rows of groups.values()) {
@@ -128,5 +152,5 @@ export function buildDatabaseActivity(corpus: Corpus, now = new Date(), previous
     entries.push({ ...e, publicAt: inferred, estimated: true });
   }
   entries.sort((a, b) => b.publicAt.localeCompare(a.publicAt) || key(a).localeCompare(key(b)));
-  return { version: 1, generatedAt: now.toISOString(), dataAsOf: corpus.dataAsOf ?? null, publicKeys, entries: recentFacts(entries, now) };
+  return { version: 1, generatedAt: now.toISOString(), dataAsOf: corpus.dataAsOf ?? null, ...inventory, entries: recentFacts(entries, now) };
 }

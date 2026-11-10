@@ -170,6 +170,7 @@ function connect(): string[] {
     bullet("MCP docs", "/docs/mcp", "Setup for Claude Code and other MCP clients, and a page for every tool, with examples."),
     bullet("API reference", "/docs/api", "Every endpoint with its parameters, answers and examples."),
     bullet("Changes feed (RSS)", "/changes/feed.xml", "The newest 50 WoW: Forever builds and Blizzard posts."),
+    bullet("Database facts feed (RSS)", "/database/feed.xml", "Entities whose facts recently reached three installs."),
     bullet("News feed (RSS)", "/news/feed.xml", "Everloot's own news posts, newest first."),
     "",
   ];
@@ -241,6 +242,9 @@ export async function llmsFullTxt(entries?: ChangeEntry[]): Promise<string> {
     "",
     "## OpenAPI and schemas",
     `${url("/api/openapi.json")} describes every endpoint above (OpenAPI 3.1). ${url("/schema/index.json")} lists the protocol's JSON Schema files: records/<kind>.json for each upload record kind, api/<name>.json for each response shape, mcp/<tool>.json for each MCP tool's input. The same definitions are the npm package @everloot/protocol in the repository.`,
+    "",
+    "## Database facts feed",
+    `${url("/database/feed.xml")} is RSS 2.0 for entities whose facts recently reached three installs. Historical dates are marked estimated.`,
     "",
     "## Changes feed",
     `${url("/changes/feed.xml")} is RSS 2.0 with the newest 50 WoW: Forever entries.`,

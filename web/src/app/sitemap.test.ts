@@ -60,6 +60,10 @@ test("public catalogue tools that are not coming-soon are in the sitemap, with r
   expect(tools.some((t) => t.private)).toBe(true);
 });
 
+test("recent public facts are discoverable in the sitemap", () => {
+  expect(byPath.has("/database/recent")).toBe(true);
+});
+
 test("/changes is dated by its newest entry", async () => {
   const newest = (await loadTimeline())[0];
   expect(newest).toBeDefined();

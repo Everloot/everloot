@@ -211,7 +211,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: spell and vendor links show hover cards, with the spell text and build or the vendor's agreed goods count.
 - Addon: shopping lists. The Everloot tab at the auction house has a Shopping list page: named lists of items with a wanted count and an optional max price per unit, each beside the price file's market value and its age, and a Search button that sends one auction-house search per press when the client's throttle allows (the lowest buyout found shows in the row; you buy from the Buy tab yourself). The Professions tab's what-to-buy list adds a recipe's reagents. Saved in your file only, up to 10 lists of 50 items; bags and bank are not read.
 - Site: the home page now states the site's promise, "Every fact shows how many players saw it, and when", with three counts under it: the installs that have reported, the facts they have confirmed and the facts waiting on one or two more installs, each with the data date and build, or "unrecorded" when the stored coverage score cannot be read. An empty loot tab on an NPC, item or object page now ends on how many installs it takes, beside the Get the addon link, and the MCP server's instructions state the same promise.
-- Site: Follow recently public database facts on the new page and RSS feed.
+- Site: /database/recent and its RSS feed list the entities whose facts reached three installs in the last 30 days;
+  dates from before the feed existed are marked estimated.
 
 ### Fixed
 - Site: the header shows the build whose files the site reads and the newest build seen, each linked to what it means.

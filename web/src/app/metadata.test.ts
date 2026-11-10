@@ -82,7 +82,12 @@ function checkComplete(path: string, m: Metadata, mustLead: boolean) {
   expect(text(m.description).length, `${path} description: ${m.description}`).toBeGreaterThanOrEqual(DESCRIPTION_MIN);
   expect(text(m.description).length, `${path} description: ${m.description}`).toBeLessThanOrEqual(DESCRIPTION_MAX);
   expect(m.alternates?.canonical, path).toBe(path);
-  expect(m.alternates?.types, path).toEqual({ "application/rss+xml": "/changes/feed.xml" });
+  expect(m.alternates?.types, path).toEqual({
+    "application/rss+xml": path === "/database" || path.startsWith("/database/") ? [
+      { title: "New public database facts", url: "/database/feed.xml" },
+      { title: "Game changes", url: "/changes/feed.xml" },
+    ] : "/changes/feed.xml",
+  });
   const og = m.openGraph as { title?: string; description?: string; url?: string; images?: { url: string }[] } | undefined;
   const tw = m.twitter as { card?: string; title?: string; description?: string; images?: { url: string }[] } | undefined;
   expect(og?.title, path).toBe(`${title} · Everloot`);

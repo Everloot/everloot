@@ -56,7 +56,7 @@ test("both files list every live and collecting tool, the changes pages, connect
     for (const tool of tools.filter((t) => !t.private && (t.status === "live" || t.status === "collecting"))) {
       expect(text).toContain(`https://everloot.app${toolHref(tool)})`);
     }
-    for (const needle of ["https://everloot.app/changes)", "https://everloot.app/changes/feed.xml", "https://everloot.app/docs)", "https://everloot.app/api/corpus/public", "https://everloot.app/mcp/public", "https://everloot.app/wow-forever", "https://everloot.app/map)", "https://everloot.app/addon)"]) {
+    for (const needle of ["https://everloot.app/database/feed.xml", "https://everloot.app/changes)", "https://everloot.app/changes/feed.xml", "https://everloot.app/docs)", "https://everloot.app/api/corpus/public", "https://everloot.app/mcp/public", "https://everloot.app/wow-forever", "https://everloot.app/map)", "https://everloot.app/addon)"]) {
       expect(text).toContain(needle);
     }
     expect(text).toContain("Data limitations");
