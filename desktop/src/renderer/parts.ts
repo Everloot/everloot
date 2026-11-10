@@ -26,11 +26,11 @@ export function statePill(j: JobStatus, paused: boolean): string {
 
 // ---------- empty states: the real reason a page has nothing, and the one thing that fills it ----------
 
-export type EmptyPage = "characters" | "upload" | "market" | "ask" | "log" | "changes";
+export type EmptyPage = "characters" | "upload" | "market" | "ask" | "log" | "changes" | "addon";
 /** The one control under an empty state: a page to open, a job to run, or a link to open. */
 export interface EmptyAction { label: string; page?: string; run?: Job; open?: string }
 export interface Empty { cause: string; step: string; action?: EmptyAction }
-type EmptyContext = { settings: Pick<Settings, "gameFolder" | "upload" | "ask">; engine: Pick<EngineState, "files" | "paused"> };
+type EmptyContext = { settings: Pick<Settings, "gameFolder" | "upload" | "prices" | "ask">; engine: Pick<EngineState, "files" | "paused"> };
 
 const EMPTY_DEFAULT: Record<EmptyPage, Empty> = {
   characters: { cause: "Save file read, no named character rows yet", step: "The addon records gold and gear while you play" },
@@ -39,13 +39,14 @@ const EMPTY_DEFAULT: Record<EmptyPage, Empty> = {
   ask: { cause: "No question waiting", step: "Type /ask in game, then /reload" },
   log: { cause: "Nothing logged since start", step: "" },
   changes: { cause: "No changes fetched yet", step: "" },
+  addon: { cause: "No Everloot addon installed", step: "Use Install below" },
 };
 
 /**
  * Why a page is empty, from the engine's own state, most fundamental first: no folder, no save file, paused, the job
  * off, a fetch error, and only then "no data yet" with what produces it.
  */
-export function emptyCause(page: EmptyPage, s: EmptyContext, extra: { error?: string } = {}): Empty {
+export function emptyCause(page: EmptyPage, s: EmptyContext, extra: { error?: string; written?: boolean } = {}): Empty {
   // The changes feed comes from the site, not the game: the folder and the jobs say nothing about it.
   if (page === "changes") return extra.error ? { cause: extra.error, step: "Try again", action: { label: "Retry", page } } : EMPTY_DEFAULT.changes;
   if (!s.settings.gameFolder) return { cause: "Not watching a game folder", step: "Choose it in Settings", action: { label: "Open Settings", page: "settings" } };
@@ -54,6 +55,12 @@ export function emptyCause(page: EmptyPage, s: EmptyContext, extra: { error?: st
   if (page === "upload" && !s.settings.upload) return { cause: "Upload is off", step: "Turn it on above" };
   if (page === "ask" && !s.settings.ask.enabled) return { cause: "/ask is off", step: "Turn it on above" };
   if (extra.error) return { cause: extra.error, step: "Try again", action: { label: "Retry", page } };
+  if (page === "market" && extra.written === false && !s.settings.prices) return { cause: "Market prices are off", step: "Turn it on above" };
+  if (page === "market" && extra.written === false) return {
+    cause: "Nothing written into the game yet",
+    step: "Prices are written at the next refresh; /reload in game to see them",
+    action: { label: "Refresh prices", run: "prices" },
+  };
   return EMPTY_DEFAULT[page];
 }
 

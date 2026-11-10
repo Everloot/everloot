@@ -1,4 +1,5 @@
 import { AwsClient } from "aws4fetch";
+import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
 import { namedRecord } from "../../../kb/src/corpus";
 import { buildAggregates, type AggregateSet } from "./aggregate-set";
 import { uploadStore, type Corpus, type R2Config } from "./upload-store";
@@ -8,7 +9,7 @@ import { uploadStore, type Corpus, type R2Config } from "./upload-store";
  * Item pages, search, zones, instances, NPCs, objects, loot, edges and addons all read it through `loadAggregates` in
  * rollup-compute.ts; before this file, each new instance downloaded the corpus snapshot, replayed every event, applied
  * publication and built every table, which cost seconds of CPU. The cron writes the file after the item view
- * (`writeAggregates`), only when that run added uploads or rebuilt, or when the file is missing; a page reads it once
+ * (`writeAggregates`), only when that run added uploads or rebuilt, or when the file is missing or stale; a page reads it once
  * per instance and again after five minutes (`loadStoredAggregates`). With no file yet, or one this code cannot read,
  * the pages work the set out from the corpus as before.
  *
@@ -90,19 +91,9 @@ async function currentSet(): Promise<AggregateSet> {
   return anonymousAggregates(corpus);
 }
 
-/** Whether the file exists; a read failure counts as missing, so the next run tries to write it. */
-async function fileExists(cloud: R2Config, doFetch: typeof fetch): Promise<boolean> {
-  try {
-    const res = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "HEAD" }));
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
 /**
- * The cron's step: writes the set when this run added uploads or rebuilt, or when there is no file yet. An idle run
- * with the file in place reads nothing but that one HEAD. `bytes` is the file's size, for the run's log.
+ * The cron's step: writes the set when this run added uploads or rebuilt, or when the file is missing, unstamped or stale. An idle run
+ * with a current file reads only a HEAD, falling back to GET if HEAD fails. `bytes` is the file's size, for the run's log.
  */
 export async function writeAggregates(opts: { added: number; rebuild?: boolean; dataAsOf: string | null }, deps: {
   cloud?: R2Config | null; fetch?: typeof fetch; build?: () => Promise<AggregateSet>; now?: () => Date;
@@ -110,9 +101,9 @@ export async function writeAggregates(opts: { added: number; rebuild?: boolean; 
   const cloud = deps.cloud === undefined ? r2FromEnv() : deps.cloud;
   if (!cloud) throw new Error("the stored aggregates need the cloud store");
   const doFetch = deps.fetch ?? fetch;
-  if (opts.added <= 0 && !opts.rebuild && await fileExists(cloud, doFetch)) return { written: false };
+  if (opts.added <= 0 && !opts.rebuild && !await storedViewNeedsWrite(r2(cloud), r2Url(cloud), opts.dataAsOf, doFetch)) return { written: false };
   const body = encodeAggregates(await (deps.build ?? currentSet)(), (deps.now?.() ?? new Date()).toISOString());
-  const put = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "PUT", body, headers: { "content-type": "application/json" } }));
+  const put = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "PUT", body, headers: { "content-type": "application/json", [STAMP]: stampOf(opts.dataAsOf) } }));
   if (!put.ok) throw new Error(`aggregates write failed (${put.status})`);
   return { written: true, bytes: new TextEncoder().encode(body).length };
 }

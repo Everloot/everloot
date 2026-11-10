@@ -38,7 +38,7 @@ test("the view holds exactly what the pages computed: agreed names, public drops
 test("the cron writes it after a change or when it is missing, and an idle run with the file reads only a HEAD", async () => {
   const view = await buildItemView(null, AT);
   const calls: Request[] = [];
-  const answer = (head: number) => vi.fn(async (req: Request) => { calls.push(req); return new Response(null, { status: req.method === "HEAD" ? head : 200 }); });
+  const answer = (head: number) => vi.fn(async (req: Request) => { calls.push(req); return new Response(null, { status: req.method === "HEAD" ? head : 200, headers: { "x-amz-meta-data-as-of": "none" } }); });
   expect(await writeItemView({ added: 0, dataAsOf: null }, { cloud: CLOUD, fetch: answer(200) as unknown as typeof fetch, build: async () => view })).toEqual({ written: false });
   expect(calls.map((c) => c.method)).toEqual(["HEAD"]);
   calls.length = 0;

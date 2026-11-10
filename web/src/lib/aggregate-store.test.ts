@@ -144,7 +144,7 @@ test("named rows change no table: no grant, revoke or hide can change the stored
   expect(plain(anonymousAggregates(corpus([...anonymousRows(), ...namedRows()])))).toEqual(plain(without));
 });
 
-const head = (status: number) => vi.fn(async (req: Request) => new Response(null, { status: req.method === "HEAD" ? status : 200 }));
+const head = (status: number) => vi.fn(async (req: Request) => new Response(null, { status: req.method === "HEAD" ? status : 200, headers: { "x-amz-meta-data-as-of": AS_OF } }));
 
 test("the cron writes the file when the run added uploads or rebuilt, or when there is none; an idle run with a file only asks", async () => {
   const set = buildAggregates(corpus(anonymousRows()));
