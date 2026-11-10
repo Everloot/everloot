@@ -43,7 +43,7 @@ test("the current section is marked", () => {
 });
 
 test("Get the addon is the primary pill and leads to /addon", () => {
-  expect(html).toMatch(/<a href="\/addon" class="btn btn-primary[^"]*">Get the addon<\/a>/);
+  expect(html).toMatch(/<a href="\/addon" class="btn btn-primary[^"]*"><span class="sm:hidden">Download<\/span><span class="hidden sm:inline">Get the addon<\/span><\/a>/);
 });
 
 test("the bar is compact: 44 px (two thirds of the old 64), the search centred, the version label kept", () => {

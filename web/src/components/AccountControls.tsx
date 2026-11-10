@@ -78,7 +78,7 @@ export default function AccountControls({ savedBuilds = false, initialShell = nu
     : <button type="button" disabled aria-busy="true" className={controlClass}>Account</button>;
 
   if (place === "menu") {
-    return status === "signed-in" ? null : <div className="flex flex-wrap gap-2 border-t border-line pt-4 sm:hidden">{signIn}<a href="/addon" className={controlClass}>Get the addon</a></div>;
+    return <div className="flex flex-wrap gap-2 border-t border-line pt-4 lg:hidden">{status !== "signed-in" && signIn}<a href="/addon" className={controlClass}>Get the addon</a></div>;
   }
 
   return (
@@ -87,11 +87,12 @@ export default function AccountControls({ savedBuilds = false, initialShell = nu
         <>
           <CreateMenu savedBuilds={savedBuilds} />
           <AvatarMenu name={name} initialShell={initialShell} profiles={profiles} savedBuilds={savedBuilds} accountSwitching={accountSwitching} signingOut={signingOut} onSignOut={signOut} />
+          <a href="/addon" className="btn hidden min-h-8 shrink-0 whitespace-nowrap px-4 text-sm lg:inline-flex">Get the addon</a>
         </>
       ) : (
         <>
           <span className="hidden sm:inline-flex">{signIn}</span>
-          <a href="/addon" className="btn btn-primary hidden min-h-8 shrink-0 whitespace-nowrap px-4 text-sm min-[400px]:inline-flex">Get the addon</a>
+          <a href="/addon" className="btn btn-primary min-h-8 shrink-0 whitespace-nowrap px-2 text-sm sm:px-4"><span className="sm:hidden">Download</span><span className="hidden sm:inline">Get the addon</span></a>
         </>
       )}
       {alert}
