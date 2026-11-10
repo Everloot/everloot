@@ -240,4 +240,98 @@ g.scopes.account.scripts.OnClick(g.scopes.account)
 assert(g.moved.shown and g.moved.text == 'Moved between your characters: -', g.moved.text)
 """)
 
-print("Lua 5.1 Gold view: characters by realm with a chart that follows the period, ledger by category, day and receipt, sales each (with the cut) or by item (per day, last sold), the gph session; empty lines for a fresh file")
+lua = fresh(SAVED, API)
+lua.execute("""
+local U, L = Everloot.Window, Everloot.Ledger
+assert(U.Open('gold'))
+local g, me = EverlootWindow.gold, Everloot.CharacterKey()
+local function click(b) b.scripts.OnClick(b) end
+EverlootDB.ledger.events = {}
+EverlootDB.ledger.sales = {}
+local today = now - now % 86400
+for _, age in ipairs({0, 6, 29, 89, 90}) do
+  for _, key in ipairs({me, 'aaaa0002'}) do
+    for _, item in ipairs({'Zebra', 'Apple'}) do
+      table.insert(EverlootDB.ledger.events, {at=today-age*86400, key=key, category='vendor', copper=100, itemName=item})
+    end
+    for _, item in ipairs({'Boots', 'Axe'}) do
+      table.insert(EverlootDB.ledger.events, {at=today-age*86400, key=key, category='vendor_spend', copper=300, itemName=item})
+    end
+  end
+end
+L.Record(me, 'mail_out', 50, {ownAlt=true, itemName='Transfer'})
+L.Record('aaaa0002', 'mail_in', 50, {ownAlt=true, itemName='Transfer'})
+L.RecordPending(me, 'Pending')
+L.RecordPending('aaaa0002', 'Pending')
+local captions = {'Today', 'Last 7 days', 'Last 30 days', 'Last 90 days'}
+for _, scope in ipairs({'character', 'account'}) do
+  click(g.scopes[scope])
+  for i, period in ipairs({'today', '7d', '30d', 'all'}) do
+    click(g.periods[period])
+    local n = scope == 'account' and 2 or 1
+    local earned, spent = i*200*n, i*600*n + (scope == 'character' and 50 or 0)
+    local days = ({1,7,30,90})[i]
+    assert(g.summaryCaption.text == captions[i] .. ' · ' .. (n == 2 and 'Account' or 'This character'))
+    assert(g.earned.text == U.MoneyShort(earned), g.earned.text)
+    assert(g.spent.text == U.MoneyShort(spent), g.spent.text)
+    assert(g.profit.text == U.MoneyShort(earned-spent), g.profit.text)
+    assert(g.earnedAverage.text == U.MoneyShort(earned/days) .. '/day')
+    assert(g.spentAverage.text == U.MoneyShort(spent/days) .. '/day')
+    assert(g.profitAverage.text == U.MoneyShort((earned-spent)/days) .. '/day')
+    assert(g.pending.text == 'plus ' .. n .. ' pending')
+    assert(g.topEarned.text == 'Top earning: Apple  ' .. U.MoneyShort(i*100*n), g.topEarned.text)
+    assert(g.topSpent.text == 'Top spending: Axe  ' .. U.MoneyShort(i*300*n), g.topSpent.text)
+  end
+end
+assert(g.summaryBox.width == 604 and g.summaryBox.height == 112)
+assert(#g.rows == 7 and g.topEarned.width == 588 and g.topSpent.width == 588)
+assert(g.summaryBox.point[3] == 0 and g.pages.overview.point[3] == -64, 'summary starts below the controls')
+assert(g.rows[1].parent.point[3] == -118 and g.rows[1].parent.height == 190)
+assert(g.bars[1].parent.point[3] == -118 and g.bars[1].parent.height == 190)
+assert(g.rows[7].point[3] - g.rows[7].height >= -156, 'seven rows leave footer room')
+local calls, summary = 0, L.Summary
+L.Summary = function(...) calls=calls+1; return summary(...) end
+local update = EverlootWindow.views.gold.scripts.OnUpdate
+for i=1,120 do update(nil, 1/60) end
+assert(calls == 0, 'idle overview does not recompute')
+L.Record(me, 'quest', 10000)
+update(nil, 1.1)
+assert(calls == 1 and g.profit.text == U.MoneyShort(10000-3200), g.profit.text)
+-- The paid sale's money event counts once; sale rows supply pending counts only.
+L.RecordSale(me, {itemName='Pending', count=1, total=500})
+L.Record(me, 'auction', 500, {itemName='Pending'})
+update(nil, 1.1)
+assert(g.pending.text == 'plus 1 pending')
+assert(g.earned.text == U.MoneyShort(12100))
+L.Record(me, 'repair', 7300)
+update(nil, 1.1)
+assert(g.profit.text == U.MoneyShort(0), 'break even')
+-- Repeated events for the same item add together rather than competing as individual receipts.
+L.Record(me, 'vendor', 2000, {itemName='Zebra'})
+update(nil, 1.1)
+assert(g.topEarned.text == 'Top earning: Zebra  ' .. U.MoneyShort(2800))
+-- Pending expiry and the UTC day boundary refresh without a new money event.
+now = now + 48*3600 + 1
+update(nil, 1.1)
+assert(g.pending.text == '')
+click(g.periods.today)
+assert(g.profit.text == U.MoneyShort(0) and g.topEarned.text == 'Top earning: -')
+assert(not U.failed, U.failed)
+""")
+
+lua = fresh('{ installId = "abcd-1234", toggles = {}, records = {} }', API)
+lua.execute("""
+local U = Everloot.Window
+assert(U.Open('gold'))
+local g = EverlootWindow.gold
+for _, scope in ipairs({'character','account'}) do
+  g.scopes[scope].scripts.OnClick()
+  for _, period in ipairs({'today','7d','30d','all'}) do
+    g.periods[period].scripts.OnClick()
+    assert(g.earned.text == U.MoneyShort(0) and g.spent.text == U.MoneyShort(0) and g.profit.text == U.MoneyShort(0))
+    assert(g.pending.text == '' and g.topEarned.text == 'Top earning: -' and g.topSpent.text == 'Top spending: -')
+  end
+end
+""")
+
+print("Lua 5.1 Gold view: periods, scopes, summary, item ties, pending, live ledger changes and empty state")

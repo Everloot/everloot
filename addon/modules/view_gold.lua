@@ -114,7 +114,39 @@ local function keysFor(scope)
   return keys
 end
 
+local function drawSummary(g, keys)
+  local now = time()
+  if g.summaryPeriod == g.period and g.summaryScope == g.scope and g.revision == E.Ledger.revision
+    and g.utcDay == math.floor(now / 86400) and not (g.pendingExpiry and now > g.pendingExpiry) then return end
+  local from, to = E.Ledger.Period(g.period)
+  local sum = E.Ledger.Summary(keys, from, to)
+  local days = PERIOD_DAYS[g.period] or 30
+  g.summaryCaption:SetText((PERIOD_CAPTION[g.period] or "Last 30 days") .. " · " .. (g.scope == "account" and "Account" or "This character"))
+  for _, entry in ipairs({ { "earned", sum.totalIn }, { "spent", sum.totalOut }, { "profit", sum.totalIn - sum.totalOut } }) do
+    g[entry[1]]:SetText(U.MoneyShort(entry[2]))
+    g[entry[1] .. "Average"]:SetText(U.MoneyShort(entry[2] / days) .. "/day")
+  end
+  local pending = 0
+  g.pendingExpiry = nil
+  for _, sale in ipairs(E.Ledger.Sales(keys, from, to)) do
+    if sale.status == "pending" then
+      pending = pending + 1
+      local expires = sale.at + 48 * 3600
+      if not g.pendingExpiry or expires < g.pendingExpiry then g.pendingExpiry = expires end
+    end
+  end
+  g.pending:SetText(pending > 0 and ("plus " .. pending .. " pending") or "")
+  for _, entry in ipairs({ { "topEarned", "Top earning" }, { "topSpent", "Top spending" } }) do
+    local item = sum[entry[1]]
+    g[entry[1]]:SetText(entry[2] .. ": " .. (item and (item.itemName .. "  " .. U.MoneyShort(item.copper)) or "-"))
+  end
+  g.revision, g.utcDay = E.Ledger.revision, math.floor(time() / 86400)
+  g.summaryPeriod, g.summaryScope = g.period, g.scope
+end
+
 local function drawOverview(g, keys)
+  drawSummary(g, keys)
+  local days = PERIOD_DAYS[g.period] or 30
   local items, realm, header, account = {}, nil, nil, nil
   g.realmTotals = {}
   for _, r in ipairs(E.Roster.Rows()) do
@@ -139,7 +171,6 @@ local function drawOverview(g, keys)
   g.total:SetText(#items > 0 and ("All characters  " .. U.Money(account)) or "")
 
   -- One bar per day of the period, sharing the chart's width; the bars past the period stay hidden.
-  local days = PERIOD_DAYS[g.period] or 30
   local series = E.Ledger.Series(keys, days)
   local high
   for _, d in ipairs(series) do
@@ -152,7 +183,7 @@ local function drawOverview(g, keys)
     if i <= days then
       local copper = series[i] and series[i].copper
       bar:SetPoint("BOTTOMLEFT", CHART_LEFT + (i - 1) * step, 40)
-      bar:SetSize(width, 220)
+      bar:SetSize(width, 110)
       bar:SetMinMaxValues(0, max)
       bar:SetValue(copper or 0)
       bar:SetStatusBarColor(unpack(copper and COLORS.accent or COLORS.muted))
@@ -313,17 +344,36 @@ local function build(f, parent)
   -- Overview: characters by realm, and the scope's closing gold over the period, one bar a day. The bars are
   -- built once for the longest period; drawOverview places the period's own and hides the rest.
   local o = g.pages.overview
+  g.summaryBox = box(o, 0, 0, W, 112)
+  local function summaryText(field, x, y, width, size, color)
+    local s = text(g.summaryBox, size or 11, NARROW, color)
+    s:SetPoint("TOPLEFT", x, y)
+    s:SetWidth(width)
+    if s.SetWordWrap then s:SetWordWrap(false) end
+    g[field] = s
+    return s
+  end
+  summaryText("summaryCaption", 8, -6, 400, 12)
+  summaryText("pending", 412, -6, 184, 11, COLORS.muted)
+  for i, entry in ipairs({ { "earned", "Gold earned" }, { "spent", "Gold spent" }, { "profit", "Profit" } }) do
+    local x = 8 + (i - 1) * 196
+    summaryText(entry[1] .. "Label", x, -24, 188):SetText(entry[2])
+    summaryText(entry[1], x, -40, 188, 12)
+    summaryText(entry[1] .. "Average", x, -56, 188, 11, COLORS.muted)
+  end
+  summaryText("topEarned", 8, -76, W - 16)
+  summaryText("topSpent", 8, -92, W - 16)
   local roster
-  g.rows, roster = list(o, 0, 0, 290, 300, "Characters", { { "name", 0, 150 }, { "gold", 150, 132, true } })
+  g.rows, roster = list(o, 0, -118, 290, 190, "Characters", { { "name", 0, 150 }, { "gold", 150, 132, true } }, 7)
   g.total = text(roster, 12)
   g.total:SetPoint("BOTTOMLEFT", 8, 10)
-  local chart = box(o, 296, 0, 308, 300)
+  local chart = box(o, 296, -118, 308, 190)
   g.chartHigh = text(chart, 11, nil, COLORS.muted)
   g.chartHigh:SetPoint("TOPLEFT", 10, -8)
   for i = 1, MAX_BARS do
     local bar = CreateFrame("StatusBar", nil, chart)
     bar:SetPoint("BOTTOMLEFT", CHART_LEFT, 40)
-    bar:SetSize(1, 220)
+    bar:SetSize(1, 110)
     bar:Hide()
     bar:SetOrientation("VERTICAL")
     bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
@@ -376,8 +426,16 @@ local function build(f, parent)
   local wait = 0
   parent:SetScript("OnUpdate", function(_, dt)
     wait = wait + (dt or 0)
-    if wait < 1 or g.tab ~= "session" then return end
+    if wait < 1 then return end
     wait = 0
+    if g.tab == "overview" then
+      -- Only the revision/day check runs while idle; queries run after a mutation or UTC rollover.
+      local now = time()
+      if g.revision ~= E.Ledger.revision or g.utcDay ~= math.floor(now / 86400)
+        or (g.pendingExpiry and now > g.pendingExpiry) then redraw() end
+      return
+    end
+    if g.tab ~= "session" then return end
     local ok, err = pcall(drawSession, g)
     if not ok then U.Fail(err) end
   end)
