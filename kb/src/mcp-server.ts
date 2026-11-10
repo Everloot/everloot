@@ -6,7 +6,7 @@ import { CREDIT_LINE, DATA_AGE, GAME_DATA_CREDIT, LICENCE, SITE, type EntityKind
 import { answerSources, answerSourcesFactsFromRecords, formatAnswerSources, type AnswerSourcesFacts } from "./answer-sources.js";
 import type { RecheckScope } from "./coverage.js";
 import type { FilesIndex } from "./files-evidence.js";
-import { auctionHistory, auctionSightingsFromRecords, handleAuctionHistory, handleStoredAuctionHistory, type AuctionPoint } from "./auction-history.js";
+import { AUCTION_HISTORY_RULE, auctionHistory, auctionPointLines, auctionSightingsFromRecords, type AuctionPoint, type AuctionSighting } from "./auction-history.js";
 import { handlePlan, planStructured } from "./bridge-plan.js";
 import { handleRecentChanges, recentChangesStructured, type ChangeEntry } from "./changes.js";
 import { ecosystemProjectsStructured, handleEcosystemProjects, type EcosystemView } from "./ecosystem.js";
@@ -20,7 +20,9 @@ import { formatItemPage, itemPage } from "./item-page.js";
 import { formatItemNumbers, itemToolFactsFromRecords } from "./item-page-tool.js";
 import { reportedItemFacts } from "./item-facts.js";
 import { formatObjectPage, objectFactsFromRecords, objectPage, type ObjectFacts } from "./object-page.js";
-import { handleMarketValue, itemMarket, type MarketState } from "./market.js";
+import {
+  handleMarketValue, itemMarket, lookupRealm, realmLookupFields, realmLookupText, resolveRealm, scanDayLine, type MarketState, type PublicDay, type RealmLookup,
+} from "./market.js";
 import { loadUploadRecords } from "./load-uploads.js";
 import { KNOWLEDGE_KINDS, MCP_PROMPT_NAMES, MCP_PROMPTS, MCP_RESOURCE_TEMPLATE_URIS, MCP_RESOURCE_TEMPLATES, MCP_RESOURCE_URIS, MCP_RESOURCES, MCP_TOOL_NAMES, MCP_TOOLS, parseRecords, type McpToolArgs, type McpToolDef, type McpToolName } from "@everloot/protocol";
 import { z } from "zod";
@@ -241,11 +243,71 @@ export async function marketValueAnswer(args: { realm: string; itemId: number },
   }
   if (!market) return notRead("Market values unavailable. They are unrecorded, not zero.");
   const now = new Date();
-  const { value, points } = itemMarket(market.state, args.realm, args.itemId, now);
-  const url = value || points.length ? marketItemUrl(args.realm, args.itemId) : undefined;
+  // The realm as the rollup knows it: an exact name, or an alias only one realm's name ends in. Unknown and ambiguous
+  // names read nothing, so they never answer as an empty market.
+  const lookup = resolveRealm(market.state, args.realm, now);
+  const realm = lookupRealm(lookup);
+  const { value, points } = realm ? itemMarket(market.state, realm, args.itemId, now) : { value: null, points: [] };
+  const url = realm && (value || points.length) ? marketItemUrl(realm, args.itemId) : undefined;
+  const page = { realm: shownRealm(args.realm, lookup), itemId: args.itemId, value, history: points, ...realmLookupFields(lookup) };
   return {
     text: `${withMore(handleMarketValue(args, market.state, now), url)}\n${answerFooter(market.dataAsOf)}`,
-    structured: { connected: true, dataAsOf: market.dataAsOf, ...(url ? { url } : {}), page: { realm: args.realm.trim(), itemId: args.itemId, value, history: points } },
+    structured: { connected: true, dataAsOf: market.dataAsOf, ...(url ? { url } : {}), page },
+  };
+}
+
+/** The realm an answer names: the full name an alias resolved to, else the name as asked. */
+function shownRealm(asked: string, lookup: RealmLookup | null): string {
+  return lookup?.status === "alias" ? lookup.realm : asked.trim();
+}
+
+/** The market rollup, or null when it is not connected or could not be read. */
+async function readMarket(loader?: MarketLoader): Promise<Awaited<ReturnType<MarketLoader>>> {
+  if (!loader) return null;
+  try {
+    return await loader();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * auction_history's page. `scanDays` are the rollup's public full-scan days for the item, the ones market_value values
+ * it by, under the same rule (3 reporters, or Everloot's own installs), so the two tools agree on which days are public;
+ * null when the rollup is not connected. `points` are the single listings players saw while browsing (auction-history.ts),
+ * null when they could not be read. The two come from different scans, so both are listed, each with its own rule.
+ */
+export function auctionHistoryPage(
+  args: { realm: string; itemId: number }, lookup: RealmLookup | null, scanDays: PublicDay[] | null, points: AuctionPoint[] | null,
+): { text: string; page: object; url?: string } {
+  const realm = shownRealm(args.realm, lookup);
+  const head = `${realm} item ${args.itemId}`;
+  const lookupFields = lookup ? realmLookupFields(lookup) : {};
+  if (!args.realm.trim()) return { text: "Name a realm.", page: { realm, itemId: args.itemId, points: [] } };
+  if (!Number.isInteger(args.itemId) || args.itemId < 1) return { text: "Name an item id.", page: { realm, itemId: args.itemId, points: [] } };
+  // A name no realm answers to, with nothing browsed under it either: say so, never an empty history.
+  if (lookup && !lookupRealm(lookup) && !points?.length) {
+    return { text: `${head}\n${realmLookupText(lookup)}`, page: { realm, itemId: args.itemId, points: [], ...lookupFields } };
+  }
+  const note = lookup && lookupRealm(lookup) ? realmLookupText(lookup) : null;
+  const browse = points ? auctionPointLines(points) : ["Browsing scans unavailable. They are unrecorded, not zero."];
+  const lines = [head, ...(note ? [note] : [])];
+  if (scanDays === null) {
+    lines.push(AUCTION_HISTORY_RULE, ...browse);
+  } else {
+    lines.push(
+      "Full scans, the public days market_value values this item by (a day is public at 3 reporters, or with Everloot's own scans):",
+      ...(scanDays.length ? scanDays.map(scanDayLine) : ["No public day yet. A day becomes public when 3 reporters scanned this item."]),
+      "Single listings seen while browsing, a separate source with its own count:",
+      AUCTION_HISTORY_RULE,
+      ...browse,
+    );
+  }
+  const url = scanDays?.length || points?.length ? marketItemUrl(lookup ? lookupRealm(lookup) ?? realm : realm, args.itemId) : undefined;
+  return {
+    text: lines.join("\n"),
+    page: { realm, itemId: args.itemId, points: points ?? [], ...(scanDays ? { scanDays } : {}), ...lookupFields },
+    url,
   };
 }
 
@@ -750,7 +812,9 @@ function professionSkillLineId(profession: string): number | undefined {
 }
 
 /** The readers a host lends the tools: the site's store in process, or nothing for a standalone server. */
-export interface ToolOptions { catalog?: CatalogLoader; corpus?: CorpusLoader; market?: MarketLoader; auctionHistory?: AuctionHistoryLoader; gameData?: GameDataLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; coverage?: CoverageLoader; settledSummary?: SettledSummaryLoader; guilds?: GuildReader; recheck?: readonly RecheckScope[] }
+export interface ToolOptions { catalog?: CatalogLoader; corpus?: CorpusLoader; market?: MarketLoader; auctionHistory?: AuctionHistoryLoader; gameData?: GameDataLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; coverage?: CoverageLoader; settledSummary?: SettledSummaryLoader; guilds?: GuildReader; recheck?: readonly RecheckScope[];
+  /** Everloot's own install ids (trusted-source.ts): a browsing day one of them scanned is public under 3, as in the market rollup. */
+  trusted?: ReadonlySet<string> }
 
 /** The guild ladder's tools: registered only when the host lends a guild reader (EVERLOOT_GUILDS on the site). */
 export const GUILD_TOOLS: readonly McpToolName[] = ["guild_search", "guild_rankings"];
@@ -999,18 +1063,25 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
       };
     },
     auction_history: async (args) => {
-      // The site's stored days when it lends them, so an answer does not replay the corpus; without them, the corpus.
-      let stored: Awaited<ReturnType<AuctionHistoryLoader>> = null;
-      try { stored = (await options.auctionHistory?.(args.realm, args.itemId)) ?? null; } catch { stored = null; }
-      if (stored) {
-        const page = { realm: args.realm.trim(), itemId: args.itemId, points: stored.points };
-        const url = page.points.length ? marketItemUrl(args.realm, args.itemId) : undefined;
-        return pageAnswer({ text: handleStoredAuctionHistory(args, stored.points), page, url }, stored.dataAsOf);
+      // The rollup reads the realm name as market_value does and lends its public full-scan days, so both tools agree.
+      const market = await readMarket(options.market);
+      const now = new Date();
+      const lookup = market ? resolveRealm(market.state, args.realm, now) : null;
+      const resolved = lookup ? lookupRealm(lookup) : null;
+      const realm = resolved ?? args.realm.trim();
+      const scanDays = market ? (resolved ? itemMarket(market.state, resolved, args.itemId, now).points : []) : null;
+      // The site's stored browsing days when it lends them, so an answer does not replay the corpus; without them, the corpus.
+      let browse: { points: AuctionPoint[]; dataAsOf: string | null } | null = null;
+      try { browse = (await options.auctionHistory?.(realm, args.itemId)) ?? null; } catch { browse = null; }
+      if (!browse) {
+        const read = await readTooledFacts<AuctionSighting[]>("auction_history", options.corpus, recheck);
+        if (read) browse = { points: auctionHistory(realm, args.itemId, read.facts, options.trusted).points, dataAsOf: read.dataAsOf };
       }
-      return readPageIn("auction_history", (facts: ReturnType<typeof auctionSightingsFromRecords>) => {
-        const page = auctionHistory(args.realm, args.itemId, facts);
-        return { text: handleAuctionHistory(args, facts), page, url: page.points.length ? marketItemUrl(args.realm, args.itemId) : undefined };
-      });
+      if (!browse && !market) {
+        const reason = uploadsConfigured(options.corpus) ? UNAVAILABLE : UPLOADS_UNSET;
+        return { text: reason, structured: { connected: false, dataAsOf: null, reason } };
+      }
+      return pageAnswer(auctionHistoryPage(args, lookup, scanDays, browse?.points ?? null), browse?.dataAsOf ?? market?.dataAsOf ?? null);
     },
     market_value: (args) => marketValueAnswer(args, options.market),
     gold_ledger: (args) => readPageIn("gold_ledger", (facts: ReturnType<typeof goldFactsFromRecords>) => {

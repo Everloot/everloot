@@ -7,6 +7,12 @@ required, or tightening a limit is a major release.
 ## [Unreleased]
 
 ### Added
+- 2.1.0 (record protocol unchanged, 1.13.0): `marketPage` and `auctionHistory` gain optional `realmStatus` (`exact`,
+  `alias`, `ambiguous` or `unknown`), `askedRealm` and `candidates`, so a client can tell a realm name no scan uses
+  from a realm with no public day. `auctionHistory` gains optional `scanDays`, the public full-scan days
+  `market_value` lists in its history. The `realm` input of `market_value` and `auction_history` and both
+  descriptions say how a name is read and that Everloot's own installs make a day public under 3. Optional, so
+  earlier readers are unaffected.
 - `dropsResponse.rates[].sourceName`: the NPC's or object's name, once 3 installs agree on it; absent until then.
   Optional, so earlier readers are unaffected.
 

@@ -138,7 +138,7 @@ test("completion_progress and market_value answer from their own loaders, and sa
   const marketResult = await marketClient.callTool({ name: "market_value", arguments: { realm: "Forever", itemId: 2589 } });
   const market = OUT.market_value.parse(marketResult.structuredContent);
   const expected = itemMarket(state, "Forever", 2589, now);
-  expect(market).toEqual({ connected: true, dataAsOf: AS_OF, url: "https://everloot.app/tools/auctions?realm=Forever&item=2589", page: { realm: "Forever", itemId: 2589, value: expected.value, history: expected.points } });
+  expect(market).toEqual({ connected: true, dataAsOf: AS_OF, url: "https://everloot.app/tools/auctions?realm=Forever&item=2589", page: { realm: "Forever", itemId: 2589, value: expected.value, history: expected.points, realmStatus: "exact" } });
   expect(market.page!.value).toMatchObject({ itemId: 2589, market: 110, reporters: 3 });
   expect(JSON.stringify(marketResult.content)).toContain("More: https://everloot.app/tools/auctions?realm=Forever&item=2589");
   // An item nobody scanned has an empty price page: no link.

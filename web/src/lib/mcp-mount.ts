@@ -15,6 +15,7 @@ import { RECHECK_SCOPES } from "./recheck-scopes";
 import { loadCensus } from "./rollup-compute";
 import { readSettledList } from "./settled-store";
 import { settledKeys } from "../../../kb/src/settled-list";
+import { trustedInstalls } from "../../../kb/src/trusted-source";
 import { uploadStore } from "./upload-store";
 import { mcpLedgerMetrics } from "./question-ledger";
 import { mcpToolMetrics, recordUsage } from "./usage-metrics";
@@ -58,6 +59,8 @@ export function toolLoaders(): ToolOptions {
     },
     // auction_history reads the cron's stored days (auction-history-store.ts); with no file it reads the corpus above.
     auctionHistory: (realm, itemId) => storedAuctionHistory(realm, itemId),
+    // Everloot's own installs: a browsing day one of them scanned is public under 3 when auction_history reads the corpus.
+    trusted: trustedInstalls(process.env.EVERLOOT_TRUSTED_INSTALLS),
     completion: (installId) => loadCompletion(installId),
     market: async () => {
       const loaded = await uploadStore.loadMarket();

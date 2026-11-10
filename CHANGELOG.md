@@ -204,6 +204,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   deploy that changes either shows at once; an idle cron run rewrites a view built from an older snapshot, and the
   cron reads the corpus once for all the stored views it writes.
 - Site: /database splits its rows into "Seen by players" and "From the game files", says after launch that a row fills when 3 installs agree, and drops the Guilds lookup row (the Tools menu has it).
+- MCP: `market_value` and `auction_history` read a realm the same way. A name that is the end of exactly one realm's
+  full name (`US1 Realm 4 PvP`) answers for that realm (`CAMWOW US1 Realm 4 PvP`) and says so; a name that ends several,
+  or that no scan uses, answers ambiguous or unknown with the closest realms to ask with, instead of "No public market
+  value". `auction_history` lists the public full-scan days `market_value` values the item by, and its browsing days
+  follow the market's rule, so a day Everloot's own installs scanned is public under 3 and says so. Before, it answered
+  "Price unrecorded" for days `market_value` listed.
 - Knowledge base: a self-hosted MCP server and `coverage-report` read the whole public corpus again. The reader stopped
   at 50 pages and 2 MB in all, and the feed is now about 98 pages and 13 MB; the limits are per page with a high total
   guard. Without a key the site allows 30 requests an hour, so a rate-limited read now says to set `EVERLOOT_API_KEY`.

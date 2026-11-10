@@ -109,6 +109,22 @@ test("a write that failed after new uploads is made again by the next idle run, 
   expect(await writeAuctionHistory({ added: 0, dataAsOf: null }, { cloud: CLOUD, fetch: answer({ stamp: "none" }) as unknown as typeof fetch, build })).toEqual({ written: false });
 });
 
+test("a day one of Everloot's own installs scanned is public under 3, as in the market rollup, and labelled", async () => {
+  const trusted = new Set(["d"]);
+  const own = [...records, scan("d", "Nightfall", 5, 40, "2026-11-04T06:00:00Z")];
+  const file = buildAuctionHistory({ ...corpus, records: own } as Corpus, AT, trusted);
+  expect(new Map(file.histories).get("nightfall|5")).toEqual([{ day: "2026-11-04", copper: 40, reporters: 1 }]);
+  // Two strangers on one day still are not public (item 6 on Forever).
+  expect(new Map(file.histories).has("forever|6")).toBe(false);
+  // Without the trusted set the same scan publishes nothing.
+  expect(new Map(buildAuctionHistory({ ...corpus, records: own } as Corpus, AT, new Set()).histories).has("nightfall|5")).toBe(false);
+  const fetch = vi.fn(async () => new Response(JSON.stringify(file), { status: 200 }));
+  const stored = await storedAuctionHistory("Nightfall", 5, { cloud: CLOUD, fetch: fetch as unknown as typeof globalThis.fetch });
+  expect(handleStoredAuctionHistory({ realm: "Nightfall", itemId: 5 }, stored!.points))
+    .toBe(handleAuctionHistory({ realm: "Nightfall", itemId: 5 }, auctionSightingsFromRecords(own), trusted));
+  expect(handleStoredAuctionHistory({ realm: "Nightfall", itemId: 5 }, stored!.points)).toContain("1 reporter (includes Everloot's own scans)");
+});
+
 test("a file of an unknown shape, a missing one or one out of reach is no history, so the readers fall back to the corpus", async () => {
   const file = buildAuctionHistory(corpus, AT);
   expect(parseAuctionHistory(file)).toEqual(file);
