@@ -30,7 +30,8 @@ const cells = (html: string, href: string) => {
 
 test("the list has a Level column and starts with the lowest level; a range the files lack is a dash", async () => {
   const html = renderToStaticMarkup(await InstancesPage());
-  const headers = [...html.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => text(m[1]!).replace(/\|/g, ""));
+  // A sortable header carries the arrow of the order the list is in.
+  const headers = [...html.matchAll(/<th[^>]*>(.*?)<\/th>/g)].map((m) => text(m[1]!).replace(/[|▲▼]/g, ""));
   expect(headers).toEqual(expect.arrayContaining(["Name", "Type", "Level", "Entered from"]));
   const rows = [...html.matchAll(/href="\/database\/instances\/(\d+)-[a-z0-9-]*"/g)].map((m) => Number(m[1]));
   expect(rows[0]).toBe(389); // Ragefire Chasm, level 13 in the files

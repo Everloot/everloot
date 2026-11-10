@@ -10,7 +10,7 @@ import { CLIENT_LAYER } from "@/lib/items";
 import { loadCatalog } from "@/lib/talents/catalogs";
 import { LINK } from "../entity";
 import {
-  listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, sortParam, sortRows, Unreadable,
+  listHref, listMetadata, listQuery, nextSort, NoMatches, PER_PAGE, sortParam, sortRows, Unreadable,
   type ListQuery, type Search,
 } from "../list-parts";
 
@@ -81,11 +81,12 @@ export default async function SpellListPage(props: { searchParams?: Promise<Sear
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }, context).split("?")[1] ?? ""));
   const strip = <ResultStrip total={sorted.length} noun={sorted.length === 1 ? "spell" : "spells"} page={q.page} perPage={PER_PAGE} href={(page) => href({ ...q, page }, context)} label="Spell pages" />;
   const chips = q.q ? [{ label: `Name: ${q.q}`, href: here({ q: undefined }) }] : [];
-  const empty = !names ? <Unreadable />
+  // The names are the game files' own: a list with none was not read, and no addon upload fills it.
+  const unread = <Unreadable>{`The spell names for build ${CLIENT_LAYER.build.version} could not be read.`}</Unreadable>;
+  const empty = !names || all.size === 0 ? unread
     : q.q ? <NoMatches noun="spells" chips={chips} clearHref={clear} />
     // The class's lines and catalog name no spell this list has.
-    : mine ? <p className="py-4 text-cell text-fg-2">{`No ${className} spells are listed here.`}</p>
-    : <NoObservations>No spell is listed yet.</NoObservations>;
+    : <p className="py-4 text-cell text-fg-2">{`No ${className} spells are listed here.`}</p>;
 
   return (
     <Container width="data">

@@ -45,6 +45,11 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
 
 ### Fixed
+- Site: the zones list and the dungeons and raids list take a name in the box and sort from their column headers
+  (`/database/zones?q=dur&sort=name`, `/database/instances?sort=-level`), as the NPC list does; the zones are one
+  table with a Continent column. The objects list sorts by name first, and an object with no agreed name says
+  "no agreed name yet" beside its id. A spell list whose names were not read says so for its build, with no addon
+  link. The coverage list and the item lists read the same query and page size as the other lists.
 - Site: item list pagination is crawlable while filter URLs stay blocked.
 - Site: /database splits its rows into "Seen by players" and "From the game files", says after launch that a row fills when 3 installs agree, and drops the Guilds lookup row (the Tools menu has it).
 - Knowledge base: a self-hosted MCP server and `coverage-report` read the whole public corpus again. The reader stopped

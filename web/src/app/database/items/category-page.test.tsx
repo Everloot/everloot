@@ -22,7 +22,8 @@ vi.mock("next/navigation", () => ({
 import ItemPage, { generateMetadata } from "./[id]/page";
 import SubclassPage, { generateMetadata as subclassMetadata } from "./[id]/[subclass]/page";
 import ItemsPage from "./page";
-import { CLIENT_LAYER, CLIENT_TAXONOMY, ITEMS_PER_PAGE } from "@/lib/items";
+import { CLIENT_LAYER, CLIENT_TAXONOMY } from "@/lib/items";
+import { PER_PAGE } from "../list-parts";
 import { edgeDegraded } from "@/lib/cf-edge-cache";
 
 const props = (id: string, search: Record<string, string> = {}) => ({ params: Promise.resolve({ id }), searchParams: Promise.resolve(search) });
@@ -35,7 +36,7 @@ test("/database/items lists every item, 50 a page, with the classes (plural) in 
   const page = await html(items());
   expect(page).toContain('href="/database/items/weapons"');
   expect(page).toContain(">Weapons<");
-  expect(page.match(/<tr /g)).toHaveLength(ITEMS_PER_PAGE);
+  expect(page.match(/<tr /g)).toHaveLength(PER_PAGE);
   expect(page).toContain(`>${CLIENT_TAXONOMY.items.length.toLocaleString("en-US")}</span> items`);
   // No provenance line and no visible breadcrumb on a data page; the BreadcrumbList stays for search engines.
   expect(page).not.toContain("data-source-line");
@@ -54,7 +55,7 @@ test("a word in the item slot is a class page; a subclass page filters by slot a
   expect(cloth).not.toContain(">Head<\/td>");
   const chest = CLIENT_TAXONOMY.items.filter((r) => r[1] === 4 && r[2] === 1 && [5, 20].includes(r[3])).length;
   expect(cloth).toContain(`>${chest.toLocaleString("en-US")}</span> items`);
-  if (chest > ITEMS_PER_PAGE) expect(cloth).toContain('href="/database/items/armor/cloth?slot=chest&amp;page=2"');
+  if (chest > PER_PAGE) expect(cloth).toContain('href="/database/items/armor/cloth?slot=chest&amp;page=2"');
 });
 
 test("filters, sort and page live in the URL in one order; several values join with commas; unknown ones are a 404", async () => {
@@ -126,11 +127,11 @@ test("a plain category page is indexed once half the rows it shows have a name, 
   expect((await generateMetadata(props("weapons"))).robots).toMatchObject({ index: false, follow: true });
   const swords = CLIENT_TAXONOMY.subclasses.find((s) => s.slug === "one-handed-swords")!;
   const all = CLIENT_TAXONOMY.items.filter((r) => r[1] === swords.classId && r[2] === swords.id).map((r) => r[0]);
-  expect(all.length).toBeGreaterThan(ITEMS_PER_PAGE * 2);
+  expect(all.length).toBeGreaterThan(PER_PAGE * 2);
   // Named items from the end of the id order: they lead the plain list anyway.
-  const late = all.slice(-ITEMS_PER_PAGE);
+  const late = all.slice(-PER_PAGE);
   const name = (ids: number[]) => ids.flatMap((itemId) => ["a", "b", "c"].map((installId) => ({ installId, itemId, name: `Sword ${itemId}` })));
-  const half = Math.ceil(ITEMS_PER_PAGE / 2);
+  const half = Math.ceil(PER_PAGE / 2);
   try {
     facts.names = name(late.slice(0, half - 1));
     expect((await subclassMetadata(sub("weapons", "one-handed-swords"))).robots).toMatchObject({ index: false });
@@ -144,7 +145,7 @@ test("a plain category page is indexed once half the rows it shows have a name, 
     expect((await subclassMetadata(sub("weapons", "one-handed-swords", { page: "2" }))).robots).toMatchObject({ index: false });
     expect((await subclassMetadata(sub("weapons", "one-handed-swords", { quality: "epic" }))).robots).toMatchObject({ index: false });
     // Enough names spill onto page 2 and index it too.
-    facts.names = name(all.slice(-(ITEMS_PER_PAGE + half)));
+    facts.names = name(all.slice(-(PER_PAGE + half)));
     expect((await subclassMetadata(sub("weapons", "one-handed-swords", { page: "2" }))).robots).toMatchObject({ index: true });
     // Two installs are not an agreed name.
     facts.names = name(late.slice(0, half)).filter((row) => row.installId !== "c");

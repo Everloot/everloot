@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { describe, filterItems, QUALITIES, resolveClass, resolveLegacyClass, resolveSubclass, slotOf, type ItemClass, type ItemRow, type ItemSubclass } from "../../../../../kb/src/item-taxonomy";
 import {
-  activeFilters, BINDINGS, CLIENT_TAXONOMY as T, categoryNamedEnough, categoryQuery, developmentLeftovers, itemFacets, ITEM_LEVEL_BRACKETS, ITEMS_PER_PAGE, itemsHref,
+  activeFilters, BINDINGS, CLIENT_TAXONOMY as T, categoryNamedEnough, categoryQuery, developmentLeftovers, itemFacets, ITEM_LEVEL_BRACKETS, itemsHref,
   listItems, NAME_FROM, SOURCES, shownItemName, subclassLabel, toggled, UNRECORDED, type CategoryQuery, type NameSource,
 } from "@/lib/items";
 import { loadListNames, loadListSeen } from "@/lib/item-view";
@@ -20,7 +20,7 @@ import Badge, { UNCONFIRMED_TITLE } from "@/components/ui/Badge";
 import { Container, DataTable, DataTitle, FilterBar, filledColumns, QUALITY_TEXT, ResultStrip, qualityOf, type FilterControl, type SparseColumn } from "@/components/ui";
 import type { Crumb } from "@/lib/jsonld";
 import { LAUNCH, LAUNCH_AT, longDate } from "@/data/wow-forever";
-import { LEVEL_BRACKETS } from "../list-parts";
+import { LEVEL_BRACKETS, PER_PAGE } from "../list-parts";
 
 type Search = Record<string, string | string[] | undefined>;
 
@@ -147,9 +147,9 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const hiddenIn = (classId?: number, subclassId?: number) => T.items.reduce((n, row) => n + Number((classId === undefined || (row[1] === classId && (subclassId === undefined || row[2] === subclassId))) && (gone(row[0]) || !fits(row))), 0);
   // The rows a class context keeps without the files deciding, for the line under the chip.
   const undecided = usable ? rows.reduce((n, row) => n + Number(usable(row) === "unknown"), 0) : 0;
-  const pages = Math.max(1, Math.ceil(rows.length / ITEMS_PER_PAGE));
+  const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
   if (q.page > pages) notFound();
-  const shown = rows.slice((q.page - 1) * ITEMS_PER_PAGE, q.page * ITEMS_PER_PAGE);
+  const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
   const tips = every ?? await tipsFor(shown.map((row) => row[0]).filter(showsTip));
   const names = new Map(shown.map((row) => [row[0], shownItemName(row[0], agreed, matched?.names, tips.get(row[0]))]));
   const icons = shown.some((row) => tips.get(row[0])?.icon || !names.get(row[0]));
@@ -285,7 +285,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   // The name box keeps every other filter (not the page) as hidden fields.
   const keep = Object.fromEntries(new URLSearchParams(link(undefined, undefined, { ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
   const pageHref = (page: number) => link(cls?.slug, sub?.slug, { ...q, page });
-  const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "item" : "items"} page={q.page} perPage={ITEMS_PER_PAGE} href={pageHref} label="Item pages" />;
+  const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "item" : "items"} page={q.page} perPage={PER_PAGE} href={pageHref} label="Item pages" />;
   const active = activeFilters(q);
 
   const chips = [

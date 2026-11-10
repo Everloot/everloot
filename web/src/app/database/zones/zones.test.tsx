@@ -19,7 +19,7 @@ vi.mock("next/navigation", () => ({
   permanentRedirect: (to: string) => { throw new Error(`REDIRECT ${to}`); },
 }));
 
-import ZonesPage, { metadata } from "./page";
+import ZonesPage, { generateMetadata as zonesMetadata } from "./page";
 import ZonePage, { generateMetadata } from "./[zone]/page";
 import { EntityRelations } from "@/components/EntityRelations";
 import type { Edge } from "../../../../../kb/src/edges";
@@ -43,7 +43,7 @@ test("the index groups released zones by continent and links each one; held-back
   expect(page).toContain('href="/database/zones/1436-westfall"');
   expect(page).toContain('href="/database/zones/1411-durotar"');
   for (const held of ["Mount Hyjal", "Riverglades", "Shen&#x27;dralas"]) expect(page).not.toContain(held);
-  expect(metadata.alternates?.canonical).toBe("/database/zones");
+  expect((await zonesMetadata()).alternates?.canonical).toBe("/database/zones");
 });
 
 test("the index is a database list: data width, zones A to Z, a dash for a count nobody reported, no all-zero column", async () => {
