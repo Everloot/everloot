@@ -41,7 +41,7 @@ export default function Page() {
           ["Overview", "Upload, prices, /ask and addon status, recent activity and Blizzard changes."],
           ["Chat", "Ask about the game or your characters, with sources. Choose an optional model provider in Assistant setup."],
           ["Characters", "Your characters' gold, gear and progress from the save file on this computer."],
-          ["Upload", "Each account file, records and confirmed uploads. Upload now, backups and restore."],
+          ["Upload", "Each account file, records and confirmed uploads. Run now, backups and restore."],
           ["Market", "Your scans, the last prices written and realms to follow. Your scanned realms are always included; follow more for their tooltip prices."],
           ["Ask", "Assistant setup, pending in-game /ask questions and recent answers. Private server settings are under Advanced."],
           ["Addon", "Installed and latest versions, checksum-checked install or update in one click, slot addon status and Saved builds sync for /everloot plan."],
@@ -62,8 +62,7 @@ export default function Page() {
       <P>
         Signing in raises the Chat and in-game <C>/ask</C> limits. A key with <strong>Read my saved builds</strong>
         {" "}brings your saved talent builds into the game from the Addon page. Character links and optional private sync
-        need the <C>link:own</C> and <C>sync:own</C> permissions respectively, when those features are available on the
-        site. A key alone does not link a character or turn on private sync. See the{" "}
+        need the <C>link:own</C> and <C>sync:own</C> permissions respectively. A key alone does not link a character or turn on private sync. See the{" "}
         <Link href="/docs/guides/account" className={docLink}>account guide</Link> for those choices.
       </P>
       <P>

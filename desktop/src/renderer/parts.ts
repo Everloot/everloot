@@ -30,7 +30,7 @@ export type EmptyPage = "characters" | "upload" | "market" | "ask" | "log" | "ch
 /** The one control under an empty state: a page to open, a job to run, or a link to open. */
 export interface EmptyAction { label: string; page?: string; run?: Job; open?: string }
 export interface Empty { cause: string; step: string; action?: EmptyAction }
-type EmptyContext = { settings: Pick<Settings, "gameFolder" | "upload" | "ask">; engine: Pick<EngineState, "files" | "paused"> };
+type EmptyContext = { settings: Pick<Settings, "gameFolder" | "upload" | "prices" | "ask">; engine: Pick<EngineState, "files" | "paused"> };
 
 const EMPTY_DEFAULT: Record<EmptyPage, Empty> = {
   characters: { cause: "Save file read, no named character rows yet", step: "The addon records gold and gear while you play" },
@@ -39,7 +39,7 @@ const EMPTY_DEFAULT: Record<EmptyPage, Empty> = {
   ask: { cause: "No question waiting", step: "Type /ask in game, then /reload" },
   log: { cause: "Nothing logged since start", step: "" },
   changes: { cause: "No changes fetched yet", step: "" },
-  addon: { cause: "No Everloot addon installed", step: "Install it above" },
+  addon: { cause: "No Everloot addon installed", step: "Use Install below" },
 };
 
 /**
@@ -55,6 +55,7 @@ export function emptyCause(page: EmptyPage, s: EmptyContext, extra: { error?: st
   if (page === "upload" && !s.settings.upload) return { cause: "Upload is off", step: "Turn it on above" };
   if (page === "ask" && !s.settings.ask.enabled) return { cause: "/ask is off", step: "Turn it on above" };
   if (extra.error) return { cause: extra.error, step: "Try again", action: { label: "Retry", page } };
+  if (page === "market" && extra.written === false && !s.settings.prices) return { cause: "Market prices are off", step: "Turn it on above" };
   if (page === "market" && extra.written === false) return {
     cause: "Nothing written into the game yet",
     step: "Prices are written at the next refresh; /reload in game to see them",

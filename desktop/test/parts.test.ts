@@ -29,7 +29,7 @@ test("the watch pill counts files and says paused first", () => {
   expect(watchPill({ files: ["a"], paused: true })).toContain(">Paused<");
 });
 
-const base = { settings: { gameFolder: "W:\\_classic_era_", upload: true, ask: { enabled: true } }, engine: { files: ["a"], paused: false } } as never as Parameters<typeof emptyCause>[1];
+const base = { settings: { gameFolder: "W:\\_classic_era_", upload: true, prices: true, ask: { enabled: true } }, engine: { files: ["a"], paused: false } } as never as Parameters<typeof emptyCause>[1];
 
 test("no game folder beats everything", () => {
   const e = emptyCause("characters", { ...base, settings: { ...base.settings, gameFolder: null } });
@@ -163,4 +163,16 @@ test("Market with nothing written offers one price refresh, without changing the
   expect(html).toContain('data-run="prices"');
   expect(html.match(/<button /g)).toHaveLength(1);
   expect(emptyCause("market", base).cause).toBe("No full scan in your save file yet");
+});
+
+test("Market with prices off says so instead of offering a refresh the engine would skip", () => {
+  const e = emptyCause("market", { ...base, settings: { ...base.settings, prices: false } }, { written: false });
+  expect(e).toEqual({ cause: "Market prices are off", step: "Turn it on above" });
+  expect(emptyState(e, "")).not.toContain("<button");
+});
+
+test("Market with no game folder gives the folder cause, never the price refresh", () => {
+  const e = emptyCause("market", { ...base, settings: { ...base.settings, gameFolder: null } }, { written: false });
+  expect(e.cause).toBe("Not watching a game folder");
+  expect(e.action?.run).toBeUndefined();
 });

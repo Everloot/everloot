@@ -781,6 +781,11 @@ function market(s: AppState): string {
   const last = m?.last ?? [];
   const stale = (at: string | null) => !at || Date.now() - new Date(at).getTime() > 24 * 3600 * 1000;
   const scans = (m?.scans ?? []).map((sc) => `<tr><td>${esc(sc.realm)}</td><td>${sc.at ? ago(sc.at) : "unknown"}</td><td class="${stale(sc.at) ? "warn" : "ok"}">${stale(sc.at) ? "scan again next time you are at the auction house" : "fresh"}</td></tr>`).join("");
+  // The panel above already shows the no-folder, no-file and paused causes; this one only adds what is its own.
+  const w = emptyCause("market", s, { written: false });
+  const marketWritten = w.action?.run === "prices" || w.cause === "Market prices are off"
+    ? w
+    : { cause: "Nothing written into the game yet", step: "Prices are written at the next refresh; /reload in game to see them" };
   return `<div class="page">
     <div class="head"><h1>Market</h1><div class="row">${jobSwitch("prices", s)}${runBtn("prices", s, "Refresh now")}</div></div>
     ${workingStrip("prices", s, statusText(j), lastLineOf("prices", s))}
@@ -805,7 +810,7 @@ function market(s: AppState): string {
       ${j.state === "error" ? `<p class="error">${esc(j.message)}</p>` : ""}
       ${last.length ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th class="num">Items</th><th>Data as of</th><th>Why</th></tr></thead><tbody>${last.map((r) => `<tr><td>${esc(r.realm)}</td><td class="num">${r.items}</td><td>${r.dataAsOf ? when(r.dataAsOf) : "–"}</td><td class="muted">${r.source === "scan" ? "your scans" : "followed"}</td></tr>`).join("")}</tbody></table></div>`
         : m?.inGame?.length ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th class="num">Items</th><th>Data as of</th></tr></thead><tbody>${m.inGame.map((r) => `<tr><td>${esc(r.realm)}</td><td class="num">${r.items}</td><td>${r.dataAsOf ? when(r.dataAsOf) : "–"}</td></tr>`).join("")}</tbody></table></div><p class="muted small">The file in the game now; not refreshed yet this session.</p>`
-        : emptyState(emptyCause("market", s, { written: false }), icon("market"))}
+        : emptyState(marketWritten, icon("market"))}
     </section>
   </div>`;
 }
@@ -884,7 +889,7 @@ function addon(s: AppState): string {
       <div class="stat"><div class="k">Builds file</div><div class="v">${a?.slots.builds ? '<span class="ok">present</span>' : "none"}</div><div class="s">EverlootBuilds</div></div>
     </div>
     <section class="panel">
-      ${!s.settings.gameFolder ? emptyState(emptyCause("addon", s), icon("addon")) : `
+      ${!s.settings.gameFolder ? `${emptyState(emptyCause("addon", s), icon("addon"))}<p class="muted small">${ext("https://everloot.app/upload", "manual install steps")}</p>` : `
       ${upToDate
         ? `<h2>Up to date</h2><p class="fg2">${a!.installed === a!.latest!.version ? `You have the newest Everloot addon, ${esc(a!.installed!)}.` : `You have ${esc(a!.installed!)}, newer than the latest release ${esc(a!.latest!.version)}.`} Nothing to do.</p>`
         : `<h2>${a?.installed ? "Update" : "Install"}</h2><p class="fg2">Downloads <code>Everloot-${esc(a?.latest?.version ?? "x.y.z")}.zip</code> from the site, checks it against the checksum published with the GitHub release, and replaces <code>Interface/AddOns/Everloot</code> in one swap. Close the game first, or <code>/reload</code> after.</p>`}
