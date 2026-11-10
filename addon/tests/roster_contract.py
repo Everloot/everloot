@@ -142,3 +142,20 @@ assert(rowsByKey.roster and rowsByKey.roster.label == 'Your characters' and orde
 assert(rowsByKey.roster.text == "Name, realm, class, level, faction, gold and professions of each character you log in with, for the window's Home. Stays in this file; never uploaded.", 'options text')
 """)
 print("roster contract: PASS")
+
+lua.execute("""
+boot()
+-- Identical display names do not merge roster identities: the key includes the GUID and install.
+UnitName = function() return 'Thrall' end
+GetRealmName = function() return 'CAMWOW US1 Realm 4 PVP' end
+UnitGUID = function() return 'Player-4242-0ABCDEF1' end
+Everloot.Roster.Update()
+local first = Everloot.CharacterKey()
+UnitGUID = function() return 'Player-4242-0ABCDEF2' end
+Everloot.Roster.Update()
+local second = Everloot.CharacterKey()
+assert(first ~= second and #Everloot.Roster.Rows() == 2, 'same name, different GUIDs stay separate')
+EverlootDB.installId = 'another-install'
+local third = Everloot.CharacterKey()
+assert(third ~= first and third ~= second, 'install namespaces the opaque key')
+""")

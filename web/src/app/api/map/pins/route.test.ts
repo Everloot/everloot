@@ -102,9 +102,21 @@ test("stored facts give the same answer with zero corpus reads", async () => {
   const { buildMapPins, encodeMapPins, forgetStoredMapPins } = await import("@/lib/map-pins-store");
   const { buildAggregates } = await import("@/lib/aggregate-set");
   const { encodeAggregates, forgetStoredAggregates } = await import("@/lib/aggregate-store");
-  const corpus = { uploads: 3, records: sightings(7, 1429, 40, 60, "Guard Marlow"), dataAsOf: "2026-11-09" };
+  // An NPC, a vendor three installs agree on, both on Eastern Kingdoms, and an NPC in a held-back zone on Kalimdor.
+  const vendor = ["install-secret-a", "install-secret-b", "install-secret-c"].map((installId) => ({
+    kind: "vendor", installId, vendorNpcId: 8, items: [{ itemId: 159, priceCopper: 25 }], capturedAt: "2026-10-17T00:00:00Z",
+  }));
+  const corpus = {
+    uploads: 3, dataAsOf: "2026-11-09",
+    records: [...sightings(7, 1429, 40, 60, "Guard Marlow"), ...sightings(8, 1429, 30, 30, "Trader Ann"), ...vendor, ...sightings(9, 2482, 50, 50, "Held Warden")],
+  };
+  const queries = ["?continent=0", "?continent=0&spoilers=1", "?continent=1", "?continent=1&spoilers=1"];
   store.loadCorpus.mockResolvedValue(corpus);
-  const before = await (await GET(req("?continent=0"))).json();
+  const before = await Promise.all(queries.map(async (q) => (await GET(req(q))).json()));
+  // The answers hold what the check is for: the vendor pin, and the held-back NPC only with spoilers=1.
+  expect(readPinSet(before[0])!.pins.map((p) => [p.name, p.kind])).toEqual(expect.arrayContaining([["Trader Ann", "vendor"], ["Guard Marlow", "npc"]]));
+  expect(readPinSet(before[2])!.pins.map((p) => p.name)).not.toContain("Held Warden");
+  expect(readPinSet(before[3])!.pins.map((p) => p.name)).toContain("Held Warden");
   store.loadCorpus.mockClear();
   forgetStoredMapPins();
   forgetStoredAggregates();
@@ -116,6 +128,6 @@ test("stored facts give the same answer with zero corpus reads", async () => {
       : url.endsWith("snapshots/map-pins.json")
         ? encodeMapPins(buildMapPins(corpus), "now") : "{}" );
   }));
-  expect(await (await GET(req("?continent=0"))).json()).toEqual(before);
+  expect(await Promise.all(queries.map(async (q) => (await GET(req(q))).json()))).toEqual(before);
   expect(store.loadCorpus).not.toHaveBeenCalled();
 });

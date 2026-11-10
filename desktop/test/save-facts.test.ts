@@ -105,3 +105,12 @@ test("after a logout the Upload page costs no parse of its own: the jobs' parse 
   expect(table).toHaveBeenCalledTimes(1);
   expect(lua).not.toHaveBeenCalled();
 });
+
+test("reports reuse their index until a file changes", () => {
+  const file = join(dir(), "Everloot.lua");
+  writeFileSync(file, DB);
+  const first = saveFacts(file).reports;
+  expect(saveFacts(file).reports).toBe(first);
+  writeFileSync(file, DB + "\n-- another write\n");
+  expect(saveFacts(file).reports).not.toBe(first);
+});

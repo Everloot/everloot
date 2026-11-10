@@ -34,7 +34,9 @@ test("carries the game-files label, the build stamp and Blizzard's credit", asyn
   const html = await page();
   expect(LEGACY_PERKS.label).toBe("found in game files, unconfirmed");
   expect(html).toContain("Found in game files, unconfirmed.");
-  expect(html).toContain(`Build ${LEGACY_PERKS.build.version}`);
+  expect(html).toContain(`Read from build ${LEGACY_PERKS.build.version}`);
+  expect(html).toContain(`on ${LEGACY_PERKS.build.extractedAt.slice(0, 10)}`);
+  expect(html).toContain(`href="/changes?show=builds&amp;q=${LEGACY_PERKS.build.version}"`);
   expect(html).toContain("Blizzard Entertainment");
 });
 

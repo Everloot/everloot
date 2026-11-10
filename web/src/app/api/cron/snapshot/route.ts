@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sharingStore, uploadStore } from "@/lib/upload-store";
+import { sharingStore, uploadStore, type Corpus } from "@/lib/upload-store";
 import { intakeQuota } from "@/lib/intake-quota";
 import { pruneKeys } from "@/lib/api-keys";
 import { guardOn } from "@/lib/data-guard";
@@ -8,11 +8,11 @@ import { playerStore } from "@/lib/player-store";
 import { pullStore } from "@/lib/pull-store";
 import { writeCoverage } from "@/lib/coverage-store";
 import { currentSettledWeek, writeSettled } from "@/lib/settled-store";
-import { writeItemView } from "@/lib/item-view-store";
-import { writeAggregates } from "@/lib/aggregate-store";
-import { writeAuctionHistory } from "@/lib/auction-history-store";
-import { writeProfessions } from "@/lib/profession-store";
-import { writeMapPins } from "@/lib/map-pins-store";
+import { buildItemView, writeItemView } from "@/lib/item-view-store";
+import { anonymousAggregates, writeAggregates } from "@/lib/aggregate-store";
+import { buildAuctionHistory, writeAuctionHistory } from "@/lib/auction-history-store";
+import { buildProfessions, writeProfessions } from "@/lib/profession-store";
+import { buildMapPins, writeMapPins } from "@/lib/map-pins-store";
 
 /**
  * GET /api/cron/snapshot — the Worker's Cron Trigger (src/lib/cf-crons.ts, every 10 minutes) extends the corpus snapshot with new uploads,
@@ -112,11 +112,20 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("settled list failed", err);
     }
+    // The stored views below each work from the corpus as it stands. It is read once, by the first view that needs it,
+    // and shared: each read runs the publication pass again. An unreachable corpus fails every view that asks for it.
+    let corpusRead: Promise<Corpus> | null = null;
+    const corpus = () => (corpusRead ??= uploadStore.loadCorpus().then((c) => {
+      if (c.unreachable) throw new Error("corpus unreachable");
+      return c;
+    }));
     // What the item lists read (lib/item-view.ts), stored after the snapshot so a page never replays the corpus. Written
     // only when this run added uploads, rebuilt, or finds no file; a failure is logged and the pages fall back.
     let itemView: { written: boolean; items?: number } | null = null;
     try {
-      itemView = await writeItemView({ added: result.added, rebuild, dataAsOf: result.dataAsOf });
+      itemView = await writeItemView({ added: result.added, rebuild, dataAsOf: result.dataAsOf }, {
+        build: async () => buildItemView(result.dataAsOf, new Date(), await corpus()),
+      });
     } catch (err) {
       console.error("item view failed", err);
     }
@@ -125,7 +134,7 @@ export async function GET(req: Request) {
     // this run added uploads, rebuilt, or finds no file; a failure is logged and the pages work the tables out themselves.
     let aggregates: { written: boolean; bytes?: number } | null = null;
     try {
-      aggregates = await writeAggregates({ added: result.added, rebuild, dataAsOf: result.dataAsOf });
+      aggregates = await writeAggregates({ added: result.added, rebuild, dataAsOf: result.dataAsOf }, { build: async () => anonymousAggregates(await corpus()) });
     } catch (err) {
       console.error("aggregates failed", err);
     }
@@ -133,20 +142,21 @@ export async function GET(req: Request) {
     // auction_history tool never replay the corpus. Same rule as the item view; a failure is logged and they read the corpus.
     let auctionHistory: { written: boolean; items?: number } | null = null;
     try {
-      auctionHistory = await writeAuctionHistory({ added: result.added, rebuild, dataAsOf: result.dataAsOf });
+      auctionHistory = await writeAuctionHistory({ added: result.added, rebuild, dataAsOf: result.dataAsOf }, { build: async () => buildAuctionHistory(await corpus()) });
     } catch (err) {
       console.error("auction history failed", err);
     }
-    // The profession and map views follow the same write rule as the aggregates.
+    // The profession and map views follow the auction history's rule: an idle run also rewrites a file built from
+    // another snapshot, so a failed write catches up on the next run.
     let professions: { written: boolean; bytes?: number } | null = null;
     let mapPins: { written: boolean; bytes?: number } | null = null;
     try {
-      professions = await writeProfessions({ added: result.added, rebuild, dataAsOf: result.dataAsOf });
+      professions = await writeProfessions({ added: result.added, rebuild, dataAsOf: result.dataAsOf }, { build: async () => buildProfessions(await corpus()) });
     } catch (err) {
       console.error("profession view failed", err);
     }
     try {
-      mapPins = await writeMapPins({ added: result.added, rebuild, dataAsOf: result.dataAsOf });
+      mapPins = await writeMapPins({ added: result.added, rebuild, dataAsOf: result.dataAsOf }, { build: async () => buildMapPins(await corpus()) });
     } catch (err) {
       console.error("map pins view failed", err);
     }

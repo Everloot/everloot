@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import JsonLd from "@/components/JsonLd";
+import { entityPageJsonLd } from "@/lib/jsonld";
 import AdSlot from "@/components/AdSlot";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
@@ -93,6 +95,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
   return (
     <Container width="data">
       <article>
+        <JsonLd data={entityPageJsonLd({ name: title, path: `/database/quests/${page.questId}`, identifier: `quest:${page.questId}` })} />
         <EntityHeader
           trail={trail}
           title={title}

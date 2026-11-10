@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, vi } from "vitest";
@@ -15,6 +15,7 @@ import { encodeBuild, encodeOrder } from "@/lib/talents/share";
 import { GET } from "./sitemap.xml/route";
 import sitemap from "@/lib/site-sitemap";
 import { approvedAddonNames } from "@/data/addon-repos";
+import { rankingWeeks } from "@/lib/rankings";
 
 const facts = vi.hoisted(() => ({ rates: [] as unknown[], names: [] as { installId: string; itemId: number; name: string }[], npcs: [] as unknown[], unreachable: false }));
 const world = vi.hoisted(() => ({ npcs: [] as unknown[], quests: [] as unknown[], vendors: [] as unknown[], unreachable: false }));
@@ -274,5 +275,58 @@ test("a zone with only a treasure on it is listed, as its page counts the treasu
     expect(await paths()).toContain("/database/zones/1450-moonglade");
   } finally {
     instances.sightings = [];
+  }
+});
+
+test("a zone's coverage page is listed once players confirmed something there, as its own robots ask; an entrance from the files alone is not enough", async () => {
+  const paths = async () => (await sitemap())!.map((e) => new URL(e.url).pathname);
+  const { generateMetadata } = await import("./database/coverage/[zone]/page");
+  const robots = async () => (await generateMetadata({ params: Promise.resolve({ zone: "1436-westfall" }) })).robots;
+  // Westfall's zone page is listed for the Deadmines entrance the files place; its coverage page has nothing yet.
+  expect(byPath.has("/database/zones/1436-westfall")).toBe(true);
+  expect(byPath.has("/database/coverage/1436-westfall")).toBe(false);
+  expect(await robots()).toMatchObject({ index: false });
+  try {
+    world.npcs = ["a", "b", "c"].map((installId) => ({ installId, npcId: 5, name: "Farmer", mapId: 1436, x: 50, y: 50, positionKind: "npc" }));
+    expect(await paths()).toContain("/database/coverage/1436-westfall");
+    expect(await robots()).toMatchObject({ index: true });
+  } finally {
+    world.npcs = [];
+  }
+});
+
+test("the class chooser is listed once both its files are reviewed, as its robots say; the group planner says noindex and is not", async () => {
+  expect(byPath.has("/classes/choose")).toBe(false);
+  expect(byPath.has("/classes/group")).toBe(false);
+  const guides = join(__dirname, "..", "..", "..", "kb", "guides");
+  const reviewed = (name: string) => readFileSync(join(guides, name), "utf8")
+    .replace("status: draft", "status: reviewed").replace('reviewer: ""', "reviewer: Kai").replace("reviewedOn: null", "reviewedOn: 2026-10-26");
+  const dir = mkdtempSync(join(tmpdir(), "sitemap-chooser-"));
+  for (const name of ["class-roles.yaml", "class-chooser.yaml"]) writeFileSync(join(dir, name), reviewed(name));
+  vi.stubEnv("GUIDES_DIR", dir);
+  try {
+    expect((await sitemap())!.map((e) => new URL(e.url).pathname)).toContain("/classes/choose");
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
+
+test("a ranking board is listed once its unfiltered view asks to be indexed (10 ranked rows), with the rankings hub", async () => {
+  let n = 0;
+  const races = [...["Orc", "Tauren", "Troll", "Scourge", "Skyborne"].map((race) => ({ race, faction: "Horde" })), ...["Dwarf", "Gnome", "Human", "NightElf", "Skyborne"].map((race) => ({ race, faction: "Alliance" }))];
+  const rows = races.flatMap((r, k) => Array.from({ length: 12 }, (_, i) => ({
+    kind: "census_seen", installId: `install-${"abc"[i % 3]}`, reporter: `${i % 3}`.padStart(16, "0"), eventId: `census_seen:x:${++n}`,
+    capturedAt: "2026-11-11T10:00:00.000Z", characterKey: `r${k}${i.toString(16).padStart(4, "0")}`, serverId: 4,
+    race: r.race, class: "WARRIOR", level: 20, faction: r.faction, via: "target",
+  })));
+  try {
+    rankings.weeks = rankingWeeks(rows as Parameters<typeof rankingWeeks>[0], "2026-11-15T12:00:00.000Z");
+    const paths = (await sitemap())!.map((e) => new URL(e.url).pathname);
+    expect(paths).toContain("/rankings");
+    expect(paths).toContain("/rankings/races");
+    // Nine classes and two sides never make 10 ranked rows, so those boards say noindex and stay out.
+    expect(paths).not.toContain("/rankings/classes");
+  } finally {
+    rankings.weeks = [];
   }
 });

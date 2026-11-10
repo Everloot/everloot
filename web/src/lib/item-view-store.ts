@@ -1,4 +1,5 @@
 import { AwsClient } from "aws4fetch";
+import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
 import { agreedItemNames } from "../../../kb/src/item-page";
 import { loadItemSeen, type ItemSeen } from "./item-seen";
 import { SOURCES, type SourceSlug } from "./items";
@@ -9,7 +10,7 @@ import { uploadStore, type Corpus, type R2Config } from "./upload-store";
  * What the item lists read from players' uploads, stored by the cron instead of worked out on each view: the names 3
  * installs agree on, the items with a public drop, and the items players have seen with where they came from. The
  * cron writes it after the corpus snapshot (`writeItemView`), only when that run added uploads or rebuilt, or when
- * the file is missing. A page reads one small file (`loadListNames`, `loadListSeen` in item-view.ts) instead of downloading and
+ * the file is missing or stale. A page reads one small file (`loadListNames`, `loadListSeen` in item-view.ts) instead of downloading and
  * replaying the whole corpus, which cost seconds of CPU on every new server instance. Every value is the same one
  * `loadShownNames` and `loadItemSeen` compute, from the same functions, so a page shows the same thing either way;
  * with no file yet (the first minutes after a deploy, or storage out of reach) the pages fall back to those.
@@ -65,19 +66,9 @@ export async function buildItemView(dataAsOf: string | null, now = new Date(), r
   };
 }
 
-/** Whether the file exists; a read failure counts as missing, so the next run tries to write it. */
-async function viewExists(cloud: R2Config, doFetch: typeof fetch): Promise<boolean> {
-  try {
-    const res = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "HEAD" }));
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
 /**
- * The cron's step: writes the view when this run added uploads or rebuilt, or when there is no file yet. An idle run
- * with the file in place reads nothing but that one HEAD.
+ * The cron's step: writes the view when this run added uploads or rebuilt, or when the file is missing, unstamped or stale. An idle run
+ * with a current file reads only a HEAD, falling back to GET if HEAD fails.
  */
 export async function writeItemView(opts: { added: number; rebuild?: boolean; dataAsOf: string | null }, deps: {
   cloud?: R2Config | null; fetch?: typeof fetch; build?: () => Promise<ItemView>;
@@ -85,9 +76,9 @@ export async function writeItemView(opts: { added: number; rebuild?: boolean; da
   const cloud = deps.cloud === undefined ? r2FromEnv() : deps.cloud;
   if (!cloud) throw new Error("the item view needs the cloud store");
   const doFetch = deps.fetch ?? fetch;
-  if (opts.added <= 0 && !opts.rebuild && await viewExists(cloud, doFetch)) return { written: false };
+  if (opts.added <= 0 && !opts.rebuild && !await storedViewNeedsWrite(r2(cloud), r2Url(cloud), opts.dataAsOf, doFetch)) return { written: false };
   const view = await (deps.build ?? (async () => buildItemView(opts.dataAsOf, new Date(), await uploadStore.loadCorpus())))();
-  const put = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "PUT", body: JSON.stringify(view), headers: { "content-type": "application/json" } }));
+  const put = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "PUT", body: JSON.stringify(view), headers: { "content-type": "application/json", [STAMP]: stampOf(opts.dataAsOf) } }));
   if (!put.ok) throw new Error(`item view write failed (${put.status})`);
   return { written: true, items: view.seen.length };
 }
