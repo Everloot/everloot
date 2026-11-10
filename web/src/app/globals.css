@@ -88,7 +88,13 @@
 }
 
 /* A wide-screen banner (ui/Banner) runs 100vw wide, which on a desktop with a scrollbar is a few
-   pixels wider than the page; clip that bleed so the page never scrolls sideways. */
+   pixels wider than the page; clip that bleed so the page never scrolls sideways. Clipping the body alone
+   is not enough: its overflow is handed to the viewport, which keeps the bleed as scrollable width
+   (scrollWidth > clientWidth). With the root holding the viewport's overflow, the body's own clip stays
+   on the body and the bleed never reaches the page's width. */
+html:has([data-banner]) {
+  overflow-x: hidden;
+}
 body:has([data-banner]) {
   overflow-x: clip;
 }
