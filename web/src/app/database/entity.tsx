@@ -86,10 +86,10 @@ export const known = (value: ReactNode, reported = 0) =>
  * An empty tab: one line. The agreement meter and "Get the addon" for what players report; a plain line
  * (and its own link, if any) for what the game files would give.
  */
-export function EmptyTab({ message, players = true, action = GET_THE_ADDON }: { message: string; players?: boolean; action?: { href: string; label: string } | null }) {
+export function EmptyTab({ message, reported = 0, players = true, action = GET_THE_ADDON }: { message: string; reported?: number; players?: boolean; action?: { href: string; label: string } | null }) {
   return (
     <p data-empty-state className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3 text-meta text-fg-2">
-      {players && <AgreementMeter count={0} />}
+      {players && <AgreementMeter count={reported} />}
       <span>{message}</span>
       {action && <Link href={action.href} className={LINK}>{action.label}</Link>}
     </p>

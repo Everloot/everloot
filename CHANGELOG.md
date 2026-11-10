@@ -53,6 +53,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: a profession page answers to its skill line id, `/tools/professions/171` or `/tools/professions/171-alchemy`, and
   redirects for good to the slug page it already had, keeping the skill range and class context in the query; an unknown id
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
+- Site: NPC pages show agreed goods and quests with their reports, link to the vendor, and show level, type and reaction even before players agree on a name.
 - Addon: the Gold Overview shows earned, spent and profit for the selected period and character or account, with daily averages, top items and pending sales.
 - Site: vendor, achievement, quest chain, zone and instance pages carry In short and Copy for AI like the other database
   pages, each line saying how many installs agree and when, or that nobody has reported it yet; a vendor links its NPC's
