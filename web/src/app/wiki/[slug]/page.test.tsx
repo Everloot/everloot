@@ -261,3 +261,10 @@ test("no private path or internal name reaches the output", async () => {
   const pattern = loadPrivatePathPattern();
   for (const slug of ["test-dungeon", "test-zone", "test-new-dungeon"]) expect(await render(slug)).not.toMatch(pattern);
 });
+
+test("Deadmines dates the older read and explains the current facts table", async () => {
+  vi.stubEnv("WIKI_DIR", fileURLToPath(new URL("../../../../../kb/wiki", import.meta.url)));
+  const html = await render("deadmines");
+  expect(html).toContain("read from build 1.60.1.70707 on 2026-11-01");
+  expect(html).toContain("the At a glance table is regenerated from the current build");
+});

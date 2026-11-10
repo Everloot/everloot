@@ -18,16 +18,23 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: a dungeon or raid page gains a Loot section after Bosses: for each boss 3 installs report, the loot table of
   its creature, the same rows its NPC page shows, or how many installs have looted it so far. In the list, an instance
   the game files place no entrance for says so beside its id, with the reason on hover.
+- Site: every database page now tells search engines its name, id and address, so results link the right page.
 - Site: the armory opens at `/armory`: a page for every WoW Forever character and guild that Blizzard's API returns,
   read hourly, with guild rosters, three boards (item level, gear score, honorable kills), a form to hide a character
   and a form to ask for one. Each page says "Data from Blizzard Entertainment", carries no ad and is not indexed yet.
+- Addon: the Collection tab gains a Quests section, each quest chain you have started with how many of its quests are
+  done, and a This character / Account switch. Account counts every character you log in with and names the one that
+  has each achievement, title, reputation, lockout or chain. It reads what the completion tracker already keeps;
+  nothing new is recorded or uploaded.
 - Knowledge base: the open data export's game-files folder gains one file per committed catalog (achievements, factions,
   titles, quest lines, mounts, encounters, recipes, class gear and its restrictions, class spells, races, legacy perks,
   talent nodes, raid buffs): ids, the names the files hold and each file's build, every row counted, with a schema each
   and a manifest line. The README and the download page no longer list the catalogs as missing. Nothing observed changes.
+- Addon: `/everloot where` finds an item's drops and vendors or an NPC's locations in your own saved sightings, with counts and a site link.
 - Site: every record kind has a docs page, `/docs/api/records/<kind>`, generated from its schema: each field with its type,
   whether it is required and its description, nested fields included, whether the kind is in the public corpus, where it
   goes, and the cross-field rules the server checks. The sidebar lists them and the schemas table links each kind to its page.
+- Site: the API docs list the site-internal routes, `/api/suggest` and `/api/map/pins`, with a note that they serve the site's pages, may change without notice and are not part of the protocol.
 - Site: the account guide and the addon page link the sample character page (/showcase/character), so a player can see
   what a character page holds before linking one. The sample stays out of search and the sitemap.
 - Site: a profession page answers to its skill line id, `/tools/professions/171` or `/tools/professions/171-alchemy`, and
@@ -172,12 +179,18 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   instead of withdrawing the event as a conflict. The map shows none of this yet.
 
 ### Fixed
+- Site: the header shows the build whose files the site reads and the newest build seen, each linked to what it means.
 - Site: /api/suggest spends the per-IP quota and shares one edge cache entry for `Thunder` and `thunder `, the coverage 400 and waitlist 503 are `no-store` (the 503 adds `Retry-After`), and the docs list every route that sends CORS from one file.
+- Site: when a database or tools page can't be read, you now get a "Database unavailable" or "Tool unavailable" page that says it could not be read, not that it is empty, with a Try again button and a link back to the section, instead of the generic error page.
 - Site: item list pagination is crawlable while filter URLs stay blocked.
+- Site: the stored profession and map views work out the derived profession steps and the recheck list on read, so a
+  deploy that changes either shows at once; an idle cron run rewrites a view built from an older snapshot, and the
+  cron reads the corpus once for all the stored views it writes.
 - Site: /database splits its rows into "Seen by players" and "From the game files", says after launch that a row fills when 3 installs agree, and drops the Guilds lookup row (the Tools menu has it).
 - Knowledge base: a self-hosted MCP server and `coverage-report` read the whole public corpus again. The reader stopped
   at 50 pages and 2 MB in all, and the feed is now about 98 pages and 13 MB; the limits are per page with a high total
   guard. Without a key the site allows 30 requests an hour, so a rate-limited read now says to set `EVERLOOT_API_KEY`.
+- Desktop App: the guide covers every page and signing in, setup points to `_forever_`, and empty Addon and Market panels offer Open Settings or Refresh prices.
 - Site: title pages and lists no longer show the game's raw `%s`: the name reads "Bloodsail Admiral <Name>", the address
   drops the trailing `-s` (`/database/titles/144-bloodsail-admiral`) and the old address redirects to the new one.
 - Site: the schemas page marks the three shapes that describe a bulk-export file rather than an endpoint and says that
@@ -382,6 +395,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   account. A character two accounts link stays frozen until it is settled: write to hello@everloot.app, we reply
   within 7 days. The data policy, /privacy and the account page say so.
 - Docs: OPEN_DATA.md and RELEASING.md no longer say the open data export sits in the roadmap's Next section; they point to ROADMAP.md.
+- Docs: each gap in DATA_PLACEMENT.md carries a dated state, and the WAF row now describes the Cloudflare rules that apply on /database/*.
+- Docs: CONTRIBUTING.md and the pull request template describe the changelog line, the labels in use and the addon install link.
 
 ## [desktop-v0.1.21] - 2026-11-10
 

@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import JsonLd from "@/components/JsonLd";
+import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
@@ -81,6 +83,7 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
   return (
     <Container width="data">
       <article>
+        <JsonLd data={entityPageJsonLd({ name: title, path: `/database/objects/${page.objectId}`, identifier: `object:${page.objectId}` })} />
         <EntityHeader trail={trail} title={title} meta={["Object", "chest, herb, ore vein or fishing pool"]} />
         <EntityTop
           box={<TooltipFrame name={title} label={`${title}, as players saw it`} />}

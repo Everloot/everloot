@@ -46,14 +46,15 @@ test("Get the addon is the primary pill and leads to /addon", () => {
   expect(html).toMatch(/<a href="\/addon" class="btn btn-primary[^"]*">Get the addon<\/a>/);
 });
 
-test("the bar is compact: 44 px (two thirds of the old 64), the search centred, the version label kept", () => {
+test("the bar is compact: 44 px (two thirds of the old 64), the search centred, the build label kept from 1280 px", () => {
   expect(DATA_SIZE.header).toBe(44);
   const bar = html.match(/<header [^>]*>\s*<div class="([^"]*)"/)?.[1] ?? "";
   expect(bar.split(" ")).toContain("h-header");
   expect(bar).not.toContain("min-h-16");
   // The search sits in its own growing slot, centred between the nav and the account area.
   expect(html).toMatch(/<div class="[^"]*\bflex-1\b[^"]*\bjustify-center\b[^"]*"><form [^>]*role="search"/);
-  expect(html).toContain("Game version:");
+  // Both builds take ~260 px; below xl the right group has no room for them, so the menu panel carries them.
+  expect(html).toMatch(/<div class="[^"]*\bhidden shrink-0 xl:block\b[^"]*"><a [^>]*>files read /);
   // Tighter nav items.
   expect(primary).toMatch(/<a href="\/map"[^>]*class="[^"]*\bpx-2\b/);
 });
