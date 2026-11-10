@@ -288,13 +288,13 @@ test("the stored auction history is written after the snapshot with what that ru
   store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-10-02T00:00:00.000Z" });
   auctions.writeAuctionHistory.mockResolvedValue({ written: true, items: 7 });
   expect(await (await GET(req())).json()).toMatchObject({ ok: true, auctionHistory: { written: true, items: 7 } });
-  expect(auctions.writeAuctionHistory).toHaveBeenCalledWith({ added: 2, rebuild: false });
+  expect(auctions.writeAuctionHistory).toHaveBeenCalledWith({ added: 2, rebuild: false, dataAsOf: "2026-10-02T00:00:00.000Z" });
   await GET(req("Bearer synthetic-cron-key", "?rebuild=1"));
   expect(auctions.writeAuctionHistory).toHaveBeenLastCalledWith(expect.objectContaining({ rebuild: true }));
-  // An idle run still asks, so a missing file is written.
+  // An idle run still asks with the snapshot's time, so a missing file or one built from an older snapshot is written.
   store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: "2026-W43" });
   await GET(req());
-  expect(auctions.writeAuctionHistory).toHaveBeenLastCalledWith({ added: 0, rebuild: false });
+  expect(auctions.writeAuctionHistory).toHaveBeenLastCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-10-01" });
   vi.spyOn(console, "error").mockImplementation(() => {});
   auctions.writeAuctionHistory.mockRejectedValue(new Error("r2 down"));
   const res = await GET(req());

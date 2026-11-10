@@ -131,7 +131,7 @@ export async function GET(req: Request) {
     // auction_history tool never replay the corpus. Same rule as the item view; a failure is logged and they read the corpus.
     let auctionHistory: { written: boolean; items?: number } | null = null;
     try {
-      auctionHistory = await writeAuctionHistory({ added: result.added, rebuild });
+      auctionHistory = await writeAuctionHistory({ added: result.added, rebuild, dataAsOf: result.dataAsOf });
     } catch (err) {
       console.error("auction history failed", err);
     }

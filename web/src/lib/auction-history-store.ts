@@ -45,29 +45,42 @@ export function buildAuctionHistory(corpus: Corpus, now = new Date()): AuctionHi
   };
 }
 
-/** Whether the file exists; a read failure counts as missing, so the next run tries to write it. */
-async function fileExists(cloud: R2Config, doFetch: typeof fetch): Promise<boolean> {
+/**
+ * The object metadata that says which corpus snapshot the file was built from, so a run that finds the file can tell
+ * whether it is behind. Without it a write that failed after new uploads would leave the file stale until the next
+ * upload, since idle runs only check that the file exists.
+ */
+const STAMP = "x-amz-meta-data-as-of";
+const stampOf = (dataAsOf: string | null) => dataAsOf ?? "none";
+
+/** The stamp of the stored file, null when it has none, undefined when there is no file or the HEAD failed. */
+async function storedStamp(cloud: R2Config, doFetch: typeof fetch): Promise<string | null | undefined> {
   try {
     const res = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "HEAD" }));
-    return res.ok;
+    return res.ok ? res.headers.get(STAMP) : undefined;
   } catch {
-    return false;
+    return undefined;
   }
 }
 
 /**
- * The cron's step: writes the file when this run added uploads or rebuilt, or when there is no file yet. An idle run
- * with the file in place reads nothing but that one HEAD.
+ * The cron's step: writes the file when this run added uploads or rebuilt, when there is no file yet, or when the file
+ * was built from another snapshot than `dataAsOf` (an earlier write failed). An idle run with a current file reads
+ * nothing but that one HEAD. Without `dataAsOf` the stamp is not compared.
  */
-export async function writeAuctionHistory(opts: { added: number; rebuild?: boolean }, deps: {
+export async function writeAuctionHistory(opts: { added: number; rebuild?: boolean; dataAsOf?: string | null }, deps: {
   cloud?: R2Config | null; fetch?: typeof fetch; build?: () => Promise<AuctionHistoryFile>;
 } = {}): Promise<{ written: boolean; items?: number }> {
   const cloud = deps.cloud === undefined ? r2FromEnv() : deps.cloud;
   if (!cloud) throw new Error("the auction history needs the cloud store");
   const doFetch = deps.fetch ?? fetch;
-  if (opts.added <= 0 && !opts.rebuild && await fileExists(cloud, doFetch)) return { written: false };
+  if (opts.added <= 0 && !opts.rebuild) {
+    const stamp = await storedStamp(cloud, doFetch);
+    if (stamp !== undefined && (opts.dataAsOf === undefined || stamp === stampOf(opts.dataAsOf))) return { written: false };
+  }
   const file = await (deps.build ?? (async () => buildAuctionHistory(await uploadStore.loadCorpus())))();
-  const put = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "PUT", body: JSON.stringify(file), headers: { "content-type": "application/json" } }));
+  const stamp = stampOf(opts.dataAsOf === undefined ? file.dataAsOf : opts.dataAsOf);
+  const put = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "PUT", body: JSON.stringify(file), headers: { "content-type": "application/json", [STAMP]: stamp } }));
   if (!put.ok) throw new Error(`auction history write failed (${put.status})`);
   return { written: true, items: file.histories.length };
 }

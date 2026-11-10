@@ -80,6 +80,35 @@ test("the cron writes it from the corpus after a change or when it is missing, a
   expect(calls).toEqual([]);
 });
 
+test("a write that failed after new uploads is made again by the next idle run, and a current file is left alone", async () => {
+  const file = buildAuctionHistory(corpus, AT);
+  const build = async () => file;
+  const OLDER = "2026-11-09T11:40:00.000Z";
+  const calls: Request[] = [];
+  const answer = (opts: { stamp?: string; put?: number }) => vi.fn(async (req: Request) => {
+    calls.push(req);
+    if (req.method === "HEAD") return new Response(null, { status: 200, headers: opts.stamp ? { "x-amz-meta-data-as-of": opts.stamp } : {} });
+    return new Response(null, { status: opts.put ?? 200 });
+  });
+  // The run with new uploads fails its PUT: the file in place is the one built from the older snapshot.
+  await expect(writeAuctionHistory({ added: 3, dataAsOf: AS_OF }, { cloud: CLOUD, fetch: answer({ stamp: OLDER, put: 503 }) as unknown as typeof fetch, build })).rejects.toThrow(/503/);
+  // The next run adds nothing, sees the older stamp and writes again, stamping the snapshot it was built from.
+  calls.length = 0;
+  expect(await writeAuctionHistory({ added: 0, dataAsOf: AS_OF }, { cloud: CLOUD, fetch: answer({ stamp: OLDER }) as unknown as typeof fetch, build })).toEqual({ written: true, items: 1 });
+  expect(calls.map((c) => c.method)).toEqual(["HEAD", "PUT"]);
+  expect(calls[1]!.headers.get("x-amz-meta-data-as-of")).toBe(AS_OF);
+  // A file with no stamp (written before stamps existed) is rewritten once too.
+  calls.length = 0;
+  expect(await writeAuctionHistory({ added: 0, dataAsOf: AS_OF }, { cloud: CLOUD, fetch: answer({}) as unknown as typeof fetch, build })).toEqual({ written: true, items: 1 });
+  // A file stamped with the current snapshot is left alone: one HEAD, no corpus read.
+  calls.length = 0;
+  expect(await writeAuctionHistory({ added: 0, dataAsOf: AS_OF }, { cloud: CLOUD, fetch: answer({ stamp: AS_OF }) as unknown as typeof fetch, build })).toEqual({ written: false });
+  expect(calls.map((c) => c.method)).toEqual(["HEAD"]);
+  // A snapshot with no time yet is stamped "none" and compared the same way.
+  calls.length = 0;
+  expect(await writeAuctionHistory({ added: 0, dataAsOf: null }, { cloud: CLOUD, fetch: answer({ stamp: "none" }) as unknown as typeof fetch, build })).toEqual({ written: false });
+});
+
 test("a file of an unknown shape, a missing one or one out of reach is no history, so the readers fall back to the corpus", async () => {
   const file = buildAuctionHistory(corpus, AT);
   expect(parseAuctionHistory(file)).toEqual(file);
