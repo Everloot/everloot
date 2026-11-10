@@ -54,9 +54,9 @@ end
 local link = '|cffffffff|Hitem:2589::::::::|h[Linen Cloth]|h|r'
 local result = run('  WhErE ' .. link .. '  ', 'database/items/2589')
 assert(result:find('Drop - Hogger: Elwynn Forest (27, 81); zone 52 (1, 3) - 2 loot windows', 1, true), result)
-assert(result:find('Drop - Old Chest: Elwynn Forest (10, 20); Elwynn Forest (11, 21) - 1 loot windows', 1, true), result)
+assert(result:find('Drop - Old Chest: Elwynn Forest (10, 20); Elwynn Forest (11, 21) - 1 loot window', 1, true), result)
 assert(result:find('Drop - npc 99: location not recorded', 1, true), result)
-assert(result:find('Vendor - Seller: Elwynn Forest (40, 50) - 1 vendor records', 1, true), result)
+assert(result:find('Vendor - Seller: Elwynn Forest (40, 50) - 1 vendor record', 1, true), result)
 assert(result:find('Vendor', 1, true) > result:find('Drop - Old Chest', 1, true))
 assert(not result:find('Hogger Jr', 1, true))
 assert(run('where 2589', 'database/items/2589') == result)
@@ -66,7 +66,31 @@ assert(not result:find('zone 99', 1, true))
 assert(run('where 99999', 'database/items/99999'):find('nothing recorded yet', 1, true))
 assert(run('where 100', 'database/items/100'):find('Hogger Jr', 1, true))
 assert(run("where Nobody & Me", 'search?q=Nobody%20%26%20Me'):find('nothing recorded yet', 1, true))
-assert(run('where', 'search?q='):find('/everloot where <', 1, true))
+printed = {}
+SlashCmdList.EVERLOOT('where')
+assert(#printed == 1 and printed[1]:find('/everloot where <', 1, true), table.concat(printed, '\\n'))
+-- Many sources and places: most-seen first, at most 8 source lines and 3 places a line.
+local saved = EverlootDB
+EverlootDB = { records = { npc_sighting = {}, loot = {} } }
+for n = 1, 20 do
+  for spot = 1, 5 do
+    table.insert(EverlootDB.records.npc_sighting, {npcId=1000 + n, name='Mob ' .. n, mapId=37, x=spot, y=spot})
+  end
+  for _ = 1, n do table.insert(EverlootDB.records.loot, {sourceNpcId=1000 + n, items={{itemId=4306, count=1}}}) end
+end
+table.insert(EverlootDB.records.loot, {sourceNpcId=2000, items='broken'})
+table.insert(EverlootDB.records.loot, {sourceNpcId=2001, items={'broken'}})
+before = serialize(EverlootDB)
+local many = run('where 4306', 'database/items/4306')
+local lines = 0
+for _ in many:gmatch('Everloot: Drop %- ') do lines = lines + 1 end
+assert(lines == 8, many)
+assert(many:find('Drop - Mob 20: Elwynn Forest (1, 1); Elwynn Forest (2, 2); Elwynn Forest (3, 3); 2 more - 20 loot windows', 1, true), many)
+assert(many:find('Mob 20', 1, true) < many:find('Mob 19', 1, true), many)
+assert(not many:find('Mob 12:', 1, true), many)
+assert(many:find('and 12 more drop sources', 1, true), many)
+EverlootDB = saved
+before = serialize(EverlootDB)
 C_Map = nil
 assert(run('where Hogger', 'search?q=Hogger'):find('zone 37 (27, 81)', 1, true))
 EverlootDB.records.npc_sighting[1].name = 'Hog|cffff0000ger'
