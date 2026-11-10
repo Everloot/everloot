@@ -147,6 +147,35 @@ test("auction_history resolves the realm before reading the stored days, and an 
   expect(ambiguous.structured.page).toMatchObject({ realmStatus: "ambiguous", candidates: [EU, US] });
 });
 
+test("an ambiguous realm returns no price from stored or corpus browsing history, for either tool", async () => {
+  const ASKED = "Realm 4 PvP";
+  const state = market(US, EU);
+  // Browsing points exist under the literal input, public by the trusted-install rule.
+  const sightings = [5, 4].map((n, i) => ({
+    kind: "auction_scan", installId: OWN, eventId: `amb-${i}`, capturedAt: dayAgo(n), realm: ASKED, itemId: LINEN, copper: 25, priceBasis: "unit",
+  }));
+  const stored = vi.fn(async () => ({ points: [{ day: dayAgo(3).slice(0, 10), copper: 25, reporters: 3 }], dataAsOf: "2026-11-10T07:50:00.000Z" }));
+  const paths = {
+    stored: handlers(state, { auctionHistory: stored, trusted: new Set([OWN]) }),
+    corpus: handlers(state, { corpus: async () => ({ records: sightings, dataAsOf: "2026-11-10T07:50:00.000Z" }), trusted: new Set([OWN]) }),
+  };
+  for (const [path, h] of Object.entries(paths)) {
+    const history = await call(h, "auction_history", ASKED);
+    expect(history.structured.page, path).toMatchObject({ realm: ASKED, points: [], scanDays: [], realmStatus: "ambiguous", candidates: [EU, US] });
+    expect(history.structured.url, path).toBeUndefined();
+    expect(history.text, path).toContain(`Ambiguous realm "${ASKED}"`);
+    expect(history.text, path).not.toMatch(/\d+c|Price unrecorded|reporter/);
+
+    const value = await call(h, "market_value", ASKED);
+    expect(value.structured.page, path).toMatchObject({ realm: ASKED, value: null, history: [], realmStatus: "ambiguous", candidates: [EU, US] });
+    expect(value.structured.url, path).toBeUndefined();
+    expect(value.text, path).toContain(`Ambiguous realm "${ASKED}"`);
+    expect(value.text, path).not.toMatch(/Market value:|\d+c/);
+  }
+  // The stored reader is never asked about a name that is not one realm's.
+  expect(stored).not.toHaveBeenCalled();
+});
+
 test("browsing days a realm the rollup lacks still answer, without the unknown-realm note", async () => {
   const sightings = ["a", "b", "c"].map((installId, i) => ({
     kind: "auction_scan", installId, eventId: `x-${i}`, capturedAt: dayAgo(3), realm: "Browse Only", itemId: LINEN, copper: 30, priceBasis: "unit",

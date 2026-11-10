@@ -111,8 +111,8 @@ export default function McpOverview() {
       <H3 id="realm-names">Realm names</H3>
       <P>
         <C>market_value</C> and <C>auction_history</C> take a realm&apos;s full name as the game&apos;s realm list shows it, such
-        as <C>CAMWOW US1 Realm 4 PvP</C>, in any case. A name that is the end of exactly one realm&apos;s full name, in whole
-        words, is read as that realm: <C>US1 Realm 4 PvP</C> answers for <C>CAMWOW US1 Realm 4 PvP</C>, and the answer says
+        as <C>CAMWOW US1 Realm 4 PvP</C>, in any case. A name of at least two words that is the end of exactly one realm&apos;s
+        full name, in whole words, is read as that realm (a one-word name never resolves): <C>US1 Realm 4 PvP</C> answers for <C>CAMWOW US1 Realm 4 PvP</C>, and the answer says
         so. A name that ends several realms&apos; names (<C>Realm 4 PvP</C> once US1 and EU1 both have prices) is ambiguous,
         and one no scan uses is unknown: both answer with the realms to ask with instead, closest first, never with an empty
         market. The page carries <C>realmStatus</C> (<C>exact</C>, <C>alias</C>, <C>ambiguous</C> or <C>unknown</C>) and, when

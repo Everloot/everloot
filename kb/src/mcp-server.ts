@@ -285,6 +285,12 @@ export function auctionHistoryPage(
   const lookupFields = lookup ? realmLookupFields(lookup) : {};
   if (!args.realm.trim()) return { text: "Name a realm.", page: { realm, itemId: args.itemId, points: [] } };
   if (!Number.isInteger(args.itemId) || args.itemId < 1) return { text: "Name an item id.", page: { realm, itemId: args.itemId, points: [] } };
+  // Several realms' names end that way and they are separate markets: no price, scanned or browsed, answers it, whatever
+  // was stored under the name as typed.
+  if (lookup?.status === "ambiguous") {
+    return { text: `${head}
+${realmLookupText(lookup)}`, page: { realm, itemId: args.itemId, points: [], ...(scanDays ? { scanDays: [] } : {}), ...lookupFields } };
+  }
   // A name no realm answers to, with nothing browsed under it either: say so, never an empty history.
   if (lookup && !lookupRealm(lookup) && !points?.length) {
     return { text: `${head}\n${realmLookupText(lookup)}`, page: { realm, itemId: args.itemId, points: [], ...lookupFields } };
@@ -1071,9 +1077,11 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
       const realm = resolved ?? args.realm.trim();
       const scanDays = market ? (resolved ? itemMarket(market.state, resolved, args.itemId, now).points : []) : null;
       // The site's stored browsing days when it lends them, so an answer does not replay the corpus; without them, the corpus.
+      // An ambiguous name reads no browsing history at all, stored or from the corpus: none of it belongs to one realm.
+      const ambiguous = lookup?.status === "ambiguous";
       let browse: { points: AuctionPoint[]; dataAsOf: string | null } | null = null;
-      try { browse = (await options.auctionHistory?.(realm, args.itemId)) ?? null; } catch { browse = null; }
-      if (!browse) {
+      if (!ambiguous) try { browse = (await options.auctionHistory?.(realm, args.itemId)) ?? null; } catch { browse = null; }
+      if (!browse && !ambiguous) {
         const read = await readTooledFacts<AuctionSighting[]>("auction_history", options.corpus, recheck);
         if (read) browse = { points: auctionHistory(realm, args.itemId, read.facts, options.trusted).points, dataAsOf: read.dataAsOf };
       }
