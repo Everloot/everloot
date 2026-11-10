@@ -1,7 +1,8 @@
 -- Everloot prices in item tooltips: the player's own latest full scan, and community market values
 -- the companion wrote into the EverlootPrices slot addon (checksummed; they show after /reload), with the
 -- game's own vendor price beside them. The drop sources in the same file (modules/drops.lua) follow the
--- prices in the same tooltip. Display only: nothing here talks to the network or acts on the auction house.
+-- prices in the same tooltip, and the player's own sales and purchases of the item from the gold ledger (ledger.lua)
+-- sit between them. Display only: nothing here talks to the network or acts on the auction house.
 
 local E = Everloot
 
@@ -124,6 +125,13 @@ end
 --- nil while the file is missing, being checked or failed its checksum. The gold-per-hour tracker reads it.
 function E:CommunityPrice(realm, itemId)
   return communityRow(communityFor(realm), itemId)
+end
+
+--- The state of a realm's price file ({ status = "verifying" | "ready" | "bad", asOf, silent }), for the window's
+--- crafting costs to say how old their market values are. `silent` is a realm the file has no entry for.
+function E:PriceFile(realm)
+  local entry = communityFor(realm)
+  return { status = entry.status, asOf = entry.asOf, silent = entry.silent }
 end
 
 local function hex(r, g, b) return string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255) end
@@ -386,9 +394,52 @@ function E:SourceLines(itemId)
   return out
 end
 
---- The tooltip: price lines, then drop lines, then the source lines. Once the Desktop App's file is in the game and its
---- prices have been checked, what is missing is said in one muted line; without the file a tooltip carries no Everloot
---- line it has no value for.
+--- One part of the item tooltip is on unless the player turned it off on the settings page: "tooltipMarket" (the
+--- price lines), "tooltipHistory" (the player's own sales and purchases) or "tooltipSources" (drops, vendors,
+--- reagents, zones). Read on every hover, so a switch applies at once.
+function E.TooltipShows(field)
+  return not (type(EverlootDB) == "table" and EverlootDB[field] == false)
+end
+
+local function plural(n, word) return n .. " " .. word .. (n == 1 and "" or "s") end
+
+--- The player's own history with the item on this realm, from the gold ledger, as { text, r, g, b, left, right }
+--- like the price lines: the last sale (its UTC day and price per unit), the average sale and the units sold over the
+--- ledger's window, sales whose letter has not been taken yet, and the average paid where the ledger knows both the
+--- item and the price of a purchase. Every amount says the window; with no history there are no lines at all.
+--- One lookup in the ledger's item index per hover.
+local function historyLines(realm, itemId)
+  local out = {}
+  local L = E.Ledger
+  local name = L and L.ItemHistory and itemName(itemId)
+  local h = name and L.ItemHistory(realm, name)
+  if not h then return out end
+  local function add(text, color, left, right)
+    out[#out + 1] = { text = text, r = color[1], g = color[2], b = color[3], left = left, right = right }
+  end
+  local window = "last " .. L.WINDOW_DAYS .. " days"
+  if h.sales > 0 then
+    local on = date("!%Y-%m-%d", h.lastAt)
+    add("Your last sale " .. E.Coins(h.lastUnit) .. " · per unit · " .. on, OWN, "Your last sale · " .. on, coinIcons(h.lastUnit))
+    add("  average sale " .. E.Coins(h.average) .. " · " .. window, OWN, "  Average sale · " .. window, coinIcons(h.average))
+    add(string.format("  %s sold in %s, %s", plural(h.units, "unit"), plural(h.sales, "sale"), window), META)
+  end
+  if h.pending > 0 then
+    -- The sold notice names the item; its gold arrives with the mailbox letter, so these have no price yet.
+    add(string.format("%s%s in the last 2 days, paid when you take the mailbox letter",
+      h.sales > 0 and "  and " or "Your sales: ", plural(h.pending, h.sales > 0 and "more sale" or "sale")), META)
+  end
+  if h.purchases > 0 then
+    add("Your average paid " .. E.Coins(h.averagePaid) .. " · " .. window, OWN, "Your average paid · " .. window, coinIcons(h.averagePaid))
+    add(string.format("  %s bought in %s, %s", plural(h.bought, "unit"), plural(h.purchases, "purchase"), window), META)
+  end
+  return out
+end
+
+--- The tooltip: price lines, then the player's own history, then drop lines, then the source lines. Once the Desktop
+--- App's file is in the game and its prices have been checked, what is missing is said in one muted line; without the
+--- file a tooltip carries no Everloot line it has no value for. Each of the three parts can be switched off on the
+--- settings page (E.TooltipShows).
 -- The crest's diamond, cut from media/crest.tga (128px), drawn inline before the name.
 local TOOLTIP_HEADER = "|TInterface\\AddOns\\Everloot\\media\\crest:14:14:0:0:128:128:36:92:36:92|t Everloot"
 
@@ -397,18 +448,25 @@ local function addLines(tooltip, itemId)
   if type(realm) ~= "string" or realm == "" then return end
   -- Without the file the tooltip stays quiet, so the first item tooltip says once per install, in chat, where
   -- community prices come from. A line in every tooltip would repeat it forever to players who never install the app.
-  if type(EverlootPricesDB) ~= "table" and not EverlootDB.priceFileHint then
+  local market, history, sources = E.TooltipShows("tooltipMarket"), E.TooltipShows("tooltipHistory"), E.TooltipShows("tooltipSources")
+  if market and type(EverlootPricesDB) ~= "table" and not EverlootDB.priceFileHint then
     EverlootDB.priceFileHint = true
     print("Everloot: community prices in item tooltips come from the Everloot Desktop App (everloot.app/addon), which writes them into the game; until then tooltips show only your own auction scans. /everloot price [item] says what Everloot has for an item.")
   end
-  local lines, entry = priceLines(realm, itemId)
+  local lines, entry
+  if market then lines, entry = priceLines(realm, itemId) else lines, entry = {}, communityFor(realm) end
+  local priced = #lines
+  if history then
+    for _, line in ipairs(historyLines(realm, itemId)) do lines[#lines + 1] = line end
+  end
   -- The unit and the realm belong to the price amounts; a drop rate is neither per unit nor per realm.
   local amounts = false
   for _, line in ipairs(lines) do amounts = amounts or line.right ~= nil end
-  local dropLines, dropNote = E:DropLines(itemId)
+  local dropLines, dropNote
+  if sources then dropLines, dropNote = E:DropLines(itemId) end
   local missing = {}
   if type(EverlootPricesDB) == "table" and entry.status ~= "verifying" then
-    if #lines == 0 then
+    if market and priced == 0 then
       if entry.status == "bad" and not entry.silent then
         missing[#missing + 1] = "community prices failed their checksum"
       elseif entry.full then
@@ -426,7 +484,9 @@ local function addLines(tooltip, itemId)
     lines[#lines + 1] = { text = note, r = META[1], g = META[2], b = META[3], wrap = true }
   end
   -- Sold by, reagent for, seen in: this install's own rows need no file, so they show with or without one.
-  for _, line in ipairs(E:SourceLines(itemId)) do lines[#lines + 1] = line end
+  if sources then
+    for _, line in ipairs(E:SourceLines(itemId)) do lines[#lines + 1] = line end
+  end
   if #lines == 0 then return end
   -- The game's two-column line puts each amount in a column beside its label; a tooltip without it gets every
   -- line's plain text instead, so nothing is lost.
@@ -507,6 +567,7 @@ function E.PriceCommand(text, tries)
   -- A failed checksum is said even when the player's own scan answers: the community prices were there to be shown.
   if #lines == 0 or (entry.status == "bad" and not entry.silent) then print("  " .. missingNote(realm, entry)) end
   for _, line in ipairs(lines) do print(hex(line.r, line.g, line.b) .. line.text .. "|r") end
+  for _, line in ipairs(historyLines(realm, id)) do print(hex(line.r, line.g, line.b) .. line.text .. "|r") end
   local dropLines, dropNote = E:DropLines(id)
   for _, line in ipairs(dropLines or {}) do print(hex(line.r, line.g, line.b) .. line.text .. "|r") end
   if dropNote and type(EverlootPricesDB) == "table" then print("  " .. dropNote:gsub("^%l", string.upper)) end

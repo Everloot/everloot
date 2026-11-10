@@ -19,7 +19,10 @@
    "guild",
    "completion",
    "addons",
-   "players"
+   "players",
+   "tooltipMarket",
+   "tooltipHistory",
+   "tooltipSources"
   ],
   "printed": [
    "Everloot 0.3.22: 2 modules on, 0 off. /everloot status for details.",
@@ -136,7 +139,10 @@
    "guild",
    "completion",
    "addons",
-   "players"
+   "players",
+   "tooltipMarket",
+   "tooltipHistory",
+   "tooltipSources"
   ],
   "printed": [
    "Everloot 0.3.22: 2 modules on, 0 off. /everloot status for details.",

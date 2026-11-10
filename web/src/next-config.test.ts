@@ -9,6 +9,16 @@ import { CHAT_PROVIDERS } from "./lib/chat/providers";
 import { isProtectedPath } from "./lib/document-boundary";
 import { isPrivatePath } from "./lib/cf-edge-cache";
 
+test("download shortcuts are exact permanent redirects, leaving files and desktop connect alone", async () => {
+  const redirects = await nextConfig.redirects!();
+  for (const [source, destination] of [["/download", "/addon"], ["/downloads", "/addon"], ["/desktop", "/addon#desktop"], ["/curseforge", "https://www.curseforge.com/wow/addons/everloot"]]) {
+    expect(redirects).toContainEqual({ source, destination, permanent: true });
+    const match = getPathMatch(source!);
+    expect(match("/desktop/connect")).toBe(false);
+    expect(match("/downloads/Everloot-0.3.22.zip")).toBe(false);
+  }
+});
+
 // The served version's prefix (/beta before launch, none once Live is served) shows the same pages; another
 // version's prefix shows its notice. Read from the routing table, so the switch at launch changes no test here.
 const underServed = (...paths: string[]) => (PREFIXES[SERVED.id] ? paths.map((p) => `${PREFIXES[SERVED.id]}${p}`) : []);
@@ -27,7 +37,7 @@ test("the old gold-per-hour page answers 301 with the addon page's section about
   expect(redirects).toContainEqual({ source: "/lore/forever-launch-date", destination: "/wow-forever", permanent: true });
   // /characters/<ruleset>/... are the character pages; the bare path is the player search, not a 404.
   expect(redirects).toContainEqual({ source: "/characters", destination: "/players", permanent: true });
-  expect(redirects).toHaveLength(8);
+  expect(redirects).toHaveLength(12);
 });
 
 test("www.everloot.app answers 301 with the same path on the apex, and only that host does", async () => {
@@ -223,7 +233,7 @@ test("Chat may ask for the microphone (dictation); every other page, the account
 });
 
 test("the sitemaps and private routes set their own CDN policy; none gets a static one that would keep a 503", async () => {
-  for (const path of ["/", "/sitemap.xml", "/database-sitemap.xml", "/database-sitemap/3.xml", "/auctions-sitemap.xml", "/auctions-sitemap/0.xml", ...PROTECTED, "/sign-in", "/api/auth/session", "/api/me"]) {
+  for (const path of ["/", "/sitemap.xml", "/database-sitemap.xml", "/database-sitemap/3.xml", "/auctions-sitemap.xml", "/auctions-sitemap/0.xml", "/lore-sitemap.xml", "/lore-sitemap/0.xml", ...PROTECTED, "/sign-in", "/api/auth/session", "/api/me"]) {
     const h = await headersFor(path);
     expect(h["CDN-Cache-Control"], path).toBeUndefined();
   }

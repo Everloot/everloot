@@ -15,6 +15,11 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: search engines and AI assistants now find more of the site: spell pages that create, cost or teach
+  something or sit in a talent tree, each zone's coverage page once players have confirmed something there, the
+  class chooser once it is reviewed, and the lore pages about an NPC, item or quest players have named in WoW:
+  Forever are in the sitemaps, and llms.txt names every database list, from spells to quest chains. A talent
+  spell's page now shows its class, tree, row and ranks.
 - Site: a dungeon or raid page gains a Loot section after Bosses: for each boss 3 installs report, the loot table of
   its creature, the same rows its NPC page shows, or how many installs have looted it so far. In the list, an instance
   the game files place no entrance for says so beside its id, with the reason on hover.
@@ -35,18 +40,34 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   whether it is required and its description, nested fields included, whether the kind is in the public corpus, where it
   goes, and the cross-field rules the server checks. The sidebar lists them and the schemas table links each kind to its page.
 - Site: the API docs list the site-internal routes, `/api/suggest` and `/api/map/pins`, with a note that they serve the site's pages, may change without notice and are not part of the protocol.
+- Addon: the window's Professions tab has a Crafting costs page: each recipe you have recorded with its reagents' cost
+  at market value (or a cheaper vendor price), the product's value per item and an estimated profit assuming one item
+  per craft, sorted by that estimate or name, with the price file's age. A reagent without a price shows the cost as unknown, never zero. Pick a recipe
+  and a count for a what-to-buy list of reagents and their total.
 - Site: the account guide and the addon page link the sample character page (/showcase/character), so a player can see
   what a character page holds before linking one. The sample stays out of search and the sitemap.
+- Addon: item tooltips show your own history with the item on this realm, from the gold ledger in your saved file:
+  your last sale (day and price per unit), your average sale and units sold over the last 90 days, sales waiting for
+  their mailbox letter, and what you paid where the ledger knows it. An item you never sold says nothing. Three new
+  switches on the settings page turn prices, your history and sources in tooltips on or off; all start on.
 - Site: a profession page answers to its skill line id, `/tools/professions/171` or `/tools/professions/171-alchemy`, and
   redirects for good to the slug page it already had, keeping the skill range and class context in the query; an unknown id
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
 - Addon: the Gold Overview shows earned, spent and profit for the selected period and character or account, with daily averages, top items and pending sales.
+- Site: vendor, achievement, quest chain, zone and instance pages carry In short and Copy for AI like the other database
+  pages, each line saying how many installs agree and when, or that nobody has reported it yet; a vendor links its NPC's
+  card as Raw JSON. An achievement page also links the Collections tool and says under its criteria what Confirmed means
+  and whether this one is.
 - Site: a "Write a wiki page" guide under Docs › Guides says how a wiki page is proposed and reviewed, with the page
   types, the front matter, the rules and the check from the wiki README; the wiki hub and the lore archive link to it.
+- MCP: generic search and exact-name lookup discover agreed gameplay names and zone ids, with separate record and
+  game ids and source labels.
+- Protocol: 2.1.0 adds optional gameplay identity and provenance fields to MCP knowledge hits.
 - Site: a faction page and a title page carry In short, Copy for AI, a "Player reports" fact that stays an empty meter
   until three installs agree, a "Track this" link to the collections tool and a relation tab ("Reputation from" on a
   faction, "Earned by" on a title) whose empty state names the 3-install rule and says what no game file read so far
   carries; a faction page also shows its lore archive page when the archive has one under the same name.
+- Desktop App: Reports shows your local ledger by day and item, with period, account, character and item filters, cumulative totals and a comparison with the previous period.
 - Site: a class page links the census narrowed to its class and the classes ranking, and the search page with no
   query lists what a search finds (items, NPCs, quests, zones, objects, the lore archive, tools and docs), each
   linked to its list, with four queries to try. Before, the class page stopped at the database links and an empty
@@ -177,7 +198,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
-- Site: dungeon and raid pages list the quests players filed under the instance in their quest log, with installs and last seen, and every boss under Loot says when no creature is tied to it yet. Instance 2999 shows as Ruins of Lordaeron, the name the game files' own kill statistic for its boss gives it, marked as from the files.
+- Docs: a page for addon authors at `/docs/addon-authors`: the licences and the credit line, the records API, a free key and
+  the files as three ways to get the data, a skinning loot recipe in curl, JavaScript and Python, why the site's drop
+  rates leave skinning out, and how to build an offline pack.
+- Site: download shortcuts (`/download`, `/downloads`, `/desktop`, `/curseforge`), CurseForge install choices and a
+  Desktop App button for your operating system make downloads easier to find, including on phones.
+- Site: dungeon and raid pages list the quests players filed under the instance in their quest log (matched by the quest-log header 3 installs agree on), with installs and last seen, and every boss under Loot says when no creature is tied to it yet. Instance 2999 shows as Ruins of Lordaeron, a name taken from the game files and marked as such.
 
 ### Fixed
 - Site: the header shows the build whose files the site reads and the newest build seen, each linked to what it means.
@@ -298,10 +324,14 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Changed
 - Docs: the launch-day page is marked historical, and day-to-day operation of the site is in docs/OPERATIONS.md.
+- Site: pages no longer jump when the footer arrives while a page is still loading, the Auction House table scrolls inside its own frame on a tablet instead of pushing the page sideways, the header's keyboard focus rings are no longer cut off at the top of the window, quick facts are one column on a phone, item, NPC, quest and spell pages keep an even gap above their auction and relation sections, the unavailable page arrows are readable, and the Auction House line under the title has spaces around its dot.
 - Protocol: `itemsResponse.items` is typed with the row `GET /api/items` returns (item id, then class, subclass, slot
   and quality, each null when the build does not name it), so a client generated from `schema/api/itemsResponse.json`
   gets fields instead of `any`. Protocol package 2.0.0 (the row's fields are now required); the answers do not change.
 - Docs: the docs index lists the backlog, the open-data export, the live-client probes, and the dated notes and folders it had left out.
+- Site: item tooltips read like the game's: the item level first and in yellow, slot and armour or weapon type in two
+  columns, damage left and speed right, Equip, Use and Chance on hit lines in green, a named set and the flavour text in
+  yellow, and the sell price as gold, silver and copper coins. Every line keeps its words, so no colour is the only cue.
 - Companion: the command line's `main` takes its uploader, price refresher, file watcher and console as an optional argument,
   with the real ones as defaults, so the watch and prices loop is tested with fakes (upload then prices on each settled
   write, prices alone, a failed refresh that keeps the previous file, upload never writing prices). Nothing it sends changes.

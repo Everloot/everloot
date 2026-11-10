@@ -7,12 +7,12 @@ import { edgeDegraded } from "@/lib/cf-edge-cache";
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 // Storage is down unless a test hands in sightings: the pages are then built from the game files alone, which is
 // where the level comes from.
-const state = vi.hoisted(() => ({ seen: { unreachable: true } as Record<string, unknown>, loot: new Map<string, unknown>(), quests: [] as unknown[] }));
+const state = vi.hoisted(() => ({ seen: { unreachable: true } as Record<string, unknown>, loot: new Map<string, unknown>(), quests: [] as unknown[], worldDown: false, lootDown: false }));
 vi.mock("@/lib/rollup-compute", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/rollup-compute")>()),
-  loadLootTables: async () => ({ tables: { sources: state.loot, leftOut: 0 }, unreachable: false, dataAsOf: "2026-11-05T00:00:00Z" }),
+  loadLootTables: async () => (state.lootDown ? { unreachable: true } : { tables: { sources: state.loot, leftOut: 0 }, unreachable: false, dataAsOf: "2026-11-05T00:00:00Z" }),
   loadItemFacts: async () => ({ rates: [], names: [], npcs: [], unreachable: false }),
-  loadWorldFacts: async () => ({ npcs: [], quests: state.quests, vendors: [], unreachable: false }),
+  loadWorldFacts: async () => (state.worldDown ? { unreachable: true } : { npcs: [], quests: state.quests, vendors: [], unreachable: false }),
 }));
 vi.mock("@/lib/instances", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/instances")>()),
@@ -233,11 +233,14 @@ test("instance 2999 takes the name the game files' kill statistic for its boss R
   try {
     const list = renderToStaticMarkup(await InstancesPage({}));
     const row = list.split("<tr").find((r) => r.includes('href="/database/instances/2999-ruins-of-lordaeron"')) ?? "";
-    expect(text(row)).toContain("|Ruins of Lordaeron|unconfirmed|name from a kill statistic|");
-    expect(row).toContain("title=\"The game files place no entrance for this instance and 3 installs have not agreed on its name. The name is the files&#x27; own, from their kill statistic &quot;Rath&#x27;mael Kills (Ruins of Lordaeron)&quot; for one of its bosses.\"");
+    expect(text(row)).toContain("|Ruins of Lordaeron|unconfirmed|name from the game files|");
+    expect(row).toContain('title="The game files place no entrance for this instance and 3 installs have not agreed on its name. The name is from the game files."');
+    // The statistic's own title is never quoted.
+    expect(row).not.toContain("Kills (");
     expect(list).not.toContain("Instance 2999");
     const page = text(renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "2999-ruins-of-lordaeron" }) })));
-    expect(page).toContain("|Name|Ruins of Lordaeron|unconfirmed|from the game files&#x27; kill statistic for Rath&#x27;mael; they place no entrance for it|");
+    expect(page).toContain("|Name|Ruins of Lordaeron|unconfirmed|name from the game files; they place no entrance for it|");
+    expect(page).not.toContain("Kills (");
   } finally {
     state.seen = { unreachable: true };
   }
@@ -286,4 +289,44 @@ test("an instance with no quest filed under its name says not reported yet; with
   const down = await questsOf("389-ragefire-chasm");
   expect(text(down)).toContain("Storage unreachable.");
   expect(down).not.toContain("<table");
+});
+
+test("a world-facts or loot read that fails marks the page for the short edge cache, not a full page", async () => {
+  state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters: killed(389, 2732, 11517) } };
+  const page = async () => renderToStaticMarkup(await InstancePage({ params: Promise.resolve({ instance: "389-ragefire-chasm" }) }));
+  try {
+    state.loot = looted(11517, INSTALLS, 2);
+    expect(edgeDegraded(await page())).toBe(false);
+    state.worldDown = true;
+    const world = await page();
+    expect(edgeDegraded(world)).toBe(true);
+    expect(text(world)).toContain("Storage unreachable.");
+    state.worldDown = false;
+    state.lootDown = true;
+    expect(edgeDegraded(await page())).toBe(true);
+  } finally {
+    state.seen = { unreachable: true };
+    state.loot = new Map();
+    state.worldDown = false;
+    state.lootDown = false;
+  }
+});
+
+test("the quest installs meter counts the installs that filed it under the header, and last seen is relative to the data date", async () => {
+  // SYNTHETIC: three installs file the quest under Shadowfang Keep, a fourth under another header, one report is after the data date.
+  state.seen = { unreachable: false, asOf: new Date("2026-11-05T00:00:00Z"), instances: { entrances: [], encounters: [] } };
+  state.quests = [
+    ...reportedQuest(1013, "The Book of Ur", "Shadowfang Keep", INSTALLS),
+    ...reportedQuest(1013, "The Book of Ur", "Silverpine Forest", ["install-d"]),
+    ...reportedQuest(1013, "The Book of Ur", "Shadowfang Keep", ["install-a"], "2026-11-09T20:00:00Z"),
+  ];
+  try {
+    const row = (await questsOf("33-shadowfang-keep")).split("<tr").find((r) => r.includes('href="/database/quests/1013"')) ?? "";
+    expect(row).toContain('data-agreement="3"');
+    expect(text(row)).toContain("2026-11-04");
+    expect(text(row)).not.toContain("2026-11-09");
+  } finally {
+    state.seen = { unreachable: true };
+    state.quests = [];
+  }
 });

@@ -4,7 +4,8 @@ import JsonLd from "@/components/JsonLd";
 import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { AgreementMeter, Badge, Card, Container, DataTable, DataTitle, EmptyState, filledColumns, reportedLabel, SectionHeading, type Column, type SparseColumn } from "@/components/ui";
+import { AgreementMeter, Badge, Card, Container, DataTable, DataTitle, EmptyState, filledColumns, InShort, OpenData, reportedLabel, SectionHeading, type Column, type SparseColumn } from "@/components/ui";
+import { observedLine } from "@/lib/evidence";
 import {
   bossRows, difficultyLabel, difficultyList, instanceDescription, instanceHref, instanceQuests, instanceRows, instanceTitle, levelLabel, loadSightings, parseInstanceSegment,
   type BossRow, type InstancePlace, type InstanceQuest, type InstanceRow,
@@ -34,12 +35,12 @@ type Props = { params: Promise<{ instance: string }> };
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 /** The instance's row, with what players reported when storage answers; null for an id the site does not show. */
-async function find(segment: string): Promise<{ row: InstanceRow; unreachable: boolean } | null> {
+async function find(segment: string): Promise<{ row: InstanceRow; unreachable: boolean; asOf?: Date } | null> {
   const id = parseInstanceSegment(segment);
   if (id === null) return null;
   const seen = await loadSightings();
   const row = instanceRows(seen.unreachable ? {} : seen).get(id);
-  return row ? { row, unreachable: seen.unreachable } : null;
+  return row ? { row, unreachable: seen.unreachable, asOf: seen.unreachable ? undefined : seen.asOf } : null;
 }
 
 const kindLabel = (raid: boolean | null) => (raid === null ? PLACEHOLDER : raid ? "Raid" : "Dungeon");
@@ -72,7 +73,7 @@ export default async function InstancePage(props: Props) {
   const { instance: segment } = await props.params;
   const found = await find(segment);
   if (!found) notFound();
-  const { row, unreachable } = found;
+  const { row, unreachable, asOf } = found;
   const canonical = instanceHref(row.instanceMapId, row.name);
   if (`/database/instances/${segment}` !== canonical) permanentRedirect(canonical);
   const title = instanceTitle(row);
@@ -122,7 +123,7 @@ export default async function InstancePage(props: Props) {
 
   // Quests: the ones 3 installs file under this instance's name in the quest log, from the stored world facts.
   const world = unreachable || row.name === null ? null : await loadWorldFacts();
-  const quests = world && !world.unreachable ? instanceQuests(world, row.name) : [];
+  const quests = world && !world.unreachable ? instanceQuests(world, row.name, asOf) : [];
   const npcName = world && !world.unreachable && quests.length ? npcNames(world) : new Map<number, string>();
   const npcLink = (id: number | null) => (id === null ? PLACEHOLDER : <Link href={`/database/npcs/${id}`} className={link}>{npcName.get(id) ?? `NPC ${id}`}</Link>);
   const questColumns: Column<InstanceQuest>[] = [
@@ -134,13 +135,30 @@ export default async function InstancePage(props: Props) {
     { key: "seen", header: "Last seen", numeric: true, cell: (q) => dayLabel(q.lastSeen) },
   ];
 
+  // The page in a few lines, from the sections below only: what it is, what players reported with its agreement and
+  // date, and what the game files list. Storage down: the player line says unrecorded, never zero.
+  const count = (n: number, one: string, many: string) => (n ? `${n} ${n === 1 ? one : many}` : null);
+  const level = levelLabel(row.level);
+  const reported = unreachable ? [] : [count(row.bosses.length, "boss", "bosses"), count(row.confirmed.length, "entrance", "entrances")];
+  const lastSeen = unreachable ? null : [...row.bosses, ...row.confirmed].map((x) => x.lastSeen).filter((t): t is string => t !== null).sort().at(-1) ?? null;
+  const filesList = [count(row.encounters.length, "encounter", "encounters"), count(row.files.length, "entrance", "entrances")].filter(Boolean);
+  const summary = [
+    `${row.raid === null ? "An instance" : row.raid ? "A raid" : "A dungeon"}${level ? `, level ${level} in the game files` : ""}.`,
+    unreachable ? STORAGE_UNREACHABLE
+      : reported.some(Boolean) ? `${observedLine(reported, lastSeen, Date.now())} Each has three installs agreeing.`
+      : row.reported > 0 ? `Nothing here is confirmed yet: ${row.reported} ${row.reported === 1 ? "install has" : "installs have"} zoned in, and 3 must agree.`
+      : observedLine([], null, Date.now()),
+    filesList.length ? `The game files list ${filesList.join(" and ")}, unconfirmed until 3 installs report them.` : "The game files list no encounter or entrance for it.",
+    ...(quests.length ? [`${quests.length} ${quests.length === 1 ? "quest" : "quests"} filed under its name in the quest log, each with three installs agreeing.`] : []),
+  ];
+
   const unconfirmed = row.reported > 0
     ? `No entrance is confirmed yet. ${row.reported} ${row.reported === 1 ? "install has" : "installs have"} zoned in, and 3 must agree on the place.`
     : "No entrance is confirmed yet: no install has reported zoning in. An entrance is confirmed once 3 installs zone in from the same place.";
 
   return (
     <Container width="data">
-      <EdgeDegraded when={unreachable} />
+      <EdgeDegraded when={unreachable || !!world?.unreachable || !!loot?.unreachable} />
       <JsonLd data={entityPageJsonLd({ name: title, path: canonical, identifier: `instance:${row.instanceMapId}` })} />
       <article>
         <DataTitle
@@ -158,6 +176,10 @@ export default async function InstancePage(props: Props) {
 
         {unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} Players&apos; reports cannot be shown until it is back; the entrance below is from the game files.</p>}
 
+        <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={link}>How to read these numbers</Link>} />
+        {/* No per-instance JSON is served, so no Raw JSON link: the copy text is the record. */}
+        <OpenData className="mb-6" text={[`${title} (instance ${row.instanceMapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
+
         <div className="space-y-6">
           <section aria-labelledby="facts">
             <SectionHeading id="facts" note="The type is from the game files where they place the entrance, else as 3 installs agree. The level is from the game files, which give one level for most instances rather than a range. The difficulty is the id 3 installs agree on; the game files' own list of the instance's difficulties shows beside it when they give one.">
@@ -169,7 +191,7 @@ export default async function InstancePage(props: Props) {
                   <dt className="text-muted">Name</dt>
                   <dd className="text-fg">
                     {row.name}
-                    <span className="ml-2 inline-flex items-baseline gap-1.5 text-meta text-muted"><Badge tone="files" />from the game files&apos; kill statistic for {row.statisticBoss}; they place no entrance for it</span>
+                    <span className="ml-2 inline-flex items-baseline gap-1.5 text-meta text-muted"><Badge tone="files" />name from the game files; they place no entrance for it</span>
                   </dd>
                 </>}
                 <dt className="text-muted">Type</dt><dd className="text-fg">{kindLabel(row.raid)}</dd>
@@ -268,7 +290,7 @@ export default async function InstancePage(props: Props) {
           </section>
 
           <section aria-labelledby="quests">
-            <SectionHeading id="quests" note="A quest is listed once 3 installs report it under this instance's name in the quest log, where the game files a dungeon's quests. Installs counts every install that reported the quest.">
+            <SectionHeading id="quests" note="A quest is listed once 3 installs file it under this instance's name in the quest log, where the game files a dungeon's quests. This matches the quest log's header, not the quest's giver or turn-in, so a quest filed under another header is not here. Installs counts the installs that agreed on the header.">
               Quests
             </SectionHeading>
             {unreachable || world?.unreachable ? <Unreachable /> : (

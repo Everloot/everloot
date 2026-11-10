@@ -28,7 +28,7 @@ export function firstFilled(tabs: Pick<TabItem, "id" | "count">[]): string | und
  * address can be shared. Arrow keys, Home and End move between tabs (WAI-ARIA tabs pattern, automatic
  * activation). The first tab with rows is open on the server and without JavaScript.
  */
-export default function Tabs({ label, tabs, inFrame = false }: { label: string; tabs: TabItem[]; inFrame?: boolean }) {
+export default function Tabs({ label, tabs, inFrame = false, className = "" }: { label: string; tabs: TabItem[]; inFrame?: boolean; className?: string }) {
   const uid = useId();
   const ids = tabs.map((t) => t.id);
   const [selected, setSelected] = useState(() => firstFilled(tabs) ?? ids[0]);
@@ -78,7 +78,7 @@ export default function Tabs({ label, tabs, inFrame = false }: { label: string; 
   const panelId = (id: string) => `${uid}-panel-${id}`;
 
   return (
-    <div data-tabs className={inFrame ? "" : "min-w-0"}>
+    <div data-tabs className={`${inFrame ? "" : "min-w-0"} ${className}`.trim() || undefined}>
       {/* The hairline sits outside the scrolling list, so a narrow screen scrolls the tabs and not the page. */}
       <div className="border-b border-line">
       <div role="tablist" aria-label={label} className={`flex ${TAB_SCROLL} ${inFrame ? "px-2" : ""}`}>

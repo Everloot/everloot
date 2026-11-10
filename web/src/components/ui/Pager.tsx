@@ -34,7 +34,7 @@ function NumberedPager({ label, page, pages, href }: Numbered) {
     <nav aria-label={label} className="flex items-center gap-1 text-control">
       {page > 1
         ? <Link href={href(page - 1)} rel="prev" aria-label="Previous page" className={`${box} text-fg-2 hover:bg-panel hover:text-fg`}>‹</Link>
-        : <span aria-hidden="true" className={`${box} text-line`}>‹</span>}
+        : <span aria-hidden="true" className={`${box} text-muted`}>‹</span>}
       {pageWindow(page, pages).map((p, i) => p === null
         ? <span key={`gap-${i}`} aria-hidden="true" className="px-1 text-muted">…</span>
         : p === page
@@ -42,7 +42,7 @@ function NumberedPager({ label, page, pages, href }: Numbered) {
           : <Link key={p} href={href(p)} aria-label={`Page ${p}`} className={`${box} text-fg-2 hover:bg-panel hover:text-fg`}>{p}</Link>)}
       {page < pages
         ? <Link href={href(page + 1)} rel="next" aria-label="Next page" className={`${box} text-fg-2 hover:bg-panel hover:text-fg`}>›</Link>
-        : <span aria-hidden="true" className={`${box} text-line`}>›</span>}
+        : <span aria-hidden="true" className={`${box} text-muted`}>›</span>}
     </nav>
   );
 }

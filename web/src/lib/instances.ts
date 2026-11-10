@@ -189,7 +189,8 @@ export function instanceQuests(facts: Pick<WorldFacts, "npcs" | "quests" | "rech
   return publicQuests({ ...facts, quests: rows, vendors: [] })
     .filter((q) => q.category?.trim().toLowerCase() === key)
     .map((q) => {
-      const own = rows.filter((r) => r.questId === q.questId && r.installId.trim());
+      // Only the installs that filed it under this header count, so the meter shows the agreement the listing rests on.
+      const own = rows.filter((r) => r.questId === q.questId && r.installId.trim() && r.category?.trim().toLowerCase() === key);
       return { ...q, installs: new Set(own.map((r) => r.installId.trim())).size, lastSeen: latest(own, asOf) };
     })
     .sort((a, b) => (a.level ?? 999) - (b.level ?? 999) || a.questId - b.questId);

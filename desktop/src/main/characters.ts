@@ -1,5 +1,5 @@
 import { parseEverlootLua, parseEverlootTable } from "../../../web/src/lib/sv-parse";
-import { directionOf } from "../shared/ledger";
+import { DAY_MS, directionOf, periodStart } from "../shared/ledger";
 import type { CharacterRow, CharactersInfo, ProgressRow } from "../shared/types";
 
 /**
@@ -15,7 +15,6 @@ export const HISTORY_POINTS = 60;
 // In and out follow the addon's ledger (addon/modules/ledger.lua, mirrored in shared/ledger.ts): `vendor` is money
 // in, since the addon writes it only for gold gained at a merchant (addon/modules/gold.lua); `vendor_spend` is out.
 // The nine uploaded categories read the same way on the website ledger (kb/src/gold-ledger.ts).
-const DAY_MS = 24 * 3600 * 1000;
 const WEEK_DAYS = 7;
 const MONEY_DAYS = 30;
 const RECEIPTS = 12;
@@ -196,13 +195,11 @@ export function collectCharacters(records: Array<Record<string, unknown>>, local
 
 /** The summary at `now`: each character's last seven days, 30 days and latest receipts, on a copy of its row. */
 export function charactersAt(base: CharacterBase, now = Date.now()): CharactersInfo {
-  const at = new Date(now);
-  const end = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate());
-  const start = end - (MONEY_DAYS - 1) * DAY_MS;
+  const start = periodStart(now, MONEY_DAYS);
   const characters = base.characters.map((c) => {
     const all = base.money.get(`${c.character}-${c.realm}`) ?? [];
     // The Gold tab's "7 days": today and the six whole UTC days before it (addon/modules/ledger.lua, L.Period).
-    const weekStart = end - (WEEK_DAYS - 1) * DAY_MS;
+    const weekStart = periodStart(now, WEEK_DAYS);
     const week = { earned: 0, spent: 0 };
     for (const e of all) if (e.ms >= weekStart && e.ms <= now) week[e.direction === "out" ? "spent" : "earned"] += e.copper;
     const events = all.filter((e) => e.ms >= start && e.ms <= now).sort((a, b) => a.ms - b.ms);

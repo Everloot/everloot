@@ -65,6 +65,14 @@ from your own sightings and loot in the saved file; one you have not met keeps i
 `/everloot price` prints the same amounts as plain text. Disenchant outcomes and values are not yet available;
 the addon does not guess them from an item's color or type.
 
+Between the prices and the sources, the tooltip shows your own history with the item, read from the gold ledger
+in your saved file for your characters on this realm: the day and price per unit of your last sale, the average
+sale price per unit and the units sold over the ledger's last 90 days, and sales from the last two days whose
+mailbox letter you have not taken yet (sold, no price until the letter). The average paid shows only for a
+purchase whose ledger entry names the item and its count. An item you never sold or bought gets no history line,
+never a zero. The ledger is indexed by item once and again only after it changes, so a hover reads one entry.
+Nothing new is recorded or uploaded for it.
+
 ### Ask about an item's price
 
 - For an immediate answer from the files already in game, type `/everloot price` followed by a
@@ -248,6 +256,11 @@ records and where it goes. A switch that has a `/everloot` command runs that com
 always agree. Changes apply after a reload; the page has a **Reload now** button. A client without the
 game's options API shows the page as a window instead.
 
+Three switches at the end of the list choose what item tooltips show: **prices** (community market, your scan,
+vendor), **your history** (your sales and purchases from the gold ledger) and **sources** (drops, vendors,
+reagents, zones). All three are on for a new install, are saved in your SavedVariables, record nothing and apply
+at once, without a reload.
+
 ## The Everloot window
 
 Left-click the minimap button, or `/everloot window`, for the Everloot window. Its sidebar has five items.
@@ -264,7 +277,14 @@ Left-click the minimap button, or `/everloot window`, for the Everloot window. I
   and has a button that runs that command. It shows this character, or the account: every character in the roster, each
   item done when any of them has it, with the name of the character that does.
 - **Professions** shows each profession in the profession book with its rank and the recipes recorded for it by
-  difficulty colour.
+  difficulty colour. **Crafting costs**, the button at its bottom, lists the recipes this install recorded under this
+  character's profession names (recipe rows carry no character, so an alt's recipes in the same profession show too)
+  with what their reagents cost at the price file's market value (a vendor's price instead when a vendor you visited
+  sells the reagent for less), what one product item sells for and an estimated profit, sorted by that estimate or by
+  name, and says how old the price file is. How many items a craft makes is not recorded, so the estimate assumes one
+  item per craft. A reagent without a price makes the cost unknown, never zero; so does a reagent name this install
+  has seen with two item ids. Choose a recipe and a count for what to buy: each reagent, how many and what they cost,
+  with Up and Down past five reagents. Your bags and bank are not read.
 - **Settings** opens this page. "What you've added", the row counts in your saved file, is on that page now.
 
 Ask, Build plan and Auctions are no longer in the sidebar. `/ask` and `/everloot plan` (the planner workspace) still work.
@@ -562,14 +582,14 @@ addon/
 │   ├── planner.lua     the planner workspace: website talent and raid plans beside your character; /everloot planner
 │   ├── raid_data.lua   raid buff list generated from web/src/data/game-data/raid-*.json
 │   ├── raid.lua        /everloot raid: buffs missing per group, and a raid share code; display only
-│   ├── prices.lua      item tooltips: your latest scan and the Everloot Desktop App's community prices
+│   ├── prices.lua      item tooltips: your latest scan, the Everloot Desktop App's community prices and your sale history
 │   ├── drops.lua       item tooltips: where an item drops, from the public rates in the same file
 │   ├── gph.lua         gold per hour sessions, kept in your file only
 │   ├── conveniences.lua  sell greys and repair at a merchant, Collect all at the mailbox; each off until enabled, no records
 │   ├── window.lua      the Everloot window: Home from what the file holds; built on first open, no records
 │   ├── view_gold.lua   the window's Gold tab: gold by realm, the ledger, auction sales, the gph session; display only
 │   ├── view_collection.lua  the window's Collection tab: achievements, reputation, titles, lockouts, quest chains; display only
-│   └── view_professions.lua  the window's Professions tab: each profession, its rank and recorded recipes; display only
+│   └── view_professions.lua  the window's Professions tab: each profession, its rank and recorded recipes, crafting costs; display only
 ├── media/crest.tga     the crest, 128 px, packaged beside the code
 └── tests/              Lua 5.1 contract tests and their fixtures
 ```

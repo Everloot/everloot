@@ -264,6 +264,7 @@ describe("instanceQuests", () => {
     q("a", 1, "Synthetic Keep"), q("b", 1, " synthetic keep "), q("c", 1, "Synthetic Keep", "2026-11-06T10:00:00Z"),
     q("a", 2, "Synthetic Keep"), q("b", 2, "Synthetic Keep"), q("c", 2, "Elsewhere"),
     q("a", 3, "Synthetic Keep"), q("b", 3, "Synthetic Keep"),
+    q("d", 1, "Elsewhere"),
   ] };
 
   test("lists a quest 3 installs file under the name, with its installs and last time, and none for no name", () => {
@@ -271,6 +272,8 @@ describe("instanceQuests", () => {
     expect(list.map((r) => r.questId)).toEqual([1]);
     // The report dated after the corpus's own date does not count as last seen.
     expect(list[0]).toMatchObject({ title: "Quest title 1", installs: 3, lastSeen: "2026-11-04T10:00:00.000Z" });
+    // A fourth install that filed it under another header is not one of the installs that agreed.
+    expect(list[0]!.installs).toBe(3);
     expect(instanceQuests(facts, null)).toEqual([]);
   });
 });
