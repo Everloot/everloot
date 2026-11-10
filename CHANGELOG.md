@@ -298,6 +298,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and the snapshot is read again only after a minute. The route itself is unchanged.
 
 ### Changed
+- Docs: the launch-day page is marked historical, and day-to-day operation of the site is in docs/OPERATIONS.md.
 - Protocol: `itemsResponse.items` is typed with the row `GET /api/items` returns (item id, then class, subclass, slot
   and quality, each null when the build does not name it), so a client generated from `schema/api/itemsResponse.json`
   gets fields instead of `any`. Protocol package 2.0.0 (the row's fields are now required); the answers do not change.
