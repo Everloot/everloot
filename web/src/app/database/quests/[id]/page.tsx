@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import JsonLd from "@/components/JsonLd";
 import { entityPageJsonLd } from "@/lib/jsonld";
+import EdgeDegraded from "@/components/EdgeDegraded";
+import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
+import { dayLabel } from "@/lib/report-labels";
 import AdSlot from "@/components/AdSlot";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
@@ -10,7 +13,7 @@ import { isPinPosition, npcPage, questPage } from "../../../../../../kb/src/worl
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { pinLink } from "@/lib/world-map";
 import { trailFor } from "@/lib/breadcrumbs";
-import { Badge, Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
+import { agreementLabel, reportedLabel, Badge, Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
 import { EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, ShowOnMap, Unreachable } from "../../entity";
 import { unknownQuest } from "../../unknown";
 import { entitySummary, observedLine } from "@/lib/evidence";
@@ -79,7 +82,9 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
   ];
   const npcLink = (id: number) => <EntityLink kind="npc" id={id} name={npcs.get(id)} />;
   const catalog = await loadCatalog();
-  const chain = catalog?.chains.find((c) => c.questIds.includes(page.questId));
+  const chains = catalog?.chains.filter((c) => c.questIds.includes(page.questId)) ?? [];
+  const chain = chains[0];
+  const questName = (id: number) => questPage(id, facts).title ?? wiki?.names.get(id)?.name;
   const position = chain?.questIds.indexOf(page.questId) ?? -1;
   const previous = chain?.questIds[position - 1];
   const next = chain?.questIds[position + 1];
@@ -107,6 +112,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
 
   return (
     <Container width="data">
+      <EdgeDegraded when={facts.unreachable || !catalog?.confirmations} />
       <article>
         <JsonLd data={entityPageJsonLd({ name: title, path: `/database/quests/${page.questId}`, identifier: `quest:${page.questId}` })} />
         <EntityHeader
@@ -133,13 +139,14 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
                 { label: "Level", value: known(page.level), numeric: true },
                 { label: "Chain", value: chain ? <>
                   <Link href={chainHref(chain.questLineId, chain.name)} className={LINK}>{chain.name}</Link>
-                  <span className="block text-muted">{chain.confirmed ? "Player reports" : CLIENT_QUEST_LINES.label} · {catalog?.confirmations ? `${chain.reporters} installs` : "installs unrecorded"} · {chainDate?.slice(0, 10) ?? "date not reported yet"}</span>
-                </> : <>Not reported yet {known(null)}</> },
-                ...(previous !== undefined ? [{ label: "Previous quest", value: <EntityLink kind="quest" id={previous} /> }] : []),
-                ...(next !== undefined ? [{ label: "Next quest", value: <EntityLink kind="quest" id={next} /> }] : []),
+                  {chains.length > 1 && <span> (also in {chains.length - 1} other {chains.length === 2 ? "chain" : "chains"})</span>}
+                  <span className="block text-muted">{chain.confirmed ? "Player reports" : CLIENT_QUEST_LINES.label} · {catalog?.confirmations ? reportedLabel(chain.reporters) : "player reports could not be read just now"} · {dayLabel(chainDate)}</span>
+                </> : !catalog?.confirmations ? STORAGE_UNREACHABLE : <>Not reported yet {known(null)}</> },
+                ...(previous !== undefined ? [{ label: "Previous quest", value: <EntityLink kind="quest" id={previous} name={questName(previous)} /> }] : []),
+                ...(next !== undefined ? [{ label: "Next quest", value: <EntityLink kind="quest" id={next} name={questName(next)} /> }] : []),
                 { label: "Zone", value: zone ? <>
                   <Link href={zoneHref(zone.mapId, zone.name)} className={LINK}>{zone.name}</Link>
-                  <span className="block text-muted">Player reports (giver location) · {giverPin!.reporters} installs · latest report: {zoneDate ?? "date not reported yet"}</span>
+                  <span className="block text-muted">Player reports (giver location) · {agreementLabel(giverPin!.reporters)} · latest report: {dayLabel(zoneDate)}</span>
                 </> : <>Not reported yet {known(null)}</> },
                 { label: "Giver", value: known(page.giverNpcId !== null ? npcLink(page.giverNpcId) : null) },
                 { label: "Turn-in", value: known(page.turnInNpcId !== null ? npcLink(page.turnInNpcId) : null) },

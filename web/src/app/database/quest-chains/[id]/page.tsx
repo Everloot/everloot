@@ -97,16 +97,16 @@ export default async function QuestChainPage(props: Props) {
               dense
               caption={`Quests in ${entry.name}`}
               columns={[
-                { key: "quest", header: "Quest", cell: (questId: number) => <>
+                { key: "quest", header: "Quest", cell: ({ questId }: { questId: number; position: number }) => <>
                   <EntityLink kind="quest" id={questId} name={nameOf(questId)} />
                   {!quests.has(questId) && nameOf(questId) && <span className="sr-only"> ({GAME_NAME_TITLE.wiki.toLowerCase()})</span>}
                 </> },
-                { key: "position", header: "Position", numeric: true, cell: (questId: number) => entry.questIds.indexOf(questId) + 1 },
-                { key: "name", header: "Name reports", cell: (questId: number) => nameOf(questId) ? null : "Name not reported yet; no agreed name yet, 3 installs needed." },
+                { key: "position", header: "Position", numeric: true, cell: ({ position }: { questId: number; position: number }) => position },
+                { key: "name", header: "Name reports", cell: ({ questId }: { questId: number; position: number }) => nameOf(questId) ? null : "Name not reported yet." },
               ]}
-              meta={(questId: number) => <>Position {entry.questIds.indexOf(questId) + 1}{!nameOf(questId) && " · Name not reported yet; no agreed name yet, 3 installs needed."}</>}
-              rows={entry.questIds}
-              rowKey={String}
+              meta={({ questId, position }) => <>Position {position}{!nameOf(questId) && " · Name not reported yet."}</>}
+              rows={entry.questIds.map((questId, index) => ({ questId, position: index + 1 }))}
+              rowKey={({ questId }) => String(questId)}
             />
           </>
         ) : <Unreachable />}

@@ -450,7 +450,7 @@ test("chain quests use player names first, then wiki names, and explain unnamed 
     expect(out).toContain("name from the warcraft wiki");
     expect(out).toContain("Quest 9");
     expect(out).toContain("Position 3");
-    expect(out).toContain("Name not reported yet; no agreed name yet, 3 installs needed.");
+    expect(out).toContain("Name not reported yet.");
   } finally {
     questNames.reported.clear();
     questNames.wiki.clear();
