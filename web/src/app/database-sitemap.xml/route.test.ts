@@ -148,3 +148,13 @@ test("a spell is listed, after the vendors, only when the files name it and rela
   expect(await robots(related)).toMatchObject({ index: true });
   expect(await robots(unrelated)).toMatchObject({ index: false });
 });
+
+test("a named spell only the talent trees hold is listed, and its page asks to be indexed", async () => {
+  // Arcane Power: a Mage talent nothing in the files or the reports relates to.
+  expect(CLIENT_EDGES.some((e) => (e.fromKind === "spell" && e.fromId === 12042) || (e.toKind === "spell" && e.toId === 12042))).toBe(false);
+  names.spells = { version: "1.60.1.70862", names: new Map([[12042, "Arcane Power"]]) };
+  const listed = urls(await (await chunkAt("0.xml")).text()).map((u) => new URL(u).pathname);
+  expect(listed).toContain("/database/spells/12042");
+  const { generateMetadata } = await import("../database/spells/[id]/page");
+  expect((await generateMetadata({ params: Promise.resolve({ id: "12042" }) })).robots).toMatchObject({ index: true });
+});

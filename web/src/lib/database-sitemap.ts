@@ -9,6 +9,7 @@ import { CLIENT_LAYER, shownItemName } from "./items";
 import { loadObjectFacts } from "./objects";
 import { loadWorldFacts } from "./rollup-compute";
 import { loadShownNames } from "./shown-item-names";
+import { loadSpellTalents } from "./talents/spell-talents";
 import type { ZoneSightings } from "./zones";
 
 /** Database detail URLs per sitemap file, under the protocol's 50,000. */
@@ -31,18 +32,24 @@ const ascending = (ids: Iterable<number>) => [...new Set(ids)].sort((a, b) => a 
 
 /**
  * The spells the sitemap lists: named in the game files' spell names and related to something, an item it creates or
- * costs, the skill line that teaches it, or a relation players reported. Each passes `spellIndexable` as its page
- * asks it (a name and a relation), and a spell known only by its name or its tooltip is left out, as the owner chose:
- * of the 32,000 named spells, only the ones a page has something to say about. Without the names file none is listed.
+ * costs, the skill line that teaches it, a relation players reported, or a place in the talent trees. Each passes
+ * `spellIndexable` as its page asks it, with the tooltip left out, so a spell known only by its name or its tooltip
+ * is left out, as the owner chose: of the 32,000 named spells, only the ones a page has something to say about.
+ * Without the names file none is listed.
  */
-export function spellIds(edges: readonly { fromKind: string; fromId: number; toKind: string; toId: number }[], names: { has(spellId: number): boolean } | null): number[] {
+export function spellIds(
+  edges: readonly { fromKind: string; fromId: number; toKind: string; toId: number }[],
+  names: { has(spellId: number): boolean } | null,
+  talents: { keys(): Iterable<number>; has(spellId: number): boolean },
+): number[] {
   if (!names) return [];
   const related = new Set<number>();
   for (const e of edges) {
     if (e.fromKind === "spell") related.add(e.fromId);
     if (e.toKind === "spell") related.add(e.toId);
   }
-  return ascending(related).filter((id) => spellIndexable({ named: names.has(id), text: false, relations: 1 }));
+  return ascending([...related, ...talents.keys()]).filter((id) =>
+    spellIndexable({ named: names.has(id), text: false, relations: related.has(id) ? 1 : 0, talents: talents.has(id) ? 1 : 0 }));
 }
 
 /**
@@ -52,8 +59,8 @@ export function spellIds(edges: readonly { fromKind: string; fromId: number; toK
  * read, so the sitemap answers 503 instead of a short list.
  */
 export async function databasePaths(): Promise<string[] | null> {
-  const [{ facts, agreed, matched }, world, objects, edges, spellNames] = await Promise.all([
-    loadShownNames(), loadWorldFacts(), loadObjectFacts(), loadEdges(), loadSpellNames(CLIENT_LAYER.build.version),
+  const [{ facts, agreed, matched }, world, objects, edges, spellNames, talents] = await Promise.all([
+    loadShownNames(), loadWorldFacts(), loadObjectFacts(), loadEdges(), loadSpellNames(CLIENT_LAYER.build.version), loadSpellTalents(),
   ]);
   if (facts.unreachable || world.unreachable || objects.unreachable || edges.unreachable) return null;
 
@@ -87,7 +94,7 @@ export async function databasePaths(): Promise<string[] | null> {
     ...quests.map((id) => `/database/quests/${id}`),
     ...objectIds.map((id) => `/database/objects/${id}`),
     ...vendors.map((id) => `/database/vendors/${id}`),
-    ...spellIds([...edges.observed, ...edges.client], spellNames?.names ?? null).map((id) => `/database/spells/${id}`),
+    ...spellIds([...edges.observed, ...edges.client], spellNames?.names ?? null, talents).map((id) => `/database/spells/${id}`),
   ];
 }
 
