@@ -16,9 +16,25 @@ import { loadCoverage } from "./coverage-compute";
 import { RECHECK_SCOPES } from "./recheck-scopes";
 import { readSettledList } from "./settled-store";
 import { emptySettledList } from "../../../kb/src/settled-list";
+import { createToolHandlers } from "../../../kb/src/mcp-server";
+import { openDb } from "../../../kb/src/db";
+import { uploadStore } from "./upload-store";
 
 vi.mock("./coverage-compute", () => ({ loadCoverage: vi.fn(async () => null) }));
 vi.mock("./settled-store", () => ({ readSettledList: vi.fn() }));
+
+it("mount readers expose agreed gameplay names and released UiMap ids through generic tools", async () => {
+  const records = ["a", "b", "c"].map((installId) => ({ kind: "item_seen", installId, itemId: 2589, name: "Linen Cloth" }));
+  Object.assign(uploadStore, { loadCorpus: async () => ({ records, dataAsOf: "2026-11-10T00:00:00Z" }) });
+  const db = openDb(":memory:");
+  try {
+    const h = createToolHandlers(db, toolLoaders());
+    const item = await h.search_knowledge({ query: "Linen Cloth", kind: "item", limit: 3 });
+    expect(item).toMatchObject({ structured: { hits: [{ gameId: 2589, sourceKind: "observed" }] } });
+    const zone = await h.get_by_name({ name: "Elwynn Forest", kind: "zone" });
+    expect(zone).toMatchObject({ structured: { hits: [{ gameId: 1429, sourceKind: "game-files" }] } });
+  } finally { db.close(); }
+});
 
 it("lends only the persisted settled list's count and date, never its identifiers", async () => {
   const list = { ...emptySettledList("1.60.1.70450"), dataAsOf: "2026-11-06T00:00:00Z", quest: [123, 1], vendor: [456] };

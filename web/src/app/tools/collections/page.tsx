@@ -16,6 +16,7 @@ import MountsView from "./MountsView";
 import RememberCharacter from "./RememberCharacter";
 import { GAP_VIEW, MOUNTS_VIEW, showOf, viewHref, type ViewQuery } from "./overview";
 import { trailFor } from "@/lib/breadcrumbs";
+import { TRACKER_NEEDS } from "@/lib/completion-lists";
 import { Card, Container, DataTitle, Disclosure, EmptyState, Field, LinkTabs, SectionHeading } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -197,8 +198,7 @@ export default async function CollectionsPage(
               Battle.net profile.
             </p>
             <p>
-              Progress needs the addon&apos;s completion tracker (off until you turn it on) and an upload that shares
-              your collection ownership. Remembering a character keeps its install id and key in this browser only.
+              {TRACKER_NEEDS} Remembering a character keeps its install id and key in this browser only.
             </p>
           </Disclosure>
         </div>

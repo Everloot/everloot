@@ -98,6 +98,17 @@ export function observedLine(parts: (string | null)[], lastSeen: string | null, 
   return `Players reported ${said.join(" and ")}${when}.`;
 }
 
+/**
+ * `observedLine` for counts that carry no date of their own: they are dated by the uploads they were read from
+ * ("last upload 2 hours ago", as `asOfLine` words it), not by a last-seen time they do not have.
+ */
+export function reportedLine(parts: (string | null)[], dataAsOf: string | null, now: number): string {
+  const said = parts.filter((p): p is string => Boolean(p));
+  if (!said.length) return "No player has reported it yet.";
+  const asOf = asOfLine(dataAsOf, now);
+  return `Players reported ${said.join(" and ")}${asOf ? ` (${asOf})` : ""}.`;
+}
+
 /** The line that says where the name came from, in the site's own words. */
 export function nameLine(named: boolean): string {
   return named ? "Players agree on the name." : "It has no agreed name yet: that needs three installs reporting the same one.";

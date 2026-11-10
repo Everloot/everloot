@@ -1,15 +1,17 @@
 import type { Metadata } from "next";
 import JsonLd from "@/components/JsonLd";
 import { entityPageJsonLd } from "@/lib/jsonld";
+import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { Container, DataTable, Facts, TooltipFrame } from "@/components/ui";
+import { Container, DataTable, Facts, InShort, OpenData, TooltipFrame } from "@/components/ui";
 import EntityLink from "@/components/EntityLink";
 import { trailFor } from "@/lib/breadcrumbs";
 import { chainHref, loadCatalog, parseSegment } from "@/lib/completion-lists";
+import { asOfLine, entitySummary } from "@/lib/evidence";
 import { loadNames } from "@/lib/names";
 import { pageMetadata } from "@/lib/seo";
 import { CLIENT_LABEL } from "../../../../../../kb/src/edges";
-import { EntityHeader, EntityTop, Unreachable } from "../../entity";
+import { EntityHeader, EntityTop, LINK, Unreachable } from "../../entity";
 import { loadQuestNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
@@ -48,6 +50,24 @@ export default async function QuestChainPage(props: Props) {
   const nameOf = (id: number) => quests.get(id) ?? wiki?.names.get(id)?.name;
   // A chain cut at 80 quests has more than it lists.
   const count = entry ? `${entry.questIds.length}${entry.truncated ? "+" : ""}` : "";
+  // The page in a few lines: what it is, who reported it and when, and where the name came from. A chain only the
+  // files list carries the files' name, so its name line says so rather than "no agreed name".
+  const asOf = asOfLine(catalog?.dataAsOf ?? null, Date.now());
+  const [what, observed, name] = entry ? entitySummary({
+    identity: entry.truncated
+      ? `A quest chain in WoW: Forever of more than ${entry.questIds.length} quests; the first ${entry.questIds.length} are listed.`
+      : `A quest chain in WoW: Forever of ${entry.questIds.length} ${entry.questIds.length === 1 ? "quest" : "quests"}.`,
+    observed: entry.confirmed
+      ? `Players reported it, three installs agreeing${asOf ? ` (${asOf})` : ""}.`
+      : catalog?.confirmations
+        ? `Found in game files, unconfirmed: ${entry.reporters} of 3 installs have reported it${asOf ? ` (${asOf})` : ""}.`
+        : "Found in game files, unconfirmed; player reports could not be read just now.",
+    named: entry.confirmed,
+  }) : [];
+  // Not confirmed is not "not reported": some installs may have reported it (the line above counts them), and when the
+  // reports could not be read the page cannot say either.
+  const filesName = `The name and the quests are shown from the game files; ${catalog?.confirmations ? "not confirmed by three installs yet" : "player reports could not be read just now"}.`;
+  const summary = entry ? [what, observed, entry.confirmed ? name : filesName] : [];
 
   return (
     <Container width="data">
@@ -70,6 +90,8 @@ export default async function QuestChainPage(props: Props) {
                 />
               }
             />
+            <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
+            <OpenData text={[`${entry.name} (quest chain ${id})`, ...summary, `Source: https://everloot.app${chainHref(entry.questLineId, entry.name)}`].join("\n")} />
             {entry.questIds.length === 1 && !entry.truncated && <p className="text-meta text-muted">{entry.confirmed ? "Players reported this chain with one quest." : "The game files list this chain with one quest."}</p>}
             <DataTable
               dense

@@ -6,6 +6,11 @@ import { fromSpanish } from "./spanish.js";
 
 export interface SearchHit {
   id: number;
+  recordId?: number;
+  gameId?: number;
+  sourceKind?: "observed" | "game-files" | "lore" | "reference";
+  build?: string;
+  observed?: { asOf: string | null };
   extId: string;
   kind: string;
   name: string;
