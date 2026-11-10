@@ -75,6 +75,14 @@ test("the panel shows a post that arrived from two regions once", async () => {
     expect(timeline.some((e) => e.id === copy.id)).toBe(false);
   }
 });
+test("the home page states the promise with its numbers; with no stored score every figure says unrecorded", () => {
+  const block = html.slice(html.indexOf('id="promise"'), html.indexOf('id="whats-new"'));
+  expect(block).toContain("Every fact shows how many players saw it, and when.");
+  expect(block.match(/>unrecorded</g)).toHaveLength(3);
+  expect(block).toContain("Data age unrecorded");
+  expect(block).toContain('href="/addon"');
+});
+
 test("the hero asks: a GET form to /chat whose question goes in ask (prefilled there, never sent), the one primary button there", () => {
   const hero = html.slice(html.indexOf('id="hero-title"'), html.indexOf('id="whats-new"'));
   const form = hero.match(/<form [^>]*>/)?.[0] ?? "";
