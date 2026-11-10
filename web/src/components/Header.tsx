@@ -29,7 +29,8 @@ const TOOL_HREFS = [...TOOL_GROUPS.flatMap((g) => g.links.map((l) => l.href)), "
 
 const isCurrent = (path: string, href: string) => path === href || path.startsWith(`${href}/`);
 
-const navItem = "inline-flex min-h-11 items-center whitespace-nowrap border-b-2 px-2 transition-colors";
+// The ring sits inside the box: these items start at the top edge of the window, where a ring offset outward is cut off.
+const navItem = "inline-flex min-h-11 items-center whitespace-nowrap border-b-2 px-2 transition-colors focus-visible:outline-offset-[-2px]";
 const navState = (on: boolean) => (on ? "border-accent text-fg" : "border-transparent text-fg-2 hover:text-accent");
 const menuLink = "flex min-h-11 items-center rounded-control px-3 text-sm text-fg-2 hover:bg-canvas hover:text-accent";
 
@@ -106,7 +107,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
     }}>
       {/* The data column's width and gutters (globals.css), so the logo lines up with the data tables. */}
       <div className="mx-auto flex h-header max-w-data items-center gap-1 px-2 sm:gap-3 sm:px-4 lg:gap-4 lg:px-6">
-        <Link href="/" className="inline-flex min-h-11 shrink-0 items-center gap-2 text-lg font-bold tracking-tight text-fg" onClick={closeAll}>
+        <Link href="/" className="inline-flex min-h-11 shrink-0 items-center gap-2 text-lg font-bold tracking-tight text-fg focus-visible:outline-offset-[-2px]" onClick={closeAll}>
           {/* The favicon's diamond, outlined in the accent green. */}
           <svg aria-hidden="true" viewBox="8 8 48 48" width="16" height="16" className="text-accent">
             <path d="M32 12 52 32 32 52 12 32Z" fill="none" stroke="currentColor" strokeWidth="5" strokeLinejoin="round" />
@@ -175,7 +176,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
             aria-expanded={searchOpen}
             aria-controls="header-search"
             onClick={() => setSearchOpen(!searchOpen)}
-            className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center text-fg-2 hover:text-accent xl:hidden"
+            className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center text-fg-2 hover:text-accent focus-visible:outline-offset-[-2px] xl:hidden"
           ><SearchIcon /></button>
           {/* Below 1280 px the right group has no room for both builds; the menu panel shows them. */}
           <GameVersionLabel className="hidden shrink-0 xl:block" />
