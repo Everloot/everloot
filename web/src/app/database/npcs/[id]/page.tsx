@@ -159,6 +159,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
           jsonHref={!facts.unreachable && hasCard.npc(page) ? `/api/tooltip/npc/${npcId}` : undefined}
         />
         <Tabs
+          className="mt-6"
           label={`${title}: relations`}
           tabs={[
             {

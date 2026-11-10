@@ -11,10 +11,12 @@ import { pinLink } from "@/lib/world-map";
 import { trailFor } from "@/lib/breadcrumbs";
 import { loadItemFacts } from "@/lib/rollup-compute";
 import { itemNames, npcNames } from "@/lib/names";
-import { entitySummary, observedLine } from "@/lib/evidence";
+import { entitySummary, reportedLine } from "@/lib/evidence";
+import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { VendorGoods } from "../goods";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
-import { Container, DataTable, Facts, InShort, Tabs, TooltipFrame } from "@/components/ui";
+import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
+import { hasCard } from "@/lib/tooltip";
 import { EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, MapName, ShowOnMap, Unreachable, zoneName } from "../../entity";
 import { vendorIndexable } from "@/lib/indexable";
 import { entityTitle, vendorDescription } from "@/lib/entity-meta";
@@ -47,7 +49,8 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
   const page = vendorPage(Number(params.id), facts);
   if (unknownVendor(page.vendorNpcId, facts)) notFound();
   // Where players saw this vendor stand: the NPC pins that 3 installs agree on, as links to the map.
-  const places: Place[] = facts.unreachable ? [] : npcPage(page.vendorNpcId, facts).pins.flatMap((pin) => {
+  const npc = facts.unreachable ? null : npcPage(page.vendorNpcId, facts);
+  const places: Place[] = !npc ? [] : npc.pins.flatMap((pin) => {
     const href = pinLink(pin.mapId, pin.x, pin.y);
     return href ? [{ href, mapId: pin.mapId, x: pin.x, y: pin.y }] : [];
   });
@@ -58,10 +61,17 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
   const vendorName = facts.unreachable ? undefined : npcNames(facts).get(page.vendorNpcId);
   const title = vendorName ? `${vendorName} (vendor)` : `Vendor NPC ${page.vendorNpcId}`;
   const trail = [...trailFor("/database/vendors")!, { name: title, path: `/database/vendors/${page.vendorNpcId}` }];
-  // The page in three lines: what it sells, where players saw it, and where the name came from.
+  // The page in three lines: what it is, what players reported (prices and positions) with the agreement and the date
+  // of the uploads, and where the name came from. Storage down: unrecorded, never "no prices".
+  const reportedParts = [
+    page.offers.length ? `${page.offers.length} ${page.offers.length === 1 ? "price" : "prices"}` : null,
+    places.length ? `${places.length} ${places.length === 1 ? "map position" : "map positions"}` : null,
+  ];
   const summary = entitySummary({
-    identity: page.offers.length ? `${page.offers.length} ${page.offers.length === 1 ? "price" : "prices"} reported` : "No prices reported yet",
-    observed: observedLine([places.length ? `${places.length} ${places.length === 1 ? "map position" : "map positions"}` : null], null, Date.now()),
+    identity: `A vendor in WoW: Forever (NPC ${page.vendorNpcId}).`,
+    observed: facts.unreachable ? STORAGE_UNREACHABLE
+      : reportedParts.some(Boolean) ? `${reportedLine(reportedParts, facts.dataAsOf ?? null, Date.now())} Each has three installs agreeing.`
+      : reportedLine([], null, Date.now()),
     named: Boolean(vendorName),
   });
 
@@ -92,6 +102,11 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
           )}
         />
         <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
+        <OpenData
+          text={[`${vendorName ?? `Vendor NPC ${page.vendorNpcId}`} (vendor ${page.vendorNpcId})`, ...summary, `Source: https://everloot.app/database/vendors/${page.vendorNpcId}`].join("\n")}
+          // The vendor is an NPC: its hover card is the public JSON there is, once players have reported the NPC.
+          jsonHref={npc && hasCard.npc(npc) ? `/api/tooltip/npc/${page.vendorNpcId}` : undefined}
+        />
         <Tabs
           label={`${title}: relations`}
           tabs={[
