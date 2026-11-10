@@ -1,4 +1,5 @@
 import { AwsClient } from "aws4fetch";
+import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
 import { derivedSteps, pathFactsFromRecords } from "../../../kb/src/recipe-thresholds";
 import { objectSpawnRowsFromRecords } from "../../../kb/src/object-spawns";
 import { uploadStore, type Corpus, type R2Config } from "./upload-store";
@@ -60,27 +61,9 @@ async function currentSet(): Promise<ProfessionsView> {
 }
 
 /**
- * The object metadata that says which corpus snapshot the file was built from, so a run that finds the file can tell
- * whether it is behind. Without it a write that failed after new uploads would leave the file stale until the next
- * upload, since idle runs would only check that the file exists.
- */
-const STAMP = "x-amz-meta-data-as-of";
-const stampOf = (dataAsOf: string | null) => dataAsOf ?? "none";
-
-/** The stamp of the stored file, null when it has none, undefined when there is no file or the HEAD failed. */
-async function storedStamp(cloud: R2Config, doFetch: typeof fetch): Promise<string | null | undefined> {
-  try {
-    const res = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "HEAD" }));
-    return res.ok ? res.headers.get(STAMP) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/**
  * The cron's step: writes the set when this run added uploads or rebuilt, when there is no file yet, or when the file
  * was built from another snapshot than `dataAsOf` (an earlier write failed, or the file predates the stamp). An idle
- * run with a current file reads nothing but that one HEAD. `bytes` is the file's size, for the run's log.
+ * run with a current file reads only a HEAD, falling back to GET if HEAD fails. `bytes` is the file's size, for the run's log.
  */
 export async function writeProfessions(opts: { added: number; rebuild?: boolean; dataAsOf: string | null }, deps: {
   cloud?: R2Config | null; fetch?: typeof fetch; build?: () => Promise<ProfessionsView>; now?: () => Date;
@@ -88,7 +71,7 @@ export async function writeProfessions(opts: { added: number; rebuild?: boolean;
   const cloud = deps.cloud === undefined ? r2FromEnv() : deps.cloud;
   if (!cloud) throw new Error("the stored professions need the cloud store");
   const doFetch = deps.fetch ?? fetch;
-  if (opts.added <= 0 && !opts.rebuild && await storedStamp(cloud, doFetch) === stampOf(opts.dataAsOf)) return { written: false };
+  if (opts.added <= 0 && !opts.rebuild && !await storedViewNeedsWrite(r2(cloud), r2Url(cloud), opts.dataAsOf, doFetch)) return { written: false };
   const body = encodeProfessions(await (deps.build ?? currentSet)(), (deps.now?.() ?? new Date()).toISOString());
   const put = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "PUT", body, headers: { "content-type": "application/json", [STAMP]: stampOf(opts.dataAsOf) } }));
   if (!put.ok) throw new Error(`professions write failed (${put.status})`);
