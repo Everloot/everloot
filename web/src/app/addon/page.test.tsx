@@ -48,10 +48,10 @@ test("the addon choices lead with the app, then website, then zip; desktop start
   const html = await render(() => Promise.resolve(Response.json(releases)));
   const choices = [...html.matchAll(/<a[^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>/g)]
     .map((match) => ({ href: match[1], text: match[2]!.trim() }));
-  const start = choices.findIndex((choice) => choice.text === "Open in the CurseForge app");
+  const start = choices.findIndex((choice) => choice.text === "Install with the CurseForge app");
   expect(start).toBeGreaterThanOrEqual(0);
   expect(choices.slice(start, start + 3)).toEqual([
-    { href: "https://www.curseforge.com/wow/addons/everloot", text: "Open in the CurseForge app" },
+    { href: "https://www.curseforge.com/wow/addons/everloot", text: "Install with the CurseForge app" },
     { href: "https://www.curseforge.com/wow/addons/everloot", text: "CurseForge website" },
     { href: addon.downloadPath, text: "Download the zip" },
   ]);
@@ -88,6 +88,7 @@ test("the addon and every desktop build are offered with version, date, size and
   // The same tested zip is on CurseForge, for players who install with its app.
   expect(html).toContain('href="https://www.curseforge.com/wow/addons/everloot"');
   expect(text).toContain("CurseForge website");
+  expect(text).toContain("Opens the CurseForge page. Press Install there to add it in the app.");
   expect(text).toContain(`Version ${addon.version}, Alpha, released 2026-10-18`);
   expect(text).toContain("Version 0.1.0, released 2026-10-19");
   for (const [label, size] of [["Windows installer", "108 MB"], ["Windows portable", "108 MB"], ["macOS disk image", "125 MB"], ["Linux AppImage", "122 MB"]]) {

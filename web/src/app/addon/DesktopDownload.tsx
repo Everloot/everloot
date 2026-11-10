@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type DesktopFile = { os: string; file: { url: string } };
+type DesktopFile = { os: string; needs: string; file: { url: string } };
 
 /** Phones and tablets keep the full list: their OS cannot run these builds. */
 export function desktopOS(platform: string, userAgent: string): string | null {
@@ -22,8 +22,11 @@ export default function DesktopDownload({ files }: { files: DesktopFile[] }) {
   // Files arrive in page order: Windows uses the installer, rather than the portable build.
   const selected = files.find((entry) => entry.os === os);
   return (
-    <a className="btn btn-primary min-h-11 w-full whitespace-nowrap" href={selected?.file.url ?? "#desktop-files"}>
-      {selected ? `Download for ${os}` : "Choose your download"}
-    </a>
+    <div className="space-y-2">
+      <a className="btn btn-primary min-h-11 w-full text-center" href={selected?.file.url ?? "#desktop-files"}>
+        {selected ? `Download for ${os}${os === "macOS" ? " (Apple silicon)" : ""}` : "Choose your download"}
+      </a>
+      {selected && <p className="text-sm text-fg-2">{selected.needs}</p>}
+    </div>
   );
 }

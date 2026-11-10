@@ -6,10 +6,10 @@ import { afterEach, expect, test, vi } from "vitest";
 import DesktopDownload, { desktopOS } from "./DesktopDownload";
 
 const files = [
-  { os: "Windows", file: { url: "/setup.exe" } },
-  { os: "Windows", file: { url: "/portable.exe" } },
-  { os: "macOS", file: { url: "/mac.dmg" } },
-  { os: "Linux", file: { url: "/linux.AppImage" } },
+  { os: "Windows", needs: "Windows 10 or 11, 64-bit", file: { url: "/setup.exe" } },
+  { os: "Windows", needs: "Windows 10 or 11, 64-bit", file: { url: "/portable.exe" } },
+  { os: "macOS", needs: "Apple silicon (M1 or newer), macOS 13 Ventura or later. No Intel build yet", file: { url: "/mac.dmg" } },
+  { os: "Linux", needs: "64-bit x86 Linux", file: { url: "/linux.AppImage" } },
 ];
 afterEach(() => vi.unstubAllGlobals());
 
@@ -38,7 +38,8 @@ test.each([
   try {
     await act(async () => root.render(<DesktopDownload files={files} />));
     expect(container.querySelector("a")?.getAttribute("href")).toBe(href);
-    expect(container.textContent).toBe(os ? `Download for ${os}` : "Choose your download");
+    expect(container.querySelector("a")?.textContent).toBe(os ? `Download for ${os}${os === "macOS" ? " (Apple silicon)" : ""}` : "Choose your download");
+    expect(container.querySelector("p")?.textContent).toBe(files.find((entry) => entry.os === os)?.needs);
   } finally {
     await act(async () => root.unmount());
   }

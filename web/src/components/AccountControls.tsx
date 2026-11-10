@@ -82,17 +82,17 @@ export default function AccountControls({ savedBuilds = false, initialShell = nu
   }
 
   return (
-    <div className="relative flex shrink-0 items-center gap-2">
+    <div className="relative flex shrink-0 items-center gap-0 sm:gap-2">
       {status === "signed-in" ? (
         <>
           <CreateMenu savedBuilds={savedBuilds} />
           <AvatarMenu name={name} initialShell={initialShell} profiles={profiles} savedBuilds={savedBuilds} accountSwitching={accountSwitching} signingOut={signingOut} onSignOut={signOut} />
-          <a href="/addon" className="btn hidden min-h-8 shrink-0 whitespace-nowrap px-4 text-sm lg:inline-flex">Get the addon</a>
+          <a href="/addon" className="btn hidden min-[340px]:inline-flex min-h-8 shrink-0 whitespace-nowrap px-2 text-sm sm:px-4"><span className="sm:hidden"><span className="sr-only">Download</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v12m-5-5 5 5 5-5M5 16v5h14v-5" /></svg></span><span className="hidden sm:inline">Get the addon</span></a>
         </>
       ) : (
         <>
           <span className="hidden sm:inline-flex">{signIn}</span>
-          <a href="/addon" className="btn btn-primary min-h-8 shrink-0 whitespace-nowrap px-2 text-sm sm:px-4"><span className="sm:hidden">Download</span><span className="hidden sm:inline">Get the addon</span></a>
+          <a href="/addon" className="btn btn-primary hidden min-[340px]:inline-flex min-h-8 shrink-0 whitespace-nowrap px-2 text-sm sm:px-4"><span className="sm:hidden">Download</span><span className="hidden sm:inline">Get the addon</span></a>
         </>
       )}
       {alert}

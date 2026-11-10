@@ -97,9 +97,9 @@ export default async function AddonPage() {
               <>
                 <div className="flex flex-col items-start gap-3">
                   <TrackedDownload className="btn btn-primary min-h-11" href={CURSEFORGE_URL} addon="everloot" to="curseforge">
-                    Open in the CurseForge app
+                    Install with the CurseForge app
                   </TrackedDownload>
-                  <p className="text-sm text-fg-2">On the project page, choose Install to open the CurseForge app.</p>
+                  <p className="text-sm text-fg-2">Opens the CurseForge page. Press Install there to add it in the app.</p>
                   <TrackedDownload className="btn min-h-11" href={CURSEFORGE_URL} addon="everloot" to="curseforge">
                     CurseForge website
                   </TrackedDownload>
@@ -146,7 +146,7 @@ export default async function AddonPage() {
             )}
           </Card>
 
-          <Card as="section" aria-labelledby="desktop" className="scroll-mt-20 space-y-6">
+          <Card as="section" aria-labelledby="desktop" className="space-y-6">
             <SectionHeading id="desktop" note={desktop ? `Version ${desktop.version}, released ${desktop.date}. Optional.` : undefined}>
               Everloot Desktop App
             </SectionHeading>
