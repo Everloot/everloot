@@ -3,6 +3,7 @@ import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
 import { matchHas } from "next/dist/shared/lib/router/utils/prepare-destination";
 import { expect, test } from "vitest";
 import nextConfig from "../next.config.js";
+import corsPrerenderedPaths from "./data/cors-prerendered-paths.json";
 import { PREFIXES, SERVED } from "./lib/build-versions";
 import { CHAT_PROVIDERS } from "./lib/chat/providers";
 import { isProtectedPath } from "./lib/document-boundary";
@@ -225,5 +226,12 @@ test("the sitemaps and private routes set their own CDN policy; none gets a stat
   for (const path of ["/", "/sitemap.xml", "/database-sitemap.xml", "/database-sitemap/3.xml", "/auctions-sitemap.xml", "/auctions-sitemap/0.xml", ...PROTECTED, "/sign-in", "/api/auth/session", "/api/me"]) {
     const h = await headersFor(path);
     expect(h["CDN-Cache-Control"], path).toBeUndefined();
+  }
+});
+
+test("every path in the CORS list sends Access-Control-Allow-Origin, and the API docs name each one", async () => {
+  const rules = await nextConfig.headers!();
+  for (const path of corsPrerenderedPaths) {
+    expect(rules.find((r) => r.source === path)?.headers).toContainEqual({ key: "Access-Control-Allow-Origin", value: "*" });
   }
 });

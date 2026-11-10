@@ -45,11 +45,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
 
 ### Fixed
-- Site: the zones list and the dungeons and raids list take a name in the box and sort from their column headers
-  (`/database/zones?q=dur&sort=name`, `/database/instances?sort=-level`), as the NPC list does; the zones are one
-  table with a Continent column. The objects list sorts by name first, and an object with no agreed name says
-  "no agreed name yet" beside its id. A spell list whose names were not read says so for its build, with no addon
-  link. The coverage list and the item lists read the same query and page size as the other lists.
+- Site: /api/suggest spends the per-IP quota and shares one edge cache entry for `Thunder` and `thunder `, the coverage 400 and waitlist 503 are `no-store` (the 503 adds `Retry-After`), and the docs list every route that sends CORS from one file.
 - Site: item list pagination is crawlable while filter URLs stay blocked.
 - Site: /database splits its rows into "Seen by players" and "From the game files", says after launch that a row fills when 3 installs agree, and drops the Guilds lookup row (the Tools menu has it).
 - Knowledge base: a self-hosted MCP server and `coverage-report` read the whole public corpus again. The reader stopped
@@ -68,6 +64,11 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: a database address with an id nothing knows (an item or NPC such as /database/items/999999) answers its 404 with a
   body again: the heading, "No report for this id yet; three installs make it public" with the addon link, and a search box
   prefilled with the id. The site 404 leads with the same search box, prefilled with the last part of the address tried.
+- Site: the zones list and the dungeons and raids list take a name in the box and sort from their column headers
+  (`/database/zones?q=dur&sort=name`, `/database/instances?sort=-level`), as the NPC list does; the zones are one
+  table with a Continent column. The objects list sorts by name first, and an object with no agreed name says
+  "no agreed name yet" beside its id. A spell list whose names were not read says so for its build, with no addon
+  link. The coverage list and the item lists read the same query and page size as the other lists.
 - Site: an Auction House price page for an item with no public name says why under its title: a name shows once
   three installs report the same one, or when the game files and the Warcraft Wiki agree on one. The title stays
   "Item N" and the prices stand. Before, the page gave the id and the prices with no reason.
