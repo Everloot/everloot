@@ -328,6 +328,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and quality, each null when the build does not name it), so a client generated from `schema/api/itemsResponse.json`
   gets fields instead of `any`. Protocol package 2.0.0 (the row's fields are now required); the answers do not change.
 - Docs: the docs index lists the backlog, the open-data export, the live-client probes, and the dated notes and folders it had left out.
+- Site: item tooltips read like the game's: the item level first and in yellow, slot and armour or weapon type in two
+  columns, damage left and speed right, Equip, Use and Chance on hit lines in green, a named set and the flavour text in
+  yellow, and the sell price as gold, silver and copper coins. Every line keeps its words, so no colour is the only cue.
 - Companion: the command line's `main` takes its uploader, price refresher, file watcher and console as an optional argument,
   with the real ones as defaults, so the watch and prices loop is tested with fakes (upload then prices on each settled
   write, prices alone, a failed refresh that keeps the previous file, upload never writing prices). Nothing it sends changes.
