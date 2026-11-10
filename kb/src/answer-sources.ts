@@ -6,13 +6,13 @@ import type { ReleaseSource } from "./release-db.js";
 import { allTerms, contentTerms, respell, search, searchSomeWords, SOME_WORDS, type Respelling, type SearchHit } from "./search.js";
 import { agreedNpcNames, npcPage, WORLD_AGREEMENT, worldFactsFromRecords, type WorldFacts } from "./world-pages.js";
 import type { RecheckScope } from "./coverage.js";
-import { filesEvidence, filesNameWords, type FilesIndex } from "./files-evidence.js";
+import { claimAnswers, claimSubject, requestedPredicate, filesEvidence, filesNameWords, type FilesIndex } from "./files-evidence.js";
 
 /**
  * answer_sources: the evidence behind a question, every piece with its source, licence and date, so
  * the client's model writes the answer and cites the pieces (docs/design/specs/2026-10-17-sourced-answers-design.md).
- * Observed facts come first (players' uploads, public after three installs agree), then curated facts
- * and the 2023 Warcraft Wiki. Nothing is fetched from other sites: the further-reading links are
+ * Answering claims come first; within each group, observed facts (three agreeing installs), curated facts,
+ * game files and the 2023 Warcraft Wiki. Nothing is fetched from other sites: the further-reading links are
  * search URLs built from the names in the question.
  */
 
@@ -38,6 +38,7 @@ export interface AnswerSourcesFacts { items: ItemFacts; world: WorldFacts }
 
 export interface AnswerSources {
   evidence: Evidence[];
+  unavailable?: { predicate: string; message: string };
   furtherReading: FurtherReading[];
   dataAsOf: string | null;
   /** Set when no page held every asked word and the lore is the pages with some of them; said in the text only. */
@@ -98,6 +99,14 @@ function loreEvidence(hit: SearchHit, url: string | undefined): Evidence {
 }
 
 const pct = (rate: number) => `${Math.round(rate * 1000) / 10}%`;
+
+/** Archive gameplay statements cannot establish Forever predicates. */
+export function evidenceAnswers(question: string, evidence: Evidence, predicate: string | null = requestedPredicate(question, [evidence.source.title, claimSubject(question, evidence.claim)]) ?? null): boolean {
+  if (/not available from permitted facts/i.test(evidence.claim)) return false;
+  if (predicate) return evidence.kind !== "lore" && claimAnswers(question, evidence.claim, predicate) && (evidence.kind !== "curated" || mentions(question, evidence.source.title));
+  // Identity questions still need the named subject, rather than a search fallback mention.
+  return /^(?:who|what) is\b|^qu[ié]+n es\b|^qu[eé] es\b/i.test(question.trim()) && (mentions(question, evidence.source.title) || mentions(question, evidence.claim.split(":")[0]!));
+}
 
 /**
  * What players observed about the names in the question: `found` holds the facts, `gaps` the names that have no
@@ -240,26 +249,32 @@ export async function answerSources(
   // without an exact named article keep their explicitly marked search fallback.
   const directLore = loreHits.filter((e) => mentions(question, e.source.title) || trainerPages.has(e));
   const lore = directLore.length ? directLore : loreHits;
+  const predicate = requestedPredicate(asked, [...(files?.facts.map((f) => f.name) ?? []), ...found.map((h) => h.name), ...[...observed, ...gaps].map((e) => claimSubject(asked, e.claim))]) ?? null;
   // What the game-data files say about the things the question names: ids and facts, labelled unconfirmed.
   // Observed facts first, then Everloot's own, then the files (current build), then the 2023 wiki. Observed and files
   // facts about the question's names are all kept; curated and wiki pages fill what the limit leaves. Last, a note for
   // each name nothing agreed is known about yet, so an answer says unrecorded rather than leaving it out.
   // A piece that answers the whole question (the dungeons for a level) leaves no room for pages that share its words;
   // a zone the question only mentions comes after the pages, in what room they leave.
-  const pieces = union(readings.map((q) => filesEvidence(q, files, args.limit))).slice(0, args.limit);
+  const pieces = union(readings.map((q) => filesEvidence(q, files, Math.max(args.limit, 30))))
+    .sort((a, b) => Number(claimAnswers(asked, b.claim, predicate)) - Number(claimAnswers(asked, a.claim, predicate))).slice(0, args.limit);
   const plain = ({ role: _role, ...e }: (typeof pieces)[number]): Evidence => e;
   const answers = pieces.filter((e) => e.role === "answer").map(plain);
   const fromFiles = pieces.filter((e) => e.role === undefined).map(plain);
   const places = pieces.filter((e) => e.role === "place").map(plain);
-  const named = observed.length + answers.length + fromFiles.length;
-  const fill = new Set(answers.length ? [] : [...curated, ...lore].slice(0, Math.max(0, args.limit - named)));
+  const named = observed.length + answers.length + fromFiles.length + gaps.length;
+  const fill = new Set(answers.length ? [] : [...curated, ...lore].sort((a, b) => Number(evidenceAnswers(asked, b, predicate)) - Number(evidenceAnswers(asked, a, predicate))).slice(0, Math.max(0, args.limit - named)));
   const room = Math.max(0, args.limit - named - fill.size);
   const evidence = [
     ...observed, ...curated.filter((e) => fill.has(e)), ...answers, ...fromFiles, ...lore.filter((e) => fill.has(e)), ...places.slice(0, room), ...gaps,
   ];
+  if (predicate) evidence.sort((a, b) => Number(evidenceAnswers(asked, b, predicate)) - Number(evidenceAnswers(asked, a, predicate)));
+  evidence.splice(args.limit);
+  const unavailable = predicate && !evidence.some((e) => evidenceAnswers(asked, e, predicate))
+    ? { predicate, message: unavailableMessage(predicate) } : undefined;
   // Observed and files facts answer the question's own names, so only an answer of fallback pages alone is marked.
   return {
-    evidence, furtherReading: furtherReading(asked), dataAsOf,
+    evidence, ...(unavailable ? { unavailable } : {}), furtherReading: furtherReading(asked), dataAsOf,
     ...(some && named === 0 ? { someWords: true as const } : {}),
     ...(respelled.length ? { respelled } : {}),
   };
@@ -279,6 +294,7 @@ export function formatAnswerSources(result: AnswerSources, corpus: boolean | "un
   const lines: string[] = [];
   if (result.someWords) lines.push(SOME_WORDS);
   else if (result.respelled?.length) lines.push(respelledLine(result.respelled));
+  if (result.unavailable) lines.push(result.unavailable.message);
   if (result.evidence.length === 0) lines.push("No evidence found for that question. Nothing here is invented: try other words or an exact name.");
   if (result.evidence.some((e) => e.kind === "lore")) lines.push("Archive lore is historical context, not confirmation of Forever gameplay. Do not infer recorded gameplay facts from it. Game-file facts remain unconfirmed; missing observations remain unrecorded.");
   const pages = new Set<string>();
@@ -296,4 +312,19 @@ export function formatAnswerSources(result: AnswerSources, corpus: boolean | "un
   else if (!corpus) lines.push("Player observations are not connected here, so the observed layer is unrecorded, not empty.");
   if (result.furtherReading.length) lines.push(`Further reading (links only, nothing fetched): ${result.furtherReading.map((l) => `${l.site} ${l.url}`).join(" | ")}`);
   return lines.join("\n");
+}
+
+const PREDICATE_TOOLS: Record<string, string> = {
+  price: "observed prices come from market_value / auction_history",
+  history: "observed price history comes from auction_history / market_value",
+  vendor: "observed sellers come from entity_relations with sold_by; read their goods with vendor_page using the vendor NPC id",
+  "drop source": "observed drop sources come from entity_relations with dropped_by, then item_page for drop rates",
+  level: "quest levels come from quest_page; zone records come from get_entity",
+  class: "class talent records come from talent_tree",
+  "profession leveling": "profession leveling routes come from profession_path",
+  acquisition: "item acquisition comes from item_page / vendor_page; mount and achievement records come from get_entity",
+  "riding skill": "mount records come from get_entity",
+};
+function unavailableMessage(predicate: string): string {
+  return `answer_sources has no permitted evidence for the requested ${predicate}; ${PREDICATE_TOOLS[predicate] ?? "discover the record with search_knowledge and read it with get_entity"}. Subject matches are context only.`;
 }

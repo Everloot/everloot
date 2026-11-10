@@ -31,7 +31,16 @@ export interface Question {
   answer?: Answer;
   /** Set for a question asked in Spanish; absent means English. The names stay as the English client has them. */
   lang?: "es";
+  /** Discovery and follow-up tools a cross-tool acceptance case needs; retrieval eval alone does not execute them. */
+  tools?: string[];
 }
+
+/** Player workflows kept separate so the historical banks remain comparable. No assumed game values. */
+export const CROSS_TOOL_QUESTIONS: readonly Question[] = [
+  { id: "cross-tool:item-name", text: "where does Linen Cloth drop", template: "cross-tool", subject: { kind: "wiki_item", name: "Linen Cloth" }, expects: { resolve: true, evidence: true }, tools: ["search_knowledge", "item_page", "answer_sources"] },
+  { id: "cross-tool:realm", text: "what is the price of Linen Cloth on US1 Realm 4 PvP", template: "cross-tool", subject: { kind: "wiki_item", name: "Linen Cloth" }, expects: { resolve: true, evidence: true }, tools: ["search", "market_value"] },
+  { id: "cross-tool:history", text: "price history of Linen Cloth on CAMWOW US1 Realm 4 PvP", template: "cross-tool", subject: { kind: "wiki_item", name: "Linen Cloth" }, expects: { resolve: true, evidence: true }, tools: ["market_value", "auction_history"] },
+];
 
 interface Template { id: string; kinds: readonly SubjectKind[]; ask: (name: string) => string; expects?: Partial<Question["expects"]> }
 
@@ -267,7 +276,7 @@ const slug = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCas
  * `spanish`, each also asked in Spanish after the English ones, ids prefixed `es:`; off by default, so the
  * build-watch diff lists each changed answer once.
  */
-export function buildQuestionBank(subjects: readonly Subject[], key?: AnswerKey, options: { spanish?: boolean } = {}): Question[] {
+export function buildQuestionBank(subjects: readonly Subject[], key?: AnswerKey, options: { spanish?: boolean; crossTool?: boolean } = {}): Question[] {
   const out: Question[] = [];
   const seen = new Set<string>();
   const add = (q: Question) => { if (!seen.has(q.id)) { seen.add(q.id); out.push(q); } };
@@ -287,6 +296,7 @@ export function buildQuestionBank(subjects: readonly Subject[], key?: AnswerKey,
     if (!es) for (const a of INSTANCE_ALIASES) add({ id: `alias:alias:${slug(a.alias)}`, text: a.alias, template: "alias", subject: { kind: "alias", name: a.name }, expects: { resolve: true, evidence: true } });
     for (const t of es ? TOPICS_ES : TOPICS) add({ id: `${es ? "es:" : ""}topic:topic:${slug(t.text)}`, text: t.text, template: "topic", subject: { kind: "topic", name: t.topic }, expects: { resolve: false, evidence: true }, ...(es ? { lang } : {}) });
   }
+  if (options.crossTool) for (const q of CROSS_TOOL_QUESTIONS) add(q);
   return out;
 }
 

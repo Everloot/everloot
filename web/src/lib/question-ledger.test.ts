@@ -41,3 +41,9 @@ test("mcpLedgerMetrics: each lookup on an MCP mount, matched to its answer by id
   expect(mcpLedgerMetrics(JSON.stringify(call(1, "search")), JSON.stringify({ jsonrpc: "2.0", id: 1, result: { content: [] } }))).toEqual([]);
   expect(mcpLedgerMetrics("not json", "{}")).toEqual([]);
 });
+
+test("an unavailable predicate alone is a miss; facts still count", () => {
+  const unavailable = { predicate: "price", message: "Use market_value" };
+  expect(found("answer_sources", { evidence: [], unavailable })).toBe(false);
+  expect(found("answer_sources", { evidence: [{ kind: "files" }], unavailable })).toBe(true);
+});

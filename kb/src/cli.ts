@@ -170,7 +170,7 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
     build, which the knowledge base already reads and which candidates remain, grouped by site domain.
     Root-listing lookups only, no file content and no keys. Writes <out>/<product>-<build>-<config>-scan.json
     and -scan.md; the report feeds the coverage backlog in docs/2026-10-18-database-taxonomy-research.md)
-  question-bank --db <public release> | --files-only [--game-data ../web/src/data/game-data] [--per-kind 60] [--spanish] [--out data/question-bank/bank.jsonl]
+  question-bank --db <public release> | --files-only [--game-data ../web/src/data/game-data] [--per-kind 60] [--spanish] [--cross-tool] [--out data/question-bank/bank.jsonl]
     (the questions players are likely to ask, generated from the game-data files, the release's page titles and a
     hand-written long tail; one JSON line each, with the facts a correct answer carries where the game-data files
     hold them. --files-only leaves out the release's titles and needs no --db: the questions the files answer and
@@ -612,7 +612,7 @@ async function main(): Promise<number> {
       const perKind = Number(flags.get("per-kind") || 60);
       const out = flags.get("out") || "data/question-bank/bank.jsonl";
       const subjects = [...gameDataSubjects(gameData), ...(release ? wikiSubjects(release, perKind) : [])];
-      const bank = buildQuestionBank(subjects, gameDataAnswerKey(gameData), { spanish: flags.has("spanish") });
+      const bank = buildQuestionBank(subjects, gameDataAnswerKey(gameData), { spanish: flags.has("spanish"), crossTool: flags.has("cross-tool") });
       mkdirSync(dirname(out), { recursive: true });
       writeFileSync(out, serializeQuestionBank(bank));
       const kinds = new Map<string, number>();

@@ -10,7 +10,7 @@ import { adler32, luaString } from "../src/bridge/lua";
 import { readAsks } from "../src/bridge/asks";
 import { renderAnswersAddon } from "../src/bridge/answers";
 import { answerPending, createAnswerStore } from "../src/bridge/run";
-import { answerFromEvidence, marketValueFrom, mcpMarketValue, siteItemSearch, withMarket, type AnswerEngine } from "../src/bridge/engine";
+import { namesSomething, answerFromEvidence, marketValueFrom, mcpMarketValue, siteItemSearch, withMarket, type AnswerEngine } from "../src/bridge/engine";
 import { FIXTURE_ANSWER, FIXTURE_STRUCTURED, FIXTURE_URL } from "../../web/src/lib/chat/market-fixture";
 import { MARKET_QUERY_BUDGET_MS } from "../../web/src/lib/chat/market-question";
 
@@ -428,4 +428,10 @@ test("a loose match (no page held every word) is said to be only the closest pag
   const lore = { claim: "The Barrens is a zone.", kind: "lore", licence: "CC-BY-SA-4.0", source: { url: "https://warcraft.wiki.gg/wiki/The_Barrens" } };
   expect(answerFromEvidence({ text: "", evidence: [lore], someWords: true }).answer).toBe("No page matched every word; the closest: The Barrens is a zone.");
   expect(answerFromEvidence({ text: "", evidence: [lore] }).answer).toBe("The Barrens is a zone.");
+});
+
+test("an unavailable predicate alone neither names evidence nor becomes an answer", () => {
+  const sourced = { text: "Use market_value", evidence: [], unavailable: { predicate: "price", message: "Use market_value" } };
+  expect(namesSomething(sourced)).toBe(false);
+  expect(answerFromEvidence(sourced)).toEqual({ answer: "No sourced answer found.", source: "none" });
 });

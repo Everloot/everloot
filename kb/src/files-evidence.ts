@@ -17,6 +17,48 @@ import { allTerms, askingWord } from "./search.js";
 
 export type FilesFactKind = "instance" | "boss" | "zone" | "flight" | "mount" | "achievement" | "talent";
 
+/** Requested gameplay predicates. A subject mention or an arbitrary number is not an answer. */
+const PREDICATES: readonly [string, RegExp, RegExp][] = [
+  ["history", /\b(?:(?:price|auction|market)\s+(?:history|historical|trend)|(?:history|historical|trend|historial)\s+(?:of\s+)?(?:price|prices|auction|market|precio|precios))\b/i, /\b(?:history|trend)\b[^.]*\d{4}-\d{2}-\d{2}/i],
+  ["class", /\b(?:which class|clase)\b/i, /\b\p{L}+(?: \p{L}+)? talent\b/iu],
+  ["riding skill", /\b(?:riding|ride|equitaci[oó]n)\b/i, /\briding skill\s+\d/i],
+  ["profession leveling", /\bhow (?:do|can) i level\b|\bc[oó]mo (?:subo|subir)\b/i, /(?!)/],
+  ["level", /\b(?:(?:what|which)\s+levels?(?!\s+\d)|(?<!to )levels?\s+(?:of|range|requirement)|de qu[eé] nivel)\b/i, /\blevels?\s+\d/i],
+  ["drop source", /\b(?:drop|drops|dropped|loot|dropea|suelta)\b/i, /\b(?:dropped from|drops from|loot from|obtained from|reward from)\b/i],
+  ["acquisition", /\b(?:obtain|acquire|consigo)\b|how (?:do|can) i get\b(?!\s+(?:to|from|there|back|exalted|honored|revered|friendly)\b)/i, /\b(?:taught by|riding skill|criteria|dropped from|drops from|loot from|obtained from|reward from)\b/i],
+  ["vendor", /\b(?:vendor|buy|sells|comprar|vende)\b/i, /\b(?:sold by|sells|vendor)\b.*\d|\b(?:sold by|sells)\s+\p{L}/iu],
+  ["price", /\b(?:price|cost|precio|cuesta)\b|\bworth\b(?!\s+it\b)|cu[aá]nto vale|how much (?:is|are)\b/i, /\b(?:price|cost|value)\b[^.]*\d+\s*(?:copper|silver|gold|c\b|s\b|g\b)/i],
+  ["bosses", /\b(?:bosses|jefes)\b/i, /\bboss(?:es)?\s*:\s*\p{L}/iu],
+  ["location", /\b(?:where|entrance|d[oó]nde|entrada)\b/i, /\b(?:entered from|was seen (?:in|on)|flight master in|zone of)\b|\b(?:under|located in|in)\s+(?!the game files)\p{Lu}/u],
+];
+
+/** Remove subject names before interpreting question words (including names containing colons). */
+export function requestedPredicate(question: string, names: readonly string[] = []): string | undefined {
+  let rest = question;
+  for (const name of [...names].sort((a, b) => b.length - a.length)) {
+    if (name && rest.toLowerCase().includes(name.toLowerCase())) rest = rest.replace(new RegExp(`(^|[^\\p{L}\\p{N}])${escape(name)}(?=$|[^\\p{L}\\p{N}])`, "giu"), " ");
+  }
+  if (/\b(?:best|mejor)\b/i.test(rest)) return undefined;
+  if (/\b(?:where|d[oó]nde)\b.*\b(?:riding|ride|equitaci[oó]n)\b/i.test(rest)) return "location";
+  return PREDICATES.find(([, asked]) => asked.test(rest))?.[0];
+}
+
+export function claimSubject(question: string, claim: string): string {
+  const prefixes = [...claim.matchAll(/:/g)].map((m) => claim.slice(0, m.index));
+  return prefixes.reverse().find((name) => mentions(question, name)) ?? "";
+}
+
+export function claimAnswers(question: string, claim: string, name: string | null = requestedPredicate(question, [claimSubject(question, claim)]) ?? null): boolean {
+  if (/not available from permitted facts|unrecorded|no .* reached|known (?:item|NPC);/i.test(claim)) return false;
+  const predicate = PREDICATES.find(([key]) => key === name);
+  if (name === "location" && /: a zone\b/.test(claim)) {
+    const words = new Set(allTerms(claimSubject(question, claim)).split(" "));
+    const extra = allTerms(question).split(" ").filter((t) => !askingWord(t) && !words.has(t) && !/^(?:dónde|donde|queda|está|esta|es|en|de|la|el)$/.test(t));
+    if (extra.length) return false;
+  }
+  return predicate ? predicate[2].test(claim) : false;
+}
+
 export interface FilesFact {
   kind: FilesFactKind;
   name: string;

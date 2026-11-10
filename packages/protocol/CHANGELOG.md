@@ -13,8 +13,10 @@ required, or tightening a limit is a major release.
   `market_value` lists in its history. The `realm` input of `market_value` and `auction_history` and both
   descriptions say how a name is read and that Everloot's own installs make a day public under 3. Optional, so
   earlier readers are unaffected.
-- 2.1.0: MCP knowledge hits optionally carry recordId, gameId, sourceKind, build and observed snapshot support for gameplay discovery. Existing tool names and ids are preserved.
-- 2.1.0: `coverage` takes optional `detail`, `offset` and `limit` and gains an output schema: `scope`, and a `page`
+  MCP knowledge hits optionally carry recordId, gameId, sourceKind, build and observed snapshot support for
+  gameplay discovery. Existing tool names and ids are preserved. `answer_sources` gains optional `unavailable`
+  (`predicate`, `message`) separately from its bounded facts-only `evidence`; answering claims sort first.
+  `coverage` takes optional `detail`, `offset` and `limit` and gains an output schema: `scope`, and a `page`
   (`coveragePage`) with the scoped totals and their denominators, each type, the answer's zones, `list`, `total`, `offset`,
   `limit` and `nextOffset`, and `measured` (false, with null `totals` and empty `types`, when no released zone matches).
   Every MCP tool now has an output schema. `everloot_plan` takes optional `status`, `detail`, `offset` and `limit`, and

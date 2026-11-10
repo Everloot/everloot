@@ -2,11 +2,95 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
+import { evidenceAnswers, answerSources } from "../src/answer-sources.js";
 import { openDb } from "../src/db.js";
+import { createToolHandlers } from "../src/mcp-server.js";
+import { emptyMarket, foldMarket } from "../src/market.js";
 import { replaceSourceRows, type EntityInput } from "../src/entities.js";
 import { buildQuestionBank, gameDataSubjects, INSTANCE_ALIASES, parseQuestionBank, serializeQuestionBank, TEMPLATES, TEMPLATES_ES, TOPICS, TOPICS_ES, wikiSubjects, type Subject } from "../src/question-bank.js";
 import type { AnswerKey } from "../src/answer-key.js";
 import { carries, evaluateBank, formatEvalReport, resolve } from "../src/question-eval.js";
+
+test("answerability requires the requested predicate, not a name, id or unrelated number", () => {
+  const evidence = (claim: string, kind: "files" | "lore" | "observed" = "files") => ({ claim, kind, source: { title: "Synthetic Forest", url: "https://example.test" }, licence: "test", asOf: null });
+  expect(evidenceAnswers("what level is Synthetic Forest", evidence("Synthetic Forest: zone 1429."))).toBe(false);
+  expect(evidenceAnswers("what level is Synthetic Forest", evidence("Synthetic Forest: levels 10 to 20."))).toBe(true);
+  expect(evidenceAnswers("where is Synthetic Vale", evidence("Synthetic Vale: a zone of Nowhere."))).toBe(true);
+  expect(evidenceAnswers("where does Synthetic Blade drop", evidence("Synthetic Blade is a legendary sword.", "lore"))).toBe(false);
+  expect(evidenceAnswers("what is the price of Synthetic Blade", evidence("Synthetic Blade dropped in 10 of 20 windows.", "observed"))).toBe(false);
+  expect(evidenceAnswers("where does Synthetic Blade drop", evidence("Synthetic Blade dropped from Synthetic Warden in 10 of 20 windows.", "observed"))).toBe(true);
+});
+
+test("a zone identity cannot stand in for its requested level", async () => {
+  const db = openDb(":memory:");
+  const result = await answerSources(db, { question: "what level is Synthetic Forest", limit: 3 }, null, null, { build: "test", extractedAt: null, facts: [{ name: "Synthetic Forest", kind: "zone", claim: "Synthetic Forest: a zone of Nowhere." }] });
+  expect(result.unavailable?.predicate).toBe("level");
+  expect(result.evidence.some(e => evidenceAnswers("what level is Synthetic Forest", e))).toBe(false);
+  db.close();
+});
+
+test("answer-bearing file claims precede subject mentions at a one-piece limit", async () => {
+  const db = openDb(":memory:");
+  const result = await answerSources(db, { question: "what level is Synthetic Forest and Synthetic Dungeon", limit: 1 }, null, null, { build: "test", extractedAt: null, facts: [
+    { name: "Synthetic Forest", kind: "zone", claim: "Synthetic Forest: a zone of Nowhere." },
+    { name: "Synthetic Dungeon", kind: "instance", claim: "Synthetic Dungeon: a dungeon, level 20." },
+  ] });
+  expect(result.evidence[0]?.claim).toContain("level 20");
+  db.close();
+});
+
+test("cross-tool item, realm and history cases preserve tool paths without assuming game values", async () => {
+  const bank = buildQuestionBank([], undefined, { crossTool: true }).filter(q => q.template === "cross-tool");
+  expect(bank.map(q => q.tools)).toEqual([
+    ["search_knowledge", "item_page", "answer_sources"], ["search", "market_value"], ["market_value", "auction_history"],
+  ]);
+  expect(parseQuestionBank(serializeQuestionBank(bank))).toEqual(bank);
+  const db = await seed();
+  const report = await evaluateBank(db, bank, null, { release: "test", dataAsOf: null });
+  expect(report.totals.withRealAnswer).toBe(0);
+  db.close();
+});
+
+test("Thunderfury lore identity earns no acquisition credit", async () => {
+  const db = openDb(":memory:");
+  await replaceSourceRows(db, "warcraft-wiki-2023", ["lore_page"], [page("blade", "Thunderfury", ["Sword items"], "Thunderfury is a legendary sword.")]);
+  const q = { id: "blade", text: "where does Thunderfury drop", template: "drops-from", subject: { kind: "wiki_item" as const, name: "Thunderfury" }, expects: { resolve: true, evidence: true } };
+  const result = await answerSources(db, { question: q.text, limit: 3 }, null, null);
+  expect(result.unavailable?.predicate).toBe("drop source");
+  const report = await evaluateBank(db, [q], null, { release: "test", dataAsOf: null });
+  expect(report.totals).toMatchObject({ withLore: 1, withRealAnswer: 0 });
+  db.close();
+});
+
+test("item-name discovery, realm aliases and history agree across tool handlers", async () => {
+  const db = openDb(":memory:");
+  const now = new Date();
+  const day = now.toISOString().slice(0, 10);
+  const capturedAt = `${day}T00:00:00Z`;
+  const realm = "CAMWOW US1 Realm 4 PvP";
+  const records = ["synthetic-a", "synthetic-b", "synthetic-c"].flatMap((installId) => [
+    { kind: "item_seen", installId, eventId: `${installId}:name`, capturedAt, itemId: 2589, name: "Synthetic Cloth", quality: "common" },
+    { kind: "auction_snapshot", installId, eventId: `${installId}:scan`, capturedAt, realm, house: "Alliance", scanId: installId, part: 1, parts: 1, items: [[2589, 4, 80, 25, 30]] },
+  ]);
+  const state = foldMarket(emptyMarket(), records, now);
+  const tools = createToolHandlers(db, { corpus: async () => ({ records, dataAsOf: capturedAt }), market: async () => ({ state, dataAsOf: capturedAt }) });
+  const object = (answer: Awaited<ReturnType<typeof tools.item_page>>) => {
+    if (typeof answer === "string") throw new Error("Expected a structured tool answer");
+    return answer;
+  };
+  const discovered = object(await tools.search_knowledge({ query: "Synthetic Cloth", kind: "item", limit: 3 }));
+  expect(discovered.structured).toMatchObject({ hits: expect.arrayContaining([expect.objectContaining({ gameId: 2589, name: "Synthetic Cloth" })]) });
+  const item = object(await tools.item_page({ itemId: 2589 }));
+  expect(item.text).toContain("Synthetic Cloth");
+  const args = { realm: "US1 Realm 4 PvP", itemId: 2589 };
+  const market = object(await tools.market_value(args));
+  const history = object(await tools.auction_history(args));
+  expect(market.structured).toMatchObject({ connected: true, page: { realm, realmStatus: "alias", history: [{ day, market: 30 }] } });
+  expect(history.structured).toMatchObject({ connected: true, page: { realm, realmStatus: "alias", scanDays: [{ day, market: 30 }] } });
+  const answer = object(await tools.answer_sources({ question: "what is the price of Synthetic Cloth", limit: 3 }));
+  expect(answer.text).toContain("answer_sources has no permitted evidence for the requested price");
+  db.close();
+});
 
 // SYNTHETIC game-data files in the shape of web/src/data/game-data; the names are made up.
 function gameDataDir(): string {
@@ -149,15 +233,15 @@ test("evaluateBank: a question with an answer key is scored on whether its evide
   const bank = buildQuestionBank([{ kind: "instance", name: "Synthetic Stockade", id: 34 }], key).filter((q) => q.template === "where-is" || q.template === "level" || q.template === "bosses");
   const report = await evaluateBank(db, bank, null, { release: "test.sqlite", dataAsOf: null, ranAt: "2026-10-28T12:00:00.000Z" });
   const byId = new Map(report.results.map((r) => [r.id, r]));
-  expect(byId.get("where-is:instance:synthetic-stockade")?.missingFacts).toEqual([]);
-  expect(byId.get("level:instance:synthetic-stockade")?.missingFacts).toEqual(["Nowhere"]);
+  expect(byId.get("where-is:instance:synthetic-stockade")?.missingFacts).toEqual(["dungeon", "keep"]);
+  expect(byId.get("level:instance:synthetic-stockade")?.missingFacts).toEqual(["dungeon", "Nowhere"]);
   expect(byId.get("bosses:instance:synthetic-stockade")).not.toHaveProperty("missingFacts");
-  expect(report.totals).toMatchObject({ withKey: 2, keyFound: 1 });
-  expect(report.keyMissing).toEqual([{ template: "level", count: 1, examples: [{ text: "what level is Synthetic Stockade", missing: ["Nowhere"] }] }]);
+  expect(report.totals).toMatchObject({ withKey: 2, keyFound: 0, withLore: 3, withRealAnswer: 0 });
+  expect(report.keyMissing).toHaveLength(2);
   const md = formatEvalReport(report);
   expect(md).toContain("| answer in evidence |");
-  expect(md).toContain("| all | 3 | 100% | 0% | 0% | 100% | 0% | 0% | 0% | 50% |");
-  expect(md).toContain(`- **level** (1): "what level is Synthetic Stockade" lacks Nowhere`);
+  expect(md).toContain("| all | 3 | 100% | 0% | 0% | 100% | 0% | 0% | 100% | 0% | 0% | 0% |");
+  expect(md).toContain(`- **level** (1): "what level is Synthetic Stockade" lacks dungeon, Nowhere`);
   expect(md).not.toContain("## By language");
 });
 

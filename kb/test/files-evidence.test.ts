@@ -109,9 +109,10 @@ test("answerSources: the files' facts come after curated and before lore, and a 
   // An achievement only the files know.
   const only = await answerSources(db, { question: "how do I get Storm the Chasm", limit: 8 }, null, null, index);
   expect(only.evidence.map((e) => e.kind)).toEqual(["files"]);
+  expect(only.unavailable).toBeUndefined();
   expect(only.evidence[0]!.url).toBe("https://everloot.app/database/achievements/49-storm-the-chasm");
-  // Without an index nothing changes.
-  expect((await answerSources(db, { question: "how do I get Storm the Chasm", limit: 8 }, null, null)).evidence).toEqual([]);
+  // Without an index the acquisition predicate is explicitly unavailable.
+  expect((await answerSources(db, { question: "how do I get Storm the Chasm", limit: 8 }, null, null)).unavailable?.predicate).toBe("acquisition");
 });
 
 test("the text names a page once: an instance and its bosses share one More line, and no licence line ends it", async () => {
@@ -124,4 +125,48 @@ test("the text names a page once: an instance and its bosses share one More line
   expect(text).toContain(`  More: ${page}`);
   expect(text).not.toContain("Credit observed facts");
   expect(text).not.toContain("Licence:");
+});
+
+test.each([
+  ["how do I get Synthetic Horse", "Synthetic Horse: a mount, taught by spell 42.", true],
+  ["¿Cómo consigo Synthetic Horse?", "Synthetic Horse: a mount, riding skill 75.", true],
+  ["how do I get Synthetic Medal", "Synthetic Medal: an achievement, criteria 3.", true],
+  ["how do I get to Ironforge", "Ironforge: a zone of Eastern Kingdoms.", false],
+  ["history of Stormwind", "Stormwind: a zone of Eastern Kingdoms.", false],
+  ["what is Hidden: BETA Survey - Level 30", "Hidden: BETA Survey - Level 30: an achievement, criteria 3.", false],
+  ["what level do I need to ride Synthetic Horse", "Synthetic Horse: a mount, riding skill 75.", true],
+  ["is Synthetic Horse worth it", "Synthetic Horse: a mount, price 10 gold.", false],
+])("predicate regression: %s", async (question, claim, expected) => {
+  const { claimAnswers } = await import("../src/files-evidence.js");
+  expect(claimAnswers(question, claim)).toBe(expected);
+});
+
+test.each([
+  ["how do I get from Orgrimmar to Thunder Bluff", undefined],
+  ["how do I get exalted with Timbermaw", undefined],
+  ["how do I get back there", undefined],
+  ["how do I level First Aid", "profession leveling"],
+  ["how can I level First Aid", "profession leveling"],
+  ["make gold at level 60", undefined],
+  ["level 1 to 60", undefined],
+  ["what level 60 dungeon should I run", undefined],
+  ["how to level of First Aid", undefined],
+  ["where do I learn riding", "location"],
+  ["dónde aprendo riding", "location"],
+  ["what level is Synthetic Stockade", "level"],
+  ["level range for Synthetic Stockade", "level"],
+  ["de qué nivel es Synthetic Stockade", "level"],
+  ["how much is Synthetic Horse", "price"],
+  ["how much are Synthetic Horses", "price"],
+  ["which class is best for solo play", undefined],
+  ["cuál es la mejor clase para jugar solo", undefined],
+  ["how do I get to Ironforge", undefined],
+  ["history of Stormwind", undefined],
+  ["price history of Synthetic Cloth", "history"],
+  ["is Synthetic Horse worth it", undefined],
+  ["what is Hidden: BETA Survey - Level 30", undefined],
+  ["what level do I need to ride Synthetic Horse", "riding skill"],
+])("question predicate excludes subject and unrelated language: %s", async (question, expected) => {
+  const { requestedPredicate } = await import("../src/files-evidence.js");
+  expect(requestedPredicate(question, ["Hidden: BETA Survey - Level 30"])).toBe(expected);
 });
