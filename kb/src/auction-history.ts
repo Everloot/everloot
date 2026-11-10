@@ -1,8 +1,10 @@
 /**
  * Auction history from scans a player uploaded on purpose.
- * A day is public after 3 installs scanned that item on that realm.
+ * A day is public after 3 installs scanned that item on that realm, or, while few players upload, when one of
+ * Everloot's own installs (trusted-source.ts) scanned it: the same rule the market rollup (market.ts) publishes by.
  * Copper is the median of the last scan per install that day.
  */
+import { TRUSTED_SOURCE_LABEL } from "./trusted-source.js";
 
 export const AUCTION_AGREEMENT = 3;
 
@@ -49,43 +51,52 @@ function median(values: number[]): number {
   return Math.round((sorted[mid - 1]! + sorted[mid]!) / 2);
 }
 
-export function auctionHistory(realm: string, itemId: number, sightings: AuctionSighting[]): AuctionHistory {
+/** A day's installs make it public: 3 of them, or one of Everloot's own (`trusted`), as the market rollup's `agreed`. */
+const publicDay = (installs: readonly string[], trusted: ReadonlySet<string>) =>
+  installs.length >= AUCTION_AGREEMENT || installs.some((id) => trusted.has(id));
+
+export function auctionHistory(realm: string, itemId: number, sightings: AuctionSighting[], trusted: ReadonlySet<string> = new Set()): AuctionHistory {
   const wanted = clean(realm);
-  const latest = new Map<string, { day: string; copper: number; seenAt: string }>();
+  const latest = new Map<string, { day: string; copper: number; seenAt: string; installId: string }>();
   for (const row of sightings) {
     const day = dayOf(row.seenAt);
     if (!row.installId.trim() || clean(row.realm) !== wanted || row.itemId !== itemId || !day) continue;
     if (!Number.isInteger(row.copper) || row.copper < 0) continue;
     const key = `${row.installId.trim()}|${day}`;
     const prev = latest.get(key);
-    if (!prev || row.seenAt > prev.seenAt) latest.set(key, { day, copper: row.copper, seenAt: row.seenAt });
+    if (!prev || row.seenAt > prev.seenAt) latest.set(key, { day, copper: row.copper, seenAt: row.seenAt, installId: row.installId.trim() });
   }
-  const byDay = new Map<string, number[]>();
+  const byDay = new Map<string, { coppers: number[]; installs: string[] }>();
   for (const row of latest.values()) {
-    const list = byDay.get(row.day) ?? [];
-    list.push(row.copper);
-    byDay.set(row.day, list);
+    const entry = byDay.get(row.day) ?? { coppers: [], installs: [] };
+    entry.coppers.push(row.copper);
+    entry.installs.push(row.installId);
+    byDay.set(row.day, entry);
   }
   const points = [...byDay.entries()]
-    .filter(([, coppers]) => coppers.length >= AUCTION_AGREEMENT)
-    .map(([day, coppers]) => ({ day, copper: median(coppers), reporters: coppers.length }))
+    .filter(([, { installs }]) => publicDay(installs, trusted))
+    .map(([day, { coppers }]) => ({ day, copper: median(coppers), reporters: coppers.length }))
     .sort((a, b) => a.day.localeCompare(b.day));
   return { realm: realm.trim(), itemId, points };
 }
 
+export const AUCTION_HISTORY_RULE =
+  "A day is public when 3 installs scanned this item on this realm; while few players upload, a day one of Everloot's own installs scanned is public with fewer, and its reporters say so. The copper is the median of the last scan from each install.";
+
+/** "3 reporters", or "1 reporter (includes Everloot's own scans)" for a day public under 3, as the market's days say it. */
+function reportersOf(reporters: number): string {
+  const count = `${reporters} reporter${reporters === 1 ? "" : "s"}`;
+  return reporters < AUCTION_AGREEMENT ? `${count} (${TRUSTED_SOURCE_LABEL})` : count;
+}
+
+/** The public days' lines, or the line that says there are none. */
+export function auctionPointLines(points: readonly AuctionPoint[]): string[] {
+  if (points.length === 0) return ["Price unrecorded. A day goes on the history when 3 installs scanned that item."];
+  return points.map((point) => `${point.day}  ${formatCopper(point.copper)}  ${reportersOf(point.reporters)}`);
+}
+
 export function formatAuctionHistory(history: AuctionHistory): string {
-  const lines = [
-    `${history.realm} item ${history.itemId}`,
-    "A day is public when 3 installs scanned this item on this realm. The copper is the median of the last scan from each install.",
-  ];
-  if (history.points.length === 0) {
-    lines.push("Price unrecorded. A day goes on the history when 3 installs scanned that item.");
-    return lines.join("\n");
-  }
-  for (const point of history.points) {
-    lines.push(`${point.day}  ${formatCopper(point.copper)}  ${point.reporters} reporters`);
-  }
-  return lines.join("\n");
+  return [`${history.realm} item ${history.itemId}`, AUCTION_HISTORY_RULE, ...auctionPointLines(history.points)].join("\n");
 }
 
 function askedWrong(args: { realm: string; itemId: number }): string | null {
@@ -94,8 +105,8 @@ function askedWrong(args: { realm: string; itemId: number }): string | null {
   return null;
 }
 
-export function handleAuctionHistory(args: { realm: string; itemId: number }, sightings: AuctionSighting[] = []): string {
-  return askedWrong(args) ?? formatAuctionHistory(auctionHistory(args.realm, args.itemId, sightings));
+export function handleAuctionHistory(args: { realm: string; itemId: number }, sightings: AuctionSighting[] = [], trusted: ReadonlySet<string> = new Set()): string {
+  return askedWrong(args) ?? formatAuctionHistory(auctionHistory(args.realm, args.itemId, sightings, trusted));
 }
 
 /** The same answer from one realm and item's public days, as auctionHistories keeps them. */
@@ -113,7 +124,7 @@ export function auctionHistoryKey(realm: string, itemId: number): string {
  * worked out in one pass so a page can look one up instead of reading every scan. A pair with no public day is left
  * out; it answers the same empty history either way.
  */
-export function auctionHistories(sightings: AuctionSighting[]): [string, AuctionPoint[]][] {
+export function auctionHistories(sightings: AuctionSighting[], trusted: ReadonlySet<string> = new Set()): [string, AuctionPoint[]][] {
   const groups = new Map<string, AuctionSighting[]>();
   for (const row of sightings) {
     const key = auctionHistoryKey(row.realm, row.itemId);
@@ -123,7 +134,7 @@ export function auctionHistories(sightings: AuctionSighting[]): [string, Auction
   }
   const out: [string, AuctionPoint[]][] = [];
   for (const [key, rows] of groups) {
-    const { points } = auctionHistory(rows[0]!.realm, rows[0]!.itemId, rows);
+    const { points } = auctionHistory(rows[0]!.realm, rows[0]!.itemId, rows, trusted);
     if (points.length) out.push([key, points]);
   }
   return out.sort((a, b) => a[0].localeCompare(b[0]));

@@ -164,6 +164,16 @@ export const objectPage = z.object({
     pins: z.array(z.object({ mapId: z.number().int(), x: z.number(), y: z.number(), reporters: z.number().int() })).optional()
         .describe("Where players saw the object on the minimap, at its own position; a pin needs 3 installs at one spot. Absent when there is none."),
 });
+/** The realm parameter of market_value and auction_history. */
+const REALM_INPUT = "The realm's full name as the game's realm list shows it, such as CAMWOW US1 Realm 4 PvP. The end of exactly one realm's full name (US1 Realm 4 PvP) is read as that realm; an unknown or ambiguous name answers with the realms to ask with.";
+/** How market_value and auction_history read the realm asked for. Absent when the market rollup is not connected. */
+const realmLookup = {
+    realmStatus: z.enum(["exact", "alias", "ambiguous", "unknown"]).optional()
+        .describe("exact: a realm Everloot holds scans for. alias: the end of exactly one public realm's full name, read as that realm (realm is its full name). ambiguous: the end of several realms' names, so nothing is read. unknown: no scan names that realm, so nothing is read; that is not an empty market."),
+    askedRealm: z.string().optional().describe("The realm as asked, when it was read as an alias."),
+    candidates: z.array(z.string()).optional().describe("For ambiguous or unknown: the realms with public prices to ask with instead, closest first."),
+};
+const marketDay = z.object({ day: z.string(), min: z.number().int(), market: z.number().int(), quantity: z.number().int(), reporters: z.number().int(), thin: z.boolean() });
 export const auctionHistory = z.object({
     realm: z.string(),
     itemId: z.number().int(),
@@ -171,7 +181,10 @@ export const auctionHistory = z.object({
         day: z.string(),
         copper: z.number().int().describe("The median of the last scan from each install that day."),
         reporters: z.number().int(),
-    })).describe("Days 3 installs scanned the item on the realm, oldest first."),
+    })).describe("Single listings players saw while browsing: days 3 installs scanned the item on the realm, or one of Everloot's own installs did (reporters under 3), oldest first."),
+    scanDays: z.array(marketDay).optional()
+        .describe("The public full-scan days market_value values the item by, the same days as its history, oldest first. Absent when the market is not connected."),
+    ...realmLookup,
 });
 export const collectionGap = z.object({
     collection: z.string(),
@@ -336,8 +349,9 @@ export const marketValue = z.object({
 export const marketPage = z.object({
     realm: z.string(),
     itemId: z.number().int(),
-    value: marketValue.nullable().describe("Null until 3 reporters scanned the item on the realm."),
-    history: z.array(z.object({ day: z.string(), min: z.number().int(), market: z.number().int(), quantity: z.number().int(), reporters: z.number().int(), thin: z.boolean() })),
+    value: marketValue.nullable().describe("Null until 3 reporters scanned the item on the realm, or one of Everloot's own installs did, and for an ambiguous or unknown realm."),
+    history: z.array(marketDay),
+    ...realmLookup,
 });
 export const relationEdge = z.object({
     fromKind: z.enum(ENTITY_KINDS), fromId: z.number().int(), rel: z.enum(RELS), toKind: z.enum(ENTITY_KINDS), toId: z.number().int(),
@@ -845,9 +859,9 @@ export const MCP_TOOLS = {
     },
     auction_history: {
         title: "Auction history for one item",
-        description: "Returns the day-by-day price history of one item on one WoW: Forever realm, from auction scans players uploaded on purpose. A day is public after 3 installs scanned that item on that realm; copper is the median. Use it for how a price moved over time; use market_value for today's market value, minimum buyout and units listed, item_page for the item itself, and vendor_page for vendor prices. Realm is the realm's name; the item id is the game's. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
+        description: "Returns the day-by-day price history of one item on one WoW: Forever realm, from auction scans players uploaded on purpose: the public full-scan days market_value values the item by, and the single listings players saw while browsing. Both follow the market's rule: a day is public after 3 reporters scanned the item, or, while few players upload, when Everloot's own installs did, and its reporters say so. Use it for how a price moved over time; use market_value for today's market value, minimum buyout and units listed, item_page for the item itself, and vendor_page for vendor prices. The realm is read as market_value reads it: an unknown or ambiguous name answers with the realms to ask with, never an empty history. The item id is the game's. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
         inputSchema: {
-            realm: z.string().describe("The realm's name, as the game shows it."),
+            realm: z.string().describe(REALM_INPUT),
             itemId: z.number().int().positive().describe("The game's item id, as item_page takes it."),
         },
         outputSchema: { ...uploadsAnswer, page: auctionHistory.optional() },
@@ -855,9 +869,9 @@ export const MCP_TOOLS = {
     },
     market_value: {
         title: "Forever market value for one item",
-        description: "Returns the market value, minimum buyout, historical value and units listed for one item on one WoW: Forever realm, from full auction scans players started and uploaded. A day is public after 3 reporters (distinct upload addresses) scanned the item, and its value is the median of theirs. Market value is a weighted mean of the public days up to 14 calendar days old, newer days weighing more, leaving out thin days (5 units listed or fewer) and outlier days. Historical is the median of the public days in the last 60 calendar days, of the days that are not thin when there are any. Use it for what an item is worth now; use auction_history for the price over time, and vendor_page for vendor prices. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
+        description: "Returns the market value, minimum buyout, historical value and units listed for one item on one WoW: Forever realm, from full auction scans players started and uploaded. A day is public after 3 reporters (distinct upload addresses) scanned the item, or, while few players upload, when Everloot's own installs did, and its reporters say so; its value is the median of theirs. Market value is a weighted mean of the public days up to 14 calendar days old, newer days weighing more, leaving out thin days (5 units listed or fewer) and outlier days. Historical is the median of the public days in the last 60 calendar days, of the days that are not thin when there are any. Use it for what an item is worth now; use auction_history for the price over time, and vendor_page for vendor prices. The realm is its full name as the game's realm list shows it. A name that is the end of exactly one realm's full name is read as that realm, and the answer says so; a name that ends several, or none, answers ambiguous or unknown with the realms to ask with, never an empty market. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
         inputSchema: {
-            realm: z.string().describe("The realm's name, as the game shows it."),
+            realm: z.string().describe(REALM_INPUT),
             itemId: z.number().int().positive().describe("The game's item id, as item_page takes it."),
         },
         outputSchema: { ...uploadsAnswer, page: marketPage.optional() },

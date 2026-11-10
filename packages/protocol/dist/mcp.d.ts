@@ -329,6 +329,14 @@ export declare const objectPage: z.ZodObject<{
     }, z.core.$strip>>>;
 }, z.core.$strip>;
 export declare const auctionHistory: z.ZodObject<{
+    realmStatus: z.ZodOptional<z.ZodEnum<{
+        alias: "alias";
+        ambiguous: "ambiguous";
+        exact: "exact";
+        unknown: "unknown";
+    }>>;
+    askedRealm: z.ZodOptional<z.ZodString>;
+    candidates: z.ZodOptional<z.ZodArray<z.ZodString>>;
     realm: z.ZodString;
     itemId: z.ZodNumber;
     points: z.ZodArray<z.ZodObject<{
@@ -336,6 +344,14 @@ export declare const auctionHistory: z.ZodObject<{
         copper: z.ZodNumber;
         reporters: z.ZodNumber;
     }, z.core.$strip>>;
+    scanDays: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        day: z.ZodString;
+        min: z.ZodNumber;
+        market: z.ZodNumber;
+        quantity: z.ZodNumber;
+        reporters: z.ZodNumber;
+        thin: z.ZodBoolean;
+    }, z.core.$strip>>>;
 }, z.core.$strip>;
 export declare const collectionGap: z.ZodObject<{
     collection: z.ZodString;
@@ -716,6 +732,14 @@ export declare const marketValue: z.ZodObject<{
     thin: z.ZodBoolean;
 }, z.core.$strip>;
 export declare const marketPage: z.ZodObject<{
+    realmStatus: z.ZodOptional<z.ZodEnum<{
+        alias: "alias";
+        ambiguous: "ambiguous";
+        exact: "exact";
+        unknown: "unknown";
+    }>>;
+    askedRealm: z.ZodOptional<z.ZodString>;
+    candidates: z.ZodOptional<z.ZodArray<z.ZodString>>;
     realm: z.ZodString;
     itemId: z.ZodNumber;
     value: z.ZodNullable<z.ZodObject<{
@@ -2694,7 +2718,7 @@ export declare const MCP_TOOLS: {
     };
     readonly auction_history: {
         readonly title: "Auction history for one item";
-        readonly description: "Returns the day-by-day price history of one item on one WoW: Forever realm, from auction scans players uploaded on purpose. A day is public after 3 installs scanned that item on that realm; copper is the median. Use it for how a price moved over time; use market_value for today's market value, minimum buyout and units listed, item_page for the item itself, and vendor_page for vendor prices. Realm is the realm's name; the item id is the game's. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
+        readonly description: "Returns the day-by-day price history of one item on one WoW: Forever realm, from auction scans players uploaded on purpose: the public full-scan days market_value values the item by, and the single listings players saw while browsing. Both follow the market's rule: a day is public after 3 reporters scanned the item, or, while few players upload, when Everloot's own installs did, and its reporters say so. Use it for how a price moved over time; use market_value for today's market value, minimum buyout and units listed, item_page for the item itself, and vendor_page for vendor prices. The realm is read as market_value reads it: an unknown or ambiguous name answers with the realms to ask with, never an empty history. The item id is the game's. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
         readonly inputSchema: {
             readonly realm: z.ZodString;
             readonly itemId: z.ZodNumber;
@@ -2705,6 +2729,14 @@ export declare const MCP_TOOLS: {
             readonly reason: z.ZodOptional<z.ZodString>;
             readonly url: z.ZodOptional<z.ZodString>;
             readonly page: z.ZodOptional<z.ZodObject<{
+                realmStatus: z.ZodOptional<z.ZodEnum<{
+                    alias: "alias";
+                    ambiguous: "ambiguous";
+                    exact: "exact";
+                    unknown: "unknown";
+                }>>;
+                askedRealm: z.ZodOptional<z.ZodString>;
+                candidates: z.ZodOptional<z.ZodArray<z.ZodString>>;
                 realm: z.ZodString;
                 itemId: z.ZodNumber;
                 points: z.ZodArray<z.ZodObject<{
@@ -2712,6 +2744,14 @@ export declare const MCP_TOOLS: {
                     copper: z.ZodNumber;
                     reporters: z.ZodNumber;
                 }, z.core.$strip>>;
+                scanDays: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                    day: z.ZodString;
+                    min: z.ZodNumber;
+                    market: z.ZodNumber;
+                    quantity: z.ZodNumber;
+                    reporters: z.ZodNumber;
+                    thin: z.ZodBoolean;
+                }, z.core.$strip>>>;
             }, z.core.$strip>>;
         };
         readonly annotations: {
@@ -2723,7 +2763,7 @@ export declare const MCP_TOOLS: {
     };
     readonly market_value: {
         readonly title: "Forever market value for one item";
-        readonly description: "Returns the market value, minimum buyout, historical value and units listed for one item on one WoW: Forever realm, from full auction scans players started and uploaded. A day is public after 3 reporters (distinct upload addresses) scanned the item, and its value is the median of theirs. Market value is a weighted mean of the public days up to 14 calendar days old, newer days weighing more, leaving out thin days (5 units listed or fewer) and outlier days. Historical is the median of the public days in the last 60 calendar days, of the days that are not thin when there are any. Use it for what an item is worth now; use auction_history for the price over time, and vendor_page for vendor prices. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
+        readonly description: "Returns the market value, minimum buyout, historical value and units listed for one item on one WoW: Forever realm, from full auction scans players started and uploaded. A day is public after 3 reporters (distinct upload addresses) scanned the item, or, while few players upload, when Everloot's own installs did, and its reporters say so; its value is the median of theirs. Market value is a weighted mean of the public days up to 14 calendar days old, newer days weighing more, leaving out thin days (5 units listed or fewer) and outlier days. Historical is the median of the public days in the last 60 calendar days, of the days that are not thin when there are any. Use it for what an item is worth now; use auction_history for the price over time, and vendor_page for vendor prices. The realm is its full name as the game's realm list shows it. A name that is the end of exactly one realm's full name is read as that realm, and the answer says so; a name that ends several, or none, answers ambiguous or unknown with the realms to ask with, never an empty market. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
         readonly inputSchema: {
             readonly realm: z.ZodString;
             readonly itemId: z.ZodNumber;
@@ -2734,6 +2774,14 @@ export declare const MCP_TOOLS: {
             readonly reason: z.ZodOptional<z.ZodString>;
             readonly url: z.ZodOptional<z.ZodString>;
             readonly page: z.ZodOptional<z.ZodObject<{
+                realmStatus: z.ZodOptional<z.ZodEnum<{
+                    alias: "alias";
+                    ambiguous: "ambiguous";
+                    exact: "exact";
+                    unknown: "unknown";
+                }>>;
+                askedRealm: z.ZodOptional<z.ZodString>;
+                candidates: z.ZodOptional<z.ZodArray<z.ZodString>>;
                 realm: z.ZodString;
                 itemId: z.ZodNumber;
                 value: z.ZodNullable<z.ZodObject<{
@@ -4571,7 +4619,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Auction history for one item";
-    description: "Returns the day-by-day price history of one item on one WoW: Forever realm, from auction scans players uploaded on purpose. A day is public after 3 installs scanned that item on that realm; copper is the median. Use it for how a price moved over time; use market_value for today's market value, minimum buyout and units listed, item_page for the item itself, and vendor_page for vendor prices. Realm is the realm's name; the item id is the game's. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
+    description: "Returns the day-by-day price history of one item on one WoW: Forever realm, from auction scans players uploaded on purpose: the public full-scan days market_value values the item by, and the single listings players saw while browsing. Both follow the market's rule: a day is public after 3 reporters scanned the item, or, while few players upload, when Everloot's own installs did, and its reporters say so. Use it for how a price moved over time; use market_value for today's market value, minimum buyout and units listed, item_page for the item itself, and vendor_page for vendor prices. The realm is read as market_value reads it: an unknown or ambiguous name answers with the realms to ask with, never an empty history. The item id is the game's. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
     inputSchema: {
         readonly realm: z.ZodString;
         readonly itemId: z.ZodNumber;
@@ -4582,6 +4630,14 @@ export declare const MCP_TOOL_LIST: ({
         readonly reason: z.ZodOptional<z.ZodString>;
         readonly url: z.ZodOptional<z.ZodString>;
         readonly page: z.ZodOptional<z.ZodObject<{
+            realmStatus: z.ZodOptional<z.ZodEnum<{
+                alias: "alias";
+                ambiguous: "ambiguous";
+                exact: "exact";
+                unknown: "unknown";
+            }>>;
+            askedRealm: z.ZodOptional<z.ZodString>;
+            candidates: z.ZodOptional<z.ZodArray<z.ZodString>>;
             realm: z.ZodString;
             itemId: z.ZodNumber;
             points: z.ZodArray<z.ZodObject<{
@@ -4589,6 +4645,14 @@ export declare const MCP_TOOL_LIST: ({
                 copper: z.ZodNumber;
                 reporters: z.ZodNumber;
             }, z.core.$strip>>;
+            scanDays: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                day: z.ZodString;
+                min: z.ZodNumber;
+                market: z.ZodNumber;
+                quantity: z.ZodNumber;
+                reporters: z.ZodNumber;
+                thin: z.ZodBoolean;
+            }, z.core.$strip>>>;
         }, z.core.$strip>>;
     };
     annotations: {
@@ -4600,7 +4664,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Forever market value for one item";
-    description: "Returns the market value, minimum buyout, historical value and units listed for one item on one WoW: Forever realm, from full auction scans players started and uploaded. A day is public after 3 reporters (distinct upload addresses) scanned the item, and its value is the median of theirs. Market value is a weighted mean of the public days up to 14 calendar days old, newer days weighing more, leaving out thin days (5 units listed or fewer) and outlier days. Historical is the median of the public days in the last 60 calendar days, of the days that are not thin when there are any. Use it for what an item is worth now; use auction_history for the price over time, and vendor_page for vendor prices. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
+    description: "Returns the market value, minimum buyout, historical value and units listed for one item on one WoW: Forever realm, from full auction scans players started and uploaded. A day is public after 3 reporters (distinct upload addresses) scanned the item, or, while few players upload, when Everloot's own installs did, and its reporters say so; its value is the median of theirs. Market value is a weighted mean of the public days up to 14 calendar days old, newer days weighing more, leaving out thin days (5 units listed or fewer) and outlier days. Historical is the median of the public days in the last 60 calendar days, of the days that are not thin when there are any. Use it for what an item is worth now; use auction_history for the price over time, and vendor_page for vendor prices. The realm is its full name as the game's realm list shows it. A name that is the end of exactly one realm's full name is read as that realm, and the answer says so; a name that ends several, or none, answers ambiguous or unknown with the realms to ask with, never an empty market. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.";
     inputSchema: {
         readonly realm: z.ZodString;
         readonly itemId: z.ZodNumber;
@@ -4611,6 +4675,14 @@ export declare const MCP_TOOL_LIST: ({
         readonly reason: z.ZodOptional<z.ZodString>;
         readonly url: z.ZodOptional<z.ZodString>;
         readonly page: z.ZodOptional<z.ZodObject<{
+            realmStatus: z.ZodOptional<z.ZodEnum<{
+                alias: "alias";
+                ambiguous: "ambiguous";
+                exact: "exact";
+                unknown: "unknown";
+            }>>;
+            askedRealm: z.ZodOptional<z.ZodString>;
+            candidates: z.ZodOptional<z.ZodArray<z.ZodString>>;
             realm: z.ZodString;
             itemId: z.ZodNumber;
             value: z.ZodNullable<z.ZodObject<{
