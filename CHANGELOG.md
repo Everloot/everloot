@@ -74,7 +74,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   until three installs agree, a "Track this" link to the collections tool and a relation tab ("Reputation from" on a
   faction, "Earned by" on a title) whose empty state names the 3-install rule and says what no game file read so far
   carries; a faction page also shows its lore archive page when the archive has one under the same name.
-- Desktop App: Reports shows your local ledger by day and item, with period, account, character and item filters, cumulative totals and a comparison with the previous period.
 - Site: a class page links the census narrowed to its class and the classes ranking, and the search page with no
   query lists what a search finds (items, NPCs, quests, zones, objects, the lore archive, tools and docs), each
   linked to its list, with four queries to try. Before, the class page stopped at the database links and an empty
@@ -241,7 +240,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Knowledge base: a self-hosted MCP server and `coverage-report` read the whole public corpus again. The reader stopped
   at 50 pages and 2 MB in all, and the feed is now about 98 pages and 13 MB; the limits are per page with a high total
   guard. Without a key the site allows 30 requests an hour, so a rate-limited read now says to set `EVERLOOT_API_KEY`.
-- Desktop App: the guide covers every page and signing in, setup points to `_forever_`, and empty Addon and Market panels offer Open Settings or Refresh prices.
 - Site: title pages and lists no longer show the game's raw `%s`: the name reads "Bloodsail Admiral <Name>", the address
   drops the trailing `-s` (`/database/titles/144-bloodsail-admiral`) and the old address redirects to the new one.
 - Site: the schemas page marks the three shapes that describe a bulk-export file rather than an endpoint and says that
@@ -328,8 +326,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   the question stays queued, so the retry's answer still reaches the game. Before, the question was dropped and a later answer never
   appeared. After each `/reload` the addon says how many questions are still waiting. Needs the next addon and Desktop App
   releases; each half is harmless without the other.
-- Companion: when two account folders carry the same install id (a copied WTF folder), upload history is kept whole, as the
-  Desktop App already does. Before, each account's upload trimmed the other's, and the next run sent those events again.
 - Site: without a key, `/api/tools/{tool}` (what the site's chat calls for each answer) counts against the MCP server's
   200 requests an hour per address instead of the bulk endpoints' 30, so a signed-out chat no longer runs out after a
   dozen questions. A key is counted as before.
@@ -355,8 +351,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   both factions; the tooltip and `/everloot price` say so, also beside your own scan. Your own scans are kept per realm
   and house; an older scan that did not record its house says so. Update the addon and the Desktop App together, then
   `/reload`: the 0.3.22 addon release or earlier shows no community prices from the new price file.
-- Desktop App: the price file is fetched and written per auction house, and the Market page lists each realm's houses
-  apart. The Characters page keeps two characters with the same name and realm apart.
 - Site: the home page banner no longer makes the page a few pixels wider than the window on a computer with a
   scrollbar, so the page has nothing to scroll sideways at any width.
 
@@ -385,9 +379,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: item tooltips read like the game's: the item level first and in yellow, slot and armour or weapon type in two
   columns, damage left and speed right, Equip, Use and Chance on hit lines in green, a named set and the flavour text in
   yellow, and the sell price as gold, silver and copper coins. Every line keeps its words, so no colour is the only cue.
-- Companion: the command line's `main` takes its uploader, price refresher, file watcher and console as an optional argument,
-  with the real ones as defaults, so the watch and prices loop is tested with fakes (upload then prices on each settled
-  write, prices alone, a failed refresh that keeps the previous file, upload never writing prices). Nothing it sends changes.
 - Site: the item lists, the census, the rankings and the MCP `population` tool read stored files the snapshot cron
   writes, instead of rebuilding from every upload on each new server instance. The census is one snapshot the cron
   extends with only the uploads received since its last run; the item lists' agreed names, public drops, and the items
@@ -491,6 +482,27 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - MCP: `coverage` and `everloot_plan` answer with a summary first and page the rest, so a broad question stays under 12 KB (the audit measured 82 KB for every zone's quests and 38 KB for the plan). `coverage` without a zone gives the totals, each type and one line per zone, 20 zones at a time, now with structured totals and denominators; `everloot_plan` with any argument names each row, 40 at a time, and states the tracker's revision (it records no date). `detail`, `offset` and `limit` read the rest, every page stays under 12,000 bytes even at the largest `limit`, and says how many it shows of how many and gives `nextOffset`. One zone answers as before, and `everloot_plan` with no arguments still returns the whole tracker. A zone filter that matches no released zone is unmeasured, not zeros.
 - MCP: rank answering claims before subject matches, state unavailable requested facts,
   and report separate answerability rates.
+
+## [desktop-v0.1.22] - 2026-11-10
+
+A Reports page for your local ledger, a guide that covers every page, and price files fetched and written per auction
+house. Addon 0.3.23 reads that per-house file: update the addon and the Desktop App together, then `/reload`, or
+tooltips show no community prices. Builds are still unsigned.
+
+### Added
+- Reports shows your local ledger by day and item, with period, account, character and item filters, cumulative totals and a comparison with the previous period.
+
+### Fixed
+- The guide covers every page and signing in, setup points to `_forever_`, and empty Addon and Market panels offer Open Settings or Refresh prices.
+- The command-line uploader: when two account folders carry the same install id (a copied WTF folder), upload history is kept whole, as the
+  Desktop App already does. Before, each account's upload trimmed the other's, and the next run sent those events again.
+- The price file is fetched and written per auction house, and the Market page lists each realm's houses
+  apart. The Characters page keeps two characters with the same name and realm apart.
+
+### Changed
+- The command-line uploader: the command line's `main` takes its uploader, price refresher, file watcher and console as an optional argument,
+  with the real ones as defaults, so the watch and prices loop is tested with fakes (upload then prices on each settled
+  write, prices alone, a failed refresh that keeps the previous file, upload never writing prices). Nothing it sends changes.
 
 ## [desktop-v0.1.21] - 2026-11-10
 
