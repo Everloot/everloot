@@ -37,6 +37,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the API docs list the site-internal routes, `/api/suggest` and `/api/map/pins`, with a note that they serve the site's pages, may change without notice and are not part of the protocol.
 - Site: the account guide and the addon page link the sample character page (/showcase/character), so a player can see
   what a character page holds before linking one. The sample stays out of search and the sitemap.
+- Addon: item tooltips show your own history with the item on this realm, from the gold ledger in your saved file:
+  your last sale (day and price per unit), your average sale and units sold over the last 90 days, sales waiting for
+  their mailbox letter, and what you paid where the ledger knows it. An item you never sold says nothing. Three new
+  switches on the settings page turn prices, your history and sources in tooltips on or off; all start on.
 - Site: a profession page answers to its skill line id, `/tools/professions/171` or `/tools/professions/171-alchemy`, and
   redirects for good to the slug page it already had, keeping the skill range and class context in the query; an unknown id
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.

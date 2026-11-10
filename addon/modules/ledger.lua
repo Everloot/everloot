@@ -11,6 +11,7 @@
 -- For days before the store existed, Summary also reads the uploaded money_event records (read only, never copied
 -- into the store), matched to a character key through the roster's name and realm.
 -- This file registers no events: gold.lua calls Record, RecordSale and Close, and the views call the queries.
+-- The item tooltip reads ItemHistory, an index by item name built once and again only after the store changes.
 
 local E = Everloot
 local L = {}
@@ -32,6 +33,8 @@ local MAX_CLOSES = 400
 local MAX_ITEM_NAME = 80
 local SERIES_DAYS = 30
 
+-- Days a query counts, for the words beside a number ("last 90 days").
+L.WINDOW_DAYS = MAX_AGE / DAY
 L.INCOME = { "loot", "quest", "vendor", "auction", "trade_in", "mail_in" }
 L.SPENDING = { "flight", "postage", "barber", "respec", "auction_spend", "repair", "vendor_spend", "trade_out", "mail_out" }
 L.LABELS = {
@@ -420,6 +423,101 @@ function L.Period(name)
   if name == "7d" then return today - 6 * DAY, now end
   if name == "all" then return 0, now end
   return today - 29 * DAY, now
+end
+
+-- What the store says about one item on one realm, for the item tooltip: { [realm] = { [itemName] = history } }.
+-- Built in one pass over the store, and again only when it changed (a write, rows added or dropped, a new store), a
+-- new UTC day moved the window, a waiting sale passed its 48 hours or the roster changed (it supplies each key's
+-- realm); a hover reads one entry.
+local items = nil
+L.indexBuilds = 0
+
+--- The realm of each character key: the roster's, and this character's own when the roster has no row for it yet.
+local function realmsOfKeys()
+  local realmOf = {}
+  if E.Roster and E.Roster.Rows then
+    local ok, rows = pcall(E.Roster.Rows)
+    for _, r in ipairs(ok and type(rows) == "table" and rows or {}) do
+      if type(r.key) == "string" and type(r.realm) == "string" then realmOf[r.key] = r.realm end
+    end
+  end
+  local ok, key = pcall(E.CharacterKey)
+  local realm = GetRealmName and E.Readable(GetRealmName())
+  if ok and validKey(key) and type(realm) == "string" and realm ~= "" and not realmOf[key] then realmOf[key] = realm end
+  return realmOf
+end
+
+--- Paid sales (units, total, count of sales, the newest), sales still waiting for their letter (48 hours at most),
+--- and auction purchases whose event names the item and its count. Rows from the last 90 days only; a pending sale
+--- past 48 hours, an unmatched one and a purchase without an item or count say nothing.
+local function buildItems(s)
+  L.indexBuilds = L.indexBuilds + 1
+  local realmOf, since, open = realmsOfKeys(), oldestDay(), time() - PENDING_SECONDS
+  local byRealm, expires = {}, math.huge
+  local function entry(key, name)
+    local realm = realmOf[key]
+    if not realm or not validName(name) then return nil end
+    local list = byRealm[realm] or {}
+    byRealm[realm] = list
+    local h = list[name]
+    if not h then
+      h = { units = 0, total = 0, sales = 0, pending = 0, bought = 0, spent = 0, purchases = 0 }
+      list[name] = h
+    end
+    return h
+  end
+  for _, row in ipairs(s.sales) do
+    if type(row) == "table" and type(row.at) == "number" and row.at >= since then
+      if row.status == "paid" and whole(row.count, 1) and whole(row.total, 1) then
+        local h = entry(row.key, row.itemName)
+        if h then
+          h.units, h.total, h.sales = h.units + row.count, h.total + row.total, h.sales + 1
+          if not h.lastAt or row.at >= h.lastAt then h.lastAt, h.lastUnit = row.at, math.floor(row.total / row.count) end
+        end
+      elseif row.status == "pending" and row.at >= open then
+        local h = entry(row.key, row.itemName)
+        if h then
+          h.pending = h.pending + 1
+          -- Still waiting at exactly 48 hours (the check above is inclusive, as ExpirePending is), gone a second later.
+          expires = math.min(expires, row.at + PENDING_SECONDS + 1)
+        end
+      end
+    end
+  end
+  for _, e in ipairs(s.events) do
+    if type(e) == "table" and e.category == "auction_spend" and e.ownAlt ~= true and type(e.at) == "number" and e.at >= since
+      and whole(e.count, 1) and whole(e.copper, 1) then
+      local h = entry(e.key, e.itemName)
+      if h then h.bought, h.spent, h.purchases = h.bought + e.count, h.spent + e.copper, h.purchases + 1 end
+    end
+  end
+  for _, list in pairs(byRealm) do
+    for _, h in pairs(list) do
+      if h.units > 0 then h.average = math.floor(h.total / h.units) end
+      if h.bought > 0 then h.averagePaid = math.floor(h.spent / h.bought) end
+    end
+  end
+  return byRealm, expires
+end
+
+--- The player's own history with one item on one realm, from every character of this install on that realm:
+--- { units, total, sales, average, lastAt, lastUnit, pending, bought, spent, purchases, averagePaid } (amounts in
+--- copper per unit), or nil when the store has nothing to say about it. Read only.
+function L.ItemHistory(realm, itemName)
+  if type(realm) ~= "string" or not validName(itemName) then return nil end
+  local s = store()
+  local today = midnight()
+  local rosterRevision = E.Roster and E.Roster.revision or 0
+  if not (items and items.sales == s.sales and items.events == s.events and items.nSales == #s.sales
+    and items.nEvents == #s.events and items.revision == L.revision and items.roster == rosterRevision
+    and items.day == today and time() < items.expires) then
+    items = { sales = s.sales, events = s.events, nSales = #s.sales, nEvents = #s.events, revision = L.revision,
+      roster = rosterRevision, day = today }
+    items.byRealm, items.expires = buildItems(s)
+  end
+  local h = items.byRealm[realm] and items.byRealm[realm][itemName]
+  if not h or (h.sales == 0 and h.pending == 0 and h.purchases == 0) then return nil end
+  return h
 end
 
 E:RegisterModule("ledger", function()
