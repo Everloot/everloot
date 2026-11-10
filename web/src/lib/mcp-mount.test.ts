@@ -12,7 +12,7 @@ vi.mock("./upload-store", () => ({ uploadStore: {} }));
 vi.mock("./usage-metrics", async (importActual) => ({ ...(await importActual<typeof import("./usage-metrics")>()), recordUsage: hoisted.record }));
 
 import { createMount, toolLoaders } from "./mcp-mount";
-import { loadCoverage } from "./coverage-compute";
+import { loadCoverageForTool } from "./coverage-answer";
 import { RECHECK_SCOPES } from "./recheck-scopes";
 import { readSettledList } from "./settled-store";
 import { emptySettledList } from "../../../kb/src/settled-list";
@@ -20,7 +20,7 @@ import { createToolHandlers } from "../../../kb/src/mcp-server";
 import { openDb } from "../../../kb/src/db";
 import { uploadStore } from "./upload-store";
 
-vi.mock("./coverage-compute", () => ({ loadCoverage: vi.fn(async () => null) }));
+vi.mock("./coverage-answer", () => ({ loadCoverageForTool: vi.fn(async () => null) }));
 vi.mock("./settled-store", () => ({ readSettledList: vi.fn() }));
 
 it("mount readers expose agreed gameplay names and released UiMap ids through generic tools", async () => {
@@ -43,9 +43,9 @@ it("lends only the persisted settled list's count and date, never its identifier
   expect(readSettledList).toHaveBeenCalledWith(list.build);
 });
 
-it("lends MCP and HTTP tools the public coverage page's reader", async () => {
+it("lends MCP and HTTP tools the stored-report reader, not the corpus one", async () => {
   expect(await toolLoaders().coverage!()).toBeNull();
-  expect(loadCoverage).toHaveBeenCalledOnce();
+  expect(loadCoverageForTool).toHaveBeenCalledOnce();
 });
 
 it("lends the curated recheck scopes, so the page tools honour the coverage cut-off", () => {
