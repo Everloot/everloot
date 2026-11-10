@@ -26,7 +26,7 @@
       }
     },
     "houses": {
-      "description": "Per realm, the auction houses that have public values of their own (scans that named their house).",
+      "description": "Per realm, the auction houses that have public values of their own. A scan counts for the house it read, else its scanner's faction.",
       "type": "object",
       "propertyNames": {
         "type": "string"
