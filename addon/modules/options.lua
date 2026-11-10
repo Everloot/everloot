@@ -8,60 +8,84 @@ local E = Everloot
 local O = {}
 E.Options = O
 
--- In page order. `command` is the /everloot word; `field` is a top-level EverlootDB key instead of a toggle;
+-- In page order. `group` is the settings page the row sits on (O.GROUPS); `command` is the /everloot word; `field` is a top-level EverlootDB key instead of a toggle;
 -- `defaultOff` reads a missing field as off; `live` applies at once, without a reload.
 O.ROWS = {
-  { key = "window", label = "Everloot window",
+  { key = "window", group = "general", label = "Everloot window",
     text = "The window from the minimap button and /everloot window. It shows what this file holds and records nothing; off leaves recording as it is." },
-  { key = "minimapButton", field = true, label = "Minimap button",
+  { key = "minimapButton", group = "general", field = true, label = "Minimap button",
     text = "The Everloot button on the minimap: click it for the window, right-click for these settings, hover it for other addons' buttons. Off hides it after a reload; /everloot window still opens the window." },
-  { key = "buttons", command = "buttons", label = "Addon buttons in the Everloot button",
+  { key = "buttons", group = "general", command = "buttons", label = "Addon buttons in the Everloot button",
     text = "Other addons' minimap buttons gather into the Everloot minimap button; hover it to use them. Records nothing; off puts them back after a reload." },
-  { key = "auctions", command = "auctions", label = "Auction scans",
+  { key = "auctions", group = "auction", command = "auctions", label = "Auction scans",
     text = "Scan this house from the Everloot tab at the auction house, one click at a time. Item prices and quantities, never sellers." },
-  { key = "scanPrompt", command = "scanprompt", field = true, label = "Scan prompt at the auction house",
+  { key = "scanPrompt", group = "auction", command = "scanprompt", field = true, label = "Scan prompt at the auction house",
     text = "A small reminder beside the house when a scan can run. The tab and /everloot scan work either way." },
-  { key = "autoVendor", command = "vendor", field = true, defaultOff = true, label = "Sell greys and repair at merchants",
+  { key = "autoVendor", group = "auction", command = "vendor", field = true, defaultOff = true, label = "Sell greys and repair at merchants",
     text = "When a merchant window opens: sells grey items and repairs with your own gold, never the guild bank. Records nothing itself." },
-  { key = "mailCollect", command = "mail", field = true, defaultOff = true, label = "Collect all at the mailbox",
+  { key = "mailCollect", group = "auction", command = "mail", field = true, defaultOff = true, label = "Collect all at the mailbox",
     text = "A button that takes money and items from auction letters only, one at a time. Skips cash on delivery and other letters." },
-  { key = "census", command = "census", label = "Census",
+  { key = "census", group = "shared", command = "census", label = "Census",
     text = "Race, class, level and faction of your characters and of players near you, nameplates included. Never names, guilds, gear or places. Off deletes its rows." },
-  { key = "openworld", label = "World",
+  { key = "openworld", group = "shared", label = "World",
     text = "NPCs, loot, quests, vendors and items you see, and where you stood at NPC windows and herbs, ore and chests. Anonymous: no character or guild names." },
-  { key = "professions", label = "Recipes and trainers",
+  { key = "professions", group = "shared", label = "Recipes and trainers",
     text = "At profession and trainer windows you open: each recipe you know with its colour at your rank, product and reagents, and each trainer recipe's required rank and cost. Never crafts or trains. Stays in this file until it is sent." },
-  { key = "mapbounds", label = "Zone map corners",
+  { key = "mapbounds", group = "shared", label = "Zone map corners",
     text = "Each zone's corners in world coordinates, once per zone per game build, so the site can place zone coordinates on one map. Nothing about you. Stays in this file until it is sent." },
-  { key = "gold", label = "Your gold",
+  { key = "gold", group = "private", label = "Your gold",
     text = "Your own gold in and out, for gold per hour. Sent only if you share it on the upload page." },
-  { key = "roster", label = "Your characters",
+  { key = "roster", group = "private", label = "Your characters",
     text = "Name, realm, class, level, faction, gold and professions of each character you log in with, for the window's Home. Stays in this file; never uploaded." },
-  { key = "gear", label = "Your gear",
+  { key = "gear", group = "private", label = "Your gear",
     text = "Your equipped items and item levels, at most once an hour. Sent only if you share it on the upload page." },
-  { key = "talents", label = "Your talents",
+  { key = "talents", group = "private", label = "Your talents",
     text = "Your own talent build, read only, for /everloot talents and plans." },
-  { key = "guild", label = "Guild",
+  { key = "guild", group = "private", label = "Guild",
     text = "Your guild's roster, lockouts and loot. Published only through an officer's upload." },
-  { key = "completion", command = "completion", label = "Completion tracker",
+  { key = "completion", group = "private", command = "completion", label = "Completion tracker",
     text = "Your achievements, reputation, titles and completed quests, read only; also your professions, raid lockouts, active talent build, character sheet stats and PvP standing. Collection rows leave from the upload page; achievements, reputation and titles also through the Desktop App's private sync, for a character you linked. Professions, lockouts, talents, stats and PvP never go in an upload, only through private sync. Off deletes its rows." },
-  { key = "addons", command = "addons", label = "Installed addon list",
+  { key = "addons", group = "shared", command = "addons", label = "Installed addon list",
     text = "Each installed addon's name and version. Sent only from the upload page. Off deletes its rows." },
-  { key = "players", command = "players", label = "Player pages",
+  { key = "players", group = "shared", command = "players", label = "Player pages",
     text = "Name, realm, race, class, level and guild of characters you see, for the site's player pages. Off deletes its rows." },
 }
 -- Only in the builds that carry the pulls module (E.RUN_RECORDS in core.lua).
 if E.Pulls then
-  O.ROWS[#O.ROWS + 1] = { key = "pulls", command = "pulls", label = "Boss pulls",
+  O.ROWS[#O.ROWS + 1] = { key = "pulls", group = "shared", command = "pulls", label = "Boss pulls",
     text = "After each boss pull: your group's names, classes, roles and the game's damage meter totals. Sent from the upload page or the Desktop App. Off deletes its rows." }
 end
 -- What the item tooltip shows (prices.lua reads them through E.TooltipShows on every hover). They record nothing.
-O.ROWS[#O.ROWS + 1] = { key = "tooltipMarket", field = true, live = true, label = "Item tooltip: prices",
+O.ROWS[#O.ROWS + 1] = { key = "tooltipMarket", group = "general", field = true, live = true, label = "Item tooltip: prices",
   text = "Community market value, min buyout and historical price, your own last scan and the vendor price. Records nothing; applies at once." }
-O.ROWS[#O.ROWS + 1] = { key = "tooltipHistory", field = true, live = true, label = "Item tooltip: your history",
+O.ROWS[#O.ROWS + 1] = { key = "tooltipHistory", group = "general", field = true, live = true, label = "Item tooltip: your history",
   text = "Your last sale, average sale and units sold, and what you paid where your gold ledger knows it, over the ledger's last 90 days, from your characters on this realm. Read from this file. Records nothing; applies at once." }
-O.ROWS[#O.ROWS + 1] = { key = "tooltipSources", field = true, live = true, label = "Item tooltip: sources",
+O.ROWS[#O.ROWS + 1] = { key = "tooltipSources", group = "general", field = true, live = true, label = "Item tooltip: sources",
   text = "Who drops it, who sells it, the recipes it is a reagent for and the zones you met its sources in. Records nothing; applies at once." }
+
+-- The settings pages, in the game's list under Everloot. Everloot itself is the overview: what this file holds and
+-- where the switches are. A client without sub-pages keeps every switch on one page, in O.ROWS order.
+O.GROUPS = {
+  { key = "general", name = "General",
+    intro = "The Everloot window, the minimap button and what the item tooltip shows. Nothing on this page records anything." },
+  { key = "auction", name = "Auction house",
+    intro = "Scans at the auction house, and the helpers at merchants and the mailbox." },
+  { key = "shared", name = "Shared with Everloot",
+    intro = "What the addon records for everloot.app. It stays in your saved file until the Everloot Desktop App or the upload page sends it, as each line says." },
+  { key = "private", name = "Your characters",
+    intro = "Your own characters, gold, gear, talents, guild and completion. Each line says whether it can leave your saved file, and how." },
+}
+O.INTRO = "What the addon records. Everything stays in your saved file until the Everloot Desktop App or the upload page sends it, as each line says."
+O.OVERVIEW = "The switches are on the pages under Everloot in this list: General, Auction house, Shared with Everloot and Your characters."
+
+--- The rows of one page, in O.ROWS order.
+function O.RowsOf(group)
+  local rows = {}
+  for _, row in ipairs(O.ROWS) do
+    if row.group == group then rows[#rows + 1] = row end
+  end
+  return rows
+end
 
 -- "What you've added": rows of each kind in the saved file now, shown under the switches.
 O.ADDED = {
@@ -145,15 +169,24 @@ function O.Click(row, on)
 end
 
 function O.Refresh()
-  local page = O.page
-  if not page then return end
-  for _, box in ipairs(page.boxes or {}) do box:SetChecked(O.IsOn(box.row)) end
-  for i, a in ipairs(O.ADDED) do
-    if page.added and page.added[i] then page.added[i]:SetText(a[2] .. ": " .. tostring(E:Count(a[1]))) end
+  for _, page in ipairs(O.pages or {}) do
+    for _, box in ipairs(page.boxes or {}) do box:SetChecked(O.IsOn(box.row)) end
+    for i, a in ipairs(O.ADDED) do
+      if page.added and page.added[i] then page.added[i]:SetText(a[2] .. ": " .. tostring(E:Count(a[1]))) end
+    end
+    if page.note then
+      page.note:SetText(O.changed and "Changes apply after a reload." or ("Everloot " .. E.VERSION .. ". Changes apply after a reload."))
+    end
   end
-  if page.note then
-    page.note:SetText(O.changed and "Changes apply after a reload." or ("Everloot " .. E.VERSION .. ". Changes apply after a reload."))
+end
+
+--- Every switch on every page.
+function O.Boxes()
+  local all = {}
+  for _, page in ipairs(O.pages or {}) do
+    for _, box in ipairs(page.boxes or {}) do all[#all + 1] = box end
   end
+  return all
 end
 
 -- Text in the Everloot window's fonts and colours (modules/window.lua loads after this file, before the page is
@@ -168,14 +201,16 @@ end
 
 local PAD = 8 -- inside the list of switches
 
-local function build()
+--- One settings page: a heading, its introduction, its switches (and, with `added`, what the file holds) in a
+--- scrolling list, and Reload now in the footer.
+local function build(frameName, name, subtitle, introText, rows, added)
   -- A frame that can take a backdrop, for when the page is shown as a window of its own.
-  local made, page = pcall(CreateFrame, "Frame", "EverlootOptionsPage", nil, "BackdropTemplate")
-  if not made or not page then page = CreateFrame("Frame", "EverlootOptionsPage") end
-  page.name = "Everloot"
+  local made, page = pcall(CreateFrame, "Frame", frameName, nil, "BackdropTemplate")
+  if not made or not page then page = CreateFrame("Frame", frameName) end
+  page.name = name
   local W = E.Window
   if W and W.Heading then
-    page.crest, page.title = W.Heading(page, "Settings")
+    page.crest, page.title = W.Heading(page, subtitle)
     page.crest:SetPoint("TOPLEFT", page, "TOPLEFT", 12, -10)
   else
     page.title = words(page, "GameFontNormalLarge")
@@ -185,34 +220,10 @@ local function build()
   local intro = words(page, "GameFontHighlightSmall", 11, "muted")
   intro:SetPoint("TOPLEFT", page, "TOPLEFT", 16, -46)
   intro:SetPoint("TOPRIGHT", page, "TOPRIGHT", -32, -46)
-  intro:SetText("What the addon records. Everything stays in your saved file until the Everloot Desktop App or the upload page sends it, as each line says.")
+  intro:SetText(introText)
   page.intro = intro
-  -- Ask Everloot: the question goes into the file, the companion answers it, and /reload prints it.
-  local ask = CreateFrame("EditBox", nil, page, "InputBoxTemplate")
-  ask:SetHeight(22)
-  if ask.SetAutoFocus then ask:SetAutoFocus(false) end
-  if ask.EnableMouse then ask:EnableMouse(true) end
-  local askLabel = words(page, "GameFontHighlightSmall", 12, "text")
-  askLabel:SetPoint("TOPLEFT", intro, "BOTTOMLEFT", 0, -14)
-  askLabel:SetPoint("TOPRIGHT", intro, "BOTTOMRIGHT", 0, -14)
-  askLabel:SetText("Ask Everloot, then /reload for the answer")
-  local send = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
-  send:SetSize(64, 22)
-  send:SetPoint("TOPRIGHT", askLabel, "BOTTOMRIGHT", 0, -8)
-  ask:SetPoint("TOPLEFT", askLabel, "BOTTOMLEFT", 0, -8)
-  ask:SetPoint("TOPRIGHT", send, "TOPLEFT", -8, 0)
-  send:SetText("Ask")
-  local function askNow()
-    local text = (ask:GetText() or ""):gsub("^%s+", ""):gsub("%s+$", "")
-    if text == "" then return end
-    if E.Ask then E:Ask(text) end
-    ask:SetText("")
-  end
-  send:SetScript("OnClick", askNow)
-  ask:SetScript("OnEnterPressed", askNow)
-  page.ask = ask
   local scroll = CreateFrame("ScrollFrame", nil, page, "UIPanelScrollFrameTemplate")
-  scroll:SetPoint("TOPLEFT", ask, "BOTTOMLEFT", 0, -18)
+  scroll:SetPoint("TOPLEFT", intro, "BOTTOMLEFT", 0, -18)
   scroll:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -32, 54)
   local content = CreateFrame("Frame", nil, scroll)
   content:SetSize(1, 1)
@@ -220,7 +231,7 @@ local function build()
   if W and W.Surface then W.Surface(scroll) end
   page.scroll = scroll
   page.boxes = {}
-  for _, row in ipairs(O.ROWS) do
+  for _, row in ipairs(rows) do
     local box = CreateFrame("CheckButton", nil, content, "UICheckButtonTemplate")
     box.row = row
     local label = words(box, "GameFontNormal", 13, "text")
@@ -233,10 +244,14 @@ local function build()
     box:SetScript("OnClick", function(self) O.Click(row, self:GetChecked() and true or false) end)
     page.boxes[#page.boxes + 1] = box
   end
-  page.addedHeading = words(content, "GameFontNormal", 13, "text")
-  page.addedHeading:SetText("What you've added")
-  page.added = {}
-  for i = 1, #O.ADDED do page.added[i] = words(content, "GameFontHighlightSmall", 11, "muted") end
+  -- False, not nil, on the pages without it: a frame's methods would answer for a missing field.
+  page.addedHeading, page.added = false, false
+  if added then
+    page.addedHeading = words(content, "GameFontNormal", 13, "text")
+    page.addedHeading:SetText("What you've added")
+    page.added = {}
+    for i = 1, #O.ADDED do page.added[i] = words(content, "GameFontHighlightSmall", 11, "muted") end
+  end
   local function layout(_, width)
     width = math.max(1, width or scroll:GetWidth())
     content:SetWidth(width)
@@ -247,11 +262,13 @@ local function build()
       box.description:SetWidth(math.max(1, width - 2 * PAD - 38))
       y = y + math.max(32, 4 + box.label:GetStringHeight() + 2 + box.description:GetStringHeight()) + 12
     end
-    page.addedHeading:SetPoint("TOPLEFT", content, "TOPLEFT", PAD, -y)
-    y = y + 22
-    for _, line in ipairs(page.added) do
-      line:SetPoint("TOPLEFT", content, "TOPLEFT", PAD, -y)
-      y = y + 16
+    if page.addedHeading then
+      page.addedHeading:SetPoint("TOPLEFT", content, "TOPLEFT", PAD, -y)
+      y = y + 22
+      for _, line in ipairs(page.added) do
+        line:SetPoint("TOPLEFT", content, "TOPLEFT", PAD, -y)
+        y = y + 16
+      end
     end
     content:SetHeight(y + PAD)
     scroll:SetVerticalScroll(math.min(scroll:GetVerticalScroll(), math.max(0, y - scroll:GetHeight())))
@@ -279,17 +296,47 @@ end
 
 --- Puts the page in the game's options: the Settings API, else the older interface options, else nothing
 --- (/everloot options then shows it as a window). Returns how it was registered.
+--- The one page with every switch: older clients, /everloot options as a window, and the fallback below.
+local function single()
+  return build("EverlootOptionsPage", "Everloot", "Settings", O.INTRO, O.ROWS, true)
+end
+
 function O.Register()
   if O.page then return O.how end
-  O.page = build()
   if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
-    local ok, category = pcall(Settings.RegisterCanvasLayoutCategory, O.page, "Everloot")
+    -- With sub-pages, Everloot is the overview and each group is a short page under it.
+    local split = Settings.RegisterCanvasLayoutSubcategory ~= nil
+    local page
+    if split then
+      page = build("EverlootOptionsPage", "Everloot", "Settings", O.INTRO .. "\n\n" .. O.OVERVIEW, {}, true)
+    else
+      page = single()
+    end
+    local ok, category = pcall(Settings.RegisterCanvasLayoutCategory, page, "Everloot")
     if ok and category then
+      O.page, O.pages = page, { page }
       pcall(Settings.RegisterAddOnCategory, category)
       O.category, O.how = category, "settings"
+      if split then
+        O.groupPages = {}
+        for _, group in ipairs(O.GROUPS) do
+          local sub = build("EverlootOptionsPage_" .. group.key, group.name, group.name, group.intro, O.RowsOf(group.key), false)
+          local made, subcategory = pcall(Settings.RegisterCanvasLayoutSubcategory, category, sub, group.name)
+          if made and subcategory then
+            O.pages[#O.pages + 1] = sub
+            O.groupPages[group.key] = sub
+          else
+            -- A page the game refused leaves its switches nowhere in the list: /everloot options then opens the
+            -- one page with every switch, as a window.
+            O.splitFailed = true
+          end
+        end
+      end
       return O.how
     end
   end
+  O.page = single()
+  O.pages = { O.page }
   if InterfaceOptions_AddCategory and pcall(InterfaceOptions_AddCategory, O.page) then
     O.how = "interface"
     return O.how
@@ -301,7 +348,7 @@ end
 --- /everloot options: opens the page where the game keeps it, or as a window of its own.
 function O.Open()
   O.Register()
-  if O.how == "settings" and Settings.OpenToCategory then
+  if O.how == "settings" and not O.splitFailed and Settings.OpenToCategory then
     local id = O.category.GetID and O.category:GetID() or O.category.ID
     if pcall(Settings.OpenToCategory, id) then return end
   elseif O.how == "interface" and InterfaceOptionsFrame_OpenToCategory then
@@ -310,7 +357,12 @@ function O.Open()
     InterfaceOptionsFrame_OpenToCategory(O.page)
     return
   end
-  local page = O.page
+  -- As a window: the overview holds no switches, so a split install shows the one page with every switch.
+  if O.groupPages and not O.whole then
+    O.whole = single()
+    O.pages[#O.pages + 1] = O.whole
+  end
+  local page = O.whole or O.page
   if not O.windowed then
     O.windowed = true
     page:SetParent(UIParent)

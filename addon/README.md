@@ -129,7 +129,7 @@ guide at everloot.app/docs/guides/addon; `addon/tests/commands_contract.py` fail
 | Command | What it does |
 |---|---|
 | `/everloot window` | Opens or closes the Everloot window (left-click on the minimap button does the same). |
-| `/everloot options` | Opens the settings page, one switch per module (right-click on the minimap button does the same). |
+| `/everloot options` | Opens the settings (right-click on the minimap button does the same): an Everloot overview with four pages under it in the game's AddOns list, General, Auction house, Shared with Everloot and Your characters, one switch per module. |
 | `/everloot planner [talents\|raid]` | Opens the planner workspace on the named tab, where a website plan is pasted and imported. |
 | `/everloot buttons on\|off` | Gathers other addons' minimap buttons into the Everloot button, or leaves them on the minimap; `/reload` to apply. |
 | `/everloot status` | Prints the version, each module and how many rows it holds, and any paused collection. |

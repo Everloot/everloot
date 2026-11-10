@@ -1,7 +1,10 @@
 """Run with: uv run --with lupa --with jsonschema python addon/tests/options_contract.py
 
 The settings page: registered with the Settings API when the client has it, else the older interface
-options, else shown as a window by /everloot options. One switch per module and the scan prompt; a switch
+options, else shown as a window by /everloot options. With sub-pages, Everloot is an overview and the switches
+sit on four short pages under it (General, Auction house, Shared with Everloot, Your characters), each switch
+on exactly one; a sub-page the game refuses sends /everloot options to the one page with every switch. The
+Ask box is not on the settings page (/ask still works). One switch per module and the scan prompt; a switch
 with a /everloot command runs it (so off deletes rows exactly as in chat), the others set the toggle; the
 boxes show the saved state; Reload now reloads. Every switch stays reachable in a scrolling list above the
 footer at any width. With the window's file loaded the page wears that window's look (a small crest heading,
@@ -160,6 +163,90 @@ O.page.reload.scripts.OnClick()
 assert(reloads == 1, 'Reload now reloads')
 """)
 
+# --- With sub-pages: an overview, and four short pages that hold every switch once ---
+SPLIT = SETTINGS + """
+subs = {}
+refuse = nil
+Settings.RegisterCanvasLayoutSubcategory = function(parent, frame, name)
+  if name == refuse then error('refused') end
+  local c = { parent = parent, frame = frame, name = name, ID = 100 + #subs }
+  subs[#subs + 1] = c
+  return c
+end
+"""
+for window in (False, True):
+    lua = fresh(SPLIT, window=window)
+    lua.execute("""
+local O = Everloot.Options
+assert(O.how == 'settings' and #registered == 1 and registered[1].frame == O.page, 'Everloot is still the AddOns category')
+assert(#subs == 4, 'four pages under it')
+local names = {}
+for i, c in ipairs(subs) do
+  names[i] = c.name
+  assert(c.parent == registered[1], 'each page sits under Everloot')
+end
+assert(table.concat(names, '|') == 'General|Auction house|Shared with Everloot|Your characters', table.concat(names, '|'))
+-- The overview: no switches, what the file holds, where the switches went, Reload now.
+assert(#O.page.boxes == 0 and #O.page.added == #O.ADDED, 'the overview holds no switches, only what you have added')
+assert(string.find(O.page.intro.text, 'General, Auction house, Shared with Everloot and Your characters', 1, true), 'the overview says where the switches are')
+assert(O.page.reload and O.page.note)
+assert(rawget(O.page, 'ask') == nil, 'no ask box')
+-- Every row on exactly one page, in O.ROWS order within it; each page short enough to read without scrolling.
+local seen = {}
+for i, c in ipairs(subs) do
+  local page = c.frame
+  assert(page == O.groupPages[O.GROUPS[i].key] and page.name == O.GROUPS[i].name)
+  assert(page.intro.text == O.GROUPS[i].intro and page.title.text ~= nil)
+  assert(rawget(page, 'added') == false, 'what you have added stays on the overview')
+  assert(#page.boxes >= 3 and #page.boxes <= 7, O.GROUPS[i].name .. ' has ' .. #page.boxes .. ' switches')
+  local last = 0
+  for _, box in ipairs(page.boxes) do
+    assert(box.row.group == O.GROUPS[i].key, box.row.key .. ' is on its own page')
+    assert(not seen[box.row.key], box.row.key .. ' is on one page only')
+    seen[box.row.key] = true
+    local at
+    for n, row in ipairs(O.ROWS) do if row == box.row then at = n end end
+    assert(at > last, 'O.ROWS order within a page'); last = at
+  end
+  page.scripts.OnShow()
+  checkRows(page)
+end
+for _, row in ipairs(O.ROWS) do assert(seen[row.key], row.key .. ' has a page') end
+assert(#O.Boxes() == #O.ROWS, 'every switch once across the pages')
+-- The groups the rows name exist, and a switch on a page still sets its module and refreshes the others.
+for _, row in ipairs(O.ROWS) do
+  local known = false
+  for _, g in ipairs(O.GROUPS) do if g.key == row.group then known = true end end
+  assert(known, row.key .. ' names a known page')
+end
+local census
+for _, box in ipairs(O.groupPages.shared.boxes) do if box.row.key == 'census' then census = box end end
+census.checked = false
+census.scripts.OnClick(census)
+assert(EverlootDB.toggles.census == false and not census.checked, 'a switch on a page sets its module')
+assert(string.find(O.groupPages.general.note.text, 'Changes apply after a reload.', 1, true), 'every footer says a reload applies it')
+SlashCmdList.EVERLOOT('options')
+assert(opened == 42, '/everloot options opens Everloot, the overview')
+""")
+
+# A page the game refuses: its switches stay reachable, /everloot options opens the one page with all of them.
+lua = fresh(SPLIT.replace("refuse = nil", "refuse = 'Auction house'"))
+lua.execute("""
+local O = Everloot.Options
+assert(O.splitFailed and #subs == 3 and O.groupPages.auction == nil, 'the refused page is not listed')
+SlashCmdList.EVERLOOT('options')
+assert(opened == nil, 'not sent to a list that lacks switches')
+assert(O.whole and O.whole.shown and #O.whole.boxes == #O.ROWS and O.close, 'a window with every switch')
+""")
+
+# The game's panel failing to open: the window shows every switch, not the empty overview.
+lua = fresh(SPLIT + "Settings.OpenToCategory = function() error('no panel') end")
+lua.execute("""
+local O = Everloot.Options
+SlashCmdList.EVERLOOT('options')
+assert(O.whole and O.whole.shown and #O.whole.boxes == #O.ROWS, 'the window holds every switch')
+""")
+
 # --- Every switch a module checks has a row on the page ---
 # The scan reads the sources: each IsEnabled("x") and each module registered under its own name is a switch
 # the player can need to turn off, so it needs an O.ROWS key (the rows come from this runtime, so a typo in
@@ -194,7 +281,7 @@ assert not missing, "modules without a switch on the settings page (add an O.ROW
 assert all(t in rows for t in follows.values()), "a module follows a switch that has no row: " + ", ".join(f"{m} -> {t}" for m, t in follows.items())
 # The minimap button is a field row (EverlootDB.minimapButton), not a toggle, so no IsEnabled call names it.
 assert "minimapButton" in rows and "EverlootDB.minimapButton" in (root / "modules" / "minimap.lua").read_text(encoding="utf-8")
-assert 'key = "minimapButton", field = true' in (root / "modules" / "options.lua").read_text(encoding="utf-8")
+assert 'key = "minimapButton", group = "general", field = true' in (root / "modules" / "options.lua").read_text(encoding="utf-8")
 assert 'key = "pulls"' in (root / "modules" / "options.lua").read_text(encoding="utf-8"), "the pulls allowlist entry needs its gated row"
 
 # --- Older client: interface options ---
@@ -246,17 +333,13 @@ for i, a in ipairs(O.ADDED) do
   assert(page.added[i].text == a[2] .. ': ' .. tostring(Everloot:Count(a[1])), page.added[i].text)
 end
 assert(page.addedHeading.text == "What you've added", 'the block has its title')
--- The controls behave as before: a switch, the ask box, Reload now.
+-- The controls behave as before: a switch and Reload now. The Ask box is gone from settings (/ask still works).
 local census
 for _, box in ipairs(page.boxes) do if box.row.key == 'census' then census = box end end
 census.checked = false
 census.scripts.OnClick(census)
 assert(EverlootDB.toggles.census == false and not census.checked, 'a switch still sets its module')
-local asked
-Everloot.Ask = function(_, question) asked = question end
-page.ask:SetText('  where is the frost book?  ')
-page.ask.scripts.OnEnterPressed(page.ask)
-assert(asked == 'where is the frost book?' and page.ask.text == '', 'the ask box sends the question and clears')
+assert(rawget(page, 'ask') == nil, 'no ask box on the settings page')
 page.reload.scripts.OnClick()
 assert(reloads == 1, 'Reload now reloads')
 """)

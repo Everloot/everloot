@@ -353,6 +353,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   scrollbar, so the page has nothing to scroll sideways at any width.
 
 ### Changed
+- Addon: the settings are split into four short pages under Everloot in the game's AddOns list: General, Auction
+  house, Shared with Everloot and Your characters. Everloot itself is an overview of what your saved file holds.
+  The Ask box left the settings page, because an answer needs the Desktop App and two reloads; `/ask` still works.
 - Site: hover cards on item, NPC, quest and object links open faster. The card's frame shows at once with the name
   and quality colour the link already has, then fills in; a card you hovered before opens whole with no wait; and the
   site keeps each card ready for every visitor instead of working it out again on each hover. A card that could not be
