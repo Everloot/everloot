@@ -9,10 +9,10 @@ import { breadcrumbJsonLd, type Crumb } from "@/lib/jsonld";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { WORLD_MAP } from "@/lib/world-map";
 
-// The layout every database entity page shares (item, NPC, quest, object, vendor), read like an item
-// database: a compact title with its type line, the tooltip box and the quick facts side by side,
-// then full-width tabs of dense tables. Stacked on a phone. No breadcrumb on screen: the trail is
-// only the BreadcrumbList JSON-LD.
+// The layout every database entity page shares (item, NPC, object, quest, spell, vendor, achievement, faction, title,
+// quest chain, zone and instance), read like an item database: a compact title with its type line, the tooltip box
+// and the quick facts side by side, then full-width tabs of dense tables. Stacked on a phone. No breadcrumb on
+// screen: the trail is only the BreadcrumbList JSON-LD.
 
 /**
  * The quiet "unconfirmed" marker as an edge: a 1 px dashed frame around what it wraps (the header icon),
@@ -46,21 +46,22 @@ export function EntityIcon({ src, quality, unconfirmed = false, item = false }: 
 }
 
 /**
- * The page title: an optional icon, the name (in its quality colour for items) and one 13 px type line
- * ("Trade Goods · Cloth · ID 2589"). The trail feeds the BreadcrumbList JSON-LD only; the layout already
- * emits it for routes lib/breadcrumbs.ts knows, so it is emitted here only for the others.
+ * The page title of every database detail page: an optional icon, the name (in its quality colour for items) and
+ * one 13 px type line ("Trade Goods · Cloth · ID 2589"). The trail feeds the BreadcrumbList JSON-LD only; the layout
+ * already emits it for routes lib/breadcrumbs.ts knows, so it is emitted here only for the others. `aside` is one
+ * quiet control at the row's end (a zone's "Open on the map"), under the title on a phone.
  */
-export function EntityHeader({ trail, title, quality, icon, meta = [] }: {
-  trail: Crumb[]; title: ReactNode; quality?: Quality; icon?: ReactNode; meta?: ReactNode[];
+export function EntityHeader({ trail, title, quality, icon, meta = [], aside }: {
+  trail: Crumb[]; title: ReactNode; quality?: Quality; icon?: ReactNode; meta?: ReactNode[]; aside?: ReactNode;
 }) {
   const page = trail[trail.length - 1];
   const emitJsonLd = trail.length > 1 && page && !trailFor(page.path);
   const parts = meta.filter((m) => m !== null && m !== undefined && m !== false && m !== "");
   return (
-    <header data-page-header className="mb-4 flex min-w-0 items-center gap-3">
+    <header data-page-header data-entity-header className={`mb-4 flex min-w-0 items-center gap-3 ${aside ? "flex-wrap" : ""}`.trim()}>
       {emitJsonLd && <JsonLd data={breadcrumbJsonLd(trail)} />}
       {icon}
-      <div className="min-w-0">
+      <div className={aside ? "min-w-0 flex-[1_1_16rem]" : "min-w-0"}>
         <h1 className={`text-title-sm [overflow-wrap:anywhere] sm:text-title ${quality ? QUALITY_TEXT[quality] : "text-fg"}`}>{title}</h1>
         {parts.length > 0 && (
           <p data-entity-meta className="text-meta text-muted">
@@ -68,6 +69,7 @@ export function EntityHeader({ trail, title, quality, icon, meta = [] }: {
           </p>
         )}
       </div>
+      {aside && <div className="min-w-0 max-sm:w-full">{aside}</div>}
     </header>
   );
 }

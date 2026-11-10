@@ -63,10 +63,10 @@ function gateText(t: SpellTalent): string {
 /** Where the spell sits in a talent tree, from the committed talent catalog, with a link to that class's calculator. */
 function TalentFacts({ talent, title }: { talent: SpellTalent; title: string }) {
   return (
-    <div className="mb-6">
+    <div className="mb-6 min-w-0 sm:max-w-[280px] lg:max-w-[584px]">
       <p className="mb-2 text-meta text-fg-2">From the talent catalog, build {talent.build}: {talent.label}.</p>
       <Facts
-        layout="rows"
+        layout="list"
         label={`${title}: ${talent.className} talent`}
         items={[
           { label: "Class", value: <Link href={`/tools/talents/${talent.classSlug}`} className={LINK}>{talent.className} talent calculator</Link> },
