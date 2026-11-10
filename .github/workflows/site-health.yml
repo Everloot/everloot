@@ -4,9 +4,10 @@ name: Site health
 # names are not uploaded), and the public MCP must list its tools (a 429 there means its hourly allowance is used
 # up for everyone). A failure opens one issue labelled site-down, or comments on the open one; the next good check
 # closes it. It is the outside check the host's own dashboards do not give, whichever host serves the site.
-# The requests name themselves (Everloot-SiteHealth) in a browser-shaped agent string: Cloudflare's bot
-# rules challenge bare tool agents on HTML pages, and a challenge page is not the site being down, so the
-# issue says which of the two it saw.
+# The requests name themselves (Everloot-SiteHealth) in a browser-shaped agent string and carry the
+# EVERLOOT_EDGE_CHECK secret in x-everloot-check, the header the zone's skip rule already lets past its bot and
+# rate-limit rules for the deploy warm-up and launch_smoke.py. Without it Cloudflare challenges the item page,
+# and a challenge page is not the site being down, so the issue still says which of the two it saw.
 on:
   schedule:
     - cron: "7,22,37,52 * * * *"
@@ -24,21 +25,27 @@ jobs:
     steps:
       - name: Ask the site
         id: health
+        env:
+          EVERLOOT_EDGE_CHECK: ${{ secrets.EVERLOOT_EDGE_CHECK }}
         run: |
           set +e
           UA='Mozilla/5.0 (compatible; Everloot-SiteHealth/1.0; +https://github.com/Everloot/everloot)'
-          body=$(curl -sS --max-time 30 -A "$UA" -w '\n%{http_code}' https://everloot.app/api/health)
+          # A stored trailing newline or space is not part of the secret (as in scripts/launch_smoke.py).
+          check=$(printf '%s' "$EVERLOOT_EDGE_CHECK" | tr -d '\r\n ')
+          edge=()
+          [ -n "$check" ] && edge=(-H "x-everloot-check: $check")
+          body=$(curl -sS --max-time 30 -A "$UA" "${edge[@]}" -w '\n%{http_code}' https://everloot.app/api/health)
           code=$(printf '%s' "$body" | tail -n1)
           printf 'status %s\n%s\n' "$code" "$(printf '%s' "$body" | head -n -1 | head -c 500)"
           problems=""
           [ "$code" = 200 ] || problems="/api/health answered HTTP $code"
-          item=$(curl -sS --max-time 30 -A "$UA" -D item-headers.txt -w '\n%{http_code}' https://everloot.app/database/items/25)
+          item=$(curl -sS --max-time 30 -A "$UA" "${edge[@]}" -D item-headers.txt -w '\n%{http_code}' https://everloot.app/database/items/25)
           item_code=$(printf '%s' "$item" | tail -n1)
           title=$(printf '%s' "$item" | grep -o '<title>[^<]*' | head -n1 | sed 's/<title>//')
           mitigated=$(grep -i '^cf-mitigated:' item-headers.txt | tr -d '\r' | cut -d' ' -f2-)
           echo "item 25: status $item_code, title: $title${mitigated:+, cf-mitigated: $mitigated}"
           if [ -n "$mitigated" ]; then
-            problems="$problems${problems:+; }/database/items/25: Cloudflare answered HTTP $item_code with cf-mitigated: $mitigated (its bot rules stopped the check, not the site; a WAF skip rule for the Everloot-SiteHealth agent lets it through)"
+            problems="$problems${problems:+; }/database/items/25: Cloudflare answered HTTP $item_code with cf-mitigated: $mitigated (its bot rules stopped the check, not the site; is the EVERLOOT_EDGE_CHECK secret set and the skip rule still in place?)"
           elif [ "$item_code" != 200 ]; then
             problems="$problems${problems:+; }/database/items/25 answered HTTP $item_code"
           elif [ -z "$title" ] || printf '%s' "$title" | grep -q '^Item 25'; then
