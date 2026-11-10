@@ -109,17 +109,18 @@ export async function writeAggregates(opts: { added: number; rebuild?: boolean; 
 }
 
 /** The read set and what identifies the file it came from. */
-let kept: { at: number; set: AggregateSet | null; generatedAt?: string; etag?: string } | null = null;
+let kept: { at: number; set: AggregateSet | null; generatedAt?: string; etag?: string; failed?: boolean } | null = null;
 
 /**
  * The stored set, kept KEEP_MS per server instance; null when there is none or it cannot be read, and the caller works
  * the set out from the corpus. Never throws. A re-read sends the kept file's ETag, so an unchanged file is not
  * downloaded again, and a file with the same `generatedAt` keeps the set already read (and every memo keyed on it).
  * A failed re-read keeps the set already read for another minute; a missing file or an unknown shape drops it.
+ * Strict readers (complete hover cards) receive null during a failed re-read, including that retry minute.
  */
-export async function loadStoredAggregates(deps: { cloud?: R2Config | null; fetch?: typeof fetch; now?: () => number } = {}): Promise<AggregateSet | null> {
+export async function loadStoredAggregates(deps: { cloud?: R2Config | null; fetch?: typeof fetch; now?: () => number; strict?: boolean } = {}): Promise<AggregateSet | null> {
   const now = (deps.now ?? Date.now)();
-  if (kept && now - kept.at < KEEP_MS) return kept.set;
+  if (kept && now - kept.at < KEEP_MS) return deps.strict && kept.failed ? null : kept.set;
   try {
     const cloud = deps.cloud === undefined ? r2FromEnv() : deps.cloud;
     if (!cloud) return null;
@@ -128,7 +129,7 @@ export async function loadStoredAggregates(deps: { cloud?: R2Config | null; fetc
       method: "GET", headers: { "accept-encoding": "identity", ...(etag ? { "if-none-match": etag } : {}) },
     }));
     if (res.status === 304 && kept?.set) {
-      kept = { ...kept, at: now };
+      kept = { ...kept, at: now, failed: false };
     } else if (res.ok) {
       const read = parseAggregates(await res.text());
       const same = read && kept?.set && kept.generatedAt === read.generatedAt;
@@ -138,12 +139,12 @@ export async function loadStoredAggregates(deps: { cloud?: R2Config | null; fetc
     } else if (res.status === 404 || !kept?.set) {
       kept = { at: now - KEEP_MS + RETRY_MS, set: null };
     } else {
-      kept = { ...kept, at: now - KEEP_MS + RETRY_MS };
+      kept = { ...kept, at: now - KEEP_MS + RETRY_MS, failed: true };
     }
   } catch {
-    kept = kept?.set ? { ...kept, at: now - KEEP_MS + RETRY_MS } : { at: now - KEEP_MS + RETRY_MS, set: null };
+    kept = kept?.set ? { ...kept, at: now - KEEP_MS + RETRY_MS, failed: true } : { at: now - KEEP_MS + RETRY_MS, set: null };
   }
-  return kept.set;
+  return deps.strict && kept.failed ? null : kept.set;
 }
 
 /** For tests: forget the kept file. */

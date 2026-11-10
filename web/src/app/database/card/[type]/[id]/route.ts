@@ -2,7 +2,7 @@ import { loadSiteCard } from "@/lib/site-card";
 import { tooltipId, tooltipType } from "@/lib/tooltip";
 
 /**
- * GET /database/card/<item|npc|quest|object>/<id>: the hover card on the site's own links (components/game/HoverCards).
+ * GET /database/card/<item|npc|quest|object|spell|vendor>/<id>: the hover card on the site's own links (components/game/HoverCards).
  * Part of the site, not the API, like /search/suggest: it follows the pages' rules (lib/site-card.ts), so other
  * sites get no CORS and search engines a noindex. Browsers keep a card five minutes and the Worker's edge cache an hour
  * (lib/cf-edge-cache.ts): on the Worker only `CDN-Cache-Control` sets the edge lifetime, and `s-maxage` alone kept
@@ -21,7 +21,7 @@ const NO_STORE = { "Cache-Control": "no-store", "CDN-Cache-Control": "no-store",
 
 export async function GET(_req: Request, ctx: { params: Promise<{ type: string; id: string }> }) {
   const params = await ctx.params;
-  const type = tooltipType(params.type);
+  const type = params.type === "spell" || params.type === "vendor" ? params.type : tooltipType(params.type);
   const id = tooltipId(params.id);
   if (!type || id === null) return Response.json({ ok: false, error: "No such card." }, { status: 404, headers: CACHE_404 });
   const result = await loadSiteCard(type, id);

@@ -44,7 +44,7 @@ export function isPrivatePath(pathname: string): boolean {
  * the lookup and before the handler, so the card cannot depend on what it never sees. Matched on the path as sent: a
  * spelling this does not match keeps its credentials and bypasses the cache, as before.
  */
-const CREDENTIAL_FREE_PATH = /^\/database\/card\/[a-z]+\/[1-9]\d{0,9}$/;
+const CREDENTIAL_FREE_PATH = /^\/database\/card\/(?:item|npc|quest|object|spell|vendor)\/[1-9]\d{0,9}$/;
 
 /** The request without its Cookie and Authorization headers on a route that reads neither; any other request as it is. */
 export function withoutCredentials(req: Request): Request {

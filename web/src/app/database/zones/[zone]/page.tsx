@@ -8,7 +8,7 @@ import AdSlot from "@/components/AdSlot";
 import EntityLink from "@/components/EntityLink";
 import ZonePreview from "@/components/ZonePreview";
 import {
-  AgreementMeter, Badge, Card, Container, DataTable, DataTitle, EmptyState, InShort, OpenData, ResultStrip, SectionHeading, Tabs,
+  AgreementMeter, Badge, Card, Container, DataTable, EmptyState, InShort, OpenData, ResultStrip, SectionHeading, Tabs,
   type Column, type TabItem,
 } from "@/components/ui";
 import { observedLine, reportedLine } from "@/lib/evidence";
@@ -35,7 +35,7 @@ import {
 } from "@/lib/zones";
 import { zoneLore } from "@/lib/zone-lore";
 import { UNAVAILABLE } from "@/lib/lore";
-import { EmptyTab, FREQUENCY, percent } from "../../entity";
+import { EmptyTab, EntityHeader, FREQUENCY, percent } from "../../entity";
 import { listQuery, PER_PAGE, type Search } from "../../list-parts";
 
 export const dynamic = "force-dynamic";
@@ -238,17 +238,14 @@ export default async function ZonePage(props: Props) {
       <EdgeDegraded when={facts.unreachable || seen.unreachable || loot.unreachable || gathering?.unreachable === true || lore === UNAVAILABLE} />
       <JsonLd data={entityPageJsonLd({ name: zone.name, path: canonical, identifier: `zone:${zone.mapId}` })} />
       <article>
-        {/* The database title row: name, continent, and the map link as a quiet control (the header keeps the one filled button). */}
-        <DataTitle
+        {/* The entity title row: name, continent, and the map link as a quiet control (the header keeps the one filled button). */}
+        <EntityHeader
           title={zone.name}
-          meta={(
-            <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
-              {zone.continentName}
-              <Badge tone="files">Zone outline · from game files</Badge>
-              <Link href={zoneCoverageHref(zone)} className={link}>Coverage</Link>
-              {wiki && <Link href={wikiHref(wiki.slug)} className={link}>Wiki</Link>}
-            </span>
-          )}
+          meta={[
+            <span key="continent" className="inline-flex items-center gap-x-2">{zone.continentName}<Badge tone="files">Zone outline · from game files</Badge></span>,
+            <Link key="coverage" href={zoneCoverageHref(zone)} className={link}>Coverage</Link>,
+            wiki ? <Link key="wiki" href={wikiHref(wiki.slug)} className={link}>Wiki</Link> : null,
+          ]}
           trail={[
             ...trailFor("/database/zones")!,
             { name: zone.name, path: canonical },
