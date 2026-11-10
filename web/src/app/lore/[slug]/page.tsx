@@ -5,9 +5,9 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { Card, Explainer, Facts, PageHeader, Prose, ReadingLayout, SectionHeading, type TocItem } from "@/components/ui";
 import LoreSource from "@/components/LoreSource";
 import { trailFor } from "@/lib/breadcrumbs";
-import { entityHref } from "@/components/EntityLink";
 import { loadNames } from "@/lib/names";
 import { foreverKind, foreverMatch, loreIndexable } from "@/lib/lore-forever";
+import { agreedKind, databaseHref, KIND_LABEL, loreLinkFor } from "@/lib/lore-links";
 import { BROWSE_HEADINGS, BROWSE_TYPES, CONVERSION_NOTE, FACET_KEYS, firstSentence, loreByExtId, loreSlug, parseLoreSlug, renderBody, UNAVAILABLE, UNAVAILABLE_COPY, type BrowseSlug, type LorePage as Lore } from "@/lib/lore";
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
@@ -84,14 +84,12 @@ export default async function LorePage(props: { params: Promise<{ slug: string }
     : [];
   const infoboxEntries = page.infobox ? Object.entries(page.infobox.fields) : [];
   const trail = [...(typeSlug ? trailFor(`/lore/${typeSlug}`)! : trailFor("/lore")!), { name: page.name, path: `/lore/${loreSlug(page)}` }];
-  // The database page for the same thing, when players have agreed on a name that is exactly this page's.
-  const match = await inDatabase(page);
-  const dbKind = match?.kind ?? null;
-  const dbId = match?.id ?? null;
+  // The database page for the same thing (lib/lore-links.ts): the one page whose name is exactly this page's.
+  const db = await loreLinkFor(page);
   // The archive has no source headings; link to its text and the metadata sections without inventing story sections.
   const sections: TocItem[] = [
     { id: "lore-text", label: "Article text" },
-    ...(dbKind && dbId !== null ? [{ id: "in-database", label: "In the database" }] : []),
+    ...(db ? [{ id: "in-database", label: "In the database" }] : []),
     ...(infoboxEntries.length > 0 ? [{ id: "infobox", label: "Wiki infobox" }] : []),
     ...(typeSlug || page.categories.length > 0 ? [{ id: "categories", label: "Categories" }] : []),
   ];
@@ -137,12 +135,12 @@ export default async function LorePage(props: { params: Promise<{ slug: string }
           </Prose>
         </section>
 
-        {dbKind && dbId !== null && (
+        {db && (
           <Card as="section" aria-labelledby="in-database" className="mt-12">
             <SectionHeading id="in-database">In the Forever database</SectionHeading>
             <p className="text-sm text-fg-2">
-              Players have recorded {page.name} in WoW: Forever.{" "}
-              <Link href={entityHref(dbKind, dbId)} className={link}>See the {dbKind === "npc" ? "NPC" : dbKind} page</Link>
+              {agreedKind(db.kind) ? `Players have recorded ${page.name} in WoW: Forever.` : `WoW: Forever has a database page for ${page.name}.`}{" "}
+              <Link href={databaseHref(db)} className={link}>See the {KIND_LABEL[db.kind]} page</Link>
             </p>
           </Card>
         )}

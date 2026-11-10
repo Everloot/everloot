@@ -27,6 +27,8 @@ import { loadItemFacts, loadLootTables } from "@/lib/rollup-compute";
 import { Unreachable } from "../../entity";
 import { NpcLootPanel } from "../../loot-tables";
 import { zoneHref } from "@/lib/zones";
+import { loreFor } from "@/lib/lore-links";
+import LoreSection from "@/components/LoreSection";
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +81,8 @@ export default async function InstancePage(props: Props) {
   const title = instanceTitle(row);
   const empty = (message: string) => <EmptyState message={message} framed={false} />;
   const prep = prepPage(row.instanceMapId);
+  // The archive files an instance as a zone page; the match is by the game files' name for it.
+  const lore = await loreFor("instance", row.instanceMapId, row.name);
 
   const confirmedColumns: Column<InstanceRow["confirmed"][number]>[] = [
     { key: "at", header: "Outdoor map and position", cell: placeCell },
@@ -262,6 +266,8 @@ export default async function InstancePage(props: Props) {
                 </div>
               )}
           </section>
+
+          <LoreSection match={lore} />
         </div>
       </article>
     </Container>

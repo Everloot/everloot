@@ -203,6 +203,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   rates leave skinning out, and how to build an offline pack.
 - Site: download shortcuts (`/download`, `/downloads`, `/desktop`, `/curseforge`), CurseForge install choices and a
   Desktop App button for your operating system make downloads easier to find, including on phones.
+- Site: object, instance, faction, title, achievement and vendor pages now link the Warcraft Wiki lore page of the same name, item pages do too when the name shown is the wiki's, and lore pages link back to the database page (zone, instance, object, faction, title, achievement, NPC, item or quest). A link needs an exact name that only one page has on each side; a name two pages share gets no link.
 
 ### Fixed
 - Site: the header shows the build whose files the site reads and the newest build seen, each linked to what it means.

@@ -21,6 +21,8 @@ import { hasCard } from "@/lib/tooltip";
 import { EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, MapName, ShowOnMap, Unreachable, zoneName } from "../../entity";
 import { vendorIndexable } from "@/lib/indexable";
 import { entityTitle, vendorDescription } from "@/lib/entity-meta";
+import { loreFor } from "@/lib/lore-links";
+import LoreSection from "@/components/LoreSection";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +74,8 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
   const items = itemFacts && !itemFacts.unreachable ? itemNames(itemFacts) : new Map<number, string>();
   const vendorName = facts.unreachable ? undefined : npcNames(facts).get(page.vendorNpcId);
   const title = vendorName ? `${vendorName} (vendor)` : `Vendor NPC ${page.vendorNpcId}`;
+  // A vendor is an NPC: its lore page is its NPC's, under the same rule.
+  const lore = vendorName ? await loreFor("npc", page.vendorNpcId, vendorName) : null;
   const trail = [...trailFor("/database/vendors")!, { name: title, path: `/database/vendors/${page.vendorNpcId}` }];
   // The page in three lines: what it is, what players reported (prices and positions) with the agreement and the date
   // of the uploads, and where the name came from. Storage down: unrecorded, never "no prices".
@@ -161,6 +165,9 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
             },
           ]}
         />
+        <div className="mt-6 space-y-6 empty:hidden">
+          <LoreSection match={lore} />
+        </div>
         {!facts.unreachable && page.offers.length > 0 && <div className="mt-6"><AdSlot slot="inContent" /></div>}
       </article>
     </Container>

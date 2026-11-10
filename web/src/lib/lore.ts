@@ -178,7 +178,7 @@ export async function loreByExtId(extId: string): Promise<LorePage | null | Unav
   };
 }
 
-export interface LoreMatch { extId: string; name: string; intro: string }
+export interface LoreMatch { extId: string; name: string; intro: string; sourceId: string }
 
 /** The first paragraph of a body, cut at `max` on a word boundary; "" when the body opens with a list or is empty. */
 export function firstParagraph(body: string, max = 420): string {
@@ -205,14 +205,14 @@ export async function loreForEntity(type: LoreType, name: string): Promise<LoreM
   if (!cache) { cache = new Map(); MATCHES.set(release.db, cache); }
   const key = `${type}|${clean.toLowerCase()}`;
   if (cache.has(key)) return cache.get(key) ?? null;
-  const rows = await release.db.all<{ extId: string; name: string; body: string }>(
-    `SELECT ext_id AS extId, name, body FROM entities
+  const rows = await release.db.all<{ extId: string; name: string; body: string; sourceId: string }>(
+    `SELECT ext_id AS extId, name, body, source_id AS sourceId FROM entities
      WHERE ${LORE_SQL} AND json_extract(data, '$.type') = ? AND name = ? COLLATE NOCASE LIMIT 3`,
     ...PUBLISHABLE, type, clean,
   );
   const usable = rows.filter((r) => !r.body.includes("REDIRECT"));
   const intro = usable.length === 1 ? firstParagraph(usable[0].body) : "";
-  const match = intro ? { extId: usable[0].extId, name: usable[0].name, intro } : null;
+  const match = intro ? { extId: usable[0].extId, name: usable[0].name, intro, sourceId: usable[0].sourceId } : null;
   if (cache.size >= MATCH_CACHE_MAX) cache.clear();
   cache.set(key, match);
   return match;

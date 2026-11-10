@@ -25,7 +25,7 @@ import { FACT_WORD, tipLines, withReported } from "@/lib/item-names";
 import { PLACEHOLDER, splitWhy } from "@/lib/placeholder";
 import type { Crumb } from "@/lib/jsonld";
 import { loadNames, nameOf } from "@/lib/names";
-import { loreForEntity } from "@/lib/lore";
+import { loreForShownItem } from "@/lib/lore-links";
 import EntityLink from "@/components/EntityLink";
 import LoreSection from "@/components/LoreSection";
 import { CategoryPage, categoryMetadata } from "../category-page";
@@ -87,7 +87,6 @@ export default async function ItemPage(props: Props) {
   // The name players agree on; else the game file name where the Warcraft Wiki gives the same one; else "Item N".
   const name = shownItemName(itemId, agreed, matched?.names);
   const title = name?.name ?? `Item ${page.itemId}`;
-  const seen = !facts.unreachable && Boolean(page.name || page.drops.length || page.pins.length);
   // The game file tooltip only for an item players have reported or whose name shows under the item name rule:
   // any id can be typed into the URL, and an item found only in the files may be unreleased (docs/DATA_POLICY.md).
   const tipped = showsTip(itemId);
@@ -104,7 +103,8 @@ export default async function ItemPage(props: Props) {
   const quality = category?.quality && category.quality.id <= 5 ? qualityOf(category.quality.id) : undefined;
   const names = await loadNames();
   const nameFor = nameOf(names);
-  const lore = seen && page.name ? await loreForEntity("item", page.name) : null;
+  // By the name the page shows, players' or the Warcraft Wiki's, so an item nobody has reported still links its lore page.
+  const lore = name ? await loreForShownItem(itemId, name, matched?.names) : null;
 
   const all = edgesFrom([...edges.observed, ...edges.client], "item", itemId);
   const rel = (r: Rel) => all.filter((e) => e.rel === r);

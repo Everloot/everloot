@@ -5,7 +5,8 @@ import { beforeEach, expect, test, vi } from "vitest";
 const store = vi.hoisted(() => ({ loadCompletion: vi.fn() }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
-  uploadStore: { loadCompletion: store.loadCompletion },
+  // The lore link asks the agreed object names too (a name an object and a faction share is no link): storage reads empty here.
+  uploadStore: { loadCompletion: store.loadCompletion, loadCorpus: async () => ({ uploads: 0, records: [], dataAsOf: null }) },
 }));
 // The game files' factions: Booty Bay under the Steamwheedle Cartel, and one faction no player has reported.
 const game = vi.hoisted(() => ({ factions: [] as { id: number; name: string; shown: boolean; parentId?: number }[] }));
@@ -23,7 +24,7 @@ vi.mock("@/components/ui/OpenData", () => ({
   default: ({ text, jsonHref }: { text: string; jsonHref?: string }) => <p><button type="button">Copy for AI</button>{jsonHref ? <a href={jsonHref}>Raw JSON</a> : null}<pre data-open-data>{text}</pre></p>,
 }));
 // The lore archive answers from here: no match unless a test sets one.
-const lore = vi.hoisted(() => ({ match: null as { extId: string; name: string; intro: string } | null, asked: [] as [string, string][] }));
+const lore = vi.hoisted(() => ({ match: null as { extId: string; name: string; intro: string; sourceId: string } | null, asked: [] as [string, string][] }));
 vi.mock("@/lib/lore", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/lore")>()),
   loreForEntity: async (type: string, name: string) => { lore.asked.push([type, name]); return lore.match; },
@@ -135,7 +136,7 @@ test("a header the files name as other factions' parent says so in short", async
 
 test("the lore block shows when the archive has a page under the faction's name, and is asked as an 'other' page", async () => {
   expect(await html("21-booty-bay")).not.toContain("lore archive");
-  lore.match = { extId: "4242", name: "Booty Bay", intro: "Booty Bay is a goblin port on the southern tip of Stranglethorn Vale." };
+  lore.match = { extId: "4242", name: "Booty Bay", intro: "Booty Bay is a goblin port on the southern tip of Stranglethorn Vale.", sourceId: "warcraft-wiki-2023" };
   const out = await html("21-booty-bay");
   expect(lore.asked).toContainEqual(["other", "Booty Bay"]);
   expect(out).toContain("Booty Bay is a goblin port");
