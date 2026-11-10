@@ -34,10 +34,40 @@ export default function Page() {
           ["/ask", "Answers questions you typed with /ask in game, if you turn it on.", "After the game writes the file."],
         ]}
       />
+      <H2 id="pages">Pages</H2>
+      <Table
+        head={["Page", "What it shows and does"]}
+        rows={[
+          ["Overview", "Upload, prices, /ask and addon status, recent activity and Blizzard changes."],
+          ["Chat", "Ask about the game or your characters, with sources. Choose an optional model provider in Assistant setup."],
+          ["Characters", "Your characters' gold, gear and progress from the save file on this computer."],
+          ["Upload", "Each account file, records and confirmed uploads. Upload now, backups and restore."],
+          ["Market", "Your scans, the last prices written and realms to follow. Your scanned realms are always included; follow more for their tooltip prices."],
+          ["Ask", "Assistant setup, pending in-game /ask questions and recent answers. Private server settings are under Advanced."],
+          ["Addon", "Installed and latest versions, checksum-checked install or update in one click, slot addon status and Saved builds sync for /everloot plan."],
+          ["Changes", "Blizzard posts, hotfixes and builds from the site's change tracker."],
+          ["Log", "What the app did this session, with Pause."],
+          ["Settings", "Account, game folder, job switches, Assistant setup, startup and updates. Data on this computer shows storage use and Delete my local data."],
+        ]}
+      />
+
+      <H2 id="signing-in">Signing in</H2>
       <P>
-        The app also has a Chat page, where you can ask about the game or about your own characters, and a Characters
-        page that reads your gold, gear and progress from your save file. That stays on your computer and is never
-        uploaded from there.
+        Choose <strong>Sign in with everloot.app</strong> during setup or under <strong>Settings &gt; Account</strong>.
+        In your browser, sign in with Battle.net and press <strong>Connect</strong>. The app receives an Everloot key;
+        it never sees your Battle.net password. You can also paste a key from the{" "}
+        <Link href="/docs/api/keys#your-keys" className={docLink}>keys page</Link>.
+        Uploads and prices work without signing in.
+      </P>
+      <P>
+        Signing in raises the Chat and in-game <C>/ask</C> limits. A key with <strong>Read my saved builds</strong>
+        {" "}brings your saved talent builds into the game from the Addon page. Character links and optional private sync
+        use your account too; a key alone does not link a character or turn on private sync. See the{" "}
+        <Link href="/docs/guides/account" className={docLink}>account guide</Link> for those choices.
+      </P>
+      <P>
+        Signing in does not upload your local chat transcript, backups or model keys. If you choose a model provider,
+        it receives your questions, conversation history and any local character details used to answer.
       </P>
       <P>
         It follows the same rules as the website. The app sends anonymous open-world events, and census rows if you
