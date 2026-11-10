@@ -47,8 +47,22 @@ const NAME_BATCH = 2_000;
  * The Warcraft Wiki copies that ask to be indexed, by kind, or null when the release or upload storage cannot be
  * read (the routes answer 503 rather than a short list). Each agreed name is looked up through the release's
  * (type, name) index, a batch of names per query; the first 300 characters of a body are enough for the length rule.
+ * The query matches names case-insensitively for ASCII only (SQLite NOCASE), so it can miss a stored name with
+ * surrounding spaces or a non-ASCII case difference that the page's own check (`idForName`) would accept: such a page
+ * still says index but is left out of the sitemap. Matching exactly would need a normalized name column in the
+ * release; a scan without the index would read every lore row per batch, which D1 bills per row.
+ * A release query that fails returns null, so the routes answer 503 rather than throw.
  */
 export async function lorePaths(): Promise<string[] | null> {
+  try {
+    return await readLorePaths();
+  } catch (err) {
+    console.error("lore sitemap: release read failed", err);
+    return null;
+  }
+}
+
+async function readLorePaths(): Promise<string[] | null> {
   const [release, items, world] = await Promise.all([getRelease(), loadItemFacts(), loadWorldFacts()]);
   if (!release || items.unreachable || world.unreachable) return null;
   const names = await loadNames(Promise.resolve(items));
