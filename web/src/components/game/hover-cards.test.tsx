@@ -306,3 +306,24 @@ test("the frame takes the coloured name from a link that shows more than the nam
   expect(linkFrame(plain)).toMatchObject({ title: "Hogger (elite)", quality: null });
   expect(linkFrame(document.createElement("a"))).toBeNull();
 });
+
+test.each([["spells", "spell"], ["vendors", "vendor"]])("%s links use the frame, shared request and visit cache", async (page, type) => {
+  container.innerHTML = `<a href="/database/${page}/10">Shown name</a>`;
+  const a = link(`/database/${page}/10`);
+  const answer = held();
+  pointer("pointerover", a);
+  await wait(SHOW_DELAY);
+  expect(card()!.textContent).toBe("Shown name");
+  expect(fetcher).toHaveBeenCalledWith(`/database/card/${type}/10`);
+  pointer("pointerout", a, "mouse", document.body);
+  pointer("pointerover", a);
+  await wait(SHOW_DELAY);
+  await answer({ ...THUNDERFURY, type, id: 10, title: "Loaded name" });
+  expect(card()!.textContent).toContain("Loaded name");
+  pointer("pointerout", a, "mouse", document.body);
+  await wait(0);
+  await act(async () => a.dispatchEvent(new FocusEvent("focusin", { bubbles: true })));
+  await wait(SHOW_DELAY);
+  expect(card()!.textContent).toContain("Loaded name");
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});

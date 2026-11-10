@@ -87,7 +87,7 @@ test("an id no page shows (unreported, unreleased) is a 404, without reading the
   for (const id of ["5", "123456"]) expect((await call("item", id)).status, id).toBe(404);
   expect(mocks.tips).not.toHaveBeenCalled();
   expect((await call("npc", "999")).status).toBe(404);
-  expect((await call("spell", "1")).status).toBe(404);
+  expect((await call("unsupported", "1")).status).toBe(404);
   expect((await call("item", "01")).status).toBe(404);
 });
 

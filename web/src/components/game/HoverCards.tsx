@@ -5,7 +5,7 @@ import { QUALITIES } from "@/design/tokens";
 import type { SiteCard } from "@/lib/site-card";
 import { CardPopup, GameCard, type CardContent } from "./GameCard";
 
-// The in-game card on every link to an item, NPC, quest or object page, mounted once in the root layout. It
+// The in-game card on every link to an item, NPC, quest, object, spell or vendor page, mounted once in the root layout. It
 // listens on the document, so a list, a search result, the type-ahead or a link inside a page needs nothing of
 // its own: any <a href="/database/items/123"> gets the card. A pointer resting on the link for SHOW_DELAY or
 // keyboard focus opens it: the card's frame at once with the name and quality colour the link already shows, filled
@@ -14,8 +14,8 @@ import { CardPopup, GameCard, type CardContent } from "./GameCard";
 // open. It appears without motion, so there is nothing for reduced motion to turn off, and it sits in a fixed layer
 // over the page, so it moves nothing on it. Links that already carry their own card (ItemTip, SpellTip) are left alone.
 
-const PATH = /^\/database\/(items|npcs|quests|objects)\/([1-9]\d{0,9})\/?$/;
-const TYPE = { items: "item", npcs: "npc", quests: "quest", objects: "object" } as const;
+const PATH = /^\/database\/(items|npcs|quests|objects|spells|vendors)\/([1-9]\d{0,9})\/?$/;
+const TYPE = { items: "item", npcs: "npc", quests: "quest", objects: "object", spells: "spell", vendors: "vendor" } as const;
 /**
  * How long the pointer rests on a link before its card is asked for and shown, so a pointer crossing a list asks
  * nothing. Short: the frame shows at once, and a card asked for before needs no request.
@@ -25,7 +25,7 @@ export const CARD_ID = "hover-card";
 /** Links inside these keep their own card, or are the card. */
 const OWN_CARD = "[data-item-tip], [data-spell-tip], [data-hover-card], [data-no-hover-card]";
 
-/** The card a link points at ("item/123"), or null: same-site links to one of the four page types, not this page. */
+/** The card a link points at ("item/123"), or null: same-site links to a supported page type, not this page. */
 export function cardKey(link: HTMLAnchorElement): string | null {
   let url: URL;
   try { url = new URL(link.href, window.location.href); } catch { return null; }
