@@ -180,14 +180,22 @@ export default function ApiOverview() {
       <H2 id="openapi">OpenAPI document</H2>
       <P>
         The whole API in one file, OpenAPI 3.1, for client generators, request tools and assistants that read OpenAPI. It is
-        assembled from the same definitions the server uses, so it cannot describe an endpoint that does not exist. The site
-        also has a few public GET routes its own pages fetch, {PAGE_INTERNAL_ROUTES.map((path, i) => (
-          <span key={path}>{i > 0 && " and "}<C>{path}</C></span>
-        ))}: they are not part of the contract, the document leaves them out, and they can change with the page.
+        assembled from the same definitions the server uses, so it cannot describe an endpoint that does not exist.
       </P>
       <div className="mt-6">
         <CodeGroup title="List the endpoints" tabs={[{ label: "cURL", lang: "bash", code: `curl -s ${SITE}/api/openapi.json | jq '.paths | keys'` }]} />
       </div>
+
+      <H2 id="site-internal-routes">Site-internal routes</H2>
+      <P>
+        These routes serve the site&apos;s own pages. They may change without notice and are not part of the protocol: the
+        package, the OpenAPI document and the schema files do not describe them, so do not build on them.
+      </P>
+      <List>
+        {PAGE_INTERNAL_ROUTES.map((r) => (
+          <li key={r.path}><C>{r.path}</C>: {r.what}.</li>
+        ))}
+      </List>
 
       <H2 id="json-schemas">JSON Schemas</H2>
       <P>
