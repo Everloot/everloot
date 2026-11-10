@@ -109,7 +109,7 @@ characters at most.
 Add one line for your pull request under `## [Unreleased]` in `CHANGELOG.md`, as the last bullet of
 `### Changed` for a change to something that exists, `### Added` for something new, or `### Fixed` for a fix.
 Start the line with the part it touches: `- Site:`, `- Addon:`, `- Docs:`, `- Knowledge base:`,
-`- Protocol:`, `- Companion:` or `- Desktop App:`. Write it for a reader of the release notes. A change
+`- Protocol:`, `- MCP:`, `- Companion:` or `- Desktop App:`. Write it for a reader of the release notes. A change
 with nothing a user would notice needs no line.
 
 Unreleased means not yet in a tagged addon or desktop release. Site and MCP server lines are already live
