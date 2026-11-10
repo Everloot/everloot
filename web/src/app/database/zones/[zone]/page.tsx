@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { trailFor } from "@/lib/breadcrumbs";
 import JsonLd from "@/components/JsonLd";
 import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
@@ -146,9 +147,7 @@ export default async function ZonePage(props: Props) {
           title={zone.name}
           meta={<span className="inline-flex items-center gap-2">{zone.continentName}<Badge tone="files">Zone outline · from game files</Badge></span>}
           trail={[
-            { name: "Home", path: "/" },
-            { name: "Database", path: "/database" },
-            { name: "Zones", path: "/database/zones" },
+            ...trailFor("/database/zones")!,
             { name: zone.name, path: canonical },
           ]}
           aside={<Link href={zoneMapHref(zone.mapId)} className="ctl inline-flex items-center border border-edge px-3 text-control text-fg-2 hover:text-fg">Open on the map</Link>}

@@ -45,6 +45,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
 
 ### Fixed
+- Site: Shared breadcrumbs cover the missing pages, professions and utility forms.
 - Site: item list pagination is crawlable while filter URLs stay blocked.
 - Site: /database splits its rows into "Seen by players" and "From the game files", says after launch that a row fills when 3 installs agree, and drops the Guilds lookup row (the Tools menu has it).
 - Knowledge base: a self-hosted MCP server and `coverage-report` read the whole public corpus again. The reader stopped

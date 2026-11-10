@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { trailFor } from "@/lib/breadcrumbs";
 import ShowcaseSections, { showcaseContents, ShowcaseHeader } from "@/components/showcase/ShowcaseSections";
 import { Card, Container, Facts, PageHeader, ReadingLayout, RailFacts, SectionHeading, type TocItem } from "@/components/ui";
 import { CLASSES } from "@/design/tokens";
@@ -69,7 +70,7 @@ export async function generateMetadata(props: { params: Promise<Params> }): Prom
 
 /** Home, then the character search while the player pages are on (it is a 404 otherwise), then the character. */
 function trail(name: string, path: string) {
-  return [{ name: "Home", path: "/" }, ...(playerPagesOn() ? [{ name: "Characters", path: "/players" }] : []), { name, path }];
+  return [...(playerPagesOn() ? trailFor("/players")! : trailFor("/players")!.slice(0, 1)), { name, path }];
 }
 
 /**
@@ -218,7 +219,7 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
     if (owner !== "unavailable" && seen !== "unavailable") notFound();
     return (
       <Container width="reading">
-        <PageHeader trail={[{ name: "Home", path: "/" }]} title="Character" />
+        <PageHeader trail={trailFor("/account")!.slice(0, 1)} title="Character" />
         <div className="space-y-4">
           {owner === "unavailable" && <Unavailable text={UNAVAILABLE} />}
           {seen === "unavailable" && <Unavailable text={PLAYER_STORAGE_UNAVAILABLE} />}

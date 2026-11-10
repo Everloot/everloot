@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import Breadcrumbs from "@/components/Breadcrumbs";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
 }));
-vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
+vi.mock("next/navigation", () => ({ usePathname: () => "/guides", notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
 
 // Every class reads the made-up test tree, at the build a test sets and with the nodes it takes out; the change
 // records are the ones a test puts in. Not game data.
@@ -577,7 +578,7 @@ describe("the guide index", () => {
   });
 
   test("its trail is Home, Guides", async () => {
-    const trail = jsonLd(await index()).find((b) => b["@type"] === "BreadcrumbList")!;
+    const trail = jsonLd(renderToStaticMarkup(<Breadcrumbs />) + await index()).find((b) => b["@type"] === "BreadcrumbList")!;
     expect(trail.itemListElement.map((i: { name: string }) => i.name)).toEqual(["Home", "Guides"]);
   });
 });

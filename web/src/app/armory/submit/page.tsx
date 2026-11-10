@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { trailFor } from "@/lib/breadcrumbs";
 import { Container, PageHeader } from "@/components/ui";
 import { ARMORY_HIDE_PATH, ARMORY_PATH, ARMORY_SUBMIT_PATH, armoryOn } from "@/lib/armory";
 import { armoryStore } from "@/lib/armory-store";
@@ -33,7 +34,7 @@ export default async function ArmorySubmitPage(props: { searchParams: Promise<Se
     <Container width="reading">
       <article className="max-w-xl space-y-6">
         <PageHeader
-          trail={[{ name: "Home", path: "/" }, { name: "Armory", path: ARMORY_PATH }, { name: "Add a character", path: ARMORY_SUBMIT_PATH }]}
+          trail={[...trailFor("/armory")!, { name: "Add a character", path: ARMORY_SUBMIT_PATH }]}
           title="Add a character"
           lede="Enter a character's region, name and surname, and Everloot asks Blizzard's API for it on its next run, usually within a few hours. If Blizzard does not know the character, nothing is added."
           meta={<ArmoryCredit at={counts ? newest(counts.map((c) => c.newest)) : null} />}

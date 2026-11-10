@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { trailFor } from "@/lib/breadcrumbs";
 import { Container, PageHeader, SectionHeading } from "@/components/ui";
 import { CURRENT_BUILD } from "@/data/game-data/raid";
 import type { ClassSlug } from "@/lib/class-context";
@@ -33,7 +34,7 @@ export default function GroupPage() {
   return (
     <Container>
       <PageHeader
-        trail={[{ name: "Home", path: "/" }, { name: "Classes", path: "/classes" }, { name: "Group", path: "/classes/group" }]}
+        trail={trailFor("/classes/group")!}
         title="Plan a group"
         lede="Choose the classes for a group of 5, 10, 20 or 40 players to see which buffs and debuffs they bring, and which nobody brings."
       />

@@ -184,7 +184,7 @@ export default async function ProfessionPage(props: Props) {
   ];
 
   const groups = recipeGroups(p.recipes);
-  const trail = [...trailFor("/tools/professions")!, { name: p.name, path }];
+  const trail = trailFor(path)!;
 
   return (
     <Container width="data">

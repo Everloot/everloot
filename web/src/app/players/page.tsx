@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import JsonLd from "@/components/JsonLd";
 import { armoryOn } from "@/lib/armory";
-import { pageMetadata } from "@/lib/seo";
+import { absoluteUrl, pageMetadata } from "@/lib/seo";
 import { trailFor } from "@/lib/breadcrumbs";
 import { optOutPath, playerPagesOn, playerPath, searchPrefix, type Player } from "@/lib/player-pages";
 import { searchPlayers } from "@/lib/people-search";
@@ -52,6 +53,7 @@ export default async function PlayersPage(props: { searchParams: Promise<{ q?: s
   return (
     <Container width="reading">
       <article className="space-y-6">
+        <JsonLd data={{ "@context": "https://schema.org", "@type": "WebPage", name: "Find a player", url: absoluteUrl("/players") }} />
         <PageHeader
           trail={trailFor("/players") ?? undefined}
           title="Find a player"

@@ -460,7 +460,7 @@ test("the hide form posts to the server without JavaScript", async () => {
   expect(html).toContain('value="Night Watch"');
   expect(html).toContain('name="realm"');
   expect(html).toContain('type="submit"');
-  expect(html).not.toContain("<script");
+  expect(html.replace(/<script type="application\/ld\+json">.*?<\/script>/g, "")).not.toContain("<script");
 });
 
 test("a hide list that cannot be read withholds every guild: the hub, the search and the page show the unavailable state", async () => {

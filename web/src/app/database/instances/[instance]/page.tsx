@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { trailFor } from "@/lib/breadcrumbs";
 import JsonLd from "@/components/JsonLd";
 import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
@@ -131,9 +132,7 @@ export default async function InstancePage(props: Props) {
           title={title}
           meta={<span className="inline-flex items-center gap-2">{kindLabel(row.raid)}<span className="text-muted">Instance {row.instanceMapId}</span></span>}
           trail={[
-            { name: "Home", path: "/" },
-            { name: "Database", path: "/database" },
-            { name: "Instances", path: "/database/instances" },
+            ...trailFor("/database/instances")!,
             { name: title, path: canonical },
           ]}
         />

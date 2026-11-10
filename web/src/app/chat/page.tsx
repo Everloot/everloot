@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import JsonLd from "@/components/JsonLd";
 import ChatClient from "@/components/chat/ChatClient";
 import { freeChatNames } from "@/lib/chat/free-chat";
 import { classAndProfessionIcons, loadSiteAssets } from "@/lib/game-assets";
 import { chatWorkspaceOn } from "@/lib/chat/workspace";
 import { profilesOn } from "@/lib/profiles";
 import { savedBuildsOn } from "@/lib/saved-builds";
-import { pageMetadata } from "@/lib/seo";
+import { absoluteUrl, pageMetadata } from "@/lib/seo";
 
 const TITLE = "Ask Everloot";
 const description = "Ask about WoW: Forever in plain words. Everloot's search finds the sources with no key. An optional AI model of your own reads them for you. Your key lasts only in this tab.";
@@ -24,6 +25,7 @@ export default async function ChatPage() {
   const tailoring = allowed(icons.professions.find((p) => p.key === "Tailoring")?.icon);
   return (
     <>
+      <JsonLd data={{ "@context": "https://schema.org", "@type": "WebPage", name: "Ask Everloot", url: absoluteUrl("/chat") }} />
       <h1 className="sr-only">{TITLE}</h1>
       <ChatClient savedBuilds={savedBuildsOn()} profiles={profilesOn()} workspace={chatWorkspaceOn()} freeChat={freeChatNames()} icons={{ warrior, tailoring }} />
     </>

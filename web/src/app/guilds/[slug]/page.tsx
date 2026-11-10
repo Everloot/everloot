@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { trailFor } from "@/lib/breadcrumbs";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -64,7 +65,7 @@ export default async function GuildFamilyPage(props: Props) {
     <Container width="data">
       <article>
         <PageHeader
-          trail={[{ name: "Home", path: "/" }, { name: `${family.name} family`, path: `/guilds/${family.slug}` }]}
+          trail={[...trailFor("/guilds")!.slice(0, 1), { name: `${family.name} family`, path: `/guilds/${family.slug}` }]}
           title={family.name}
           lede={family.summary}
         />

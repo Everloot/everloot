@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { trailFor } from "@/lib/breadcrumbs";
 import JsonLd from "@/components/JsonLd";
 import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
@@ -88,7 +89,7 @@ export default async function ClassHubPage({ params }: Params) {
     <Container>
       <JsonLd data={entityPageJsonLd({ name, path, identifier: `class:${slug}` })} />
       <PageHeader
-        trail={[{ name: "Home", path: "/" }, { name: "Classes", path: "/classes" }, { name, path }]}
+        trail={[...trailFor("/classes")!, { name, path }]}
         title={<span className={CLASS_TEXT[slug]}>{name}</span>}
         lede={lede(name, guides.length)}
       />

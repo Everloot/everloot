@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, DataTable, EmptyState, FilterBar, PageHeader, type Column, type FilterControl } from "@/components/ui";
 import {
   BOARD_ROWS, boardHref, boardQuery, GEAR_BOARDS, gearBoardPath, leaderboardsOn, loadGearBoard, rankEntries, updatedLine,
@@ -103,7 +104,7 @@ export async function GearBoardPage({ metric, searchParams }: { metric: GearMetr
     <Container width="data">
       <article>
         <PageHeader
-          trail={[{ name: "Home", path: "/" }, { name: "Rankings", path: "/rankings" }, { name: def.title, path }]}
+          trail={[...trailFor("/rankings")!, { name: def.title, path }]}
           title={def.title}
           lede={def.lede}
           meta={board.state === "ready" && (

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { trailFor } from "@/lib/breadcrumbs";
 import { objectList } from "../../../../../kb/src/object-page";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
-import type { Crumb } from "@/lib/jsonld";
 import { loadObjectFacts } from "@/lib/objects";
 import { objectNames } from "@/lib/names";
 import { LINK } from "../entity";
@@ -16,7 +16,6 @@ const META = {
 };
 export const dynamic = "force-dynamic";
 
-const TRAIL: Crumb[] = [{ name: "Home", path: "/" }, { name: "Database", path: "/database" }, { name: "Objects", path: "/database/objects" }];
 const SORTS = ["id", "windows", "items", "installs"] as const;
 type Sort = (typeof SORTS)[number];
 // Most-looted first, as the list has always read.
@@ -65,7 +64,7 @@ export default async function ObjectsPage(props: { searchParams?: Promise<Search
   return (
     <Container width="data">
       <article>
-        <DataTitle title="Objects" trail={TRAIL} aside={strip} />
+        <DataTitle title="Objects" trail={trailFor("/database/objects")!} aside={strip} />
         <FilterBar
           label="Object filters"
           search={{ action: "/database/objects", value: q.q, placeholder: "Object id", label: "Find an object by id", keep }}

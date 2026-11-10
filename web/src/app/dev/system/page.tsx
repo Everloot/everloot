@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { trailFor } from "@/lib/breadcrumbs";
 import type { ReactNode } from "react";
 import { CLASSES, QUALITIES, RADIUS, SPACE, tokens, WIDTH, type TokenName } from "@/design/tokens";
 import {
@@ -150,7 +151,7 @@ export default function DesignSystemPage() {
               title="Linen Cloth"
               quality="common"
               icon={<IconStandIn quality="common" />}
-              trail={[{ name: "Home", path: "/" }, { name: "Database", path: "/database" }, { name: "Items", path: "/database/items" }, { name: "Linen Cloth", path: "/database/items/2589" }]}
+              trail={[...trailFor("/database/items")!, { name: "Linen Cloth", path: "/database/items/2589" }]}
               meta={<><Badge tone="files" /><span className="font-mono tabular-nums">Item 2589</span><AgreementMeter count={0} withText /></>}
               actions={<a href="#page-header" className="btn">Copy link</a>}
             />

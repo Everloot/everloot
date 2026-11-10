@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { trailFor } from "@/lib/breadcrumbs";
 import { hasCard } from "@/lib/tooltip";
 import { objectPage, type ObjectDrop, type ObjectFacts, type ObjectPage as ObjectFactsPage } from "../../../../../../kb/src/object-page";
 import { pendingLine } from "../../../../../../kb/src/pending-loot";
@@ -59,9 +60,7 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
   if (unknownObject(page, facts, facts.unreachable)) notFound();
   const title = !facts.unreachable && page.name ? page.name : `Object ${page.objectId}`;
   const trail: Crumb[] = [
-    { name: "Home", path: "/" },
-    { name: "Database", path: "/database" },
-    { name: "Objects", path: "/database/objects" },
+    ...trailFor("/database/objects")!,
     { name: title, path: `/database/objects/${page.objectId}` },
   ];
   const windows = page.zero?.kills ?? page.drops[0]?.kills;

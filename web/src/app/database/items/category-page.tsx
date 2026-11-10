@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { trailFor } from "@/lib/breadcrumbs";
 import { isDevelopmentItemName } from "../../../../../kb/src/dev-item-names";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
@@ -157,9 +158,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const title = sub ? subclassLabel(sub).label : cls ? cls.label : "Items";
 
   const trail: Crumb[] = [
-    { name: "Home", path: "/" },
-    { name: "Database", path: "/database" },
-    { name: "Items", path: "/database/items" },
+    ...trailFor("/database/items")!,
     ...(cls ? [{ name: cls.label, path: itemsHref(cls.slug) }] : []),
     ...(cls && sub ? [{ name: subName(sub), path: itemsHref(cls.slug, sub.slug) }] : []),
   ];
