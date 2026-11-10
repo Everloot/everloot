@@ -26,7 +26,7 @@ test("every tool gets a parameter table in declaration order, with required flag
   expect(item[3]).toMatchObject({ type: "string", required: false });
   expect(item[4]).toMatchObject({ type: "object", required: false });
   expect(toolOutput("search_knowledge")[0]).toMatchObject({ name: "hits", type: "array of objects", required: true });
-  expect(toolOutput("everloot_plan").map((f) => f.name)).toEqual(["rows", "index", "counts", "total", "offset", "nextOffset", "url"]);
+  expect(toolOutput("everloot_plan").map((f) => f.name)).toEqual(["rows", "index", "counts", "total", "offset", "nextOffset", "revision", "dataAsOf", "url"]);
   expect(toolParams("everloot_plan").map((p) => [p.name, p.required])).toEqual([["status", false], ["detail", false], ["offset", false], ["limit", false]]);
 });
 

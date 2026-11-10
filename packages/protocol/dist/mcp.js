@@ -442,6 +442,12 @@ export const planRow = z.object({
     done: z.string().describe("What done means, or why this row is not a build."),
     proof: z.enum(["none", "code", "deployed", "client", "public", "real-data"]).optional().describe("The furthest the row is proven."),
 });
+/**
+ * The most one paged coverage or everloot_plan answer sends: the tool result (text block plus structuredContent)
+ * as UTF-8 JSON. A page holds fewer items than limit when they would not fit, and always at least one.
+ * everloot_plan called with no arguments is exempt: it returns the whole tracker, as before paging existed.
+ */
+export const ANSWER_BYTES = 12_000;
 /** Rows per everloot_plan answer: the summary names each row, detail adds what done means. */
 export const PLAN_ROWS = { summary: 40, detail: 10, max: 100 };
 /** How much one coverage answer lists: zones, or one zone's reported entries, each with nextOffset to continue. */
@@ -463,17 +469,18 @@ export const coveragePage = z.object({
     expectedAsOf: z.string().nullable().describe("The date of the expected counts; null when unrecorded."),
     settledList: z.object({ facts: z.number().int().nullable(), dataAsOf: z.string().nullable() })
         .describe("The build's whole-fact settled list, before zone and type filters; null facts when unknown, not zero."),
-    totals: coverageCounts.describe("Every zone and type in scope together."),
+    measured: z.boolean().describe("False when no released zone matches the scope: totals is null and types and zones are empty, unmeasured rather than zero."),
+    totals: coverageCounts.nullable().describe("Every zone and type in scope together; null when no zone matches (unmeasured, not zero)."),
     needsInstalls: z.number().int().nullable().describe("Fields one or two installs short in scope; null when the capped list cannot count them."),
-    types: z.array(z.object({ type: z.enum(COVERAGE_TYPE_NAMES), counts: coverageCounts })).describe("Each type in scope over every zone in scope."),
+    types: z.array(z.object({ type: z.enum(COVERAGE_TYPE_NAMES), counts: coverageCounts })).describe("Each type in scope over every zone in scope; empty when no zone matches."),
     zones: z.array(z.object({ mapId: z.number().int(), name: z.string(), installs: z.number().int(), counts: coverageCounts }))
         .describe("This answer's zones, each over the types in scope."),
     detail: z.boolean().describe("True when the text holds per-field counts and reported entries."),
     list: z.enum(["zones", "entries"]).describe("What offset, limit and total count: zones, or, for one zone with detail, its reported entries."),
     total: z.number().int(),
     offset: z.number().int(),
-    limit: z.number().int(),
-    nextOffset: z.number().int().optional().describe("Present when more remain: pass it as offset with the same arguments."),
+    limit: z.number().int().describe("The limit asked for, or the default. A page holds fewer when the answer would pass ANSWER_BYTES."),
+    nextOffset: z.number().int().optional().describe("Present when more remain, counted from the items this answer holds: pass it as offset with the same arguments."),
 });
 /** The kind filter of search_knowledge and get_by_name. */
 const KIND_FILTER = "Narrow to one record kind. item, npc, object and quest include names 3 installs agree on; zone uses released UiMap ids from the game files. achievement, faction, title, quest_chain, mount, legacy_perk, race and instance come from the game files (found in game files, unconfirmed); spell, lore_page, creator and realm come from the knowledge release; build is an Everloot team starter talent build, not observed. Without it, every kind.";
@@ -922,7 +929,7 @@ export const MCP_TOOLS = {
     },
     coverage: {
         title: "Database coverage by zone, type and field",
-        description: `Counts how much of WoW: Forever's database is settled or confirmed, per zone, per type and per field, as https://everloot.app/database/coverage shows it. Coverage is settled over expected, with confirmed over expected beside it; the denominator is the larger of expected and observed, and confirmed includes settled. A player-reported fact is public after three installs agree; fields one or two installs short are counted without their values. Scoped totals and the current build's settled-list size come separately dated and measured. Only public report identifiers and game-file facts are listed, never unconfirmed values, baseline rows, names or ids, or player names. When coverage data is available, every answer states its scope, method, data date and install counts; when it is not, the answer states the scope and marks the counts, data date and installs [?], not zero. Unknown values are [?]. Without zone the answer is a summary: scoped totals, each type, and one line per zone, ${COVERAGE_PAGE.summaryZones} zones at a time; detail adds per-field counts and reported entries. A partial answer says how many it shows of how many and gives nextOffset; pass it as offset with the same arguments for the rest. Use it for how complete the database is for a zone or type; use the page tools for the facts themselves.`,
+        description: `Counts how much of WoW: Forever's database is settled or confirmed, per zone, per type and per field, as https://everloot.app/database/coverage shows it. Coverage is settled over expected, with confirmed over expected beside it; the denominator is the larger of expected and observed, and confirmed includes settled. A player-reported fact is public after three installs agree; fields one or two installs short are counted without their values. Scoped totals and the current build's settled-list size come separately dated and measured. Only public report identifiers and game-file facts are listed, never unconfirmed values, baseline rows, names or ids, or player names. When coverage data is available, every answer states its scope, method, data date and install counts; when it is not, the answer states the scope and marks the counts, data date and installs [?], not zero. Unknown values are [?]. Without zone the answer is a summary: scoped totals, each type, and one line per zone, ${COVERAGE_PAGE.summaryZones} zones at a time; detail adds per-field counts and reported entries. A page holds fewer than limit when more would pass ${ANSWER_BYTES} bytes. A zone filter that matches no released zone is unmeasured (measured false, null totals), not zero. A partial answer says how many it shows of how many and gives nextOffset; pass it as offset with the same arguments for the rest. Use it for how complete the database is for a zone or type; use the page tools for the facts themselves.`,
         inputSchema: {
             zone: z.number().int().positive().optional().describe("Released UiMap zone id, such as 1429 for Elwynn Forest. Omit for all released zones."),
             type: z.enum(COVERAGE_TYPE_NAMES).optional().describe("Coverage type. Omit for all types."),
@@ -987,22 +994,24 @@ export const MCP_TOOLS = {
     },
     everloot_plan: {
         title: "Everloot implementation tracker",
-        description: `Returns the Everloot feature catalogue: what is live, what is next, what is waiting, and which reference sites are page shapes only, as the tracker that ships with the site holds it. Use it only for questions about Everloot itself, such as whether a feature exists; it holds no game data. For game facts use search_knowledge or answer_sources; for community addons use ecosystem_projects. By default a summary: the counts and each row's id, name and how far it is proven, ${PLAN_ROWS.summary} rows at a time; detail adds what done means (${PLAN_ROWS.detail} rows at a time) and status narrows to one section. A partial answer gives nextOffset; pass it as offset with the same arguments for the rest. Needs no account.`,
+        description: `Returns the Everloot feature catalogue: what is live, what is next, what is waiting, and which reference sites are page shapes only, as the tracker that ships with the site holds it. Use it only for questions about Everloot itself, such as whether a feature exists; it holds no game data. For game facts use search_knowledge or answer_sources; for community addons use ecosystem_projects. With no arguments it returns the whole tracker, every row with what done means, as it always has. Any argument returns a bounded page instead: a summary of the counts and each row's id, name and how far it is proven, ${PLAN_ROWS.summary} rows at a time; detail adds what done means (${PLAN_ROWS.detail} rows at a time) and status narrows to one section. A page holds fewer rows when more would pass ${ANSWER_BYTES} bytes, states the tracker revision (the tracker records no date), and when partial gives nextOffset; pass it as offset with the same arguments for the rest. Needs no account.`,
         inputSchema: {
             status: z.enum(["live", "next", "waiting", "shape"]).optional().describe("Only rows with this status: live, next, waiting or shape. Without it, every row."),
-            detail: z.boolean().optional().describe("true adds each row's done-when text. Default false: id, name and how far it is proven."),
+            detail: z.boolean().optional().describe("On a page, true adds each row's done-when text. Default false: id, name and how far it is proven. With no arguments at all, the whole tracker with done text."),
             offset: z.number().int().min(0).optional().describe("Row to start at, default 0. Use nextOffset from the last answer."),
             limit: z.number().int().min(1).max(PLAN_ROWS.max).optional()
-                .describe(`Rows per answer: default ${PLAN_ROWS.summary}, or ${PLAN_ROWS.detail} with detail; at most ${PLAN_ROWS.max}.`),
+                .describe(`Rows per answer: default ${PLAN_ROWS.summary}, or ${PLAN_ROWS.detail} with detail; at most ${PLAN_ROWS.max}, and fewer when more would pass ${ANSWER_BYTES} bytes.`),
         },
         outputSchema: {
-            rows: z.array(planRow).describe("With detail, this answer's rows with what done means, in the tracker's order. Empty in a summary, which lists them in index."),
-            index: z.array(planRow.omit({ done: true })).optional().describe("A summary's rows: id, status, name and proof, in the tracker's order."),
+            rows: z.array(planRow).describe("With no arguments, every row with what done means, in the tracker's order. On a page: with detail, this answer's rows; empty in a summary, which lists them in index."),
+            index: z.array(planRow.omit({ done: true })).optional().describe("Id, status, name and proof, in the tracker's order: every row with no arguments, this answer's rows on a summary page; absent on a detail page."),
             counts: z.object({ live: z.number().int(), next: z.number().int(), waiting: z.number().int(), shape: z.number().int() })
                 .describe("Rows per status in the whole tracker, whatever status, offset and limit ask for."),
-            total: z.number().int().optional().describe("Rows matching status."),
+            total: z.number().int().optional().describe("Rows matching status. On a page only, like the fields after it."),
             offset: z.number().int().optional(),
-            nextOffset: z.number().int().optional().describe("Present when more rows remain: pass it as offset with the same arguments."),
+            nextOffset: z.number().int().optional().describe("Present when more rows remain, counted from the rows this page holds: pass it as offset with the same arguments."),
+            revision: z.string().optional().describe("A hash of the tracker's rows. Pages with different revisions came from different trackers: start again from offset 0."),
+            dataAsOf: z.string().nullable().optional().describe("The tracker's date. Always null: the tracker records no date, so it is unknown."),
             url: z.string().optional().describe("The whole tracker as one page."),
         },
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },

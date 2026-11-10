@@ -352,6 +352,13 @@ test("the tool catalogue documents coverage filters, field grain, withheld value
   }
 });
 
+test("long answers: the byte budget, the plan's unbounded no-argument answer, its revision and unmeasured coverage", () => {
+  for (const words of ["at most 12,000 bytes", "with no arguments returns the whole tracker as it always has", "that answer is not size-bounded",
+    "states its revision", "the date is unknown", "page.measured is false", "counted from the items it holds"]) {
+    expect(text).toContain(words);
+  }
+});
+
 test("every docs page's BreadcrumbList starts at Home", () => {
   const lists = [...page.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/g)]
     .map((m) => JSON.parse(m[1]) as { "@type": string; itemListElement?: { name: string }[] })

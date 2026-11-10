@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { COVERAGE_PAGE, PLAN_ROWS, PLAYER_DATA_TOOLS } from "@everloot/protocol";
+import { ANSWER_BYTES, COVERAGE_PAGE, PLAN_ROWS, PLAYER_DATA_TOOLS } from "@everloot/protocol";
 import { C, Cards, H2, H3, LinkCard, List, P, Table, docLink } from "@/components/docs/blocks";
 import { CodeGroup } from "@/components/docs/DocsClient";
 import DocPage from "@/components/docs/DocPage";
@@ -198,12 +198,20 @@ export default function McpOverview() {
         <C>coverage</C> without a zone gives the scoped totals, each type and one line per zone,{" "}
         {COVERAGE_PAGE.summaryZones} zones at a time; <C>detail: true</C> adds per-field counts and the reported fields
         needing installs, and a single <C>zone</C> answers in detail by default, paging its reported entries{" "}
-        {COVERAGE_PAGE.entries} at a time. <C>everloot_plan</C> lists each row&apos;s id, name and how far it is proven,{" "}
-        {PLAN_ROWS.summary} rows at a time; <C>detail: true</C> adds what done means and <C>status</C> narrows to one
-        section. Every page says how many it shows of how many and repeats the scope, data date and denominator. A
-        partial answer carries <C>nextOffset</C> in its structured content and a <C>Continue:</C> line in its text:
-        pass it as <C>offset</C> with the same arguments, and the pages together hold every row exactly once.
-        A short answer, such as one zone and one type, is unchanged.
+        {COVERAGE_PAGE.entries} at a time. A zone that matches no released zone is unmeasured:{" "}
+        <C>page.measured</C> is false and <C>page.totals</C> is null, never a row of zeros. <C>everloot_plan</C> called
+        with no arguments returns the whole tracker as it always has, every row with what done means, plus an{" "}
+        <C>index</C>; that answer is not size-bounded. Any argument returns a page instead: each row&apos;s id, name and
+        how far it is proven, {PLAN_ROWS.summary} rows at a time; <C>detail: true</C> adds what done means and{" "}
+        <C>status</C> narrows to one section. The tracker records no date, so a plan page states its{" "}
+        <C>revision</C> (a hash of the rows) and says the date is unknown (<C>dataAsOf</C> is null); pages with
+        different revisions come from different trackers. A page is at most {ANSWER_BYTES.toLocaleString("en-US")} bytes
+        of text and structured content and holds fewer items than <C>limit</C> when more would not fit. Every page says
+        how many it shows of how many and repeats the scope, the data date (or the plan&apos;s revision) and, for{" "}
+        <C>coverage</C>, the denominator. A partial answer carries <C>nextOffset</C>, counted from the items it holds, in
+        its structured content and a <C>Continue:</C> line in its text: pass it as <C>offset</C> with the same
+        arguments, and the pages together hold every row exactly once. A short answer, such as one zone and one type,
+        is unchanged.
       </P>
 
       <H3 id="sources-and-credit">Sources and credit</H3>

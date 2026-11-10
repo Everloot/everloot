@@ -1,4 +1,5 @@
 import { COVERAGE_PAGE, type CoveragePageOut, type McpToolArgs } from "@everloot/protocol";
+import { fitAnswer } from "./answer-budget.js";
 import { COVERAGE_TYPES, coverageShares, type CoverageCell, type CoverageReport, type CoverageType } from "./coverage.js";
 
 /** The host lends the same score its public coverage page reads. No raw records or baseline are read here. */
@@ -91,65 +92,74 @@ export async function answerCoverage(args: McpToolArgs<"coverage">, loader?: Cov
   if (!zones.length) lines.push("No released zone matches this filter; no counts measured for this scope.");
 
   const zoneCell = (zone: (typeof zones)[number]) => sumCells(types.map((t) => zone.types[t]));
-  const typeCells = types.map((t) => ({ type: t, cell: sumCells(zones.map((zone) => zone.types[t])) }));
+  // No matching zone is unmeasured: null totals and no per-type rows, never a row of zeros.
+  const measured = zones.length > 0;
+  const typeCells = measured ? types.map((t) => ({ type: t, cell: sumCells(zones.map((zone) => zone.types[t])) })) : [];
   const totals = sumCells(cells);
   // One zone with detail pages its reported entries; otherwise the list is the zones.
-  const list: "zones" | "entries" = detail && args.zone !== undefined && zones.length ? "entries" : "zones";
+  const list: "zones" | "entries" = detail && args.zone !== undefined && measured ? "entries" : "zones";
   const limit = args.limit ?? (list === "entries" ? COVERAGE_PAGE.entries : detail ? COVERAGE_PAGE.detailZones : COVERAGE_PAGE.summaryZones);
-  const zonePage = list === "zones" ? zones.slice(offset, offset + limit) : zones;
-  let total = zones.length;
-  let next: number | undefined;
-
-  if (!detail && zones.length) {
-    lines.push(`All scoped zones and types: ${cellText(totals)}`);
-    for (const { type, cell } of typeCells) lines.push(`${type}: ${cellText(cell)}`);
-    lines.push(`\nShowing ${range("zones", offset, zonePage.length, zones.length)}, each over the types in scope.`);
-    for (const zone of zonePage) lines.push(`  ${zone.name} (zone ${zone.mapId}); ${zone.installs} installs: ${shortText(zoneCell(zone))}`);
+  const needsOf = (zone: (typeof zones)[number]) => zone.needs.filter((n) => args.type === undefined || n.type === args.type);
+  const total = list === "entries" ? needsOf(zones[0]!).length : zones.length;
+  const head = [...lines];
+  if (!detail && measured) {
+    head.push(`All scoped zones and types: ${cellText(totals)}`);
+    for (const { type, cell } of typeCells) head.push(`${type}: ${cellText(cell)}`);
   }
-  if (detail && list === "zones" && zones.length) lines.push(`\nShowing ${range("zones", offset, zonePage.length, zones.length)}, with per-field counts.`);
-  if (detail) {
-    for (const zone of zonePage) {
-      lines.push(`\n${zone.name} (zone ${zone.mapId}); ${zone.installs} distinct folded installs; data as of ${report.dataAsOf ?? unknown}.`);
-      for (const type of types) {
-        lines.push(`${type}: ${cellText(zone.types[type])}`);
-        for (const field of zone.fields.filter((f) => f.type === type)) lines.push(`  ${type}.${field.field}: ${cellText(field)}`);
-      }
-      const needs = zone.needs.filter((n) => args.type === undefined || n.type === args.type);
-      // One zone pages its entries by offset; several zones each show their first few and say how to read the rest.
-      const from = list === "entries" ? offset : 0;
-      const shown = needs.slice(from, from + (list === "entries" ? limit : COVERAGE_PAGE.entriesPerZone));
-      if (list === "entries") total = needs.length;
-      // The score caps the combined list per zone, before a type filter. Never imply it is exhaustive.
-      const capped = `from ${zone.needs.length}/${zone.needsTotal} listed across all types (the page's capped list). Values are withheld until 3 installs agree.`;
-      lines.push(from === 0 && shown.length === needs.length
-        ? `Reported fields needing installs: showing ${needs.length} matching entries ${capped}`
-        : `Reported fields needing installs: showing ${range("entries", from, shown.length, needs.length)} matching, ${capped}`);
-      for (const need of shown) {
-        lines.push(`  ${need.type}.${need.field}: ${need.label}; ${need.voters}/3 agreeing installs; ${need.need} more needed; ${need.href ? `https://everloot.app${need.href}` : unknown}`);
-      }
-      const end = from + shown.length;
-      if (list === "entries" && end < needs.length) next = end;
-      if (list === "zones" && end < needs.length) {
-        lines.push(`  ${needs.length - end} more entries here: call coverage with zone=${zone.mapId}${args.type ? ` and type=${args.type}` : ""}, offset=${end}.`);
+
+  /** The answer holding the first n items of this page: zones, or the one zone's reported entries. */
+  const render = (n: number): CoverageAnswer => {
+    const out = [...head];
+    const zonePage = list === "zones" ? zones.slice(offset, offset + n) : zones;
+    let next: number | undefined;
+    if (!detail && measured) {
+      out.push(`\nShowing ${range("zones", offset, zonePage.length, zones.length)}, each over the types in scope.`);
+      for (const zone of zonePage) out.push(`  ${zone.name} (zone ${zone.mapId}); ${zone.installs} installs: ${shortText(zoneCell(zone))}`);
+    }
+    if (detail && list === "zones" && measured) out.push(`\nShowing ${range("zones", offset, zonePage.length, zones.length)}, with per-field counts.`);
+    if (detail) {
+      for (const zone of zonePage) {
+        out.push(`\n${zone.name} (zone ${zone.mapId}); ${zone.installs} distinct folded installs; data as of ${report.dataAsOf ?? unknown}.`);
+        for (const type of types) {
+          out.push(`${type}: ${cellText(zone.types[type])}`);
+          for (const field of zone.fields.filter((f) => f.type === type)) out.push(`  ${type}.${field.field}: ${cellText(field)}`);
+        }
+        const needs = needsOf(zone);
+        // One zone pages its entries by offset; several zones each show their first few and say how to read the rest.
+        const from = list === "entries" ? offset : 0;
+        const shown = needs.slice(from, from + (list === "entries" ? n : COVERAGE_PAGE.entriesPerZone));
+        // The score caps the combined list per zone, before a type filter. Never imply it is exhaustive.
+        const capped = `from ${zone.needs.length}/${zone.needsTotal} listed across all types (the page's capped list). Values are withheld until 3 installs agree.`;
+        out.push(from === 0 && shown.length === needs.length
+          ? `Reported fields needing installs: showing ${needs.length} matching entries ${capped}`
+          : `Reported fields needing installs: showing ${range("entries", from, shown.length, needs.length)} matching, ${capped}`);
+        for (const need of shown) {
+          out.push(`  ${need.type}.${need.field}: ${need.label}; ${need.voters}/3 agreeing installs; ${need.need} more needed; ${need.href ? `https://everloot.app${need.href}` : unknown}`);
+        }
+        const end = from + shown.length;
+        if (list === "entries" && end < needs.length) next = end;
+        if (list === "zones" && end < needs.length) {
+          out.push(`  ${needs.length - end} more entries here: call coverage with zone=${zone.mapId}${args.type ? ` and type=${args.type}` : ""}, offset=${end}.`);
+        }
       }
     }
-  }
-  if (list === "zones" && offset + zonePage.length < zones.length) next = offset + zonePage.length;
-  if (next !== undefined) lines.push(`\n${continuation(list, next, total)}`);
-  if (!detail && zones.length) lines.push("Per-field counts and the reported fields needing installs: pass detail=true, or zone=<id> for one zone.");
-
-  return {
-    text: `${lines.join("\n")}\nMore: ${page}`,
-    structured: {
-      connected: true, dataAsOf: report.dataAsOf, url: page, scope: scopeOut,
-      page: {
-        build: report.build, installs: report.installs, expectedAsOf: report.expected?.dataAsOf ?? null,
-        settledList: { facts: settled?.facts ?? null, dataAsOf: settled?.dataAsOf ?? null },
-        totals: counts(totals), needsInstalls,
-        types: typeCells.map(({ type, cell }) => ({ type, counts: counts(cell) })),
-        zones: zonePage.map((zone) => ({ mapId: zone.mapId, name: zone.name, installs: zone.installs, counts: counts(zoneCell(zone)) })),
-        detail, list, total, offset, limit, ...(next !== undefined ? { nextOffset: next } : {}),
+    if (list === "zones" && offset + zonePage.length < zones.length) next = offset + zonePage.length;
+    if (next !== undefined) out.push(`\n${continuation(list, next, total)}`);
+    if (!detail && measured) out.push("Per-field counts and the reported fields needing installs: pass detail=true, or zone=<id> for one zone.");
+    return {
+      text: `${out.join("\n")}\nMore: ${page}`,
+      structured: {
+        connected: true, dataAsOf: report.dataAsOf, url: page, scope: scopeOut,
+        page: {
+          build: report.build, installs: report.installs, expectedAsOf: report.expected?.dataAsOf ?? null,
+          settledList: { facts: settled?.facts ?? null, dataAsOf: settled?.dataAsOf ?? null },
+          measured, totals: measured ? counts(totals) : null, needsInstalls,
+          types: typeCells.map(({ type, cell }) => ({ type, counts: counts(cell) })),
+          zones: zonePage.map((zone) => ({ mapId: zone.mapId, name: zone.name, installs: zone.installs, counts: counts(zoneCell(zone)) })),
+          detail, list, total, offset, limit, ...(next !== undefined ? { nextOffset: next } : {}),
+        },
       },
-    },
+    };
   };
+  return fitAnswer(limit, render);
 }

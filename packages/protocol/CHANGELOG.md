@@ -16,10 +16,14 @@ required, or tightening a limit is a major release.
 - 2.1.0: MCP knowledge hits optionally carry recordId, gameId, sourceKind, build and observed snapshot support for gameplay discovery. Existing tool names and ids are preserved.
 - 2.1.0: `coverage` takes optional `detail`, `offset` and `limit` and gains an output schema: `scope`, and a `page`
   (`coveragePage`) with the scoped totals and their denominators, each type, the answer's zones, `list`, `total`, `offset`,
-  `limit` and `nextOffset`. Every MCP tool now has an output schema. `everloot_plan` takes optional `status`, `detail`,
-  `offset` and `limit`, and its output gains optional `index`, `total`, `offset`, `nextOffset` and `url`. Without `detail`
-  it answers a summary: `rows` is empty and `index` names the page's rows; a reader that wants every row with its done
-  text pages with `detail: true`. New constants `COVERAGE_PAGE` and `PLAN_ROWS` hold the page sizes.
+  `limit` and `nextOffset`, and `measured` (false, with null `totals` and empty `types`, when no released zone matches).
+  Every MCP tool now has an output schema. `everloot_plan` takes optional `status`, `detail`, `offset` and `limit`, and
+  its output gains optional `index`, `total`, `offset`, `nextOffset`, `revision`, `dataAsOf` and `url`. Called with no
+  arguments it answers as before: the whole tracker's text and every row in `rows`, now with `index` beside them. Any
+  argument answers a page; without `detail` that page is a summary, with `rows` empty and `index` naming the page's
+  rows, and it states the tracker `revision` with `dataAsOf` null (the tracker records no date). New constants
+  `COVERAGE_PAGE` and `PLAN_ROWS` hold the page sizes, and `ANSWER_BYTES` (12,000) the most one page sends; a page
+  holds fewer items than `limit` rather than pass it, and its `nextOffset` counts the items it holds.
 - `dropsResponse.rates[].sourceName`: the NPC's or object's name, once 3 installs agree on it; absent until then.
   Optional, so earlier readers are unaffected.
 

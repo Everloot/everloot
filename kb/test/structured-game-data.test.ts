@@ -105,6 +105,8 @@ test("everloot_plan: every tracker row with its status and proof across detail p
   const byStatus = (["live", "next", "waiting", "shape"] as const).flatMap((s) => BRIDGE_PLAN.filter((r) => r.status === s));
   expect(rows).toEqual(byStatus);
   plan = planOut.parse((await c.callTool({ name: "everloot_plan", arguments: {} })).structuredContent);
+  // No arguments is the whole tracker, as before paging.
+  expect(plan.rows).toEqual(BRIDGE_PLAN);
   expect(plan.counts.live + plan.counts.next + plan.counts.waiting + plan.counts.shape).toBe(BRIDGE_PLAN.length);
   expect(plan.counts.live).toBe(BRIDGE_PLAN.filter((r) => r.status === "live").length);
 });

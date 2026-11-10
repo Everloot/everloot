@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/everloot_plan.json",
   "title": "Everloot implementation tracker",
-  "description": "Returns the Everloot feature catalogue: what is live, what is next, what is waiting, and which reference sites are page shapes only, as the tracker that ships with the site holds it. Use it only for questions about Everloot itself, such as whether a feature exists; it holds no game data. For game facts use search_knowledge or answer_sources; for community addons use ecosystem_projects. By default a summary: the counts and each row's id, name and how far it is proven, 40 rows at a time; detail adds what done means (10 rows at a time) and status narrows to one section. A partial answer gives nextOffset; pass it as offset with the same arguments for the rest. Needs no account.",
+  "description": "Returns the Everloot feature catalogue: what is live, what is next, what is waiting, and which reference sites are page shapes only, as the tracker that ships with the site holds it. Use it only for questions about Everloot itself, such as whether a feature exists; it holds no game data. For game facts use search_knowledge or answer_sources; for community addons use ecosystem_projects. With no arguments it returns the whole tracker, every row with what done means, as it always has. Any argument returns a bounded page instead: a summary of the counts and each row's id, name and how far it is proven, 40 rows at a time; detail adds what done means (10 rows at a time) and status narrows to one section. A page holds fewer rows when more would pass 12000 bytes, states the tracker revision (the tracker records no date), and when partial gives nextOffset; pass it as offset with the same arguments for the rest. Needs no account.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -23,7 +23,7 @@
         ]
       },
       "detail": {
-        "description": "true adds each row's done-when text. Default false: id, name and how far it is proven.",
+        "description": "On a page, true adds each row's done-when text. Default false: id, name and how far it is proven. With no arguments at all, the whole tracker with done text.",
         "type": "boolean"
       },
       "offset": {
@@ -33,7 +33,7 @@
         "maximum": 9007199254740991
       },
       "limit": {
-        "description": "Rows per answer: default 40, or 10 with detail; at most 100.",
+        "description": "Rows per answer: default 40, or 10 with detail; at most 100, and fewer when more would pass 12000 bytes.",
         "type": "integer",
         "minimum": 1,
         "maximum": 100
@@ -89,10 +89,10 @@
           ],
           "additionalProperties": false
         },
-        "description": "With detail, this answer's rows with what done means, in the tracker's order. Empty in a summary, which lists them in index."
+        "description": "With no arguments, every row with what done means, in the tracker's order. On a page: with detail, this answer's rows; empty in a summary, which lists them in index."
       },
       "index": {
-        "description": "A summary's rows: id, status, name and proof, in the tracker's order.",
+        "description": "Id, status, name and proof, in the tracker's order: every row with no arguments, this answer's rows on a summary page; absent on a detail page.",
         "type": "array",
         "items": {
           "type": "object",
@@ -167,7 +167,7 @@
         "description": "Rows per status in the whole tracker, whatever status, offset and limit ask for."
       },
       "total": {
-        "description": "Rows matching status.",
+        "description": "Rows matching status. On a page only, like the fields after it.",
         "type": "integer",
         "minimum": -9007199254740991,
         "maximum": 9007199254740991
@@ -178,10 +178,21 @@
         "maximum": 9007199254740991
       },
       "nextOffset": {
-        "description": "Present when more rows remain: pass it as offset with the same arguments.",
+        "description": "Present when more rows remain, counted from the rows this page holds: pass it as offset with the same arguments.",
         "type": "integer",
         "minimum": -9007199254740991,
         "maximum": 9007199254740991
+      },
+      "revision": {
+        "description": "A hash of the tracker's rows. Pages with different revisions came from different trackers: start again from offset 0.",
+        "type": "string"
+      },
+      "dataAsOf": {
+        "description": "The tracker's date. Always null: the tracker records no date, so it is unknown.",
+        "type": [
+          "string",
+          "null"
+        ]
       },
       "url": {
         "description": "The whole tracker as one page.",
