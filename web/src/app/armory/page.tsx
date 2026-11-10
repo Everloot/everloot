@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, DataTable, Input, PageHeader, SectionHeading, type Column } from "@/components/ui";
 import {
   ARMORY_BOARDS, ARMORY_HIDE_PATH, ARMORY_KEPT_DAYS, ARMORY_METRICS, ARMORY_PATH, ARMORY_SUBMIT_PATH, armoryBoardPath, armoryCharacterPath,
@@ -84,7 +85,7 @@ export default async function ArmoryPage(props: { searchParams: Promise<{ q?: st
     <Container width="reading">
       <article className="space-y-8">
         <PageHeader
-          trail={[{ name: "Home", path: "/" }, { name: "Armory", path: ARMORY_PATH }]}
+          trail={trailFor("/armory")!}
           title="Armory"
           lede="Every WoW: Forever character and guild Everloot has read from Blizzard's API: level, gear, item level, honorable kills and guild rosters. Each is read again within 20 days, and nothing is kept longer than 30 days after its last read."
           meta={<ArmoryCredit at={counts ? newest(counts.map((c) => c.newest)) : null} />}

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { trailFor } from "@/lib/breadcrumbs";
 import { RememberedClass } from "@/components/classes/UseClassButton";
 import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
 import { Container, DataTable, PageHeader, type Column } from "@/components/ui";
@@ -44,7 +45,7 @@ export default function ClassesPage() {
   return (
     <Container>
       <PageHeader
-        trail={[{ name: "Home", path: "/" }, { name: "Classes", path: "/classes" }]}
+        trail={trailFor("/classes")!}
         title="Classes"
         lede="The nine WoW: Forever classes, each linked to its page: its talent calculator, the races that can play it and the database pages to plan with."
       />

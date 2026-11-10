@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, DataTable, EmptyState, FilterBar, Input, PageHeader, ResultStrip, SectionHeading, type Column, type FilterControl } from "@/components/ui";
 import { FAMILIES } from "@/data/families";
 import { armoryOn } from "@/lib/armory";
@@ -133,7 +134,7 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
     <Container width="data">
       <article>
         <PageHeader
-          trail={[{ name: "Home", path: "/" }, { name: "Guilds", path: "/guilds" }]}
+          trail={trailFor("/guilds")!}
           title="Guilds"
           lede="WoW: Forever guilds by progression, from their members' uploads."
           meta={!data.unreachable && <span>{dataAgeLabel(data.dataAsOf)}</span>}

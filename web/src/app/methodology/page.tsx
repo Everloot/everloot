@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { trailFor } from "@/lib/breadcrumbs";
 import { WIKI_URL } from "@/components/LoreSource";
 import { CURRENT_VERSION } from "@/lib/game-version";
 import { loadSiteAssets } from "@/lib/game-assets";
@@ -43,7 +44,7 @@ export default async function MethodologyPage() {
       <PageHeader
         title="How we count"
         lede="Every fact on Everloot comes from players running the Everloot addon and choosing to upload what it recorded."
-        trail={[{ name: "Home", path: "/" }, { name: "How we count", path: "/methodology" }]}
+        trail={trailFor("/methodology")!}
       />
       <div className="space-y-12">
         <p className="text-fg-2">

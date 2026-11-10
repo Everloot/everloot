@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { trailFor } from "@/lib/breadcrumbs";
+import JsonLd from "@/components/JsonLd";
 import { Container, Input, PageHeader } from "@/components/ui";
 import { guildsOn } from "@/lib/guilds";
-import { pageMetadata } from "@/lib/seo";
+import { absoluteUrl, pageMetadata } from "@/lib/seo";
 import { link } from "../parts";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +26,9 @@ export default async function HideGuildPage(props: { searchParams: Promise<{ gui
   return (
     <Container width="reading">
       <article className="space-y-6">
+        <JsonLd data={{ "@context": "https://schema.org", "@type": "WebPage", name: "Hide a guild", url: absoluteUrl("/guilds/hide") }} />
         <PageHeader
+          trail={trailFor("/guilds/hide")!}
           title="Hide a guild"
           lede="Enter the guild's name and realm. Its page, its place on the ladder and its search result are removed, and the kills its members upload are not kept. You do not need an account or an officer rank, and we do not ask who you are, so the hide takes effect as soon as you send it."
           meta={<span>The characters keep their own pages; each can be hidden with the <Link href="/players/opt-out" className={link}>character hide form</Link>. To undo a guild hide, email <a className={link} href="mailto:hello@everloot.app">hello@everloot.app</a>.</span>}

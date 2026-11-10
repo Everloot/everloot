@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { trailFor } from "@/lib/breadcrumbs";
 import ShowcaseSections, { showcaseContents, ShowcaseHeader } from "@/components/showcase/ShowcaseSections";
 import { Container, ReadingLayout, RailFacts } from "@/components/ui";
 import { SAMPLE_NOTE, sampleShowcase } from "@/data/showcase";
@@ -46,7 +47,7 @@ export default async function SampleCharacterPage() {
           <div role="note" data-sample className="rounded-control border border-line bg-panel p-4 text-sm text-fg-2">{SAMPLE_NOTE}</div>
           <ShowcaseHeader
             showcase={showcase}
-            trail={[{ name: "Home", path: "/" }, { name: "Sample character", path: PATH }]}
+            trail={trailFor(PATH)!}
             actions={<a href={`${PATH}/card-square.png`} className="btn" download="examplechar-card.png">Download card</a>}
           />
           <ShowcaseSections showcase={showcase} preview />

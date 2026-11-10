@@ -10,6 +10,7 @@ vi.mock("@/lib/upload-store", async (importOriginal) => ({
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); }, useRouter: () => ({ push: () => {} }) }));
 
+import { trailFor } from "@/lib/breadcrumbs";
 import ObjectPage, { generateMetadata } from "./[id]/page";
 import ObjectsPage from "./page";
 import ItemPage from "../items/[id]/page";
@@ -28,6 +29,12 @@ beforeEach(() => store.loadCorpus.mockReset());
 test("an object with loot from 3 installs lists its drops; the list page links it; item pages link back", async () => {
   store.loadCorpus.mockResolvedValue(corpus([loot("install-a", 1731, [2770]), loot("install-b", 1731, [2770]), loot("install-c", 1731, [])]));
   const page = await html(ObjectPage(props("1731")));
+  const blocks = [...page.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/g)].map((match) => JSON.parse(match[1]));
+  expect(blocks.find((block) => block["@type"] === "BreadcrumbList")?.itemListElement).toEqual(
+    [...trailFor("/database/objects")!, { name: "Object 1731", path: "/database/objects/1731" }].map((crumb, i) => ({
+      "@type": "ListItem", position: i + 1, name: crumb.name, item: `https://everloot.app${crumb.path === "/" ? "" : crumb.path}`,
+    })),
+  );
   expect(page).toContain("Object 1731");
   expect(page).toContain('href="/database/items/2770"');
   expect(page).toContain("66.7%");

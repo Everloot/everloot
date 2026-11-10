@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { trailFor } from "@/lib/breadcrumbs";
 import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
 import { Container, FilterBar, PageHeader, SectionHeading, type FilterControl } from "@/components/ui";
 import { MAX_LEVEL, ROLES, classLabel } from "@/lib/class-context";
@@ -124,7 +125,7 @@ export default async function GuidesIndex({ searchParams }: Props) {
 
   return (
     <Container>
-      <PageHeader trail={[{ name: "Home", path: "/" }, { name: "Guides", path: "/guides" }]} title="Guides" lede={LEDE} />
+      <PageHeader trail={trailFor("/guides")!} title="Guides" lede={LEDE} />
       {any && <FilterBar label="Guide filters" controls={controls} active={active} clearHref="/guides" />}
       {error && <p className="mt-4 text-sm text-muted">{error} This page shows every guide instead.</p>}
       <div className="mt-8 space-y-10">

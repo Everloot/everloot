@@ -1,3 +1,4 @@
+import Breadcrumbs from "@/components/Breadcrumbs";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test, vi } from "vitest";
@@ -14,6 +15,7 @@ vi.mock("@/lib/rollup-compute", () => ({
 vi.mock("@/lib/upload-store", () => ({ STORAGE_UNREACHABLE: "Storage unavailable" }));
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock("next/navigation", () => ({
+  usePathname: () => "/database/items",
   notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
   permanentRedirect: (href: string) => { throw new Error(`NEXT_REDIRECT ${href}`); },
   useRouter: () => ({ push: () => {} }),
@@ -41,7 +43,7 @@ test("/database/items lists every item, 50 a page, with the classes (plural) in 
   // No provenance line and no visible breadcrumb on a data page; the BreadcrumbList stays for search engines.
   expect(page).not.toContain("data-source-line");
   expect(page).not.toContain('aria-label="Breadcrumb"');
-  expect(page).toContain('"@type":"BreadcrumbList"');
+  expect(renderToStaticMarkup(<Breadcrumbs />) + page).toContain('"@type":"BreadcrumbList"');
 });
 
 test("a word in the item slot is a class page; a subclass page filters by slot and quality and pages", async () => {

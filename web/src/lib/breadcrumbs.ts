@@ -6,6 +6,26 @@ import { CLASSES } from "@/design/tokens";
  * tool's trail still goes from Home straight to the tool. Pages without an entry have no breadcrumb.
  */
 const NAMES: Record<string, string> = {
+  "/database/objects": "Objects",
+  "/database/items": "Items",
+  "/guides": "Guides",
+  "/guilds": "Guilds",
+  "/classes": "Classes",
+  "/classes/choose": "Class chooser",
+  "/classes/group": "Group",
+  "/players": "Characters",
+  "/players/opt-out": "Hide a character",
+  "/guilds/hide": "Hide a guild",
+  "/chat": "Ask Everloot",
+  "/addon": "Get the addon",
+  "/methodology": "How we count",
+  "/account": "Account",
+  "/settings": "Settings",
+  "/me": "My builds",
+  "/armory": "Armory",
+  "/armory/hide": "Hide a character",
+  "/armory/submit": "Add a character",
+  "/showcase/character": "Sample character",
   "/about": "About",
   "/tools": "Tools",
   "/privacy": "Privacy",
@@ -67,6 +87,14 @@ const NAMES: Record<string, string> = {
 
 /** The parent of a page, when it is not Home. */
 const PARENT: Record<string, string> = {
+  "/database/objects": "/database",
+  "/database/items": "/database",
+  "/classes/choose": "/classes",
+  "/classes/group": "/classes",
+  "/players/opt-out": "/players",
+  "/guilds/hide": "/guilds",
+  "/armory/hide": "/armory",
+  "/armory/submit": "/armory",
   "/lore/coverage": "/lore",
   "/lore/npcs": "/lore",
   "/lore/items": "/lore",
@@ -95,6 +123,7 @@ const PARENT: Record<string, string> = {
 };
 
 const titleCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const PROFESSIONS = ["alchemy", "blacksmithing", "enchanting", "engineering", "herbalism", "leatherworking", "mining", "skinning", "tailoring", "cooking", "first-aid", "fishing"];
 
 /** Home, each ancestor and the page. Null for Home itself and for pages with no trail. */
 export function trailFor(pathname: string): Crumb[] | null {
@@ -103,6 +132,10 @@ export function trailFor(pathname: string): Crumb[] | null {
   const cls = path.match(/^\/tools\/talents\/([a-z]+)$/);
   if (cls && (CLASSES as readonly string[]).includes(cls[1])) {
     return [home, { name: NAMES["/tools/talents"], path: "/tools/talents" }, { name: titleCase(cls[1]), path: path }];
+  }
+  const profession = path.match(/^\/tools\/professions\/([a-z-]+)$/);
+  if (profession && PROFESSIONS.includes(profession[1])) {
+    return [...trailFor("/tools/professions")!, { name: profession[1].split("-").map(titleCase).join(" "), path }];
   }
   if (!NAMES[path]) return null;
   const trail: Crumb[] = [];

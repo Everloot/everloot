@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { trailFor } from "@/lib/breadcrumbs";
 import { cache } from "react";
 import { Container, DataTable, PageHeader, SectionHeading, type Column } from "@/components/ui";
 import {
-  ARMORY_PATH, armoryCharacterPath, armoryGuildPath, armoryOn, classTokenOfId, isArmoryRegion, metricValue, raceOfId, regionLabel,
+  armoryCharacterPath, armoryGuildPath, armoryOn, classTokenOfId, isArmoryRegion, metricValue, raceOfId, regionLabel,
   slugFromSegment, UNKNOWN, validArmorySlug,
 } from "@/lib/armory";
 import { armoryStore, type ArmoryGuild, type ArmoryMember } from "@/lib/armory-store";
@@ -81,7 +82,7 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params> }
   if (read === "unreachable") {
     return (
       <Container width="data">
-        <PageHeader trail={[{ name: "Home", path: "/" }, { name: "Armory", path: ARMORY_PATH }]} title="Guild" />
+        <PageHeader trail={trailFor("/armory")!} title="Guild" />
         <div className="space-y-3">
           <Unreachable />
           <ArmoryCredit at={null} />
@@ -98,7 +99,7 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params> }
     <Container width="data">
       <article className="space-y-8">
         <PageHeader
-          trail={[{ name: "Home", path: "/" }, { name: "Armory", path: ARMORY_PATH }, { name: g.name, path }]}
+          trail={[...trailFor("/armory")!, { name: g.name, path }]}
           title={g.name}
           lede={`${g.faction} guild · ${regionLabel(g.region)} ${g.ruleset} · ${g.memberCount.toLocaleString("en-US")} ${g.memberCount === 1 ? "member" : "members"}`}
           meta={created ? <span>Created <span className="font-mono tabular-nums">{created}</span></span> : undefined}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { trailFor } from "@/lib/breadcrumbs";
 import JsonLd from "@/components/JsonLd";
 import GuideHistory from "@/components/guides/GuideHistory";
 import GuidePlan from "@/components/guides/GuidePlan";
@@ -155,7 +156,7 @@ export default async function GuidePage({ params }: Params) {
       <JsonLd data={published && guide.reviewed ? guideArticleJsonLd({ title: guide.title, summary: guide.summary, path, published, modified: guide.reviewed.on }) : null} />
       <article data-guide>
         <PageHeader
-          trail={[{ name: "Home", path: "/" }, { name: "Guides", path: "/guides" }, { name: guide.title, path }]}
+          trail={[...trailFor("/guides")!, { name: guide.title, path }]}
           title={guide.title}
           lede={guide.summary}
           meta={
