@@ -180,7 +180,7 @@ export default async function SpellPage(props: Props) {
           text={[`${title} (spell ${spellId})`, tip?.text ?? "", ...summary, `Source: https://everloot.app/database/spells/${spellId}`].filter(Boolean).join("\n")}
         />
         {tabs.length
-          ? <Tabs label={`${title}: relations`} tabs={tabs} />
+          ? <Tabs label={`${title}: relations`} tabs={tabs} className="mt-6" />
           : <EmptyTab message={`The game files list nothing here (build ${build}).`} players={false} action={null} />}
       </article>
     </Container>
