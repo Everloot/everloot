@@ -233,7 +233,7 @@ test("Chat may ask for the microphone (dictation); every other page, the account
 });
 
 test("the sitemaps and private routes set their own CDN policy; none gets a static one that would keep a 503", async () => {
-  for (const path of ["/", "/sitemap.xml", "/database-sitemap.xml", "/database-sitemap/3.xml", "/auctions-sitemap.xml", "/auctions-sitemap/0.xml", ...PROTECTED, "/sign-in", "/api/auth/session", "/api/me"]) {
+  for (const path of ["/", "/sitemap.xml", "/database-sitemap.xml", "/database-sitemap/3.xml", "/auctions-sitemap.xml", "/auctions-sitemap/0.xml", "/lore-sitemap.xml", "/lore-sitemap/0.xml", ...PROTECTED, "/sign-in", "/api/auth/session", "/api/me"]) {
     const h = await headersFor(path);
     expect(h["CDN-Cache-Control"], path).toBeUndefined();
   }
