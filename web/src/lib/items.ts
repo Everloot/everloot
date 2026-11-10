@@ -1,11 +1,9 @@
 import { CLIENT_EDGES, CLIENT_LAYER, CLIENT_SKILLS, CLIENT_TAXONOMY } from "../../../kb/src/client-layer-file";
 import { isDevelopmentItemName } from "../../../kb/src/dev-item-names";
 import { describe, filterItems, QUALITIES, slotOf, slugify, type ItemRow } from "../../../kb/src/item-taxonomy";
+import { PER_PAGE } from "@/app/database/list-parts";
 
 export { CLIENT_LAYER, CLIENT_TAXONOMY };
-
-/** Rows on one page of an item list (density spec, 2026-10-20: 50, as on Wowhead and WarcraftDB). */
-export const ITEMS_PER_PAGE = 50;
 
 /**
  * A page of a category stays out of search (noindex, and out of the sitemap) until at least this share of the
@@ -66,7 +64,7 @@ export function developmentLeftovers(rows: readonly ItemRow[], name: (id: number
  */
 export function categoryNamedEnough(classId: number | undefined, subclassId: number | undefined, named: { has(id: number): boolean }, page = 1, hidden?: { has(id: number): boolean }): boolean {
   const rows = sortItems(filterItems(CLIENT_TAXONOMY, { classId, subclassId }).filter((row) => !hidden?.has(row[0])), undefined, { name: (id) => (named.has(id) ? "" : undefined) });
-  const shown = rows.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  const shown = rows.slice((page - 1) * PER_PAGE, page * PER_PAGE);
   return shown.length > 0 && shown.filter((row) => named.has(row[0])).length / shown.length >= MIN_NAMED_SHARE;
 }
 

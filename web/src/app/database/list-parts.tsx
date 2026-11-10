@@ -106,9 +106,9 @@ export function NoMatches({ noun, chips, clearHref }: { noun: string; chips: { l
   );
 }
 
-/** Storage could not be read: the list is unrecorded, never empty. */
-export function Unreadable() {
-  return <p className="py-4 text-cell text-fg-2">{STORAGE_UNREACHABLE}</p>;
+/** A source could not be read: the list is unrecorded, never empty. Storage, unless the line names another source. */
+export function Unreadable({ children = STORAGE_UNREACHABLE }: { children?: string }) {
+  return <p className="py-4 text-cell text-fg-2">{children}</p>;
 }
 
 /** What a list says it holds: the game files' entries and the players' confirmations kept apart. */

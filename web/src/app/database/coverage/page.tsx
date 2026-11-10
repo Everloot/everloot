@@ -8,7 +8,7 @@ import { cellDetail, cellRank, COVERAGE_SORTS, measuredLine, shareText, TYPE_LAB
 import { pageMetadata } from "@/lib/seo";
 import { PLATEAU_TYPES, type TypePlateau } from "../../../../../kb/src/plateau";
 import { LINK } from "../entity";
-import { listHref, NoMatches, nextSort, sortParam, sortRows, Unreadable, type Search } from "../list-parts";
+import { listHref, listQuery, NoMatches, nextSort, sortParam, sortRows, Unreadable, type Search } from "../list-parts";
 import { loadPlateau, plateauDetail, plateauMeasured, plateauShare, plateauVerdict } from "./plateau";
 
 const META = {
@@ -21,11 +21,10 @@ export const dynamic = "force-dynamic";
 /** Lowest first: the zone that most needs players heads the list. */
 const DEFAULT_SORT = { key: "quests" as CoverageSort, desc: false };
 
-function coverageQuery(search: Search): { q?: string; sort?: { key: CoverageSort; desc: boolean } } | null {
-  const q = typeof search.q === "string" ? search.q.trim().slice(0, 60) : undefined;
-  const sort = typeof search.sort === "string" ? /^(-?)([a-z]+)$/.exec(search.sort) : undefined;
-  if (sort === null || (sort && !(COVERAGE_SORTS as readonly string[]).includes(sort[2]))) return null;
-  return { ...(q ? { q } : {}), ...(sort ? { sort: { key: sort[2] as CoverageSort, desc: sort[1] === "-" } } : {}) };
+/** The lists' own query; the zones fit one page, so any later page is malformed. */
+function coverageQuery(search: Search) {
+  const q = listQuery(search, COVERAGE_SORTS);
+  return q && q.page === 1 ? q : null;
 }
 
 export async function generateMetadata(props: { searchParams?: Promise<Search> }): Promise<Metadata> {
