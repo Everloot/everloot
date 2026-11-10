@@ -184,6 +184,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Knowledge base: a self-hosted MCP server and `coverage-report` read the whole public corpus again. The reader stopped
   at 50 pages and 2 MB in all, and the feed is now about 98 pages and 13 MB; the limits are per page with a high total
   guard. Without a key the site allows 30 requests an hour, so a rate-limited read now says to set `EVERLOOT_API_KEY`.
+- Desktop App: the guide covers every page and signing in, setup points to `_forever_`, and empty Addon and Market panels offer Open Settings or Refresh prices.
 - Site: title pages and lists no longer show the game's raw `%s`: the name reads "Bloodsail Admiral <Name>", the address
   drops the trailing `-s` (`/database/titles/144-bloodsail-admiral`) and the old address redirects to the new one.
 - Site: the schemas page marks the three shapes that describe a bulk-export file rather than an endpoint and says that
@@ -388,6 +389,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   account. A character two accounts link stays frozen until it is settled: write to hello@everloot.app, we reply
   within 7 days. The data policy, /privacy and the account page say so.
 - Docs: OPEN_DATA.md and RELEASING.md no longer say the open data export sits in the roadmap's Next section; they point to ROADMAP.md.
+- Docs: each gap in DATA_PLACEMENT.md carries a dated state, and the WAF row now describes the Cloudflare rules that apply on /database/*.
 - Docs: CONTRIBUTING.md and the pull request template describe the changelog line, the labels in use and the addon install link.
 
 ## [desktop-v0.1.21] - 2026-11-10
