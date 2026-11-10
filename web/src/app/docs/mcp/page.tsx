@@ -114,6 +114,24 @@ export default function McpOverview() {
         item, npc, object, quest and zone append at indices 8 through 12. For example, faction gameId 72 remains record 1,010,000,072. The table order above is not the index order.
       </P>
 
+      <H3 id="realm-names">Realm names</H3>
+      <P>
+        <C>market_value</C> and <C>auction_history</C> take a realm&apos;s full name as the game&apos;s realm list shows it, such
+        as <C>CAMWOW US1 Realm 4 PvP</C>, in any case. A name of at least two words that is the end of exactly one realm&apos;s
+        full name, in whole words, is read as that realm (a one-word name never resolves): <C>US1 Realm 4 PvP</C> answers for <C>CAMWOW US1 Realm 4 PvP</C>, and the answer says
+        so. A name that ends several realms&apos; names (<C>Realm 4 PvP</C> once US1 and EU1 both have prices) is ambiguous,
+        and one no scan uses is unknown: both answer with the realms to ask with instead, closest first, never with an empty
+        market. The page carries <C>realmStatus</C> (<C>exact</C>, <C>alias</C>, <C>ambiguous</C> or <C>unknown</C>) and, when
+        they apply, <C>askedRealm</C> and <C>candidates</C>. Realms are never merged: each realm, ruleset and auction house is
+        its own market.
+      </P>
+      <P>
+        Both tools publish a day by the market&apos;s rule: 3 reporters, or, while few players upload, a day Everloot&apos;s
+        own installs scanned, labelled &quot;includes Everloot&apos;s own scans&quot;. <C>auction_history</C> lists the
+        public full-scan days <C>market_value</C> values the item by (<C>page.scanDays</C>), then the single listings players
+        saw while browsing (<C>page.points</C>), a separate source with its own count.
+      </P>
+
       <H3 id="structured-content">structuredContent</H3>
       <P>
         Tools with an output schema return <C>structuredContent</C> beside the text, of the shape in their schema file at{" "}
