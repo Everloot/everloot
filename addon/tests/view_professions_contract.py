@@ -213,8 +213,9 @@ assert(c.page.shown and p.toggle.text == 'Ranks and trainers' and not p.blocks[1
 for id, n in pairs(calls) do assert(n == 1, 'item ' .. id .. ' priced ' .. n .. ' times in one redraw') end
 assert(calls[2678] == 1 and calls[2840] == 1)
 assert(c.age.text == 'Market values from the price file built 2026-10-29 (1 day ago), all houses; a vendor price when it is lower.', c.age.text)
-assert(c.note.text == 'Value and profit are per item: how many items a craft makes is not recorded.')
-assert(c.head.value.text == 'Value per item')
+assert(c.note.text == 'Value is per item. Est. profit assumes one item per craft: how many items a craft makes is not recorded.')
+assert(c.head.value.text == 'Value per item' and c.head.profit.text == 'Est. profit (1/craft)', c.head.profit.text)
+assert(c.sortButton.text == 'Sort: est. profit' and c.filterButton.text == 'Est. profitable only', c.filterButton.text)
 local function row(i) local r = c.rows[i]; return r.shown and r.name.text or nil end
 -- Sorted by profit: known profits highest first, then no product price, then unknown costs, by name.
 assert(row(1) == 'Smelt Copper' and row(2) == 'Spiced Wolf Meat' and row(3) == 'Herb Baked Egg'
@@ -229,10 +230,10 @@ assert(r2.cost.text == M(60) and r2.value.text == M(45) and r2.profit.text == M(
 -- No output price: the cost stands, the value says so, no profit.
 local r3 = c.rows[3]
 assert(r3.cost.text == M(40) and r3.value.shown and r3.value.text == 'no price' and r3.profit.text == '-', r3.value.text)
--- Partly unpriced: never a zero.
+-- Partly unpriced: never a zero, and the product's value still shows.
 local r4 = c.rows[4]
-assert(r4.cost.text == 'cost unknown (1 reagent unpriced)' and not r4.value.shown and r4.profit.text == '-', r4.cost.text)
-assert(c.rows[5].cost.text == 'cost unknown (2 reagents unpriced)', c.rows[5].cost.text)
+assert(r4.cost.text == 'unknown (1 unpriced)' and r4.value.shown and r4.value.text == M(100) and r4.profit.text == '-', r4.cost.text)
+assert(c.rows[5].cost.text == 'unknown (2 unpriced)' and c.rows[5].value.text == M(500), c.rows[5].cost.text)
 for i = 1, 5 do assert(not c.rows[i].cost.text:find('^0') and c.rows[i].cost.text ~= M(0)) end
 
 -- What to buy for the first row by default.
@@ -240,6 +241,7 @@ local b = c.buy
 assert(b.title.text == 'What to buy: 1 × Smelt Copper', b.title.text)
 assert(b.lines[1].shown and b.lines[1].text == '1 × Copper Ore · ' .. M(20) .. ' each · ' .. M(20), b.lines[1].text)
 assert(not b.lines[2].shown and b.total.text == 'Total: ' .. M(20), b.total.text)
+assert(not b.up.shown and not b.down.shown, 'one reagent needs no paging')
 -- Choose Spiced Wolf Meat and eleven crafts.
 c.rows[2].scripts.OnClick()
 b.steps[4].scripts.OnClick()
@@ -299,7 +301,7 @@ local c = p.craft
 assert(c.age.text:find('^No price file in the game yet'), c.age.text)
 local names = {}
 for i = 1, 5 do names[c.rows[i].name.text] = c.rows[i] end
-assert(names['Spiced Wolf Meat'].cost.text == 'cost unknown (1 reagent unpriced)')
+assert(names['Spiced Wolf Meat'].cost.text == 'unknown (1 unpriced)')
 assert(names['Smelt Copper'].cost.text == U.MoneyShort(30) and names['Smelt Copper'].value.text == 'no price')
 assert(not U.failed)
 """)
@@ -314,6 +316,88 @@ assert(c.age.text == 'OLD FILE: market values from 2026-10-20 (10 days ago). The
 assert(c.age.color[1] == 1 and c.age.color[2] == 0.4)
 assert(not U.failed)
 """)
+# A reagent name this install saw with two item ids is ambiguous: unpriced, never the last id's price, and the
+# client's lookup by name does not settle it. Before, a second Copper Ore id at 50c turned Smelt Copper's 20c into 50c.
+AMBIGUOUS_RECORDS = CRAFT_RECORDS.replace("{ itemId = 2770, name = 'Copper Ore' },",
+                                          "{ itemId = 2770, name = 'Copper Ore' }, { itemId = 99001, name = 'Copper Ore' },"
+                                          " { itemId = 2672, name = 'Wolf Meat' },")
+assert AMBIGUOUS_RECORDS != CRAFT_RECORDS
+AMBIGUOUS_ROWS = PRICE_ROWS + ";99001,50,45,55,10,2026-10-29,3"
+lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {AMBIGUOUS_RECORDS} }}",
+            API + price_file("2026-10-29T06:00:00Z").replace(PRICE_ROWS, AMBIGUOUS_ROWS).replace(
+                str(zlib.adler32(PRICE_ROWS.encode())), str(zlib.adler32(AMBIGUOUS_ROWS.encode())))
+            + "GetItemInfo = function(name) if name == 'Copper Ore' then return name, '|Hitem:2770::|h[Copper Ore]|h' end end\n")
+lua.execute("""
+local U = Everloot.Window
+local M = U.MoneyShort
+assert(Everloot.ItemIdFrom('Copper Ore') == 2770, 'the client would name one id')
+assert(U.Open('professions') == true)
+local p = EverlootWindow.professions
+p.toggle.scripts.OnClick()
+local c = p.craft
+local smelt
+for i = 1, 6 do if c.rows[i].shown and c.rows[i].name.text == 'Smelt Copper' then smelt = c.rows[i] end end
+assert(smelt and smelt.cost.text == 'unknown (1 unpriced)' and smelt.value.text == M(150) and smelt.profit.text == '-',
+  smelt and smelt.cost.text)
+smelt.scripts.OnClick()
+assert(c.buy.lines[1].text == '1 × Copper Ore · unpriced (ambiguous name)', c.buy.lines[1].text)
+assert(c.buy.total.text == 'Total unknown: 1 reagent unpriced', c.buy.total.text)
+-- The same id seen twice is not ambiguous: Wolf Meat stays priced.
+c.rows[1].scripts.OnClick()
+assert(c.rows[1].name.text == 'Spiced Wolf Meat' and c.rows[1].cost.text == M(60), c.rows[1].name.text)
+assert(not U.failed)
+""")
+
+# Seven reagents: five lines, then Down for the other two; every reagent and quantity is reachable, the total counts
+# them all, and choosing another recipe starts it at its first page.
+SEVEN = "{ profession = 'Mining', recipe = 'Seven Ores', recipeId = 30, learned = true, productItemId = 2840, reagents = { " + \
+    ", ".join(f"{{ item = 'Ore {i}', count = {i} }}" for i in range(1, 8)) + " } }"
+SEVEN_ITEMS = ", ".join(f"{{ itemId = {3000 + i}, name = 'Ore {i}' }}" for i in range(1, 8))
+SEVEN_RECORDS = CRAFT_RECORDS.replace("  recipe_observed = {\n", "  recipe_observed = {\n    " + SEVEN + ",\n", 1) \
+    .replace("  item_seen = {\n", "  item_seen = {\n    " + SEVEN_ITEMS + ",\n", 1) \
+    .replace("{ vendorNpcId = 1, items = { ", "{ vendorNpcId = 1, items = { "
+             + ", ".join(f"{{ itemId = {3000 + i}, priceCopper = {i} }}" for i in range(1, 8)) + ", ", 1)
+assert SEVEN_RECORDS.count("Ore 7") == 2 and "itemId = 3007, priceCopper = 7" in SEVEN_RECORDS
+lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {SEVEN_RECORDS} }}", API + price_file("2026-10-29T06:00:00Z"))
+lua.execute("""
+local U = Everloot.Window
+local M = U.MoneyShort
+assert(U.Open('professions') == true)
+local p = EverlootWindow.professions
+p.toggle.scripts.OnClick()
+local c = p.craft
+c.sortButton.scripts.OnClick()
+local seven
+for i = 1, 8 do if c.rows[i].shown and c.rows[i].name.text == 'Seven Ores' then seven = c.rows[i] end end
+assert(seven, 'the seven-reagent recipe is listed')
+seven.scripts.OnClick()
+c.buy.steps[3].scripts.OnClick()
+local b = c.buy
+assert(b.title.text == 'What to buy: 2 × Seven Ores', b.title.text)
+for i = 1, 5 do
+  assert(b.lines[i].shown and b.lines[i].text == (2 * i) .. ' × Ore ' .. i .. ' · ' .. M(i) .. ' each (vendor) · ' .. M(2 * i * i),
+    b.lines[i].text)
+end
+assert(not b.up.shown and b.down.shown, 'Down for the rest')
+-- 2 × (1 + 4 + 9 + 16 + 25 + 36 + 49)
+assert(b.total.text == 'Total: ' .. M(280), b.total.text)
+b.down.scripts.OnClick()
+assert(b.lines[1].text == '12 × Ore 6 · ' .. M(6) .. ' each (vendor) · ' .. M(72), b.lines[1].text)
+assert(b.lines[2].text == '14 × Ore 7 · ' .. M(7) .. ' each (vendor) · ' .. M(98), b.lines[2].text)
+assert(not b.lines[3].shown and b.up.shown and not b.down.shown)
+assert(b.total.text == 'Total: ' .. M(280), b.total.text)
+-- The page holds while the count changes, and Up goes back.
+b.steps[3].scripts.OnClick()
+assert(b.lines[2].text == '21 × Ore 7 · ' .. M(7) .. ' each (vendor) · ' .. M(147), b.lines[2].text)
+b.up.scripts.OnClick()
+assert(b.lines[1].text == '3 × Ore 1 · ' .. M(1) .. ' each (vendor) · ' .. M(3) and b.down.shown, b.lines[1].text)
+-- Another recipe starts at its first page.
+b.down.scripts.OnClick()
+c.rows[1].scripts.OnClick()
+assert(b.lines[1].shown and b.lines[1].text:find(' × ') and not b.up.shown and not b.down.shown, b.lines[1].text)
+assert(not U.failed)
+""")
+
 # No recipes recorded: the page says how to read them, and the what-to-buy box asks for a recipe.
 lua = fresh("{ installId = 'abcd-1234', toggles = {}, records = {} }", API)
 lua.execute("""
@@ -327,5 +411,5 @@ assert(not c.rows[1].shown and c.buy.total.text == 'Choose a recipe in the list.
 """)
 print("Lua 5.1 Professions view: book ranks with bars, recipe counts by colour and the newest read date, next trainer "
       "recipes with cost and trainer, other characters' professions, the open-the-window line, no book, no professions; "
-      "crafting costs with vendor-cheaper reagents, unpriced reagents and products, profit and name sort, the profitable "
-      "filter, what-to-buy totals and the price file's age")
+      "crafting costs with vendor-cheaper reagents, unpriced reagents and products, ambiguous reagent names, estimated "
+      "profit and name sort, the profitable filter, what-to-buy totals with reagent paging and the price file's age")

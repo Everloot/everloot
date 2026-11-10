@@ -35,8 +35,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   goes, and the cross-field rules the server checks. The sidebar lists them and the schemas table links each kind to its page.
 - Site: the API docs list the site-internal routes, `/api/suggest` and `/api/map/pins`, with a note that they serve the site's pages, may change without notice and are not part of the protocol.
 - Addon: the window's Professions tab has a Crafting costs page: each recipe you have recorded with its reagents' cost
-  at market value (or a cheaper vendor price), the product's value per item and the profit, sorted by profit or
-  name, with the price file's age. A reagent without a price shows the cost as unknown, never zero. Pick a recipe
+  at market value (or a cheaper vendor price), the product's value per item and an estimated profit assuming one item
+  per craft, sorted by that estimate or name, with the price file's age. A reagent without a price shows the cost as unknown, never zero. Pick a recipe
   and a count for a what-to-buy list of reagents and their total.
 - Site: the account guide and the addon page link the sample character page (/showcase/character), so a player can see
   what a character page holds before linking one. The sample stays out of search and the sitemap.
