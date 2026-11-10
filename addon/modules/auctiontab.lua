@@ -4,6 +4,9 @@
 -- their tab system, so their code is never changed: it shows a panel over the house, and clicking any of
 -- their tabs hides it. Nothing here posts, bids or buys, and a scan starts only from the player's click.
 -- With the Everloot window's file loaded (modules/window.lua) the panel wears that window's look.
+-- A button at its top right swaps the panel for the shopping lists (modules/shopping.lua): the active list with each
+-- item's wanted count, max price, market value and what a search found, and a Search button per item that sends one
+-- search per press.
 
 local E = Everloot
 local T = {}
@@ -16,6 +19,13 @@ local sessionStart = time()   -- a scan before this load is already in the saved
 local COLUMN, SCROLLBAR, PAD, GAP = 460, 26, 8, 12
 local HINT = "Type an item's name or id, or shift-click an item here."
 local NONE = "No Everloot price for that item on this realm yet."
+-- The shopping page: rows on screen at once, their height, and each column's left edge and width.
+local SHOP_ROWS, SHOP_ROW_H = 10, 18
+local SHOP_COLUMNS = { { "name", 0, 220 }, { "want", 226, 40 }, { "max", 272, 90 }, { "market", 368, 130 }, { "found", 504, 90 } }
+local SHOP_HELP = "Item: a name, an id or shift-click. Want: how many. Max each: like 1g 50s, blank for no limit."
+local SHOP_EMPTY = "Nothing on this list yet. Add an item above, or a recipe's reagents from the Professions tab of the Everloot window."
+local FALLBACK_COLORS = { text = { 1, 1, 1, 1 }, muted = { 0.788, 0.765, 0.69, 1 }, accent = { 0.612, 0.941, 0.227, 1 } }
+local WARN = { 1, 0.4, 0.4, 1 }  -- the tooltip's warning red (prices.lua)
 
 local function realmName()
   -- A realm name the client will not let the addon read is unknown, like a missing one.
@@ -216,6 +226,243 @@ local function layout(panel, width)
   layoutResults(panel)
 end
 
+-- Shopping lists -------------------------------------------------------------------------------------------------
+
+local function tone(name)
+  local W = E.Window
+  return (W and W.COLORS and W.COLORS[name]) or FALLBACK_COLORS[name]
+end
+
+local function shopButton(parent, label, w, onClick)
+  local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+  b:SetSize(w, 20)
+  b:SetText(label)
+  b:SetScript("OnClick", function()
+    local shop = T.panel and T.panel.shop
+    if shop and onClick ~= shop.deleteClick then shop.confirmDelete = false end
+    onClick()
+    T.RefreshShop()
+  end)
+  return b
+end
+
+local function shopBox(parent, w, x, y)
+  local b = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
+  b:SetSize(w, 20)
+  b:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+  if b.SetAutoFocus then b:SetAutoFocus(false) end
+  b:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+  return b
+end
+
+local function say(text) E.Shopping.message = text end
+
+-- Adds what the three boxes say to the active list, or updates the item when it is already there.
+local function addFromBoxes(shop)
+  local S = E.Shopping
+  local id = E.ItemIdFrom(shop.itemBox:GetText() or "")
+  if not id then return say("Type an item's name or id, or shift-click an item into the Item box.") end
+  local wantText = (shop.wantBox:GetText() or ""):gsub("%s", "")
+  local want = wantText == "" and 1 or tonumber(wantText)
+  if not want or want < 1 or want ~= math.floor(want) then return say("Want is a whole number of at least 1.") end
+  local max, blank = S.ParseMoney(shop.maxBox:GetText())
+  if not max and not blank then return say("Max each reads like 1g 50s, 75s or 2 (gold); leave it blank for no limit.") end
+  local item, why = S.Set(id, want, max, S.ItemName(id))
+  if not item then return say(why) end
+  shop.itemBox:SetText(""); shop.wantBox:SetText(""); shop.maxBox:SetText("")
+  say("Saved " .. (S.ItemName(id, item.name) or ("item " .. id)) .. ": want " .. item.want
+    .. (item.max and (", max " .. E.Coins(item.max) .. " each.") or ", no max."))
+end
+
+-- One list row: the item (a click puts it in the boxes to change), its numbers, Search and remove.
+local function drawShopRow(line, item)
+  local S = E.Shopping
+  line.item = item
+  line.name:SetText(S.ItemName(item.itemId, item.name) or ("Item " .. item.itemId))
+  line.name:SetTextColor(unpack(tone("text")))
+  line.want:SetText(tostring(item.want))
+  line.max:SetText(item.max and S.Money(item.max) or "no limit")
+  line.max:SetTextColor(unpack(tone(item.max and "text" or "muted")))
+  local market = S.Market(item.itemId)
+  if market then
+    local age, stale = S.Age(market.day)
+    line.market:SetText(S.Money(market.market) .. " · " .. age)
+    line.market:SetTextColor(unpack(stale and WARN or tone("text")))
+  else
+    line.market:SetText("no price")
+    line.market:SetTextColor(unpack(tone("muted")))
+  end
+  local f = S.Found(item.itemId)
+  if f and f.min then
+    line.found:SetText(S.Money(f.min) .. " ×" .. f.quantity)
+    line.found:SetTextColor(unpack(tone((not item.max or f.min <= item.max) and "accent" or "text")))
+  else
+    line.found:SetText(f and "none" or "-")
+    line.found:SetTextColor(unpack(tone("muted")))
+  end
+end
+
+--- Draws the shopping page from the saved lists: the active list's name, the file's age, a page of items, the last
+--- thing a search or a button said, and the caps.
+function T.RefreshShop()
+  local shop = T.panel and T.panel.shop
+  local S = E.Shopping
+  if not (shop and S) then return end
+  local db = S.DB()
+  local list, index = S.Active()
+  shop.listName:SetText(list and (list.name .. "  |cffc9c3b0" .. index .. " of " .. #db.lists .. "|r") or "No list yet")
+  local fileLine, warn = S.FileLine()
+  shop.file:SetText(fileLine)
+  shop.file:SetTextColor(unpack(warn and WARN or tone("muted")))
+  local items = list and list.items or {}
+  shop.offset = math.min(shop.offset, math.floor(math.max(#items - 1, 0) / SHOP_ROWS) * SHOP_ROWS)
+  for i, line in ipairs(shop.rows) do
+    local item = items[shop.offset + i]
+    if item then drawShopRow(line, item); line:Show() else line.item = nil; line:Hide() end
+  end
+  if #items == 0 then shop.empty:Show() else shop.empty:Hide() end
+  if shop.offset > 0 then shop.up:Show() else shop.up:Hide() end
+  if shop.offset + SHOP_ROWS < #items then shop.down:Show() else shop.down:Hide() end
+  shop.message:SetText(S.message or "")
+  shop.deleteButton:SetText(shop.confirmDelete and "Confirm" or "Delete")
+end
+
+-- The shopping page: list controls, the add boxes, a line on the price file, the column heads, the rows, then the
+-- last message and the caps above the panel's footer. It covers the scan controls and the lookup while shown.
+local function buildShop(panel)
+  local S = E.Shopping
+  local shop = { offset = 0, rows = {} }
+  local page = CreateFrame("Frame", nil, panel)
+  page:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -46)
+  page:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -16, 30)
+  page:Hide()
+  shop.page = page
+
+  local prev = shopButton(page, "<", 24, function() S.Select(select(2, S.Active()) - 1) end)
+  prev:SetPoint("TOPLEFT", page, "TOPLEFT", 0, 0)
+  shop.listName = words(page, "GameFontNormal", 13, "text")
+  shop.listName:SetPoint("TOPLEFT", page, "TOPLEFT", 30, -4)
+  shop.listName:SetWidth(176)
+  if shop.listName.SetWordWrap then shop.listName:SetWordWrap(false) end
+  local nextButton = shopButton(page, ">", 24, function() S.Select(select(2, S.Active()) + 1) end)
+  nextButton:SetPoint("TOPLEFT", page, "TOPLEFT", 210, 0)
+  shop.nameBox = shopBox(page, 130, 252, 0)
+  if shop.nameBox.SetMaxLetters then shop.nameBox:SetMaxLetters(S.MAX_NAME) end
+  shop.newButton = shopButton(page, "New list", 76, function()
+    local list, why = S.Create(shop.nameBox:GetText())
+    if list then shop.nameBox:SetText(""); shop.offset = 0; say("Made " .. list.name .. ".") else say(why) end
+  end)
+  shop.newButton:SetPoint("TOPLEFT", page, "TOPLEFT", 390, 0)
+  shop.renameButton = shopButton(page, "Rename", 70, function()
+    local ok, why = S.Rename(shop.nameBox:GetText())
+    if ok then shop.nameBox:SetText(""); say("Renamed.") else say(why) end
+  end)
+  shop.renameButton:SetPoint("TOPLEFT", page, "TOPLEFT", 470, 0)
+  -- Deleting takes two presses: the first asks, the second deletes. Any other button cancels it.
+  shop.deleteClick = function()
+    local list = S.Active()
+    if not list then return say("No list to delete.") end
+    if not shop.confirmDelete then
+      shop.confirmDelete = true
+      return say("Press Confirm to delete " .. list.name .. " and its " .. #list.items .. " items.")
+    end
+    shop.confirmDelete, shop.offset = false, 0
+    local _, said = S.Delete()
+    say(said)
+  end
+  shop.deleteButton = shopButton(page, "Delete", 70, shop.deleteClick)
+  shop.deleteButton:SetPoint("TOPLEFT", page, "TOPLEFT", 544, 0)
+
+  shop.itemBox = shopBox(page, 214, 6, -30)
+  shop.itemBox:SetScript("OnEnterPressed", function(self) self:ClearFocus(); addFromBoxes(shop); T.RefreshShop() end)
+  shop.wantBox = shopBox(page, 40, 230, -30)
+  shop.maxBox = shopBox(page, 90, 276, -30)
+  shop.addButton = shopButton(page, "Add or update", 120, function() addFromBoxes(shop) end)
+  shop.addButton:SetPoint("TOPLEFT", page, "TOPLEFT", 374, -30)
+  shop.help = words(page, "GameFontDisableSmall", 11, "muted")
+  shop.help:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -56)
+  shop.help:SetText(SHOP_HELP)
+  shop.file = words(page, "GameFontDisableSmall", 11, "muted")
+  shop.file:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -70)
+
+  shop.head = {}
+  local heads = { name = "Item", want = "Want", max = "Max each", market = "Market · age", found = "Lowest found" }
+  for _, col in ipairs(SHOP_COLUMNS) do
+    local s = words(page, "GameFontDisableSmall", 11, "muted")
+    s:SetPoint("TOPLEFT", page, "TOPLEFT", col[2], -90)
+    s:SetWidth(col[3])
+    if col[1] ~= "name" then s:SetJustifyH("RIGHT") end
+    s:SetText(heads[col[1]])
+    shop.head[col[1]] = s
+  end
+  for i = 1, SHOP_ROWS do
+    local line = CreateFrame("Button", nil, page)
+    line:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -106 - (i - 1) * SHOP_ROW_H)
+    line:SetSize(686, SHOP_ROW_H)
+    for _, col in ipairs(SHOP_COLUMNS) do
+      local s = words(line, "GameFontHighlightSmall", 12, "text", col[1] ~= "name")
+      s:SetPoint("LEFT", line, "LEFT", col[2], 0)
+      s:SetWidth(col[3])
+      if s.SetWordWrap then s:SetWordWrap(false) end
+      if col[1] ~= "name" then s:SetJustifyH("RIGHT") end
+      line[col[1]] = s
+    end
+    -- A click on the row puts the item in the boxes, to change its numbers with Add or update.
+    line:SetScript("OnClick", function()
+      local item = line.item
+      if not item then return end
+      shop.itemBox:SetText(S.ItemName(item.itemId, item.name) or tostring(item.itemId))
+      shop.wantBox:SetText(tostring(item.want))
+      shop.maxBox:SetText(item.max and E.Coins(item.max) or "")
+    end)
+    -- The row's buttons are its children, so they hide with it. Search sends one search per press.
+    line.search = shopButton(line, "Search", 60, function()
+      if line.item then S.Search(line.item.itemId, line.item.name) end
+    end)
+    line.search:SetPoint("LEFT", line, "LEFT", 600, 0)
+    line.remove = shopButton(line, "x", 22, function()
+      if line.item and S.Remove(line.item.itemId) then say("Removed " .. (S.ItemName(line.item.itemId, line.item.name) or "the item") .. ".") end
+    end)
+    line.remove:SetPoint("LEFT", line, "LEFT", 664, 0)
+    shop.rows[i] = line
+  end
+  shop.empty = words(page, "GameFontHighlightSmall", 12, "muted")
+  shop.empty:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -108)
+  shop.empty:SetWidth(560)
+  shop.caps = words(page, "GameFontDisableSmall", 10, "muted")
+  shop.caps:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", 0, 0)
+  shop.caps:SetText(S.CAPS .. " Nothing is uploaded, bought or posted for you.")
+  shop.message = words(page, "GameFontHighlightSmall", 12, "text")
+  shop.message:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", 0, 16)
+  shop.message:SetWidth(560)
+  shop.up = shopButton(page, "Up", 48, function() shop.offset = math.max(0, shop.offset - SHOP_ROWS) end)
+  shop.up:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -54, 12)
+  shop.down = shopButton(page, "Down", 48, function() shop.offset = shop.offset + SHOP_ROWS end)
+  shop.down:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", 0, 12)
+  shop.empty:SetText(SHOP_EMPTY)
+  panel.shop = shop
+  S.OnChange = T.RefreshShop
+end
+
+--- Shows the price lookup ("lookup") or the shopping lists ("shop"); each hides what the other shows.
+function T.SetMode(mode)
+  local panel = T.panel
+  if not (panel and panel.shop) then return end
+  local shopping = mode == "shop"
+  panel.mode = shopping and "shop" or "lookup"
+  for _, part in ipairs({ panel.intro, panel.scanButton, panel.shareButton, panel.status, panel.lookupLabel, panel.lookup, panel.results }) do
+    if shopping then part:Hide() else part:Show() end
+  end
+  if shopping then
+    panel.shop.page:Show()
+    T.RefreshShop()
+  else
+    panel.shop.confirmDelete = false
+    panel.shop.page:Hide()
+  end
+  panel.modeButton:SetText(shopping and "Price lookup" or "Shopping list")
+end
+
 --- Looks up what the player typed and shows it in the panel.
 function T.ShowResult(text)
   if T.panel then render(T.panel, T.Result(text)) end
@@ -223,6 +470,9 @@ end
 
 function T.Refresh()
   if T.panel and T.panel.status then T.panel.status:SetText(table.concat(T.StatusLines(), "\n")) end
+  -- A search the house never answered is let go after a while; the shopping page redraws its ages and results.
+  if E.Shopping then E.Shopping.Tick() end
+  if T.panel and T.panel.mode == "shop" then T.RefreshShop() end
 end
 
 function T.Show()
@@ -287,6 +537,7 @@ local function buildPanel(house)
   local label = words(panel, "GameFontNormal", 13, "text")
   label:SetPoint("TOPLEFT", status, "BOTTOMLEFT", 0, -16)
   label:SetText("Look up a price")
+  panel.lookupLabel = label
   local box = CreateFrame("EditBox", "EverlootAuctionLookup", panel, "InputBoxTemplate")
   box:SetSize(260, 20)
   box:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 6, -6)
@@ -332,6 +583,16 @@ local function buildPanel(house)
   panel.unit:SetText("per unit")
   panel.message = words(content, "GameFontHighlightSmall", 12, "muted")
   render(panel, { message = HINT })
+  -- The shopping lists, behind a button at the top right, when their file is loaded.
+  if E.Shopping then
+    buildShop(panel)
+    panel.mode = "lookup"
+    panel.modeButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    panel.modeButton:SetSize(120, 22)
+    panel.modeButton:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -16, -12)
+    panel.modeButton:SetText("Shopping list")
+    panel.modeButton:SetScript("OnClick", function() T.SetMode(panel.mode == "shop" and "lookup" or "shop") end)
+  end
   -- A hook, not a script: the backdrop template keeps its own size handler.
   panel:HookScript("OnSizeChanged", function(self, width) layout(self, width) end)
 
@@ -348,8 +609,11 @@ end
 local function hookLinks()
   if T.linksHooked or not hooksecurefunc then return end
   local function insert(link)
-    local box = T.panel and T.panel.lookup
-    if box and box.HasFocus and box:HasFocus() and type(link) == "string" then box:SetText(link) end
+    local p = T.panel
+    if not p or type(link) ~= "string" then return end
+    for _, box in pairs({ p.lookup, E.Shopping and p.shop and p.shop.itemBox or nil }) do
+      if box.HasFocus and box:HasFocus() then box:SetText(link) end
+    end
   end
   if ChatEdit_InsertLink then hooksecurefunc("ChatEdit_InsertLink", insert) end
   T.linksHooked = true

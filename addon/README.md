@@ -99,6 +99,21 @@ When scans are on, the cooldown is over and no scan is running, opening the auct
 the next visit. It never scans by itself. `/everloot scanprompt off` turns it off (the **Everloot scan**
 button and `/everloot scan` still work). With scans off, the first visit prints one line saying how to opt in.
 
+### Shopping lists
+
+**Shopping list**, at the top right of the Everloot tab at the auction house, swaps the scan controls and the price
+lookup for your shopping lists; **Price lookup** swaps back. A list holds items with how many you want and, if you
+like, the most you will pay per unit. Add an item by name, id or shift-click with **Add or update** (click a row to
+change it), or from the Everloot window: **Professions**, **Crafting costs**, choose a recipe and a count, then
+**Add to shopping list** adds its reagents to the active list (a reagent name seen with two item ids is skipped and
+said). Each row shows the price file's market value with how old that item's value is (red past two days), and a line
+above the rows says when the file was built and which auction house its values are for. **Search** sends one
+auction-house search for that item, only when you press it and only when the client's search throttle is ready, and
+never while a scan or another search is waiting; the lowest buyout found and how many are listed show in the row,
+lit when within your max. Blizzard's Buy tab shows the same results for you to buy there yourself: nothing is bought,
+bid on or posted for you. Lists are kept in your saved file only, never uploaded: up to 10 lists of 50 items, and
+the page says so. Wanted counts are your own numbers; your bags and bank are not read.
+
 ## Commands
 
 Every command the addon answers. This table is the source for the in-game help line (`core.lua`) and the
@@ -284,7 +299,8 @@ Left-click the minimap button, or `/everloot window`, for the Everloot window. I
   name, and says how old the price file is. How many items a craft makes is not recorded, so the estimate assumes one
   item per craft. A reagent without a price makes the cost unknown, never zero; so does a reagent name this install
   has seen with two item ids. Choose a recipe and a count for what to buy: each reagent, how many and what they cost,
-  with Up and Down past five reagents. Your bags and bank are not read.
+  with Up and Down past five reagents. **Add to shopping list** adds those reagents to your active shopping list (see
+  Shopping lists). Your bags and bank are not read.
 - **Settings** opens this page. "What you've added", the row counts in your saved file, is on that page now.
 
 Ask, Build plan and Auctions are no longer in the sidebar. `/ask` and `/everloot plan` (the planner workspace) still work.
@@ -566,7 +582,8 @@ addon/
 │   ├── options.lua     the settings page (Esc > Options > AddOns > Everloot, or /everloot options)
 │   ├── minimap.lua     the minimap button: left-click the window, right-click the settings
 │   ├── drawer.lua      the button drawer: other addons' minimap buttons gathered into the Everloot button
-│   ├── auctiontab.lua  the Everloot tab at the auction house: scan, cooldown, Share now, price lookup
+│   ├── shopping.lua    shopping lists saved in your file: items, wanted counts, max prices; one search per press
+│   ├── auctiontab.lua  the Everloot tab at the auction house: scan, cooldown, Share now, price lookup, shopping lists
 │   ├── addons.lua      your installed addons' names, titles and versions; off until enabled
 │   ├── mapbounds.lua   each zone's corners in world coordinates, once per zone per build
 │   ├── talents.lua     your talent build per spec group, plus the game's own loadout string
