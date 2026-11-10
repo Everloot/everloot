@@ -92,3 +92,16 @@ test("a run writes the three files beside item-names.json, for the snapshot's bu
   expect(spells).toEqual({ schema: SPELL_NAMES_SCHEMA, build: { version: B1 }, count: 2, names: { 3275: "Linen Bandage", 1316597: "Stock Crate" } });
   expect(run.spells.counts).toEqual({ ids: 2, named: 2 });
 });
+
+test("wiki NPC and fallback spell catalogs preserve source pages and omit conflicting names", () => {
+  const { dir, snapshotPath, kbPath } = fixtures();
+  const db = new Database(kbPath);
+  const add = (kind: string, id: string, name: string) => db.prepare("INSERT INTO entities (kind, name, data, source_id, source_url, licence, retrieved_at) VALUES ('lore_page', ?, ?, 'warcraft-wiki-2023', ?, 'CC-BY-SA-4.0', '2023-11-13')").run(name, JSON.stringify({ type: kind, infobox: { template: kind === "npc" ? "npcbox" : "infobox spell", fields: { id, name } } }), page(name));
+  add("npc", "448", "Hogger");
+  add("npc", "999", "First"); add("npc", "999", "Other");
+  add("spell", "10", "Blizzard");
+  db.close();
+  const run = runGameNames({ snapshotPath, kbPath, outDir: join(dir, "assets") });
+  expect(JSON.parse(readFileSync(run.wikiEntities[0]!.path, "utf8")).names).toEqual({ 448: { n: "Hogger", w: "Hogger" } });
+  expect(JSON.parse(readFileSync(run.wikiEntities[1]!.path, "utf8")).names).toEqual({ 10: { n: "Blizzard", w: "Blizzard" } });
+});

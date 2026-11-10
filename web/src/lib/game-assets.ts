@@ -419,7 +419,7 @@ async function loadNamesFile<T extends { version: string }>(file: string, versio
 }
 
 /** `loadNamesFile`, distinguishing a failed read and a present file that failed parsing from absence. */
-async function readNamesFile<T extends { version: string }>(file: string, version: string, base: string | null, store: PrivateStore | null, parse: (raw: unknown) => T | null): Promise<T | null | typeof PRIVATE_UNREACHABLE | typeof PRIVATE_MALFORMED> {
+export async function readNamesFile<T extends { version: string }>(file: string, version: string, base: string | null, store: PrivateStore | null, parse: (raw: unknown) => T | null): Promise<T | null | typeof PRIVATE_UNREACHABLE | typeof PRIVATE_MALFORMED> {
   const folder = base ? buildFolder(base) : null;
   if (!folder || !store) return null;
   const raw = await store.read(`${folder}/${file}`);

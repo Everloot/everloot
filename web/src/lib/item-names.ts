@@ -165,7 +165,7 @@ const FACT_LINE = ITEM_FACTS.map((fact) => ({
     : new RegExp(`^\\+?${NUMBER} ${escape(FACT_WORD[fact])}$`),
 }));
 const rank = (fact: ItemFactName) => ITEM_FACTS.indexOf(fact);
-const factOf = (line: string) => FACT_LINE.find((f) => f.re.test(line))?.fact ?? null;
+const factOf = (line: string) => FACT_LINE.find((f) => f.re.test(line.replace(/ \(unconfirmed, seen by \d+ players?\)$/, "")))?.fact ?? null;
 /** The first line the game prints below the armour, stats and resistances. */
 const BELOW_STATS = /^(Classes: |Races: |Requires |Item Level |Use: |Equip: |Chance on hit: |Set: |Restrictions: |Equip and Use: |"|Sell Price: )/;
 
@@ -186,18 +186,20 @@ const installs = (n: number) => `${n.toLocaleString("en-US")} ${n === 1 ? "insta
  * and when. A contested line keeps its placeholder and says why. The reasons for the stat and armour placeholders go
  * once no such placeholder is left.
  */
-export function withReported<T extends Pick<ItemTipText, "lines" | "why" | "partial">>(tip: T, state: Pick<ItemFactState, "shown" | "contested">): T {
-  if (!state.shown.length && !state.contested.length) return tip;
+export function withReported<T extends Pick<ItemTipText, "lines" | "why" | "partial">>(tip: T, state: Pick<ItemFactState, "shown" | "contested" | "unconfirmed">): T {
+  if (!state.shown.length && !state.contested.length && !state.unconfirmed?.length) return tip;
   const lines = [...tip.lines];
   const evidence: string[] = [];
-  for (const f of state.shown) {
-    const text = factLine(f.fact, f.value);
+  for (const f of [...state.shown, ...(state.unconfirmed ?? [])]) {
+    const pending = f.reporters < 3;
+    const text = factLine(f.fact, f.value) + (pending ? ` (unconfirmed, seen by ${f.reporters} ${f.reporters === 1 ? "player" : "players"})` : "");
     const at = lines.indexOf(factLine(f.fact, null));
     if (at >= 0) lines[at] = text;
     else lines.splice(slotFor(lines, f.fact), 0, text);
     const seen = f.lastSeen ? f.lastSeen.slice(0, 10) : PLACEHOLDER;
     evidence.push(`${text.replace(/^\((.*)\)$/, "$1")}: reported by ${installs(f.reporters)}, last seen ${seen}, build ${f.build}.`);
   }
+  if (state.unconfirmed?.length) evidence.push("Help confirm these values: install the addon at /addon.");
   const why = tip.why.filter((w) =>
     !(w === WHY.stats && !lines.some((l) => l.startsWith(`+${PLACEHOLDER} `))) && !(w === WHY.armor && !lines.includes(factLine("armor", null))));
   const disputed = state.contested.filter((fact) => lines.includes(factLine(fact, null))).map((fact) => FACT_WORD[fact]);
