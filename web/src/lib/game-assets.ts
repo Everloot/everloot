@@ -282,15 +282,17 @@ export async function loadItemTips(assets: SiteAssets | null, ids: readonly numb
 /**
  * `loadItemTips`, and whether a read of the private bucket failed (its index or a shard), so a reader that must not
  * keep a partial answer, such as the edge-cached hover card, can tell a failure from an item with no tooltip.
+ * `degraded` is a broken folder rather than a failed read: a shard the index lists that is not there or is not a
+ * shard, or a record for an asked-for item that is not a record. An item its shard does not hold is neither.
  */
-export async function readItemTips(assets: SiteAssets | null, ids: readonly number[], store: PrivateStore | null = privateStoreFromEnv()): Promise<{ tips: Map<number, ItemTip>; unreachable: boolean }> {
+export async function readItemTips(assets: SiteAssets | null, ids: readonly number[], store: PrivateStore | null = privateStoreFromEnv()): Promise<{ tips: Map<number, ItemTip>; unreachable: boolean; degraded: boolean }> {
   const out = new Map<number, ItemTip>();
-  const result = { tips: out, unreachable: false };
+  const result = { tips: out, unreachable: false, degraded: false };
   const wanted = [...new Set(ids)].filter((id) => Number.isInteger(id) && id > 0);
   const folder = assets ? buildFolder(assets.base) : null;
   if (!assets || !store || !folder || !wanted.length) return result;
   const read = await store.read(`${folder}/items.json`);
-  if (read === PRIVATE_UNREACHABLE) return { tips: out, unreachable: true };
+  if (read === PRIVATE_UNREACHABLE) return { ...result, unreachable: true };
   const index = ItemIndexSchema.safeParse(read);
   if (!index.success || index.data.build.version !== assets.version) return result;
   const byShard = new Map<number, number[]>();
@@ -304,10 +306,13 @@ export async function readItemTips(assets: SiteAssets | null, ids: readonly numb
     const shardRead = await store.read(`${folder}/${file}`);
     if (shardRead === PRIVATE_UNREACHABLE) { result.unreachable = true; return; }
     const body = z.record(z.string(), z.unknown()).safeParse(shardRead);
-    if (!body.success) return;
+    if (!body.success) { result.degraded = true; return; }
     for (const id of ids) {
-      const r = ItemRecordSchema.safeParse(body.data[String(id)]);
+      const raw = body.data[String(id)];
+      if (raw === undefined) continue;
+      const r = ItemRecordSchema.safeParse(raw);
       if (r.success) out.set(id, itemTip(r.data, assets));
+      else result.degraded = true;
     }
   }));
   return result;

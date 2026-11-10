@@ -132,6 +132,22 @@ test("a private read that failed is told apart from an item with no tooltip: the
   expect((await readItemTips(a, [9], memoryStore({}))).unreachable).toBe(false);
 });
 
+test("a broken item folder is told apart from an item with no tooltip: a listed shard missing or not a shard, or a bad record", async () => {
+  const a = parseSiteManifest(siteManifest, BASE)!;
+  const withShard = (shard?: unknown) => memoryStore({ [`${FOLDER}/items.json`]: itemIndex, ...(shard === undefined ? {} : { [`${FOLDER}/items/0.json`]: shard }) });
+  expect(await readItemTips(a, [9, 25], withShard(shard0))).toMatchObject({ unreachable: false, degraded: false });
+  for (const [why, store] of [["missing", withShard()], ["array", withShard([shard0["9"]])], ["string", withShard("x")], ["record", withShard({ ...shard0, "9": { n: 1 } })]] as const) {
+    const read = await readItemTips(a, [9], store);
+    expect(read, why).toMatchObject({ unreachable: false, degraded: true });
+    // The plain reader still just draws no tooltip.
+    expect((await loadItemTips(a, [9], store)).size, why).toBe(0);
+  }
+  // A bad record for another item, an item the shard does not hold, no index or another build: not degraded.
+  expect((await readItemTips(a, [25, 30], withShard({ ...shard0, "9": { n: 1 } }))).degraded).toBe(false);
+  expect((await readItemTips(a, [9], memoryStore({}))).degraded).toBe(false);
+  expect((await readItemTips(a, [9], memoryStore({ [`${FOLDER}/items.json`]: { ...itemIndex, build: { version: "9.9.9.1" } } }))).degraded).toBe(false);
+});
+
 test("the private bucket needs all four server-only variables, signs its reads, and keeps what it read", async () => {
   expect(privateStoreFromEnv({})).toBeNull();
   expect(privateStoreFromEnv({ GAME_DATA_S3_ENDPOINT: "https://r2.example.test", GAME_DATA_BUCKET: "private" })).toBeNull();

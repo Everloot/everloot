@@ -3,18 +3,24 @@ import { beforeEach, expect, test, vi } from "vitest";
 // Players agree on one item name (19019) and one quest; the name rule shows a wiki-matched item (647) and a
 // wiki quest title (176). Item 5 is in the game files only: no card, as on its page.
 const mocks = vi.hoisted(() => ({
-  items: vi.fn(), world: vi.fn(), reported: vi.fn(), objects: vi.fn(), assets: vi.fn(), tips: vi.fn(), quests: vi.fn(), shown: vi.fn(), names: vi.fn(), tipsDown: vi.fn(),
+  items: vi.fn(), world: vi.fn(), reported: vi.fn(), objects: vi.fn(), assets: vi.fn(), tips: vi.fn(), quests: vi.fn(), shown: vi.fn(), names: vi.fn(), tipsDown: vi.fn(), store: vi.fn(),
 }));
 vi.mock("@/lib/rollup-compute", () => ({ loadItemFacts: mocks.items, loadWorldFacts: mocks.world, loadReportedItemFacts: mocks.reported, loadAllReportedItemFacts: vi.fn() }));
 vi.mock("@/lib/objects", () => ({ loadObjectFacts: mocks.objects }));
 vi.mock("@/lib/game-assets", () => ({
   loadSiteAssets: mocks.assets, loadItemTips: mocks.tips, loadQuestNames: mocks.quests, readQuestNames: mocks.quests, loadItemNames: mocks.names,
-  readItemTips: async (assets: unknown, ids: number[]) => ({ tips: await mocks.tips(assets, ids), unreachable: mocks.tipsDown() }),
+  // With a private folder set (mocks.store), the real reader reads it; else the stubbed tips.
+  readItemTips: async (assets: never, ids: number[]) => {
+    const store = mocks.store();
+    if (store) return (await vi.importActual<typeof import("@/lib/game-assets")>("@/lib/game-assets")).readItemTips(assets, ids, store);
+    return { tips: await mocks.tips(assets, ids), unreachable: mocks.tipsDown(), degraded: false };
+  },
   PRIVATE_UNREACHABLE: Symbol.for("unreachable"),
 }));
 vi.mock("@/lib/shown-item-names", () => ({ loadShownNames: mocks.shown }));
 
 import { edgeTtl } from "@/lib/cf-edge-cache";
+import { itemIndex, memoryStore, shard0 } from "@/lib/game-assets.fixture";
 import { forgetItemView } from "@/lib/item-view-store";
 import { GET } from "./route";
 
@@ -36,6 +42,7 @@ beforeEach(() => {
   mocks.objects.mockReset().mockResolvedValue({ rates: [], names: [], unreachable: false, dataAsOf: null, measuredZeros: [] });
   mocks.assets.mockReset().mockResolvedValue({ base: "https://assets.everloot.app/b", version: "70450", label: "Found in game files, unconfirmed" });
   mocks.tipsDown.mockReset().mockReturnValue(false);
+  mocks.store.mockReset().mockReturnValue(null);
   mocks.tips.mockReset().mockImplementation(async (_a: unknown, ids: number[]) => new Map(ids.includes(647) ? [[647, TIP]] : []));
   mocks.quests.mockReset().mockResolvedValue({ names: new Map([[176, { name: "Wanted: Hogger", wikiPage: "z" }]]) });
   const agreed = new Map([[19019, "Thunderfury"]]);
@@ -207,4 +214,41 @@ test("names that could not be read are a 503, never a 404 a browser would keep: 
   // With the names read, an id no page shows is a 404 as before.
   mocks.shown.mockResolvedValue({ facts: { unreachable: false }, degraded: false, agreed: new Map(), matched: null, showsTip: () => false });
   expect((await call("item", "5")).status).toBe(404);
+});
+
+// The private item folder as the real reader sees it: 647 is in shard 1 (512 a shard).
+const FOLDER = "wow_classic_beta-70450-84bea423";
+function privateFolder(shard: unknown, listed = true) {
+  mocks.assets.mockResolvedValue({ base: `https://assets.everloot.app/${FOLDER}`, version: itemIndex.build.version, label: "found in game files, unconfirmed" });
+  const index = { ...itemIndex, shards: listed ? { "1": { file: "items/1.json", bytes: 1, sha256: "0".repeat(64) } } : {} };
+  mocks.store.mockReturnValue(memoryStore({ [`${FOLDER}/items.json`]: index, ...(shard === undefined ? {} : { [`${FOLDER}/items/1.json`]: shard }) }));
+}
+
+test("the private item files read whole make a card the edge keeps; an item its shard does not hold is no failure", async () => {
+  privateFolder({ "647": shard0["9"] });
+  const res = await call("item", "647");
+  expect(res.status).toBe(200);
+  expect((await res.json()).card.lines.length).toBeGreaterThan(0);
+  expect(edgeTtl(res)).toBe(3600);
+  privateFolder({ "648": { n: 1 } });
+  expect(edgeTtl(await call("item", "647"))).toBe(3600);
+  privateFolder(undefined, false);
+  expect(edgeTtl(await call("item", "647"))).toBe(3600);
+});
+
+test("a shard the index lists that is not there is a 503, not a card without its game file lines", async () => {
+  privateFolder(undefined);
+  expectUnavailable(await call("item", "647"));
+});
+
+test("a shard that is not a shard is a 503, not a card without its game file lines", async () => {
+  for (const shard of [[shard0["9"]], "items", 7]) {
+    privateFolder(shard);
+    expectUnavailable(await call("item", "647"));
+  }
+});
+
+test("a record for the item that is not a record is a 503, not a card without its game file lines", async () => {
+  privateFolder({ "647": { n: 1 } });
+  expectUnavailable(await call("item", "647"));
 });

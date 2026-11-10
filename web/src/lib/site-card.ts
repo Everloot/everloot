@@ -75,8 +75,8 @@ async function itemCard(id: number): Promise<SiteCardResult> {
     loadSiteAssets().then((assets) => (assets || !assetsBaseUrl() ? readItemTips(assets, [id]) : null)),
     loadCardFacts(id),
   ]);
-  // A manifest that did not load (with its URL set), a private file that could not be read, or the aggregates.
-  if (!files || files.unreachable || reported.unreachable) return UNAVAILABLE;
+  // A manifest that did not load (with its URL set), a private file that could not be read or is broken, or the aggregates.
+  if (!files || files.unreachable || files.degraded || reported.unreachable) return UNAVAILABLE;
   const filesTip = files.tips.get(id);
   const tip = filesTip && withReported(filesTip, reported);
   const name = shownItemName(id, shown.agreed, shown.matched?.names, tip);
