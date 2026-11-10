@@ -74,7 +74,7 @@ export default async function FactionPage(props: Props) {
   return (
     <Container width="data">
       <article>
-        <JsonLd data={entityPageJsonLd({ name: title, path: `/database/factions/${segment}`, identifier: `faction:${id}` })} />
+        {entry && <JsonLd data={entityPageJsonLd({ name: title, path: factionHref(entry.factionId, entry.name), identifier: `faction:${id}` })} />}
         <EntityHeader trail={trail} title={title} meta={["Faction", entry?.header ?? null, <span key="id" className="tabular-nums">ID {id}</span>]} />
         {entry ? (
           <>

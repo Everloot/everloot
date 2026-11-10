@@ -47,7 +47,7 @@ export default async function QuestChainPage(props: Props) {
   return (
     <Container width="data">
       <article>
-        <JsonLd data={entityPageJsonLd({ name: title, path: `/database/quest-chains/${segment}`, identifier: `quest_chain:${id}` })} />
+        {entry && <JsonLd data={entityPageJsonLd({ name: title, path: chainHref(entry.questLineId, entry.name), identifier: `quest_chain:${id}` })} />}
         <EntityHeader trail={trail} title={title} meta={["Quest chain", entry ? `${count} quests` : null, <span key="id" className="tabular-nums">ID {id}</span>]} />
         {entry ? (
           <>

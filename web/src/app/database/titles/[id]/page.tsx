@@ -68,7 +68,7 @@ export default async function TitlePage(props: Props) {
   return (
     <Container width="data">
       <article>
-        <JsonLd data={entityPageJsonLd({ name: title, path: `/database/titles/${segment}`, identifier: `title:${id}` })} />
+        {entry && <JsonLd data={entityPageJsonLd({ name: title, path: titleHref(entry.titleId, entry.name), identifier: `title:${id}` })} />}
         <EntityHeader trail={trail} title={title} meta={["Title", <span key="id" className="tabular-nums">ID {id}</span>]} />
         {entry ? (
           <>
