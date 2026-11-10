@@ -5,6 +5,21 @@ site, the MCP server and every contribution. If a pull request adds data, it fol
 
 This is our reading of the rules, not legal advice.
 
+**2026-11-10 owner decision: wiki names and partial item stats.** NPC pages and spells without a
+name use the Warcraft Wiki's name matched by infobox id, from the 2023-11-13 archive, under CC BY-SA 4.0.
+Names players agree on come first; spell names from the current game files also come before wiki names.
+The name carries the same *Name from the Warcraft Wiki* label as items, including hover cards.
+Conflicting wiki names for one id are withheld. Catalogs stay in private build-stamped storage.
+
+Item stat values reported by one or two distinct installs are shown on the item page, hover card and
+`/api/tooltip`, labelled *unconfirmed, seen by N player(s)*, with an invitation to install the addon
+at `/addon` to help confirm them. Zero reports keeps `[?]`. Partial reports that disagree keep `[?]`.
+Three agreeing installs still define confirmed. Build selection and latest vote per install follow
+the existing stat rules; an older confirmed or contested build is not replaced by a newer partial build.
+Only counts are public, never install ids or who reported a value. The trusted-install / Everloot's own
+install exception does not confirm a stat: one own-install report is still unconfirmed. Other publication
+thresholds remain as before. This decision supersedes earlier wording that all partial stat values stay hidden.
+
 ## What we publish
 
 **What players see in the game.** The Everloot addon records what happens around you while you
@@ -155,7 +170,9 @@ game shows the player an item's tooltip, the addon reads those numbers for the p
 a random suffix on the player's copy, and records the item id, which line, the number and the client build.
 Nothing about the character is recorded, and nothing is read from a tooltip about anything other than an item.
 These are player data like any other upload: public as anonymous records, under CC BY-SA 4.0, and stated on a
-page only when three installs report the same number for the same line. A patch can change an item, so the
+page as confirmed only when three installs report the same number for the same line. One or two agreeing
+installs show an unconfirmed value, labelled with the player count and a link to `/addon`. A patch can change
+an item, so the
 number is decided within the newest build that three installs reported. Each number shown says how many
 installs reported it, from which build and when it was last seen. A line installs disagree on is not shown;
 it stays `[?]`, and the tooltip says the installs disagree. The game files' tooltip carries these numbers only
@@ -163,8 +180,8 @@ where it is already shown (the item tooltip rule below).
 
 Item pages may show how many distinct installs reported each tooltip line in its newest reported build
 when fewer than three have reported it (for example, "1 of 3 installs reported"). These progress counts
-are omitted for a line already agreed or contested in any build, include no reported value or install
-identity, and do not lower the confirmation threshold.
+are omitted for a line already agreed or contested in any build, include no install identity, and do not lower
+the confirmation threshold. The tooltip shows the partial value under the 2026-11-10 decision above.
 
 Full auction scans are not public records either. They feed market values only, and a value is
 published when three distinct reporters scanned the item. For that count, an upload containing a scan

@@ -15,6 +15,8 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: show labelled Warcraft Wiki names for NPCs and unnamed spells, and anonymous unconfirmed item stat values from one or two players.
+- Docs: document wiki name fallbacks and labelled partial stat reports.
 - Addon: Collection lists dungeons, raids and unconfirmed world bosses, with local boss kills and weekly lockouts.
 - Site: keep local boss-kill history out of public upload batches.
 - Docs: explain how to regenerate Collection instance data and its agreement snapshot.

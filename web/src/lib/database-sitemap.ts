@@ -1,3 +1,4 @@
+import { loadWikiEntityNames } from "./wiki-entity-names";
 import { itemPage } from "../../../kb/src/item-page";
 import { objectPage } from "../../../kb/src/object-page";
 import { npcPage, questPage, vendorPage } from "../../../kb/src/world-pages";
@@ -77,7 +78,12 @@ export async function databasePaths(): Promise<string[] | null> {
 
   const none = { npcs: [], quests: [], vendors: [], recheck: world.recheck };
   const npcRows = byKey(world.npcs, (r) => r.npcId);
-  const npcs = ascending(npcRows.keys()).filter((id) => npcIndexable(npcPage(id, { ...none, npcs: npcRows.get(id)! }), false));
+  const npcWiki = await loadWikiEntityNames("npc");
+  const spellWiki = await loadWikiEntityNames("spell");
+  const npcs = ascending([...npcRows.keys(), ...(npcWiki?.names.keys() ?? [])]).filter((id) => {
+    const page = npcPage(id, { ...none, npcs: npcRows.get(id) ?? [] });
+    return npcIndexable({ ...page, name: page.name ?? npcWiki?.names.get(id)?.name ?? null }, false);
+  });
   const questRows = byKey(world.quests, (r) => r.questId);
   const quests = ascending(questRows.keys()).filter((id) => questIndexable(questPage(id, { ...none, quests: questRows.get(id)!, npcs: world.npcs }), false));
   const vendorRows = byKey(world.vendors, (r) => r.vendorNpcId);
@@ -94,7 +100,7 @@ export async function databasePaths(): Promise<string[] | null> {
     ...quests.map((id) => `/database/quests/${id}`),
     ...objectIds.map((id) => `/database/objects/${id}`),
     ...vendors.map((id) => `/database/vendors/${id}`),
-    ...spellIds([...edges.observed, ...edges.client], spellNames?.names ?? null, talents).map((id) => `/database/spells/${id}`),
+    ...spellIds([...edges.observed, ...edges.client], { has: (id: number) => Boolean(spellNames?.names.has(id) || spellWiki?.names.has(id)) }, talents).map((id) => `/database/spells/${id}`),
   ];
 }
 
