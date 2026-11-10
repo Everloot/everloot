@@ -3,8 +3,9 @@ import { beforeEach, expect, test, vi } from "vitest";
 // Players agree on one item name (19019) and one quest; the name rule shows a wiki-matched item (647) and a
 // wiki quest title (176). Item 5 is in the game files only: no card, as on its page.
 const mocks = vi.hoisted(() => ({
-  items: vi.fn(), world: vi.fn(), reported: vi.fn(), objects: vi.fn(), assets: vi.fn(), tips: vi.fn(), quests: vi.fn(), shown: vi.fn(), names: vi.fn(), tipsDown: vi.fn(), store: vi.fn(),
+  wiki: vi.fn(), items: vi.fn(), world: vi.fn(), reported: vi.fn(), objects: vi.fn(), assets: vi.fn(), tips: vi.fn(), quests: vi.fn(), shown: vi.fn(), names: vi.fn(), tipsDown: vi.fn(), store: vi.fn(),
 }));
+vi.mock("@/lib/wiki-entity-names", async (original) => ({ ...await original<typeof import("@/lib/wiki-entity-names")>(), loadWikiEntityNames: mocks.wiki }));
 vi.mock("@/lib/rollup-compute", () => ({ loadItemFacts: mocks.items, loadWorldFacts: mocks.world, loadReportedItemFacts: mocks.reported, loadAllReportedItemFacts: vi.fn() }));
 vi.mock("@/lib/objects", () => ({ loadObjectFacts: mocks.objects }));
 vi.mock("@/lib/game-assets", () => ({
@@ -29,6 +30,7 @@ const call = (type: string, id: string) => GET(new Request(`https://everloot.app
 const TIP = { name: "Destiny", color: "#a335ee", quality: "Epic", icon: "https://assets.everloot.app/b/icons/7.webp", lines: ["Two-Hand", "+[?] Strength"], partial: true, why: ["[?] stat amounts: reason."], label: "Found in game files, unconfirmed · build 70450" };
 
 beforeEach(() => {
+  mocks.wiki.mockReset().mockResolvedValue(null);
   forgetItemView();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
@@ -52,6 +54,16 @@ beforeEach(() => {
     facts: { unreachable: false }, agreed, matched: { names: matched },
     showsTip: (id: number) => agreed.has(id) || matched.has(id),
   });
+});
+
+test.each([1, 2])("NPC hover card labels a wiki-matched name with %i reporters", async (count) => {
+  mocks.world.mockResolvedValue({ npcs: Array.from({ length: count }, (_, i) => ({ installId: `secret-reporter-${i}`, npcId: 448, name: "Hogger", mapId: 0, x: 0, y: 0 })), quests: [], vendors: [], unreachable: false });
+  mocks.wiki.mockResolvedValue({ version: "x", names: new Map([["hogger", { name: "Hogger", wikiPage: "https://warcraft.wiki.gg/wiki/Hogger" }]]) });
+  const res = await call("npc", "448");
+  expect(res.status).toBe(200);
+  const body = await res.json();
+  expect(body.card).toMatchObject({ title: "Hogger", foot: "Name from the Warcraft Wiki" });
+  expect(JSON.stringify(body)).not.toContain("secret-reporter");
 });
 
 test("an item the name rule shows gets its page's box: the game's lines, its quality, its icon, and where the name comes from", async () => {

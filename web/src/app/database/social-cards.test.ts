@@ -7,9 +7,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { itemFacts, worldFacts, titles, rendered } = vi.hoisted(() => ({
   itemFacts: { rates: [] as unknown[], names: [] as unknown[], npcs: [] as unknown[], unreachable: false },
   worldFacts: { npcs: [] as unknown[], quests: [] as unknown[], vendors: [] as unknown[], unreachable: false },
-  titles: { quests: null as unknown },
+  titles: { quests: null as unknown, wiki: null as unknown },
   rendered: vi.fn(),
 }));
+vi.mock("@/lib/wiki-entity-names", async (original) => ({ ...await original<typeof import("@/lib/wiki-entity-names")>(), loadWikiEntityNames: async () => titles.wiki }));
 vi.mock("@/lib/rollup-compute", () => ({
   loadItemFacts: async () => itemFacts,
   loadWorldFacts: async () => worldFacts,
@@ -55,7 +56,16 @@ describe("the database entity cards", () => {
     Object.assign(itemFacts, { rates: [], names: [], npcs: [], unreachable: false });
     Object.assign(worldFacts, { npcs: [], quests: [], vendors: [], unreachable: false });
     titles.quests = null;
+    titles.wiki = null;
     rendered.mockClear();
+  });
+
+  it.each([1, 2])("social card uses the wiki-matched name for %i reporters", async (count) => {
+    titles.wiki = { version: "x", names: new Map([["hogger", { name: "Hogger", wikiPage: "https://warcraft.wiki.gg/wiki/Hogger" }]]) };
+    worldFacts.npcs = npc(count);
+    await NpcImage(props("123"));
+    expect(lastCard()).toMatchObject({ title: "Hogger", installs: count });
+    expect(JSON.stringify(lastCard())).not.toContain("installId");
   });
 
   it("each route is the shared card size and a PNG", () => {

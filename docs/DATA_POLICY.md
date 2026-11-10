@@ -5,11 +5,19 @@ site, the MCP server and every contribution. If a pull request adds data, it fol
 
 This is our reading of the rules, not legal advice.
 
-**2026-11-10 owner decision: wiki names and partial item stats.** NPC pages and spells without a
-name use the Warcraft Wiki's name matched by infobox id, from the 2023-11-13 archive, under CC BY-SA 4.0.
-Names players agree on come first; spell names from the current game files also come before wiki names.
-The name carries the same *Name from the Warcraft Wiki* label as items, including hover cards.
-Conflicting wiki names for one id are withheld. Catalogs stay in private build-stamped storage.
+**2026-11-10 owner decision: wiki names and partial item stats.** An NPC with one or two
+distinct installs reporting a unanimous name may show that name when it exactly matches a Warcraft Wiki
+NPC page's infobox name (or page title) after the item name normalization: Unicode NFC, case, spacing
+and apostrophe style. The 2023-11-13 archive's `npcbox` pages supply a normalized name set, with page
+paths, in the private build-stamped `wiki-npc-names.json` catalog (`everloot.wiki-npc-names/2`).
+The website compares the reports it already loads, honoring the existing recheck cutoffs. Disagreeing
+reports, no reports or no wiki match keep "NPC N". Three agreeing installs take precedence as before.
+The name carries the same *Name from the Warcraft Wiki* label as items and links the source page;
+the same name appears in headings, breadcrumbs, metadata, JSON-LD, social cards and site hover cards,
+and counts toward sitemap eligibility. Only counts are public, never reporter identities. This is a
+website rule; the API, MCP, bulk exports and embeddable cards retain their existing agreement rules.
+Wiki names are CC BY-SA 4.0. The legacy id-keyed spell wiki path remains inert: the current dump has
+no usable spell ids. Spell names from the current game files and player agreement work as before.
 
 Item stat values reported by one or two distinct installs are shown on the item page, hover card and
 `/api/tooltip`, labelled *unconfirmed, seen by N player(s)*, with an invitation to install the addon

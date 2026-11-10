@@ -840,6 +840,7 @@ async function main(): Promise<number> {
       for (const m of run.quests.mismatches.slice(0, 15)) console.log(`  ${m.id}: "${m.wiki.join('" | "')}"`);
       for (const [label, r] of [["item sets", run.sets], ["spells", run.spells]] as const) console.log(`${label}: ${r.counts.ids} in the files, ${r.counts.named} named`);
       for (const r of [run.quests, run.sets, run.spells]) console.log(`shown -> ${r.path} (${r.file.count} names)`);
+      for (const r of run.wikiEntities) console.log(`wiki ${r.kind} -> ${r.path} (${r.count} names)`);
       return 0;
     }
     case "name-gaps": {

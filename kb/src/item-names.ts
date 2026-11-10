@@ -51,7 +51,8 @@ export interface ShownNames {
 }
 
 /** Two names agree when they differ only in case, spacing or the kind of apostrophe. */
-export const normName = (s: string) => s.normalize("NFC").replace(/[‘’`]/g, "'").replace(/\s+/g, " ").trim().toLowerCase();
+export { normName } from "./name-normalization.js";
+import { normName } from "./name-normalization.js";
 
 export const emptyLedger = (): Ledger => ({ schema: LEDGER_SCHEMA, runs: [], items: {} });
 

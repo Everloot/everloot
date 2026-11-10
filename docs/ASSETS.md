@@ -310,9 +310,17 @@ repeat these steps for a new build or another deployment.
    npm run kb -- game-names data/client/<product>-<build>-<config>.sqlite --wiki data/release/<release>.sqlite
    ```
 
-   It prints the counts and writes `wiki-npc-names.json` and `wiki-spell-names.json` (wiki infobox ids, conflicting names omitted), plus `quest-names.json`, `item-set-names.json` and `spell-names.json` beside
+   It prints the counts and writes `wiki-npc-names.json` (schema `everloot.wiki-npc-names/2`, normalized NPC names to wiki page paths)
+   and `wiki-spell-names.json` (legacy infobox ids; inert on the current dump), plus `quest-names.json`, `item-set-names.json` and `spell-names.json` beside
    `item-names.json`. Upload each one with the same script, dry run first. Without them, the pages read
    "Quest N", "item set N" and "spell N".
+
+   NPC names need one or two unanimous install reports matching a name from a wiki `npcbox` page,
+   using its name field or page title and the item name normalization. Three agreeing installs take
+   precedence; disagreement or no match keeps "NPC N". Pages label and link the wiki source, including
+   the same name in metadata, cards and sitemap eligibility. Reporter identities are never shown.
+   Upload the version 2 NPC file to the private folder for the active build with the same script;
+   an old version 1 NPC catalog is rejected by the website until replaced.
 
    To see what is still unnamed and why, run the gap report with the same two files:
 
