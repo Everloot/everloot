@@ -65,6 +65,14 @@ from your own sightings and loot in the saved file; one you have not met keeps i
 `/everloot price` prints the same amounts as plain text. Disenchant outcomes and values are not yet available;
 the addon does not guess them from an item's color or type.
 
+Between the prices and the sources, the tooltip shows your own history with the item, read from the gold ledger
+in your saved file for your characters on this realm: the day and price per unit of your last sale, the average
+sale price per unit and the units sold over the ledger's last 90 days, and sales from the last two days whose
+mailbox letter you have not taken yet (sold, no price until the letter). The average paid shows only for a
+purchase whose ledger entry names the item and its count. An item you never sold or bought gets no history line,
+never a zero. The ledger is indexed by item once and again only after it changes, so a hover reads one entry.
+Nothing new is recorded or uploaded for it.
+
 ### Ask about an item's price
 
 - For an immediate answer from the files already in game, type `/everloot price` followed by a
@@ -246,6 +254,11 @@ Esc > Options > AddOns > **Everloot**, or `/everloot options`, lists every modul
 records and where it goes. A switch that has a `/everloot` command runs that command, so the page and chat
 always agree. Changes apply after a reload; the page has a **Reload now** button. A client without the
 game's options API shows the page as a window instead.
+
+Three switches at the end of the list choose what item tooltips show: **prices** (community market, your scan,
+vendor), **your history** (your sales and purchases from the gold ledger) and **sources** (drops, vendors,
+reagents, zones). All three are on for a new install, are saved in your SavedVariables, record nothing and apply
+at once, without a reload.
 
 ## The Everloot window
 
@@ -559,7 +572,7 @@ addon/
 │   ├── planner.lua     the planner workspace: website talent and raid plans beside your character; /everloot planner
 │   ├── raid_data.lua   raid buff list generated from web/src/data/game-data/raid-*.json
 │   ├── raid.lua        /everloot raid: buffs missing per group, and a raid share code; display only
-│   ├── prices.lua      item tooltips: your latest scan and the Everloot Desktop App's community prices
+│   ├── prices.lua      item tooltips: your latest scan, the Everloot Desktop App's community prices and your sale history
 │   ├── drops.lua       item tooltips: where an item drops, from the public rates in the same file
 │   ├── gph.lua         gold per hour sessions, kept in your file only
 │   ├── conveniences.lua  sell greys and repair at a merchant, Collect all at the mailbox; each off until enabled, no records
