@@ -43,6 +43,7 @@ required, or tightening a limit is a major release.
 - The `object_page` answer carries `name`, null until 3 installs agree on one, as the NPC page does.
 - Description text only, no shape change: in `API_ROUTES`, the `limit` paging parameter states its caps (500 rows
   without a key, 5,000 with one), and the corpus and client-layer routes and the market rule read in plain words.
+- Description-only patch documentation: clarify MCP tool routing, identity, realm aliases and price methods; no schema fields or package version change.
 
 ### Added
 - 1.26.0 (record protocol 1.13.0): `census_seen.via` takes `nameplate`, a player the game drew a nameplate for

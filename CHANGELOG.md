@@ -460,6 +460,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Docs: OPEN_DATA.md and RELEASING.md no longer say the open data export sits in the roadmap's Next section; they point to ROADMAP.md.
 - Docs: each gap in DATA_PLACEMENT.md carries a dated state, and the WAF row now describes the Cloudflare rules that apply on /database/*.
 - Docs: CONTRIBUTING.md and the pull request template describe the changelog line, the labels in use and the addon install link.
+- MCP: clarify tool choice, name and id discovery, realm aliases, evidence limits and price methods, with three example journeys.
 
 ## [desktop-v0.1.21] - 2026-11-10
 

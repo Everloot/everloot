@@ -43,28 +43,28 @@ Use the same words everywhere, so the listings match the site and each other.
 
 ### Long description
 
-> Everloot answers questions about World of Warcraft: Forever using the Warcraft Wiki archive
-> (CC BY-SA 4.0, with article attribution), game-file records labelled unconfirmed with their build,
-> and observations players reported through the Everloot addon. Archive lore is historical background,
-> not confirmation of Forever gameplay. A player-reported fact (a drop rate, a vendor's price, a
-> quest's rewards, where an NPC stands, which recipe turns yellow) is stated only once three separate
-> installs reported it, and the answer says how many did and when the data was last updated. Nothing
-> is scraped from other sites and no fact is guessed: when something is not recorded yet, the tool says
-> so instead of making a number up.
-> Player-observed coverage is limited before launch. A tool's presence does not mean its requested
-> data has been recorded; missing observations remain unrecorded, not zero.
+> Everloot answers questions about World of Warcraft: Forever with sources and dates. Its 32 read-only
+> tools cover player observations, game-file metadata and the historical 2023 Warcraft Wiki archive.
+> Archive lore is background, not confirmation of current Forever gameplay. Game-file facts stay
+> unconfirmed with their build and Blizzard credit; they are not under Everloot's licence. Player-reported
+> data is CC BY-SA 4.0; lore carries its own attribution. Keep each answer's source link.
 >
-> 32 read-only tools: search the lore archive, open one record, look up an item, NPC, object, quest or
-> vendor, find what is near a spot on the map, follow relations (dropped by, sold by, reagent for),
-> browse item categories, plan a profession, read recipe skill ranges, read talent trees and talent
-> share codes, list the races each class can be with their racial traits, check auction history and
-> market values, a gold ledger, find a guild, a guild's board and guild ladders for raids and dungeons,
-> collection, achievement, reputation, title and quest progress, database coverage and population,
-> Blizzard's latest posts and builds, the addon ecosystem and Everloot's own build tracker.
-> Game-file facts are labelled "found in game files, unconfirmed" with their build, carry Blizzard's
-> credit and are not under Everloot's licence. Player-reported data is CC BY-SA 4.0; an answer built on
-> it ends with a link to its page on everloot.app, when it has one, and the data's age. The code is open source. No
-> account, no key, no sign-in wall.
+> Start a question with answer_sources and check that its claims contain the requested fact. Use
+> search_knowledge for partial names, get_by_name for exact full names. Pass recordId to get_entity
+> or fetch; pass only a verified gameId to item_page, npc_page, object_page or quest_page. Read achievements,
+> reputations, titles and quest chains through generic records and paged fields. Never use lore ids as game ids.
+>
+> Observed facts normally need three agreeing installs. Market days and census counts allow the labelled
+> Everloot own-install exception while few players upload; keep the actual counts. Missing is unrecorded,
+> never zero. Market tools accept full realm names or unique whole-word suffixes of at least two words;
+> ambiguous or unknown names return candidates. Keep scan dates: an old minimum is not a live offer.
+> Market text separates houses; structured content and full-scan history use the house with most units,
+> named in the text (ties: Alliance, Horde, Neutral). Browsing sightings are separate and unscoped.
+> Profession estimates use unscoped median prices, not a current realm minimum.
+>
+> Tools also cover professions, talents, maps, guilds, owned progress, coverage, population, official changes
+> and community addons. Owned progress and ledgers require deliberately shared identifiers and sharing setup.
+> See the decision tree and three call journeys at https://everloot.app/docs/mcp. No account or key needed.
 
 ### Test cases (for reviewers)
 
