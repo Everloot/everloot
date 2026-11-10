@@ -15,8 +15,8 @@ import { loadItemSeen } from "@/lib/item-seen";
 import { itemSourceValue } from "./item-source";
 import { RelationTarget, SameIcon } from "@/components/EntityRelations";
 import { pinLink } from "@/lib/world-map";
-import { gameNameFor, loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
-import { Badge, Container, DataTable, EvidenceLine, Facts, InShort, OpenData, QUALITY_TEXT, Tabs, TooltipFrame, qualityOf, reportedLabel, type Column, type Fact, type TabItem } from "@/components/ui";
+import { gameNameFor, loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames, unknownItemIcon } from "@/lib/game-assets";
+import { Badge, Container, DataTable, EvidenceLine, Facts, InShort, OpenData, QUALITY_TEXT, Tabs, TooltipFrame, TooltipLines, qualityOf, reportedLabel, type Column, type Fact, type TabItem } from "@/components/ui";
 import { isDevelopmentItemName } from "../../../../../../kb/src/dev-item-names";
 import { categoryOf } from "../../../../../../kb/src/item-taxonomy";
 import { edgesFrom, evidenceLabel, type Edge, type Rel } from "../../../../../../kb/src/edges";
@@ -186,7 +186,7 @@ export default async function ItemPage(props: Props) {
           {page.pendingLoot && <p className="py-2 text-meta text-fg-2">{pendingLine(page.pendingLoot, true)}</p>}
         </>,
     },
-    relationTab("sold-by", "Sold by", "sold_by", "Vendor", "No vendor seen selling this yet."),
+    relationTab("sold-by", "Sold by", "sold_by", "Vendor", "No vendor seen selling this yet. A vendor shows once 3 installs report it."),
     relationTab("created-by", "Created by", "created_by", "Recipe", "No recipe makes this.", PROFESSIONS),
     relationTab("used-in", "Used in", "reagent_for", "Recipe", "No recipe uses this.", PROFESSIONS),
     ...(rel("reward_from").length ? [relationTab("reward-from", "Reward from", "reward_from", "Quest", "")] : []),
@@ -218,8 +218,10 @@ export default async function ItemPage(props: Props) {
   const tipWhy = tip ? splitWhy(tip.why) : { reasons: [], evidence: [] };
   const boxLines = tip ? [...tip.lines, ...tipWhy.evidence] : tooltipLines;
   const boxNotes = tip && tip.lines.some((line) => line.includes(PLACEHOLDER)) ? tipWhy.reasons : [];
-  // The quality colour only where the name is shown from players or the wiki: an id nobody reported stays plain.
-  const shownQuality = name ? quality : undefined;
+  // The quality colour only where the name is shown from players or the wiki: an id nobody reported stays plain. The
+  // taxonomy gives the quality, else the names file (for an item whose quality the taxonomy leaves unrecorded).
+  const nameQuality = category?.quality?.id ?? matched?.names.get(itemId)?.quality;
+  const shownQuality = name && nameQuality !== undefined && nameQuality <= 5 ? qualityOf(nameQuality) : undefined;
   // As the lists label it: no "(OBSOLETE)" suffix and no "Subclass 0".
   const subclassLabel = category?.subclass ? labelOf(category.subclass).label : undefined;
 
@@ -267,7 +269,7 @@ export default async function ItemPage(props: Props) {
           trail={trail}
           title={title}
           quality={shownQuality}
-          icon={<EntityIcon src={tip?.icon} unconfirmed={!confirmed} />}
+          icon={<EntityIcon item src={tip?.icon ?? (assets ? unknownItemIcon(assets.base) : null)} quality={shownQuality} unconfirmed={!confirmed} />}
           meta={[category?.class?.label, subclassLabel, name ? <span key="id" className="tabular-nums">ID {itemId}</span> : null]}
         />
         {isDevelopmentItemName(name?.name) && (
@@ -277,7 +279,7 @@ export default async function ItemPage(props: Props) {
           box={
             <>
               <TooltipFrame name={tip?.name ?? title} quality={tip ? quality : undefined} label={`${tip?.name ?? title}, from the game files`}>
-                {boxLines.map((line, i) => <p key={i}>{line}</p>)}
+                <TooltipLines lines={boxLines} />
               </TooltipFrame>
               {boxNotes.length > 0 && (
                 <div data-card-notes className="mt-1 space-y-0.5 rounded-[4px] border border-line bg-panel px-2 py-1 text-xs text-muted">
@@ -307,7 +309,7 @@ export default async function ItemPage(props: Props) {
           jsonHref={!facts.unreachable && hasCard.item(page) ? `/api/tooltip/item/${itemId}` : undefined}
         />
         <MarketBox itemId={itemId} rows={auctions} />
-        <Tabs label={`${title}: relations`} tabs={tabs} />
+        <Tabs label={`${title}: relations`} tabs={tabs} className="mt-6" />
         <div className="mt-6 space-y-6 empty:hidden">
           <LoreSection match={lore} />
           {!facts.unreachable && (page.name !== null || page.drops.length > 0) && <AdSlot slot="inContent" />}

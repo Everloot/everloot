@@ -6,7 +6,7 @@ import { CREDIT_LINE, DATA_AGE, GAME_DATA_CREDIT, LICENCE, SITE, type EntityKind
 import { answerSources, answerSourcesFactsFromRecords, formatAnswerSources, type AnswerSourcesFacts } from "./answer-sources.js";
 import type { RecheckScope } from "./coverage.js";
 import type { FilesIndex } from "./files-evidence.js";
-import { auctionHistory, auctionSightingsFromRecords, handleAuctionHistory, handleStoredAuctionHistory, type AuctionPoint } from "./auction-history.js";
+import { AUCTION_HISTORY_RULE, auctionHistory, auctionPointLines, auctionSightingsFromRecords, type AuctionPoint, type AuctionSighting } from "./auction-history.js";
 import { handlePlan, planStructured } from "./bridge-plan.js";
 import { handleRecentChanges, recentChangesStructured, type ChangeEntry } from "./changes.js";
 import { ecosystemProjectsStructured, handleEcosystemProjects, type EcosystemView } from "./ecosystem.js";
@@ -20,9 +20,11 @@ import { formatItemPage, itemPage } from "./item-page.js";
 import { formatItemNumbers, itemToolFactsFromRecords } from "./item-page-tool.js";
 import { reportedItemFacts } from "./item-facts.js";
 import { formatObjectPage, objectFactsFromRecords, objectPage, type ObjectFacts } from "./object-page.js";
-import { handleMarketValue, itemMarketByHouse, type MarketState } from "./market.js";
+import {
+  busiestHouseMarket, handleMarketValue, lookupRealm, realmLookupFields, realmLookupText, resolveRealm, scanDayLine, type MarketState, type PublicDay, type RealmLookup,
+} from "./market.js";
 import { loadUploadRecords } from "./load-uploads.js";
-import { KNOWLEDGE_KINDS, MCP_PROMPT_NAMES, MCP_PROMPTS, MCP_RESOURCE_TEMPLATE_URIS, MCP_RESOURCE_TEMPLATES, MCP_RESOURCE_URIS, MCP_RESOURCES, MCP_TOOL_NAMES, MCP_TOOLS, parseRecords, type McpToolArgs, type McpToolDef, type McpToolName } from "@everloot/protocol";
+import { KNOWLEDGE_KINDS, MCP_PROMPT_NAMES, MCP_PROMPTS, MCP_RESOURCE_TEMPLATE_URIS, MCP_RESOURCE_TEMPLATES, MCP_RESOURCE_URIS, MCP_RESOURCES, MCP_TOOL_NAMES, MCP_TOOLS, parseRecords, type AuctionHouse, type McpToolArgs, type McpToolDef, type McpToolName } from "@everloot/protocol";
 import { z } from "zod";
 import { formatProfessionPath, professionPath } from "./profession-path.js";
 import { promptText } from "./prompts.js";
@@ -48,7 +50,7 @@ import {
 } from "./page-urls.js";
 import { allTerms, getByName, getDocument, getEntity, search, searchSomeWords, SOME_WORDS, type SearchHit } from "./search.js";
 import { confirmedCatalog, confirmedLine, isConfirmable, type ConfirmedIds } from "./catalog-confirmed.js";
-import { bodyOf, catalogLabel, getCatalogByName, getCatalogEntity, isCatalogId, searchCatalog, type CatalogIndex, type CatalogRecord } from "./catalog-index.js";
+import { bodyOf, gameplayIndex, mergeCatalogIndexes, catalogLabel, getCatalogByName, getCatalogEntity, isCatalogId, searchCatalog, CATALOG_ID_BASE, type CatalogIndex, type CatalogRecord } from "./catalog-index.js";
 import { cutArrays, MAX_ROWS, readField, type FieldRead } from "./json-pointer.js";
 
 export const SERVER_NAME = "everloot-knowledge";
@@ -241,14 +243,81 @@ export async function marketValueAnswer(args: { realm: string; itemId: number },
   }
   if (!market) return notRead("Market values unavailable. They are unrecorded, not zero.");
   const now = new Date();
+  // The realm as the rollup knows it: an exact name, or an alias only one realm's name ends in. Unknown and ambiguous
+  // names read nothing, so they never answer as an empty market.
+  const lookup = resolveRealm(market.state, args.realm, now);
+  const realm = lookupRealm(lookup);
   // The text names every house; the page carries the house with the most units listed, which the text names too.
-  const busiest = itemMarketByHouse(market.state, args.realm, args.itemId, now).sort((a, b) => b.value.quantity - a.value.quantity)[0];
+  const busiest = realm ? busiestHouseMarket(market.state, realm, args.itemId, now) : null;
   const value = busiest?.value ?? null;
   const points = busiest?.points ?? [];
-  const url = value ? marketItemUrl(args.realm, args.itemId) : undefined;
+  const url = realm && (value || points.length) ? marketItemUrl(realm, args.itemId) : undefined;
+  const page = { realm: shownRealm(args.realm, lookup), itemId: args.itemId, value, history: points, ...realmLookupFields(lookup) };
   return {
     text: `${withMore(handleMarketValue(args, market.state, now), url)}\n${answerFooter(market.dataAsOf)}`,
-    structured: { connected: true, dataAsOf: market.dataAsOf, ...(url ? { url } : {}), page: { realm: args.realm.trim(), itemId: args.itemId, value, history: points } },
+    structured: { connected: true, dataAsOf: market.dataAsOf, ...(url ? { url } : {}), page },
+  };
+}
+
+/** The realm an answer names: the full name an alias resolved to, else the name as asked. */
+function shownRealm(asked: string, lookup: RealmLookup | null): string {
+  return lookup?.status === "alias" ? lookup.realm : asked.trim();
+}
+
+/** The market rollup, or null when it is not connected or could not be read. */
+async function readMarket(loader?: MarketLoader): Promise<Awaited<ReturnType<MarketLoader>>> {
+  if (!loader) return null;
+  try {
+    return await loader();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * auction_history's page. `scanDays` are the rollup's public full-scan days for the item in one house (`scanHouse`, the
+ * one with the most units listed), the ones market_value's page carries, under the same rule (3 reporters, or Everloot's own installs), so the two tools agree on which days are public;
+ * null when the rollup is not connected. `points` are the single listings players saw while browsing (auction-history.ts),
+ * null when they could not be read. The two come from different scans, so both are listed, each with its own rule.
+ */
+export function auctionHistoryPage(
+  args: { realm: string; itemId: number }, lookup: RealmLookup | null, scanDays: PublicDay[] | null, points: AuctionPoint[] | null,
+  scanHouse: AuctionHouse | null = null,
+): { text: string; page: object; url?: string } {
+  const realm = shownRealm(args.realm, lookup);
+  const head = `${realm} item ${args.itemId}`;
+  const lookupFields = lookup ? realmLookupFields(lookup) : {};
+  if (!args.realm.trim()) return { text: "Name a realm.", page: { realm, itemId: args.itemId, points: [] } };
+  if (!Number.isInteger(args.itemId) || args.itemId < 1) return { text: "Name an item id.", page: { realm, itemId: args.itemId, points: [] } };
+  // Several realms' names end that way and they are separate markets: no price, scanned or browsed, answers it, whatever
+  // was stored under the name as typed.
+  if (lookup?.status === "ambiguous") {
+    return { text: `${head}
+${realmLookupText(lookup)}`, page: { realm, itemId: args.itemId, points: [], ...(scanDays ? { scanDays: [] } : {}), ...lookupFields } };
+  }
+  // A name no realm answers to, with nothing browsed under it either: say so, never an empty history.
+  if (lookup && !lookupRealm(lookup) && !points?.length) {
+    return { text: `${head}\n${realmLookupText(lookup)}`, page: { realm, itemId: args.itemId, points: [], ...lookupFields } };
+  }
+  const note = lookup && lookupRealm(lookup) ? realmLookupText(lookup) : null;
+  const browse = points ? auctionPointLines(points) : ["Browsing scans unavailable. They are unrecorded, not zero."];
+  const lines = [head, ...(note ? [note] : [])];
+  if (scanDays === null) {
+    lines.push(AUCTION_HISTORY_RULE, ...browse);
+  } else {
+    lines.push(
+      `Full scans${scanHouse ? ` in the ${scanHouse} auction house, the one with the most units listed` : ""}: the public days market_value values this item by (a day is public at 3 reporters, or with Everloot's own scans):`,
+      ...(scanDays.length ? scanDays.map(scanDayLine) : ["No public day yet. A day becomes public when 3 reporters scanned this item."]),
+      "Single listings seen while browsing, a separate source with its own count:",
+      AUCTION_HISTORY_RULE,
+      ...browse,
+    );
+  }
+  const url = scanDays?.length || points?.length ? marketItemUrl(lookup ? lookupRealm(lookup) ?? realm : realm, args.itemId) : undefined;
+  return {
+    text: lines.join("\n"),
+    page: { realm, itemId: args.itemId, points: points ?? [], ...(scanDays ? { scanDays } : {}), ...lookupFields },
+    url,
   };
 }
 
@@ -493,7 +562,10 @@ type SearchArgs = McpToolArgs<"search_knowledge">;
 /** The hits, each with its page on the site when it has one the site indexes. */
 async function withPages(db: ReleaseSource, hits: SearchHit[]): Promise<(SearchHit & { url?: string })[]> {
   const urls = await loreUrls(db, hits);
-  return hits.map((h) => (urls.has(h.id) ? { ...h, url: urls.get(h.id)! } : h));
+  return hits.map((h) => ({ ...h, recordId: h.id,
+    sourceKind: h.sourceKind ?? (h.gameVersion === "lore" || h.kind === "lore_page" ? "lore" : "reference"),
+    ...(urls.has(h.id) ? { url: urls.get(h.id)! } : {}),
+  }));
 }
 
 /** Hits that player uploads confirm carry `confirmed`. Only catalog records can be: release rows are lore. */
@@ -504,11 +576,12 @@ function annotate<T extends SearchHit>(hits: T[], ids: ConfirmedIds | null): (T 
 
 /** One hit as text: its heading, `middle` (the snippet, or the field read), its source, and its page when it has one. */
 function hitText(h: SearchHit & { url?: string }, middle: string, ids: ConfirmedIds | null): string {
-  const line = `[${h.kind}/${h.gameVersion}] ${h.name}\n${middle}\nSource: ${h.sourceUrl} (${h.licence}, retrieved ${h.retrievedAt})`;
+  const identity = h.gameId === undefined ? `recordId: ${h.id}` : `recordId: ${h.id}; gameId: ${h.gameId}`;
+  const line = `[${h.kind}/${h.gameVersion}] ${h.name}\n${identity}\n${middle}\nSource: ${h.sourceUrl} (${h.licence}, retrieved ${h.retrievedAt})`;
   const confirmed = ids && isCatalogId(h.id) ? confirmedLine(h.kind, h.extId, ids) : null;
   const head = confirmed ? `${line}\n${confirmed}` : line;
   // A game-file record carries its own credit as the last line, after the page it links.
-  return isCatalogId(h.id) ? withMore(`${head}\n${GAME_DATA_CREDIT}`, h.url, GAME_DATA_CREDIT) : withMore(head, h.url);
+  return isCatalogId(h.id) && h.sourceKind !== "observed" ? withMore(`${head}\n${GAME_DATA_CREDIT}`, h.url, GAME_DATA_CREDIT) : withMore(head, h.url);
 }
 
 /**
@@ -753,7 +826,9 @@ function professionSkillLineId(profession: string): number | undefined {
 }
 
 /** The readers a host lends the tools: the site's store in process, or nothing for a standalone server. */
-export interface ToolOptions { catalog?: CatalogLoader; corpus?: CorpusLoader; market?: MarketLoader; auctionHistory?: AuctionHistoryLoader; gameData?: GameDataLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; coverage?: CoverageLoader; settledSummary?: SettledSummaryLoader; guilds?: GuildReader; recheck?: readonly RecheckScope[] }
+export interface ToolOptions { catalog?: CatalogLoader; corpus?: CorpusLoader; market?: MarketLoader; auctionHistory?: AuctionHistoryLoader; gameData?: GameDataLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; coverage?: CoverageLoader; settledSummary?: SettledSummaryLoader; guilds?: GuildReader; recheck?: readonly RecheckScope[];
+  /** Everloot's own install ids (trusted-source.ts): a browsing day one of them scanned is public under 3, as in the market rollup. */
+  trusted?: ReadonlySet<string> }
 
 /** The guild ladder's tools: registered only when the host lends a guild reader (EVERLOOT_GUILDS on the site). */
 export const GUILD_TOOLS: readonly McpToolName[] = ["guild_search", "guild_rankings"];
@@ -771,23 +846,52 @@ const GUILD_HIDDEN = "This guild asked to be hidden. Nothing about it is shown."
 export type ToolAnswer = Answer;
 export type ToolHandlers = { [K in McpToolName]: (args: McpToolArgs<K>) => ToolAnswer | Promise<ToolAnswer> };
 
+// HTTP creates a server per request. Keep discovery across those servers by snapshot time, size and scope values.
+let gameplayMemo: { key: string; index: CatalogIndex } | undefined;
+let mergedMemo: { catalog: CatalogIndex | null; gameplay: CatalogIndex | null; index: CatalogIndex } | undefined;
+const gameplayKind = (kind?: string): boolean => kind === undefined || ["item", "npc", "object", "quest"].includes(kind);
+// Appended observed kinds occupy slots 8-11; zones (slot 12) come from the game files.
+const gameplayId = (id: number): boolean =>
+  Number.isInteger(id) && id >= CATALOG_ID_BASE + 8 * 10_000_000 && id < CATALOG_ID_BASE + 12 * 10_000_000;
+const NO_DISCOVERY_SCOPES: readonly RecheckScope[] = [];
+
 /**
  * One handler per tool, typed by the protocol's input shape. The MCP registration in
  * createKnowledgeServer and the site's GET /api/tools/{tool} are both thin wrappers over these, so
  * a tool answers the same over MCP and over plain HTTP.
  */
 export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {}): ToolHandlers {
-  const recheck = options.recheck ?? [];
+  const recheck = options.recheck ?? NO_DISCOVERY_SCOPES;
   // A catalog that cannot be read leaves the release's answer, never an error. The failure is kept, so the loader is
   // not run again for every request, and said once.
   let catalogFailed = false;
-  const catalogOf = async (): Promise<CatalogIndex | null> => {
+  const filesCatalogOf = async (): Promise<CatalogIndex | null> => {
     if (catalogFailed) return null;
     try { return (await options.catalog?.()) ?? null; } catch (error) {
       catalogFailed = true;
       console.warn(`The game-file catalog could not be read; answers carry the release only: ${error instanceof Error ? error.message : String(error)}`);
       return null;
     }
+  };
+  const catalogOf = async (includeGameplay = true): Promise<CatalogIndex> => {
+    const catalog = await filesCatalogOf();
+    const corpus = !includeGameplay ? null : options.corpus ? await options.corpus().catch(() => null)
+      : await readCorpusRecords(["item_seen", "npc_sighting", "quest", "loot", "object_sighting"]);
+    let gameplay: CatalogIndex | null = null;
+    if (corpus) {
+      const key = tooledKey(options.corpus ? "loader" : "url", corpus, recheck);
+      if (!gameplayMemo || gameplayMemo.key !== key) {
+        gameplayMemo = { key, index: gameplayIndex(corpus.records, corpus.dataAsOf ?? null, recheck) };
+      }
+      gameplay = gameplayMemo.index;
+    }
+    // No gameplay index: the files catalog answers as it is, so a lore or release-only call between two gameplay
+    // calls never evicts the merged index.
+    if (!gameplay && catalog) return catalog;
+    if (!mergedMemo || mergedMemo.catalog !== catalog || mergedMemo.gameplay !== gameplay) {
+      mergedMemo = { catalog, gameplay, index: mergeCatalogIndexes(catalog, gameplay) };
+    }
+    return mergedMemo.index;
   };
   // The rollup's agreed ids, read only when a hit is a catalog record the rollup can confirm; unreadable leaves the
   // answer unconfirmed, never an error.
@@ -798,12 +902,12 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
   const readFacts = <T>(tool: ToolName, render: (facts: T) => string) => fromTooledUploads(tool, render, options.corpus, recheck);
   const handlers: ToolHandlers = {
     search_knowledge: async (args) => {
-      const result = await searchResult(db, args, await catalogOf());
+      const result = await searchResult(db, args, await catalogOf((!args.version || args.version === "forever") && gameplayKind(args.kind)));
       const ids = await confirmedOf(result.hits);
       return { text: await textOfSearch(db, result, ids), structured: { hits: annotate(await withPages(db, result.hits), ids) } };
     },
     get_entity: async (args) => {
-      const catalog = await catalogOf();
+      const catalog = await catalogOf(gameplayId(args.id));
       const hit = await entityOf(db, args.id, catalog);
       const ids = await confirmedOf(hit ? [hit] : []);
       if (args.field === undefined || !hit) return { text: await handleGetEntity(db, args, catalog, ids), structured: { hit: hit ? annotate(await withPages(db, [hit]), ids)[0]! : null } };
@@ -812,11 +916,11 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
       const shown = annotate(await withPages(db, [hit]), ids)[0]!;
       if (!read.ok) return { text: missText(args.field, read.keys), structured: { hit: shown, keys: read.keys } };
       // Game-file data keeps its label and build with the slice, as in every other answer about it.
-      const label = isCatalogId(hit.id) && typeof data.build === "string" ? `${catalogLabel(data.build)}\n` : "";
+      const label = hit.sourceKind === "game-files" && typeof data.build === "string" ? `${catalogLabel(data.build)}\n` : "";
       return { text: hitText(shown, `${label}${rowsText(read)}`, ids), structured: { hit: shown, field: fieldOut(read) } };
     },
     get_by_name: async (args) => {
-      const catalog = await catalogOf();
+      const catalog = await catalogOf(gameplayKind(args.kind));
       const hits = await namedHits(db, args.name, args.kind, catalog);
       const ids = await confirmedOf(hits);
       return { text: await handleGetByName(db, args, catalog, ids), structured: { hits: annotate(await withPages(db, hits), ids) } };
@@ -827,7 +931,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
     fetch: async (args) => {
       const numeric = /^\d{1,15}$/.test(args.id) ? Number(args.id) : undefined;
       if (numeric !== undefined && isCatalogId(numeric)) {
-        const catalog = await catalogOf();
+        const catalog = await catalogOf(gameplayId(numeric));
         const record = catalog ? getCatalogEntity(catalog, numeric) : undefined;
         if (record) {
           const ids = await confirmedOf([record]);
@@ -839,7 +943,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
           });
           return jsonAnswer({
             id: String(record.id), title: record.name, text, url: record.sourceUrl,
-            metadata: { kind: record.kind, gameVersion: record.gameVersion, sourceUrl: record.sourceUrl, sourceId: record.sourceId, licence: record.licence, retrievedAt: record.retrievedAt, credit: GAME_DATA_CREDIT, ...(line ? { confirmed: { asOf: ids!.asOf } } : {}) },
+            metadata: { recordId: record.id, gameId: record.gameId, sourceKind: record.sourceKind, ...(record.build ? { build: record.build } : {}), ...(record.observed ? { observed: record.observed } : {}), kind: record.kind, gameVersion: record.gameVersion, sourceUrl: record.sourceUrl, sourceId: record.sourceId, licence: record.licence, retrievedAt: record.retrievedAt, credit: record.sourceKind === "observed" ? CREDIT_LINE : GAME_DATA_CREDIT, ...(line ? { confirmed: { asOf: ids!.asOf } } : {}) },
             ...read,
           });
         }
@@ -1002,18 +1106,29 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
       };
     },
     auction_history: async (args) => {
-      // The site's stored days when it lends them, so an answer does not replay the corpus; without them, the corpus.
-      let stored: Awaited<ReturnType<AuctionHistoryLoader>> = null;
-      try { stored = (await options.auctionHistory?.(args.realm, args.itemId)) ?? null; } catch { stored = null; }
-      if (stored) {
-        const page = { realm: args.realm.trim(), itemId: args.itemId, points: stored.points };
-        const url = page.points.length ? marketItemUrl(args.realm, args.itemId) : undefined;
-        return pageAnswer({ text: handleStoredAuctionHistory(args, stored.points), page, url }, stored.dataAsOf);
+      // The rollup reads the realm name as market_value does and lends its public full-scan days, so both tools agree.
+      const market = await readMarket(options.market);
+      const now = new Date();
+      const lookup = market ? resolveRealm(market.state, args.realm, now) : null;
+      const resolved = lookup ? lookupRealm(lookup) : null;
+      const realm = resolved ?? args.realm.trim();
+      // The same house market_value's page carries: the one with the most units listed, never a mix of houses.
+      const busiest = market && resolved ? busiestHouseMarket(market.state, resolved, args.itemId, now) : null;
+      const scanDays = market ? busiest?.points ?? [] : null;
+      // The site's stored browsing days when it lends them, so an answer does not replay the corpus; without them, the corpus.
+      // An ambiguous name reads no browsing history at all, stored or from the corpus: none of it belongs to one realm.
+      const ambiguous = lookup?.status === "ambiguous";
+      let browse: { points: AuctionPoint[]; dataAsOf: string | null } | null = null;
+      if (!ambiguous) try { browse = (await options.auctionHistory?.(realm, args.itemId)) ?? null; } catch { browse = null; }
+      if (!browse && !ambiguous) {
+        const read = await readTooledFacts<AuctionSighting[]>("auction_history", options.corpus, recheck);
+        if (read) browse = { points: auctionHistory(realm, args.itemId, read.facts, options.trusted).points, dataAsOf: read.dataAsOf };
       }
-      return readPageIn("auction_history", (facts: ReturnType<typeof auctionSightingsFromRecords>) => {
-        const page = auctionHistory(args.realm, args.itemId, facts);
-        return { text: handleAuctionHistory(args, facts), page, url: page.points.length ? marketItemUrl(args.realm, args.itemId) : undefined };
-      });
+      if (!browse && !market) {
+        const reason = uploadsConfigured(options.corpus) ? UNAVAILABLE : UPLOADS_UNSET;
+        return { text: reason, structured: { connected: false, dataAsOf: null, reason } };
+      }
+      return pageAnswer(auctionHistoryPage(args, lookup, scanDays, browse?.points ?? null, busiest?.house ?? null), browse?.dataAsOf ?? market?.dataAsOf ?? null);
     },
     market_value: (args) => marketValueAnswer(args, options.market),
     gold_ledger: (args) => readPageIn("gold_ledger", (facts: ReturnType<typeof goldFactsFromRecords>) => {

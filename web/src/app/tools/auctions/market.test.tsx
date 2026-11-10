@@ -84,6 +84,8 @@ test("the hub is the browse view across realms: names, realms, house switch, cat
   const words = text(html);
   expect(html).toContain("Auction House");
   expect(words).toContain("Updated 4 min ago");
+  // The facts under the title are separated by a dot with a space each side.
+  expect(html).toContain('<span aria-hidden="true"> · </span>');
   expect(html).toContain('href="/tools/auctions/forever"');
   expect(html).toContain('href="/tools/auctions/malganis"');
   // Two reporters are not enough: Nightfall is not listed.

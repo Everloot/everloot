@@ -4,6 +4,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { pageMetadata } from "@/lib/seo";
 import { formatCopper, MARKET_RULE, reportersText } from "../../../../../../../kb/src/market";
 import { auctionSightingsFromRecords, handleAuctionHistory, handleStoredAuctionHistory } from "../../../../../../../kb/src/auction-history";
+import { trustedInstalls } from "../../../../../../../kb/src/trusted-source";
 import { STORAGE_UNREACHABLE, uploadStore } from "@/lib/upload-store";
 import { storedAuctionHistory } from "@/lib/auction-history-store";
 import { marketDatasetJsonLd } from "@/lib/jsonld";
@@ -66,7 +67,7 @@ export default async function RealmItemPage(props: Props) {
   const corpus = row && !stored ? await uploadStore.loadCorpus() : null;
   const browse = stored ? handleStoredAuctionHistory({ realm, itemId }, stored.points) : corpus && (corpus.unreachable
     ? STORAGE_UNREACHABLE
-    : handleAuctionHistory({ realm, itemId }, auctionSightingsFromRecords(corpus.records)));
+    : handleAuctionHistory({ realm, itemId }, auctionSightingsFromRecords(corpus.records), trustedInstalls(process.env.EVERLOOT_TRUSTED_INSTALLS)));
   const path = itemHref({ slug }, itemId);
   const trail = [...trailFor(AH_PATH)!, { name: realm, path: realmHref({ slug }) }, { name: label, path }];
   const v = row?.value;

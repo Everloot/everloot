@@ -154,7 +154,7 @@ function zonesOf(npcs: readonly NpcSightingRow[]): Map<number, number | null> {
 
 /** `zonesOf` once per sightings array, so a list of quests or vendors places every NPC in one pass. */
 const zoneCache = new WeakMap<readonly NpcSightingRow[], Map<number, number | null>>();
-function zonesFor(npcs: readonly NpcSightingRow[]): Map<number, number | null> {
+export function zonesFor(npcs: readonly NpcSightingRow[]): Map<number, number | null> {
   const cached = zoneCache.get(npcs);
   if (cached) return cached;
   const zones = zonesOf(npcs);
@@ -179,7 +179,7 @@ function npcScope(npcId: number, rows: readonly NpcSightingRow[], zone: number |
 }
 
 /** The quest facts a scope can cover: counted where the leading giver (then turn-in) stands, with the rewards' ids. */
-function questScope(questId: number, rows: readonly QuestSighting[], zones: ReadonlyMap<number, number | null>): ScopedFact {
+export function questScope(questId: number, rows: readonly QuestSighting[], zones: ReadonlyMap<number, number | null>): ScopedFact {
   const lead = (k: "giverNpcId" | "turnInNpcId") => {
     const id = tallyVotes(rows.flatMap((r) => (r[k] === undefined ? [] : [{ installId: r.installId, value: r[k]! }]))).groups.sort((a, b) => b.voters.size - a.voters.size)[0]?.value;
     return typeof id === "number" ? zones.get(id) ?? null : null;

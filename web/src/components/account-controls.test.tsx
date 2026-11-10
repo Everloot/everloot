@@ -59,6 +59,13 @@ describe("header account controls", () => {
     expect(container.querySelector('#site-navigation a[href="/addon"]')?.textContent).toBe("Get the addon");
   });
 
+  it("keeps the addon download in the mobile menu when signed in", async () => {
+    vi.stubGlobal("fetch", async () => Response.json({ user }));
+    await act(async () => root.render(<Header />));
+    await act(async () => button("Menu").click());
+    expect(container.querySelector('#site-navigation a[href="/addon"]')?.textContent).toBe("Get the addon");
+  });
+
   // The text links moved into the avatar menu, and My builds is now Your builds there (account shell spec).
   it("links a signed-in visitor to Your builds only with saved builds on", async () => {
     vi.stubGlobal("fetch", async () => Response.json({ user }));

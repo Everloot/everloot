@@ -144,7 +144,7 @@ export function PendingRealms({ realms }: { realms: PendingRealm[] }) {
 export function Facts({ items }: { items: ReactNode[] }) {
   return (
     <>
-      {items.flatMap((item, i) => (i === 0 ? [<span key={i}>{item}</span>] : [<span key={`s${i}`} aria-hidden="true">·</span>, <span key={i}>{item}</span>]))}
+      {items.flatMap((item, i) => (i === 0 ? [<span key={i}>{item}</span>] : [<span key={`s${i}`} aria-hidden="true">{" · "}</span>, <span key={i}>{item}</span>]))}
     </>
   );
 }

@@ -106,11 +106,13 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
           ]}
         />
         <EntityTop
-          box={
+          // No box without an agreed level: the quick facts' Level row carries its meter, and a frame with only the
+          // title would repeat the heading.
+          box={!facts.unreachable && page.level !== null && (
             <TooltipFrame name={title} label={wikiTitle ? `${title}, ${GAME_NAME_TITLE.wiki.toLowerCase()}` : `${title}, as players saw it`}>
-              {!facts.unreachable && page.level !== null && <p>Level {page.level}</p>}
+              <p>Level {page.level}</p>
             </TooltipFrame>
-          }
+          )}
           facts={!facts.unreachable && (
             <Facts
               layout="list"
@@ -131,6 +133,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
           jsonHref={!facts.unreachable && hasCard.quest(page) ? `/api/tooltip/quest/${page.questId}` : undefined}
         />
         <Tabs
+          className="mt-6"
           label={`${title}: relations`}
           tabs={[
             {
@@ -145,7 +148,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
                     rowKey={String}
                   />
                 )
-                : <EmptyTab message="No agreed rewards yet." />,
+                : <EmptyTab message="No agreed rewards yet. A reward shows once 3 installs report it." />,
             },
             {
               id: "givers", label: "Giver and turn-in", count: facts.unreachable ? undefined : people.length,
@@ -163,7 +166,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
                     rowKey={(p) => p.role}
                   />
                 )
-                : <EmptyTab message="No agreed giver or turn-in yet." />,
+                : <EmptyTab message="No agreed giver or turn-in yet. Each shows once 3 installs report it." />,
             },
           ]}
         />

@@ -4,7 +4,8 @@ import JsonLd from "@/components/JsonLd";
 import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { AgreementMeter, Badge, Card, Container, DataTable, DataTitle, EmptyState, filledColumns, reportedLabel, SectionHeading, type Column, type SparseColumn } from "@/components/ui";
+import { AgreementMeter, Badge, Card, Container, DataTable, DataTitle, Disclosure, EmptyState, filledColumns, InShort, OpenData, reportedLabel, SectionHeading, type Column, type SparseColumn } from "@/components/ui";
+import { observedLine } from "@/lib/evidence";
 import {
   bossRows, difficultyLabel, difficultyList, instanceDescription, instanceHref, instanceRows, instanceTitle, levelLabel, loadSightings, parseInstanceSegment,
   type BossRow, type InstancePlace, type InstanceRow,
@@ -119,6 +120,22 @@ export default async function InstancePage(props: Props) {
   const names = itemFacts && !itemFacts.unreachable ? itemNames(itemFacts) : new Map<number, string>();
   const tips = await loadItemTips(droppedIds.length ? await loadSiteAssets() : null, droppedIds);
 
+  // The page in a few lines, from the sections below only: what it is, what players reported with its agreement and
+  // date, and what the game files list. Storage down: the player line says unrecorded, never zero.
+  const count = (n: number, one: string, many: string) => (n ? `${n} ${n === 1 ? one : many}` : null);
+  const level = levelLabel(row.level);
+  const reported = unreachable ? [] : [count(row.bosses.length, "boss", "bosses"), count(row.confirmed.length, "entrance", "entrances")];
+  const lastSeen = unreachable ? null : [...row.bosses, ...row.confirmed].map((x) => x.lastSeen).filter((t): t is string => t !== null).sort().at(-1) ?? null;
+  const filesList = [count(row.encounters.length, "encounter", "encounters"), count(row.files.length, "entrance", "entrances")].filter(Boolean);
+  const summary = [
+    `${row.raid === null ? "An instance" : row.raid ? "A raid" : "A dungeon"}${level ? `, level ${level} in the game files` : ""}.`,
+    unreachable ? STORAGE_UNREACHABLE
+      : reported.some(Boolean) ? `${observedLine(reported, lastSeen, Date.now())} Each has three installs agreeing.`
+      : row.reported > 0 ? `Nothing here is confirmed yet: ${row.reported} ${row.reported === 1 ? "install has" : "installs have"} zoned in, and 3 must agree.`
+      : observedLine([], null, Date.now()),
+    filesList.length ? `The game files list ${filesList.join(" and ")}, unconfirmed until 3 installs report them.` : "The game files list no encounter or entrance for it.",
+  ];
+
   const unconfirmed = row.reported > 0
     ? `No entrance is confirmed yet. ${row.reported} ${row.reported === 1 ? "install has" : "installs have"} zoned in, and 3 must agree on the place.`
     : "No entrance is confirmed yet: no install has reported zoning in. An entrance is confirmed once 3 installs zone in from the same place.";
@@ -143,11 +160,20 @@ export default async function InstancePage(props: Props) {
 
         {unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} Players&apos; reports cannot be shown until it is back; the entrance below is from the game files.</p>}
 
+        <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={link}>How to read these numbers</Link>} />
+        {/* No per-instance JSON is served, so no Raw JSON link: the copy text is the record. */}
+        <OpenData className="mb-6" text={[`${title} (instance ${row.instanceMapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
+
         <div className="space-y-6">
           <section aria-labelledby="facts">
-            <SectionHeading id="facts" note="The type is from the game files where they place the entrance, else as 3 installs agree. The level is from the game files, which give one level for most instances rather than a range. The difficulty is the id 3 installs agree on; the game files' own list of the instance's difficulties shows beside it when they give one.">
-              Facts
-            </SectionHeading>
+            <SectionHeading id="facts">Facts</SectionHeading>
+            {/* One note for the whole page, under the first section, rather than one per section. */}
+            <Disclosure summary="How this is counted">
+              <p>Facts: the type is from the game files where they place the entrance, else as 3 installs agree. The level is from the game files, which give one level for most instances rather than a range. The difficulty is the id 3 installs agree on; the game files' own list of the instance's difficulties shows beside it when they give one.</p>
+              <p>Entrance: confirmed by the instance id, the last place outside where 3 installs stood before zoning in, at the median of their positions.</p>
+              <p>Bosses: a boss is listed once 3 installs report its encounter ending here. Kills count every install's kills together; wipes are not kills. The encounters the game files list for this instance follow, marked unconfirmed until 3 installs report them.</p>
+              <p>Loot: each boss's loot is the loot table of the creature 3 installs tie to its encounter, the same rows its NPC page shows. A rate needs loot windows from 3 installs; short of that, the count so far shows and no rate.</p>
+            </Disclosure>
             <Card as="div">
               <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
                 <dt className="text-muted">Type</dt><dd className="text-fg">{kindLabel(row.raid)}</dd>
@@ -171,9 +197,7 @@ export default async function InstancePage(props: Props) {
           </section>
 
           <section aria-labelledby="entrance">
-            <SectionHeading id="entrance" note="Confirmed by the instance id: the last place outside where 3 installs stood before zoning in, at the median of their positions.">
-              Entrance
-            </SectionHeading>
+            <SectionHeading id="entrance">Entrance</SectionHeading>
             {row.files.length > 0 && (
               <ul className="mb-3 space-y-1 text-sm">
                 {row.files.map((p) => (
@@ -193,9 +217,7 @@ export default async function InstancePage(props: Props) {
           </section>
 
           <section aria-labelledby="bosses">
-            <SectionHeading id="bosses" note="A boss is listed once 3 installs report its encounter ending here. Kills count every install's kills together; wipes are not kills. The encounters the game files list for this instance follow, marked unconfirmed until 3 installs report them.">
-              Bosses
-            </SectionHeading>
+            <SectionHeading id="bosses">Bosses</SectionHeading>
             <DataTable
               dense caption={`Bosses players reported in ${title}, and the ones the game files list`} columns={shownBossColumns} rows={bosses} rowKey={(b) => String(b.encounterId)}
               meta={anyReport ? bossMeta : undefined}
@@ -209,9 +231,7 @@ export default async function InstancePage(props: Props) {
           </section>
 
           <section aria-labelledby="loot">
-            <SectionHeading id="loot" note="Each boss's loot is the loot table of the creature 3 installs tie to its encounter, the same rows its NPC page shows. A rate needs loot windows from 3 installs; short of that, the count so far shows and no rate.">
-              Loot
-            </SectionHeading>
+            <SectionHeading id="loot">Loot</SectionHeading>
             {unreachable || loot?.unreachable ? <Unreachable />
               : lootBosses.length === 0 ? empty("No loot to show yet: no boss here has a creature 3 installs agree on. Loot shows per boss once 3 installs report the boss and loot it.")
               : (

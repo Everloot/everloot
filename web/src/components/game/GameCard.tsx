@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { DATA_SIZE } from "@/design/tokens";
 import TooltipFrame from "@/components/ui/TooltipFrame";
+import TooltipLines from "@/components/ui/TooltipLines";
 import { qualityOf } from "@/components/ui/quality";
 import { PLACEHOLDER } from "@/lib/placeholder";
 import GameIcon from "./GameIcon";
@@ -38,7 +39,7 @@ export function GameCard({ card }: { card: CardContent }) {
         icon={card.icon ? <GameIcon src={card.icon} size={ICON} /> : undefined}
         foot={card.foot ?? undefined}
       >
-        {card.lines.length > 0 ? card.lines.map((line, i) => <p key={i}>{line}</p>) : null}
+        {card.lines.length > 0 ? <TooltipLines lines={card.lines} /> : null}
       </TooltipFrame>
       {notes && <div data-card-notes className="mt-1 space-y-0.5 rounded-[4px] border border-line bg-panel px-2 py-1 text-xs text-muted">{notes.map((note, i) => <p key={i}>{note}</p>)}</div>}
     </div>

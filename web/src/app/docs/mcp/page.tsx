@@ -99,13 +99,37 @@ export default function McpOverview() {
 
       <H3 id="record-ids">Record ids</H3>
       <P>
-        A hit&apos;s <C>id</C> is the record id: pass it to <C>get_entity</C> as a number, or to <C>fetch</C> as a string. A
-        knowledge-release record&apos;s id is its row in the release. A game-file catalog record has a stable synthetic id, the
-        same on every build: {CATALOG_ID_BASE.toLocaleString("en-US")} plus the kind&apos;s position in the table above
-        (achievement is 0) times {CATALOG_KIND_SPAN.toLocaleString("en-US")}, plus the in-game id. So the faction with in-game
-        id 72 is record {(CATALOG_ID_BASE + CATALOG_KIND_SPAN + 72).toLocaleString("en-US")}, and <C>get_entity(72)</C> reads
-        release row 72, whatever its kind. The page tools (<C>item_page</C>, <C>npc_page</C> and the rest) and the site&apos;s
-        own URLs take the in-game id, which a hit&apos;s <C>url</C> carries, not the record id.
+        A hit&apos;s <C>recordId</C> (also <C>id</C>) goes to <C>get_entity</C> or, as a string, <C>fetch</C>.
+        Its separate <C>gameId</C> goes to gameplay tools. Search for <C>Linen Cloth</C> with kind <C>item</C>,
+        then pass gameId 2589 as <C>item_page.itemId</C>. Find <C>Elwynn Forest</C> with kind <C>zone</C>,
+        then pass its gameId as <C>world_map_near.zone: &quot;1429&quot;</C>, with x and y on the 0 to 100 scale.
+        NPC gameIds go to <C>npc_page.npcId</C>. Never use an archive record id as a game id.
+        Item, NPC, object and quest metadata includes only names three installs agree on, ids and kind;
+        it exports no game-file tooltip or description text. <C>sourceKind</C> distinguishes observed names,
+        game-file metadata, lore and other reference records. <C>observed.asOf</C> is the corpus snapshot date,
+        not the last sighting; game-file metadata carries <C>build</C> and stays unconfirmed.
+        Lore remains labelled <C>lore</C> and has no gameId.
+        Stable metadata ids use {CATALOG_ID_BASE.toLocaleString("en-US")} plus the permanent kind index times
+        {CATALOG_KIND_SPAN.toLocaleString("en-US")}, plus gameId. Existing indices 0 through 7 remain unchanged;
+        item, npc, object, quest and zone append at indices 8 through 12. For example, faction gameId 72 remains record 1,010,000,072. The table order above is not the index order.
+      </P>
+
+      <H3 id="realm-names">Realm names</H3>
+      <P>
+        <C>market_value</C> and <C>auction_history</C> take a realm&apos;s full name as the game&apos;s realm list shows it, such
+        as <C>CAMWOW US1 Realm 4 PvP</C>, in any case. A name of at least two words that is the end of exactly one realm&apos;s
+        full name, in whole words, is read as that realm (a one-word name never resolves): <C>US1 Realm 4 PvP</C> answers for <C>CAMWOW US1 Realm 4 PvP</C>, and the answer says
+        so. A name that ends several realms&apos; names (<C>Realm 4 PvP</C> once US1 and EU1 both have prices) is ambiguous,
+        and one no scan uses is unknown: both answer with the realms to ask with instead, closest first, never with an empty
+        market. The page carries <C>realmStatus</C> (<C>exact</C>, <C>alias</C>, <C>ambiguous</C> or <C>unknown</C>) and, when
+        they apply, <C>askedRealm</C> and <C>candidates</C>. Realms are never merged: each realm, ruleset and auction house is
+        its own market.
+      </P>
+      <P>
+        Both tools publish a day by the market&apos;s rule: 3 reporters, or, while few players upload, a day Everloot&apos;s
+        own installs scanned, labelled &quot;includes Everloot&apos;s own scans&quot;. <C>auction_history</C> lists the
+        public full-scan days <C>market_value</C> values the item by (<C>page.scanDays</C>), then the single listings players
+        saw while browsing (<C>page.points</C>), a separate source with its own count.
       </P>
 
       <H3 id="structured-content">structuredContent</H3>

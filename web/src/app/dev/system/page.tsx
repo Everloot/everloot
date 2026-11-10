@@ -1,9 +1,10 @@
+import GameIcon from "@/components/game/GameIcon";
 import type { Metadata } from "next";
 import { trailFor } from "@/lib/breadcrumbs";
 import type { ReactNode } from "react";
 import { CLASSES, QUALITIES, RADIUS, SPACE, tokens, WIDTH, type TokenName } from "@/design/tokens";
 import {
-  AgreementMeter, Badge, Card, Container, DataTable, EmptyState, PageHeader, SectionHeading, Tabs, TooltipFrame,
+  AgreementMeter, Badge, Card, Container, DataTable, EmptyState, PageHeader, SectionHeading, Tabs, TooltipFrame, TooltipLines,
   QUALITY_TEXT, qualityOf, type Column,
 } from "@/components/ui";
 
@@ -85,6 +86,8 @@ export default function DesignSystemPage() {
             <div className="space-y-6">
               <div>
                 <Label>Item quality</Label>
+                {/* The icon quality borders, around the site's own mark: this page reads no game art. */}
+                <div className="flex gap-3 py-3">{QUALITIES.map((quality) => <GameIcon key={quality} src="/icon.svg" size={40} quality={quality} />)}</div>
                 <ul className="divide-y divide-line">{QUALITIES.map((q) => <Swatch key={q} name={`q-${q}`} />)}</ul>
               </div>
               <div>
@@ -253,9 +256,9 @@ export default function DesignSystemPage() {
         <Specimen id="tooltip" title="TooltipFrame" note="Game things keep the game's frame, dark in every theme.">
           <div className="flex flex-wrap items-start gap-6">
             <TooltipFrame name="Truesilver Champion" quality="rare" label="Truesilver Champion, from the game files" foot="Build 1.60.1.70450 · unconfirmed">
-              <p>Binds when equipped</p>
-              <p className="flex justify-between gap-4"><span>Two-Hand</span><span>Sword</span></p>
-              <p className="text-q-uncommon">Made by Blacksmithing</p>
+              <TooltipLines
+                lines={["Item Level 57", "Binds when equipped", "Two-Hand · Sword", "[?] - [?] Damage · Speed 3.40", "([?] damage per second)", "Requires Level 52", "Chance on hit: [?]", "Sell Price: 5g 64s 12c"]}
+              />
             </TooltipFrame>
             <TooltipFrame name="Linen Cloth" quality="common" foot="Build 1.60.1.70450 · unconfirmed"><p>Trade Goods · Cloth</p></TooltipFrame>
           </div>

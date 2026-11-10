@@ -48,7 +48,7 @@ export interface PublicMcpConfig extends ToolOptions {
  */
 const TOOL_OPTION_KEYS = {
   catalog: true, corpus: true, market: true, auctionHistory: true, gameData: true, completion: true, changes: true, ecosystem: true, census: true,
-  coverage: true, settledSummary: true, guilds: true, recheck: true,
+  coverage: true, settledSummary: true, guilds: true, recheck: true, trusted: true,
 } as const satisfies Record<keyof ToolOptions, true>;
 
 /** The loaders a config carries, picked out of the mount's settings. */

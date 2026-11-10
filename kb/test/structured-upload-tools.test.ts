@@ -139,7 +139,7 @@ test("completion_progress and market_value answer from their own loaders, and sa
   const market = OUT.market_value.parse(marketResult.structuredContent);
   // The page carries one house's value (the busiest); these scans read the Alliance house.
   const expected = itemMarket(state, "Forever", 2589, now, "Alliance");
-  expect(market).toEqual({ connected: true, dataAsOf: AS_OF, url: "https://everloot.app/tools/auctions?realm=Forever&item=2589", page: { realm: "Forever", itemId: 2589, value: expected.value, history: expected.points } });
+  expect(market).toEqual({ connected: true, dataAsOf: AS_OF, url: "https://everloot.app/tools/auctions?realm=Forever&item=2589", page: { realm: "Forever", itemId: 2589, value: expected.value, history: expected.points, realmStatus: "exact" } });
   expect(market.page!.value).toMatchObject({ itemId: 2589, market: 110, reporters: 3 });
   expect(JSON.stringify(marketResult.content)).toContain("More: https://everloot.app/tools/auctions?realm=Forever&item=2589");
   // An item nobody scanned has an empty price page: no link.

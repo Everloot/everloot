@@ -182,6 +182,19 @@ export const objectPage = z.object({
     .describe("Where players saw the object on the minimap, at its own position; a pin needs 3 installs at one spot. Absent when there is none."),
 });
 
+/** The realm parameter of market_value and auction_history. */
+const REALM_INPUT =
+  "The realm's full name as the game's realm list shows it, such as CAMWOW US1 Realm 4 PvP. The end of exactly one realm's full name (US1 Realm 4 PvP) is read as that realm; an unknown or ambiguous name answers with the realms to ask with.";
+
+/** How market_value and auction_history read the realm asked for. Absent when the market rollup is not connected. */
+const realmLookup = {
+  realmStatus: z.enum(["exact", "alias", "ambiguous", "unknown"]).optional()
+    .describe("exact: a realm Everloot holds scans for. alias: the end of exactly one public realm's full name, read as that realm (realm is its full name). ambiguous: the end of several realms' names, so nothing is read. unknown: no scan names that realm, so nothing is read; that is not an empty market."),
+  askedRealm: z.string().optional().describe("The realm as asked, when it was read as an alias."),
+  candidates: z.array(z.string()).optional().describe("For ambiguous or unknown: the realms with public prices to ask with instead, closest first."),
+};
+const marketDay = z.object({ day: z.string(), min: z.number().int(), market: z.number().int(), quantity: z.number().int(), reporters: z.number().int(), thin: z.boolean() });
+
 export const auctionHistory = z.object({
   realm: z.string(),
   itemId: z.number().int(),
@@ -189,7 +202,10 @@ export const auctionHistory = z.object({
     day: z.string(),
     copper: z.number().int().describe("The median of the last scan from each install that day."),
     reporters: z.number().int(),
-  })).describe("Days 3 installs scanned the item on the realm, oldest first."),
+  })).describe("Single listings players saw while browsing: days 3 installs scanned the item on the realm, or one of Everloot's own installs did (reporters under 3), oldest first."),
+  scanDays: z.array(marketDay).optional()
+    .describe("The public full-scan days market_value values the item by, the same days as its history, oldest first. Absent when the market is not connected."),
+  ...realmLookup,
 });
 export const collectionGap = z.object({
   collection: z.string(),
@@ -359,8 +375,9 @@ export const marketValue = z.object({
 export const marketPage = z.object({
   realm: z.string(),
   itemId: z.number().int(),
-  value: marketValue.nullable().describe("Null until 3 reporters scanned the item on the realm."),
-  history: z.array(z.object({ day: z.string(), min: z.number().int(), market: z.number().int(), quantity: z.number().int(), reporters: z.number().int(), thin: z.boolean() })),
+  value: marketValue.nullable().describe("Null until 3 reporters scanned the item on the realm, or one of Everloot's own installs did, and for an ambiguous or unknown realm."),
+  history: z.array(marketDay),
+  ...realmLookup,
 });
 export const relationEdge = z.object({
   fromKind: z.enum(ENTITY_KINDS), fromId: z.number().int(), rel: z.enum(RELS), toKind: z.enum(ENTITY_KINDS), toId: z.number().int(),
@@ -461,7 +478,7 @@ export type PlanRowOut = z.infer<typeof planRow>;
 
 /** The kind filter of search_knowledge and get_by_name. */
 const KIND_FILTER =
-  "Narrow to one record kind. achievement, faction, title, quest_chain, mount, legacy_perk, race and instance come from the game files (found in game files, unconfirmed); item, npc, object, quest, zone, spell, lore_page, creator and realm from the knowledge release; build is an Everloot team starter talent build, not observed. Without it, every kind.";
+  "Narrow to one record kind. item, npc, object and quest include names 3 installs agree on; zone uses released UiMap ids from the game files. achievement, faction, title, quest_chain, mount, legacy_perk, race and instance come from the game files (found in game files, unconfirmed); spell, lore_page, creator and realm come from the knowledge release; build is an Everloot team starter talent build, not observed. Without it, every kind.";
 
 const searchArgs = {
   query: z.string().max(1000).describe("What to look up: names, questions, keywords. Question words are ignored."),
@@ -519,6 +536,11 @@ export type FetchedDocumentOut = z.infer<typeof fetchedDocument>;
 /** One knowledge record as search_knowledge, get_entity and get_by_name return it. */
 export const knowledgeHit = z.object({
   id: z.number().int().describe("The record id, for get_entity."),
+  recordId: z.number().int().optional().describe("Alias of id. Pass to get_entity or fetch, never a gameplay tool."),
+  gameId: z.number().int().optional().describe("Gameplay id: itemId for item_page, npcId for npc_page, questId for quest_page, objectId for object_page; a zone is a UiMap id for world_map_near.zone. Absent for lore, reference and other catalog kinds (including instances, whose extId is a Map.db map id, not a UiMap id)."),
+  sourceKind: z.enum(["observed", "game-files", "lore", "reference"]).optional().describe("Observed names are agreed by 3 installs; game-files facts remain unconfirmed. Lore is historical archive text, not current gameplay evidence."),
+  build: z.string().optional().describe("Game-file build this metadata was read from; not inferred for observed names."),
+  observed: z.object({ asOf: z.string().nullable() }).optional().describe("Name agreed by 3 or more installs. asOf is the corpus snapshot time, not the last observation time."),
   extId: z.string().describe("The source's own id, such as a wiki page title."),
   kind: z.enum(KNOWLEDGE_KINDS),
   name: z.string(),
@@ -583,21 +605,21 @@ export const MCP_TOOLS = {
   search_knowledge: {
     title: "Search the Everloot knowledge base",
     description:
-      "Searches WoW lore, Forever reference data and the game-file catalogs (achievements, factions, titles, quest chains, mounts, legacy perks, races, instances) by names, keywords or a question. Exact-name matches rank first. Every hit carries its id, kind, source, licence and date, and a game-file hit says when player uploads confirm it. Use it to find a record from a name or a topic, then pass the hit's id to get_entity for its summary, or to fetch as a string for the whole text. Use get_by_name when you already know the exact full name, and answer_sources when you need cited evidence for a question rather than records. search is the same search in the ChatGPT connector shape.",
+      "Searches agreed gameplay names (items, NPCs, objects, quests), released zones, WoW lore, Forever reference data and the game-file catalogs (achievements, factions, titles, quest chains, mounts, legacy perks, races, instances) by names, keywords or a question. Exact-name matches rank first. Hits separate recordId (alias of id, for get_entity/fetch) from gameId (for gameplay tools; stringify a zone gameId for world_map_near.zone). Lore ids are archive records, never game ids. Metadata carries sourceKind, build when from files, and observed snapshot support when players agree. Every hit carries its id, kind, source, licence and date, and a game-file hit says when player uploads confirm it. Use it to find a record from a name or a topic, then pass the hit's id to get_entity for its summary, or to fetch as a string for the whole text. Use get_by_name when you already know the exact full name, and answer_sources when you need cited evidence for a question rather than records. search is the same search in the ChatGPT connector shape.",
     inputSchema: searchArgs,
     outputSchema: { hits: z.array(knowledgeHit) },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   get_entity: {
     title: "Get one knowledge record by id",
-    description: "Returns one knowledge record's summary, by the numeric id a search_knowledge or get_by_name hit gave: title, a short excerpt in the source's words, the URL to cite, source, licence and date. A game-file record carries its build and says when player uploads confirm it. Use it to read one hit again by its id; for the whole text, call fetch with the same id as a string. An id no record has returns a null hit, not an error. Give field, a JSON pointer such as /questIds, to read one value of the record's data instead of the excerpt; an array comes in pages of up to 48 rows, and nextOffset says where the next page starts. A pointer that leads nowhere answers with the keys it could have used, not an error.",
+    description: "Returns one knowledge record's summary, by the numeric id a search_knowledge or get_by_name hit gave: title, a short excerpt in the source's words, the URL to cite, source, licence and date. Gameplay metadata separates recordId from gameId and labels sourceKind, build or observed snapshot support. A game-file record carries its build and says when player uploads confirm it. Use it to read one hit again by its id; for the whole text, call fetch with the same id as a string. An id no record has returns a null hit, not an error. Give field, a JSON pointer such as /questIds, to read one value of the record's data instead of the excerpt; an array comes in pages of up to 48 rows, and nextOffset says where the next page starts. A pointer that leads nowhere answers with the keys it could have used, not an error.",
     inputSchema: { id: z.number().int().describe("The numeric id of a search_knowledge or get_by_name hit."), ...fieldReadInput },
     outputSchema: { hit: knowledgeHit.nullable(), ...fieldReadOutput },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   get_by_name: {
     title: "Get records by exact name",
-    description: "Returns the records whose full name matches exactly, case-insensitively, optionally narrowed to one record kind. Use it to disambiguate when you know the exact name and want the id without a ranked search; use search_knowledge for partial names, keywords or questions. Several records can share a name across kinds, so check each hit's kind. Empty hits mean no record has that exact name.",
+    description: "Returns the records whose full name matches exactly, case-insensitively, optionally narrowed to one record kind. Use it to disambiguate when you know the exact name and want the id without a ranked search; use search_knowledge for partial names, keywords or questions. Several records can share a name across kinds, so check each hit's kind and sourceKind. Use gameId for gameplay tools and recordId for get_entity; lore hits have no gameId. Empty hits mean no record has that exact name.",
     inputSchema: {
       name: z.string().max(200).describe("The full record name, any case, up to 200 characters."),
       kind: z.enum(KNOWLEDGE_KINDS).optional().describe(KIND_FILTER),
@@ -915,9 +937,9 @@ export const MCP_TOOLS = {
   auction_history: {
     title: "Auction history for one item",
     description:
-      "Returns the day-by-day price history of one item on one WoW: Forever realm, from auction scans players uploaded on purpose. A day is public after 3 installs scanned that item on that realm; copper is the median. Use it for how a price moved over time; use market_value for today's market value, minimum buyout and units listed, item_page for the item itself, and vendor_page for vendor prices. Realm is the realm's name; the item id is the game's. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
+      "Returns the day-by-day price history of one item on one WoW: Forever realm, from auction scans players uploaded on purpose: the public full-scan days market_value values the item by, and the single listings players saw while browsing. Both follow the market's rule: a day is public after 3 reporters scanned the item, or, while few players upload, when Everloot's own installs did, and its reporters say so. Use it for how a price moved over time; use market_value for today's market value, minimum buyout and units listed, item_page for the item itself, and vendor_page for vendor prices. The realm is read as market_value reads it: an unknown or ambiguous name answers with the realms to ask with, never an empty history. The item id is the game's. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
     inputSchema: {
-      realm: z.string().describe("The realm's name, as the game shows it."),
+      realm: z.string().describe(REALM_INPUT),
       itemId: z.number().int().positive().describe("The game's item id, as item_page takes it."),
     },
     outputSchema: { ...uploadsAnswer, page: auctionHistory.optional() },
@@ -926,9 +948,9 @@ export const MCP_TOOLS = {
   market_value: {
     title: "Forever market value for one item",
     description:
-      "Returns the market value, minimum buyout, historical value and units listed for one item on one WoW: Forever realm, from full auction scans players started and uploaded. A day is public after 3 reporters (distinct upload addresses) scanned the item, and its value is the median of theirs. Market value is a weighted mean of the public days up to 14 calendar days old, newer days weighing more, leaving out thin days (5 units listed or fewer) and outlier days. Historical is the median of the public days in the last 60 calendar days, of the days that are not thin when there are any. Use it for what an item is worth now; use auction_history for the price over time, and vendor_page for vendor prices. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
+      "Returns the market value, minimum buyout, historical value and units listed for one item on one WoW: Forever realm, from full auction scans players started and uploaded. A day is public after 3 reporters (distinct upload addresses) scanned the item, or, while few players upload, when Everloot's own installs did, and its reporters say so; its value is the median of theirs. Market value is a weighted mean of the public days up to 14 calendar days old, newer days weighing more, leaving out thin days (5 units listed or fewer) and outlier days. Historical is the median of the public days in the last 60 calendar days, of the days that are not thin when there are any. Use it for what an item is worth now; use auction_history for the price over time, and vendor_page for vendor prices. The realm is its full name as the game's realm list shows it. A name that is the end of exactly one realm's full name is read as that realm, and the answer says so; a name that ends several, or none, answers ambiguous or unknown with the realms to ask with, never an empty market. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
     inputSchema: {
-      realm: z.string().describe("The realm's name, as the game shows it."),
+      realm: z.string().describe(REALM_INPUT),
       itemId: z.number().int().positive().describe("The game's item id, as item_page takes it."),
     },
     outputSchema: { ...uploadsAnswer, page: marketPage.optional() },

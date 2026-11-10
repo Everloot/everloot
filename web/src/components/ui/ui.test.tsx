@@ -17,7 +17,8 @@ import Card from "./Card";
 import Container from "./Container";
 import DataTable, { filledColumns, type Column, type SparseColumn } from "./DataTable";
 import EmptyState from "./EmptyState";
-import { pageWindow } from "./Pager";
+import Facts from "./Facts";
+import Pager, { pageWindow } from "./Pager";
 import PageHeader from "./PageHeader";
 import ReadingLayout, { RailFacts } from "./ReadingLayout";
 import SectionHeading from "./SectionHeading";
@@ -222,9 +223,10 @@ describe("DataTable", () => {
       <DataTable dense caption="Items" columns={columns} rows={rows} rowKey={(r) => String(r.id)} sort={{ key: "name", direction: "asc" }} sortHref={(key, dir) => `?sort=${dir === "desc" ? "-" : ""}${key}`} />,
     );
     expect(html).not.toContain("rounded-card");
-    expect(html).toMatch(/<th scope="col" aria-sort="ascending" class="[^"]*h-th sm:sticky sm:top-header[^"]*text-th/);
-    // Not sticky on a phone, where a sideways-scrolling table would push its header down onto the rows.
+    expect(html).toMatch(/<th scope="col" aria-sort="ascending" class="[^"]*h-th lg:sticky lg:top-header[^"]*text-th/);
+    // Not sticky below 1024 px, where a sideways-scrolling table would push its header down onto the rows.
     expect(html).not.toMatch(/[\s"]sticky[\s"]/);
+    expect(html).not.toMatch(/sm:sticky/);
     expect(html).not.toContain("font-mono text-xs");
     expect(html).toMatch(/<td class="[^"]*sm:h-row/);
     expect(html).toContain("▲");
@@ -237,7 +239,14 @@ describe("DataTable", () => {
     const html = render(<DataTable dense caption="Items" columns={columns} rows={rows} rowKey={(r) => String(r.id)} meta={(r) => `Seen ${r.count}`} />);
     expect(html.match(/hidden sm:table-cell/g)).toHaveLength(1 + rows.length);
     expect(html).toContain('<div class="text-cell-2 text-muted sm:hidden">Seen 12</div>');
-    expect(html).not.toContain("overflow-x-auto");
+    // The columns that show from 640 px can still be wider than a tablet: the table scrolls inside itself below 1024 px.
+    expect(html).toMatch(/role="region" aria-label="Items" tabindex="0" class="[^"]*overflow-x-auto lg:overflow-visible/);
+  });
+
+  test("dense without a phone line scrolls inside itself below 1024 px, not 640", () => {
+    const html = render(<DataTable dense caption="Items" columns={columns} rows={rows} rowKey={(r) => String(r.id)} />);
+    expect(html).toMatch(/role="region" aria-label="Items" tabindex="0" class="[^"]*overflow-x-auto lg:overflow-visible/);
+    expect(html).not.toContain("sm:overflow-visible");
   });
 
   test("filledColumns leaves out a column blank on every row; one value anywhere keeps it", () => {
@@ -264,6 +273,23 @@ describe("DataTable", () => {
     expect(html.match(/<th /g)).toHaveLength(2);
     expect(html).toContain('colSpan="2"');
     expect(html).toContain("data-empty-state");
+  });
+});
+
+describe("Facts list", () => {
+  test("quick facts are one column until a wide screen, so a long value is not squeezed beside another", () => {
+    const html = render(<Facts layout="list" items={[{ label: "Reported name", value: "Linen Cloth" }]} />);
+    expect(html).toContain('class="columns-1 gap-x-6 text-meta lg:columns-2"');
+  });
+});
+
+describe("Pager", () => {
+  test("a disabled arrow is muted text, readable as 'not available', not the border colour", () => {
+    const first = render(<Pager label="Pages" page={1} pages={3} href={(p) => `?page=${p}`} />);
+    expect(first).toMatch(/<span aria-hidden="true" class="[^"]*text-muted">‹<\/span>/);
+    const last = render(<Pager label="Pages" page={3} pages={3} href={(p) => `?page=${p}`} />);
+    expect(last).toMatch(/<span aria-hidden="true" class="[^"]*text-muted">›<\/span>/);
+    expect(first + last).not.toContain("text-line");
   });
 });
 

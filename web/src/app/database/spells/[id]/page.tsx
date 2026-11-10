@@ -13,6 +13,7 @@ import { edgesFrom, edgesTo, type Edge, type Rel } from "../../../../../../kb/sr
 import { entityLabel } from "../../../../../../kb/src/edges";
 import { trailFor } from "@/lib/breadcrumbs";
 import { spellIndexable } from "@/lib/indexable";
+import { loadSpellTalents, type SpellTalent } from "@/lib/talents/spell-talents";
 import { DESCRIPTION_MAX, pageMetadata } from "@/lib/seo";
 
 /**
@@ -52,16 +53,46 @@ const relationColumns: Column<Edge>[] = [
   { key: "build", header: "Build", cell: (e) => e.build ?? "—" },
 ];
 
+/** The row gate as the catalog states it: the points, and where they count when the files say. */
+function gateText(t: SpellTalent): string {
+  if (!t.gate) return "None";
+  const where = t.gate.scope === "class" ? "in the class" : `in ${t.tree}`;
+  return `${t.gate.points} ${where}${t.gate.scope === "unconfirmed" ? " (where they count is unconfirmed)" : ""}`;
+}
+
+/** Where the spell sits in a talent tree, from the committed talent catalog, with a link to that class's calculator. */
+function TalentFacts({ talent, title }: { talent: SpellTalent; title: string }) {
+  return (
+    <div className="mb-6">
+      <p className="mb-2 text-meta text-fg-2">From the talent catalog, build {talent.build}: {talent.label}.</p>
+      <Facts
+        layout="rows"
+        label={`${title}: ${talent.className} talent`}
+        items={[
+          { label: "Class", value: <Link href={`/tools/talents/${talent.classSlug}`} className={LINK}>{talent.className} talent calculator</Link> },
+          { label: "Tree", value: talent.tree },
+          { label: "Row", value: talent.row, numeric: true },
+          { label: "Column", value: talent.col, numeric: true },
+          { label: "Ranks", value: talent.maxRanks, numeric: true },
+          ...(talent.tier !== null ? [{ label: "Tier", value: talent.tier, numeric: true }] : []),
+          { label: "Points spent first", value: gateText(talent) },
+        ]}
+      />
+    </div>
+  );
+}
+
 /**
  * What the page reads about one spell. The spell is unknown, a 404 rather than an empty page, when the game
  * files' spell names are loaded and do not hold it, it has no tooltip and no relation points from or to it.
  * Without the names file, or with upload storage out of reach, nothing can be ruled out.
  */
 async function loadSpell(spellId: number) {
-  const [edges, assets, spellNames] = await Promise.all([
+  const [edges, assets, spellNames, talentIndex] = await Promise.all([
     loadEdges(),
     loadSiteAssets(),
     loadSpellNames(CLIENT_LAYER.build.version),
+    loadSpellTalents(),
   ]);
   const both = [...edges.observed, ...edges.client];
   // Both directions: the files store what a spell creates and what it costs on the item (item -> created_by
@@ -69,8 +100,9 @@ async function loadSpell(spellId: number) {
   const all = [...edgesFrom(both, "spell", spellId), ...edgesTo(both, "spell", spellId)];
   const name = spellNames?.names.get(spellId);
   const tip = assets?.spellTips.get(spellId);
-  const unknown = spellNames !== null && !edges.unreachable && name === undefined && !tip && !all.length;
-  return { edges, assets, all, name, tip, unknown };
+  const talents = talentIndex.get(spellId) ?? [];
+  const unknown = spellNames !== null && !edges.unreachable && name === undefined && !tip && !all.length && !talents.length;
+  return { edges, assets, all, name, tip, talents, unknown };
 }
 
 /**
@@ -91,7 +123,7 @@ function spellDescription(name: string | undefined, id: number): string {
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const params = await props.params;
   if (!/^[1-9]\d*$/.test(params.id)) return { robots: { index: false, follow: true } };
-  const { all, name, tip, unknown } = await loadSpell(Number(params.id));
+  const { all, name, tip, talents, unknown } = await loadSpell(Number(params.id));
   if (unknown) notFound();
   const shown = name ?? tip?.name ?? undefined;
   return {
@@ -101,7 +133,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
       description: spellDescription(shown, Number(params.id)),
       path: `/database/spells/${params.id}`,
     }),
-    robots: { index: spellIndexable({ named: Boolean(name ?? tip?.name), text: Boolean(tip?.text), relations: all.length }), follow: true },
+    robots: { index: spellIndexable({ named: Boolean(name ?? tip?.name), text: Boolean(tip?.text), relations: all.length, talents: talents.length }), follow: true },
   };
 }
 
@@ -109,7 +141,7 @@ export default async function SpellPage(props: Props) {
   const params = await props.params;
   if (!/^[1-9]\d*$/.test(params.id)) notFound();
   const spellId = Number(params.id);
-  const { edges, assets, all, name, tip, unknown } = await loadSpell(spellId);
+  const { edges, assets, all, name, tip, talents, unknown } = await loadSpell(spellId);
   if (unknown) notFound();
   const rel = (r: Rel) => all.filter((e) => e.rel === r);
   const icon = assets?.spellIcons.get(spellId);
@@ -146,6 +178,9 @@ export default async function SpellPage(props: Props) {
     relationTab("costs", relLabel.reagent_for!, "reagent_for"),
     relationTab("taught-by", relLabel.in_skill_line!, "in_skill_line"),
     relationTab("reward-from", relLabel.reward_from!, "reward_from"),
+    talents.length
+      ? { id: "talent", label: "Talent", count: talents.length, panel: <>{talents.map((t) => <TalentFacts key={`${t.classSlug}-${t.tree}-${t.row}-${t.col}`} talent={t} title={title} />)}</> }
+      : null,
   ].filter((t): t is TabItem => t !== null);
 
   const trail = [...trailFor("/database/spells")!, { name: title, path: `/database/spells/${spellId}` }];
@@ -180,7 +215,7 @@ export default async function SpellPage(props: Props) {
           text={[`${title} (spell ${spellId})`, tip?.text ?? "", ...summary, `Source: https://everloot.app/database/spells/${spellId}`].filter(Boolean).join("\n")}
         />
         {tabs.length
-          ? <Tabs label={`${title}: relations`} tabs={tabs} />
+          ? <Tabs label={`${title}: relations`} tabs={tabs} className="mt-6" />
           : <EmptyTab message={`The game files list nothing here (build ${build}).`} players={false} action={null} />}
       </article>
     </Container>

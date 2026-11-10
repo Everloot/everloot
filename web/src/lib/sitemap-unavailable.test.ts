@@ -9,11 +9,15 @@ import { GET as databaseIndex } from "../app/database-sitemap.xml/route";
 import { GET as databaseChunk } from "../app/database-sitemap/[n]/route";
 import { GET as auctionsIndex } from "../app/auctions-sitemap.xml/route";
 import { GET as auctionsChunk } from "../app/auctions-sitemap/[n]/route";
+import { GET as loreIndex } from "../app/lore-sitemap.xml/route";
+import { GET as loreChunk } from "../app/lore-sitemap/[n]/route";
 import * as site from "./site-sitemap";
 import * as database from "./database-sitemap";
 import * as auctions from "./auctions-sitemap";
+import * as lore from "./lore-forever";
 import { databaseUnavailable } from "./database-sitemap";
 import { auctionsUnavailable } from "./auctions-sitemap";
+import { loreUnavailable } from "./lore-forever";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -41,12 +45,15 @@ const routes = [
   { path: "/database-sitemap/0.xml", get: () => chunk(databaseChunk, "0.xml") },
   { path: "/auctions-sitemap.xml", get: auctionsIndex },
   { path: "/auctions-sitemap/0.xml", get: () => chunk(auctionsChunk, "0.xml") },
+  { path: "/lore-sitemap.xml", get: loreIndex },
+  { path: "/lore-sitemap/0.xml", get: () => chunk(loreChunk, "0.xml") },
 ];
 
 test("successful XML indexes and chunks retain their CDN policy through Next's Node sender", async () => {
   vi.spyOn(site, "default").mockResolvedValue([{ url: "https://everloot.app/", lastModified: new Date("2026-10-20") }]);
   vi.spyOn(database, "databasePaths").mockResolvedValue(["/database/items/2589"]);
   vi.spyOn(auctions, "auctionPaths").mockResolvedValue(["/auctions"]);
+  vi.spyOn(lore, "lorePaths").mockResolvedValue(["/lore/1-thrall"]);
   for (const { path, get } of routes) {
     const response = await get();
     expect(response.status, path).toBe(200);
@@ -64,6 +71,7 @@ test("unavailable indexes and chunks keep all three no-store headers after stati
   vi.spyOn(site, "default").mockResolvedValue(null);
   vi.spyOn(database, "databasePaths").mockResolvedValue(null);
   vi.spyOn(auctions, "auctionPaths").mockResolvedValue(null);
+  vi.spyOn(lore, "lorePaths").mockResolvedValue(null);
   for (const { path, get } of routes) {
     const response = await get();
     expect(response.status, path).toBe(503);
@@ -75,7 +83,8 @@ test("unavailable indexes and chunks keep all three no-store headers after stati
 test("malformed and out-of-range chunks never receive positive CDN caching", async () => {
   vi.spyOn(database, "databasePaths").mockResolvedValue([]);
   vi.spyOn(auctions, "auctionPaths").mockResolvedValue([]);
-  for (const [prefix, get] of [["database", databaseChunk], ["auctions", auctionsChunk]] as const) {
+  vi.spyOn(lore, "lorePaths").mockResolvedValue([]);
+  for (const [prefix, get] of [["database", databaseChunk], ["auctions", auctionsChunk], ["lore", loreChunk]] as const) {
     for (const n of ["bad.xml", "1.xml"]) {
       const path = `/${prefix}-sitemap/${n}`;
       const response = await chunk(get, n);
@@ -87,7 +96,7 @@ test("malformed and out-of-range chunks never receive positive CDN caching", asy
 });
 
 test("sitemap outage 503s tell the CDN not to cache them", () => {
-  for (const res of [databaseUnavailable(), auctionsUnavailable()]) {
+  for (const res of [databaseUnavailable(), auctionsUnavailable(), loreUnavailable()]) {
     expect(res.status).toBe(503);
     for (const key of ["Cache-Control", "CDN-Cache-Control"]) expect(res.headers.get(key), key).toBe("no-store");
   }

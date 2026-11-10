@@ -467,6 +467,89 @@ export function marketHouses(state: MarketState, now: Date = new Date()): Record
   return out;
 }
 
+/** How a realm name was read against the rollup (resolveRealm). */
+export type RealmLookup =
+  | { status: "exact"; realm: string }
+  | { status: "alias"; realm: string; asked: string }
+  | { status: "ambiguous"; asked: string; candidates: string[] }
+  | { status: "unknown"; asked: string; candidates: string[] };
+
+/** Most realms an unknown-realm answer suggests. */
+export const REALM_CANDIDATES = 5;
+
+const realmWords = (realm: string) => realmKey(realm).split(/\s+/).filter(Boolean);
+
+function editDistance(a: string, b: string): number {
+  let row = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j++) next[j] = Math.min(row[j]! + 1, next[j - 1]! + 1, row[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
+    row = next;
+  }
+  return row[b.length]!;
+}
+
+/** The listed realms closest to a name: most words in common first, then the fewest letters changed. */
+function closestRealms(listed: readonly string[], asked: string): string[] {
+  const want = new Set(realmWords(asked));
+  const scored = listed.map((name) => ({
+    name,
+    shared: realmWords(name).filter((w) => want.has(w)).length,
+    distance: editDistance(realmKey(asked), realmKey(name)),
+  }));
+  scored.sort((a, b) => b.shared - a.shared || a.distance - b.distance || a.name.localeCompare(b.name));
+  return scored.slice(0, REALM_CANDIDATES).map((s) => s.name);
+}
+
+/**
+ * The realm a name means, read the way the fold keys realms (realmKey). A name the rollup holds is exact. Otherwise a
+ * name that is the end of exactly one public realm's full name, in whole words and at least two of them, is an alias
+ * for it: "US1 Realm 4 PvP" for "CAMWOW US1 Realm 4 PvP". The words it ends in are the realm's own, so an alias never
+ * crosses a ruleset, and a realm is never merged with another: the answer reads the one realm the name resolved to.
+ * A name that ends several realms' names is ambiguous; anything else is unknown, with the closest public realms.
+ */
+export function resolveRealm(state: MarketState, asked: string, now: Date = new Date()): RealmLookup {
+  const name = asked.trim();
+  // A realm is held when its house-unknown view or any of its houses is.
+  const key = realmKey(name);
+  if (state.realms[key] || AUCTION_HOUSES.some((h) => state.houses?.[houseKey(key, h)])) return { status: "exact", realm: realmName(state, name) };
+  const listed = marketRealms(state, now);
+  const want = realmWords(name);
+  const tail = ` ${want.join(" ")}`;
+  const matches = want.length >= 2 ? listed.filter((realm) => ` ${realmWords(realm).join(" ")}`.endsWith(tail)) : [];
+  if (matches.length === 1) return { status: "alias", realm: matches[0]!, asked: name };
+  if (matches.length > 1) return { status: "ambiguous", asked: name, candidates: matches };
+  return { status: "unknown", asked: name, candidates: closestRealms(listed, name) };
+}
+
+/** The realm a lookup settled on, or null when it named none or several. */
+export function lookupRealm(lookup: RealmLookup): string | null {
+  return lookup.status === "exact" || lookup.status === "alias" ? lookup.realm : null;
+}
+
+/** What an answer says about how the realm was read: nothing for an exact name. */
+export function realmLookupText(lookup: RealmLookup): string | null {
+  switch (lookup.status) {
+    case "exact":
+      return null;
+    case "alias":
+      return `Read "${lookup.asked}" as ${lookup.realm}: the only realm with public prices whose full name ends that way.`;
+    case "ambiguous":
+      return `Ambiguous realm "${lookup.asked}": several realms' full names end that way, and they are separate markets. Ask again with one of: ${lookup.candidates.join(", ")}.`;
+    case "unknown":
+      return lookup.candidates.length
+        ? `Unknown realm "${lookup.asked}": no scan names a realm that way, so this is not a measured empty market. Closest realms with public prices: ${lookup.candidates.join(", ")}. Ask again with the full name as the game's realm list shows it.`
+        : `Unknown realm "${lookup.asked}": no scan names a realm that way, and no realm has public prices yet. This is not a measured empty market.`;
+  }
+}
+
+/** The structured page's account of the lookup: `realmStatus`, and the name asked or the candidates when they matter. */
+export function realmLookupFields(lookup: RealmLookup): { realmStatus: RealmLookup["status"]; askedRealm?: string; candidates?: string[] } {
+  if (lookup.status === "exact") return { realmStatus: "exact" };
+  if (lookup.status === "alias") return { realmStatus: "alias", askedRealm: lookup.asked };
+  return { realmStatus: lookup.status, candidates: lookup.candidates };
+}
+
 /** The realm's display name: the first spelling seen (the house-unknown view's, else a house's), or the name as asked. */
 export function realmName(state: MarketState, realm: string): string {
   const key = realmKey(realm);
@@ -479,6 +562,11 @@ export function itemMarketByHouse(state: MarketState, realm: string, itemId: num
     const { value, points } = itemMarket(state, realm, itemId, now, house);
     return value ? [{ house, value, points }] : [];
   });
+}
+
+/** The house with the most units listed for the item, or null: what market_value's page carries and auction_history's scan days read. */
+export function busiestHouseMarket(state: MarketState, realm: string, itemId: number, now: Date): { house: AuctionHouse; value: MarketValue; points: PublicDay[] } | null {
+  return itemMarketByHouse(state, realm, itemId, now).sort((a, b) => b.value.quantity - a.value.quantity)[0] ?? null;
 }
 
 /**
@@ -516,13 +604,22 @@ export function reportersText(reporters: number): string {
   return reporters < AUCTION_AGREEMENT ? `${count} (${TRUSTED_SOURCE_LABEL})` : count;
 }
 
+/** One public day as the answers list it: market_value's history and auction_history's full-scan days. */
+export function scanDayLine(p: PublicDay): string {
+  return `${p.day}  value ${formatCopper(p.market)}  min ${formatCopper(p.min)}  ${p.quantity} units${p.thin ? " (thin)" : ""}  ${reportersText(p.reporters)}`;
+}
+
 /** Each house of the realm with a public value for the item, one block per house, named; never a mix of houses. */
 export function handleMarketValue(args: { realm: string; itemId: number }, state: MarketState | null, now: Date): string {
   if (!args.realm.trim()) return "Name a realm.";
   if (!Number.isInteger(args.itemId) || args.itemId < 1) return "Name an item id.";
   if (!state) return "Market values are unavailable. They are unrecorded, not zero.";
-  const houses = itemMarketByHouse(state, args.realm, args.itemId, now);
-  const lines = [`${args.realm.trim()} item ${args.itemId}`, MARKET_RULE];
+  const lookup = resolveRealm(state, args.realm, now);
+  const realm = lookupRealm(lookup);
+  const note = realmLookupText(lookup);
+  if (!realm) return [`${args.realm.trim()} item ${args.itemId}`, note!].join("\n");
+  const houses = itemMarketByHouse(state, realm, args.itemId, now);
+  const lines = [`${lookup.status === "alias" ? realm : args.realm.trim()} item ${args.itemId}`, ...(note ? [note] : []), MARKET_RULE];
   if (!houses.length) {
     lines.push("No public market value yet in any auction house. A day becomes public when 3 reporters scanned this item in one house.");
     return lines.join("\n");
@@ -535,7 +632,7 @@ export function handleMarketValue(args: { realm: string; itemId: number }, state
       `Historical: ${formatCopper(value.historical)}`,
       `Units listed: ${value.quantity}${value.thin ? " (thin: not counted in the market value)" : ""}`,
       "History:",
-      ...points.map((p) => `${p.day}  value ${formatCopper(p.market)}  min ${formatCopper(p.min)}  ${p.quantity} units${p.thin ? " (thin)" : ""}  ${reportersText(p.reporters)}`),
+      ...points.map(scanDayLine),
     );
   }
   const missing = AUCTION_HOUSES.filter((h) => !houses.some((x) => x.house === h));

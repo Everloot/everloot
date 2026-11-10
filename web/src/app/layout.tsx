@@ -52,6 +52,8 @@ export const metadata: Metadata = {
     description:
       "WoW: Forever observations from addon uploads, guild tools and auction house prices.",
   },
+  // app/favicon.ico is linked by the file convention already.
+  icons: { icon: [{ url: "/icon.svg", type: "image/svg+xml" }], apple: "/apple-icon.png" },
   alternates: { types: FEED },
   robots: { index: true, follow: true },
   // Search Console and Bing Webmaster Tools ownership tags. Each is emitted only when its variable is set.
@@ -76,7 +78,7 @@ export default function RootLayout({
         <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-canvas focus:px-4 focus:py-3">Skip to content</a>
         <NavPendingBar />
         <Header savedBuilds={savedBuildsOn()} profiles={profilesOn()} accountSwitching={authV2Enabled()} guilds={guildsOn()} />
-        <main id="main-content" className="flex-1 min-w-0 mx-auto w-full max-w-wide px-4 py-8">
+        <main id="main-content" className="min-h-[100dvh] flex-1 min-w-0 mx-auto w-full max-w-wide px-4 py-8">
           <Breadcrumbs />
           <DocumentBoundary>{children}</DocumentBoundary>
         </main>

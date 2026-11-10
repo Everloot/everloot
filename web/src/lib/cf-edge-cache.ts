@@ -38,6 +38,25 @@ export function isPrivatePath(pathname: string): boolean {
 }
 
 /**
+ * The site's hover cards (app/database/card/[type]/[id]): JSON that reads no cookie and no header. A signed-in visitor,
+ * or one Cloudflare has cleared after a challenge, sends cookies with every same-site fetch, and a cookie bypasses the
+ * shared cache, so their cards were rendered on every hover. The entry takes the credentials off these requests before
+ * the lookup and before the handler, so the card cannot depend on what it never sees. Matched on the path as sent: a
+ * spelling this does not match keeps its credentials and bypasses the cache, as before.
+ */
+const CREDENTIAL_FREE_PATH = /^\/database\/card\/[a-z]+\/[1-9]\d{0,9}$/;
+
+/** The request without its Cookie and Authorization headers on a route that reads neither; any other request as it is. */
+export function withoutCredentials(req: Request): Request {
+  if (req.method !== "GET" || !(req.headers.has("cookie") || req.headers.has("authorization"))) return req;
+  if (!CREDENTIAL_FREE_PATH.test(new URL(req.url).pathname)) return req;
+  const headers = new Headers(req.headers);
+  headers.delete("cookie");
+  headers.delete("authorization");
+  return new Request(req.url, { method: "GET", headers });
+}
+
+/**
  * Headers Next's router sends for a React Server Components payload instead of HTML. The Cache API ignores
  * `Vary`, so a request carrying any of them (or `_rsc`) bypasses the shared cache: an RSC payload can never be
  * stored under the HTML page's key, nor the HTML served to the router.
@@ -229,6 +248,7 @@ export async function cachedResponse(
   store: EdgeCacheStore,
   ctx: EdgeCacheContext,
 ): Promise<Response> {
+  request = withoutCredentials(request);
   if (!edgeCacheable(request) || !versionsComplete(versions)) return handler(request);
   const key = edgeCacheKey(request, cacheVersionFor(new URL(request.url).pathname, versions));
   const hit = await store.match(key);

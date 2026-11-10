@@ -75,10 +75,10 @@ export async function loadItemFacts(read?: Corpus): Promise<ItemFacts & { unreac
 }
 
 /** NPC, quest, and vendor rows from the same uploads. */
-export async function loadWorldFacts(read?: Corpus): Promise<WorldFacts & { unreachable: boolean }> {
+export async function loadWorldFacts(read?: Corpus): Promise<WorldFacts & { unreachable: boolean; dataAsOf?: string | null }> {
   const agg = await loadAggregates(read);
-  if (!agg) return { npcs: [], quests: [], vendors: [], unreachable: true };
-  return { ...agg.world, unreachable: false };
+  if (!agg) return { npcs: [], quests: [], vendors: [], unreachable: true, dataAsOf: null };
+  return { ...agg.world, unreachable: false, dataAsOf: agg.dataAsOf };
 }
 
 /** Dungeon entrances and encounters players' clients saw, and objects seen on the minimap, each public at 3 installs. */
@@ -93,6 +93,19 @@ export async function loadReportedItemFacts(itemId: number): Promise<ItemFactSta
   const agg = await loadAggregates();
   if (!agg) return { shown: [], contested: [], unreachable: true };
   return { ...reportedItemFacts(agg.itemFacts.get(itemId), agg.dataAsOf ? new Date(agg.dataAsOf) : new Date()), progress: itemFactProgress(agg.itemFacts.get(itemId)), unreachable: false };
+}
+
+/** `loadReportedItemFacts` for every item with an agreed or a disputed line, for the cron's stored item view. */
+export async function loadAllReportedItemFacts(read?: Corpus): Promise<{ reported: Map<number, ItemFactState>; unreachable: boolean }> {
+  const agg = await loadAggregates(read);
+  if (!agg) return { reported: new Map(), unreachable: true };
+  const asOf = agg.dataAsOf ? new Date(agg.dataAsOf) : new Date();
+  const reported = new Map<number, ItemFactState>();
+  for (const [itemId, rows] of agg.itemFacts) {
+    const state = reportedItemFacts(rows, asOf);
+    if (state.shown.length || state.contested.length) reported.set(itemId, state);
+  }
+  return { reported, unreachable: false };
 }
 
 /** Items players have seen a recipe make (3 installs), for the item lists' Source column. */

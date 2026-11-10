@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/auction_history.json",
   "title": "Auction history for one item",
-  "description": "Returns the day-by-day price history of one item on one WoW: Forever realm, from auction scans players uploaded on purpose. A day is public after 3 installs scanned that item on that realm; copper is the median. Use it for how a price moved over time; use market_value for today's market value, minimum buyout and units listed, item_page for the item itself, and vendor_page for vendor prices. Realm is the realm's name; the item id is the game's. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
+  "description": "Returns the day-by-day price history of one item on one WoW: Forever realm, from auction scans players uploaded on purpose: the public full-scan days market_value values the item by, and the single listings players saw while browsing. Both follow the market's rule: a day is public after 3 reporters scanned the item, or, while few players upload, when Everloot's own installs did, and its reporters say so. Use it for how a price moved over time; use market_value for today's market value, minimum buyout and units listed, item_page for the item itself, and vendor_page for vendor prices. The realm is read as market_value reads it: an unknown or ambiguous name answers with the realms to ask with, never an empty history. The item id is the game's. Reads Everloot's public player data when connected. Missing or unavailable data is reported explicitly.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -14,7 +14,7 @@
     "properties": {
       "realm": {
         "type": "string",
-        "description": "The realm's name, as the game shows it."
+        "description": "The realm's full name as the game's realm list shows it, such as CAMWOW US1 Realm 4 PvP. The end of exactly one realm's full name (US1 Realm 4 PvP) is read as that realm; an unknown or ambiguous name answers with the realms to ask with."
       },
       "itemId": {
         "type": "integer",
@@ -89,7 +89,72 @@
               ],
               "additionalProperties": false
             },
-            "description": "Days 3 installs scanned the item on the realm, oldest first."
+            "description": "Single listings players saw while browsing: days 3 installs scanned the item on the realm, or one of Everloot's own installs did (reporters under 3), oldest first."
+          },
+          "scanDays": {
+            "description": "The public full-scan days market_value values the item by, the same days as its history, oldest first. Absent when the market is not connected.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "string"
+                },
+                "min": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "market": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "reporters": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "thin": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "day",
+                "min",
+                "market",
+                "quantity",
+                "reporters",
+                "thin"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "realmStatus": {
+            "description": "exact: a realm Everloot holds scans for. alias: the end of exactly one public realm's full name, read as that realm (realm is its full name). ambiguous: the end of several realms' names, so nothing is read. unknown: no scan names that realm, so nothing is read; that is not an empty market.",
+            "type": "string",
+            "enum": [
+              "exact",
+              "alias",
+              "ambiguous",
+              "unknown"
+            ]
+          },
+          "askedRealm": {
+            "description": "The realm as asked, when it was read as an alias.",
+            "type": "string"
+          },
+          "candidates": {
+            "description": "For ambiguous or unknown: the realms with public prices to ask with instead, closest first.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [

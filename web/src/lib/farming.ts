@@ -104,6 +104,43 @@ export function gatherAreas(rows: readonly ObjectSpawnRow[], kind: "herb" | "ore
     .sort((a, b) => b.nodes - a.nodes || a.zone.name.localeCompare(b.zone.name));
 }
 
+/** The objects players opened in a zone, from the loot-derived rows: only those with a spot 3 installs placed there. Fishing is never a spot. */
+export function gatheredObjects(mapId: number, sightings: readonly ObjectSpawnRow[]): number[] {
+  const opened = new Set(sightings.filter((r) => r.mapId === mapId).map((r) => r.objectId));
+  const mine = sightings.filter((r) => opened.has(r.objectId));
+  return [...new Set(objectSpawns(mine).pins.filter((p) => p.mapId === mapId).map((p) => p.objectId))].sort((a, b) => a - b);
+}
+
+/** A link from a zone page to where that zone is farmed or gathered. */
+export interface FarmLink { label: string; href: string }
+
+/**
+ * Where a zone is farmed or gathered, as links: the farming page when public loot comes from NPCs placed in the zone, and
+ * each profession's "where to gather" section that lists the zone, by the same rules as `farmingAreas` and
+ * `gatherAreas`. A zone with nothing agreed has none, so no link points at a list the zone is not on. `sightings` are
+ * the loot-derived object rows the professions pages read; only the objects opened in this zone are worked out.
+ */
+export function zoneFarmLinks(
+  zone: ZoneSummary,
+  npcIds: readonly number[],
+  rates: readonly { sourceNpcId?: number; itemId: number; drops: number; public: boolean }[],
+  sightings: readonly ObjectSpawnRow[],
+): FarmLink[] {
+  const here = new Set(npcIds);
+  const dropped = new Set(rates.filter((r) => r.public && r.drops > 0 && r.sourceNpcId !== undefined && here.has(r.sourceNpcId)).map((r) => r.itemId));
+  const holds = (subclass: number) => [...dropped].some((id) => itemSubclass.get(id) === subclass);
+  const opened = new Set(sightings.filter((r) => r.mapId === zone.mapId).map((r) => r.objectId));
+  const mine = sightings.filter((r) => opened.has(r.objectId));
+  const gathers = (kind: "herb" | "ore") => gatherAreas(mine, kind, [zone]).length > 0;
+  const out: FarmLink[] = [];
+  if (dropped.size) out.push({ label: "Farming routes", href: "/tools/farming-routes" });
+  if (gathers("herb")) out.push({ label: "Herbalism", href: "/tools/professions/herbalism#gather" });
+  if (gathers("ore")) out.push({ label: "Mining", href: "/tools/professions/mining#gather" });
+  if (holds(SUBCLASS.leather)) out.push({ label: "Skinning", href: "/tools/professions/skinning#gather" });
+  if (holds(SUBCLASS.cloth)) out.push({ label: "Tailoring", href: "/tools/professions/tailoring#gather" }, { label: "First Aid", href: "/tools/professions/first-aid#gather" });
+  return out;
+}
+
 /** An area is in a level range when its levels overlap it; an area with no agreed level never is. */
 export const inLevels = (area: FarmArea, range: Levels) => area.levels !== null && area.levels.min <= range.max && area.levels.max >= range.min;
 

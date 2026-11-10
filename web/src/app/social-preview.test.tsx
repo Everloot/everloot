@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { expect, test, vi } from "vitest";
 import { tokens } from "@/design/tokens";
+import sharp from "sharp";
 
 // next/font only runs under Next's compiler.
 vi.mock("./fonts", () => ({ fontVariables: "" }));
@@ -27,4 +28,11 @@ test("shared links use the large card", () => {
 test("the favicon is the green diamond on the canvas", () => {
   const svg = readFileSync(new URL("./icon.svg", import.meta.url), "utf8");
   expect(new Set(svg.match(/#[0-9A-Fa-f]{6}/g))).toEqual(new Set([tokens.dark.canvas, tokens.dark.accent]));
+});
+
+test("SVG and Apple favicons are linked and both Apple paths have a 180px PNG", async () => {
+  expect(metadata.icons).toMatchObject({ icon: expect.arrayContaining([{ url: "/icon.svg", type: "image/svg+xml" }]), apple: "/apple-icon.png" });
+  for (const path of ["./apple-icon.png", "../../public/apple-touch-icon.png"]) {
+    expect(await sharp(readFileSync(new URL(path, import.meta.url))).metadata()).toMatchObject({ width: 180, height: 180, format: "png" });
+  }
 });

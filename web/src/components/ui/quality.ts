@@ -12,6 +12,15 @@ export const QUALITY_TEXT: Record<Quality, string> = {
   legendary: "text-q-legendary",
 };
 
+export const QUALITY_BORDER: Record<Quality, string> = {
+  poor: "border-q-poor",
+  common: "border-q-common",
+  uncommon: "border-q-uncommon",
+  rare: "border-q-rare",
+  epic: "border-q-epic",
+  legendary: "border-q-legendary",
+};
+
 export const QUALITY_LABEL: Record<Quality, string> = {
   poor: "Poor",
   common: "Common",
