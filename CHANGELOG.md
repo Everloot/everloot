@@ -175,6 +175,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
+- Docs: a page for addon authors at `/docs/addon-authors`: the licences and the credit line, the records API, a free key and
+  the files as three ways to get the data, a skinning loot recipe in curl, JavaScript and Python, why the site's drop
+  rates leave skinning out, and how to build an offline pack.
 
 ### Fixed
 - Site: /api/suggest spends the per-IP quota and shares one edge cache entry for `Thunder` and `thunder `, the coverage 400 and waitlist 503 are `no-store` (the 503 adds `Retry-After`), and the docs list every route that sends CORS from one file.
