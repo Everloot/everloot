@@ -6,7 +6,7 @@ import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasCard } from "@/lib/tooltip";
-import { npcPage, questPage } from "../../../../../../kb/src/world-pages";
+import { isPinPosition, npcPage, questPage } from "../../../../../../kb/src/world-pages";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { pinLink } from "@/lib/world-map";
 import { trailFor } from "@/lib/breadcrumbs";
@@ -24,6 +24,9 @@ import EntityLink from "@/components/EntityLink";
 import LoreSection from "@/components/LoreSection";
 import { questIndexable } from "@/lib/indexable";
 import { entityTitle, questDescription } from "@/lib/entity-meta";
+import { chainHref, loadCatalog } from "@/lib/completion-lists";
+import { CLIENT_QUEST_LINES } from "@/data/game-data/client-quest-lines";
+import { zoneByMapId, zoneHref } from "@/lib/zones";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +47,7 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
   };
 }
 
-interface Person { role: string; npcId: number; map: { href: string; mapId: number; x: number; y: number } | null }
+interface Person { role: string; npcId: number; map: { href: string; mapId: number; x: number; y: number; reporters: number } | null }
 
 export default async function QuestPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -56,7 +59,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
   const where = (npcId: number | null) => {
     const pin = npcId === null || facts.unreachable ? undefined : npcPage(npcId, facts).pins.find((p) => pinLink(p.mapId, p.x, p.y));
     const href = pin ? pinLink(pin.mapId, pin.x, pin.y) : null;
-    return pin && href ? { href, mapId: pin.mapId, x: pin.x, y: pin.y } : null;
+    return pin && href ? { href, mapId: pin.mapId, x: pin.x, y: pin.y, reporters: pin.reporters } : null;
   };
   // The title players agree on; else the Warcraft Wiki's, for a quest the game files list (docs/DATA_POLICY.md).
   const reported = facts.unreachable ? null : page.title;
@@ -75,6 +78,16 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
     ...(page.turnInNpcId !== null ? [{ role: "Turn-in", npcId: page.turnInNpcId, map: where(page.turnInNpcId) }] : []),
   ];
   const npcLink = (id: number) => <EntityLink kind="npc" id={id} name={npcs.get(id)} />;
+  const catalog = await loadCatalog();
+  const chain = catalog?.chains.find((c) => c.questIds.includes(page.questId));
+  const position = chain?.questIds.indexOf(page.questId) ?? -1;
+  const previous = chain?.questIds[position - 1];
+  const next = chain?.questIds[position + 1];
+  const giverPin = people.find((p) => p.role === "Giver")?.map;
+  const zone = giverPin ? zoneByMapId(giverPin.mapId) : undefined;
+  const zoneDate = giverPin ? facts.npcs.filter((r) => r.npcId === page.giverNpcId && r.mapId === giverPin.mapId && isPinPosition(r.positionKind))
+    .flatMap((r) => r.capturedAt ? [r.capturedAt] : []).sort().at(-1)?.slice(0, 10) : undefined;
+  const chainDate = chain?.confirmed ? catalog?.dataAsOf : CLIENT_QUEST_LINES.build.extractedAt;
 
   const named = title !== `Quest ${page.questId}`;
   // The page in three lines: what it is, what players reported, and where the title came from.
@@ -118,6 +131,16 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
               items={[
                 { label: "Reported title", value: known(page.title) },
                 { label: "Level", value: known(page.level), numeric: true },
+                { label: "Chain", value: chain ? <>
+                  <Link href={chainHref(chain.questLineId, chain.name)} className={LINK}>{chain.name}</Link>
+                  <span className="block text-muted">{chain.confirmed ? "Player reports" : CLIENT_QUEST_LINES.label} · {catalog?.confirmations ? `${chain.reporters} installs` : "installs unrecorded"} · {chainDate?.slice(0, 10) ?? "date not reported yet"}</span>
+                </> : <>Not reported yet {known(null)}</> },
+                ...(previous !== undefined ? [{ label: "Previous quest", value: <EntityLink kind="quest" id={previous} /> }] : []),
+                ...(next !== undefined ? [{ label: "Next quest", value: <EntityLink kind="quest" id={next} /> }] : []),
+                { label: "Zone", value: zone ? <>
+                  <Link href={zoneHref(zone.mapId, zone.name)} className={LINK}>{zone.name}</Link>
+                  <span className="block text-muted">Player reports (giver location) · {giverPin!.reporters} installs · latest report: {zoneDate ?? "date not reported yet"}</span>
+                </> : <>Not reported yet {known(null)}</> },
                 { label: "Giver", value: known(page.giverNpcId !== null ? npcLink(page.giverNpcId) : null) },
                 { label: "Turn-in", value: known(page.turnInNpcId !== null ? npcLink(page.turnInNpcId) : null) },
                 { label: "Rewards", value: known(page.rewards.length ? `${page.rewards.length} items` : null) },

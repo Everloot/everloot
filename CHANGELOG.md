@@ -194,6 +194,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Docs: a page for addon authors at `/docs/addon-authors`: the licences and the credit line, the records API, a free key and
   the files as three ways to get the data, a skinning loot recipe in curl, JavaScript and Python, why the site's drop
   rates leave skinning out, and how to build an offline pack.
+- Site: Quest pages link their chain, previous and next quests, and reported zone; chain lists explain quests whose names are not reported yet.
 
 ### Fixed
 - Site: the header shows the build whose files the site reads and the newest build seen, each linked to what it means.

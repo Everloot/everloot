@@ -36,8 +36,14 @@ vi.mock("@/lib/rollup-compute", () => ({
   loadWorldFacts: async () => ({ npcs: [], quests: [], vendors: [], unreachable: false }),
   loadInstanceFacts: async () => ({ entrances: [], encounters: [], sightings: [], unreachable: false, dataAsOf: null }),
 }));
-vi.mock("@/lib/names", () => ({ loadNames: async () => ({ items: new Map(), npcs: new Map(), quests: new Map() }), objectNames: () => new Map() }));
+vi.mock("@/lib/names", () => ({ loadNames: async () => ({ items: new Map(), npcs: new Map(), quests: questNames.reported }), objectNames: () => new Map() }));
 vi.mock("@/lib/objects", () => ({ loadObjectFacts: async () => ({ rates: [], measuredZeros: [], names: [], unreachable: false }) }));
+
+const questNames = vi.hoisted(() => ({ reported: new Map<number, string>(), wiki: new Map<number, { name: string }>() }));
+vi.mock("@/lib/game-assets", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/game-assets")>()),
+  loadQuestNames: async () => ({ names: questNames.wiki }),
+}));
 
 import AchievementList, { generateMetadata as achievementListMetadata } from "./achievements/page";
 import AchievementPage, { generateMetadata as achievementMetadata } from "./achievements/[id]/page";
@@ -429,4 +435,32 @@ test("a base-only achievement page keeps the file-only presentation and the unco
   const description = (await achievementMetadata(page("50-loremaster"))).description;
   expect(description).toContain("Found in game files, unconfirmed");
   expect(description).not.toContain("player reports");
+});
+
+
+test("chain quests use player names first, then wiki names, and explain unnamed positions", async () => {
+  questNames.reported.set(7, "Reported quest");
+  questNames.wiki.set(7, { name: "Wiki loses" });
+  questNames.wiki.set(8, { name: "Wiki quest" });
+  try {
+    const out = await html(ChainPage(page("900-the-defias")));
+    expect(out).toContain("Reported quest");
+    expect(out).not.toContain("Wiki loses");
+    expect(out).toContain("Wiki quest");
+    expect(out).toContain("name from the warcraft wiki");
+    expect(out).toContain("Quest 9");
+    expect(out).toContain("Position 3");
+    expect(out).toContain("Name not reported yet; no agreed name yet, 3 installs needed.");
+  } finally {
+    questNames.reported.clear();
+    questNames.wiki.clear();
+  }
+});
+
+test("a one-quest game-file chain explains why it is listed", async () => {
+  game.questLines = [{ id: 5963, name: "To Have Loved and Lost", questIds: [91564] }];
+  const out = await html(ChainPage(page("5963-to-have-loved-and-lost")));
+  expect(out).toContain("The game files list this chain with one quest.");
+  expect(out).toContain("Quest 91564");
+  expect(out).toContain("Position 1");
 });
