@@ -11,12 +11,12 @@ import {
 import { loadListNames, loadListSeen } from "@/lib/item-view";
 import { pageMetadata } from "@/lib/seo";
 import EdgeDegraded from "@/components/EdgeDegraded";
-import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
+import { loadItemTips, loadSiteAssets, unknownItemIcon } from "@/lib/game-assets";
 import { classLabel, hasClassContext, parseClassContext, withClassContext, withoutClassContext } from "@/lib/class-context";
 import ClassContextChip from "@/components/classes/ClassContextChip";
 import { classUse } from "@/lib/class-gear";
 import { CLIENT_CLASS_GEAR } from "@/data/game-data/client-class-gear";
-import GameIcon, { UNKNOWN_ITEM_ICON } from "@/components/game/GameIcon";
+import GameIcon from "@/components/game/GameIcon";
 import Badge, { UNCONFIRMED_TITLE } from "@/components/ui/Badge";
 import { Container, DataTable, DataTitle, FilterBar, filledColumns, QUALITY_TEXT, ResultStrip, qualityOf, type FilterControl, type SparseColumn } from "@/components/ui";
 import type { Crumb } from "@/lib/jsonld";
@@ -124,11 +124,14 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const nameOf = (id: number) => agreed.get(id) ?? matched?.names.get(id)?.name;
   // The game file name, icon and tooltip facts only for items players reported (3 installs) or the item name rule
   // names, as on the item page: a list of every id in the files must not become a list of unreleased items.
-  const tipsFor = async (ids: number[]) => loadItemTips(ids.length ? await loadSiteAssets() : null, ids);
+  const tipsFor = async (ids: number[]) => {
+    const assets = ids.length ? await loadSiteAssets() : null;
+    return { assets, tips: await loadItemTips(assets, ids) };
+  };
   // A level or binding filter or sort reads the facts of every row that may show them; otherwise only this page's.
   const wide = Boolean(q.ilvl || q.req || q.bind) || q.sort?.key === "ilvl" || q.sort?.key === "req";
   const every = wide ? await tipsFor(base.map((row) => row[0]).filter(showsTip)) : null;
-  const ctx = { name: nameOf, seen: seen.seen, sources: (id: number) => seen.from.get(id), tip: (id: number) => every?.get(id) };
+  const ctx = { name: nameOf, seen: seen.seen, sources: (id: number) => seen.from.get(id), tip: (id: number) => every?.tips.get(id) };
   const listed = listItems(base, q, ctx);
   // The items no source names ("Item N") are one line above the table unless asked for, in the unrecorded quality
   // view (which lists them by design) or by id; not when nothing in the list has a name (names out of reach),
@@ -151,9 +154,10 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
   if (q.page > pages) notFound();
   const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
-  const tips = every ?? await tipsFor(shown.map((row) => row[0]).filter(showsTip));
+  const { assets, tips } = every ?? await tipsFor(shown.map((row) => row[0]).filter(showsTip));
   const names = new Map(shown.map((row) => [row[0], shownItemName(row[0], agreed, matched?.names, tips.get(row[0]))]));
-  const icons = shown.some((row) => tips.get(row[0])?.icon || !names.get(row[0]));
+  // The icon column, with the game's question mark where a row has no icon, only with the asset files.
+  const unknownIcon = assets && shown.some((row) => tips.get(row[0])?.icon || !names.get(row[0])) ? unknownItemIcon(assets.base) : null;
   const here = (over: Partial<CategoryQuery>) => link(cls?.slug, sub?.slug, { ...q, page: 1, ...over });
   const title = sub ? subclassLabel(sub).label : cls ? cls.label : "Items";
 
@@ -176,7 +180,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
         const unconfirmed = name?.source === "files";
         return (
           <span className="flex min-w-0 items-center gap-2">
-            {icons && <GameIcon src={tip?.icon || UNKNOWN_ITEM_ICON} size={24} quality={c.quality && c.quality.id <= 5 ? qualityOf(c.quality.id) : undefined} />}
+            {unknownIcon && <GameIcon src={tip?.icon || unknownIcon} size={24} quality={c.quality && c.quality.id <= 5 ? qualityOf(c.quality.id) : undefined} />}
             {/* Where the name comes from is in the link's hover card (and words for a screen reader, after the link so the
                 link's text is the name alone), never a printed label; a name only the game files give carries the
                 quiet unconfirmed marker. */}

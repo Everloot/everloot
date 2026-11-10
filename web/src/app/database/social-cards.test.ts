@@ -67,15 +67,15 @@ describe("the database entity cards", () => {
   it("an item's card shows its name, its class line and how many installs agree on the name", async () => {
     itemFacts.names = installs(3, { itemId: 19019, name: "Thunderfury" });
     await expectPng(await ItemImage(props("19019")));
-    expect(lastCard()).toEqual({ title: "Thunderfury", type: "Weapons · One-Handed Swords", quality: "legendary", color: undefined, omitZero: true, installs: 3 });
-    // Two installs so far: the id for a name, and their count.
+    expect(lastCard()).toEqual({ title: "Thunderfury", type: "Weapons · One-Handed Swords", quality: "legendary", omitZero: true, installs: 3 });
+    // Two installs so far: the id for a name, in no quality colour, and their count.
     itemFacts.names = installs(2, { itemId: 19019, name: "Thunderfury" });
     await ItemImage(props("19019"));
-    expect(lastCard()).toEqual({ title: "Item 19019", type: "Weapons · One-Handed Swords", quality: "legendary", color: undefined, omitZero: true, installs: 2 });
+    expect(lastCard()).toEqual({ title: "Item 19019", type: "Weapons · One-Handed Swords", quality: undefined, omitZero: true, installs: 2 });
     // With storage out of reach the page shows no meter, so the card has no installs line.
     itemFacts.unreachable = true;
     await ItemImage(props("19019"));
-    expect(lastCard()).toEqual({ title: "Item 19019", type: "Weapons · One-Handed Swords", quality: "legendary", color: undefined, omitZero: true, installs: null });
+    expect(lastCard()).toEqual({ title: "Item 19019", type: "Weapons · One-Handed Swords", quality: undefined, omitZero: true, installs: null });
   });
 
   it("an NPC's and a quest's card show the agreed name and level; a wiki-titled quest says no install agrees yet", async () => {

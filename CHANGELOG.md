@@ -317,7 +317,11 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Protocol: `itemsResponse.items` is typed with the row `GET /api/items` returns (item id, then class, subclass, slot
   and quality, each null when the build does not name it), so a client generated from `schema/api/itemsResponse.json`
   gets fields instead of `any`. Protocol package 2.0.0 (the row's fields are now required); the answers do not change.
-- Site: item icons have quality-coloured borders and a question-mark fallback, shared item links keep their quality colour, and missing facts explain the three-install rule.
+- Site: item icons have quality-coloured borders, and an item without its own icon shows the game's question mark from the
+  same asset files (no icon without them); an item page's name uses the quality colour token of the theme, and a shared
+  item card colours the name only when one is shown;
+  empty tabs say when 3 installs must agree; the tooltip embed's icon border takes the quality colour, and the tooltip docs
+  list the class and quality colours for both themes; the SVG and Apple touch icons are linked.
 - Docs: the docs index lists the backlog, the open-data export, the live-client probes, and the dated notes and folders it had left out.
 - Companion: the command line's `main` takes its uploader, price refresher, file watcher and console as an optional argument,
   with the real ones as defaults, so the watch and prices loop is tested with fakes (upload then prices on each settled

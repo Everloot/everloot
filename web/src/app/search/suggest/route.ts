@@ -25,7 +25,7 @@ export async function GET(req: Request) {
   const shown = q ? loadShownNames() : undefined;
   const rows = q ? await suggest(q, scope ?? undefined, await loadShownSearchNames(shown)) : [];
   // Item rows carry the game icon where the item's page shows one.
-  const icons = await shownItemIcons(rows.flatMap((r) => (r.type === "item" ? [r.id] : [])), shown);
+  const { icons } = await shownItemIcons(rows.flatMap((r) => (r.type === "item" ? [r.id] : [])), shown);
   const results = rows.map((r) => (r.type === "item" && icons.has(r.id) ? { ...r, icon: icons.get(r.id) } : r));
   return Response.json({ q, limit: SUGGEST_LIMIT, results }, { headers: HEADERS });
 }

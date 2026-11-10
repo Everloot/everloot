@@ -327,7 +327,7 @@ test("the shown item names come from one private file for the client layer's bui
   const names = await loadItemNames("1.60.1.70450", BASE, store) as ItemNames | null;
   expect(store.reads).toEqual([`${FOLDER}/item-names.json`]);
   expect(names?.wiki).toEqual({ name: namesFile.wiki.name, url: "https://warcraft.wiki.gg" });
-  expect(names?.names.get(19019)).toEqual({ name: "Thunderfury, Blessed Blade of the Windseeker", color: qualityColor(5), wikiPage: "https://warcraft.wiki.gg/wiki/Thunderfury,_Blessed_Blade_of_the_Windseeker", source: "wiki" });
+  expect(names?.names.get(19019)).toEqual({ name: "Thunderfury, Blessed Blade of the Windseeker", color: qualityColor(5), quality: 5, wikiPage: "https://warcraft.wiki.gg/wiki/Thunderfury,_Blessed_Blade_of_the_Windseeker", source: "wiki" });
   expect(names?.names.has(9)).toBe(false);
 });
 
@@ -335,8 +335,8 @@ test("every id shows; a name without a wiki page is the game files' alone, and o
   const file = { ...namesFile, count: 4, names: { ...namesFile.names, 191666: { n: "Skeletal Steed", q: 4 }, 883: { n: "Deprecated Fire Eyed Skull", w: "Deprecated_Fire_Eyed_Skull" } } };
   const names = await loadItemNames("1.60.1.70450", BASE, memoryStore({ [`${FOLDER}/item-names.json`]: file })) as ItemNames | null;
   expect([...names!.names.keys()].sort((a, b) => a - b)).toEqual([883, 2589, 19019, 191666]);
-  expect(names!.names.get(191666)).toEqual({ name: "Skeletal Steed", color: qualityColor(4), wikiPage: null, source: "files" });
-  expect(names!.names.get(883)).toEqual({ name: "Deprecated Fire Eyed Skull", color: qualityColor(1), wikiPage: "https://warcraft.wiki.gg/wiki/Deprecated_Fire_Eyed_Skull", source: "wiki" });
+  expect(names!.names.get(191666)).toEqual({ name: "Skeletal Steed", color: qualityColor(4), quality: 4, wikiPage: null, source: "files" });
+  expect(names!.names.get(883)).toEqual({ name: "Deprecated Fire Eyed Skull", color: qualityColor(1), quality: 1, wikiPage: "https://warcraft.wiki.gg/wiki/Deprecated_Fire_Eyed_Skull", source: "wiki" });
 });
 
 test("without the file, the bucket or the asset URL, or with a file for another build or of another kind, no names show", async () => {

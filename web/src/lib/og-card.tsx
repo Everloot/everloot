@@ -105,9 +105,9 @@ export async function renderCard(card: { label: string; title: string; subtitle:
  * changes as players report, so the card is kept as long as the site's own hover card, not for a year as the
  * other cards are.
  */
-export async function renderEntityCard(card: { title: string; type: string; installs: number | null; quality?: Quality; color?: string; omitZero?: boolean }): Promise<ImageResponse> {
+export async function renderEntityCard(card: { title: string; type: string; installs: number | null; quality?: Quality; omitZero?: boolean }): Promise<ImageResponse> {
   const subtitle = card.installs === null || (card.omitZero && card.installs === 0) ? card.type : `${card.type} · ${agreementLabel(card.installs)}`;
-  const image = await renderCard({ label: "Everloot database", title: card.title, subtitle, color: card.quality ? tokens.dark[`q-${card.quality}`] : card.color, fit: true });
+  const image = await renderCard({ label: "Everloot database", title: card.title, subtitle, color: card.quality ? tokens.dark[`q-${card.quality}`] : undefined, fit: true });
   image.headers.set("Cache-Control", "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400");
   return image;
 }

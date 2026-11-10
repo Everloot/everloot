@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import LoreSearchForm from "@/components/LoreSearchForm";
-import GameIcon, { UNKNOWN_ITEM_ICON } from "@/components/game/GameIcon";
+import GameIcon from "@/components/game/GameIcon";
 import { Container, DataTable, DataTitle, Entry, EntryList, filledColumns, LinkTabs, Pager, QUALITY_TEXT, SearchBar, qualityOf, type SparseColumn } from "@/components/ui";
 import { CC_BY_SA } from "@/lib/jsonld";
 import { BROWSE_HEADINGS, BROWSE_TYPES, hasTypes, loreSlug, MAX_QUERY, searchLore, UNAVAILABLE, UNAVAILABLE_COPY, type BrowseSlug, type LoreType } from "@/lib/lore";
@@ -95,7 +95,7 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
   // Matched on the names the database pages show, so a name a list prints is found here too.
   const groups = q ? await siteSearch(q, { ...(scope ? { only: scope, limit: SCOPED_LIMIT } : {}), names: loadShownSearchNames(shown) }) : null;
   // The game icon beside each item hit, where its page shows one.
-  const icons = await shownItemIcons(groups?.find((g) => g.type === "item")?.results.flatMap((r) => (r.id === undefined ? [] : [r.id])) ?? [], shown);
+  const { icons, unknown } = await shownItemIcons(groups?.find((g) => g.type === "item")?.results.flatMap((r) => (r.id === undefined ? [] : [r.id])) ?? [], shown);
   const base = `/search?q=${encodeURIComponent(q)}`;
   const tabs = groups && groups.length > 0 && [
     { label: "All", href: base, current: !scope },
@@ -137,9 +137,9 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
         ) : (
           // Characters and guilds sit after the database groups, above the lore archive, tools and docs.
           <>
-            {groups.slice(0, split).map((group) => <ResultTable key={group.type} group={group} q={q} scoped={Boolean(scope)} icons={icons} />)}
+            {groups.slice(0, split).map((group) => <ResultTable key={group.type} group={group} q={q} scoped={Boolean(scope)} icons={icons} unknown={unknown} />)}
             {people && <PeopleResults q={q} />}
-            {groups.slice(split).map((group) => <ResultTable key={group.type} group={group} q={q} scoped={Boolean(scope)} icons={icons} />)}
+            {groups.slice(split).map((group) => <ResultTable key={group.type} group={group} q={q} scoped={Boolean(scope)} icons={icons} unknown={unknown} />)}
           </>
         )}
       </article>
@@ -148,7 +148,7 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
 }
 
 /** One type's results as a dense table; its heading is the first column's header. */
-function ResultTable({ group, q, scoped, icons }: { group: SearchGroup; q: string; scoped: boolean; icons: Map<number, string> }) {
+function ResultTable({ group, q, scoped, icons, unknown }: { group: SearchGroup; q: string; scoped: boolean; icons: Map<number, string>; unknown: string | null }) {
   const more = group.total > group.results.length;
   const all = isScope(group.type) ? `/search?q=${encodeURIComponent(q)}&in=${group.type}` : group.type === "lore" ? `/search?q=${encodeURIComponent(q)}&in=lore` : null;
   const list = more && scoped && group.type in DATABASE_LIST ? `/database/${DATABASE_LIST[group.type as keyof typeof DATABASE_LIST]}?q=${encodeURIComponent(q)}` : null;
@@ -157,11 +157,11 @@ function ResultTable({ group, q, scoped, icons }: { group: SearchGroup; q: strin
     const style = group.type === "item" && typeof r.quality === "number" && r.quality <= 5 ? `${QUALITY_TEXT[qualityOf(r.quality)]} hover:underline underline-offset-4` : "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
     const link = <Link href={r.href} className={style}>{r.label}</Link>;
     // Item hits carry the game icon as the item lists do, and the game's fallback where one is missing.
-    if (group.type !== "item" || icons.size === 0) return link;
+    if (group.type !== "item" || !unknown) return link;
     const icon = r.id === undefined ? undefined : icons.get(r.id);
     return (
       <span className="flex min-w-0 items-center gap-2">
-        <GameIcon src={icon || UNKNOWN_ITEM_ICON} size={20} quality={typeof r.quality === "number" && r.quality <= 5 ? qualityOf(r.quality) : undefined} />
+        <GameIcon src={icon || unknown} size={20} quality={typeof r.quality === "number" && r.quality <= 5 ? qualityOf(r.quality) : undefined} />
         {link}
       </span>
     );

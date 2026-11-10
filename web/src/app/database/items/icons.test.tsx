@@ -70,9 +70,9 @@ test("an unreported item: the creating spell's icon, but no game file tooltip; t
   expect(state.tipCalls).toEqual([]);
 });
 
-test("without the manifest the item uses the question mark and no credit", async () => {
+test("without the manifest there is no icon and no credit", async () => {
   const page = await html(ItemPage(props(String(made.fromId))));
-  expect(page).toContain("134400.webp");
+  expect(page).not.toContain("<img");
   expect(page).not.toContain(CREDIT);
 });
 
@@ -94,18 +94,30 @@ test("a category list asks for game file names and icons only for items players 
 const matchedNames = (ids: number[]) => ({
   version: "1.60.1.70450",
   wiki: { name: "Warcraft Wiki (Internet Archive dump, 2023-11-13)", url: "https://warcraft.wiki.gg" },
-  names: new Map(ids.map((id) => [id, { name: `Wiki name ${id}`, color: "#a335ee", wikiPage: `https://warcraft.wiki.gg/wiki/Wiki_${id}` }])),
+  names: new Map(ids.map((id) => [id, { name: `Wiki name ${id}`, color: "#a335ee", quality: 4, wikiPage: `https://warcraft.wiki.gg/wiki/Wiki_${id}` }])),
 });
 const clothIds = () => CLIENT_TAXONOMY.items.filter((r) => r[1] === 4 && r[2] === 1).map((r) => r[0]);
 const cloth = () => SubclassPage({ params: Promise.resolve({ id: "armor", subclass: "cloth" }), searchParams: Promise.resolve({}) });
 
-test("the audited item keeps its name colour when its icon and taxonomy quality are missing", async () => {
+test("the audited item keeps its quality when its icon and taxonomy quality are missing: the question mark from the asset folder, the theme's token on the name", async () => {
+  state.assets = assets;
   state.missingTip = true;
   state.matched = matchedNames([7230]);
   const page = await html(ItemPage(props("7230")));
-  expect(page).toContain("134400.webp");
-  expect(page).toMatch(/<h1 style="color:#a335ee"[^>]*>Wiki name 7230<\/h1>/);
+  expect(page).toMatch(new RegExp(`<img src="${BASE}/icons/134400\\.webp"[^>]*border-q-epic`));
+  expect(page).toMatch(/<h1 class="[^"]*text-q-epic"[^>]*>Wiki name 7230<\/h1>/);
+  expect(page).not.toContain("<h1 style=");
   expect(page).not.toContain("border-dashed");
+});
+
+test("a category row without an icon shows the question mark from the same asset folder", async () => {
+  state.assets = assets;
+  const ids = clothIds();
+  state.names = agreed(ids[1]);
+  state.missingTip = true;
+  const page = await html(SubclassPage({ params: Promise.resolve({ id: "armor", subclass: "cloth" }), searchParams: Promise.resolve({ unnamed: "1" }) }));
+  expect(page).toContain(`${BASE}/icons/134400.webp`);
+  expect(page).not.toContain("assets.everloot.app");
 });
 
 test("a category row shows a name the game files and the wiki agree on, in its quality colour, its source in the hover card and in words for a screen reader, no printed label", async () => {

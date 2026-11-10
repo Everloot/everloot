@@ -10,7 +10,7 @@ import { npcPage, questPage } from "../../../../../../kb/src/world-pages";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { pinLink } from "@/lib/world-map";
 import { trailFor } from "@/lib/breadcrumbs";
-import { Badge, Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, EmptyState } from "@/components/ui";
+import { Badge, Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
 import { EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, ShowOnMap, Unreachable } from "../../entity";
 import { unknownQuest } from "../../unknown";
 import { entitySummary, observedLine } from "@/lib/evidence";
@@ -106,11 +106,13 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
           ]}
         />
         <EntityTop
-          box={
-            (!facts.unreachable && page.level !== null) ? <TooltipFrame name={title} label={wikiTitle ? `${title}, ${GAME_NAME_TITLE.wiki.toLowerCase()}` : `${title}, as players saw it`}>
-              {!facts.unreachable && page.level !== null && <p>Level {page.level}</p>}
-            </TooltipFrame> : facts.unreachable ? <Unreachable /> : <EmptyState message="No quest level is confirmed yet; 3 installs must agree before it appears." />
-          }
+          // No box without an agreed level: the quick facts' Level row carries its meter, and a frame with only the
+          // title would repeat the heading.
+          box={!facts.unreachable && page.level !== null && (
+            <TooltipFrame name={title} label={wikiTitle ? `${title}, ${GAME_NAME_TITLE.wiki.toLowerCase()}` : `${title}, as players saw it`}>
+              <p>Level {page.level}</p>
+            </TooltipFrame>
+          )}
           facts={!facts.unreachable && (
             <Facts
               layout="list"
@@ -145,7 +147,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
                     rowKey={String}
                   />
                 )
-                : <EmptyTab message="No agreed rewards yet." />,
+                : <EmptyTab message="No agreed rewards yet. A reward shows once 3 installs report it." />,
             },
             {
               id: "givers", label: "Giver and turn-in", count: facts.unreachable ? undefined : people.length,
@@ -163,7 +165,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
                     rowKey={(p) => p.role}
                   />
                 )
-                : <EmptyTab message="No agreed giver or turn-in yet." />,
+                : <EmptyTab message="No agreed giver or turn-in yet. Each shows once 3 installs report it." />,
             },
           ]}
         />

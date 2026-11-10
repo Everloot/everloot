@@ -11,6 +11,7 @@ vi.mock("@/lib/shown-item-names", () => ({ loadShownNames: async () => ({ matche
 vi.mock("@/lib/game-assets", () => ({
   loadQuestNames: async () => ({ names: mocks.quests }),
   loadSiteAssets: async () => ({ base: "https://assets.everloot.app/b" }),
+  unknownItemIcon: (base: string) => `${base}/icons/134400.webp`,
   // Only Thunderfury has an icon in these game files.
   loadItemTips: async (_a: unknown, ids: number[]) => new Map(ids.filter((id) => id === 19019).map((id) => [id, { icon: "https://assets.everloot.app/b/icons/1.webp" }])),
 }));

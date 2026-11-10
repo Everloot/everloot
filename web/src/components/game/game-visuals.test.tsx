@@ -108,12 +108,12 @@ afterEach(() => {
 
 const ART = /<img|<image|data-game-credit|data-item-tip|data-spell-tip|data-page-banner|data-launch-banner|Blizzard Entertainment, Inc\.|Classes and professions|Game map art/;
 
-test.each(pages)("%s: without assets, only the generic item fallback may appear; no facts or fetch", async (_name, page) => {
+test.each(pages)("%s: with the asset URL unset there is no image, no tooltip, no credit and no fetch", async (_name, page) => {
   vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", "");
   const fetcher = vi.fn();
   vi.stubGlobal("fetch", fetcher);
   const html = await render(page);
-  expect(html.replace(/<img[^>]*\/134400\.webp[^>]*>/g, "")).not.toMatch(ART);
+  expect(html).not.toMatch(ART);
   expect(fetcher).not.toHaveBeenCalled();
 });
 
@@ -168,8 +168,7 @@ test("item page: the tooltip card for an item players reported; an id nobody rep
   fetcher.mockClear();
   forgetPrivateReads();
   const typed = await render(() => ItemPage({ params: Promise.resolve({ id: "25" }) }));
-  expect(typed).not.toMatch(/Worn Shortsword|data-game-credit/);
-  expect(typed).toContain("134400.webp");
+  expect(typed).not.toMatch(/Worn Shortsword|<img|data-game-credit/);
   // The one read is the file of names the game files and the wiki agree on (none for item 25 here): no manifest, no shard.
   expect(fetcher.mock.calls.map(([req]) => String(req instanceof Request ? req.url : req))).toEqual([expect.stringMatching(/\/item-names\.json$/)]);
 });

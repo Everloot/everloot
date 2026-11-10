@@ -124,7 +124,7 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
                     rowKey={(o) => `${o.itemId}-${o.priceCopper}`}
                   />
                 )
-                : <EmptyTab message="No agreed goods yet." />,
+                : <EmptyTab message="No agreed goods yet. An item shows once 3 installs see it for sale." />,
             },
             {
               id: "map", label: "Map", count: facts.unreachable ? undefined : places.length,
@@ -142,7 +142,7 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
                     rowKey={(p) => p.href}
                   />
                 )
-                : <EmptyTab message="No agreed position yet." />,
+                : <EmptyTab message="No agreed position yet. A pin needs 3 installs at the same spot." />,
             },
           ]}
         />

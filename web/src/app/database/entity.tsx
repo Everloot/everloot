@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import JsonLd from "@/components/JsonLd";
-import GameIcon, { UNKNOWN_ITEM_ICON } from "@/components/game/GameIcon";
+import GameIcon from "@/components/game/GameIcon";
 import { AgreementMeter, GET_THE_ADDON, QUALITY_TEXT, type Quality } from "@/components/ui";
 import { UNCONFIRMED_TITLE } from "@/components/ui/Badge";
 import { trailFor } from "@/lib/breadcrumbs";
@@ -27,14 +27,18 @@ export function Unconfirmed({ children, className = "" }: { children: ReactNode;
   );
 }
 
-/** Item headers keep the game's question mark when the icon is missing. */
+/**
+ * The header's icon: the game icon, or an empty frame of the same size when there is none to show. An item's icon
+ * (the page passes the game's question mark where its own is missing) has its quality border and no frame; with no
+ * asset files an item has no icon at all.
+ */
 export function EntityIcon({ src, quality, unconfirmed = false, item = false }: { src?: string | null; quality?: Quality; unconfirmed?: boolean; item?: boolean }) {
-  if (item || quality) return (
+  if (item) return src ? (
     <span className="shrink-0" data-unconfirmed={unconfirmed || undefined} title={unconfirmed ? UNCONFIRMED_TITLE : undefined}>
-      <GameIcon src={src || UNKNOWN_ITEM_ICON} quality={quality} size={40} className="rounded-[3px]" />
+      <GameIcon src={src} quality={quality} size={40} className="rounded-[3px]" />
       {unconfirmed && <span className="sr-only"> unconfirmed</span>}
     </span>
-  );
+  ) : null;
   const icon = src
     ? <GameIcon src={src} size={40} className="rounded-[3px]" />
     : <span aria-hidden="true" className="block h-10 w-10 rounded-[3px] bg-panel" />;
@@ -46,8 +50,8 @@ export function EntityIcon({ src, quality, unconfirmed = false, item = false }: 
  * ("Trade Goods · Cloth · ID 2589"). The trail feeds the BreadcrumbList JSON-LD only; the layout already
  * emits it for routes lib/breadcrumbs.ts knows, so it is emitted here only for the others.
  */
-export function EntityHeader({ trail, title, quality, color, icon, meta = [] }: {
-  trail: Crumb[]; title: ReactNode; quality?: Quality; color?: string; icon?: ReactNode; meta?: ReactNode[];
+export function EntityHeader({ trail, title, quality, icon, meta = [] }: {
+  trail: Crumb[]; title: ReactNode; quality?: Quality; icon?: ReactNode; meta?: ReactNode[];
 }) {
   const page = trail[trail.length - 1];
   const emitJsonLd = trail.length > 1 && page && !trailFor(page.path);
@@ -57,7 +61,7 @@ export function EntityHeader({ trail, title, quality, color, icon, meta = [] }: 
       {emitJsonLd && <JsonLd data={breadcrumbJsonLd(trail)} />}
       {icon}
       <div className="min-w-0">
-        <h1 style={color ? { color } : undefined} className={`text-title-sm [overflow-wrap:anywhere] sm:text-title ${quality ? QUALITY_TEXT[quality] : "text-fg"}`}>{title}</h1>
+        <h1 className={`text-title-sm [overflow-wrap:anywhere] sm:text-title ${quality ? QUALITY_TEXT[quality] : "text-fg"}`}>{title}</h1>
         {parts.length > 0 && (
           <p data-entity-meta className="text-meta text-muted">
             {parts.map((part, i) => <span key={i}>{i > 0 && <span aria-hidden="true"> · </span>}{part}</span>)}
@@ -70,9 +74,11 @@ export function EntityHeader({ trail, title, quality, color, icon, meta = [] }: 
 
 /**
  * The top band: the tooltip box (or a map thumbnail) at left, the quick facts beside it (two 280 px columns
- * of them on a wide screen, so the band stays short); stacked on a phone.
+ * of them on a wide screen, so the band stays short); stacked on a phone. No box (a tooltip with no lines to
+ * show) leaves the facts alone at the same width.
  */
 export function EntityTop({ box, facts }: { box: ReactNode; facts: ReactNode }) {
+  if (!box) return facts ? <section aria-label="Quick facts" className="mb-6 min-w-0 sm:max-w-[280px] lg:max-w-[584px]">{facts}</section> : null;
   return (
     <div className="mb-6 grid items-start gap-4 sm:grid-cols-[minmax(0,320px)_minmax(0,280px)] sm:gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,584px)]">
       <div className="min-w-0">{box}</div>
@@ -96,7 +102,7 @@ export function EmptyTab({ message, players = true, action = GET_THE_ADDON }: { 
   return (
     <p data-empty-state className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3 text-meta text-fg-2">
       {players && <AgreementMeter count={0} />}
-      <span>{message}{players && " Facts appear once 3 installs agree."}</span>
+      <span>{message}</span>
       {action && <Link href={action.href} className={LINK}>{action.label}</Link>}
     </p>
   );
