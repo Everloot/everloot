@@ -17,11 +17,21 @@ vi.mock("@/lib/game-assets", async (importOriginal) => ({
 }));
 vi.mock("@/data/game-data/client-factions", () => ({ CLIENT_FACTIONS: { factions: [{ id: 529, name: "Argent Dawn", shown: true }] } }));
 vi.mock("@/data/game-data/client-titles", () => ({ CLIENT_TITLES: { titles: [{ id: 200, name: "Jenkins" }] } }));
-// Storage is down for the instance sightings: the page is built from the game files alone.
-vi.mock("@/lib/instances", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/instances")>()),
-  loadSightings: async () => ({ unreachable: true }),
-}));
+// Storage is down for the instance sightings: the page is built from the game files alone. A test can add an
+// instance of a zone's name (a copy of the Deadmines row under another id).
+const extra = vi.hoisted(() => ({ instanceNamed: null as string | null }));
+vi.mock("@/lib/instances", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/instances")>();
+  return {
+    ...real,
+    loadSightings: async () => ({ unreachable: true }),
+    instanceRows: (...args: Parameters<typeof real.instanceRows>) => {
+      const rows = real.instanceRows(...args);
+      if (!extra.instanceNamed) return rows;
+      return new Map([...rows, [9999, { ...rows.get(36)!, instanceMapId: 9999, name: extra.instanceNamed }]]);
+    },
+  };
+});
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
 }));
@@ -48,6 +58,7 @@ beforeEach(() => {
   store.loadCorpus.mockReset().mockResolvedValue(corpus([]));
   store.loadCompletion.mockReset().mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });
   wikiItems.names = null;
+  extra.instanceNamed = null;
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
 
@@ -62,6 +73,7 @@ const PAGES = {
   "titles/[id]": () => import("./titles/[id]/page"),
   "achievements/[id]": () => import("./achievements/[id]/page"),
   "items/[id]": () => import("./items/[id]/page"),
+  "zones/[zone]": () => import("./zones/[zone]/page"),
 };
 async function database(path: keyof typeof PAGES, key: string, value: string) {
   const { default: Page } = await PAGES[path]();
@@ -70,6 +82,10 @@ async function database(path: keyof typeof PAGES, key: string, value: string) {
 async function lore(slug: string) {
   const { default: Page } = await import("../lore/[slug]/page");
   return renderToStaticMarkup(await Page(props("slug", slug)));
+}
+async function loreRobots(slug: string) {
+  const { generateMetadata } = await import("../lore/[slug]/page");
+  return (await generateMetadata(props("slug", slug))).robots as { index: boolean };
 }
 const READ = (name: string) => `Read ${name} in the lore archive`;
 
@@ -127,6 +143,46 @@ test("an instance links its lore page by the game files' name, and the lore page
   expect(back).toContain("See the instance page");
   // An instance the archive has no page for shows no lore.
   expect(await database("instances/[instance]", "instance", "43-wailing-caverns")).not.toContain('id="lore"');
+});
+
+test("a zone links its lore page under the same rule, and the lore page links back", async () => {
+  const page = await database("zones/[zone]", "zone", "1436-westfall");
+  expect(page).toContain('id="lore"');
+  expect(page).toContain('href="/lore/303-westfall"');
+  expect(page).toContain(READ("Westfall"));
+  expect(await lore("303-westfall")).toContain('href="/database/zones/1436-westfall"');
+});
+
+test("a zone whose name the archive has twice links nothing, and neither copy links it", async () => {
+  expect(await database("zones/[zone]", "zone", "1429-elwynn-forest")).not.toContain('id="lore"');
+  for (const slug of ["312-elwynn-forest", "313-elwynn-forest"]) expect(await lore(slug), slug).not.toContain("In the Forever database");
+});
+
+test("a zone and an instance of one name: neither links the lore page, and it links neither", async () => {
+  extra.instanceNamed = "Westfall";
+  expect(await database("zones/[zone]", "zone", "1436-westfall")).not.toContain('id="lore"');
+  expect(await database("instances/[instance]", "instance", "9999-westfall")).not.toContain('id="lore"');
+  expect(await lore("303-westfall")).not.toContain("In the Forever database");
+  expect((await loreRobots("303-westfall")).index).toBe(false);
+});
+
+test("a lore page links back, is indexed and is in the lore sitemap together, or none of the three", async () => {
+  store.loadCorpus.mockResolvedValue(corpus(object(1731, "Copper Vein"), npc(77, "Thrall"), npc(90, "Hogger"), npc(91, "Hogger"), npc(92, "Twin Guard")));
+  const { lorePaths } = await import("@/lib/lore-forever");
+  const listed = new Set(await lorePaths());
+  const linked: string[] = [];
+  for (const slug of [
+    "1-thrall", "300-copper-vein", "301-argent-dawn", "302-deadmines", "303-westfall", "307-explore-westfall", "308-jenkins",
+    "305-twin-vein", "306-twin-vein", "310-hogger", "312-elwynn-forest", "313-elwynn-forest", "314-twin-guard", "315-twin-guard",
+    "309-shared-name", "4-return-to-sender", "100-zone-1",
+  ]) {
+    const backlink = (await lore(slug)).includes("In the Forever database");
+    expect({ slug, indexed: (await loreRobots(slug)).index, listed: listed.has(`/lore/${slug}`) }).toEqual({ slug, indexed: backlink, listed: backlink });
+    if (backlink) linked.push(slug);
+  }
+  expect(linked).toEqual(["1-thrall", "300-copper-vein", "301-argent-dawn", "302-deadmines", "303-westfall", "307-explore-westfall", "308-jenkins"]);
+  // Nothing else is listed.
+  expect([...listed].sort()).toEqual(linked.map((s) => `/lore/${s}`).sort());
 });
 
 test("a zone's lore page links back to the zone page", async () => {

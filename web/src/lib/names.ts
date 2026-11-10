@@ -48,8 +48,10 @@ export function nameOf(names: Names): (kind: EdgeKind, id: number) => string | u
 
 const byName =new WeakMap<Map<number, string>, Map<string, number[]>>();
 
-/** The id of the one entity with this exact name (case-insensitive); null when none or when two share it. */
-export function idForName(names: Map<number, string>, name: string): number | null {
+/** Who holds an exact name (case-insensitive): nobody, exactly one entity, or two or more. */
+export type NameMatch = { kind: "missing" } | { kind: "unique"; id: number } | { kind: "ambiguous" };
+
+export function matchName(names: Map<number, string>, name: string): NameMatch {
   let index = byName.get(names);
   if (!index) {
     index = new Map();
@@ -59,6 +61,12 @@ export function idForName(names: Map<number, string>, name: string): number | nu
     }
     byName.set(names, index);
   }
-  const ids = index.get(name.trim().toLowerCase());
-  return ids?.length === 1 ? ids[0] : null;
+  const ids = index.get(name.trim().toLowerCase()) ?? [];
+  return ids.length === 0 ? { kind: "missing" } : ids.length === 1 ? { kind: "unique", id: ids[0]! } : { kind: "ambiguous" };
+}
+
+/** The id of the one entity with this exact name (case-insensitive); null when none or when two share it. */
+export function idForName(names: Map<number, string>, name: string): number | null {
+  const match = matchName(names, name);
+  return match.kind === "unique" ? match.id : null;
 }

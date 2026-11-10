@@ -1,42 +1,13 @@
-import { getRelease } from "./release";
-import { isIndexable, loreSlug, type LorePage } from "./lore";
-import { idForName, loadNames, type Names } from "./names";
-import { loadItemFacts, loadWorldFacts } from "./rollup-compute";
+import { loreHeadsNamed, loreSlug, onlyUsable, UNAVAILABLE } from "./lore";
+import { LINKED_TYPES, loadLinkNames, loreStanding, namesOfType, WIKI_SOURCE } from "./lore-links";
 
 /**
- * The lore archive pages about something in WoW: Forever. A Warcraft Wiki copy stands for a Forever database page when
- * it is typed as an NPC, an item or a quest and its name is exactly the one name players agreed on for that kind
- * (`idForName`): the page then links that database page under "In the Forever database". Those copies are indexed and
- * listed in /lore-sitemap.xml; every other wiki copy stays noindex and unlisted (owner decision, 2026-11-10).
- * Everloot's own entries keep the length rule alone and are not listed: the one there is today moved to /wow-forever.
+ * The lore archive pages about something in WoW: Forever. A Warcraft Wiki copy stands for a Forever database page
+ * under the rule in lib/lore-links.ts (`loreStanding`): it then links that page under "In the Forever database", asks
+ * to be indexed and is listed in /lore-sitemap.xml; every other wiki copy stays noindex and unlisted (owner decision,
+ * 2026-11-10). Everloot's own entries keep the length rule alone and are not listed: the one there is today moved to
+ * /wow-forever.
  */
-
-export const WIKI_SOURCE = "warcraft-wiki-2023";
-export const FOREVER_KINDS = ["npc", "item", "quest"] as const;
-export type ForeverKind = (typeof FOREVER_KINDS)[number];
-
-const namesFor = (names: Pick<Names, "npcs" | "items" | "quests">, kind: ForeverKind) =>
-  kind === "npc" ? names.npcs : kind === "item" ? names.items : names.quests;
-
-/** The database kind a wiki lore page could stand for, from its type; null for other types and Everloot's own entries. */
-export function foreverKind(page: Pick<LorePage, "sourceId" | "type">): ForeverKind | null {
-  return page.sourceId === WIKI_SOURCE && (FOREVER_KINDS as readonly string[]).includes(page.type ?? "") ? (page.type as ForeverKind) : null;
-}
-
-/** The database page a wiki lore page stands for, or null. */
-export function foreverMatch(page: Pick<LorePage, "sourceId" | "type" | "name">, names: Pick<Names, "npcs" | "items" | "quests">): { kind: ForeverKind; id: number } | null {
-  const kind = foreverKind(page);
-  if (!kind) return null;
-  const id = idForName(namesFor(names, kind), page.name);
-  return id === null ? null : { kind, id };
-}
-
-/**
- * Whether a lore page asks to be indexed: long enough and not a redirect, and, for a Warcraft Wiki copy, about
- * something in the Forever database. The page's robots and the lore sitemap both ask this.
- */
-export const loreIndexable = (page: Pick<LorePage, "sourceId" | "body">, inDatabase: boolean): boolean =>
-  isIndexable(page.body) && (page.sourceId !== WIKI_SOURCE || inDatabase);
 
 /** Lore URLs per sitemap file, under the protocol's 50,000. */
 export const LORE_CHUNK = 40_000;
@@ -44,14 +15,12 @@ export const LORE_CHUNK = 40_000;
 const NAME_BATCH = 2_000;
 
 /**
- * The Warcraft Wiki copies that ask to be indexed, by kind, or null when the release or upload storage cannot be
- * read (the routes answer 503 rather than a short list). Each agreed name is looked up through the release's
- * (type, name) index, a batch of names per query; the first 300 characters of a body are enough for the length rule.
- * The query matches names case-insensitively for ASCII only (SQLite NOCASE), so it can miss a stored name with
- * surrounding spaces or a non-ASCII case difference that the page's own check (`idForName`) would accept: such a page
- * still says index but is left out of the sitemap. Matching exactly would need a normalized name column in the
- * release; a scan without the index would read every lore row per batch, which D1 bills per row.
- * A release query that fails returns null, so the routes answer 503 rather than throw.
+ * The Warcraft Wiki copies that ask to be indexed, or null when the release or upload storage cannot be read (the
+ * routes answer 503 rather than a short list). For each lore type a database page can stand for, every name a kind
+ * of that type holds is looked up through the release's (type, name) index, a batch of names per query, and each
+ * page found is judged by `loreStanding`, the rule its own robots and link use; the first `LORE_HEAD` characters of a
+ * body are all that rule reads. The query reads only the rows of those names, never the whole archive (D1 bills per
+ * row read). A release query that fails returns null, so the routes answer 503 rather than throw.
  */
 export async function lorePaths(): Promise<string[] | null> {
   try {
@@ -63,23 +32,20 @@ export async function lorePaths(): Promise<string[] | null> {
 }
 
 async function readLorePaths(): Promise<string[] | null> {
-  const [release, items, world] = await Promise.all([getRelease(), loadItemFacts(), loadWorldFacts()]);
-  if (!release || items.unreachable || world.unreachable) return null;
-  const names = await loadNames(Promise.resolve(items));
+  const sets = await loadLinkNames("all");
   const out = new Set<string>();
-  for (const kind of FOREVER_KINDS) {
-    const unique = [...new Set([...namesFor(names, kind).values()].map((n) => n.trim()).filter(Boolean))];
-    for (let i = 0; i < unique.length; i += NAME_BATCH) {
-      const rows = await release.db.all<{ extId: string; name: string; head: string }>(
-        `SELECT ext_id AS extId, name, substr(body, 1, 300) AS head FROM entities
-         WHERE kind = 'lore_page' AND source_id = ? AND json_extract(data, '$.type') = ?
-           AND name COLLATE NOCASE IN (SELECT value FROM json_each(?)) AND instr(body, 'REDIRECT') = 0
-         ORDER BY name COLLATE NOCASE, id`,
-        WIKI_SOURCE, kind, JSON.stringify(unique.slice(i, i + NAME_BATCH)),
-      );
+  for (const type of LINKED_TYPES) {
+    const names = namesOfType(type, sets);
+    // Storage down: the routes answer 503 rather than a list that leaves out every page the missing names would link.
+    if (!names) return null;
+    const groups = await loreHeadsNamed(type, names, NAME_BATCH);
+    if (groups === UNAVAILABLE) return null;
+    for (const rows of groups) {
+      const only = onlyUsable(rows.map((r) => ({ ...r, body: r.head })))?.extId ?? null;
       for (const row of rows) {
-        const page = { sourceId: WIKI_SOURCE, type: kind, name: row.name, body: row.head };
-        if (loreIndexable(page, foreverMatch(page, names) !== null)) out.add(`/lore/${loreSlug(row)}`);
+        if (row.sourceId !== WIKI_SOURCE) continue;
+        const page = { extId: row.extId, sourceId: row.sourceId, type, name: row.name, body: row.head };
+        if (loreStanding(page, only, sets).index) out.add(`/lore/${loreSlug(row)}`);
       }
     }
   }

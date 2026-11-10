@@ -3,10 +3,9 @@ import { CLIENT_FACTIONS } from "@/data/game-data/client-factions";
 import { CLIENT_TITLES } from "@/data/game-data/client-titles";
 import { achievementHref, factionHref, titleDisplayName, titleHref } from "./completion-lists";
 import { instanceHref, instanceRows } from "./instances";
-import { loreForEntity, UNAVAILABLE, type LoreMatch, type LoreType, type Unavailable } from "./lore";
-import { foreverMatch, WIKI_SOURCE, type ForeverKind } from "./lore-forever";
-import { idForName, loadNames, objectNames, type Names } from "./names";
-import { loadItemFacts } from "./rollup-compute";
+import { isIndexable, loreForEntity, UNAVAILABLE, type LoreMatch, type LorePage, type LoreType, type Unavailable } from "./lore";
+import { itemNames, matchName, npcNames, objectNames, questTitles } from "./names";
+import { loadItemFacts, loadWorldFacts } from "./rollup-compute";
 import { publicZones, zoneHref } from "./zones";
 
 /**
@@ -15,13 +14,17 @@ import { publicZones, zoneHref } from "./zones";
  * exactly one page of that kind, and the copy's archive type is the one that kind uses. The database page asks the
  * archive for the copy and links it only if the copy, read the other way (`databaseLink`), points back at the
  * same page, so the two directions cannot disagree. A name two database pages share, or one that fits two kinds
- * under the same archive type, is no link: a wrong link is worse than none.
+ * under the same archive type, is no link: a wrong link is worse than none. Nor is any name while one of the kinds
+ * that could claim it cannot be read: the kind left out might hold it too.
  *
- * NPCs, items and quests use `foreverMatch` (lib/lore-forever.ts), the rule that also decides which copies are
- * indexed. The other kinds use the same exact-name test over their own names: objects over the names players agreed
- * on (3 installs), zones and instances over the names the game files give them, factions, titles and achievements
- * over the names of the game files' lists. No id is guessed and nothing is matched by words.
+ * Every kind uses the same exact-name test over its own names: NPCs, items, quests and objects over the names players
+ * agreed on (3 installs), zones and instances over the names the game files give them, factions, titles and
+ * achievements over the names of the game files' lists. No id is guessed and nothing is matched by words. The same
+ * rule decides which wiki copies ask to be indexed and are listed in /lore-sitemap.xml (`loreStanding`).
  */
+
+/** The archive source whose copies link database pages, and are indexed only when they do. */
+export const WIKI_SOURCE = "warcraft-wiki-2023";
 
 /** The archive type each database kind's lore pages carry (the wiki files an object, faction, title or achievement under none of its own). */
 export const LORE_TYPE = {
@@ -40,29 +43,49 @@ export const KIND_LABEL: Record<DatabaseKind, string> = {
 const KINDS_OF_TYPE: Partial<Record<LoreType, DatabaseKind[]>> = {
   npc: ["npc"], item: ["item"], quest: ["quest"], zone: ["zone", "instance"], other: ["object", "faction", "title", "achievement"],
 };
-const FOREVER: readonly DatabaseKind[] = ["npc", "item", "quest"];
-/** Whether the page's name is one players agreed on (the kinds `foreverMatch` covers), so it may say players recorded it. */
-export const agreedKind = (kind: DatabaseKind): kind is ForeverKind => FOREVER.includes(kind);
+/** The lore types a database page can stand for. */
+export const LINKED_TYPES = Object.keys(KINDS_OF_TYPE) as LoreType[];
+/** Whether the page's name is one players agreed on, so the lore page may say players recorded it (objects say less). */
+export const agreedKind = (kind: DatabaseKind): boolean => kind === "npc" || kind === "item" || kind === "quest";
 
-/** The names of every kind a lore page can be matched to, by id; a kind the caller did not need is empty. */
-export interface LinkNames extends Names {
-  zones: Map<number, string>;
-  instances: Map<number, string>;
-  factions: Map<number, string>;
-  titles: Map<number, string>;
-  achievements: Map<number, string>;
+/**
+ * The names of every kind a lore page can be matched to, by id. A kind the caller did not need is empty; a kind
+ * that could not be read is null, and no lore page of its type links anything until it can.
+ */
+export type NameSet = Map<number, string> | null;
+export interface LinkNames {
+  npcs: NameSet;
+  items: NameSet;
+  quests: NameSet;
+  objects: NameSet;
+  zones: NameSet;
+  instances: NameSet;
+  factions: NameSet;
+  titles: NameSet;
+  achievements: NameSet;
 }
 const SET_OF = {
   npc: "npcs", item: "items", quest: "quests", object: "objects", zone: "zones", instance: "instances",
   faction: "factions", title: "titles", achievement: "achievements",
 } as const satisfies Record<DatabaseKind, keyof LinkNames>;
 
+/** Every name the kinds of a lore type hold (the names its pages could link by); null while any of them cannot be read. */
+export function namesOfType(type: LoreType, sets: LinkNames): string[] | null {
+  const out: string[] = [];
+  for (const kind of KINDS_OF_TYPE[type] ?? []) {
+    const names = sets[SET_OF[kind]];
+    if (!names) return null;
+    out.push(...names.values());
+  }
+  return out;
+}
+
 type StaticNames = Pick<LinkNames, "zones" | "instances" | "factions" | "titles" | "achievements">;
 let fixed: StaticNames | null = null;
 
-/** A game-file list that cannot be read adds no names (no link) rather than failing the page. */
-function fromFiles(read: () => [number, string][]): Map<number, string> {
-  try { return new Map(read()); } catch { return new Map(); }
+/** A game-file list that cannot be read is unreadable (no link for its type) rather than failing the page. */
+function fromFiles(read: () => [number, string][]): NameSet {
+  try { return new Map(read()); } catch { return null; }
 }
 
 /** The names the game files give zones, instances, factions, titles and achievements; static, so built once. */
@@ -78,47 +101,75 @@ function staticNames(): StaticNames {
 }
 
 /**
- * The names a lore page of this type is matched against. Only what the type needs is read: the agreed NPC, item and
- * quest names for those types, the agreed object names for `other`, nothing from storage for a zone.
+ * The names a lore page of this type is matched against; `"all"` for every type at once (the lore sitemap). Only
+ * what the type needs is read: the agreed NPC and quest names from the world facts, the agreed item and object names
+ * from the item facts, nothing from storage for a zone. Facts that cannot be read leave their names null.
  */
-export async function loadLinkNames(type: LoreType | null): Promise<LinkNames> {
+export async function loadLinkNames(type: LoreType | null | "all"): Promise<LinkNames> {
   const none = new Map<number, string>();
-  const base: LinkNames = { items: none, npcs: none, quests: none, objects: none, ...staticNames() };
-  if (type === "npc" || type === "item" || type === "quest") return { ...base, ...(await loadNames()) };
-  if (type === "other") {
-    const items = await loadItemFacts();
-    return { ...base, objects: items.unreachable ? none : objectNames(items) };
-  }
-  return base;
+  const [world, items] = await Promise.all([
+    type === "npc" || type === "quest" || type === "all" ? loadWorldFacts() : null,
+    type === "item" || type === "other" || type === "all" ? loadItemFacts() : null,
+  ]);
+  const read = <F extends { unreachable?: boolean }>(facts: F | null, names: (f: F) => Map<number, string>): NameSet =>
+    !facts ? none : facts.unreachable ? null : names(facts);
+  return {
+    npcs: read(world, npcNames), quests: read(world, questTitles),
+    items: read(items, itemNames), objects: read(items, objectNames),
+    ...staticNames(),
+  };
 }
 
 export interface DatabaseLink { kind: DatabaseKind; id: number; name: string }
 
+/** The database kinds a lore page could stand for: none unless it is a typed Warcraft Wiki copy. */
+const kindsOf = (page: { sourceId: string; type: LoreType | null }): DatabaseKind[] =>
+  page.sourceId === WIKI_SOURCE && page.type ? KINDS_OF_TYPE[page.type] ?? [] : [];
+
 /**
  * The one database page a lore page stands for, or null. A Warcraft Wiki copy only (the archive's own entries
- * have no type), and only when exactly one kind of the page's type has exactly one page with that name.
+ * have no type), and only when exactly one kind of the page's type has exactly one page with that name, no kind of
+ * that type has the name twice, and every kind of that type could be read.
  */
 export function databaseLink(page: { sourceId: string; type: LoreType | null; name: string }, sets: LinkNames): DatabaseLink | null {
-  if (page.sourceId !== WIKI_SOURCE || !page.type) return null;
   const found: DatabaseLink[] = [];
-  for (const kind of KINDS_OF_TYPE[page.type] ?? []) {
+  for (const kind of kindsOf(page)) {
     const names = sets[SET_OF[kind]];
-    const id = agreedKind(kind) ? foreverMatch(page, sets)?.id ?? null : idForName(names, page.name);
-    if (id !== null) found.push({ kind, id, name: names.get(id) ?? page.name });
+    if (!names) return null;
+    const match = matchName(names, page.name);
+    if (match.kind === "ambiguous") return null;
+    if (match.kind === "unique") found.push({ kind, id: match.id, name: names.get(match.id) ?? page.name });
   }
   return found.length === 1 ? found[0]! : null;
 }
 
 /**
- * The database page a lore page links, for the page itself. `databaseLink` plus the archive's half of the rule the
- * database pages apply: the archive has exactly one page of this name and type (`loreForEntity`, the same indexed
- * lookup), and it is this one. Two copies of one name stand for no database page, from either side.
+ * Whether a lore page asks to be indexed: long enough and not a redirect, and, for a Warcraft Wiki copy, linked to a
+ * database page. Everloot's own entries keep the length rule alone.
  */
-export async function loreLinkFor(page: { extId: string; sourceId: string; type: LoreType | null; name: string }): Promise<DatabaseLink | null> {
-  const link = databaseLink(page, await loadLinkNames(page.type));
-  if (!link || !page.type) return null;
-  const only = await loreForEntity(page.type, page.name);
-  return only !== null && only !== UNAVAILABLE && only.extId === page.extId ? link : null;
+export const loreIndexable = (page: Pick<LorePage, "sourceId" | "body">, linked: boolean): boolean =>
+  isIndexable(page.body) && (page.sourceId !== WIKI_SOURCE || linked);
+
+export interface LoreStanding { link: DatabaseLink | null; index: boolean }
+type StandingPage = Pick<LorePage, "extId" | "sourceId" | "type" | "name" | "body">;
+
+/**
+ * The one rule for a lore page, behind its "In the Forever database" link, its robots and /lore-sitemap.xml: it links
+ * the database page it stands for (`databaseLink`) when it is also the archive's one usable page of its name and type
+ * (`only`: the extId `loreForEntity` answers, the lookup the database pages make), and a wiki copy asks to be indexed
+ * exactly when it links. `body` may be the first `LORE_HEAD` characters only (what the sitemap reads). `sets` is null
+ * when the page could stand for nothing, so no names were read.
+ */
+export function loreStanding(page: StandingPage, only: string | null, sets: LinkNames | null): LoreStanding {
+  const link = sets && only === page.extId ? databaseLink(page, sets) : null;
+  return { link, index: loreIndexable(page, link !== null) };
+}
+
+/** `loreStanding` for a lore page being served: names and the archive are read only when it could link. */
+export async function loreStandingFor(page: StandingPage): Promise<LoreStanding> {
+  const sets = kindsOf(page).length > 0 ? await loadLinkNames(page.type) : null;
+  const only = sets && page.type && databaseLink(page, sets) ? await loreForEntity(page.type, page.name) : null;
+  return loreStanding(page, only && only !== UNAVAILABLE ? only.extId : null, sets);
 }
 
 /** Where a database page is. Zones, instances, factions, titles and achievements carry their name in the path. */
@@ -146,7 +197,9 @@ export async function loreFor(kind: DatabaseKind, id: number, name: string | nul
   if (!clean) return null;
   const type = LORE_TYPE[kind];
   const names = sets ?? await loadLinkNames(type);
-  if (idForName(names[SET_OF[kind]], clean) !== id) return null;
+  // The archive is asked only for a name that stands for this page, read from the wiki's side (`databaseLink`).
+  const own = databaseLink({ sourceId: WIKI_SOURCE, type, name: clean }, names);
+  if (own?.kind !== kind || own.id !== id) return null;
   const match = await loreForEntity(type, clean);
   if (match === null || match === UNAVAILABLE) return match;
   const back = databaseLink({ sourceId: match.sourceId, type, name: match.name }, names);
@@ -182,7 +235,8 @@ export async function loreForShownItem(
   if (shown.source === "players") return loreFor("item", id, shown.name, sets);
   if (!matched) return null;
   const names = sets ?? await loadLinkNames("item");
-  if (idForName(names.items, shown.name) !== null || idForName(wikiItemNames(matched), shown.name) !== id) return null;
+  const wiki = matchName(wikiItemNames(matched), shown.name);
+  if (!names.items || matchName(names.items, shown.name).kind !== "missing" || wiki.kind !== "unique" || wiki.id !== id) return null;
   const match = await loreForEntity("item", shown.name);
   return match !== null && match !== UNAVAILABLE && match.sourceId !== WIKI_SOURCE ? null : match;
 }

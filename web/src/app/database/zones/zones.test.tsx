@@ -9,7 +9,7 @@ vi.mock("@/lib/upload-store", async (importOriginal) => ({
   uploadStore: { loadCorpus: store.loadCorpus },
 }));
 vi.mock("@/lib/zone-lore", () => ({
-  zoneLore: (name: string) => name === "Westfall"
+  zoneLore: (_mapId: number, name: string) => name === "Westfall"
     ? { name, text: "Westfall is a farming zone.", href: "/lore/1-westfall", sourceUrl: "https://example.test/Westfall", licence: "CC BY-SA 4.0" }
     : null,
 }));

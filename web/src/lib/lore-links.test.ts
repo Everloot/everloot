@@ -149,14 +149,68 @@ describe("a lore page leads to its database page", () => {
     expect(databaseLink(page("spell", "Copper Vein"), s)).toBeNull();
   });
 
-  test("an NPC, item or quest copy answers exactly as foreverMatch does", async () => {
+  test("a name one kind holds twice is no link, though another kind of the type holds it once", async () => {
+    const { databaseLink, loreFor } = await links();
+    // Two objects called Argent Dawn and one faction: the faction is not the one page of that name.
+    const twice = sets({ objects: new Map([[1750, "Argent Dawn"], [1751, "Argent Dawn"]]) });
+    expect(databaseLink(page("other", "Argent Dawn"), twice)).toBeNull();
+    expect(await loreFor("faction", 529, "Argent Dawn", twice)).toBeNull();
+    // Two instances called Westfall: the zone of that name links nothing either.
+    const instances = sets({ instances: new Map([[36, "Deadmines"], [1450, "Westfall"], [1451, "Westfall"]]) });
+    expect(databaseLink(page("zone", "Westfall"), instances)).toBeNull();
+    expect(await loreFor("zone", 1436, "Westfall", instances)).toBeNull();
+  });
+
+  test("a kind whose names cannot be read stops every link of its lore type until it can", async () => {
+    const { databaseLink, loreFor } = await links();
+    // The agreed object names are unreadable: the faction might share its name with an object nobody can see.
+    const noObjects = sets({ objects: null });
+    expect(databaseLink(page("other", "Argent Dawn"), noObjects)).toBeNull();
+    expect(databaseLink(page("other", "Jenkins"), noObjects)).toBeNull();
+    expect(await loreFor("faction", 529, "Argent Dawn", noObjects)).toBeNull();
+    expect(await loreFor("title", 200, "Jenkins", noObjects)).toBeNull();
+    // Other types do not wait on it.
+    expect(databaseLink(page("zone", "Westfall"), noObjects)).toMatchObject({ kind: "zone", id: 1436 });
+    // The instance list is unreadable: no zone links.
+    expect(databaseLink(page("zone", "Westfall"), sets({ instances: null }))).toBeNull();
+    expect(await loreFor("zone", 1436, "Westfall", sets({ instances: null }))).toBeNull();
+  });
+
+  test("storage down: the names players agreed on are unreadable, not empty", async () => {
     vi.stubEnv("KB_SNAPSHOT_PATH", release);
-    const { foreverMatch } = await import("./lore-forever");
-    const { databaseLink } = await import("./lore-links");
+    vi.doMock("./rollup-compute", async (importOriginal) => ({
+      ...(await importOriginal<typeof import("./rollup-compute")>()),
+      loadItemFacts: async () => ({ unreachable: true }),
+      loadWorldFacts: async () => ({ unreachable: true }),
+    }));
+    const { loadLinkNames, databaseLink } = await import("./lore-links");
+    const other = await loadLinkNames("other");
+    expect(other.objects).toBeNull();
+    expect(other.factions?.size).toBeGreaterThan(0);
+    expect(databaseLink(page("other", "Argent Dawn"), other)).toBeNull();
+    expect((await loadLinkNames("npc")).npcs).toBeNull();
+    // A zone reads nothing from storage.
+    expect((await loadLinkNames("zone")).npcs).toEqual(new Map());
+    vi.doUnmock("./rollup-compute");
+  });
+});
+
+describe("one rule for the link back, the robots and the sitemap", () => {
+  const page = (extId: string, type: Type, name: string, body = "x".repeat(400), sourceId = "warcraft-wiki-2023") => ({ extId, sourceId, type, name, body });
+
+  test("a copy that links is indexed; one that does not, or is too short to index, is not", async () => {
+    const { loreStanding } = await links();
     const s = sets();
-    for (const [type, name] of [["npc", "Thrall"], ["npc", "Hogger"], ["item", "Warchief's Blade"], ["quest", "Return to Sender"], ["quest", "Nothing"]] as const) {
-      const p = page(type, name);
-      expect(databaseLink(p, s)?.id ?? null, `${type} ${name}`).toBe(foreverMatch(p, s)?.id ?? null);
-    }
+    expect(loreStanding(page("300", "other", "Copper Vein"), "300", s)).toMatchObject({ link: { kind: "object", id: 1731 }, index: true });
+    // The archive's one page of the name is another copy (or there is none): no link, so no index.
+    expect(loreStanding(page("300", "other", "Copper Vein"), "999", s)).toEqual({ link: null, index: false });
+    expect(loreStanding(page("300", "other", "Copper Vein"), null, s)).toEqual({ link: null, index: false });
+    // Two NPCs called Hogger: the copy links neither and stays out of search.
+    expect(loreStanding(page("310", "npc", "Hogger"), "310", s)).toEqual({ link: null, index: false });
+    // A short page keeps its link but not the index; an untyped copy and a spell are neither.
+    expect(loreStanding(page("300", "other", "Copper Vein", "short"), "300", s)).toMatchObject({ link: { id: 1731 }, index: false });
+    expect(loreStanding(page("300", null, "Copper Vein"), "300", s)).toEqual({ link: null, index: false });
+    // Everloot's own entries link nothing and keep the length rule alone.
+    expect(loreStanding(page("forever", null, "Launch", "x".repeat(400), "curated"), null, null)).toEqual({ link: null, index: true });
   });
 });

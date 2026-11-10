@@ -189,12 +189,27 @@ export function firstParagraph(body: string, max = 420): string {
 const MATCH_CACHE_MAX = 500;
 const MATCHES = new WeakMap<object, Map<string, LoreMatch | null>>();
 
+/** The start of a body that the length rule and the opening rule read; the lore sitemap reads no more of each page. */
+export const LORE_HEAD = INDEXABLE_MIN_BODY;
+
+/**
+ * The archive's one page among the non-redirect rows of one name and type: exactly one row, and its text opens with
+ * a paragraph (read from its first `LORE_HEAD` characters, so the sitemap, which reads no more, answers the same).
+ */
+export function onlyUsable<T extends { body: string }>(rows: readonly T[]): T | null {
+  return rows.length === 1 && firstParagraph(rows[0]!.body.slice(0, LORE_HEAD)) ? rows[0]! : null;
+}
+
+/** SQLite NOCASE folds ASCII letters only; this is that comparison's key, for grouping rows as a NOCASE query does. */
+const nocase = (s: string) => s.replace(/[A-Z]/g, (c) => c.toLowerCase());
+
 /**
  * The lore page for a database entity: an exact name match (any case) within the type. Two pages with one
  * name in a type, a redirect or a page with no opening paragraph are no match: a wrong link is worse than none.
  * The archive has a game id only for quests (a field of their infobox, not indexed), so the id match the plan
  * names would scan the whole file; the name lookup uses the (type, name) index. Answers are kept per opened
- * release, so a page never asks twice for the same name.
+ * release, so a page never asks twice for the same name. A query that fails is unavailable (no link) and is not
+ * kept, so the next request asks again.
  */
 export async function loreForEntity(type: LoreType, name: string): Promise<LoreMatch | null | Unavailable> {
   const release = await getRelease();
@@ -205,17 +220,50 @@ export async function loreForEntity(type: LoreType, name: string): Promise<LoreM
   if (!cache) { cache = new Map(); MATCHES.set(release.db, cache); }
   const key = `${type}|${clean.toLowerCase()}`;
   if (cache.has(key)) return cache.get(key) ?? null;
-  const rows = await release.db.all<{ extId: string; name: string; body: string; sourceId: string }>(
-    `SELECT ext_id AS extId, name, body, source_id AS sourceId FROM entities
-     WHERE ${LORE_SQL} AND json_extract(data, '$.type') = ? AND name = ? COLLATE NOCASE LIMIT 3`,
-    ...PUBLISHABLE, type, clean,
-  );
-  const usable = rows.filter((r) => !r.body.includes("REDIRECT"));
-  const intro = usable.length === 1 ? firstParagraph(usable[0].body) : "";
-  const match = intro ? { extId: usable[0].extId, name: usable[0].name, intro, sourceId: usable[0].sourceId } : null;
+  let rows: { extId: string; name: string; body: string; sourceId: string }[];
+  try {
+    rows = await release.db.all<{ extId: string; name: string; body: string; sourceId: string }>(
+      `SELECT ext_id AS extId, name, body, source_id AS sourceId FROM entities
+       WHERE ${LORE_SQL} AND json_extract(data, '$.type') = ? AND name = ? COLLATE NOCASE AND instr(body, 'REDIRECT') = 0 LIMIT 2`,
+      ...PUBLISHABLE, type, clean,
+    );
+  } catch (err) {
+    console.error("lore lookup: release read failed", err);
+    return UNAVAILABLE;
+  }
+  const only = onlyUsable(rows);
+  const match = only ? { extId: only.extId, name: only.name, intro: firstParagraph(only.body), sourceId: only.sourceId } : null;
   if (cache.size >= MATCH_CACHE_MAX) cache.clear();
   cache.set(key, match);
   return match;
+}
+
+export interface LoreHead { extId: string; name: string; sourceId: string; head: string }
+
+/**
+ * For the lore sitemap: the archive's non-redirect pages of one type whose names are among `names`, grouped as
+ * `loreForEntity` groups them (one group per name under SQLite's NOCASE), each with the first `LORE_HEAD` characters
+ * of its body. One query per batch of names through the (type, name) index: a scan would read every lore row per
+ * batch, which D1 bills per row. A name that differs from another only in ASCII case is asked once.
+ */
+export async function loreHeadsNamed(type: LoreType, names: readonly string[], batch: number): Promise<LoreHead[][] | Unavailable> {
+  const release = await getRelease();
+  if (!release) return UNAVAILABLE;
+  const unique = [...new Map(names.map((n) => n.trim()).filter(Boolean).map((n) => [nocase(n), n])).values()];
+  const groups: LoreHead[][] = [];
+  for (let i = 0; i < unique.length; i += batch) {
+    const rows = await release.db.all<LoreHead>(
+      `SELECT ext_id AS extId, name, source_id AS sourceId, substr(body, 1, ${LORE_HEAD}) AS head FROM entities
+       WHERE ${LORE_SQL} AND json_extract(data, '$.type') = ?
+         AND name COLLATE NOCASE IN (SELECT value FROM json_each(?)) AND instr(body, 'REDIRECT') = 0
+       ORDER BY name COLLATE NOCASE, id`,
+      ...PUBLISHABLE, type, JSON.stringify(unique.slice(i, i + batch)),
+    );
+    const byName = new Map<string, LoreHead[]>();
+    for (const row of rows) byName.set(nocase(row.name), [...(byName.get(nocase(row.name)) ?? []), row]);
+    groups.push(...byName.values());
+  }
+  return groups;
 }
 
 export async function searchLore(q: string, page: number, type?: LoreType): Promise<{ hits: SearchHit[]; hasNext: boolean } | Unavailable> {

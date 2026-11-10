@@ -25,7 +25,8 @@ const EMPTY_FACETS: Record<"expansion" | "profession" | "class" | "race" | "zone
  * (other, an object), Argent Dawn 301 (other, a faction), Deadmines 302 and Westfall 303 (zone, an instance and a
  * zone), Worn Shortsword 304 (item), two "Twin Vein" 305 and 306 (other, one name twice), Explore Westfall 307
  * (other, an achievement), Jenkins 308 (other, a title), Shared Name 309 (other, a name two kinds could claim),
- * Hogger 310 (npc, a name two NPCs share), and Hogger (curated) 311 (a copy that is not the wiki's).
+ * Hogger 310 (npc, a name two NPCs share), and Hogger (curated) 311 (a copy that is not the wiki's), two
+ * "Elwynn Forest" 312 and 313 (zone, a released zone's name twice) and two "Twin Guard" 314 and 315 (npc, one name twice).
  */
 export async function buildLoreRelease(options: { typed?: boolean; facets?: boolean; dir?: string; landing?: boolean; links?: boolean } = {}): Promise<string> {
   const typed = options.typed ?? true;
@@ -57,6 +58,7 @@ export async function buildLoreRelease(options: { typed?: boolean; facets?: bool
       ["300", "Copper Vein", "other"], ["301", "Argent Dawn", "other"], ["302", "Deadmines", "zone"], ["303", "Westfall", "zone"],
       ["304", "Worn Shortsword", "item"], ["305", "Twin Vein", "other"], ["306", "Twin Vein", "other"], ["307", "Explore Westfall", "other"],
       ["308", "Jenkins", "other"], ["309", "Shared Name", "other"], ["310", "Hogger", "npc"],
+      ["312", "Elwynn Forest", "zone"], ["313", "Elwynn Forest", "zone"], ["314", "Twin Guard", "npc"], ["315", "Twin Guard", "npc"],
     ].map(([id, name, type]) => wiki(id!, name!, `${name} is a page for the links. ${"It stands. ".repeat(30)}`, { type, facets: EMPTY_FACETS, damaged: false })) : []),
     ...(options.landing ? [
       wiki("481380", "Alliance", `* A quote set as a list.\n\nThe Alliance is one of two major factions. ${"It fights on. ".repeat(30)}`, { type: "other", facets: EMPTY_FACETS, damaged: false }),

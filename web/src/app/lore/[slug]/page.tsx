@@ -5,9 +5,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { Card, Explainer, Facts, PageHeader, Prose, ReadingLayout, SectionHeading, type TocItem } from "@/components/ui";
 import LoreSource from "@/components/LoreSource";
 import { trailFor } from "@/lib/breadcrumbs";
-import { loadNames } from "@/lib/names";
-import { foreverKind, foreverMatch, loreIndexable } from "@/lib/lore-forever";
-import { agreedKind, databaseHref, KIND_LABEL, loreLinkFor } from "@/lib/lore-links";
+import { agreedKind, databaseHref, KIND_LABEL, loreStandingFor } from "@/lib/lore-links";
 import { BROWSE_HEADINGS, BROWSE_TYPES, CONVERSION_NOTE, FACET_KEYS, firstSentence, loreByExtId, loreSlug, parseLoreSlug, renderBody, UNAVAILABLE, UNAVAILABLE_COPY, type BrowseSlug, type LorePage as Lore } from "@/lib/lore";
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
@@ -41,11 +39,6 @@ async function lookup(slug: string): Promise<Lore | null | typeof UNAVAILABLE> {
   return parsed ? loreByExtId(parsed.extId) : null;
 }
 
-/** The Forever database page this copy stands for, by the names players agreed on; names are read only for an NPC, item or quest copy. */
-async function inDatabase(page: Lore) {
-  return foreverKind(page) ? foreverMatch(page, await loadNames()) : null;
-}
-
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await props.params;
   const page = await lookup(slug);
@@ -58,9 +51,9 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
     description,
     alternates: { canonical: url, types: FEED },
     // A Warcraft Wiki copy stays readable (and linked to its original) but out of search, the wiki being the source to
-    // rank, unless it is about something in the Forever database (lib/lore-forever.ts, the rule /lore-sitemap.xml uses).
-    // Everloot's own entries follow the length rule.
-    robots: { index: loreIndexable(page, (await inDatabase(page)) !== null), follow: true },
+    // rank, unless it links its Forever database page (lib/lore-links.ts `loreStanding`, the rule behind the link below
+    // and /lore-sitemap.xml). Everloot's own entries follow the length rule.
+    robots: { index: (await loreStandingFor(page)).index, follow: true },
     openGraph: { type: "article", title: page.name, description, url, siteName: "Everloot", images: [IMAGE] },
     twitter: { card: "summary", title: page.name, description, images: [TWITTER_IMAGE] },
   };
@@ -85,7 +78,7 @@ export default async function LorePage(props: { params: Promise<{ slug: string }
   const infoboxEntries = page.infobox ? Object.entries(page.infobox.fields) : [];
   const trail = [...(typeSlug ? trailFor(`/lore/${typeSlug}`)! : trailFor("/lore")!), { name: page.name, path: `/lore/${loreSlug(page)}` }];
   // The database page for the same thing (lib/lore-links.ts): the one page whose name is exactly this page's.
-  const db = await loreLinkFor(page);
+  const db = (await loreStandingFor(page)).link;
   // The archive has no source headings; link to its text and the metadata sections without inventing story sections.
   const sections: TocItem[] = [
     { id: "lore-text", label: "Article text" },
