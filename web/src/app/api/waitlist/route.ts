@@ -21,7 +21,7 @@ export async function POST(req: Request) {
         { status: 429, headers: { "retry-after": String(quota.retryAfter), "cache-control": "no-store" } });
     }
   } catch {
-    return NextResponse.json({ ok: false, error: "signup unavailable, retry later" }, { status: 503 });
+    return NextResponse.json({ ok: false, error: "signup unavailable, retry later" }, { status: 503, headers: { "retry-after": "60", "cache-control": "no-store" } });
   }
   recordUsage("api.waitlist");
   let body: unknown;

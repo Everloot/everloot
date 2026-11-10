@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const build = new URL(req.url).searchParams.get("build") ?? "";
   if (!BUILD_PATTERN.test(build) || build.length > 32) {
-    return NextResponse.json({ ok: false, error: "build must be a client build such as 1.60.1.70450" }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "build must be a client build such as 1.60.1.70450" }, { status: 400, headers: { "cache-control": "no-store" } });
   }
   let body: string;
   try {

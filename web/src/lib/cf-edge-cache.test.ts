@@ -373,3 +373,10 @@ test("a missing content version disables the cache instead of sharing a made-up 
   expect(rendered).toBe(2);
   expect(store.entries.size).toBe(0);
 });
+
+test("the suggest box shares one cache key for a query however it is cased or padded", () => {
+  const key = (u: string) => edgeCacheKey(new Request(u), "v1").url;
+  expect(key("https://everloot.app/api/suggest?q=Thunder")).toBe(key("https://everloot.app/api/suggest?q=thunder%20"));
+  expect(key("https://everloot.app/api/suggest?q=thunder")).not.toBe(key("https://everloot.app/api/suggest?q=thunderfury"));
+  expect(key("https://everloot.app/search?q=Thunder")).not.toBe(key("https://everloot.app/search?q=thunder"));
+});
