@@ -45,6 +45,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
 
 ### Fixed
+- Site: an Auction House item page and the MCP `auction_history` tool read the daily prices from a file the snapshot
+  cron writes, instead of replaying the whole corpus on each request. The values are the same; with no file yet (the
+  first minutes after a deploy) they read the corpus as before, and with neither readable they still say unrecorded.
 - Site: item list pagination is crawlable while filter URLs stay blocked.
 - Site: /database splits its rows into "Seen by players" and "From the game files", says after launch that a row fills when 3 installs agree, and drops the Guilds lookup row (the Tools menu has it).
 - Knowledge base: a self-hosted MCP server and `coverage-report` read the whole public corpus again. The reader stopped

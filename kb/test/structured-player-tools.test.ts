@@ -3,11 +3,11 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { MCP_TOOLS } from "@everloot/protocol";
 import { afterEach, expect, test } from "vitest";
 import { z } from "zod";
-import { auctionHistory, auctionSightingsFromRecords } from "../src/auction-history.js";
+import { auctionHistories, auctionHistory, auctionHistoryKey, auctionSightingsFromRecords } from "../src/auction-history.js";
 import { collectionFactsFromRecords, collectionGap } from "../src/collection-gap.js";
 import { openDb, type DB } from "../src/db.js";
 import { guildBoard, guildFactsFromRecords } from "../src/guild-board.js";
-import { createKnowledgeServer } from "../src/mcp-server.js";
+import { createKnowledgeServer, type ToolOptions } from "../src/mcp-server.js";
 
 const OUT = {
   auction_history: z.object(MCP_TOOLS.auction_history.outputSchema),
@@ -33,10 +33,10 @@ records.push({ installId: "owner", kind: "collection_owned", collection: "Mounts
 const databases: DB[] = [];
 afterEach(() => { for (const db of databases.splice(0)) db.close(); });
 
-async function client(corpus?: () => Promise<{ records: unknown[]; dataAsOf: string } | null>) {
+async function client(corpus?: () => Promise<{ records: unknown[]; dataAsOf: string } | null>, more: ToolOptions = {}) {
   const db = openDb(":memory:");
   databases.push(db);
-  const server = createKnowledgeServer(db, corpus ? { corpus } : {});
+  const server = createKnowledgeServer(db, { ...(corpus ? { corpus } : {}), ...more });
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   await server.connect(serverSide);
   const c = new Client({ name: "test", version: "0" });
@@ -74,4 +74,30 @@ test("a blank name keeps the text's refusal and a page with nothing agreed; no c
   const off = OUT.auction_history.parse((await (await client()).callTool({ name: "auction_history", arguments: { realm: "Forever", itemId: 5 } })).structuredContent);
   expect(off.connected).toBe(false);
   expect(off).not.toHaveProperty("page");
+});
+
+test("auction_history answers from the site's stored days without reading the corpus, the same as from the corpus", async () => {
+  const stored = new Map(auctionHistories(auctionSightingsFromRecords(records)));
+  const auctionHistory = async (realm: string, itemId: number) => ({ points: stored.get(auctionHistoryKey(realm, itemId)) ?? [], dataAsOf: AS_OF });
+  let corpusReads = 0;
+  const corpus = async () => { corpusReads += 1; return { records, dataAsOf: AS_OF }; };
+  const fromStore = await client(corpus, { auctionHistory });
+  const fromCorpus = await client(async () => ({ records, dataAsOf: AS_OF }));
+  for (const args of [{ realm: "Forever", itemId: 5 }, { realm: " forever ", itemId: 5 }, { realm: "Forever", itemId: 6 }, { realm: " ", itemId: 5 }]) {
+    const a = await fromStore.callTool({ name: "auction_history", arguments: args });
+    const b = await fromCorpus.callTool({ name: "auction_history", arguments: args });
+    expect(a.structuredContent).toEqual(b.structuredContent);
+    expect(a.content).toEqual(b.content);
+  }
+  expect(corpusReads).toBe(0);
+  // No stored file, or one that cannot be read: the corpus answers, and without one the answer stays unavailable.
+  for (const missing of [async () => null, async () => { throw new Error("r2 down"); }]) {
+    const c = await client(corpus, { auctionHistory: missing });
+    const out = OUT.auction_history.parse((await c.callTool({ name: "auction_history", arguments: { realm: "Forever", itemId: 5 } })).structuredContent);
+    expect(out.page!.points).toEqual([{ day: "2026-10-12", copper: 200, reporters: 3 }]);
+  }
+  expect(corpusReads).toBe(2);
+  const down = await client(async () => null, { auctionHistory: async () => null });
+  expect(OUT.auction_history.parse((await down.callTool({ name: "auction_history", arguments: { realm: "Forever", itemId: 5 } })).structuredContent))
+    .toMatchObject({ connected: false, reason: "Public corpus unavailable. These figures are unrecorded, not zero." });
 });
