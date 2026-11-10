@@ -1,15 +1,13 @@
 import { trailFor } from "@/lib/breadcrumbs";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { Metadata } from "next";
 import { Container, PageHeader, SectionHeading } from "@/components/ui";
 import { CURRENT_BUILD } from "@/data/game-data/raid";
 import { CLASSES } from "@/design/tokens";
-import { READING, ROLE_DOES, chooserReviewed, listed, notOffered, optionOffered, optionWeights } from "@/lib/class-chooser";
+import { READING, ROLE_DOES, listed, notOffered, optionOffered, optionWeights } from "@/lib/class-chooser";
 import { ROLES, classLabel, type ClassSlug } from "@/lib/class-context";
-import { guidesDir } from "@/lib/guides";
+import { chooserIndexable, loadChooser } from "@/lib/class-chooser-file";
 import { pageMetadata } from "@/lib/seo";
-import { CHOOSER_FILES, parseClassChooser, type ClassChooserData } from "../../../../../kb/src/guides/class-chooser";
+import type { ClassChooserData } from "../../../../../kb/src/guides/class-chooser";
 import ClassChooser from "./ClassChooser";
 
 // Built once per deploy, like the class hubs: the chooser's files are read from kb/guides while the site builds, and
@@ -29,20 +27,10 @@ const PLURAL: Record<ClassSlug, string> = {
   shaman: "Shaman", mage: "Mages", warlock: "Warlocks", druid: "Druids",
 };
 
-/** The chooser's two files as the site reads them; null when one is missing or breaks a rule, as the guide check refuses it. */
-function loadChooser(): ClassChooserData | null {
-  try {
-    const read = (name: string) => readFileSync(join(guidesDir(), name), "utf8");
-    return parseClassChooser(read(CHOOSER_FILES.roles), read(CHOOSER_FILES.chooser));
-  } catch {
-    return null;
-  }
-}
-
 export async function generateMetadata(): Promise<Metadata> {
   const data = loadChooser();
   // Out of search until both files are reviewed. A result lives in the link's fragment, which is never a page of its own.
-  return { ...pageMetadata({ title: TITLE, description, path: PATH }), robots: { index: data !== null && chooserReviewed(data), follow: true } };
+  return { ...pageMetadata({ title: TITLE, description, path: PATH }), robots: { index: chooserIndexable(data), follow: true } };
 }
 
 /** A file's version and its review, in one sentence. */
@@ -58,7 +46,7 @@ function reviewLine(name: string, f: { version: number; status: string; reviewer
  */
 export default function ChooserPage() {
   const data = loadChooser();
-  const reviewed = data !== null && chooserReviewed(data);
+  const reviewed = chooserIndexable(data);
   return (
     <Container>
       <PageHeader
