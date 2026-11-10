@@ -3,6 +3,7 @@ const { readdirSync, readFileSync } = require("node:fs");
 const path = require("node:path");
 const versions = require("./src/data/build-versions.json");
 const protectedPaths = require("./src/data/protected-paths.json");
+const corsPrerenderedPaths = require("./src/data/cors-prerendered-paths.json");
 
 const reportOnlyCsp = [
   "default-src 'self'",
@@ -189,8 +190,8 @@ const nextConfig = {
       { source: "/rankings/:path*", headers: briefCdnHeaders },
       // The sitemaps set these on their own successful responses (lib/database-sitemap.ts), so their 503s stay uncached.
       // Two public API routes are prerendered, so no handler of theirs runs to set it.
-      { source: "/api/items/categories", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] },
-      { source: "/api/edges/client-layer", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] },
+      // The list is data/cors-prerendered-paths.json, which the API docs page reads for its CORS paragraph.
+      ...corsPrerenderedPaths.map((source) => ({ source, headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] })),
       // The embeddable tooltip script other sites load: an hour in browsers and at the CDN, so a fix reaches them quickly.
       { source: "/tooltips.js", headers: [
         { key: "Cache-Control", value: "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400" },
