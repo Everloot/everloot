@@ -123,3 +123,34 @@ test("a lore page links back to the database page when players agree on its name
   const eagle = renderToStaticMarkup(await LorePage({ params: Promise.resolve({ slug: "7-zul-gurub-eagle" }) }));
   expect(eagle).not.toContain("In the Forever database");
 });
+
+test("the lore sitemap lists exactly the wiki copies that link a Forever database page, and each says index", async () => {
+  vi.stubEnv("KB_SNAPSHOT_PATH", release);
+  const { GET: index } = await import("../lore-sitemap.xml/route");
+  const { GET: chunk } = await import("../lore-sitemap/[n]/route");
+  const { generateMetadata } = await import("../lore/[slug]/page");
+  const urls = (xml: string) => [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => new URL(m[1]!).pathname);
+  expect(urls(await (await index()).text())).toEqual(["/lore-sitemap/0.xml"]);
+  const listed = urls(await (await chunk(new Request("https://everloot.app/"), { params: Promise.resolve({ n: "0.xml" }) })).text());
+  // Thrall the NPC and Return to Sender the quest: players agreed on both names. The NPC copy named Return to Sender
+  // has no agreed NPC of that name, the eagle has no agreed name at all, and the redirect and the stub are thin.
+  expect(listed).toEqual(["/lore/1-thrall", "/lore/5-return-to-sender"]);
+  const robots = async (slug: string) => (await generateMetadata({ params: Promise.resolve({ slug }) })).robots;
+  for (const path of listed) expect(await robots(path.slice("/lore/".length)), path).toMatchObject({ index: true, follow: true });
+  for (const slug of ["4-return-to-sender", "7-zul-gurub-eagle", "3-old-name", "2-stub"]) expect(await robots(slug), slug).toMatchObject({ index: false, follow: true });
+});
+
+test("the lore sitemap answers 503, not a short list, when upload storage or the release cannot be read", async () => {
+  vi.stubEnv("KB_SNAPSHOT_PATH", release);
+  store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], unreachable: true });
+  const { GET: index } = await import("../lore-sitemap.xml/route");
+  const res = await index();
+  expect(res.status).toBe(503);
+  expect(res.headers.get("cache-control")).toBe("no-store");
+  store.loadCorpus.mockResolvedValue({ uploads: 3, records, dataAsOf: "2026-10-09T00:00:00.000Z" });
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  vi.resetModules();
+  vi.stubEnv("KB_SNAPSHOT_PATH", "C:/missing/release.sqlite");
+  const { GET: missing } = await import("../lore-sitemap.xml/route");
+  expect((await missing()).status).toBe(503);
+});

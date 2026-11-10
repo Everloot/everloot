@@ -15,6 +15,11 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: search engines and AI assistants now find more of the site: spell pages that create, cost or teach
+  something or sit in a talent tree, each zone's coverage page once players have confirmed something there, the
+  class chooser once it is reviewed, and the lore pages about an NPC, item or quest players have named in WoW:
+  Forever are in the sitemaps, and llms.txt names every database list, from spells to quest chains. A talent
+  spell's page now shows its class, tree, row and ranks.
 - Site: a dungeon or raid page gains a Loot section after Bosses: for each boss 3 installs report, the loot table of
   its creature, the same rows its NPC page shows, or how many installs have looted it so far. In the list, an instance
   the game files place no entrance for says so beside its id, with the reason on hover.
@@ -35,8 +40,16 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   whether it is required and its description, nested fields included, whether the kind is in the public corpus, where it
   goes, and the cross-field rules the server checks. The sidebar lists them and the schemas table links each kind to its page.
 - Site: the API docs list the site-internal routes, `/api/suggest` and `/api/map/pins`, with a note that they serve the site's pages, may change without notice and are not part of the protocol.
+- Addon: the window's Professions tab has a Crafting costs page: each recipe you have recorded with its reagents' cost
+  at market value (or a cheaper vendor price), the product's value per item and an estimated profit assuming one item
+  per craft, sorted by that estimate or name, with the price file's age. A reagent without a price shows the cost as unknown, never zero. Pick a recipe
+  and a count for a what-to-buy list of reagents and their total.
 - Site: the account guide and the addon page link the sample character page (/showcase/character), so a player can see
   what a character page holds before linking one. The sample stays out of search and the sitemap.
+- Addon: item tooltips show your own history with the item on this realm, from the gold ledger in your saved file:
+  your last sale (day and price per unit), your average sale and units sold over the last 90 days, sales waiting for
+  their mailbox letter, and what you paid where the ledger knows it. An item you never sold says nothing. Three new
+  switches on the settings page turn prices, your history and sources in tooltips on or off; all start on.
 - Site: a profession page answers to its skill line id, `/tools/professions/171` or `/tools/professions/171-alchemy`, and
   redirects for good to the slug page it already had, keeping the skill range and class context in the query; an unknown id
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
@@ -47,6 +60,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   until three installs agree, a "Track this" link to the collections tool and a relation tab ("Reputation from" on a
   faction, "Earned by" on a title) whose empty state names the 3-install rule and says what no game file read so far
   carries; a faction page also shows its lore archive page when the archive has one under the same name.
+- Desktop App: Reports shows your local ledger by day and item, with period, account, character and item filters, cumulative totals and a comparison with the previous period.
 - Site: a class page links the census narrowed to its class and the classes ranking, and the search page with no
   query lists what a search finds (items, NPCs, quests, zones, objects, the lore archive, tools and docs), each
   linked to its list, with four queries to try. Before, the class page stopped at the database links and an empty
@@ -177,6 +191,11 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
+- Docs: a page for addon authors at `/docs/addon-authors`: the licences and the credit line, the records API, a free key and
+  the files as three ways to get the data, a skinning loot recipe in curl, JavaScript and Python, why the site's drop
+  rates leave skinning out, and how to build an offline pack.
+- Site: download shortcuts (`/download`, `/downloads`, `/desktop`, `/curseforge`), CurseForge install choices and a
+  Desktop App button for your operating system make downloads easier to find, including on phones.
 - Site: Zone pages have an Items tab with the items players looted from the NPCs and objects confirmed there, each with its source, observed frequency and installs, and an empty zone says a rate needs loot windows from 3 installs. The header links the zone's coverage page and its wiki page when one is published, and a line under the tabs links the farming and gathering pages that list the zone.
 
 ### Fixed

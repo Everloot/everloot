@@ -538,3 +538,17 @@ details.set-sec[open] > summary { margin-bottom: 12px; }
 }
 
 .overview-grid .sec-head:not(:first-child) { margin-top: 28px; }
+
+/* Local ledger reports use the app's existing controls and table palette. */
+.report-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; margin: 24px 0; }
+.report-controls > label:not(.switch) { display: grid; gap: 6px; flex: 1 1 150px; min-width: 0; }
+.report-controls select { width: 100%; }
+.report-chart { margin: 24px 0; }
+.report-chart figcaption { font-weight: 600; }
+.report-chart svg { width: 100%; height: auto; color: rgb(var(--accent)); }
+.report-chart polyline { fill: none; stroke: currentColor; stroke-width: 2; }
+.report-chart circle { fill: currentColor; }
+.report-chart text { fill: rgb(var(--fg-2)); font: 12px Geist, sans-serif; }
+.report-zero { stroke: rgb(var(--fg-2)); stroke-opacity: .25; }
+.report-table { overflow-x: auto; }
+.report-paging { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
