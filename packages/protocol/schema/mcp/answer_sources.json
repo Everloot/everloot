@@ -20,7 +20,7 @@
       },
       "limit": {
         "default": 8,
-        "description": "Most lore and curated pieces, 1 to 25, default 8.",
+        "description": "Most evidence pieces, 1 to 25, default 8.",
         "type": "integer",
         "minimum": 1,
         "maximum": 25
@@ -99,7 +99,24 @@
           ],
           "additionalProperties": false
         },
-        "description": "Observed first, then curated, then lore."
+        "description": "Answering claims first; within each group observed, curated, game files, then lore. Facts only, capped by limit."
+      },
+      "unavailable": {
+        "description": "No permitted answering evidence for this predicate; message points to the relevant tool. Never an evidence piece.",
+        "type": "object",
+        "properties": {
+          "predicate": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "predicate",
+          "message"
+        ],
+        "additionalProperties": false
       },
       "furtherReading": {
         "type": "array",

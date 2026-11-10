@@ -24,7 +24,7 @@ test("answerability requires the requested predicate, not a name, id or unrelate
 test("a zone identity cannot stand in for its requested level", async () => {
   const db = openDb(":memory:");
   const result = await answerSources(db, { question: "what level is Synthetic Forest", limit: 3 }, null, null, { build: "test", extractedAt: null, facts: [{ name: "Synthetic Forest", kind: "zone", claim: "Synthetic Forest: a zone of Nowhere." }] });
-  expect(result.evidence.at(-1)?.claim).toContain("The requested level is not available from permitted facts");
+  expect(result.unavailable?.predicate).toBe("level");
   expect(result.evidence.some(e => evidenceAnswers("what level is Synthetic Forest", e))).toBe(false);
   db.close();
 });
@@ -56,7 +56,7 @@ test("Thunderfury lore identity earns no acquisition credit", async () => {
   await replaceSourceRows(db, "warcraft-wiki-2023", ["lore_page"], [page("blade", "Thunderfury", ["Sword items"], "Thunderfury is a legendary sword.")]);
   const q = { id: "blade", text: "where does Thunderfury drop", template: "drops-from", subject: { kind: "wiki_item" as const, name: "Thunderfury" }, expects: { resolve: true, evidence: true } };
   const result = await answerSources(db, { question: q.text, limit: 3 }, null, null);
-  expect(result.evidence.at(-1)?.claim).toContain("requested drop source is not available");
+  expect(result.unavailable?.predicate).toBe("drop source");
   const report = await evaluateBank(db, [q], null, { release: "test", dataAsOf: null });
   expect(report.totals).toMatchObject({ withLore: 1, withRealAnswer: 0 });
   db.close();
@@ -88,7 +88,7 @@ test("item-name discovery, realm aliases and history agree across tool handlers"
   expect(market.structured).toMatchObject({ connected: true, page: { realm, realmStatus: "alias", history: [{ day, market: 30 }] } });
   expect(history.structured).toMatchObject({ connected: true, page: { realm, realmStatus: "alias", scanDays: [{ day, market: 30 }] } });
   const answer = object(await tools.answer_sources({ question: "what is the price of Synthetic Cloth", limit: 3 }));
-  expect(answer.text).toContain("requested price is not available from permitted facts");
+  expect(answer.text).toContain("answer_sources has no permitted evidence for the requested price");
   db.close();
 });
 

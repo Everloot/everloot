@@ -630,10 +630,11 @@ export const MCP_TOOLS = {
         description: "Returns cited evidence for a natural-language WoW: Forever question: observed, curated, game-file and 2023 Warcraft Wiki claims, each with source URL, licence and date. Start here for why, where or how many. Check that a claim contains the requested fact: a subject mention alone is not an answer. Observations need three agreeing installs; files stay unconfirmed with their build; archive lore may differ in Forever. If the requested fact is absent, say unrecorded rather than importing Classic or retail knowledge. For names use search_knowledge, then the hit's verified gameId with item_page, npc_page or quest_page. Further-reading URLs are search links, not fetched evidence. Disconnected observations are unrecorded, not zero.",
         inputSchema: {
             question: z.string().min(1).max(500).describe("The question, 1 to 500 characters, with names spelled as in the game."),
-            limit: z.number().int().min(1).max(25).default(8).describe("Most lore and curated pieces, 1 to 25, default 8."),
+            limit: z.number().int().min(1).max(25).default(8).describe("Most evidence pieces, 1 to 25, default 8."),
         },
         outputSchema: {
-            evidence: z.array(evidence).describe("Observed first, then curated, then lore."),
+            evidence: z.array(evidence).describe("Answering claims first; within each group observed, curated, game files, then lore. Facts only, capped by limit."),
+            unavailable: z.object({ predicate: z.string(), message: z.string() }).optional().describe("No permitted answering evidence for this predicate; message points to the relevant tool. Never an evidence piece."),
             furtherReading: z.array(z.object({ site: z.string(), url: z.string() })).describe("Search links on other sites. Nothing was fetched."),
             dataAsOf: z.string().nullable().describe("When the observed layer was current; null when it is not connected."),
         },

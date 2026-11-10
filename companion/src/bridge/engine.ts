@@ -71,7 +71,7 @@ export interface Piece { claim: string; kind: string; source: { url: string; tit
  * answer_sources for one question: the text a model reads, the pieces as the tool structured them, and whether no page
  * held every asked word (the tool says so only in its text, so its pieces are the closest pages, not an answer).
  */
-export interface Sourced { text: string; evidence: Piece[]; someWords?: boolean }
+export interface Sourced { text: string; evidence: Piece[]; someWords?: boolean; unavailable?: { predicate: string; message: string } }
 
 /** The first line answer_sources writes when no page held every asked word (kb/src/search.ts, SOME_WORDS). */
 export const SOME_WORDS = "No page has every word you asked for. Pages with some of them:";
@@ -116,7 +116,7 @@ export function sourceLines(sourced: Sourced): string {
 }
 
 /**
- * The first piece and its source line. answer_sources orders them observed, curated, game files, then the 2023 wiki,
+ * The first piece and its source line. answer_sources puts answering claims first, then orders observed, curated, game files and the 2023 wiki,
  * and the first three answer names the question carries, so the first piece is the most direct one. When no page held
  * every word, the answer says it is only the closest page. No piece means no answer: nothing unsourced reaches the game.
  */

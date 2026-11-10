@@ -6,13 +6,13 @@ import type { ReleaseSource } from "./release-db.js";
 import { allTerms, contentTerms, respell, search, searchSomeWords, SOME_WORDS, type Respelling, type SearchHit } from "./search.js";
 import { agreedNpcNames, npcPage, WORLD_AGREEMENT, worldFactsFromRecords, type WorldFacts } from "./world-pages.js";
 import type { RecheckScope } from "./coverage.js";
-import { claimAnswers, requestedPredicate, filesEvidence, filesNameWords, type FilesIndex } from "./files-evidence.js";
+import { claimAnswers, claimSubject, requestedPredicate, filesEvidence, filesNameWords, type FilesIndex } from "./files-evidence.js";
 
 /**
  * answer_sources: the evidence behind a question, every piece with its source, licence and date, so
  * the client's model writes the answer and cites the pieces (docs/design/specs/2026-10-17-sourced-answers-design.md).
- * Observed facts come first (players' uploads, public after three installs agree), then curated facts
- * and the 2023 Warcraft Wiki. Nothing is fetched from other sites: the further-reading links are
+ * Answering claims come first; within each group, observed facts (three agreeing installs), curated facts,
+ * game files and the 2023 Warcraft Wiki. Nothing is fetched from other sites: the further-reading links are
  * search URLs built from the names in the question.
  */
 
@@ -38,6 +38,7 @@ export interface AnswerSourcesFacts { items: ItemFacts; world: WorldFacts }
 
 export interface AnswerSources {
   evidence: Evidence[];
+  unavailable?: { predicate: string; message: string };
   furtherReading: FurtherReading[];
   dataAsOf: string | null;
   /** Set when no page held every asked word and the lore is the pages with some of them; said in the text only. */
@@ -102,7 +103,7 @@ const pct = (rate: number) => `${Math.round(rate * 1000) / 10}%`;
 /** Archive gameplay statements cannot establish Forever predicates. */
 export function evidenceAnswers(question: string, evidence: Evidence): boolean {
   if (/not available from permitted facts/i.test(evidence.claim)) return false;
-  if (requestedPredicate(question)) return evidence.kind !== "lore" && claimAnswers(question, evidence.claim) && (evidence.kind !== "curated" || mentions(question, evidence.source.title));
+  if (requestedPredicate(question, [evidence.source.title, claimSubject(question, evidence.claim)])) return evidence.kind !== "lore" && claimAnswers(question, evidence.claim) && (evidence.kind !== "curated" || mentions(question, evidence.source.title));
   // Identity questions still need the named subject, rather than a search fallback mention.
   return /^(?:who|what) is\b|^qu[ié]+n es\b|^qu[eé] es\b/i.test(question.trim()) && (mentions(question, evidence.source.title) || mentions(question, evidence.claim.split(":")[0]!));
 }
@@ -266,15 +267,14 @@ export async function answerSources(
   const evidence = [
     ...observed, ...curated.filter((e) => fill.has(e)), ...answers, ...fromFiles, ...lore.filter((e) => fill.has(e)), ...places.slice(0, room), ...gaps,
   ];
-  if (requestedPredicate(asked)) evidence.sort((a, b) => Number(evidenceAnswers(asked, b)) - Number(evidenceAnswers(asked, a)));
-  const predicate = requestedPredicate(asked);
-  if (predicate && !evidence.some((e) => evidenceAnswers(asked, e))) {
-    // Keep the wire shape stable. This is a limitation statement, never a gameplay value.
-    evidence.push({ claim: `The requested ${predicate} is not available from permitted facts for this question. Subject matches are context only.`, kind: "curated", source: { title: "Everloot data policy", url: `${SITE}/methodology` }, licence: LICENCE, asOf: null });
-  }
+  const predicate = requestedPredicate(asked, [...(files?.facts.map((f) => f.name) ?? []), ...found.map((h) => h.name), ...observed.map((e) => claimSubject(asked, e.claim))]);
+  if (predicate) evidence.sort((a, b) => Number(evidenceAnswers(asked, b)) - Number(evidenceAnswers(asked, a)));
+  evidence.splice(args.limit);
+  const unavailable = predicate && !evidence.some((e) => evidenceAnswers(asked, e))
+    ? { predicate, message: unavailableMessage(predicate) } : undefined;
   // Observed and files facts answer the question's own names, so only an answer of fallback pages alone is marked.
   return {
-    evidence, furtherReading: furtherReading(asked), dataAsOf,
+    evidence, ...(unavailable ? { unavailable } : {}), furtherReading: furtherReading(asked), dataAsOf,
     ...(some && named === 0 ? { someWords: true as const } : {}),
     ...(respelled.length ? { respelled } : {}),
   };
@@ -292,15 +292,13 @@ const KIND_LABEL: Record<EvidenceKind, string> = { observed: "observed in play",
 /** `corpus`: true when player observations were read, false when none are connected, "unreachable" when the read failed. */
 export function formatAnswerSources(result: AnswerSources, corpus: boolean | "unreachable"): string {
   const lines: string[] = [];
-  const unavailable = result.evidence.find((e) => /not available from permitted facts/i.test(e.claim));
   if (result.someWords) lines.push(SOME_WORDS);
   else if (result.respelled?.length) lines.push(respelledLine(result.respelled));
-  if (unavailable) lines.push(unavailable.claim);
+  if (result.unavailable) lines.push(result.unavailable.message);
   if (result.evidence.length === 0) lines.push("No evidence found for that question. Nothing here is invented: try other words or an exact name.");
   if (result.evidence.some((e) => e.kind === "lore")) lines.push("Archive lore is historical context, not confirmation of Forever gameplay. Do not infer recorded gameplay facts from it. Game-file facts remain unconfirmed; missing observations remain unrecorded.");
   const pages = new Set<string>();
   for (const e of result.evidence) {
-    if (e === unavailable) continue;
     const support = e.support !== undefined ? `, ${e.support} installs` : "";
     lines.push(`- [${KIND_LABEL[e.kind]}${support}] ${e.claim}\n  Source: ${e.source.url} (${e.licence}${e.asOf ? `, as of ${e.asOf.slice(0, 10)}` : ""})`);
     // A lore piece's source is the wiki; its page on the site is listed beside it, once per page (the bosses of one
@@ -314,4 +312,17 @@ export function formatAnswerSources(result: AnswerSources, corpus: boolean | "un
   else if (!corpus) lines.push("Player observations are not connected here, so the observed layer is unrecorded, not empty.");
   if (result.furtherReading.length) lines.push(`Further reading (links only, nothing fetched): ${result.furtherReading.map((l) => `${l.site} ${l.url}`).join(" | ")}`);
   return lines.join("\n");
+}
+
+const PREDICATE_TOOLS: Record<string, string> = {
+  price: "observed prices come from market_value / auction_history",
+  history: "observed price history comes from auction_history / market_value",
+  vendor: "observed vendors come from vendor_page",
+  "drop source": "observed drop sources come from item_page",
+  level: "zone records come from get_entity; NPC levels come from npc_page",
+  acquisition: "item acquisition comes from item_page / vendor_page; mount and achievement records come from get_entity",
+  "riding skill": "mount records come from get_entity",
+};
+function unavailableMessage(predicate: string): string {
+  return `answer_sources has no permitted evidence for the requested ${predicate}; ${PREDICATE_TOOLS[predicate] ?? "discover the record with search_knowledge and read it with get_entity"}. Subject matches are context only.`;
 }

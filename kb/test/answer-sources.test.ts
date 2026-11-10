@@ -74,7 +74,7 @@ test("a position names its zone when the game files have it, and keeps the map i
   expect(unnamed.evidence.find((e) => e.claim.startsWith("Forest Spider was seen"))!.claim).toBe("Forest Spider was seen on map 141 at 41, 61.");
 });
 
-test("a name with nothing agreed yet is noted after every piece that answers, and never takes an answer's place", async () => {
+test("an unrecorded name never displaces factual evidence within the limit", async () => {
   // Three installs agree on the item's name, and none has looted it: a known item with no drop source yet.
   const records: unknown[] = ["install-a", "install-b", "install-c"].map((installId, i) => (
     { ...base, installId, eventId: `hammer-${i}`, kind: "item_seen", itemId: 17182, name: "Doomhammer", quality: "legendary" }
@@ -83,8 +83,7 @@ test("a name with nothing agreed yet is noted after every piece that answers, an
   expect(parsed.receipt.rejected).toEqual([]);
   const result = await answerSources(await seed(), { question: "Did Thrall carry the Doomhammer?", limit: 2 }, answerSourcesFactsFromRecords(parsed.records), null);
   expect(result.evidence.slice(0, 2).map((e) => e.kind).sort()).toEqual(["curated", "lore"]);
-  expect(result.evidence).toHaveLength(3);
-  expect(result.evidence[2]).toMatchObject({ kind: "observed", claim: expect.stringContaining("Doomhammer is a known item; no drop source has reached three installs yet") });
+  expect(result.evidence).toHaveLength(2);
 });
 
 test("nothing found is said plainly, never invented; without the corpus, lore still answers and the text says observations are unrecorded", async () => {
@@ -122,7 +121,8 @@ test.each(["Which bosses are in Deadmines?", "¿Qué jefes hay en Deadmines?"])(
   const files = { build: "test-build", extractedAt: null, facts: [{ kind: "instance" as const, name: "Deadmines", claim: "The files name a dungeon encounter." }] };
   const answer = await answerSources(db, { question, limit: 8 }, null, null, files);
   expect(answer.evidence.filter((piece) => piece.kind === "lore").map((piece) => piece.source.title)).toEqual(["Deadmines"]);
-  expect(answer.evidence.at(-1)?.claim).toContain("requested bosses is not available");
+  expect(answer.evidence[0].kind).toBe("files");
+  expect(answer.unavailable?.predicate).toBe("bosses");
   expect(formatAnswerSources(answer, false)).toContain("Archive lore is historical context");
   db.close();
 });
@@ -135,6 +135,37 @@ test("question and game-name words do not introduce unrelated archive or curated
   ]);
   await replaceSourceRows(db, "curated", ["lore_page"], [row("launch", "Forever launch", "Forever launches on a stated date.")]);
   const answer = await answerSources(db, { question: "What drops from Edwin VanCleef in Forever?", limit: 8 }, null, null);
-  expect(answer.evidence.map((piece) => piece.source.title)).toEqual(["Edwin VanCleef", "Everloot data policy"]);
+  expect(answer.evidence.map((piece) => piece.source.title)).toEqual(["Edwin VanCleef"]);
+  db.close();
+});
+
+test("unavailable is separate from evidence and preserves the empty answer", async () => {
+  const db = openDb(":memory:");
+  const answer = await answerSources(db, { question: "price of Synthetic Missing", limit: 1 }, null, null);
+  expect(answer.evidence).toEqual([]);
+  expect(answer).toMatchObject({ unavailable: { predicate: "price", message: expect.stringContaining("market_value / auction_history") } });
+  expect(formatAnswerSources(answer, false)).toContain("No evidence found");
+  expect(formatAnswerSources(answer, false)).toContain("answer_sources has no permitted evidence");
+  db.close();
+});
+
+test("observed facts and missing predicates both respect a one-piece limit", async () => {
+  const result = await answerSources(await seed(), { question: "price of Peacebloom and Forest Spider", limit: 1 }, facts(), null);
+  expect(result.evidence).toHaveLength(1);
+  expect(result.evidence.every((e) => e.source.title !== "Everloot data policy")).toBe(true);
+  expect(result.unavailable?.predicate).toBe("price");
+});
+
+test.each([
+  ["how do I get Synthetic Horse", "Synthetic Horse", "a mount, taught by spell 42", "mount"],
+  ["¿Cómo consigo Synthetic Medal?", "Synthetic Medal", "an achievement, criteria 3", "achievement"],
+  ["what is Hidden: BETA Survey - Level 30", "Hidden: BETA Survey - Level 30", "an achievement, criteria 3", "achievement"],
+  ["what level do I need to ride Synthetic Horse", "Synthetic Horse", "a mount, riding skill 75", "mount"],
+])("answer_sources does not mark available or unasked predicates unavailable: %s", async (question, name, description, kind) => {
+  const db = openDb(":memory:");
+  const result = await answerSources(db, { question, limit: 1 }, null, null, { build: "test", extractedAt: null, facts: [{ kind: kind as "mount" | "achievement", name, claim: `${name}: ${description}.` }] });
+  expect(result.evidence).toHaveLength(1);
+  expect(result.evidence[0].kind).toBe("files");
+  expect(result.unavailable).toBeUndefined();
   db.close();
 });

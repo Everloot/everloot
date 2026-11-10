@@ -228,3 +228,14 @@ templates and stable ids and round trip, wiki subjects by category with the firs
 search / none / n/a, and the report's totals, gap lists and markdown. `kb/test/answer-key.test.ts`: each template's
 facts, field and build from synthetic files, no answer for a missing field or file, and the diff's changed, added and
 removed lists with reordered facts not counted.
+
+### Answerability metrics
+
+The offline evaluator separates retrieval from answering. `withEvidence` counts questions with any factual
+evidence; `withObserved`, `withFiles` and `withLore` count questions retrieving each kind independently.
+`withRealAnswer` requires a claim bearing the requested predicate, plus every answer-key fact when keyed.
+`keyFound` counts keyed questions whose answering claims contain all key facts; its denominator is `withKey`.
+Source titles and `unavailable` notices earn no answering or key credit. Lore cannot establish current Forever
+gameplay. Unsupported question shapes earn no real-answer credit. These are deterministic retrieval and
+answerability checks, not model accuracy or tool-selection scores. Compare frozen banks with identical
+release, files, observation connection and limit; distinguish scorer changes from retrieval changes.

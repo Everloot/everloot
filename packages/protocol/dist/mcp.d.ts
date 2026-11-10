@@ -1689,6 +1689,10 @@ export declare const MCP_TOOLS: {
                 support: z.ZodOptional<z.ZodNumber>;
                 url: z.ZodOptional<z.ZodString>;
             }, z.core.$strip>>;
+            readonly unavailable: z.ZodOptional<z.ZodObject<{
+                predicate: z.ZodString;
+                message: z.ZodString;
+            }, z.core.$strip>>;
             readonly furtherReading: z.ZodArray<z.ZodObject<{
                 site: z.ZodString;
                 url: z.ZodString;
@@ -3711,6 +3715,10 @@ export declare const MCP_TOOL_LIST: ({
             asOf: z.ZodNullable<z.ZodString>;
             support: z.ZodOptional<z.ZodNumber>;
             url: z.ZodOptional<z.ZodString>;
+        }, z.core.$strip>>;
+        readonly unavailable: z.ZodOptional<z.ZodObject<{
+            predicate: z.ZodString;
+            message: z.ZodString;
         }, z.core.$strip>>;
         readonly furtherReading: z.ZodArray<z.ZodObject<{
             site: z.ZodString;
