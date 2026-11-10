@@ -86,3 +86,20 @@ test("once checks confirm a reading, the files' range prints with where it came 
   expect(itemTipText({ ...cutlass, w: undefined }, checked).why).toEqual([WHY.damage]);
   expect(itemTipText({ ...cutlass, w: { ...cutlass.w!, ds: 9 } }, checked).lines).toContain("[?] - [?] Damage · Speed 2.20");
 });
+
+import { siteItemFacts, type ItemFactRow } from "../../../kb/src/item-facts";
+import { renderToStaticMarkup } from "react-dom/server";
+import { createElement } from "react";
+import TooltipLines from "@/components/ui/TooltipLines";
+
+test.each([0, 1, 2, 3])("%i distinct reporters render unknown, unconfirmed or confirmed", (count) => {
+  const rows: ItemFactRow[] = Array.from({ length: count }, (_, i) => ({ installId: `private-${i}`, itemId: 9, fact: "armor", value: 565, clientBuild: "1.60.1.70450" }));
+  const state = siteItemFacts([...rows, ...rows]);
+  const tip = withReported(itemTipText({ ...shard0["9"], c: 4, sc: 4, s: 1 }), state);
+  const lines = [...tip.lines, ...tip.why];
+  expect(tip.lines).toContain(count === 0 ? "[?] Armor" : count === 3 ? "565 Armor" : `565 Armor (unconfirmed, seen by ${count} ${count === 1 ? "player" : "players"})`);
+  expect(JSON.stringify(state)).not.toContain("private-");
+  const html = renderToStaticMarkup(createElement(TooltipLines, { lines }));
+  expect(html.includes('href="/addon"')).toBe(count === 1 || count === 2);
+  expect(state.shown.length).toBe(count === 3 ? 1 : 0);
+});

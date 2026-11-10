@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { WorldFacts } from "../../../../../../kb/src/world-pages";
 
-const mocks = vi.hoisted(() => ({ world: vi.fn(), rollup: vi.fn(), items: vi.fn() }));
+const mocks = vi.hoisted(() => ({ world: vi.fn(), rollup: vi.fn(), items: vi.fn(), wiki: vi.fn() }));
 vi.mock("@/lib/rollup-compute", () => ({
   loadWorldFacts: mocks.world, computeRollups: mocks.rollup, loadItemFacts: mocks.items,
   loadLootTables: async () => ({ tables: { sources: new Map(), leftOut: 0 }, dataAsOf: null }),
@@ -11,7 +11,8 @@ vi.mock("@/lib/game-assets", () => ({ loadSiteAssets: async () => null, loadItem
 vi.mock("@/lib/lore", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/lore")>()), loreForEntity: async () => null }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
 
-import NpcPage from "./page";
+vi.mock("@/lib/wiki-entity-names", async (original) => ({ ...await original<typeof import("@/lib/wiki-entity-names")>(), loadWikiEntityNames: mocks.wiki }));
+import NpcPage, { generateMetadata } from "./page";
 import VendorPage from "../../vendors/[id]/page";
 
 const at = "2026-11-08T12:00:00Z";
@@ -29,6 +30,7 @@ afterEach(() => vi.restoreAllMocks());
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.wiki.mockResolvedValue(null);
   vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-11-10T12:00:00Z"));
   facts = {
     npcs: installs.map((installId) => ({ installId, npcId: 1125, name: installId, mapId: 0, x: 0, y: 0, level: 55, reaction: "friendly", creatureType: "Humanoid", rank: "normal", capturedAt: at })),
@@ -169,4 +171,17 @@ test("zone rechecks reset goods and quest relations at the NPC's reported zone",
   const out = await html();
   expect(panel(out, "goods")).toContain('data-agreement="0"');
   expect(panel(out, "quests")).toContain('data-agreement="0"');
+});
+
+test("NPC wiki fallback names the heading, breadcrumbs, metadata and JSON-LD, with the item source label", async () => {
+  mocks.wiki.mockResolvedValue({ version: "x", names: new Map([[1125, { name: "Hogger", wikiPage: "https://warcraft.wiki.gg/wiki/Hogger" }]]) });
+  const out = await html();
+  expect(out).toContain('title="Name from the Warcraft Wiki"');
+  expect(out).toContain('"name":"Hogger"');
+  expect(out).toMatch(/<h1[^>]*>.*Hogger/);
+  expect((await generateMetadata({ params: Promise.resolve({ id: "1125" }) })).title).toContain("Hogger");
+  facts.npcs = facts.npcs.map((r) => ({ ...r, name: "Player name" }));
+  const agreed = await html();
+  expect(agreed).toMatch(/<h1[^>]*>Player name<\/h1>/);
+  expect(agreed).not.toContain('title="Name from the Warcraft Wiki"');
 });

@@ -1,7 +1,7 @@
 import type { AddonRollup, AddonTrend } from "../../../kb/src/addon-rollup";
 import { censusFromRows, type CensusView } from "../../../kb/src/census";
 import type { Edge } from "../../../kb/src/edges";
-import { itemFactProgress, reportedItemFacts, type ItemFactProgress, type ItemFactState } from "../../../kb/src/item-facts";
+import { itemFactProgress, siteItemFacts, type ItemFactProgress, type ItemFactState } from "../../../kb/src/item-facts";
 import type { ItemFacts } from "../../../kb/src/item-page";
 import type { InstanceFacts } from "../../../kb/src/instances";
 import type { LootTables } from "../../../kb/src/loot-tables";
@@ -92,7 +92,7 @@ export async function loadInstanceFacts(): Promise<InstanceFacts & { sightings: 
 export async function loadReportedItemFacts(itemId: number): Promise<ItemFactState & { progress?: ItemFactProgress[]; unreachable: boolean }> {
   const agg = await loadAggregates();
   if (!agg) return { shown: [], contested: [], unreachable: true };
-  return { ...reportedItemFacts(agg.itemFacts.get(itemId), agg.dataAsOf ? new Date(agg.dataAsOf) : new Date()), progress: itemFactProgress(agg.itemFacts.get(itemId)), unreachable: false };
+  return { ...siteItemFacts(agg.itemFacts.get(itemId), agg.dataAsOf ? new Date(agg.dataAsOf) : new Date()), progress: itemFactProgress(agg.itemFacts.get(itemId)), unreachable: false };
 }
 
 /** `loadReportedItemFacts` for every item with an agreed or a disputed line, for the cron's stored item view. */
@@ -102,8 +102,8 @@ export async function loadAllReportedItemFacts(read?: Corpus): Promise<{ reporte
   const asOf = agg.dataAsOf ? new Date(agg.dataAsOf) : new Date();
   const reported = new Map<number, ItemFactState>();
   for (const [itemId, rows] of agg.itemFacts) {
-    const state = reportedItemFacts(rows, asOf);
-    if (state.shown.length || state.contested.length) reported.set(itemId, state);
+    const state = siteItemFacts(rows, asOf);
+    if (state.shown.length || state.contested.length || state.unconfirmed?.length) reported.set(itemId, state);
   }
   return { reported, unreachable: false };
 }

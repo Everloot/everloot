@@ -165,7 +165,7 @@ export default function Footer() {
 export function SiteCredit() {
   return (
     <p data-site-credit>
-      Game data and art &copy; Blizzard Entertainment · Everloot data CC BY-SA 4.0 · Item and quest names from the Warcraft Wiki
+      Game data and art &copy; Blizzard Entertainment · Everloot data CC BY-SA 4.0 · Item, quest, NPC and spell names from the Warcraft Wiki
       (CC BY-SA 4.0) · <Link href="/methodology#credits" className="text-fg-2 underline underline-offset-4 hover:text-accent transition-colors">Credits</Link>
     </p>
   );

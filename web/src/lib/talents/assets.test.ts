@@ -149,7 +149,7 @@ const SHOWS_ART = new Set([
   // The item lists' stored view: the same shown names as shown-item-names.ts, read from the cron's file instead of the corpus.
   "web/src/lib/item-view.ts",
   // The same names and quest titles for the entity tokens on a wiki page.
-  "web/src/lib/wiki-names.ts",
+  "web/src/lib/wiki-names.ts", "web/src/lib/wiki-entity-names.ts",
   // Dungeon wiki pages show loading-screen art under the approved page-banner extension.
   "web/src/app/wiki/[slug]/page.tsx", "web/src/app/wiki/dungeon-facts.tsx",
   // The coverage score's expected counts (coverage-expected.json, counts only) sit beside the names in the private bucket.

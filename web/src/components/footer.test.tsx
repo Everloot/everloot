@@ -63,7 +63,7 @@ test("states the code and data licences", () => {
 });
 
 test("one site-wide credit line, linked to the full credits on /methodology", () => {
-  expect(text()).toContain("Game data and art © Blizzard Entertainment · Everloot data CC BY-SA 4.0 · Item and quest names from the Warcraft Wiki (CC BY-SA 4.0) · Credits");
+  expect(text()).toContain("Game data and art © Blizzard Entertainment · Everloot data CC BY-SA 4.0 · Item, quest, NPC and spell names from the Warcraft Wiki (CC BY-SA 4.0) · Credits");
   expect(html()).toMatch(/<p data-site-credit[^>]*>[\s\S]*href="\/methodology#credits"[\s\S]*<\/p>/);
 });
 

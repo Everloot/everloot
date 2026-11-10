@@ -1,3 +1,4 @@
+import { loadWikiEntityNames, shownEntityName } from "@/lib/wiki-entity-names";
 import { notFound } from "next/navigation";
 import { npcNameReporters, npcPage } from "../../../../../../kb/src/world-pages";
 import { AGREEMENT_NEEDED } from "@/components/ui/AgreementMeter";
@@ -16,10 +17,11 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   if (!/^[1-9]\d*$/.test(id)) notFound();
   const npcId = Number(id);
   const [facts, rollup] = await Promise.all([loadWorldFacts(), computeRollups()]);
-  if (unknownNpc(npcId, facts, rollup)) notFound();
+  const wiki = await loadWikiEntityNames("npc");
+  if (unknownNpc(npcId, facts, rollup) && !wiki?.names.has(npcId)) notFound();
   const page = npcPage(npcId, facts);
   return renderEntityCard({
-    title: !facts.unreachable && page.name ? page.name : `NPC ${npcId}`,
+    title: shownEntityName(npcId, facts.unreachable ? null : page.name, wiki).name ?? `NPC ${npcId}`,
     type: "NPC",
     omitZero: true,
     installs: facts.unreachable ? null : page.name ? AGREEMENT_NEEDED : npcNameReporters(npcId, facts),

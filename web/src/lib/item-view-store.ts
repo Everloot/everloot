@@ -97,6 +97,7 @@ const SOURCE_SLUGS = new Set<string>(SOURCES.map((s) => s.slug));
 const FACT_NAMES = new Set<string>(ITEM_FACTS);
 const isFactState = (v: unknown): v is ItemFactState => {
   const s = v as Partial<ItemFactState> | null;
+  if (s?.unconfirmed !== undefined && (!Array.isArray(s.unconfirmed) || !s.unconfirmed.every((f) => f && FACT_NAMES.has(f.fact) && Number.isFinite(f.value) && Number.isInteger(f.reporters) && f.reporters >= 1 && f.reporters <= 2 && typeof f.build === "string" && (f.lastSeen === null || typeof f.lastSeen === "string")))) return false;
   return Boolean(s) && Array.isArray(s!.contested) && s!.contested.every((f) => FACT_NAMES.has(f)) && Array.isArray(s!.shown) && s!.shown.every((f) =>
     Boolean(f) && FACT_NAMES.has(f.fact) && Number.isFinite(f.value) && Number.isInteger(f.reporters) && typeof f.build === "string" && (f.lastSeen === null || typeof f.lastSeen === "string"));
 };

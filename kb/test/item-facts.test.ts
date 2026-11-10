@@ -106,3 +106,21 @@ describe("item facts players report", () => {
     expect(reportedItemFacts(undefined)).toEqual({ shown: [], contested: [] });
   });
 });
+
+import { siteItemFacts } from "../src/item-facts.js";
+test.each([0, 1, 2, 3])("site values with %i reporters keep confirmation and privacy separate", (count) => {
+  const rows = Array.from({ length: count }, (_, i) => ({ installId: `secret-${i}`, itemId: 1, fact: "armor" as const, value: 565, clientBuild: "1.60.1.70450" }));
+  const state = siteItemFacts([...rows, ...rows]);
+  expect(state.shown.length).toBe(count === 3 ? 1 : 0);
+  expect(state.unconfirmed?.[0]?.reporters ?? 0).toBe(count === 1 || count === 2 ? count : 0);
+  expect(JSON.stringify(state)).not.toContain("secret-");
+  expect(reportedItemFacts(rows).shown.length).toBe(count === 3 ? 1 : 0);
+});
+test("conflicting partial numbers and older confirmed builds are not replaced with a candidate", () => {
+  const row = { installId: "a", itemId: 1, fact: "armor" as const, value: 100, clientBuild: "1.60.1.70450" };
+  expect(siteItemFacts([row, { ...row, installId: "b", value: 101 }]).unconfirmed).toBeUndefined();
+  const agreed = ["a", "b", "c"].map((installId) => ({ ...row, installId }));
+  const state = siteItemFacts([...agreed, { ...row, value: 102, clientBuild: "1.60.2.70450" }]);
+  expect(state.shown[0]?.value).toBe(100);
+  expect(state.unconfirmed).toBeUndefined();
+});

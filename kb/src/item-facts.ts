@@ -37,6 +37,8 @@ export interface ReportedFact {
 }
 
 export interface ItemFactState {
+  /** Website-only candidates; never treated as confirmed or accompanied by install identities. */
+  unconfirmed?: ReportedFact[];
   /** Agreed numbers, in `ITEM_FACTS` order (the game's: armour, block, damage, stats, resistances). */
   shown: ReportedFact[];
   /** Lines 3 or more installs reported without agreeing on one number, in the same order. */
@@ -132,4 +134,26 @@ export function reportedItemFacts(rows: readonly ItemFactRow[] | undefined, asOf
     }
   }
   return state;
+}
+
+/** Partial tooltip reports for the site. Confirmed and contested builds keep the existing decision. */
+export function siteItemFacts(rows: readonly ItemFactRow[] | undefined, asOf: Date = new Date()): ItemFactState {
+  const state = reportedItemFacts(rows, asOf);
+  const unconfirmed: ReportedFact[] = [];
+  for (const progress of itemFactProgress(rows)) {
+    const votes = new Map<string, ItemFactRow>();
+    for (const row of rows ?? []) {
+      if (row.fact !== progress.fact || row.clientBuild !== progress.build) continue;
+      const prior = votes.get(row.installId);
+      if (!prior || time(row) >= time(prior)) votes.set(row.installId, row);
+    }
+    const values = new Map<string, ItemFactRow[]>();
+    for (const row of votes.values()) values.set(key(row.value), [...(values.get(key(row.value)) ?? []), row]);
+    // Disagreeing partial reports have no single value to show.
+    if (values.size !== 1) continue;
+    const agreeing = [...values.values()][0]!;
+    unconfirmed.push({ fact: progress.fact, value: Number(key(agreeing[0]!.value)), reporters: agreeing.length,
+      build: progress.build, lastSeen: latest(agreeing, asOf) });
+  }
+  return unconfirmed.length ? { ...state, unconfirmed } : state;
 }

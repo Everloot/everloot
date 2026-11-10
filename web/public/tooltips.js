@@ -1,6 +1,4 @@
-/*! Everloot tooltips (AGPL-3.0-only). <script src="https://everloot.app/tooltips.js" async></script>
- * Hover or focus a link to an everloot.app item, NPC, quest or object page to see its card. No cookies, no
- * tracking: one GET to the script's own site per link, sent without cookies or referrer. See everloot.app/connect. */
+/*! Everloot tooltips, AGPL-3.0-only. No cookies or tracking. */
 (function () {
   "use strict";
   var D = document, W = window;
@@ -99,6 +97,14 @@
     body.appendChild(title);
     for (i = 0; i < (d.lines || []).length; i++) {
       line = String(d.lines[i]);
+      if (line === "Help confirm these values: install the addon at /addon.") {
+        a = el("a", "", "Help confirm these values: install the addon.");
+        a.href = ORIGIN + "/addon";
+        a.target = "_blank";
+        a.rel = "noopener";
+        body.appendChild(a);
+        continue;
+      }
       body.appendChild(el("div", line.charAt(0) === '"' ? "y" : "", line));
     }
     head.appendChild(body);
