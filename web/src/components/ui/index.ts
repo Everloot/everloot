@@ -29,4 +29,5 @@ export { default as Segmented, type SegmentedOption } from "./Segmented";
 export { default as Tabs, tabFromHash, type TabItem } from "./Tabs";
 export { default as ReadingLayout, RailFacts, type TocItem } from "./ReadingLayout";
 export { default as TooltipFrame, type TooltipFrameProps } from "./TooltipFrame";
+export { default as TooltipLines } from "./TooltipLines";
 export { QUALITY_LABEL, QUALITY_TEXT, qualityOf, type Quality } from "./quality";

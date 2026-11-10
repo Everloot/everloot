@@ -16,7 +16,7 @@ import { itemSourceValue } from "./item-source";
 import { RelationTarget, SameIcon } from "@/components/EntityRelations";
 import { pinLink } from "@/lib/world-map";
 import { gameNameFor, loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
-import { Badge, Container, DataTable, EvidenceLine, Facts, InShort, OpenData, QUALITY_TEXT, Tabs, TooltipFrame, qualityOf, reportedLabel, type Column, type Fact, type TabItem } from "@/components/ui";
+import { Badge, Container, DataTable, EvidenceLine, Facts, InShort, OpenData, QUALITY_TEXT, Tabs, TooltipFrame, TooltipLines, qualityOf, reportedLabel, type Column, type Fact, type TabItem } from "@/components/ui";
 import { isDevelopmentItemName } from "../../../../../../kb/src/dev-item-names";
 import { categoryOf } from "../../../../../../kb/src/item-taxonomy";
 import { edgesFrom, evidenceLabel, type Edge, type Rel } from "../../../../../../kb/src/edges";
@@ -277,7 +277,7 @@ export default async function ItemPage(props: Props) {
           box={
             <>
               <TooltipFrame name={tip?.name ?? title} quality={tip ? quality : undefined} label={`${tip?.name ?? title}, from the game files`}>
-                {boxLines.map((line, i) => <p key={i}>{line}</p>)}
+                <TooltipLines lines={boxLines} />
               </TooltipFrame>
               {boxNotes.length > 0 && (
                 <div data-card-notes className="mt-1 space-y-0.5 rounded-[4px] border border-line bg-panel px-2 py-1 text-xs text-muted">

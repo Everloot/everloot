@@ -148,7 +148,7 @@ test("a file that is not there is null; a bucket that cannot be read (an error, 
 
 test("an item tooltip reads like the game's and marks the stat amounts the tables do not give", () => {
   const text = itemTipText(shard0["25"]);
-  expect(text.lines).toEqual(["Binds when equipped", "Unique", "One-Hand · Sword", "[?] - [?] Damage · Speed 1.90", "([?] damage per second)", "+[?] Stamina", "+[?] Strength", "Requires Level 5", "Item Level 2", '"Old."', "Sell Price: 7c"]);
+  expect(text.lines).toEqual(["Item Level 2", "Binds when equipped", "Unique", "One-Hand · Sword", "[?] - [?] Damage · Speed 1.90", "([?] damage per second)", "+[?] Stamina", "+[?] Strength", "Requires Level 5", '"Old."', "Sell Price: 7c"]);
   expect(text.partial).toBe(true);
   expect(itemTipText(shard0["9"]).partial).toBe(false);
   // A stat kind without a word is left out, not printed as "unknown stat 51".
@@ -175,8 +175,8 @@ test("the set, the Unique-Equipped category, the restrictions and the effects pr
   };
   const text = itemTipText(helm);
   expect(text.lines).toEqual([
-    "Unique-Equipped: Synthetic Signet (1)", "Head · Plate", "[?] Armor", "Classes: Warrior", "Requires Level 60", "Requires Synthetic Guild - Honored",
-    "Item Level 66", "Equip: Synthetic effect.", "Use: Restores [?] health.", "Set: Synthetic Battlegear", '"Shiny."', "Sell Price: 13c",
+    "Item Level 66", "Unique-Equipped: Synthetic Signet (1)", "Head · Plate", "[?] Armor", "Classes: Warrior", "Requires Level 60",
+    "Requires Synthetic Guild - Honored", "Equip: Synthetic effect.", "Use: Restores [?] health.", "Set: Synthetic Battlegear", '"Shiny."', "Sell Price: 13c",
   ]);
   expect(text.why).toEqual([WHY.armor, WHY.effect]);
   // A requirement the files do not name is marked and explained; so is a set without a name.
@@ -195,10 +195,10 @@ test("a record from an older shard says its restrictions, set and effects are no
 
 test("a weapon with no stats still marks its damage, and worn armor its armor value, as not in the tables", () => {
   const plain = itemTipText({ ...shard0["25"], st: [], b: 0, u: 0, r: 1, t: undefined });
-  expect(plain.lines).toEqual(["One-Hand · Sword", "[?] - [?] Damage · Speed 1.90", "([?] damage per second)", "Item Level 2", "Sell Price: 7c"]);
+  expect(plain.lines).toEqual(["Item Level 2", "One-Hand · Sword", "[?] - [?] Damage · Speed 1.90", "([?] damage per second)", "Sell Price: 7c"]);
   expect(plain.partial).toBe(true);
   const chest = { ...shard0["9"], c: 4, sc: 1, s: 20 };
-  expect(itemTipText(chest).lines.slice(0, 2)).toEqual(["Chest · Cloth", "[?] Armor"]);
+  expect(itemTipText(chest).lines.slice(0, 3)).toEqual(["Item Level 5", "Chest · Cloth", "[?] Armor"]);
   expect(itemTipText(chest).partial).toBe(true);
   // A shirt, a ring (armor subclass 0) and a libram carry no armor line, and nothing else gets a damage line.
   for (const r of [{ ...chest, s: 4 }, { ...chest, sc: 0, s: 11 }, { ...chest, sc: 7, s: 28 }, { ...shard0["9"], d: 1500 }]) {
