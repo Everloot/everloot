@@ -42,8 +42,8 @@ export interface ShownFileNames<S extends string> {
 
 type WikiTitles = ReadonlyMap<number, { name: string; page: string }[]>;
 
-/** Wiki names matched by infobox id, with the source and dump date. Quest titles remain the default. */
-export function wikiQuestTitles(kbPath: string, kind: "quest" | "npc" | "spell" = "quest"): { dump: string; wiki: ShownNames["wiki"]; titles: Map<number, { name: string; page: string }[]> } {
+/** Quest/spell titles by infobox id and NPC names by normalized text, with source and dump date. */
+export function wikiQuestTitles(kbPath: string, kind: "quest" | "npc" | "spell" = "quest") {
   const db = new Database(kbPath, { readonly: true, fileMustExist: true });
   try {
     const source = db.prepare("SELECT name, licence, homepage FROM sources WHERE id = ?").get(WIKI_SOURCE_ID) as { name: string; licence: string; homepage: string } | undefined;
@@ -52,6 +52,7 @@ export function wikiQuestTitles(kbPath: string, kind: "quest" | "npc" | "spell" 
     const dates = db.prepare("SELECT DISTINCT retrieved_at AS d FROM entities WHERE source_id = ?").all(WIKI_SOURCE_ID) as { d: string }[];
     if (dates.length !== 1) throw new Error(`expected one dump date for ${WIKI_SOURCE_ID}, found ${dates.length}`);
     const titles = new Map<number, { name: string; page: string }[]>();
+    const npcNames: Record<string, { n: string; w: string }> = Object.create(null);
     const rows = db.prepare("SELECT name, data, source_url AS url FROM entities WHERE source_id = ? AND kind = 'lore_page'").iterate(WIKI_SOURCE_ID) as Iterable<{ name: string; data: string; url: string }>;
     for (const r of rows) {
       let data: { type?: string; infobox?: { template?: string; fields?: Record<string, string> } };
@@ -61,12 +62,20 @@ export function wikiQuestTitles(kbPath: string, kind: "quest" | "npc" | "spell" 
         continue;
       }
       const fields = data.infobox?.fields;
-      const name = (fields?.name ?? r.name).trim();
+      const name = kind === "npc" ? fields?.name?.trim() || r.name.trim() : (fields?.name ?? r.name).trim();
       if ((kind === "quest" && data.infobox?.template !== "questbox") || (kind === "npc" && data.infobox?.template !== "npcbox")) continue;
-      if (data.type !== kind || !fields || !name || !isWikiPage(r.url)) continue;
+      if (!name || !isWikiPage(r.url)) continue;
+      if (kind === "npc") {
+        const key = normName(name);
+        const w = r.url.slice(WIKI_PAGE_PREFIX.length);
+        // Duplicate names choose a stable page, independent of SQLite row order.
+        if (!npcNames[key] || w < npcNames[key].w) npcNames[key] = { n: name, w };
+        continue;
+      }
+      if (data.type !== kind || !fields) continue;
       for (const id of infoboxItemIds(fields?.id)) titles.set(id, [...(titles.get(id) ?? []), { name, page: r.url }]);
     }
-    return { dump: dates[0]!.d, wiki: { name: source.name, url: source.homepage, licence: source.licence }, titles };
+    return { dump: dates[0]!.d, wiki: { name: source.name, url: source.homepage, licence: source.licence }, titles, npcNames };
   } finally {
     db.close();
   }
@@ -136,13 +145,13 @@ export function runGameNames(opts: { snapshotPath: string; kbPath: string; outDi
   const spellNames = shownFileNames(SPELL_NAMES_SCHEMA, meta.version, spells, spells.keys(), mayShowSpellName);
   const wikiEntities = (["npc", "spell"] as const).map((kind) => {
     const source = wikiQuestTitles(opts.kbPath, kind);
-    const names: Record<string, { n: string; w: string }> = {};
+    const names: Record<string, { n: string; w: string }> = kind === "npc" ? source.npcNames : {};
     for (const [id, pages] of source.titles) {
       if (new Set(pages.map((p) => normName(p.name))).size !== 1) continue;
       const page = pages[0]!;
       names[id] = { n: page.name, w: page.page.slice(WIKI_PAGE_PREFIX.length) };
     }
-    return { kind, file: { schema: `everloot.wiki-${kind}-names/1`, build: { version: meta.version }, wiki: source.wiki, count: Object.keys(names).length, names } };
+    return { kind, file: { schema: `everloot.wiki-${kind}-names/${kind === "npc" ? 2 : 1}`, build: { version: meta.version }, wiki: source.wiki, count: Object.keys(names).length, names } };
   });
   const dir = shownNamesDir(opts.outDir, meta);
   mkdirSync(dir, { recursive: true });
@@ -152,7 +161,7 @@ export function runGameNames(opts: { snapshotPath: string; kbPath: string; outDi
     return path;
   };
   return {
-    wikiEntities: wikiEntities.map(({ kind, file }) => ({ kind, path: write(`wiki-${kind}-names.json`, file) })),
+    wikiEntities: wikiEntities.map(({ kind, file }) => ({ kind, count: file.count, path: write(`wiki-${kind}-names.json`, file) })),
     build: meta.version, wikiDump: wiki.dump, wikiQuestIds: wiki.titles.size,
     quests: { ...quests, path: write("quest-names.json", quests.file) },
     sets: { ...setNames, path: write("item-set-names.json", setNames.file) },

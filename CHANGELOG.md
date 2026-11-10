@@ -15,6 +15,8 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: show labelled, linked Warcraft Wiki NPC names when one or two installs unanimously report a matching name.
+- Docs: describe NPC name agreement, the private version 2 catalog and the inert spell wiki path.
 - Site: show labelled Warcraft Wiki names for NPCs and unnamed spells, and anonymous unconfirmed item stat values from one or two players.
 - Docs: document wiki name fallbacks and labelled partial stat reports.
 - Addon: Collection lists dungeons, raids and unconfirmed world bosses, with local boss kills and weekly lockouts.

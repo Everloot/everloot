@@ -173,15 +173,26 @@ test("zone rechecks reset goods and quest relations at the NPC's reported zone",
   expect(panel(out, "quests")).toContain('data-agreement="0"');
 });
 
-test("NPC wiki fallback names the heading, breadcrumbs, metadata and JSON-LD, with the item source label", async () => {
-  mocks.wiki.mockResolvedValue({ version: "x", names: new Map([[1125, { name: "Hogger", wikiPage: "https://warcraft.wiki.gg/wiki/Hogger" }]]) });
+test.each([1, 2])("%i agreeing reports plus a wiki match name all page surfaces without identities", async (count) => {
+  facts.npcs = facts.npcs.slice(0, count).map((r, i) => ({ ...r, installId: `private-reporter-${i}`, name: "Hogger" }));
+  mocks.wiki.mockResolvedValue({ version: "x", names: new Map([["hogger", { name: "Hogger", wikiPage: "https://warcraft.wiki.gg/wiki/Hogger" }]]) });
   const out = await html();
   expect(out).toContain('title="Name from the Warcraft Wiki"');
   expect(out).toContain('"name":"Hogger"');
   expect(out).toMatch(/<h1[^>]*>.*Hogger/);
+  expect(out).not.toContain("private-reporter");
+  expect(out).toContain('href="https://warcraft.wiki.gg/wiki/Hogger"');
   expect((await generateMetadata({ params: Promise.resolve({ id: "1125" }) })).title).toContain("Hogger");
-  facts.npcs = facts.npcs.map((r) => ({ ...r, name: "Player name" }));
+  mocks.wiki.mockResolvedValue(null);
+  expect(await html()).toMatch(/<h1[^>]*>NPC 1125<\/h1>/);
+  facts.npcs = installs.map((installId) => ({ ...facts.npcs[0], installId, name: "Player name" }));
   const agreed = await html();
   expect(agreed).toMatch(/<h1[^>]*>Player name<\/h1>/);
   expect(agreed).not.toContain('title="Name from the Warcraft Wiki"');
+});
+
+test("disagreeing reports cannot borrow a wiki name", async () => {
+  facts.npcs = facts.npcs.slice(0, 2).map((r, i) => ({ ...r, name: i ? "Other" : "Hogger" }));
+  mocks.wiki.mockResolvedValue({ version: "x", names: new Map([["hogger", { name: "Hogger", wikiPage: "https://warcraft.wiki.gg/wiki/Hogger" }]]) });
+  expect(await html()).toMatch(/<h1[^>]*>NPC 1125<\/h1>/);
 });
