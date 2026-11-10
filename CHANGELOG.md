@@ -15,6 +15,9 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Addon: Collection lists dungeons, raids and unconfirmed world bosses, with local boss kills and weekly lockouts.
+- Site: keep local boss-kill history out of public upload batches.
+- Docs: explain how to regenerate Collection instance data and its agreement snapshot.
 - Site: search engines and AI assistants now find more of the site: spell pages that create, cost or teach
   something or sit in a talent tree, each zone's coverage page once players have confirmed something there, the
   class chooser once it is reviewed, and the lore pages about an NPC, item or quest players have named in WoW:
@@ -215,6 +218,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   dates from before the feed existed are marked estimated.
 
 ### Fixed
+- Addon: the other addons' buttons in the Everloot minimap drawer no longer look greyed out. LibDBIcon locks each
+  button under the drawer's panel, so the drawer now lifts that lock before raising them above it.
 - Site: the header shows the build whose files the site reads and the newest build seen, each linked to what it means.
 - Site: /api/suggest spends the per-IP quota and shares one edge cache entry for `Thunder` and `thunder `, the coverage 400 and waitlist 503 are `no-store` (the 503 adds `Retry-After`), and the docs list every route that sends CORS from one file.
 - Site: when a database or tools page can't be read, you now get a "Database unavailable" or "Tool unavailable" page that says it could not be read, not that it is empty, with a Try again button and a link back to the section, instead of the generic error page.
