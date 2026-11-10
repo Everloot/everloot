@@ -3,13 +3,15 @@ import { beforeEach, expect, test, vi } from "vitest";
 // Players agree on one item name (19019) and one quest; the name rule shows a wiki-matched item (647) and a
 // wiki quest title (176). Item 5 is in the game files only: no card, as on its page.
 const mocks = vi.hoisted(() => ({
-  items: vi.fn(), world: vi.fn(), reported: vi.fn(), objects: vi.fn(), assets: vi.fn(), tips: vi.fn(), quests: vi.fn(), shown: vi.fn(),
+  items: vi.fn(), world: vi.fn(), reported: vi.fn(), objects: vi.fn(), assets: vi.fn(), tips: vi.fn(), quests: vi.fn(), shown: vi.fn(), names: vi.fn(),
 }));
-vi.mock("@/lib/rollup-compute", () => ({ loadItemFacts: mocks.items, loadWorldFacts: mocks.world, loadReportedItemFacts: mocks.reported }));
+vi.mock("@/lib/rollup-compute", () => ({ loadItemFacts: mocks.items, loadWorldFacts: mocks.world, loadReportedItemFacts: mocks.reported, loadAllReportedItemFacts: vi.fn() }));
 vi.mock("@/lib/objects", () => ({ loadObjectFacts: mocks.objects }));
-vi.mock("@/lib/game-assets", () => ({ loadSiteAssets: mocks.assets, loadItemTips: mocks.tips, loadQuestNames: mocks.quests }));
+vi.mock("@/lib/game-assets", () => ({ loadSiteAssets: mocks.assets, loadItemTips: mocks.tips, loadQuestNames: mocks.quests, loadItemNames: mocks.names, PRIVATE_UNREACHABLE: Symbol.for("unreachable") }));
 vi.mock("@/lib/shown-item-names", () => ({ loadShownNames: mocks.shown }));
 
+import { edgeTtl } from "@/lib/cf-edge-cache";
+import { forgetItemView } from "@/lib/item-view-store";
 import { GET } from "./route";
 
 const three = (make: (installId: string) => object) => ["a", "b", "c"].map(make);
@@ -17,6 +19,9 @@ const call = (type: string, id: string) => GET(new Request(`https://everloot.app
 const TIP = { name: "Destiny", color: "#a335ee", quality: "Epic", icon: "https://assets.everloot.app/b/icons/7.webp", lines: ["Two-Hand", "+[?] Strength"], partial: true, why: ["[?] stat amounts: reason."], label: "Found in game files, unconfirmed · build 70450" };
 
 beforeEach(() => {
+  forgetItemView();
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   mocks.items.mockReset().mockResolvedValue({ rates: [], npcs: [], unreachable: false, names: three((installId) => ({ installId, itemId: 19019, name: "Thunderfury" })) });
   mocks.world.mockReset().mockResolvedValue({
     unreachable: false, vendors: [],
@@ -29,7 +34,8 @@ beforeEach(() => {
   mocks.tips.mockReset().mockImplementation(async (_a: unknown, ids: number[]) => new Map(ids.includes(647) ? [[647, TIP]] : []));
   mocks.quests.mockReset().mockResolvedValue({ names: new Map([[176, { name: "Wanted: Hogger", wikiPage: "z" }]]) });
   const agreed = new Map([[19019, "Thunderfury"]]);
-  const matched = new Map([[647, { name: "Destiny", color: "#a335ee", wikiPage: "Destiny" }]]);
+  const matched = new Map([[647, { name: "Destiny", color: "#a335ee", wikiPage: "Destiny", source: "wiki" }]]);
+  mocks.names.mockReset().mockResolvedValue({ names: matched });
   mocks.shown.mockReset().mockResolvedValue({
     facts: { unreachable: false }, agreed, matched: { names: matched },
     showsTip: (id: number) => agreed.has(id) || matched.has(id),
@@ -92,4 +98,42 @@ test("it is the site's own route: no CORS, never indexed; storage down is a 503 
   const down = await call("item", "19019");
   expect(down.status).toBe(503);
   expect(down.headers.get("cache-control")).toBe("no-store");
+});
+
+test("a card is kept an hour by the Worker's edge cache and five minutes by the browser; a 404 is not kept at the edge", async () => {
+  const res = await call("item", "647");
+  expect(res.headers.get("cdn-cache-control")).toBe("max-age=3600");
+  expect(res.headers.get("cache-control")).toMatch(/^public, max-age=300\b/);
+  expect(edgeTtl(res)).toBe(3600);
+  const missing = await call("item", "5");
+  expect(missing.status).toBe(404);
+  expect(edgeTtl(missing)).toBeNull();
+});
+
+test("with the cron's stored item view, an item card reads that one small file: never the corpus or the aggregate set", async () => {
+  for (const [k, v] of Object.entries({ R2_ACCOUNT_ID: "acct", R2_ACCESS_KEY_ID: "id", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "everloot-uploads" })) vi.stubEnv(k, v);
+  const view = {
+    version: 1, generatedAt: "2026-11-10T00:00:00.000Z", dataAsOf: null, agreed: [[19019, "Thunderfury"]], dropped: [], seen: [19019], from: [],
+    reported: [[647, { shown: [{ fact: "strength", value: 7, reporters: 4, build: "1.60.1.70450", lastSeen: "2026-11-05T12:00:00.000Z" }], contested: [] }]],
+  };
+  const r2 = vi.fn(async () => new Response(JSON.stringify(view), { status: 200 }));
+  vi.stubGlobal("fetch", r2);
+  const { card } = await (await call("item", "647")).json();
+  expect(card.lines).toEqual(["Two-Hand", "+7 Strength", "+7 Strength: reported by 4 installs, last seen 2026-11-05, build 1.60.1.70450."]);
+  expect((await (await call("item", "19019")).json()).card).toMatchObject({ title: "Thunderfury", foot: "Name confirmed by players" });
+  expect((await call("item", "5")).status).toBe(404);
+  // The names and the reported numbers came from the view, read once for both cards.
+  expect(mocks.shown).not.toHaveBeenCalled();
+  expect(mocks.reported).not.toHaveBeenCalled();
+  expect(mocks.items).not.toHaveBeenCalled();
+  expect(r2).toHaveBeenCalledTimes(1);
+});
+
+test("a stored view written before it held the reported numbers still names the card, and the numbers come from the aggregates", async () => {
+  for (const [k, v] of Object.entries({ R2_ACCOUNT_ID: "acct", R2_ACCESS_KEY_ID: "id", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "everloot-uploads" })) vi.stubEnv(k, v);
+  const view = { version: 1, generatedAt: "2026-11-10T00:00:00.000Z", dataAsOf: null, agreed: [], dropped: [], seen: [], from: [] };
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(view), { status: 200 })));
+  expect((await call("item", "647")).status).toBe(200);
+  expect(mocks.shown).not.toHaveBeenCalled();
+  expect(mocks.reported).toHaveBeenCalledWith(647);
 });

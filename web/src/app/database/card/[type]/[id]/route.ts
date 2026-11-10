@@ -4,11 +4,17 @@ import { tooltipId, tooltipType } from "@/lib/tooltip";
 /**
  * GET /database/card/<item|npc|quest|object>/<id>: the hover card on the site's own links (components/game/HoverCards).
  * Part of the site, not the API, like /search/suggest: it follows the pages' rules (lib/site-card.ts), so other
- * sites get no CORS and search engines a noindex. The CDN keeps a card for an hour, a 404 for five minutes.
+ * sites get no CORS and search engines a noindex. Browsers keep a card five minutes and the Worker's edge cache an hour
+ * (lib/cf-edge-cache.ts): on the Worker only `CDN-Cache-Control` sets the edge lifetime, and `s-maxage` alone kept
+ * nothing, so every hover rendered the card again. The edge keeps 200s only; a 404 is kept by the browser.
  */
 export const dynamic = "force-dynamic";
 
-const CACHE = { "Cache-Control": "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400", "X-Robots-Tag": "noindex" };
+const CACHE = {
+  "Cache-Control": "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+  "CDN-Cache-Control": "max-age=3600",
+  "X-Robots-Tag": "noindex",
+};
 const CACHE_404 = { "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600", "X-Robots-Tag": "noindex" };
 const NO_STORE = { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" };
 

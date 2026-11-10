@@ -2,10 +2,9 @@ import type { TooltipType } from "@everloot/protocol";
 import { categoryOf } from "../../../kb/src/item-taxonomy";
 import { loadItemTips, loadQuestNames, loadSiteAssets } from "./game-assets";
 import { withReported } from "./item-names";
+import { loadCardFacts, loadListNames } from "./item-view";
 import { splitWhy } from "./placeholder";
-import { loadReportedItemFacts } from "./rollup-compute";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, NAME_FROM, shownItemName } from "./items";
-import { loadShownNames } from "./shown-item-names";
 import { loadTooltip, NO_QUEST_TITLE } from "./tooltip";
 
 /**
@@ -54,12 +53,14 @@ export async function loadSiteCard(type: TooltipType, id: number): Promise<SiteC
 }
 
 async function itemCard(id: number): Promise<SiteCardResult> {
-  const shown = await loadShownNames();
+  // The cron's stored item view (lib/item-view.ts), the same names the item page shows, so a card never replays or
+  // downloads the whole corpus; the view's absence falls back to that.
+  const shown = await loadListNames();
   // The item page's test for its game file box; any other id may be unreleased content.
-  if (!shown.showsTip(id)) return shown.facts.unreachable ? { status: 503, error: UNREACHABLE } : { status: 404, error: NOT_FOUND };
-  const filesTip = (await loadItemTips(await loadSiteAssets(), [id])).get(id);
+  if (!shown.showsTip(id)) return shown.unreachable ? { status: 503, error: UNREACHABLE } : { status: 404, error: NOT_FOUND };
   // As the item page's box: the numbers 3 installs agree on, with their installs, build and date.
-  const tip = filesTip && withReported(filesTip, await loadReportedItemFacts(id));
+  const [filesTip, reported] = await Promise.all([loadSiteAssets().then((assets) => loadItemTips(assets, [id])).then((tips) => tips.get(id)), loadCardFacts(id)]);
+  const tip = filesTip && withReported(filesTip, reported);
   const name = shownItemName(id, shown.agreed, shown.matched?.names, tip);
   const category = categoryOf(CLIENT_TAXONOMY, id);
   // As the item page's box: the game's lines, else the type and slot from the client layer.

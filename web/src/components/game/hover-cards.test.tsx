@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import HoverCards, { CARD_ID, forgetCards, SHOW_DELAY } from "./HoverCards";
+import HoverCards, { CARD_ID, forgetCards, linkFrame, Lru, SHOW_DELAY } from "./HoverCards";
 
 const THUNDERFURY = {
   type: "item", id: 19019, title: "Thunderfury, Blessed Blade of the Windseeker", quality: 5,
@@ -53,7 +53,7 @@ test("resting the pointer on an item link shows the in-game card: icon, name in 
   expect(fetcher).not.toHaveBeenCalled();
   expect(card()).toBeNull();
   await wait(20);
-  expect(fetcher).toHaveBeenCalledWith("/database/card/item/19019", expect.anything());
+  expect(fetcher).toHaveBeenCalledWith("/database/card/item/19019");
   const shown = card()!;
   expect(shown.getAttribute("role")).toBe("tooltip");
   expect(shown.querySelector("[data-tooltip-frame]")).not.toBeNull();
@@ -174,4 +174,98 @@ test("the icon sits inside the frame beside the name, and the footnote shows onl
   await act(async () => link("/database/items/19019").blur());
   const clean = await open({ ...THUNDERFURY, lines: ["Binds when picked up"], notes: [NOTE] });
   expect(clean.querySelector("[data-card-notes]")).toBeNull();
+});
+
+/** A fetch that answers only when the test says so. */
+function held() {
+  let answer!: (res: Response) => void;
+  fetcher.mockImplementationOnce(() => new Promise<Response>((resolve) => { answer = resolve; }));
+  return (card: object | null) => act(async () => {
+    answer(card ? new Response(JSON.stringify({ ok: true, card }), { status: 200 }) : new Response("{}", { status: 404 }));
+    await vi.advanceTimersByTimeAsync(0);
+  });
+}
+
+test("the frame shows at once with the name and quality colour the link shows, and the card fills it when it arrives", async () => {
+  const a = link("/database/items/19019");
+  a.className = "text-q-legendary hover:underline";
+  const answer = held();
+  pointer("pointerover", a);
+  await wait(SHOW_DELAY);
+  const frame = card()!;
+  expect(frame.querySelector("[data-tooltip-frame] p")!.textContent).toBe("Thunderfury");
+  expect(frame.querySelector("[data-tooltip-frame] p")!.className).toContain("text-q-legendary");
+  expect(frame.querySelector("img")).toBeNull();
+  expect(a.getAttribute("aria-describedby")).toBe(CARD_ID);
+
+  await answer(THUNDERFURY);
+  expect(card()!.querySelector("[data-tooltip-frame] p")!.textContent).toBe(THUNDERFURY.title);
+  expect(card()!.querySelector("img")!.getAttribute("src")).toBe(THUNDERFURY.icon);
+  expect(card()!.textContent).toContain("Binds when picked up");
+});
+
+test("a link with no card (404) loses its frame when the answer comes, and shows nothing on the next hover", async () => {
+  const a = link("/database/items/99999");
+  const answer = held();
+  pointer("pointerover", a);
+  await wait(SHOW_DELAY);
+  expect(card()!.textContent).toBe("Item 99999");
+  await answer(null);
+  expect(card()).toBeNull();
+  expect(a.hasAttribute("aria-describedby")).toBe(false);
+  pointer("pointerout", a, "mouse", document.body);
+  pointer("pointerover", a);
+  await wait(SHOW_DELAY);
+  expect(card()).toBeNull();
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+
+test("a card asked for while the pointer rested is kept after it leaves: the next hover shows it whole with no request", async () => {
+  const a = link("/database/items/19019");
+  const answer = held();
+  pointer("pointerover", a);
+  await wait(SHOW_DELAY);
+  pointer("pointerout", a, "mouse", document.body);
+  // Back on the link before the answer: the same request serves both hovers.
+  pointer("pointerover", a);
+  await wait(SHOW_DELAY);
+  await answer(THUNDERFURY);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(card()!.querySelector("img")).not.toBeNull();
+  pointer("pointerout", a, "mouse", document.body);
+  await wait(0);
+
+  pointer("pointerover", a);
+  await wait(SHOW_DELAY - 1);
+  expect(card()).toBeNull();
+  await wait(1);
+  // Whole at once: no frame first, no second request.
+  expect(card()!.querySelector("img")!.getAttribute("src")).toBe(THUNDERFURY.icon);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+
+test("the visit's cards are a least-recently-used map: reading one keeps it, and the oldest goes past the limit", () => {
+  const lru = new Lru<string, number>(2);
+  lru.set("a", 1);
+  lru.set("b", 2);
+  expect(lru.get("a")).toBe(1);
+  lru.set("c", 3);
+  expect(lru.has("b")).toBe(false);
+  expect([lru.get("a"), lru.get("c"), lru.size]).toEqual([1, 3, 2]);
+  lru.set("a", 4);
+  lru.set("d", 5);
+  expect(lru.has("c")).toBe(false);
+  expect(lru.get("a")).toBe(4);
+  expect(lru.get("missing")).toBeUndefined();
+});
+
+test("the frame takes the coloured name from a link that shows more than the name, and a plain link's whole text", async () => {
+  const row = document.createElement("a");
+  row.href = "/database/items/19019";
+  row.innerHTML = '<span class="min-w-0 text-q-epic">Thunderfury</span><span class="text-muted">Item 19019</span>';
+  expect(linkFrame(row)).toEqual({ title: "Thunderfury", quality: 4, icon: null, lines: [], foot: null });
+  const plain = document.createElement("a");
+  plain.innerHTML = "Hogger <span>(elite)</span>";
+  expect(linkFrame(plain)).toMatchObject({ title: "Hogger (elite)", quality: null });
+  expect(linkFrame(document.createElement("a"))).toBeNull();
 });
