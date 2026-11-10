@@ -4,11 +4,19 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from "vitest";
 import { edgeDegraded } from "@/lib/cf-edge-cache";
 
-const store = vi.hoisted(() => ({ loadCorpus: vi.fn() }));
+const store = vi.hoisted(() => ({ loadCorpus: vi.fn(), lootDown: false }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
   uploadStore: { loadCorpus: store.loadCorpus },
 }));
+// The loot tables are a read of their own: one test fails it while the world facts read fine.
+vi.mock("@/lib/rollup-compute", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/rollup-compute")>();
+  return {
+    ...real,
+    loadLootTables: async () => (store.lootDown ? { tables: { sources: new Map(), leftOut: 0 }, unreachable: true, dataAsOf: null } : real.loadLootTables()),
+  };
+});
 vi.mock("@/lib/zone-lore", () => ({
   zoneLore: (name: string) => name === "Westfall"
     ? { name, text: "Westfall is a farming zone.", href: "/lore/1-westfall", sourceUrl: "https://example.test/Westfall", licence: "CC BY-SA 4.0" }
@@ -32,9 +40,9 @@ const sighting = (installId: string, npcId: number, name: string, mapId: number,
 const three = (npcId: number, name: string, mapId: number, x: number, y: number) => ["a", "b", "c"].map((i) => sighting(`install-${i}`, npcId, name, mapId, x, y));
 const corpus = (records: unknown[]) => ({ uploads: 3, records, dataAsOf: "2026-10-10T00:00:00.000Z" });
 const html = async (el: Promise<ReactNode>) => renderToStaticMarkup(await el);
-const props = (zone: string) => ({ params: Promise.resolve({ zone }) });
+const props = (zone: string, search: Record<string, string> = {}) => ({ params: Promise.resolve({ zone }), searchParams: Promise.resolve(search) });
 
-beforeEach(() => store.loadCorpus.mockReset());
+beforeEach(() => { store.loadCorpus.mockReset(); store.lootDown = false; });
 // The fixture wiki has a published zone page for Westfall; the committed one keeps it a draft, which gets no link.
 beforeAll(() => { vi.stubEnv("WIKI_DIR", fileURLToPath(new URL("../../../test/wiki", import.meta.url))); });
 afterAll(() => { vi.unstubAllEnvs(); });
@@ -196,6 +204,8 @@ test("herbs gathered at a spot 3 installs placed are items found here too, and l
   expect(page).toContain('href="/database/objects/1618"');
   expect(page).toContain('href="/tools/professions/herbalism#gather"');
   expect(page).not.toContain('href="/tools/professions/mining#gather"');
+  // A herb spot 3 installs placed is something players confirmed, so the zone does not say nobody did.
+  expect(page).not.toContain("Players have not confirmed anything");
 });
 
 test("an empty zone says what a rate needs and links coverage, but no farming, gathering or wiki page it has nothing for", async () => {
@@ -228,4 +238,62 @@ test("storage down shows no Items tab, no empty items copy and no farming links,
   expect(page).not.toContain("No item has an agreed drop");
   expect(page).not.toContain("Farming and gathering");
   expect(page).toContain('href="/database/coverage/1436-westfall"');
+});
+
+test("an item two sources drop is one row and one in the count, with each source's own numbers under it", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([
+    ...three(100, "Guard Orin", 1436, 40, 50),
+    ...installs.map((i) => loot(i, { npc: 100 }, [750, 2589])),
+    ...minimap(77, "Battered Chest", 1436),
+    ...installs.map((i) => loot(i, { obj: 77 }, [750])),
+  ]));
+  const page = await html(ZonePage(props("1436-westfall")));
+  // Two items, not three rows: 750 once, with both sources.
+  expect(page.match(/href="\/database\/items\/750"/g)).toHaveLength(1);
+  expect(page).toMatch(/<span[^>]*>2<\/span> items/);
+  expect(page).toContain("2 sources");
+  const detail = page.slice(page.indexOf("data-item-sources"));
+  expect(detail).toContain('href="/database/npcs/100"');
+  expect(detail).toContain('href="/database/objects/77"');
+  expect(detail).toContain("100.0% · 3 of 3 windows · 3 installs");
+  // The single-source item keeps its own columns.
+  expect(page).toContain('href="/database/items/2589"');
+});
+
+test("the Items tab pages 50 to a page like the database lists; a bad or past-the-end page is a 404", async () => {
+  const ids = Array.from({ length: 60 }, (_, n) => 1000 + n);
+  store.loadCorpus.mockResolvedValue(corpus([
+    ...three(100, "Guard Orin", 1436, 40, 50),
+    ...installs.map((i) => loot(i, { npc: 100 }, ids)),
+  ]));
+  const first = await html(ZonePage(props("1436-westfall")));
+  expect(first).toContain('href="/database/items/1049"');
+  expect(first).not.toContain('href="/database/items/1050"');
+  expect(first).toContain("1–50");
+  expect(first).toContain('href="/database/zones/1436-westfall?page=2#items"');
+  const second = await html(ZonePage(props("1436-westfall", { page: "2" })));
+  expect(second).toContain('href="/database/items/1050"');
+  expect(second).toContain('href="/database/items/1059"');
+  expect(second).not.toContain('href="/database/items/1049"');
+  await expect(html(ZonePage(props("1436-westfall", { page: "3" })))).rejects.toThrow("NEXT_NOT_FOUND");
+  await expect(html(ZonePage(props("1436-westfall", { page: "0" })))).rejects.toThrow("NEXT_NOT_FOUND");
+  await expect(html(ZonePage(props("1436-westfall", { page: "x" })))).rejects.toThrow("NEXT_NOT_FOUND");
+});
+
+test("when only the loot tables cannot be read the Items tab says so, the page is marked degraded, and the rest stays", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([
+    ...three(100, "Guard Orin", 1436, 40, 50),
+    ...installs.map((i) => loot(i, { npc: 100 }, [750])),
+  ]));
+  store.lootDown = true;
+  const page = await html(ZonePage(props("1436-westfall")));
+  expect(page).toContain("Items could not be read right now.");
+  expect(page).not.toContain("No item has an agreed drop");
+  expect(page).not.toContain('href="/database/items/750"');
+  expect(edgeDegraded(page)).toBe(true);
+  // The pins, the Coverage link and the other tabs are untouched.
+  expect(page).toContain('href="/database/npcs/100"');
+  expect(page).toContain('href="/database/coverage/1436-westfall"');
+  store.lootDown = false;
+  expect(edgeDegraded(await html(ZonePage(props("1436-westfall"))))).toBe(false);
 });
