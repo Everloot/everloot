@@ -11,6 +11,27 @@ import {
 } from "./aggregate-store";
 import { computeRollups, loadAddonLeaderboard, loadItemFacts } from "./rollup-compute";
 
+test.each(["error", "throw", "malformed", "missing"])("strict hover-card reads reject a %s refresh, including its retry window", async (failure) => {
+  forgetStoredAggregates();
+  let now = 0;
+  const text = encodeAggregates(buildAggregates(corpus(anonymousRows())), "2026-11-06T12:00:00.000Z");
+  const fetcher = vi.fn(async () => new Response(text));
+  const deps = { cloud: CLOUD, fetch: fetcher, now: () => now };
+  expect(await loadStoredAggregates({ ...deps, strict: true })).not.toBeNull();
+  now += 5 * 60_000;
+  fetcher.mockImplementation(async () => {
+    if (failure === "throw") throw new Error("down");
+    return new Response(failure === "malformed" ? "bad json" : "", { status: failure === "missing" ? 404 : failure === "error" ? 503 : 200 });
+  });
+  expect(await loadStoredAggregates({ ...deps, strict: true })).toBeNull();
+  expect(await loadStoredAggregates({ ...deps, strict: true })).toBeNull();
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  now += 60_000;
+  fetcher.mockImplementation(async () => new Response(text));
+  expect(await loadStoredAggregates({ ...deps, strict: true })).not.toBeNull();
+  expect(store.loadCorpus).not.toHaveBeenCalled();
+});
+
 const AS_OF = "2026-11-06T12:00:00.000Z";
 const CLOUD = { r2AccountId: "acct", r2AccessKeyId: "id", r2SecretAccessKey: "s", r2Bucket: "uploads" };
 const INSTALLS = ["install-aaaa-0001", "install-bbbb-0002", "install-cccc-0003", "install-dddd-0004"];
