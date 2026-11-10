@@ -370,7 +370,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
 
-## [0.3.22] - 2026-11-09
+## [0.3.22] - 2026-11-10
 
 Release channel: Alpha
 
