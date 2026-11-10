@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { CURRENT_BUILD, TABLES } from "@/data/game-data/raid";
 import {
   assetUrl, BANNER_MAP, buildFolder, classAndProfessionIcons, continentArt, creditWhat, emblems, FETCH_TIMEOUT_MS, forgetPrivateReads, iconUrl,
-  instanceThumbs, itemIconUrl, itemShard, itemTip, gameNameFor, launchArt, loadingArt, loadItemNames, loadItemSetNames, loadItemTips, loadQuestNames, loadSpellNames, loadSiteAssets, parseSiteManifest, poiIcons, PRIVATE_UNREACHABLE, privateStoreFromEnv, raidArt, type ItemNames,
+  instanceThumbs, itemIconUrl, itemShard, itemTip, gameNameFor, launchArt, loadingArt, loadItemNames, loadItemSetNames, loadItemTips, loadQuestNames, loadSpellNames, loadSiteAssets, parseSiteManifest, poiIcons, PRIVATE_UNREACHABLE, privateStoreFromEnv, raidArt, readItemTips, readQuestNames, type ItemNames,
 } from "./game-assets";
 import { itemTipText, qualityColor, tipLines, WHY } from "./item-names";
 import { cameraBox, zoneArtShown, ZONE_ART_ZOOM, type Box, type Camera } from "./map-view";
@@ -114,6 +114,38 @@ test("item tooltips come from the private bucket only, read only the shards the 
   const idle = memoryStore(privateFiles);
   expect((await loadItemTips(a, [], idle)).size).toBe(0);
   expect(idle.reads).toEqual([]);
+});
+
+test("a private read that failed is told apart from an item with no tooltip: the index, or the shard it needs", async () => {
+  const a = parseSiteManifest(siteManifest, BASE)!;
+  const failing = (path: string) => ({ read: async (p: string) => (p === path ? PRIVATE_UNREACHABLE : (privateFiles as Record<string, unknown>)[p] ?? null) });
+  expect(await readItemTips(a, [9], memoryStore(privateFiles))).toMatchObject({ unreachable: false });
+  expect((await readItemTips(a, [9], memoryStore(privateFiles))).tips.has(9)).toBe(true);
+  for (const path of [`${FOLDER}/items.json`, `${FOLDER}/items/0.json`]) {
+    const read = await readItemTips(a, [9], failing(path));
+    expect(read.unreachable, path).toBe(true);
+    expect(read.tips.size, path).toBe(0);
+    // The plain reader still just draws no tooltip.
+    expect((await loadItemTips(a, [9], failing(path))).size, path).toBe(0);
+  }
+  // A file that is not there, or for another build, is no failure.
+  expect((await readItemTips(a, [9], memoryStore({}))).unreachable).toBe(false);
+});
+
+test("a broken item folder is told apart from an item with no tooltip: a listed shard missing or not a shard, or a bad record", async () => {
+  const a = parseSiteManifest(siteManifest, BASE)!;
+  const withShard = (shard?: unknown) => memoryStore({ [`${FOLDER}/items.json`]: itemIndex, ...(shard === undefined ? {} : { [`${FOLDER}/items/0.json`]: shard }) });
+  expect(await readItemTips(a, [9, 25], withShard(shard0))).toMatchObject({ unreachable: false, degraded: false });
+  for (const [why, store] of [["missing", withShard()], ["array", withShard([shard0["9"]])], ["string", withShard("x")], ["record", withShard({ ...shard0, "9": { n: 1 } })]] as const) {
+    const read = await readItemTips(a, [9], store);
+    expect(read, why).toMatchObject({ unreachable: false, degraded: true });
+    // The plain reader still just draws no tooltip.
+    expect((await loadItemTips(a, [9], store)).size, why).toBe(0);
+  }
+  // A bad record for another item, an item the shard does not hold, no index or another build: not degraded.
+  expect((await readItemTips(a, [25, 30], withShard({ ...shard0, "9": { n: 1 } }))).degraded).toBe(false);
+  expect((await readItemTips(a, [9], memoryStore({}))).degraded).toBe(false);
+  expect((await readItemTips(a, [9], memoryStore({ [`${FOLDER}/items.json`]: { ...itemIndex, build: { version: "9.9.9.1" } } }))).degraded).toBe(false);
 });
 
 test("the private bucket needs all four server-only variables, signs its reads, and keeps what it read", async () => {
@@ -377,6 +409,13 @@ test("without a file, for another build, or with one file's content under anothe
   expect(await loadQuestNames("1.60.1.70450", BASE, memoryStore({ [`${FOLDER}/quest-names.json`]: { ...questFile, wiki: { ...questFile.wiki, licence: "CC-BY-NC" } } }))).toBeNull();
   expect(await loadSpellNames("1.60.1.70450", BASE, memoryStore({ [`${FOLDER}/spell-names.json`]: setFile }))).toBeNull();
   expect(await loadItemSetNames("1.60.1.70450", BASE, null)).toBeNull();
+});
+
+test("quest titles that could not be read are PRIVATE_UNREACHABLE to readQuestNames and nothing to loadQuestNames", async () => {
+  const down = { read: async () => PRIVATE_UNREACHABLE };
+  expect(await readQuestNames("1.60.1.70450", BASE, down)).toBe(PRIVATE_UNREACHABLE);
+  expect(await loadQuestNames("1.60.1.70450", BASE, down)).toBeNull();
+  expect(await readQuestNames("1.60.1.70450", BASE, memoryStore({}))).toBeNull();
 });
 
 test("a relation target takes its name from the loaded files, and says whether the wiki or the game files gave it", () => {

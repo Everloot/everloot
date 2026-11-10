@@ -324,6 +324,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and the other from the clock, so they disagreed. Both pages say when the GitHub facts are older than 26 hours.
 
 ### Changed
+- Site: hover cards on item, NPC, quest and object links open faster. The card's frame shows at once with the name
+  and quality colour the link already has, then fills in; a card you hovered before opens whole with no wait; and the
+  site keeps each card ready for every visitor instead of working it out again on each hover. A card that could not be
+  read whole while storage is down is never kept, and hovering the link again a few seconds later asks for it again.
 - Docs: the launch-day page is marked historical, and day-to-day operation of the site is in docs/OPERATIONS.md.
 - Site: pages no longer jump when the footer arrives while a page is still loading, the Auction House table scrolls inside its own frame on a tablet instead of pushing the page sideways, the header's keyboard focus rings are no longer cut off at the top of the window, quick facts are one column on a phone, item, NPC, quest and spell pages keep an even gap above their auction and relation sections, the unavailable page arrows are readable, and the Auction House line under the title has spaces around its dot.
 - Protocol: `itemsResponse.items` is typed with the row `GET /api/items` returns (item id, then class, subclass, slot

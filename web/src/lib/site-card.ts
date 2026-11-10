@@ -1,11 +1,11 @@
 import type { TooltipType } from "@everloot/protocol";
 import { categoryOf } from "../../../kb/src/item-taxonomy";
-import { loadItemTips, loadQuestNames, loadSiteAssets } from "./game-assets";
+import { loadSiteAssets, PRIVATE_UNREACHABLE, readItemTips, readQuestNames } from "./game-assets";
 import { withReported } from "./item-names";
+import { loadCardFacts, loadListNames } from "./item-view";
 import { splitWhy } from "./placeholder";
-import { loadReportedItemFacts } from "./rollup-compute";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, NAME_FROM, shownItemName } from "./items";
-import { loadShownNames } from "./shown-item-names";
+import { assetsBaseUrl } from "./talents/assets";
 import { loadTooltip, NO_QUEST_TITLE } from "./tooltip";
 
 /**
@@ -14,6 +14,10 @@ import { loadTooltip, NO_QUEST_TITLE } from "./tooltip";
  * shows it (players reported it, or its name shows under the item name rule), a quest's Warcraft Wiki title
  * where its page shows one, and where a shown name comes from, which the lists used to say in a `title`.
  * Pages only, like the names it reads: the embeddable card (/api/tooltip) keeps the three-install rule.
+ *
+ * A 200 is kept an hour at the edge, so it is a whole card or nothing: any read that failed (the players' uploads or
+ * aggregates, the names, the asset manifest, the private item files, the quest titles) makes the card a 503, never
+ * a card missing what that read holds. A 404 is only for an id no page shows.
  */
 export interface SiteCard {
   type: TooltipType;
@@ -35,6 +39,7 @@ export type SiteCardResult = { status: 200; body: SiteCard } | { status: 404 | 5
 
 const NOT_FOUND = "No card: no such page, or players have not reported it yet.";
 const UNREACHABLE = "Storage is unavailable. The card is unrecorded, not empty.";
+const UNAVAILABLE = { status: 503, error: UNREACHABLE } as const;
 const join = (parts: (string | null | undefined)[]) => parts.filter(Boolean).join(" · ") || null;
 
 /** A card with no game file art: an NPC, a quest or an object, as the embeddable card has it. */
@@ -44,22 +49,36 @@ const plain = (type: TooltipType, id: number, title: string, lines: string[], fo
 export async function loadSiteCard(type: TooltipType, id: number): Promise<SiteCardResult> {
   if (type === "item") return itemCard(id);
   const result = await loadTooltip(type, id);
+  // Storage down: the players' facts are unread, so no wiki title stands in for them.
+  if (result.status === 503) return result;
   // A quest players agree on no title for: the quest page shows the Warcraft Wiki's, for a quest the game files list.
   const agreedTitle = result.status === 200 && !result.body.lines.includes(NO_QUEST_TITLE);
   if (type === "quest" && !agreedTitle) {
-    const wiki = (await loadQuestNames(CLIENT_LAYER.build.version))?.names.get(id)?.name;
+    const names = await readQuestNames(CLIENT_LAYER.build.version);
+    if (names === PRIVATE_UNREACHABLE) return UNAVAILABLE;
+    const wiki = names?.names.get(id)?.name;
     if (wiki) return plain(type, id, wiki, result.status === 200 ? result.body.lines.filter((l) => l !== NO_QUEST_TITLE) : [], NAME_FROM.wiki);
   }
   return result.status === 200 ? plain(type, id, result.body.title, result.body.lines) : result;
 }
 
 async function itemCard(id: number): Promise<SiteCardResult> {
-  const shown = await loadShownNames();
+  // The cron's stored item view (lib/item-view.ts), the same names the item page shows, so a card never replays or
+  // downloads the whole corpus; the view's absence falls back to that.
+  const shown = await loadListNames();
+  // Unread uploads or names: whether a page shows this id, and under what name, is unknown.
+  if (shown.unreachable || shown.degraded) return UNAVAILABLE;
   // The item page's test for its game file box; any other id may be unreleased content.
-  if (!shown.showsTip(id)) return shown.facts.unreachable ? { status: 503, error: UNREACHABLE } : { status: 404, error: NOT_FOUND };
-  const filesTip = (await loadItemTips(await loadSiteAssets(), [id])).get(id);
+  if (!shown.showsTip(id)) return { status: 404, error: NOT_FOUND };
   // As the item page's box: the numbers 3 installs agree on, with their installs, build and date.
-  const tip = filesTip && withReported(filesTip, await loadReportedItemFacts(id));
+  const [files, reported] = await Promise.all([
+    loadSiteAssets().then((assets) => (assets || !assetsBaseUrl() ? readItemTips(assets, [id]) : null)),
+    loadCardFacts(id),
+  ]);
+  // A manifest that did not load (with its URL set), a private file that could not be read or is broken, or the aggregates.
+  if (!files || files.unreachable || files.degraded || reported.unreachable) return UNAVAILABLE;
+  const filesTip = files.tips.get(id);
+  const tip = filesTip && withReported(filesTip, reported);
   const name = shownItemName(id, shown.agreed, shown.matched?.names, tip);
   const category = categoryOf(CLIENT_TAXONOMY, id);
   // As the item page's box: the game's lines, else the type and slot from the client layer.
