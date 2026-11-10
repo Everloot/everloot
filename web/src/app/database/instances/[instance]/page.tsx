@@ -4,7 +4,7 @@ import JsonLd from "@/components/JsonLd";
 import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { AgreementMeter, Badge, Card, Container, DataTable, DataTitle, Disclosure, EmptyState, filledColumns, InShort, OpenData, reportedLabel, SectionHeading, type Column, type SparseColumn } from "@/components/ui";
+import { AgreementMeter, Badge, Container, DataTable, Disclosure, EmptyState, Facts, filledColumns, InShort, OpenData, reportedLabel, SectionHeading, type Column, type Fact, type SparseColumn } from "@/components/ui";
 import { observedLine } from "@/lib/evidence";
 import {
   bossRows, difficultyLabel, difficultyList, instanceDescription, instanceHref, instanceQuests, instanceRows, instanceTitle, levelLabel, loadSightings, parseInstanceSegment,
@@ -24,7 +24,7 @@ import EntityLink from "@/components/EntityLink";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
 import { itemNames, npcNames } from "@/lib/names";
 import { loadItemFacts, loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
-import { Unreachable } from "../../entity";
+import { EntityHeader, EntityTop, Unreachable } from "../../entity";
 import { NpcLootPanel } from "../../loot-tables";
 import { zoneHref } from "@/lib/zones";
 import { loreFor } from "@/lib/lore-links";
@@ -156,6 +156,22 @@ export default async function InstancePage(props: Props) {
     ...(quests.length ? [`${quests.length} ${quests.length === 1 ? "quest" : "quests"} filed under its name in the quest log, each with three installs agreeing.`] : []),
   ];
 
+  // The quick facts, as every database page lists them: label left, value right, the files' own value beside it.
+  const filesNote = (text: string) => <span className="ml-2 inline-flex items-baseline gap-1.5 text-meta text-muted"><Badge tone="files" />{text}</span>;
+  const facts: Fact[] = [
+    ...(row.statisticBoss ? [{ label: "Name", value: <>{row.name}{filesNote("name from the game files; they place no entrance for it")}</> }] : []),
+    { label: "Type", value: kindLabel(row.raid) },
+    { label: "Level", value: levelLabel(row.level) ?? <span className="text-muted">–</span> },
+    { label: "Difficulty", value: <>
+      {row.difficulty !== null ? difficultyLabel(row.difficulty) : PLACEHOLDER}
+      {row.difficulties.length > 0 && filesNote(`in the files, ${difficultyList(row.difficulties)}`)}
+    </> },
+    { label: "Bosses reported", value: <>
+      {unreachable ? PLACEHOLDER : row.bosses.length}
+      {row.encounters.length > 0 && filesNote(`in the files, ${row.encounters.length}`)}
+    </> },
+  ];
+
   const unconfirmed = row.reported > 0
     ? `No entrance is confirmed yet. ${row.reported} ${row.reported === 1 ? "install has" : "installs have"} zoned in, and 3 must agree on the place.`
     : "No entrance is confirmed yet: no install has reported zoning in. An entrance is confirmed once 3 installs zone in from the same place.";
@@ -165,9 +181,9 @@ export default async function InstancePage(props: Props) {
       <EdgeDegraded when={unreachable || !!world?.unreachable || !!loot?.unreachable} />
       <JsonLd data={entityPageJsonLd({ name: title, path: canonical, identifier: `instance:${row.instanceMapId}` })} />
       <article>
-        <DataTitle
+        <EntityHeader
           title={title}
-          meta={<span className="inline-flex items-center gap-2">{kindLabel(row.raid)}<span className="text-muted">Instance {row.instanceMapId}</span></span>}
+          meta={[kindLabel(row.raid), <span key="id" className="tabular-nums">Instance {row.instanceMapId}</span>]}
           trail={[
             ...trailFor("/database/instances")!,
             { name: title, path: canonical },
@@ -180,49 +196,21 @@ export default async function InstancePage(props: Props) {
 
         {unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} Players&apos; reports cannot be shown until it is back; the entrance below is from the game files.</p>}
 
+        <EntityTop box={null} facts={<Facts layout="list" label={`${title}: quick facts`} items={facts} />} />
+
         <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={link}>How to read these numbers</Link>} />
         {/* No per-instance JSON is served, so no Raw JSON link: the copy text is the record. */}
         <OpenData className="mb-6" text={[`${title} (instance ${row.instanceMapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
 
         <div className="space-y-6">
-          <section aria-labelledby="facts">
-            <SectionHeading id="facts">Facts</SectionHeading>
-            {/* One note for the whole page, under the first section, rather than one per section. */}
-            <Disclosure summary="How this is counted">
-              <p>Facts: the type is from the game files where they place the entrance, else as 3 installs agree. The level is from the game files, which give one level for most instances rather than a range. The difficulty is the id 3 installs agree on; the game files' own list of the instance's difficulties shows beside it when they give one.</p>
-              <p>Entrance: confirmed by the instance id, the last place outside where 3 installs stood before zoning in, at the median of their positions.</p>
-              <p>Bosses: a boss is listed once 3 installs report its encounter ending here. Kills count every install's kills together; wipes are not kills. The encounters the game files list for this instance follow, marked unconfirmed until 3 installs report them.</p>
-              <p>Loot: each boss's loot is the loot table of the creature 3 installs tie to its encounter, the same rows its NPC page shows. A rate needs loot windows from 3 installs; short of that, the count so far shows and no rate.</p>
-              <p>Quests: a quest is listed once 3 installs file it under this instance's name in the quest log, where the game files a dungeon's quests. This matches the quest log's header, not the quest's giver or turn-in, so a quest filed under another header is not here. Installs counts the installs that agreed on the header.</p>
-            </Disclosure>
-            <Card as="div">
-              <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
-                {row.statisticBoss && <>
-                  <dt className="text-muted">Name</dt>
-                  <dd className="text-fg">
-                    {row.name}
-                    <span className="ml-2 inline-flex items-baseline gap-1.5 text-meta text-muted"><Badge tone="files" />name from the game files; they place no entrance for it</span>
-                  </dd>
-                </>}
-                <dt className="text-muted">Type</dt><dd className="text-fg">{kindLabel(row.raid)}</dd>
-                <dt className="text-muted">Level</dt><dd className="text-fg">{levelLabel(row.level) ?? <span className="text-muted">–</span>}</dd>
-                <dt className="text-muted">Difficulty</dt>
-                <dd className="text-fg">
-                  {row.difficulty !== null ? difficultyLabel(row.difficulty) : PLACEHOLDER}
-                  {row.difficulties.length > 0 && (
-                    <span className="ml-2 inline-flex items-baseline gap-1.5 text-meta text-muted"><Badge tone="files" />in the files, {difficultyList(row.difficulties)}</span>
-                  )}
-                </dd>
-                <dt className="text-muted">Bosses reported</dt>
-                <dd className="text-fg">
-                  {unreachable ? PLACEHOLDER : row.bosses.length}
-                  {row.encounters.length > 0 && (
-                    <span className="ml-2 inline-flex items-baseline gap-1.5 text-meta text-muted"><Badge tone="files" />in the files, {row.encounters.length}</span>
-                  )}
-                </dd>
-              </dl>
-            </Card>
-          </section>
+          {/* One note for the whole page, above the first section, rather than one per section. */}
+          <Disclosure as="h2" summary="How this is counted">
+            <p>Facts: the type is from the game files where they place the entrance, else as 3 installs agree. The level is from the game files, which give one level for most instances rather than a range. The difficulty is the id 3 installs agree on; the game files' own list of the instance's difficulties shows beside it when they give one.</p>
+            <p>Entrance: confirmed by the instance id, the last place outside where 3 installs stood before zoning in, at the median of their positions.</p>
+            <p>Bosses: a boss is listed once 3 installs report its encounter ending here. Kills count every install's kills together; wipes are not kills. The encounters the game files list for this instance follow, marked unconfirmed until 3 installs report them.</p>
+            <p>Loot: each boss's loot is the loot table of the creature 3 installs tie to its encounter, the same rows its NPC page shows. A rate needs loot windows from 3 installs; short of that, the count so far shows and no rate.</p>
+            <p>Quests: a quest is listed once 3 installs file it under this instance's name in the quest log, where the game files a dungeon's quests. This matches the quest log's header, not the quest's giver or turn-in, so a quest filed under another header is not here. Installs counts the installs that agreed on the header.</p>
+          </Disclosure>
 
           <section aria-labelledby="entrance">
             <SectionHeading id="entrance">Entrance</SectionHeading>

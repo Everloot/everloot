@@ -1,8 +1,8 @@
 import Link from "next/link";
 import GameIcon from "./game/GameIcon";
 
-const PAGE = { item: "items", npc: "npcs", quest: "quests", object: "objects", vendor: "vendors" } as const;
-const WORD = { item: "Item", npc: "NPC", quest: "Quest", object: "Object", vendor: "Vendor NPC" } as const;
+const PAGE = { item: "items", npc: "npcs", quest: "quests", object: "objects", vendor: "vendors", spell: "spells" } as const;
+const WORD = { item: "Item", npc: "NPC", quest: "Quest", object: "Object", vendor: "Vendor NPC", spell: "Spell" } as const;
 
 export type EntityKind = keyof typeof PAGE;
 

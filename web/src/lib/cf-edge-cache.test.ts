@@ -381,7 +381,7 @@ test("the suggest box shares one cache key for a query however it is cased or pa
   expect(key("https://everloot.app/search?q=Thunder")).not.toBe(key("https://everloot.app/search?q=thunder"));
 });
 
-test("a hover card is cached for every visitor: its cookies and authorization never reach the handler or the key", async () => {
+test.each(["item/2589", "spell/10", "vendor/3934"])("a %s hover card is cached for every visitor: its credentials never reach the handler or key", async (cardPath) => {
   const store = fakeStore();
   const ctx = fakeContext();
   const seen: (string | null)[] = [];
@@ -391,18 +391,26 @@ test("a hover card is cached for every visitor: its cookies and authorization ne
     seen.push(r.headers.get("cookie") ?? r.headers.get("authorization"));
     return Response.json({ ok: true, n: rendered }, { headers: { "cache-control": "public, max-age=300", "cdn-cache-control": "max-age=3600" } });
   };
-  const signedIn = () => new Request("https://everloot.app/database/card/item/2589", { headers: { cookie: "__Secure-everloot.session_token=abc; cf_clearance=x", "x-everloot-check": "s" } });
+  const signedIn = () => new Request(`https://everloot.app/database/card/${cardPath}`, { headers: { cookie: "__Secure-everloot.session_token=abc; cf_clearance=x", "x-everloot-check": "s" } });
   await cachedResponse(signedIn(), VERSIONS, handler, store, ctx);
   await Promise.all(ctx.waits);
-  const anonymous = await cachedResponse(new Request("https://everloot.app/database/card/item/2589"), VERSIONS, handler, store, ctx);
-  const again = await cachedResponse(new Request("https://everloot.app/database/card/item/2589", { headers: { authorization: "Bearer t" } }), VERSIONS, handler, store, ctx);
+  const anonymous = await cachedResponse(new Request(`https://everloot.app/database/card/${cardPath}`), VERSIONS, handler, store, ctx);
+  const again = await cachedResponse(new Request(`https://everloot.app/database/card/${cardPath}`, { headers: { authorization: "Bearer t" } }), VERSIONS, handler, store, ctx);
   expect(rendered).toBe(1);
   expect(seen).toEqual([null]);
   expect(anonymous.headers.get("x-everloot-edge-cache")).toBe("HIT");
   expect(again.headers.get("x-everloot-edge-cache")).toBe("HIT");
   expect(await again.json()).toEqual({ ok: true, n: 1 });
   expect(again.headers.get("cache-control")).toBe("public, max-age=300");
-  expect([...store.entries.keys()]).toEqual([`https://everloot.app/database/card/item/2589?__edge_version=${version("/database/card/item/2589")}`]);
+  expect([...store.entries.keys()]).toEqual([`https://everloot.app/database/card/${cardPath}?__edge_version=${version(`/database/card/${cardPath}`)}`]);
+});
+
+test.each(["spell", "vendor"])("only the exact %s card path drops credentials", (type) => {
+  for (const path of [`${type}/10/extra`, `${type}/010`, `${type}/10/`, `${type}-private/10`, `${type}/me`, "unknown/10"]) {
+    const req = new Request(`https://everloot.app/database/card/${path}`, { headers: { cookie: "session=private", authorization: "Bearer private" } });
+    expect(withoutCredentials(req)).toBe(req);
+    expect(edgeCacheable(req)).toBe(false);
+  }
 });
 
 test("only the card route drops credentials: a page, a card spelled another way or a POST keeps them and bypasses the cache", () => {

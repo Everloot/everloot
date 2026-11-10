@@ -208,6 +208,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: dungeon and raid pages list the quests players filed under the instance in their quest log (matched by the quest-log header 3 installs agree on), with installs and last seen, and every boss under Loot says when no creature is tied to it yet. Instance 2999 shows as Ruins of Lordaeron, a name taken from the game files and marked as such.
 - Site: Quest pages link their chain, previous and next quests, and reported zone; chain lists explain quests whose names are not reported yet.
 - Site: object, instance, faction, title, achievement and vendor pages now link the Warcraft Wiki lore page of the same name, item pages do too when the name shown is the wiki's, and lore pages link back to the database page (zone, instance, object, faction, title, achievement, NPC, item or quest). A link needs an exact name that only one page has on each side; a name two pages share gets no link. Zone pages follow the same rule, and a Warcraft Wiki copy is indexed and listed in the lore sitemap exactly when it links back.
+- Site: spell and vendor links show hover cards, with the spell text and build or the vendor's agreed goods count.
 - Site: the home page now states the site's promise, "Every fact shows how many players saw it, and when", with three counts under it: the installs that have reported, the facts they have confirmed and the facts waiting on one or two more installs, each with the data date and build, or "unrecorded" when the stored coverage score cannot be read. An empty loot tab on an NPC, item or object page now ends on how many installs it takes, beside the Get the addon link, and the MCP server's instructions state the same promise.
 
 ### Fixed
@@ -461,6 +462,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Docs: OPEN_DATA.md and RELEASING.md no longer say the open data export sits in the roadmap's Next section; they point to ROADMAP.md.
 - Docs: each gap in DATA_PLACEMENT.md carries a dated state, and the WAF row now describes the Cloudflare rules that apply on /database/*.
 - Docs: CONTRIBUTING.md and the pull request template describe the changelog line, the labels in use and the addon install link.
+- Site: zone and instance pages open with the same title row as the other database pages (name, type line, quiet controls at its end), and the instance and spell-talent facts use the same label-and-value list.
 
 ## [desktop-v0.1.21] - 2026-11-10
 

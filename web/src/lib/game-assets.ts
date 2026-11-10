@@ -191,6 +191,8 @@ export async function loadSiteAssets(base: string | null = assetsBaseUrl(), fetc
 export interface PrivateStore { read(path: string): Promise<unknown | null> }
 /** A private read that failed, as opposed to a file that is not there. Readers that only want the file see a non-object. */
 export const PRIVATE_UNREACHABLE: unique symbol = Symbol("private bucket unreachable");
+/** A present names file that does not match its schema. */
+export const PRIVATE_MALFORMED: unique symbol = Symbol("private names malformed");
 
 // Signed requests differ every time, so the fetch cache cannot keep them; this does, per server instance.
 const kept = new Map<string, { at: number; value: unknown | null }>();
@@ -413,19 +415,21 @@ const parsedGameNames = new WeakMap<object, { file: string; names: { version: st
 
 async function loadNamesFile<T extends { version: string }>(file: string, version: string, base: string | null, store: PrivateStore | null, parse: (raw: unknown) => T | null): Promise<T | null> {
   const names = await readNamesFile(file, version, base, store, parse);
-  return names === PRIVATE_UNREACHABLE ? null : names;
+  return names === PRIVATE_UNREACHABLE || names === PRIVATE_MALFORMED ? null : names;
 }
 
-/** `loadNamesFile`, with PRIVATE_UNREACHABLE when the bucket could not be read. */
-async function readNamesFile<T extends { version: string }>(file: string, version: string, base: string | null, store: PrivateStore | null, parse: (raw: unknown) => T | null): Promise<T | null | typeof PRIVATE_UNREACHABLE> {
+/** `loadNamesFile`, distinguishing a failed read and a present file that failed parsing from absence. */
+async function readNamesFile<T extends { version: string }>(file: string, version: string, base: string | null, store: PrivateStore | null, parse: (raw: unknown) => T | null): Promise<T | null | typeof PRIVATE_UNREACHABLE | typeof PRIVATE_MALFORMED> {
   const folder = base ? buildFolder(base) : null;
   if (!folder || !store) return null;
   const raw = await store.read(`${folder}/${file}`);
   if (raw === PRIVATE_UNREACHABLE) return raw;
-  if (!raw || typeof raw !== "object") return null;
+  if (raw === null) return null;
+  if (typeof raw !== "object") return PRIVATE_MALFORMED;
   if (parsedGameNames.get(raw)?.file !== file) parsedGameNames.set(raw, { file, names: parse(raw) });
   const names = parsedGameNames.get(raw)!.names as T | null;
-  return names && names.version === version ? names : null;
+  if (!names) return PRIVATE_MALFORMED;
+  return names.version === version ? names : null;
 }
 
 /**
@@ -439,8 +443,8 @@ export async function loadQuestNames(version: string, base: string | null = asse
 }
 
 /** `loadQuestNames`, with PRIVATE_UNREACHABLE when the bucket could not be read, like loadItemNames. */
-export function readQuestNames(version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()): Promise<QuestNames | null | typeof PRIVATE_UNREACHABLE> {
-  return readNamesFile("quest-names.json", version, base, store, (raw) => {
+export async function readQuestNames(version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()): Promise<QuestNames | null | typeof PRIVATE_UNREACHABLE> {
+  const names = await readNamesFile("quest-names.json", version, base, store, (raw) => {
     const f = QuestNamesSchema.safeParse(raw);
     return f.success ? {
       version: f.data.build.version,
@@ -449,6 +453,7 @@ export function readQuestNames(version: string, base: string | null = assetsBase
       names: new Map(Object.entries(f.data.names).filter(([id, x]) => mayShowQuestTitle(Number(id), x.n)).map(([id, x]) => [Number(id), { name: x.n, wikiPage: `${WIKI_PAGE_PREFIX}${x.w}` }])),
     } : null;
   });
+  return names === PRIVATE_MALFORMED ? null : names;
 }
 
 function fileNames(schema: typeof SetNamesSchema | typeof SpellNamesSchema, may: (id: number, name: string) => boolean) {
@@ -466,6 +471,10 @@ export const loadItemSetNames = (version: string, base: string | null = assetsBa
   loadNamesFile("item-set-names.json", version, base, store, fileNames(SetNamesSchema, mayShowSetName));
 export const loadSpellNames = (version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()) =>
   loadNamesFile("spell-names.json", version, base, store, fileNames(SpellNamesSchema, mayShowSpellName));
+
+/** Spell names, distinguishing failed reads and malformed files from an absent or wrong-build catalog. */
+export const readSpellNames = (version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()) =>
+  readNamesFile("spell-names.json", version, base, store, fileNames(SpellNamesSchema, mayShowSpellName));
 
 /** A relation target's name from these files, and where it comes from: the wiki (quest titles) or the game files alone. */
 export interface GameName { name: string; source: "wiki" | "files" }
