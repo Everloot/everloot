@@ -277,7 +277,14 @@ Left-click the minimap button, or `/everloot window`, for the Everloot window. I
   and has a button that runs that command. It shows this character, or the account: every character in the roster, each
   item done when any of them has it, with the name of the character that does.
 - **Professions** shows each profession in the profession book with its rank and the recipes recorded for it by
-  difficulty colour.
+  difficulty colour. **Crafting costs**, the button at its bottom, lists the recipes this install recorded under this
+  character's profession names (recipe rows carry no character, so an alt's recipes in the same profession show too)
+  with what their reagents cost at the price file's market value (a vendor's price instead when a vendor you visited
+  sells the reagent for less), what one product item sells for and an estimated profit, sorted by that estimate or by
+  name, and says how old the price file is. How many items a craft makes is not recorded, so the estimate assumes one
+  item per craft. A reagent without a price makes the cost unknown, never zero; so does a reagent name this install
+  has seen with two item ids. Choose a recipe and a count for what to buy: each reagent, how many and what they cost,
+  with Up and Down past five reagents. Your bags and bank are not read.
 - **Settings** opens this page. "What you've added", the row counts in your saved file, is on that page now.
 
 Ask, Build plan and Auctions are no longer in the sidebar. `/ask` and `/everloot plan` (the planner workspace) still work.
@@ -582,7 +589,7 @@ addon/
 │   ├── window.lua      the Everloot window: Home from what the file holds; built on first open, no records
 │   ├── view_gold.lua   the window's Gold tab: gold by realm, the ledger, auction sales, the gph session; display only
 │   ├── view_collection.lua  the window's Collection tab: achievements, reputation, titles, lockouts, quest chains; display only
-│   └── view_professions.lua  the window's Professions tab: each profession, its rank and recorded recipes; display only
+│   └── view_professions.lua  the window's Professions tab: each profession, its rank and recorded recipes, crafting costs; display only
 ├── media/crest.tga     the crest, 128 px, packaged beside the code
 └── tests/              Lua 5.1 contract tests and their fixtures
 ```
