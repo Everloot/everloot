@@ -126,8 +126,9 @@ test("the schemas page marks the file-only shapes, says reporters is installs, a
   for (const [name, file] of Object.entries(FILE_SCHEMAS)) expect(text).toContain(`/schema/api/${name}.json Describes a file, not an endpoint: ${file}.`);
   expect(text.split("Describes a file, not an endpoint").length - 1).toBe(fileOnly.length);
   expect(text).toContain("reporters, it is the count of installs that agree on that fact, the same number the open-data files call installs");
-  for (const path of PAGE_INTERNAL_ROUTES) expect(page).toContain(`>${path}</code>`);
-  expect(text).toContain("they are not part of the contract, the document leaves them out");
+  for (const r of PAGE_INTERNAL_ROUTES) expect(page).toContain(`>${r.path}</code>`);
+  expect(text).toContain("/search/suggest: the type-ahead under the site's search boxes");
+  expect(text).toContain("/database/card/{type}/{id}: the hover card on the site's own links");
   expect(page).toContain('id="site-internal-routes"');
   expect(page).toContain("may change without notice and are not part of the protocol");
   for (const path of corsPrerenderedPaths) expect(page).toContain(`>${path}</code>`);

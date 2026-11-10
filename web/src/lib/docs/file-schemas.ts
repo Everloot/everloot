@@ -14,4 +14,10 @@ export const FILE_SCHEMAS: Partial<Record<ApiSchemaName, string>> = {
  * Public GET routes a page of the site fetches for itself. They are outside the protocol package, so the OpenAPI
  * document and the endpoint pages do not describe them, and they can change with the page.
  */
-export const PAGE_INTERNAL_ROUTES = ["/api/map/pins", "/api/suggest"] as const;
+export const PAGE_INTERNAL_ROUTES = [
+  { path: "/api/suggest", file: "api/suggest", what: "suggestions from the names players agree on" },
+  { path: "/api/map/pins", file: "api/map/pins", what: "the pins the map draws on a continent" },
+  { path: "/search/suggest", file: "search/suggest", what: "the type-ahead under the site's search boxes, matched on the names the pages show" },
+  { path: "/search/people", file: "search/people", what: "the player results on the search page, asked for from the browser" },
+  { path: "/database/card/{type}/{id}", file: "database/card/[type]/[id]", what: "the hover card on the site's own links" },
+] as const;
