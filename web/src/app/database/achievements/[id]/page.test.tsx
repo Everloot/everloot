@@ -83,6 +83,32 @@ test("an achievement only the game files know says so, counts no installs as agr
   expect(text).not.toContain("Elwynn");
 });
 
+// Three installs agree on the entry (name, category, points and 3 criteria) but each words the criteria differently, so no list is agreed.
+const unlisted = (id: number, name: string) => ["one", "two", "three"].map((i) => reported(`reporter-${i}`, {
+  achievementId: id, name, categoryId: 3, category: "Quests", points: 10, criteriaCount: 3,
+  criteria: ["A", "B", "C"].map((t) => ({ text: `${t} by ${i}`, required: 1 })),
+}));
+
+test("a confirmed achievement whose criteria text nobody agreed on: the count is the players', the list is the game files'", async () => {
+  serve(unlisted(50, "Loremaster"));
+  const out = await html("50-loremaster");
+  expect(out).toContain("An achievement in Quests, 10 points, 3 criteria.");
+  expect(factOf(out, "Criteria")).toBe("3");
+  expect(out).toContain("The category, points and criteria count are as three installs reported them; the criteria list is the game files&#x27; (build 1.15.8.70862), unconfirmed.");
+  expect(out).not.toContain("and so is the criteria list");
+  // The list on the page is the files' one criterion, not the three the installs sent.
+  expect(out).toContain("Elwynn");
+  expect(openData(out).join("\n")).not.toContain("by one");
+});
+
+test("a confirmed achievement with no agreed criteria text and none in the game files says the list is still to come", async () => {
+  serve(unlisted(5, "Two Steps"));
+  const out = await html("5-two-steps");
+  expect(out).toContain("The category, points and criteria count are as three installs reported them; the criteria list shows once three installs report the same full list.");
+  expect(factOf(out, "Criteria")).toBe("3");
+  expect(out).not.toContain("the game files&#x27; (build");
+});
+
 test("an achievement two installs reported stays unconfirmed and says how many have sent it", async () => {
   serve([...from(3, twoSteps), ...from(2, loremaster)]);
   const out = await html("50-loremaster");

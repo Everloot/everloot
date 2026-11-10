@@ -11,7 +11,8 @@ import { pinLink } from "@/lib/world-map";
 import { trailFor } from "@/lib/breadcrumbs";
 import { loadItemFacts } from "@/lib/rollup-compute";
 import { itemNames, npcNames } from "@/lib/names";
-import { entitySummary, observedLine } from "@/lib/evidence";
+import { entitySummary, reportedLine } from "@/lib/evidence";
+import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import EntityLink from "@/components/EntityLink";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
 import ItemTip from "@/components/game/ItemTip";
@@ -72,10 +73,17 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
   const vendorName = facts.unreachable ? undefined : npcNames(facts).get(page.vendorNpcId);
   const title = vendorName ? `${vendorName} (vendor)` : `Vendor NPC ${page.vendorNpcId}`;
   const trail = [...trailFor("/database/vendors")!, { name: title, path: `/database/vendors/${page.vendorNpcId}` }];
-  // The page in three lines: what it sells, where players saw it, and where the name came from.
+  // The page in three lines: what it is, what players reported (prices and positions) with the agreement and the date
+  // of the uploads, and where the name came from. Storage down: unrecorded, never "no prices".
+  const reportedParts = [
+    page.offers.length ? `${page.offers.length} ${page.offers.length === 1 ? "price" : "prices"}` : null,
+    places.length ? `${places.length} ${places.length === 1 ? "map position" : "map positions"}` : null,
+  ];
   const summary = entitySummary({
-    identity: page.offers.length ? `${page.offers.length} ${page.offers.length === 1 ? "price" : "prices"} reported` : "No prices reported yet",
-    observed: observedLine([places.length ? `${places.length} ${places.length === 1 ? "map position" : "map positions"}` : null], null, Date.now()),
+    identity: `A vendor in WoW: Forever (NPC ${page.vendorNpcId}).`,
+    observed: facts.unreachable ? STORAGE_UNREACHABLE
+      : reportedParts.some(Boolean) ? `${reportedLine(reportedParts, facts.dataAsOf ?? null, Date.now())} Each has three installs agreeing.`
+      : reportedLine([], null, Date.now()),
     named: Boolean(vendorName),
   });
 

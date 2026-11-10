@@ -71,7 +71,9 @@ export default async function AchievementPage(props: Props) {
   const fileCriteria = entry?.criteria ?? files?.criteria.map((c) => ({ text: c.text, required: c.amount ?? 1 })) ?? [];
   const fromReports = Boolean(entry?.criteria);
   const points = entry?.points ?? files?.points ?? null;
-  const criteria = fromReports ? entry!.criteriaCount : files?.criteria.length ?? null;
+  // The count and the list have separate sources: a confirmed entry's count is agreed by three installs whether or not
+  // they agreed on the list's text; without an entry both are the game files'.
+  const criteria = entry ? entry.criteriaCount : files?.criteria.length ?? null;
   const facts: { label: string; value: ReactNode; numeric?: boolean }[] = [
     { label: "Category", value: entry?.category ?? null },
     { label: "Points", value: points, numeric: true },
@@ -87,7 +89,9 @@ export default async function AchievementPage(props: Props) {
   const summary = entry || files ? [
     `${files?.statistic ? "A statistic the game keeps, not an achievement to earn" : entry?.category ? `An achievement in ${entry.category}` : "An achievement"}, ${points === null ? "points not reported yet" : `${points} ${points === 1 ? "point" : "points"}`}, ${criteria === null ? "criteria count not reported yet" : `${criteria} ${criteria === 1 ? "criterion" : "criteria"}`}.`,
     entry
-      ? `The category, points and criteria count are as three installs reported them${fromReports ? ", and so is the criteria list" : fileCriteria.length ? `; the criteria list is the game files' (build ${fileVersion}), unconfirmed` : ""}.`
+      ? `The category, points and criteria count are as three installs reported them${fromReports ? ", and so is the criteria list"
+        : fileCriteria.length ? `; the criteria list is the game files' (build ${fileVersion}), unconfirmed`
+        : entry.criteriaCount > 0 ? "; the criteria list shows once three installs report the same full list" : ""}.`
       : `The name, points and criteria are from the game files of build ${fileVersion}, unconfirmed; the category shows once three installs agree.`,
     state === "Confirmed" ? `Three installs confirmed it${asOf ? ` (${asOf})` : ""}.`
       : state === "Unconfirmed" ? `Not confirmed yet: ${listed?.reporters ?? 0} of 3 installs have sent it${asOf ? ` (${asOf})` : ""}.`

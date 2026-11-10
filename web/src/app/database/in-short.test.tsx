@@ -47,13 +47,14 @@ beforeEach(() => store.loadCorpus.mockReset());
 test("a vendor page copies its In short lines, and links the NPC's card as Raw JSON once players reported the NPC", async () => {
   serve([...guard, ...sells]);
   const out = await html(VendorPage({ params: Promise.resolve({ id: "1" }) }));
-  expect(inShort(out)).toContain("1 price reported");
-  expect(inShort(out)).toContain("Players reported 1 map position.");
+  expect(inShort(out)).toContain("A vendor in WoW: Forever (NPC 1).");
+  // The prices and the position are dated by the uploads they were read from, with the agreement beside them.
+  expect(inShort(out)).toMatch(/Players reported 1 price and 1 map position \(last upload [^)]+\)\. Each has three installs agreeing\./);
   expect(inShort(out)).toContain("Players agree on the name.");
   expect(openData(out)).toEqual([
     "Guard Thomas (vendor 1)",
-    "1 price reported",
-    "Players reported 1 map position.",
+    "A vendor in WoW: Forever (NPC 1).",
+    expect.stringMatching(/^Players reported 1 price and 1 map position \(last upload [^)]+\)\. Each has three installs agreeing\.$/),
     "Players agree on the name.",
     "Source: https://everloot.app/database/vendors/1",
   ]);
@@ -63,17 +64,27 @@ test("a vendor page copies its In short lines, and links the NPC's card as Raw J
 test("a vendor nobody placed or named keeps Copy for AI and has no Raw JSON, since its NPC has no card", async () => {
   serve(sells);
   const out = await html(VendorPage({ params: Promise.resolve({ id: "1" }) }));
-  expect(inShort(out)).toContain("No player has reported it yet.");
+  expect(inShort(out)).toMatch(/Players reported 1 price \(last upload [^)]+\)\. Each has three installs agreeing\./);
   expect(openData(out)[0]).toBe("Vendor NPC 1 (vendor 1)");
   expect(openData(out).at(-1)).toBe("Source: https://everloot.app/database/vendors/1");
   expect(out).not.toContain("Raw JSON");
+});
+
+test("a vendor page with storage down says the figures are unrecorded, not that it has no prices", async () => {
+  down();
+  const out = await html(VendorPage({ params: Promise.resolve({ id: "1" }) }));
+  expect(inShort(out)).toContain("Storage unreachable. These figures are unrecorded, not zero.");
+  expect(inShort(out)).not.toContain("No player has reported");
+  expect(inShort(out)).not.toContain("No prices");
 });
 
 test("a zone page sums up what three installs agree on, and the entrances the game files give it", async () => {
   serve([...guard, ...sells]);
   const out = await html(ZonePage({ params: Promise.resolve({ zone: "1429-elwynn-forest" }) }));
   expect(inShort(out)).toContain("A zone in Eastern Kingdoms; its name and outline are from the game files.");
-  expect(inShort(out)).toContain("Players reported 1 vendor. Each has three installs agreeing.");
+  // The vendor count is dated by the uploads, not by a treasure or entrance date it does not have.
+  expect(inShort(out)).toMatch(/Players reported 1 vendor \(last upload [^)]+\)\. Each has three installs agreeing\./);
+  expect(inShort(out)).not.toContain("last seen");
   const text = openData(out);
   expect(text[0]).toBe("Elwynn Forest (zone 1429)");
   expect(text.at(-1)).toBe("Source: https://everloot.app/database/zones/1429-elwynn-forest");
@@ -86,10 +97,17 @@ test("a zone nobody reported anything in says so, and one with storage down says
   expect(inShort(empty)).toContain("No player has reported it yet.");
   expect(inShort(empty)).toContain("A zone in Kalimdor; its name and outline are from the game files.");
   expect(openData(empty)[0]).toBe("Durotar (zone 1411)");
+  // No entrance is "none recorded", with the reason, not a claim that nothing is entered from the zone.
+  expect(inShort(empty)).toContain("No entrance recorded yet: the game files place none here and players have not confirmed one.");
+  expect(empty).not.toContain("No dungeon or raid is entered from this zone");
   down();
   const unread = await html(ZonePage({ params: Promise.resolve({ zone: "1411-durotar" }) }));
   expect(inShort(unread)).toContain("Storage unreachable. These figures are unrecorded, not zero.");
   expect(inShort(unread)).not.toContain("No player has reported");
+  // Unreadable reports are not the same as an empty list in the game files.
+  expect(inShort(unread)).toContain("No entrance recorded yet in the game files; player reports could not be read just now.");
+  expect(inShort(unread)).not.toContain("players have not confirmed one");
+  expect(unread).not.toContain("No dungeon or raid is entered from this zone");
   // The entrances are the game files', so that line stays either way.
   expect(inShort(unread).match(/<li>/g)).toHaveLength(3);
 });

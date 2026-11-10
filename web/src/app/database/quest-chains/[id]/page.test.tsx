@@ -65,7 +65,9 @@ test("a chain only the game files list: unconfirmed, with how many installs have
   serve(from(2, { questLineId: 1, name: "The Missing Diplomat", questIds: [11, 10] }));
   const out = await html("1-the-missing-diplomat");
   expect(out).toMatch(/Found in game files, unconfirmed: 2 of 3 installs have reported it \(last upload [^)]+\)\./);
-  expect(out).toContain("The name and the quests are shown from the game files; players have not reported them yet.");
+  // Two installs did report it, so the page does not say players have not.
+  expect(out).toContain("The name and the quests are shown from the game files; not confirmed by three installs yet.");
+  expect(out).not.toContain("have not reported them yet");
   expect(out).not.toContain("Players agree on the name.");
   const text = openData(out);
   expect(text[0]).toBe("The Missing Diplomat (quest chain 1)");
@@ -76,5 +78,7 @@ test("with the player rollup unreadable, a files-only chain says reports could n
   store.loadCompletion.mockResolvedValue({ state: null, dataAsOf: null, unreachable: true });
   const out = await html("1-the-missing-diplomat");
   expect(out).toContain("Found in game files, unconfirmed; player reports could not be read just now.");
+  expect(out).toContain("The name and the quests are shown from the game files; player reports could not be read just now.");
+  expect(out).not.toContain("not confirmed by three installs yet");
   expect(out).not.toContain("0 of 3");
 });

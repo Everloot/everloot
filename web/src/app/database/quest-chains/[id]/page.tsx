@@ -59,7 +59,10 @@ export default async function QuestChainPage(props: Props) {
         : "Found in game files, unconfirmed; player reports could not be read just now.",
     named: entry.confirmed,
   }) : [];
-  const summary = entry ? [what, observed, entry.confirmed ? name : "The name and the quests are shown from the game files; players have not reported them yet."] : [];
+  // Not confirmed is not "not reported": some installs may have reported it (the line above counts them), and when the
+  // reports could not be read the page cannot say either.
+  const filesName = `The name and the quests are shown from the game files; ${catalog?.confirmations ? "not confirmed by three installs yet" : "player reports could not be read just now"}.`;
+  const summary = entry ? [what, observed, entry.confirmed ? name : filesName] : [];
 
   return (
     <Container width="data">
