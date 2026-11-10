@@ -1,8 +1,13 @@
 import { AwsClient } from "aws4fetch";
+import { RECHECK_SCOPES } from "./recheck-scopes";
 import { observedFacts } from "./world-map";
 import { uploadStore, type R2Config } from "./upload-store";
 
-/** Anonymous facts stored by the snapshot cron; pages fall back to the corpus until the file can be read. */
+/**
+ * Anonymous facts stored by the snapshot cron; pages fall back to the corpus until the file can be read. The file holds
+ * the reported rows only: `facts.recheck` is the build's curated recheck list (recheck-scopes.ts), set again on read,
+ * so a deploy that changes the list shows at once instead of after the next upload.
+ */
 export interface MapPinsView { dataAsOf: string | null; facts: ReturnType<typeof observedFacts>; }
 
 export const MAP_PINS_KEY = "snapshots/map-pins.json";
@@ -25,20 +30,22 @@ export function buildMapPins(corpus: { records: unknown[]; dataAsOf?: string | n
 }
 
 export function encodeMapPins(set: MapPinsView, generatedAt: string): string {
-  return JSON.stringify({ version: 1, generatedAt, set });
+  const { recheck: _recheck, ...facts } = set.facts;
+  return JSON.stringify({ version: 1, generatedAt, set: { ...set, facts } });
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const arrays = (v: unknown, ...keys: string[]) => isObject(v) && keys.every((k) => Array.isArray(v[k]));
 
-/** Unknown or unreadable files fall back to the corpus. */
+/** Unknown or unreadable files fall back to the corpus. A `recheck` list in an older file is ignored. */
 export function parseMapPins(text: string): { generatedAt: string; set: MapPinsView } | null {
   try {
     const raw: unknown = JSON.parse(text);
     if (!isObject(raw) || raw.version !== 1 || typeof raw.generatedAt !== "string" || !isObject(raw.set)) return null;
     const s = raw.set;
-    if (!(s.dataAsOf === null || typeof s.dataAsOf === "string") || !(arrays(s.facts, "npcs", "quests", "vendors") && isObject(s.facts) && Array.isArray(s.facts.recheck))) return null;
-    return { generatedAt: raw.generatedAt, set: s as unknown as MapPinsView };
+    if (!(s.dataAsOf === null || typeof s.dataAsOf === "string") || !arrays(s.facts, "npcs", "quests", "vendors")) return null;
+    const set = s as unknown as MapPinsView;
+    return { generatedAt: raw.generatedAt, set: { ...set, facts: { ...set.facts, recheck: RECHECK_SCOPES } } };
   } catch {
     return null;
   }
@@ -51,19 +58,28 @@ async function currentSet(): Promise<MapPinsView> {
   return buildMapPins(corpus);
 }
 
-/** Whether the file exists; a read failure counts as missing, so the next run tries to write it. */
-async function fileExists(cloud: R2Config, doFetch: typeof fetch): Promise<boolean> {
+/**
+ * The object metadata that says which corpus snapshot the file was built from, so a run that finds the file can tell
+ * whether it is behind. Without it a write that failed after new uploads would leave the file stale until the next
+ * upload, since idle runs would only check that the file exists.
+ */
+const STAMP = "x-amz-meta-data-as-of";
+const stampOf = (dataAsOf: string | null) => dataAsOf ?? "none";
+
+/** The stamp of the stored file, null when it has none, undefined when there is no file or the HEAD failed. */
+async function storedStamp(cloud: R2Config, doFetch: typeof fetch): Promise<string | null | undefined> {
   try {
     const res = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "HEAD" }));
-    return res.ok;
+    return res.ok ? res.headers.get(STAMP) : undefined;
   } catch {
-    return false;
+    return undefined;
   }
 }
 
 /**
- * The cron's step: writes the set when this run added uploads or rebuilt, or when there is no file yet. An idle run
- * with the file in place reads nothing but that one HEAD. `bytes` is the file's size, for the run's log.
+ * The cron's step: writes the set when this run added uploads or rebuilt, when there is no file yet, or when the file
+ * was built from another snapshot than `dataAsOf` (an earlier write failed, or the file predates the stamp). An idle
+ * run with a current file reads nothing but that one HEAD. `bytes` is the file's size, for the run's log.
  */
 export async function writeMapPins(opts: { added: number; rebuild?: boolean; dataAsOf: string | null }, deps: {
   cloud?: R2Config | null; fetch?: typeof fetch; build?: () => Promise<MapPinsView>; now?: () => Date;
@@ -71,9 +87,9 @@ export async function writeMapPins(opts: { added: number; rebuild?: boolean; dat
   const cloud = deps.cloud === undefined ? r2FromEnv() : deps.cloud;
   if (!cloud) throw new Error("the stored map-pins need the cloud store");
   const doFetch = deps.fetch ?? fetch;
-  if (opts.added <= 0 && !opts.rebuild && await fileExists(cloud, doFetch)) return { written: false };
+  if (opts.added <= 0 && !opts.rebuild && await storedStamp(cloud, doFetch) === stampOf(opts.dataAsOf)) return { written: false };
   const body = encodeMapPins(await (deps.build ?? currentSet)(), (deps.now?.() ?? new Date()).toISOString());
-  const put = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "PUT", body, headers: { "content-type": "application/json" } }));
+  const put = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "PUT", body, headers: { "content-type": "application/json", [STAMP]: stampOf(opts.dataAsOf) } }));
   if (!put.ok) throw new Error(`map-pins write failed (${put.status})`);
   return { written: true, bytes: new TextEncoder().encode(body).length };
 }
