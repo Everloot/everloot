@@ -22,7 +22,7 @@ beforeAll(async () => { site = await loopbackSite(); });
 afterAll(async () => { await site.stop(); });
 
 const PRICE = "price 2589 on Forever";
-const MARKET = "Item 2589 on Forever, all houses: market 3s 10c";
+const MARKET = "Item 2589 on Forever, busiest auction house: market 3s 10c";
 const configs: [string, (d: string) => string | null][] = [
   ["no config", () => null],
   ["malformed JSON", () => "{"],

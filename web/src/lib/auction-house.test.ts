@@ -7,10 +7,10 @@ import {
 
 const now = new Date("2026-10-20T12:00:00.000Z");
 const at = (daysAgo: number) => new Date(now.getTime() - daysAgo * 86_400_000).toISOString();
-/** One full scan per install; `items` are [itemId, unit market value] with 40 units each. */
+/** One full scan per install, by a Horde character; `items` are [itemId, unit market value] with 40 units each. */
 const scans = (realm: string, daysAgo: number, items: [number, number][], installs = ["install-a", "install-b", "install-c"]) =>
   installs.map((installId) => ({
-    kind: "auction_snapshot", installId, capturedAt: at(daysAgo), realm,
+    kind: "auction_snapshot", installId, capturedAt: at(daysAgo), realm, faction: "Horde",
     items: items.map(([id, value]) => [id, 2, 40, value, value]),
   }));
 
@@ -58,15 +58,17 @@ test("moves compare the newest solid day with the day before, or a week before",
   expect(rows.find((r) => r.value.itemId === 4306)!.updatedAt).toBeNull();
 });
 
-test("each house is its own board; the blend is every house, and the switch counts items per house", () => {
+test("each house is its own board; All lists every house's rows apart, and the switch counts items per house", () => {
   const houses = foldMarket(emptyMarket(), [
     ...scans("Forever", 0, [[2589, 100]]).map((r) => ({ ...r, house: "Horde" })),
     ...scans("Forever", 0, [[2589, 300], [765, 30]]).map((r, i) => ({ ...r, installId: `alliance-${i}-x`, house: "Alliance" })),
   ], now);
-  expect(realmBoards(houses, now).map((b) => [b.realm.slug, b.house, b.rows.length])).toEqual([["forever", null, 2]]);
+  expect(realmBoards(houses, now).map((b) => [b.realm.slug, b.house, b.items, b.rows.length])).toEqual([["forever", null, 2, 3]]);
+  // Never a blend: each house keeps its own price, named.
+  expect(realmBoards(houses, now)[0]!.byItem.get(2589)!.map((r) => [r.house, r.value.market])).toEqual([["Alliance", 300], ["Horde", 100]]);
   const horde = realmBoards(houses, now, "Horde");
   expect(horde.map((b) => [b.realm.name, b.house])).toEqual([["Forever", "Horde"]]);
-  expect(horde[0]!.byItem.get(2589)!.value.market).toBe(100);
+  expect(horde[0]!.byItem.get(2589)!.map((r) => r.value.market)).toEqual([100]);
   expect(realmBoards(houses, now, "Neutral")).toEqual([]);
   expect(itemByHouse(houses, now, "forever", 2589).map((r) => [r.house, r.value.market])).toEqual([["Alliance", 300], ["Horde", 100]]);
   expect([...houseCounts(houses, now, "forever")]).toEqual([[null, 2], ["Alliance", 2], ["Horde", 1], ["Neutral", 0]]);
@@ -77,21 +79,30 @@ test("each house is its own board; the blend is every house, and the switch coun
   expect(houseParam("goblin")).toBeUndefined();
 });
 
+test("scans whose house is unknown never reach a page: their values may mix houses", () => {
+  const unknown = foldMarket(emptyMarket(), scans("Forever", 0, [[2589, 100]]).map(({ faction: _, ...r }) => r), now);
+  expect(Object.keys(unknown.realms)).toEqual(["forever"]);
+  expect(realmBoards(unknown, now)).toEqual([]);
+  expect(itemByHouse(unknown, now, "forever", 2589)).toEqual([]);
+  expect(agreementSoFar(unknown, "forever")).toBe(0);
+  expect(pendingRealms(unknown, now)).toEqual([]);
+});
+
 test("a row carries its listings while its newest day is open", () => {
   const rows = realmBoards(state, now)[0]!.byItem;
-  expect(rows.get(2589)!.listings).toBe(2);
+  expect(rows.get(2589)![0]!.listings).toBe(2);
   // Its only day is 30 days old: closed, so no count is kept.
-  expect(rows.get(4306)!.listings).toBeNull();
+  expect(rows.get(4306)![0]!.listings).toBeNull();
 });
 
 test("the sparkline places the solid days of the last two weeks by day, and needs two of them", () => {
   const rows = realmBoards(state, now)[0]!.byItem;
   // 765: yesterday at 30, today at 33. Today is at the right edge, the higher value at the top.
-  expect(sparkline(rows.get(765)!.points, now)).toBe("58.2,15.0 63.0,1.0");
-  expect(sparkline(rows.get(2589)!.points, now)).toBeNull();
+  expect(sparkline(rows.get(765)![0]!.points, now)).toBe("58.2,15.0 63.0,1.0");
+  expect(sparkline(rows.get(2589)![0]!.points, now)).toBeNull();
   // 2592 a week ago and today; 4306 only 30 days ago.
-  expect(sparkline(rows.get(2592)!.points, now)?.split(" ")).toHaveLength(2);
-  expect(sparkline(rows.get(4306)!.points, now)).toBeNull();
+  expect(sparkline(rows.get(2592)![0]!.points, now)?.split(" ")).toHaveLength(2);
+  expect(sparkline(rows.get(4306)![0]!.points, now)).toBeNull();
   expect(SPARK_BOX).toEqual({ width: 64, height: 16 });
 });
 

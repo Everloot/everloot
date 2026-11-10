@@ -6,19 +6,44 @@
 
 local E = Everloot
 
---- The player's latest full scan on this realm: { at, items = { [itemId] = {id, auctions, quantity, min, value} } }.
-function E:OwnScan(realm)
-  local last = EverlootDB.lastScans and EverlootDB.lastScans[realm]
+--- The auction house whose prices this character sees: the open auctioneer's (a goblin house is "Neutral"), else the
+--- character's faction house. Each house is its own market. Nil when neither can be read: then no community price is
+--- shown, never another house's.
+function E:MarketHouse()
+  if E.auctionHouseKind then return E.auctionHouseKind end
+  if not UnitFactionGroup then return nil end
+  local ok, group = pcall(UnitFactionGroup, "player")
+  group = ok and E.Readable(group)
+  if group == "Alliance" or group == "Horde" then return group end
+  return nil
+end
+
+--- The player's latest full scan of one auction house on this realm (`house` defaults to E:MarketHouse()):
+--- { at, house, items = { [itemId] = {id, auctions, quantity, min, value} } }. Scans are indexed by realm and house
+--- (EverlootDB.houseScans). A scan stored before that, or one whose auctioneer could not be read, is found through
+--- the realm's latest scan only when it is this house's or recorded no house; `house` is then nil, so the tooltip says
+--- the house was not recorded. Another house's scan is never returned.
+function E:OwnScan(realm, house)
+  house = house or E:MarketHouse()
+  local byHouse = EverlootDB.houseScans and EverlootDB.houseScans[realm]
+  local last = (house and byHouse and byHouse[house]) or (EverlootDB.lastScans and EverlootDB.lastScans[realm])
   if not last then return nil end
-  if E.ownScanCache and E.ownScanCache.scanId == last.scanId then return E.ownScanCache end
-  local items = {}
-  for _, row in ipairs(EverlootDB.records.auction_snapshot or {}) do
-    if row.scanId == last.scanId then
-      for _, item in ipairs(row.items) do items[item[1]] = item end
+  local cached = E.ownScanCache
+  if not (cached and cached.scanId == last.scanId) then
+    local items, scanHouse, found = {}, nil, false
+    for _, row in ipairs(EverlootDB.records.auction_snapshot or {}) do
+      if row.scanId == last.scanId then
+        found = true
+        scanHouse = scanHouse or row.house
+        for _, item in ipairs(row.items) do items[item[1]] = item end
+      end
     end
+    if not found then return nil end
+    cached = { scanId = last.scanId, at = last.at, house = scanHouse, items = items }
+    E.ownScanCache = cached
   end
-  E.ownScanCache = { scanId = last.scanId, at = last.at, items = items }
-  return E.ownScanCache
+  if cached.house and cached.house ~= house then return nil end
+  return cached
 end
 
 E.THIN_UNITS = 5          -- as kb/src/market.ts: this many units listed or fewer is a thin market
@@ -39,7 +64,7 @@ function E.DayNumber(text)
   return era * 146097 + doe - 719468
 end
 
--- Community prices per realm: { status = "verifying" | "ready" | "bad", data, asOf }.
+-- Community prices per realm and house ("forever|horde"): { status = "verifying" | "ready" | "bad", data, asOf, house }.
 local community = {}
 
 function E:ResetPrices()
@@ -72,20 +97,26 @@ end
 
 E.VerifyChecksum = verify
 
---- One realm's price file entry from EverlootPricesDB: "itemId,market,min,historical,quantity,day,reporters;..."
---- with an Adler-32 `sum` over that string. A blank market is unrecorded. The string is searched, not
---- parsed: a tooltip finds its one row, so a large file costs nothing until its checksum has passed.
-local function communityFor(realm)
-  local key = realm:lower()
+--- One house of one realm in EverlootPricesDB, keyed "realm|house" in lower case (`house` defaults to E:MarketHouse()):
+--- "itemId,market,min,historical,quantity,day,reporters;..." with an Adler-32 `sum` over that string. A blank market is
+--- unrecorded. The string is searched, not parsed: a tooltip finds its one row, so a large file costs nothing until its
+--- checksum has passed. A block keyed by the realm alone comes from an older file whose values may mix both factions:
+--- it is never read as this house's price (`legacy` says it is there), because a blended price can be far from what
+--- this house charges and nothing in it says which house it came from. Without a house nothing is read (`noHouse`).
+local function communityFor(realm, house)
+  house = house or E:MarketHouse()
+  if not house then return { status = "bad", silent = true, noHouse = true } end
+  local key = realm:lower() .. "|" .. house:lower()
   local entry = community[key]
   if entry == nil then
     local realms = type(EverlootPricesDB) == "table" and EverlootPricesDB.realms
     local db = type(realms) == "table" and realms[key]
+    local where = realm .. " (" .. house .. " auction house)"
     if type(db) ~= "table" then
-      entry = { status = "bad", silent = true }
+      entry = { status = "bad", silent = true, legacy = type(realms) == "table" and type(realms[realm:lower()]) == "table" or nil }
     elseif type(db.data) ~= "string" or type(db.sum) ~= "number" then
       entry = { status = "bad" }
-      print("Everloot: community prices for " .. realm .. " failed their checksum and are not shown.")
+      print("Everloot: community prices for " .. where .. " failed their checksum and are not shown.")
     else
       entry = { status = "verifying", data = ";" .. db.data .. ";", asOf = db.dataAsOf }
       community[key] = entry
@@ -98,10 +129,11 @@ local function communityFor(realm)
           entry.full = separators - 1 >= E.PRICE_FILE_ROWS
         else
           entry.data = nil
-          print("Everloot: community prices for " .. realm .. " failed their checksum and are not shown.")
+          print("Everloot: community prices for " .. where .. " failed their checksum and are not shown.")
         end
       end)
     end
+    entry.house = house
     community[key] = entry
   end
   return entry
@@ -121,17 +153,19 @@ local function communityRow(entry, itemId)
   }
 end
 
---- The community row for one item on a realm ({ market, min, historical, quantity, day, reporters }), or
---- nil while the file is missing, being checked or failed its checksum. The gold-per-hour tracker reads it.
-function E:CommunityPrice(realm, itemId)
-  return communityRow(communityFor(realm), itemId)
+--- The community row for one item in one house of a realm ({ market, min, historical, quantity, day, reporters }), or
+--- nil while the file is missing, being checked or failed its checksum, or the house is unknown. `house` defaults to
+--- E:MarketHouse(). The gold-per-hour tracker reads it.
+function E:CommunityPrice(realm, itemId, house)
+  return communityRow(communityFor(realm, house), itemId)
 end
 
---- The state of a realm's price file ({ status = "verifying" | "ready" | "bad", asOf, silent }), for the window's
---- crafting costs to say how old their market values are. `silent` is a realm the file has no entry for.
-function E:PriceFile(realm)
-  local entry = communityFor(realm)
-  return { status = entry.status, asOf = entry.asOf, silent = entry.silent }
+--- The state of one house of a realm in the price file ({ status = "verifying" | "ready" | "bad", asOf, silent, house,
+--- legacy, noHouse }), for the window's crafting costs to say how old their market values are and which house they are
+--- for. `silent` is a realm and house the file has no entry for; `legacy` an older realm-only block that is not read.
+function E:PriceFile(realm, house)
+  local entry = communityFor(realm, house)
+  return { status = entry.status, asOf = entry.asOf, silent = entry.silent, house = entry.house, legacy = entry.legacy, noHouse = entry.noHouse }
 end
 
 local function hex(r, g, b) return string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255) end
@@ -179,7 +213,7 @@ function E.RealmRuleset(realm)
 end
 
 --- The header's right column: the realm the prices are from, its ruleset split off in its own colour, and the unit
---- of every amount below: "CAMWOW US1 Realm 4 PvP · per unit".
+--- of every amount below: "CAMWOW US1 Realm 4 PvP · per unit". The market line names its auction house.
 local function headerRight(realm)
   local name, rule = E.RealmRuleset(realm)
   local ruleset = rule and (" " .. hex(rule.r, rule.g, rule.b) .. rule.label .. "|r") or ""
@@ -201,6 +235,9 @@ local function vendorPrice(itemId)
   return sell
 end
 
+--- The tooltip's note for an older realm-only price file, with or without an own scan beside it.
+local LEGACY_TIP = "no community price: the price file is from before houses were kept apart; refresh it in the Desktop App"
+
 --- The price lines for one item on the player's realm, as { text, r, g, b }: the community market value
 --- from the companion's file (with its freshness), the player's own last scan, and the vendor price beside them.
 --- The tooltip and the chat command show the same lines, so they always agree. `text` is plain, for chat; a line
@@ -216,9 +253,10 @@ local function priceLines(realm, itemId)
   if row then
     local thin = row.quantity <= E.THIN_UNITS
     local unrecorded = thin and "unrecorded (thin)" or "unrecorded"
-    -- The website can show one auction house; this file blends every house on the realm, so say so beside the numbers.
-    add("Everloot market " .. (row.market and E.Coins(row.market) or unrecorded) .. " · per unit · all houses", LABEL,
-      "Market value · all houses", row.market and coinIcons(row.market) or quiet(unrecorded))
+    -- Each auction house is its own market: the value is this house's, and the line says which.
+    local house = entry.house .. " house"
+    add("Everloot market " .. (row.market and E.Coins(row.market) or unrecorded) .. " · per unit · " .. house, LABEL,
+      "Market value · " .. house, row.market and coinIcons(row.market) or quiet(unrecorded))
     add("  min " .. E.Coins(row.min), LABEL, "  Min buyout", coinIcons(row.min))
     add("  historical " .. E.Coins(row.historical), LABEL, "  Historical", coinIcons(row.historical))
     add(string.format("  %d units listed%s, %d reporters on %s", row.quantity, thin and " (thin)" or "", row.reporters, row.day), META)
@@ -246,7 +284,8 @@ local function priceLines(realm, itemId)
     local hours = math.floor((time() - own.at) / 3600)
     add("Your scan: min " .. E.Coins(item[4]) .. " · per unit", OWN, "Your scan · min buyout", coinIcons(item[4]))
     add("  value " .. E.Coins(item[5]), OWN, "  Value", coinIcons(item[5]))
-    add(string.format("  %d units listed, scanned %s", item[3], hours < 1 and "under 1 h ago" or (hours .. " h ago")), META)
+    add(string.format("  %d units listed, scanned %s, %s", item[3], hours < 1 and "under 1 h ago" or (hours .. " h ago"),
+      own.house and (own.house .. " house") or "house not recorded"), META)
   end
   -- The game's own vendor price, for comparison beside an auction price; by itself it is no reason for these lines.
   if #out > 0 then
@@ -471,9 +510,16 @@ local function addLines(tooltip, itemId)
         missing[#missing + 1] = "community prices failed their checksum"
       elseif entry.full then
         missing[#missing + 1] = "not in the local price file, which keeps 2,000 items"
+      elseif entry.noHouse then
+        missing[#missing + 1] = "this character's auction house is unknown, so no community price"
+      elseif entry.legacy then
+        missing[#missing + 1] = LEGACY_TIP
       else
         missing[#missing + 1] = "no price on " .. realm .. " yet"
       end
+    elseif market and entry.legacy then
+      -- Your own scan answers, but the community price is gone because the file is older: say why on its own.
+      missing[#missing + 1] = LEGACY_TIP
     end
     missing[#missing + 1] = dropNote
   end
@@ -530,7 +576,14 @@ local function missingNote(realm, entry)
     if type(EverlootPricesDB) ~= "table" then
       return "No Everloot price file in the game yet: the Everloot Desktop App writes it, then /reload."
     end
-    return "The Everloot price file has no data for " .. realm .. " yet: scan its auction house or follow it in the Desktop App, then /reload."
+    if entry.noHouse then
+      return "Everloot cannot tell this character's auction house, so it shows no community price: each house is its own market."
+    end
+    if entry.legacy then
+      return "The Everloot price file is from before auction houses were kept apart: its prices may mix both factions, so they are not shown. Refresh it with the Everloot Desktop App, then /reload."
+    end
+    local where = entry.house and ("the " .. entry.house .. " auction house on " .. realm) or realm
+    return "The Everloot price file has no data for " .. where .. " yet: scan its auction house or follow it in the Desktop App, then /reload."
   end
   if entry.full then
     return "Not in this realm's price file, which keeps only the 2,000 items with the most units listed. A public price may still be on the website."
@@ -563,9 +616,10 @@ function E.PriceCommand(text, tries)
     return C_Timer.After(0, function() E.PriceCommand(text, (tries or 0) + 1) end)
   end
   local name = (GetItemInfo and select(2, GetItemInfo(id))) or ("item " .. id)
-  print("Everloot price: " .. name .. " on " .. realm)
-  -- A failed checksum is said even when the player's own scan answers: the community prices were there to be shown.
-  if #lines == 0 or (entry.status == "bad" and not entry.silent) then print("  " .. missingNote(realm, entry)) end
+  print("Everloot price: " .. name .. " on " .. realm .. (entry.house and (", " .. entry.house .. " auction house") or ""))
+  -- A failed checksum, or an older realm-only file, is said even when the player's own scan answers: the community
+  -- prices were there to be shown.
+  if #lines == 0 or (entry.status == "bad" and not entry.silent) or entry.legacy then print("  " .. missingNote(realm, entry)) end
   for _, line in ipairs(lines) do print(hex(line.r, line.g, line.b) .. line.text .. "|r") end
   for _, line in ipairs(historyLines(realm, id)) do print(hex(line.r, line.g, line.b) .. line.text .. "|r") end
   local dropLines, dropNote = E:DropLines(id)

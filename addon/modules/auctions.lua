@@ -321,8 +321,11 @@ local function pruneScans(realm)
     if r.realm == realm and not seen[r.scanId] then seen[r.scanId] = true; order[#order + 1] = r.scanId end
   end
   if #order <= E.SCANS_KEPT then return end
+  -- Each house's latest scan stays, so the tooltip still has this player's own scan of every house they use.
+  local latest = {}
+  for _, last in pairs(EverlootDB.houseScans and EverlootDB.houseScans[realm] or {}) do latest[last.scanId] = true end
   local drop = {}
-  for i = 1, #order - E.SCANS_KEPT do drop[order[i]] = true end
+  for i = 1, #order - E.SCANS_KEPT do if not latest[order[i]] then drop[order[i]] = true end end
   local kept = {}
   for _, r in ipairs(rows) do if not drop[r.scanId] then kept[#kept + 1] = r end end
   EverlootDB.records.auction_snapshot = kept
@@ -353,6 +356,13 @@ local function finish()
     }) then
       return say("the scan could not be stored. Upload your file with the Everloot Desktop App, then scan again.")
     end
+  end
+  -- Own scans are indexed by realm and house: each house is its own market. A scan whose auctioneer could not be read
+  -- has no house and is found only through the realm's latest scan, labelled as such.
+  if s.house then
+    EverlootDB.houseScans = EverlootDB.houseScans or {}
+    EverlootDB.houseScans[s.realm] = EverlootDB.houseScans[s.realm] or {}
+    EverlootDB.houseScans[s.realm][s.house] = { scanId = scanId, at = s.startedAt }
   end
   pruneScans(s.realm)
   EverlootDB.lastScans = EverlootDB.lastScans or {}

@@ -24,7 +24,7 @@ import { ahQuery } from "./browse";
 const today = new Date();
 const dayAgo = (n: number) => new Date(today.getTime() - n * 86_400_000).toISOString();
 const scans = (capturedAt: string, items: number[][]) => ["install-a", "install-b", "install-c"].map((installId, i) => ({
-  kind: "auction_snapshot", installId, eventId: `${installId}:${capturedAt}`, capturedAt, realm: "Forever",
+  kind: "auction_snapshot", faction: "Horde", installId, eventId: `${installId}:${capturedAt}`, capturedAt, realm: "Forever",
   scanId: `${installId}-${capturedAt}`, part: 1, parts: 1, items: items.map(([id, min, market]) => [id, 2, 40 + i, min, market]),
 }));
 // Two items with a week of history, so the "changed most" filter has rows.

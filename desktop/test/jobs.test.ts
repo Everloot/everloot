@@ -81,7 +81,7 @@ describe("a price question in /ask", () => {
       const { deps } = companionJobs(join(d, "data"), () => settingsFor(d));
       expect(await deps.ask(file)).toMatch(/^answered 2, failed 0/);
       const lua = written(d);
-      expect(lua).toContain(`["ask:1"] = { ["answer"] = "Item 2589 on Forever, all houses: market 3s 10c`);
+      expect(lua).toContain(`["ask:1"] = { ["answer"] = "Item 2589 on Forever, busiest auction house: market 3s 10c`);
       expect(lua).toContain(`["source"] = ${JSON.stringify(FIXTURE_URL)}`);
       expect(lua).toContain('["ask:2"] = { ["answer"] = "Warchief."');
       expect(market).toHaveBeenCalledTimes(1);

@@ -42,6 +42,11 @@ switches on its own.
 | `/ask` | Answers pending `/ask` questions into the `EverlootAnswers` slot addon | After the game writes the file; the public search needs no token file or key (an MCP URL and token file are an optional private-server setup under Advanced on the Ask page) |
 | Saved builds | Reads the talent builds you saved on everloot.app with your account key (it needs the "Read my saved builds" permission) and writes them into the `EverlootBuilds` slot addon, where `/everloot plan` lists them after a `/reload`. Nothing goes back to the site | After you sign in, on **Sync builds** (Addon page), and every 15 minutes, only to the site you signed in on and over https. Never without a key; a key the site refuses stops the timer until you press Sync builds or sign in again; signing out takes the builds out of the game |
 
+The price file is keyed by realm and auction house, and only an addon newer than 0.3.22 reads it that way. The 0.3.22
+addon release or earlier shows no community prices from this app's file, and a newer addon ignores the realm-only prices
+the 0.1.21 Desktop App release or earlier wrote (they may mix both factions). Drop rates and sources keep working in both cases.
+Update the addon and the app together, let the app refresh prices, then `/reload` in game.
+
 The window is a sidebar with one page per thing to manage:
 
 | Page | What it shows and does |

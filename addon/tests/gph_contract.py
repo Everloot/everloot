@@ -43,6 +43,8 @@ GOLD_AMOUNT = '%d Gold'; SILVER_AMOUNT = '%d Silver'; COPPER_AMOUNT = '%d Copper
 money = 50000
 GetMoney = function() return money end
 GetRealmName = function() return 'Forever' end
+-- An Alliance character: community prices are read from the realm's Alliance auction house.
+UnitFactionGroup = function() return 'Alliance', 'Alliance' end
 UnitName = function() return 'Farmer' end
 zone = 'Elwynn Forest'
 GetRealZoneText = function() return zone end

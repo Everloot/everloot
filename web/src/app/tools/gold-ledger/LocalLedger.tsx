@@ -3,7 +3,7 @@ import { useEffect, useId, useState } from "react";
 import { Card, DataTable, SectionHeading, type Column } from "@/components/ui";
 import { parseEverlootLua } from "@/lib/sv-parse";
 import {
-  RIVER_DAYS, categoryLabel, characterKey, isMoneyLedger, narrowLedger, summarizeMoney,
+  RIVER_DAYS, categoryLabel, characterKey, installHint, isMoneyLedger, narrowLedger, rosterLabel, summarizeMoney,
   type CategoryTotal, type GoldSeries, type MoneyLedger, type Receipt, type RiverDay, type RosterRow,
 } from "@/lib/money-ledger";
 import { formatCopper } from "../../../../../kb/src/gold-ledger";
@@ -101,8 +101,8 @@ function LedgerView({ ledger }: { ledger: MoneyLedger }) {
   const selectId = useId();
   const chosen = ledger.roster.find((r) => characterKey(r) === key);
   const shown = narrowLedger(ledger, key);
-  // "Thrall (Moon Guard)" when one character is chosen, else "all characters".
-  const who = chosen ? `${chosen.character} (${chosen.realm})` : "all characters";
+  // "Thrall (Moon Guard)" when one character is chosen, else "all characters"; the install tells apart two of one name.
+  const who = chosen ? rosterLabel(chosen, ledger.roster) : "all characters";
   return (
     <div className="space-y-8">
       <p className="text-sm text-muted">Read {when(ledger.madeAt)}. A missing line means the addon did not record it, not zero.</p>
@@ -112,7 +112,7 @@ function LedgerView({ ledger }: { ledger: MoneyLedger }) {
           <select id={selectId} value={chosen ? characterKey(chosen) : ""} onChange={(e) => setKey(e.target.value || null)}
             className="min-h-11 rounded-control border border-edge bg-canvas px-3 text-base text-fg">
             <option value="">All characters</option>
-            {ledger.roster.map((r) => <option key={characterKey(r)} value={characterKey(r)}>{r.character} ({r.realm})</option>)}
+            {ledger.roster.map((r) => <option key={characterKey(r)} value={characterKey(r)}>{rosterLabel(r, ledger.roster)}</option>)}
           </select>
         </div>
       )}
@@ -149,7 +149,7 @@ function WeekCard({ week, who }: { week: MoneyLedger["week"]; who: string }) {
 
 function Roster({ rows }: { rows: RosterRow[] }) {
   const columns: Column<RosterRow>[] = [
-    { key: "character", header: "Character", nowrap: true, cell: (r) => r.character },
+    { key: "character", header: "Character", nowrap: true, cell: (r) => <>{r.character}{installHint(r, rows) && <span className="text-muted"> {installHint(r, rows)}</span>}</> },
     { key: "realm", header: "Realm", nowrap: true, cell: (r) => r.realm },
     { key: "gold", header: "Gold", numeric: true, cell: (r) => <span className={r.copper === null ? "text-muted" : undefined}>{gold(r.copper)}</span> },
     { key: "peak", header: "Peak", numeric: true, cell: (r) => <span className={r.peakCopper === null ? "text-muted" : undefined}>{gold(r.peakCopper)}</span> },
@@ -159,7 +159,7 @@ function Roster({ rows }: { rows: RosterRow[] }) {
   return (
     <section aria-labelledby="ledger-roster">
       <SectionHeading id="ledger-roster" note={rows.length ? `${formatCopper(total)} across ${rows.length} ${rows.length === 1 ? "character" : "characters"}.` : undefined}>Characters</SectionHeading>
-      <DataTable caption="Gold per character" columns={columns} rows={rows} rowKey={(r) => `${r.character}-${r.realm}`}
+      <DataTable caption="Gold per character" columns={columns} rows={rows} rowKey={(r) => characterKey(r)}
         empty={<p className="px-4 py-6 text-sm text-fg-2">This file has no gold snapshots yet. The addon writes one when a character logs in.</p>} />
     </section>
   );
@@ -223,7 +223,7 @@ function Receipts({ rows, total }: { rows: Receipt[]; total: number }) {
   return (
     <section aria-labelledby="ledger-receipts">
       <SectionHeading id="ledger-receipts" note={total > rows.length ? `The newest ${rows.length} of ${total.toLocaleString("en-US")}.` : undefined}>Receipts</SectionHeading>
-      <DataTable caption="Money events, newest first" columns={columns} rows={rows} rowKey={(r) => `${r.at}-${r.character}-${r.realm}-${r.category}-${r.copper}`}
+      <DataTable caption="Money events, newest first" columns={columns} rows={rows} rowKey={(r) => `${r.at}-${characterKey(r)}-${r.category}-${r.copper}`}
         empty={<p className="px-4 py-6 text-sm text-fg-2">This file has no money events yet.</p>} />
     </section>
   );
@@ -239,8 +239,8 @@ function History({ series }: { series: GoldSeries[] }) {
             const high = Math.max(1, ...s.points.map((p) => p.copper));
             const first = s.points[0]!, last = s.points.at(-1)!;
             return (
-              <li key={`${s.character}-${s.realm}`}>
-                <p className="text-sm text-fg">{s.character} <span className="text-muted">{s.realm}</span></p>
+              <li key={characterKey(s)}>
+                <p className="text-sm text-fg">{s.character} <span className="text-muted">{s.realm}{installHint(s, series) && ` ${installHint(s, series)}`}</span></p>
                 <div aria-hidden="true" className="mt-2 flex h-12 items-end gap-px border-b border-line">
                   {s.points.map((p, i) => (
                     <div key={i} className="min-w-0 flex-1 rounded-t-sm bg-accent" style={{ height: `${Math.max(2, Math.round((p.copper / high) * 48))}px` }} title={`${day(p.at)}: ${formatCopper(p.copper)}`} />

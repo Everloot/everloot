@@ -178,7 +178,7 @@ describe("answerMarketQuestion", () => {
 
   test("an id given without a name is labelled by its id", async () => {
     const reply = await answerMarketQuestion("price 2589 on Forever", deps());
-    expect(reply!.text.startsWith("Item 2589 on Forever, all houses:")).toBe(true);
+    expect(reply!.text.startsWith("Item 2589 on Forever, busiest auction house:")).toBe(true);
   });
 
   test("several matching items ask which one and look nothing up", async () => {
@@ -349,7 +349,7 @@ describe("answerMarketQuestion", () => {
 describe("the same values as the server's derivation", () => {
   const NOW = new Date("2026-10-20T12:00:00Z");
   const scans = [100, 300, 500].map((unit, i) => ({
-    kind: "auction_snapshot", installId: `install-${i}`, eventId: `e:${i}`, capturedAt: "2026-10-20T10:00:00Z", realm: FIXTURE_REALM,
+    kind: "auction_snapshot", faction: "Alliance", installId: `install-${i}`, eventId: `e:${i}`, capturedAt: "2026-10-20T10:00:00Z", realm: FIXTURE_REALM,
     scanId: `s-${i}`, part: 1, parts: 1, items: [[FIXTURE_ITEM, 4, 80 + i * 20, unit, unit + 10]], reporter: String(i + 1).padStart(16, "0"),
   }));
   const state = foldMarket(emptyMarket(), scans, NOW);
@@ -361,7 +361,7 @@ describe("the same values as the server's derivation", () => {
     const structured = real.structured as { page: { value: unknown; history: unknown } };
     expect(structured.page.value).toEqual(FIXTURE_STRUCTURED.page.value);
     expect(structured.page.history).toEqual(FIXTURE_STRUCTURED.page.history);
-    expect(itemMarket(state, FIXTURE_REALM, FIXTURE_ITEM, NOW).value).toMatchObject({ market: 310, min: 300, historical: 310 });
+    expect(itemMarket(state, FIXTURE_REALM, FIXTURE_ITEM, NOW, "Alliance").value).toMatchObject({ market: 310, min: 300, historical: 310 });
   });
 
   test("copper formatting is the server's", () => {

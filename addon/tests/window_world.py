@@ -89,6 +89,8 @@ UnitClass = function() return 'Shaman', 'SHAMAN' end
 UnitRace = function() return 'Orc' end
 UnitLevel = function() return 24 end
 GetRealmName = function() return 'Forever' end
+-- An Alliance character: community prices are read from the realm's Alliance auction house.
+UnitFactionGroup = function() return 'Alliance', 'Alliance' end
 RAID_CLASS_COLORS = { SHAMAN = { r = 0, g = 0.44, b = 0.87 } }
 GetProfessions = function() return 1, nil, nil, 4, 5 end
 GetProfessionInfo = function(i)

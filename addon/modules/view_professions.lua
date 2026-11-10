@@ -353,8 +353,8 @@ local function ageLine(realm)
     return "OLD FILE: market values from " .. file.asOf:sub(1, 10) .. " (" .. age .. "). The Everloot Desktop App "
       .. "refreshes it, then /reload.", WARN
   end
-  return "Market values from the price file built " .. file.asOf:sub(1, 10) .. " (" .. age .. "), all houses; "
-    .. "a vendor price when it is lower.", COLORS.muted
+  return "Market values from the price file built " .. file.asOf:sub(1, 10) .. " (" .. age .. "), " .. file.house
+    .. " auction house; a vendor price when it is lower.", COLORS.muted
 end
 
 local function buyLine(part, count)

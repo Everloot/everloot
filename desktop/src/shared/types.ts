@@ -98,7 +98,8 @@ export interface FileSummary {
 
 export interface ScanAge { realm: string; at: string | null }
 
-export interface RealmSummary { realm: string; items: number; dataAsOf: string | null; source: "scan" | "followed" }
+/** One auction house of one realm the last refresh wrote: each house is its own market. */
+export interface RealmSummary { realm: string; house: string; items: number; dataAsOf: string | null; source: "scan" | "followed" }
 export interface MarketInfo {
   /** Realms named in the player's own scans. */
   own: string[];
@@ -116,13 +117,17 @@ export interface MarketInfo {
   /** The player's last full scan per realm across every account file, newest first. */
   scans: ScanAge[];
   error: string | null;
-  /** What the EverlootPrices file in the game holds now, per realm; null when there is no file. */
-  inGame: { realm: string; dataAsOf: string | null; items: number }[] | null;
+  /**
+   * What the EverlootPrices file in the game holds now, per realm and house; null when there is no file. `house` is null
+   * for a block from an older file keyed by realm alone: its values may mix both factions, and the addon no longer shows them.
+   */
+  inGame: { realm: string; house: string | null; dataAsOf: string | null; items: number }[] | null;
 }
-/** One item's price on each realm in the game's prices file, as the tooltip shows it. */
+/** One item's price in each house of each realm in the game's prices file, as the tooltip shows it. */
 export interface PriceLookup {
   itemId: number | null;
-  rows: { realm: string; dataAsOf: string | null; market: number | null; min: number; historical: number; quantity: number; day: string; reporters: number }[];
+  /** `house` is null for an older file's realm-only block: its values may mix both factions. */
+  rows: { realm: string; house: string | null; dataAsOf: string | null; market: number | null; min: number; historical: number; quantity: number; day: string; reporters: number }[];
   /** Why there is nothing to show, in a sentence; null with rows. */
   note: string | null;
 }
@@ -202,6 +207,11 @@ export interface MoneyDay {
   spent: number;
 }
 export interface CharacterRow {
+  /**
+   * Which character the row is: "key:" and the local roster key when the file's roster names it once, else "install:"
+   * with the install id, name and realm. Two characters with one name and realm stay two rows; the name and realm are labels.
+   */
+  id: string;
   character: string;
   realm: string;
   /** Copper, latest snapshot. */

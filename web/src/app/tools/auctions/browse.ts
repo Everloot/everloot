@@ -1,7 +1,7 @@
 import type { AuctionHouse } from "@everloot/protocol";
 import { QUALITIES, resolveClass, resolveSubclass, slotOf, type ItemClass, type ItemRow, type ItemSubclass } from "../../../../../kb/src/item-taxonomy";
 import { CLIENT_TAXONOMY as T } from "@/lib/items";
-import { houseParam, houseSlug, priceMove, type MarketRow, type Move } from "@/lib/auction-house";
+import { HOUSES, houseParam, houseSlug, priceMove, type MarketRow, type Move } from "@/lib/auction-house";
 import { rulesetParam, type RulesetSlug } from "@/lib/realms";
 
 /**
@@ -225,7 +225,8 @@ export function browseRows(rows: readonly MarketRow[], q: AhQuery, ctx: BrowseCo
     }
   };
   const dir = sort.desc ? -1 : 1;
-  const tie = (a: BrowseRow, b: BrowseRow) => a.row.value.itemId - b.row.value.itemId || a.row.realm.name.localeCompare(b.row.realm.name);
+  const tie = (a: BrowseRow, b: BrowseRow) => a.row.value.itemId - b.row.value.itemId || a.row.realm.name.localeCompare(b.row.realm.name)
+    || HOUSES.indexOf(a.row.house) - HOUSES.indexOf(b.row.house);
   return kept.map((b) => ({ b, k: key(b) })).sort((x, y) => {
     if (x.k === null || y.k === null) return x.k === y.k ? tie(x.b, y.b) : x.k === null ? 1 : -1;
     const c = typeof x.k === "number" && typeof y.k === "number" ? x.k - y.k : String(x.k).localeCompare(String(y.k));
