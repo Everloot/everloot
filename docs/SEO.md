@@ -42,9 +42,10 @@ the owner can do. Written after the 2026-10-17 audit.
   Bytespider, Amazonbot, Meta-ExternalAgent, Google-Extended, Applebot-Extended) are disallowed everywhere,
   matching the Cloudflare training policy, while AI search and user-requested fetches (OAI-SearchBot, ChatGPT-User,
   Claude-SearchBot, Claude-User, PerplexityBot) follow the public rules; and `Mediapartners-Google`, the AdSense
-  crawler, is kept off `/lore`, where no ads run. The file names the three sitemaps.
-- **Database sitemap.** `/database-sitemap.xml` indexes chunks of up to 40,000 item, NPC, quest, object and
-  vendor detail pages. It lists a page by the same function its robots metadata calls
+  crawler, is kept off `/lore`, where no ads run. The file names the four sitemaps.
+- **Database sitemap.** `/database-sitemap.xml` indexes chunks of up to 40,000 item, NPC, quest, object,
+  vendor and spell detail pages; a spell is listed when the files name it and relate it to something or place it in
+  a talent tree. It lists a page by the same function its robots metadata calls
   (`web/src/lib/indexable.ts`), so it never lists a noindex page. It answers 503 when upload storage cannot be
   read. A plain list's later pages (`?page=2`) are their own canonical; filters, sorts and name searches stay
   noindex. An item category page is indexed once half the rows it shows have a name; named rows come first.
@@ -54,7 +55,11 @@ the owner can do. Written after the 2026-10-17 audit.
   `web/src/lib/guide-freshness.ts`, the rule the page's robots use too). A filtered list on /guides is noindex. A
   class hub is indexed, and listed, once it lists a published guide.
 - **Lore archive.** The Warcraft Wiki copies stay readable, linked to their originals, but say `noindex, follow`
-  and are in no sitemap (owner decision, 2026-10-20). /lore, its browse pages and /lore/coverage stay indexed.
+  and are in no sitemap (owner decision, 2026-10-20), except the copies about something in WoW: Forever (owner
+  decision, 2026-11-10): an NPC, item or quest copy whose name is exactly the one name players agreed on for that
+  kind, the page that links its database page under "In the Forever database". Those say index when they pass the
+  length rule and are listed in `/lore-sitemap.xml` (`web/src/lib/lore-forever.ts`; the page and the sitemap ask the
+  same `loreIndexable`). /lore, its browse pages and /lore/coverage stay indexed.
 - **www.** `www.everloot.app` answers 301 to the same path and query on `everloot.app` (`web/next.config.js`).
 - **Auction House pages** (`/tools/auctions/<realm>`, `/tools/auctions/<realm>/<itemId>`,
   `/tools/auctions/item/<itemId>`) are built on first visit and rebuilt at most every five minutes. One is
@@ -98,7 +103,7 @@ everything else stays Open, including steps whose code is merged but whose accou
 |---|---|---|---|
 | 1 | **Worker secret.** Add `INDEXNOW_KEY` with `npx wrangler secret put INDEXNOW_KEY` from `web/`. Generate one, for example 32 random hex characters. Then open `https://everloot.app/indexnow.txt` and confirm it shows the key. | Open | checked 2026-11-09 |
 | 2 | **www redirect.** `www.everloot.app/*` is a route of the Worker, and the site answers 301 itself when a request reaches it on `www.everloot.app`. After the deploy, `curl -I https://www.everloot.app/about` should show a 301 to `https://everloot.app/about`. | Open | checked 2026-11-09 |
-| 3 | **Google Search Console.** Add the property for `everloot.app`. Either verify by DNS, or set `GSC_VERIFICATION` (the content value of the meta tag) as a var in `web/wrangler.jsonc`. Submit `https://everloot.app/sitemap.xml`, `https://everloot.app/database-sitemap.xml` and `https://everloot.app/auctions-sitemap.xml`. If the lore sitemap was submitted before, remove it: it no longer exists. | Open | checked 2026-11-09 |
+| 3 | **Google Search Console.** Add the property for `everloot.app`. Either verify by DNS, or set `GSC_VERIFICATION` (the content value of the meta tag) as a var in `web/wrangler.jsonc`. Submit `https://everloot.app/sitemap.xml`, `https://everloot.app/database-sitemap.xml`, `https://everloot.app/auctions-sitemap.xml` and `https://everloot.app/lore-sitemap.xml`. The lore sitemap now lists only the Forever-matching lore copies (2026-11-10); it uses the address the old lore sitemap had, so an earlier submission of it can stay. | Open | checked 2026-11-09 |
 | 4 | **Bing Webmaster Tools.** Add the site, or import it from Search Console. Set `BING_VERIFICATION` if you verify by meta tag. Submit the same three sitemaps. IndexNow submissions show under "IndexNow" once the key works. | Open | checked 2026-11-09 |
 | 5 | **MCP registry.** The public server (`https://everloot.app/mcp/public`) is published to the official MCP registry as `app.everloot/knowledge` (first published 2026-10-19; `server.json` is at version 0.9.1 since 2026-11-06, and the listing text is in `docs/2026-10-18-mcp-listings.md`). `EVERLOOT_MCP_PUBLIC` is `1` in the `vars` of `web/wrangler.jsonc`; without it the endpoint answers 404. | Done | 2026-11-06 |
 | 6 | **Directories.** Glama is claimed by a DNS TXT record (`_glama-claim.everloot.app`, must stay) and ingests the registry entry. Smithery and mcp.so: check whether the registry publish reached them, submit by hand if not (`docs/2026-10-18-mcp-listings.md`). | Glama done; Smithery and mcp.so open | 2026-11-03 |
