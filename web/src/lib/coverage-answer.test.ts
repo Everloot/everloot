@@ -18,7 +18,7 @@ const report = (build = BUILD) => computeCoverage({
     ...Array.from({ length: 2 }, (_, i) => ({ kind: "npc_sighting", installId: `b-${i}`, npcId: 456, name: "Waiting", mapId: 1429, x: 10, y: 20, positionKind: "interaction", capturedAt: asOf })),
   ],
 });
-const reply = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
+const reply = (body: unknown, init: ResponseInit = {}) => new Response(JSON.stringify(body), { status: 200, ...init });
 const deps = (fetcher: typeof fetch) => ({ cloud, fetch: fetcher, now: () => 0, build: BUILD });
 const live = () => vi.fn(async () => ({ ...report(), dataAsOf: "2026-11-09T00:00:00.000Z" }));
 
@@ -75,4 +75,49 @@ test("a stored report missing something the tool prints is unusable, not a parti
 
 test("nothing stored and nothing live is unknown", async () => {
   expect(await loadCoverageForTool({ stored: async () => null, live: async () => null })).toBeNull();
+});
+
+/** Warm the per-instance cache at t=0, then let the keep window lapse so the next read goes back to storage. */
+const warm = async (fetcher: typeof fetch) => { await loadCoverageSummary({ cloud, fetch: fetcher, now: () => 0, build: BUILD }); };
+const at = (fetcher: typeof fetch, now: number) => ({ cloud, fetch: fetcher, now: () => now, build: BUILD });
+
+test("a warmed cache whose refresh fails is not served as stored: the tool computes live, and the stored answer returns on recovery", async () => {
+  const ok = JSON.stringify(report());
+  let down = false;
+  const fetcher = vi.fn(async () => (down ? new Response("", { status: 503 }) : new Response(ok, { status: 200 })));
+  await warm(fetcher);
+  expect(await loadCoverageForTool({ stored: () => loadStoredCoverage(at(fetcher, 200_000)), live: live() })).toMatchObject({ source: "stored" });
+
+  down = true;
+  const replay = live();
+  const during = await loadCoverageForTool({ stored: () => loadStoredCoverage(at(fetcher, 400_000)), live: replay });
+  expect(during).toMatchObject({ source: "live", dataAsOf: "2026-11-09T00:00:00.000Z" });
+  expect(replay).toHaveBeenCalledOnce();
+  expect(await answerCoverage({}, async () => during)).toContain("(computed from the corpus now");
+  // still down a minute later, and the retry has not turned the old report into a fresh one
+  expect(await loadStoredCoverage(at(fetcher, 400_000 + 61_000))).toBeNull();
+
+  down = false;
+  const after = live();
+  expect(await loadCoverageForTool({ stored: () => loadStoredCoverage(at(fetcher, 400_000 + 122_000)), live: after })).toMatchObject({ source: "stored", installs: 7 });
+  expect(after).not.toHaveBeenCalled();
+});
+
+test("a network failure on refresh behaves the same, and the tool says unavailable when live fails too", async () => {
+  const fetcher = vi.fn(async () => reply(report()));
+  await warm(fetcher);
+  fetcher.mockRejectedValue(new Error("offline"));
+  expect(await loadStoredCoverage(at(fetcher, 400_000))).toBeNull();
+  expect(await loadCoverageForTool({ stored: () => loadStoredCoverage(at(fetcher, 400_000)), live: async () => null })).toBeNull();
+});
+
+test("an unchanged file (304) keeps the stored report fresh, and the home page keeps its dated summary through the same outage", async () => {
+  const fetcher = vi.fn(async () => reply(report(), { headers: { etag: '"v1"' } }));
+  await warm(fetcher);
+  fetcher.mockResolvedValueOnce(new Response(null, { status: 304 }));
+  expect(await loadStoredCoverage(at(fetcher, 301_000))).toMatchObject({ installs: 7 });
+
+  fetcher.mockResolvedValue(new Response("", { status: 503 }));
+  expect(await loadStoredCoverage(at(fetcher, 700_000))).toBeNull();
+  expect(await loadCoverageSummary(at(fetcher, 700_000))).toMatchObject({ installs: 7, dataAsOf: asOf });
 });

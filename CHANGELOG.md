@@ -470,7 +470,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - MCP: clarify tool choice, name and id discovery, realm aliases, evidence limits and price methods, with three example journeys.
 - MCP: the `coverage` tool answers from the stored coverage report the snapshot cron writes for the build, the same
   one the home page counts, so both show the same installs and facts and no answer replays the corpus. Only when
-  that report is missing or for another build does it compute the score live; the answer's date line says which.
+  that report is missing, for another build, or not confirmed by storage in the last five minutes (a failed refresh
+  no longer keeps it) does it compute the score live; the answer's date line says which.
 
 ## [desktop-v0.1.21] - 2026-11-10
 

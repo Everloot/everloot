@@ -71,7 +71,8 @@ const KEEP_MS = 5 * 60_000;
 /** A failed read is asked for again after a minute. */
 const RETRY_MS = 60_000;
 
-type Kept = { build: string; at: number; summary: CoverageSummary | null; report: CoverageReport | null; etag?: string };
+/** `okAt` is when the storage last answered for this file (a 200 or a 304); a failed refresh moves `at` but never `okAt`. */
+type Kept = { build: string; at: number; okAt: number; summary: CoverageSummary | null; report: CoverageReport | null; etag?: string };
 let kept: Kept | null = null;
 
 type Deps = { cloud?: R2Config | null; fetch?: typeof fetch; now?: () => number; build?: string };
@@ -80,7 +81,7 @@ type Deps = { cloud?: R2Config | null; fetch?: typeof fetch; now?: () => number;
  * The summary for the build the site reads, from the stored score: one small GET per instance every five minutes,
  * conditional on the ETag so an unchanged file is not downloaded again. Null when storage is not configured, the file
  * is missing or unreadable: the page then says "unrecorded". A failed re-read keeps the last good summary, which
- * carries its own date. Never throws.
+ * carries its own date: a display policy for the page only, the tool's reader below does not share it. Never throws.
  */
 export async function loadCoverageSummary(deps: Deps = {}): Promise<CoverageSummary | null> {
   return (await readKept(deps))?.summary ?? null;
@@ -89,10 +90,14 @@ export async function loadCoverageSummary(deps: Deps = {}): Promise<CoverageSumm
 /**
  * The whole stored score for the build, from the same read as the summary (one GET, one ETag, one five-minute keep),
  * so a reader of it never replays the corpus and agrees with the home page to the number. Null when storage is not
- * configured, the file is missing, unreadable or for another build. Never throws.
+ * configured, the file is missing, unreadable or for another build, and also when a refresh has failed: a report
+ * the storage has not confirmed within the keep window is not served (the home page may keep showing its summary,
+ * dated; an answer that says "stored" must not be older than that), so the caller computes live or says unavailable.
+ * Never throws.
  */
 export async function loadStoredCoverage(deps: Deps = {}): Promise<CoverageReport | null> {
-  return (await readKept(deps))?.report ?? null;
+  const k = await readKept(deps);
+  return k?.report && (deps.now ?? Date.now)() - k.okAt < KEEP_MS ? k.report : null;
 }
 
 async function readKept(deps: Deps): Promise<Kept | null> {
@@ -108,18 +113,18 @@ async function readKept(deps: Deps): Promise<Kept | null> {
     const etag = last?.summary ? last.etag : undefined;
     const res = await (deps.fetch ?? fetch)(await client.sign(url, { method: "GET", headers: { "accept-encoding": "identity", ...(etag ? { "if-none-match": etag } : {}) } }));
     if (res.status === 304 && last?.summary) {
-      kept = { ...last, at: now };
+      kept = { ...last, at: now, okAt: now };
     } else if (res.ok) {
       let raw: unknown = null;
       try { raw = JSON.parse(await res.text()); } catch { /* unreadable: summarize says null */ }
       const summary = summarizeCoverage(raw);
-      kept = summary ? { build, at: now, summary, report: readStoredReport(raw, build), etag: res.headers.get("etag") ?? undefined } : { build, at: now - KEEP_MS + RETRY_MS, summary: null, report: null };
+      kept = summary ? { build, at: now, okAt: now, summary, report: readStoredReport(raw, build), etag: res.headers.get("etag") ?? undefined } : { build, at: now - KEEP_MS + RETRY_MS, okAt: now, summary: null, report: null };
     } else {
       const keep = res.status !== 404;
-      kept = { build, at: now - KEEP_MS + RETRY_MS, summary: keep ? last?.summary ?? null : null, report: keep ? last?.report ?? null : null, etag: last?.etag };
+      kept = { build, at: now - KEEP_MS + RETRY_MS, okAt: last?.okAt ?? now, summary: keep ? last?.summary ?? null : null, report: keep ? last?.report ?? null : null, etag: last?.etag };
     }
   } catch {
-    kept = { build, at: now - KEEP_MS + RETRY_MS, summary: last?.summary ?? null, report: last?.report ?? null, etag: last?.etag };
+    kept = { build, at: now - KEEP_MS + RETRY_MS, okAt: last?.okAt ?? now, summary: last?.summary ?? null, report: last?.report ?? null, etag: last?.etag };
   }
   return kept;
 }
