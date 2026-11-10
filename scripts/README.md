@@ -4,6 +4,7 @@ Repository-level tools. Site-specific maintainer scripts are in `web/scripts/`.
 
 | Script | What it does |
 |---|---|
+| `ios_api_smoke.py` | Checks eight public read requests required by the iPhone app, including sources and unknown-data states. Run `python scripts/ios_api_smoke.py`; fixture tests: `python -m unittest discover -s scripts -p test_ios_api_smoke.py`. No credentials. |
 | `package-addon.py` | Builds `web/public/downloads/Everloot-<version>.zip` from `addon/`. CI checks the committed zip matches. |
 | `check_internal_paths.py` | CI guard: fails when a file names a maintainer's private workspace, secrets folder or personal paths. Its tests are `test_check_internal_paths.py`. |
 | `check_dco.py` | CI guard on pull requests: fails when a commit has no `Signed-off-by:` line and prints the fix. Its tests are `test_check_dco.py`. |
