@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { loadSightings } from "@/lib/instances";
-import { uploadStore } from "@/lib/upload-store";
-import { CONTINENTS, continentPinSet, observedFacts } from "@/lib/world-map";
+import { loadMapPins } from "@/lib/map-pins-store";
+import { CONTINENTS, continentPinSet } from "@/lib/world-map";
 
 export const dynamic = "force-dynamic";
 
@@ -24,17 +24,17 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "continent is 0 (Eastern Kingdoms) or 1 (Kalimdor)." }, { status: 400, headers: NO_STORE });
   }
   const spoilers = params.get("spoilers") === "1";
-  const [corpus, seen] = await Promise.all([uploadStore.loadCorpus(), loadSightings()]);
-  const facts = observedFacts(corpus.unreachable ? [] : corpus.records);
+  const [view, seen] = await Promise.all([loadMapPins(), loadSightings()]);
+  const facts = view.facts;
   const body = {
     ok: true,
     continent: continentId,
     spoilers,
-    dataAsOf: corpus.unreachable ? null : corpus.dataAsOf ?? null,
+    dataAsOf: view.unreachable ? null : view.dataAsOf ?? null,
     // Unreachable storage still answers with the game-file items; the player points are missing, not zero.
-    unreachable: Boolean(corpus.unreachable),
+    unreachable: Boolean(view.unreachable),
     ...continentPinSet(continentId, facts, spoilers, undefined, seen.unreachable ? {} : seen),
   };
   // A degraded answer is not cached, so the next request tries storage again.
-  return NextResponse.json(body, { headers: corpus.unreachable || seen.unreachable ? NO_STORE : CACHE });
+  return NextResponse.json(body, { headers: view.unreachable || seen.unreachable ? NO_STORE : CACHE });
 }
