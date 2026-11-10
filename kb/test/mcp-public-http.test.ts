@@ -34,7 +34,8 @@ test("the server info links the source code (AGPL section 13)", async () => {
   const info = (await init.json()).result.serverInfo;
   expect(info.websiteUrl).toBe("https://github.com/Everloot/everloot");
   expect(info.title).toBe("Everloot");
-  expect(info.description).toContain("CC BY-SA 4.0");
+  expect(info.description).toContain("with sources and dates");
+  expect(info.description).not.toContain("CC BY-SA");
   expect(info.icons.map((i: { src: string }) => i.src)).toEqual(["https://everloot.app/icon-64.png", "https://everloot.app/icon-512.png"]);
 });
 
