@@ -62,7 +62,8 @@ export default function Page() {
       <P>
         Signing in raises the Chat and in-game <C>/ask</C> limits. A key with <strong>Read my saved builds</strong>
         {" "}brings your saved talent builds into the game from the Addon page. Character links and optional private sync
-        use your account too; a key alone does not link a character or turn on private sync. See the{" "}
+        need the <C>link:own</C> and <C>sync:own</C> permissions respectively, when those features are available on the
+        site. A key alone does not link a character or turn on private sync. See the{" "}
         <Link href="/docs/guides/account" className={docLink}>account guide</Link> for those choices.
       </P>
       <P>
@@ -72,7 +73,7 @@ export default function Page() {
       <P>
         It follows the same rules as the website. The app sends anonymous open-world events, and census rows if you
         allowed the census on its setup screen (the box is ticked until you untick it; a switch in its settings changes
-        it later). It never sends named data (guild, gear, gold, collection) or your installed addon list; those stay on your
+        it later). The public upload never sends named data (guild, gear, gold, collection) or your installed addon list; those stay on your
         computer. Player rows stay there too, unless you turn on <em>Send the player pages with the uploads</em> in its
         settings. Nothing touches the game client.
       </P>
