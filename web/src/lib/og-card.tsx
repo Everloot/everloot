@@ -84,13 +84,13 @@ export async function renderCard(card: { label: string; title: string; subtitle:
   const fit = card.fit ? fittedTitle(card.title) : null;
   return new ImageResponse(
     (
-      <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", padding: "80px", background: c.canvas, color: c.fg, fontFamily: "Geist" }}>
+      <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", position: "relative", padding: "80px", background: c.canvas, color: c.fg, fontFamily: "Geist" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
           <svg width="56" height="56" viewBox="8 8 48 48">
             <path d="M32 12 52 32 32 52 12 32Z" fill="none" stroke={c.accent} strokeWidth="5" strokeLinejoin="round" />
           </svg>
           <div style={{ fontSize: 40, fontWeight: 700, color: c.accent }}>{card.label}</div>
-          {card.icon && <img alt="" src={card.icon} width={96} height={96} style={{ marginLeft: "auto" }} />}
+          {card.icon && <img alt="" src={card.icon} width={96} height={96} style={{ position: "absolute", top: 64, right: 80 }} />}
         </div>
         <div style={{ color: card.color ?? c.fg, fontSize: fit?.fontSize ?? 84, fontWeight: 700, letterSpacing: -2, marginTop: 40, lineHeight: 1.05, ...(fit ? { display: "block", lineClamp: fit.lines } : {}) }}>{card.title}</div>
         <div style={{ fontSize: 36, marginTop: 28, color: c["fg-2"] }}>{card.subtitle}</div>
