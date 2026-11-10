@@ -42,6 +42,18 @@ const EFFECT = /^(?:Equip|Use|Chance on hit): /;
 const YELLOW = /^(?:Item Level \d+|Set: (?!\[\?\]$).+|".+")$/;
 const PRICE = /^(Sell Price:) (?:(\d+)g )?(?:(\d+)s )?(\d+)c$/;
 
+const ITEM_LEVEL = /^Item Level \d+$/;
+
+/**
+ * The order the site draws a card in: the game prints the item level directly under the name. The lines themselves
+ * (item-names.ts, the card API, the hover card's script) keep the order they are served in, so only the screen moves
+ * it. Every other line stays where it is.
+ */
+export function gameOrder(lines: readonly string[]): string[] {
+  const at = lines.findIndex((l) => ITEM_LEVEL.test(l));
+  return at > 0 ? [lines[at], ...lines.slice(0, at), ...lines.slice(at + 1)] : [...lines];
+}
+
 export function tipLine(line: string): TipLine {
   const damage = DAMAGE.exec(line);
   if (damage) return { kind: "pair", left: damage[1], right: damage[2] };

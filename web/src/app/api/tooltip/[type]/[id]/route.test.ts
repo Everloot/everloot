@@ -9,6 +9,8 @@ vi.mock("@/lib/objects", () => ({ loadObjectFacts: mocks.objects }));
 vi.mock("@/lib/game-assets", () => ({ loadSiteAssets: mocks.assets, loadItemTips: mocks.tips }));
 
 import { GET, OPTIONS } from "./route";
+import { itemTipText } from "@/lib/item-names";
+import type { ItemRecord } from "../../../../../../../kb/src/assets/items";
 
 const three = (make: (installId: string) => object) => ["a", "b", "c"].map(make);
 const call = (type: string, id: string) => GET(new Request(`https://everloot.app/api/tooltip/${type}/${id}`), { params: Promise.resolve({ type, id }) });
@@ -56,6 +58,33 @@ test("the numbers 3 installs' tooltips agree on fill the card; a contested line 
   ]);
   expect(body.partial).toBe(true);
   expect(mocks.reported).toHaveBeenCalledWith(19019);
+});
+
+// The API's lines are an ordered list other readers render as they come (packages/protocol, public/tooltips.js), so
+// the site's game-style reorder of the item level is in the tooltip component, not in these lines. These are the
+// orders main served before it: the item level sits after the requirements, ahead of the effects.
+const SHAPE = { st: [], u: 0, d: 0, sp: 0, r: 0, b: 0, s: 0, cr: [], rq: [], fx: [] } satisfies Partial<ItemRecord>;
+const MACE: ItemRecord = { ...SHAPE, n: "Test Mace", q: 2, l: 9, r: 4, b: 2, s: 21, c: 2, sc: 4, d: 2100, sp: 110, fx: ["Chance on hit: Synthetic effect."] };
+const HELM: ItemRecord = {
+  ...SHAPE, n: "Test Helm", q: 4, l: 61, r: 56, b: 2, s: 1, c: 4, sc: 4, st: [4, 32], sp: 21894,
+  cr: ["Classes: Warrior"], fx: ["Equip: Synthetic effect."], is: { id: 1, n: "Synthetic Battlegear" }, t: "Synthetic.",
+};
+
+test.each([
+  { what: "a weapon", record: MACE, lines: [
+    "Binds when equipped", "Main Hand · Mace", "[?] - [?] Damage · Speed 2.10", "([?] damage per second)", "Requires Level 4", "Item Level 9",
+    "Chance on hit: Synthetic effect.", "Sell Price: 1s 10c",
+  ] },
+  { what: "an armor piece", record: HELM, lines: [
+    "Binds when equipped", "Head · Plate", "[?] Armor", "+[?] Strength", "+[?] Critical Strike Rating", "Classes: Warrior", "Requires Level 56", "Item Level 61",
+    "Equip: Synthetic effect.", "Set: Synthetic Battlegear", '"Synthetic."', "Sell Price: 2g 18s 94c",
+  ] },
+])("/api/tooltip serves $what's lines in the order main did, with the item level after the requirements", async ({ record, lines }) => {
+  const tip = itemTipText(record);
+  mocks.tips.mockResolvedValue(new Map([[19019, { name: record.n, color: "#ffffff", quality: "Common", icon: null, label: "x", partial: tip.partial, lines: tip.lines, why: [] }]]));
+  const body = tooltipResponse.parse(await (await call("item", "19019")).json());
+  expect(body.lines).toEqual(lines);
+  expect(body.lines.indexOf(`Item Level ${record.l}`)).toBeGreaterThan(0);
 });
 
 test("an item card carries the page's name, the licence and the page URL, and parses as the protocol's shape", async () => {

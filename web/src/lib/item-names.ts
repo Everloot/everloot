@@ -88,8 +88,6 @@ export const tipLines = (t: Pick<ItemTipText, "lines" | "why">): string[] => [..
 export function itemTipText(r: ItemRecord, checked: readonly CheckedWeapon[] = CHECKED_WEAPONS): ItemTipText {
   const lines: string[] = [];
   const why = new Set<string>();
-  // The item level first under the name, then the binding, as the game's tooltip orders them.
-  if (r.l > 0) lines.push(`Item Level ${r.l}`);
   if (BINDING[r.b]) lines.push(BINDING[r.b]);
   if (r.lc) lines.push(r.lc);
   else if (r.u === 1) lines.push("Unique");
@@ -122,6 +120,7 @@ export function itemTipText(r: ItemRecord, checked: readonly CheckedWeapon[] = C
   if (r.r > 1) lines.push(`Requires Level ${r.r}`);
   lines.push(...(r.rq ?? []));
   if ([r.lc ?? "", ...(r.cr ?? []), ...(r.rq ?? [])].some((l) => l.includes(PLACEHOLDER))) why.add(WHY.restriction);
+  if (r.l > 0) lines.push(`Item Level ${r.l}`);
   lines.push(...(r.fx ?? []));
   if (r.fx?.some((l) => l.includes(PLACEHOLDER))) why.add(WHY.effect);
   if (r.is) lines.push(`Set: ${r.is.n ?? PLACEHOLDER}`);
@@ -168,7 +167,7 @@ const FACT_LINE = ITEM_FACTS.map((fact) => ({
 const rank = (fact: ItemFactName) => ITEM_FACTS.indexOf(fact);
 const factOf = (line: string) => FACT_LINE.find((f) => f.re.test(line))?.fact ?? null;
 /** The first line the game prints below the armour, stats and resistances. */
-const BELOW_STATS = /^(Classes: |Races: |Requires |Use: |Equip: |Chance on hit: |Set: |Restrictions: |Equip and Use: |"|Sell Price: )/;
+const BELOW_STATS = /^(Classes: |Races: |Requires |Item Level |Use: |Equip: |Chance on hit: |Set: |Restrictions: |Equip and Use: |"|Sell Price: )/;
 
 /** Where a line the files did not print goes: after the facts that come before it in the game, else before the rest. */
 function slotFor(lines: readonly string[], fact: ItemFactName): number {

@@ -22,7 +22,7 @@ test("each placeholder the files print is the line a reported number fills", () 
 test("agreed numbers replace their placeholders, the reasons that no longer apply go, and each number says who and when", () => {
   const sword = itemTipText(shard0["25"]);
   const filled = withReported(sword, { shown: [fact({ fact: "damage_per_second", value: 12.4 }), fact({ fact: "stamina", value: 5 }), fact({ fact: "strength", value: 3, reporters: 7, lastSeen: null })], contested: [] });
-  expect(filled.lines).toEqual(["Item Level 2", "Binds when equipped", "Unique", "One-Hand · Sword", "[?] - [?] Damage · Speed 1.90", "(12.4 damage per second)", "+5 Stamina", "+3 Strength", "Requires Level 5", '"Old."', "Sell Price: 7c"]);
+  expect(filled.lines).toEqual(["Binds when equipped", "Unique", "One-Hand · Sword", "[?] - [?] Damage · Speed 1.90", "(12.4 damage per second)", "+5 Stamina", "+3 Strength", "Requires Level 5", "Item Level 2", '"Old."', "Sell Price: 7c"]);
   expect(filled.why).toEqual([
     WHY.damage,
     "12.4 damage per second: reported by 3 installs, last seen 2026-11-05, build 1.60.1.70450.",
@@ -38,12 +38,12 @@ test("agreed numbers replace their placeholders, the reasons that no longer appl
 
 test("a line the files did not print goes where the game prints it; a contested line keeps its [?] and says why", () => {
   const shield = itemTipText({ ...shard0["9"], c: 4, sc: 6, s: 14, st: [7, 6], r: 20 });
-  expect(shield.lines.slice(0, 5)).toEqual(["Item Level 5", "Off Hand · Shield", "[?] Armor", "+[?] Stamina", "+[?] Spirit"]);
+  expect(shield.lines.slice(0, 4)).toEqual(["Off Hand · Shield", "[?] Armor", "+[?] Stamina", "+[?] Spirit"]);
   const got = withReported(shield, {
     shown: [fact({ fact: "armor", value: 300 }), fact({ fact: "block", value: 6 }), fact({ fact: "stamina", value: 4 }), fact({ fact: "shadow_resistance", value: 5 })],
     contested: ["spirit", "fire_resistance"],
   });
-  expect(got.lines.slice(0, 8)).toEqual(["Item Level 5", "Off Hand · Shield", "300 Armor", "6 Block", "+4 Stamina", "+[?] Spirit", "+5 Shadow Resistance", "Requires Level 20"]);
+  expect(got.lines.slice(0, 7)).toEqual(["Off Hand · Shield", "300 Armor", "6 Block", "+4 Stamina", "+[?] Spirit", "+5 Shadow Resistance", "Requires Level 20"]);
   // Spirit is still a placeholder, so its reason stays; armour's goes. Fire resistance has no line to explain.
   expect(got.why.slice(0, 2)).toEqual([WHY.stats, "[?] Spirit: installs disagree on the number, so none is shown until 3 agree on one."]);
   expect(got.why).not.toContain(WHY.armor);
@@ -71,12 +71,12 @@ test("a weapon's damage stays [?] with its reason while no weapon has been check
 test("once checks confirm a reading, the files' range prints with where it came from, apart from the reported per second", () => {
   const checked = [check(cutlass, 851, { min: 10, max: 20 })];
   const tip = itemTipText(cutlass, checked);
-  expect(tip.lines.slice(0, 5)).toEqual(["Item Level 15", "Binds when equipped", "One-Hand · Sword", "10 - 20 Damage · Speed 2.20", "([?] damage per second)"]);
+  expect(tip.lines.slice(0, 4)).toEqual(["Binds when equipped", "One-Hand · Sword", "10 - 20 Damage · Speed 2.20", "([?] damage per second)"]);
   const source = "10 - 20 Damage: worked out from the game files (ItemDamageOneHand, the weapon speed and its spread), the way 1 weapon from that table read off the game's own tooltip on 2026-11-04 agree, build 1.60.1.99999.";
   expect(tip.why).toEqual([source]);
   // The per-second number is the players'; it fills its own line and says so on its own line.
   const filled = withReported(tip, { shown: [fact({ fact: "damage_per_second", value: 6.8 })], contested: [] });
-  expect(filled.lines.slice(3, 5)).toEqual(["10 - 20 Damage · Speed 2.20", "(6.8 damage per second)"]);
+  expect(filled.lines.slice(2, 4)).toEqual(["10 - 20 Damage · Speed 2.20", "(6.8 damage per second)"]);
   expect(filled.why).toEqual([source, "6.8 damage per second: reported by 3 installs, last seen 2026-11-05, build 1.60.1.70450."]);
   // A wand prints its school; a table no checked weapon came from keeps [?].
   const wand: ItemRecord = { ...cutlass, n: "Flamestick", s: 26, sc: 19, d: 1800, w: { t: "ItemDamageWand", dps: 13.575119972229004, dv: 0.6000000238418579, ds: 2 } };

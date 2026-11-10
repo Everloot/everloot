@@ -1,4 +1,4 @@
-import { tipLine, type Metal } from "@/lib/tip-line";
+import { gameOrder, tipLine, type Metal } from "@/lib/tip-line";
 
 const COIN_TEXT: Record<Metal, string> = { gold: "text-coin-gold", silver: "text-coin-silver", copper: "text-coin-copper" };
 const COIN_FILL: Record<Metal, string> = { gold: "bg-coin-gold", silver: "bg-coin-silver", copper: "bg-coin-copper" };
@@ -18,13 +18,14 @@ function Coin({ metal }: { metal: Metal }) {
 /**
  * An item tooltip's lines laid out as the game draws them (lib/tip-line.ts): slot and kind, and damage and speed, in
  * two columns; Equip, Use and Chance on hit lines in green; the item level, a set and the flavour text in yellow; the
- * sell price in coins. Every line keeps its words, so no colour is the only signal, and the reading order is the
- * visual order. Any other line is drawn as it is.
+ * sell price in coins. The item level is drawn first, under the name, as the game does (`gameOrder`); the lines passed
+ * in keep the order they are served in. Every line keeps its words, so no colour is the only signal, and the reading
+ * order is the visual order. Any other line is drawn as it is.
  */
 export default function TooltipLines({ lines }: { lines: readonly string[] }) {
   return (
     <>
-      {lines.map((line, i) => {
+      {gameOrder(lines).map((line, i) => {
         const t = tipLine(line);
         if (t.kind === "pair") {
           return (

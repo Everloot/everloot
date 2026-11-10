@@ -5,7 +5,7 @@ import type { ItemRecord } from "../../../../kb/src/assets/items";
 import { GameCard } from "@/components/game/GameCard";
 import { itemTipText } from "@/lib/item-names";
 import { itemFactLines, NO_ITEM_FACTS } from "@/lib/tooltip";
-import { tipLine } from "@/lib/tip-line";
+import { gameOrder, tipLine } from "@/lib/tip-line";
 
 // Made-up records in the shard's shape: the names, effects and flavour text are not the game's.
 const base = { st: [], u: 0, d: 0, sp: 0, r: 0, b: 0, s: 0, cr: [], rq: [], fx: [] } satisfies Partial<ItemRecord>;
@@ -36,8 +36,13 @@ describe("item tooltip lines", () => {
   test("a weapon: item level first, slot and kind and damage and speed in two columns, its proc in green", () => {
     const lines = itemTipText(WEAPON).lines;
     const root = card(lines);
-    // One element per line, in the game's order, reading the same as the text (a pair's halves joined for screen readers).
-    expect(rows(root).map((p) => p.textContent)).toEqual(lines.map((l) => l.replace(" · ", ", ")));
+    // One element per line, in the game's order (the item level moved up under the name, nothing else), reading the
+    // same as the text (a pair's halves joined for screen readers).
+    expect(rows(root).map((p) => p.textContent)).toEqual(gameOrder(lines).map((l) => l.replace(" · ", ", ")));
+    expect(rows(root).map((p) => p.textContent)).toEqual([
+      "Item Level 9", "Binds when equipped", "Main Hand, Mace", "[?] - [?] Damage, Speed 2.10", "([?] damage per second)",
+      "Requires Level 4", "Chance on hit: Synthetic effect.", "Sell Price: 1s 10c",
+    ]);
     expect(rows(root)[0].className).toBe("text-tip-yellow");
     const pairs = [...root.querySelectorAll("[data-tip-pair]")].map((p) => [...p.children].filter((c) => !c.classList.contains("sr-only")).map((c) => c.textContent));
     expect(pairs).toEqual([["Main Hand", "Mace"], ["[?] - [?] Damage", "Speed 2.10"]]);
@@ -61,6 +66,21 @@ describe("item tooltip lines", () => {
     expect([...price.querySelectorAll("[role=img]")].map((c) => [c.getAttribute("aria-label"), c.className.match(/bg-coin-\w+/)![0]]))
       .toEqual([["gold", "bg-coin-gold"], ["silver", "bg-coin-silver"], ["copper", "bg-coin-copper"]]);
     expect([...price.querySelectorAll(".text-coin-gold, .text-coin-silver, .text-coin-copper")].map((c) => c.textContent)).toEqual(["2", "18", "94"]);
+  });
+
+  test("the site moves the item level under the name and leaves the lines it is given in the order it got them", () => {
+    for (const record of [WEAPON, ARMOR]) {
+      const lines = itemTipText(record).lines;
+      const before = [...lines];
+      const shown = gameOrder(lines);
+      expect(lines).toEqual(before);
+      expect(shown[0]).toBe(`Item Level ${record.l}`);
+      // Only that one line moved: the rest keep their relative order.
+      expect(shown.slice(1)).toEqual(lines.filter((l) => !l.startsWith("Item Level ")));
+    }
+    // Nothing to move: no item level, or already first.
+    expect(gameOrder(["Quest Item", "Unique"])).toEqual(["Quest Item", "Unique"]);
+    expect(gameOrder(["Item Level 5", "Use: x"])).toEqual(["Item Level 5", "Use: x"]);
   });
 
   test("a consumable: its Use line green, a copper-only price, no columns", () => {
