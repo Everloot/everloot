@@ -37,6 +37,8 @@ export async function generateMetadata(props: { searchParams?: Promise<Search> }
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 const NO_NAME = "The game files place no entrance for this instance, so the site has no name for it, and 3 installs have not confirmed one. It is listed by its id because players reported an entrance or a boss there.";
+const statisticName = (boss: string, name: string) =>
+  `The game files place no entrance for this instance and 3 installs have not agreed on its name. The name is the files' own, from their kill statistic "${boss} Kills (${name})" for one of its bosses.`;
 
 /** One row per instance: the entrance's zone, its confirmation, and the bosses players report. */
 export default async function InstancesPage(props: { searchParams?: Promise<Search> }) {
@@ -66,8 +68,10 @@ export default async function InstancesPage(props: { searchParams?: Promise<Sear
     { key: "name", header: "Name", sortable: true, cell: (r) => {
       const src = thumb(r);
       const named = <Link href={instanceHref(r.instanceMapId, r.name)} className={link}>{instanceTitle(r)}</Link>;
-      // An instance with no name is listed by its id, with a line saying why.
-      const name = r.name !== null ? named : (
+      // An instance with no name is listed by its id, with a line saying why; one named only by a kill statistic says so.
+      const name = r.statisticBoss ? (
+        <span className="inline-flex flex-wrap items-baseline gap-x-2" title={statisticName(r.statisticBoss, r.name!)}>{named}<span className="inline-flex items-baseline gap-1.5 text-meta text-muted"><Badge tone="files" />name from a kill statistic</span></span>
+      ) : r.name !== null ? named : (
         <span className="inline-flex flex-wrap items-baseline gap-x-2" title={NO_NAME}>{named}<span className="text-meta text-muted">no entrance in the game files</span></span>
       );
       return src ? <span className="flex min-w-0 items-center gap-2"><ArtThumb src={src} />{name}</span> : name;

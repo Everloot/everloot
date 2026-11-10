@@ -6,8 +6,8 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { AgreementMeter, Badge, Card, Container, DataTable, DataTitle, EmptyState, filledColumns, reportedLabel, SectionHeading, type Column, type SparseColumn } from "@/components/ui";
 import {
-  bossRows, difficultyLabel, difficultyList, instanceDescription, instanceHref, instanceRows, instanceTitle, levelLabel, loadSightings, parseInstanceSegment,
-  type BossRow, type InstancePlace, type InstanceRow,
+  bossRows, difficultyLabel, difficultyList, instanceDescription, instanceHref, instanceQuests, instanceRows, instanceTitle, levelLabel, loadSightings, parseInstanceSegment,
+  type BossRow, type InstancePlace, type InstanceQuest, type InstanceRow,
 } from "@/lib/instances";
 import { entityTitle } from "@/lib/entity-meta";
 import { dayLabel } from "@/lib/report-labels";
@@ -21,8 +21,8 @@ import { prepPage } from "@/lib/wiki-dungeon";
 import { npcLootTable } from "../../../../../../kb/src/loot-tables";
 import EntityLink from "@/components/EntityLink";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
-import { itemNames } from "@/lib/names";
-import { loadItemFacts, loadLootTables } from "@/lib/rollup-compute";
+import { itemNames, npcNames } from "@/lib/names";
+import { loadItemFacts, loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
 import { Unreachable } from "../../entity";
 import { NpcLootPanel } from "../../loot-tables";
 import { zoneHref } from "@/lib/zones";
@@ -109,15 +109,30 @@ export default async function InstancePage(props: Props) {
     ? `${b.boss.kills.toLocaleString("en-US")} kills · ${b.boss.reporters} ${b.boss.reporters === 1 ? "install" : "installs"} · ${dayLabel(b.boss.lastSeen)}`
     : b.reported ? reportedLabel(b.reported) : "Not confirmed yet");
 
-  // Loot, per boss: the loot table of each creature 3 installs tie to the encounter, the same table its NPC page shows.
-  const lootBosses = bosses.flatMap((b) => (b.boss?.npcIds.length ? [{ encounterId: b.encounterId, name: b.name ?? `Encounter ${b.encounterId}`, npcIds: b.boss.npcIds }] : []));
-  const loot = unreachable || lootBosses.length === 0 ? null : await loadLootTables();
+  // Loot, per boss: every boss above, with the loot table of each creature 3 installs tie to its encounter, the same
+  // table its NPC page shows. A boss with no creature tied yet keeps its line, saying so.
+  const lootBosses = bosses.map((b) => ({ encounterId: b.encounterId, name: b.name ?? `Encounter ${b.encounterId}`, npcIds: b.boss?.npcIds ?? [] }));
+  const loot = unreachable || !lootBosses.some((b) => b.npcIds.length) ? null : await loadLootTables();
   const lootTables = new Map(loot && !loot.unreachable ? lootBosses.flatMap((b) => b.npcIds).map((id) => [id, npcLootTable(loot.tables, id)]) : []);
   // Item names (and icons, when the game files have them) for the drop rows; an item nobody named stays "Item N".
   const droppedIds = [...lootTables.values()].flatMap((t) => t.rows.map((r) => r.itemId));
   const itemFacts = droppedIds.length ? await loadItemFacts() : null;
   const names = itemFacts && !itemFacts.unreachable ? itemNames(itemFacts) : new Map<number, string>();
   const tips = await loadItemTips(droppedIds.length ? await loadSiteAssets() : null, droppedIds);
+
+  // Quests: the ones 3 installs file under this instance's name in the quest log, from the stored world facts.
+  const world = unreachable || row.name === null ? null : await loadWorldFacts();
+  const quests = world && !world.unreachable ? instanceQuests(world, row.name) : [];
+  const npcName = world && !world.unreachable && quests.length ? npcNames(world) : new Map<number, string>();
+  const npcLink = (id: number | null) => (id === null ? PLACEHOLDER : <Link href={`/database/npcs/${id}`} className={link}>{npcName.get(id) ?? `NPC ${id}`}</Link>);
+  const questColumns: Column<InstanceQuest>[] = [
+    { key: "quest", header: "Quest", cell: (q) => <Link href={`/database/quests/${q.questId}`} className={link}>{q.title ?? `Quest ${q.questId}`}</Link> },
+    { key: "level", header: "Level", numeric: true, cell: (q) => q.level ?? PLACEHOLDER },
+    { key: "giver", header: "Giver", cell: (q) => npcLink(q.giverNpcId) },
+    { key: "turnin", header: "Turn-in", cell: (q) => npcLink(q.turnInNpcId) },
+    { key: "installs", header: "Installs", cell: (q) => <AgreementMeter count={q.installs} /> },
+    { key: "seen", header: "Last seen", numeric: true, cell: (q) => dayLabel(q.lastSeen) },
+  ];
 
   const unconfirmed = row.reported > 0
     ? `No entrance is confirmed yet. ${row.reported} ${row.reported === 1 ? "install has" : "installs have"} zoned in, and 3 must agree on the place.`
@@ -150,6 +165,13 @@ export default async function InstancePage(props: Props) {
             </SectionHeading>
             <Card as="div">
               <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
+                {row.statisticBoss && <>
+                  <dt className="text-muted">Name</dt>
+                  <dd className="text-fg">
+                    {row.name}
+                    <span className="ml-2 inline-flex items-baseline gap-1.5 text-meta text-muted"><Badge tone="files" />from the game files&apos; kill statistic for {row.statisticBoss}; they place no entrance for it</span>
+                  </dd>
+                </>}
                 <dt className="text-muted">Type</dt><dd className="text-fg">{kindLabel(row.raid)}</dd>
                 <dt className="text-muted">Level</dt><dd className="text-fg">{levelLabel(row.level) ?? <span className="text-muted">–</span>}</dd>
                 <dt className="text-muted">Difficulty</dt>
@@ -209,16 +231,19 @@ export default async function InstancePage(props: Props) {
           </section>
 
           <section aria-labelledby="loot">
-            <SectionHeading id="loot" note="Each boss's loot is the loot table of the creature 3 installs tie to its encounter, the same rows its NPC page shows. A rate needs loot windows from 3 installs; short of that, the count so far shows and no rate.">
+            <SectionHeading id="loot" note="Each boss above, with the loot table of the creature 3 installs tie to its encounter: the same rows its NPC page shows. A rate needs loot windows from 3 installs; short of that, the count so far shows and no rate.">
               Loot
             </SectionHeading>
             {unreachable || loot?.unreachable ? <Unreachable />
-              : lootBosses.length === 0 ? empty("No loot to show yet: no boss here has a creature 3 installs agree on. Loot shows per boss once 3 installs report the boss and loot it.")
+              : lootBosses.length === 0 ? empty("No loot to show yet: no boss is known here. Loot shows per boss once 3 installs report the boss and the creature they fought.")
               : (
                 <div className="space-y-4">
                   {lootBosses.map((b) => (
                     <div key={b.encounterId} data-boss-loot={b.encounterId}>
                       <h3 className="text-cell font-semibold text-fg">{b.name}</h3>
+                      {b.npcIds.length === 0 && (
+                        <p className="pt-1 text-meta text-fg-2">Not reported yet: no creature is tied to this boss. Its loot shows once 3 installs report which creature they fought in the encounter.</p>
+                      )}
                       {b.npcIds.map((id) => {
                         const table = lootTables.get(id)!;
                         return (
@@ -240,6 +265,20 @@ export default async function InstancePage(props: Props) {
                   ))}
                 </div>
               )}
+          </section>
+
+          <section aria-labelledby="quests">
+            <SectionHeading id="quests" note="A quest is listed once 3 installs report it under this instance's name in the quest log, where the game files a dungeon's quests. Installs counts every install that reported the quest.">
+              Quests
+            </SectionHeading>
+            {unreachable || world?.unreachable ? <Unreachable /> : (
+              <DataTable
+                dense caption={`Quests players filed under ${title}`} columns={questColumns} rows={quests} rowKey={(q) => String(q.questId)}
+                empty={empty(row.name === null
+                  ? "Not reported yet: this instance has no name to match the quest log by."
+                  : `Not reported yet: no quest has 3 installs filing it under ${row.name} in the quest log.`)}
+              />
+            )}
           </section>
         </div>
       </article>

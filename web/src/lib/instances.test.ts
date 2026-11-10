@@ -5,7 +5,7 @@ import type { EncounterRow, InstanceEntranceRow } from "../../../kb/src/instance
 // The loaders read storage; these tests hand the readers their facts directly.
 vi.mock("./rollup-compute", () => ({ loadInstanceFacts: vi.fn(), loadItemFacts: vi.fn() }));
 
-import { bossLine, bossRows, compareInstances, difficultyLabel, difficultyLabelIn, difficultyList, entranceLinks, instanceHref, instanceRows as rowsWith, levelLabel, parseInstanceSegment } from "./instances";
+import { bossLine, bossRows, compareInstances, difficultyLabel, difficultyLabelIn, difficultyList, entranceLinks, instanceHref, instanceQuests, instanceRows as rowsWith, levelLabel, parseInstanceSegment, statisticNames } from "./instances";
 
 // The synthetic world has no encounter list of its own; the one test that merges the files' bosses hands one in.
 const instanceRows = (seen?: Parameters<typeof rowsWith>[0], data?: Parameters<typeof rowsWith>[1]) => rowsWith(seen, data, {});
@@ -220,5 +220,57 @@ describe("markers on the map", () => {
     const vault = { ...seen, instances: { entrances: ids.map((i) => ({ ...entrance(i, 35, "2026-10-18T10:00:00Z"), name: "Synthetic Vault", x: 60, y: 40 })), encounters: [] } };
     const entrances = continentPinSet(0, { npcs: [], quests: [], vendors: [] }, false, data, vault).entrances;
     expect(entrances.find((e) => e.files === false)).toMatchObject({ id: "p35-1429", names: ["Synthetic Vault"], confirmed: 3 });
+  });
+});
+
+describe("statisticNames", () => {
+  // SYNTHETIC statistics and encounter lists in the shape of the generated files.
+  const stat = (title: string, statistic = true) => ({ title, points: 0, description: title, criteria: [{ text: title }], ...(statistic ? { statistic: true as const } : {}) });
+  const achievements = { achievements: {
+    "1": stat("Grim Boss Kills (Synthetic Ruins)"),
+    "2": stat("Odd Boss Kills (Synthetic Ruins)"),
+    "3": stat("Split Boss Kills (Hall A)"),
+    "4": stat("Other Split Kills (Hall B)"),
+    "5": stat("Earned Boss Kills (Not A Statistic)", false),
+  } } as unknown as Parameters<typeof statisticNames>[1];
+
+  test("names an instance when its bosses' kill statistics give one name, and none when they give two or none", () => {
+    const names = statisticNames({
+      "10": [{ id: 1, name: "Grim Boss" }, { id: 2, name: "Odd Boss" }, { id: 3, name: "Quiet Boss" }],
+      "11": [{ id: 4, name: "Split Boss" }, { id: 5, name: "Other Split" }],
+      "12": [{ id: 6, name: "Earned Boss" }],
+      "13": [{ id: 7, name: "Quiet Boss" }],
+    }, achievements);
+    expect(names.get(10)).toEqual({ name: "Synthetic Ruins", boss: "Grim Boss" });
+    expect(names.has(11)).toBe(false);
+    expect(names.has(12)).toBe(false);
+    expect(names.has(13)).toBe(false);
+  });
+
+  test("the name joins only a row with none of its own", () => {
+    const seen = { instances: { entrances: [], encounters: ["a", "b", "c"].map((installId) => ({ installId, encounterId: 1, name: "Grim Boss", instanceMapId: 10, success: true, npcIds: [] })) } };
+    const row = rowsWith(seen, data, {}, new Map([[10, { name: "Synthetic Ruins", boss: "Grim Boss" }], [34, { name: "Other", boss: "x" }]]));
+    expect(row.get(10)).toMatchObject({ name: "Synthetic Ruins", statisticBoss: "Grim Boss" });
+    expect(row.get(34)?.name).toBe("Synthetic Stockade");
+    expect(row.get(34)?.statisticBoss).toBeUndefined();
+  });
+});
+
+describe("instanceQuests", () => {
+  // SYNTHETIC quest reports.
+  const q = (installId: string, questId: number, category: string, capturedAt = "2026-11-04T10:00:00Z") =>
+    ({ installId, questId, title: `Quest title ${questId}`, level: 20, rewardItemIds: [], category, capturedAt });
+  const facts = { npcs: [], quests: [
+    q("a", 1, "Synthetic Keep"), q("b", 1, " synthetic keep "), q("c", 1, "Synthetic Keep", "2026-11-06T10:00:00Z"),
+    q("a", 2, "Synthetic Keep"), q("b", 2, "Synthetic Keep"), q("c", 2, "Elsewhere"),
+    q("a", 3, "Synthetic Keep"), q("b", 3, "Synthetic Keep"),
+  ] };
+
+  test("lists a quest 3 installs file under the name, with its installs and last time, and none for no name", () => {
+    const list = instanceQuests(facts, "Synthetic Keep", new Date("2026-11-05T00:00:00Z"));
+    expect(list.map((r) => r.questId)).toEqual([1]);
+    // The report dated after the corpus's own date does not count as last seen.
+    expect(list[0]).toMatchObject({ title: "Quest title 1", installs: 3, lastSeen: "2026-11-04T10:00:00.000Z" });
+    expect(instanceQuests(facts, null)).toEqual([]);
   });
 });

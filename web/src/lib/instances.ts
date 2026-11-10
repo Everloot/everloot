@@ -1,6 +1,10 @@
-import { agreedDifficulties, bossLabel, confirmedEntrances, instanceBosses, reportedBosses, type InstanceBoss } from "../../../kb/src/instances";
+import { agreedDifficulties, bossLabel, confirmedEntrances, instanceBosses, latest, reportedBosses, type InstanceBoss } from "../../../kb/src/instances";
+import type { ClientAchievements } from "../../../kb/src/client-achievements";
 import type { ClientEncounter } from "../../../kb/src/client-encounters";
+import type { WorldFacts } from "../../../kb/src/world-pages";
+import { CLIENT_ACHIEVEMENTS } from "@/data/game-data/client-achievements";
 import { CLIENT_ENCOUNTERS } from "@/data/game-data/client-encounters";
+import { publicQuests, type QuestRow } from "./world-lists";
 import { dayLabel } from "./report-labels";
 import type { WorldMapData } from "../../../kb/src/world-map-data";
 import { slugify } from "../../../kb/src/lore-slug";
@@ -20,8 +24,10 @@ export interface InstancePlace { mapId: number; zoneName: string; x: number; y: 
  */
 export interface InstanceRow {
   instanceMapId: number;
-  /** The game files' name, else the name 3 installs agree on, else null. */
+  /** The game files' name, else the name 3 installs agree on, else the name the files' kill statistics give it, else null. */
   name: string | null;
+  /** When the name is a kill statistic's: the boss that statistic counts. */
+  statisticBoss?: string;
   /** Raid or dungeon from the files, else as 3 installs agree; null when neither says. */
   raid: boolean | null;
   /** The difficulty id 3 installs agree on, or null. */
@@ -136,17 +142,72 @@ export function parseInstanceSegment(segment: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
+const KILLS_STATISTIC = /^(.+) Kills \((.+)\)$/;
+
+/**
+ * The instance names the game files' own kill statistics give: a statistic titled "Rath'mael Kills (Ruins of
+ * Lordaeron)" that counts Rath'mael names the instance whose encounter list holds Rath'mael. An instance is named
+ * only when the statistics for its encounters give one name between them; with none or two, it has none.
+ */
+export function statisticNames(
+  encounters: Readonly<Record<string, ClientEncounter[]>> = CLIENT_ENCOUNTERS.instances,
+  achievements: Pick<ClientAchievements, "achievements"> = CLIENT_ACHIEVEMENTS,
+): Map<number, { name: string; boss: string }> {
+  const byBoss = new Map<string, Set<string>>();
+  for (const a of Object.values(achievements.achievements)) {
+    const m = a.statistic ? KILLS_STATISTIC.exec(a.title) : null;
+    if (!m) continue;
+    byBoss.set(m[1]!, (byBoss.get(m[1]!) ?? new Set()).add(m[2]!));
+  }
+  const out = new Map<number, { name: string; boss: string }>();
+  for (const [id, list] of Object.entries(encounters)) {
+    const named = list.flatMap((e) => [...(byBoss.get(e.name) ?? [])].map((name) => ({ name, boss: e.name })));
+    if (named.length && named.every((n) => n.name === named[0]!.name)) out.set(Number(id), named[0]!);
+  }
+  return out;
+}
+
+let statistics: Map<number, { name: string; boss: string }> | null = null;
+/** Read once; when the achievements file cannot be read, no instance takes a name from it. */
+function filesStatisticNames(): Map<number, { name: string; boss: string }> {
+  try { return (statistics ??= statisticNames()); } catch { return new Map(); }
+}
+
+/** One quest of an instance: its list row, how many installs reported it and when one last did. */
+export interface InstanceQuest extends QuestRow { installs: number; lastSeen: string | null }
+
+/**
+ * The quests whose quest-log header 3 installs agree is this instance's name, as the game files it under the dungeon
+ * it is for. Lowest level first; none for an instance with no name.
+ */
+export function instanceQuests(facts: Pick<WorldFacts, "npcs" | "quests" | "recheck">, name: string | null, asOf: Date = new Date()): InstanceQuest[] {
+  const key = name?.trim().toLowerCase();
+  if (!key) return [];
+  const ids = new Set(facts.quests.filter((r) => r.category?.trim().toLowerCase() === key).map((r) => r.questId));
+  if (ids.size === 0) return [];
+  const rows = facts.quests.filter((r) => ids.has(r.questId));
+  return publicQuests({ ...facts, quests: rows, vendors: [] })
+    .filter((q) => q.category?.trim().toLowerCase() === key)
+    .map((q) => {
+      const own = rows.filter((r) => r.questId === q.questId && r.installId.trim());
+      return { ...q, installs: new Set(own.map((r) => r.installId.trim())).size, lastSeen: latest(own, asOf) };
+    })
+    .sort((a, b) => (a.level ?? 999) - (b.level ?? 999) || a.questId - b.questId);
+}
+
 /**
  * Every instance the site shows, by id. An instance is listed when the files place its entrance in a released zone,
  * when 3 installs confirm an entrance in one, or when 3 installs report a boss in it: an instance known only from an
  * entrance in a held-back zone has no row, as on the map without spoilers, and the files' encounter list never adds
  * a row by itself. Entrances come from `placedEntrances`, the
- * list the zone pages and the map read, so the three never disagree.
+ * list the zone pages and the map read, so the three never disagree. A row with no name from either takes the one
+ * the files' kill statistics give it (`statisticNames`).
  */
 export function instanceRows(
   seen: ZoneSightings = {},
   data: Pick<WorldMapData, "zones" | "continents" | "entrances"> = WORLD_MAP,
   encounters: Readonly<Record<string, ClientEncounter[]>> = CLIENT_ENCOUNTERS.instances,
+  statistics: ReadonlyMap<number, { name: string; boss: string }> = filesStatisticNames(),
 ): Map<number, InstanceRow> {
   const zoneName = new Map(publicZones(data).map((z) => [z.mapId, z.name]));
   const place = (mapId: number, x: number, y: number): InstancePlace | null => (zoneName.has(mapId) ? { mapId, zoneName: zoneName.get(mapId)!, x, y } : null);
@@ -189,6 +250,8 @@ export function instanceRows(
     if (r) r.reportedBosses = counts;
   }
   for (const r of out.values()) {
+    const named = r.name === null ? statistics.get(r.instanceMapId) : undefined;
+    if (named) { r.name = named.name; r.statisticBoss = named.boss; }
     if (r.confirmed.length) continue;
     const installs = new Set(facts.entrances.filter((e) => e.instanceMapId === r.instanceMapId).map((e) => e.installId));
     // No place has 3 installs agreeing: the count is shown, never a place.
