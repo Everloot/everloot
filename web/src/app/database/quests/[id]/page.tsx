@@ -14,7 +14,7 @@ import { loadWorldFacts } from "@/lib/rollup-compute";
 import { pinLink } from "@/lib/world-map";
 import { trailFor } from "@/lib/breadcrumbs";
 import { agreementLabel, reportedLabel, Badge, Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
-import { EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, ShowOnMap, Unreachable } from "../../entity";
+import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, ShowOnMap, Unreachable } from "../../entity";
 import { unknownQuest } from "../../unknown";
 import { entitySummary, observedLine } from "@/lib/evidence";
 import { loadItemFacts } from "@/lib/rollup-compute";
@@ -113,7 +113,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
   return (
     <Container width="data">
       <EdgeDegraded when={facts.unreachable || !catalog?.confirmations} />
-      <article>
+      <EntityLayout>
         <JsonLd data={entityPageJsonLd({ name: title, path: `/database/quests/${page.questId}`, identifier: `quest:${page.questId}` })} />
         <EntityHeader
           trail={trail}
@@ -157,11 +157,13 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
             />
           )}
         />
-        <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-        <OpenData
-          text={[`${title} (quest ${page.questId})`, ...summary, `Source: https://everloot.app/database/quests/${page.questId}`].join("\n")}
-          jsonHref={!facts.unreachable && hasCard.quest(page) ? `/api/tooltip/quest/${page.questId}` : undefined}
-        />
+        <EntitySidebar>
+          <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
+          <OpenData
+            text={[`${title} (quest ${page.questId})`, ...summary, `Source: https://everloot.app/database/quests/${page.questId}`].join("\n")}
+            jsonHref={!facts.unreachable && hasCard.quest(page) ? `/api/tooltip/quest/${page.questId}` : undefined}
+          />
+        </EntitySidebar>
         <Tabs
           className="mt-6"
           label={`${title}: relations`}
@@ -204,7 +206,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
           <LoreSection match={lore} />
           {!facts.unreachable && page.title !== null && <AdSlot slot="inContent" />}
         </div>
-      </article>
+      </EntityLayout>
     </Container>
   );
 }

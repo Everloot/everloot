@@ -1,3 +1,5 @@
+import { assetsBaseUrl } from "@/lib/talents/assets";
+import { FETCH_TIMEOUT_MS, REVALIDATE_SECONDS } from "@/lib/game-assets";
 import { ImageResponse } from "next/og";
 import { agreementLabel } from "@/components/ui/AgreementMeter";
 import { tokens, type CLASSES } from "@/design/tokens";
@@ -73,11 +75,11 @@ export function fittedTitle(title: string): { fontSize: number; lines: number } 
 }
 
 /**
- * A text-only social card on the brand canvas: the diamond mark, a small label, the page title and one
- * line under it. Nothing from the game, so no Blizzard art can end up in a shared link. `fit` bounds the title
+ * A social card on the brand canvas: the diamond mark, a small label, the page title and one
+ * line under it. Entity cards may include an approved game icon; other cards stay text-only. `fit` bounds the title
  * (fittedTitle); without it the title is drawn at full size as it is.
  */
-export async function renderCard(card: { label: string; title: string; subtitle: string; color?: string; fit?: boolean }): Promise<ImageResponse> {
+export async function renderCard(card: { label: string; title: string; subtitle: string; color?: string; fit?: boolean; icon?: string | null }): Promise<ImageResponse> {
   const c = tokens.dark;
   const fit = card.fit ? fittedTitle(card.title) : null;
   return new ImageResponse(
@@ -88,6 +90,7 @@ export async function renderCard(card: { label: string; title: string; subtitle:
             <path d="M32 12 52 32 32 52 12 32Z" fill="none" stroke={c.accent} strokeWidth="5" strokeLinejoin="round" />
           </svg>
           <div style={{ fontSize: 40, fontWeight: 700, color: c.accent }}>{card.label}</div>
+          {card.icon && <img alt="" src={card.icon} width={96} height={96} style={{ marginLeft: "auto" }} />}
         </div>
         <div style={{ color: card.color ?? c.fg, fontSize: fit?.fontSize ?? 84, fontWeight: 700, letterSpacing: -2, marginTop: 40, lineHeight: 1.05, ...(fit ? { display: "block", lineClamp: fit.lines } : {}) }}>{card.title}</div>
         <div style={{ fontSize: 36, marginTop: 28, color: c["fg-2"] }}>{card.subtitle}</div>
@@ -100,14 +103,16 @@ export async function renderCard(card: { label: string; title: string; subtitle:
 
 /**
  * A database entity page's card (an item, NPC or quest): the name as the title, its type and the page's own
- * "N of 3 installs agree" line under it. Text only, like the card above: no icon from the game files. The
+ * "N of 3 installs agree" line under it. An existing game icon is allowed (owner decision 2026-11-10);
+ * unavailable or disabled art stays text-only. The
  * installs line is left off while upload storage is out of reach, as the page leaves its meter off. The count
  * changes as players report, so the card is kept as long as the site's own hover card, not for a year as the
  * other cards are.
  */
-export async function renderEntityCard(card: { title: string; type: string; installs: number | null; quality?: Quality; omitZero?: boolean }): Promise<ImageResponse> {
+export async function renderEntityCard(card: { title: string; type: string; installs: number | null; quality?: Quality; omitZero?: boolean; icon?: string | null }): Promise<ImageResponse> {
   const subtitle = card.installs === null || (card.omitZero && card.installs === 0) ? card.type : `${card.type} · ${agreementLabel(card.installs)}`;
-  const image = await renderCard({ label: "Everloot database", title: card.title, subtitle, color: card.quality ? tokens.dark[`q-${card.quality}`] : undefined, fit: true });
+  const icon = await fetchCardIcon(card.icon);
+  const image = await renderCard({ icon, label: "Everloot database", title: card.title, subtitle, color: card.quality ? tokens.dark[`q-${card.quality}`] : undefined, fit: true });
   image.headers.set("Cache-Control", "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400");
   return image;
 }
@@ -171,4 +176,27 @@ export async function renderCharacterCard(view: Showcase, size: CharacterCardSiz
     ),
     { ...CHARACTER_CARD_SIZES[size] },
   );
+}
+
+/** Fetch once and embed the bytes so the image renderer never makes a second request. */
+async function fetchCardIcon(url?: string | null): Promise<string | null> {
+  const base = assetsBaseUrl();
+  if (!base || !url || !url.startsWith(`${base}/icons/`)) return null;
+  try {
+    const res = await fetch(url, { next: { revalidate: REVALIDATE_SECONDS }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+    if (!res.ok) return null;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    // The assets host serves WebP; next/og also accepts PNG and JPEG. Reject non-image responses.
+    const type = res.headers.get("content-type")?.split(";")[0];
+    if (!type || !["image/webp", "image/png", "image/jpeg"].includes(type) || !bytes.length || bytes.length > 65536) return null;
+    if (type === "image/webp") {
+      // next/og cannot decode WebP. These small icons use portable JS codecs, with no native addon or WASM.
+      const [{ decode }, { encode }] = await Promise.all([import("@stacksjs/ts-webp"), import("fast-png")]);
+      const decoded = decode(bytes);
+      if (decoded.width > 128 || decoded.height > 128) return null;
+      const png = encode({ width: decoded.width, height: decoded.height, data: decoded.data, channels: 4 });
+      return `data:image/png;base64,${Buffer.from(png).toString("base64")}`;
+    }
+    return `data:${type};base64,${Buffer.from(bytes).toString("base64")}`;
+  } catch { return null; }
 }

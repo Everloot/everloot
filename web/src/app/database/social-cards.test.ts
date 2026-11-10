@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// The item, NPC and quest pages' own social cards: the name, its type and the installs line, text only, under
+// The item, NPC and quest pages' own social cards: the name, type, installs line and an eligible item icon, under
 // the pages' rules (the same 404 for an unknown id). The words on a PNG cannot be read back, so the test reads
 // them off the renderer's arguments and checks the bytes it returns are a PNG.
 const { itemFacts, worldFacts, titles, rendered } = vi.hoisted(() => ({
@@ -21,6 +21,8 @@ vi.mock("@/lib/upload-store", () => ({ STORAGE_UNREACHABLE: "Storage unavailable
 vi.mock("@/lib/game-assets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/game-assets")>()),
   loadQuestNames: async () => titles.quests,
+  loadSiteAssets: async () => ({ base: "https://assets.example/build" }),
+  loadItemTips: async () => new Map([[19019, { icon: "https://assets.example/build/icons/19019.webp" }]]),
 }));
 vi.mock("@/lib/og-card", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/og-card")>();
@@ -67,7 +69,7 @@ describe("the database entity cards", () => {
   it("an item's card shows its name, its class line and how many installs agree on the name", async () => {
     itemFacts.names = installs(3, { itemId: 19019, name: "Thunderfury" });
     await expectPng(await ItemImage(props("19019")));
-    expect(lastCard()).toEqual({ title: "Thunderfury", type: "Weapons · One-Handed Swords", quality: "legendary", omitZero: true, installs: 3 });
+    expect(lastCard()).toEqual({ title: "Thunderfury", type: "Weapons · One-Handed Swords", quality: "legendary", icon: "https://assets.example/build/icons/19019.webp", omitZero: true, installs: 3 });
     // Two installs so far: the id for a name, in no quality colour, and their count.
     itemFacts.names = installs(2, { itemId: 19019, name: "Thunderfury" });
     await ItemImage(props("19019"));

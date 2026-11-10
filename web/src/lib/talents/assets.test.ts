@@ -102,6 +102,8 @@ const root = join(__dirname, "../../../..");
 
 // The pages that show Blizzard's art, and the modules that read it for them. Nothing else may.
 const SHOWS_ART = new Set([
+  // Approved entity share icons use the same page art switch and item visibility rule.
+  "web/src/lib/og-card.tsx", "web/src/app/database/items/[id]/opengraph-image.tsx",
   "web/src/lib/talents/assets.ts", "web/src/lib/game-assets.ts", "web/src/lib/game-assets.fixture.ts",
   "web/src/components/RaidBuilder.tsx",
   "web/src/app/page.tsx", "web/src/app/sign-in/page.tsx", "web/src/app/sign-up/page.tsx", "web/src/components/AuthShell.tsx", "web/src/app/map/map-screen.tsx", "web/src/components/RaidView.tsx", "web/src/app/tools/auctions/page.tsx", "web/src/app/tools/auctions/art.ts",

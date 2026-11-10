@@ -14,7 +14,7 @@ import { pinLink, WORLD_MAP } from "@/lib/world-map";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, type Column } from "@/components/ui";
-import { EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, MapName, ShowOnMap, Unreachable } from "../../entity";
+import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, MapName, ShowOnMap, Unreachable } from "../../entity";
 import { NpcLootPanel } from "../../loot-tables";
 import { VendorGoods } from "../../vendors/goods";
 import { npcRelations } from "../relations";
@@ -126,10 +126,10 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
 
   return (
     <Container width="data">
-      <article>
+      <EntityLayout>
         <JsonLd data={entityPageJsonLd({ name: title, path: `/database/npcs/${npcId}`, identifier: `npc:${npcId}` })} />
         <EntityHeader trail={trail} title={title} meta={["NPC", zone?.name, named ? <span key="id" className="tabular-nums">ID {npcId}</span> : null]} />
-        <EntityTop
+        <EntityTop railMap
           // No box without an agreed position: the Map tab says why, and a frame with only the name would repeat the title.
           box={firstPin && (zone ? <MapThumb pin={firstPin} zone={zone.name} art={art?.smallUrl ?? art?.url ?? null} /> : (
             <TooltipFrame name={title} label={`${title}, as players saw it`}>
@@ -154,11 +154,13 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
             />
           )}
         />
-        <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-        <OpenData
-          text={[`${title} (npc ${npcId})`, ...summary, `Source: https://everloot.app/database/npcs/${npcId}`].join("\n")}
-          jsonHref={!facts.unreachable && hasCard.npc(page) ? `/api/tooltip/npc/${npcId}` : undefined}
-        />
+        <EntitySidebar>
+          <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
+          <OpenData
+            text={[`${title} (npc ${npcId})`, ...summary, `Source: https://everloot.app/database/npcs/${npcId}`].join("\n")}
+            jsonHref={!facts.unreachable && hasCard.npc(page) ? `/api/tooltip/npc/${npcId}` : undefined}
+          />
+        </EntitySidebar>
         <Tabs
           className="mt-6"
           label={`${title}: relations`}
@@ -213,7 +215,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
           <LoreSection match={lore} />
           {!unreachable && (page.name !== null || dropped.length > 0 || zero !== undefined) && <AdSlot slot="inContent" />}
         </div>
-      </article>
+      </EntityLayout>
     </Container>
   );
 }

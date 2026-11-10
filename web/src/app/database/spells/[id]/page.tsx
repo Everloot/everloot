@@ -4,7 +4,7 @@ import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, type Column, type TabItem } from "@/components/ui";
-import { EmptyTab, EntityHeader, EntityTop, LINK } from "../../entity";
+import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, LINK } from "../../entity";
 import { entitySummary, evidenceLine } from "@/lib/evidence";
 import { loadEdges } from "@/lib/edges";
 import { loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
@@ -185,7 +185,7 @@ export default async function SpellPage(props: Props) {
 
   return (
     <Container width="data">
-      <article>
+      <EntityLayout>
         <JsonLd data={entityPageJsonLd({ name: title, path: `/database/spells/${spellId}`, identifier: `spell:${spellId}` })} />
         <EntityHeader trail={trail} title={title} meta={["Spell", <span key="id" className="tabular-nums">ID {spellId}</span>]} />
         <EntityTop
@@ -208,14 +208,16 @@ export default async function SpellPage(props: Props) {
             />
           }
         />
-        <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-        <OpenData
-          text={[`${title} (spell ${spellId})`, tip?.text ?? "", ...summary, `Source: https://everloot.app/database/spells/${spellId}`].filter(Boolean).join("\n")}
-        />
+        <EntitySidebar>
+          <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
+          <OpenData
+            text={[`${title} (spell ${spellId})`, tip?.text ?? "", ...summary, `Source: https://everloot.app/database/spells/${spellId}`].filter(Boolean).join("\n")}
+          />
+        </EntitySidebar>
         {tabs.length
           ? <Tabs label={`${title}: relations`} tabs={tabs} className="mt-6" />
           : <EmptyTab message={`The game files list nothing here (build ${build}).`} players={false} action={null} />}
-      </article>
+      </EntityLayout>
     </Container>
   );
 }

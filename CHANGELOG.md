@@ -12,6 +12,8 @@ build that has a zip in the repository. Earlier builds have none.
 
 ## [Unreleased]
 
+- Site: Show item game icons on social cards with a text fallback, and reuse entity summaries, facts and maps in a wide-screen right column.
+
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
