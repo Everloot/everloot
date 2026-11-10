@@ -205,6 +205,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: download shortcuts (`/download`, `/downloads`, `/desktop`, `/curseforge`), CurseForge install choices and a
   Desktop App button for your operating system make downloads easier to find, including on phones.
 - Site: Zone pages have an Items tab with the items players looted from the NPCs and objects confirmed there, each with its source, observed frequency and installs (an item two sources drop is one row with its sources under it, 50 items a page), and an empty zone says a rate needs loot windows from 3 installs. The header links the zone's coverage page and its wiki page when one is published, and a line under the tabs links the farming and gathering pages that list the zone. When the loot tables cannot be read the tab says so instead of vanishing.
+- Site: Quest pages link their chain, previous and next quests, and reported zone; chain lists explain quests whose names are not reported yet.
 
 ### Fixed
 - Site: the header shows the build whose files the site reads and the newest build seen, each linked to what it means.
