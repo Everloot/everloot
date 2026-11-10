@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { DataTable, SectionHeading, type Column } from "@/components/ui";
 import type { LegacyPerkCatalog, Node, Tree } from "../../../kb/src/legacy-perks/catalog";
 
@@ -15,7 +16,9 @@ export default function LegacyPerks({ catalog }: { catalog: LegacyPerkCatalog })
   return (
     <div className="space-y-12">
       <p className="text-sm text-muted">
-        {`Found in game files, unconfirmed. Build ${catalog.build.version}, trait system ${catalog.traitSystemId}. `}
+        Found in game files, unconfirmed.{" "}
+        <Link href={`/changes?show=builds&q=${catalog.build.version}`} className="underline decoration-edge underline-offset-4 hover:decoration-fg">{`Read from build ${catalog.build.version}`}</Link>
+        {` on ${catalog.build.extractedAt.slice(0, 10)}, trait system ${catalog.traitSystemId}. `}
         {catalog.credit}
       </p>
 

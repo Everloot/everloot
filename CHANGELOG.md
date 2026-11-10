@@ -18,6 +18,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: a dungeon or raid page gains a Loot section after Bosses: for each boss 3 installs report, the loot table of
   its creature, the same rows its NPC page shows, or how many installs have looted it so far. In the list, an instance
   the game files place no entrance for says so beside its id, with the reason on hover.
+- Site: every database page now tells search engines its name, id and address, so results link the right page.
 - Site: the armory opens at `/armory`: a page for every WoW Forever character and guild that Blizzard's API returns,
   read hourly, with guild rosters, three boards (item level, gear score, honorable kills), a form to hide a character
   and a form to ask for one. Each page says "Data from Blizzard Entertainment", carries no ad and is not indexed yet.
@@ -43,6 +44,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: a profession page answers to its skill line id, `/tools/professions/171` or `/tools/professions/171-alchemy`, and
   redirects for good to the slug page it already had, keeping the skill range and class context in the query; an unknown id
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
+- Addon: the Gold Overview shows earned, spent and profit for the selected period and character or account, with daily averages, top items and pending sales.
 - Site: a "Write a wiki page" guide under Docs › Guides says how a wiki page is proposed and reviewed, with the page
   types, the front matter, the rules and the check from the wiki README; the wiki hub and the lore archive link to it.
 - Site: a faction page and a title page carry In short, Copy for AI, a "Player reports" fact that stays an empty meter
@@ -181,6 +183,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   instead of withdrawing the event as a conflict. The map shows none of this yet.
 
 ### Fixed
+- Site: the header shows the build whose files the site reads and the newest build seen, each linked to what it means.
 - Site: /api/suggest spends the per-IP quota and shares one edge cache entry for `Thunder` and `thunder `, the coverage 400 and waitlist 503 are `no-store` (the 503 adds `Retry-After`), and the docs list every route that sends CORS from one file.
 - Site: when a database or tools page can't be read, you now get a "Database unavailable" or "Tool unavailable" page that says it could not be read, not that it is empty, with a Try again button and a link back to the section, instead of the generic error page.
 - Site: item list pagination is crawlable while filter URLs stay blocked.
@@ -397,6 +400,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   within 7 days. The data policy, /privacy and the account page say so.
 - Docs: OPEN_DATA.md and RELEASING.md no longer say the open data export sits in the roadmap's Next section; they point to ROADMAP.md.
 - Docs: each gap in DATA_PLACEMENT.md carries a dated state, and the WAF row now describes the Cloudflare rules that apply on /database/*.
+- Docs: CONTRIBUTING.md and the pull request template describe the changelog line, the labels in use and the addon install link.
 
 ## [desktop-v0.1.21] - 2026-11-10
 

@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import JsonLd from "@/components/JsonLd";
+import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { Container, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
@@ -66,6 +68,7 @@ export default async function TitlePage(props: Props) {
   return (
     <Container width="data">
       <article>
+        {entry && <JsonLd data={entityPageJsonLd({ name: title, path: titleHref(entry.titleId, entry.name), identifier: `title:${id}` })} />}
         <EntityHeader trail={trail} title={title} meta={["Title", <span key="id" className="tabular-nums">ID {id}</span>]} />
         {entry ? (
           <>

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { CURRENT_VERSION, GAME_VERSIONS, shortBuild, versionLabel } from "./game-version";
+import { CURRENT_VERSION, GAME_VERSIONS } from "./game-version";
 
 const dir = join(__dirname, "..", "data", "game-data");
 const read = (file: string) => JSON.parse(readFileSync(join(dir, file), "utf8"));
@@ -19,11 +19,6 @@ describe("game versions", () => {
       expect(v.note).toBeTruthy();
     }
     expect(GAME_VERSIONS[2].note).toContain("2026-11-04");
-  });
-
-  test("the label is the short build", () => {
-    expect(shortBuild("1.60.1.70450")).toBe("1.60.1");
-    expect(versionLabel()).toBe(`Build ${shortBuild(CURRENT_VERSION.build!)}`);
   });
 
   // A build bump regenerates the layers; one left behind would show the old build under the new label.

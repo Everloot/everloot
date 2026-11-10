@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import JsonLd from "@/components/JsonLd";
+import { entityPageJsonLd } from "@/lib/jsonld";
 import AdSlot from "@/components/AdSlot";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
@@ -78,6 +80,7 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
   return (
     <Container width="data">
       <article>
+        <JsonLd data={entityPageJsonLd({ name: title, path: `/database/vendors/${page.vendorNpcId}`, identifier: `vendor:${page.vendorNpcId}` })} />
         <EntityHeader
           trail={trail}
           title={title}
