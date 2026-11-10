@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/coverage.json",
   "title": "Database coverage by zone, type and field",
-  "description": "Counts how much of WoW: Forever's database is settled or confirmed, per zone, per type and per field, as https://everloot.app/database/coverage shows it, in text only. Coverage is settled over expected, with confirmed over expected beside it; the denominator is the larger of expected and observed, and confirmed includes settled. A player-reported fact is public after three installs agree; fields one or two installs short are counted without their values. Scoped totals and the current build's settled-list size come separately dated and measured. Only public report identifiers and game-file facts are listed, never unconfirmed values, baseline rows, names or ids, or player names. When coverage data is available, every answer states its scope, method, data date and install counts; when it is not, the answer states the scope and marks the counts, data date and installs [?], not zero. Unknown values are [?]. Use it for how complete the database is for a zone or type; use the page tools for the facts themselves.",
+  "description": "Counts how much of WoW: Forever's database is settled or confirmed, per zone, per type and per field, as https://everloot.app/database/coverage shows it. Coverage is settled over expected, with confirmed over expected beside it; the denominator is the larger of expected and observed, and confirmed includes settled. A player-reported fact is public after three installs agree; fields one or two installs short are counted without their values. Scoped totals and the current build's settled-list size come separately dated and measured. Only public report identifiers and game-file facts are listed, never unconfirmed values, baseline rows, names or ids, or player names. When coverage data is available, every answer states its scope, method, data date and install counts; when it is not, the answer states the scope and marks the counts, data date and installs [?], not zero. Unknown values are [?]. Without zone the answer is a summary: scoped totals, each type, and one line per zone, 20 zones at a time; detail adds per-field counts and reported entries. A partial answer says how many it shows of how many and gives nextOffset; pass it as offset with the same arguments for the rest. Use it for how complete the database is for a zone or type; use the page tools for the facts themselves.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -32,8 +32,473 @@
           "bosses",
           "treasures"
         ]
+      },
+      "detail": {
+        "description": "true lists each zone's per-type and per-field counts and the reported fields needing installs. Default: true with zone, false without it.",
+        "type": "boolean"
+      },
+      "offset": {
+        "description": "Where the list starts: zones, or with zone and detail that zone's reported entries. Default 0; use nextOffset from the last answer.",
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991
+      },
+      "limit": {
+        "description": "How many per answer: default 20 zones in a summary, 1 zones with detail, 25 reported entries for one zone; at most 50.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50
       }
     }
+  },
+  "outputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "connected": {
+        "type": "boolean",
+        "description": "False when no corpus was read; the page is then absent, which is not a measured zero."
+      },
+      "dataAsOf": {
+        "description": "The corpus snapshot time, or null when unrecorded.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "reason": {
+        "description": "Why nothing was read, when connected is false.",
+        "type": "string"
+      },
+      "url": {
+        "description": "The everloot.app page that shows this answer, absolute. Absent when there is no such page or it would be empty.",
+        "type": "string"
+      },
+      "scope": {
+        "type": "object",
+        "properties": {
+          "zone": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "quests",
+                  "npcs",
+                  "pins",
+                  "vendors",
+                  "drops",
+                  "rares",
+                  "entrances",
+                  "bosses",
+                  "treasures"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "zone",
+          "type"
+        ],
+        "additionalProperties": false,
+        "description": "The zone and type asked for; null is all."
+      },
+      "page": {
+        "type": "object",
+        "properties": {
+          "build": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "installs": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Distinct folded installs overall, including unplaced facts, before zone and type filters."
+          },
+          "expectedAsOf": {
+            "description": "The date of the expected counts; null when unrecorded.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "settledList": {
+            "type": "object",
+            "properties": {
+              "facts": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "dataAsOf": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "facts",
+              "dataAsOf"
+            ],
+            "additionalProperties": false,
+            "description": "The build's whole-fact settled list, before zone and type filters; null facts when unknown, not zero."
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "settled": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "confirmed": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "Includes settled."
+              },
+              "reported": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "recheck": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "expected": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "From the game files and a local Classic baseline (counts only); null when unknown."
+              },
+              "observed": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "denominator": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "max(expected, observed); null when unknown, never zero."
+              }
+            },
+            "required": [
+              "settled",
+              "confirmed",
+              "reported",
+              "recheck",
+              "expected",
+              "observed",
+              "denominator"
+            ],
+            "additionalProperties": false,
+            "description": "Every zone and type in scope together."
+          },
+          "needsInstalls": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Fields one or two installs short in scope; null when the capped list cannot count them."
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "quests",
+                    "npcs",
+                    "pins",
+                    "vendors",
+                    "drops",
+                    "rares",
+                    "entrances",
+                    "bosses",
+                    "treasures"
+                  ]
+                },
+                "counts": {
+                  "type": "object",
+                  "properties": {
+                    "settled": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "confirmed": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Includes settled."
+                    },
+                    "reported": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "recheck": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "expected": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "From the game files and a local Classic baseline (counts only); null when unknown."
+                    },
+                    "observed": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "denominator": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "max(expected, observed); null when unknown, never zero."
+                    }
+                  },
+                  "required": [
+                    "settled",
+                    "confirmed",
+                    "reported",
+                    "recheck",
+                    "expected",
+                    "observed",
+                    "denominator"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "type",
+                "counts"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Each type in scope over every zone in scope."
+          },
+          "zones": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "mapId": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "name": {
+                  "type": "string"
+                },
+                "installs": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "counts": {
+                  "type": "object",
+                  "properties": {
+                    "settled": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "confirmed": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Includes settled."
+                    },
+                    "reported": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "recheck": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "expected": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "From the game files and a local Classic baseline (counts only); null when unknown."
+                    },
+                    "observed": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "denominator": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "max(expected, observed); null when unknown, never zero."
+                    }
+                  },
+                  "required": [
+                    "settled",
+                    "confirmed",
+                    "reported",
+                    "recheck",
+                    "expected",
+                    "observed",
+                    "denominator"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "mapId",
+                "name",
+                "installs",
+                "counts"
+              ],
+              "additionalProperties": false
+            },
+            "description": "This answer's zones, each over the types in scope."
+          },
+          "detail": {
+            "type": "boolean",
+            "description": "True when the text holds per-field counts and reported entries."
+          },
+          "list": {
+            "type": "string",
+            "enum": [
+              "zones",
+              "entries"
+            ],
+            "description": "What offset, limit and total count: zones, or, for one zone with detail, its reported entries."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "nextOffset": {
+            "description": "Present when more remain: pass it as offset with the same arguments.",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "build",
+          "installs",
+          "expectedAsOf",
+          "settledList",
+          "totals",
+          "needsInstalls",
+          "types",
+          "zones",
+          "detail",
+          "list",
+          "total",
+          "offset",
+          "limit"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "connected",
+      "dataAsOf",
+      "scope"
+    ],
+    "additionalProperties": false
   },
   "x-everloot-output": {
     "type": "text",

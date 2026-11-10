@@ -14,6 +14,12 @@ required, or tightening a limit is a major release.
   descriptions say how a name is read and that Everloot's own installs make a day public under 3. Optional, so
   earlier readers are unaffected.
 - 2.1.0: MCP knowledge hits optionally carry recordId, gameId, sourceKind, build and observed snapshot support for gameplay discovery. Existing tool names and ids are preserved.
+- 2.1.0: `coverage` takes optional `detail`, `offset` and `limit` and gains an output schema: `scope`, and a `page`
+  (`coveragePage`) with the scoped totals and their denominators, each type, the answer's zones, `list`, `total`, `offset`,
+  `limit` and `nextOffset`. Every MCP tool now has an output schema. `everloot_plan` takes optional `status`, `detail`,
+  `offset` and `limit`, and its output gains optional `index`, `total`, `offset`, `nextOffset` and `url`. Without `detail`
+  it answers a summary: `rows` is empty and `index` names the page's rows; a reader that wants every row with its done
+  text pages with `detail: true`. New constants `COVERAGE_PAGE` and `PLAN_ROWS` hold the page sizes.
 - `dropsResponse.rates[].sourceName`: the NPC's or object's name, once 3 installs agree on it; absent until then.
   Optional, so earlier readers are unaffected.
 

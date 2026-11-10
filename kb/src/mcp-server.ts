@@ -7,7 +7,7 @@ import { answerSources, answerSourcesFactsFromRecords, formatAnswerSources, type
 import type { RecheckScope } from "./coverage.js";
 import type { FilesIndex } from "./files-evidence.js";
 import { AUCTION_HISTORY_RULE, auctionHistory, auctionPointLines, auctionSightingsFromRecords, type AuctionPoint, type AuctionSighting } from "./auction-history.js";
-import { handlePlan, planStructured } from "./bridge-plan.js";
+import { handlePlan } from "./bridge-plan.js";
 import { handleRecentChanges, recentChangesStructured, type ChangeEntry } from "./changes.js";
 import { ecosystemProjectsStructured, handleEcosystemProjects, type EcosystemView } from "./ecosystem.js";
 import { collectionFactsFromRecords, collectionGap, handleCollectionGap } from "./collection-gap.js";
@@ -1175,7 +1175,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
     },
     coverage: (args) => answerCoverage(args, options.coverage, options.settledSummary),
     population: (args) => answerPopulation(args, options.census, answerFooter),
-    everloot_plan: () => ({ text: handlePlan(), structured: planStructured() }),
+    everloot_plan: (args) => handlePlan(args),
   };
   void readFacts;
   return handlers;

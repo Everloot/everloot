@@ -466,6 +466,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: zone and instance pages open with the same title row as the other database pages (name, type line, quiet controls at its end), and the instance and spell-talent facts use the same label-and-value list.
 - Site: the web-font swap no longer moves the page. Geist and Geist Mono now fall back to Arial and Courier New resized per weight to Geist's widths (the Arial fallback was 4% too wide at regular), and a screen of height is reserved only while the database hub streams, so a 404 or an empty result keeps its footer in view.
 - MCP: clarify tool choice, name and id discovery, realm aliases, evidence limits and price methods, with three example journeys.
+- MCP: `coverage` and `everloot_plan` answer with a summary first and page the rest, so a broad question stays under 12 KB (the audit measured 82 KB for every zone's quests and 38 KB for the plan). `coverage` without a zone gives the totals, each type and one line per zone, 20 zones at a time, now with structured totals and denominators; `everloot_plan` names each row, 40 at a time. `detail`, `offset` and `limit` read the rest, and every page says how many it shows of how many and gives `nextOffset`. One zone answers as before.
 
 ## [desktop-v0.1.21] - 2026-11-10
 

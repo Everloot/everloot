@@ -1030,6 +1030,95 @@ export declare const planRow: z.ZodObject<{
     }>>;
 }, z.core.$strip>;
 export type PlanRowOut = z.infer<typeof planRow>;
+/** Rows per everloot_plan answer: the summary names each row, detail adds what done means. */
+export declare const PLAN_ROWS: {
+    readonly summary: 40;
+    readonly detail: 10;
+    readonly max: 100;
+};
+/** How much one coverage answer lists: zones, or one zone's reported entries, each with nextOffset to continue. */
+export declare const COVERAGE_PAGE: {
+    readonly summaryZones: 20;
+    readonly detailZones: 1;
+    readonly entries: 25;
+    readonly entriesPerZone: 10;
+    readonly max: 50;
+};
+/** One coverage cell: entity-field facts, never values. A null count is unknown, not zero. */
+export declare const coverageCounts: z.ZodObject<{
+    settled: z.ZodNumber;
+    confirmed: z.ZodNumber;
+    reported: z.ZodNumber;
+    recheck: z.ZodNumber;
+    expected: z.ZodNullable<z.ZodNumber>;
+    observed: z.ZodNumber;
+    denominator: z.ZodNullable<z.ZodNumber>;
+}, z.core.$strip>;
+export declare const coveragePage: z.ZodObject<{
+    build: z.ZodNullable<z.ZodString>;
+    installs: z.ZodNumber;
+    expectedAsOf: z.ZodNullable<z.ZodString>;
+    settledList: z.ZodObject<{
+        facts: z.ZodNullable<z.ZodNumber>;
+        dataAsOf: z.ZodNullable<z.ZodString>;
+    }, z.core.$strip>;
+    totals: z.ZodObject<{
+        settled: z.ZodNumber;
+        confirmed: z.ZodNumber;
+        reported: z.ZodNumber;
+        recheck: z.ZodNumber;
+        expected: z.ZodNullable<z.ZodNumber>;
+        observed: z.ZodNumber;
+        denominator: z.ZodNullable<z.ZodNumber>;
+    }, z.core.$strip>;
+    needsInstalls: z.ZodNullable<z.ZodNumber>;
+    types: z.ZodArray<z.ZodObject<{
+        type: z.ZodEnum<{
+            bosses: "bosses";
+            drops: "drops";
+            entrances: "entrances";
+            npcs: "npcs";
+            pins: "pins";
+            quests: "quests";
+            rares: "rares";
+            treasures: "treasures";
+            vendors: "vendors";
+        }>;
+        counts: z.ZodObject<{
+            settled: z.ZodNumber;
+            confirmed: z.ZodNumber;
+            reported: z.ZodNumber;
+            recheck: z.ZodNumber;
+            expected: z.ZodNullable<z.ZodNumber>;
+            observed: z.ZodNumber;
+            denominator: z.ZodNullable<z.ZodNumber>;
+        }, z.core.$strip>;
+    }, z.core.$strip>>;
+    zones: z.ZodArray<z.ZodObject<{
+        mapId: z.ZodNumber;
+        name: z.ZodString;
+        installs: z.ZodNumber;
+        counts: z.ZodObject<{
+            settled: z.ZodNumber;
+            confirmed: z.ZodNumber;
+            reported: z.ZodNumber;
+            recheck: z.ZodNumber;
+            expected: z.ZodNullable<z.ZodNumber>;
+            observed: z.ZodNumber;
+            denominator: z.ZodNullable<z.ZodNumber>;
+        }, z.core.$strip>;
+    }, z.core.$strip>>;
+    detail: z.ZodBoolean;
+    list: z.ZodEnum<{
+        entries: "entries";
+        zones: "zones";
+    }>;
+    total: z.ZodNumber;
+    offset: z.ZodNumber;
+    limit: z.ZodNumber;
+    nextOffset: z.ZodOptional<z.ZodNumber>;
+}, z.core.$strip>;
+export type CoveragePageOut = z.infer<typeof coveragePage>;
 /**
  * search and fetch answer in the shape OpenAI's connector contract asks for (ChatGPT connectors, deep
  * research and company knowledge call exactly these two tools by name): a result list, then one document
@@ -2851,7 +2940,7 @@ export declare const MCP_TOOLS: {
     };
     readonly coverage: {
         readonly title: "Database coverage by zone, type and field";
-        readonly description: "Counts how much of WoW: Forever's database is settled or confirmed, per zone, per type and per field, as https://everloot.app/database/coverage shows it, in text only. Coverage is settled over expected, with confirmed over expected beside it; the denominator is the larger of expected and observed, and confirmed includes settled. A player-reported fact is public after three installs agree; fields one or two installs short are counted without their values. Scoped totals and the current build's settled-list size come separately dated and measured. Only public report identifiers and game-file facts are listed, never unconfirmed values, baseline rows, names or ids, or player names. When coverage data is available, every answer states its scope, method, data date and install counts; when it is not, the answer states the scope and marks the counts, data date and installs [?], not zero. Unknown values are [?]. Use it for how complete the database is for a zone or type; use the page tools for the facts themselves.";
+        readonly description: "Counts how much of WoW: Forever's database is settled or confirmed, per zone, per type and per field, as https://everloot.app/database/coverage shows it. Coverage is settled over expected, with confirmed over expected beside it; the denominator is the larger of expected and observed, and confirmed includes settled. A player-reported fact is public after three installs agree; fields one or two installs short are counted without their values. Scoped totals and the current build's settled-list size come separately dated and measured. Only public report identifiers and game-file facts are listed, never unconfirmed values, baseline rows, names or ids, or player names. When coverage data is available, every answer states its scope, method, data date and install counts; when it is not, the answer states the scope and marks the counts, data date and installs [?], not zero. Unknown values are [?]. Without zone the answer is a summary: scoped totals, each type, and one line per zone, 20 zones at a time; detail adds per-field counts and reported entries. A partial answer says how many it shows of how many and gives nextOffset; pass it as offset with the same arguments for the rest. Use it for how complete the database is for a zone or type; use the page tools for the facts themselves.";
         readonly inputSchema: {
             readonly zone: z.ZodOptional<z.ZodNumber>;
             readonly type: z.ZodOptional<z.ZodEnum<{
@@ -2865,6 +2954,93 @@ export declare const MCP_TOOLS: {
                 treasures: "treasures";
                 vendors: "vendors";
             }>>;
+            readonly detail: z.ZodOptional<z.ZodBoolean>;
+            readonly offset: z.ZodOptional<z.ZodNumber>;
+            readonly limit: z.ZodOptional<z.ZodNumber>;
+        };
+        readonly outputSchema: {
+            readonly connected: z.ZodBoolean;
+            readonly dataAsOf: z.ZodNullable<z.ZodString>;
+            readonly reason: z.ZodOptional<z.ZodString>;
+            readonly url: z.ZodOptional<z.ZodString>;
+            readonly scope: z.ZodObject<{
+                zone: z.ZodNullable<z.ZodNumber>;
+                type: z.ZodNullable<z.ZodEnum<{
+                    bosses: "bosses";
+                    drops: "drops";
+                    entrances: "entrances";
+                    npcs: "npcs";
+                    pins: "pins";
+                    quests: "quests";
+                    rares: "rares";
+                    treasures: "treasures";
+                    vendors: "vendors";
+                }>>;
+            }, z.core.$strip>;
+            readonly page: z.ZodOptional<z.ZodObject<{
+                build: z.ZodNullable<z.ZodString>;
+                installs: z.ZodNumber;
+                expectedAsOf: z.ZodNullable<z.ZodString>;
+                settledList: z.ZodObject<{
+                    facts: z.ZodNullable<z.ZodNumber>;
+                    dataAsOf: z.ZodNullable<z.ZodString>;
+                }, z.core.$strip>;
+                totals: z.ZodObject<{
+                    settled: z.ZodNumber;
+                    confirmed: z.ZodNumber;
+                    reported: z.ZodNumber;
+                    recheck: z.ZodNumber;
+                    expected: z.ZodNullable<z.ZodNumber>;
+                    observed: z.ZodNumber;
+                    denominator: z.ZodNullable<z.ZodNumber>;
+                }, z.core.$strip>;
+                needsInstalls: z.ZodNullable<z.ZodNumber>;
+                types: z.ZodArray<z.ZodObject<{
+                    type: z.ZodEnum<{
+                        bosses: "bosses";
+                        drops: "drops";
+                        entrances: "entrances";
+                        npcs: "npcs";
+                        pins: "pins";
+                        quests: "quests";
+                        rares: "rares";
+                        treasures: "treasures";
+                        vendors: "vendors";
+                    }>;
+                    counts: z.ZodObject<{
+                        settled: z.ZodNumber;
+                        confirmed: z.ZodNumber;
+                        reported: z.ZodNumber;
+                        recheck: z.ZodNumber;
+                        expected: z.ZodNullable<z.ZodNumber>;
+                        observed: z.ZodNumber;
+                        denominator: z.ZodNullable<z.ZodNumber>;
+                    }, z.core.$strip>;
+                }, z.core.$strip>>;
+                zones: z.ZodArray<z.ZodObject<{
+                    mapId: z.ZodNumber;
+                    name: z.ZodString;
+                    installs: z.ZodNumber;
+                    counts: z.ZodObject<{
+                        settled: z.ZodNumber;
+                        confirmed: z.ZodNumber;
+                        reported: z.ZodNumber;
+                        recheck: z.ZodNumber;
+                        expected: z.ZodNullable<z.ZodNumber>;
+                        observed: z.ZodNumber;
+                        denominator: z.ZodNullable<z.ZodNumber>;
+                    }, z.core.$strip>;
+                }, z.core.$strip>>;
+                detail: z.ZodBoolean;
+                list: z.ZodEnum<{
+                    entries: "entries";
+                    zones: "zones";
+                }>;
+                total: z.ZodNumber;
+                offset: z.ZodNumber;
+                limit: z.ZodNumber;
+                nextOffset: z.ZodOptional<z.ZodNumber>;
+            }, z.core.$strip>>;
         };
         readonly annotations: {
             readonly readOnlyHint: true;
@@ -3085,8 +3261,18 @@ export declare const MCP_TOOLS: {
     };
     readonly everloot_plan: {
         readonly title: "Everloot implementation tracker";
-        readonly description: "Returns the Everloot feature catalogue: what is live, what is next, what is waiting, and which reference sites are page shapes only, as the tracker that ships with the site holds it. Use it only for questions about Everloot itself, such as whether a feature exists; it holds no game data. For game facts use search_knowledge or answer_sources; for community addons use ecosystem_projects. Takes no arguments and needs no account.";
-        readonly inputSchema: {};
+        readonly description: "Returns the Everloot feature catalogue: what is live, what is next, what is waiting, and which reference sites are page shapes only, as the tracker that ships with the site holds it. Use it only for questions about Everloot itself, such as whether a feature exists; it holds no game data. For game facts use search_knowledge or answer_sources; for community addons use ecosystem_projects. By default a summary: the counts and each row's id, name and how far it is proven, 40 rows at a time; detail adds what done means (10 rows at a time) and status narrows to one section. A partial answer gives nextOffset; pass it as offset with the same arguments for the rest. Needs no account.";
+        readonly inputSchema: {
+            readonly status: z.ZodOptional<z.ZodEnum<{
+                live: "live";
+                next: "next";
+                shape: "shape";
+                waiting: "waiting";
+            }>>;
+            readonly detail: z.ZodOptional<z.ZodBoolean>;
+            readonly offset: z.ZodOptional<z.ZodNumber>;
+            readonly limit: z.ZodOptional<z.ZodNumber>;
+        };
         readonly outputSchema: {
             readonly rows: z.ZodArray<z.ZodObject<{
                 id: z.ZodString;
@@ -3107,12 +3293,34 @@ export declare const MCP_TOOLS: {
                     "real-data": "real-data";
                 }>>;
             }, z.core.$strip>>;
+            readonly index: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                id: z.ZodString;
+                status: z.ZodEnum<{
+                    live: "live";
+                    next: "next";
+                    shape: "shape";
+                    waiting: "waiting";
+                }>;
+                name: z.ZodString;
+                proof: z.ZodOptional<z.ZodEnum<{
+                    client: "client";
+                    code: "code";
+                    deployed: "deployed";
+                    none: "none";
+                    public: "public";
+                    "real-data": "real-data";
+                }>>;
+            }, z.core.$strip>>>;
             readonly counts: z.ZodObject<{
                 live: z.ZodNumber;
                 next: z.ZodNumber;
                 waiting: z.ZodNumber;
                 shape: z.ZodNumber;
             }, z.core.$strip>;
+            readonly total: z.ZodOptional<z.ZodNumber>;
+            readonly offset: z.ZodOptional<z.ZodNumber>;
+            readonly nextOffset: z.ZodOptional<z.ZodNumber>;
+            readonly url: z.ZodOptional<z.ZodString>;
         };
         readonly annotations: {
             readonly readOnlyHint: true;
@@ -4752,7 +4960,7 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Database coverage by zone, type and field";
-    description: "Counts how much of WoW: Forever's database is settled or confirmed, per zone, per type and per field, as https://everloot.app/database/coverage shows it, in text only. Coverage is settled over expected, with confirmed over expected beside it; the denominator is the larger of expected and observed, and confirmed includes settled. A player-reported fact is public after three installs agree; fields one or two installs short are counted without their values. Scoped totals and the current build's settled-list size come separately dated and measured. Only public report identifiers and game-file facts are listed, never unconfirmed values, baseline rows, names or ids, or player names. When coverage data is available, every answer states its scope, method, data date and install counts; when it is not, the answer states the scope and marks the counts, data date and installs [?], not zero. Unknown values are [?]. Use it for how complete the database is for a zone or type; use the page tools for the facts themselves.";
+    description: "Counts how much of WoW: Forever's database is settled or confirmed, per zone, per type and per field, as https://everloot.app/database/coverage shows it. Coverage is settled over expected, with confirmed over expected beside it; the denominator is the larger of expected and observed, and confirmed includes settled. A player-reported fact is public after three installs agree; fields one or two installs short are counted without their values. Scoped totals and the current build's settled-list size come separately dated and measured. Only public report identifiers and game-file facts are listed, never unconfirmed values, baseline rows, names or ids, or player names. When coverage data is available, every answer states its scope, method, data date and install counts; when it is not, the answer states the scope and marks the counts, data date and installs [?], not zero. Unknown values are [?]. Without zone the answer is a summary: scoped totals, each type, and one line per zone, 20 zones at a time; detail adds per-field counts and reported entries. A partial answer says how many it shows of how many and gives nextOffset; pass it as offset with the same arguments for the rest. Use it for how complete the database is for a zone or type; use the page tools for the facts themselves.";
     inputSchema: {
         readonly zone: z.ZodOptional<z.ZodNumber>;
         readonly type: z.ZodOptional<z.ZodEnum<{
@@ -4766,6 +4974,93 @@ export declare const MCP_TOOL_LIST: ({
             treasures: "treasures";
             vendors: "vendors";
         }>>;
+        readonly detail: z.ZodOptional<z.ZodBoolean>;
+        readonly offset: z.ZodOptional<z.ZodNumber>;
+        readonly limit: z.ZodOptional<z.ZodNumber>;
+    };
+    outputSchema: {
+        readonly connected: z.ZodBoolean;
+        readonly dataAsOf: z.ZodNullable<z.ZodString>;
+        readonly reason: z.ZodOptional<z.ZodString>;
+        readonly url: z.ZodOptional<z.ZodString>;
+        readonly scope: z.ZodObject<{
+            zone: z.ZodNullable<z.ZodNumber>;
+            type: z.ZodNullable<z.ZodEnum<{
+                bosses: "bosses";
+                drops: "drops";
+                entrances: "entrances";
+                npcs: "npcs";
+                pins: "pins";
+                quests: "quests";
+                rares: "rares";
+                treasures: "treasures";
+                vendors: "vendors";
+            }>>;
+        }, z.core.$strip>;
+        readonly page: z.ZodOptional<z.ZodObject<{
+            build: z.ZodNullable<z.ZodString>;
+            installs: z.ZodNumber;
+            expectedAsOf: z.ZodNullable<z.ZodString>;
+            settledList: z.ZodObject<{
+                facts: z.ZodNullable<z.ZodNumber>;
+                dataAsOf: z.ZodNullable<z.ZodString>;
+            }, z.core.$strip>;
+            totals: z.ZodObject<{
+                settled: z.ZodNumber;
+                confirmed: z.ZodNumber;
+                reported: z.ZodNumber;
+                recheck: z.ZodNumber;
+                expected: z.ZodNullable<z.ZodNumber>;
+                observed: z.ZodNumber;
+                denominator: z.ZodNullable<z.ZodNumber>;
+            }, z.core.$strip>;
+            needsInstalls: z.ZodNullable<z.ZodNumber>;
+            types: z.ZodArray<z.ZodObject<{
+                type: z.ZodEnum<{
+                    bosses: "bosses";
+                    drops: "drops";
+                    entrances: "entrances";
+                    npcs: "npcs";
+                    pins: "pins";
+                    quests: "quests";
+                    rares: "rares";
+                    treasures: "treasures";
+                    vendors: "vendors";
+                }>;
+                counts: z.ZodObject<{
+                    settled: z.ZodNumber;
+                    confirmed: z.ZodNumber;
+                    reported: z.ZodNumber;
+                    recheck: z.ZodNumber;
+                    expected: z.ZodNullable<z.ZodNumber>;
+                    observed: z.ZodNumber;
+                    denominator: z.ZodNullable<z.ZodNumber>;
+                }, z.core.$strip>;
+            }, z.core.$strip>>;
+            zones: z.ZodArray<z.ZodObject<{
+                mapId: z.ZodNumber;
+                name: z.ZodString;
+                installs: z.ZodNumber;
+                counts: z.ZodObject<{
+                    settled: z.ZodNumber;
+                    confirmed: z.ZodNumber;
+                    reported: z.ZodNumber;
+                    recheck: z.ZodNumber;
+                    expected: z.ZodNullable<z.ZodNumber>;
+                    observed: z.ZodNumber;
+                    denominator: z.ZodNullable<z.ZodNumber>;
+                }, z.core.$strip>;
+            }, z.core.$strip>>;
+            detail: z.ZodBoolean;
+            list: z.ZodEnum<{
+                entries: "entries";
+                zones: "zones";
+            }>;
+            total: z.ZodNumber;
+            offset: z.ZodNumber;
+            limit: z.ZodNumber;
+            nextOffset: z.ZodOptional<z.ZodNumber>;
+        }, z.core.$strip>>;
     };
     annotations: {
         readonly readOnlyHint: true;
@@ -4986,8 +5281,18 @@ export declare const MCP_TOOL_LIST: ({
     name: "answer_sources" | "auction_history" | "class_races" | "collection_gap" | "completion_progress" | "coverage" | "ecosystem_projects" | "entity_relations" | "everloot_plan" | "fetch" | "get_by_name" | "get_entity" | "gold_ledger" | "guild_board" | "guild_rankings" | "guild_search" | "item_categories" | "item_page" | "market_value" | "npc_page" | "object_page" | "population" | "profession_path" | "quest_page" | "recent_changes" | "recipe_thresholds" | "search" | "search_knowledge" | "talent_plan" | "talent_tree" | "vendor_page" | "world_map_near";
 } | {
     title: "Everloot implementation tracker";
-    description: "Returns the Everloot feature catalogue: what is live, what is next, what is waiting, and which reference sites are page shapes only, as the tracker that ships with the site holds it. Use it only for questions about Everloot itself, such as whether a feature exists; it holds no game data. For game facts use search_knowledge or answer_sources; for community addons use ecosystem_projects. Takes no arguments and needs no account.";
-    inputSchema: {};
+    description: "Returns the Everloot feature catalogue: what is live, what is next, what is waiting, and which reference sites are page shapes only, as the tracker that ships with the site holds it. Use it only for questions about Everloot itself, such as whether a feature exists; it holds no game data. For game facts use search_knowledge or answer_sources; for community addons use ecosystem_projects. By default a summary: the counts and each row's id, name and how far it is proven, 40 rows at a time; detail adds what done means (10 rows at a time) and status narrows to one section. A partial answer gives nextOffset; pass it as offset with the same arguments for the rest. Needs no account.";
+    inputSchema: {
+        readonly status: z.ZodOptional<z.ZodEnum<{
+            live: "live";
+            next: "next";
+            shape: "shape";
+            waiting: "waiting";
+        }>>;
+        readonly detail: z.ZodOptional<z.ZodBoolean>;
+        readonly offset: z.ZodOptional<z.ZodNumber>;
+        readonly limit: z.ZodOptional<z.ZodNumber>;
+    };
     outputSchema: {
         readonly rows: z.ZodArray<z.ZodObject<{
             id: z.ZodString;
@@ -5008,12 +5313,34 @@ export declare const MCP_TOOL_LIST: ({
                 "real-data": "real-data";
             }>>;
         }, z.core.$strip>>;
+        readonly index: z.ZodOptional<z.ZodArray<z.ZodObject<{
+            id: z.ZodString;
+            status: z.ZodEnum<{
+                live: "live";
+                next: "next";
+                shape: "shape";
+                waiting: "waiting";
+            }>;
+            name: z.ZodString;
+            proof: z.ZodOptional<z.ZodEnum<{
+                client: "client";
+                code: "code";
+                deployed: "deployed";
+                none: "none";
+                public: "public";
+                "real-data": "real-data";
+            }>>;
+        }, z.core.$strip>>>;
         readonly counts: z.ZodObject<{
             live: z.ZodNumber;
             next: z.ZodNumber;
             waiting: z.ZodNumber;
             shape: z.ZodNumber;
         }, z.core.$strip>;
+        readonly total: z.ZodOptional<z.ZodNumber>;
+        readonly offset: z.ZodOptional<z.ZodNumber>;
+        readonly nextOffset: z.ZodOptional<z.ZodNumber>;
+        readonly url: z.ZodOptional<z.ZodString>;
     };
     annotations: {
         readonly readOnlyHint: true;
@@ -5034,8 +5361,8 @@ export declare const DATA_AGE: {
 /**
  * What every tool returns: one text content block. Answers built on player data end with how old the
  * data is (DATA_AGE). Tools that read nothing from players carry their sources inside the text instead.
- * Tools with an outputSchema also return structuredContent of that shape (STRUCTURED_TOOLS lists them;
- * coverage is text only). When one everloot.app page shows the answer, its structured `url` holds it and
+ * Tools with an outputSchema also return structuredContent of that shape (STRUCTURED_TOOLS lists them,
+ * now every tool). When one everloot.app page shows the answer, its structured `url` holds it and
  * the text carries a `More: <url>` line, last before the data age: that link is how the answer is
  * credited. The licence and credit line travel in the response headers, not in each answer.
  */

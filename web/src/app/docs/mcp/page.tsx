@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PLAYER_DATA_TOOLS } from "@everloot/protocol";
+import { COVERAGE_PAGE, PLAN_ROWS, PLAYER_DATA_TOOLS } from "@everloot/protocol";
 import { C, Cards, H2, H3, LinkCard, List, P, Table, docLink } from "@/components/docs/blocks";
 import { CodeGroup } from "@/components/docs/DocsClient";
 import DocPage from "@/components/docs/DocPage";
@@ -187,9 +187,23 @@ export default function McpOverview() {
       <H3 id="structured-content">structuredContent</H3>
       <P>
         Tools with an output schema return <C>structuredContent</C> beside the text, of the shape in their schema file at{" "}
-        <C>/schema/mcp/&lt;tool&gt;.json</C>. <C>coverage</C> returns text only, including scoped field totals and the separately dated whole-fact settled-list size for the build. <C>item_page</C> adds player-reported numbers with agreement evidence in <C>page.reported</C>; its input is unchanged. Each structured tool page lists the top-level fields. Structured answers built on player data start with{" "}
+        <C>/schema/mcp/&lt;tool&gt;.json</C>. Every tool has one. <C>coverage</C>&apos;s <C>page</C> holds the scoped totals with their denominators, each type, the zones on this answer and the separately dated whole-fact settled-list size for the build. <C>item_page</C> adds player-reported numbers with agreement evidence in <C>page.reported</C>; its input is unchanged. Each structured tool page lists the top-level fields. Structured answers built on player data start with{" "}
         <C>connected</C> and <C>dataAsOf</C>, and carry a <C>page</C> only when a corpus was read: an absent page is not a
         measured zero.
+      </P>
+
+      <H3 id="long-answers">Long answers</H3>
+      <P>
+        The two tools whose full answer runs to tens of kilobytes answer with a summary first and page the rest.{" "}
+        <C>coverage</C> without a zone gives the scoped totals, each type and one line per zone,{" "}
+        {COVERAGE_PAGE.summaryZones} zones at a time; <C>detail: true</C> adds per-field counts and the reported fields
+        needing installs, and a single <C>zone</C> answers in detail by default, paging its reported entries{" "}
+        {COVERAGE_PAGE.entries} at a time. <C>everloot_plan</C> lists each row&apos;s id, name and how far it is proven,{" "}
+        {PLAN_ROWS.summary} rows at a time; <C>detail: true</C> adds what done means and <C>status</C> narrows to one
+        section. Every page says how many it shows of how many and repeats the scope, data date and denominator. A
+        partial answer carries <C>nextOffset</C> in its structured content and a <C>Continue:</C> line in its text:
+        pass it as <C>offset</C> with the same arguments, and the pages together hold every row exactly once.
+        A short answer, such as one zone and one type, is unchanged.
       </P>
 
       <H3 id="sources-and-credit">Sources and credit</H3>

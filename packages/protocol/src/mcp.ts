@@ -475,6 +475,41 @@ export const planRow = z.object({
   proof: z.enum(["none", "code", "deployed", "client", "public", "real-data"]).optional().describe("The furthest the row is proven."),
 });
 export type PlanRowOut = z.infer<typeof planRow>;
+/** Rows per everloot_plan answer: the summary names each row, detail adds what done means. */
+export const PLAN_ROWS = { summary: 40, detail: 10, max: 100 } as const;
+
+/** How much one coverage answer lists: zones, or one zone's reported entries, each with nextOffset to continue. */
+export const COVERAGE_PAGE = { summaryZones: 20, detailZones: 1, entries: 25, entriesPerZone: 10, max: 50 } as const;
+const COVERAGE_TYPE_NAMES = ["quests", "npcs", "pins", "vendors", "drops", "rares", "entrances", "bosses", "treasures"] as const;
+/** One coverage cell: entity-field facts, never values. A null count is unknown, not zero. */
+export const coverageCounts = z.object({
+  settled: z.number().int(),
+  confirmed: z.number().int().describe("Includes settled."),
+  reported: z.number().int(),
+  recheck: z.number().int(),
+  expected: z.number().int().nullable().describe("From the game files and a local Classic baseline (counts only); null when unknown."),
+  observed: z.number().int(),
+  denominator: z.number().int().nullable().describe("max(expected, observed); null when unknown, never zero."),
+});
+export const coveragePage = z.object({
+  build: z.string().nullable(),
+  installs: z.number().int().describe("Distinct folded installs overall, including unplaced facts, before zone and type filters."),
+  expectedAsOf: z.string().nullable().describe("The date of the expected counts; null when unrecorded."),
+  settledList: z.object({ facts: z.number().int().nullable(), dataAsOf: z.string().nullable() })
+    .describe("The build's whole-fact settled list, before zone and type filters; null facts when unknown, not zero."),
+  totals: coverageCounts.describe("Every zone and type in scope together."),
+  needsInstalls: z.number().int().nullable().describe("Fields one or two installs short in scope; null when the capped list cannot count them."),
+  types: z.array(z.object({ type: z.enum(COVERAGE_TYPE_NAMES), counts: coverageCounts })).describe("Each type in scope over every zone in scope."),
+  zones: z.array(z.object({ mapId: z.number().int(), name: z.string(), installs: z.number().int(), counts: coverageCounts }))
+    .describe("This answer's zones, each over the types in scope."),
+  detail: z.boolean().describe("True when the text holds per-field counts and reported entries."),
+  list: z.enum(["zones", "entries"]).describe("What offset, limit and total count: zones, or, for one zone with detail, its reported entries."),
+  total: z.number().int(),
+  offset: z.number().int(),
+  limit: z.number().int(),
+  nextOffset: z.number().int().optional().describe("Present when more remain: pass it as offset with the same arguments."),
+});
+export type CoveragePageOut = z.infer<typeof coveragePage>;
 
 /** The kind filter of search_knowledge and get_by_name. */
 const KIND_FILTER =
@@ -970,10 +1005,19 @@ export const MCP_TOOLS = {
   coverage: {
     title: "Database coverage by zone, type and field",
     description:
-      "Counts how much of WoW: Forever's database is settled or confirmed, per zone, per type and per field, as https://everloot.app/database/coverage shows it, in text only. Coverage is settled over expected, with confirmed over expected beside it; the denominator is the larger of expected and observed, and confirmed includes settled. A player-reported fact is public after three installs agree; fields one or two installs short are counted without their values. Scoped totals and the current build's settled-list size come separately dated and measured. Only public report identifiers and game-file facts are listed, never unconfirmed values, baseline rows, names or ids, or player names. When coverage data is available, every answer states its scope, method, data date and install counts; when it is not, the answer states the scope and marks the counts, data date and installs [?], not zero. Unknown values are [?]. Use it for how complete the database is for a zone or type; use the page tools for the facts themselves.",
+      `Counts how much of WoW: Forever's database is settled or confirmed, per zone, per type and per field, as https://everloot.app/database/coverage shows it. Coverage is settled over expected, with confirmed over expected beside it; the denominator is the larger of expected and observed, and confirmed includes settled. A player-reported fact is public after three installs agree; fields one or two installs short are counted without their values. Scoped totals and the current build's settled-list size come separately dated and measured. Only public report identifiers and game-file facts are listed, never unconfirmed values, baseline rows, names or ids, or player names. When coverage data is available, every answer states its scope, method, data date and install counts; when it is not, the answer states the scope and marks the counts, data date and installs [?], not zero. Unknown values are [?]. Without zone the answer is a summary: scoped totals, each type, and one line per zone, ${COVERAGE_PAGE.summaryZones} zones at a time; detail adds per-field counts and reported entries. A partial answer says how many it shows of how many and gives nextOffset; pass it as offset with the same arguments for the rest. Use it for how complete the database is for a zone or type; use the page tools for the facts themselves.`,
     inputSchema: {
       zone: z.number().int().positive().optional().describe("Released UiMap zone id, such as 1429 for Elwynn Forest. Omit for all released zones."),
-      type: z.enum(["quests", "npcs", "pins", "vendors", "drops", "rares", "entrances", "bosses", "treasures"]).optional().describe("Coverage type. Omit for all types."),
+      type: z.enum(COVERAGE_TYPE_NAMES).optional().describe("Coverage type. Omit for all types."),
+      detail: z.boolean().optional().describe("true lists each zone's per-type and per-field counts and the reported fields needing installs. Default: true with zone, false without it."),
+      offset: z.number().int().min(0).optional().describe("Where the list starts: zones, or with zone and detail that zone's reported entries. Default 0; use nextOffset from the last answer."),
+      limit: z.number().int().min(1).max(COVERAGE_PAGE.max).optional()
+        .describe(`How many per answer: default ${COVERAGE_PAGE.summaryZones} zones in a summary, ${COVERAGE_PAGE.detailZones} zones with detail, ${COVERAGE_PAGE.entries} reported entries for one zone; at most ${COVERAGE_PAGE.max}.`),
+    },
+    outputSchema: {
+      ...uploadsAnswer,
+      scope: z.object({ zone: z.number().int().nullable(), type: z.enum(COVERAGE_TYPE_NAMES).nullable() }).describe("The zone and type asked for; null is all."),
+      page: coveragePage.optional(),
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
@@ -1030,11 +1074,23 @@ export const MCP_TOOLS = {
   everloot_plan: {
     title: "Everloot implementation tracker",
     description:
-      "Returns the Everloot feature catalogue: what is live, what is next, what is waiting, and which reference sites are page shapes only, as the tracker that ships with the site holds it. Use it only for questions about Everloot itself, such as whether a feature exists; it holds no game data. For game facts use search_knowledge or answer_sources; for community addons use ecosystem_projects. Takes no arguments and needs no account.",
-    inputSchema: {},
+      `Returns the Everloot feature catalogue: what is live, what is next, what is waiting, and which reference sites are page shapes only, as the tracker that ships with the site holds it. Use it only for questions about Everloot itself, such as whether a feature exists; it holds no game data. For game facts use search_knowledge or answer_sources; for community addons use ecosystem_projects. By default a summary: the counts and each row's id, name and how far it is proven, ${PLAN_ROWS.summary} rows at a time; detail adds what done means (${PLAN_ROWS.detail} rows at a time) and status narrows to one section. A partial answer gives nextOffset; pass it as offset with the same arguments for the rest. Needs no account.`,
+    inputSchema: {
+      status: z.enum(["live", "next", "waiting", "shape"]).optional().describe("Only rows with this status: live, next, waiting or shape. Without it, every row."),
+      detail: z.boolean().optional().describe("true adds each row's done-when text. Default false: id, name and how far it is proven."),
+      offset: z.number().int().min(0).optional().describe("Row to start at, default 0. Use nextOffset from the last answer."),
+      limit: z.number().int().min(1).max(PLAN_ROWS.max).optional()
+        .describe(`Rows per answer: default ${PLAN_ROWS.summary}, or ${PLAN_ROWS.detail} with detail; at most ${PLAN_ROWS.max}.`),
+    },
     outputSchema: {
-      rows: z.array(planRow).describe("Every row, in the tracker's order."),
-      counts: z.object({ live: z.number().int(), next: z.number().int(), waiting: z.number().int(), shape: z.number().int() }),
+      rows: z.array(planRow).describe("With detail, this answer's rows with what done means, in the tracker's order. Empty in a summary, which lists them in index."),
+      index: z.array(planRow.omit({ done: true })).optional().describe("A summary's rows: id, status, name and proof, in the tracker's order."),
+      counts: z.object({ live: z.number().int(), next: z.number().int(), waiting: z.number().int(), shape: z.number().int() })
+        .describe("Rows per status in the whole tracker, whatever status, offset and limit ask for."),
+      total: z.number().int().optional().describe("Rows matching status."),
+      offset: z.number().int().optional(),
+      nextOffset: z.number().int().optional().describe("Present when more rows remain: pass it as offset with the same arguments."),
+      url: z.string().optional().describe("The whole tracker as one page."),
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
@@ -1056,8 +1112,8 @@ export const DATA_AGE = { prefix: "Data as of ", unrecorded: "Data age unrecorde
 /**
  * What every tool returns: one text content block. Answers built on player data end with how old the
  * data is (DATA_AGE). Tools that read nothing from players carry their sources inside the text instead.
- * Tools with an outputSchema also return structuredContent of that shape (STRUCTURED_TOOLS lists them;
- * coverage is text only). When one everloot.app page shows the answer, its structured `url` holds it and
+ * Tools with an outputSchema also return structuredContent of that shape (STRUCTURED_TOOLS lists them,
+ * now every tool). When one everloot.app page shows the answer, its structured `url` holds it and
  * the text carries a `More: <url>` line, last before the data age: that link is how the answer is
  * credited. The licence and credit line travel in the response headers, not in each answer.
  */

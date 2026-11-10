@@ -1,9 +1,10 @@
 /**
  * One list of everything Everloot still has to ship.
- * docs/TRACKER.md is this function's output. A test fails if the file drifts.
- * The MCP tool `everloot_plan` returns the same text, so a connected client
- * sees the whole map and cannot quietly drop a row.
+ * docs/TRACKER.md is renderTracker's output. A test fails if the file drifts.
+ * The MCP tool `everloot_plan` reads the same rows a page at a time, with the whole
+ * tracker's counts and a continuation, so a connected client cannot quietly drop a row.
  */
+import { PLAN_ROWS, type McpToolArgs } from "@everloot/protocol";
 
 export type PlanStatus = "live" | "next" | "waiting" | "shape";
 
@@ -126,7 +127,7 @@ export function renderTracker(): string {
     "# Everloot implementation tracker",
     "",
     "Generated from `kb/src/bridge-plan.ts`. Edit that file, then regenerate this page.",
-    "The MCP tool `everloot_plan` returns the same text.",
+    "The MCP tool `everloot_plan` reads the same rows, a page at a time.",
     "",
     "Two reference links open a page on the maintainer's own character, so the page shape",
     "could be read on a real name. It is not a fixture and not the Forever beta character.",
@@ -159,13 +160,62 @@ export function renderTracker(): string {
   return lines.join("\n");
 }
 
-export function handlePlan(): string {
-  return renderTracker();
+const TRACKER_URL = "https://github.com/Everloot/everloot/blob/main/docs/TRACKER.md";
+const STATUSES = ["live", "next", "waiting", "shape"] as const;
+
+export interface PlanAnswer {
+  text: string;
+  structured: {
+    rows: PlanItem[];
+    index?: Omit<PlanItem, "done">[];
+    counts: Record<PlanStatus, number>;
+    total: number;
+    offset: number;
+    nextOffset?: number;
+    url: string;
+  };
 }
 
-/** The same rows as the text, for a client that reads structured content. */
-export function planStructured(): { rows: PlanItem[]; counts: Record<PlanStatus, number> } {
+/**
+ * everloot_plan: the rows in TRACKER.md's order, a page at a time. The summary names each row and how far it is
+ * proven; detail adds what done means. Counts are always the whole tracker's, so a page never hides a section.
+ */
+export function handlePlan(args: McpToolArgs<"everloot_plan"> = {}): PlanAnswer {
   const counts: Record<PlanStatus, number> = { live: 0, next: 0, waiting: 0, shape: 0 };
   for (const row of BRIDGE_PLAN) counts[row.status] += 1;
-  return { rows: [...BRIDGE_PLAN], counts };
+  const matching = STATUSES.filter((s) => !args.status || s === args.status).flatMap((s) => BRIDGE_PLAN.filter((row) => row.status === s));
+  const detail = args.detail ?? false;
+  const offset = args.offset ?? 0;
+  const limit = args.limit ?? (detail ? PLAN_ROWS.detail : PLAN_ROWS.summary);
+  const page = matching.slice(offset, offset + limit);
+  const next = offset + page.length < matching.length ? offset + page.length : undefined;
+  const scope = args.status ? ` with status ${args.status}` : "";
+  const lines = [
+    `Everloot implementation tracker: ${BRIDGE_PLAN.length} rows; ${counts.live} live, ${counts.next} next, ${counts.waiting} waiting on Carlos, ${counts.shape} shape only.`,
+    "Proven, furthest first: real uploads, public client, beta client, on everloot.app, code + tests, not built. Live means usable today, not proven with real data.",
+    page.length
+      ? `Showing rows ${offset + 1}–${offset + page.length} of ${matching.length}${scope}: ${detail ? "id, name, how far it is proven and what done means" : "id, name and how far it is proven"}.`
+      : `Showing none of ${matching.length} rows${scope} (offset ${offset} is past the end).`,
+  ];
+  let section: PlanStatus | null = null;
+  for (const row of page) {
+    if (row.status !== section) { section = row.status; lines.push("", `## ${STATUS_LABEL[section]}`); }
+    const proof = row.proof ? ` (${PROOF_LABEL[row.proof]})` : "";
+    lines.push(`- \`${row.id}\` ${row.name}${proof}${detail ? `: ${row.done}` : ""}`);
+  }
+  if (page.some((row) => row.status === "shape")) {
+    lines.push("", "Two reference links open a page on the maintainer's own character, so the page shape could be read on a real name. It is not a fixture and not the Forever beta character.");
+  }
+  lines.push("");
+  if (next !== undefined) lines.push(`Continue: ${matching.length - next} more rows; pass offset=${next} with the same arguments.`);
+  if (!detail) lines.push("What done means for each row: pass detail=true, and status to narrow to one section.");
+  lines.push(`Whole tracker: ${TRACKER_URL}`);
+  return {
+    text: lines.join("\n"),
+    structured: {
+      rows: detail ? page.map((row) => ({ ...row })) : [],
+      ...(detail ? {} : { index: page.map(({ done: _done, ...row }) => row) }),
+      counts, total: matching.length, offset, ...(next !== undefined ? { nextOffset: next } : {}), url: TRACKER_URL,
+    },
+  };
 }

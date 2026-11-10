@@ -1,7 +1,7 @@
 # Everloot implementation tracker
 
 Generated from `kb/src/bridge-plan.ts`. Edit that file, then regenerate this page.
-The MCP tool `everloot_plan` returns the same text.
+The MCP tool `everloot_plan` reads the same rows, a page at a time.
 
 Two reference links open a page on the maintainer's own character, so the page shape
 could be read on a real name. It is not a fixture and not the Forever beta character.
