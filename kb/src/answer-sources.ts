@@ -101,9 +101,9 @@ function loreEvidence(hit: SearchHit, url: string | undefined): Evidence {
 const pct = (rate: number) => `${Math.round(rate * 1000) / 10}%`;
 
 /** Archive gameplay statements cannot establish Forever predicates. */
-export function evidenceAnswers(question: string, evidence: Evidence): boolean {
+export function evidenceAnswers(question: string, evidence: Evidence, predicate: string | null = requestedPredicate(question, [evidence.source.title, claimSubject(question, evidence.claim)]) ?? null): boolean {
   if (/not available from permitted facts/i.test(evidence.claim)) return false;
-  if (requestedPredicate(question, [evidence.source.title, claimSubject(question, evidence.claim)])) return evidence.kind !== "lore" && claimAnswers(question, evidence.claim) && (evidence.kind !== "curated" || mentions(question, evidence.source.title));
+  if (predicate) return evidence.kind !== "lore" && claimAnswers(question, evidence.claim, predicate) && (evidence.kind !== "curated" || mentions(question, evidence.source.title));
   // Identity questions still need the named subject, rather than a search fallback mention.
   return /^(?:who|what) is\b|^qu[ié]+n es\b|^qu[eé] es\b/i.test(question.trim()) && (mentions(question, evidence.source.title) || mentions(question, evidence.claim.split(":")[0]!));
 }
@@ -249,6 +249,7 @@ export async function answerSources(
   // without an exact named article keep their explicitly marked search fallback.
   const directLore = loreHits.filter((e) => mentions(question, e.source.title) || trainerPages.has(e));
   const lore = directLore.length ? directLore : loreHits;
+  const predicate = requestedPredicate(asked, [...(files?.facts.map((f) => f.name) ?? []), ...found.map((h) => h.name), ...[...observed, ...gaps].map((e) => claimSubject(asked, e.claim))]) ?? null;
   // What the game-data files say about the things the question names: ids and facts, labelled unconfirmed.
   // Observed facts first, then Everloot's own, then the files (current build), then the 2023 wiki. Observed and files
   // facts about the question's names are all kept; curated and wiki pages fill what the limit leaves. Last, a note for
@@ -256,21 +257,20 @@ export async function answerSources(
   // A piece that answers the whole question (the dungeons for a level) leaves no room for pages that share its words;
   // a zone the question only mentions comes after the pages, in what room they leave.
   const pieces = union(readings.map((q) => filesEvidence(q, files, Math.max(args.limit, 30))))
-    .sort((a, b) => Number(claimAnswers(asked, b.claim)) - Number(claimAnswers(asked, a.claim))).slice(0, args.limit);
+    .sort((a, b) => Number(claimAnswers(asked, b.claim, predicate)) - Number(claimAnswers(asked, a.claim, predicate))).slice(0, args.limit);
   const plain = ({ role: _role, ...e }: (typeof pieces)[number]): Evidence => e;
   const answers = pieces.filter((e) => e.role === "answer").map(plain);
   const fromFiles = pieces.filter((e) => e.role === undefined).map(plain);
   const places = pieces.filter((e) => e.role === "place").map(plain);
-  const named = observed.length + answers.length + fromFiles.length;
-  const fill = new Set(answers.length ? [] : [...curated, ...lore].sort((a, b) => Number(evidenceAnswers(asked, b)) - Number(evidenceAnswers(asked, a))).slice(0, Math.max(0, args.limit - named)));
+  const named = observed.length + answers.length + fromFiles.length + gaps.length;
+  const fill = new Set(answers.length ? [] : [...curated, ...lore].sort((a, b) => Number(evidenceAnswers(asked, b, predicate)) - Number(evidenceAnswers(asked, a, predicate))).slice(0, Math.max(0, args.limit - named)));
   const room = Math.max(0, args.limit - named - fill.size);
   const evidence = [
     ...observed, ...curated.filter((e) => fill.has(e)), ...answers, ...fromFiles, ...lore.filter((e) => fill.has(e)), ...places.slice(0, room), ...gaps,
   ];
-  const predicate = requestedPredicate(asked, [...(files?.facts.map((f) => f.name) ?? []), ...found.map((h) => h.name), ...observed.map((e) => claimSubject(asked, e.claim))]);
-  if (predicate) evidence.sort((a, b) => Number(evidenceAnswers(asked, b)) - Number(evidenceAnswers(asked, a)));
+  if (predicate) evidence.sort((a, b) => Number(evidenceAnswers(asked, b, predicate)) - Number(evidenceAnswers(asked, a, predicate)));
   evidence.splice(args.limit);
-  const unavailable = predicate && !evidence.some((e) => evidenceAnswers(asked, e))
+  const unavailable = predicate && !evidence.some((e) => evidenceAnswers(asked, e, predicate))
     ? { predicate, message: unavailableMessage(predicate) } : undefined;
   // Observed and files facts answer the question's own names, so only an answer of fallback pages alone is marked.
   return {
@@ -317,9 +317,11 @@ export function formatAnswerSources(result: AnswerSources, corpus: boolean | "un
 const PREDICATE_TOOLS: Record<string, string> = {
   price: "observed prices come from market_value / auction_history",
   history: "observed price history comes from auction_history / market_value",
-  vendor: "observed vendors come from vendor_page",
-  "drop source": "observed drop sources come from item_page",
-  level: "zone records come from get_entity; NPC levels come from npc_page",
+  vendor: "observed sellers come from entity_relations with sold_by; read their goods with vendor_page using the vendor NPC id",
+  "drop source": "observed drop sources come from entity_relations with dropped_by, then item_page for drop rates",
+  level: "quest levels come from quest_page; zone records come from get_entity",
+  class: "class talent records come from talent_tree",
+  "profession leveling": "profession leveling routes come from profession_path",
   acquisition: "item acquisition comes from item_page / vendor_page; mount and achievement records come from get_entity",
   "riding skill": "mount records come from get_entity",
 };

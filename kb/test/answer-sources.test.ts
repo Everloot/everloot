@@ -1,5 +1,5 @@
 ﻿import { expect, test } from "vitest";
-import { answerSources, answerSourcesFactsFromRecords, formatAnswerSources, furtherReading, type AnswerSourcesFacts } from "../src/answer-sources.js";
+import { answerSources, answerSourcesFactsFromRecords, evidenceAnswers, formatAnswerSources, furtherReading, type AnswerSourcesFacts } from "../src/answer-sources.js";
 import { openDb } from "../src/db.js";
 import { SOME_WORDS } from "../src/search.js";
 import { replaceSourceRows, type EntityInput } from "../src/entities.js";
@@ -22,6 +22,35 @@ async function seed() {
 }
 
 const base = { capturedAt: "2026-10-09T00:00:00Z" };
+
+test.each([
+  ["what level is Synthetic Quest", "level", "quest_page"],
+  ["who sells Synthetic Cloth", "vendor", "entity_relations with sold_by"],
+  ["which class has Synthetic Talent", "class", "talent_tree"],
+  ["what drops Synthetic Cloth", "drop source", "entity_relations with dropped_by, then item_page"],
+  ["how do I level First Aid", "profession leveling", "profession_path"],
+])("unavailable tools match their supported facts: %s", async (question, predicate, tool) => {
+  const result = await answerSources(openDb(":memory:"), { question, limit: 8 }, null, null);
+  expect(result.unavailable?.predicate).toBe(predicate);
+  expect(result.unavailable?.message).toContain(tool);
+  if (predicate === "level") expect(result.unavailable?.message).not.toContain("npc_page");
+});
+
+test("one predicate governs claims even when a source title contains question words", () => {
+  const piece = { kind: "files" as const, claim: "Synthetic Horse: riding skill 75.", source: { title: "riding", url: "https://example.test" }, licence: "test", asOf: null };
+  expect(evidenceAnswers("what level riding", piece, "level")).toBe(false);
+  expect(evidenceAnswers("what level riding", piece, "riding skill")).toBe(true);
+  expect(evidenceAnswers("what level riding", piece, null)).toBe(false);
+});
+
+test.each(["what is Legion instances by level", "qué es Legion instances by level"])("direct lore titles do not request their embedded predicates: %s", async (question) => {
+  const db = openDb(":memory:");
+  await replaceSourceRows(db, "warcraft-wiki-2023", ["lore_page"], [row("legion", "Legion instances by level", "A list of instances.")]);
+  const result = await answerSources(db, { question, limit: 8 }, null, null);
+  expect(result.evidence[0]!.source.title).toBe("Legion instances by level");
+  expect(result.unavailable).toBeUndefined();
+  expect(evidenceAnswers(question, result.evidence[0]!)).toBe(true);
+});
 function facts(): AnswerSourcesFacts {
   const records: unknown[] = [];
   for (const [i, install] of ["install-a", "install-b", "install-c"].entries()) {
@@ -74,7 +103,7 @@ test("a position names its zone when the game files have it, and keeps the map i
   expect(unnamed.evidence.find((e) => e.claim.startsWith("Forest Spider was seen"))!.claim).toBe("Forest Spider was seen on map 141 at 41, 61.");
 });
 
-test("an unrecorded name never displaces factual evidence within the limit", async () => {
+test("an unrecorded name keeps its room after factual evidence within the limit", async () => {
   // Three installs agree on the item's name, and none has looted it: a known item with no drop source yet.
   const records: unknown[] = ["install-a", "install-b", "install-c"].map((installId, i) => (
     { ...base, installId, eventId: `hammer-${i}`, kind: "item_seen", itemId: 17182, name: "Doomhammer", quality: "legendary" }
@@ -82,7 +111,8 @@ test("an unrecorded name never displaces factual evidence within the limit", asy
   const parsed = parseRecords(records);
   expect(parsed.receipt.rejected).toEqual([]);
   const result = await answerSources(await seed(), { question: "Did Thrall carry the Doomhammer?", limit: 2 }, answerSourcesFactsFromRecords(parsed.records), null);
-  expect(result.evidence.slice(0, 2).map((e) => e.kind).sort()).toEqual(["curated", "lore"]);
+  expect(result.evidence.map((e) => e.kind)).toEqual(["curated", "observed"]);
+  expect(result.evidence[1]!.claim).toContain("unrecorded, not zero");
   expect(result.evidence).toHaveLength(2);
 });
 
