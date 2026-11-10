@@ -307,7 +307,7 @@ export default async function ItemPage(props: Props) {
           jsonHref={!facts.unreachable && hasCard.item(page) ? `/api/tooltip/item/${itemId}` : undefined}
         />
         <MarketBox itemId={itemId} rows={auctions} />
-        <Tabs label={`${title}: relations`} tabs={tabs} />
+        <Tabs label={`${title}: relations`} tabs={tabs} className="mt-6" />
         <div className="mt-6 space-y-6 empty:hidden">
           <LoreSection match={lore} />
           {!facts.unreachable && (page.name !== null || page.drops.length > 0) && <AdSlot slot="inContent" />}
