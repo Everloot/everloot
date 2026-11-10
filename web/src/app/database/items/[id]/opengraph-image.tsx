@@ -1,3 +1,4 @@
+import { loadSiteAssets, loadItemTips } from "@/lib/game-assets";
 import { qualityOf } from "@/components/ui/quality";
 import { notFound } from "next/navigation";
 import { edgesFrom } from "../../../../../../kb/src/edges";
@@ -22,7 +23,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const { id } = await params;
   if (!/^[1-9]\d*$/.test(id)) notFound();
   const itemId = Number(id);
-  const [{ facts, agreed, matched }, edges, itemSeen] = await Promise.all([loadShownNames(), loadEdges(), loadItemSeen()]);
+  const [{ facts, agreed, matched, showsTip }, edges, itemSeen] = await Promise.all([loadShownNames(), loadEdges(), loadItemSeen()]);
   if (unknownItem(itemId, facts, edgesFrom([...edges.observed, ...edges.client], "item", itemId), itemSeen)) notFound();
   const page = itemPage(itemId, facts);
   const category = categoryOf(CLIENT_TAXONOMY, itemId);
@@ -30,7 +31,10 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const name = shownItemName(itemId, agreed, matched?.names);
   // As the page's heading: the quality colour only on a shown name, from the taxonomy, else the names file.
   const nameQuality = category?.quality?.id ?? matched?.names.get(itemId)?.quality;
+  const assets = showsTip(itemId) ? await loadSiteAssets() : null;
+  const icon = assets ? (await loadItemTips(assets, [itemId])).get(itemId)?.icon : null;
   return renderEntityCard({
+    ...(icon ? { icon } : {}),
     title: name?.name ?? `Item ${itemId}`,
     type,
     quality: name && nameQuality !== undefined && nameQuality <= 5 ? qualityOf(nameQuality) : undefined,

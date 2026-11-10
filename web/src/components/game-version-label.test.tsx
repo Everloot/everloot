@@ -18,6 +18,7 @@ test("the header labels both sources and links to their explanations", () => {
   expect(html).toContain('href="/changes?show=builds&amp;q=1.60.1.80001"');
   expect(html).toContain('href="/changes"');
   expect(html).toContain('title="The game files');
+  expect(html).toContain("rounded-full border border-line bg-panel");
   expect(html).toContain('title="The newest WoW: Forever build');
 });
 

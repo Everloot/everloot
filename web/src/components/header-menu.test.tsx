@@ -31,6 +31,16 @@ afterEach(async () => {
 const toolsButton = () => Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "Tools")!;
 const menu = () => container.querySelector("#tools-menu:not([hidden])");
 
+test("the menu keeps both build links reachable below the desktop build chip breakpoint", async () => {
+  const toggle = container.querySelector<HTMLButtonElement>('button[aria-controls="site-navigation"]')!;
+  expect(toggle.className).toContain("xl:hidden");
+  await act(async () => toggle.click());
+  const nav = container.querySelector("#site-navigation")!;
+  expect(nav.className).toContain("xl:hidden");
+  expect(nav.querySelector('a[href^="/changes?show=builds"]')).not.toBeNull();
+  expect(nav.querySelector('a[title^="The newest WoW"]')).not.toBeNull();
+});
+
 test("Tools opens its grouped menu and says so", async () => {
   await act(async () => toolsButton().click());
   expect(toolsButton().getAttribute("aria-expanded")).toBe("true");

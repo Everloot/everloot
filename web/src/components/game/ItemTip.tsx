@@ -4,6 +4,7 @@ import { cloneElement, isValidElement, useEffect, useId, useState, type ReactEle
 import type { ItemTip as Tip } from "@/lib/game-assets";
 import { CardPopup, GameCard } from "./GameCard";
 import { splitWhy } from "@/lib/placeholder";
+import { QUALITIES } from "@/design/tokens";
 import GameIcon from "./GameIcon";
 
 // An item link with the item's icon in front and the game's tooltip on hover and keyboard focus
@@ -41,7 +42,7 @@ function Tipped({ tip, size, children }: { tip: Tip; size: number; children: Rea
       onFocus={(e) => setOpen({ anchor: e.currentTarget, x: null })}
       onBlur={() => setOpen(null)}
     >
-      {tip.icon && <GameIcon src={tip.icon} size={size} />}
+      {tip.icon && <GameIcon src={tip.icon} size={size} quality={QUALITIES.find((q) => q === tip.quality.toLowerCase())} />}
       {link}
       <span id={descId} hidden>{[`${tip.name}, ${tip.quality}`, ...tip.lines, tip.label].join(". ")}</span>
       {open && (

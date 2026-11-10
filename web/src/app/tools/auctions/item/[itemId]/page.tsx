@@ -1,8 +1,9 @@
+import Coins from "@/components/ui/Coins";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { pageMetadata } from "@/lib/seo";
-import { formatCopper, MARKET_RULE } from "../../../../../../../kb/src/market";
+import { MARKET_RULE } from "../../../../../../../kb/src/market";
 import { uploadStore } from "@/lib/upload-store";
 import { marketDatasetJsonLd } from "@/lib/jsonld";
 import JsonLd from "@/components/JsonLd";
@@ -101,8 +102,8 @@ export default async function CrossRealmItemPage(props: Props) {
           <>
             <PriceFacts facts={[
               { label: "Realms", value: realmCount(rows).toLocaleString("en-US"), note: "With a public price" },
-              { label: "Lowest market value", value: low ? formatCopper(low.value.market!) : "unrecorded", note: where(low) },
-              { label: "Highest market value", value: high ? formatCopper(high.value.market!) : "unrecorded", note: where(high) },
+              { label: "Lowest market value", value: low ? <Coins copper={low.value.market} /> : "unrecorded", note: where(low) },
+              { label: "Highest market value", value: high ? <Coins copper={high.value.market} /> : "unrecorded", note: where(high) },
               { label: "Units listed", value: rows.reduce((n, r) => n + r.value.quantity, 0).toLocaleString("en-US"), note: "Newest day in each house" },
             ]} />
             <section aria-labelledby="ah-realm-prices">

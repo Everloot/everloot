@@ -181,7 +181,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
           {/* Below 1280 px the right group has no room for both builds; the menu panel shows them. */}
           <GameVersionLabel className="hidden shrink-0 xl:block" />
           <AccountControls savedBuilds={savedBuilds} profiles={profiles} accountSwitching={accountSwitching} />
-          <button ref={toggle} type="button" aria-label={open ? "Close menu" : "Menu"} aria-expanded={open} aria-controls="site-navigation" onClick={() => setOpen(!open)} className="btn min-h-8 shrink-0 px-3 text-sm lg:hidden">
+          <button ref={toggle} type="button" aria-label={open ? "Close menu" : "Menu"} aria-expanded={open} aria-controls="site-navigation" onClick={() => setOpen(!open)} className="btn min-h-8 shrink-0 px-3 text-sm xl:hidden">
             {open ? "Close" : "Menu"}
           </button>
         </div>
@@ -201,7 +201,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
       </div>
 
       {open && (
-        <nav id="site-navigation" aria-label="Site menu" className="pop absolute inset-x-0 top-full max-h-[75vh] overflow-y-auto border-b border-edge bg-panel lg:hidden">
+        <nav id="site-navigation" aria-label="Site menu" className="pop absolute inset-x-0 top-full max-h-[75vh] overflow-y-auto border-b border-edge bg-panel xl:hidden">
           <div className="mx-auto max-w-data space-y-6 px-4 py-6 lg:px-6">
             <form action="/search" method="get" role="search" onSubmit={() => track("search", { surface: "menu" })} className="flex items-center gap-2 rounded-full border border-edge bg-canvas px-3 text-muted focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">
               <SearchIcon />

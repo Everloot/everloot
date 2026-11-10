@@ -49,7 +49,7 @@ test("four tabs link agreed goods and giver/turn-in quests with their evidence",
   for (const id of ["drops", "map", "goods", "quests"]) expect(out).toContain(`data-tab-panel="${id}"`);
   expect(panel(out, "goods")).toContain('href="/database/vendors/1125"');
   expect(panel(out, "goods")).toContain('href="/database/items/117"');
-  expect(panel(out, "goods")).toContain("1g 23s 45c");
+  expect(panel(out, "goods")).toContain("1 gold 23 silver 45 copper");
   for (const id of [10, 11, 12]) expect(panel(out, "quests")).toContain(`href="/database/quests/${id}"`);
   expect(panel(out, "quests")).toContain("Giver");
   expect(panel(out, "quests")).toContain("Turn-in");
@@ -151,7 +151,7 @@ test("vendor page keeps the same goods table after sharing it with NPC pages", a
   facts.vendors = goods();
   const out = renderToStaticMarkup(await VendorPage({ params: Promise.resolve({ id: "1125" }) }));
   expect(out).toContain('href="/database/items/117"');
-  expect(out).toContain("1g 23s 45c");
+  expect(out).toContain("1 gold 23 silver 45 copper");
   expect(out).toContain("Installs");
 });
 

@@ -17,7 +17,7 @@ import LoreSection from "@/components/LoreSection";
 import { pageMetadata } from "@/lib/seo";
 import { Container, DataTable, Facts, InShort, installsNeeded, OpenData, Tabs, TooltipFrame, type Column } from "@/components/ui";
 import type { Crumb } from "@/lib/jsonld";
-import { EmptyTab, EntityHeader, EntityTop, FREQUENCY, known, LINK, MAP_LINK_HEADER, MapName, percent, ShowOnMap, Unreachable } from "../../entity";
+import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, FREQUENCY, known, LINK, MAP_LINK_HEADER, MapName, percent, ShowOnMap, Unreachable } from "../../entity";
 import { entitySummary, observedLine } from "@/lib/evidence";
 
 export const dynamic = "force-dynamic";
@@ -86,7 +86,7 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
 
   return (
     <Container width="data">
-      <article>
+      <EntityLayout>
         <JsonLd data={entityPageJsonLd({ name: title, path: `/database/objects/${page.objectId}`, identifier: `object:${page.objectId}` })} />
         <EntityHeader trail={trail} title={title} meta={["Object", "chest, herb, ore vein or fishing pool"]} />
         <EntityTop
@@ -103,11 +103,13 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
             />
           )}
         />
-        <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-        <OpenData
-          text={[`${title} (object ${page.objectId})`, ...summary, `Source: https://everloot.app/database/objects/${page.objectId}`].join("\n")}
-          jsonHref={!facts.unreachable && hasCard.object(page) ? `/api/tooltip/object/${page.objectId}` : undefined}
-        />
+        <EntitySidebar>
+          <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
+          <OpenData
+            text={[`${title} (object ${page.objectId})`, ...summary, `Source: https://everloot.app/database/objects/${page.objectId}`].join("\n")}
+            jsonHref={!facts.unreachable && hasCard.object(page) ? `/api/tooltip/object/${page.objectId}` : undefined}
+          />
+        </EntitySidebar>
         <Tabs
           label={`${title}: relations`}
           tabs={[{
@@ -129,7 +131,7 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
         <div className="mt-6 space-y-6 empty:hidden">
           <LoreSection match={lore} />
         </div>
-      </article>
+      </EntityLayout>
     </Container>
   );
 }

@@ -1,4 +1,6 @@
 "use client";
+
+import Coins, { CoinText } from "@/components/ui/Coins";
 import { useEffect, useId, useState } from "react";
 import { Card, DataTable, SectionHeading, type Column } from "@/components/ui";
 import { parseEverlootLua } from "@/lib/sv-parse";
@@ -13,8 +15,8 @@ export const STORAGE_KEY = "everloot:gold-ledger";
 const MAX_BYTES = 20_000_000;
 const FILE_PATH = "World of Warcraft/<game version>/WTF/Account/<account>/SavedVariables/Everloot.lua";
 
-const gold = (copper: number | null) => (copper === null ? "unrecorded" : formatCopper(copper));
-const signed = (copper: number) => (copper < 0 ? `-${formatCopper(-copper)}` : formatCopper(copper));
+const gold = (copper: number | null) => <Coins copper={copper} />;
+const signed = (copper: number) => <Coins copper={copper} />;
 const when = (at: string) => new Date(at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 const day = (at: string) => new Date(at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
@@ -128,8 +130,8 @@ function LedgerView({ ledger }: { ledger: MoneyLedger }) {
 
 function WeekCard({ week, who }: { week: MoneyLedger["week"]; who: string }) {
   const facts = [
-    { label: "Money in", value: formatCopper(week.in) },
-    { label: "Money out", value: formatCopper(week.out) },
+    { label: "Money in", value: <Coins copper={week.in} /> },
+    { label: "Money out", value: <Coins copper={week.out} /> },
     { label: "Net", value: signed(week.net) },
   ];
   return (
@@ -158,7 +160,7 @@ function Roster({ rows }: { rows: RosterRow[] }) {
   const total = rows.reduce((s, r) => s + (r.copper ?? 0), 0);
   return (
     <section aria-labelledby="ledger-roster">
-      <SectionHeading id="ledger-roster" note={rows.length ? `${formatCopper(total)} across ${rows.length} ${rows.length === 1 ? "character" : "characters"}.` : undefined}>Characters</SectionHeading>
+      <SectionHeading id="ledger-roster" note={rows.length ? <><Coins copper={total} /> across {rows.length} {rows.length === 1 ? "character" : "characters"}.</> : undefined}>Characters</SectionHeading>
       <DataTable caption="Gold per character" columns={columns} rows={rows} rowKey={(r) => characterKey(r)}
         empty={<p className="px-4 py-6 text-sm text-fg-2">This file has no gold snapshots yet. The addon writes one when a character logs in.</p>} />
     </section>
@@ -201,7 +203,7 @@ function Categories({ rows, who }: { rows: CategoryTotal[]; who: string }) {
   const columns: Column<CategoryTotal>[] = [
     { key: "category", header: "Category", nowrap: true, cell: (r) => categoryLabel(r.category) },
     { key: "direction", header: "In or out", cell: (r) => r.direction },
-    { key: "copper", header: "Amount", numeric: true, cell: (r) => formatCopper(r.copper) },
+    { key: "copper", header: "Amount", numeric: true, cell: (r) => <CoinText text={formatCopper(r.copper)} /> },
     { key: "events", header: "Events", numeric: true, cell: (r) => r.events.toLocaleString("en-US") },
   ];
   return (
@@ -218,7 +220,7 @@ function Receipts({ rows, total }: { rows: Receipt[]; total: number }) {
     { key: "at", header: "When", nowrap: true, cell: (r) => when(r.at) },
     { key: "character", header: "Character", nowrap: true, cell: (r) => r.character },
     { key: "category", header: "Category", nowrap: true, cell: (r) => categoryLabel(r.category) },
-    { key: "copper", header: "Amount", numeric: true, cell: (r) => <span className={r.direction === "out" ? "text-warning" : "text-fg"}>{r.direction === "out" ? "-" : "+"}{formatCopper(r.copper)}</span> },
+    { key: "copper", header: "Amount", numeric: true, cell: (r) => <span className={r.direction === "out" ? "text-warning" : "text-fg"}>{r.direction === "out" ? "-" : "+"}<CoinText text={formatCopper(r.copper)} /></span> },
   ];
   return (
     <section aria-labelledby="ledger-receipts">
@@ -248,8 +250,8 @@ function History({ series }: { series: GoldSeries[] }) {
                 </div>
                 <p className="mt-1 font-mono text-xs tabular-nums text-muted">
                   {s.points.length === 1
-                    ? `${formatCopper(first.copper)} on ${day(first.at)}`
-                    : `${formatCopper(first.copper)} on ${day(first.at)} to ${formatCopper(last.copper)} on ${day(last.at)}`}
+                    ? <><Coins copper={first.copper} /> on {day(first.at)}</>
+                    : <><Coins copper={first.copper} /> on {day(first.at)} to <Coins copper={last.copper} /> on {day(last.at)}</>}
                 </p>
               </li>
             );

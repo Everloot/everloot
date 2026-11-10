@@ -35,7 +35,7 @@ import { MarketBox, loadMarketBox } from "@/app/tools/auctions/MarketBox";
 import { pendingLine } from "../../../../../../kb/src/pending-loot";
 import { itemDropSources } from "../../../../../../kb/src/loot-tables";
 import { loadLootTables, loadReportedItemFacts } from "@/lib/rollup-compute";
-import { EmptyTab, EntityHeader, EntityIcon, EntityTop, known, LINK, MAP_LINK_HEADER, MapName, ShowOnMap, Unreachable } from "../../entity";
+import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityIcon, EntityTop, known, LINK, MAP_LINK_HEADER, MapName, ShowOnMap, Unreachable } from "../../entity";
 import { ItemSourcesPanel } from "../../loot-tables";
 import { unknownItem } from "../../unknown";
 import { itemSummary } from "@/lib/evidence";
@@ -264,7 +264,7 @@ export default async function ItemPage(props: Props) {
     <Container width="data">
       <EdgeDegraded when={degraded || itemSeen.unreachable || edges.unreachable || reported.unreachable} />
       <JsonLd data={entityPageJsonLd({ name: title, path: `/database/items/${itemId}`, identifier: `item:${itemId}` })} />
-      <article>
+      <EntityLayout>
         <EntityHeader
           trail={trail}
           title={title}
@@ -298,23 +298,25 @@ export default async function ItemPage(props: Props) {
             </ul>
           </section>
         )}
-        <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-        <OpenData
-          text={[
-            `${title} (item ${itemId})`,
-            ...tooltipLines,
-            ...summary,
-            `Source: https://everloot.app/database/items/${itemId}`,
-          ].join("\n")}
-          jsonHref={!facts.unreachable && hasCard.item(page) ? `/api/tooltip/item/${itemId}` : undefined}
-        />
+        <EntitySidebar>
+          <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
+          <OpenData
+            text={[
+              `${title} (item ${itemId})`,
+              ...tooltipLines,
+              ...summary,
+              `Source: https://everloot.app/database/items/${itemId}`,
+            ].join("\n")}
+            jsonHref={!facts.unreachable && hasCard.item(page) ? `/api/tooltip/item/${itemId}` : undefined}
+          />
+        </EntitySidebar>
         <MarketBox itemId={itemId} rows={auctions} />
         <Tabs label={`${title}: relations`} tabs={tabs} className="mt-6" />
         <div className="mt-6 space-y-6 empty:hidden">
           <LoreSection match={lore} />
           {!facts.unreachable && (page.name !== null || page.drops.length > 0) && <AdSlot slot="inContent" />}
         </div>
-      </article>
+      </EntityLayout>
     </Container>
   );
 }

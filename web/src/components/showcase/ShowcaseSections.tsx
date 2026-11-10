@@ -49,7 +49,7 @@ const qualityText = (r: GearRow) => (r.quality === null ? "text-fg" : QUALITY_TE
 function Slot({ slot, row }: { slot: GearSlot; row: GearRow | null }) {
   return (
     <li data-slot={slot} data-empty={row ? undefined : ""} className="flex items-center gap-3 border-b border-line px-4 py-2 sm:px-6">
-      {row?.icon ? <GameIcon src={row.icon} size={32} /> : null}
+      {row?.icon ? <GameIcon src={row.icon} size={32} quality={row.quality === null ? undefined : qualityOf(row.quality)} /> : null}
       <div className="min-w-0 flex-1">
         <p className="text-meta text-muted">{GEAR_SLOTS[slot]}</p>
         {row

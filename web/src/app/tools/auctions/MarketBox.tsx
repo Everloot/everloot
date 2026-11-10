@@ -1,3 +1,4 @@
+import { CoinText } from "@/components/ui/Coins";
 import Link from "next/link";
 import { DataTable, type Column } from "@/components/ui";
 import { uploadStore } from "@/lib/upload-store";
@@ -26,8 +27,8 @@ export function MarketBox({ itemId, rows }: { itemId: number; rows: MarketRow[] 
   const columns: Column<MarketRow>[] = [
     { key: "realm", header: "Realm", nowrap: true, cell: (r) => <Link href={itemHref(r.realm, itemId)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg"><RealmName name={r.realm.name} /></Link> },
     { key: "house", header: "House", nowrap: true, cell: (r) => r.house },
-    { key: "market", header: "Market value", numeric: true, cell: (r) => <span className={r.value.market === null ? "text-muted" : undefined}>{money(r.value.market)}</span> },
-    { key: "min", header: "Min buyout", numeric: true, cell: (r) => formatCopper(r.value.min) },
+    { key: "market", header: "Market value", numeric: true, cell: (r) => <span className={r.value.market === null ? "text-muted" : undefined}><CoinText text={money(r.value.market)} /></span> },
+    { key: "min", header: "Min buyout", numeric: true, cell: (r) => <CoinText text={formatCopper(r.value.min)} /> },
   ];
   return (
     <section aria-labelledby="item-auction-house" data-market-box className="mt-6 mb-6 max-w-[584px]">
