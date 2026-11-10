@@ -336,7 +336,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the local gold ledger keeps two characters with the same name and realm from different installs apart.
 - Addon: tooltips, `/everloot price` and crafting costs read the community price of your character's own auction house,
   or the open auctioneer's, and say which. An older price file keyed by realm alone is not read, since its values may mix
-  both factions. Your own scans are kept per realm and house; an older scan that did not record its house says so.
+  both factions; the tooltip and `/everloot price` say so, also beside your own scan. Your own scans are kept per realm
+  and house; an older scan that did not record its house says so. Update the addon and the Desktop App together, then
+  `/reload`: addon 0.3.22 or earlier shows no community prices from the new price file.
 - Desktop App: the price file is fetched and written per auction house, and the Market page lists each realm's houses
   apart. The Characters page keeps two characters with the same name and realm apart.
 

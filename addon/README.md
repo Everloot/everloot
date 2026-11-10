@@ -48,7 +48,10 @@ new UTC day, so levelling a profession adds a few rows per recipe, not one per s
 Tooltip prices show the item's newest public observation day separately from when the price file was built,
 and warn when either is old. Community values are one auction house's: the character's faction house, or the open
 auctioneer's (a goblin house is the neutral one), named on the line; another house's price is never shown, and an older
-price file keyed by realm alone is not read, since its values may mix both factions. They are recorded asking-price
+price file keyed by realm alone is not read, since its values may mix both factions: with Desktop App 0.1.21 or
+earlier the tooltip says so instead of showing a price, and addon 0.3.22 or earlier finds no community price in a newer
+file. Update the addon and the Desktop App together, let the app refresh prices, then `/reload`; drop rates and sources
+keep working throughout. They are recorded asking-price
 estimates, not live listings or guaranteed sale prices. Your own latest scan of each house is kept per realm and house
 (`EverlootDB.houseScans`); a scan whose auctioneer could not be read says its house was not recorded.
 Below the prices, the tooltip shows where the item drops when three installs looted the source: each rate as
