@@ -259,8 +259,10 @@ Left-click the minimap button, or `/everloot window`, for the Everloot window. I
   lists the money events by category, by day or by receipt. **Sales** lists auction sales one by one or by item.
   **Session** is the gold per hour session. Ledger and Sales can be set to today, 7 days, 30 days or all; Overview always
   shows the last 30 days. Overview, Ledger and Sales can be set to this character or the account; Session has neither.
-- **Collection** shows this character's achievements, reputation, titles and raid lockouts from the rows the
-  completion tracker wrote, so it needs `/everloot completion on`; with it off the tab says so and has a button that runs that command.
+- **Collection** shows achievements, reputation, titles, raid lockouts and quest chains (quests done of each chain's
+  total) from the rows the completion tracker wrote, so it needs `/everloot completion on`; with it off the tab says so
+  and has a button that runs that command. It shows this character, or the account: every character in the roster, each
+  item done when any of them has it, with the name of the character that does.
 - **Professions** shows each profession in the profession book with its rank and the recipes recorded for it by
   difficulty colour.
 - **Settings** opens this page. "What you've added", the row counts in your saved file, is on that page now.
@@ -566,7 +568,7 @@ addon/
 │   ├── conveniences.lua  sell greys and repair at a merchant, Collect all at the mailbox; each off until enabled, no records
 │   ├── window.lua      the Everloot window: Home from what the file holds; built on first open, no records
 │   ├── view_gold.lua   the window's Gold tab: gold by realm, the ledger, auction sales, the gph session; display only
-│   ├── view_collection.lua  the window's Collection tab: achievements, reputation, titles, lockouts; display only
+│   ├── view_collection.lua  the window's Collection tab: achievements, reputation, titles, lockouts, quest chains; display only
 │   └── view_professions.lua  the window's Professions tab: each profession, its rank and recorded recipes; display only
 ├── media/crest.tga     the crest, 128 px, packaged beside the code
 └── tests/              Lua 5.1 contract tests and their fixtures

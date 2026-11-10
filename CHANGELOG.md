@@ -21,6 +21,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the armory opens at `/armory`: a page for every WoW Forever character and guild that Blizzard's API returns,
   read hourly, with guild rosters, three boards (item level, gear score, honorable kills), a form to hide a character
   and a form to ask for one. Each page says "Data from Blizzard Entertainment", carries no ad and is not indexed yet.
+- Addon: the Collection tab gains a Quests section, each quest chain you have started with how many of its quests are
+  done, and a This character / Account switch. Account counts every character you log in with and names the one that
+  has each achievement, title, reputation, lockout or chain. It reads what the completion tracker already keeps;
+  nothing new is recorded or uploaded.
 - Knowledge base: the open data export's game-files folder gains one file per committed catalog (achievements, factions,
   titles, quest lines, mounts, encounters, recipes, class gear and its restrictions, class spells, races, legacy perks,
   talent nodes, raid buffs): ids, the names the files hold and each file's build, every row counted, with a schema each
