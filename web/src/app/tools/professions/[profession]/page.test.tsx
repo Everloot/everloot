@@ -20,18 +20,16 @@ vi.mock("@/lib/rollup-compute", async (importOriginal) => {
       fail.rollups ? { rates: [], measuredZeros: [], rejected: [], stats: { uploads: 0, lootWindows: 0, records: 0, unreachable: true, dataAsOf: null } } : real.computeRollups(...args),
   };
 });
+// The game-file layer only: the item names file and a tooltip with an icon for each item the page may show one for.
+// The players' names come from the real readers, the corpus path and the stored item view alike.
 vi.mock("@/lib/game-assets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/game-assets")>()),
   loadSiteAssets: async () => null,
-  loadItemTips: async () => new Map(),
+  loadItemNames: async () => ({ version: "1.60.1.70707", wiki: { name: "Warcraft Wiki", url: "" }, names: new Map([[2454, { name: "Elixir of Minor Strength", color: "#ffffff", wikiPage: null, source: "files" as const }]]) }),
+  loadItemTips: async (_assets: unknown, ids: readonly number[]) => new Map(ids.map((id) => [id, {
+    name: `Tip ${id}`, color: "#1eff00", quality: "Uncommon", icon: `https://icons.test/${id}.jpg`, lines: [`Tip line ${id}`], partial: false, why: [], label: "", level: 0, required: 0, binding: 0,
+  }])),
   loadSpellNames: async () => ({ version: "1.60.1.70707", names: new Map([[2329, "Elixir of Minor Strength"]]) }),
-}));
-vi.mock("@/lib/shown-item-names", () => ({
-  loadShownNames: async () => ({
-    facts: { unreachable: true }, agreed: new Map<number, string>(), named: { has: () => false },
-    matched: { version: "1.60.1.70707", wiki: { name: "Warcraft Wiki", url: "" }, names: new Map([[2454, { name: "Elixir of Minor Strength", color: "#ffffff", wikiPage: null, source: "files" as const }]]) },
-    showsTip: (id: number) => id === 2454,
-  }),
 }));
 vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a>,
@@ -42,10 +40,6 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/components/EmailCapture", () => ({ default: () => null }));
 
-vi.mock("@/lib/item-view", async () => {
-  const { loadShownNames } = await import("@/lib/shown-item-names");
-  return { loadListNames: loadShownNames };
-});
 import ProfessionPage from "./page";
 
 const obs = (installId: string, rank: number, difficulty: string, recipe = "Lesser Healing Potion") => ({
@@ -220,10 +214,24 @@ test("Tailoring and First Aid list the same cloth zones; Skinning lists the leat
 });
 
 test("the mob-backed gathering pages read the corpus once", async () => {
-  for (const profession of ["skinning", "tailoring", "first-aid", "herbalism"]) {
-    store.loadCorpus.mockReset().mockResolvedValue(clothAndLeather());
-    await render(profession);
-    expect(store.loadCorpus, profession).toHaveBeenCalledTimes(1);
+  // The item names come from the stored item view, as once the cron has written it; the other stored files are missing.
+  const { buildItemView, forgetItemView } = await import("@/lib/item-view-store");
+  for (const [key, value] of Object.entries({ R2_ACCOUNT_ID: "acct", R2_ACCESS_KEY_ID: "id", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "uploads" })) vi.stubEnv(key, value);
+  try {
+    for (const profession of ["skinning", "tailoring", "first-aid", "herbalism"]) {
+      const corpus = clothAndLeather();
+      const view = JSON.stringify(await buildItemView(corpus.dataAsOf, new Date(), corpus as unknown as import("@/lib/upload-store").Corpus));
+      vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) =>
+        (input as Request).url.endsWith("snapshots/item-view.json") ? new Response(view) : new Response(null, { status: 404 })));
+      forgetItemView();
+      store.loadCorpus.mockReset().mockResolvedValue(corpus);
+      await render(profession);
+      expect(store.loadCorpus, profession).toHaveBeenCalledTimes(1);
+    }
+  } finally {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    forgetItemView();
   }
 });
 
@@ -284,24 +292,34 @@ test.each(["alchemy", "herbalism", "mining", "tailoring", "skinning"])("stored %
   const { buildProfessions, encodeProfessions, forgetStoredProfessions } = await import("@/lib/profession-store");
   const { buildAggregates } = await import("@/lib/aggregate-set");
   const { encodeAggregates, forgetStoredAggregates } = await import("@/lib/aggregate-store");
+  const { buildItemView, forgetItemView } = await import("@/lib/item-view-store");
+  const forget = () => { forgetStoredProfessions(); forgetStoredAggregates(); forgetItemView(); };
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
-  forgetStoredProfessions();
-  forgetStoredAggregates();
-  const corpus = { ...clothAndLeather(), records: [...clothAndLeather().records, obs("a", 1, "optimal"), obs("b", 1, "optimal"), obs("c", 1, "optimal")] };
+  forget();
+  // Three installs name Earthroot (2449), a reagent of the Alchemy recipes, so the page shows a players' name and its icon.
+  const named = three.map((installId, i) => ({ kind: "item_seen", eventId: `seen${i}`, installId, capturedAt: "2026-10-10T00:00:00.000Z", itemId: 2449, name: "Earthroot" }));
+  const corpus = { ...clothAndLeather(), records: [...clothAndLeather().records, obs("a", 1, "optimal"), obs("b", 1, "optimal"), obs("c", 1, "optimal"), ...named] };
   store.loadCorpus.mockResolvedValue(corpus);
   const before = await render(profession);
+  if (profession === "alchemy") {
+    expect(before).toContain(">Earthroot<");
+    expect(before).toContain("https://icons.test/2449.jpg");
+  }
   store.loadCorpus.mockClear();
-  forgetStoredProfessions();
-  forgetStoredAggregates();
+  forget();
+  const view = await buildItemView(corpus.dataAsOf, new Date(), corpus as unknown as import("@/lib/upload-store").Corpus);
   for (const [key, value] of Object.entries({ R2_ACCOUNT_ID: "acct", R2_ACCESS_KEY_ID: "id", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "uploads" })) vi.stubEnv(key, value);
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const url = (input as Request).url;
     return new Response(url.endsWith("snapshots/aggregates.json")
       ? encodeAggregates(buildAggregates(corpus as unknown as import("@/lib/upload-store").Corpus), "now")
       : url.endsWith("snapshots/professions.json")
-        ? encodeProfessions(buildProfessions(corpus), "now") : "{}" );
+        ? encodeProfessions(buildProfessions(corpus), "now")
+        : url.endsWith("snapshots/item-view.json") ? JSON.stringify(view) : "{}" );
   }));
   expect(await render(profession)).toEqual(before);
+  const served = vi.mocked(fetch).mock.calls.map(([input]) => (input as Request).url);
+  expect(served.some((url) => url.endsWith("snapshots/item-view.json"))).toBe(true);
   expect(store.loadCorpus).not.toHaveBeenCalled();
 });

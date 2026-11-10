@@ -863,3 +863,71 @@ C_AuctionHouse.GetReplicateItemInfo = savedInfo
 loadedLater = false
 """)
 print("Lua 5.1 market: clicked full scan, chunked reads, retry, parts, cooldown, 3 scans kept, scan timeout, tooltips with sliced checksums, stale and thin labels, /everloot price in chat, no buy or post call")
+
+lua.execute("""
+-- The scan boundary preserves the complete realm and stamps scanner faction separately from house.
+rows = {}; row(2589, 10, 1000, true)
+UnitExists = function(unit) return unit == 'npc' end
+for _, ending in ipairs({ 'PVE', 'PVP', 'RP', 'RPPVP', 'Hardcore' }) do
+  for _, faction in ipairs({ 'Alliance', 'Horde' }) do
+    for _, house in ipairs({ 'Alliance', 'Horde', 'Neutral' }) do
+      local realm = 'CAMWOW US1 Realm 4 ' .. ending
+      GetRealmName = function() return realm end
+      UnitFactionGroup = function(unit)
+        if unit == 'player' then return faction end
+        return house == 'Neutral' and 'Neutral' or house
+      end
+      timers = {}; now = now + 901
+      fire('AUCTION_HOUSE_CLOSED'); fire('AUCTION_HOUSE_SHOW')
+      SlashCmdList.EVERLOOT('scan'); fire('REPLICATE_ITEM_LIST_UPDATE'); drain()
+      local scan = EverlootDB.records.auction_snapshot[#EverlootDB.records.auction_snapshot]
+      assert(scan.realm == realm and scan.faction == faction and scan.house == house,
+        'full realm, faction and actual house survive scan storage')
+    end
+  end
+end
+
+-- Community lookup must use the full name, never the display base without its ruleset.
+EverlootPricesDB = { realms = {} }
+for i, ending in ipairs({ 'PVE', 'PVP', 'RP', 'RPPVP', 'Hardcore' }) do
+  local realm = 'CAMWOW US1 Realm 4 ' .. ending
+  local data = '2589,' .. (100 + i) .. ',100,100,40,2026-11-10,3'
+  EverlootPricesDB.realms[realm:lower()] = { data = data, sum = Everloot.Adler32(data) }
+end
+Everloot:ResetPrices()
+for i, ending in ipairs({ 'PVE', 'PVP', 'RP', 'RPPVP', 'Hardcore' }) do
+  local price = Everloot:CommunityPrice('CAMWOW US1 Realm 4 ' .. ending, 2589)
+  assert(price and price.market == 100 + i, 'reader keeps ruleset prices separate')
+end
+assert(Everloot:CommunityPrice('CAMWOW US1 Realm 4', 2589) == nil, 'no base-name fallback')
+assert(Everloot:CommunityPrice('CAMWOW EU1 Realm 4 PVP', 2589) == nil, 'no other-region fallback')
+""")
+
+# These are executable isolation requirements, not fixes. Their expected failures remain visible
+# until the owner approves a house-qualified price file and variant-qualified snapshot items.
+import unittest
+
+
+class MarketIdentityGaps(unittest.TestCase):
+    @unittest.expectedFailure
+    def test_community_file_without_a_house_must_not_supply_a_faction_price(self):
+        lua.execute("UnitFactionGroup = function() return 'Horde' end")
+        self.assertIsNone(lua.eval("Everloot:CommunityPrice('CAMWOW US1 Realm 4 PVP', 2589)"))
+
+    @unittest.expectedFailure
+    def test_scan_must_keep_different_item_suffixes_separate(self):
+        lua.execute("""
+        rows = {}; row(2589, 10, 1000, true); row(2589, 10, 9000, true)
+        C_AuctionHouse.GetReplicateItemLink = function(i)
+          return 'item:2589:0:0:0:0:0:' .. (i == 1 and 123 or 456) .. ':0'
+        end
+        GetRealmName = function() return 'CAMWOW US1 Realm 4 PVP' end
+        timers = {}; now = now + 901
+        fire('AUCTION_HOUSE_CLOSED'); fire('AUCTION_HOUSE_SHOW')
+        SlashCmdList.EVERLOOT('scan'); fire('REPLICATE_ITEM_LIST_UPDATE'); drain()
+        """)
+        self.assertEqual(lua.eval("#EverlootDB.records.auction_snapshot[#EverlootDB.records.auction_snapshot].items"), 2)
+
+
+result = unittest.TextTestRunner().run(unittest.defaultTestLoader.loadTestsFromTestCase(MarketIdentityGaps))
+assert result.wasSuccessful(), "market identity expectations changed; review the owner-blocked tests"

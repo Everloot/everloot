@@ -1,58 +1,31 @@
-// @vitest-environment jsdom
-import { act } from "react";
-import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, expect, test } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
+import { expect, test, vi } from "vitest";
+
+vi.mock("@/data/game-data/client-layer.json", () => ({ default: { build: { product: "wowf", version: "1.60.1.80001" } } }));
+vi.mock("../../../kb/changes/builds.json", () => ({ default: { builds: [
+  { product: "wowf", version: "1.60.1.80002", buildId: 80002, firstSeen: "2026-11-09" },
+  { product: "wowf", version: "1.60.1.80001", buildId: 80001, firstSeen: "2026-11-08" },
+  { product: "wow_classic_era", version: "1.15.9.90000", buildId: 90000, firstSeen: "2026-11-10" },
+] } }));
+
 import GameVersionLabel from "./GameVersionLabel";
-import { CURRENT_VERSION, GAME_VERSIONS } from "@/lib/game-version";
 
-let container: HTMLDivElement;
-let root: Root;
-
-beforeEach(async () => {
-  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  container = document.createElement("div");
-  document.body.append(container);
-  root = createRoot(container);
-  await act(async () => root.render(<GameVersionLabel />));
-});
-afterEach(async () => {
-  await act(async () => root.unmount());
-  container.remove();
+test("the header labels both sources and links to their explanations", () => {
+  const html = renderToStaticMarkup(<GameVersionLabel />);
+  expect(html).toMatch(/>files read 80001<\/a>/);
+  expect(html).toMatch(/>newest seen 80002<\/a>/);
+  expect(html.match(/<a /g)).toHaveLength(2);
+  expect(html).toContain('href="/changes?show=builds&amp;q=1.60.1.80001"');
+  expect(html).toContain('href="/changes"');
+  expect(html).toContain('title="The game files');
+  expect(html).toContain('title="The newest WoW: Forever build');
 });
 
-const button = () => container.querySelector("button")!;
-const menu = () => container.querySelector<HTMLElement>("#game-version-menu")!;
-
-test("the button names the version and the menu starts closed", () => {
-  expect(button().textContent).toBe("Build 1.60.1");
-  expect(button().getAttribute("aria-label")).toBe("Game version: Build 1.60.1");
-  expect(button().getAttribute("aria-expanded")).toBe("false");
-  expect(menu().hidden).toBe(true);
-});
-
-// Which version is current comes from lib/game-version.ts (Beta before launch, Live after), which its own test pins.
-test("opening lists the unavailable versions as disabled with their note, and the current one with the full build", async () => {
-  await act(async () => button().click());
-  expect(button().getAttribute("aria-expanded")).toBe("true");
-  expect(menu().hidden).toBe(false);
-  const rows = [...menu().querySelectorAll("li")];
-  expect(rows.map((r) => r.firstElementChild?.textContent)).toEqual(["Live", "PTR", "Beta"]);
-  GAME_VERSIONS.forEach((v, i) => {
-    if (v.id === CURRENT_VERSION.id) {
-      expect(rows[i].getAttribute("aria-disabled"), v.id).toBeNull();
-      expect(rows[i].getAttribute("aria-current"), v.id).toBe("true");
-      expect(rows[i].textContent, v.id).toContain(CURRENT_VERSION.build!);
-    } else {
-      expect(rows[i].getAttribute("aria-disabled"), v.id).toBe("true");
-      expect(rows[i].textContent, v.id).toContain(v.note!);
-    }
-  });
-});
-
-test("Escape closes the menu and returns focus to the button", async () => {
-  await act(async () => button().click());
-  button().focus();
-  await act(async () => { button().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
-  expect(menu().hidden).toBe(true);
-  expect(document.activeElement).toBe(button());
+test("with no build read, the label says unknown and links to how the files are read", async () => {
+  vi.resetModules();
+  vi.doMock("@/data/game-data/client-layer.json", () => ({ default: { build: { product: "wowf", version: null } } }));
+  const { default: Label } = await import("./GameVersionLabel");
+  const html = renderToStaticMarkup(<Label />);
+  expect(html).toMatch(/href="\/methodology#files"[^>]*>files read unknown<\/a>/);
+  expect(html).not.toContain("undefined");
 });

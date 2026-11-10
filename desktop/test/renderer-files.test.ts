@@ -20,3 +20,11 @@ test("a top-level note marked small keeps the small size under the prose rule", 
   expect(css).toMatch(/\.page > p:not\(\.small\)/);
   expect(css).not.toMatch(/\.page > p,/);
 });
+
+test("the welcome folder hint names Forever on Windows and other platforms", () => {
+  const app = readFileSync(new URL("../src/renderer/app.ts", import.meta.url), "utf8");
+  const welcome = app.slice(app.indexOf("function welcome()"), app.indexOf("function overview("));
+  expect(welcome).toContain('"World of Warcraft\\\\_forever_"');
+  expect(welcome).toContain('"World of Warcraft/_forever_"');
+  expect(welcome).not.toContain("_classic_era_");
+});
