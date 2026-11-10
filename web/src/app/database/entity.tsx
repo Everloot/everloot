@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import JsonLd from "@/components/JsonLd";
-import GameIcon from "@/components/game/GameIcon";
+import GameIcon, { UNKNOWN_ITEM_ICON } from "@/components/game/GameIcon";
 import { AgreementMeter, GET_THE_ADDON, QUALITY_TEXT, type Quality } from "@/components/ui";
 import { UNCONFIRMED_TITLE } from "@/components/ui/Badge";
 import { trailFor } from "@/lib/breadcrumbs";
@@ -27,8 +27,14 @@ export function Unconfirmed({ children, className = "" }: { children: ReactNode;
   );
 }
 
-/** The header's icon: the game icon, or an empty frame of the same size when there is none to show. */
-export function EntityIcon({ src, unconfirmed = false }: { src?: string | null; unconfirmed?: boolean }) {
+/** Item headers keep the game's question mark when the icon is missing. */
+export function EntityIcon({ src, quality, unconfirmed = false, item = false }: { src?: string | null; quality?: Quality; unconfirmed?: boolean; item?: boolean }) {
+  if (item || quality) return (
+    <span className="shrink-0" data-unconfirmed={unconfirmed || undefined} title={unconfirmed ? UNCONFIRMED_TITLE : undefined}>
+      <GameIcon src={src || UNKNOWN_ITEM_ICON} quality={quality} size={40} className="rounded-[3px]" />
+      {unconfirmed && <span className="sr-only"> unconfirmed</span>}
+    </span>
+  );
   const icon = src
     ? <GameIcon src={src} size={40} className="rounded-[3px]" />
     : <span aria-hidden="true" className="block h-10 w-10 rounded-[3px] bg-panel" />;
@@ -40,8 +46,8 @@ export function EntityIcon({ src, unconfirmed = false }: { src?: string | null; 
  * ("Trade Goods · Cloth · ID 2589"). The trail feeds the BreadcrumbList JSON-LD only; the layout already
  * emits it for routes lib/breadcrumbs.ts knows, so it is emitted here only for the others.
  */
-export function EntityHeader({ trail, title, quality, icon, meta = [] }: {
-  trail: Crumb[]; title: ReactNode; quality?: Quality; icon?: ReactNode; meta?: ReactNode[];
+export function EntityHeader({ trail, title, quality, color, icon, meta = [] }: {
+  trail: Crumb[]; title: ReactNode; quality?: Quality; color?: string; icon?: ReactNode; meta?: ReactNode[];
 }) {
   const page = trail[trail.length - 1];
   const emitJsonLd = trail.length > 1 && page && !trailFor(page.path);
@@ -51,7 +57,7 @@ export function EntityHeader({ trail, title, quality, icon, meta = [] }: {
       {emitJsonLd && <JsonLd data={breadcrumbJsonLd(trail)} />}
       {icon}
       <div className="min-w-0">
-        <h1 className={`text-title-sm [overflow-wrap:anywhere] sm:text-title ${quality ? QUALITY_TEXT[quality] : "text-fg"}`}>{title}</h1>
+        <h1 style={color ? { color } : undefined} className={`text-title-sm [overflow-wrap:anywhere] sm:text-title ${quality ? QUALITY_TEXT[quality] : "text-fg"}`}>{title}</h1>
         {parts.length > 0 && (
           <p data-entity-meta className="text-meta text-muted">
             {parts.map((part, i) => <span key={i}>{i > 0 && <span aria-hidden="true"> · </span>}{part}</span>)}
@@ -90,7 +96,7 @@ export function EmptyTab({ message, players = true, action = GET_THE_ADDON }: { 
   return (
     <p data-empty-state className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3 text-meta text-fg-2">
       {players && <AgreementMeter count={0} />}
-      <span>{message}</span>
+      <span>{message}{players && " Facts appear once 3 installs agree."}</span>
       {action && <Link href={action.href} className={LINK}>{action.label}</Link>}
     </p>
   );

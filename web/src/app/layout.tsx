@@ -52,6 +52,7 @@ export const metadata: Metadata = {
     description:
       "WoW: Forever observations from addon uploads, guild tools and auction house prices.",
   },
+  icons: { icon: [{ url: "/favicon.ico", sizes: "any" }, { url: "/icon.svg", type: "image/svg+xml" }], apple: "/apple-icon.png" },
   alternates: { types: FEED },
   robots: { index: true, follow: true },
   // Search Console and Bing Webmaster Tools ownership tags. Each is emitted only when its variable is set.

@@ -267,7 +267,8 @@ export default async function ItemPage(props: Props) {
           trail={trail}
           title={title}
           quality={shownQuality}
-          icon={<EntityIcon src={tip?.icon} unconfirmed={!confirmed} />}
+          color={!shownQuality ? name?.color ?? undefined : undefined}
+          icon={<EntityIcon item src={tip?.icon} quality={quality} unconfirmed={!confirmed} />}
           meta={[category?.class?.label, subclassLabel, name ? <span key="id" className="tabular-nums">ID {itemId}</span> : null]}
         />
         {isDevelopmentItemName(name?.name) && (

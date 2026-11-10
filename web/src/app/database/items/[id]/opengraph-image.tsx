@@ -1,3 +1,4 @@
+import { qualityOf } from "@/components/ui/quality";
 import { notFound } from "next/navigation";
 import { edgesFrom } from "../../../../../../kb/src/edges";
 import { itemNameReporters, itemPage } from "../../../../../../kb/src/item-page";
@@ -29,6 +30,9 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   return renderEntityCard({
     title: shownItemName(itemId, agreed, matched?.names)?.name ?? `Item ${itemId}`,
     type,
+    quality: category?.quality && category.quality.id <= 5 ? qualityOf(category.quality.id) : undefined,
+    color: shownItemName(itemId, agreed, matched?.names)?.color ?? undefined,
+    omitZero: true,
     installs: facts.unreachable ? null : page.name ? AGREEMENT_NEEDED : itemNameReporters(itemId, facts),
   });
 }

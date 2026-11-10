@@ -262,7 +262,7 @@ test("items no source names are one line above the list, sort last when shown, a
     expect(open.indexOf("Linen Cap")).toBeLessThan(open.indexOf(`>Item ${first}<`));
     expect(open).toContain(`>${total.toLocaleString("en-US")}</span> items`);
     expect(open).toContain(`Hide the ${(total - 1).toLocaleString("en-US")} unnamed items`);
-    expect(open).toContain(">?</span>");
+    expect(open).toContain("134400.webp");
     const m = await subclassMetadata(sub("armor", "cloth", { unnamed: "1" }));
     expect(m.robots).toMatchObject({ index: false });
     expect(m.alternates?.canonical).toBe("/database/items/armor/cloth");

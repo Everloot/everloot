@@ -16,7 +16,7 @@ import { classLabel, hasClassContext, parseClassContext, withClassContext, witho
 import ClassContextChip from "@/components/classes/ClassContextChip";
 import { classUse } from "@/lib/class-gear";
 import { CLIENT_CLASS_GEAR } from "@/data/game-data/client-class-gear";
-import GameIcon from "@/components/game/GameIcon";
+import GameIcon, { UNKNOWN_ITEM_ICON } from "@/components/game/GameIcon";
 import Badge, { UNCONFIRMED_TITLE } from "@/components/ui/Badge";
 import { Container, DataTable, DataTitle, FilterBar, filledColumns, QUALITY_TEXT, ResultStrip, qualityOf, type FilterControl, type SparseColumn } from "@/components/ui";
 import type { Crumb } from "@/lib/jsonld";
@@ -176,12 +176,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
         const unconfirmed = name?.source === "files";
         return (
           <span className="flex min-w-0 items-center gap-2">
-            {icons && (tip?.icon
-              ? <GameIcon src={tip.icon} size={24} />
-              : name
-                ? <span aria-hidden="true" className="h-6 w-6 shrink-0 rounded-sm border border-line" />
-                // No name from any source: the same empty tile with a question mark, so a run of ids reads as unknown, not broken.
-                : <span aria-hidden="true" className="grid h-6 w-6 shrink-0 place-items-center rounded-sm border border-line bg-panel text-cell-2 text-muted">?</span>)}
+            {icons && <GameIcon src={tip?.icon || UNKNOWN_ITEM_ICON} size={24} quality={c.quality && c.quality.id <= 5 ? qualityOf(c.quality.id) : undefined} />}
             {/* Where the name comes from is in the link's hover card (and words for a screen reader, after the link so the
                 link's text is the name alone), never a printed label; a name only the game files give carries the
                 quiet unconfirmed marker. */}
@@ -343,24 +338,26 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
             </span>
           )}
         </ClassContextChip>
+        {(held > 0 || (unnamedCount > 0 && (folded || q.unnamed))) && <p className="mt-2 flex flex-wrap gap-x-2 text-cell-2 text-muted">
         {held > 0 && (
-          <p className="mt-2 text-cell-2 text-muted">
+          <span>
             <Link href={here({ dev: q.dev ? undefined : true })} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">
               {q.dev ? "Hide" : "Show"} {held.toLocaleString("en-US")} development {held === 1 ? "leftover" : "leftovers"}
             </Link>
             {" "}
             {q.dev ? "Test, placeholder and retired items the game files still list are in the list." : "Test, placeholder and retired items the game files still list stay out of it."}
-          </p>
+          </span>
         )}
         {unnamedCount > 0 && (folded || q.unnamed) && (
-          <p className="mt-2 text-cell-2 text-muted">
+          <span>
             {folded ? `${unnamedCount.toLocaleString("en-US")} ${unnamedCount === 1 ? "item" : "items"} the game files do not name yet. ` : ""}
             {namesArrive()}{" "}
             <Link href={here({ unnamed: q.unnamed ? undefined : true })} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">
               {q.unnamed ? `Hide the ${unnamedCount.toLocaleString("en-US")} unnamed ${unnamedCount === 1 ? "item" : "items"}` : "Show them"}
             </Link>
-          </p>
+          </span>
         )}
+        </p>}
         <div className="mt-2">
           <DataTable
             dense

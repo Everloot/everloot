@@ -8,7 +8,7 @@ import { npcPage, questPage } from "../../../../../../kb/src/world-pages";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { pinLink } from "@/lib/world-map";
 import { trailFor } from "@/lib/breadcrumbs";
-import { Badge, Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
+import { Badge, Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, EmptyState } from "@/components/ui";
 import { EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, ShowOnMap, Unreachable } from "../../entity";
 import { unknownQuest } from "../../unknown";
 import { entitySummary, observedLine } from "@/lib/evidence";
@@ -104,9 +104,9 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
         />
         <EntityTop
           box={
-            <TooltipFrame name={title} label={wikiTitle ? `${title}, ${GAME_NAME_TITLE.wiki.toLowerCase()}` : `${title}, as players saw it`}>
+            (!facts.unreachable && page.level !== null) ? <TooltipFrame name={title} label={wikiTitle ? `${title}, ${GAME_NAME_TITLE.wiki.toLowerCase()}` : `${title}, as players saw it`}>
               {!facts.unreachable && page.level !== null && <p>Level {page.level}</p>}
-            </TooltipFrame>
+            </TooltipFrame> : facts.unreachable ? <Unreachable /> : <EmptyState message="No quest level is confirmed yet; 3 installs must agree before it appears." />
           }
           facts={!facts.unreachable && (
             <Facts

@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
+  missingTip: false,
   assets: null as unknown, names: [] as unknown[], tipCalls: [] as number[][], matched: null as unknown,
   levels: new Map<number, { level: number; required: number; binding: number }>(),
   progress: [] as { fact: "armor"; reporters: number; build: string }[],
@@ -13,6 +14,7 @@ vi.mock("@/lib/game-assets", async (importOriginal) => ({
   loadItemNames: async () => state.matched,
   loadItemTips: async (_assets: unknown, ids: readonly number[]) => {
     state.tipCalls.push([...ids]);
+    if (state.missingTip) return new Map();
     return new Map(ids.map((id) => [id, { name: `Game name ${id}`, color: "#fff", quality: "Common", icon: `https://assets.example.test/b/icons/i${id}.webp`, lines: [], partial: false, why: [], label: "found in game files, unconfirmed · build 1.60.1.70450", level: 0, required: 0, binding: 0, ...state.levels.get(id) }]));
   },
 }));
@@ -49,7 +51,7 @@ const html = async (el: Promise<ReactNode>) => renderToStaticMarkup(await el);
 const props = (id: string) => ({ params: Promise.resolve({ id }), searchParams: Promise.resolve({}) });
 const agreed = (itemId: number) => ["a", "b", "c"].map((installId) => ({ installId, itemId, name: `Agreed ${itemId}` }));
 
-beforeEach(() => { state.assets = null; state.names = []; state.tipCalls = []; state.matched = null; state.levels = new Map(); state.progress = []; });
+beforeEach(() => { state.missingTip = false; state.assets = null; state.names = []; state.tipCalls = []; state.matched = null; state.levels = new Map(); state.progress = []; });
 
 test("a below-threshold item fact shows report progress even without a game-file tooltip", async () => {
   state.progress = [{ fact: "armor", reporters: 1, build: "1.60.1.70450" }];
@@ -68,9 +70,9 @@ test("an unreported item: the creating spell's icon, but no game file tooltip; t
   expect(state.tipCalls).toEqual([]);
 });
 
-test("without the manifest there is no icon and no credit", async () => {
+test("without the manifest the item uses the question mark and no credit", async () => {
   const page = await html(ItemPage(props(String(made.fromId))));
-  expect(page).not.toContain("<img");
+  expect(page).toContain("134400.webp");
   expect(page).not.toContain(CREDIT);
 });
 
@@ -96,6 +98,15 @@ const matchedNames = (ids: number[]) => ({
 });
 const clothIds = () => CLIENT_TAXONOMY.items.filter((r) => r[1] === 4 && r[2] === 1).map((r) => r[0]);
 const cloth = () => SubclassPage({ params: Promise.resolve({ id: "armor", subclass: "cloth" }), searchParams: Promise.resolve({}) });
+
+test("the audited item keeps its name colour when its icon and taxonomy quality are missing", async () => {
+  state.missingTip = true;
+  state.matched = matchedNames([7230]);
+  const page = await html(ItemPage(props("7230")));
+  expect(page).toContain("134400.webp");
+  expect(page).toMatch(/<h1 style="color:#a335ee"[^>]*>Wiki name 7230<\/h1>/);
+  expect(page).not.toContain("border-dashed");
+});
 
 test("a category row shows a name the game files and the wiki agree on, in its quality colour, its source in the hover card and in words for a screen reader, no printed label", async () => {
   state.assets = assets;

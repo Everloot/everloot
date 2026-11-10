@@ -11,7 +11,7 @@ import { computeRollups, loadLootTables, loadWorldFacts } from "@/lib/rollup-com
 import { pinLink, WORLD_MAP } from "@/lib/world-map";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
 import { trailFor } from "@/lib/breadcrumbs";
-import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, type Column } from "@/components/ui";
+import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, EmptyState, type Column } from "@/components/ui";
 import { EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, MapName, ShowOnMap, Unreachable } from "../../entity";
 import { NpcLootPanel } from "../../loot-tables";
 import { unknownNpc } from "../../unknown";
@@ -124,9 +124,9 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
         <EntityHeader trail={trail} title={title} meta={["NPC", zone?.name, named ? <span key="id" className="tabular-nums">ID {npcId}</span> : null]} />
         <EntityTop
           box={(firstPin && zone && <MapThumb pin={firstPin} zone={zone.name} art={art?.smallUrl ?? art?.url ?? null} />) || (
-            <TooltipFrame name={title} label={`${title}, as players saw it`}>
+            firstPin ? <TooltipFrame name={title} label={`${title}, as players saw it`}>
               {firstPin && <p>Map {firstPin.mapId} at {firstPin.x}, {firstPin.y}</p>}
-            </TooltipFrame>
+            </TooltipFrame> : unreachable ? <Unreachable /> : <EmptyState message="No position is confirmed yet; 3 installs must agree before it appears." />
           )}
           facts={!unreachable && (
             <Facts

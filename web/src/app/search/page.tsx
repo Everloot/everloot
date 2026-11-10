@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import LoreSearchForm from "@/components/LoreSearchForm";
-import GameIcon from "@/components/game/GameIcon";
+import GameIcon, { UNKNOWN_ITEM_ICON } from "@/components/game/GameIcon";
 import { Container, DataTable, DataTitle, Entry, EntryList, filledColumns, LinkTabs, Pager, QUALITY_TEXT, SearchBar, qualityOf, type SparseColumn } from "@/components/ui";
 import { CC_BY_SA } from "@/lib/jsonld";
 import { BROWSE_HEADINGS, BROWSE_TYPES, hasTypes, loreSlug, MAX_QUERY, searchLore, UNAVAILABLE, UNAVAILABLE_COPY, type BrowseSlug, type LoreType } from "@/lib/lore";
@@ -156,12 +156,12 @@ function ResultTable({ group, q, scoped, icons }: { group: SearchGroup; q: strin
     // An item name takes its quality colour; any other hit is a plain link, never the accent an uncommon item resembles.
     const style = group.type === "item" && typeof r.quality === "number" && r.quality <= 5 ? `${QUALITY_TEXT[qualityOf(r.quality)]} hover:underline underline-offset-4` : "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
     const link = <Link href={r.href} className={style}>{r.label}</Link>;
-    // Item hits carry the game icon as the item lists do, and an empty box where an item has none.
+    // Item hits carry the game icon as the item lists do, and the game's fallback where one is missing.
     if (group.type !== "item" || icons.size === 0) return link;
     const icon = r.id === undefined ? undefined : icons.get(r.id);
     return (
       <span className="flex min-w-0 items-center gap-2">
-        {icon ? <GameIcon src={icon} size={20} /> : <span aria-hidden="true" className="h-5 w-5 shrink-0 rounded-sm border border-line" />}
+        <GameIcon src={icon || UNKNOWN_ITEM_ICON} size={20} quality={typeof r.quality === "number" && r.quality <= 5 ? qualityOf(r.quality) : undefined} />
         {link}
       </span>
     );

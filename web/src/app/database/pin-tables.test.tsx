@@ -37,6 +37,21 @@ const LABEL = 'aria-label="Show Elwynn Forest at 40, 60 on the map"';
 
 beforeEach(() => store.loadCorpus.mockReset().mockResolvedValue({ uploads: 3, records, dataAsOf: "2026-10-10T00:00:00.000Z" }));
 
+test("unconfirmed NPC positions and quest levels explain the threshold instead of drawing name-only tooltips", async () => {
+  store.loadCorpus.mockResolvedValue({ uploads: 1, records: records.filter((r) => r.installId === "a"), dataAsOf: "2026-10-10T00:00:00.000Z" });
+  for (const [page, message] of [
+    [() => NpcPage(props("1")), "No position is confirmed yet"],
+    [() => QuestPage(props("176")), "No quest level is confirmed yet"],
+  ] as const) {
+    const markup = await html(page());
+    expect(markup).not.toContain("data-tooltip-frame");
+    expect(markup).toContain(message);
+    expect(markup).toContain("3 installs must agree");
+    const empty = markup.match(/<div data-empty-state[\s\S]*?<\/div>/)?.[0] ?? "";
+    expect(empty.match(/href=/g)).toHaveLength(1);
+  }
+});
+
 test("an NPC's pin table names the zone, keeps the map id in a tooltip, and names its link and its link column", async () => {
   const page = await html(NpcPage(props("1")));
   expect(page).toContain('<span title="UiMap 1429">Elwynn Forest</span>');

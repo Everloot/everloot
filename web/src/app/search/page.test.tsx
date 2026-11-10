@@ -112,8 +112,9 @@ test("item hits lead with the game icon and the quality colour, and no hit carri
   const html = await render({ q: "thunderfury" });
   expect(icons.asked).toEqual([[19019, 5]]);
   expect(html).toMatch(/<img src="https:\/\/assets\.everloot\.app\/b\/icons\/1\.webp"[^>]*>(<!-- -->)?<a href="\/database\/items\/19019" class="text-q-legendary/);
-  // An item without an icon keeps the place of one.
-  expect(html).toMatch(/<span aria-hidden="true" class="h-5 w-5[^"]*"><\/span><a href="\/database\/items\/5"/);
+  // An item without an icon uses the game's question mark and its quality border.
+  expect(html).toMatch(/<img[^>]*134400\.webp[^>]*border-q-common[^>]*>(<!-- -->)?<a href="\/database\/items\/5"/);
+  expect(html).toContain("border-q-legendary");
   expect(html.indexOf('id="results-item"')).toBeLessThan(html.indexOf('id="results-lore"'));
   expect(html).not.toMatch(/<a [^>]*title=/);
   icons.map = new Map();
