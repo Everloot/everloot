@@ -334,6 +334,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   share images. A new link is private, every page is noindex, and the hide form takes a page down without an
   account. A character two accounts link stays frozen until it is settled: write to hello@everloot.app, we reply
   within 7 days. The data policy, /privacy and the account page say so.
+- Docs: each gap in DATA_PLACEMENT.md carries a dated state, and the WAF row now describes the Cloudflare rules that apply on /database/*.
 
 ### Added
 - Site: the open data export, at `/database/download`. The published data as NDJSON files anyone can download
