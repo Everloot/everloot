@@ -13,3 +13,8 @@ export const LOCAL_ONLY_CATEGORIES: readonly string[] = [...LEDGER_INCOME, ...LE
 
 /** "out" for a spending category, "in" for anything else, as the addon's L.Direction and the web's directionOf. */
 export const directionOf = (category: string): "in" | "out" => (LEDGER_SPENDING.includes(category) ? "out" : "in");
+
+export const DAY_MS = 24 * 3600 * 1000;
+/** The Gold tab's periods include today and preceding whole UTC days. */
+export const utcDay = (ms: number): number => Math.floor(ms / DAY_MS) * DAY_MS;
+export const periodStart = (now: number, days: number): number => utcDay(now) - (days - 1) * DAY_MS;

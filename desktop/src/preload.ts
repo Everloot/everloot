@@ -39,6 +39,7 @@ const api: EverlootApi = {
   setupAddon: (folder: string) => ipcRenderer.invoke("setupAddon", folder),
   setupInstallAddon: (folder: string) => ipcRenderer.invoke("setupInstallAddon", folder),
   changes: () => ipcRenderer.invoke("changes"),
+  reportsInfo: (query) => ipcRenderer.invoke("reportsInfo", query),
   charactersInfo: () => ipcRenderer.invoke("charactersInfo"),
   chatInfo: () => ipcRenderer.invoke("chatInfo"),
   chatSend: (text: string) => ipcRenderer.invoke("chatSend", text),

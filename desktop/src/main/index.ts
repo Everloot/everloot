@@ -1,7 +1,9 @@
+import { reportAt } from "./reports";
+import type { ReportQuery } from "../shared/reports";
 import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, net, powerMonitor, screen, session, shell } from "electron";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { loadProviders } from "../../../companion/src/providers/config";
 import type { AddonInfo, AppState, AskInfo, DataUsage, Job, MarketInfo, PriceLookup, Settings } from "../shared/types";
 import { JOBS } from "../shared/types";
@@ -562,6 +564,16 @@ if (!app.requestSingleInstanceLock()) {
     return installAddon({ version: latest.version, endpoint: settings.endpoint, addonsDir: dir });
   });
   handle("changes", () => changes());
+  handle("reportsInfo", async (_e, query: ReportQuery) => {
+    const files = engine.snapshot().files;
+    await readyFacts(files);
+    let unreadable = 0;
+    const indexes = files.flatMap(file => {
+      try { return [{ account: basename(dirname(dirname(file))), index: saveFacts(file).reports }]; }
+      catch { unreadable++; return []; }
+    });
+    return { ...reportAt(indexes, query), unreadable };
+  });
   handle("charactersInfo", async () => {
     const files = engine.snapshot().files;
     await readyFacts(files);
