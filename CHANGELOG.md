@@ -466,6 +466,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: zone and instance pages open with the same title row as the other database pages (name, type line, quiet controls at its end), and the instance and spell-talent facts use the same label-and-value list.
 - Site: the web-font swap no longer moves the page. Geist and Geist Mono now fall back to Arial and Courier New resized per weight to Geist's widths (the Arial fallback was 4% too wide at regular), and a screen of height is reserved only while the database hub streams, so a 404 or an empty result keeps its footer in view.
 - MCP: clarify tool choice, name and id discovery, realm aliases, evidence limits and price methods, with three example journeys.
+- MCP: the `coverage` tool answers from the stored coverage report the snapshot cron writes for the build, the same
+  one the home page counts, so both show the same installs and facts and no answer replays the corpus. Only when
+  that report is missing or for another build does it compute the score live; the answer's date line says which.
 
 ## [desktop-v0.1.21] - 2026-11-10
 

@@ -1,5 +1,5 @@
 import { AwsClient } from "aws4fetch";
-import { COVERAGE_SCHEMA, COVERAGE_TYPES } from "../../../kb/src/coverage";
+import { COVERAGE_SCHEMA, COVERAGE_TYPES, type CoverageCell, type CoverageReport } from "../../../kb/src/coverage";
 import { CLIENT_LAYER } from "./items";
 import { r2Config, type R2Config } from "./upload-store";
 
@@ -43,12 +43,38 @@ export function summarizeCoverage(raw: unknown): CoverageSummary | null {
   return { installs: raw.installs, confirmed, waiting, dataAsOf, build: typeof raw.build === "string" ? raw.build : null };
 }
 
+const cellOf = (v: unknown): v is CoverageCell => isObject(v) && count(v.observed) && count(v.reported) && count(v.recheck) && count(v.confirmed) && count(v.settled)
+  && (v.expected === null || count(v.expected)) && (v.denominator === null || count(v.denominator));
+const cellsOf = (v: unknown) => isObject(v) && COVERAGE_TYPES.every((t) => cellOf(v[t]));
+const needOf = (v: unknown) => isObject(v) && COVERAGE_TYPES.includes(v.type as never) && typeof v.field === "string" && typeof v.label === "string"
+  && count(v.voters) && count(v.need) && (v.href === null || typeof v.href === "string");
+const areaOf = (v: unknown) => isObject(v) && count(v.installs) && count(v.needsTotal) && cellsOf(v.types)
+  && Array.isArray(v.fields) && v.fields.every((f) => cellOf(f) && isObject(f) && COVERAGE_TYPES.includes(f.type as never) && typeof f.field === "string")
+  && Array.isArray(v.needs) && v.needs.every(needOf);
+
+/**
+ * The whole stored score, for the readers that need more than the four home-page numbers (the MCP coverage tool).
+ * Null unless it is a score for `build` that has every field those readers print: a report for another build, or
+ * one this code cannot read, is unusable, never a partial answer.
+ */
+export function readStoredReport(raw: unknown, build: string): CoverageReport | null {
+  if (!isObject(raw) || raw.schema !== COVERAGE_SCHEMA || raw.build !== build || typeof raw.method !== "string" || !count(raw.installs)) return null;
+  if (raw.dataAsOf !== null && typeof raw.dataAsOf !== "string") return null;
+  if (raw.expected !== null && !(isObject(raw.expected) && (raw.expected.dataAsOf === null || typeof raw.expected.dataAsOf === "string"))) return null;
+  if (!cellsOf(raw.totals) || !areaOf(raw.unplaced) || !isObject(raw.locate) || !Array.isArray(raw.locate.quests) || !Array.isArray(raw.locate.npcs)) return null;
+  if (!Array.isArray(raw.zones) || raw.zones.length === 0 || !raw.zones.every((z) => areaOf(z) && Number.isInteger((z as { mapId?: unknown }).mapId) && typeof (z as { name?: unknown }).name === "string")) return null;
+  return raw as unknown as CoverageReport;
+}
+
 /** How long one server instance keeps the read: the cron rewrites the score at most every 10 minutes. */
 const KEEP_MS = 5 * 60_000;
 /** A failed read is asked for again after a minute. */
 const RETRY_MS = 60_000;
 
-let kept: { build: string; at: number; summary: CoverageSummary | null; etag?: string } | null = null;
+type Kept = { build: string; at: number; summary: CoverageSummary | null; report: CoverageReport | null; etag?: string };
+let kept: Kept | null = null;
+
+type Deps = { cloud?: R2Config | null; fetch?: typeof fetch; now?: () => number; build?: string };
 
 /**
  * The summary for the build the site reads, from the stored score: one small GET per instance every five minutes,
@@ -56,10 +82,23 @@ let kept: { build: string; at: number; summary: CoverageSummary | null; etag?: s
  * is missing or unreadable: the page then says "unrecorded". A failed re-read keeps the last good summary, which
  * carries its own date. Never throws.
  */
-export async function loadCoverageSummary(deps: { cloud?: R2Config | null; fetch?: typeof fetch; now?: () => number; build?: string } = {}): Promise<CoverageSummary | null> {
+export async function loadCoverageSummary(deps: Deps = {}): Promise<CoverageSummary | null> {
+  return (await readKept(deps))?.summary ?? null;
+}
+
+/**
+ * The whole stored score for the build, from the same read as the summary (one GET, one ETag, one five-minute keep),
+ * so a reader of it never replays the corpus and agrees with the home page to the number. Null when storage is not
+ * configured, the file is missing, unreadable or for another build. Never throws.
+ */
+export async function loadStoredCoverage(deps: Deps = {}): Promise<CoverageReport | null> {
+  return (await readKept(deps))?.report ?? null;
+}
+
+async function readKept(deps: Deps): Promise<Kept | null> {
   const now = (deps.now ?? Date.now)();
   const build = deps.build ?? CLIENT_LAYER.build.version;
-  if (kept && kept.build === build && now - kept.at < KEEP_MS) return kept.summary;
+  if (kept && kept.build === build && now - kept.at < KEEP_MS) return kept;
   const last = kept?.build === build ? kept : null;
   try {
     const cloud = deps.cloud === undefined ? r2Config() : deps.cloud;
@@ -74,14 +113,15 @@ export async function loadCoverageSummary(deps: { cloud?: R2Config | null; fetch
       let raw: unknown = null;
       try { raw = JSON.parse(await res.text()); } catch { /* unreadable: summarize says null */ }
       const summary = summarizeCoverage(raw);
-      kept = summary ? { build, at: now, summary, etag: res.headers.get("etag") ?? undefined } : { build, at: now - KEEP_MS + RETRY_MS, summary: null };
+      kept = summary ? { build, at: now, summary, report: readStoredReport(raw, build), etag: res.headers.get("etag") ?? undefined } : { build, at: now - KEEP_MS + RETRY_MS, summary: null, report: null };
     } else {
-      kept = { build, at: now - KEEP_MS + RETRY_MS, summary: res.status === 404 ? null : last?.summary ?? null, etag: last?.etag };
+      const keep = res.status !== 404;
+      kept = { build, at: now - KEEP_MS + RETRY_MS, summary: keep ? last?.summary ?? null : null, report: keep ? last?.report ?? null : null, etag: last?.etag };
     }
   } catch {
-    kept = { build, at: now - KEEP_MS + RETRY_MS, summary: last?.summary ?? null, etag: last?.etag };
+    kept = { build, at: now - KEEP_MS + RETRY_MS, summary: last?.summary ?? null, report: last?.report ?? null, etag: last?.etag };
   }
-  return kept.summary;
+  return kept;
 }
 
 /** For tests: forget the kept read. */
