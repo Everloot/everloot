@@ -5,7 +5,7 @@ import { afterEach, expect, test, vi } from "vitest";
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
 // The game files' spell names and whether upload storage answered; no names file and storage down unless a test sets them.
-const files = vi.hoisted(() => ({ spells: null as { version: string; names: Map<number, string> } | null, unreachable: true }));
+const files = vi.hoisted(() => ({ spells: null as { version: string; names: Map<number, string> } | null, unreachable: true, wiki: null as import("@/lib/wiki-entity-names").WikiEntityNames | null }));
 vi.mock("@/lib/game-assets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/game-assets")>()),
   loadSpellNames: async () => files.spells,
@@ -15,11 +15,12 @@ vi.mock("@/lib/edges", async (importOriginal) => {
   return { ...real, loadEdges: async () => ({ observed: [], client: real.CLIENT_EDGES, unreachable: files.unreachable, dataAsOf: null }) };
 });
 
+vi.mock("@/lib/wiki-entity-names", async (original) => ({ ...await original<typeof import("@/lib/wiki-entity-names")>(), loadWikiEntityNames: async () => files.wiki }));
 import SpellPage, { generateMetadata } from "./page";
 import { CLIENT_EDGES } from "@/lib/edges";
 import { DESCRIPTION_MAX, DESCRIPTION_MIN } from "@/lib/seo";
 
-afterEach(() => { files.spells = null; files.unreachable = true; });
+afterEach(() => { files.spells = null; files.unreachable = true; files.wiki = null; });
 
 const props = (id: string) => ({ params: Promise.resolve({ id }) });
 const render = async (id: string) => renderToStaticMarkup(await SpellPage(props(id)));
@@ -150,4 +151,14 @@ test("a spell only the talent trees hold shows where it sits, says index, and li
   // Without a name it stays noindex, as every other spell does.
   known([]);
   expect((await generateMetadata(props("12042"))).robots).toMatchObject({ index: false });
+});
+
+test("an unnamed spell uses the labelled wiki name, while a current file name wins", async () => {
+  files.wiki = { version: "x", names: new Map([[taught, { name: "Wiki spell", wikiPage: "https://warcraft.wiki.gg/wiki/Wiki_spell" }]]) };
+  const page = await render(String(taught));
+  expect(page).toContain('title="Name from the Warcraft Wiki"');
+  expect(page).toContain('"name":"Wiki spell"');
+  expect((await generateMetadata(props(String(taught)))).title).toContain("Wiki spell");
+  known([[taught, "Current spell"]]);
+  expect(await render(String(taught))).not.toContain('title="Name from the Warcraft Wiki"');
 });

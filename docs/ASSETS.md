@@ -310,7 +310,7 @@ repeat these steps for a new build or another deployment.
    npm run kb -- game-names data/client/<product>-<build>-<config>.sqlite --wiki data/release/<release>.sqlite
    ```
 
-   It prints the counts and writes `quest-names.json`, `item-set-names.json` and `spell-names.json` beside
+   It prints the counts and writes `wiki-npc-names.json` and `wiki-spell-names.json` (wiki infobox ids, conflicting names omitted), plus `quest-names.json`, `item-set-names.json` and `spell-names.json` beside
    `item-names.json`. Upload each one with the same script, dry run first. Without them, the pages read
    "Quest N", "item set N" and "spell N".
 

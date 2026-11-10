@@ -42,8 +42,8 @@ export interface ShownFileNames<S extends string> {
 
 type WikiTitles = ReadonlyMap<number, { name: string; page: string }[]>;
 
-/** The wiki's quest titles by quest id, from the quest infoboxes in a knowledge base file, with the dump's date. */
-export function wikiQuestTitles(kbPath: string): { dump: string; wiki: ShownNames["wiki"]; titles: Map<number, { name: string; page: string }[]> } {
+/** Wiki names matched by infobox id, with the source and dump date. Quest titles remain the default. */
+export function wikiQuestTitles(kbPath: string, kind: "quest" | "npc" | "spell" = "quest"): { dump: string; wiki: ShownNames["wiki"]; titles: Map<number, { name: string; page: string }[]> } {
   const db = new Database(kbPath, { readonly: true, fileMustExist: true });
   try {
     const source = db.prepare("SELECT name, licence, homepage FROM sources WHERE id = ?").get(WIKI_SOURCE_ID) as { name: string; licence: string; homepage: string } | undefined;
@@ -52,7 +52,7 @@ export function wikiQuestTitles(kbPath: string): { dump: string; wiki: ShownName
     const dates = db.prepare("SELECT DISTINCT retrieved_at AS d FROM entities WHERE source_id = ?").all(WIKI_SOURCE_ID) as { d: string }[];
     if (dates.length !== 1) throw new Error(`expected one dump date for ${WIKI_SOURCE_ID}, found ${dates.length}`);
     const titles = new Map<number, { name: string; page: string }[]>();
-    const rows = db.prepare("SELECT name, data, source_url AS url FROM entities WHERE source_id = ? AND kind = 'lore_page' AND data LIKE '%questbox%'").iterate(WIKI_SOURCE_ID) as Iterable<{ name: string; data: string; url: string }>;
+    const rows = db.prepare("SELECT name, data, source_url AS url FROM entities WHERE source_id = ? AND kind = 'lore_page'").iterate(WIKI_SOURCE_ID) as Iterable<{ name: string; data: string; url: string }>;
     for (const r of rows) {
       let data: { type?: string; infobox?: { template?: string; fields?: Record<string, string> } };
       try {
@@ -62,7 +62,8 @@ export function wikiQuestTitles(kbPath: string): { dump: string; wiki: ShownName
       }
       const fields = data.infobox?.fields;
       const name = (fields?.name ?? r.name).trim();
-      if (data.type !== "quest" || data.infobox?.template !== "questbox" || !name || !isWikiPage(r.url)) continue;
+      if ((kind === "quest" && data.infobox?.template !== "questbox") || (kind === "npc" && data.infobox?.template !== "npcbox")) continue;
+      if (data.type !== kind || !fields || !name || !isWikiPage(r.url)) continue;
       for (const id of infoboxItemIds(fields?.id)) titles.set(id, [...(titles.get(id) ?? []), { name, page: r.url }]);
     }
     return { dump: dates[0]!.d, wiki: { name: source.name, url: source.homepage, licence: source.licence }, titles };
@@ -119,7 +120,7 @@ export function shownFileNames<S extends string>(
 
 /**
  * One run: reads the snapshot's quest ids, item sets and spell names and the knowledge base's quest infoboxes,
- * and writes quest-names.json, item-set-names.json and spell-names.json for the snapshot's build into the same
+ * and writes quest, set, spell and wiki NPC/spell name catalogs for the snapshot's build into the same
  * folder as item-names.json. Returns the counts for the report.
  */
 export function runGameNames(opts: { snapshotPath: string; kbPath: string; outDir: string }) {
@@ -133,6 +134,16 @@ export function runGameNames(opts: { snapshotPath: string; kbPath: string; outDi
   const quests = shownQuestNames(meta.version, questIds, wiki.titles, wiki.wiki);
   const setNames = shownFileNames(SET_NAMES_SCHEMA, meta.version, sets, sets.keys(), mayShowSetName);
   const spellNames = shownFileNames(SPELL_NAMES_SCHEMA, meta.version, spells, spells.keys(), mayShowSpellName);
+  const wikiEntities = (["npc", "spell"] as const).map((kind) => {
+    const source = wikiQuestTitles(opts.kbPath, kind);
+    const names: Record<string, { n: string; w: string }> = {};
+    for (const [id, pages] of source.titles) {
+      if (new Set(pages.map((p) => normName(p.name))).size !== 1) continue;
+      const page = pages[0]!;
+      names[id] = { n: page.name, w: page.page.slice(WIKI_PAGE_PREFIX.length) };
+    }
+    return { kind, file: { schema: `everloot.wiki-${kind}-names/1`, build: { version: meta.version }, wiki: source.wiki, count: Object.keys(names).length, names } };
+  });
   const dir = shownNamesDir(opts.outDir, meta);
   mkdirSync(dir, { recursive: true });
   const write = (file: string, body: unknown) => {
@@ -141,6 +152,7 @@ export function runGameNames(opts: { snapshotPath: string; kbPath: string; outDi
     return path;
   };
   return {
+    wikiEntities: wikiEntities.map(({ kind, file }) => ({ kind, path: write(`wiki-${kind}-names.json`, file) })),
     build: meta.version, wikiDump: wiki.dump, wikiQuestIds: wiki.titles.size,
     quests: { ...quests, path: write("quest-names.json", quests.file) },
     sets: { ...setNames, path: write("item-set-names.json", setNames.file) },

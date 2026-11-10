@@ -1,3 +1,4 @@
+import { loadWikiEntityNames } from "./wiki-entity-names";
 import type { TooltipType } from "@everloot/protocol";
 import { npcPage, vendorPage } from "../../../kb/src/world-pages";
 import { loadStoredAggregates } from "./aggregate-store";
@@ -63,6 +64,11 @@ export async function loadSiteCard(type: SiteCardType, id: number): Promise<Site
   // Storage down: the players' facts are unread, so no wiki title stands in for them.
   if (result.status === 503) return result;
   // A quest players agree on no title for: the quest page shows the Warcraft Wiki's, for a quest the game files list.
+  if (type === "npc" && (result.status !== 200 || result.body.title === `NPC ${id}`)) {
+    const wiki = await loadWikiEntityNames("npc");
+    const name = wiki?.names.get(id)?.name;
+    if (name) return plain(type, id, name, result.status === 200 ? result.body.lines.filter((l) => !l.startsWith("No agreed name")) : [], NAME_FROM.wiki);
+  }
   const agreedTitle = result.status === 200 && !result.body.lines.includes(NO_QUEST_TITLE);
   if (type === "quest" && !agreedTitle) {
     const names = await readQuestNames(CLIENT_LAYER.build.version);
@@ -80,7 +86,8 @@ async function spellCard(id: number): Promise<SiteCardResult> {
   // A configured catalog that cannot be read must not turn into a cached, incomplete card.
   if (names === PRIVATE_UNREACHABLE || names === PRIVATE_MALFORMED || !assets || !set) return UNAVAILABLE;
   const tip = assets?.spellTips.get(id);
-  const name = names?.names.get(id);
+  const wiki = await loadWikiEntityNames("spell");
+  const name = names?.names.get(id) || tip?.name || wiki?.names.get(id)?.name;
   const related = [...set.edges, ...CLIENT_EDGES].some((edge) =>
     (edge.fromKind === "spell" && edge.fromId === id) || (edge.toKind === "spell" && edge.toId === id));
   if (names !== null && name === undefined && !tip && !related && !talents.get(id)?.length) return { status: 404, error: NOT_FOUND };
@@ -90,7 +97,7 @@ async function spellCard(id: number): Promise<SiteCardResult> {
     body: {
       type: "spell", id, title, quality: null, color: null, icon: assets?.spellIcons.get(id) ?? null,
       lines: [tip?.text || "No text for this spell in the client files."],
-      foot: tipLabel(assets!),
+      foot: join([!names?.names.get(id) && !tip?.name && wiki?.names.has(id) ? NAME_FROM.wiki : null, tipLabel(assets!)]),
     },
   };
 }

@@ -1,3 +1,5 @@
+import { loadWikiEntityNames, shownEntityName } from "@/lib/wiki-entity-names";
+import { NAME_FROM } from "@/lib/items";
 import type { Metadata } from "next";
 import JsonLd from "@/components/JsonLd";
 import { entityPageJsonLd } from "@/lib/jsonld";
@@ -36,12 +38,13 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
   if (!/^[1-9]\d*$/.test(params.id)) return { robots: { index: false, follow: true } };
   const npcId = Number(params.id);
   const [facts, rollup] = await Promise.all([loadWorldFacts(), computeRollups()]);
-  if (unknownNpc(npcId, facts, rollup)) notFound();
+  const wiki = await loadWikiEntityNames("npc");
+  if (unknownNpc(npcId, facts, rollup) && !wiki?.names.has(npcId)) notFound();
   const page = npcPage(npcId, facts);
-  const name = !facts.unreachable && page.name ? page.name : `NPC ${npcId}`;
+  const name = shownEntityName(npcId, facts.unreachable ? null : page.name, wiki).name ?? `NPC ${npcId}`;
   return {
     ...pageMetadata({ title: entityTitle(name, "NPC"), description: npcDescription({ name, id: npcId, positions: facts.unreachable ? 0 : page.pins.length }), path: `/database/npcs/${npcId}`, image: `/database/npcs/${npcId}/opengraph-image` }),
-    robots: { index: npcIndexable(page, facts.unreachable), follow: true },
+    robots: { index: npcIndexable({ ...page, name: shownEntityName(npcId, page.name, wiki).name ?? null }, facts.unreachable), follow: true },
   };
 }
 
@@ -83,7 +86,8 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
   const npcId = Number(params.id);
   const facts = await loadWorldFacts();
   const rollup = await computeRollups();
-  if (unknownNpc(npcId, facts, rollup)) notFound();
+  const wiki = await loadWikiEntityNames("npc");
+  if (unknownNpc(npcId, facts, rollup) && !wiki?.names.has(npcId)) notFound();
   const unreachable = facts.unreachable || rollup.stats.unreachable;
   const page = npcPage(npcId, facts);
   const goods = vendorPage(npcId, facts).offers;
@@ -92,7 +96,8 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
   // The same traits as the NPC list, each shown when 3 installs agree.
   const traits = npcTraits(facts.npcs.filter((r) => r.npcId === npcId), facts.recheck);
   const pending = !unreachable && page.pendingLoot ? <p className="py-2 text-meta text-fg-2">{pendingLine(page.pendingLoot)}</p> : null;
-  const title = unreachable ? `NPC ${page.npcId}` : page.name ?? `NPC ${page.npcId}`;
+  const shown = shownEntityName(npcId, unreachable ? null : page.name, wiki);
+  const title = shown.name ?? `NPC ${page.npcId}`;
   const zero = rollup.measuredZeros.find((row) => row.public && row.sourceNpcId === npcId);
   const dropped = rollup.rates.filter((row) => row.public && row.sourceNpcId === npcId);
   const firstPin = unreachable ? undefined : page.pins[0];
@@ -121,14 +126,15 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
       null,
       now,
     ),
-    named,
+    named: Boolean(page.name),
   });
+  if (shown.fromWiki) summary[2] = NAME_FROM.wiki + ".";
 
   return (
     <Container width="data">
       <EntityLayout>
         <JsonLd data={entityPageJsonLd({ name: title, path: `/database/npcs/${npcId}`, identifier: `npc:${npcId}` })} />
-        <EntityHeader trail={trail} title={title} meta={["NPC", zone?.name, named ? <span key="id" className="tabular-nums">ID {npcId}</span> : null]} />
+        <EntityHeader trail={trail} title={shown.fromWiki ? <span title={NAME_FROM.wiki}>{title}<span className="sr-only">. {NAME_FROM.wiki}</span></span> : title} meta={["NPC", zone?.name, named ? <span key="id" className="tabular-nums">ID {npcId}</span> : null]} />
         <EntityTop railMap
           // No box without an agreed position: the Map tab says why, and a frame with only the name would repeat the title.
           box={firstPin && (zone ? <MapThumb pin={firstPin} zone={zone.name} art={art?.smallUrl ?? art?.url ?? null} /> : (

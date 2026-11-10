@@ -1,3 +1,5 @@
+import { loadWikiEntityNames, shownEntityName } from "@/lib/wiki-entity-names";
+import { NAME_FROM } from "@/lib/items";
 import type { Metadata } from "next";
 import JsonLd from "@/components/JsonLd";
 import { entityPageJsonLd } from "@/lib/jsonld";
@@ -98,11 +100,13 @@ async function loadSpell(spellId: number) {
   // Both directions: the files store what a spell creates and what it costs on the item (item -> created_by
   // or reagent_for -> spell), and what teaches it on the spell (spell -> in_skill_line -> skill).
   const all = [...edgesFrom(both, "spell", spellId), ...edgesTo(both, "spell", spellId)];
-  const name = spellNames?.names.get(spellId);
+  const wiki = await loadWikiEntityNames("spell");
+  const shownName = shownEntityName(spellId, spellNames?.names.get(spellId) || assets?.spellTips.get(spellId)?.name, wiki);
+  const name = shownName.name;
   const tip = assets?.spellTips.get(spellId);
   const talents = talentIndex.get(spellId) ?? [];
   const unknown = spellNames !== null && !edges.unreachable && name === undefined && !tip && !all.length && !talents.length;
-  return { edges, assets, all, name, tip, talents, unknown };
+  return { edges, assets, all, name, tip, talents, unknown, fromWiki: shownName.fromWiki };
 }
 
 /**
@@ -141,7 +145,7 @@ export default async function SpellPage(props: Props) {
   const params = await props.params;
   if (!/^[1-9]\d*$/.test(params.id)) notFound();
   const spellId = Number(params.id);
-  const { edges, all, name, tip, talents, unknown } = await loadSpell(spellId);
+  const { edges, all, name, tip, talents, unknown, fromWiki } = await loadSpell(spellId);
   if (unknown) notFound();
   const rel = (r: Rel) => all.filter((e) => e.rel === r);
   const title = name ?? tip?.name ?? `Spell ${spellId}`;
@@ -156,8 +160,9 @@ export default async function SpellPage(props: Props) {
     observed: creates.length
       ? `The files say it creates ${creates.length} ${creates.length === 1 ? "item" : "items"}${costs.length ? ` and costs ${costs.length} ${costs.length === 1 ? "reagent" : "reagents"}` : ""}.`
       : "The files say nothing about what it creates.",
-    named: Boolean(name),
+    named: Boolean(name) && !fromWiki,
   });
+  if (fromWiki) summary[2] = NAME_FROM.wiki + ".";
 
   // Every relation here is the game files' own, so an empty one is not something a player report could fill: the tab
   // is left out rather than shown with the agreement meter and "Get the addon". When the files relate nothing to the
@@ -187,7 +192,7 @@ export default async function SpellPage(props: Props) {
     <Container width="data">
       <EntityLayout>
         <JsonLd data={entityPageJsonLd({ name: title, path: `/database/spells/${spellId}`, identifier: `spell:${spellId}` })} />
-        <EntityHeader trail={trail} title={title} meta={["Spell", <span key="id" className="tabular-nums">ID {spellId}</span>]} />
+        <EntityHeader trail={trail} title={fromWiki ? <span title={NAME_FROM.wiki}>{title}<span className="sr-only">. {NAME_FROM.wiki}</span></span> : title} meta={["Spell", <span key="id" className="tabular-nums">ID {spellId}</span>]} />
         <EntityTop
           box={
             <TooltipFrame name={tip?.name ?? title} label={`${tip?.name ?? title}, from the game files`}>

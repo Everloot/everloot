@@ -26,6 +26,7 @@ export default function TooltipLines({ lines }: { lines: readonly string[] }) {
   return (
     <>
       {gameOrder(lines).map((line, i) => {
+        if (line === "Help confirm these values: install the addon at /addon.") return <p key={i}>Help confirm these values: <a className="underline" href="/addon">install the addon</a>.</p>;
         const t = tipLine(line);
         if (t.kind === "pair") {
           return (
