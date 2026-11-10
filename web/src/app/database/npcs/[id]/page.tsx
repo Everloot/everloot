@@ -6,7 +6,7 @@ import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasCard } from "@/lib/tooltip";
-import { npcNameReporters, npcPage, npcTraits, type NpcPin, type NpcRank } from "../../../../../../kb/src/world-pages";
+import { npcNameReporters, npcPage, npcTraits, vendorPage, type NpcPin, type NpcRank } from "../../../../../../kb/src/world-pages";
 import { pendingLine } from "../../../../../../kb/src/pending-loot";
 import { npcLootTable } from "../../../../../../kb/src/loot-tables";
 import { computeRollups, loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
@@ -16,6 +16,8 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, type Column } from "@/components/ui";
 import { EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, MapName, ShowOnMap, Unreachable } from "../../entity";
 import { NpcLootPanel } from "../../loot-tables";
+import { VendorGoods } from "../../vendors/goods";
+import { npcRelations } from "../relations";
 import { unknownNpc } from "../../unknown";
 import { entitySummary, observedLine } from "@/lib/evidence";
 import { loadItemFacts } from "@/lib/rollup-compute";
@@ -84,7 +86,9 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
   if (unknownNpc(npcId, facts, rollup)) notFound();
   const unreachable = facts.unreachable || rollup.stats.unreachable;
   const page = npcPage(npcId, facts);
-  // Level and rank, each shown when 3 installs report the same one.
+  const goods = vendorPage(npcId, facts).offers;
+  const { quests, goodsEvidence } = npcRelations(npcId, facts);
+  // The same traits as the NPC list, each shown when 3 installs agree.
   const traits = npcTraits(facts.npcs.filter((r) => r.npcId === npcId), facts.recheck);
   const pending = !unreachable && page.pendingLoot ? <p className="py-2 text-meta text-fg-2">{pendingLine(page.pendingLoot)}</p> : null;
   const title = unreachable ? `NPC ${page.npcId}` : page.name ?? `NPC ${page.npcId}`;
@@ -92,11 +96,11 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
   const dropped = rollup.rates.filter((row) => row.public && row.sourceNpcId === npcId);
   const firstPin = unreachable ? undefined : page.pins[0];
   const zone = firstPin ? zoneByMapId(firstPin.mapId) : undefined;
-  // Item names (and icons, when the game files have them) for the drop list; an item nobody named stays "Item N".
-  const itemFacts = unreachable || dropped.length === 0 ? null : await loadItemFacts();
+  // Item names (and icons, when the game files have them) for the drop and goods lists; an item nobody named stays "Item N".
+  const itemFacts = unreachable || (dropped.length === 0 && goods.length === 0) ? null : await loadItemFacts();
   const names = itemFacts && !itemFacts.unreachable ? itemNames(itemFacts) : new Map<number, string>();
-  const assets = dropped.length > 0 || zone ? await loadSiteAssets() : null;
-  const tips = await loadItemTips(assets, dropped.map((row) => row.itemId));
+  const assets = dropped.length > 0 || goods.length > 0 || zone ? await loadSiteAssets() : null;
+  const tips = await loadItemTips(assets, [...dropped.map((row) => row.itemId), ...goods.map((o) => o.itemId)]);
   const art = zone ? assets?.maps.find((m) => m.kind === "zone" && m.uiMapId === zone.mapId && !m.heldBack) : undefined;
   const lore = !unreachable && page.name ? await loreForEntity("npc", page.name) : null;
   // The loot table with each number's windows, installs and dates; its public rows are the rates above.
@@ -138,6 +142,8 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
               items={[
                 { label: "Reported name", value: known(page.name, npcNameReporters(npcId, facts)) },
                 { label: "Level", value: known(traits.level), numeric: true },
+                { label: "Type", value: known(traits.creatureType) },
+                { label: "Reaction", value: known(traits.reaction && ({ friendly: "Friendly", neutral: "Neutral", hostile: "Hostile" })[traits.reaction]) },
                 { label: "Rank", value: known(traits.rank && RANK_LABELS[traits.rank]) },
                 { label: "Zone", value: zone ? <Link href={zoneHref(zone.mapId, zone.name)} className={LINK}>{zone.name}</Link> : known(null) },
                 { label: "Map positions", value: known(page.pins.length || null), numeric: true },
@@ -167,6 +173,31 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
                   />
                   {pending}
                 </>,
+            },
+            {
+              id: "goods", label: "Goods", count: unreachable ? undefined : goods.length,
+              panel: unreachable ? <Unreachable />
+                : goods.length ? <>
+                  <p className="py-2 text-meta text-fg-2">Sells: <Link href={`/database/vendors/${npcId}`} className={LINK}>Vendor goods</Link></p>
+                  <VendorGoods title={title} offers={goods} tips={tips} items={names} evidence={goodsEvidence} />
+                </>
+                : <EmptyTab message="No agreed goods yet. A price needs 3 installs." />,
+            },
+            {
+              id: "quests", label: "Quests", count: unreachable ? undefined : quests.length,
+              panel: unreachable ? <Unreachable />
+                : quests.length ? <DataTable
+                  dense
+                  caption={`Quests ${title} gives and takes`}
+                  columns={[
+                    { key: "role", header: "Role", cell: (q) => q.role },
+                    { key: "quest", header: "Quest", cell: (q) => <EntityLink kind="quest" id={q.questId} name={q.title} /> },
+                    { key: "reported", header: "Reported", cell: (q) => q.reported },
+                  ]}
+                  rows={quests}
+                  rowKey={(q) => `${q.questId}-${q.role}`}
+                />
+                : <EmptyTab message="No agreed quest yet. A quest needs its giver or turn-in from 3 installs." />,
             },
             {
               id: "map", label: "Map", count: unreachable ? undefined : page.pins.length,

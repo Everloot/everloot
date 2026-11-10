@@ -5,16 +5,15 @@ import AdSlot from "@/components/AdSlot";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { npcPage, stockLabel, vendorPage, type VendorOffer } from "../../../../../../kb/src/world-pages";
+import { npcPage, vendorPage } from "../../../../../../kb/src/world-pages";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { pinLink } from "@/lib/world-map";
 import { trailFor } from "@/lib/breadcrumbs";
 import { loadItemFacts } from "@/lib/rollup-compute";
 import { itemNames, npcNames } from "@/lib/names";
 import { entitySummary, observedLine } from "@/lib/evidence";
-import EntityLink from "@/components/EntityLink";
+import { VendorGoods } from "../goods";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
-import ItemTip from "@/components/game/ItemTip";
 import { Container, DataTable, Facts, InShort, Tabs, TooltipFrame } from "@/components/ui";
 import { EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, MapName, ShowOnMap, Unreachable, zoneName } from "../../entity";
 import { vendorIndexable } from "@/lib/indexable";
@@ -37,17 +36,6 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
     ...pageMetadata({ title: entityTitle(name, "vendor"), description: vendorDescription({ name, id: page.vendorNpcId, offers: facts.unreachable ? 0 : page.offers.length }), path: `/database/vendors/${params.id}` }),
     robots: { index: vendorIndexable(page, facts.unreachable), follow: true },
   };
-}
-
-function formatCopper(copper: number): string {
-  const gold = Math.floor(copper / 10000);
-  const silver = Math.floor((copper % 10000) / 100);
-  const coins = copper % 100;
-  const parts: string[] = [];
-  if (gold > 0) parts.push(`${gold}g`);
-  if (silver > 0 || gold > 0) parts.push(`${silver}s`);
-  parts.push(`${coins}c`);
-  return parts.join(" ");
 }
 
 interface Place { href: string; mapId: number; x: number; y: number }
@@ -111,18 +99,7 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
               id: "goods", label: "Goods", count: facts.unreachable ? undefined : page.offers.length,
               panel: facts.unreachable ? <Unreachable />
                 : page.offers.length ? (
-                  <DataTable
-                    dense
-                    caption={`What ${title} sells`}
-                    columns={[
-                      { key: "item", header: "Item", cell: (o: VendorOffer) => <ItemTip tip={tips.get(o.itemId)}><EntityLink kind="item" id={o.itemId} name={items.get(o.itemId) ?? tips.get(o.itemId)?.name} /></ItemTip> },
-                      { key: "price", header: "Price", numeric: true, cell: (o: VendorOffer) => formatCopper(o.priceCopper) },
-                      { key: "stock", header: "Stock", numeric: true, cell: (o: VendorOffer) => stockLabel(o) },
-                      { key: "installs", header: "Installs", numeric: true, cell: (o: VendorOffer) => o.reporters },
-                    ]}
-                    rows={page.offers}
-                    rowKey={(o) => `${o.itemId}-${o.priceCopper}`}
-                  />
+                  <VendorGoods title={title} offers={page.offers} tips={tips} items={items} />
                 )
                 : <EmptyTab message="No agreed goods yet." />,
             },
