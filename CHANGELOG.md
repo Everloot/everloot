@@ -53,6 +53,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: a profession page answers to its skill line id, `/tools/professions/171` or `/tools/professions/171-alchemy`, and
   redirects for good to the slug page it already had, keeping the skill range and class context in the query; an unknown id
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
+- Site: NPC pages show agreed goods and quests with their reports, link to the vendor, and show level, type and reaction even before players agree on a name.
 - Addon: the Gold Overview shows earned, spent and profit for the selected period and character or account, with daily averages, top items and pending sales.
 - Site: vendor, achievement, quest chain, zone and instance pages carry In short and Copy for AI like the other database
   pages, each line saying how many installs agree and when, or that nobody has reported it yet; a vendor links its NPC's
@@ -203,6 +204,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   rates leave skinning out, and how to build an offline pack.
 - Site: download shortcuts (`/download`, `/downloads`, `/desktop`, `/curseforge`), CurseForge install choices and a
   Desktop App button for your operating system make downloads easier to find, including on phones.
+- Site: Zone pages have an Items tab with the items players looted from the NPCs and objects confirmed there, each with its source, observed frequency and installs (an item two sources drop is one row with its sources under it, 50 items a page), and an empty zone says a rate needs loot windows from 3 installs. The header links the zone's coverage page and its wiki page when one is published, and a line under the tabs links the farming and gathering pages that list the zone. When the loot tables cannot be read the tab says so instead of vanishing.
 - Site: dungeon and raid pages list the quests players filed under the instance in their quest log (matched by the quest-log header 3 installs agree on), with installs and last seen, and every boss under Loot says when no creature is tied to it yet. Instance 2999 shows as Ruins of Lordaeron, a name taken from the game files and marked as such.
 
 ### Fixed
@@ -323,11 +325,20 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and the other from the clock, so they disagreed. Both pages say when the GitHub facts are older than 26 hours.
 
 ### Changed
+- Site: hover cards on item, NPC, quest and object links open faster. The card's frame shows at once with the name
+  and quality colour the link already has, then fills in; a card you hovered before opens whole with no wait; and the
+  site keeps each card ready for every visitor instead of working it out again on each hover. A card that could not be
+  read whole while storage is down is never kept, and hovering the link again a few seconds later asks for it again.
 - Docs: the launch-day page is marked historical, and day-to-day operation of the site is in docs/OPERATIONS.md.
 - Site: pages no longer jump when the footer arrives while a page is still loading, the Auction House table scrolls inside its own frame on a tablet instead of pushing the page sideways, the header's keyboard focus rings are no longer cut off at the top of the window, quick facts are one column on a phone, item, NPC, quest and spell pages keep an even gap above their auction and relation sections, the unavailable page arrows are readable, and the Auction House line under the title has spaces around its dot.
 - Protocol: `itemsResponse.items` is typed with the row `GET /api/items` returns (item id, then class, subclass, slot
   and quality, each null when the build does not name it), so a client generated from `schema/api/itemsResponse.json`
   gets fields instead of `any`. Protocol package 2.0.0 (the row's fields are now required); the answers do not change.
+- Site: item icons have quality-coloured borders, and an item without its own icon shows the game's question mark from the
+  same asset files (no icon without them); an item page's name uses the quality colour token of the theme, and a shared
+  item card colours the name only when one is shown;
+  empty tabs say when 3 installs must agree; the tooltip embed's icon border takes the quality colour, and the tooltip docs
+  list the class and quality colours for both themes; the SVG and Apple touch icons are linked.
 - Docs: the docs index lists the backlog, the open-data export, the live-client probes, and the dated notes and folders it had left out.
 - Site: item tooltips read like the game's: the item level first and in yellow, slot and armour or weapon type in two
   columns, damage left and speed right, Equip, Use and Chance on hit lines in green, a named set and the flavour text in

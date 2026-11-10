@@ -1,8 +1,9 @@
+import { CLASSES, QUALITIES, tokens } from "@/design/tokens";
 import type { Metadata } from "next";
 import Script from "next/script";
 import Link from "next/link";
 import { SITE } from "@everloot/protocol";
-import { Callout, C, H2, List, P, docLink } from "@/components/docs/blocks";
+import { Callout, C, H2, List, P, Table, docLink } from "@/components/docs/blocks";
 import { CodeGroup } from "@/components/docs/DocsClient";
 import DocPage from "@/components/docs/DocPage";
 import { CONNECT_EXAMPLES as ex } from "@/lib/docs/connect-data";
@@ -64,6 +65,11 @@ export default function Page() {
       <Callout kind="note">
         <p>Game icons and tooltip text are Blizzard&apos;s. The card credits them: &quot;Icons, tooltip text and interface art are &copy; Blizzard Entertainment, Inc. Everloot is a fan project and is not affiliated with or endorsed by Blizzard.&quot; They stay outside Everloot&apos;s licence, and they are not in the bulk downloads, the rest of the API or the MCP server.</p>
       </Callout>
+
+      <H2 id="colours-and-icons">Colours and icons</H2>
+      <P>The tooltip frame stays dark in both themes; item names and their 1px icon borders use quality colours, while character names use class colours.</P>
+      <Table head={["Class", "Light", "Dark"]} rows={CLASSES.map((name) => [name[0].toUpperCase() + name.slice(1), tokens.light[`class-${name}`], tokens.dark[`class-${name}`]])} />
+      <Table head={["Quality", "Light", "Dark"]} rows={QUALITIES.map((name) => [name[0].toUpperCase() + name.slice(1), tokens.light[`q-${name}`], tokens.dark[`q-${name}`]])} />
 
       <H2 id="the-endpoint">The endpoint behind it</H2>
       <P>

@@ -94,6 +94,15 @@ export function publishedPage(wiki: Wiki, slug: string): WikiPage | null {
 
 export const wikiHref = (slug: string) => `/wiki/${slug}`;
 
+/** The published zone page that binds this zone, for the zone's database page; a draft or an unreadable wiki gives none, never a failed page. */
+export function zoneWikiPage(mapId: number, wiki: () => Wiki = loadWiki): WikiPage | null {
+  try {
+    return publishedPages(wiki()).find((p) => p.type === "zone" && p.binds.zone === mapId) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Whether a page binds anything. A dungeon, raid or race written from a Blizzard post before the game files
  * have it may bind nothing yet; it then has no infobox or data blocks to show.

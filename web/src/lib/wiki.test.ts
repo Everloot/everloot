@@ -3,7 +3,7 @@ import { join } from "node:path";
 import picomatch from "next/dist/compiled/picomatch";
 import { expect, test } from "vitest";
 import nextConfig from "../../next.config.js";
-import { loadWiki, wikiDir, wikiTitle } from "./wiki";
+import { loadWiki, wikiDir, wikiTitle, zoneWikiPage, type Wiki, type WikiPage } from "./wiki";
 
 test("titles end with the type word and stay under 60 characters", () => {
   expect(wikiTitle({ title: "Deadmines", type: "dungeon" })).toBe("Deadmines · WoW Forever dungeon");
@@ -26,4 +26,18 @@ test("the site reads every committed page from kb/wiki, which the /wiki function
   const keyFor = (route: string) => Object.keys(includes).find((key) => picomatch(key, { dot: true, contains: true })(route));
   for (const route of ["/wiki/page", "/wiki/[slug]/page"]) expect(includes[keyFor(route)!]).toEqual(["../kb/wiki/*.md", "../kb/wiki/categories.yaml"]);
   expect(existsSync(join(process.cwd(), "..", "kb", "wiki", "categories.yaml"))).toBe(true);
+});
+
+test("a zone's wiki page is the published zone page that binds it; a draft, another type or another zone gives none", () => {
+  const page = (slug: string, over: Partial<WikiPage>): WikiPage => ({
+    slug, title: slug, type: "zone", binds: { zone: 1436 }, summary: "", categories: [], origin: "original", adaptedFrom: [], status: "published", reviewed: null, blocks: [], ...over,
+  });
+  const wiki = (...pages: WikiPage[]): Wiki => ({ pages: new Map(pages.map((p) => [p.slug, p])), categories: new Map() });
+  expect(zoneWikiPage(1436, () => wiki(page("westfall", {})))?.slug).toBe("westfall");
+  expect(zoneWikiPage(1436, () => wiki(page("westfall", { status: "draft" })))).toBeNull();
+  expect(zoneWikiPage(1411, () => wiki(page("westfall", {})))).toBeNull();
+  expect(zoneWikiPage(1436, () => wiki(page("deadmines", { type: "dungeon", binds: { zone: 1436 } })))).toBeNull();
+  expect(zoneWikiPage(1436, () => { throw new Error("no wiki"); })).toBeNull();
+  // The committed Westfall page is still a draft, so it gets no link until it is published.
+  expect(zoneWikiPage(1436)).toBeNull();
 });

@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { agreementLabel } from "@/components/ui/AgreementMeter";
 import { tokens, type CLASSES } from "@/design/tokens";
+import type { Quality } from "@/components/ui/quality";
 import type { Showcase } from "@/lib/character-showcase";
 // The cards are drawn on each request on the Worker, which has no node_modules to read, so the bundler inlines
 // the fonts' bytes (`?inline`, next.config.js). The package's exports hide its font files, hence the path.
@@ -76,7 +77,7 @@ export function fittedTitle(title: string): { fontSize: number; lines: number } 
  * line under it. Nothing from the game, so no Blizzard art can end up in a shared link. `fit` bounds the title
  * (fittedTitle); without it the title is drawn at full size as it is.
  */
-export async function renderCard(card: { label: string; title: string; subtitle: string; fit?: boolean }): Promise<ImageResponse> {
+export async function renderCard(card: { label: string; title: string; subtitle: string; color?: string; fit?: boolean }): Promise<ImageResponse> {
   const c = tokens.dark;
   const fit = card.fit ? fittedTitle(card.title) : null;
   return new ImageResponse(
@@ -88,7 +89,7 @@ export async function renderCard(card: { label: string; title: string; subtitle:
           </svg>
           <div style={{ fontSize: 40, fontWeight: 700, color: c.accent }}>{card.label}</div>
         </div>
-        <div style={{ fontSize: fit?.fontSize ?? 84, fontWeight: 700, letterSpacing: -2, marginTop: 40, lineHeight: 1.05, ...(fit ? { display: "block", lineClamp: fit.lines } : {}) }}>{card.title}</div>
+        <div style={{ color: card.color ?? c.fg, fontSize: fit?.fontSize ?? 84, fontWeight: 700, letterSpacing: -2, marginTop: 40, lineHeight: 1.05, ...(fit ? { display: "block", lineClamp: fit.lines } : {}) }}>{card.title}</div>
         <div style={{ fontSize: 36, marginTop: 28, color: c["fg-2"] }}>{card.subtitle}</div>
         <div style={{ fontSize: 28, marginTop: 56, color: c.muted }}>everloot.app</div>
       </div>
@@ -104,9 +105,9 @@ export async function renderCard(card: { label: string; title: string; subtitle:
  * changes as players report, so the card is kept as long as the site's own hover card, not for a year as the
  * other cards are.
  */
-export async function renderEntityCard(card: { title: string; type: string; installs: number | null }): Promise<ImageResponse> {
-  const subtitle = card.installs === null ? card.type : `${card.type} · ${agreementLabel(card.installs)}`;
-  const image = await renderCard({ label: "Everloot database", title: card.title, subtitle, fit: true });
+export async function renderEntityCard(card: { title: string; type: string; installs: number | null; quality?: Quality; omitZero?: boolean }): Promise<ImageResponse> {
+  const subtitle = card.installs === null || (card.omitZero && card.installs === 0) ? card.type : `${card.type} · ${agreementLabel(card.installs)}`;
+  const image = await renderCard({ label: "Everloot database", title: card.title, subtitle, color: card.quality ? tokens.dark[`q-${card.quality}`] : undefined, fit: true });
   image.headers.set("Cache-Control", "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400");
   return image;
 }
