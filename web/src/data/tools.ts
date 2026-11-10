@@ -263,7 +263,6 @@ export const getTool = (slug: string): Tool | undefined =>
   tools.find((t) => t.slug === slug);
 
 export const liveTools = () => tools.filter((t) => t.status === "live");
-export const upcomingTools = () => tools.filter((t) => t.status === "coming-soon");
 
 /** The Tools menu, grouped the way players use them. The header and home page share these groups. */
 export const TOOL_GROUPS = (["Plan", "Look up", "Track"] as const).map((title) => ({
