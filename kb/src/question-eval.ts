@@ -4,7 +4,7 @@
  * evidence, and what does not. The report is the demand signal for the next data wave and the regression
  * check for retrieval changes (docs/design/specs/2026-10-27-question-bank-design.md).
  */
-import { answerSources, type AnswerSourcesFacts, type EvidenceKind } from "./answer-sources.js";
+import { answerSources, evidenceAnswers, type AnswerSourcesFacts, type EvidenceKind } from "./answer-sources.js";
 import type { FilesIndex } from "./files-evidence.js";
 import type { Question, SubjectKind } from "./question-bank.js";
 import { sameTitle } from "./name-aliases.js";
@@ -22,6 +22,8 @@ export interface QuestionResult {
   /** How many pieces of evidence answer_sources returned, and of which kinds. */
   evidence: number;
   evidenceKinds: EvidenceKind[];
+  /** At least one claim answers the predicate; keyed questions must also carry every keyed fact. */
+  realAnswer: boolean;
   /** True when at least one piece points at an everloot.app page. */
   page: boolean;
   /** For a question with an answer key: the key's facts that no piece of evidence carries. Empty means all are there. */
@@ -30,7 +32,7 @@ export interface QuestionResult {
   lang?: "es";
 }
 
-export interface EvalRow { label: string; questions: number; exact: number; search: number; none: number; withEvidence: number; withObserved: number; withFiles: number; withPage: number; withKey: number; keyFound: number }
+export interface EvalRow { label: string; questions: number; exact: number; search: number; none: number; withEvidence: number; withObserved: number; withFiles: number; withLore: number; withRealAnswer: number; withPage: number; withKey: number; keyFound: number }
 
 export interface EvalReport {
   schema: "everloot.question-eval/1";
@@ -86,14 +88,18 @@ export function carries(text: string, fact: string): boolean {
 
 export async function evaluateQuestion(db: ReleaseSource, q: Question, facts: AnswerSourcesFacts | null, dataAsOf: string | null, files: FilesIndex | null = null, limit = 8): Promise<QuestionResult> {
   const result = await answerSources(db, { question: q.text, limit }, facts, dataAsOf, files);
-  const kinds = [...new Set(result.evidence.map((e) => e.kind))];
-  const said = result.evidence.map((e) => `${e.claim}\n${e.source.title}`).join("\n");
+  const evidence = result.evidence.filter((e) => !/not available from permitted facts/i.test(e.claim));
+  const answering = evidence.filter((e) => evidenceAnswers(q.text, e));
+  const kinds = [...new Set(evidence.map((e) => e.kind))];
+  const said = answering.map((e) => e.claim).join("\n");
+  const missingFacts = q.answer?.facts.filter((f) => !carries(said, f));
   return {
     id: q.id, template: q.template, kind: q.subject.kind,
     resolution: await resolve(db, q),
-    evidence: result.evidence.length, evidenceKinds: kinds,
+    evidence: evidence.length, evidenceKinds: kinds,
+    realAnswer: answering.length > 0 && (!missingFacts || missingFacts.length === 0),
     page: result.evidence.some((e) => Boolean(e.url)),
-    ...(q.answer ? { missingFacts: q.answer.facts.filter((f) => !carries(said, f)) } : {}),
+    ...(missingFacts ? { missingFacts } : {}),
     ...(q.lang ? { lang: q.lang } : {}),
   };
 }
@@ -110,6 +116,8 @@ function fold(label: string, rows: readonly QuestionResult[]): EvalRow {
     withEvidence: rows.filter((r) => r.evidence > 0).length,
     withObserved: rows.filter((r) => r.evidenceKinds.includes("observed")).length,
     withFiles: rows.filter((r) => r.evidenceKinds.includes("files")).length,
+    withLore: rows.filter((r) => r.evidenceKinds.includes("lore")).length,
+    withRealAnswer: rows.filter((r) => r.realAnswer).length,
     withPage: rows.filter((r) => r.page).length,
     withKey: rows.filter((r) => r.missingFacts).length,
     keyFound: rows.filter((r) => r.missingFacts?.length === 0).length,
@@ -153,17 +161,18 @@ export async function evaluateBank(
 const pct = (n: number, of: number) => (of === 0 ? "–" : `${Math.round((100 * n) / of)}%`);
 const rowLine = (r: EvalRow) => {
   const resolvable = r.exact + r.search + r.none; // the rows that expected a resolution
-  return `| ${r.label} | ${r.questions} | ${pct(r.exact, resolvable)} | ${pct(r.search, resolvable)} | ${pct(r.none, resolvable)} | ${pct(r.withEvidence, r.questions)} | ${pct(r.withObserved, r.questions)} | ${pct(r.withFiles, r.questions)} | ${pct(r.withPage, r.questions)} | ${pct(r.keyFound, r.withKey)} |`;
+  return `| ${r.label} | ${r.questions} | ${pct(r.exact, resolvable)} | ${pct(r.search, resolvable)} | ${pct(r.none, resolvable)} | ${pct(r.withEvidence, r.questions)} | ${pct(r.withObserved, r.questions)} | ${pct(r.withFiles, r.questions)} | ${pct(r.withLore, r.questions)} | ${pct(r.withRealAnswer, r.questions)} | ${pct(r.withPage, r.questions)} | ${pct(r.keyFound, r.withKey)} |`;
 };
 
 /** The report as the markdown the eval commits: totals, per template, per kind, then the gap lists. */
 export function formatEvalReport(report: EvalReport): string {
-  const head = "| | questions | exact | by search | unresolved | with evidence | with observed | with files | with page | answer in evidence |\n|---|---|---|---|---|---|---|---|---|---|";
+  const head = "| | questions | exact | by search | unresolved | with evidence | with observed | with files | with lore | real answer | with page | answer in evidence |\n|---|---|---|---|---|---|---|---|---|---|---|---|";
   const lines = [
     `# Question eval, ${report.ranAt.slice(0, 10)}`,
     "",
     `Release \`${report.release}\`${report.limit !== undefined ? `, answer_sources limit ${report.limit}` : ""}. Player observations ${report.corpusConnected ? `connected (data as of ${report.dataAsOf ?? "unrecorded"})` : "not connected: the observed layer is unrecorded, not empty"}.`,
     "Resolution: the subject's name met a record exactly, or through search on the question, or not at all. Evidence: what `answer_sources` returned; \"with files\" counts the game files' own facts (ids and facts, unconfirmed). Percentages of resolution are over the questions that expect one. \"Answer in evidence\": of the questions with an answer key (the facts the game-data files say a correct answer carries), how many got evidence carrying every one of them.",
+    "Observed, files and lore are separate retrieval coverage rates, not correctness scores. Real answer counts only claims carrying the requested predicate (and all key facts when keyed). Archive lore cannot establish Forever gameplay. Limitation statements, subject-only matches and source titles earn no answer credit. Unrecognized question shapes conservatively earn no real-answer credit. Cross-tool cases describe follow-up paths; this offline retrieval eval does not execute those tools or test their agreement.",
     "",
     "## Totals",
     "",

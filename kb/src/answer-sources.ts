@@ -6,7 +6,7 @@ import type { ReleaseSource } from "./release-db.js";
 import { allTerms, contentTerms, respell, search, searchSomeWords, SOME_WORDS, type Respelling, type SearchHit } from "./search.js";
 import { agreedNpcNames, npcPage, WORLD_AGREEMENT, worldFactsFromRecords, type WorldFacts } from "./world-pages.js";
 import type { RecheckScope } from "./coverage.js";
-import { filesEvidence, filesNameWords, type FilesIndex } from "./files-evidence.js";
+import { claimAnswers, requestedPredicate, filesEvidence, filesNameWords, type FilesIndex } from "./files-evidence.js";
 
 /**
  * answer_sources: the evidence behind a question, every piece with its source, licence and date, so
@@ -98,6 +98,14 @@ function loreEvidence(hit: SearchHit, url: string | undefined): Evidence {
 }
 
 const pct = (rate: number) => `${Math.round(rate * 1000) / 10}%`;
+
+/** Archive gameplay statements cannot establish Forever predicates. */
+export function evidenceAnswers(question: string, evidence: Evidence): boolean {
+  if (/not available from permitted facts/i.test(evidence.claim)) return false;
+  if (requestedPredicate(question)) return evidence.kind !== "lore" && claimAnswers(question, evidence.claim) && (evidence.kind !== "curated" || mentions(question, evidence.source.title));
+  // Identity questions still need the named subject, rather than a search fallback mention.
+  return /^(?:who|what) is\b|^qu[ié]+n es\b|^qu[eé] es\b/i.test(question.trim()) && (mentions(question, evidence.source.title) || mentions(question, evidence.claim.split(":")[0]!));
+}
 
 /**
  * What players observed about the names in the question: `found` holds the facts, `gaps` the names that have no
@@ -246,17 +254,24 @@ export async function answerSources(
   // each name nothing agreed is known about yet, so an answer says unrecorded rather than leaving it out.
   // A piece that answers the whole question (the dungeons for a level) leaves no room for pages that share its words;
   // a zone the question only mentions comes after the pages, in what room they leave.
-  const pieces = union(readings.map((q) => filesEvidence(q, files, args.limit))).slice(0, args.limit);
+  const pieces = union(readings.map((q) => filesEvidence(q, files, Math.max(args.limit, 30))))
+    .sort((a, b) => Number(claimAnswers(asked, b.claim)) - Number(claimAnswers(asked, a.claim))).slice(0, args.limit);
   const plain = ({ role: _role, ...e }: (typeof pieces)[number]): Evidence => e;
   const answers = pieces.filter((e) => e.role === "answer").map(plain);
   const fromFiles = pieces.filter((e) => e.role === undefined).map(plain);
   const places = pieces.filter((e) => e.role === "place").map(plain);
   const named = observed.length + answers.length + fromFiles.length;
-  const fill = new Set(answers.length ? [] : [...curated, ...lore].slice(0, Math.max(0, args.limit - named)));
+  const fill = new Set(answers.length ? [] : [...curated, ...lore].sort((a, b) => Number(evidenceAnswers(asked, b)) - Number(evidenceAnswers(asked, a))).slice(0, Math.max(0, args.limit - named)));
   const room = Math.max(0, args.limit - named - fill.size);
   const evidence = [
     ...observed, ...curated.filter((e) => fill.has(e)), ...answers, ...fromFiles, ...lore.filter((e) => fill.has(e)), ...places.slice(0, room), ...gaps,
   ];
+  if (requestedPredicate(asked)) evidence.sort((a, b) => Number(evidenceAnswers(asked, b)) - Number(evidenceAnswers(asked, a)));
+  const predicate = requestedPredicate(asked);
+  if (predicate && !evidence.some((e) => evidenceAnswers(asked, e))) {
+    // Keep the wire shape stable. This is a limitation statement, never a gameplay value.
+    evidence.push({ claim: `The requested ${predicate} is not available from permitted facts for this question. Subject matches are context only.`, kind: "curated", source: { title: "Everloot data policy", url: `${SITE}/methodology` }, licence: LICENCE, asOf: null });
+  }
   // Observed and files facts answer the question's own names, so only an answer of fallback pages alone is marked.
   return {
     evidence, furtherReading: furtherReading(asked), dataAsOf,
@@ -277,12 +292,15 @@ const KIND_LABEL: Record<EvidenceKind, string> = { observed: "observed in play",
 /** `corpus`: true when player observations were read, false when none are connected, "unreachable" when the read failed. */
 export function formatAnswerSources(result: AnswerSources, corpus: boolean | "unreachable"): string {
   const lines: string[] = [];
+  const unavailable = result.evidence.find((e) => /not available from permitted facts/i.test(e.claim));
   if (result.someWords) lines.push(SOME_WORDS);
   else if (result.respelled?.length) lines.push(respelledLine(result.respelled));
+  if (unavailable) lines.push(unavailable.claim);
   if (result.evidence.length === 0) lines.push("No evidence found for that question. Nothing here is invented: try other words or an exact name.");
   if (result.evidence.some((e) => e.kind === "lore")) lines.push("Archive lore is historical context, not confirmation of Forever gameplay. Do not infer recorded gameplay facts from it. Game-file facts remain unconfirmed; missing observations remain unrecorded.");
   const pages = new Set<string>();
   for (const e of result.evidence) {
+    if (e === unavailable) continue;
     const support = e.support !== undefined ? `, ${e.support} installs` : "";
     lines.push(`- [${KIND_LABEL[e.kind]}${support}] ${e.claim}\n  Source: ${e.source.url} (${e.licence}${e.asOf ? `, as of ${e.asOf.slice(0, 10)}` : ""})`);
     // A lore piece's source is the wiki; its page on the site is listed beside it, once per page (the bosses of one

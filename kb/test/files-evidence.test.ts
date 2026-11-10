@@ -108,10 +108,11 @@ test("answerSources: the files' facts come after curated and before lore, and a 
   expect(result.evidence.map((e) => e.kind)).toEqual(["files", "files", "lore"]);
   // An achievement only the files know.
   const only = await answerSources(db, { question: "how do I get Storm the Chasm", limit: 8 }, null, null, index);
-  expect(only.evidence.map((e) => e.kind)).toEqual(["files"]);
+  expect(only.evidence.map((e) => e.kind)).toEqual(["files", "curated"]);
+  expect(only.evidence[1]!.claim).toContain("not available from permitted facts");
   expect(only.evidence[0]!.url).toBe("https://everloot.app/database/achievements/49-storm-the-chasm");
   // Without an index nothing changes.
-  expect((await answerSources(db, { question: "how do I get Storm the Chasm", limit: 8 }, null, null)).evidence).toEqual([]);
+  expect((await answerSources(db, { question: "how do I get Storm the Chasm", limit: 8 }, null, null)).evidence[0]?.claim).toContain("not available from permitted facts");
 });
 
 test("the text names a page once: an instance and its bosses share one More line, and no licence line ends it", async () => {

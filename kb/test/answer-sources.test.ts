@@ -122,7 +122,7 @@ test.each(["Which bosses are in Deadmines?", "¿Qué jefes hay en Deadmines?"])(
   const files = { build: "test-build", extractedAt: null, facts: [{ kind: "instance" as const, name: "Deadmines", claim: "The files name a dungeon encounter." }] };
   const answer = await answerSources(db, { question, limit: 8 }, null, null, files);
   expect(answer.evidence.filter((piece) => piece.kind === "lore").map((piece) => piece.source.title)).toEqual(["Deadmines"]);
-  expect(answer.evidence[0]?.kind).toBe("files");
+  expect(answer.evidence.at(-1)?.claim).toContain("requested bosses is not available");
   expect(formatAnswerSources(answer, false)).toContain("Archive lore is historical context");
   db.close();
 });
@@ -135,6 +135,6 @@ test("question and game-name words do not introduce unrelated archive or curated
   ]);
   await replaceSourceRows(db, "curated", ["lore_page"], [row("launch", "Forever launch", "Forever launches on a stated date.")]);
   const answer = await answerSources(db, { question: "What drops from Edwin VanCleef in Forever?", limit: 8 }, null, null);
-  expect(answer.evidence.map((piece) => piece.source.title)).toEqual(["Edwin VanCleef"]);
+  expect(answer.evidence.map((piece) => piece.source.title)).toEqual(["Edwin VanCleef", "Everloot data policy"]);
   db.close();
 });

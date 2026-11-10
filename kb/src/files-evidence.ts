@@ -17,6 +17,34 @@ import { allTerms, askingWord } from "./search.js";
 
 export type FilesFactKind = "instance" | "boss" | "zone" | "flight" | "mount" | "achievement" | "talent";
 
+/** Requested gameplay predicates. A subject mention or an arbitrary number is not an answer. */
+const PREDICATES: readonly [string, RegExp, RegExp][] = [
+  ["history", /\b(?:history|historical|trend|historial)\b/i, /\b(?:history|trend)\b[^.]*\d{4}-\d{2}-\d{2}/i],
+  ["class", /\b(?:which class|clase)\b/i, /\b\p{L}+(?: \p{L}+)? talent\b/iu],
+  ["level", /\b(?:level|levels|lvl|nivel|niveles)\b/i, /\blevels?\s+\d/i],
+  ["drop source", /\b(?:drop|drops|dropped|loot|obtain|acquire|dropea|consigo)\b|how (?:do|can) i get/i, /\b(?:dropped from|drops from|loot from|obtained from|reward from)\b/i],
+  ["vendor", /\b(?:vendor|buy|sells|comprar|vende)\b/i, /\b(?:sold by|sells|vendor)\b.*\d|\b(?:sold by|sells)\s+\p{L}/iu],
+  ["price", /\b(?:price|cost|worth|precio|cuesta)\b|cu[aá]nto vale/i, /\b(?:price|cost|value)\b[^.]*\d+\s*(?:copper|silver|gold|c\b|s\b|g\b)/i],
+  ["bosses", /\b(?:bosses|jefes)\b/i, /\bboss(?:es)?\s*:\s*\p{L}/iu],
+  ["riding skill", /\b(?:riding|equitaci[oó]n)\b/i, /\briding skill\s+\d/i],
+  ["location", /\b(?:where|entrance|d[oó]nde|entrada)\b/i, /\b(?:entered from|was seen (?:in|on)|flight master in|zone of)\b|\b(?:under|located in|in)\s+(?!the game files)\p{Lu}/u],
+];
+
+export function requestedPredicate(question: string): string | undefined {
+  return PREDICATES.find(([, asked]) => asked.test(question))?.[0];
+}
+
+export function claimAnswers(question: string, claim: string): boolean {
+  if (/not available from permitted facts|unrecorded|no .* reached|known (?:item|NPC);/i.test(claim)) return false;
+  const predicate = PREDICATES.find(([, asked]) => asked.test(question));
+  if (predicate?.[0] === "location" && /: a zone\b/.test(claim)) {
+    const name = new Set(allTerms(claim.split(":")[0]!).split(" "));
+    const extra = allTerms(question).split(" ").filter((t) => !askingWord(t) && !name.has(t) && !/^(?:dónde|donde|queda|está|esta|es|en|de|la|el)$/.test(t));
+    if (extra.length) return false;
+  }
+  return predicate ? predicate[2].test(claim) : false;
+}
+
 export interface FilesFact {
   kind: FilesFactKind;
   name: string;
