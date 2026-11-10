@@ -6,18 +6,20 @@ vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
   uploadStore: { loadCorpus: store.loadCorpus },
 }));
-// Source-backed item names; none unless a test sets them.
-const names = vi.hoisted(() => ({ matched: null as unknown }));
+// Source-backed item names and the game files' spell names; none unless a test sets them.
+const names = vi.hoisted(() => ({ matched: null as unknown, spells: null as { version: string; names: Map<number, string> } | null }));
 vi.mock("@/lib/game-assets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/game-assets")>()),
   loadItemNames: async () => names.matched,
   loadQuestNames: async () => null,
+  loadSpellNames: async () => names.spells,
 }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); }, permanentRedirect: () => {} }));
 
 import { GET as index } from "./route";
 import { GET as chunk } from "../database-sitemap/[n]/route";
 import { DATABASE_CHUNK } from "@/lib/database-sitemap";
+import { CLIENT_EDGES } from "@/lib/edges";
 
 const matched = (ids: number[]) => ({
   version: "1.60.1.70450",
@@ -48,7 +50,7 @@ const records = [
 ];
 
 beforeEach(() => { store.loadCorpus.mockReset().mockResolvedValue({ uploads: 3, records, dataAsOf: "2026-10-09T00:00:00.000Z" }); });
-afterEach(() => { names.matched = null; });
+afterEach(() => { names.matched = null; names.spells = null; });
 
 const urls = (xml: string) => [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]!);
 const chunkAt = (n: string) => chunk(new Request("https://everloot.app/"), { params: Promise.resolve({ n }) });
@@ -127,4 +129,32 @@ test("unreadable upload storage is a 503, not a short list", async () => {
     expect(res.status).toBe(503);
     expect(res.headers.get("cache-control")).toBe("no-store");
   }
+});
+
+test("a spell is listed, after the vendors, only when the files name it and relate it to something; its page asks to be indexed and the others do not", async () => {
+  // One spell an item is created by (the item stores it), one that teaches nothing and creates nothing: named, but thin.
+  const related = CLIENT_EDGES.find((e) => e.toKind === "spell" && e.rel === "created_by")!.toId;
+  const touched = new Set(CLIENT_EDGES.flatMap((e) => [e.fromKind === "spell" ? e.fromId : -1, e.toKind === "spell" ? e.toId : -1]));
+  const unrelated = Array.from({ length: 100_000 }, (_, i) => i + 1).find((id) => !touched.has(id))!;
+  const listed = async () => urls(await (await chunkAt("0.xml")).text()).map((u) => new URL(u).pathname).filter((p) => p.startsWith("/database/spells/"));
+  // Without the names file no spell is listed: a page with no name says noindex.
+  expect(await listed()).toEqual([]);
+  names.spells = { version: "1.60.1.70862", names: new Map([[related, "Related Spell"], [unrelated, "Thin Spell"]]) };
+  const all = urls(await (await chunkAt("0.xml")).text()).map((u) => new URL(u).pathname);
+  expect(all.at(-1)).toBe(`/database/spells/${related}`);
+  expect(await listed()).toEqual([`/database/spells/${related}`]);
+  const { generateMetadata } = await import("../database/spells/[id]/page");
+  const robots = async (id: number) => (await generateMetadata({ params: Promise.resolve({ id: String(id) }) })).robots;
+  expect(await robots(related)).toMatchObject({ index: true });
+  expect(await robots(unrelated)).toMatchObject({ index: false });
+});
+
+test("a named spell only the talent trees hold is listed, and its page asks to be indexed", async () => {
+  // Arcane Power: a Mage talent nothing in the files or the reports relates to.
+  expect(CLIENT_EDGES.some((e) => (e.fromKind === "spell" && e.fromId === 12042) || (e.toKind === "spell" && e.toId === 12042))).toBe(false);
+  names.spells = { version: "1.60.1.70862", names: new Map([[12042, "Arcane Power"]]) };
+  const listed = urls(await (await chunkAt("0.xml")).text()).map((u) => new URL(u).pathname);
+  expect(listed).toContain("/database/spells/12042");
+  const { generateMetadata } = await import("../database/spells/[id]/page");
+  expect((await generateMetadata({ params: Promise.resolve({ id: "12042" }) })).robots).toMatchObject({ index: true });
 });

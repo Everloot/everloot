@@ -4,6 +4,26 @@ import { ALL_RECORD_KINDS, GUILD_KILL_KINDS, parseRecords, parseUpload, PUBLIC_R
 
 const base = { installId: "test-install-1234", capturedAt: "2026-09-29T12:00:00.000Z", eventId: "evt-1" };
 
+test("auction snapshots preserve full region/ruleset names and both faction and house", () => {
+  for (const ending of ["PVE", "PVP", "RP", "RPPVP", "Hardcore"]) {
+    for (const region of ["US1", "EU1"]) {
+      for (const faction of ["Alliance", "Horde"]) {
+        const row = { ...base, kind: "auction_snapshot", realm: `CAMWOW ${region} Realm 4 ${ending}`,
+          faction, house: "Neutral", scanId: "scan-1", part: 1, parts: 1, items: [[2589, 2, 40, 100, 110]] };
+        expect(parseRecords([row]).records).toEqual([row]);
+      }
+    }
+  }
+});
+
+test.fails("owner review: snapshots must retain a distinguishing item suffix", () => {
+  const row = { ...base, kind: "auction_snapshot", realm: "CAMWOW US1 Realm 4 PVP",
+    faction: "Alliance", house: "Alliance", scanId: "scan-1", part: 1, parts: 1,
+    items: [[2589, 2, 40, 100, 110, 123]] };
+  // A sixth tuple value cannot currently survive intake. Its shape needs owner review.
+  expect(parseRecords([row]).records).toEqual([row]);
+});
+
 test("recipe observations preserve optional API identity and learned state with legacy compatibility", () => {
   const row = { ...base, kind: "recipe_observed", profession: "Alchemy", rank: 60, recipe: "Potion", difficulty: "optimal", reagents: [] };
   const result = parseRecords([row, { ...row, recipeId: 2330, learned: false }, { ...row, recipeId: 2330, learned: true }]);

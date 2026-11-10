@@ -1,3 +1,5 @@
+import { reportsView } from "./reports";
+import type { ReportInfo, ReportQuery } from "../shared/reports";
 import { accountOf as account } from "../main/engine";
 import { diagnostics } from "../shared/diagnostics";
 import { ago, answerSuggestion, clock, companionStatus, copyLabel, esc, gold, kb, msg, JOB_NAMES, restartWait, savedNote, setupAddonLine, sparkline, statusText, when, type CompanionState } from "./format";
@@ -11,11 +13,12 @@ import { emptyCause, emptyState, ghostProfile, jobOfLine, ownedLockouts, ownedPr
 declare global { interface Window { everloot: EverlootApi } }
 const api = window.everloot;
 
-type Page = "overview" | "chat" | "characters" | "upload" | "market" | "ask" | "addon" | "changes" | "log" | "settings";
+type Page = "reports" | "overview" | "chat" | "characters" | "upload" | "market" | "ask" | "addon" | "changes" | "log" | "settings";
 const PAGES: { id: Page; label: string; job?: Job }[] = [
   { id: "overview", label: "Overview" },
   { id: "chat", label: "Chat" },
   { id: "characters", label: "Characters" },
+  { id: "reports", label: "Reports" },
   { id: "upload", label: "Upload", job: "upload" },
   { id: "market", label: "Market", job: "prices" },
   { id: "ask", label: "Ask", job: "ask" },
@@ -71,7 +74,10 @@ let copied: { index: number; label: string } | null = null;
 let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 /** The Market page's last price lookup; null before the first. */
 let priceLookup: PriceLookup | null = null;
-const data: { upload?: FileSummary[]; backups?: BackupInfo[]; market?: MarketInfo; ask?: AskInfo; addon?: AddonInfo; changes?: ChangeItem[]; changesError?: string; characters?: CharactersInfo; chat?: ChatInfo; usage?: DataUsage } = {};
+let reportQuery: ReportQuery = {};
+let reportPage = 0;
+let reportRequest = 0;
+const data: { reports?: ReportInfo; upload?: FileSummary[]; backups?: BackupInfo[]; market?: MarketInfo; ask?: AskInfo; addon?: AddonInfo; changes?: ChangeItem[]; changesError?: string; characters?: CharactersInfo; chat?: ChatInfo; usage?: DataUsage } = {};
 
 const main = document.getElementById("app")!;
 const bar = document.getElementById("bar")!;
@@ -97,6 +103,7 @@ const onOff = (job: Job, s: AppState) => (job === "ask" ? s.settings.ask.enabled
 const jobSwitch = (job: Job, s: AppState) => `<label class="switch"><input type="checkbox" data-toggle="${job}" ${onOff(job, s) ? "checked" : ""}><span>${onOff(job, s) ? "On" : "Off"}</span></label>`;
 /** The inline icon set: one 24-unit grid and one stroke, painted by `.ico`. Always decorative; the label beside it names the control. */
 const ICONS: Record<string, string> = {
+  reports: '<path d="M4 20V10m8 10V4m8 16v-7M2 21h20"/>',
   overview: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
   chat: '<path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-9l-5 3v-3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/>',
   characters: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>',
@@ -136,7 +143,7 @@ function welcome(): string {
     ? `<div class="choices">${candidates.map((c) => `
         <label class="choice"><input type="radio" name="folder" value="${esc(c.folder)}" ${chosenFolder === c.folder ? "checked" : ""}>
           <span class="grow"><span class="mono">${esc(c.product)}</span> <span class="muted">${c.files ? `${c.files} account file(s) with Everloot data` : c.hasAccounts ? "no Everloot data yet" : "never played here yet"}</span><br><span class="muted mono small">${esc(c.folder)}</span></span></label>`).join("")}</div>`
-    : `<p class="muted">No World of Warcraft folder was found in the usual places. Browse to the folder that holds <code>WTF</code>, for example <code>${state?.platform === "win32" ? "World of Warcraft\\_classic_era_" : "World of Warcraft/_classic_era_"}</code>.</p>`;
+    : `<p class="muted">No World of Warcraft folder was found in the usual places. Browse to the folder that holds <code>WTF</code>, for example <code>${state?.platform === "win32" ? "World of Warcraft\\_forever_" : "World of Warcraft/_forever_"}</code>.</p>`;
   const custom = chosenFolder && !candidates.some((c) => c.folder === chosenFolder) ? `<p class="mono fg2">${esc(chosenFolder)}</p>` : "";
   const a = setupAddon?.folder === chosenFolder ? setupAddon : null;
   const line = setupAddonLine(a?.installed);
@@ -781,6 +788,11 @@ function market(s: AppState): string {
   const last = m?.last ?? [];
   const stale = (at: string | null) => !at || Date.now() - new Date(at).getTime() > 24 * 3600 * 1000;
   const scans = (m?.scans ?? []).map((sc) => `<tr><td>${esc(sc.realm)}</td><td>${sc.at ? ago(sc.at) : "unknown"}</td><td class="${stale(sc.at) ? "warn" : "ok"}">${stale(sc.at) ? "scan again next time you are at the auction house" : "fresh"}</td></tr>`).join("");
+  // The panel above already shows the no-folder, no-file and paused causes; this one only adds what is its own.
+  const w = emptyCause("market", s, { written: false });
+  const marketWritten = w.action?.run === "prices" || w.cause === "Market prices are off"
+    ? w
+    : { cause: "Nothing written into the game yet", step: "Prices are written at the next refresh; /reload in game to see them" };
   return `<div class="page">
     <div class="head"><h1>Market</h1><div class="row">${jobSwitch("prices", s)}${runBtn("prices", s, "Refresh now")}</div></div>
     ${workingStrip("prices", s, statusText(j), lastLineOf("prices", s))}
@@ -805,7 +817,7 @@ function market(s: AppState): string {
       ${j.state === "error" ? `<p class="error">${esc(j.message)}</p>` : ""}
       ${last.length ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th class="num">Items</th><th>Data as of</th><th>Why</th></tr></thead><tbody>${last.map((r) => `<tr><td>${esc(r.realm)}</td><td class="num">${r.items}</td><td>${r.dataAsOf ? when(r.dataAsOf) : "–"}</td><td class="muted">${r.source === "scan" ? "your scans" : "followed"}</td></tr>`).join("")}</tbody></table></div>`
         : m?.inGame?.length ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th class="num">Items</th><th>Data as of</th></tr></thead><tbody>${m.inGame.map((r) => `<tr><td>${esc(r.realm)}</td><td class="num">${r.items}</td><td>${r.dataAsOf ? when(r.dataAsOf) : "–"}</td></tr>`).join("")}</tbody></table></div><p class="muted small">The file in the game now; not refreshed yet this session.</p>`
-        : emptyState({ cause: "Nothing written into the game yet", step: "Prices are written at the next refresh; /reload in game to see them" }, icon("market"))}
+        : emptyState(marketWritten, icon("market"))}
     </section>
   </div>`;
 }
@@ -884,6 +896,7 @@ function addon(s: AppState): string {
       <div class="stat"><div class="k">Builds file</div><div class="v">${a?.slots.builds ? '<span class="ok">present</span>' : "none"}</div><div class="s">EverlootBuilds</div></div>
     </div>
     <section class="panel">
+      ${!s.settings.gameFolder ? `${emptyState(emptyCause("addon", s), icon("addon"))}<p class="muted small">${ext("https://everloot.app/upload", "manual install steps")}</p>` : `
       ${upToDate
         ? `<h2>Up to date</h2><p class="fg2">${a!.installed === a!.latest!.version ? `You have the newest Everloot addon, ${esc(a!.installed!)}.` : `You have ${esc(a!.installed!)}, newer than the latest release ${esc(a!.latest!.version)}.`} Nothing to do.</p>`
         : `<h2>${a?.installed ? "Update" : "Install"}</h2><p class="fg2">Downloads <code>Everloot-${esc(a?.latest?.version ?? "x.y.z")}.zip</code> from the site, checks it against the checksum published with the GitHub release, and replaces <code>Interface/AddOns/Everloot</code> in one swap. Close the game first, or <code>/reload</code> after.</p>`}
@@ -893,7 +906,7 @@ function addon(s: AppState): string {
         ${a?.addonsDir ? '<button type="button" class="link" id="openAddons">open the AddOns folder</button>' : ""}
         <span class="${flash.startsWith("!") ? "error" : "ok"} small" role="status">${esc(flash.replace(/^!/, ""))}</span>
       </div>
-      ${upToDate ? `<p class="muted small">Addon acting up? <button type="button" class="link" id="installAddon" ${s.settings.gameFolder && !busy ? "" : "disabled"}>${busy === "install" ? "Reinstalling…" : a!.installed === a!.latest!.version ? `Reinstall ${esc(a!.installed!)}` : `Install release ${esc(a!.latest!.version)}`}</button> puts a clean copy of the release back${a!.installed === a!.latest!.version ? "" : " in place of this build"}. Only needed when files are broken or missing.</p>` : ""}
+      ${upToDate ? `<p class="muted small">Addon acting up? <button type="button" class="link" id="installAddon" ${s.settings.gameFolder && !busy ? "" : "disabled"}>${busy === "install" ? "Reinstalling…" : a!.installed === a!.latest!.version ? `Reinstall ${esc(a!.installed!)}` : `Install release ${esc(a!.latest!.version)}`}</button> puts a clean copy of the release back${a!.installed === a!.latest!.version ? "" : " in place of this build"}. Only needed when files are broken or missing.</p>` : ""}`}
     </section>
     ${savedBuilds(s)}
     <section class="panel"><h2>In game</h2>
@@ -1083,7 +1096,7 @@ function renderSide(s: AppState): void {
   const web = WEBSITE_LINKS.map((l) => `<button type="button" class="out" data-open="${esc(websiteUrl(s.settings.endpoint, l.path))}"><span class="grow">${esc(l.label)}<span class="sr-only"> (opens in your browser)</span></span>${icon("external", "ico ext")}</button>`).join("");
   const group = (id: string, label: string | null, body: string) => `<div class="nav-group" role="group" ${label ? `aria-labelledby="ng-${id}"` : `aria-label="Main"`}>${label ? `<div class="section" id="ng-${id}">${label}</div>` : ""}${body}</div>`;
   const pages = (ids: Page[]) => ids.map((id) => PAGES.find((p) => p.id === id)!).map((p) => item(p.id, p.label, p.job)).join("");
-  nav.innerHTML = group("main", null, pages(["overview", "chat", "characters"]))
+  nav.innerHTML = group("main", null, pages(["overview", "chat", "characters", "reports"]))
     + group("companion", "Companion", pages(["upload", "market", "ask", "addon", "changes", "log"]))
     + group("web", "On everloot.app", web);
   const e = s.engine;
@@ -1323,7 +1336,7 @@ function render(): void {
   const scrolls = page === "chat" && keepScroll ? CHAT_SCROLLERS.map((sel) => [sel, main.querySelector(sel)?.scrollTop ?? 0] as const) : [];
   const drawerTab = drawerChar ? main.querySelector<HTMLElement>('[data-dwtab][aria-selected="true"]')?.dataset.dwtab ?? "overview" : null;
   const refocus = keepFocus();
-  main.innerHTML = page === "overview" ? overview(s) : page === "chat" ? chat() : page === "characters" ? characters() : page === "upload" ? upload(s) : page === "market" ? market(s) : page === "ask" ? ask(s)
+  main.innerHTML = page === "reports" ? reportsView(data.reports, reportQuery, reportPage) : page === "overview" ? overview(s) : page === "chat" ? chat() : page === "characters" ? characters() : page === "upload" ? upload(s) : page === "market" ? market(s) : page === "ask" ? ask(s)
     : page === "addon" ? addon(s) : page === "changes" ? changes() : page === "log" ? log(s) : settings(s);
   // The page's CSP allows no inline style attributes; bar heights go through the DOM instead.
   for (const el of main.querySelectorAll<HTMLElement>("[data-h]")) el.style.height = `${el.dataset.h}%`;
@@ -1357,6 +1370,7 @@ async function load(p: Page): Promise<void> {
       data.chat = await api.chatInfo(); for (const own of data.chat.providers) loadModels(own.kind);
     }
     else if (p === "ask") { [data.ask, data.chat] = await Promise.all([api.askInfo(), api.chatInfo()]); for (const own of data.chat.providers) loadModels(own.kind); }
+    else if (p === "reports") { const request = ++reportRequest; const result = await api.reportsInfo(reportQuery); if (request === reportRequest) data.reports = result; }
     else if (p === "characters") data.characters = await api.charactersInfo();
     else if (p === "upload") [data.upload, data.backups] = await Promise.all([api.uploadInfo(), api.backups()]);
     else if (p === "market") data.market = await api.marketInfo();
@@ -1558,6 +1572,8 @@ async function onClick(ev: MouseEvent): Promise<void> {
   if (adv) { advancedOpen = !(adv.parentElement as HTMLDetailsElement).open; return; }
   const t = el.closest<HTMLElement>("button");
   if (!t) return;
+  if (t.dataset.page === "reports-reset") { reportQuery = {}; reportPage = 0; await load("reports"); return; }
+  if (t.id === "reportPrevious" || t.id === "reportNext") { reportPage = Math.max(0, reportPage + (t.id === "reportNext" ? 1 : -1)); render(); return; }
   if (t.dataset.page) { void go(t.dataset.page as Page); return; }
   if (t.dataset.ask) {
     // Not go(): its load("chat") would answer after the send and overwrite the busy thread.
@@ -1699,6 +1715,18 @@ async function onClick(ev: MouseEvent): Promise<void> {
 }
 
 async function onChange(ev: Event): Promise<void> {
+  const control = ev.target as HTMLInputElement;
+  if (control.id.startsWith("report")) {
+    if (control.id === "reportPeriod") reportQuery.period = control.value === "all" ? "all" : Number(control.value) as 7 | 14 | 30 | 90;
+    if (control.id === "reportMetric") { reportQuery.metric = control.value as ReportQuery["metric"]; reportQuery.item = undefined; }
+    if (control.id === "reportScope") { const [account, character] = JSON.parse(control.value); reportQuery.account = account; reportQuery.character = character; reportQuery.item = undefined; }
+    if (control.id === "reportItem") reportQuery.item = control.value;
+    if (control.id === "reportCumulative") reportQuery.cumulative = control.checked;
+    reportPage = 0;
+    await load("reports");
+    main.querySelector<HTMLElement>(`#${control.id}`)?.focus();
+    return;
+  }
   const el = ev.target as HTMLInputElement;
   if (el.id === "censusConsent") { censusChoice = el.checked; return; }
   if (el.id === "agree") { agreed = el.checked; render(); return; }
