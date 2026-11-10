@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import JsonLd from "@/components/JsonLd";
+import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import LoreSection from "@/components/LoreSection";
@@ -72,6 +74,7 @@ export default async function FactionPage(props: Props) {
   return (
     <Container width="data">
       <article>
+        <JsonLd data={entityPageJsonLd({ name: title, path: `/database/factions/${segment}`, identifier: `faction:${id}` })} />
         <EntityHeader trail={trail} title={title} meta={["Faction", entry?.header ?? null, <span key="id" className="tabular-nums">ID {id}</span>]} />
         {entry ? (
           <>

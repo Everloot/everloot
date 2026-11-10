@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import JsonLd from "@/components/JsonLd";
+import { entityPageJsonLd } from "@/lib/jsonld";
 import { notFound, permanentRedirect } from "next/navigation";
 import { Badge, Container, DataTable, Facts, TooltipFrame } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
@@ -66,6 +68,7 @@ export default async function AchievementPage(props: Props) {
   return (
     <Container width="data">
       <article>
+        <JsonLd data={entityPageJsonLd({ name: title, path: canonical, identifier: `achievement:${id}` })} />
         <EntityHeader trail={trail} title={title} meta={["Achievement", entry ? entry.category : null, <span key="id" className="tabular-nums">ID {id}</span>]} />
         {entry ? (
           <EntityTop

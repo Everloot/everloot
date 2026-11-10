@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import JsonLd from "@/components/JsonLd";
+import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, type Column, type TabItem } from "@/components/ui";
@@ -151,6 +153,7 @@ export default async function SpellPage(props: Props) {
   return (
     <Container width="data">
       <article>
+        <JsonLd data={entityPageJsonLd({ name: title, path: `/database/spells/${spellId}`, identifier: `spell:${spellId}` })} />
         <EntityHeader trail={trail} title={title} meta={["Spell", <span key="id" className="tabular-nums">ID {spellId}</span>]} />
         <EntityTop
           box={

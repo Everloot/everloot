@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import JsonLd from "@/components/JsonLd";
+import { entityPageJsonLd } from "@/lib/jsonld";
 import { notFound, permanentRedirect } from "next/navigation";
 import { Container, DataTable, Facts, TooltipFrame } from "@/components/ui";
 import EntityLink from "@/components/EntityLink";
@@ -45,6 +47,7 @@ export default async function QuestChainPage(props: Props) {
   return (
     <Container width="data">
       <article>
+        <JsonLd data={entityPageJsonLd({ name: title, path: `/database/quest-chains/${segment}`, identifier: `quest_chain:${id}` })} />
         <EntityHeader trail={trail} title={title} meta={["Quest chain", entry ? `${count} quests` : null, <span key="id" className="tabular-nums">ID {id}</span>]} />
         {entry ? (
           <>
