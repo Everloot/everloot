@@ -44,7 +44,7 @@ O.ROWS = {
   { key = "guild", label = "Guild",
     text = "Your guild's roster, lockouts and loot. Published only through an officer's upload." },
   { key = "completion", command = "completion", label = "Completion tracker",
-    text = "Your achievements, reputation, titles and completed quests, read only; also your professions, raid lockouts, active talent build, character sheet stats and PvP standing. Collection rows leave from the upload page; achievements, reputation and titles also through the Desktop App's private sync, for a character you linked. Professions, lockouts, talents, stats and PvP never go in an upload, only through private sync. Off deletes its rows." },
+    text = "Your achievements, reputation, titles and completed quests, read only; also your professions, dungeon and raid lockouts, active talent build, character sheet stats and PvP standing. Your boss kills stay on this computer. Collection rows leave from the upload page; achievements, reputation and titles also through the Desktop App's private sync, for a character you linked. Professions, lockouts, talents, stats and PvP never go in an upload, only through private sync. Off deletes its rows." },
   { key = "addons", command = "addons", label = "Installed addon list",
     text = "Each installed addon's name and version. Sent only from the upload page. Off deletes its rows." },
   { key = "players", command = "players", label = "Player pages",
@@ -98,7 +98,7 @@ O.DELETES = {
   addons = { "addon_seen" },
   completion = { "achievement_catalog", "reputation_catalog", "title_catalog", "quest_chain_catalog",
     "achievement_owned", "reputation_owned", "title_owned", "quest_owned",
-    "profession_owned", "lockout_owned", "talent_owned", "stats_owned", "pvp_owned" },
+    "profession_owned", "lockout_owned", "talent_owned", "stats_owned", "pvp_owned", "boss_kill_owned" },
 }
 
 --- How many rows turning this row off would delete.

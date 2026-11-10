@@ -15,6 +15,9 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Addon: Collection lists dungeons, raids and unconfirmed world bosses, with local boss kills and weekly lockouts.
+- Site: keep local boss-kill history out of public upload batches.
+- Docs: explain how to regenerate Collection instance data and its agreement snapshot.
 - Site: search engines and AI assistants now find more of the site: spell pages that create, cost or teach
   something or sit in a talent tree, each zone's coverage page once players have confirmed something there, the
   class chooser once it is reviewed, and the lore pages about an NPC, item or quest players have named in WoW:

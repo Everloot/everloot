@@ -1,4 +1,4 @@
--- Everloot window, Collection: achievements, reputation, titles, raid lockouts and quest chains, from the rows the
+-- Everloot window, Collection: achievements, reputation, titles, instances and quest chains, from the rows the
 -- completion tracker (completion.lua) and owned.lua wrote, read through Everloot:Rows. This character by default;
 -- Account joins every character in the roster (roster.lua) and names the one that holds each item.
 -- Display only: it reads, the one button runs /everloot completion on, the command the player could type, and
@@ -12,18 +12,17 @@ local COLORS, NARROW, text, surface = U.COLORS, U.NARROW, U.Text, U.Surface
 local W = 604          -- the view frame window.lua gives every view (W - MAIN - 12 wide)
 local ROWS, ROW_H = 12, 18
 local SECTIONS = { { "achievements", "Achievements" }, { "reputation", "Reputation" }, { "titles", "Titles" },
-  { "raids", "Raids" }, { "quests", "Quests" } }
+  { "raids", "Dungeons & raids" }, { "quests", "Quests" } }
 local SCOPES = { { "character", "This character", 110 }, { "account", "Account", 80 } }
 local EXALTED = 8
 local OFF_TEXT = "The completion tracker reads your achievements, reputation, titles, completed quests, professions, raid "
   .. "lockouts, active talent build, character sheet stats and PvP standing, from the game's own windows, never writing "
-  .. "back. Collection rows leave only from the upload page; professions, lockouts, talents, stats and PvP never go in an upload."
+  .. "back. Your boss kills stay on this computer. Collection rows leave only from the upload page; professions, lockouts, talents, stats and PvP never go in an upload."
 local TURNED_ON = "Turned on. /reload to start reading."
 local NOTHING_READ = "Nothing read yet. Open the achievements, reputation or titles window, then /reload."
 local NO_CHAINS = "No quest chains read yet. They are read at login and each time you turn in a quest."
 local NOTHING_MISSING = "Nothing missing here."
 local NO_KEY = "This character cannot be identified yet."
-local NO_RAIDS = "No raid lockouts this week."
 local DETAIL_W, DETAIL_WIDE = 180, 276   -- the detail column, narrower beside a bar
 
 local refresh
@@ -184,31 +183,44 @@ local function titles(s)
   return items, "Titles: " .. n .. " of " .. #items
 end
 
--- Lockouts as owned.lua wrote them; one whose reset time has passed is gone in the game too. Each key's lockouts
--- are its own, so the account scope lists every key's, named.
+-- The shipped player agreement gates instances; personal kills never change that public catalog.
 local function raids(s)
+  local data = E.InstanceData or { instances = {}, asOf = "unknown" }
   local now = date("!%Y-%m-%dT%H:%M:%SZ", time())
-  local order = {}
-  for i, k in ipairs(s.keys) do order[k] = i end
+  local keys = {}
+  for _, key in ipairs(s.keys) do keys[key] = true end
   local items = {}
-  for _, r in ipairs(E:Rows("lockout_owned")) do
-    if type(r) == "table" and order[r.characterKey] and type(r.resetAt) == "string" and r.resetAt > now then
-      local killed, total = r.bossesKilledCount, r.bossesTotal
-      local day, hour = r.resetAt:match("^(%d+%-%d+%-%d+)T(%d+:%d+)")
-      items[#items + 1] = {
-        name = name(r.instance) .. (type(r.difficulty) == "string" and (" · " .. r.difficulty) or ""),
-        detail = held((number(killed) and killed or "-") .. " of " .. (number(total) and total or "-")
-          .. " · resets " .. (day and (day .. " " .. hour) or "-"), s, r.characterKey),
-        done = number(killed) and number(total) and killed >= total or false,
-        order = order[r.characterKey],
-      }
+  for _, group in ipairs({ "Dungeons", "Raids", "World bosses" }) do
+    items[#items + 1] = { name = group, detail = group == "World bosses" and "Found in game files, unconfirmed" or "Agreed by players", done = false }
+    local instances = {}
+    for _, instance in ipairs(data.instances) do
+      if instance.group == group then instances[#instances + 1] = instance end
     end
+    table.sort(instances, byName)
+    for _, instance in ipairs(instances) do
+      items[#items + 1] = { name = instance.name, detail = instance.unconfirmed and "Unconfirmed" or "", done = false }
+      for _, r in ipairs(E:Rows("lockout_owned")) do
+        if keys[r.characterKey] and (r.instanceId == instance.id or r.instance == instance.name)
+          and type(r.resetAt) == "string" and r.resetAt > now then
+          local day, hour = r.resetAt:match("^(%d+%-%d+%-%d+)T(%d+:%d+)")
+          items[#items + 1] = { name = "  This week's lockout", detail = held((r.bossesKilledCount or "-") .. " of " .. (r.bossesTotal or "-")
+            .. " / resets " .. (day and (day .. " " .. hour .. " UTC") or r.resetAt), s, r.characterKey), done = false }
+        end
+      end
+      for _, boss in ipairs(instance.bosses) do
+        local kill
+        -- The most recent kill across the scope gives both the date and the holder, including across difficulties.
+        for _, r in ipairs(E:Rows("boss_kill_owned")) do
+          if keys[r.characterKey] and r.instanceMapId == instance.id and r.encounterId == boss.id
+            and type(r.lastKillAt) == "string" and (not kill or r.lastKillAt > kill.lastKillAt) then kill = r end
+        end
+        items[#items + 1] = { name = "  " .. boss.name, done = kill ~= nil,
+          detail = kill and held("Last killed " .. kill.lastKillAt, s, kill.characterKey) or "No kill recorded" }
+      end
+    end
+    if #instances == 0 then items[#items + 1] = { name = "No agreed instances yet", detail = "", done = false } end
   end
-  table.sort(items, function(a, b)
-    if a.name ~= b.name then return byName(a, b) end
-    return a.order < b.order
-  end)
-  return items, #items > 0 and ("Raids: " .. #items .. " saved this week") or NO_RAIDS
+  return items, "Dungeons & raids / as of " .. data.asOf:sub(1, 10)
 end
 
 -- One row per chain the tracker read: its quests done of its total. In the account scope a chain shows the key
@@ -259,7 +271,7 @@ local function quests(s)
 end
 
 local READ = { achievements = achievements, reputation = reputation, titles = titles, raids = raids, quests = quests }
-local EMPTY = { raids = NO_RAIDS, quests = NO_CHAINS }
+local EMPTY = { quests = NO_CHAINS }
 
 local function draw(row, item)
   row.name:SetText(item.name)
@@ -342,11 +354,11 @@ local function build(f, parent)
   c.onPage:SetPoint("TOPLEFT", 0, 0)
   c.onPage:SetSize(W, 390)
   for i, s in ipairs(SECTIONS) do
-    c.sections[s[1]] = button(c.onPage, s[2], 96, function() c.section = s[1]; c.rows.offset = 0 end)
-    c.sections[s[1]]:SetPoint("TOPLEFT", (i - 1) * 100, -8)
+    c.sections[s[1]] = button(c.onPage, s[2], s[1] == "raids" and 140 or 82, function() c.section = s[1]; c.rows.offset = 0 end)
+    c.sections[s[1]]:SetPoint("TOPLEFT", (i - 1) * 86 + (i > 4 and 58 or 0), -8)
   end
   c.missingOnly = button(c.onPage, "Missing only", 100, function() c.missing = not c.missing; c.rows.offset = 0 end)
-  c.missingOnly:SetPoint("TOPRIGHT", 0, -8)
+  c.missingOnly:SetPoint("TOPRIGHT", 0, -336)
   local right = 0
   for i = #SCOPES, 1, -1 do
     local s = SCOPES[i]

@@ -1,0 +1,132 @@
+{
+  "source": "https://everloot.app/api/corpus/public?kinds=instance_entrance,encounter",
+  "asOf": "2026-11-10T20:10:17.037Z",
+  "label": "Agreed by players, 3 installs; Data from Everloot (https://everloot.app), CC BY-SA 4.0",
+  "entrances": [],
+  "bosses": [
+    {
+      "instanceMapId": 48,
+      "encounterId": 2910
+    },
+    {
+      "instanceMapId": 48,
+      "encounterId": 2911
+    },
+    {
+      "instanceMapId": 48,
+      "encounterId": 2912
+    },
+    {
+      "instanceMapId": 48,
+      "encounterId": 2914
+    },
+    {
+      "instanceMapId": 48,
+      "encounterId": 2915
+    },
+    {
+      "instanceMapId": 48,
+      "encounterId": 2916
+    },
+    {
+      "instanceMapId": 389,
+      "encounterId": 2732
+    },
+    {
+      "instanceMapId": 389,
+      "encounterId": 2733
+    },
+    {
+      "instanceMapId": 389,
+      "encounterId": 2734
+    },
+    {
+      "instanceMapId": 389,
+      "encounterId": 2735
+    },
+    {
+      "instanceMapId": 43,
+      "encounterId": 585
+    },
+    {
+      "instanceMapId": 43,
+      "encounterId": 586
+    },
+    {
+      "instanceMapId": 43,
+      "encounterId": 587
+    },
+    {
+      "instanceMapId": 43,
+      "encounterId": 588
+    },
+    {
+      "instanceMapId": 43,
+      "encounterId": 589
+    },
+    {
+      "instanceMapId": 43,
+      "encounterId": 590
+    },
+    {
+      "instanceMapId": 43,
+      "encounterId": 591
+    },
+    {
+      "instanceMapId": 43,
+      "encounterId": 592
+    },
+    {
+      "instanceMapId": 2999,
+      "encounterId": 3353
+    },
+    {
+      "instanceMapId": 2999,
+      "encounterId": 3354
+    },
+    {
+      "instanceMapId": 2999,
+      "encounterId": 3355
+    },
+    {
+      "instanceMapId": 2999,
+      "encounterId": 3411
+    },
+    {
+      "instanceMapId": 2999,
+      "encounterId": 3412
+    },
+    {
+      "instanceMapId": 33,
+      "encounterId": 2748
+    },
+    {
+      "instanceMapId": 33,
+      "encounterId": 2749
+    },
+    {
+      "instanceMapId": 33,
+      "encounterId": 2750
+    },
+    {
+      "instanceMapId": 33,
+      "encounterId": 2751
+    },
+    {
+      "instanceMapId": 33,
+      "encounterId": 2752
+    },
+    {
+      "instanceMapId": 33,
+      "encounterId": 2753
+    },
+    {
+      "instanceMapId": 33,
+      "encounterId": 2754
+    },
+    {
+      "instanceMapId": 33,
+      "encounterId": 2755
+    }
+  ]
+}

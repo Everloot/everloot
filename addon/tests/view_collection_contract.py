@@ -143,11 +143,9 @@ click(c.missingOnly)
 assert(shown(rows) == 2 and rows[1].name.text == 'Private' and rows[2].name.text == 'Scout', 'the missing titles')
 click(c.missingOnly)
 
--- Raids: this week's lockouts for this character; a lockout that has reset is gone.
+-- Instances are covered by instances_contract.py, including scope and live lockouts.
 click(c.sections.raids)
-assert(c.summary.text == 'Raids: 1 saved this week', c.summary.text)
-assert(shown(rows) == 1 and rows[1].name.text == 'Molten Core' and rows[1].detail.text == '3 of 10 · resets 2026-11-11 07:00', rows[1].detail.text)
-assert(rows[1].detail.width == 276, 'a row without a bar gives its room to the detail')
+assert(c.sections.raids.text == 'Dungeons & raids')
 
 -- Quests: one row per chain, this character's quests done of its total; a chain cut at the tracker's limit is never complete.
 click(c.sections.quests)
@@ -192,7 +190,7 @@ click(c.sections.quests)
 assert(c.summary.text == 'Quests: 0 of 0 chains complete', c.summary.text)
 assert(shown(c.rows) == 0 and c.rows.empty.text == 'No quest chains read yet. They are read at login and each time you turn in a quest.', c.rows.empty.text)
 click(c.sections.raids)
-assert(c.summary.text == 'No raid lockouts this week.' and c.rows.empty.text == 'No raid lockouts this week.')
+assert(c.summary.text:find('Dungeons & raids', 1, true))
 assert(EverlootWindow.shown and not U.failed)
 """)
 
@@ -239,12 +237,6 @@ assert(rows[2].name.text == 'Orgrimmar' and rows[2].detail.text == '42500 / 4299
 click(c.sections.titles)
 assert(c.summary.text == 'Titles: 3 of 3', c.summary.text)
 assert(rows[1].name.text == 'Corporal' and rows[1].detail.text == 'Brakka' and rows[2].name.text == 'Private' and rows[2].detail.text == 'Velda')
-
--- Raids: each character's own lockouts, named; Blackwing Lair belongs to a key outside the roster.
-click(c.sections.raids)
-assert(c.summary.text == 'Raids: 2 saved this week', c.summary.text)
-assert(rows[1].name.text == 'Molten Core' and rows[1].detail.text == '3 of 10 · resets 2026-11-11 07:00 · Brakka', rows[1].detail.text)
-assert(rows[2].name.text == 'Zul Gurub' and rows[2].detail.text == '2 of 10 · resets 2026-11-09 07:00 · Velda', rows[2].detail.text)
 
 -- Quests: the character furthest along each chain; quests done on different characters are not added together.
 click(c.sections.quests)

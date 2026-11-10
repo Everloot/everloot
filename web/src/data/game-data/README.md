@@ -39,3 +39,28 @@ with its single-target cast (Mark of the Wild) because they do not stack. Entrie
 the build are left out.
 
 World of Warcraft and its names are trademarks and copyright of Blizzard Entertainment, Inc.
+
+## Addon Collection instances
+
+From the repository root, fetch every page of
+`https://everloot.app/api/corpus/public?kinds=instance_entrance,encounter` into one response JSON. Keep its
+`dataAsOf`, set `next` to null only after following all pages, and require `records.length === total`.
+Then run from `web/`:
+
+```sh
+npx tsx scripts/build-instance-data.ts --snapshot /path/to/complete-corpus.json
+```
+
+This commits only the agreed instance/encounter ids and agreed entrance types to
+`addon/data/agreed-instances.json`, using `instanceBosses` and `confirmedEntrances` from `kb/src/instances.ts`,
+the same functions used by the open-data export. No personal kills, install ids or invented reports are shipped.
+The current snapshot is as of **2026-11-10T20:10:17.037Z**. Entrance agreement is currently empty; the game-file
+type supplies grouping until players agree an entrance. Only bosses meeting the agreement rule are listed.
+
+Regenerate Lua from the committed snapshot with `npx tsx scripts/build-instance-data.ts` in `web/`.
+Encounter names/order come from `client-encounters.json` (build 1.60.1.70862); instance names/types come from
+`map.json`, with `addon/data/instance-map-names.json` for maps that have no entrance coordinates. That supplemental
+game-file export is stamped separately (currently 1.60.1.70634); refresh it from a client SQLite snapshot with
+`python scripts/build-instance-map-names.py /path/to/snapshot.sqlite` at the repository root, then regenerate Lua.
+World bosses 2789, 2791, 2804 and 2832 always come from the game files, explicitly unconfirmed.
+`web/scripts/instance-data.test.ts` checks that the committed Lua matches these sources exactly.
