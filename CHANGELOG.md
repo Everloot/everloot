@@ -45,7 +45,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
 
 ### Fixed
-- Site: Shared breadcrumbs cover the missing pages, professions and utility forms.
+- Site: /api/suggest spends the per-IP quota and shares one edge cache entry for `Thunder` and `thunder `, the coverage 400 and waitlist 503 are `no-store` (the 503 adds `Retry-After`), and the docs list every route that sends CORS from one file.
 - Site: item list pagination is crawlable while filter URLs stay blocked.
 - Site: /database splits its rows into "Seen by players" and "From the game files", says after launch that a row fills when 3 installs agree, and drops the Guilds lookup row (the Tools menu has it).
 - Knowledge base: a self-hosted MCP server and `coverage-report` read the whole public corpus again. The reader stopped
@@ -74,6 +74,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: an addon page typed in the wrong case, and the four retired tool addresses (/tools/database, /tools/completionist,
   /tools/guild-tracker, /tools/profession-planner), answer a permanent 308 like every other moved address on the site.
   Before, they answered a temporary 307, so a crawler kept asking for the old address.
+- Site: Shared breadcrumbs cover the missing pages, professions and utility forms.
 - Site: a faction page says whether the faction is a header of the reputation pane (Yes or No) and names its parent
   faction from the game files, with the id shown once; a header with no standing of its own is noindex and out of the
   sitemap. Faction, achievement and instance pages take the item pages' title, "Ironforge – WoW Forever faction".
