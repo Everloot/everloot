@@ -6,10 +6,8 @@ required, or tightening a limit is a major release.
 
 ## [Unreleased]
 
-## [2.1.0] - 2026-11-10
-
 ### Added
-- MCP knowledge hits optionally carry recordId, gameId, sourceKind, build and observed snapshot support for gameplay discovery. Existing tool names and ids are preserved.
+- 2.1.0: MCP knowledge hits optionally carry recordId, gameId, sourceKind, build and observed snapshot support for gameplay discovery. Existing tool names and ids are preserved.
 - `dropsResponse.rates[].sourceName`: the NPC's or object's name, once 3 installs agree on it; absent until then.
   Optional, so earlier readers are unaffected.
 

@@ -56,7 +56,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Addon: the Gold Overview shows earned, spent and profit for the selected period and character or account, with daily averages, top items and pending sales.
 - Site: a "Write a wiki page" guide under Docs › Guides says how a wiki page is proposed and reviewed, with the page
   types, the front matter, the rules and the check from the wiki README; the wiki hub and the lore archive link to it.
-- MCP: generic search and exact-name lookup discover agreed gameplay names and zone ids, with separate record and game ids and source labels.
+- MCP: generic search and exact-name lookup discover agreed gameplay names and zone ids, with separate record and
+  game ids and source labels.
 - Protocol: 2.1.0 adds optional gameplay identity and provenance fields to MCP knowledge hits.
 - Site: a faction page and a title page carry In short, Copy for AI, a "Player reports" fact that stays an empty meter
   until three installs agree, a "Track this" link to the collections tool and a relation tab ("Reputation from" on a

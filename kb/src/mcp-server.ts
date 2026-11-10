@@ -48,7 +48,7 @@ import {
 } from "./page-urls.js";
 import { allTerms, getByName, getDocument, getEntity, search, searchSomeWords, SOME_WORDS, type SearchHit } from "./search.js";
 import { confirmedCatalog, confirmedLine, isConfirmable, type ConfirmedIds } from "./catalog-confirmed.js";
-import { bodyOf, gameplayIndex, mergeCatalogIndexes, catalogLabel, getCatalogByName, getCatalogEntity, isCatalogId, searchCatalog, type CatalogIndex, type CatalogRecord } from "./catalog-index.js";
+import { bodyOf, gameplayIndex, mergeCatalogIndexes, catalogLabel, getCatalogByName, getCatalogEntity, isCatalogId, searchCatalog, CATALOG_ID_BASE, type CatalogIndex, type CatalogRecord } from "./catalog-index.js";
 import { cutArrays, MAX_ROWS, readField, type FieldRead } from "./json-pointer.js";
 
 export const SERVER_NAME = "everloot-knowledge";
@@ -772,9 +772,13 @@ const GUILD_HIDDEN = "This guild asked to be hidden. Nothing about it is shown."
 export type ToolAnswer = Answer;
 export type ToolHandlers = { [K in McpToolName]: (args: McpToolArgs<K>) => ToolAnswer | Promise<ToolAnswer> };
 
-// HTTP creates a server per request. Keep discovery across those servers, keyed by the exact corpus and scopes.
-let gameplayMemo: { records: unknown[]; asOf: string | null; recheck: readonly RecheckScope[]; index: CatalogIndex } | undefined;
-let mergedMemo: { catalog: CatalogIndex | null; gameplay: CatalogIndex; index: CatalogIndex } | undefined;
+// HTTP creates a server per request. Keep discovery across those servers by snapshot time, size and scope values.
+let gameplayMemo: { key: string; index: CatalogIndex } | undefined;
+let mergedMemo: { catalog: CatalogIndex | null; gameplay: CatalogIndex | null; index: CatalogIndex } | undefined;
+const gameplayKind = (kind?: string): boolean => kind === undefined || ["item", "npc", "object", "quest"].includes(kind);
+// Appended observed kinds occupy slots 8-11; zones (slot 12) come from the game files.
+const gameplayId = (id: number): boolean =>
+  Number.isInteger(id) && id >= CATALOG_ID_BASE + 8 * 10_000_000 && id < CATALOG_ID_BASE + 12 * 10_000_000;
 const NO_DISCOVERY_SCOPES: readonly RecheckScope[] = [];
 
 /**
@@ -795,17 +799,20 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
       return null;
     }
   };
-  const catalogOf = async (): Promise<CatalogIndex> => {
+  const catalogOf = async (includeGameplay = true): Promise<CatalogIndex> => {
     const catalog = await filesCatalogOf();
-    const corpus = options.corpus ? await options.corpus().catch(() => null)
+    const corpus = !includeGameplay ? null : options.corpus ? await options.corpus().catch(() => null)
       : await readCorpusRecords(["item_seen", "npc_sighting", "quest", "loot", "object_sighting"]);
-    if (!corpus) return mergeCatalogIndexes(catalog);
-    const asOf = corpus.dataAsOf ?? null;
-    if (!gameplayMemo || gameplayMemo.records !== corpus.records || gameplayMemo.asOf !== asOf || gameplayMemo.recheck !== recheck) {
-      gameplayMemo = { records: corpus.records, asOf, recheck, index: gameplayIndex(corpus.records, asOf, recheck) };
+    let gameplay: CatalogIndex | null = null;
+    if (corpus) {
+      const key = tooledKey(options.corpus ? "loader" : "url", corpus, recheck);
+      if (!gameplayMemo || gameplayMemo.key !== key) {
+        gameplayMemo = { key, index: gameplayIndex(corpus.records, corpus.dataAsOf ?? null, recheck) };
+      }
+      gameplay = gameplayMemo.index;
     }
-    if (!mergedMemo || mergedMemo.catalog !== catalog || mergedMemo.gameplay !== gameplayMemo.index) {
-      mergedMemo = { catalog, gameplay: gameplayMemo.index, index: mergeCatalogIndexes(catalog, gameplayMemo.index) };
+    if (!mergedMemo || mergedMemo.catalog !== catalog || mergedMemo.gameplay !== gameplay) {
+      mergedMemo = { catalog, gameplay, index: mergeCatalogIndexes(catalog, gameplay) };
     }
     return mergedMemo.index;
   };
@@ -818,12 +825,12 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
   const readFacts = <T>(tool: ToolName, render: (facts: T) => string) => fromTooledUploads(tool, render, options.corpus, recheck);
   const handlers: ToolHandlers = {
     search_knowledge: async (args) => {
-      const result = await searchResult(db, args, await catalogOf());
+      const result = await searchResult(db, args, await catalogOf(args.version !== "lore" && gameplayKind(args.kind)));
       const ids = await confirmedOf(result.hits);
       return { text: await textOfSearch(db, result, ids), structured: { hits: annotate(await withPages(db, result.hits), ids) } };
     },
     get_entity: async (args) => {
-      const catalog = await catalogOf();
+      const catalog = await catalogOf(gameplayId(args.id));
       const hit = await entityOf(db, args.id, catalog);
       const ids = await confirmedOf(hit ? [hit] : []);
       if (args.field === undefined || !hit) return { text: await handleGetEntity(db, args, catalog, ids), structured: { hit: hit ? annotate(await withPages(db, [hit]), ids)[0]! : null } };
@@ -836,7 +843,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
       return { text: hitText(shown, `${label}${rowsText(read)}`, ids), structured: { hit: shown, field: fieldOut(read) } };
     },
     get_by_name: async (args) => {
-      const catalog = await catalogOf();
+      const catalog = await catalogOf(gameplayKind(args.kind));
       const hits = await namedHits(db, args.name, args.kind, catalog);
       const ids = await confirmedOf(hits);
       return { text: await handleGetByName(db, args, catalog, ids), structured: { hits: annotate(await withPages(db, hits), ids) } };
@@ -847,7 +854,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
     fetch: async (args) => {
       const numeric = /^\d{1,15}$/.test(args.id) ? Number(args.id) : undefined;
       if (numeric !== undefined && isCatalogId(numeric)) {
-        const catalog = await catalogOf();
+        const catalog = await catalogOf(gameplayId(numeric));
         const record = catalog ? getCatalogEntity(catalog, numeric) : undefined;
         if (record) {
           const ids = await confirmedOf([record]);

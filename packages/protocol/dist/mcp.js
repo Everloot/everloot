@@ -483,7 +483,7 @@ export const fetchedDocument = z.object({
 export const knowledgeHit = z.object({
     id: z.number().int().describe("The record id, for get_entity."),
     recordId: z.number().int().optional().describe("Alias of id. Pass to get_entity or fetch, never a gameplay tool."),
-    gameId: z.number().int().optional().describe("Gameplay id: itemId for item_page, npcId for npc_page, questId for quest_page, objectId for object_page; a zone is a UiMap id for world_map_near.zone. Absent for lore and reference records."),
+    gameId: z.number().int().optional().describe("Gameplay id: itemId for item_page, npcId for npc_page, questId for quest_page, objectId for object_page; a zone is a UiMap id for world_map_near.zone. Absent for lore, reference and other catalog kinds (including instances, whose extId is a Map.db map id, not a UiMap id)."),
     sourceKind: z.enum(["observed", "game-files", "lore", "reference"]).optional().describe("Observed names are agreed by 3 installs; game-files facts remain unconfirmed. Lore is historical archive text, not current gameplay evidence."),
     build: z.string().optional().describe("Game-file build this metadata was read from; not inferred for observed names."),
     observed: z.object({ asOf: z.string().nullable() }).optional().describe("Name agreed by 3 or more installs. asOf is the corpus snapshot time, not the last observation time."),

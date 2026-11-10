@@ -62,7 +62,7 @@
                 "maximum": 9007199254740991
               },
               "gameId": {
-                "description": "Gameplay id: itemId for item_page, npcId for npc_page, questId for quest_page, objectId for object_page; a zone is a UiMap id for world_map_near.zone. Absent for lore and reference records.",
+                "description": "Gameplay id: itemId for item_page, npcId for npc_page, questId for quest_page, objectId for object_page; a zone is a UiMap id for world_map_near.zone. Absent for lore, reference and other catalog kinds (including instances, whose extId is a Map.db map id, not a UiMap id).",
                 "type": "integer",
                 "minimum": -9007199254740991,
                 "maximum": 9007199254740991

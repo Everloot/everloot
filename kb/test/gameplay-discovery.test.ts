@@ -1,13 +1,14 @@
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { openDb, type DB } from "../src/db.js";
 import { createToolHandlers } from "../src/mcp-server.js";
 import { buildCatalogIndex } from "../src/catalog-index.js";
+import * as catalogModule from "../src/catalog-index.js";
 import { WORLD_MAP_DATA } from "../src/world-map-file.js";
 import { catalogId, CATALOG_ID_BASE } from "../src/catalog-index.js";
 import { replaceSourceRows } from "../src/entities.js";
 
 const dbs: DB[] = [];
-afterEach(() => { for (const db of dbs.splice(0)) db.close(); });
+afterEach(() => { vi.restoreAllMocks(); for (const db of dbs.splice(0)) db.close(); });
 const rows = ["a", "b", "c"].flatMap((installId) => [
   { kind: "item_seen", installId, itemId: 2589, name: "Linen Cloth", description: "PRIVATE TEXT" },
   { kind: "npc_sighting", installId, npcId: 3840, name: "Druid of the Fang", mapId: 1429, x: 50, y: 50, positionKind: "interaction" },
@@ -36,6 +37,9 @@ test("released zone names give UiMap ids for world_map_near", async () => {
   const hit = out(await h.get_by_name({ name: "Elwynn Forest", kind: "zone" })).hits[0];
   expect(hit).toMatchObject({ gameId: 1429, sourceKind: "game-files", build: expect.any(String) });
   expect(out(await h.get_entity({ id: hit.recordId })).hit.gameId).toBe(1429);
+  const instance = out(await h.get_entity({ id: catalogId("instance", "34") })).hit;
+  expect(instance).not.toBeNull();
+  expect(instance).not.toHaveProperty("gameId");
   const near = await h.world_map_near({ zone: String(hit.gameId), x: 50, y: 50, radius: 500, limit: 5 });
   expect(JSON.stringify(near)).toContain("Elwynn Forest");
 });
@@ -98,4 +102,44 @@ test("held-back zones are absent even when their map metadata is available", asy
     const hits = out(await h.get_by_name({ name: zone.name, kind: "zone" })).hits;
     expect(hits.some((hit: { gameId: number }) => hit.gameId === zone.uiMapId)).toBe(false);
   }
+});
+
+test("discovery reuses indexes across fresh corpus arrays and equivalent scopes", async () => {
+  const db = openDb(":memory:"); dbs.push(db);
+  const catalog = buildCatalogIndex({ map: WORLD_MAP_DATA });
+  const build = vi.spyOn(catalogModule, "gameplayIndex");
+  const merge = vi.spyOn(catalogModule, "mergeCatalogIndexes");
+  const corpus = vi.fn(async () => ({ records: [...rows], dataAsOf: "2026-11-12T00:00:00Z" }));
+  const make = () => createToolHandlers(db, { catalog: () => catalog, corpus, recheck: [] });
+  await make().search_knowledge({ query: "Linen Cloth", kind: "item", limit: 5 });
+  await make().get_by_name({ name: "Linen Cloth", kind: "item" });
+  await make().get_entity({ id: catalogId("item", "2589") });
+  await make().fetch({ id: String(catalogId("item", "2589")) });
+  expect(corpus).toHaveBeenCalledTimes(4);
+  expect(build).toHaveBeenCalledTimes(1);
+  expect(merge).toHaveBeenCalledTimes(1);
+});
+
+test("release-only and lore discovery never read the corpus", async () => {
+  const db = openDb(":memory:"); dbs.push(db);
+  const corpus = vi.fn(async () => ({ records: [...rows], dataAsOf: null }));
+  const h = createToolHandlers(db, { catalog: () => buildCatalogIndex({ map: WORLD_MAP_DATA }), corpus });
+  await h.search_knowledge({ query: "Linen Cloth", version: "lore", limit: 5 });
+  await h.search_knowledge({ query: "Elwynn Forest", kind: "zone", limit: 5 });
+  await h.get_by_name({ name: "Linen Cloth", kind: "lore_page" });
+  await h.get_entity({ id: 1 });
+  await h.get_entity({ id: catalogId("zone", "1429") });
+  await h.fetch({ id: String(catalogId("instance", "34")) });
+  expect(corpus).not.toHaveBeenCalled();
+});
+
+test("unavailable corpus reuses the files-only merged index", async () => {
+  const db = openDb(":memory:"); dbs.push(db);
+  const catalog = buildCatalogIndex({ map: WORLD_MAP_DATA });
+  const merge = vi.spyOn(catalogModule, "mergeCatalogIndexes");
+  const corpus = async () => null;
+  for (let i = 0; i < 2; i++) {
+    await createToolHandlers(db, { catalog: () => catalog, corpus }).get_by_name({ name: "Linen Cloth", kind: "item" });
+  }
+  expect(merge).toHaveBeenCalledTimes(1);
 });

@@ -48,3 +48,18 @@ The ID-chain tests above measure this fix. No current production corpus or live 
 - PR title format, whitespace and eleventh Added changelog bullet checked.
 
 Protocol 2.1.0 adds optional fields only. All existing tool names remain unchanged; existing id ranges are preserved.
+
+## Review follow-up
+
+Three new regressions failed before the cache fix: fresh arrays rebuilt the gameplay index four times,
+release/lore-only calls read the corpus six times, and unavailable storage rebuilt the merged index twice.
+All eleven discovery tests now pass, including an instance that must not expose its Map.db id as a gameplay id.
+
+The discovery key follows the existing gameplay-tool snapshot key (source, asOf, record count and scope values).
+Calls unable to return observed kinds skip the corpus; unavailable storage reuses the files-only merged index.
+Only zones among game-file catalog kinds expose gameId; their ids are UiMap ids.
+
+After integrating main: KB 1,996 passed, one expected failure and one skipped across 169 files;
+protocol 99 passed and one expected failure across eight files; web MCP mount, routes, catalog and docs
+34 passed across five files. Web and KB typechecks pass; web lint passes with four existing warnings.
+No flaky failures occurred. All five packages installed with npm ci; protocol dist and schemas rebuilt.

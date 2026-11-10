@@ -143,7 +143,7 @@ function record(kind: CatalogKind, extId: string, name: string, stamp: Stamp, fi
   return {
     id: catalogId(kind, extId),
     recordId: catalogId(kind, extId),
-    gameId: Number(extId),
+    ...(kind === "zone" ? { gameId: Number(extId) } : {}),
     sourceKind: "game-files",
     build: stamp.version,
     extId,
