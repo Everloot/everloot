@@ -24,9 +24,9 @@ const CENSUS_SEEN = "census_seen", CENSUS_SELF = "census_self";
 /**
  * Kinds the addon keeps for the Everloot Desktop App's own Characters page and that no uploader sends: the player's
  * professions, raid lockouts, active talent build (addon/modules/owned.lua), character sheet stats (charstats.lua) and
- * PvP standing (pvp.lua). The protocol has no schema for them, so the intake would refuse them anyway; they are held here by name so they never reach a batch and are not counted as invalid.
+ * PvP standing (pvp.lua), and own boss kills (boss_kills.lua). The protocol has no schema for them, so the intake would refuse them anyway; they are held here by name so they never reach a batch and are not counted as invalid.
  */
-export const LOCAL_ONLY_KINDS: readonly string[] = ["profession_owned", "lockout_owned", "talent_owned", "stats_owned", "pvp_owned"];
+export const LOCAL_ONLY_KINDS: readonly string[] = ["profession_owned", "lockout_owned", "talent_owned", "stats_owned", "pvp_owned", "boss_kill_owned"];
 
 /** Distinct characters per census kind. A row without a guid is not a character and is not counted. */
 export function censusCharacters(records: readonly { kind: string; guid?: unknown }[]): UploadSession["census"] {

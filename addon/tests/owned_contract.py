@@ -120,10 +120,10 @@ assert lua.eval("raidInfoAsked") == 1
 # An empty saved list at login means the answer has not come yet: no lockout rows before UPDATE_INSTANCE_INFO.
 assert plain(lua, "lockout_owned") == []
 
-# The answer: raids this character is saved to, with an absolute reset. A dungeon and an expired raid are left out.
+# The answer: raids this character is saved to, with an absolute reset. Saved dungeons are included; an expired raid is left out.
 lua.execute("event('UPDATE_INSTANCE_INFO')")
 locks = plain(lua, "lockout_owned")
-assert [l["instance"] for l in locks] == ["Molten Core", "Onyxia's Lair"], locks
+assert [l["instance"] for l in locks] == ["Molten Core", "Onyxia's Lair", "Deadmines"], locks
 mc = locks[0]
 assert {k: mc[k] for k in ("characterKey", "class", "level", "instance", "instanceId", "difficultyId", "difficulty", "bossesKilledCount", "bossesTotal", "resetAt")} == {
     "characterKey": key, "class": "MAGE", "level": 60, "instance": "Molten Core", "instanceId": 409, "difficultyId": 9,
@@ -141,7 +141,7 @@ assert lua.eval("#forbidden") == 0, list(lua.eval("forbidden").values())
 lua.execute("book[1][3] = 260; event('SKILL_LINES_CHANGED'); event('UPDATE_INSTANCE_INFO'); event('UPDATE_INSTANCE_INFO')")
 profs = plain(lua, "profession_owned")
 assert len(profs) == 3 and profs[[p["profession"] for p in profs].index("Tailoring")]["rank"] == 260, profs
-assert len(plain(lua, "lockout_owned")) == 2
+assert len(plain(lua, "lockout_owned")) == 3
 
 # A dropped profession goes from the file.
 lua.execute("professions[2] = nil; event('SKILL_LINES_CHANGED')")
@@ -156,7 +156,7 @@ event('PLAYER_ENTERING_WORLD'); event('UPDATE_INSTANCE_INFO')
 other = lua.eval("(Everloot.Completion.Identity())")
 assert other != key
 locks = plain(lua, "lockout_owned")
-assert sorted((l["characterKey"], l["bossesKilledCount"]) for l in locks) == sorted([(key, 6), (key, 1), (other, 2)]), locks
+assert sorted((l["characterKey"], l["bossesKilledCount"]) for l in locks) == sorted([(key, 6), (key, 1), (key, 5), (other, 2)]), locks
 assert {p["characterKey"] for p in plain(lua, "profession_owned")} == {key, other}
 
 # Three days on, the first character's Molten Core lockout has reset: the next read drops it for every character.
@@ -188,7 +188,7 @@ lua = addon(setup="GetProfessionInfo = nil")
 assert "professions unavailable, missing GetProfessionInfo (records nothing)" in status(lua), status(lua)
 lua.execute("event('PLAYER_ENTERING_WORLD'); event('SKILL_LINES_CHANGED'); event('UPDATE_INSTANCE_INFO')")
 assert plain(lua, "profession_owned") == []
-assert len(plain(lua, "lockout_owned")) == 2
+assert len(plain(lua, "lockout_owned")) == 3
 
 lua = addon(setup="GetSavedInstanceInfo = nil; RequestRaidInfo = nil")
 assert "lockouts unavailable, missing GetSavedInstanceInfo (records nothing)" in status(lua), status(lua)
@@ -198,7 +198,7 @@ assert plain(lua, "lockout_owned") == [] and len(plain(lua, "profession_owned"))
 # RequestRaidInfo is optional: without it the list is still read when the server sends it.
 lua = addon(setup="RequestRaidInfo = nil")
 lua.execute("event('PLAYER_ENTERING_WORLD'); event('UPDATE_INSTANCE_INFO')")
-assert len(plain(lua, "lockout_owned")) == 2
+assert len(plain(lua, "lockout_owned")) == 3
 
 # Values the game leaves out are left out, not written as zeros.
 lua = addon(setup="""

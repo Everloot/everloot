@@ -3,7 +3,7 @@
 -- Runs with the completion tracker (/everloot completion on|off) and under its key.
 --
 --   profession_owned  one row per profession: name, skill line id, rank, max rank.
---   lockout_owned     one row per raid this character is saved to: instance, difficulty, bosses killed of total,
+--   lockout_owned     one row per saved instance this character is saved to: instance, difficulty, bosses killed of total,
 --                     when the lockout resets.
 --   talent_owned      one row: the ACTIVE spec group's tree id, spec id, spent points and every spent node with its
 --                     ranks and choice. Copied from E.Talents.Snapshot (talents.lua), which also feeds the anonymous
@@ -122,7 +122,7 @@ function O.ReadProfessions()
   return replace("profession_owned", key, rows)
 end
 
---- This character's raid lockouts as the server last reported them, or nil when the client cannot list them.
+--- This character's instance lockouts as the server last reported them, or nil when the client cannot list them.
 function O.ReadLockouts()
   if not ready.lockouts then return nil end
   local key, class, level = E.Completion.Identity()
@@ -136,7 +136,7 @@ function O.ReadLockouts()
     name = text(name, 80)
     reset = type(reset) == "number" and math.floor(reset) or nil
     -- An expired lockout is still listed, unlocked with no time left: it is left out.
-    if name and locked == true and isRaid == true and whole(reset, 1, 31 * 24 * 3600)
+    if name and locked == true and (isRaid == true or isRaid == false) and whole(reset, 1, 31 * 24 * 3600)
       and whole(numEncounters, 1, MAX_BOSSES) and whole(encounterProgress, 0, numEncounters) then
       rows[#rows + 1] = {
         characterKey = key, class = class, level = level, capturedAt = at, installId = EverlootDB.installId,
