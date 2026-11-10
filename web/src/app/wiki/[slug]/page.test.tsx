@@ -167,7 +167,7 @@ test("a published dungeon page shows the game files' level and entrance marked u
   const html = await render("test-dungeon");
   const glance = section(html, "at-a-glance");
   // The committed build gives the Deadmines one level; it is printed as given, never widened into a range.
-  expect(glance).toMatch(/<dt[^>]*>Level<\/dt><dd[^>]*>16 <a href="\/methodology#files"><span data-badge="files"/);
+  expect(glance).toMatch(/<dt[^>]*>Level<\/dt><dd[^>]*>16 <span data-badge="files"/);
   expect(glance).not.toMatch(/16\s*[–-]/);
   expect(glance).toMatch(/<dt[^>]*>Entrance<\/dt><dd[^>]*>[\s\S]*href="\/database\/zones\/1436-westfall"[^>]*>Westfall<\/a>[\s\S]*href="\/map\?zone=1436&amp;x=38.2&amp;y=77.5"[^>]*>38.2, 77.5<\/a>[\s\S]*data-badge="files"/);
   expect(glance).toContain("Difficulties in the files");
@@ -267,5 +267,4 @@ test("Deadmines dates the older read and explains the current facts table", asyn
   const html = await render("deadmines");
   expect(html).toContain("read from build 1.60.1.70707 on 2026-11-01");
   expect(html).toContain("the At a glance table is regenerated from the current build");
-  expect(html).toContain('href="/methodology#files"');
 });

@@ -43,9 +43,8 @@ export default function MapList({ zones, shown, show, pinTotal, spoilers, thumbs
                 href={zoneHref(z.mapId, spoilers)} onClick={(e) => { e.preventDefault(); onZone(z.mapId); }}
                 className="inline-flex min-h-11 items-center gap-1.5 text-fg underline decoration-edge underline-offset-4 hover:decoration-fg md:min-h-8"
               >
-                {z.name}{z.heldBack && " *"}
+                {z.name}{z.heldBack && <> *<Badge tone="files">{HELD_LABEL}</Badge></>}
               </Link>
-              {z.heldBack && <Badge tone="files">{HELD_LABEL}</Badge>}
             </li>
           ))}
         </ul>

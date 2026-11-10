@@ -26,14 +26,14 @@ const BASE = "inline-flex h-6 max-w-full items-center gap-1.5 whitespace-nowrap 
 export default function Badge(props: BadgeProps) {
   switch (props.tone) {
     case "files": {
-      // A custom title can describe a saved talent build rather than a game-file source.
       const marker = (
         <span data-badge="files" title={props.title ?? UNCONFIRMED_TITLE} className="inline-flex h-2.5 w-2.5 shrink-0 items-center justify-center align-middle">
           <span aria-hidden="true" className="block h-2 w-2 rotate-45 rounded-[1px] border-[1.5px] border-edge" />
           <span className="sr-only">{props.children ?? "unconfirmed"}</span>
         </span>
       );
-      return props.title && !props.href ? marker : <Link href={props.href ?? "/methodology#files"}>{marker}</Link>;
+      // Only a caller that names a page gets a link, with a 24 px target around the 10 px marker.
+      return props.href ? <Link href={props.href} className="inline-flex min-h-6 min-w-6 items-center justify-center align-middle">{marker}</Link> : marker;
     }
     case "confirmed":
       return <span data-badge="confirmed" className={`${BASE} border-accent text-accent`}>{props.children ?? "Confirmed by 3 installs"}</span>;
