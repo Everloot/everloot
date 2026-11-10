@@ -126,6 +126,13 @@ function E:CommunityPrice(realm, itemId)
   return communityRow(communityFor(realm), itemId)
 end
 
+--- The state of a realm's price file ({ status = "verifying" | "ready" | "bad", asOf, silent }), for the window's
+--- crafting costs to say how old their market values are. `silent` is a realm the file has no entry for.
+function E:PriceFile(realm)
+  local entry = communityFor(realm)
+  return { status = entry.status, asOf = entry.asOf, silent = entry.silent }
+end
+
 local function hex(r, g, b) return string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255) end
 
 -- The tooltip's colours: fel green for the header only, Everloot's price gold for labels, the player's own scan in
