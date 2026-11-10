@@ -126,5 +126,5 @@ test("a hover card reads an item's reported numbers from the stored view; an ite
   useCloud();
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(view), { status: 200 })));
   expect((await loadCardFacts(20)).shown).toEqual([{ fact: "strength", value: 7, reporters: 3, build: "1.60.1.70862", lastSeen: null }]);
-  expect(await loadCardFacts(10)).toEqual({ shown: [], contested: [] });
+  expect(await loadCardFacts(10)).toEqual({ shown: [], contested: [], unreachable: false });
 });

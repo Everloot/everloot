@@ -3,11 +3,15 @@ import { beforeEach, expect, test, vi } from "vitest";
 // Players agree on one item name (19019) and one quest; the name rule shows a wiki-matched item (647) and a
 // wiki quest title (176). Item 5 is in the game files only: no card, as on its page.
 const mocks = vi.hoisted(() => ({
-  items: vi.fn(), world: vi.fn(), reported: vi.fn(), objects: vi.fn(), assets: vi.fn(), tips: vi.fn(), quests: vi.fn(), shown: vi.fn(), names: vi.fn(),
+  items: vi.fn(), world: vi.fn(), reported: vi.fn(), objects: vi.fn(), assets: vi.fn(), tips: vi.fn(), quests: vi.fn(), shown: vi.fn(), names: vi.fn(), tipsDown: vi.fn(),
 }));
 vi.mock("@/lib/rollup-compute", () => ({ loadItemFacts: mocks.items, loadWorldFacts: mocks.world, loadReportedItemFacts: mocks.reported, loadAllReportedItemFacts: vi.fn() }));
 vi.mock("@/lib/objects", () => ({ loadObjectFacts: mocks.objects }));
-vi.mock("@/lib/game-assets", () => ({ loadSiteAssets: mocks.assets, loadItemTips: mocks.tips, loadQuestNames: mocks.quests, loadItemNames: mocks.names, PRIVATE_UNREACHABLE: Symbol.for("unreachable") }));
+vi.mock("@/lib/game-assets", () => ({
+  loadSiteAssets: mocks.assets, loadItemTips: mocks.tips, loadQuestNames: mocks.quests, readQuestNames: mocks.quests, loadItemNames: mocks.names,
+  readItemTips: async (assets: unknown, ids: number[]) => ({ tips: await mocks.tips(assets, ids), unreachable: mocks.tipsDown() }),
+  PRIVATE_UNREACHABLE: Symbol.for("unreachable"),
+}));
 vi.mock("@/lib/shown-item-names", () => ({ loadShownNames: mocks.shown }));
 
 import { edgeTtl } from "@/lib/cf-edge-cache";
@@ -31,6 +35,7 @@ beforeEach(() => {
   mocks.reported.mockReset().mockResolvedValue({ shown: [], contested: [], unreachable: false });
   mocks.objects.mockReset().mockResolvedValue({ rates: [], names: [], unreachable: false, dataAsOf: null, measuredZeros: [] });
   mocks.assets.mockReset().mockResolvedValue({ base: "https://assets.everloot.app/b", version: "70450", label: "Found in game files, unconfirmed" });
+  mocks.tipsDown.mockReset().mockReturnValue(false);
   mocks.tips.mockReset().mockImplementation(async (_a: unknown, ids: number[]) => new Map(ids.includes(647) ? [[647, TIP]] : []));
   mocks.quests.mockReset().mockResolvedValue({ names: new Map([[176, { name: "Wanted: Hogger", wikiPage: "z" }]]) });
   const agreed = new Map([[19019, "Thunderfury"]]);
@@ -136,4 +141,70 @@ test("a stored view written before it held the reported numbers still names the 
   expect((await call("item", "647")).status).toBe(200);
   expect(mocks.shown).not.toHaveBeenCalled();
   expect(mocks.reported).toHaveBeenCalledWith(647);
+});
+
+const DOWN = Symbol.for("unreachable");
+const R2 = { R2_ACCOUNT_ID: "acct", R2_ACCESS_KEY_ID: "id", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "everloot-uploads" };
+/** The cron's stored item view, read from the (stubbed) uploads bucket. */
+function storedView(view: object) {
+  for (const [k, v] of Object.entries(R2)) vi.stubEnv(k, v);
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(view), { status: 200 })));
+}
+/** A read failed: a 503 neither the browser nor the edge keeps, so the next hover asks again. */
+function expectUnavailable(res: Response) {
+  expect(res.status).toBe(503);
+  expect(res.headers.get("cache-control")).toBe("no-store");
+  expect(res.headers.get("cdn-cache-control")).toBe("no-store");
+  expect(edgeTtl(res)).toBeNull();
+}
+
+test("an asset manifest that did not load is a 503, not a card without its game file lines", async () => {
+  vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", "https://assets.everloot.app/b");
+  mocks.assets.mockResolvedValue(null);
+  expectUnavailable(await call("item", "647"));
+  expect(mocks.tips).not.toHaveBeenCalled();
+  // Without a manifest URL there is nothing to read: the card is whole without game file lines.
+  vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", "");
+  const res = await call("item", "19019");
+  expect(res.status).toBe(200);
+  expect(edgeTtl(res)).toBe(3600);
+});
+
+test("an item file shard that could not be read is a 503, not a card without its game file lines", async () => {
+  mocks.tipsDown.mockReturnValue(true);
+  expectUnavailable(await call("item", "647"));
+});
+
+test("a stored view from before the reported numbers, with the aggregates out of reach, is a 503 rather than a card without them", async () => {
+  storedView({ version: 1, generatedAt: "2026-11-10T00:00:00.000Z", dataAsOf: null, agreed: [], dropped: [], seen: [], from: [] });
+  mocks.reported.mockResolvedValue({ shown: [], contested: [], unreachable: true });
+  expectUnavailable(await call("item", "647"));
+  expect(mocks.reported).toHaveBeenCalledWith(647);
+});
+
+test("a quest with storage down is a 503: the Warcraft Wiki title does not stand in for the players' facts", async () => {
+  mocks.world.mockResolvedValue({ unreachable: true, vendors: [], npcs: [], quests: [] });
+  expectUnavailable(await call("quest", "176"));
+  expectUnavailable(await call("quest", "9"));
+  // Quest titles that could not be read are a 503 too, for a quest players have not titled.
+  mocks.world.mockResolvedValue({ unreachable: false, vendors: [], npcs: [], quests: [] });
+  mocks.quests.mockResolvedValue(DOWN);
+  expectUnavailable(await call("quest", "176"));
+});
+
+test("names that could not be read are a 503, never a 404 a browser would keep: with the stored view and without it", async () => {
+  storedView({ version: 1, generatedAt: "2026-11-10T00:00:00.000Z", dataAsOf: null, agreed: [[19019, "Thunderfury"]], dropped: [], seen: [], from: [], reported: [] });
+  mocks.names.mockResolvedValue(DOWN);
+  // 647 is shown only under its wiki name, which is now unread: it could be shown or not.
+  expectUnavailable(await call("item", "647"));
+  expectUnavailable(await call("item", "5"));
+
+  forgetItemView();
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+  mocks.shown.mockResolvedValue({ facts: { unreachable: false }, degraded: true, agreed: new Map(), matched: null, showsTip: () => false });
+  expectUnavailable(await call("item", "647"));
+  // With the names read, an id no page shows is a 404 as before.
+  mocks.shown.mockResolvedValue({ facts: { unreachable: false }, degraded: false, agreed: new Map(), matched: null, showsTip: () => false });
+  expect((await call("item", "5")).status).toBe(404);
 });

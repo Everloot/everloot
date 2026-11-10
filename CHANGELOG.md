@@ -317,7 +317,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 ### Changed
 - Site: hover cards on item, NPC, quest and object links open faster. The card's frame shows at once with the name
   and quality colour the link already has, then fills in; a card you hovered before opens whole with no wait; and the
-  site keeps each card ready for every visitor instead of working it out again on each hover.
+  site keeps each card ready for every visitor instead of working it out again on each hover. A card that could not be
+  read whole while storage is down is never kept, and hovering the link again a few seconds later asks for it again.
 - Docs: the launch-day page is marked historical, and day-to-day operation of the site is in docs/OPERATIONS.md.
 - Protocol: `itemsResponse.items` is typed with the row `GET /api/items` returns (item id, then class, subclass, slot
   and quality, each null when the build does not name it), so a client generated from `schema/api/itemsResponse.json`

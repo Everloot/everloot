@@ -38,11 +38,12 @@ export async function loadListNames(): Promise<ListNames> {
 
 /**
  * One item's tooltip numbers installs agree or disagree on, for its hover card, from the stored view; falls back to
- * `loadReportedItemFacts` (the whole aggregate set) when there is no view or it predates the field.
+ * `loadReportedItemFacts` (the whole aggregate set) when there is no view or it predates the field. `unreachable` when
+ * that fallback could not read the aggregates.
  */
-export async function loadCardFacts(itemId: number): Promise<ItemFactState> {
+export async function loadCardFacts(itemId: number): Promise<ItemFactState & { unreachable: boolean }> {
   const reported = (await loadItemView())?.reported;
-  return reported ? reported.get(itemId) ?? NO_REPORTED_FACTS : loadReportedItemFacts(itemId);
+  return reported ? { ...(reported.get(itemId) ?? NO_REPORTED_FACTS), unreachable: false } : loadReportedItemFacts(itemId);
 }
 
 /** The items players have seen and where from, from the stored view; falls back to `loadItemSeen`. */

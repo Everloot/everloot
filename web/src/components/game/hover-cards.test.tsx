@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import HoverCards, { CARD_ID, forgetCards, linkFrame, Lru, SHOW_DELAY } from "./HoverCards";
+import HoverCards, { CARD_ID, forgetCards, linkFrame, Lru, RETRY_DELAY, SHOW_DELAY } from "./HoverCards";
 
 const THUNDERFURY = {
   type: "item", id: 19019, title: "Thunderfury, Blessed Blade of the Windseeker", quality: 5,
@@ -88,6 +88,43 @@ test("an id nobody reported (404) gets no card, and is not asked for again", asy
   await wait(SHOW_DELAY);
   expect(fetcher).toHaveBeenCalledTimes(1);
   expect(card()).toBeNull();
+});
+
+test("a 503 (storage down) is not kept: no card now, and a hover after a short delay asks again and shows it", async () => {
+  let down = true;
+  fetcher.mockImplementation(async () => (down
+    ? new Response(JSON.stringify({ ok: false }), { status: 503 })
+    : new Response(JSON.stringify({ ok: true, card: THUNDERFURY }), { status: 200 })));
+  const a = link("/database/items/19019");
+  const hover = async () => {
+    pointer("pointerout", a, "mouse", document.body);
+    pointer("pointerover", a);
+    await wait(SHOW_DELAY);
+  };
+  await hover();
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(card()).toBeNull();
+  // Straight back: not asked again yet, so a list crossed during an outage does not hammer it.
+  down = false;
+  await hover();
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(card()).toBeNull();
+  await wait(RETRY_DELAY);
+  await hover();
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(card()!.textContent).toContain(THUNDERFURY.title);
+  // A network error is not kept either.
+  fetcher.mockRejectedValueOnce(new TypeError("offline"));
+  const other = link("/database/items/99999");
+  pointer("pointerout", a, "mouse", document.body);
+  pointer("pointerover", other);
+  await wait(SHOW_DELAY);
+  expect(fetcher).toHaveBeenCalledTimes(3);
+  pointer("pointerout", other, "mouse", document.body);
+  await wait(RETRY_DELAY);
+  pointer("pointerover", other);
+  await wait(SHOW_DELAY);
+  expect(fetcher).toHaveBeenCalledTimes(4);
 });
 
 test("keyboard focus shows the card and Escape hides it, with focus left on the link", async () => {

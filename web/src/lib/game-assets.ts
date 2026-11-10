@@ -276,12 +276,23 @@ export function itemTip(r: ItemRecord, assets: Pick<SiteAssets, "base" | "versio
  * icons) and the private bucket, and the private files must be for the same build. Never throws.
  */
 export async function loadItemTips(assets: SiteAssets | null, ids: readonly number[], store: PrivateStore | null = privateStoreFromEnv()): Promise<Map<number, ItemTip>> {
+  return (await readItemTips(assets, ids, store)).tips;
+}
+
+/**
+ * `loadItemTips`, and whether a read of the private bucket failed (its index or a shard), so a reader that must not
+ * keep a partial answer, such as the edge-cached hover card, can tell a failure from an item with no tooltip.
+ */
+export async function readItemTips(assets: SiteAssets | null, ids: readonly number[], store: PrivateStore | null = privateStoreFromEnv()): Promise<{ tips: Map<number, ItemTip>; unreachable: boolean }> {
   const out = new Map<number, ItemTip>();
+  const result = { tips: out, unreachable: false };
   const wanted = [...new Set(ids)].filter((id) => Number.isInteger(id) && id > 0);
   const folder = assets ? buildFolder(assets.base) : null;
-  if (!assets || !store || !folder || !wanted.length) return out;
-  const index = ItemIndexSchema.safeParse(await store.read(`${folder}/items.json`));
-  if (!index.success || index.data.build.version !== assets.version) return out;
+  if (!assets || !store || !folder || !wanted.length) return result;
+  const read = await store.read(`${folder}/items.json`);
+  if (read === PRIVATE_UNREACHABLE) return { tips: out, unreachable: true };
+  const index = ItemIndexSchema.safeParse(read);
+  if (!index.success || index.data.build.version !== assets.version) return result;
   const byShard = new Map<number, number[]>();
   for (const id of wanted) {
     const s = itemShard(id, index.data.shardSize);
@@ -290,14 +301,16 @@ export async function loadItemTips(assets: SiteAssets | null, ids: readonly numb
   await Promise.all([...byShard].map(async ([shard, ids]) => {
     const file = index.data.shards[String(shard)]?.file;
     if (!file) return;
-    const body = z.record(z.string(), z.unknown()).safeParse(await store.read(`${folder}/${file}`));
+    const shardRead = await store.read(`${folder}/${file}`);
+    if (shardRead === PRIVATE_UNREACHABLE) { result.unreachable = true; return; }
+    const body = z.record(z.string(), z.unknown()).safeParse(shardRead);
     if (!body.success) return;
     for (const id of ids) {
       const r = ItemRecordSchema.safeParse(body.data[String(id)]);
       if (r.success) out.set(id, itemTip(r.data, assets));
     }
   }));
-  return out;
+  return result;
 }
 
 /* ---------- Item names from the game files and the Warcraft Wiki ---------- */
@@ -390,9 +403,16 @@ export interface FileNames { version: string; names: Map<number, string> }
 const parsedGameNames = new WeakMap<object, { file: string; names: { version: string } | null }>();
 
 async function loadNamesFile<T extends { version: string }>(file: string, version: string, base: string | null, store: PrivateStore | null, parse: (raw: unknown) => T | null): Promise<T | null> {
+  const names = await readNamesFile(file, version, base, store, parse);
+  return names === PRIVATE_UNREACHABLE ? null : names;
+}
+
+/** `loadNamesFile`, with PRIVATE_UNREACHABLE when the bucket could not be read. */
+async function readNamesFile<T extends { version: string }>(file: string, version: string, base: string | null, store: PrivateStore | null, parse: (raw: unknown) => T | null): Promise<T | null | typeof PRIVATE_UNREACHABLE> {
   const folder = base ? buildFolder(base) : null;
   if (!folder || !store) return null;
   const raw = await store.read(`${folder}/${file}`);
+  if (raw === PRIVATE_UNREACHABLE) return raw;
   if (!raw || typeof raw !== "object") return null;
   if (parsedGameNames.get(raw)?.file !== file) parsedGameNames.set(raw, { file, names: parse(raw) });
   const names = parsedGameNames.get(raw)!.names as T | null;
@@ -404,8 +424,14 @@ async function loadNamesFile<T extends { version: string }>(file: string, versio
  * the Warcraft Wiki"): `<build folder>/quest-names.json` in the private bucket, read like loadItemNames. Null when
  * it is missing, unreadable or for another build; the pages then show "Quest N". Never throws.
  */
-export function loadQuestNames(version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()): Promise<QuestNames | null> {
-  return loadNamesFile("quest-names.json", version, base, store, (raw) => {
+export async function loadQuestNames(version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()): Promise<QuestNames | null> {
+  const names = await readQuestNames(version, base, store);
+  return names === PRIVATE_UNREACHABLE ? null : names;
+}
+
+/** `loadQuestNames`, with PRIVATE_UNREACHABLE when the bucket could not be read, like loadItemNames. */
+export function readQuestNames(version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()): Promise<QuestNames | null | typeof PRIVATE_UNREACHABLE> {
+  return readNamesFile("quest-names.json", version, base, store, (raw) => {
     const f = QuestNamesSchema.safeParse(raw);
     return f.success ? {
       version: f.data.build.version,

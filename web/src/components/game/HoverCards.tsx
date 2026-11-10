@@ -57,12 +57,16 @@ export class Lru<K, V> {
 
 /** How many cards a visit keeps: a few long lists' worth, a few hundred kilobytes at most. */
 export const CARD_LIMIT = 300;
+/** How long after a failed answer (a 503 while storage is down, a network error) a hover asks for that card again. */
+export const RETRY_DELAY = 5_000;
 // The cards asked for this visit; null is a 404 (unreported or unreleased: never a card). A failure is not kept.
 const cards = new Lru<string, SiteCard | null>(CARD_LIMIT);
+// When a card's answer last failed: a hover within RETRY_DELAY asks nothing, the next one after it asks again.
+const failed = new Lru<string, number>(CARD_LIMIT);
 // A card on its way: a second hover meanwhile waits for the same answer instead of asking again.
 const asking = new Map<string, Promise<SiteCard | null>>();
 /** For tests. */
-export const forgetCards = () => { cards.clear(); asking.clear(); };
+export const forgetCards = () => { cards.clear(); failed.clear(); asking.clear(); };
 
 /**
  * The card, from this visit's cards or asked for once. A request is not cancelled when the pointer leaves: the
@@ -70,17 +74,21 @@ export const forgetCards = () => { cards.clear(); asking.clear(); };
  */
 export function cardFor(key: string): Promise<SiteCard | null> {
   if (cards.has(key)) return Promise.resolve(cards.get(key) ?? null);
+  const failedAt = failed.get(key);
+  if (failedAt !== undefined && Date.now() - failedAt < RETRY_DELAY) return Promise.resolve(null);
   let asked = asking.get(key);
   if (!asked) {
+    const fail = () => { failed.set(key, Date.now()); return null; };
     asked = fetch(`/database/card/${key}`)
       .then(async (res) => {
+        // Only a 404 says there is no card; a 503 says the card could not be read this time.
         if (res.status === 404) { cards.set(key, null); return null; }
-        if (!res.ok) return null;
+        if (!res.ok) return fail();
         const card = ((await res.json()) as { card?: SiteCard }).card ?? null;
         cards.set(key, card);
         return card;
       })
-      .catch(() => null)
+      .catch(fail)
       .finally(() => asking.delete(key));
     asking.set(key, asked);
   }
