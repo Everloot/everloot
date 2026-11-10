@@ -75,6 +75,12 @@ That command is the rollback in `web/README.md` and [RELEASING.md](RELEASING.md)
 ([the go-live note](2026-11-02-showcase-go-live.md)). The other way back is to re-run
 `.github/workflows/deploy-worker.yml` on an older commit ([RELEASING.md](RELEASING.md)).
 
+The version just before may be unhealthy too. To land on a known-good one, list the versions with
+`npx wrangler versions list` and pass the chosen id: `npx wrangler rollback <version-id>`. Then confirm
+recovery before calling it done: warm the commit that version was built from with
+`node scripts/cf-warm.mjs https://everloot.app <commit>`, and run the Site health workflow by hand
+(`gh workflow run site-health.yml`). Recovery is a clean warm and a green health run.
+
 There is nothing to roll back when the build or deploy step failed, because the warm step never ran.
 
 ## The three cron schedules
@@ -97,7 +103,7 @@ completion rebuild is folded into a separate object over several runs and replac
 only when it has caught up (`web/src/app/api/cron/snapshot/route.ts`). The same query on `/api/cron/profiles`
 makes that run a full pass. `/api/cron/blue` and `/api/cron/indexnow` do not read it.
 
-A cron route that answers anything other than 200 makes `web/scripts/cf-entry.mjs` throw, so the
+A cron route that answers outside 200 to 299 makes `web/scripts/cf-entry.mjs` throw, so the
 trigger is recorded as failed.
 
 ## What `/api/health` answers
@@ -116,7 +122,8 @@ A read that fails, a timestamp that does not parse, or one more than 30 seconds 
 `.github/workflows/site-health.yml` runs at `7,22,37,52 * * * *`, and by hand. It asks
 `https://everloot.app/api/health`, then `https://everloot.app/database/items/25`, then
 `POST https://everloot.app/mcp/public` with `tools/list`. It sends `EVERLOOT_EDGE_CHECK` as
-`x-everloot-check`. The requests name themselves `Everloot-SiteHealth` in the user agent.
+`x-everloot-check` on the health and item requests only; the MCP request goes without it, because it
+measures the public allowance. The requests name themselves `Everloot-SiteHealth` in the user agent.
 
 A failure opens one issue labelled `site-down`, or comments on the open one, and the run exits 1.
 The next clean check closes those issues. The comment records which of these it saw:
