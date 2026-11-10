@@ -3,6 +3,20 @@ import { parseEverlootLua } from "./sv-parse";
 import { HISTORY_POINTS, RIVER_DAYS, categoryLabel, characterKey, directionOf, isMoneyLedger, narrowLedger, summarizeMoney, thin } from "./money-ledger";
 
 const NOW = Date.parse("2026-10-24T12:00:00Z");
+
+test("the same character name on two rulesets keeps separate ledger rows", () => {
+  const rows = ["PVE", "PVP"].map((ending, i) => ({ kind: "gold_snapshot", installId: "install-a",
+    character: "Thrall", realm: `CAMWOW US1 Realm 4 ${ending}`, capturedAt: "2026-10-24T10:00:00Z",
+    currentCopper: 100 + i, peakCopper: 100 + i }));
+  expect(summarizeMoney(rows, NOW).roster).toHaveLength(2);
+});
+
+test.fails("owner review: the same name and realm from different accounts must keep separate ledger rows", () => {
+  const rows = ["account-a", "account-b"].map((installId, i) => ({ kind: "gold_snapshot", installId,
+    character: "Thrall", realm: "CAMWOW US1 Realm 4 PVP", capturedAt: "2026-10-24T10:00:00Z",
+    currentCopper: 100 + i, peakCopper: 100 + i }));
+  expect(summarizeMoney(rows, NOW).roster).toHaveLength(2);
+});
 const gold = (character: string, capturedAt: string, currentCopper: number, peakCopper = currentCopper) =>
   ({ kind: "gold_snapshot", installId: "i", capturedAt, character, realm: "Moon Guard", currentCopper, peakCopper });
 const money = (character: string, capturedAt: string, category: string, copper: number) =>

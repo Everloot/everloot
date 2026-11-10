@@ -61,6 +61,24 @@ beforeEach(() => {
   store.loadCorpus.mockReset().mockResolvedValue({ uploads: 3, records: named, dataAsOf: "2026-10-20T06:30:00.000Z" });
 });
 
+test("same base name keeps ruleset and region in distinct page URLs and house prices", async () => {
+  const names = ["CAMWOW US1 Realm 4 PVE", "CAMWOW US1 Realm 4 PVP", "CAMWOW US1 Realm 4 RP",
+    "CAMWOW US1 Realm 4 RPPVP", "CAMWOW US1 Realm 4 Hardcore", "CAMWOW EU1 Realm 4 PVP"];
+  const rows = names.flatMap((name, i) => [
+    ...scans(dayAgo(0), [[2589, 101 + i, 101 + i]], name, undefined, { house: "Alliance" }),
+    ...scans(dayAgo(0), [[2589, 901 + i, 901 + i]], name, undefined, { house: "Horde" }),
+  ]);
+  store.loadMarket.mockResolvedValue({ state: foldMarket(emptyMarket(), rows, today), dataAsOf: today.toISOString() });
+  const html = await hub({ house: "alliance" });
+  for (const [i, name] of names.entries()) {
+    const slug = name.toLowerCase().replaceAll(" ", "-");
+    expect(html).toContain(`/tools/auctions/${slug}`);
+    const page = text(await realmHtml(slug, { house: "alliance" }));
+    expect(page).toContain(`1s ${1 + i}c`);
+    expect(page).not.toContain(`9s ${1 + i}c`);
+  }
+});
+
 test("the hub is the browse view across realms: names, realms, house switch, category tree and the way to add a realm", async () => {
   const html = await hub({});
   const words = text(html);
