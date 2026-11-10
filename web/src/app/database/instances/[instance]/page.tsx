@@ -204,7 +204,7 @@ export default async function InstancePage(props: Props) {
 
         <div className="space-y-6">
           {/* One note for the whole page, above the first section, rather than one per section. */}
-          <Disclosure summary="How this is counted">
+          <Disclosure as="h2" summary="How this is counted">
             <p>Facts: the type is from the game files where they place the entrance, else as 3 installs agree. The level is from the game files, which give one level for most instances rather than a range. The difficulty is the id 3 installs agree on; the game files' own list of the instance's difficulties shows beside it when they give one.</p>
             <p>Entrance: confirmed by the instance id, the last place outside where 3 installs stood before zoning in, at the median of their positions.</p>
             <p>Bosses: a boss is listed once 3 installs report its encounter ending here. Kills count every install's kills together; wipes are not kills. The encounters the game files list for this instance follow, marked unconfirmed until 3 installs report them.</p>
