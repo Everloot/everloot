@@ -64,15 +64,67 @@ export default function McpOverview() {
 
       <H2 id="core-concepts">Core concepts</H2>
 
+      <H3 id="choose-a-tool">Choose a tool</H3>
+      <P>
+        Start a question with <C>answer_sources</C> and check that its evidence contains the fact asked for.
+        A mention of the subject alone is not an answer. For a partial name use <C>search_knowledge</C>;
+        use <C>get_by_name</C> only for an exact full name. Check the hit&apos;s kind, gameVersion and sourceKind.
+        Read its recordId with <C>get_entity</C> or <C>fetch</C>; pass only its verified gameId to a page tool.
+        Lore is historical background, never confirmation of current Forever gameplay. If evidence is missing, say so.
+      </P>
+
+      <H3 id="multi-call-journeys">Three sample journeys</H3>
+      <P>
+        These show call order, not guaranteed recorded answers. Use the ids the response supplies, and stop when
+        the required metadata or evidence is missing.
+      </P>
+      <List>
+        <li>
+          Where does Linen Cloth come from? Call <C>answer_sources</C> with that question, then{" "}
+          <C>search_knowledge</C> with query <C>Linen Cloth</C> and kind <C>item</C>.
+          Read the chosen hit&apos;s recordId with <C>get_entity</C>; pass its gameId (2589) to{" "}
+          <C>item_page</C> and <C>entity_relations</C> with kind <C>item</C>.
+          Follow returned NPC game ids with <C>npc_page</C>, or vendor NPC ids with <C>vendor_page</C>.
+          Cite the page and keep loot-window counts and install support.
+        </li>
+        <li>
+          What is near Elwynn Forest at 40, 60? Call <C>get_by_name</C> with name <C>Elwynn Forest</C>{" "}
+          and kind <C>zone</C>. Pass the hit&apos;s gameId as <C>world_map_near.zone: &quot;1429&quot;</C>,
+          with x 40 and y 60. Follow a returned NPC with <C>npc_page</C> or a vendor with <C>vendor_page</C>.
+          For an achievement, faction, title or quest_chain instead, read its recordId with <C>get_entity</C>;
+          use <C>field</C> and <C>nextOffset</C> to continue arrays. Archive ids never go to gameplay tools.
+        </li>
+        <li>
+          What is Linen Cloth worth on US1 Realm 4 PvP? Resolve the item with <C>search_knowledge</C>, then call{" "}
+          <C>market_value</C> with its gameId and realm <C>CAMWOW US1 Realm 4 PvP</C>.
+          A unique suffix of two or more whole words also works; if ambiguous or unknown, select a returned full-name
+          candidate and retry. Call <C>auction_history</C> with the resolved realm and itemId for the dated history.
+          Keep the own-scan label, reporter count, scan days and corpus date. Market text lists houses separately; its structured page and history full-scan days use the house with most
+          units listed (ties: Alliance, Horde, Neutral), named in the text. Browsing sightings are separate and not split by house.
+          No input selects a house; never blend house prices or call an old minimum a live offer.
+        </li>
+      </List>
+
       <H3 id="player-data-and-the-3-install-rule">Player data and the 3-install rule</H3>
       <P>
         Tools built on player data, marked below, state a fact only after 3 installs agree on it. A few follow their own
-        rule and say so on their pages: <C>guild_board</C> needs 2 of a guild&apos;s officers to agree, and{" "}
+        rule and say so on their pages: market days and census counts can use Everloot&apos;s own installs while few
+        players upload, explicitly labelled with the actual counts. This exception does not confirm other gameplay facts.{" "}
+        <C>guild_board</C> needs 2 of a guild&apos;s officers to agree, and{" "}
         <C>gold_ledger</C>, <C>collection_gap</C> and <C>completion_progress</C> read the owner&apos;s own shared upload for
         what that person owns or has done. They say when something is not
         recorded yet, and an unrecorded answer is never a zero. Anything read from the game files is labelled &quot;found in game
         files, unconfirmed&quot;, with its build. <Link href="/docs/how-it-works" className={docLink}>How Everloot works</Link>{" "}
         explains the rule.
+      </P>
+
+      <P>
+        For owned progress and ledgers, ask for the player&apos;s deliberately shared identifiers and follow the sharing
+        setup on the tool&apos;s page. The player can find their install id at <C>EverlootDB.installId</C> in their own{" "}
+        <C>SavedVariables/Everloot.lua</C>; a characterKey comes from their completion upload. Share only the needed
+        identifier, not the whole file. Never infer these ids or probe other players&apos; ids.
+        Profession cost estimates use median reagent prices from at least three installs, without realm, build or time
+        scoping; use <C>market_value</C> for a dated realm value. Missing prices stay unknown.
       </P>
 
       <H3 id="record-kinds">Record kinds</H3>

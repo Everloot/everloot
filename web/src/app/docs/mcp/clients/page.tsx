@@ -21,6 +21,10 @@ export default function ClientsPage() {
         Every client uses the same hosted endpoint. It needs no sign-in and asks for no key, so there is nothing to set up beyond
         the URL.
       </P>
+      <P>
+        Once connected, follow the <Link href="/docs/mcp#choose-a-tool" className={docLink}>tool decision tree</Link>:
+        question to evidence, name to verified game id, then page tool. The overview includes three sample call journeys.
+      </P>
       <div className="mt-6">
         <CodeGroup title="MCP endpoint" tabs={[{ label: "URL", lang: "text", code: MCP_URL }]} />
       </div>

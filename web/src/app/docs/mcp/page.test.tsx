@@ -12,6 +12,18 @@ import { KNOWLEDGE_KINDS, MCP_TOOL_NAMES } from "@everloot/protocol";
 import { CATALOG_ID_BASE, CATALOG_KIND_SPAN, CATALOG_KINDS, kindRows } from "./kinds";
 import McpOverview from "./page";
 
+/** The text between tags in rendered markup, joined with no space at element boundaries, as a browser shows it. */
+function pageText(html: string): string {
+  let out = "";
+  let inTag = false;
+  for (const ch of html) {
+    if (ch === "<") inTag = true;
+    else if (ch === ">") inTag = false;
+    else if (!inTag) out += ch;
+  }
+  return out.replaceAll("&#x27;", "'").replaceAll("&quot;", '"').replaceAll("&amp;", "&");
+}
+
 // The kb package is not a dependency of the site, so the page's copy of the catalog scheme is read back from its source.
 const KB_CATALOG_INDEX = new URL("../../../../../kb/src/catalog-index.ts", import.meta.url);
 
@@ -48,4 +60,13 @@ test("the page renders every kind and names the id scheme", () => {
   expect(text).toContain("1,000,000,000");
   expect(text).toContain("1,010,000,072");
   expect(html).toContain('href="/docs/mcp/tools/item_page"');
+});
+
+test("the page keeps a space where an element ends a line of prose", () => {
+  // Tags are dropped without a replacement space, so a space lost between a <code> and the next word shows up here.
+  // The page's text as a browser reads it: element boundaries add no space, so a dropped JSX space shows up.
+  const text = pageText(renderToStaticMarkup(<McpOverview />)).replace(/\s+/g, " ");
+  expect(text).toContain("name Elwynn Forest and kind zone");
+  expect(text).toContain("other gameplay facts. guild_board needs");
+  expect(text).toContain("in their own SavedVariables/Everloot.lua");
 });

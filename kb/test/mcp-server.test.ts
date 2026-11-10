@@ -6,6 +6,7 @@ import { openDb } from "../src/db.js";
 import { replaceSourceRows, type EntityInput } from "../src/entities.js";
 import {
   PROMISE,
+  SERVER_DESCRIPTION,
   SERVER_INSTRUCTIONS,
   SERVER_NAME,
   cachePublicCorpus,
@@ -24,6 +25,16 @@ import type { GuildReader } from "../src/guilds.js";
 import { CREDIT_LINE, LICENCE } from "@everloot/protocol";
 
 const UNAVAILABLE_TEXT = "Public corpus unavailable. These figures are unrecorded, not zero.";
+
+test("connection guidance routes identities without licensing Blizzard data", () => {
+  expect(SERVER_DESCRIPTION).not.toContain("CC BY-SA");
+  for (const word of ["answer_sources", "search_knowledge", "get_by_name", "recordId", "gameId", "get_entity", "fetch", "nextOffset", "item_page", "npc_page", "quest_page", "world_map_near", "candidates"]) {
+    expect(SERVER_INSTRUCTIONS).toContain(word);
+  }
+  expect(SERVER_INSTRUCTIONS).toContain("at least two words");
+  expect(SERVER_INSTRUCTIONS).toContain("own-install exception");
+  expect(SERVER_INSTRUCTIONS).toContain("requested fact");
+});
 
 const row = (extId: string, name: string, body = "", extra: Partial<EntityInput> = {}): EntityInput => ({
   kind: "lore_page",
