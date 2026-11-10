@@ -211,6 +211,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: spell and vendor links show hover cards, with the spell text and build or the vendor's agreed goods count.
 - Addon: shopping lists. The Everloot tab at the auction house has a Shopping list page: named lists of items with a wanted count and an optional max price per unit, each beside the price file's market value and its age, and a Search button that sends one auction-house search per press when the client's throttle allows (the lowest buyout found shows in the row; you buy from the Buy tab yourself). The Professions tab's what-to-buy list adds a recipe's reagents. Saved in your file only, up to 10 lists of 50 items; bags and bank are not read.
 - Site: the home page now states the site's promise, "Every fact shows how many players saw it, and when", with three counts under it: the installs that have reported, the facts they have confirmed and the facts waiting on one or two more installs, each with the data date and build, or "unrecorded" when the stored coverage score cannot be read. An empty loot tab on an NPC, item or object page now ends on how many installs it takes, beside the Get the addon link, and the MCP server's instructions state the same promise.
+- Site: /database/recent and its RSS feed list the entities whose facts reached three installs in the last 30 days;
+  dates from before the feed existed are marked estimated.
 
 ### Fixed
 - Site: the header shows the build whose files the site reads and the newest build seen, each linked to what it means.
@@ -347,6 +349,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   `/reload`: the 0.3.22 addon release or earlier shows no community prices from the new price file.
 - Desktop App: the price file is fetched and written per auction house, and the Market page lists each realm's houses
   apart. The Characters page keeps two characters with the same name and realm apart.
+- Site: the home page banner no longer makes the page a few pixels wider than the window on a computer with a
+  scrollbar, so the page has nothing to scroll sideways at any width.
 
 ### Changed
 - Site: hover cards on item, NPC, quest and object links open faster. The card's frame shows at once with the name
@@ -466,7 +470,13 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: zone and instance pages open with the same title row as the other database pages (name, type line, quiet controls at its end), and the instance and spell-talent facts use the same label-and-value list.
 - Site: the web-font swap no longer moves the page. Geist and Geist Mono now fall back to Arial and Courier New resized per weight to Geist's widths (the Arial fallback was 4% too wide at regular), and a screen of height is reserved only while the database hub streams, so a 404 or an empty result keeps its footer in view.
 - MCP: clarify tool choice, name and id discovery, realm aliases, evidence limits and price methods, with three example journeys.
-- MCP: rank answering claims before subject matches, state unavailable requested facts, and report separate answerability rates.
+- MCP: the `coverage` tool answers from the stored coverage report the snapshot cron writes for the build, the same
+  one the home page counts, so both show the same installs and facts and no answer replays the corpus. Only when
+  that report is missing, for another build, or not confirmed by storage in the last five minutes (a failed refresh
+  no longer keeps it) does it compute the score live; the answer's date line says which.
+- MCP: `coverage` and `everloot_plan` answer with a summary first and page the rest, so a broad question stays under 12 KB (the audit measured 82 KB for every zone's quests and 38 KB for the plan). `coverage` without a zone gives the totals, each type and one line per zone, 20 zones at a time, now with structured totals and denominators; `everloot_plan` with any argument names each row, 40 at a time, and states the tracker's revision (it records no date). `detail`, `offset` and `limit` read the rest, every page stays under 12,000 bytes even at the largest `limit`, and says how many it shows of how many and gives `nextOffset`. One zone answers as before, and `everloot_plan` with no arguments still returns the whole tracker. A zone filter that matches no released zone is unmeasured, not zeros.
+- MCP: rank answering claims before subject matches, state unavailable requested facts,
+  and report separate answerability rates.
 
 ## [desktop-v0.1.21] - 2026-11-10
 

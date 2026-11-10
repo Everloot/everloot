@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import { z } from "zod";
 import { MCP_TOOLS } from "@everloot/protocol";
 import { computeCoverage } from "../src/coverage.js";
+import type { CoverageAnswer } from "../src/coverage-tool.js";
 import { createToolHandlers } from "../src/mcp-server.js";
 import type { DB } from "../src/db.js";
 
@@ -18,21 +19,26 @@ const report = () => computeCoverage({
     { zone: "1429", types: { npc: 10 }, fields: { npc: { name: 10 } } },
   ] },
 });
-const call = (args = {}, loader = async () => report()) => createToolHandlers({} as DB, { coverage: loader }).coverage(args);
+const answer = (args = {}, loader = async () => report()) => createToolHandlers({} as DB, { coverage: loader }).coverage(args);
+const textOf = async (a: unknown) => ((await a) as CoverageAnswer).text;
+const call = (args = {}, loader = async () => report()) => textOf(answer(args, loader));
 
-test("coverage declares optional zone and type and text-only read-only output", () => {
+test("coverage declares optional zone, type, detail, offset and limit and a read-only structured output", () => {
   const def = MCP_TOOLS.coverage;
   const input = z.object(def.inputSchema);
   expect(input.parse({})).toEqual({});
   expect(input.parse({ zone: 1429, type: "npcs" })).toEqual({ zone: 1429, type: "npcs" });
+  expect(input.parse({ detail: true, offset: 3, limit: 2 })).toEqual({ detail: true, offset: 3, limit: 2 });
   expect(input.safeParse({ zone: -1 }).success).toBe(false);
   expect(input.safeParse({ type: "players" }).success).toBe(false);
+  expect(input.safeParse({ limit: 51 }).success).toBe(false);
+  expect(input.safeParse({ offset: -1 }).success).toBe(false);
   expect(def.annotations.readOnlyHint).toBe(true);
-  expect("outputSchema" in def).toBe(false);
+  expect(def.outputSchema).toBeDefined();
 });
 
 test("coverage gives dated counts, field grain, method, installs, and safe reported lists", async () => {
-  const text = await call();
+  const text = await call({ detail: true, limit: 2 });
   expect(text).toContain("all released zones; all types");
   expect(text).toContain(asOf);
   expect(text).toContain("2 distinct folded installs");
@@ -64,7 +70,7 @@ test("confirmed, settled and game-file counts use the score without exposing raw
     })),
     fileEntrances: [{ instanceMapIds: [36], zone: 1429 }],
   });
-  const text = await call({}, async () => r);
+  const text = await call({ detail: true }, async () => r);
   expect(text).toContain("5 distinct folded installs");
   expect(text).toContain("npcs: 1/[?] settled; 1/[?] confirmed");
   expect(text).toContain("entrances: 0/3 settled; 0/3 confirmed");
@@ -83,16 +89,16 @@ test("unknown denominators, dates and build read [?], never a measured zero", as
 });
 
 test("unavailable, disconnected and unknown zones are explicit", async () => {
-  expect(await createToolHandlers({} as DB).coverage({})).toContain("not connected");
+  expect(await textOf(createToolHandlers({} as DB).coverage({}))).toContain("not connected");
   expect(await call({}, async () => { throw new Error("private failure"); })).toContain("unavailable");
   expect(await call({ zone: 9999 })).toContain("No released zone matches");
 });
 
 test("scoped totals keep whole-fact settled-list counts separate, dated and counts-only", async () => {
-  const text = await createToolHandlers({} as DB, {
+  const { text } = await createToolHandlers({} as DB, {
     coverage: async () => report(),
     settledSummary: async (build) => ({ build, dataAsOf: "2026-10-21T12:00:00Z", facts: 17 }),
-  }).coverage({ zone: 1429, type: "npcs" });
+  }).coverage({ zone: 1429, type: "npcs" }) as CoverageAnswer;
   expect(text).toContain("Whole-fact settled list: 17 facts; build test-build; data as of 2026-10-21T12:00:00Z");
   expect(text).toContain("entire build, before zone/type filters");
   expect(text).toContain("Scoped entity-field totals: 0 settled; 0 confirmed (includes settled); 1 still reported");
@@ -106,13 +112,13 @@ test("undated, wrong-build and failed settled lists are unknown, dated empty lis
     async () => ({ build: "wrong", dataAsOf: asOf, facts: 99 }),
     async () => { throw new Error("private failure"); },
   ]) {
-    const text = await createToolHandlers({} as DB, { coverage: async () => report(), settledSummary }).coverage({});
+    const { text } = await createToolHandlers({} as DB, { coverage: async () => report(), settledSummary }).coverage({}) as CoverageAnswer;
     expect(text).toContain("Whole-fact settled list: [?] facts");
     expect(text).not.toMatch(/99 facts|private failure/);
   }
-  const text = await createToolHandlers({} as DB, {
+  const { text } = await createToolHandlers({} as DB, {
     coverage: async () => report(), settledSummary: async (build) => ({ build, dataAsOf: asOf, facts: 0 }),
-  }).coverage({});
+  }).coverage({}) as CoverageAnswer;
   expect(text).toContain("Whole-fact settled list: 0 facts");
 });
 
@@ -121,4 +127,10 @@ test("a capped list never invents an exhaustive type-filtered needs count", asyn
   r.zones[0]!.needsTotal = 999;
   const text = await call({ zone: r.zones[0]!.mapId, type: "npcs" }, async () => r);
   expect(text).toContain("Fields needing one or two more installs: [?]");
+});
+
+test("the date line says whether the score is the stored report or computed live, and stays as it was when the host does not say", async () => {
+  expect(await call({}, async () => ({ ...report(), source: "stored" as const }))).toContain(`Data as of ${asOf} (stored report, written by the snapshot cron for this build); build test-build`);
+  expect(await call({}, async () => ({ ...report(), source: "live" as const }))).toContain(`Data as of ${asOf} (computed from the corpus now: no stored report for this build was usable); build test-build`);
+  expect(await call()).toContain(`Data as of ${asOf}; build test-build`);
 });

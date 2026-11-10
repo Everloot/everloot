@@ -24,9 +24,13 @@ const professions = vi.hoisted(() => ({ writeProfessions: vi.fn(), buildProfessi
 vi.mock("@/lib/profession-store", () => professions);
 const mapPins = vi.hoisted(() => ({ writeMapPins: vi.fn(), buildMapPins: vi.fn() }));
 vi.mock("@/lib/map-pins-store", () => mapPins);
+const activity = vi.hoisted(() => ({ writeDatabaseActivity: vi.fn(), buildDatabaseActivity: vi.fn() }));
+vi.mock("@/lib/database-activity-store", () => ({ writeDatabaseActivity: activity.writeDatabaseActivity }));
+vi.mock("@/lib/database-activity", () => ({ buildDatabaseActivity: activity.buildDatabaseActivity }));
 import { GET } from "./route";
 beforeEach(() => {
   store.loadCorpus.mockReset();
+  activity.writeDatabaseActivity.mockReset().mockResolvedValue({ written: false });
   professions.writeProfessions.mockReset().mockResolvedValue({ written: false });
   mapPins.writeMapPins.mockReset().mockResolvedValue({ written: false });
   vi.stubEnv("CRON_SECRET", "synthetic-cron-key");
@@ -352,4 +356,22 @@ test("the stored views share one corpus read per run, and an idle run reads none
   expect(res.status).toBe(200);
   expect(await res.json()).toMatchObject({ ok: true, itemView: null, aggregates: null, auctionHistory: null, professions: null, mapPins: null });
   expect(store.loadCorpus).toHaveBeenCalledOnce();
+});
+
+test("database activity is isolated, has a response key and shares the lazy corpus", async () => {
+  store.writeSnapshot.mockResolvedValue({ added: 1, dataAsOf: "2026-11-10T00:00:00Z" });
+  const corpus = { records: [], uploads: 0 };
+  store.loadCorpus.mockResolvedValue(corpus);
+  activity.writeDatabaseActivity.mockImplementation(async (_opts, deps) => {
+    await deps.build(null);
+    await deps.build(null);
+    return { written: true, entries: 0 };
+  });
+  expect(await (await GET(req())).json()).toMatchObject({ databaseActivity: { written: true } });
+  expect(store.loadCorpus).toHaveBeenCalledOnce();
+  expect(activity.buildDatabaseActivity).toHaveBeenCalledWith(corpus, expect.any(Date), null);
+  activity.writeDatabaseActivity.mockRejectedValue(new Error("R2 down"));
+  const res = await GET(req());
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ ok: true, databaseActivity: null });
 });

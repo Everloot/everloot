@@ -345,9 +345,16 @@ test("the docs name no internal path and no AI as an author", () => {
   expect(decoded).not.toMatch(/co-authored|generated (by|with)|written by (an )?(ai|claude|gpt)/i);
 });
 
-test("the tool catalogue documents coverage filters, field grain and withheld values", () => {
+test("the tool catalogue documents coverage filters, field grain, withheld values and paging", () => {
   expect(page).toContain("/docs/mcp/tools/coverage");
-  for (const words of ["Database coverage", "UiMap zone id", "settled / expected", "confirmed / expected", "unconfirmed values", "text only"]) {
+  for (const words of ["Database coverage", "UiMap zone id", "settled / expected", "confirmed / expected", "unconfirmed values", "nextOffset"]) {
+    expect(text).toContain(words);
+  }
+});
+
+test("long answers: the byte budget, the plan's unbounded no-argument answer, its revision and unmeasured coverage", () => {
+  for (const words of ["at most 12,000 bytes", "with no arguments returns the whole tracker as it always has", "that answer is not size-bounded",
+    "states its revision", "the date is unknown", "page.measured is false", "counted from the items it holds"]) {
     expect(text).toContain(words);
   }
 });

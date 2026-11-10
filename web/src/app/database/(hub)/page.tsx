@@ -101,6 +101,7 @@ export default async function DatabasePage() {
             asOfLine(stats.unreachable ? null : stats.dataAsOf, Date.now()),
           ].filter(Boolean).join(" · ")}
         />
+        <p className="mb-4 text-meta"><Link href="/database/recent" className="text-fg hover:underline">New public facts</Link></p>
         <SearchBar
           action="/search"
           id="database-search"

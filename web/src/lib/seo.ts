@@ -20,7 +20,7 @@ export const TWITTER_IMAGE ={ url: "/twitter-image", width: 1200, height: 630 };
  * `title` goes through the layout's "%s · Everloot" template; the social title adds the site name itself.
  * Pass `image` for a route that has its own opengraph-image (the same path serves the Twitter card).
  */
-export function pageMetadata(page: { title: string; description: string; path: string; image?: string; alt?: string; imageWidth?: number; imageHeight?: number }): Metadata {
+export function pageMetadata(page: { title: string; description: string; path: string; image?: string; alt?: string; imageWidth?: number; imageHeight?: number; feed?: string }): Metadata {
   const social = `${page.title} · ${SITE_NAME}`;
   const size = { width: page.imageWidth ?? 1200, height: page.imageHeight ?? 630 };
   const og = page.image ? { url: page.image, ...size, alt: page.alt ?? social } : { ...IMAGE, alt: social };
@@ -28,7 +28,7 @@ export function pageMetadata(page: { title: string; description: string; path: s
   return {
     title: page.title,
     description: page.description,
-    alternates: { canonical: page.path, types: FEED },
+    alternates: { canonical: page.path, types: page.feed || page.path.startsWith("/database") ? { "application/rss+xml": [{ url: page.feed ?? "/database/feed.xml", title: "New public database facts" }, { url: FEED["application/rss+xml"], title: "Game changes" }] } : FEED },
     openGraph: { type: "website", siteName: SITE_NAME, title: social, description: page.description, url: page.path, images: [og] },
     twitter: { card: "summary_large_image", title: social, description: page.description, images: [tw] },
   };

@@ -2,7 +2,7 @@ import { createMcpHttpHandler } from "../../../kb/src/mcp-http-server";
 import type { ToolOptions } from "../../../kb/src/mcp-server";
 import { catalogIndex } from "./catalog-index";
 import { loadTimeline } from "./changes";
-import { loadCoverage } from "./coverage-compute";
+import { loadCoverageForTool } from "./coverage-answer";
 import { loadCompletion } from "./completion-store";
 import { attributionHeaders } from "./data-guard";
 import { storedAuctionHistory } from "./auction-history-store";
@@ -38,7 +38,8 @@ export function toolLoaders(): ToolOptions {
   return {
     // The curated scopes: page tools count only reports after a scope's date, as the coverage score does.
     recheck: RECHECK_SCOPES,
-    coverage: () => loadCoverage(),
+    // The stored report the home page counts; the live computation only when it is missing or for another build.
+    coverage: () => loadCoverageForTool(),
     settledSummary: async (build) => {
       const list = await readSettledList(build);
       return { build: list.build, dataAsOf: list.dataAsOf, facts: settledKeys(list).size };

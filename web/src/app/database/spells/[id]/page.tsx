@@ -141,16 +141,14 @@ export default async function SpellPage(props: Props) {
   const params = await props.params;
   if (!/^[1-9]\d*$/.test(params.id)) notFound();
   const spellId = Number(params.id);
-  const { edges, assets, all, name, tip, talents, unknown } = await loadSpell(spellId);
+  const { edges, all, name, tip, talents, unknown } = await loadSpell(spellId);
   if (unknown) notFound();
   const rel = (r: Rel) => all.filter((e) => e.rel === r);
-  const icon = assets?.spellIcons.get(spellId);
   const title = name ?? tip?.name ?? `Spell ${spellId}`;
   const build = edges.client.find((e) => e.fromId === spellId || e.toId === spellId)?.build ?? CLIENT_LAYER.build.version;
 
   const creates = rel("created_by");
   const costs = rel("reagent_for");
-  const taught = rel("in_skill_line");
 
   // The page in three lines: what it is, what the files say it does, and where the name came from.
   const summary = entitySummary({

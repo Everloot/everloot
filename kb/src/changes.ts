@@ -318,16 +318,23 @@ export function renderFeed(entries: ChangeEntry[], site: { baseUrl: string; now:
       "    </item>",
     ].join("\n");
   });
+  return renderRssChannel(items, { baseUrl: base, now: entries[0] ? new Date(entries[0].at) : site.now });
+}
+
+/** Shared RSS envelope for the game timeline and the public database facts. Item XML is escaped by the caller. */
+export function renderRssChannel(items: string[], site: { baseUrl: string; now: Date; title?: string; path?: string; description?: string }): string {
+  const base = site.baseUrl.replace(/\/$/, "");
+  const path = site.path ?? "/changes";
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">',
     "  <channel>",
-    "    <title>Everloot: what changed in WoW: Forever</title>",
-    `    <link>${xml(`${base}/changes`)}</link>`,
-    `    <atom:link href="${xml(`${base}/changes/feed.xml`)}" rel="self" type="application/rss+xml"/>`,
-    "    <description>Official Blizzard posts and new game builds for WoW: Forever, newest first. Each post links to its page on Everloot, which links Blizzard's original.</description>",
+    `    <title>${xml(site.title ?? "Everloot: what changed in WoW: Forever")}</title>`,
+    `    <link>${xml(`${base}${path}`)}</link>`,
+    `    <atom:link href="${xml(`${base}${path}/feed.xml`)}" rel="self" type="application/rss+xml"/>`,
+    `    <description>${xml(site.description ?? "Official Blizzard posts and new game builds for WoW: Forever, newest first. Each post links to its page on Everloot, which links Blizzard's original.")}</description>`,
     "    <language>en-us</language>",
-    `    <lastBuildDate>${(entries[0] ? new Date(entries[0].at) : site.now).toUTCString()}</lastBuildDate>`,
+    `    <lastBuildDate>${site.now.toUTCString()}</lastBuildDate>`,
     ...items,
     "  </channel>",
     "</rss>",
