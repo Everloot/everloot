@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { parseEverlootLua } from "./sv-parse";
-import { HISTORY_POINTS, RIVER_DAYS, categoryLabel, characterKey, directionOf, isMoneyLedger, narrowLedger, summarizeMoney, thin } from "./money-ledger";
+import { HISTORY_POINTS, RIVER_DAYS, categoryLabel, characterKey, directionOf, isMoneyLedger, narrowLedger, rosterLabel, summarizeMoney, thin } from "./money-ledger";
 
 const NOW = Date.parse("2026-10-24T12:00:00Z");
 
@@ -11,11 +11,22 @@ test("the same character name on two rulesets keeps separate ledger rows", () =>
   expect(summarizeMoney(rows, NOW).roster).toHaveLength(2);
 });
 
-test.fails("owner review: the same name and realm from different accounts must keep separate ledger rows", () => {
-  const rows = ["account-a", "account-b"].map((installId, i) => ({ kind: "gold_snapshot", installId,
-    character: "Thrall", realm: "CAMWOW US1 Realm 4 PVP", capturedAt: "2026-10-24T10:00:00Z",
-    currentCopper: 100 + i, peakCopper: 100 + i }));
-  expect(summarizeMoney(rows, NOW).roster).toHaveLength(2);
+test("the same name and realm from different installs keep separate ledger rows, money and history", () => {
+  const rows = ["account-a", "account-b"].flatMap((installId, i) => [
+    { kind: "gold_snapshot", installId, character: "Thrall", realm: "CAMWOW US1 Realm 4 PVP", capturedAt: "2026-10-24T10:00:00Z", currentCopper: 100 + i, peakCopper: 100 + i },
+    { kind: "money_event", installId, character: "Thrall", realm: "CAMWOW US1 Realm 4 PVP", capturedAt: "2026-10-24T09:00:00Z", category: "loot", copper: 10 * (i + 1) },
+  ]);
+  const ledger = summarizeMoney(rows, NOW);
+  expect(ledger.roster.map((r) => [r.install, r.copper])).toEqual([[2, 101], [1, 100]]);
+  for (const row of ledger.roster) {
+    const own = narrowLedger(ledger, characterKey(row));
+    expect(own.receipts.map((r) => [r.install, r.copper])).toEqual([[row.install, 10 * row.install]]);
+    expect(own.history.map((s) => s.install)).toEqual([row.install]);
+  }
+  // The name is a label: two rows that share it say which install each is; the install id itself is not kept.
+  expect(ledger.roster.map((r) => rosterLabel(r, ledger.roster))).toEqual(["Thrall (CAMWOW US1 Realm 4 PVP, install 2)", "Thrall (CAMWOW US1 Realm 4 PVP, install 1)"]);
+  expect(JSON.stringify(ledger)).not.toContain("account-");
+  expect(rosterLabel(ledger.roster[0]!, [ledger.roster[0]!])).toBe("Thrall (CAMWOW US1 Realm 4 PVP)");
 });
 const gold = (character: string, capturedAt: string, currentCopper: number, peakCopper = currentCopper) =>
   ({ kind: "gold_snapshot", installId: "i", capturedAt, character, realm: "Moon Guard", currentCopper, peakCopper });
@@ -42,8 +53,8 @@ describe("summarizeMoney", () => {
 
   test("the roster has each character's newest gold and highest peak, richest first", () => {
     expect(ledger.roster).toEqual([
-      { character: "Jaina", realm: "Moon Guard", copper: 2_000_000, peakCopper: 2_500_000, at: "2026-10-24T08:00:00Z" },
-      { character: "Thrall", realm: "Moon Guard", copper: 125_000, peakCopper: 125_000, at: "2026-10-23T10:00:00Z" },
+      { install: 1, character: "Jaina", realm: "Moon Guard", copper: 2_000_000, peakCopper: 2_500_000, at: "2026-10-24T08:00:00Z" },
+      { install: 1, character: "Thrall", realm: "Moon Guard", copper: 125_000, peakCopper: 125_000, at: "2026-10-23T10:00:00Z" },
     ]);
   });
 
@@ -73,7 +84,7 @@ describe("summarizeMoney", () => {
 
   test("receipts are the money events, newest first", () => {
     expect(ledger.eventCount).toBe(7);
-    expect(ledger.receipts[0]).toEqual({ at: "2026-10-25T09:30:00Z", character: "Jaina", realm: "Moon Guard", category: "loot", direction: "in", copper: 999 });
+    expect(ledger.receipts[0]).toEqual({ at: "2026-10-25T09:30:00Z", install: 1, character: "Jaina", realm: "Moon Guard", category: "loot", direction: "in", copper: 999 });
     expect(ledger.receipts.map((r) => r.at)).toEqual([...ledger.receipts.map((r) => r.at)].sort().reverse());
   });
 
@@ -94,7 +105,7 @@ describe("summarizeMoney", () => {
 
   test("a character with money events but no snapshot shows with unrecorded gold", () => {
     expect(summarizeMoney([money("Anduin", "2026-10-24T09:00:00Z", "loot", 5)], NOW).roster).toEqual([
-      { character: "Anduin", realm: "Moon Guard", copper: null, peakCopper: null, at: null },
+      { install: 1, character: "Anduin", realm: "Moon Guard", copper: null, peakCopper: null, at: null },
     ]);
   });
 
@@ -109,7 +120,7 @@ describe("summarizeMoney", () => {
 
 describe("narrowLedger", () => {
   const ledger = summarizeMoney(RECORDS, NOW);
-  const thrall = narrowLedger(ledger, characterKey({ character: "Thrall", realm: "Moon Guard" }));
+  const thrall = narrowLedger(ledger, characterKey({ install: 1, character: "Thrall", realm: "Moon Guard" }));
 
   test("week, river, categories, receipts and history hold only that character", () => {
     expect(thrall.week).toEqual({ in: 11_800, out: 0, net: 11_800 });

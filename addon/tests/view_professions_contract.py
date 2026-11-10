@@ -191,7 +191,7 @@ PRICE_ROWS = ";".join([
 
 
 def price_file(as_of: str) -> str:
-    return (f"EverlootPricesDB = {{ realms = {{ forever = {{ data = '{PRICE_ROWS}', sum = {zlib.adler32(PRICE_ROWS.encode())}, "
+    return (f"EverlootPricesDB = {{ realms = {{ ['forever|alliance'] = {{ data = '{PRICE_ROWS}', sum = {zlib.adler32(PRICE_ROWS.encode())}, "
             f"dataAsOf = '{as_of}' }} }} }}\n")
 
 
@@ -212,7 +212,7 @@ local c = p.craft
 assert(c.page.shown and p.toggle.text == 'Ranks and trainers' and not p.blocks[1].shown and not p.others.shown)
 for id, n in pairs(calls) do assert(n == 1, 'item ' .. id .. ' priced ' .. n .. ' times in one redraw') end
 assert(calls[2678] == 1 and calls[2840] == 1)
-assert(c.age.text == 'Market values from the price file built 2026-10-29 (1 day ago), all houses; a vendor price when it is lower.', c.age.text)
+assert(c.age.text == 'Market values from the price file built 2026-10-29 (1 day ago), Alliance auction house; a vendor price when it is lower.', c.age.text)
 assert(c.note.text == 'Value is per item. Est. profit assumes one item per craft: how many items a craft makes is not recorded.')
 assert(c.head.value.text == 'Value per item' and c.head.profit.text == 'Est. profit (1/craft)', c.head.profit.text)
 assert(c.sortButton.text == 'Sort: est. profit' and c.filterButton.text == 'Est. profitable only', c.filterButton.text)

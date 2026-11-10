@@ -222,9 +222,10 @@ const ago = (days: number) => (days === 1 ? "1 day" : `${days} days`);
 
 /** The short answer for a reading: the essentials first, optional notes only while they fit. */
 function describe(name: string, realm: string, reading: Reading): { kind: MarketKind; text: string } {
-  const head = `${name} on ${realm}, all houses`;
+  // market_value's structured page carries one house's value, the house with the most units listed: never a blend.
+  const head = `${name} on ${realm}, busiest auction house`;
   if (reading.kind === "none") {
-    return { kind: "no-public", text: `No public price for ${head} yet. A day becomes public after 3 reporters' full scans, so this is missing data, not a price of zero. Your own scan, if you made one, shows in game with /everloot price.` };
+    return { kind: "no-public", text: `No public price for ${name} on ${realm} in any auction house yet. A day becomes public after 3 reporters' full scans, so this is missing data, not a price of zero. Your own scan, if you made one, shows in game with /everloot price.` };
   }
   const v = reading.value;
   const stale = v.ageDays > STALE_DAYS;

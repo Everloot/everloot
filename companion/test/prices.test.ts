@@ -3,7 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, vi } from "vitest";
 import { adler32 } from "../src/bridge/lua";
-import { fetchRealmPrices, readRealms, refreshPrices, renderPricesAddon, PRICES_ADDON } from "../src/prices";
+import { fetchRealmPrices, housesFor, neutralRealmsIn, readRealms, refreshPrices, renderPricesAddon, PRICES_ADDON } from "../src/prices";
+import { parseEverlootTable } from "../../web/src/lib/sv-parse";
 import { FIXTURE_DROPS, FIXTURE_REALMS, FIXTURE_SOURCES } from "../scripts/write-prices-fixture";
 
 const FIXTURE = new URL("../../addon/tests/fixtures/EverlootPrices.lua", import.meta.url);
@@ -13,20 +14,31 @@ test("price discovery and output keep region and ruleset endings in separate rea
   names.push("CAMWOW EU1 Realm 4 PVP");
   const sv = `EverlootDB = { records = { auction_snapshot = { ${names.map((realm) => `{ realm = "${realm}" }`).join(",")} } } }`;
   expect(readRealms(sv)).toEqual(names);
-  const { lua } = renderPricesAddon(names.map((realm, i) => ({ realm, dataAsOf: null,
+  const { lua } = renderPricesAddon(names.map((realm, i) => ({ realm, house: "Alliance" as const, dataAsOf: null,
     items: [[2589, 100 + i, 100 + i, 100 + i, 40, "2026-11-10", 3]] })));
   for (const [i, name] of names.entries()) {
-    expect(lua).toContain(`["${name.toLowerCase()}"]`);
+    expect(lua).toContain(`["${name.toLowerCase()}|alliance"]`);
     expect(lua).toContain(`2589,${100 + i},${100 + i},${100 + i},40,2026-11-10,3`);
   }
 });
 
-test.fails("owner review: a price file must not overwrite one house with another on the same realm", () => {
-  const realms = ["Alliance", "Horde"].map((house, i) => ({ realm: "CAMWOW US1 Realm 4 PVP", house,
+test("a price file never overwrites one house with another on the same realm", () => {
+  const realms = (["Alliance", "Horde"] as const).map((house, i) => ({ realm: "CAMWOW US1 Realm 4 PVP", house,
     dataAsOf: null, items: [[2589, 100 + i, 100, 100, 40, "2026-11-10", 3] as import("../src/prices").PriceRow] }));
   const { lua } = renderPricesAddon(realms);
   const keys = [...lua.matchAll(/^  \["([^"]+)"\]/gm)].map((m) => m[1]);
   expect(new Set(keys).size).toBe(2);
+  expect(keys).toEqual(["camwow us1 realm 4 pvp|alliance", "camwow us1 realm 4 pvp|horde"]);
+  // No realm-only key: an addon from before houses finds nothing rather than another house's price.
+  expect(lua).not.toContain('["camwow us1 realm 4 pvp"]');
+});
+
+test("each realm is fetched for both faction houses, and the neutral one only where the player's scans read it", () => {
+  const db = parseEverlootTable(`EverlootDB = { records = { auction_snapshot = { { realm = "Forever", house = "Neutral", faction = "Horde" }, { realm = "Doomhowl", faction = "Alliance" } } } }`);
+  const neutral = neutralRealmsIn(db);
+  expect([...neutral]).toEqual(["forever"]);
+  expect(housesFor("FOREVER", neutral)).toEqual(["Alliance", "Horde", "Neutral"]);
+  expect(housesFor("Doomhowl", neutral)).toEqual(["Alliance", "Horde"]);
 });
 
 const SV = `EverlootDB = {
@@ -48,7 +60,7 @@ test("realms come from the player's own auction scans, once each; guild and gold
 
 test("a long answer is cut to the site's row cap", async () => {
   const items = Array.from({ length: 2500 }, (_, i) => [i + 1, 5, 5, 5, 5, "2026-10-20", 3]);
-  const prices = await fetchRealmPrices("https://e.example", "Forever", vi.fn().mockResolvedValue(Response.json({ ...body, items })));
+  const prices = await fetchRealmPrices("https://e.example", "Forever", "Horde", vi.fn().mockResolvedValue(Response.json({ ...body, house: "Horde", items })));
   expect(prices.items).toHaveLength(2000);
 });
 
@@ -58,15 +70,22 @@ const body = {
   items: [[2589, 205, 200, 190, 40, "2026-10-20", 3], [765, null, 30, 33, 900, "2026-10-05", 4]],
 };
 
-test("a realm's prices are fetched and every tuple is checked", async () => {
-  const send = vi.fn().mockResolvedValue(Response.json({ ...body, items: [...body.items, [1, "x"], [2, 1, 1, 1, 1, "bad day", 1]] }));
-  const prices = await fetchRealmPrices("https://everloot.example", "Forever", send);
-  expect(send.mock.calls[0][0]).toBe("https://everloot.example/api/market/prices?realm=Forever");
-  expect(prices).toEqual({ realm: "Forever", dataAsOf: "2026-10-20T06:30:00.000Z", items: body.items });
+test("a realm's prices are fetched per house and every tuple is checked", async () => {
+  const send = vi.fn().mockResolvedValue(Response.json({ ...body, house: "Alliance", items: [...body.items, [1, "x"], [2, 1, 1, 1, 1, "bad day", 1]] }));
+  const prices = await fetchRealmPrices("https://everloot.example", "Forever", "Alliance", send);
+  expect(send.mock.calls[0][0]).toBe("https://everloot.example/api/market/prices?realm=Forever&house=alliance");
+  expect(prices).toEqual({ realm: "Forever", house: "Alliance", dataAsOf: "2026-10-20T06:30:00.000Z", items: body.items });
+});
+
+test("an answer for another house, or a realm-wide one without a house, is refused, never written as this house's", async () => {
+  for (const answer of [{ ...body }, { ...body, house: "Horde" }]) {
+    await expect(fetchRealmPrices("https://e.example", "Forever", "Alliance", vi.fn().mockResolvedValue(Response.json(answer))))
+      .rejects.toThrow(/Forever \(Alliance\): unexpected answer/);
+  }
 });
 
 test("a failed fetch is an error, never an empty price list", async () => {
-  await expect(fetchRealmPrices("https://e.example", "Forever", vi.fn().mockResolvedValue(Response.json({ ok: false }, { status: 503 }))))
+  await expect(fetchRealmPrices("https://e.example", "Forever", "Horde", vi.fn().mockResolvedValue(Response.json({ ok: false }, { status: 503 }))))
     .rejects.toThrow(/503/);
 });
 
@@ -76,8 +95,9 @@ test("the slot addon holds one checksummed string per realm and matches the gold
   const data = "2589,205,200,190,40,2026-10-20,3;765,,30,33,900,2026-10-05,4";
   expect(lua).toContain(`["data"] = "${data}"`);
   expect(lua).toContain(`["sum"] = ${adler32(data)}`);
-  // Keys are lower-cased so the addon's GetRealmName():lower() finds them.
-  expect(lua).toContain('["forever"] = {');
+  // Keys are the lower-cased realm and house, so the addon finds them from GetRealmName():lower() and the house it reads.
+  expect(lua).toContain('["forever|alliance"] = {');
+  expect(lua).toContain('["forever|horde"] = {');
   // A hostile realm name stays a string literal.
   expect(lua).not.toMatch(/\n[^"\n]*os\.execute/);
   expect(lua).toBe(readFileSync(FIXTURE, "utf8").replace(/\r\n/g, "\n"));
@@ -117,21 +137,24 @@ test("item sources follow the drops in their own checksummed block: one row per 
 });
 
 test("realm keys lower-case ASCII only, as Lua's string.lower does", () => {
-  const { lua } = renderPricesAddon([{ realm: "Ärden Forever", dataAsOf: null, items: [] }]);
-  expect(lua).toContain('["Ärden forever"]');
+  const { lua } = renderPricesAddon([{ realm: "Ärden Forever", house: "Neutral", dataAsOf: null, items: [] }]);
+  expect(lua).toContain('["Ärden forever|neutral"]');
 });
 
-test("refresh writes the slot addon for the realms in the file, and keeps the old one on any failure", async () => {
+test("refresh writes the slot addon for each house of the realms in the file, and keeps the old one on any failure", async () => {
   const dir = mkdtempSync(join(tmpdir(), "everloot-prices-"));
   const sv = join(dir, "Everloot.lua");
   writeFileSync(sv, SV.replace("gold_snapshot", "auction_scan"));
   const addons = join(dir, "AddOns");
-  const ok = vi.fn(async (url: string) => Response.json({ ...body, realm: url.includes("Nightfall") ? "Nightfall" : "Forever" }));
+  const ok = vi.fn(async (url: string) => Response.json({ ...body, realm: url.includes("Nightfall") ? "Nightfall" : "Forever", house: url.endsWith("horde") ? "Horde" : "Alliance" }));
   expect(await refreshPrices({ svFiles: [sv], addonsDir: addons, endpoint: "https://e.example", fetch: ok as unknown as typeof fetch }))
-    .toEqual({ realms: 2, items: 4 });
+    .toEqual({ realms: 2, items: 8 });
+  expect(ok.mock.calls.map(([url]) => url.split("?")[1])).toEqual(["realm=Forever&house=alliance", "realm=Forever&house=horde", "realm=Nightfall&house=alliance", "realm=Nightfall&house=horde"]);
   const written = join(addons, PRICES_ADDON, `${PRICES_ADDON}.lua`);
   const before = readFileSync(written, "utf8");
-  expect(before).toContain('["nightfall"]');
+  expect(before).toContain('["nightfall|alliance"]');
+  expect(before).toContain('["nightfall|horde"]');
+  expect(before).not.toContain('["nightfall"]');
 
   const down = vi.fn().mockResolvedValue(new Response("down", { status: 500 }));
   await expect(refreshPrices({ svFiles: [sv], addonsDir: addons, endpoint: "https://e.example", fetch: down })).rejects.toThrow(/500/);

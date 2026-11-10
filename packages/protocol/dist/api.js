@@ -55,7 +55,7 @@ export const marketRealmsResponse = z.object({
     dataAsOf: ISO_TIME.nullable(),
     realms: z.array(z.string()),
     houses: z.record(z.string(), z.array(z.enum(AUCTION_HOUSES))).optional()
-        .describe("Per realm, the auction houses that have public values of their own (scans that named their house)."),
+        .describe("Per realm, the auction houses that have public values of their own. A scan counts for the house it read, else its scanner's faction."),
     pending: z.array(z.object({
         realm: z.string(),
         reporters: z.number().int().min(1),
@@ -462,11 +462,11 @@ export const API_ROUTES = [
     {
         method: "GET", path: "/api/market/prices",
         summary: "Forever market values from full auction scans players started",
-        description: "Without `realm`, the realms that have public values (and, in `houses`, which auction houses have values of their own). With it, the items with the most units listed on that realm as tuples in `fields` order, copper per unit. Without `house` the values blend every house of the realm; with it, only scans that named that house count. A day is public when three reporters scanned the item on that realm.",
+        description: "Without `realm`, the realms that have public values (and, in `houses`, which auction houses have values of their own). With it, the items with the most units listed on that realm as tuples in `fields` order, copper per unit. Each scan counts for one house: the house it read, else its scanner's faction. Ask once per house (`house`) for current prices. Without `house` the answer reads only scans that recorded no house: older addons, plus days stored before houses were kept apart, which may mix them. That list is often empty and never stands in for a house. A day is public when three reporters scanned the item in that house.",
         access: "rate-limited", data: "observed",
         query: [
             { name: "realm", description: "Realm name. Omit it to list realms.", schema: { type: "string", minLength: 2, maxLength: 40 } },
-            { name: "house", description: "Alliance, Horde or Neutral (any case). Needs realm.", schema: { type: "string", enum: ["alliance", "horde", "neutral"] } },
+            { name: "house", description: "Alliance, Horde or Neutral (any case). Needs realm. Without it, only scans that recorded no house are read.", schema: { type: "string", enum: ["alliance", "horde", "neutral"] } },
         ],
         responses: {
             "200": { description: "Realms when `realm` is absent (marketRealmsResponse), prices when present.", schema: "marketPricesResponse" },

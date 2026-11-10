@@ -21,10 +21,10 @@ import { formatItemNumbers, itemToolFactsFromRecords } from "./item-page-tool.js
 import { reportedItemFacts } from "./item-facts.js";
 import { formatObjectPage, objectFactsFromRecords, objectPage, type ObjectFacts } from "./object-page.js";
 import {
-  handleMarketValue, itemMarket, lookupRealm, realmLookupFields, realmLookupText, resolveRealm, scanDayLine, type MarketState, type PublicDay, type RealmLookup,
+  busiestHouseMarket, handleMarketValue, lookupRealm, realmLookupFields, realmLookupText, resolveRealm, scanDayLine, type MarketState, type PublicDay, type RealmLookup,
 } from "./market.js";
 import { loadUploadRecords } from "./load-uploads.js";
-import { KNOWLEDGE_KINDS, MCP_PROMPT_NAMES, MCP_PROMPTS, MCP_RESOURCE_TEMPLATE_URIS, MCP_RESOURCE_TEMPLATES, MCP_RESOURCE_URIS, MCP_RESOURCES, MCP_TOOL_NAMES, MCP_TOOLS, parseRecords, type McpToolArgs, type McpToolDef, type McpToolName } from "@everloot/protocol";
+import { KNOWLEDGE_KINDS, MCP_PROMPT_NAMES, MCP_PROMPTS, MCP_RESOURCE_TEMPLATE_URIS, MCP_RESOURCE_TEMPLATES, MCP_RESOURCE_URIS, MCP_RESOURCES, MCP_TOOL_NAMES, MCP_TOOLS, parseRecords, type AuctionHouse, type McpToolArgs, type McpToolDef, type McpToolName } from "@everloot/protocol";
 import { z } from "zod";
 import { formatProfessionPath, professionPath } from "./profession-path.js";
 import { promptText } from "./prompts.js";
@@ -247,11 +247,17 @@ export async function marketValueAnswer(args: { realm: string; itemId: number },
   // names read nothing, so they never answer as an empty market.
   const lookup = resolveRealm(market.state, args.realm, now);
   const realm = lookupRealm(lookup);
-  const { value, points } = realm ? itemMarket(market.state, realm, args.itemId, now) : { value: null, points: [] };
+  // The text names every house; the page carries the house with the most units listed (ties: Alliance, then Horde, then
+  // Neutral), which the text names too.
+  const busiest = realm ? busiestHouseMarket(market.state, realm, args.itemId, now) : null;
+  const value = busiest?.value ?? null;
+  const points = busiest?.points ?? [];
   const url = realm && (value || points.length) ? marketItemUrl(realm, args.itemId) : undefined;
   const page = { realm: shownRealm(args.realm, lookup), itemId: args.itemId, value, history: points, ...realmLookupFields(lookup) };
+  const body = handleMarketValue(args, market.state, now);
+  const pageHouse = busiest ? `\nThe structured page carries the ${busiest.house} auction house (most units listed; ties: Alliance, then Horde, then Neutral).` : "";
   return {
-    text: `${withMore(handleMarketValue(args, market.state, now), url)}\n${answerFooter(market.dataAsOf)}`,
+    text: `${withMore(`${body}${pageHouse}`, url)}\n${answerFooter(market.dataAsOf)}`,
     structured: { connected: true, dataAsOf: market.dataAsOf, ...(url ? { url } : {}), page },
   };
 }
@@ -272,13 +278,14 @@ async function readMarket(loader?: MarketLoader): Promise<Awaited<ReturnType<Mar
 }
 
 /**
- * auction_history's page. `scanDays` are the rollup's public full-scan days for the item, the ones market_value values
- * it by, under the same rule (3 reporters, or Everloot's own installs), so the two tools agree on which days are public;
+ * auction_history's page. `scanDays` are the rollup's public full-scan days for the item in one house (`scanHouse`, the
+ * one with the most units listed; ties: Alliance, then Horde, then Neutral), the ones market_value's page carries, under the same rule (3 reporters, or Everloot's own installs), so the two tools agree on which days are public;
  * null when the rollup is not connected. `points` are the single listings players saw while browsing (auction-history.ts),
  * null when they could not be read. The two come from different scans, so both are listed, each with its own rule.
  */
 export function auctionHistoryPage(
   args: { realm: string; itemId: number }, lookup: RealmLookup | null, scanDays: PublicDay[] | null, points: AuctionPoint[] | null,
+  scanHouse: AuctionHouse | null = null,
 ): { text: string; page: object; url?: string } {
   const realm = shownRealm(args.realm, lookup);
   const head = `${realm} item ${args.itemId}`;
@@ -302,8 +309,8 @@ ${realmLookupText(lookup)}`, page: { realm, itemId: args.itemId, points: [], ...
     lines.push(AUCTION_HISTORY_RULE, ...browse);
   } else {
     lines.push(
-      "Full scans, the public days market_value values this item by (a day is public at 3 reporters, or with Everloot's own scans):",
-      ...(scanDays.length ? scanDays.map(scanDayLine) : ["No public day yet. A day becomes public when 3 reporters scanned this item."]),
+      `Full scans${scanHouse ? ` in the ${scanHouse} auction house, the one with the most units listed` : ""}: the public days market_value values this item by (a day is public at 3 reporters, or with Everloot's own scans):`,
+      ...(scanDays.length ? scanDays.map(scanDayLine) : ["No public day yet. A day becomes public when 3 reporters scanned this item in one house."]),
       "Single listings seen while browsing, a separate source with its own count:",
       AUCTION_HISTORY_RULE,
       ...browse,
@@ -1108,7 +1115,9 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
       const lookup = market ? resolveRealm(market.state, args.realm, now) : null;
       const resolved = lookup ? lookupRealm(lookup) : null;
       const realm = resolved ?? args.realm.trim();
-      const scanDays = market ? (resolved ? itemMarket(market.state, resolved, args.itemId, now).points : []) : null;
+      // The same house market_value's page carries: the one with the most units listed, never a mix of houses.
+      const busiest = market && resolved ? busiestHouseMarket(market.state, resolved, args.itemId, now) : null;
+      const scanDays = market ? busiest?.points ?? [] : null;
       // The site's stored browsing days when it lends them, so an answer does not replay the corpus; without them, the corpus.
       // An ambiguous name reads no browsing history at all, stored or from the corpus: none of it belongs to one realm.
       const ambiguous = lookup?.status === "ambiguous";
@@ -1122,7 +1131,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
         const reason = uploadsConfigured(options.corpus) ? UNAVAILABLE : UPLOADS_UNSET;
         return { text: reason, structured: { connected: false, dataAsOf: null, reason } };
       }
-      return pageAnswer(auctionHistoryPage(args, lookup, scanDays, browse?.points ?? null), browse?.dataAsOf ?? market?.dataAsOf ?? null);
+      return pageAnswer(auctionHistoryPage(args, lookup, scanDays, browse?.points ?? null, busiest?.house ?? null), browse?.dataAsOf ?? market?.dataAsOf ?? null);
     },
     market_value: (args) => marketValueAnswer(args, options.market),
     gold_ledger: (args) => readPageIn("gold_ledger", (facts: ReturnType<typeof goldFactsFromRecords>) => {

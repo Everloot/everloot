@@ -79,7 +79,8 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
       await readyFacts(files);
       const r = await refreshMarket({ svFiles: files, followed: s.market.realms, addonsDir: addonsDir(), endpoint: s.endpoint });
       lastMarket = r.realms;
-      return `${r.items} items on ${r.realms.length} realm(s) and ${r.drops} drop sources written; /reload in game to see them`;
+      const realms = new Set(r.realms.map((x) => x.realm.toLowerCase())).size;
+      return `${r.items} items in ${r.realms.length} auction house(s) on ${realms} realm(s) and ${r.drops} drop sources written; /reload in game to see them`;
     },
     async ask(file) {
       const s = current();

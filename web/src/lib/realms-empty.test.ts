@@ -19,7 +19,7 @@ test("with the map empty every realm is forever, and nothing is guessed", () => 
 
 const now = new Date("2026-11-10T12:00:00.000Z");
 const scans = (realm: string, items: [number, number][]) => ["install-a", "install-b", "install-c"].map((installId) => ({
-  kind: "auction_snapshot", installId, capturedAt: now.toISOString(), realm, items: items.map(([id, value]) => [id, 2, 40, value, value]),
+  kind: "auction_snapshot", faction: "Horde", installId, capturedAt: now.toISOString(), realm, items: items.map(([id, value]) => [id, 2, 40, value, value]),
 }));
 const state = foldMarket(emptyMarket(), [...scans("Forever", [[2589, 205], [765, 33]]), ...scans("Mal'Ganis", [[2589, 300]])], now);
 

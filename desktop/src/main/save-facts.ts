@@ -1,7 +1,7 @@
 import { indexLedger, type LedgerIndex } from "./reports";
 import { readFileSync, statSync } from "node:fs";
 import { asksIn, type Ask } from "../../../companion/src/bridge/asks";
-import { realmsIn } from "../../../companion/src/prices";
+import { neutralRealmsIn, realmsIn } from "../../../companion/src/prices";
 import { parseEverlootTable } from "../../../web/src/lib/sv-parse";
 import type { CharactersInfo, FileSummary, ScanAge } from "../shared/types";
 import { charactersAt, collectCharacters, type CharacterBase } from "./characters";
@@ -17,7 +17,7 @@ export type UploadFacts = Pick<FileSummary, "error" | "addonVersion" | "clientBu
  * What the jobs and pages read from an account file besides its upload records, and its characters (null for a file
  * the Characters page skips).
  */
-export interface SaveFacts { reports: LedgerIndex; realms: string[]; scans: ScanAge[]; asks: Ask[]; characters: CharacterBase | null; upload: UploadFacts }
+export interface SaveFacts { reports: LedgerIndex; realms: string[]; neutralRealms: string[]; scans: ScanAge[]; asks: Ask[]; characters: CharacterBase | null; upload: UploadFacts }
 
 /** One parse per file write (size and write time), shared by the prices and ask jobs, the state push and the pages. */
 const memo = new Map<string, { key: string; facts: SaveFacts | Error }>();
@@ -49,7 +49,7 @@ export function saveFacts(file: string): SaveFacts {
 export function factsFrom(text: string): SaveFacts {
   const check = { extra: null as string | null };
   const db = parseEverlootTable(text, check);
-  return { reports: indexLedger(db), realms: realmsIn(db), scans: scanAgesIn(db), asks: asksIn(db), characters: charactersIn(db), upload: uploadIn(db, check.extra) };
+  return { reports: indexLedger(db), realms: realmsIn(db), neutralRealms: [...neutralRealmsIn(db)], scans: scanAgesIn(db), asks: asksIn(db), characters: charactersIn(db), upload: uploadIn(db, check.extra) };
 }
 
 /** The last facts read for the file, whichever write they belong to; null before any read, or when it did not parse. Never reads the file. */
@@ -139,7 +139,8 @@ function charactersIn(db: Record<string, unknown>): CharacterBase | null {
     if (!Array.isArray(rows)) return null;
     for (const row of rows) {
       if (!row || typeof row !== "object" || Array.isArray(row)) return null;
-      records.push({ ...(row as Record<string, unknown>), kind });
+      // As parseEverlootLua: the file's install id, unless the row carries its own, so a character row keeps it.
+      records.push({ installId: db.installId, ...(row as Record<string, unknown>), kind });
     }
   }
   return collectCharacters(records, { ledger: db.ledger, roster: db.roster });

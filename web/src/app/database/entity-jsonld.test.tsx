@@ -78,3 +78,16 @@ test.each(cases)("$kind page identifies its visible entity at its canonical URL"
     expect(scripts.join("")).toContain("\\u003cName>");
   }
 });
+
+test.each(cases)("$kind page opens with the shared entity header, and lists its facts in the one layout", async ({ page }) => {
+  const html = renderToStaticMarkup(await page());
+  // One title row, EntityHeader's: the h1 and its type line inside it, no list-page title row beside it.
+  const headers = [...html.matchAll(/<header[^>]*data-page-header[^>]*>/g)].map((m) => m[0]);
+  expect(headers).toHaveLength(1);
+  expect(headers[0]).toContain("data-entity-header");
+  const header = /<header[^>]*data-entity-header[^>]*>([\s\S]*?)<\/header>/.exec(html)?.[1] ?? "";
+  expect(header).toMatch(/<h1[^>]*>/);
+  expect(header).toContain("data-entity-meta");
+  // Quick facts, where the page has them, are the label-left, value-right list: never the card or the grid.
+  for (const m of html.matchAll(/data-facts="(\w+)"/g)) expect(m[1]).toBe("list");
+});

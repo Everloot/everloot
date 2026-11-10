@@ -297,7 +297,7 @@ test("with a provider the price is still the market's: no model request, no my_ 
   const mine = { name: "my_characters", description: "d", inputSchema: {}, run: vi.fn(() => "gold") };
   const entry = { type: "openai-compatible", baseUrl: "https://openrouter.ai/api/v1", model: "m" };
   const r = await answer({ mcp: { url: "u", token: null }, entries: [entry], history: [], question: "price 2589 on Forever", session: marketSession(calls), send: send as never, local: [mine] });
-  expect(r.text.startsWith("Item 2589 on Forever, all houses: market 3s 10c")).toBe(true);
+  expect(r.text.startsWith("Item 2589 on Forever, busiest auction house: market 3s 10c")).toBe(true);
   expect(r.model).toBeNull();
   expect(send).not.toHaveBeenCalled();
   expect(mine.run).not.toHaveBeenCalled();
@@ -338,7 +338,7 @@ test.each([
   const entry = { type: "openai-compatible", baseUrl: "https://openrouter.ai/api/v1", model: "m" };
   const r = await answer({ mcp: { url: "u", token: null }, entries: [entry], history: [], question, session: marketSession(calls), send, local: [mine] });
   expect(r.model).toBeNull();
-  expect(r.text).toContain("on Forever, all houses: market 3s 10c");
+  expect(r.text).toContain("on Forever, busiest auction house: market 3s 10c");
   expect(calls.map((c) => c.name)).toEqual(["market_value"]);
   expect(mine.run).not.toHaveBeenCalled();
   expect(vi.mocked(send as never as (u: string) => Promise<Response>).mock.calls.some(([u]) => String(u).includes("openrouter"))).toBe(false);
