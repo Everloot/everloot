@@ -46,7 +46,12 @@ function Frame.SetText(self, t) self.text = t end
 function Frame.GetText(self) return rawget(self, 'text') end
 function Frame.SetChecked(self, v) self.checked = v and true or false end
 function Frame.GetChecked(self) return self.checked end
-function Frame.Show(self) self.shown = true end
+function Frame.Show(self)
+  if rawget(self, 'shown') then return end
+  self.shown = true
+  local f = self.scripts.OnShow
+  if f then f(self) end
+end
 function Frame.Hide(self) self.shown = false end
 function Frame.SetParent(self, p) self.parentSet = p end
 function Frame.SetFont(self, path, size) self.font, self.size = path, size; return true end
@@ -65,7 +70,7 @@ function Frame.CreateTexture(self)
 end
 function Frame.RegisterEvent(self, e) self.events[e] = true end
 CreateFrame = function(kind, name, parent, template)
-  return setmetatable({ kind = kind, name = name, parent = parent, template = template, scripts = {}, hooks = {}, events = {} }, Frame)
+  return setmetatable({ kind = kind, name = name, parent = parent, template = template, scripts = {}, hooks = {}, events = {}, shown = true }, Frame)
 end
 
 -- Every switch stays reachable in a bounded viewport, including small panels and long descriptions.
@@ -114,8 +119,9 @@ opened = nil
 Settings = {
   RegisterCanvasLayoutCategory = function(frame, name) local c = { frame = frame, name = name, ID = 42 }; function c:GetID() return self.ID end; return c end,
   RegisterAddOnCategory = function(c) registered[#registered + 1] = c end,
-  OpenToCategory = function(id) opened = id end,
+  OpenToCategory = function(id) opened = id; SettingsPanel.shown = true end,
 }
+SettingsPanel = { shown = false, IsShown = function(self) return self.shown end }
 """
 
 # --- Modern client: the Settings API ---
@@ -128,7 +134,8 @@ SlashCmdList.EVERLOOT('options')
 assert(opened == 42, '/everloot options opens the category')
 
 -- The boxes show the saved state: a new install has auctions and the census on, players off.
-O.page.scripts.OnShow()
+assert(not O.page.shown, 'built hidden; the game shows it when picked')
+O.page:Show()
 local byKey = {}
 for _, box in ipairs(O.page.boxes) do byKey[box.row.key] = box end
 assert(#O.page.boxes == #O.ROWS and byKey.auctions.checked and byKey.census.checked and byKey.scanPrompt.checked and not byKey.players.checked)
@@ -193,8 +200,11 @@ assert(O.page.reload and O.page.note)
 assert(rawget(O.page, 'ask') == nil, 'no ask box')
 -- Every row on exactly one page, in O.ROWS order within it; each page short enough to read without scrolling.
 local seen = {}
+-- A switch changed by command before a page was ever opened: the first visit shows the saved state.
+SlashCmdList.EVERLOOT('census off')
 for i, c in ipairs(subs) do
   local page = c.frame
+  assert(not page.shown, O.GROUPS[i].name .. ' stays hidden until it is picked')
   assert(page == O.groupPages[O.GROUPS[i].key] and page.name == O.GROUPS[i].name)
   assert(page.intro.text == O.GROUPS[i].intro and page.title.text ~= nil)
   assert(rawget(page, 'added') == false, 'what you have added stays on the overview')
@@ -208,9 +218,16 @@ for i, c in ipairs(subs) do
     for n, row in ipairs(O.ROWS) do if row == box.row then at = n end end
     assert(at > last, 'O.ROWS order within a page'); last = at
   end
-  page.scripts.OnShow()
+  page:Show()
+  for _, box in ipairs(page.boxes) do
+    assert(box.points and box.points.TOPLEFT, box.row.key .. ' is laid out on the first visit')
+    assert(box.checked == O.IsOn(box.row), box.row.key .. ' shows the saved state on the first visit')
+  end
   checkRows(page)
 end
+local censusBox
+for _, box in ipairs(O.groupPages.shared.boxes) do if box.row.key == 'census' then censusBox = box end end
+assert(censusBox and not censusBox.checked, 'census off by command shows unticked on the first visit')
 for _, row in ipairs(O.ROWS) do assert(seen[row.key], row.key .. ' has a page') end
 assert(#O.Boxes() == #O.ROWS, 'every switch once across the pages')
 -- The groups the rows name exist, and a switch on a page still sets its module and refreshes the others.
@@ -237,6 +254,9 @@ assert(O.splitFailed and #subs == 3 and O.groupPages.auction == nil, 'the refuse
 SlashCmdList.EVERLOOT('options')
 assert(opened == nil, 'not sent to a list that lacks switches')
 assert(O.whole and O.whole.shown and #O.whole.boxes == #O.ROWS and O.close, 'a window with every switch')
+for _, box in ipairs(O.whole.boxes) do
+  assert(box.points and box.points.TOPLEFT and box.checked == O.IsOn(box.row), box.row.key .. ' laid out and ticked in the window')
+end
 """)
 
 # The game's panel failing to open: the window shows every switch, not the empty overview.
@@ -245,6 +265,21 @@ lua.execute("""
 local O = Everloot.Options
 SlashCmdList.EVERLOOT('options')
 assert(O.whole and O.whole.shown and #O.whole.boxes == #O.ROWS, 'the window holds every switch')
+for _, box in ipairs(O.whole.boxes) do
+  assert(box.points and box.points.TOPLEFT and box.checked == O.IsOn(box.row), box.row.key .. ' laid out and ticked in the window')
+end
+""")
+
+# The game ignoring the request without an error: the panel never shows, so the window opens instead.
+lua = fresh(SPLIT + "Settings.OpenToCategory = function(id) opened = id end")
+lua.execute("""
+local O = Everloot.Options
+SlashCmdList.EVERLOOT('options')
+assert(opened == 42 and not SettingsPanel.shown, 'asked, but the panel stayed closed')
+assert(O.whole and O.whole.shown and #O.whole.boxes == #O.ROWS, 'the window holds every switch')
+for _, box in ipairs(O.whole.boxes) do
+  assert(box.points and box.points.TOPLEFT and box.checked == O.IsOn(box.row), box.row.key .. ' laid out and ticked in the window')
+end
 """)
 
 # --- Every switch a module checks has a row on the page ---
@@ -324,7 +359,7 @@ for _, box in ipairs(page.boxes) do
   assert(box.label.size > box.description.size and box.label.color[1] > box.description.color[1], 'a label reads above its description')
 end
 assert(page.intro.font:find('FRIZQT', 1, true) and page.note.font:find('FRIZQT', 1, true), 'the introduction and the footer note too')
-page.scripts.OnShow()
+page:Show()
 checkRows(page)
 
 -- What you've added: one line per kind of row in the saved file, filled when the page shows.

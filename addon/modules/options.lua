@@ -291,6 +291,9 @@ local function build(frameName, name, subtitle, introText, rows, added)
   note:SetJustifyV("TOP")
   page.note = note
   page:SetScript("OnShow", function() layout(); O.Refresh() end)
+  -- A new frame starts shown, and the game's list shows a page only when it is picked: hidden until then, so
+  -- every first visit runs OnShow and lays out and ticks the switches from the saved file.
+  page:Hide()
   return page
 end
 
@@ -350,7 +353,8 @@ function O.Open()
   O.Register()
   if O.how == "settings" and not O.splitFailed and Settings.OpenToCategory then
     local id = O.category.GetID and O.category:GetID() or O.category.ID
-    if pcall(Settings.OpenToCategory, id) then return end
+    -- The call returns nothing either way: the panel being on screen afterwards is the proof it opened.
+    if pcall(Settings.OpenToCategory, id) and not (SettingsPanel and SettingsPanel.IsShown and not SettingsPanel:IsShown()) then return end
   elseif O.how == "interface" and InterfaceOptionsFrame_OpenToCategory then
     -- The older frame needs two calls when it has not been opened yet this session.
     InterfaceOptionsFrame_OpenToCategory(O.page)
