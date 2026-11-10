@@ -18,8 +18,14 @@ const view = vi.hoisted(() => ({ writeItemView: vi.fn() }));
 vi.mock("@/lib/item-view-store", () => ({ writeItemView: view.writeItemView }));
 const aggregates = vi.hoisted(() => ({ writeAggregates: vi.fn() }));
 vi.mock("@/lib/aggregate-store", () => ({ writeAggregates: aggregates.writeAggregates }));
+const professions = vi.hoisted(() => ({ writeProfessions: vi.fn() }));
+vi.mock("@/lib/profession-store", () => professions);
+const mapPins = vi.hoisted(() => ({ writeMapPins: vi.fn() }));
+vi.mock("@/lib/map-pins-store", () => mapPins);
 import { GET } from "./route";
 beforeEach(() => {
+  professions.writeProfessions.mockReset().mockResolvedValue({ written: false });
+  mapPins.writeMapPins.mockReset().mockResolvedValue({ written: false });
   vi.stubEnv("CRON_SECRET", "synthetic-cron-key");
   store.snapshotWork.mockReset().mockResolvedValue({ idle: false, retryRollups: false });
   store.writeCronRun.mockReset().mockResolvedValue(undefined);
@@ -279,4 +285,22 @@ test("an idle run still asks for the stored aggregates, so a missing file is wri
   store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: "2026-W43" });
   await GET(req());
   expect(aggregates.writeAggregates).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-10-01" });
+});
+
+test("profession and map views follow aggregates, including idle runs and rebuilds; failures are logged", async () => {
+  for (const rebuild of [false, true]) {
+    store.writeSnapshot.mockResolvedValue({ uploads: 3, added: 2, dataAsOf: "2026-11-09" });
+    await GET(req("Bearer synthetic-cron-key", rebuild ? "?rebuild=1" : ""));
+    for (const write of [professions.writeProfessions, mapPins.writeMapPins]) {
+      expect(write).toHaveBeenLastCalledWith({ added: 2, rebuild, dataAsOf: "2026-11-09" });
+      expect(write.mock.invocationCallOrder.at(-1)).toBeGreaterThan(aggregates.writeAggregates.mock.invocationCallOrder.at(-1)!);
+    }
+  }
+  store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-11-09" });
+  await GET(req());
+  expect(professions.writeProfessions).toHaveBeenLastCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-11-09" });
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  professions.writeProfessions.mockRejectedValue(new Error("offline"));
+  mapPins.writeMapPins.mockRejectedValue(new Error("offline"));
+  expect(await (await GET(req())).json()).toMatchObject({ ok: true, professions: null, mapPins: null });
 });
