@@ -6,21 +6,29 @@ import { adler32, luaString } from "./bridge/lua";
 
 /**
  * Community market prices into the game: the realms in the player's own SavedVariables are fetched from
- * everloot.app/api/market/prices and written into the EverlootPrices slot addon, which the addon's
- * tooltips read after the next /reload. Design: docs/design/specs/2026-10-16-forever-market-design.md
+ * everloot.app/api/market/prices, one request per auction house, and written into the EverlootPrices slot addon,
+ * which the addon's tooltips read after the next /reload. Each auction house of a realm is its own market, so the
+ * file keys every block by realm and house ("forever|horde"); it never holds a realm-only price.
+ * Design: docs/design/specs/2026-10-16-forever-market-design.md
  */
 
 export const PRICES_ADDON = "EverlootPrices";
 
 /** [itemId, market | null, min, historical, quantity, day, reporters], as the site sends them. */
 export type PriceRow = [number, number | null, number, number, number, string, number];
-export interface RealmPrices { realm: string; dataAsOf: string | null; items: PriceRow[] }
+/** The auction houses a realm's prices come from; each is its own market (kb/src/market.ts). */
+export type House = "Alliance" | "Horde" | "Neutral";
+/** Both faction houses are fetched for every realm, so each of the player's characters finds its own house's prices. */
+export const FACTION_HOUSES: readonly House[] = ["Alliance", "Horde"];
+export interface RealmPrices { realm: string; house: House; dataAsOf: string | null; items: PriceRow[] }
 
 const MAX_REALMS = 20;
 const MAX_ROWS = 2000;
 
 /** The addon looks realms up with GetRealmName():lower(); Lua 5.1 lower-cases ASCII letters only. */
 const realmKey = (realm: string) => realm.trim().replace(/[A-Z]/g, (c) => c.toLowerCase());
+/** One house of one realm in the file: "forever|horde", as kb/src/market.ts keys it and the addon looks it up. */
+export const priceKey = (realm: string, house: House) => `${realmKey(realm)}|${house.toLowerCase()}`;
 
 /** Record kinds whose realm is auction data the player chose to scan or upload; no other kind names a realm to the site. */
 const AUCTION_KINDS = ["auction_snapshot", "auction_scan", "price_seen"];
@@ -47,6 +55,25 @@ export function realmsIn(db: Record<string, unknown>): string[] {
   return names.slice(0, MAX_REALMS);
 }
 
+/** Realms (lower-cased) where the player's own auction records name the neutral house: those also get its prices. */
+export function neutralRealmsIn(db: Record<string, unknown>): Set<string> {
+  const out = new Set<string>();
+  const records = db.records && typeof db.records === "object" ? (db.records as Record<string, unknown>) : {};
+  for (const kind of AUCTION_KINDS) {
+    const rows = records[kind];
+    if (!Array.isArray(rows)) continue;
+    for (const row of rows as { realm?: unknown; house?: unknown }[]) {
+      if (row?.house === "Neutral" && typeof row.realm === "string") out.add(realmKey(row.realm));
+    }
+  }
+  return out;
+}
+
+/** The houses fetched for a realm: both faction houses, and the neutral one when the player's scans named it. */
+export function housesFor(realm: string, neutral: ReadonlySet<string>): House[] {
+  return neutral.has(realmKey(realm)) ? [...FACTION_HOUSES, "Neutral"] : [...FACTION_HOUSES];
+}
+
 const copper = (n: unknown): n is number => Number.isSafeInteger(n) && (n as number) >= 0;
 
 function priceRow(raw: unknown): PriceRow | null {
@@ -59,14 +86,19 @@ function priceRow(raw: unknown): PriceRow | null {
   return raw as PriceRow;
 }
 
-/** One realm from the site. A failed request throws: it is never an empty price list. */
-export async function fetchRealmPrices(endpoint: string, realm: string, send: typeof fetch = fetch): Promise<RealmPrices> {
-  const res = await send(`${endpoint.replace(/\/$/, "")}/api/market/prices?realm=${encodeURIComponent(realm)}`);
-  if (!res.ok) throw new Error(`market prices for ${realm}: HTTP ${res.status}`);
-  const body = (await res.json()) as { ok?: unknown; realm?: unknown; dataAsOf?: unknown; items?: unknown };
-  if (body.ok !== true || !Array.isArray(body.items)) throw new Error(`market prices for ${realm}: unexpected answer`);
+/**
+ * One house of one realm from the site. A failed request throws: it is never an empty price list. An answer that
+ * does not name the house asked for is refused, so a realm-wide answer can never be written as a house's prices.
+ */
+export async function fetchRealmPrices(endpoint: string, realm: string, house: House, send: typeof fetch = fetch): Promise<RealmPrices> {
+  const where = `${realm} (${house})`;
+  const res = await send(`${endpoint.replace(/\/$/, "")}/api/market/prices?realm=${encodeURIComponent(realm)}&house=${house.toLowerCase()}`);
+  if (!res.ok) throw new Error(`market prices for ${where}: HTTP ${res.status}`);
+  const body = (await res.json()) as { ok?: unknown; realm?: unknown; house?: unknown; dataAsOf?: unknown; items?: unknown };
+  if (body.ok !== true || !Array.isArray(body.items) || body.house !== house) throw new Error(`market prices for ${where}: unexpected answer`);
   return {
     realm: typeof body.realm === "string" ? body.realm : realm,
+    house,
     dataAsOf: typeof body.dataAsOf === "string" ? body.dataAsOf : null,
     // The site caps a realm at 2,000 rows; the file never carries more however the answer looks.
     items: body.items.slice(0, MAX_ROWS).map(priceRow).filter((r): r is PriceRow => r !== null),
@@ -137,8 +169,10 @@ function block(key: string, data: string, dates: { dataAsOf: string | null; fetc
 }
 
 /**
- * The slot addon: per lower-cased realm, one "id,market,min,historical,quantity,day,reporters;..." string and its
- * Adler-32; with `drops`, one "itemId,kind,sourceId,drops,windows,installs;..." string and its Adler-32 beside them;
+ * The slot addon: per house of each realm, keyed "realm|house" in lower case, one
+ * "id,market,min,historical,quantity,day,reporters;..." string and its Adler-32. An addon from before houses finds no
+ * realm-only key and shows no community price rather than another house's. With `drops`, one
+ * "itemId,kind,sourceId,drops,windows,installs;..." string and its Adler-32 beside them;
  * with `sources`, one "itemId,npcId/npcId,reagentOf;..." string and its Adler-32 after the drops. Each block is
  * optional: an addon reading a file without one shows what it showed before the block existed.
  */
@@ -154,7 +188,7 @@ export function renderPricesAddon(realms: RealmPrices[], drops?: DropSources, so
   ].join("\n");
   const rows = realms.map((r) => {
     const data = r.items.map((i) => [i[0], i[1] ?? "", i[2], i[3], i[4], i[5], i[6]].join(",")).join(";");
-    return `  [${luaString(realmKey(r.realm))}] = { ["dataAsOf"] = ${luaString(r.dataAsOf ?? "")}, ` +
+    return `  [${luaString(priceKey(r.realm, r.house))}] = { ["dataAsOf"] = ${luaString(r.dataAsOf ?? "")}, ` +
       `["data"] = ${luaString(data)}, ["sum"] = ${adler32(data)} },`;
   });
   const blocks: string[] = [];
@@ -184,18 +218,24 @@ export function writePricesAddon(addonsDir: string, realms: RealmPrices[], drops
   }
 }
 
-/** Fetch every realm the files mention and rewrite the slot addon. Any failure keeps the previous file. */
+/** Fetch every house of every realm the files mention and rewrite the slot addon. Any failure keeps the previous file. */
 export async function refreshPrices(options: {
   svFiles: string[]; addonsDir: string; endpoint: string; fetch?: typeof fetch;
 }): Promise<{ realms: number; items: number }> {
   const names: string[] = [];
+  const neutral = new Set<string>();
   for (const file of options.svFiles) {
-    for (const realm of readRealms(readFileSync(file, "utf8"))) {
+    const db = parseEverlootTable(readFileSync(file, "utf8"));
+    for (const realm of realmsIn(db)) {
       if (!names.some((n) => realmKey(n) === realmKey(realm))) names.push(realm);
     }
+    for (const key of neutralRealmsIn(db)) neutral.add(key);
   }
-  const realms: RealmPrices[] = [];
-  for (const realm of names.slice(0, MAX_REALMS)) realms.push(await fetchRealmPrices(options.endpoint, realm, options.fetch));
-  writePricesAddon(options.addonsDir, realms);
-  return { realms: realms.length, items: realms.reduce((n, r) => n + r.items.length, 0) };
+  const chosen = names.slice(0, MAX_REALMS);
+  const houses: RealmPrices[] = [];
+  for (const realm of chosen) {
+    for (const house of housesFor(realm, neutral)) houses.push(await fetchRealmPrices(options.endpoint, realm, house, options.fetch));
+  }
+  writePricesAddon(options.addonsDir, houses);
+  return { realms: chosen.length, items: houses.reduce((n, r) => n + r.items.length, 0) };
 }

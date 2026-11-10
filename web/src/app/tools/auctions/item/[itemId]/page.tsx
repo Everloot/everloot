@@ -34,6 +34,9 @@ async function load(params: Props["params"]) {
   return { itemId, market, rows, tip: tips.get(itemId), names, label: itemLabel(itemId, names) };
 }
 
+const realmCount = (rows: MarketRow[]) => new Set(rows.map((r) => r.realm.key)).size;
+const where = (r: MarketRow | null) => (r ? `${r.realm.name}, ${r.house}` : undefined);
+
 /** The row with the lowest or highest market value; rows without one are skipped. */
 function extreme(rows: MarketRow[], pick: (a: number, b: number) => boolean): MarketRow | null {
   let best: MarketRow | null = null;
@@ -44,7 +47,7 @@ function extreme(rows: MarketRow[], pick: (a: number, b: number) => boolean): Ma
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const { itemId, rows, label } = await load(props.params);
   const description = rows.length
-    ? `${label} auction prices on ${count(rows.length, "realm")} in WoW: Forever: market value, minimum buyout and units listed side by side, from player scans.`
+    ? `${label} auction prices on ${count(realmCount(rows), "realm")} in WoW: Forever, each auction house apart: market value, minimum buyout and units listed side by side, from player scans.`
     : `No public auction price for ${label} in WoW: Forever yet. A price shows once 3 reporters scan the item on a realm; scans come from the Everloot addon.`;
   return {
     ...pageMetadata({ title: `WoW Forever ${label} Auction Prices`, description, path: crossRealmHref(itemId) }),
@@ -65,7 +68,7 @@ export default async function CrossRealmItemPage(props: Props) {
       {rows.length > 0 && (
         <JsonLd data={marketDatasetJsonLd({
           name: `${label} auction prices across realms`,
-          description: `Public auction house prices for ${label} on every WoW: Forever realm with a public day (3 reporters, or Everloot's own scans): market value, minimum buyout, historical value and units listed.`,
+          description: `Public auction house prices for ${label} in each auction house of every WoW: Forever realm with a public day (3 reporters, or Everloot's own scans): market value, minimum buyout, historical value and units listed.`,
           path,
           apiPath: "/api/market/prices",
           from: days[0]!,
@@ -78,8 +81,8 @@ export default async function CrossRealmItemPage(props: Props) {
         icon={tip?.icon ? <GameIcon src={tip.icon} size={40} /> : undefined}
         title={label}
         quality={itemQuality(itemId, tip, names.has(itemId)) ?? undefined}
-        lede="Auction House prices on every realm with public scans."
-        meta={rows.length > 0 && <Facts items={[count(rows.length, "realm"), `Newest public day ${days.at(-1)}`]} />}
+        lede="Auction House prices on every realm with public scans, each auction house apart."
+        meta={rows.length > 0 && <Facts items={[count(realmCount(rows), "realm"), `Newest public day ${days.at(-1)}`]} />}
         actions={<Link href={`/database/items/${itemId}`} className="btn">Item details</Link>}
       />
 
@@ -97,14 +100,14 @@ export default async function CrossRealmItemPage(props: Props) {
         {rows.length > 0 && (
           <>
             <PriceFacts facts={[
-              { label: "Realms", value: rows.length.toLocaleString("en-US"), note: "With a public price" },
-              { label: "Lowest market value", value: low ? formatCopper(low.value.market!) : "unrecorded", note: low?.realm.name },
-              { label: "Highest market value", value: high ? formatCopper(high.value.market!) : "unrecorded", note: high?.realm.name },
-              { label: "Units listed", value: rows.reduce((n, r) => n + r.value.quantity, 0).toLocaleString("en-US"), note: "Newest day on each realm" },
+              { label: "Realms", value: realmCount(rows).toLocaleString("en-US"), note: "With a public price" },
+              { label: "Lowest market value", value: low ? formatCopper(low.value.market!) : "unrecorded", note: where(low) },
+              { label: "Highest market value", value: high ? formatCopper(high.value.market!) : "unrecorded", note: where(high) },
+              { label: "Units listed", value: rows.reduce((n, r) => n + r.value.quantity, 0).toLocaleString("en-US"), note: "Newest day in each house" },
             ]} />
             <section aria-labelledby="ah-realm-prices">
               <SectionHeading id="ah-realm-prices">By realm</SectionHeading>
-              <RealmPrices rows={rows} caption={`${label} by realm`} empty="No realm has a public price for this item yet." />
+              <RealmPrices rows={rows} caption={`${label} by realm and auction house`} empty="No realm has a public price for this item yet." />
             </section>
           </>
         )}

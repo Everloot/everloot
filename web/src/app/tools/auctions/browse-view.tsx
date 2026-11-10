@@ -88,7 +88,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
   // Names and levels for every row only when a filter or sort reads them; otherwise just the page's.
   const wide = Boolean(q.q || q.lvl) || WIDE_SORTS.includes(q.sort?.key as AhSort);
 
-  // The ruleset tabs and their summary, counted on the realm-wide blend (every house) so they do not change with the house tab.
+  // The ruleset tabs and their summary, counted across every house so they do not change with the house tab.
   const summaries = state && !slug ? rulesetSummaries(state, now) : [];
   // The summary is the unfiltered first page's; a search or filter shows only its results.
   const summaryRows = activeFilters(q) || q.page > 1 ? [] : ruleset ? summaries.filter((r) => r.ruleset === ruleset) : summaries;
@@ -151,7 +151,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
       type: "menu", key: "realm", label: "Realm",
       options: [
         { label: "All realms", href: ahHref(AH_PATH, { ...q, page: 1 }), on: !slug, reset: true },
-        ...realmsHere.map((b) => ({ label: <RealmName name={b.realm.name} />, href: ahHref(realmHref(b.realm), { ...q, ruleset: undefined, page: 1 }), on: b.realm.slug === slug, count: b.rows.length })),
+        ...realmsHere.map((b) => ({ label: <RealmName name={b.realm.name} />, href: ahHref(realmHref(b.realm), { ...q, ruleset: undefined, page: 1 }), on: b.realm.slug === slug, count: b.items })),
       ],
     },
     {
@@ -183,6 +183,8 @@ export async function browseView({ slug, search }: { slug: string | null; search
       cell: ({ row }) => <ItemLink id={row.value.itemId} href={itemHref(row.realm, row.value.itemId)} tip={tips.get(row.value.itemId)} names={names} />,
     },
     ...(showRealm ? [{ key: "realm", header: "Realm", nowrap: true, cell: ({ row }: BrowseRow) => <Link href={ahHref(realmHref(row.realm), { house: q.house })} className="text-fg-2 hover:text-fg hover:underline underline-offset-4"><RealmName name={row.realm.name} /></Link> }] : []),
+    // Every row is one house's price; with every house shown, the row says which.
+    ...(!q.house ? [{ key: "house", header: "House", nowrap: true, cell: ({ row }: BrowseRow) => row.house }] : []),
     { key: "ilvl", header: "iLvl", numeric: true, sortable: true, cell: ({ row }) => tips.get(row.value.itemId)?.level || <span className="text-muted">—</span> },
     { key: "req", header: "Req.", numeric: true, sortable: true, cell: ({ row }) => tips.get(row.value.itemId)?.required || <span className="text-muted">—</span> },
     { key: "market", header: "Market value", numeric: true, sortable: true, cell: ({ row }) => <span className={row.value.market === null ? "text-muted" : undefined}>{money(row.value.market)}</span> },
@@ -239,13 +241,13 @@ export async function browseView({ slug, search }: { slug: string | null; search
     body = (
       <DataTable
         dense
-        caption={`${title}${q.house ? `, ${q.house}` : ""}: ${count(results.length, "item")}`}
+        caption={`${title}, ${q.house ? `${q.house} auction house` : "each auction house apart"}: ${count(results.length, q.house ? "item" : "price")}`}
         columns={columns}
         rows={shown}
-        rowKey={({ row }) => `${row.realm.key}:${row.value.itemId}`}
+        rowKey={({ row }) => `${row.realm.key}:${row.house}:${row.value.itemId}`}
         sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}
         sortHref={(key, dir) => here({ sort: key === fallback.key && (dir === "desc") === fallback.desc ? undefined : { key: key as AhSort, desc: dir === "desc" } })}
-        meta={({ row, move }) => [showRealm ? row.realm.name : null, money(row.value.market), `${row.value.quantity.toLocaleString("en-US")} units`, move ? percent(move.change) : null].filter(Boolean).join(" · ")}
+        meta={({ row, move }) => [showRealm ? row.realm.name : null, row.house, money(row.value.market), `${row.value.quantity.toLocaleString("en-US")} units`, move ? percent(move.change) : null].filter(Boolean).join(" · ")}
         empty={empty}
       />
     );

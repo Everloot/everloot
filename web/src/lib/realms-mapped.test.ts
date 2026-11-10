@@ -20,7 +20,7 @@ const { playerPath, rulesetOf } = await import("./player-pages");
 const now = new Date("2026-11-10T12:00:00.000Z");
 const at = (daysAgo: number) => new Date(now.getTime() - daysAgo * 86_400_000).toISOString();
 const scans = (realm: string, daysAgo: number, items: [number, number][], faction?: string) => ["install-a", "install-b", "install-c"].map((installId) => ({
-  kind: "auction_snapshot", installId, capturedAt: at(daysAgo), realm, ...(faction ? { faction } : {}),
+  kind: "auction_snapshot", installId, capturedAt: at(daysAgo), realm, faction: faction ?? "Alliance",
   items: items.map(([id, value]) => [id, 2, 40, value, value]),
 }));
 const state = foldMarket(emptyMarket(), [

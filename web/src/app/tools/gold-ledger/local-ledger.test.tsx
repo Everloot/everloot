@@ -112,7 +112,7 @@ test("choosing a character narrows the week, categories and receipts to them and
   expect(receipts()).toHaveLength(3);
 
   await act(async () => {
-    select.value = "Thrall-Moon Guard";
+    select.value = "1:Thrall-Moon Guard";
     select.dispatchEvent(new Event("change", { bubbles: true }));
   });
   expect(notes()).toContain("The last 7 days, Thrall (Moon Guard).");

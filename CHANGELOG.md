@@ -332,6 +332,18 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: /addons and the addon tracker's Rising board count a star change over the same window, the 7 days before
   the newest daily count, and print it the same way ("+21 since 2026-10-28"); before, one counted from the snapshot
   and the other from the clock, so they disagreed. Both pages say when the GitHub facts are older than 26 hours.
+- Site: auction prices no longer blend auction houses. Every scan now counts for its own house only (the house it read,
+  else its scanner's faction), and the Auction House pages, the item box, `market_value` and the chat show each house's
+  price apart and name it; "All houses" lists every house's rows side by side. `/api/market/prices` without `house`
+  answers only from scans that recorded no house. Days folded before this change still mix houses until they age out.
+- Site: the local gold ledger keeps two characters with the same name and realm from different installs apart.
+- Addon: tooltips, `/everloot price` and crafting costs read the community price of your character's own auction house,
+  or the open auctioneer's, and say which. An older price file keyed by realm alone is not read, since its values may mix
+  both factions; the tooltip and `/everloot price` say so, also beside your own scan. Your own scans are kept per realm
+  and house; an older scan that did not record its house says so. Update the addon and the Desktop App together, then
+  `/reload`: the 0.3.22 addon release or earlier shows no community prices from the new price file.
+- Desktop App: the price file is fetched and written per auction house, and the Market page lists each realm's houses
+  apart. The Characters page keeps two characters with the same name and realm apart.
 
 ### Changed
 - Site: hover cards on item, NPC, quest and object links open faster. The card's frame shows at once with the name

@@ -24,7 +24,7 @@ import RealmItemPage from "./[realm]/[itemId]/page";
 const today = new Date();
 const capturedAt = new Date(today.getTime() - 60 * 60_000).toISOString();
 const market = foldMarket(emptyMarket(), ["install-a", "install-b", "install-c"].map((installId, i) => ({
-  kind: "auction_snapshot", installId, eventId: `${installId}:${capturedAt}`, capturedAt, realm: "Forever",
+  kind: "auction_snapshot", faction: "Horde", installId, eventId: `${installId}:${capturedAt}`, capturedAt, realm: "Forever",
   scanId: `${installId}-${capturedAt}`, part: 1, parts: 1, items: [[2589, 2, 40 + i, 200, 205]],
 })), today);
 const scans = ["a", "b", "c"].map((installId) => ({

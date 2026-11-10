@@ -27,7 +27,7 @@ vi.mock("next/navigation", () => ({
 
 const today = new Date();
 const scans = (realm: string, items: number[][]) => ["install-a", "install-b", "install-c"].map((installId, i) => ({
-  kind: "auction_snapshot", installId, eventId: `${installId}:${realm}`, capturedAt: today.toISOString(), realm,
+  kind: "auction_snapshot", faction: "Horde", installId, eventId: `${installId}:${realm}`, capturedAt: today.toISOString(), realm,
   scanId: `${installId}-${realm}`, part: 1, parts: 1, items: items.map(([id, min, market]) => [id, 2, 40 + i, min, market]),
 }));
 const market = foldMarket(emptyMarket(), [...scans("Mal'Ganis", [[2589, 200, 205]]), ...scans("Forever", [[765, 30, 33]])], today);

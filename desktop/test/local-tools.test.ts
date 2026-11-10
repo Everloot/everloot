@@ -6,7 +6,7 @@ const NOW = Date.parse("2026-10-19T08:00:00Z");
 
 const info: CharactersInfo = {
   characters: [{
-    character: "Volvik", realm: "Nightslayer", gold: 1234_56_78, peakGold: 2000_00_00, gearSlots: 15, itemLevel: 61,
+    id: "key:00000001", character: "Volvik", realm: "Nightslayer", gold: 1234_56_78, peakGold: 2000_00_00, gearSlots: 15, itemLevel: 61,
     spent: { repairs: 50_00_00, auction: 100_00_00 }, earned: { loot: 300_00_00 },
     history: [], week: { earned: 20_00_00, spent: 35_00_00 }, equipped: [], days: [], receipts: [],
   }],

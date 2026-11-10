@@ -10,10 +10,12 @@ const HOSTILE = 'x"] = 1 } os.execute("calc") --[[\n]]\\\0\r\t';
 
 export const FIXTURE_REALMS: RealmPrices[] = [
   {
-    realm: "Forever", dataAsOf: "2026-10-20T06:30:00.000Z",
+    realm: "Forever", house: "Alliance", dataAsOf: "2026-10-20T06:30:00.000Z",
     items: [[2589, 205, 200, 190, 40, "2026-10-20", 3], [765, null, 30, 33, 900, "2026-10-05", 4]],
   },
-  { realm: HOSTILE, dataAsOf: "2026-10-20T06:30:00.000Z", items: [[1, 1, 1, 1, 1, "2026-10-20", 3]] },
+  // The Horde house of the same realm is its own market, at its own price.
+  { realm: "Forever", house: "Horde", dataAsOf: "2026-10-20T06:30:00.000Z", items: [[2589, 900, 880, 850, 12, "2026-10-20", 3], [765, null, 30, 33, 900, "2026-10-05", 4]] },
+  { realm: HOSTILE, house: "Alliance", dataAsOf: "2026-10-20T06:30:00.000Z", items: [[1, 1, 1, 1, 1, "2026-10-20", 3]] },
 ];
 
 /** Linen (2589) from four NPCs, out of order so the writer sorts them; ore (2770) from an object; 12345 has a drop and no price. */

@@ -45,7 +45,7 @@ records.push({ installId: "owner", kind: "collection_owned", collection: "Mounts
 
 const now = new Date();
 const market = foldMarket(emptyMarket(), ["a", "b", "c"].map((who, i) => ({
-  kind: "auction_snapshot", installId: `${who}-install`, eventId: `e:${i}`, capturedAt: now.toISOString(), realm: "Forever",
+  kind: "auction_snapshot", installId: `${who}-install`, eventId: `e:${i}`, capturedAt: now.toISOString(), realm: "Forever", faction: "Alliance",
   scanId: `s-${i}`, part: 1, parts: 1, items: [[2589, 2, 40, 100, 110]],
 })), now);
 

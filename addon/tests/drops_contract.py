@@ -58,6 +58,8 @@ timers = {}
 C_Timer = { After = function(seconds, f) table.insert(timers, { seconds = seconds, f = f }) end }
 function drain() while #timers > 0 do table.remove(timers, 1).f() end end
 GetRealmName = function() return 'Forever' end
+-- An Alliance character: community prices are read from the realm's Alliance auction house.
+UnitFactionGroup = function() return 'Alliance', 'Alliance' end
 tooltipCalls = {}
 Enum = { TooltipDataType = { Item = 0 } }
 TooltipDataProcessor = { AddTooltipPostCall = function(kind, f) table.insert(tooltipCalls, { kind = kind, f = f }) end }

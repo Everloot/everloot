@@ -18,8 +18,10 @@ const NO_STORE = { "Cache-Control": "no-store" };
  * public market value, as tuples (see `fields`), at most MAX_PRICE_ROWS of them. The companion writes
  * them into the EverlootPrices slot addon. Without `realm` it lists the realms that have public values, and in
  * `pending` the realms with scans but none public yet, each with how many reporters have scanned there (a count only).
- * `house` (Alliance, Horde or Neutral, any case) narrows a realm to the scans of that auction house;
- * without it the values blend every house, as they did before scans named their house.
+ * `house` (Alliance, Horde or Neutral, any case) asks for one auction house: each house is its own market, and the
+ * companion asks for each house it writes. Without it the answer holds only scans that named neither a house nor a
+ * faction, and days folded before houses were kept apart: an older companion's request. Those may mix houses, so no
+ * house's price ever comes from them, and every scan that names its house is left out of them.
  * Install ids and upload addresses stay on the site. Requests the CDN does not answer count against a
  * per-IP quota, or against the caller's key (lib/data-guard.ts).
  */

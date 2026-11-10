@@ -31,13 +31,13 @@ import { GET as sitemapChunk } from "../../auctions-sitemap/[n]/route";
 
 const today = new Date();
 const dayAgo = (n: number) => new Date(today.getTime() - n * 86_400_000).toISOString();
-const scans = (capturedAt: string, items: number[][], realm = "Forever", installs = ["install-a", "install-b", "install-c"], extra: Record<string, unknown> = {}) => installs.map((installId, i) => ({
+// Scans read the Horde auction house unless a test names another.
+const scans = (capturedAt: string, items: number[][], realm = "Forever", installs = ["install-a", "install-b", "install-c"], extra: Record<string, unknown> = { house: "Horde" }) => installs.map((installId, i) => ({
   kind: "auction_snapshot", installId, eventId: `${installId}:${capturedAt}`, capturedAt, realm,
   scanId: `${installId}-${capturedAt}`, part: 1, parts: 1, items: items.map(([id, min, market]) => [id, 2, 40 + i, min, market]), ...extra,
 }));
 const market = foldMarket(emptyMarket(), [
-  // Today's Forever scans were read at the Horde auction house: the blend and the Horde house both get them.
-  ...scans(dayAgo(0), [[2589, 200, 205], [765, 30, 33]], "Forever", undefined, { house: "Horde" }),
+  ...scans(dayAgo(0), [[2589, 200, 205], [765, 30, 33]]),
   ...scans(dayAgo(1), [[765, 28, 30]]),
   ...scans(dayAgo(3), [[2589, 180, 190]]),
   ...scans(dayAgo(7), [[765, 25, 27]]),
@@ -97,7 +97,7 @@ test("the hub is the browse view across realms: names, realms, house switch, cat
   // The house switch, the game's categories, the week's change and its trend line.
   expect(html).toContain('href="/tools/auctions?house=horde"');
   expect(words).toMatch(/All houses \(3\)/);
-  expect(words).toMatch(/Horde \(2\)/);
+  expect(words).toMatch(/Horde \(3\)/);
   expect(words).toMatch(/Alliance \(0\)/);
   expect(html).toContain('href="/tools/auctions?class=trade-goods"');
   expect(words).toContain("+22%");
@@ -154,7 +154,7 @@ test("a realm page sorts, filters and switches house in the URL; only its plain 
 
   const horde = text(await realmHtml("forever", { house: "horde" }));
   expect(horde).toContain("Linen Cloth");
-  expect(horde).not.toContain("Item 4306");
+  expect(horde).toContain("Forever, Horde auction house: 3 items");
   const cloth = text(await realmHtml("forever", { class: "trade-goods", sub: "cloth" }));
   expect(cloth).toContain("Linen Cloth");
   expect(cloth).not.toContain("Item 765");
@@ -209,9 +209,12 @@ test("an item page shows its value, a 60-day chart, each house, the other realms
   expect(html).toContain("<svg");
   expect(html).toContain('href="/tools/auctions/malganis/2589"');
   expect(html).toContain('href="/tools/auctions/item/2589"');
-  // The houses: Horde has its own price from today's scans.
+  // The page names the house its price is for; the Houses tab lists each house.
+  expect(words).toContain("Horde auction house price on Forever");
+  expect(words).not.toContain("blended");
   expect(words).toMatch(/Houses \(1\)/);
-  expect(words).toMatch(/Horde2s 5c2s 0c/);
+  expect(words).toMatch(/Horde1s 98c2s 0c/);
+  expect(html).toContain("/api/market/prices?realm=Forever&house=horde");
   // The day list: three days ago the value was 1s 90c.
   expect(html).toMatch(/<td[^>]*>[^<]*<\/td><td[^>]*>1s 90c<\/td>/);
   expect(html).toContain('"@type":"Dataset"');
@@ -225,7 +228,7 @@ test("an item page shows its value, a 60-day chart, each house, the other realms
 test("an item with no market value in 14 days, or none at all, is not indexed, and says what it needs", async () => {
   expect((await itemMetadata(item("forever", "4306"))).robots).toMatchObject({ index: false });
   const html = renderToStaticMarkup(await RealmItemPage(item("forever", "9999")));
-  expect(text(html)).toContain("No price for Item 9999 on Forever yet: it needs scans from 3 players.");
+  expect(text(html)).toContain("No price for Item 9999 on Forever yet: it needs scans from 3 players in one auction house.");
   expect(html).toContain('data-agreement="0"');
   expect(html).not.toContain('"@type":"Dataset"');
   expect((await itemMetadata(item("forever", "9999"))).robots).toMatchObject({ index: false });
@@ -236,8 +239,8 @@ test("the cross-realm page compares every realm with a price", async () => {
   const props = { params: Promise.resolve({ itemId: "2589" }) };
   const html = text(renderToStaticMarkup(await CrossRealmItemPage(props)));
   expect(html).toContain("Linen Cloth");
-  expect(html).toContain("Lowest market value1s 98c");
-  expect(html).toContain("Highest market value3s 0c");
+  expect(html).toContain("Lowest market value1s 98cForever, Horde");
+  expect(html).toContain("Highest market value3s 0cMal&#x27;Ganis, Horde");
   expect(html).toContain("Mal&#x27;Ganis");
   expect((await crossMetadata(props)).robots).toMatchObject({ index: true });
   expect((await crossMetadata({ params: Promise.resolve({ itemId: "9999" }) })).robots).toMatchObject({ index: false });
@@ -261,7 +264,7 @@ test("an unnamed item's price pages say why the name is missing and still link t
 
 test("the item database page gets a small Auction House box only when a price is public", async () => {
   const rows = await loadMarketBox(2589, today);
-  expect(rows.map((r) => [r.realm.name, r.house, r.value.market])).toEqual([["Forever", null, 198], ["Forever", "Horde", 205], ["Mal'Ganis", null, 300]]);
+  expect(rows.map((r) => [r.realm.name, r.house, r.value.market])).toEqual([["Forever", "Horde", 198], ["Mal'Ganis", "Horde", 300]]);
   const box = renderToStaticMarkup(<MarketBox itemId={2589} rows={rows} />);
   expect(text(box)).toContain("Auction House");
   expect(box).toContain('href="/tools/auctions/item/2589"');
@@ -274,6 +277,31 @@ test("the item database page gets a small Auction House box only when a price is
   expect(renderToStaticMarkup(await DatabaseItemPage({ params: Promise.resolve({ id: "2592" }) }))).not.toContain("data-market-box");
   store.loadMarket.mockRejectedValue(new Error("down"));
   expect(await loadMarketBox(2589, today)).toEqual([]);
+});
+
+test("every price names its house: All houses lists each house's price apart, and nothing blends them", async () => {
+  const rows = [
+    ...scans(dayAgo(0), [[2589, 100, 100]], "Forever", undefined, { house: "Alliance" }),
+    ...scans(dayAgo(0), [[2589, 900, 900]], "Forever", ["install-d", "install-e", "install-f"], { faction: "Horde" }),
+    // Older scans that recorded neither a house nor a faction: their values could be any house's, so no page shows them.
+    ...scans(dayAgo(0), [[2589, 5000, 5000], [765, 70, 70]], "Forever", ["install-g", "install-h", "install-i"], {}),
+  ];
+  store.loadMarket.mockResolvedValue({ state: foldMarket(emptyMarket(), rows, today), dataAsOf: today.toISOString() });
+  const page = await realmHtml("forever");
+  const words = text(page);
+  expect(words).toContain("Forever, each auction house apart: 2 prices");
+  expect(page).toMatch(/>House</);
+  expect(words).toMatch(/Alliance[\s\S]*1s 0c/);
+  expect(words).toMatch(/Horde[\s\S]*9s 0c/);
+  // The average of the two houses, and the house-unknown scans, are nowhere.
+  expect(words).not.toMatch(/5s 0c|50s 0c|Item 765/);
+  expect(text(await realmHtml("forever", { house: "alliance" }))).not.toContain("9s 0c");
+  const item = text(renderToStaticMarkup(await RealmItemPage({ params: Promise.resolve({ realm: "forever", itemId: "2589" }) })));
+  expect(item).toMatch(/Houses \(2\)/);
+  expect(item).toMatch(/Alliance1s 0c1s 0c[\s\S]*Horde9s 0c9s 0c/);
+  expect(item).not.toMatch(/5s 0c|50s 0c/);
+  const box = await loadMarketBox(2589, today);
+  expect(box.map((r) => [r.house, r.value.market])).toEqual([["Alliance", 100], ["Horde", 900]]);
 });
 
 test("the Auction House sitemap lists only the indexable pages", async () => {
