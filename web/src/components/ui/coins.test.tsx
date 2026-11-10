@@ -14,6 +14,9 @@ test.each([
   expect(root.querySelector(".sr-only")?.textContent).toBe(spoken);
   expect(root.querySelectorAll('svg[aria-hidden="true"][width="12"][height="12"]')).toHaveLength(count);
   expect(root.querySelectorAll("linearGradient, radialGradient")).toHaveLength(0);
+  // The metal reads without the colour: each coin carries its letter.
+  const letters = [...root.querySelectorAll("svg text")].map((t) => t.textContent);
+  expect(letters).toEqual(spoken.split(" ").filter((w) => ["gold", "silver", "copper"].includes(w)).map((m) => m[0]));
 });
 
 test("unknown and unavailable amounts remain text", () => {
