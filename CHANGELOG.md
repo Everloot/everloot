@@ -16,8 +16,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Added
 - Site: search engines and AI assistants now find more of the site: spell pages that create, cost or teach
-  something, each zone's coverage page once players have confirmed something there, and the class chooser once
-  it is reviewed are in the sitemaps, and llms.txt names every database list, from spells to quest chains.
+  something or sit in a talent tree, each zone's coverage page once players have confirmed something there, the
+  class chooser once it is reviewed, and the lore pages about an NPC, item or quest players have named in WoW:
+  Forever are in the sitemaps, and llms.txt names every database list, from spells to quest chains. A talent
+  spell's page now shows its class, tree, row and ranks.
 - Site: a dungeon or raid page gains a Loot section after Bosses: for each boss 3 installs report, the loot table of
   its creature, the same rows its NPC page shows, or how many installs have looted it so far. In the list, an instance
   the game files place no entrance for says so beside its id, with the reason on hover.

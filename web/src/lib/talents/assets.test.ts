@@ -132,6 +132,8 @@ const SHOWS_ART = new Set([
   // The item names shown from the game files and the Warcraft Wiki: read for the item pages, and by the sitemap
   // only to know whether a category has enough names to list.
   "web/src/lib/shown-item-names.ts", "web/src/lib/site-sitemap.ts", "web/scripts/upload-item-names.mjs",
+  // The spell names, read by the database sitemap only to know whether a spell's page is named: ids out, no names.
+  "web/src/lib/database-sitemap.ts",
   // The same names and the quest titles for the site's own search (/search and /search/suggest), never /api/suggest.
   "web/src/lib/shown-search-names.ts",
   // The hover card on the site's own database links, one entity per request, under the pages' rules; and the
