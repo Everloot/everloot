@@ -99,13 +99,19 @@ export default function McpOverview() {
 
       <H3 id="record-ids">Record ids</H3>
       <P>
-        A hit&apos;s <C>id</C> is the record id: pass it to <C>get_entity</C> as a number, or to <C>fetch</C> as a string. A
-        knowledge-release record&apos;s id is its row in the release. A game-file catalog record has a stable synthetic id, the
-        same on every build: {CATALOG_ID_BASE.toLocaleString("en-US")} plus the kind&apos;s position in the table above
-        (achievement is 0) times {CATALOG_KIND_SPAN.toLocaleString("en-US")}, plus the in-game id. So the faction with in-game
-        id 72 is record {(CATALOG_ID_BASE + CATALOG_KIND_SPAN + 72).toLocaleString("en-US")}, and <C>get_entity(72)</C> reads
-        release row 72, whatever its kind. The page tools (<C>item_page</C>, <C>npc_page</C> and the rest) and the site&apos;s
-        own URLs take the in-game id, which a hit&apos;s <C>url</C> carries, not the record id.
+        A hit&apos;s <C>recordId</C> (also <C>id</C>) goes to <C>get_entity</C> or, as a string, <C>fetch</C>.
+        Its separate <C>gameId</C> goes to gameplay tools. Search for <C>Linen Cloth</C> with kind <C>item</C>,
+        then pass gameId 2589 as <C>item_page.itemId</C>. Find <C>Elwynn Forest</C> with kind <C>zone</C>,
+        then pass its gameId as <C>world_map_near.zone: &quot;1429&quot;</C>, with x and y on the 0 to 100 scale.
+        NPC gameIds go to <C>npc_page.npcId</C>. Never use an archive record id as a game id.
+        Item, NPC, object and quest metadata includes only names three installs agree on, ids and kind;
+        it exports no game-file tooltip or description text. <C>sourceKind</C> distinguishes observed names,
+        game-file metadata, lore and other reference records. <C>observed.asOf</C> is the corpus snapshot date,
+        not the last sighting; game-file metadata carries <C>build</C> and stays unconfirmed.
+        Lore remains labelled <C>lore</C> and has no gameId.
+        Stable metadata ids use {CATALOG_ID_BASE.toLocaleString("en-US")} plus the permanent kind index times
+        {CATALOG_KIND_SPAN.toLocaleString("en-US")}, plus gameId. Existing indices 0 through 7 remain unchanged;
+        item, npc, object, quest and zone append at indices 8 through 12. For example, faction gameId 72 remains record 1,010,000,072. The table order above is not the index order.
       </P>
 
       <H3 id="structured-content">structuredContent</H3>

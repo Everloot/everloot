@@ -8,9 +8,10 @@ import AdSlot from "@/components/AdSlot";
 import EntityLink from "@/components/EntityLink";
 import ZonePreview from "@/components/ZonePreview";
 import {
-  AgreementMeter, Badge, Card, Container, DataTable, DataTitle, EmptyState, ResultStrip, SectionHeading, Tabs,
+  AgreementMeter, Badge, Card, Container, DataTable, DataTitle, EmptyState, InShort, OpenData, ResultStrip, SectionHeading, Tabs,
   type Column, type TabItem,
 } from "@/components/ui";
+import { observedLine, reportedLine } from "@/lib/evidence";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
 import { loadItemTips, loadQuestNames, loadSiteAssets } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
@@ -111,6 +112,30 @@ export default async function ZonePage(props: Props) {
   const farmLinks = !gathering ? [] : zoneFarmLinks(zone, (here?.npcs ?? []).map((n) => n.npcId), rates, gatherRows);
   const wiki = zoneWikiPage(zone.mapId);
   const nameOf = (n: ZoneNpc) => n.name ?? `NPC ${n.npcId}`;
+  // The page in a few lines, from the lists below only: what it is, what players reported with its agreement and date,
+  // and what the game files give. Storage down: the player line says unrecorded, never zero.
+  // The NPC, vendor and quest counts come from the uploads, so the snapshot's date labels them ("last upload"); the
+  // treasures keep their own last-seen date. Neither borrows the other's.
+  const now = Date.now();
+  const count = (n: number, one: string, many: string) => (n ? `${n} ${n === 1 ? one : many}` : null);
+  const uploadDate = seen.asOf?.toISOString() ?? null;
+  const treasureSeen = treasures.map((x) => x.lastSeen).filter((t): t is string => t !== null).sort().at(-1) ?? null;
+  const fromUploads = [count(npcs.length, "NPC position", "NPC positions"), count(vendors.length, "vendor", "vendors"), count(quests.length, "quest", "quests"), count(items.length, "looted item", "looted items")];
+  const treasureCount = count(treasures.length, "treasure", "treasures");
+  const reportedParts = [fromUploads.some(Boolean) ? reportedLine(fromUploads, uploadDate, now) : null, treasureCount ? observedLine([treasureCount], treasureSeen, now) : null].filter(Boolean);
+  const observed = reportedParts.length ? `${reportedParts.join(" ")} Each has three installs agreeing.` : observedLine([], null, now);
+  const fromFiles = entrances.filter((e) => e.files).length, zonedIn = entrances.filter((e) => e.confirmed !== null).length;
+  // No entrance is not "none exists": the game files may not place one and the player reports may not have been readable.
+  const noEntrance = facts.unreachable || seen.unreachable
+    ? "No entrance recorded yet in the game files; player reports could not be read just now."
+    : "No entrance recorded yet: the game files place none here and players have not confirmed one.";
+  const summary = [
+    `A zone in ${zone.continentName}; its name and outline are from the game files.`,
+    facts.unreachable ? STORAGE_UNREACHABLE : seen.unreachable ? `${observed} Treasure and entrance reports could not be read just now.` : observed,
+    entrances.length
+      ? `${entrances.length} ${entrances.length === 1 ? "dungeon or raid entrance" : "dungeon and raid entrances"}${fromFiles ? `, ${fromFiles} read from the game files` : ""}${zonedIn ? `, ${zonedIn} confirmed by three installs zoning in` : ""}.`
+      : noEntrance,
+  ];
   // An empty list is one muted line. The addon call is made once, in the notice above the tabs.
   const empty = (message: string) => <div className="px-4 sm:px-6"><EmptyTab message={message} players={false} action={null} /></div>;
 
@@ -201,7 +226,7 @@ export default async function ZonePage(props: Props) {
         {itemPages > 1 && <div className="px-4 pt-2 sm:px-6"><ResultStrip total={items.length} noun={items.length === 1 ? "item" : "items"} page={query.page} perPage={PER_PAGE} href={itemsHref} label="Item pages" /></div>}
         {items.length > 0 && <p className="px-4 py-2 text-meta text-fg-2 sm:px-6">{METHOD_LINE}{loot.dataAsOf ? ` Data as of ${loot.dataAsOf.slice(0, 10)}.` : ""}</p>}
       </> },
-    { id: "dungeons", label: "Dungeons and raids", count: entrances.length, panel: <DataTable dense caption={`Dungeon and raid entrances in ${zone.name}`} columns={entranceColumns} rows={entrances} rowKey={(e) => `${e.names.join("|")}-${e.x}-${e.y}`} empty={empty("No dungeon or raid is entered from this zone.")} /> },
+    { id: "dungeons", label: "Dungeons and raids", count: entrances.length, panel: <DataTable dense caption={`Dungeon and raid entrances in ${zone.name}`} columns={entranceColumns} rows={entrances} rowKey={(e) => `${e.names.join("|")}-${e.x}-${e.y}`} empty={empty(noEntrance)} /> },
     { id: "objects", label: "Objects", count: treasures.length, panel: <DataTable dense caption={`Treasures players saw on the minimap in ${zone.name}`} columns={treasureColumns} rows={treasures} rowKey={(t) => `${t.objectId}-${t.x}-${t.y}`} empty={empty("No treasure has a confirmed position here yet. A pin needs 3 installs at the same spot.")} /> },
   ];
   // Storage down: an empty list would read as "nobody has seen anything", so only the game-file list stays.
@@ -231,6 +256,10 @@ export default async function ZonePage(props: Props) {
         />
 
         {facts.unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} The lists below cannot be shown until it is back.</p>}
+
+        <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={link}>How to read these numbers</Link>} />
+        {/* No per-zone JSON is served, so no Raw JSON link: the copy text is the record. */}
+        <OpenData className="mb-6" text={[`${zone.name} (zone ${zone.mapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
 
         <div className="space-y-6">
           <ZonePreview

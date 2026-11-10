@@ -41,8 +41,8 @@ export function lorePath(row: { extId: string; name: string }): string {
  * licence are shown with the text; a catalog record points at its database page; any other record points at the
  * source's own page.
  */
-export function recordUrl(row: { kind: string; extId: string; name: string; sourceUrl: string }, site: string): string {
+export function recordUrl(row: { kind: string; extId: string; name: string; sourceUrl: string; sourceKind?: string }, site: string): string {
   if (row.kind === "lore_page") return `${site}${lorePath(row)}`;
-  const path = catalogPath(row.kind, row.extId, row.name);
+  const path = catalogPath(row.kind, row.extId, row.name, row.sourceKind);
   return path === null ? row.sourceUrl : `${site}${path}`;
 }

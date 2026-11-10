@@ -206,6 +206,8 @@ test("herbs gathered at a spot 3 installs placed are items found here too, and l
   expect(page).not.toContain('href="/tools/professions/mining#gather"');
   // A herb spot 3 installs placed is something players confirmed, so the zone does not say nobody did.
   expect(page).not.toContain("Players have not confirmed anything");
+  expect(page).not.toContain("No player has reported it yet.");
+  expect(page).toContain("1 looted item");
 });
 
 test("an empty zone says what a rate needs and links coverage, but no farming, gathering or wiki page it has nothing for", async () => {

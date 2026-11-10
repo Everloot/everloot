@@ -170,6 +170,7 @@ test("a release-only question with the catalog present gives the release's some-
     SOURCE_TEXT_NOTE,
     "",
     "[lore_page/lore] Thunderfury, Blessed Blade",
+    "recordId: 4",
     "A legendary sword.",
     "Source: https://example.test/10 (CC-BY-SA-4.0, retrieved 2023-11-13)",
   ].join("\n"));
@@ -190,10 +191,12 @@ test("stopwords match no catalog name, so a question full of them still gets the
     SOURCE_TEXT_NOTE,
     "",
     "[lore_page/lore] Gold farming",
+    "recordId: 5",
     "Ways to earn gold.",
     "Source: https://example.test/21 (CC-BY-SA-4.0, retrieved 2023-11-13)",
     "",
     "[lore_page/lore] The Barrens",
+    "recordId: 4",
     "A dry plain. Farming here is slow.",
     "Source: https://example.test/20 (CC-BY-SA-4.0, retrieved 2023-11-13)",
   ].join("\n"));
