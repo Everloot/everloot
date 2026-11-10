@@ -46,7 +46,7 @@ export interface CharacterBase extends CharactersInfo { money: Map<string, Money
  */
 export interface LocalTables { ledger?: unknown; roster?: unknown }
 
-type LedgerEvent = MoneyEvent & { character: string; realm: string };
+type LedgerEvent = MoneyEvent & { key: string; character: string; realm: string };
 
 const whole = (v: unknown, least: number): v is number => typeof v === "number" && Number.isInteger(v) && v >= least;
 
@@ -69,29 +69,44 @@ function ledgerEvents({ ledger, roster }: LocalTables): LedgerEvent[] {
     if (!character || !realm || !whole(at, 0) || !whole(copper, 1) || !str(category)) continue;
     const ms = at * 1000;
     const cat = str(category);
-    out.push({ character, realm, at: new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z"), ms, category: cat, copper, direction: directionOf(cat) });
+    out.push({ key: key as string, character, realm, at: new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z"), ms, category: cat, copper, direction: directionOf(cat) });
+  }
+  return out;
+}
+
+/** The roster keys that carry each name and realm ("name\0realm"), from the file's local roster. */
+function keysByName(roster: unknown): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  if (!roster || typeof roster !== "object" || Array.isArray(roster)) return out;
+  for (const [key, who] of Object.entries(roster as Record<string, unknown>)) {
+    const name = who && typeof who === "object" ? `${str((who as Record<string, unknown>).name)}\0${str((who as Record<string, unknown>).realm)}` : "";
+    if (name !== "\0") out.set(name, [...(out.get(name) ?? []), key]);
   }
   return out;
 }
 
 /**
  * Everything in the summary but the last seven days, the 30 days and the receipts, from records already read.
+ * A row is one character: a roster key, or an install id with a name and realm when the roster cannot tell which
+ * key a record belongs to. Records join a roster key's row only when the roster names exactly one key that way.
  * Money comes from the ledger when the file has one; `money_event` records count only from before the ledger's
  * oldest event, the way the Gold tab reads them, so a file from before the ledger still shows its money.
  */
 export function collectCharacters(records: Array<Record<string, unknown>>, local: LocalTables = {}): CharacterBase {
   const ledger = ledgerEvents(local);
   const ledgerFrom = ledger.reduce((min, e) => Math.min(min, e.ms), Infinity);
+  const byName = keysByName(local.roster);
   const named = new Map<string, CharacterRow>();
   const keyed = new Map<string, ProgressRow>();
   const gearAt = new Map<string, string>();
   const money = new Map<string, MoneyEvent[]>();
-  const row = (r: Record<string, unknown>): CharacterRow | null => {
+  const row = (r: Record<string, unknown>, key?: string): CharacterRow | null => {
     const character = str(r.character), realm = str(r.realm);
     if (!character || !realm) return null;
-    const id = `${character}-${realm}`;
+    const keys = byName.get(`${character}\0${realm}`) ?? [];
+    const id = key ? `key:${key}` : keys.length === 1 ? `key:${keys[0]}` : `install:${str(r.installId)}\0${character}\0${realm}`;
     let c = named.get(id);
-    if (!c) { c = { character, realm, gold: null, peakGold: null, gearSlots: 0, itemLevel: null, equipped: [], spent: {}, earned: {}, history: [], week: { earned: 0, spent: 0 }, days: [], receipts: [] }; named.set(id, c); }
+    if (!c) { c = { id, character, realm, gold: null, peakGold: null, gearSlots: 0, itemLevel: null, equipped: [], spent: {}, earned: {}, history: [], week: { earned: 0, spent: 0 }, days: [], receipts: [] }; named.set(id, c); }
     return c;
   };
   const prog = (r: Record<string, unknown>): ProgressRow | null => {
@@ -116,7 +131,7 @@ export function collectCharacters(records: Array<Record<string, unknown>>, local
         const c = row(r); if (!c) break;
         const eq = Array.isArray(r.equipped) ? (r.equipped as Record<string, unknown>[]) : [];
         if (!eq.length) break;
-        const id = `${c.character}-${c.realm}`, at = str(r.capturedAt), seen = gearAt.get(id) ?? "";
+        const id = c.id, at = str(r.capturedAt), seen = gearAt.get(id) ?? "";
         if (c.equipped.length && !(at && at > seen)) break;
         c.equipped = eq.map((e) => ({ slot: str(e.slot), itemLevel: num(e.itemLevel) })).filter((e) => e.slot && e.itemLevel > 0);
         c.gearSlots = c.equipped.length;
@@ -134,7 +149,7 @@ export function collectCharacters(records: Array<Record<string, unknown>>, local
         const bucket = direction === "out" ? c.spent : c.earned;
         bucket[cat] = (bucket[cat] ?? 0) + copper;
         if (Number.isFinite(at)) {
-          const id = `${c.character}-${c.realm}`;
+          const id = c.id;
           const list = money.get(id) ?? [];
           list.push({ at: str(r.capturedAt), ms: at, category: cat, copper, direction });
           money.set(id, list);
@@ -166,10 +181,10 @@ export function collectCharacters(records: Array<Record<string, unknown>>, local
     }
   }
   for (const e of ledger) {
-    const c = row(e); if (!c) continue;
+    const c = row(e, e.key); if (!c) continue;
     const bucket = e.direction === "out" ? c.spent : c.earned;
     bucket[e.category] = (bucket[e.category] ?? 0) + e.copper;
-    const id = `${c.character}-${c.realm}`;
+    const id = c.id;
     const list = money.get(id) ?? [];
     list.push({ at: e.at, ms: e.ms, category: e.category, copper: e.copper, direction: e.direction });
     money.set(id, list);
@@ -197,7 +212,7 @@ export function collectCharacters(records: Array<Record<string, unknown>>, local
 export function charactersAt(base: CharacterBase, now = Date.now()): CharactersInfo {
   const start = periodStart(now, MONEY_DAYS);
   const characters = base.characters.map((c) => {
-    const all = base.money.get(`${c.character}-${c.realm}`) ?? [];
+    const all = base.money.get(c.id) ?? [];
     // The Gold tab's "7 days": today and the six whole UTC days before it (addon/modules/ledger.lua, L.Period).
     const weekStart = periodStart(now, WEEK_DAYS);
     const week = { earned: 0, spent: 0 };

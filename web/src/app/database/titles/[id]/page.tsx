@@ -8,7 +8,9 @@ import { CLIENT_TITLES } from "@/data/game-data/client-titles";
 import { trailFor } from "@/lib/breadcrumbs";
 import { loadCatalog, parseSegment, titleDisplayName, titleHref } from "@/lib/completion-lists";
 import { entitySummary } from "@/lib/evidence";
+import { loreFor } from "@/lib/lore-links";
 import { pageMetadata } from "@/lib/seo";
+import LoreSection from "@/components/LoreSection";
 import { CLIENT_LABEL } from "../../../../../../kb/src/edges";
 import { EmptyTab, EntityHeader, EntityTop, known, LINK, Unreachable } from "../../entity";
 
@@ -64,6 +66,8 @@ export default async function TitlePage(props: Props) {
   const inFiles = listed ? "The game files list it." : "No game file read so far lists it.";
   // The name on an unconfirmed page is the files' own, so the name line says so instead of "no agreed name".
   const summary = entry ? [what, observed, inFiles, "No achievement is linked to it yet.", !entry.confirmed && listed ? FILES_NAME : name] : [];
+  // The archive files a title under no type of its own, so its page is one of the "other" pages.
+  const lore = entry ? await loreFor("title", id, title) : null;
 
   return (
     <Container width="data">
@@ -99,6 +103,9 @@ export default async function TitlePage(props: Props) {
                 },
               ]}
             />
+            <div className="mt-6 space-y-6 empty:hidden">
+              <LoreSection match={lore} />
+            </div>
           </>
         ) : <Unreachable />}
       </article>

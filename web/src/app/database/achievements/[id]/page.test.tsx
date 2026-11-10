@@ -5,7 +5,8 @@ import { beforeEach, expect, test, vi } from "vitest";
 const store = vi.hoisted(() => ({ loadCompletion: vi.fn() }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
-  uploadStore: { loadCompletion: store.loadCompletion },
+  // The lore link asks the agreed object names too (a name an object and an achievement share is no link): storage reads empty here.
+  uploadStore: { loadCompletion: store.loadCompletion, loadCorpus: async () => ({ uploads: 0, records: [], dataAsOf: null }) },
 }));
 // The game files' achievements: one with text and a criterion, one with no criteria at all.
 const game = vi.hoisted(() => ({ achievements: {} as Record<string, { title: string; points: number; description?: string; criteria: { text: string; amount?: number }[] }> }));
@@ -13,6 +14,8 @@ vi.mock("@/data/game-data/client-achievements", () => ({ get CLIENT_ACHIEVEMENTS
 vi.mock("@/data/game-data/client-titles", () => ({ get CLIENT_TITLES() { return { titles: [] }; } }));
 vi.mock("@/data/game-data/client-factions", () => ({ get CLIENT_FACTIONS() { return { factions: [] }; } }));
 vi.mock("@/data/game-data/client-quest-lines", () => ({ get CLIENT_QUEST_LINES() { return { questLines: [] }; } }));
+// No lore archive is open here, so the page shows no lore block.
+vi.mock("@/lib/release", () => ({ getRelease: () => null }));
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NEXT_NOT_FOUND"); },

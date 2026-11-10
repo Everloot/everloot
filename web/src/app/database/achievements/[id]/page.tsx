@@ -9,6 +9,8 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { achievementHref, loadCatalog, parseSegment, TRACKER_NEEDS } from "@/lib/completion-lists";
 import { entityTitle } from "@/lib/entity-meta";
 import { asOfLine } from "@/lib/evidence";
+import { loreFor } from "@/lib/lore-links";
+import LoreSection from "@/components/LoreSection";
 import { pageMetadata } from "@/lib/seo";
 import { CLIENT_LABEL } from "../../../../../../kb/src/edges";
 import { CLIENT_ACHIEVEMENTS } from "@/data/game-data/client-achievements";
@@ -65,6 +67,8 @@ export default async function AchievementPage(props: Props) {
   const canonical = achievementHref(id, title);
   if (`/database/achievements/${segment}` !== canonical) permanentRedirect(canonical);
   const trail = [...trailFor("/database/achievements")!, { name: title, path: `/database/achievements/${segment}` }];
+  // The archive files an achievement under no type of its own, so its page is one of the "other" pages.
+  const lore = listed || files ? await loreFor("achievement", id, title) : null;
   // Player reports win; the build's files fill the gaps, as "unconfirmed". The files' criteria show when
   // the reports did not carry criteria, or never happened.
   const fileVersion = CLIENT_ACHIEVEMENTS.build.version;
@@ -156,6 +160,9 @@ export default async function AchievementPage(props: Props) {
         {!entry && files && (
           <p className="mt-2 text-meta text-muted">Found in game files, unconfirmed. Criteria and text are the game files&apos;; the category and the count of installs that earned it appear once three installs agree.</p>
         )}
+        <div className="mt-6 space-y-6 empty:hidden">
+          <LoreSection match={lore} />
+        </div>
       </article>
     </Container>
   );

@@ -12,6 +12,8 @@ import { objectIndexable } from "@/lib/indexable";
 import { entityTitle, objectDescription } from "@/lib/entity-meta";
 import { formatMeasuredZero } from "../../../../../../kb/src/item-page";
 import { loadObjectFacts } from "@/lib/objects";
+import { loreFor } from "@/lib/lore-links";
+import LoreSection from "@/components/LoreSection";
 import { pageMetadata } from "@/lib/seo";
 import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, type Column } from "@/components/ui";
 import type { Crumb } from "@/lib/jsonld";
@@ -67,6 +69,8 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
   ];
   const windows = page.zero?.kills ?? page.drops[0]?.kills;
   const pins = facts.unreachable ? [] : page.pins ?? [];
+  // The archive files an object under no type of its own, so its page is one of the "other" pages.
+  const lore = !facts.unreachable && page.name ? await loreFor("object", page.objectId, page.name) : null;
   // Reported windows the rates leave out: a count under the drops, never a rate.
   const pending = !facts.unreachable && page.pendingLoot ? <p className="py-2 text-meta text-fg-2">{pendingLine(page.pendingLoot)}</p> : null;
   // The page in three lines: what it is, what players found in it, and what is not known.
@@ -122,6 +126,9 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
               : <EmptyTab message="No agreed position yet. A pin needs 3 installs at the same spot." />,
           }]}
         />
+        <div className="mt-6 space-y-6 empty:hidden">
+          <LoreSection match={lore} />
+        </div>
       </article>
     </Container>
   );

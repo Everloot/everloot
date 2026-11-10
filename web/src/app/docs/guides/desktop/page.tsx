@@ -34,6 +34,15 @@ export default function Page() {
           ["/ask", "Answers questions you typed with /ask in game, if you turn it on.", "After the game writes the file."],
         ]}
       />
+      <Callout kind="note">
+        <p>
+          Prices are written per auction house, and the addon reads them that way, so update the addon and the app
+          together. The 0.3.22 addon release or earlier shows no community prices from a newer app&apos;s file. A newer addon ignores
+          the prices the 0.1.21 Desktop App release or earlier wrote, since they may mix both factions, and its tooltip says so. Drop
+          rates and sources keep working either way. After updating both, let the app refresh prices, then type{" "}
+          <C>/reload</C> in game.
+        </p>
+      </Callout>
       <H2 id="pages">Pages</H2>
       <Table
         head={["Page", "What it shows and does"]}

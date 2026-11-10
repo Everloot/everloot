@@ -8,7 +8,7 @@ vi.mock("@/lib/rollup-compute", () => ({
   loadLootTables: async () => ({ tables: { sources: new Map(), leftOut: 0 }, dataAsOf: null }),
 }));
 vi.mock("@/lib/game-assets", () => ({ loadSiteAssets: async () => null, loadItemTips: async () => new Map() }));
-vi.mock("@/lib/lore", () => ({ loreForEntity: async () => null }));
+vi.mock("@/lib/lore", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/lore")>()), loreForEntity: async () => null }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
 
 import NpcPage from "./page";

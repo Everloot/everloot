@@ -32,7 +32,7 @@ test("explicit price requests isolate region, ruleset and all three houses", asy
   }
 });
 
-test.fails("owner review: realm-only price requests must not publish a cross-house consensus", async () => {
+test("realm-only price requests never publish a cross-house consensus", async () => {
   const rows = scans.map((s, i) => ({ ...s, house: i ? "Horde" : "Alliance", items: [[2589, 2, 40, 100 + i, 100 + i]] }));
   store.loadMarket.mockResolvedValue({ state: foldMarket(emptyMarket(), rows, NOW), dataAsOf: NOW.toISOString() });
   expect((await (await GET(req("?realm=Forever"))).json()).items).toEqual([]);
@@ -153,9 +153,10 @@ test("a house narrows a realm to the scans of that auction house; the realm list
   expect(horde).toMatchObject({ ok: true, realm: "Forever", house: "Horde", items: [[2589, 900, 900, 900, 10, day, 3]] });
   expect(() => marketPricesResponse.parse(horde)).not.toThrow();
   expect((await (await GET(req("?realm=Forever&house=Alliance"))).json())).toMatchObject({ ok: true, house: "Alliance", items: [] });
-  const blended = await (await GET(req("?realm=Forever"))).json();
-  expect(blended).not.toHaveProperty("house");
-  expect(blended.items[0][6]).toBe(6);
+  // Without a house only the scans that named none answer: the Horde scans never join them.
+  const unknown = await (await GET(req("?realm=Forever"))).json();
+  expect(unknown).not.toHaveProperty("house");
+  expect(unknown.items[0][6]).toBe(3);
   const realms = await (await GET(req())).json();
   expect(realms).toMatchObject({ realms: ["Forever"], houses: { Forever: ["Horde"] } });
   expect(() => marketRealmsResponse.parse(realms)).not.toThrow();
@@ -170,7 +171,7 @@ test("a house must be Alliance, Horde or Neutral, and needs a realm", async () =
 test("without a realm it also counts the players behind each realm that has scans but no public prices, never a value", async () => {
   const pendingScans = ["install-p-1", "install-p-2"].map((installId, i) => ({
     kind: "auction_snapshot", installId, eventId: `p:${i}`, capturedAt: NOW.toISOString(), realm: "CAMWOW US1 Realm 4 PvP",
-    scanId: `p-${i}`, part: 1, parts: 1, items: [[2589, 2, 40, 12345, 12345]],
+    scanId: `p-${i}`, part: 1, parts: 1, faction: "Horde", items: [[2589, 2, 40, 12345, 12345]],
   }));
   store.loadMarket.mockResolvedValue({ state: foldMarket(emptyMarket(), [...scans, ...pendingScans], NOW), dataAsOf: "2026-10-20T12:00:00.000Z" });
   const body = await (await GET(req())).json();

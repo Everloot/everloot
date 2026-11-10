@@ -206,6 +206,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   Desktop App button for your operating system make downloads easier to find, including on phones.
 - Site: Zone pages have an Items tab with the items players looted from the NPCs and objects confirmed there, each with its source, observed frequency and installs (an item two sources drop is one row with its sources under it, 50 items a page), and an empty zone says a rate needs loot windows from 3 installs. The header links the zone's coverage page and its wiki page when one is published, and a line under the tabs links the farming and gathering pages that list the zone. When the loot tables cannot be read the tab says so instead of vanishing.
 - Site: dungeon and raid pages list the quests players filed under the instance in their quest log (matched by the quest-log header 3 installs agree on), with installs and last seen, and every boss under Loot says when no creature is tied to it yet. Instance 2999 shows as Ruins of Lordaeron, a name taken from the game files and marked as such.
+- Site: Quest pages link their chain, previous and next quests, and reported zone; chain lists explain quests whose names are not reported yet.
+- Site: object, instance, faction, title, achievement and vendor pages now link the Warcraft Wiki lore page of the same name, item pages do too when the name shown is the wiki's, and lore pages link back to the database page (zone, instance, object, faction, title, achievement, NPC, item or quest). A link needs an exact name that only one page has on each side; a name two pages share gets no link. Zone pages follow the same rule, and a Warcraft Wiki copy is indexed and listed in the lore sitemap exactly when it links back.
 - Site: spell and vendor links show hover cards, with the spell text and build or the vendor's agreed goods count.
 
 ### Fixed
@@ -331,6 +333,18 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: /addons and the addon tracker's Rising board count a star change over the same window, the 7 days before
   the newest daily count, and print it the same way ("+21 since 2026-10-28"); before, one counted from the snapshot
   and the other from the clock, so they disagreed. Both pages say when the GitHub facts are older than 26 hours.
+- Site: auction prices no longer blend auction houses. Every scan now counts for its own house only (the house it read,
+  else its scanner's faction), and the Auction House pages, the item box, `market_value` and the chat show each house's
+  price apart and name it; "All houses" lists every house's rows side by side. `/api/market/prices` without `house`
+  answers only from scans that recorded no house. Days folded before this change still mix houses until they age out.
+- Site: the local gold ledger keeps two characters with the same name and realm from different installs apart.
+- Addon: tooltips, `/everloot price` and crafting costs read the community price of your character's own auction house,
+  or the open auctioneer's, and say which. An older price file keyed by realm alone is not read, since its values may mix
+  both factions; the tooltip and `/everloot price` say so, also beside your own scan. Your own scans are kept per realm
+  and house; an older scan that did not record its house says so. Update the addon and the Desktop App together, then
+  `/reload`: the 0.3.22 addon release or earlier shows no community prices from the new price file.
+- Desktop App: the price file is fetched and written per auction house, and the Market page lists each realm's houses
+  apart. The Characters page keeps two characters with the same name and realm apart.
 
 ### Changed
 - Site: hover cards on item, NPC, quest and object links open faster. The card's frame shows at once with the name

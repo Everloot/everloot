@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fetchRealmPrices, writePricesAddon, type DropRow, type DropSources, type RealmPrices } from "../../../companion/src/prices";
+import { fetchRealmPrices, housesFor, writePricesAddon, type DropRow, type DropSources, type RealmPrices } from "../../../companion/src/prices";
 import { validRealm } from "../../../packages/protocol/src/realm";
 import type { RealmSummary } from "../shared/types";
 import { saveFacts } from "./save-facts";
@@ -60,24 +60,34 @@ export function suggestedRealms(characters: string[], own: string[], followed: s
 
 /** Realms named in the player's own auction scans across every account file. */
 export function ownRealms(svFiles: string[]): string[] {
-  const names: string[] = [];
-  for (const file of svFiles) {
-    let realms: string[];
-    // A file that cannot be read is skipped; one that does not parse still fails, as it always did.
-    try { realms = saveFacts(file).realms; } catch (err) { if (typeof (err as { code?: unknown }).code === "string") continue; throw err; }
-    for (const realm of realms) if (!names.some((n) => realmKey(n) === realmKey(realm))) names.push(realm);
-  }
-  return names;
+  return ownMarkets(svFiles).realms;
 }
 
-/** One item's row from the prices file, as the tooltip reads it. `market` is null when unrecorded. */
-export interface PriceRow { realm: string; dataAsOf: string | null; itemId: number; market: number | null; min: number; historical: number; quantity: number; day: string; reporters: number }
-export interface PricesFile { realms: { realm: string; dataAsOf: string | null; items: number }[]; rows: Map<string, string> }
+/** As ownRealms, with the realms (lower-cased) where the player's scans read the neutral house. */
+function ownMarkets(svFiles: string[]): { realms: string[]; neutral: Set<string> } {
+  const names: string[] = [];
+  const neutral = new Set<string>();
+  for (const file of svFiles) {
+    let facts: ReturnType<typeof saveFacts>;
+    // A file that cannot be read is skipped; one that does not parse still fails, as it always did.
+    try { facts = saveFacts(file); } catch (err) { if (typeof (err as { code?: unknown }).code === "string") continue; throw err; }
+    for (const realm of facts.realms) if (!names.some((n) => realmKey(n) === realmKey(realm))) names.push(realm);
+    for (const key of facts.neutralRealms) neutral.add(key);
+  }
+  return { realms: names, neutral };
+}
+
+/** One item's row from the prices file, as the tooltip reads it. `market` is null when unrecorded; `house` null for an older realm-only block. */
+export interface PriceRow { realm: string; house: string | null; dataAsOf: string | null; itemId: number; market: number | null; min: number; historical: number; quantity: number; day: string; reporters: number }
+export interface PricesFile { realms: { realm: string; house: string | null; dataAsOf: string | null; items: number }[]; rows: Map<string, string> }
+
+const HOUSE_NAMES: Record<string, string> = { alliance: "Alliance", horde: "Horde", neutral: "Neutral" };
 
 /**
  * Reads the EverlootPrices file this app wrote into the game, so the Market page shows what the game
- * shows: each realm's item count and date, and one item's row on request. Read-only; null when absent.
- * The realm key is the lower-case name the file uses.
+ * shows: each realm and house's item count and date, and one item's row on request. Read-only; null when absent.
+ * The file keys a block "realm|house" in lower case; a block keyed by the realm alone is from an older file, its
+ * values possibly mixing both factions, and gets a null house.
  */
 export function readPricesFile(addonsDir: string): PricesFile | null {
   let text: string;
@@ -85,23 +95,25 @@ export function readPricesFile(addonsDir: string): PricesFile | null {
   const realms: PricesFile["realms"] = [];
   const rows = new Map<string, string>();
   for (const m of text.matchAll(/\[\s*"((?:[^"\\]|\\.)*)"\s*\]\s*=\s*\{\s*\["dataAsOf"\]\s*=\s*"([^"]*)",\s*\["data"\]\s*=\s*"([^"]*)"/g)) {
-    const [, realm, dataAsOf, data] = m;
-    rows.set(realm, `;${data};`);
-    realms.push({ realm, dataAsOf: dataAsOf || null, items: data ? data.split(";").length : 0 });
+    const [, key, dataAsOf, data] = m;
+    const bar = key.lastIndexOf("|");
+    const house = bar >= 0 ? HOUSE_NAMES[key.slice(bar + 1)] ?? null : null;
+    rows.set(key, `;${data};`);
+    realms.push({ realm: house ? key.slice(0, bar) : key, house, dataAsOf: dataAsOf || null, items: data ? data.split(";").length : 0 });
   }
   return { realms, rows };
 }
 
-/** One item on every realm in the file, in file order. */
+/** One item in every house of every realm in the file, in file order. */
 export function priceRows(file: PricesFile, itemId: number): PriceRow[] {
   const out: PriceRow[] = [];
   for (const r of file.realms) {
-    const data = file.rows.get(r.realm)!;
+    const data = file.rows.get(r.house ? `${r.realm}|${r.house.toLowerCase()}` : r.realm)!;
     const at = data.indexOf(`;${itemId},`);
     if (at < 0) continue;
     const m = /^(\d+),(\d*),(\d+),(\d+),(\d+),([\d-]+),(\d+);/.exec(data.slice(at + 1));
     if (!m) continue;
-    out.push({ realm: r.realm, dataAsOf: r.dataAsOf, itemId, market: m[2] ? Number(m[2]) : null, min: Number(m[3]), historical: Number(m[4]), quantity: Number(m[5]), day: m[6], reporters: Number(m[7]) });
+    out.push({ realm: r.realm, house: r.house, dataAsOf: r.dataAsOf, itemId, market: m[2] ? Number(m[2]) : null, min: Number(m[3]), historical: Number(m[4]), quantity: Number(m[5]), day: m[6], reporters: Number(m[7]) });
   }
   return out;
 }
@@ -182,17 +194,20 @@ export function readDropsBlock(addonsDir: string): DropSources | null {
 }
 
 /**
- * Fetches every chosen realm and rewrites the EverlootPrices slot addon. Any price failure keeps the previous file.
+ * Fetches each auction house of every chosen realm (both faction houses, and the neutral one where the player's
+ * scans read it) and rewrites the EverlootPrices slot addon. Any price failure keeps the previous file.
  * Drop rates are refetched once a day; between fetches, or when the drop fetch fails, the last good block is kept.
  */
 export async function refreshMarket(options: {
   svFiles: string[]; followed: string[]; addonsDir: string; endpoint: string; send?: typeof fetch; now?: Date;
 }): Promise<{ realms: RealmSummary[]; items: number; drops: number }> {
   const now = options.now ?? new Date();
-  const chosen = mergeRealms(ownRealms(options.svFiles), options.followed);
-  // Independent GETs to the same site; together they take one round trip, not one per realm (at most 20).
-  const fetched: RealmPrices[] = await Promise.all(chosen.map(({ realm }) => fetchRealmPrices(options.endpoint, realm, options.send)));
-  const summaries: RealmSummary[] = fetched.map((prices, i) => ({ realm: prices.realm, items: prices.items.length, dataAsOf: prices.dataAsOf, source: chosen[i].source }));
+  const own = ownMarkets(options.svFiles);
+  const chosen = mergeRealms(own.realms, options.followed)
+    .flatMap(({ realm, source }) => housesFor(realm, own.neutral).map((house) => ({ realm, house, source })));
+  // Independent GETs to the same site; together they take one round trip, not one per realm and house (at most 60).
+  const fetched: RealmPrices[] = await Promise.all(chosen.map(({ realm, house }) => fetchRealmPrices(options.endpoint, realm, house, options.send)));
+  const summaries: RealmSummary[] = fetched.map((prices, i) => ({ realm: prices.realm, house: prices.house, items: prices.items.length, dataAsOf: prices.dataAsOf, source: chosen[i].source }));
   let drops = readDropsBlock(options.addonsDir);
   const age = drops ? now.getTime() - Date.parse(drops.fetchedAt) : Infinity;
   if (!(age >= 0 && age < DROPS_EVERY_MS)) {

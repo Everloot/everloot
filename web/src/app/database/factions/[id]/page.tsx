@@ -9,7 +9,7 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { factionHeaderOnly, factionHref, factionInFiles, loadCatalog, parseSegment } from "@/lib/completion-lists";
 import { entityTitle } from "@/lib/entity-meta";
 import { entitySummary } from "@/lib/evidence";
-import { loreForEntity } from "@/lib/lore";
+import { loreFor } from "@/lib/lore-links";
 import { pageMetadata } from "@/lib/seo";
 import { CLIENT_LABEL } from "../../../../../../kb/src/edges";
 import { EmptyTab, EntityHeader, EntityTop, known, LINK, Unreachable } from "../../entity";
@@ -69,7 +69,7 @@ export default async function FactionPage(props: Props) {
   // The name on an unconfirmed page is the files' own, so the name line says so instead of "no agreed name".
   const summary = entry ? [what, observed, inFiles, "No quest is linked to it yet.", !entry.confirmed && files ? FILES_NAME : name] : [];
   // The archive files a faction under no type of its own, so its page is one of the "other" pages.
-  const lore = entry ? await loreForEntity("other", entry.name) : null;
+  const lore = entry ? await loreFor("faction", id, entry.name) : null;
 
   return (
     <Container width="data">

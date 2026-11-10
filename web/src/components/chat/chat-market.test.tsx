@@ -86,7 +86,7 @@ test("with a key the price still comes from the market, and the provider is neve
   sessionStorage.setItem("everloot.chat.providers.v1", JSON.stringify([{ kind: "openrouter", model: "deepseek/deepseek-v4.1-flash", key: KEY }]));
   await render(<ChatClient />);
   await say("price 2589 on Forever");
-  expect(text()).toContain("Item 2589 on Forever, all houses: market 3s 10c");
+  expect(text()).toContain("Item 2589 on Forever, busiest auction house: market 3s 10c");
   expect(urls().some((u) => u.startsWith("https://openrouter.ai/api/v1/chat/completions"))).toBe(false);
   expect(urls().some((u) => u.startsWith("/schema/mcp/"))).toBe(false);
 });
@@ -100,7 +100,7 @@ test.each([
   await render(<ChatClient />);
   await say(question);
   expect(urls()).toContain("/api/tools/market_value?realm=Forever&itemId=2589");
-  expect(text()).toContain("on Forever, all houses: market 3s 10c");
+  expect(text()).toContain("on Forever, busiest auction house: market 3s 10c");
   expect(urls().some((u) => u.startsWith("https://openrouter.ai/api/v1/chat/completions"))).toBe(false);
   expect(urls().some((u) => u.startsWith("/schema/mcp/") || u.startsWith("/api/tools/answer_sources"))).toBe(false);
 });
@@ -110,7 +110,7 @@ test("a canonical name that begins with an article is searched whole and its own
   await say("price The Review Blade on Forever");
   expect(urls().filter((u) => u.startsWith("/search/suggest"))).toEqual(["/search/suggest?q=The+Review+Blade&in=item"]);
   expect(urls()).toContain("/api/tools/market_value?realm=Forever&itemId=2589");
-  expect(text()).toContain("The Review Blade (item 2589) on Forever, all houses: market 3s 10c");
+  expect(text()).toContain("The Review Blade (item 2589) on Forever, busiest auction house: market 3s 10c");
   calls.length = 0;
   await say("what is the price of the Linen Cloth on Forever");
   expect(urls().filter((u) => u.startsWith("/search/suggest"))).toEqual(["/search/suggest?q=the+Linen+Cloth&in=item", "/search/suggest?q=Linen+Cloth&in=item"]);
@@ -183,7 +183,7 @@ test("asking again a question left unanswered replaces it, so the chat holds it 
   await say("price 2589 on Forever");
   const questions = () => (JSON.parse(stored()) as { messages: { role: string; text: string }[] }[])[0].messages.filter((m) => m.role === "user").map((m) => m.text);
   expect(questions()).toEqual(["price 2589 on Forever"]);
-  expect(text()).toContain("Item 2589 on Forever, all houses: market 3s 10c");
+  expect(text()).toContain("Item 2589 on Forever, busiest auction house: market 3s 10c");
   hang = true;
   await say("price 2996 on Forever");
   await act(async () => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); });

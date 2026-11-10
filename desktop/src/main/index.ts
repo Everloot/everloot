@@ -519,7 +519,7 @@ if (!app.requestSingleInstanceLock()) {
     const dir = addonsDir();
     const file = dir ? readPricesFile(dir) : null;
     if (!file) return { itemId, rows: [], note: "No prices file in the game yet. Turn on Market prices and press Refresh now." };
-    const rows = priceRows(file, itemId).map(({ realm, dataAsOf, market, min, historical, quantity, day, reporters }) => ({ realm, dataAsOf, market, min, historical, quantity, day, reporters }));
+    const rows = priceRows(file, itemId).map(({ realm, house, dataAsOf, market, min, historical, quantity, day, reporters }) => ({ realm, house, dataAsOf, market, min, historical, quantity, day, reporters }));
     return { itemId, rows, note: rows.length ? null : "This item is not in the game's price file. Each realm's file keeps the 2,000 items with the most units listed, so a public price may still be on the website; a day is public once three reporters scanned it." };
   });
   handle("askInfo", async (): Promise<AskInfo> => {

@@ -241,7 +241,7 @@ end
 LONG = 'Precio de mercado de la comunidad en todas las casas de subastas del reino, por unidad'
 STALE = '  STALE: newest public day 2026-10-01 is 19 days old; the Everloot Desktop App refreshes it, then /reload'
 STUB = {
-  { text = 'Everloot market 2s 5c · per unit · all houses', left = 'Everloot market · per unit · all houses',
+  { text = 'Everloot market 2s 5c · per unit · Alliance house', left = 'Everloot market · per unit · Alliance house',
     right = '2|TInterface\\\\MoneyFrame\\\\UI-SilverIcon:0:0:2:0|t 5|TInterface\\\\MoneyFrame\\\\UI-CopperIcon:0:0:2:0|t', r = 0.9, g = 0.8, b = 0.5 },
   { text = '  min 2s 0c', left = '  min', right = '2s 0c', r = 0.9, g = 0.8, b = 0.5 },
   { text = '  40 up · 3 reporters · 2026-10-20', r = 0.6, g = 0.6, b = 0.6 },
@@ -355,7 +355,8 @@ local T, p = Everloot.AuctionTab, Everloot.AuctionTab.panel
 Everloot:ResetPrices()
 lookup('2589')
 sameAsLines((Everloot.PriceLines('Forever', 2589)))
-assert(shownText():find('all houses', 1, true), 'a community price says it blends every house: ' .. shownText())
+-- A Horde character at a Horde auctioneer: the Horde house's price, named; never the Alliance price of the same realm.
+assert(shownText():find('Horde house', 1, true) and not shownText():find('Alliance', 1, true), 'a community price names its house: ' .. shownText())
 assert(shownText():find('Your scan', 1, true), 'the player\\'s own scan is still there: ' .. shownText())
 checkLayout()
 lookup('765')
@@ -410,7 +411,7 @@ lookup('2589')
 sameAsLines({ many[1] })
 p.results.height = 200
 -- Lines with no amount (an older reader's plain lines) show as text, and the heading claims no unit.
-local plainLines = { { text = 'Everloot market 2s 5c · per unit · all houses', r = 0.9, g = 0.8, b = 0.5 } }
+local plainLines = { { text = 'Everloot market 2s 5c · per unit · Alliance house', r = 0.9, g = 0.8, b = 0.5 } }
 Everloot.PriceLines = function() return plainLines, { status = 'ready' } end
 lookup('2589')
 sameAsLines(plainLines)

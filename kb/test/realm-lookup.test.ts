@@ -8,7 +8,8 @@ import { createToolHandlers, type ToolOptions } from "../src/mcp-server.js";
 
 /**
  * market_value and auction_history read a realm name the same way (resolveRealm), and list the same public full-scan
- * days. The fixture is the audit's case: Linen Cloth on CAMWOW US1 Realm 4 PvP, scanned by one of Everloot's own installs.
+ * days. The fixture is the audit's case: Linen Cloth on CAMWOW US1 Realm 4 PvP, scanned by one of Everloot's own installs
+ * at the Horde auction house (each house is its own market, and market_value reads houses, never a mix).
  */
 
 const US = "CAMWOW US1 Realm 4 PvP";
@@ -22,7 +23,7 @@ const dayAgo = (n: number) => new Date(now.getTime() - n * 86_400_000).toISOStri
 function snapshot(realm: string, daysAgo: number, item: [number, number, number, number, number], installId = OWN) {
   return {
     kind: "auction_snapshot", installId, eventId: `${installId}:${realm}:${daysAgo}`, capturedAt: dayAgo(daysAgo), realm,
-    reporter: "0123456789abcdef", scanId: `s-${daysAgo}`, part: 1, parts: 1, items: [item],
+    reporter: "0123456789abcdef", scanId: `s-${daysAgo}`, part: 1, parts: 1, house: "Horde", items: [item],
   };
 }
 
@@ -31,6 +32,18 @@ const fourDays = (realm: string) => [5, 4, 3, 2].map((n) => snapshot(realm, n, [
 
 function market(...realms: string[]): MarketState {
   return foldMarket(emptyMarket(), realms.flatMap(fourDays), now, {}, undefined, new Set([OWN]));
+}
+
+/** Four days of one trusted install's full scans of Linen on `realm` in `house` (none: a scan that recorded no house), `units` listed. */
+function houseScans(realm: string, house: "Alliance" | "Horde" | "Neutral" | null, units: number) {
+  return [5, 4, 3, 2].map((n) => {
+    const { house: _kept, ...scan } = snapshot(realm, n, [LINEN, 40, units, 13 + n, 25]);
+    return { ...scan, eventId: `${scan.eventId}:${house ?? "none"}`, scanId: `${scan.scanId}-${house ?? "none"}`, ...(house ? { house } : {}) };
+  });
+}
+
+function houseMarket(...scans: ReturnType<typeof houseScans>[]): MarketState {
+  return foldMarket(emptyMarket(), scans.flat(), now, {}, undefined, new Set([OWN]));
 }
 
 const databases: DB[] = [];
@@ -193,4 +206,72 @@ test("a browsing day is public with one of Everloot's own installs, as in the ma
   expect(auctionHistory("Forever", 1, [day(OWN, 10)], trusted).points).toEqual([{ day: "2026-11-05", copper: 10, reporters: 1 }]);
   expect(auctionHistory("Forever", 1, [day("x", 10), day("y", 20)], trusted).points).toEqual([]);
   expect(handleAuctionHistory({ realm: "Forever", itemId: 1 }, [day(OWN, 10)], trusted)).toContain("2026-11-05  10c  1 reporter (includes Everloot's own scans)");
+});
+
+test("both tools read the house with the most units listed, name it, and agree on its days", async () => {
+  // Alliance 100 units a day, Horde 300: the Horde days are the ones both tools carry.
+  const state = houseMarket(houseScans(US, "Alliance", 100), houseScans(US, "Horde", 300));
+  const h = handlers(state);
+  const value = await call(h, "market_value", US);
+  const history = await call(h, "auction_history", US);
+  const horde = value.structured.page!.history;
+  expect(horde).toHaveLength(4);
+  expect(horde.every((day) => day.quantity === 300)).toBe(true);
+  expect(value.structured.page!.value).toMatchObject({ quantity: 300 });
+  expect(history.structured.page!.scanDays).toEqual(horde);
+  expect(history.text).toContain("in the Horde auction house");
+  expect(history.text).not.toContain("in the Alliance auction house");
+  // market_value's text still shows both houses, and says which one its page carries.
+  expect(value.text).toContain("Alliance auction house:");
+  expect(value.text).toContain("Horde auction house:");
+  expect(value.text).toContain("The structured page carries the Horde auction house (most units listed");
+});
+
+test("a tie in units listed goes to Alliance, then Horde, then Neutral, in both tools", async () => {
+  const state = houseMarket(houseScans(US, "Neutral", 200), houseScans(US, "Horde", 200), houseScans(US, "Alliance", 200));
+  const h = handlers(state);
+  const value = await call(h, "market_value", US);
+  const history = await call(h, "auction_history", US);
+  expect(value.text).toContain("The structured page carries the Alliance auction house");
+  expect(history.text).toContain("in the Alliance auction house");
+  expect(history.structured.page!.scanDays).toEqual(value.structured.page!.history);
+  // Without Alliance the tie goes to Horde.
+  const noAlliance = handlers(houseMarket(houseScans(US, "Neutral", 200), houseScans(US, "Horde", 200)));
+  expect((await call(noAlliance, "market_value", US)).text).toContain("The structured page carries the Horde auction house");
+  expect((await call(noAlliance, "auction_history", US)).text).toContain("in the Horde auction house");
+});
+
+test("scans that recorded no house are in no house's days, for either tool", async () => {
+  // The house-less scans list 900 units, more than the Horde's 300, but they are no house's market.
+  const state = houseMarket(houseScans(US, "Horde", 300), houseScans(US, null, 900));
+  const h = handlers(state);
+  const value = await call(h, "market_value", US);
+  const history = await call(h, "auction_history", US);
+  expect(value.structured.page!.value).toMatchObject({ quantity: 300 });
+  expect(history.structured.page!.scanDays).toEqual(value.structured.page!.history);
+  expect(value.structured.page!.history.every((day) => day.quantity === 300)).toBe(true);
+  expect(history.text).toContain("in the Horde auction house");
+
+  // A realm held only by house-less scans shows no days at all.
+  const only = handlers(houseMarket(houseScans(US, null, 900)));
+  const noValue = await call(only, "market_value", US);
+  const noHistory = await call(only, "auction_history", US);
+  expect(noValue.structured.page).toMatchObject({ value: null, history: [] });
+  expect(noValue.text).toContain("No public market value yet in any auction house");
+  expect(noValue.text).not.toContain("The structured page carries");
+  expect(noHistory.structured.page!.scanDays).toEqual([]);
+  expect(noHistory.text).toContain("No public day yet");
+});
+
+test("a realm held only by house-less scans is never an alias, an ambiguity or a candidate", async () => {
+  // EU holds house-less scans only: no price is public there, so no name resolves to it, and none suggests it.
+  const state = houseMarket(houseScans(US, "Horde", 300), houseScans(EU, null, 300));
+  expect(resolveRealm(state, "Realm 4 PvP", now)).toEqual({ status: "alias", realm: US, asked: "Realm 4 PvP" });
+  expect(resolveRealm(state, "EU1 Realm 4 PvP", now)).toMatchObject({ status: "unknown", candidates: [US] });
+  const h = handlers(state);
+  const answers = { market_value: await call(h, "market_value", "EU1 Realm 4 PvE"), auction_history: await call(h, "auction_history", "EU1 Realm 4 PvE") };
+  for (const [tool, answer] of Object.entries(answers)) {
+    expect(answer.structured.page, tool).toMatchObject({ realmStatus: "unknown", candidates: [US] });
+    expect(answer.text, tool).not.toContain(EU);
+  }
 });

@@ -19,7 +19,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   const market = await uploadStore.loadMarket();
   const board = market.state ? findBoard(realmBoards(market.state, new Date()), slug) : null;
   const name = board?.realm.name ?? slugWords(slug);
-  const items = board ? count(board.rows.length, "item") : "the items";
+  const items = board ? count(board.items, "item") : "the items";
   const q = ahQuery((await props.searchParams) ?? {});
   return {
     ...pageMetadata({

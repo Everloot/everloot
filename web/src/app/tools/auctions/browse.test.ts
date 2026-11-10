@@ -8,7 +8,7 @@ const at = (daysAgo: number) => new Date(now.getTime() - daysAgo * 86_400_000).t
 /** Three installs scan the items; `items` are [itemId, unit price, units]. */
 const scans = (daysAgo: number, items: [number, number, number][]) =>
   ["install-a", "install-b", "install-c"].map((installId) => ({
-    kind: "auction_snapshot", installId, capturedAt: at(daysAgo), realm: "Forever",
+    kind: "auction_snapshot", faction: "Horde", installId, capturedAt: at(daysAgo), realm: "Forever",
     items: items.map(([id, value, units]) => [id, 3, units, value, value]),
   }));
 

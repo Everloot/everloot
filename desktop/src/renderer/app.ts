@@ -224,7 +224,7 @@ function overview(s: AppState): string {
     </section>
     <div class="stats">
       ${cell("upload", "Upload", dot(up), up.state === "ok" ? "OK" : up.state === "error" ? "Failed" : up.state === "off" ? "Off" : up.state === "running" ? "Running" : "Waiting", `${last(up)}${askWhy("upload", s)}`)}
-      ${cell("market", "Market prices", dot(pr), data.market ? `${data.market.last.length} realm(s)` : pr.state === "off" ? "Off" : pr.state === "running" ? "Running" : "Waiting", `${data.market?.scans[0] ? `your last scan ${ago(data.market.scans[0].at)}` : last(pr)}${suggestionLine(data.market)}${askWhy("prices", s)}`)}
+      ${cell("market", "Market prices", dot(pr), data.market ? `${new Set(data.market.last.map((r) => r.realm.toLowerCase())).size} realm(s)` : pr.state === "off" ? "Off" : pr.state === "running" ? "Running" : "Waiting", `${data.market?.scans[0] ? `your last scan ${ago(data.market.scans[0].at)}` : last(pr)}${suggestionLine(data.market)}${askWhy("prices", s)}`)}
       ${cell("ask", "/ask", dot(ask), ask.state === "off" ? "Off" : ask.state === "error" ? "Failed" : ask.state === "running" ? "Running" : "On", `${ask.at ? last(ask) : s.settings.ask.enabled ? "waiting" : 'answers <code>/ask</code> in game · <button type="button" class="link" data-page="ask">turn on in Ask</button>'}${askWhy("ask", s)}`)}
       ${cell("addon", "Addon", "", addonLine, `${addon?.slots.prices ? "prices file in game" : "no prices file yet"}${addon && (!addon.installed || addon.newer) ? ` · <button type="button" class="link" data-page="addon">${addon.installed ? "update" : "install"}</button>` : ""}`)}
     </div>
@@ -546,7 +546,7 @@ function keyedRows(c: CharactersInfo | undefined): string {
 function characters(): string {
   const c = data.characters;
   const named = c?.characters ?? [];
-  const selected = named.find((r) => `${r.character}\u0000${r.realm}` === charPick) ?? named[0] ?? null;
+  const selected = named.find((r) => r.id === charPick) ?? named[0] ?? null;
   const t = selected ? totals(selected.days) : { earned: 0, spent: 0 };
   const net30 = netOf(t), week = selected ? netOf(selected.week) : 0;
   const rows = named.map((r, i) => {
@@ -676,7 +676,7 @@ function drawerShare(c: CharacterRow): string {
 function selectChar(i: number): void {
   const c = data.characters?.characters[i];
   if (!c) return;
-  charPick = `${c.character}\u0000${c.realm}`;
+  charPick = c.id;
   render();
   openDrawer(c, main.querySelector<HTMLElement>(`[data-char="${i}"]`));
 }
@@ -701,7 +701,7 @@ function openDrawer(c: CharacterRow, opener: HTMLElement | null, tab = "overview
 function reopenDrawer(tab: string): void {
   const was = drawerChar!;
   const rows = data.characters?.characters ?? [];
-  const i = rows.findIndex((r) => r.character === was.character && r.realm === was.realm);
+  const i = rows.findIndex((r) => r.id === was.id);
   if (i < 0) { drawerChar = null; drawerOpener = null; return; }
   openDrawer(rows[i], main.querySelector<HTMLElement>(`[data-char="${i}"]`), tab, false);
 }
@@ -815,8 +815,8 @@ function market(s: AppState): string {
     </section>
     <section class="panel"><div class="row between"><h2>Written into the game</h2><span class="muted small">${j.at ? when(j.at) : ""}</span></div>
       ${j.state === "error" ? `<p class="error">${esc(j.message)}</p>` : ""}
-      ${last.length ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th class="num">Items</th><th>Data as of</th><th>Why</th></tr></thead><tbody>${last.map((r) => `<tr><td>${esc(r.realm)}</td><td class="num">${r.items}</td><td>${r.dataAsOf ? when(r.dataAsOf) : "–"}</td><td class="muted">${r.source === "scan" ? "your scans" : "followed"}</td></tr>`).join("")}</tbody></table></div>`
-        : m?.inGame?.length ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th class="num">Items</th><th>Data as of</th></tr></thead><tbody>${m.inGame.map((r) => `<tr><td>${esc(r.realm)}</td><td class="num">${r.items}</td><td>${r.dataAsOf ? when(r.dataAsOf) : "–"}</td></tr>`).join("")}</tbody></table></div><p class="muted small">The file in the game now; not refreshed yet this session.</p>`
+      ${last.length ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th>House</th><th class="num">Items</th><th>Data as of</th><th>Why</th></tr></thead><tbody>${last.map((r) => `<tr><td>${esc(r.realm)}</td><td>${esc(r.house)}</td><td class="num">${r.items}</td><td>${r.dataAsOf ? when(r.dataAsOf) : "–"}</td><td class="muted">${r.source === "scan" ? "your scans" : "followed"}</td></tr>`).join("")}</tbody></table></div>`
+        : m?.inGame?.length ? `<div class="tablewrap"><table><thead><tr><th>Realm</th><th>House</th><th class="num">Items</th><th>Data as of</th></tr></thead><tbody>${m.inGame.map((r) => `<tr><td>${esc(r.realm)}</td><td>${houseCell(r.house)}</td><td class="num">${r.items}</td><td>${r.dataAsOf ? when(r.dataAsOf) : "–"}</td></tr>`).join("")}</tbody></table></div><p class="muted small">The file in the game now; not refreshed yet this session.</p>`
         : emptyState(marketWritten, icon("market"))}
     </section>
   </div>`;
@@ -834,15 +834,20 @@ function suggestionLine(m: MarketInfo | undefined): string {
   return ` · no prices yet; follow your characters' realms (${esc(m.suggested.join(", "))}) <button type="button" class="link" data-suggestion="follow">Follow</button>`;
 }
 
-/** The last lookup on the Market page: each realm's row from the game's prices file, and the site's full history. */
+/** A price's auction house; an older file's realm-only block says its values may mix both factions. */
+function houseCell(house: string | null): string {
+  return house ? esc(house) : '<span class="muted">older file, both factions</span>';
+}
+
+/** The last lookup on the Market page: each realm and house's row from the game's prices file, and the site's full history. */
 function priceResult(s: AppState): string {
   const p = priceLookup;
   if (!p) return "";
   if (!p.rows.length) return `<p class="muted">${esc(p.note ?? "Nothing found.")}</p>`;
   const site = (realm: string) => websiteUrl(s.settings.endpoint, `/tools/auctions?realm=${encodeURIComponent(realm)}&item=${p.itemId}`);
-  return `<div class="tablewrap"><table><thead><tr><th>Realm</th><th class="num">Market</th><th class="num">Min</th><th class="num">Historical</th><th class="num">Up</th><th class="num">Reporters</th><th>Day</th><th></th></tr></thead><tbody>${p.rows.map((r) =>
-    `<tr><td>${esc(r.realm)}</td><td class="num">${r.market === null ? '<span class="muted">unrecorded</span>' : gold(r.market)}</td><td class="num">${gold(r.min)}</td><td class="num">${gold(r.historical)}</td><td class="num">${r.quantity}</td><td class="num">${r.reporters}</td><td>${esc(r.day)}</td><td>${ext(site(r.realm), "history ↗")}</td></tr>`).join("")}</tbody></table></div>
-    <p class="muted small">Item ${p.itemId}. Market weighs the last 14 public days, historical is the 60-day median, min is the lowest buyout per unit. All houses on each realm are blended.</p>`;
+  return `<div class="tablewrap"><table><thead><tr><th>Realm</th><th>House</th><th class="num">Market</th><th class="num">Min</th><th class="num">Historical</th><th class="num">Up</th><th class="num">Reporters</th><th>Day</th><th></th></tr></thead><tbody>${p.rows.map((r) =>
+    `<tr><td>${esc(r.realm)}</td><td>${houseCell(r.house)}</td><td class="num">${r.market === null ? '<span class="muted">unrecorded</span>' : gold(r.market)}</td><td class="num">${gold(r.min)}</td><td class="num">${gold(r.historical)}</td><td class="num">${r.quantity}</td><td class="num">${r.reporters}</td><td>${esc(r.day)}</td><td>${ext(site(r.realm), "history ↗")}</td></tr>`).join("")}</tbody></table></div>
+    <p class="muted small">Item ${p.itemId}. Market weighs the last 14 public days, historical is the 60-day median, min is the lowest buyout per unit. Each auction house is its own market; the game shows the one your character uses.</p>`;
 }
 
 function ask(s: AppState): string {
