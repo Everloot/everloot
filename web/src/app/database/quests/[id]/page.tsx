@@ -133,6 +133,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
           jsonHref={!facts.unreachable && hasCard.quest(page) ? `/api/tooltip/quest/${page.questId}` : undefined}
         />
         <Tabs
+          className="mt-6"
           label={`${title}: relations`}
           tabs={[
             {

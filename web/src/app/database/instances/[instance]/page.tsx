@@ -4,7 +4,8 @@ import JsonLd from "@/components/JsonLd";
 import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { AgreementMeter, Badge, Card, Container, DataTable, DataTitle, Disclosure, EmptyState, filledColumns, reportedLabel, SectionHeading, type Column, type SparseColumn } from "@/components/ui";
+import { AgreementMeter, Badge, Card, Container, DataTable, DataTitle, Disclosure, EmptyState, filledColumns, InShort, OpenData, reportedLabel, SectionHeading, type Column, type SparseColumn } from "@/components/ui";
+import { observedLine } from "@/lib/evidence";
 import {
   bossRows, difficultyLabel, difficultyList, instanceDescription, instanceHref, instanceRows, instanceTitle, levelLabel, loadSightings, parseInstanceSegment,
   type BossRow, type InstancePlace, type InstanceRow,
@@ -119,6 +120,22 @@ export default async function InstancePage(props: Props) {
   const names = itemFacts && !itemFacts.unreachable ? itemNames(itemFacts) : new Map<number, string>();
   const tips = await loadItemTips(droppedIds.length ? await loadSiteAssets() : null, droppedIds);
 
+  // The page in a few lines, from the sections below only: what it is, what players reported with its agreement and
+  // date, and what the game files list. Storage down: the player line says unrecorded, never zero.
+  const count = (n: number, one: string, many: string) => (n ? `${n} ${n === 1 ? one : many}` : null);
+  const level = levelLabel(row.level);
+  const reported = unreachable ? [] : [count(row.bosses.length, "boss", "bosses"), count(row.confirmed.length, "entrance", "entrances")];
+  const lastSeen = unreachable ? null : [...row.bosses, ...row.confirmed].map((x) => x.lastSeen).filter((t): t is string => t !== null).sort().at(-1) ?? null;
+  const filesList = [count(row.encounters.length, "encounter", "encounters"), count(row.files.length, "entrance", "entrances")].filter(Boolean);
+  const summary = [
+    `${row.raid === null ? "An instance" : row.raid ? "A raid" : "A dungeon"}${level ? `, level ${level} in the game files` : ""}.`,
+    unreachable ? STORAGE_UNREACHABLE
+      : reported.some(Boolean) ? `${observedLine(reported, lastSeen, Date.now())} Each has three installs agreeing.`
+      : row.reported > 0 ? `Nothing here is confirmed yet: ${row.reported} ${row.reported === 1 ? "install has" : "installs have"} zoned in, and 3 must agree.`
+      : observedLine([], null, Date.now()),
+    filesList.length ? `The game files list ${filesList.join(" and ")}, unconfirmed until 3 installs report them.` : "The game files list no encounter or entrance for it.",
+  ];
+
   const unconfirmed = row.reported > 0
     ? `No entrance is confirmed yet. ${row.reported} ${row.reported === 1 ? "install has" : "installs have"} zoned in, and 3 must agree on the place.`
     : "No entrance is confirmed yet: no install has reported zoning in. An entrance is confirmed once 3 installs zone in from the same place.";
@@ -142,6 +159,10 @@ export default async function InstancePage(props: Props) {
         )}
 
         {unreachable && <p className="mb-3 text-meta text-warning">{STORAGE_UNREACHABLE} Players&apos; reports cannot be shown until it is back; the entrance below is from the game files.</p>}
+
+        <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={link}>How to read these numbers</Link>} />
+        {/* No per-instance JSON is served, so no Raw JSON link: the copy text is the record. */}
+        <OpenData className="mb-6" text={[`${title} (instance ${row.instanceMapId})`, ...summary, `Source: https://everloot.app${canonical}`].join("\n")} />
 
         <div className="space-y-6">
           <section aria-labelledby="facts">

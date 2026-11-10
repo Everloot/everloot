@@ -91,7 +91,7 @@ test("answer shapes are unchanged", async () => {
   expect(rollup.stats).toEqual({ uploads: 2, lootWindows: 2, records: 2, unreachable: false, dataAsOf: "2026-10-10T11:00:00.000Z" });
   expect(await loadItemFacts()).toEqual({ rates: [], names: [], npcs: [], unreachable: false });
   // The world facts carry the recheck scopes the readers apply (kb/curated/recheck.json holds none today).
-  expect(await loadWorldFacts()).toEqual({ npcs: [], quests: [], vendors: [], recheck: [], unreachable: false });
+  expect(await loadWorldFacts()).toEqual({ npcs: [], quests: [], vendors: [], recheck: [], unreachable: false, dataAsOf: "2026-10-10T11:00:00.000Z" });
   expect(await loadPopularAddons()).toEqual({ addons: [], reportingInstalls: 0, unreachable: false, dataAsOf: "2026-10-10T11:00:00.000Z" });
   expect(await loadAddonLeaderboard()).toEqual({ addons: [], reportingInstalls: 0, trends: {}, unreachable: false, dataAsOf: "2026-10-10T11:00:00.000Z" });
   expect(await loadObservedEdges()).toEqual({ edges: [], unreachable: false, dataAsOf: "2026-10-10T11:00:00.000Z" });

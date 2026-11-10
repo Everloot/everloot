@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/get_by_name.json",
   "title": "Get records by exact name",
-  "description": "Returns the records whose full name matches exactly, case-insensitively, optionally narrowed to one record kind. Use it to disambiguate when you know the exact name and want the id without a ranked search; use search_knowledge for partial names, keywords or questions. Several records can share a name across kinds, so check each hit's kind. Empty hits mean no record has that exact name.",
+  "description": "Returns the records whose full name matches exactly, case-insensitively, optionally narrowed to one record kind. Use it to disambiguate when you know the exact name and want the id without a ranked search; use search_knowledge for partial names, keywords or questions. Several records can share a name across kinds, so check each hit's kind and sourceKind. Use gameId for gameplay tools and recordId for get_entity; lore hits have no gameId. Empty hits mean no record has that exact name.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -18,7 +18,7 @@
         "description": "The full record name, any case, up to 200 characters."
       },
       "kind": {
-        "description": "Narrow to one record kind. achievement, faction, title, quest_chain, mount, legacy_perk, race and instance come from the game files (found in game files, unconfirmed); item, npc, object, quest, zone, spell, lore_page, creator and realm from the knowledge release; build is an Everloot team starter talent build, not observed. Without it, every kind.",
+        "description": "Narrow to one record kind. item, npc, object and quest include names 3 installs agree on; zone uses released UiMap ids from the game files. achievement, faction, title, quest_chain, mount, legacy_perk, race and instance come from the game files (found in game files, unconfirmed); spell, lore_page, creator and realm come from the knowledge release; build is an Everloot team starter talent build, not observed. Without it, every kind.",
         "type": "string",
         "enum": [
           "item",
@@ -60,6 +60,48 @@
               "minimum": -9007199254740991,
               "maximum": 9007199254740991,
               "description": "The record id, for get_entity."
+            },
+            "recordId": {
+              "description": "Alias of id. Pass to get_entity or fetch, never a gameplay tool.",
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "gameId": {
+              "description": "Gameplay id: itemId for item_page, npcId for npc_page, questId for quest_page, objectId for object_page; a zone is a UiMap id for world_map_near.zone. Absent for lore, reference and other catalog kinds (including instances, whose extId is a Map.db map id, not a UiMap id).",
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "sourceKind": {
+              "description": "Observed names are agreed by 3 installs; game-files facts remain unconfirmed. Lore is historical archive text, not current gameplay evidence.",
+              "type": "string",
+              "enum": [
+                "observed",
+                "game-files",
+                "lore",
+                "reference"
+              ]
+            },
+            "build": {
+              "description": "Game-file build this metadata was read from; not inferred for observed names.",
+              "type": "string"
+            },
+            "observed": {
+              "description": "Name agreed by 3 or more installs. asOf is the corpus snapshot time, not the last observation time.",
+              "type": "object",
+              "properties": {
+                "asOf": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "asOf"
+              ],
+              "additionalProperties": false
             },
             "extId": {
               "type": "string",

@@ -1,7 +1,7 @@
 {
   "$id": "https://everloot.app/schema/mcp/search_knowledge.json",
   "title": "Search the Everloot knowledge base",
-  "description": "Searches WoW lore, Forever reference data and the game-file catalogs (achievements, factions, titles, quest chains, mounts, legacy perks, races, instances) by names, keywords or a question. Exact-name matches rank first. Every hit carries its id, kind, source, licence and date, and a game-file hit says when player uploads confirm it. Use it to find a record from a name or a topic, then pass the hit's id to get_entity for its summary, or to fetch as a string for the whole text. Use get_by_name when you already know the exact full name, and answer_sources when you need cited evidence for a question rather than records. search is the same search in the ChatGPT connector shape.",
+  "description": "Searches agreed gameplay names (items, NPCs, objects, quests), released zones, WoW lore, Forever reference data and the game-file catalogs (achievements, factions, titles, quest chains, mounts, legacy perks, races, instances) by names, keywords or a question. Exact-name matches rank first. Hits separate recordId (alias of id, for get_entity/fetch) from gameId (for gameplay tools; stringify a zone gameId for world_map_near.zone). Lore ids are archive records, never game ids. Metadata carries sourceKind, build when from files, and observed snapshot support when players agree. Every hit carries its id, kind, source, licence and date, and a game-file hit says when player uploads confirm it. Use it to find a record from a name or a topic, then pass the hit's id to get_entity for its summary, or to fetch as a string for the whole text. Use get_by_name when you already know the exact full name, and answer_sources when you need cited evidence for a question rather than records. search is the same search in the ChatGPT connector shape.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -18,7 +18,7 @@
         "description": "What to look up: names, questions, keywords. Question words are ignored."
       },
       "kind": {
-        "description": "Narrow to one record kind. achievement, faction, title, quest_chain, mount, legacy_perk, race and instance come from the game files (found in game files, unconfirmed); item, npc, object, quest, zone, spell, lore_page, creator and realm from the knowledge release; build is an Everloot team starter talent build, not observed. Without it, every kind.",
+        "description": "Narrow to one record kind. item, npc, object and quest include names 3 installs agree on; zone uses released UiMap ids from the game files. achievement, faction, title, quest_chain, mount, legacy_perk, race and instance come from the game files (found in game files, unconfirmed); spell, lore_page, creator and realm come from the knowledge release; build is an Everloot team starter talent build, not observed. Without it, every kind.",
         "type": "string",
         "enum": [
           "item",
@@ -77,6 +77,48 @@
               "minimum": -9007199254740991,
               "maximum": 9007199254740991,
               "description": "The record id, for get_entity."
+            },
+            "recordId": {
+              "description": "Alias of id. Pass to get_entity or fetch, never a gameplay tool.",
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "gameId": {
+              "description": "Gameplay id: itemId for item_page, npcId for npc_page, questId for quest_page, objectId for object_page; a zone is a UiMap id for world_map_near.zone. Absent for lore, reference and other catalog kinds (including instances, whose extId is a Map.db map id, not a UiMap id).",
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "sourceKind": {
+              "description": "Observed names are agreed by 3 installs; game-files facts remain unconfirmed. Lore is historical archive text, not current gameplay evidence.",
+              "type": "string",
+              "enum": [
+                "observed",
+                "game-files",
+                "lore",
+                "reference"
+              ]
+            },
+            "build": {
+              "description": "Game-file build this metadata was read from; not inferred for observed names.",
+              "type": "string"
+            },
+            "observed": {
+              "description": "Name agreed by 3 or more installs. asOf is the corpus snapshot time, not the last observation time.",
+              "type": "object",
+              "properties": {
+                "asOf": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "asOf"
+              ],
+              "additionalProperties": false
             },
             "extId": {
               "type": "string",

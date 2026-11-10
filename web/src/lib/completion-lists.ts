@@ -111,6 +111,9 @@ export const titleDisplayName = (name: string) => name.replace(NAME_SLOT, "<Name
 export const titleHref = (id: number, name: string) => `/database/titles/${segment(id, name.replace(NAME_SLOT, " "))}`;
 export const chainHref = (id: number, name: string) => `/database/quest-chains/${segment(id, name)}`;
 
+/** What the collections tool needs before it can show a character's progress; the tool and the entry pages say it alike. */
+export const TRACKER_NEEDS = "Progress needs the addon's completion tracker (off until you turn it on) and an upload that shares your collection ownership.";
+
 /**
  * What the game files say of a faction beyond its name: the parent they name for it, and whether they name it as
  * another faction's parent (a header of the reputation pane). Null when the file could not be read.
