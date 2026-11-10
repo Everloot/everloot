@@ -961,6 +961,22 @@ printed = {}
 Everloot.PriceCommand('2589')
 local said = table.concat(printed, '\\n')
 assert(said:find('from before auction houses were kept apart', 1, true) and said:find('Desktop App') and not said:find('7s 0c'), said)
+-- With an own scan of this house, the scan answers and the note about the older file still says why the community price
+-- is gone: an own price never hides it.
+table.insert(EverlootDB.records.auction_snapshot, { realm = realm, scanId = 'legacy-own', house = 'Horde', items = { { 2589, 1, 10, 444, 444 } } })
+EverlootDB.houseScans = EverlootDB.houseScans or {}
+EverlootDB.houseScans[realm] = { Horde = { scanId = 'legacy-own', at = now } }
+tip = tooltipFor(2589)
+assert(tip:find('Your scan: min 4s 44c', 1, true), 'the own scan answers: ' .. tip)
+assert(tip:find('No community price: the price file is from before houses were kept apart', 1, true) and not tip:find('7s 0c'), 'and the tooltip still says why there is no community price: ' .. tip)
+printed = {}
+Everloot.PriceCommand('2589')
+said = table.concat(printed, '\\n')
+assert(said:find('Your scan', 1, true), 'the command shows the own scan: ' .. said)
+assert(said:find('from before auction houses were kept apart', 1, true) and said:find('Desktop App') and not said:find('7s 0c'), 'and says why community prices are gone: ' .. said)
+EverlootDB.houseScans[realm] = nil
+table.remove(EverlootDB.records.auction_snapshot)
+Everloot.ownScanCache = nil
 """)
 
 # The player's own scans are indexed by realm and house: the Horde scan answers a Horde character, the Alliance scan an

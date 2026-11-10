@@ -240,6 +240,9 @@ end
 --- The tooltip and the chat command show the same lines, so they always agree. `text` is plain, for chat; a line
 --- holding one amount also has `left` (its label) and `right` (the amount in coin icons, or a word when there is
 --- none) for the tooltip's two columns, and a long warning has `wrap`.
+--- The tooltip's note for an older realm-only price file, with or without an own scan beside it.
+local LEGACY_TIP = "no community price: the price file is from before houses were kept apart; refresh it in the Desktop App"
+
 local function priceLines(realm, itemId)
   local out = {}
   local function add(text, color, left, right, wrap)
@@ -510,10 +513,13 @@ local function addLines(tooltip, itemId)
       elseif entry.noHouse then
         missing[#missing + 1] = "this character's auction house is unknown, so no community price"
       elseif entry.legacy then
-        missing[#missing + 1] = "the price file is from before houses were kept apart; refresh it in the Desktop App"
+        missing[#missing + 1] = LEGACY_TIP
       else
         missing[#missing + 1] = "no price on " .. realm .. " yet"
       end
+    elseif market and entry.legacy then
+      -- Your own scan answers, but the community price is gone because the file is older: say why on its own.
+      missing[#missing + 1] = LEGACY_TIP
     end
     missing[#missing + 1] = dropNote
   end
@@ -611,8 +617,9 @@ function E.PriceCommand(text, tries)
   end
   local name = (GetItemInfo and select(2, GetItemInfo(id))) or ("item " .. id)
   print("Everloot price: " .. name .. " on " .. realm .. (entry.house and (", " .. entry.house .. " auction house") or ""))
-  -- A failed checksum is said even when the player's own scan answers: the community prices were there to be shown.
-  if #lines == 0 or (entry.status == "bad" and not entry.silent) then print("  " .. missingNote(realm, entry)) end
+  -- A failed checksum, or an older realm-only file, is said even when the player's own scan answers: the community
+  -- prices were there to be shown.
+  if #lines == 0 or (entry.status == "bad" and not entry.silent) or entry.legacy then print("  " .. missingNote(realm, entry)) end
   for _, line in ipairs(lines) do print(hex(line.r, line.g, line.b) .. line.text .. "|r") end
   for _, line in ipairs(historyLines(realm, id)) do print(hex(line.r, line.g, line.b) .. line.text .. "|r") end
   local dropLines, dropNote = E:DropLines(id)
