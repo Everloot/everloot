@@ -37,8 +37,8 @@ export default function Page() {
       <Callout kind="note">
         <p>
           Prices are written per auction house, and the addon reads them that way, so update the addon and the app
-          together. Addon 0.3.22 or earlier shows no community prices from a newer app&apos;s file. A newer addon ignores
-          the prices Desktop App 0.1.21 or earlier wrote, since they may mix both factions, and its tooltip says so. Drop
+          together. The 0.3.22 addon release or earlier shows no community prices from a newer app&apos;s file. A newer addon ignores
+          the prices the 0.1.21 Desktop App release or earlier wrote, since they may mix both factions, and its tooltip says so. Drop
           rates and sources keep working either way. After updating both, let the app refresh prices, then type{" "}
           <C>/reload</C> in game.
         </p>

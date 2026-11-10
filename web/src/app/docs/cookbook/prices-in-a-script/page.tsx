@@ -34,14 +34,14 @@ if (!realm) {
     console.log("No realm has public prices yet. A day is public once 3 reporters have scanned the item in that auction house.");
   } else {
     console.log("Realms with public prices:");
-    for (const name of list.realms) console.log(\`  \${name}: \${(list.houses[name] ?? []).join(", ") || "no house yet"}\`);
+    for (const name of list.realms) console.log(\`  \${name}: \${((list.houses ?? {})[name] ?? []).join(", ") || "no house yet"}\`);
     console.log('Run again with a realm, for example: node prices.mjs "<realm>"');
   }
   process.exit(0);
 }
 
 // Each auction house is its own market, so ask once per house: the one you named, or each house the list gives.
-const listed = Object.entries(list.houses).find(([name]) => name.toLowerCase() === realm.toLowerCase())?.[1] ?? [];
+const listed = Object.entries(list.houses ?? {}).find(([name]) => name.toLowerCase() === realm.toLowerCase())?.[1] ?? [];
 const houses = house ? [house] : listed;
 if (houses.length === 0) {
   console.log(\`No auction house on \${realm} has public prices yet.\`);
@@ -103,12 +103,12 @@ if realm is None:
     else:
         print("Realms with public prices:")
         for name in listing["realms"]:
-            print(f"  {name}: {', '.join(listing['houses'].get(name, [])) or 'no house yet'}")
+            print(f"  {name}: {', '.join(listing.get('houses', {}).get(name, [])) or 'no house yet'}")
         print('Run again with a realm, for example: python prices.py "<realm>"')
     raise SystemExit(0)
 
 # Each auction house is its own market, so ask once per house: the one you named, or each house the list gives.
-listed = next((h for name, h in listing["houses"].items() if name.lower() == realm.lower()), [])
+listed = next((h for name, h in listing.get("houses", {}).items() if name.lower() == realm.lower()), [])
 houses = [house] if house else listed
 if not houses:
     print(f"No auction house on {realm} has public prices yet.")

@@ -513,7 +513,9 @@ export function resolveRealm(state: MarketState, asked: string, now: Date = new 
   // A realm is held when its house-unknown view or any of its houses is.
   const key = realmKey(name);
   if (state.realms[key] || AUCTION_HOUSES.some((h) => state.houses?.[houseKey(key, h)])) return { status: "exact", realm: realmName(state, name) };
-  const listed = marketRealms(state, now);
+  // Only realms with a public value of their own in a house are named: a realm held only by house-unknown scans answers
+  // nothing, so it is never an alias, an ambiguity or a candidate.
+  const listed = Object.keys(marketHouses(state, now)).sort((a, b) => a.localeCompare(b));
   const want = realmWords(name);
   const tail = ` ${want.join(" ")}`;
   const matches = want.length >= 2 ? listed.filter((realm) => ` ${realmWords(realm).join(" ")}`.endsWith(tail)) : [];
@@ -564,7 +566,7 @@ export function itemMarketByHouse(state: MarketState, realm: string, itemId: num
   });
 }
 
-/** The house with the most units listed for the item, or null: what market_value's page carries and auction_history's scan days read. */
+/** The house with the most units listed for the item (ties: Alliance, then Horde, then Neutral), or null: what market_value's page carries and auction_history's scan days read. */
 export function busiestHouseMarket(state: MarketState, realm: string, itemId: number, now: Date): { house: AuctionHouse; value: MarketValue; points: PublicDay[] } | null {
   return itemMarketByHouse(state, realm, itemId, now).sort((a, b) => b.value.quantity - a.value.quantity)[0] ?? null;
 }

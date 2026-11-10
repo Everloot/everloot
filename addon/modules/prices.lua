@@ -235,14 +235,14 @@ local function vendorPrice(itemId)
   return sell
 end
 
+--- The tooltip's note for an older realm-only price file, with or without an own scan beside it.
+local LEGACY_TIP = "no community price: the price file is from before houses were kept apart; refresh it in the Desktop App"
+
 --- The price lines for one item on the player's realm, as { text, r, g, b }: the community market value
 --- from the companion's file (with its freshness), the player's own last scan, and the vendor price beside them.
 --- The tooltip and the chat command show the same lines, so they always agree. `text` is plain, for chat; a line
 --- holding one amount also has `left` (its label) and `right` (the amount in coin icons, or a word when there is
 --- none) for the tooltip's two columns, and a long warning has `wrap`.
---- The tooltip's note for an older realm-only price file, with or without an own scan beside it.
-local LEGACY_TIP = "no community price: the price file is from before houses were kept apart; refresh it in the Desktop App"
-
 local function priceLines(realm, itemId)
   local out = {}
   local function add(text, color, left, right, wrap)

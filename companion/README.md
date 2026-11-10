@@ -57,8 +57,8 @@ house blocks. Until both sides are updated, tooltips lose community prices:
 
 | Addon | Price file written by | Community prices in game |
 |---|---|---|
-| 0.3.22 or earlier | a newer Desktop App or this companion | Gone: the file has no realm-only block, the only kind that addon reads |
-| newer than 0.3.22 | Desktop App 0.1.21 or earlier, or an older companion | Ignored on purpose: a realm-only block may mix both factions; the tooltip and `/everloot price` say so |
+| the 0.3.22 release or earlier | a newer Desktop App or this companion | Gone: the file has no realm-only block, the only kind that addon reads |
+| newer than 0.3.22 | the Desktop App 0.1.21 release or earlier, or an older companion | Ignored on purpose: a realm-only block may mix both factions; the tooltip and `/everloot price` say so |
 | newer than 0.3.22 | a newer Desktop App or this companion | Each house's prices, named on the line |
 
 Drop rates and sources in the same file keep working in every case. To get prices back, update both the addon and
