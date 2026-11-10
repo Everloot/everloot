@@ -24,8 +24,14 @@ import { CLIENT_LABEL } from "./edges.js";
 import { expandAliases } from "./name-aliases.js";
 import { allTerms, contentTerms, PICK_WORDS, type SearchHit } from "./search.js";
 import { fromSpanish } from "./spanish.js";
+import { itemFactsFromRecords } from "./drop-rollup.js";
+import { agreedItemNames } from "./item-page.js";
+import { agreedNpcNames, agreedQuestTitles, worldFactsFromRecords } from "./world-pages.js";
+import { agreedObjectNames } from "./object-spawns.js";
+import type { RecheckScope } from "./coverage.js";
 
-export const CATALOG_KINDS = ["achievement", "faction", "title", "quest_chain", "mount", "legacy_perk", "race", "instance"] as const;
+// Append only: each position owns a permanent record-id range.
+export const CATALOG_KINDS = ["achievement", "faction", "title", "quest_chain", "mount", "legacy_perk", "race", "instance", "item", "npc", "object", "quest", "zone"] as const;
 export type CatalogKind = (typeof CATALOG_KINDS)[number];
 
 /** Catalog ids start here, far above any release rowid, and are the same on every build. */
@@ -47,9 +53,10 @@ export function isCatalogId(id: number): boolean {
 
 export const CATALOG_LICENCE = "Game data © Blizzard Entertainment, Inc.; not under Everloot's licence";
 
-/** Only what the index reads of map.json: the dungeon and raid entrances and the build they came from. */
+/** Only what the index reads of map.json: released zones, dungeon and raid entrances, and their build. */
 export const WorldMapEntrances = z.object({
   source: z.object({ version: z.string(), extractedAt: z.string() }),
+  zones: z.array(z.object({ uiMapId: z.number().int(), name: z.string() })).optional(),
   entrances: z.array(z.object({
     mapId: z.number().int(), name: z.string().optional(), raid: z.boolean(), minLevel: z.number().int().optional(), maxLevel: z.number().int().optional(),
   })),
@@ -135,13 +142,17 @@ function record(kind: CatalogKind, extId: string, name: string, stamp: Stamp, fi
   const body = bodyOf(name, stamp.version, fields);
   return {
     id: catalogId(kind, extId),
+    recordId: catalogId(kind, extId),
+    ...(kind === "zone" ? { gameId: Number(extId) } : {}),
+    sourceKind: "game-files",
+    build: stamp.version,
     extId,
     kind,
     name,
     snippet: body.slice(0, 160),
     gameVersion: "forever",
     sourceId: "game-files",
-    sourceUrl: `${SITE}${catalogPath(kind, extId, name)}`,
+    sourceUrl: `${SITE}${catalogPath(kind, extId, name, "game-files")}`,
     licence: CATALOG_LICENCE,
     retrievedAt: stamp.extractedAt,
     body,
@@ -213,7 +224,40 @@ export function buildCatalogIndex(files: CatalogFiles): CatalogIndex {
     ...(files.legacyPerks ? recordsOfLegacyPerks(files.legacyPerks) : []),
     ...(files.races ? recordsOfRaces(files.races) : []),
     ...(files.map ? recordsOfInstances(files.map, files.encounters) : []),
+    ...(files.map?.zones ?? []).map((zone) => record("zone", String(zone.uiMapId), zone.name, files.map!.source, { uiMapId: zone.uiMapId })),
   ].filter((r): r is CatalogRecord => r !== undefined);
+  return indexRecords(all);
+}
+
+/** Only agreed names and ids leave the corpus here; no tooltip, description or other game text. */
+export function gameplayIndex(records: unknown[], asOf: string | null, recheck: readonly RecheckScope[] = []): CatalogIndex {
+  const items = itemFactsFromRecords(records, recheck);
+  const world = worldFactsFromRecords(records, recheck);
+  const names = {
+    item: agreedItemNames(items), npc: agreedNpcNames(world), quest: agreedQuestTitles(world),
+    object: agreedObjectNames(items.objects, recheck),
+  };
+  const all: CatalogRecord[] = [];
+  for (const [kind, named] of Object.entries(names)) for (const [gameId, name] of named) {
+    if (isDevelopmentItemName(name)) continue;
+    const id = catalogId(kind, String(gameId));
+    const body = `${name}\n${kind} gameId: ${gameId}\nName agreed by 3 or more installs. Snapshot: ${asOf ?? "unrecorded"}.`;
+    all.push({ id, recordId: id, gameId, extId: String(gameId), kind, name, snippet: body,
+      gameVersion: "forever", sourceKind: "observed", observed: { asOf },
+      sourceId: "player-uploads", sourceUrl: `${SITE}${catalogPath(kind, String(gameId), name, "observed")}`,
+      licence: "CC-BY-SA-4.0", retrievedAt: asOf ?? "unrecorded", body,
+      data: { gameId, kind, name, observed: { asOf } },
+    });
+  }
+  return indexRecords(all);
+}
+
+/** Rebuild all lookup maps together so a refreshed corpus cannot leave stale name entries. */
+export function mergeCatalogIndexes(...indexes: (CatalogIndex | null)[]): CatalogIndex {
+  return indexRecords(indexes.flatMap((index) => index ? [...index.byId.values()] : []));
+}
+
+function indexRecords(all: CatalogRecord[]): CatalogIndex {
   const index: CatalogIndex = { byKind: new Map(), byId: new Map(), byName: new Map() };
   for (const r of all) {
     index.byId.set(r.id, r);

@@ -10,7 +10,16 @@ function segment(id: string, name: string): string {
  * The everloot.app path of a catalog record, or null when its kind has no page of its own. Instances use the
  * same address as the database page (web/src/lib/instances.ts), where the id is the instance's map id.
  */
-export function catalogPath(kind: string, extId: string, name: string): string | null {
+export function catalogPath(kind: string, extId: string, name: string, sourceKind?: string): string | null {
+  if (sourceKind === "observed" || sourceKind === "game-files") {
+    switch (kind) {
+      case "item": return `/database/items/${segment(extId, name)}`;
+      case "npc": return `/database/npcs/${segment(extId, name)}`;
+      case "object": return `/database/objects/${segment(extId, name)}`;
+      case "quest": return `/database/quests/${segment(extId, name)}`;
+      case "zone": return `/database/zones/${segment(extId, name)}`;
+    }
+  }
   switch (kind) {
     case "achievement": return `/database/achievements/${segment(extId, name)}`;
     case "faction": return `/database/factions/${segment(extId, name)}`;
