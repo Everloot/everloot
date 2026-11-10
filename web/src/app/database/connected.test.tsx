@@ -6,7 +6,7 @@ import { buildLoreRelease } from "@/test/lore-release";
 const store = vi.hoisted(() => ({ loadCorpus: vi.fn() }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
-  uploadStore: { loadCorpus: store.loadCorpus },
+  uploadStore: { loadCorpus: store.loadCorpus, loadCompletion: async () => ({ state: null, dataAsOf: null, unreachable: true }) },
 }));
 // Quest titles from the private names file; none unless a test sets them.
 const titles = vi.hoisted(() => ({ quests: null as unknown }));
