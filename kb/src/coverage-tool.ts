@@ -2,8 +2,14 @@ import { COVERAGE_PAGE, type CoveragePageOut, type McpToolArgs } from "@everloot
 import { fitAnswer } from "./answer-budget.js";
 import { COVERAGE_TYPES, coverageShares, type CoverageCell, type CoverageReport, type CoverageType } from "./coverage.js";
 
-/** The host lends the same score its public coverage page reads. No raw records or baseline are read here. */
-export type CoverageLoader = () => Promise<CoverageReport | null>;
+/**
+ * Where a lent score came from: the report the snapshot cron stored for the build, or one computed from the corpus
+ * because no stored report was usable. A host that does not say leaves the answer's date line as it was.
+ */
+export type CoverageSource = "stored" | "live";
+export type LoadedCoverage = CoverageReport & { source?: CoverageSource };
+/** The host lends the score the home page and coverage pages read. No raw records or baseline are read here. */
+export type CoverageLoader = () => Promise<LoadedCoverage | null>;
 /** Counts only from the persisted list; never lend its ids or settled values to the tool. */
 export type SettledSummaryLoader = (build: string) => Promise<{ build: string; dataAsOf: string | null; facts: number } | null>;
 
@@ -18,6 +24,10 @@ export interface CoverageAnswer {
 
 const unknown = "[?]";
 const page = "https://everloot.app/database/coverage";
+const sourceText: Record<CoverageSource, string> = {
+  stored: " (stored report, written by the snapshot cron for this build)",
+  live: " (computed from the corpus now: no stored report for this build was usable)",
+};
 const pct = (value: number | null) => value === null ? unknown : `${Math.floor(value * 100)}%`;
 
 function cellText(cell: CoverageCell): string {
@@ -63,7 +73,7 @@ export async function answerCoverage(args: McpToolArgs<"coverage">, loader?: Cov
     structured: { connected: false, dataAsOf: null, reason: `Coverage ${reason}; counts are unknown, not zero.`, scope: scopeOut },
   });
   if (!loader) return unavailable("not connected");
-  let report: CoverageReport | null;
+  let report: LoadedCoverage | null;
   try { report = await loader(); } catch { return unavailable("unavailable"); }
   if (!report) return unavailable("unavailable");
   const zones = report.zones.filter((z) => args.zone === undefined || z.mapId === args.zone);
@@ -72,7 +82,7 @@ export async function answerCoverage(args: McpToolArgs<"coverage">, loader?: Cov
   const detail = args.detail ?? args.zone !== undefined;
   const offset = args.offset ?? 0;
   const lines = [scope,
-    `Data as of ${report.dataAsOf ?? unknown}; build ${report.build ?? unknown}; ${report.installs} distinct folded installs overall, including unplaced facts, before zone/type filters. Each zone states its own installs across all types.`,
+    `Data as of ${report.dataAsOf ?? unknown}${report.source ? sourceText[report.source] : ""}; build ${report.build ?? unknown}; ${report.installs} distinct folded installs overall, including unplaced facts, before zone/type filters. Each zone states its own installs across all types.`,
     `Method: ${report.method}`,
     "coverage = settled / expected; confirmed / expected beside it. Denominator = max(expected, observed), in entity-field facts. Confirmed includes settled. Reported counts are aggregate states, never unconfirmed values.",
     `Expected counts dated ${report.expected?.dataAsOf ?? unknown}, from game files and a local Classic baseline (counts only). Missing or zero denominators give [?] shares.`,

@@ -128,3 +128,9 @@ test("a capped list never invents an exhaustive type-filtered needs count", asyn
   const text = await call({ zone: r.zones[0]!.mapId, type: "npcs" }, async () => r);
   expect(text).toContain("Fields needing one or two more installs: [?]");
 });
+
+test("the date line says whether the score is the stored report or computed live, and stays as it was when the host does not say", async () => {
+  expect(await call({}, async () => ({ ...report(), source: "stored" as const }))).toContain(`Data as of ${asOf} (stored report, written by the snapshot cron for this build); build test-build`);
+  expect(await call({}, async () => ({ ...report(), source: "live" as const }))).toContain(`Data as of ${asOf} (computed from the corpus now: no stored report for this build was usable); build test-build`);
+  expect(await call()).toContain(`Data as of ${asOf}; build test-build`);
+});
