@@ -1,3 +1,4 @@
+import { CoinText } from "@/components/ui/Coins";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
@@ -123,9 +124,9 @@ export default async function RealmItemPage(props: Props) {
         {row && v && (
           <>
             <PriceFacts facts={[
-              { label: "Market value", value: money(v.market), note: v.market === null ? "No solid day in the last 14" : "Weighted over 14 days" },
-              { label: "Min buyout", value: formatCopper(v.min), note: `On ${v.day}` },
-              { label: "Historical", value: formatCopper(v.historical), note: "60-day median" },
+              { label: "Market value", value: v.market === null ? "unrecorded" : <CoinText text={money(v.market)} />, note: v.market === null ? "No solid day in the last 14" : "Weighted over 14 days" },
+              { label: "Min buyout", value: <CoinText text={formatCopper(v.min)} />, note: `On ${v.day}` },
+              { label: "Historical", value: <CoinText text={formatCopper(v.historical)} />, note: "60-day median" },
               { label: "Units listed", value: v.quantity.toLocaleString("en-US"), note: v.thin ? "Thin: left out of the market value" : `On ${v.day}` },
             ]} />
             <section aria-labelledby="ah-chart">

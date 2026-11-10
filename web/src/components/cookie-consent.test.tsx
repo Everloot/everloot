@@ -36,6 +36,13 @@ afterEach(async () => {
 
 const button = (label: string) => Array.from(container.querySelectorAll("button")).find((b) => b.textContent === label)!;
 const scripts = () => Array.from(document.head.querySelectorAll("script"));
+
+it("uses a full-width bottom strip with equally prominent Reject and Accept", async () => {
+  await act(async () => root.render(<CookieConsent analytics={{ gaId: GA }} />));
+  const banner = container.querySelector("section")!;
+  expect(banner.className).toContain("bottom-0 inset-x-0 w-full");
+  expect(button("Reject optional cookies").className).toBe(button("Accept optional cookies").className);
+});
 // The Google tag is told apart by the exact host of its address, not a substring of it.
 const googleTagLoaded = () => scripts().some((s) => new URL(s.src).hostname === "www.googletagmanager.com");
 const checkboxes = () => Array.from(container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));

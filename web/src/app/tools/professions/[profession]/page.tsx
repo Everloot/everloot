@@ -1,3 +1,4 @@
+import { CoinText } from "@/components/ui/Coins";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
@@ -176,7 +177,7 @@ export default async function ProfessionPage(props: Props) {
           <span className="text-cell-2 text-fg-2">
             <Badge tone="confirmed">{t.installs} installs</Badge>{" "}
             yellow {rangeText(t.yellow)}, green {rangeText(t.green)}, grey {rangeText(t.grey)}
-            {t.costCopper !== null && <>; {formatCopper(t.costCopper)} a craft</>}
+            {t.costCopper !== null && <>; <CoinText text={formatCopper(t.costCopper)} /> a craft</>}
           </span>
         );
       },

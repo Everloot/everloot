@@ -63,11 +63,11 @@ test("reads Everloot.lua in the browser and shows the ledger, sending nothing", 
   await drop(LUA);
   const text = container.textContent!;
   expect(text).toContain("Thrall");
-  expect(text).toContain("123g 45s 67c"); // gold
-  expect(text).toContain("200g 0s 0c"); // peak
-  expect(text).toContain("1g 23s 45c"); // quest, in the week card and the receipts
-  expect(text).toContain("2s 50c"); // flight
-  expect(text).toContain("1g 20s 95c"); // net this week
+  expect(text).toContain("123 gold 45 silver 67 copper"); // gold
+  expect(text).toContain("200 gold 0 silver 0 copper"); // peak
+  expect(text).toContain("1 gold 23 silver 45 copper"); // quest, in the week card and the receipts
+  expect(text).toContain("2 silver 50 copper"); // flight
+  expect(text).toContain("1 gold 20 silver 95 copper"); // net this week
   expect(container.querySelectorAll("[data-river] > li")).toHaveLength(30);
   expect(fetchSpy).not.toHaveBeenCalled();
   expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
@@ -91,13 +91,13 @@ test("Remember keeps the summary, not the file, and Forget clears it", async () 
   await act(async () => root.unmount());
   root = createRoot(container);
   await act(async () => root.render(<LocalLedger />));
-  expect(container.textContent).toContain("123g 45s 67c");
+  expect(container.textContent).toContain("123 gold 45 silver 67 copper");
   expect(remember().checked).toBe(true);
 
   const forget = [...container.querySelectorAll("button")].find((b) => b.textContent === "Forget")!;
   await act(async () => { forget.click(); });
   expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
-  expect(container.textContent).not.toContain("123g 45s 67c");
+  expect(container.textContent).not.toContain("123 gold 45 silver 67 copper");
 });
 
 test("choosing a character narrows the week, categories and receipts to them and names them", async () => {

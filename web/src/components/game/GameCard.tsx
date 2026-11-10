@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { DATA_SIZE } from "@/design/tokens";
+import { DATA_SIZE, QUALITIES, tokens } from "@/design/tokens";
 import TooltipFrame from "@/components/ui/TooltipFrame";
 import TooltipLines from "@/components/ui/TooltipLines";
 import { qualityOf } from "@/components/ui/quality";
@@ -29,14 +29,14 @@ const MARGIN = 8;
 
 /** The game's tooltip box: the icon beside the name inside it, the reasons for any `[?]` as a footnote under it. */
 export function GameCard({ card }: { card: CardContent }) {
-  const quality = typeof card.quality === "number" && card.quality >= 0 && card.quality <= 5 ? qualityOf(card.quality) : undefined;
+  const quality = typeof card.quality === "number" && card.quality >= 0 && card.quality <= 5 ? qualityOf(card.quality) : QUALITIES.find((q) => tokens.dark[`q-${q}`] === card.color);
   const notes = card.notes?.length && card.lines.some((line) => line.includes(PLACEHOLDER)) ? card.notes : null;
   return (
     <div>
       <TooltipFrame
         name={!quality && card.color ? <span style={{ color: card.color }}>{card.title}</span> : card.title}
         quality={quality}
-        icon={card.icon ? <GameIcon src={card.icon} size={ICON} /> : undefined}
+        icon={card.icon ? <GameIcon src={card.icon} size={ICON} quality={quality} /> : undefined}
         foot={card.foot ?? undefined}
       >
         {card.lines.length > 0 ? <TooltipLines lines={card.lines} /> : null}

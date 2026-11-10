@@ -54,7 +54,7 @@ test("the bar is compact: 44 px (two thirds of the old 64), the search centred, 
   // The search sits in its own growing slot, centred between the nav and the account area.
   expect(html).toMatch(/<div class="[^"]*\bflex-1\b[^"]*\bjustify-center\b[^"]*"><form [^>]*role="search"/);
   // Both builds take ~260 px; below xl the right group has no room for them, so the menu panel carries them.
-  expect(html).toMatch(/<div class="[^"]*\bhidden shrink-0 xl:block\b[^"]*"><a [^>]*>files read /);
+  expect(html).toMatch(/<div class="[^"]*\bhidden shrink-0 xl:block\b[^"]*"><div class="[^"]*rounded-full[^"]*"><a [^>]*>files read /);
   // Tighter nav items.
   expect(primary).toMatch(/<a href="\/map"[^>]*class="[^"]*\bpx-2\b/);
 });

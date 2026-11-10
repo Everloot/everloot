@@ -87,7 +87,7 @@ export default function CookieConsent({ adsenseClient, analytics = {} }: { adsen
   // The banner sits over the foot of the window. While it is open, scroll padding of its height makes the
   // browser bring a control that takes focus (a calculator's, say) into view above it rather than under it,
   // and as much padding under the page gives the last controls on it the room to get there. The strip is the
-  // banner's own height plus its computed bottom inset (1rem, so it follows the root font) plus 8 px for the
+  // banner's own height plus its computed bottom inset plus 8 px for the
   // focus ring. No window measure goes in: innerHeight and clientHeight disagree when a desktop scrollbar or a
   // phone's toolbar takes part of the window, while the banner always covers its height and inset.
   useEffect(() => {
@@ -143,9 +143,10 @@ export default function CookieConsent({ adsenseClient, analytics = {} }: { adsen
   if (!visible) return null;
   const allRejected = categories.length > 0 && categories.every((c) => choices[c] === "rejected");
   return (
-    // At 390 px the first view is under 140 px tall. Zoom can make it taller than the window, so it stops 5rem
-    // short of the top, room for a focused 44 px control and its ring above it, and scrolls inside.
-    <section ref={panel} aria-labelledby="cookie-heading" className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[min(92%,640px)] max-h-[calc(100dvh-6rem)] overflow-y-auto z-50 rounded-xl border border-line bg-canvas p-3" onKeyDown={(event) => { if (event.key === "Escape" && categories.every((c) => choices[c])) close(); }}>
+    // Zoom can make the strip taller than the window: leave room above it for a focused control and its ring.
+    <section ref={panel} aria-labelledby="cookie-heading" className="fixed bottom-0 inset-x-0 w-full max-h-[calc(100dvh-6rem)] overflow-y-auto z-50 border-t border-line bg-canvas px-4 py-2" onKeyDown={(event) => { if (event.key === "Escape" && categories.every((c) => choices[c])) close(); }}>
+      <div className="mx-auto max-w-data sm:flex sm:items-center sm:gap-4">
+      <div className="min-w-0 flex-1">
       <h2 ref={heading} tabIndex={-1} id="cookie-heading" className="text-sm font-semibold text-fg">Cookie preferences</h2>
       {categories.length === 0 ? (
         <p className="text-sm text-fg">No optional cookies are in use on this site right now.</p>
@@ -156,7 +157,8 @@ export default function CookieConsent({ adsenseClient, analytics = {} }: { adsen
         </p>
       )}
       {saveFailed && <p role="status" className="mt-2 text-sm text-fg">Your browser could not save this choice permanently. {allRejected ? "Optional cookies remain rejected in this tab; if all storage is blocked, keep the current URL to preserve rejection when reloading." : "Acceptance applies to this page only. Recheck your preferences after reloading."}</p>}
-      <div className="mt-2 flex flex-wrap items-center gap-2 justify-end">
+      </div>
+      <div className="mt-2 flex shrink-0 flex-wrap items-center gap-2 sm:mt-0">
         {(categories.length === 0 || categories.every((c) => choices[c])) && <button type="button" onClick={close} className="btn min-h-11 px-3 text-sm">Close</button>}
         {/* Rejecting takes one action, and its button looks exactly like accepting's. */}
         {categories.length > 0 && <>
@@ -165,8 +167,9 @@ export default function CookieConsent({ adsenseClient, analytics = {} }: { adsen
           <button type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)} className="btn min-h-11 px-3 text-sm">Choices</button>
         </>}
       </div>
+      </div>
       {expanded && categories.length > 0 && (
-        <fieldset className="mt-3 space-y-2">
+        <fieldset className="mx-auto mt-3 max-w-data space-y-2">
           <legend className="sr-only">Optional cookie categories</legend>
           <p className="text-sm text-fg">Your choice is saved when browser storage is available.</p>
           {categories.map((category) => (

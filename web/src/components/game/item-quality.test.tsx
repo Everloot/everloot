@@ -5,6 +5,11 @@ import { EntityIcon } from "@/app/database/entity";
 import { QUALITIES } from "@/design/tokens";
 import { unknownItemIcon } from "@/lib/game-assets";
 
+test("all entity types omit the icon frame when game art is unavailable", () => {
+  expect(renderToStaticMarkup(<EntityIcon unconfirmed />)).toBe("");
+  expect(renderToStaticMarkup(<EntityIcon />)).toBe("");
+});
+
 test("every item quality has a solid one-pixel icon border; non-items keep their border", () => {
   for (const quality of QUALITIES) {
     const html = renderToStaticMarkup(<GameIcon src="/icon.webp" quality={quality} />);

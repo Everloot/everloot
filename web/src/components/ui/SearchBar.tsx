@@ -167,7 +167,7 @@ export function SuggestField({ id, name = "q", label, placeholder, defaultValue 
               onClick={() => setOpen(false)}
               className={`flex h-9 items-center gap-3 px-3 text-cell ${i === active ? "bg-canvas" : ""}`}
             >
-              {row.icon && <GameIcon src={row.icon} size={18} />}
+              {row.icon && <GameIcon src={row.icon} size={18} quality={row.type === "item" && typeof row.quality === "number" ? qualityOf(row.quality) : undefined} />}
               <span className={`min-w-0 flex-1 truncate ${row.type === "item" && typeof row.quality === "number" && row.quality <= 5 ? QUALITY_TEXT[qualityOf(row.quality)] : "text-fg"}`}>{row.label}</span>
               <span className="shrink-0 text-cell-2 text-muted">{typeNote(row)}</span>
             </Link>

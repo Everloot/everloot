@@ -1,3 +1,4 @@
+import { CoinText } from "@/components/ui/Coins";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import ItemTip from "@/components/game/ItemTip";
@@ -51,8 +52,8 @@ export function Sparkline({ points, now }: { points: PublicDay[]; now: Date }) {
 export function HousePrices({ rows, caption, now }: { rows: MarketRow[]; caption: string; now: Date }) {
   const columns: Column<MarketRow>[] = [
     { key: "house", header: "House", nowrap: true, cell: (r) => r.house },
-    { key: "market", header: "Market value", numeric: true, cell: (r) => <span className={r.value.market === null ? "text-muted" : undefined}>{money(r.value.market)}</span> },
-    { key: "min", header: "Min buyout", numeric: true, cell: (r) => formatCopper(r.value.min) },
+    { key: "market", header: "Market value", numeric: true, cell: (r) => <span className={r.value.market === null ? "text-muted" : undefined}><CoinText text={money(r.value.market)} /></span> },
+    { key: "min", header: "Min buyout", numeric: true, cell: (r) => <CoinText text={formatCopper(r.value.min)} /> },
     { key: "units", header: "Units", numeric: true, cell: (r) => r.value.quantity.toLocaleString("en-US") },
     { key: "updated", header: "Updated", numeric: true, cell: (r) => (r.updatedAt !== null ? <TimeAgo at={r.updatedAt} renderedAt={now.getTime()} /> : r.value.day) },
   ];
@@ -152,7 +153,7 @@ export function Facts({ items }: { items: ReactNode[] }) {
 export const count = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
 /** Market value, minimum buyout, historical and units in one card. */
-export function PriceFacts({ facts }: { facts: { label: string; value: string; note?: string }[] }) {
+export function PriceFacts({ facts }: { facts: { label: string; value: ReactNode; note?: string }[] }) {
   return (
     <Card>
       <dl className="grid grid-cols-2 gap-x-6 gap-y-5 lg:grid-cols-4">
@@ -191,7 +192,7 @@ export function PriceChart({ points }: { points: PublicDay[] }) {
       </svg>
       <figcaption className="flex flex-wrap justify-between gap-x-4 text-xs text-muted">
         <span>{points[0]!.day} to {points.at(-1)!.day}</span>
-        <span className="font-mono tabular-nums">{formatCopper(low)} to {formatCopper(high)}</span>
+        <span className="font-mono tabular-nums"><CoinText text={formatCopper(low)} /> to <CoinText text={formatCopper(high)} /></span>
       </figcaption>
     </figure>
   );
@@ -208,9 +209,9 @@ export function RealmPrices({ rows, caption, empty }: { rows: MarketRow[]; capti
       cell: (r) => <Link href={itemHref(r.realm, r.value.itemId)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg"><RealmName name={r.realm.name} /></Link>,
     },
     { key: "house", header: "House", nowrap: true, cell: (r) => r.house },
-    { key: "market", header: "Market value", numeric: true, cell: (r) => <span className={r.value.market === null ? "text-muted" : undefined}>{money(r.value.market)}</span> },
-    { key: "min", header: "Min buyout", numeric: true, cell: (r) => formatCopper(r.value.min) },
-    { key: "historical", header: "Historical", numeric: true, cell: (r) => formatCopper(r.value.historical) },
+    { key: "market", header: "Market value", numeric: true, cell: (r) => <span className={r.value.market === null ? "text-muted" : undefined}><CoinText text={money(r.value.market)} /></span> },
+    { key: "min", header: "Min buyout", numeric: true, cell: (r) => <CoinText text={formatCopper(r.value.min)} /> },
+    { key: "historical", header: "Historical", numeric: true, cell: (r) => <CoinText text={formatCopper(r.value.historical)} /> },
     { key: "units", header: "Units", numeric: true, cell: (r) => r.value.quantity.toLocaleString("en-US") },
     { key: "reporters", header: "Reporters", numeric: true, cell: (r) => reporterCell(r.value.reporters) },
     { key: "day", header: "Day", numeric: true, cell: (r) => r.value.day },
@@ -222,8 +223,8 @@ export function RealmPrices({ rows, caption, empty }: { rows: MarketRow[]; capti
 export function DayTable({ points, caption }: { points: PublicDay[]; caption: string }) {
   const columns: Column<PublicDay>[] = [
     { key: "day", header: "Day", numeric: true, cell: (p) => p.day },
-    { key: "value", header: "Value", numeric: true, cell: (p) => formatCopper(p.market) },
-    { key: "min", header: "Min buyout", numeric: true, cell: (p) => formatCopper(p.min) },
+    { key: "value", header: "Value", numeric: true, cell: (p) => <CoinText text={formatCopper(p.market)} /> },
+    { key: "min", header: "Min buyout", numeric: true, cell: (p) => <CoinText text={formatCopper(p.min)} /> },
     { key: "units", header: "Units", numeric: true, cell: (p) => `${p.quantity.toLocaleString("en-US")}${p.thin ? " (thin)" : ""}` },
     { key: "reporters", header: "Reporters", numeric: true, cell: (p) => reporterCell(p.reporters) },
   ];

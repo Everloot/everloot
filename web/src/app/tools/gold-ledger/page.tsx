@@ -3,6 +3,7 @@ import JsonLd from "@/components/JsonLd";
 import { webApplicationJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
+import { MoneyText } from "@/components/ui/Coins";
 import { goldFactsFromRecords, handleGoldLedger } from "../../../../../kb/src/gold-ledger";
 import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT, uploadStore } from "@/lib/upload-store";
 import { dataAgeLabel } from "@/lib/data-age";
@@ -68,7 +69,7 @@ export default async function GoldLedgerPage(
 
           {pending
             ? <EmptyState message="No gold ledger yet: a character's ledger appears once its player uploads the Everloot addon's file." />
-            : <Card><pre className="whitespace-pre-wrap text-sm text-fg">{answer}</pre></Card>}
+            : <Card><pre className="whitespace-pre-wrap text-sm text-fg"><MoneyText text={answer} /></pre></Card>}
         </section>
 
         <Disclosure summary="What does the ledger record?">

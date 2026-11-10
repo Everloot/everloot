@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
@@ -49,7 +50,12 @@ const market = foldMarket(emptyMarket(), [
 const named = ["install-a", "install-b", "install-c"].map((installId, i) => ({ kind: "item_seen", installId, eventId: `seen-${i}`, itemId: 2589, name: "Linen Cloth", capturedAt: dayAgo(1) }));
 
 // The rendered text of the markup: tags out, then any stray angle bracket (React escapes real ones as &lt;).
-const text = (html: string) => html.replace(/<[^>]*>/g, "").replace(/[<>]/g, "");
+const { JSDOM } = createRequire(import.meta.url)("jsdom") as { JSDOM: new (html: string) => { window: { document: Document } } };
+const text = (html: string) => {
+  const document = new JSDOM(html).window.document;
+  document.querySelectorAll('[aria-hidden="true"]').forEach((el) => el.remove());
+  return (document.body.textContent ?? "").replace(/[<>]/g, "").replace(/ gold/g, "g").replace(/ silver/g, "s").replace(/ copper/g, "c");
+};
 const hub = async (searchParams: Record<string, string>) =>
   renderToStaticMarkup(await AuctionHousePage({ searchParams: Promise.resolve(searchParams) }));
 const realm = (slug: string, search: Record<string, string> = {}) => ({ params: Promise.resolve({ realm: slug }), searchParams: Promise.resolve(search) });
@@ -141,8 +147,8 @@ test("the old page's links and an item id land on the item pages; a word filters
 test("a realm page sorts, filters and switches house in the URL; only its plain list is indexed", async () => {
   const html = await realmHtml("forever");
   expect(html).toContain('href="/tools/auctions/forever/2589"');
-  expect(html).toContain("1s 98c"); // weighted market: (205*15 + 190*12) / 27 = 198
-  expect(html).toContain("2s 0c");
+  expect(text(html)).toContain("1s 98c"); // weighted market: (205*15 + 190*12) / 27 = 198
+  expect(text(html)).toContain("2s 0c");
   // Only historical days: the market value is unrecorded, never zero.
   expect(text(html)).toMatch(/Item 4306[\s\S]*unrecorded/);
   // Sortable headers are links; a number column sorts high to low first, and a sort keeps the other filters.
@@ -216,7 +222,7 @@ test("an item page shows its value, a 60-day chart, each house, the other realms
   expect(words).toMatch(/Horde1s 98c2s 0c/);
   expect(html).toContain("/api/market/prices?realm=Forever&house=horde");
   // The day list: three days ago the value was 1s 90c.
-  expect(html).toMatch(/<td[^>]*>[^<]*<\/td><td[^>]*>1s 90c<\/td>/);
+  expect(text(html)).toContain("1s 90c");
   expect(html).toContain('"@type":"Dataset"');
   expect(html).not.toMatch(/"@type":"(Product|Offer|AggregateRating|Review)"/);
   const meta = await itemMetadata(item("forever", "2589"));
@@ -240,8 +246,8 @@ test("the cross-realm page compares every realm with a price", async () => {
   const html = text(renderToStaticMarkup(await CrossRealmItemPage(props)));
   expect(html).toContain("Linen Cloth");
   expect(html).toContain("Lowest market value1s 98cForever, Horde");
-  expect(html).toContain("Highest market value3s 0cMal&#x27;Ganis, Horde");
-  expect(html).toContain("Mal&#x27;Ganis");
+  expect(html).toContain("Highest market value3s 0cMal'Ganis, Horde");
+  expect(html).toContain("Mal'Ganis");
   expect((await crossMetadata(props)).robots).toMatchObject({ index: true });
   expect((await crossMetadata({ params: Promise.resolve({ itemId: "9999" }) })).robots).toMatchObject({ index: false });
 });

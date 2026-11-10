@@ -360,6 +360,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   scrollbar, so the page has nothing to scroll sideways at any width.
 
 ### Changed
+- Site: keep build links reachable below 1280px, omit empty game-art frames, show coin images and
+  quality borders, round the header build pill, and compact the cookie strip with equal Accept and Reject.
 - Site: the home and addon pages no longer say live-client verification is pending: the addon was checked in the live Forever client on 0.3.22.
 - Addon: the settings are split into four short pages under Everloot in the game's AddOns list: General, Auction
   house, Shared with Everloot and Your characters. Everloot itself is an overview of what your saved file holds.
