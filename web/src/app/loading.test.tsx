@@ -25,6 +25,16 @@ describe.each([
   });
 });
 
+// The only reserved height on the site: the skeleton is a screen tall, so the footer starts below the fold while the
+// hub streams. <main> carries none, or a short finished page (404, empty search) would push its footer off the screen.
+test("the database skeleton reserves a screen of height and <main> reserves none", () => {
+  expect(renderToStaticMarkup(<DatabaseLoading />)).toContain("min-h-[100dvh]");
+  const layout = readFileSync(join(__dirname, "layout.tsx"), "utf8");
+  const main = layout.match(/<main [^>]*>/)?.[0] ?? "";
+  expect(main).toContain('id="main-content"');
+  expect(main).not.toMatch(/min-h-/);
+});
+
 test("the database skeleton draws the search field and its row of scope chips", () => {
   const html = renderToStaticMarkup(<DatabaseLoading />);
   expect(html).toContain("h-12 w-full rounded-control");

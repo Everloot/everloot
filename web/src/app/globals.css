@@ -18,6 +18,68 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* What shows before Geist loads (src/app/fonts.ts names these first in each stack): Arial and Courier New resized to
+   Geist's widths, so the swap moves no text. Measured from the font files, not guessed:
+   - size-adjust is Geist's advance width over the fallback's, summed over the site's own text at each weight we
+     use (400, 500, 600, 700). Arial has Regular and Bold only, so 400 and 500 use Regular and 600 and 700 use Bold.
+     Geist Mono and Courier New are both 0.6 em wide, so the mono faces are 100%.
+   - ascent-override and descent-override are Geist's hhea ascent (1005) and descent (295) over 1000 units, divided
+     by that face's size-adjust, as next/font does; Geist has no line gap.
+   Recompute these if the geist package changes version. */
+@font-face {
+  font-family: "GeistSansFallback";
+  src: local("Arial"), local("ArialMT");
+  font-weight: 400;
+  size-adjust: 101.79%;
+  ascent-override: 98.73%;
+  descent-override: 28.98%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "GeistSansFallback";
+  src: local("Arial"), local("ArialMT");
+  font-weight: 500;
+  size-adjust: 104.14%;
+  ascent-override: 96.51%;
+  descent-override: 28.33%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "GeistSansFallback";
+  src: local("Arial Bold"), local("Arial-BoldMT");
+  font-weight: 600;
+  size-adjust: 100.01%;
+  ascent-override: 100.49%;
+  descent-override: 29.5%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "GeistSansFallback";
+  src: local("Arial Bold"), local("Arial-BoldMT");
+  font-weight: 700;
+  size-adjust: 102.19%;
+  ascent-override: 98.35%;
+  descent-override: 28.87%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "GeistMonoFallback";
+  src: local("Courier New"), local("CourierNewPSMT");
+  font-weight: 100 599;
+  size-adjust: 100%;
+  ascent-override: 100.5%;
+  descent-override: 29.5%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "GeistMonoFallback";
+  src: local("Courier New Bold"), local("CourierNewPS-BoldMT");
+  font-weight: 600 900;
+  size-adjust: 100%;
+  ascent-override: 100.5%;
+  descent-override: 29.5%;
+  line-gap-override: 0%;
+}
 
 /* Thin scrollbars inside the docs' sidebar and code panels, in the line colour. */
 [data-docs] * {

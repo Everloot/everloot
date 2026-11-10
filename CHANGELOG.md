@@ -463,6 +463,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Docs: each gap in DATA_PLACEMENT.md carries a dated state, and the WAF row now describes the Cloudflare rules that apply on /database/*.
 - Docs: CONTRIBUTING.md and the pull request template describe the changelog line, the labels in use and the addon install link.
 - Site: zone and instance pages open with the same title row as the other database pages (name, type line, quiet controls at its end), and the instance and spell-talent facts use the same label-and-value list.
+- Site: the web-font swap no longer moves the page. Geist and Geist Mono now fall back to Arial and Courier New resized per weight to Geist's widths (the Arial fallback was 4% too wide at regular), and a screen of height is reserved only while the database hub streams, so a 404 or an empty result keeps its footer in view.
 
 ## [desktop-v0.1.21] - 2026-11-10
 
