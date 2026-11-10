@@ -147,19 +147,15 @@ def test_the_minimap_button_can_be_switched_off():
     assert lua.eval("Everloot.Minimap.Button() ~= nil") is True
 
 
-def test_the_ask_box_sends_a_question_the_way_the_command_does():
+def test_ask_left_the_settings_page_and_the_command_still_queues():
     lua = fresh(MINIMAP, "{ installId = 'abcd-1234', toggles = { players = true }, records = {} }")
     lua.execute("Everloot.Options.Open()")
-    lua.execute("""
-    local box = Everloot.Options.page.ask
-    box:SetText('  where does the mage get the frost book?  ')
-    box.scripts.OnEnterPressed(box)
-    """)
-    asks = lua.eval("EverlootDB.asks and #EverlootDB.asks or 0")
-    assert asks == 1
+    # The settings page has no Ask box: asking from the game needs the Desktop App and two reloads, so it is not
+    # offered among the switches. /ask still queues a question for the companion.
+    assert lua.eval("rawget(Everloot.Options.page, 'ask') == nil") is True
+    lua.execute("SlashCmdList.EVERLOOTASK('  where does the mage get the frost book?  ')")
+    assert lua.eval("EverlootDB.asks and #EverlootDB.asks or 0") == 1
     assert lua.eval("EverlootDB.asks[1].question") == "where does the mage get the frost book?"
-    # The box is empty again, so the same question is not sent twice.
-    assert lua.eval("Everloot.Options.page.ask:GetText()") == ""
 
 
 if __name__ == "__main__":
@@ -167,5 +163,5 @@ if __name__ == "__main__":
     test_the_button_sits_on_the_minimap_and_opens_the_panel()
     test_hovering_the_button_explains_its_three_actions()
     test_the_minimap_button_can_be_switched_off()
-    test_the_ask_box_sends_a_question_the_way_the_command_does()
+    test_ask_left_the_settings_page_and_the_command_still_queues()
     print("Lua 5.1 minimap: absent-client fallback, one button, options and ask box")
