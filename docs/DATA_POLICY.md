@@ -686,6 +686,17 @@ our licence. Everything else Everloot publishes is
 under CC BY-SA 4.0: anyone may reuse it with credit, and what they build from it must stay under the
 same licence.
 
+### Recently public facts
+
+The database's recent-facts page and RSS feed read a snapshot written every ten minutes. They list at most 500
+entities from the last 30 days: agreed item names or public rates, NPC pins or loot, quest givers, object loot,
+bosses and entrances, under the same publication rules as their pages. Entries carry only the entity's kind,
+id, public name, page link, agreement count and publication time. No install ids or player names are included.
+The snapshot also keeps the current public entity keys (kind and id only, capped at 100,000), so an old capture
+uploaded today is dated when it first becomes public. Existing entities on the initial backfill have estimated
+dates from report capture days; the page and feed label those estimates. A failed snapshot write is retried.
+
+
 ## What we refuse
 
 - **Bulk scraping of any site.** No crawlers, no copying another database's rows, guides or text.

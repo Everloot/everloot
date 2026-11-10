@@ -214,7 +214,7 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
         <JsonLd data={changesJsonLd({ name: TITLE, description: LEAD, path: "/changes", entries: shown.map((e) => e.source === "manual" ? { ...e, at: e.at.slice(0, 10), author: "Everloot" } : e) })} />
         <DataTitle
           title={TITLE}
-          meta={<>{LEAD} {latestBuildLine(all)} <a href="/changes/feed.xml" className={LINK}>RSS</a> · <Link href="/news" className={LINK}>Everloot news</Link></>}
+          meta={<>{LEAD} {latestBuildLine(all)} <a href="/changes/feed.xml" className={LINK}>RSS</a> · <Link href="/news" className={LINK}>Everloot news</Link> · <Link href="/database/recent" className={LINK}>New public facts</Link></>}
           aside={strip}
         />
         <FilterBar
