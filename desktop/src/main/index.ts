@@ -1,3 +1,5 @@
+import { reportAt } from "./reports";
+import type { ReportQuery } from "../shared/reports";
 import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, net, powerMonitor, screen, session, shell } from "electron";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -15,7 +17,7 @@ import { fetchChanges } from "./changes";
 import { createChat } from "./chat";
 import { DATA_NOTICE_BYTES, dataUsage, deleteLocalData } from "./data-folder";
 import { localTools } from "./local-tools";
-import { createEngine } from "./engine";
+import { accountOf, createEngine } from "./engine";
 import { connectInBrowser } from "./connect";
 import { allowedExternal } from "./external";
 import { candidateRoots, detectGameFolders, foreverSuggestion, realFs, resolvePickedFolder } from "./game-folder";
@@ -562,6 +564,16 @@ if (!app.requestSingleInstanceLock()) {
     return installAddon({ version: latest.version, endpoint: settings.endpoint, addonsDir: dir });
   });
   handle("changes", () => changes());
+  handle("reportsInfo", async (_e, query: ReportQuery) => {
+    const files = engine.snapshot().files;
+    await readyFacts(files);
+    let unreadable = 0;
+    const indexes = files.flatMap(file => {
+      try { return [{ account: accountOf(file), index: saveFacts(file).reports }]; }
+      catch { unreadable++; return []; }
+    });
+    return { ...reportAt(indexes, query), unreadable };
+  });
   handle("charactersInfo", async () => {
     const files = engine.snapshot().files;
     await readyFacts(files);

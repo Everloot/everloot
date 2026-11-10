@@ -355,6 +355,7 @@ export interface EverlootApi {
   setupInstallAddon(folder: string): Promise<{ version: string; files: number }>;
   changes(): Promise<ChangeItem[]>;
   charactersInfo(): Promise<CharactersInfo>;
+  reportsInfo(query: import("./reports").ReportQuery): Promise<import("./reports").ReportInfo>;
   chatInfo(): Promise<ChatInfo>;
   chatSend(text: string): Promise<ChatInfo>;
   chatClear(): Promise<ChatInfo>;
