@@ -33,6 +33,8 @@ test("quota storage failure fails closed and stores nothing", async () => {
   deps.request.mockRejectedValue(new Error("Quota storage unavailable"));
   const response = await POST(signup());
   expect(response.status).toBe(503);
+  expect(response.headers.get("cache-control")).toBe("no-store");
+  expect(response.headers.get("retry-after")).toBe("60");
   expect(deps.putWaitlist).not.toHaveBeenCalled();
 });
 

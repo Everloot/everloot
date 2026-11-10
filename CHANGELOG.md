@@ -45,7 +45,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
 
 ### Fixed
-- Site: profession pages and map pins read files the snapshot cron writes instead of replaying the corpus on each request.
+- Site: /api/suggest spends the per-IP quota and shares one edge cache entry for `Thunder` and `thunder `, the coverage 400 and waitlist 503 are `no-store` (the 503 adds `Retry-After`), and the docs list every route that sends CORS from one file.
 - Site: item list pagination is crawlable while filter URLs stay blocked.
 - Site: /database splits its rows into "Seen by players" and "From the game files", says after launch that a row fills when 3 installs agree, and drops the Guilds lookup row (the Tools menu has it).
 - Knowledge base: a self-hosted MCP server and `coverage-report` read the whole public corpus again. The reader stopped
@@ -56,6 +56,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the schemas page marks the three shapes that describe a bulk-export file rather than an endpoint and says that
   `reporters` in the API and MCP shapes is the count the open-data files call `installs`; the API page names the routes
   its own pages fetch (/api/map/pins, /api/suggest) as outside the OpenAPI contract. The open-data notes say the same.
+- Site: profession pages and map pins read files the snapshot cron writes instead of replaying the corpus on each request.
 - Site: the tools catalogue supplies the menu, uses Collections and Guild board, and farming no longer asks for a launch notification.
 - Desktop App: the Characters page reads the addon's local ledger (`EverlootDB.ledger`) from the save file beside the
   `money_event` rows, so its 7-day net is the Gold tab's "7 days" for the same character (today and the six UTC days

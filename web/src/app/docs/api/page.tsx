@@ -5,6 +5,7 @@ import { C, Callout, H2, H3, List, P, Table, docLink } from "@/components/docs/b
 import { CodeGroup } from "@/components/docs/DocsClient";
 import DocPage from "@/components/docs/DocPage";
 import { ANON_PAGE, ANON_PER_HOUR, guardOn, KEY_PAGE, KEY_PER_HOUR } from "@/lib/data-guard";
+import corsPrerenderedPaths from "@/data/cors-prerendered-paths.json";
 import { PAGE_INTERNAL_ROUTES } from "@/lib/docs/file-schemas";
 import { DOCS_TABS, endpointHref } from "@/lib/docs/nav";
 import { pageMetadata } from "@/lib/seo";
@@ -163,8 +164,9 @@ export default function ApiOverview() {
 
       <H2 id="cors">CORS</H2>
       <P>
-        The tooltip endpoint, the OpenAPI document and the JSON Schemas send <C>Access-Control-Allow-Origin: *</C>, so a web
-        page on any site can read them. The other endpoints set no CORS headers: call them from a server, a script or a
+        The tooltip endpoint, the OpenAPI document, the JSON Schemas{corsPrerenderedPaths.map((path, i) => (
+          <span key={path}>{i < corsPrerenderedPaths.length - 1 ? ", " : " and "}<C>{path}</C></span>
+        ))} send <C>Access-Control-Allow-Origin: *</C>, so a web page on any site can read them. The other endpoints set no CORS headers: call them from a server, a script or a
         desktop tool. The MCP endpoint lets browsers call it only from a short list of AI sites.
       </P>
 
