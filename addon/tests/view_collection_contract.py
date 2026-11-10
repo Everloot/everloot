@@ -61,12 +61,13 @@ RECORDS = f"""{{
     {{ questLineId = 900, name = 'The Defias Brotherhood', questIds = {{ 101, 102, 103, 104 }} }},
     {{ questLineId = 901, name = 'Kolkar Raiders', questIds = {{ 201, 202 }} }},
     {{ questLineId = 902, name = 'The Long Road', questIds = {{ 301, 302 }}, truncated = true }},
+    {{ questLineId = 903, name = 'Wayward Trail', questIds = {{ 401, 402, 403, 404 }} }},
   }},
   quest_owned = {{
     {{ characterKey = '{ME}', questIds = {{ 101, 102, 201 }} }},
-    {{ characterKey = '{ME}', questIds = {{ 103, 104 }} }},
-    {{ characterKey = 'zzzz9999', questIds = {{ 201, 202, 301, 302 }} }},
-    {{ characterKey = 'yyyy0000', questIds = {{ 101, 102, 103, 104 }} }},
+    {{ characterKey = '{ME}', questIds = {{ 103, 104, 401, 402 }} }},
+    {{ characterKey = 'zzzz9999', questIds = {{ 201, 202, 301, 302, 403, 404 }} }},
+    {{ characterKey = 'yyyy0000', questIds = {{ 101, 102, 103, 104, 401, 402, 403, 404 }} }},
   }},
 }}"""
 # Two of this player's own characters; 'yyyy0000' has rows in the file but is not in the roster.
@@ -150,20 +151,21 @@ assert(rows[1].detail.width == 276, 'a row without a bar gives its room to the d
 
 -- Quests: one row per chain, this character's quests done of its total; a chain cut at the tracker's limit is never complete.
 click(c.sections.quests)
-assert(c.section == 'quests' and c.summary.text == 'Quests: 1 of 3 chains complete', c.summary.text)
-assert(shown(rows) == 3)
+assert(c.section == 'quests' and c.summary.text == 'Quests: 1 of 4 chains complete', c.summary.text)
+assert(shown(rows) == 4)
+assert(rows[4].name.text == 'Wayward Trail' and rows[4].detail.text == '2 of 4' and rows[4].done.text == '', rows[4].detail.text)
 assert(rows[1].name.text == 'Kolkar Raiders' and rows[1].detail.text == '1 of 2' and rows[1].done.text == '', rows[1].detail.text)
 assert(rows[1].bar.shown and rows[1].bar.lo == 0 and rows[1].bar.hi == 2 and rows[1].bar.value == 1, 'the bar runs to the chain total')
 assert(rows[1].detail.width == 180, 'the detail leaves room for the bar')
 assert(rows[2].name.text == 'The Defias Brotherhood' and rows[2].detail.text == '4 of 4' and rows[2].done.text == 'done', 'quests from two rows count')
 assert(rows[3].name.text == 'The Long Road' and rows[3].detail.text == '0 of 2+' and rows[3].done.text == '', rows[3].detail.text)
 click(c.missingOnly)
-assert(shown(rows) == 2 and rows[1].name.text == 'Kolkar Raiders' and rows[2].name.text == 'The Long Road', 'missing only hides complete chains')
+assert(shown(rows) == 3 and rows[1].name.text == 'Kolkar Raiders' and rows[2].name.text == 'The Long Road', 'missing only hides complete chains')
 click(c.missingOnly)
 
 -- Account with no roster: this character alone, named as such.
 click(c.scopes.account)
-assert(c.scope == 'account' and c.summary.text == 'Quests: 1 of 3 chains complete', c.summary.text)
+assert(c.scope == 'account' and c.summary.text == 'Quests: 1 of 4 chains complete', c.summary.text)
 assert(rows[2].detail.text == '4 of 4 · This character', rows[2].detail.text)
 click(c.scopes.character)
 assert(c.scope == 'character' and rows[2].detail.text == '4 of 4', rows[2].detail.text)
@@ -246,18 +248,21 @@ assert(rows[2].name.text == 'Zul Gurub' and rows[2].detail.text == '2 of 10 · r
 
 -- Quests: the character furthest along each chain; quests done on different characters are not added together.
 click(c.sections.quests)
-assert(c.summary.text == 'Quests: 2 of 3 chains complete', c.summary.text)
+assert(c.summary.text == 'Quests: 2 of 4 chains complete', c.summary.text)
+assert(rows[4].name.text == 'Wayward Trail' and rows[4].detail.text == '2 of 4 · Brakka' and rows[4].done.text == '', 'furthest character, not a union: ' .. rows[4].detail.text)
+assert(rows[4].bar.value == 2)
 assert(rows[1].name.text == 'Kolkar Raiders' and rows[1].detail.text == '2 of 2 · Velda' and rows[1].done.text == 'done', rows[1].detail.text)
 assert(rows[1].bar.value == 2)
 assert(rows[2].name.text == 'The Defias Brotherhood' and rows[2].detail.text == '4 of 4 · Brakka', rows[2].detail.text)
 assert(rows[3].name.text == 'The Long Road' and rows[3].detail.text == '2 of 2+ · Velda' and rows[3].done.text == '', rows[3].detail.text)
 click(c.missingOnly)
-assert(shown(rows) == 1 and rows[1].name.text == 'The Long Road', 'missing only over the account')
+assert(shown(rows) == 2 and rows[1].name.text == 'The Long Road' and rows[2].name.text == 'Wayward Trail', 'missing only over the account')
 click(c.missingOnly)
 
 -- Back to this character: the alt's rows stop counting.
 click(c.scopes.character)
-assert(c.summary.text == 'Quests: 1 of 3 chains complete' and rows[1].detail.text == '1 of 2', c.summary.text)
+assert(c.summary.text == 'Quests: 1 of 4 chains complete' and rows[1].detail.text == '1 of 2', c.summary.text)
+assert(rows[4].detail.text == '2 of 4', rows[4].detail.text)
 assert(EverlootWindow.shown and not U.failed)
 """)
 print("Lua 5.1 Collection view: off says what the tracker reads and turns it on; achievements newest first, standing bars, "

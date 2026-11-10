@@ -216,13 +216,36 @@ end
 -- quest limit ("+") is never counted complete.
 local function quests(s)
   local ids = known("quest_owned", s, "questIds")
-  local items, complete = {}, 0
+  -- quest id -> the chains holding it, so each key's completed quests are walked once, not once per chain.
+  local chains, byQuest = {}, {}
   for _, q in ipairs(E:Rows("quest_chain_catalog")) do
     if type(q) == "table" and type(q.questIds) == "table" and #q.questIds > 0 then
+      chains[#chains + 1] = q
+      local seen = {}
+      for _, id in ipairs(q.questIds) do
+        if not seen[id] then
+          seen[id] = true
+          local list = byQuest[id] or {}
+          list[#list + 1] = #chains
+          byQuest[id] = list
+        end
+      end
+    end
+  end
+  local counts = {}
+  for _, k in ipairs(s.keys) do
+    local mine = {}
+    for id in pairs(ids[k]) do
+      for _, c in ipairs(byQuest[id] or {}) do mine[c] = (mine[c] or 0) + 1 end
+    end
+    counts[k] = mine
+  end
+  local items, complete = {}, 0
+  for c, q in ipairs(chains) do
+    do
       local total, most, holder = #q.questIds, 0, nil
       for _, k in ipairs(s.keys) do
-        local n = 0
-        for _, id in ipairs(q.questIds) do if ids[k][id] then n = n + 1 end end
+        local n = counts[k][c] or 0
         if n > most then most, holder = n, k end
       end
       local item = { name = name(q.name), done = most >= total and not q.truncated, bar = { 0, total, most } }
