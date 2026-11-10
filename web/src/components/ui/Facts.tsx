@@ -11,14 +11,13 @@ export interface Fact {
  * A few facts about one thing, label over value, in one card: an addon's installs and dates, a
  * repository's licence and last commit. `rows` puts the label beside its value instead, for longer
  * values (an infobox, a pack's details). `list` is the quick-facts list of a database page: no card,
- * 13 px text on 28 px rows, label left and value right, flowing down two columns on a phone and on a
- * wide screen (one beside the tooltip on a tablet). Not for a dataset
- * that can be empty: that is a DataTable.
+ * 13 px text on 28 px rows, label left and value right, one column on a phone and a tablet and two flowing
+ * down on a wide screen. Not for a dataset that can be empty: that is a DataTable.
  */
 export default function Facts({ items, layout = "grid", label }: { items: Fact[]; layout?: "grid" | "rows" | "list"; label?: string }) {
   if (layout === "list") {
     return (
-      <dl data-facts="list" aria-label={label} className="columns-2 gap-x-6 text-meta sm:columns-1 lg:columns-2">
+      <dl data-facts="list" aria-label={label} className="columns-1 gap-x-6 text-meta lg:columns-2">
         {items.map((item, i) => (
           <div key={i} className="flex min-h-7 min-w-0 break-inside-avoid items-center justify-between gap-3 border-b border-line py-1">
             <dt className="shrink-0 text-muted">{item.label}</dt>

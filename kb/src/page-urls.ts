@@ -156,10 +156,10 @@ const LORE_BATCH = 90;
  * enough text, not a redirect stub, and a game-file catalog record (catalog-index.ts) with its database page.
  * Other records get none.
  */
-export async function loreUrls(source: ReleaseSource, rows: readonly { id: number; extId: string; name: string; kind: string }[]): Promise<Map<number, string>> {
+export async function loreUrls(source: ReleaseSource, rows: readonly { id: number; extId: string; name: string; kind: string; sourceKind?: string }[]): Promise<Map<number, string>> {
   const out = new Map<number, string>();
   for (const r of rows) {
-    const path = catalogPath(r.kind, r.extId, r.name);
+    const path = catalogPath(r.kind, r.extId, r.name, r.sourceKind);
     if (path !== null) out.set(r.id, abs(path));
   }
   const lore = rows.filter((r) => r.kind === "lore_page");

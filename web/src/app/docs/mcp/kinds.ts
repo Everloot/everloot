@@ -10,12 +10,12 @@ export type KnowledgeKind = (typeof KNOWLEDGE_KINDS)[number];
 /** Where a kind's records come from, in the words of the kind filter of search_knowledge and get_by_name. */
 export const KIND_ORIGINS = {
   release: "Knowledge release",
-  catalog: "Game-file catalog (found in game files, unconfirmed)",
+  catalog: "Metadata index: agreed player names for item/NPC/object/quest; game files for other kinds (unconfirmed)",
   starter: "Everloot team starter builds (not observed)",
 } as const;
 
 /** The game-file catalog kinds, in the order the kb index numbers them: the order sets each kind's id range. */
-export const CATALOG_KINDS = ["achievement", "faction", "title", "quest_chain", "mount", "legacy_perk", "race", "instance"] as const;
+export const CATALOG_KINDS = ["achievement", "faction", "title", "quest_chain", "mount", "legacy_perk", "race", "instance", "item", "npc", "object", "quest", "zone"] as const;
 
 /** Catalog ids start here, far above any release rowid, and each kind owns a span of this many ids. */
 export const CATALOG_ID_BASE = 1_000_000_000;
@@ -27,6 +27,7 @@ const DEDICATED_TOOLS: Partial<Record<KnowledgeKind, readonly string[]>> = {
   npc: ["npc_page", "vendor_page"],
   object: ["object_page"],
   quest: ["quest_page"],
+  zone: ["world_map_near"],
   race: ["class_races"],
   build: ["talent_tree"],
 };

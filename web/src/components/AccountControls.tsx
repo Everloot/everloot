@@ -31,7 +31,7 @@ export default function AccountControls({ savedBuilds = false, initialShell = nu
   const [retry, setRetry] = useState(0);
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const controlClass = "inline-flex items-center min-h-11 px-2 text-sm text-fg-2 hover:text-accent disabled:opacity-60";
+  const controlClass = "inline-flex items-center min-h-11 px-2 text-sm text-fg-2 hover:text-accent focus-visible:outline-offset-[-2px] disabled:opacity-60";
 
   useEffect(() => {
     let active = true;

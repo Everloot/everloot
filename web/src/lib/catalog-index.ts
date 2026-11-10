@@ -1,4 +1,4 @@
-// The game-file catalogs (achievements, factions, titles, quest lines, mounts, legacy perks, races, instances) as the
+// The game-file catalogs (achievements, factions, titles, quest lines, mounts, legacy perks, races, instances, zones) as the
 // knowledge tools' search index, built once from the site's own committed files (the same imports the pages read) and
 // lent to the MCP mounts and GET /api/tools. See kb/src/catalog-index.ts.
 import achievementsJson from "@/data/game-data/client-achievements.json";
