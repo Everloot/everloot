@@ -12,7 +12,7 @@ vi.mock("@/lib/player-store", async (importOriginal) => ({ ...(await importOrigi
 vi.mock("@/lib/names", () => ({ loadNames: async () => ({ items: new Map(), npcs: new Map(), quests: new Map(), objects: new Map() }) }));
 vi.mock("@/lib/shown-search-names", () => ({ loadShownSearchNames: async () => ({ items: new Map(), npcs: new Map(), quests: new Map(), objects: new Map() }) }));
 vi.mock("@/lib/shown-item-names", () => ({ loadShownNames: async () => ({}) }));
-vi.mock("@/lib/item-icons", () => ({ shownItemIcons: async () => new Map() }));
+vi.mock("@/lib/item-icons", () => ({ shownItemIcons: async () => ({ icons: new Map(), unknown: null }) }));
 vi.mock("@/lib/objects", () => ({ loadObjectFacts: async () => ({ rates: [], measuredZeros: [], names: [], unreachable: false }) }));
 
 import { PEOPLE_PER_MINUTE } from "@/lib/people-search";

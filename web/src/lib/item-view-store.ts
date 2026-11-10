@@ -1,14 +1,17 @@
 import { AwsClient } from "aws4fetch";
+import { ITEM_FACTS } from "@everloot/protocol";
+import type { ItemFactState } from "../../../kb/src/item-facts";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
 import { agreedItemNames } from "../../../kb/src/item-page";
 import { loadItemSeen, type ItemSeen } from "./item-seen";
 import { SOURCES, type SourceSlug } from "./items";
-import { loadItemFacts } from "./rollup-compute";
+import { loadAllReportedItemFacts, loadItemFacts } from "./rollup-compute";
 import { uploadStore, type Corpus, type R2Config } from "./upload-store";
 
 /**
- * What the item lists read from players' uploads, stored by the cron instead of worked out on each view: the names 3
- * installs agree on, the items with a public drop, and the items players have seen with where they came from. The
+ * What the item lists and the hover cards read from players' uploads, stored by the cron instead of worked out on each
+ * view: the names 3 installs agree on, the items with a public drop, the items players have seen with where they came
+ * from, and the tooltip numbers installs agree or disagree on. The
  * cron writes it after the corpus snapshot (`writeItemView`), only when that run added uploads or rebuilt, or when
  * the file is missing or stale. A page reads one small file (`loadListNames`, `loadListSeen` in item-view.ts) instead of downloading and
  * replaying the whole corpus, which cost seconds of CPU on every new server instance. Every value is the same one
@@ -36,6 +39,11 @@ export interface ItemView {
   seen: number[];
   /** Where each seen item came from, in SOURCES order; an item seen only by name has none. */
   from: [number, SourceSlug[]][];
+  /**
+   * `loadReportedItemFacts` for every item with an agreed or a disputed tooltip line; an item not listed has neither.
+   * Absent in a file written before it was added: the hover card then reads the aggregates.
+   */
+  reported?: [number, ItemFactState][];
 }
 
 /** The uploads bucket's settings, read here rather than through upload-store so a page that mocks the store still renders. */
@@ -53,8 +61,8 @@ const r2 = (cloud: R2Config) => new AwsClient({ accessKeyId: cloud.r2AccessKeyId
  * aggregates, which the same run writes only afterwards (aggregate-store.ts).
  */
 export async function buildItemView(dataAsOf: string | null, now = new Date(), read?: Corpus): Promise<ItemView> {
-  const [facts, seen] = await Promise.all([loadItemFacts(read), loadItemSeen(read)]);
-  if (facts.unreachable || seen.unreachable) throw new Error("corpus unreachable");
+  const [facts, seen, reported] = await Promise.all([loadItemFacts(read), loadItemSeen(read), loadAllReportedItemFacts(read)]);
+  if (facts.unreachable || seen.unreachable || reported.unreachable) throw new Error("corpus unreachable");
   return {
     version: 1,
     generatedAt: now.toISOString(),
@@ -63,6 +71,7 @@ export async function buildItemView(dataAsOf: string | null, now = new Date(), r
     dropped: [...new Set(facts.rates.filter((r) => r.public).map((r) => r.itemId))].sort((a, b) => a - b),
     seen: [...seen.seen].sort((a, b) => a - b),
     from: [...seen.from].sort((a, b) => a[0] - b[0]),
+    reported: [...reported.reported].sort((a, b) => a[0] - b[0]),
   };
 }
 
@@ -85,6 +94,12 @@ export async function writeItemView(opts: { added: number; rebuild?: boolean; da
 
 const isIds = (v: unknown): v is number[] => Array.isArray(v) && v.every((x) => Number.isInteger(x));
 const SOURCE_SLUGS = new Set<string>(SOURCES.map((s) => s.slug));
+const FACT_NAMES = new Set<string>(ITEM_FACTS);
+const isFactState = (v: unknown): v is ItemFactState => {
+  const s = v as Partial<ItemFactState> | null;
+  return Boolean(s) && Array.isArray(s!.contested) && s!.contested.every((f) => FACT_NAMES.has(f)) && Array.isArray(s!.shown) && s!.shown.every((f) =>
+    Boolean(f) && FACT_NAMES.has(f.fact) && Number.isFinite(f.value) && Number.isInteger(f.reporters) && typeof f.build === "string" && (f.lastSeen === null || typeof f.lastSeen === "string"));
+};
 
 /** The file as read, or null for a shape this code does not know (the pages then fall back). */
 export function parseItemView(raw: unknown): ItemView | null {
@@ -93,11 +108,15 @@ export function parseItemView(raw: unknown): ItemView | null {
   if (!isIds(v.dropped) || !isIds(v.seen)) return null;
   if (!Array.isArray(v.agreed) || !v.agreed.every((e) => Array.isArray(e) && Number.isInteger(e[0]) && typeof e[1] === "string")) return null;
   if (!Array.isArray(v.from) || !v.from.every((e) => Array.isArray(e) && Number.isInteger(e[0]) && Array.isArray(e[1]) && e[1].every((s) => SOURCE_SLUGS.has(s)))) return null;
-  return { version: 1, generatedAt: v.generatedAt, dataAsOf: typeof v.dataAsOf === "string" ? v.dataAsOf : null, agreed: v.agreed, dropped: v.dropped, seen: v.seen, from: v.from };
+  if (v.reported !== undefined && !(Array.isArray(v.reported) && v.reported.every((e) => Array.isArray(e) && Number.isInteger(e[0]) && isFactState(e[1])))) return null;
+  return {
+    version: 1, generatedAt: v.generatedAt, dataAsOf: typeof v.dataAsOf === "string" ? v.dataAsOf : null, agreed: v.agreed, dropped: v.dropped, seen: v.seen, from: v.from,
+    ...(v.reported ? { reported: v.reported } : {}),
+  };
 }
 
-/** The read view with its maps built once, so each page view only looks things up. */
-export interface ReadView { view: ItemView; agreed: Map<number, string>; dropped: Set<number>; seen: ItemSeen }
+/** The read view with its maps built once, so each page view only looks things up. `reported` is null in an older file. */
+export interface ReadView { view: ItemView; agreed: Map<number, string>; dropped: Set<number>; seen: ItemSeen; reported: Map<number, ItemFactState> | null }
 let kept: { at: number; read: ReadView | null } | null = null;
 
 /** The stored view, kept KEEP_MS per server instance; null when there is none or it cannot be read. Never throws. */
@@ -116,6 +135,7 @@ export async function loadItemView(deps: { cloud?: R2Config | null; fetch?: type
         agreed: new Map(view.agreed),
         dropped: new Set(view.dropped),
         seen: { seen: new Set(view.seen), from: new Map(view.from), unreachable: false },
+        reported: view.reported ? new Map(view.reported) : null,
       };
     }
   } catch {

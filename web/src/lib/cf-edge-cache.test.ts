@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { classContextParams } from "./class-context";
-import { DEGRADED_TTL, ITEM_LIST_PARAMS, cacheCopy, cacheVersionFor, cachedResponse, edgeCacheKey, edgeCacheable, edgeDegraded, edgeTtl, forCache, fromCache, isPrivatePath, versionsComplete } from "./cf-edge-cache";
+import { DEGRADED_TTL, ITEM_LIST_PARAMS, cacheCopy, cacheVersionFor, cachedResponse, edgeCacheKey, edgeCacheable, edgeDegraded, edgeTtl, forCache, fromCache, isPrivatePath, versionsComplete, withoutCredentials } from "./cf-edge-cache";
 import { itemsHref } from "./items";
 
 const page = (headers: Record<string, string>, status = 200) => new Response("<html></html>", { status, headers });
@@ -379,4 +379,51 @@ test("the suggest box shares one cache key for a query however it is cased or pa
   expect(key("https://everloot.app/api/suggest?q=Thunder")).toBe(key("https://everloot.app/api/suggest?q=thunder%20"));
   expect(key("https://everloot.app/api/suggest?q=thunder")).not.toBe(key("https://everloot.app/api/suggest?q=thunderfury"));
   expect(key("https://everloot.app/search?q=Thunder")).not.toBe(key("https://everloot.app/search?q=thunder"));
+});
+
+test("a hover card is cached for every visitor: its cookies and authorization never reach the handler or the key", async () => {
+  const store = fakeStore();
+  const ctx = fakeContext();
+  const seen: (string | null)[] = [];
+  let rendered = 0;
+  const handler = async (r: Request) => {
+    rendered++;
+    seen.push(r.headers.get("cookie") ?? r.headers.get("authorization"));
+    return Response.json({ ok: true, n: rendered }, { headers: { "cache-control": "public, max-age=300", "cdn-cache-control": "max-age=3600" } });
+  };
+  const signedIn = () => new Request("https://everloot.app/database/card/item/2589", { headers: { cookie: "__Secure-everloot.session_token=abc; cf_clearance=x", "x-everloot-check": "s" } });
+  await cachedResponse(signedIn(), VERSIONS, handler, store, ctx);
+  await Promise.all(ctx.waits);
+  const anonymous = await cachedResponse(new Request("https://everloot.app/database/card/item/2589"), VERSIONS, handler, store, ctx);
+  const again = await cachedResponse(new Request("https://everloot.app/database/card/item/2589", { headers: { authorization: "Bearer t" } }), VERSIONS, handler, store, ctx);
+  expect(rendered).toBe(1);
+  expect(seen).toEqual([null]);
+  expect(anonymous.headers.get("x-everloot-edge-cache")).toBe("HIT");
+  expect(again.headers.get("x-everloot-edge-cache")).toBe("HIT");
+  expect(await again.json()).toEqual({ ok: true, n: 1 });
+  expect(again.headers.get("cache-control")).toBe("public, max-age=300");
+  expect([...store.entries.keys()]).toEqual([`https://everloot.app/database/card/item/2589?__edge_version=${version("/database/card/item/2589")}`]);
+});
+
+test("only the card route drops credentials: a page, a card spelled another way or a POST keeps them and bypasses the cache", () => {
+  const cookie = { cookie: "a=1" };
+  for (const url of ["https://everloot.app/database/items/2589", "https://everloot.app/database/card/item/2589/extra", "https://everloot.app/database/%63ard/item/2589", "https://everloot.app/database/card/item/02589", "https://everloot.app/me"]) {
+    const req = new Request(url, { headers: cookie });
+    expect(withoutCredentials(req), url).toBe(req);
+    expect(edgeCacheable(withoutCredentials(req)), url).toBe(false);
+  }
+  const post = new Request("https://everloot.app/database/card/item/2589", { method: "POST", headers: cookie });
+  expect(withoutCredentials(post)).toBe(post);
+  const card = withoutCredentials(new Request("https://everloot.app/database/card/npc/448?utm_source=x", { headers: { ...cookie, accept: "application/json" } }));
+  expect(card.headers.has("cookie")).toBe(false);
+  expect(card.headers.get("accept")).toBe("application/json");
+  expect(card.url).toBe("https://everloot.app/database/card/npc/448?utm_source=x");
+  expect(edgeCacheable(card)).toBe(true);
+});
+
+test("the edge-check header the deploy warm-up and audits send changes neither whether a page is cached nor its key", () => {
+  const plain = new Request("https://everloot.app/database/card/item/2589");
+  const checked = new Request("https://everloot.app/database/card/item/2589", { headers: { "x-everloot-check": "s3cret", "user-agent": "everloot-deploy-warm" } });
+  expect(edgeCacheable(checked)).toBe(true);
+  expect(edgeCacheKey(checked, "v").url).toBe(edgeCacheKey(plain, "v").url);
 });

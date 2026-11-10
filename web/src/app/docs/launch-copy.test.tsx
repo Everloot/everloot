@@ -14,6 +14,17 @@ import Prices, { metadata as pricesMetadata } from "./cookbook/prices-in-a-scrip
 import TooltipsOnYourSite from "./cookbook/tooltips-on-your-site/page";
 import Quickstart from "./quickstart/page";
 import Tooltips from "./tooltips/page";
+import { CLASSES, QUALITIES, tokens } from "@/design/tokens";
+
+test("tooltip colour tables list every class and quality in both themes", () => {
+  const html = renderToStaticMarkup(<Tooltips />);
+  expect(html).toContain('id="colours-and-icons"');
+  for (const key of [...CLASSES.map((c) => `class-${c}` as const), ...QUALITIES.map((q) => `q-${q}` as const)]) {
+    expect(html).toContain(tokens.light[key]);
+    expect(html).toContain(tokens.dark[key]);
+  }
+  for (const name of [...CLASSES, ...QUALITIES]) expect(html).toContain(name[0].toUpperCase() + name.slice(1));
+});
 
 // These pages are static: they are rendered once, before launch, and served after it. Their launch sentences
 // must read true at either time, so each page renders the same at both clocks and none promises a launch to come.

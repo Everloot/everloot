@@ -85,16 +85,17 @@
 
   // Every string from the server goes in as text, never as markup.
   function render(d) {
-    var head = el("div", "h"), body = el("div"), title = el("div", "t", String(d.title)), g = d.gameData, icon = d.icon && ok(d.icon), url = d.url && ok(d.url), i, line, a;
+    var head = el("div", "h"), body = el("div"), title = el("div", "t", String(d.title)), g = d.gameData, icon = d.icon && ok(d.icon), url = d.url && ok(d.url), color = /^#[0-9a-f]{6}$/i.test(d.color) ? d.color : "", i, line, a;
     box.textContent = "";
     if (icon) {
       var img = el("img", "i");
       img.alt = "";
       img.referrerPolicy = "no-referrer";
       img.src = icon.href;
+      img.style.borderColor = color; // the quality colour, as the name
       head.appendChild(img);
     }
-    if (/^#[0-9a-f]{6}$/i.test(d.color)) title.style.color = d.color;
+    title.style.color = color;
     body.appendChild(title);
     for (i = 0; i < (d.lines || []).length; i++) {
       line = String(d.lines[i]);

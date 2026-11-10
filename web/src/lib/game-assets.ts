@@ -116,6 +116,8 @@ export const assetUrl = (base: string, file: string) => `${base}/${file}`;
 export const iconUrl = (base: string, name: string) => assetUrl(base, `icons/${name}`);
 /** An item's icon by the file data id its record carries. */
 export const itemIconUrl = (base: string, fileId: number) => iconUrl(base, `${fileId}.webp`);
+/** The game's question mark (INV_Misc_QuestionMark) in the same folder: the icon of an item whose own is missing. */
+export const unknownItemIcon = (base: string) => itemIconUrl(base, 134400);
 /** The shard that holds an item. */
 export const itemShard = (itemId: number, shardSize: number) => Math.floor(itemId / shardSize);
 /** The build folder, the last part of the asset URL ("wow_classic_beta-70450-84bea423"); the private bucket uses the same name. */
@@ -276,12 +278,25 @@ export function itemTip(r: ItemRecord, assets: Pick<SiteAssets, "base" | "versio
  * icons) and the private bucket, and the private files must be for the same build. Never throws.
  */
 export async function loadItemTips(assets: SiteAssets | null, ids: readonly number[], store: PrivateStore | null = privateStoreFromEnv()): Promise<Map<number, ItemTip>> {
+  return (await readItemTips(assets, ids, store)).tips;
+}
+
+/**
+ * `loadItemTips`, and whether a read of the private bucket failed (its index or a shard), so a reader that must not
+ * keep a partial answer, such as the edge-cached hover card, can tell a failure from an item with no tooltip.
+ * `degraded` is a broken folder rather than a failed read: a shard the index lists that is not there or is not a
+ * shard, or a record for an asked-for item that is not a record. An item its shard does not hold is neither.
+ */
+export async function readItemTips(assets: SiteAssets | null, ids: readonly number[], store: PrivateStore | null = privateStoreFromEnv()): Promise<{ tips: Map<number, ItemTip>; unreachable: boolean; degraded: boolean }> {
   const out = new Map<number, ItemTip>();
+  const result = { tips: out, unreachable: false, degraded: false };
   const wanted = [...new Set(ids)].filter((id) => Number.isInteger(id) && id > 0);
   const folder = assets ? buildFolder(assets.base) : null;
-  if (!assets || !store || !folder || !wanted.length) return out;
-  const index = ItemIndexSchema.safeParse(await store.read(`${folder}/items.json`));
-  if (!index.success || index.data.build.version !== assets.version) return out;
+  if (!assets || !store || !folder || !wanted.length) return result;
+  const read = await store.read(`${folder}/items.json`);
+  if (read === PRIVATE_UNREACHABLE) return { ...result, unreachable: true };
+  const index = ItemIndexSchema.safeParse(read);
+  if (!index.success || index.data.build.version !== assets.version) return result;
   const byShard = new Map<number, number[]>();
   for (const id of wanted) {
     const s = itemShard(id, index.data.shardSize);
@@ -290,14 +305,19 @@ export async function loadItemTips(assets: SiteAssets | null, ids: readonly numb
   await Promise.all([...byShard].map(async ([shard, ids]) => {
     const file = index.data.shards[String(shard)]?.file;
     if (!file) return;
-    const body = z.record(z.string(), z.unknown()).safeParse(await store.read(`${folder}/${file}`));
-    if (!body.success) return;
+    const shardRead = await store.read(`${folder}/${file}`);
+    if (shardRead === PRIVATE_UNREACHABLE) { result.unreachable = true; return; }
+    const body = z.record(z.string(), z.unknown()).safeParse(shardRead);
+    if (!body.success) { result.degraded = true; return; }
     for (const id of ids) {
-      const r = ItemRecordSchema.safeParse(body.data[String(id)]);
+      const raw = body.data[String(id)];
+      if (raw === undefined) continue;
+      const r = ItemRecordSchema.safeParse(raw);
       if (r.success) out.set(id, itemTip(r.data, assets));
+      else result.degraded = true;
     }
   }));
-  return out;
+  return result;
 }
 
 /* ---------- Item names from the game files and the Warcraft Wiki ---------- */
@@ -319,6 +339,8 @@ export interface MatchedName {
   name: string;
   /** Name colour by quality; common when only the wiki names the item. */
   color: string;
+  /** The quality id `color` is for. */
+  quality: number;
   /** The wiki article that gives this name; null for a name from the game files alone. */
   wikiPage: string | null;
   source: "wiki" | "files";
@@ -354,7 +376,7 @@ export async function loadItemNames(version: string, base: string | null = asset
       wiki: { name: f.data.wiki.name, url: f.data.wiki.url },
       // The rule is applied again here, so a file written before a change to it cannot show what it now holds back.
       names: new Map(Object.entries(f.data.names).filter(([id, x]) => mayShowName(Number(id), x.n)).map(([id, x]) => [Number(id), {
-        name: x.n, color: qualityColor(x.q ?? 1), wikiPage: x.w ? `${WIKI_PAGE_PREFIX}${x.w}` : null, source: x.w ? "wiki" : "files",
+        name: x.n, color: qualityColor(x.q ?? 1), quality: x.q ?? 1, wikiPage: x.w ? `${WIKI_PAGE_PREFIX}${x.w}` : null, source: x.w ? "wiki" : "files",
       } satisfies MatchedName])),
     } : null);
   }
@@ -390,9 +412,16 @@ export interface FileNames { version: string; names: Map<number, string> }
 const parsedGameNames = new WeakMap<object, { file: string; names: { version: string } | null }>();
 
 async function loadNamesFile<T extends { version: string }>(file: string, version: string, base: string | null, store: PrivateStore | null, parse: (raw: unknown) => T | null): Promise<T | null> {
+  const names = await readNamesFile(file, version, base, store, parse);
+  return names === PRIVATE_UNREACHABLE ? null : names;
+}
+
+/** `loadNamesFile`, with PRIVATE_UNREACHABLE when the bucket could not be read. */
+async function readNamesFile<T extends { version: string }>(file: string, version: string, base: string | null, store: PrivateStore | null, parse: (raw: unknown) => T | null): Promise<T | null | typeof PRIVATE_UNREACHABLE> {
   const folder = base ? buildFolder(base) : null;
   if (!folder || !store) return null;
   const raw = await store.read(`${folder}/${file}`);
+  if (raw === PRIVATE_UNREACHABLE) return raw;
   if (!raw || typeof raw !== "object") return null;
   if (parsedGameNames.get(raw)?.file !== file) parsedGameNames.set(raw, { file, names: parse(raw) });
   const names = parsedGameNames.get(raw)!.names as T | null;
@@ -404,8 +433,14 @@ async function loadNamesFile<T extends { version: string }>(file: string, versio
  * the Warcraft Wiki"): `<build folder>/quest-names.json` in the private bucket, read like loadItemNames. Null when
  * it is missing, unreadable or for another build; the pages then show "Quest N". Never throws.
  */
-export function loadQuestNames(version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()): Promise<QuestNames | null> {
-  return loadNamesFile("quest-names.json", version, base, store, (raw) => {
+export async function loadQuestNames(version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()): Promise<QuestNames | null> {
+  const names = await readQuestNames(version, base, store);
+  return names === PRIVATE_UNREACHABLE ? null : names;
+}
+
+/** `loadQuestNames`, with PRIVATE_UNREACHABLE when the bucket could not be read, like loadItemNames. */
+export function readQuestNames(version: string, base: string | null = assetsBaseUrl(), store: PrivateStore | null = privateStoreFromEnv()): Promise<QuestNames | null | typeof PRIVATE_UNREACHABLE> {
+  return readNamesFile("quest-names.json", version, base, store, (raw) => {
     const f = QuestNamesSchema.safeParse(raw);
     return f.success ? {
       version: f.data.build.version,

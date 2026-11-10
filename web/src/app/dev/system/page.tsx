@@ -1,3 +1,4 @@
+import GameIcon from "@/components/game/GameIcon";
 import type { Metadata } from "next";
 import { trailFor } from "@/lib/breadcrumbs";
 import type { ReactNode } from "react";
@@ -85,6 +86,8 @@ export default function DesignSystemPage() {
             <div className="space-y-6">
               <div>
                 <Label>Item quality</Label>
+                {/* The icon quality borders, around the site's own mark: this page reads no game art. */}
+                <div className="flex gap-3 py-3">{QUALITIES.map((quality) => <GameIcon key={quality} src="/icon.svg" size={40} quality={quality} />)}</div>
                 <ul className="divide-y divide-line">{QUALITIES.map((q) => <Swatch key={q} name={`q-${q}`} />)}</ul>
               </div>
               <div>

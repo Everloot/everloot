@@ -95,7 +95,7 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
   // Matched on the names the database pages show, so a name a list prints is found here too.
   const groups = q ? await siteSearch(q, { ...(scope ? { only: scope, limit: SCOPED_LIMIT } : {}), names: loadShownSearchNames(shown) }) : null;
   // The game icon beside each item hit, where its page shows one.
-  const icons = await shownItemIcons(groups?.find((g) => g.type === "item")?.results.flatMap((r) => (r.id === undefined ? [] : [r.id])) ?? [], shown);
+  const { icons, unknown } = await shownItemIcons(groups?.find((g) => g.type === "item")?.results.flatMap((r) => (r.id === undefined ? [] : [r.id])) ?? [], shown);
   const base = `/search?q=${encodeURIComponent(q)}`;
   const tabs = groups && groups.length > 0 && [
     { label: "All", href: base, current: !scope },
@@ -137,9 +137,9 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
         ) : (
           // Characters and guilds sit after the database groups, above the lore archive, tools and docs.
           <>
-            {groups.slice(0, split).map((group) => <ResultTable key={group.type} group={group} q={q} scoped={Boolean(scope)} icons={icons} />)}
+            {groups.slice(0, split).map((group) => <ResultTable key={group.type} group={group} q={q} scoped={Boolean(scope)} icons={icons} unknown={unknown} />)}
             {people && <PeopleResults q={q} />}
-            {groups.slice(split).map((group) => <ResultTable key={group.type} group={group} q={q} scoped={Boolean(scope)} icons={icons} />)}
+            {groups.slice(split).map((group) => <ResultTable key={group.type} group={group} q={q} scoped={Boolean(scope)} icons={icons} unknown={unknown} />)}
           </>
         )}
       </article>
@@ -148,7 +148,7 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
 }
 
 /** One type's results as a dense table; its heading is the first column's header. */
-function ResultTable({ group, q, scoped, icons }: { group: SearchGroup; q: string; scoped: boolean; icons: Map<number, string> }) {
+function ResultTable({ group, q, scoped, icons, unknown }: { group: SearchGroup; q: string; scoped: boolean; icons: Map<number, string>; unknown: string | null }) {
   const more = group.total > group.results.length;
   const all = isScope(group.type) ? `/search?q=${encodeURIComponent(q)}&in=${group.type}` : group.type === "lore" ? `/search?q=${encodeURIComponent(q)}&in=lore` : null;
   const list = more && scoped && group.type in DATABASE_LIST ? `/database/${DATABASE_LIST[group.type as keyof typeof DATABASE_LIST]}?q=${encodeURIComponent(q)}` : null;
@@ -156,12 +156,12 @@ function ResultTable({ group, q, scoped, icons }: { group: SearchGroup; q: strin
     // An item name takes its quality colour; any other hit is a plain link, never the accent an uncommon item resembles.
     const style = group.type === "item" && typeof r.quality === "number" && r.quality <= 5 ? `${QUALITY_TEXT[qualityOf(r.quality)]} hover:underline underline-offset-4` : "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
     const link = <Link href={r.href} className={style}>{r.label}</Link>;
-    // Item hits carry the game icon as the item lists do, and an empty box where an item has none.
-    if (group.type !== "item" || icons.size === 0) return link;
+    // Item hits carry the game icon as the item lists do, and the game's fallback where one is missing.
+    if (group.type !== "item" || !unknown) return link;
     const icon = r.id === undefined ? undefined : icons.get(r.id);
     return (
       <span className="flex min-w-0 items-center gap-2">
-        {icon ? <GameIcon src={icon} size={20} /> : <span aria-hidden="true" className="h-5 w-5 shrink-0 rounded-sm border border-line" />}
+        <GameIcon src={icon || unknown} size={20} quality={typeof r.quality === "number" && r.quality <= 5 ? qualityOf(r.quality) : undefined} />
         {link}
       </span>
     );
