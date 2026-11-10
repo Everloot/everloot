@@ -12,6 +12,8 @@ import { buildItemView, writeItemView } from "@/lib/item-view-store";
 import { anonymousAggregates, writeAggregates } from "@/lib/aggregate-store";
 import { buildAuctionHistory, writeAuctionHistory } from "@/lib/auction-history-store";
 import { buildProfessions, writeProfessions } from "@/lib/profession-store";
+import { buildDatabaseActivity } from "@/lib/database-activity";
+import { writeDatabaseActivity } from "@/lib/database-activity-store";
 import { buildMapPins, writeMapPins } from "@/lib/map-pins-store";
 
 /**
@@ -160,13 +162,21 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("map pins view failed", err);
     }
+    let databaseActivity: { written: boolean; entries?: number } | null = null;
+    try {
+      databaseActivity = await writeDatabaseActivity({ added: result.added, rebuild, dataAsOf: result.dataAsOf }, {
+        build: async (previous) => buildDatabaseActivity(await corpus(), new Date(), previous),
+      });
+    } catch (err) {
+      console.error("database activity failed", err);
+    }
     // A rollup with uploads left over is pending: the next run folds them even when no new upload arrived.
     await uploadStore.writeCronRun(
       completion.remaining > 0 || completion.rebuilding || (market.remaining ?? 0) > 0 || (census?.remaining ?? 0) > 0,
       result.dataAsOf,
       settled?.written ? week : work.settledWeek ?? null,
     );
-    return NextResponse.json({ ok: true, rebuild, ...result, market, completion, coverage, settled, census, itemView, aggregates, auctionHistory, professions, mapPins });
+    return NextResponse.json({ ok: true, rebuild, ...result, market, completion, coverage, settled, census, itemView, aggregates, auctionHistory, professions, mapPins, databaseActivity });
   } catch (err) {
     console.error("snapshot failed", err);
     return NextResponse.json({ ok: false, error: "snapshot failed" }, { status: 500 });

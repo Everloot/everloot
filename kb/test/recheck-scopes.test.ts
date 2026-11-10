@@ -7,7 +7,7 @@ import { confirmedEntrances, instanceBosses, instanceFactsFromRecords } from "..
 import { agreedObjectNames, objectSightingRowsFromRecords, objectSpawns } from "../src/object-spawns.js";
 import { laterSince, npcZones, scopeSince } from "../src/recheck-scopes.js";
 import {
-  agreedNpcNames, agreedQuestTitles, npcPage, npcRoles, npcTraits, questPage, questTraits, vendorPage, worldFactsFromRecords,
+  agreedNpcNames, agreedQuestTitles, npcPage, npcRoles, npcTraits, questPage, zonesFor, questTraits, vendorPage, worldFactsFromRecords,
 } from "../src/world-pages.js";
 
 const day = (n: number) => new Date(Date.UTC(2026, 9, 1 + n)).toISOString();
@@ -112,7 +112,9 @@ test("a fact in recheck is neither confirmed nor settled until three new install
   const scopes = [scope({ type: "quests", ids: [20] })];
   for (const [n, title, state] of [[2, null, "recheck"], [3, "A Threat Without", "confirmed"]] as const) {
     const records = [...old, ...each(n, 10, 25, quest({ title: "A Threat Without" }))];
-    expect(questPage(20, { ...worldFactsFromRecords(records), recheck: scopes }).title).toBe(title);
+    const facts = { ...worldFactsFromRecords(records), recheck: scopes };
+    expect(questPage(20, facts).title).toBe(title);
+    expect(questPage(20, facts, zonesFor(facts.npcs))).toEqual(questPage(20, facts));
     const report = buildCoverageReport({ baseline: EMPTY_BASELINE, records, dataAsOf: day(30), connected: true, recheck: scopes });
     expect(report.rows.find((r) => r.type === "quest" && r.field === "title")?.state).toBe(state);
   }

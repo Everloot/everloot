@@ -331,15 +331,15 @@ export function handleNpcPage(args: { npcId: number }, facts: WorldFacts = EMPTY
 }
 
 /** The recheck cut-off for one quest's fields, placed by its giver among `facts.npcs`. */
-function questSince(questId: number, rows: readonly QuestSighting[], facts: Pick<Partial<WorldFacts>, "npcs" | "recheck">): string | null {
+function questSince(questId: number, rows: readonly QuestSighting[], facts: Pick<Partial<WorldFacts>, "npcs" | "recheck">, zones?: ReadonlyMap<number, number | null>): string | null {
   const scopes = facts.recheck ?? NO_SCOPES;
   if (!scopes.length) return null;
-  return scopeSince(scopes, questScope(questId, rows, zonesFor(facts.npcs ?? [])));
+  return scopeSince(scopes, questScope(questId, rows, zones ?? zonesFor(facts.npcs ?? [])));
 }
 
-export function questPage(questId: number, facts: WorldFacts): QuestPage {
+export function questPage(questId: number, facts: WorldFacts, zones?: ReadonlyMap<number, number | null>): QuestPage {
   const rows = facts.quests.filter((row) => row.questId === questId && row.installId.trim());
-  const s = questSince(questId, rows, facts);
+  const s = questSince(questId, rows, facts, zones);
   const rewarded = rows.flatMap((row) => [...new Set(row.rewardItemIds)].filter((itemId) => Number.isInteger(itemId) && itemId >= 1).map((itemId) => ({ ...row, itemId })));
   const rewards = installsAfter(rewarded, (row) => row.itemId, s);
   return {
