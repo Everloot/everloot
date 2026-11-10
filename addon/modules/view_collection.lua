@@ -189,7 +189,7 @@ local function raids(s)
   local now = date("!%Y-%m-%dT%H:%M:%SZ", time())
   local keys = {}
   for _, key in ipairs(s.keys) do keys[key] = true end
-  local items = {}
+  local items, listed = {}, {}
   for _, group in ipairs({ "Dungeons", "Raids", "World bosses" }) do
     items[#items + 1] = { name = group, detail = group == "World bosses" and "Found in game files, unconfirmed" or "Agreed by players", done = false }
     local instances = {}
@@ -202,6 +202,7 @@ local function raids(s)
       for _, r in ipairs(E:Rows("lockout_owned")) do
         if keys[r.characterKey] and (r.instanceId == instance.id or r.instance == instance.name)
           and type(r.resetAt) == "string" and r.resetAt > now then
+          listed[r] = true
           local day, hour = r.resetAt:match("^(%d+%-%d+%-%d+)T(%d+:%d+)")
           items[#items + 1] = { name = "  This week's lockout", detail = held((r.bossesKilledCount or "-") .. " of " .. (r.bossesTotal or "-")
             .. " / resets " .. (day and (day .. " " .. hour .. " UTC") or r.resetAt), s, r.characterKey), done = false }
@@ -215,10 +216,27 @@ local function raids(s)
             and type(r.lastKillAt) == "string" and (not kill or r.lastKillAt > kill.lastKillAt) then kill = r end
         end
         items[#items + 1] = { name = "  " .. boss.name, done = kill ~= nil,
-          detail = kill and held("Last killed " .. kill.lastKillAt, s, kill.characterKey) or "No kill recorded" }
+          detail = kill and held("Last killed " .. kill.lastKillAt:sub(1, 10), s, kill.characterKey) or "No kill recorded" }
       end
     end
     if #instances == 0 then items[#items + 1] = { name = "No agreed instances yet", detail = "", done = false } end
+  end
+  -- A lockout the game reports for an instance players have not agreed on yet is still this character's: it is
+  -- listed on its own, as the Raids section did before, rather than dropped.
+  local other = {}
+  for _, r in ipairs(E:Rows("lockout_owned")) do
+    if keys[r.characterKey] and not listed[r] and type(r.resetAt) == "string" and r.resetAt > now then
+      local day, hour = r.resetAt:match("^(%d+%-%d+%-%d+)T(%d+:%d+)")
+      other[#other + 1] = { name = "  " .. name(r.instance) .. (type(r.difficulty) == "string" and (" / " .. r.difficulty) or ""),
+        detail = held((r.bossesKilledCount or "-") .. " of " .. (r.bossesTotal or "-") .. " / resets "
+          .. (day and (day .. " " .. hour .. " UTC") or r.resetAt), s, r.characterKey),
+        done = number(r.bossesKilledCount) and number(r.bossesTotal) and r.bossesKilledCount >= r.bossesTotal or false }
+    end
+  end
+  if #other > 0 then
+    table.sort(other, byName)
+    items[#items + 1] = { name = "Other lockouts this week", detail = "Not on the agreed list yet", done = false }
+    for _, item in ipairs(other) do items[#items + 1] = item end
   end
   return items, "Dungeons & raids / as of " .. data.asOf:sub(1, 10)
 end
@@ -358,7 +376,7 @@ local function build(f, parent)
     c.sections[s[1]]:SetPoint("TOPLEFT", (i - 1) * 86 + (i > 4 and 58 or 0), -8)
   end
   c.missingOnly = button(c.onPage, "Missing only", 100, function() c.missing = not c.missing; c.rows.offset = 0 end)
-  c.missingOnly:SetPoint("TOPRIGHT", 0, -336)
+  c.missingOnly:SetPoint("TOPRIGHT", 0, -8)
   local right = 0
   for i = #SCOPES, 1, -1 do
     local s = SCOPES[i]
