@@ -114,13 +114,22 @@ local function keysFor(scope)
   return keys
 end
 
+-- Days the per-day averages divide by. A fixed period has its own length; "All" counts the UTC days from the first
+-- event in scope through today, at least 1 and at most the ledger's 90, so a young ledger is not averaged over days
+-- it never had.
+local function averageDays(period, firstAt, now)
+  if period ~= "all" then return PERIOD_DAYS[period] or 30 end
+  if not firstAt then return 1 end
+  return math.min(PERIOD_DAYS.all, math.max(1, math.floor(now / 86400) - math.floor(firstAt / 86400) + 1))
+end
+
 local function drawSummary(g, keys)
   local now = time()
   if g.summaryPeriod == g.period and g.summaryScope == g.scope and g.revision == E.Ledger.revision
     and g.utcDay == math.floor(now / 86400) and not (g.pendingExpiry and now > g.pendingExpiry) then return end
   local from, to = E.Ledger.Period(g.period)
   local sum = E.Ledger.Summary(keys, from, to)
-  local days = PERIOD_DAYS[g.period] or 30
+  local days = averageDays(g.period, sum.firstAt, now)
   g.summaryCaption:SetText((PERIOD_CAPTION[g.period] or "Last 30 days") .. " · " .. (g.scope == "account" and "Account" or "This character"))
   for _, entry in ipairs({ { "earned", sum.totalIn }, { "spent", sum.totalOut }, { "profit", sum.totalIn - sum.totalOut } }) do
     g[entry[1]]:SetText(U.MoneyShort(entry[2]))
@@ -131,7 +140,7 @@ local function drawSummary(g, keys)
   for _, sale in ipairs(E.Ledger.Sales(keys, from, to)) do
     if sale.status == "pending" then
       pending = pending + 1
-      local expires = sale.at + 48 * 3600
+      local expires = sale.at + E.Ledger.PENDING_SECONDS
       if not g.pendingExpiry or expires < g.pendingExpiry then g.pendingExpiry = expires end
     end
   end
@@ -193,7 +202,6 @@ local function drawOverview(g, keys)
     end
   end
   g.chartHigh:SetText("Highest  " .. U.Money(high))
-  g.chartCaption:SetText((PERIOD_CAPTION[g.period] or "Last 30 days") .. " · " .. (g.scope == "account" and "Account" or "This character"))
 end
 
 local function drawLedger(g, keys)
@@ -382,8 +390,6 @@ local function build(f, parent)
     back:SetColorTexture(0.133, 0.137, 0.114, 1)
     g.bars[i] = bar
   end
-  g.chartCaption = text(chart, 12)
-  g.chartCaption:SetPoint("BOTTOMLEFT", 10, 14)
 
   -- Ledger: by day on the left; by category and the receipts of the day picked stacked on the right, five rows
   -- each, so every money column has room for its coins.

@@ -27,6 +27,7 @@ local MAX_EVENTS = 5000
 local MAX_AGE = 90 * DAY
 local MAX_SALES = 2000
 local PENDING_SECONDS = 48 * 3600
+L.PENDING_SECONDS = PENDING_SECONDS
 local MAX_CLOSES = 400
 local MAX_ITEM_NAME = 80
 local SERIES_DAYS = 30
@@ -269,9 +270,11 @@ function L.Summary(keys, fromTs, toTs)
   local items = { ["in"] = {}, out = {} }
   local netted = #keys > 1
   local events = store().events
+  local firstAt
 
   local function count(i, e)
     if not (wanted[e.key] and type(e.at) == "number" and e.at >= fromTs and e.at <= toTs) then return end
+    if not firstAt or e.at < firstAt then firstAt = e.at end
     local dir = L.Direction(e.category)
     local ymd = day(e.at)
     rows[#rows + 1] = { i = i, e = e, ymd = ymd, direction = dir }
@@ -348,7 +351,7 @@ function L.Summary(keys, fromTs, toTs)
     end
     return best
   end
-  return { categories = categories, days = days, receipts = receipts, totalIn = totalIn, totalOut = totalOut,
+  return { categories = categories, days = days, receipts = receipts, totalIn = totalIn, totalOut = totalOut, firstAt = firstAt,
     unrecorded = unrecorded, moved = moved, topEarned = top(items["in"]), topSpent = top(items.out) }
 end
 

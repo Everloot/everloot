@@ -102,9 +102,9 @@ assert(g.accountTotal == 1312745 + 250000, 'the account total is every character
 assert(#g.bars == 90 and shown(g.bars) == 30, 'thirty bars for 30 days, the rest built and hidden')
 assert(g.bars[30].value == 1312745 and g.bars[30].hi == 1312745 and g.bars[29].value == 1200000, 'today is the last bar')
 assert(g.bars[1].value == 0 and g.bars[1].lo == 0, 'a day before any close draws nothing')
-assert(g.chartCaption.text == 'Last 30 days · This character', g.chartCaption.text)
+assert(g.summaryCaption.text == 'Last 30 days · This character', g.summaryCaption.text)
 click(g.scopes.account)
-assert(g.scope == 'account' and g.bars[30].value == 1312745 + 250000 and g.chartCaption.text == 'Last 30 days · Account')
+assert(g.scope == 'account' and g.bars[30].value == 1312745 + 250000 and g.summaryCaption.text == 'Last 30 days · Account')
 click(g.scopes.character)
 -- The period row is on the Overview and the chart follows it: 7 days draws seven bars, All draws the ledger's 90.
 for _, p in ipairs({{ 'today', '7d', '30d', 'all' }}) do assert(g.periods[p].shown, p .. ' shows on the overview') end
@@ -112,13 +112,13 @@ click(g.periods['7d'])
 assert(g.period == '7d' and shown(g.bars) == 7 and g.bars[7].shown and not g.bars[8].shown, 'seven bars')
 assert(g.bars[7].value == 1312745 and g.bars[6].value == 1200000 and g.bars[5].value == 1000000 and g.bars[4].value == 0, 'today is the seventh')
 assert(g.bars[1].point[2] == 10 and g.bars[7].width > g.bars[7].height / 10, 'the seven share the chart width')
-assert(g.chartCaption.text == 'Last 7 days · This character', g.chartCaption.text)
+assert(g.summaryCaption.text == 'Last 7 days · This character', g.summaryCaption.text)
 click(g.periods.all)
 assert(g.period == 'all' and shown(g.bars) == 90 and g.bars[90].value == 1312745 and g.bars[1].value == 0, 'ninety bars, today last')
 assert(g.bars[90].point[2] + g.bars[90].width <= 298 and g.bars[90].width >= 1, 'the ninetieth stays inside the chart')
-assert(g.chartCaption.text == 'Last 90 days · This character', g.chartCaption.text)
+assert(g.summaryCaption.text == 'Last 90 days · This character', g.summaryCaption.text)
 click(g.periods.today)
-assert(shown(g.bars) == 1 and g.bars[1].value == 1312745 and g.chartCaption.text == 'Today · This character', g.chartCaption.text)
+assert(shown(g.bars) == 1 and g.bars[1].value == 1312745 and g.summaryCaption.text == 'Today · This character', g.summaryCaption.text)
 click(g.periods['30d'])
 assert(shown(g.bars) == 30 and g.bars[30].value == 1312745)
 
@@ -316,6 +316,26 @@ update(nil, 1.1)
 assert(g.pending.text == '')
 click(g.periods.today)
 assert(g.profit.text == U.MoneyShort(0) and g.topEarned.text == 'Top earning: -')
+-- "All" averages over the UTC days from the first event in scope through today, not a fixed 90.
+today = now - now % 86400
+for _, case in ipairs({ { 'a ledger of five days', {0, 4}, 5 }, { 'a ledger of one day', {0}, 1 },
+                        { 'a ledger over 60 days old', {0, 60, 120}, 61 }, { 'a ledger at the 90-day edge', {0, 89}, 90 } }) do
+  EverlootDB.ledger.events = {}
+  EverlootDB.ledger.sales = {}
+  for _, age in ipairs(case[2]) do
+    table.insert(EverlootDB.ledger.events, {at=today-age*86400+3600, key=me, category='vendor', copper=900, itemName='Apple'})
+  end
+  L.Record(me, 'quest', 0 + 100)
+  click(g.scopes.character)
+  click(g.periods.all)
+  click(g.periods.today)
+  click(g.periods.all)
+  local counted = 0
+  for _, age in ipairs(case[2]) do if age <= 89 then counted = counted + 900 end end
+  counted = counted + 100
+  assert(g.earned.text == U.MoneyShort(counted), case[1] .. ' ' .. g.earned.text)
+  assert(g.earnedAverage.text == U.MoneyShort(counted / case[3]) .. '/day', case[1] .. ' ' .. g.earnedAverage.text)
+end
 assert(not U.failed, U.failed)
 """)
 
