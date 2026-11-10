@@ -139,6 +139,8 @@ export function edgeCacheKey(req: Request, version: string): Request {
     : [...url.searchParams].filter(([k]) => !isTracking(k));
   // Array.prototype.sort is stable: equal names stay in request order.
   kept.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  // The suggest box answers `Thunder` and `thunder ` alike (app/api/suggest/route.ts), so they share a key.
+  if (url.pathname === "/api/suggest") for (const pair of kept) if (pair[0] === "q") pair[1] = pair[1].trim().toLowerCase();
   url.search = new URLSearchParams(kept).toString();
   url.searchParams.set("__edge_version", version || "unknown");
   return new Request(url.toString(), { method: "GET" });
