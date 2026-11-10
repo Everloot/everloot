@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { lootWindowsFromRecords, rollupDrops } from "../src/drop-rollup.js";
-import { itemDropSources, lootTablesFromRecords, missingLine, npcLootTable, shortLine } from "../src/loot-tables.js";
+import { itemDropSources, lootTablesFromRecords, missingLine, npcLootTable, objectLootRows, shortLine } from "../src/loot-tables.js";
 import { pendingForNpc, pendingLootFromRecords } from "../src/pending-loot.js";
 
 const asOf = "2026-10-21T00:00:00.000Z";
@@ -129,4 +129,19 @@ test("implausible item entries are skipped and the window still counts", () => {
   const table = npcLootTable(lootTablesFromRecords(records, asOf), 8);
   expect(table.rows.map((r) => r.itemId)).toEqual([20]);
   expect(table.span.windows).toBe(3);
+});
+
+test("an object's rows come only once 3 installs looted it, with the same numbers an item page gives", () => {
+  const records = [
+    loot("install-a", { obj: 9 }, [[12, 1], [13, 1]]),
+    loot("install-b", { obj: 9 }, [[12, 1]]),
+    loot("install-a", { obj: 5 }, [[14, 1]]),
+  ];
+  expect(objectLootRows(lootTablesFromRecords(records, asOf), 9)).toEqual([]);
+  const rated = lootTablesFromRecords([...records, loot("install-c", { obj: 9 }, [])], asOf);
+  const rows = objectLootRows(rated, 9);
+  expect(rows.map((r) => [r.sourceObjectId, r.itemId, r.withItem, r.windows, r.installs])).toEqual([[9, 12, 2, 3, 3], [9, 13, 1, 3, 3]]);
+  expect(rows[0]).toEqual(itemDropSources(rated, 12).rows[0]);
+  expect(objectLootRows(rated, 5)).toEqual([]);
+  expect(objectLootRows(rated, 404)).toEqual([]);
 });

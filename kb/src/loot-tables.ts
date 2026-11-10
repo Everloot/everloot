@@ -123,6 +123,15 @@ export function npcLootTable(tables: LootTables, npcId: number): NpcLootTable {
   return { npcId, state: "rated", span, rows, missingInstalls };
 }
 
+/** Every item from one object (a chest, herb or vein), once 3 installs looted it; none before that. */
+export function objectLootRows(tables: LootTables, objectId: number): LootTableRow[] {
+  const key = `obj:${objectId}`;
+  const source = tables.sources.get(key);
+  if (!source || source.installs.size < INDEPENDENT_INSTALLS) return [];
+  return [...source.items].map(([itemId, item]) => rowOf(key, source, itemId, item.windows))
+    .sort((a, b) => b.rate - a.rate || a.itemId - b.itemId);
+}
+
 /** Every source 3 installs looted whose windows held the item, and one count for the sources short of that. */
 export function itemDropSources(tables: LootTables, itemId: number): ItemDropSources {
   const rows: LootTableRow[] = [];

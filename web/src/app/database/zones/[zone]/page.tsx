@@ -5,15 +5,23 @@ import { entityPageJsonLd } from "@/lib/jsonld";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
+import EntityLink from "@/components/EntityLink";
 import ZonePreview from "@/components/ZonePreview";
 import {
   AgreementMeter, Badge, Card, Container, DataTable, DataTitle, EmptyState, SectionHeading, Tabs,
   type Column, type TabItem,
 } from "@/components/ui";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
-import { loadQuestNames, loadSiteAssets } from "@/lib/game-assets";
+import { loadItemTips, loadQuestNames, loadSiteAssets } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
-import { loadWorldFacts } from "@/lib/rollup-compute";
+import { computeRollups, loadItemFacts, loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
+import { zoneCoverageHref } from "@/lib/coverage-view";
+import { gatheredObjects, zoneFarmLinks } from "@/lib/farming";
+import { itemNames } from "@/lib/names";
+import { loadProfessions } from "@/lib/profession-store";
+import { METHOD_LINE } from "../../../../../../kb/src/loot-tables";
+import { zoneItems, type ZoneItem } from "@/lib/zone-items";
+import { wikiHref, zoneWikiPage } from "@/lib/wiki";
 import { bossLine, entranceLinks, instanceHref, loadSightings } from "@/lib/instances";
 import { confirmedLine, dayLabel } from "@/lib/report-labels";
 import { pageMetadata } from "@/lib/seo";
@@ -25,7 +33,7 @@ import {
   type ZoneEntrance, type ZoneNpc, type ZoneQuest, type ZoneTreasure,
 } from "@/lib/zones";
 import { zoneLore } from "@/lib/zone-lore";
-import { EmptyTab } from "../../entity";
+import { EmptyTab, FREQUENCY, percent } from "../../entity";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +75,7 @@ export default async function ZonePage(props: Props) {
   const canonical = zoneHref(zone.mapId, zone.name);
   if (`/database/zones/${segment}` !== canonical) permanentRedirect(canonical);
 
-  const [facts, seen] = await Promise.all([loadWorldFacts(), loadSightings()]);
+  const [facts, seen, loot, { rates }] = await Promise.all([loadWorldFacts(), loadSightings(), loadLootTables(), computeRollups()]);
   // Entrances come from the game files, so they show even when storage is down; player reports do not.
   const here = zoneContents(facts.unreachable ? { npcs: [], quests: [], vendors: [] } : facts, undefined, facts.unreachable ? {} : seen).get(zone.mapId);
   const lore = await zoneLore(zone.name);
@@ -81,6 +89,18 @@ export default async function ZonePage(props: Props) {
   const wikiTitles = quests.some((q) => !q.title) ? await loadQuestNames(CLIENT_LAYER.build.version) : null;
   const entrances = here?.entrances ?? [];
   const treasures = here?.treasures ?? [];
+  // Items need the loot tables as well as the pins; a failed read of either is unavailable, never an empty list.
+  const itemsDown = facts.unreachable || loot.unreachable;
+  // Gathering reads the stored professions view the profession pages read, not the corpus.
+  const gathering = facts.unreachable ? null : await loadProfessions();
+  const gatherRows = gathering && !gathering.unreachable ? gathering.sightings : [];
+  const gathered = gatherRows.length ? gatheredObjects(zone.mapId, gatherRows).map((id) => ({ id, name: seen.objectNames?.get(id) ?? null })) : [];
+  const items = itemsDown ? [] : zoneItems(here, loot.tables, gathered);
+  const itemFacts = items.length ? await loadItemFacts() : null;
+  const itemName = itemFacts && !itemFacts.unreachable ? itemNames(itemFacts) : new Map<number, string>();
+  const tips = await loadItemTips(assets, items.map((i) => i.itemId));
+  const farmLinks = !gathering ? [] : zoneFarmLinks(zone, (here?.npcs ?? []).map((n) => n.npcId), rates, gatherRows);
+  const wiki = zoneWikiPage(zone.mapId);
   const nameOf = (n: ZoneNpc) => n.name ?? `NPC ${n.npcId}`;
   // An empty list is one muted line. The addon call is made once, in the notice above the tabs.
   const empty = (message: string) => <div className="px-4 sm:px-6"><EmptyTab message={message} players={false} action={null} /></div>;
@@ -104,6 +124,14 @@ export default async function ZonePage(props: Props) {
     { key: "level", header: "Level", numeric: true, cell: (q) => q.level ?? "–" },
     { key: "giver", header: "Giver", cell: (q) => npcLink(q.giverNpcId) },
     { key: "turnin", header: "Turn-in", cell: (q) => npcLink(q.turnInNpcId) },
+  ];
+  const itemColumns: Column<ZoneItem>[] = [
+    { key: "item", header: "Item", cell: (i) => <EntityLink kind="item" id={i.itemId} name={itemName.get(i.itemId) ?? tips.get(i.itemId)?.name} icon={tips.get(i.itemId)?.icon} /> },
+    { key: "from", header: "From", cell: (i) => <EntityLink kind={i.from.kind} id={i.from.id} name={i.from.name} /> },
+    { key: "with", header: "Windows with it", numeric: true, cell: (i) => i.withItem },
+    { key: "windows", header: "Out of", numeric: true, cell: (i) => i.windows },
+    { key: "rate", header: FREQUENCY, numeric: true, cell: (i) => percent(i.rate) },
+    { key: "installs", header: "Installs", numeric: true, cell: (i) => <AgreementMeter count={i.installs} /> },
   ];
   const entranceColumns: Column<ZoneEntrance>[] = [
     // Each instance entered here links to its own page.
@@ -131,11 +159,15 @@ export default async function ZonePage(props: Props) {
     { id: "npcs", label: "NPCs", count: npcs.length, panel: <DataTable dense caption={`NPCs players placed in ${zone.name}`} columns={npcColumns("npcs")} rows={npcs} rowKey={(n) => String(n.npcId)} empty={empty("No NPC has a confirmed position here yet. A pin needs 3 installs on the same map.")} /> },
     { id: "vendors", label: "Vendors", count: vendors.length, panel: <DataTable dense caption={`Vendors players placed in ${zone.name}`} columns={npcColumns("vendors")} rows={vendors} rowKey={(n) => String(n.npcId)} empty={empty("No vendor here has prices 3 installs agree on yet.")} /> },
     { id: "quests", label: "Quests", count: quests.length, panel: <DataTable dense caption={`Quests given or turned in at confirmed NPCs in ${zone.name}`} columns={questColumns} rows={quests} rowKey={(q) => String(q.questId)} empty={empty("No quest has a confirmed giver or turn-in here yet.")} /> },
+    { id: "items", label: "Items", count: items.length, panel: <>
+      <DataTable dense caption={`Items players looted from confirmed NPCs and objects in ${zone.name}`} columns={itemColumns} rows={items} rowKey={(i) => `${i.from.kind}-${i.from.id}-${i.itemId}`} empty={empty("No item has an agreed drop from a confirmed NPC or object here yet. A rate needs loot windows from 3 installs.")} />
+      {items.length > 0 && <p className="px-4 py-2 text-meta text-fg-2 sm:px-6">{METHOD_LINE}{loot.dataAsOf ? ` Data as of ${loot.dataAsOf.slice(0, 10)}.` : ""}</p>}
+    </> },
     { id: "dungeons", label: "Dungeons and raids", count: entrances.length, panel: <DataTable dense caption={`Dungeon and raid entrances in ${zone.name}`} columns={entranceColumns} rows={entrances} rowKey={(e) => `${e.names.join("|")}-${e.x}-${e.y}`} empty={empty("No dungeon or raid is entered from this zone.")} /> },
     { id: "objects", label: "Objects", count: treasures.length, panel: <DataTable dense caption={`Treasures players saw on the minimap in ${zone.name}`} columns={treasureColumns} rows={treasures} rowKey={(t) => `${t.objectId}-${t.x}-${t.y}`} empty={empty("No treasure has a confirmed position here yet. A pin needs 3 installs at the same spot.")} /> },
   ];
   // Storage down: an empty list would read as "nobody has seen anything", so only the game-file list stays.
-  const tabs = facts.unreachable ? all.filter((t) => t.id === "dungeons") : all;
+  const tabs = facts.unreachable ? all.filter((t) => t.id === "dungeons") : itemsDown ? all.filter((t) => t.id !== "items") : all;
 
   return (
     <Container width="data">
@@ -145,7 +177,14 @@ export default async function ZonePage(props: Props) {
         {/* The database title row: name, continent, and the map link as a quiet control (the header keeps the one filled button). */}
         <DataTitle
           title={zone.name}
-          meta={<span className="inline-flex items-center gap-2">{zone.continentName}<Badge tone="files">Zone outline · from game files</Badge></span>}
+          meta={(
+            <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+              {zone.continentName}
+              <Badge tone="files">Zone outline · from game files</Badge>
+              <Link href={zoneCoverageHref(zone)} className={link}>Coverage</Link>
+              {wiki && <Link href={wikiHref(wiki.slug)} className={link}>Wiki</Link>}
+            </span>
+          )}
           trail={[
             ...trailFor("/database/zones")!,
             { name: zone.name, path: canonical },
@@ -190,6 +229,12 @@ export default async function ZonePage(props: Props) {
               </div>
             )}
             <Tabs label={`Known in ${zone.name}`} tabs={tabs} />
+            {farmLinks.length > 0 && (
+              <p data-farm-links className="mt-3 text-meta text-fg-2">
+                Farming and gathering:{" "}
+                {farmLinks.map((l, i) => <span key={l.href}>{i > 0 && " · "}<Link href={l.href} className={link}>{l.label}</Link></span>)}
+              </p>
+            )}
           </section>
         </div>
         {!facts.unreachable && hasContent(here) && <AdSlot slot="inContent" />}

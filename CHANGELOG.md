@@ -177,6 +177,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   agree. Fishing (the bobber, or an object installs agree is fished) is never a pin. An upload of an event
   that only adds fields to an earlier copy, as when an older Desktop App had dropped them, replaces that copy
   instead of withdrawing the event as a conflict. The map shows none of this yet.
+- Site: Zone pages have an Items tab with the items players looted from the NPCs and objects confirmed there, each with its source, observed frequency and installs, and an empty zone says a rate needs loot windows from 3 installs. The header links the zone's coverage page and its wiki page when one is published, and a line under the tabs links the farming and gathering pages that list the zone.
 
 ### Fixed
 - Site: the header shows the build whose files the site reads and the newest build seen, each linked to what it means.
