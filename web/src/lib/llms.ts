@@ -11,6 +11,9 @@ import { CREDIT_LINE } from "@everloot/protocol";
 import { SITE_URL } from "@/lib/seo";
 import { TALENT_CLASSES } from "@/lib/talents/catalogs";
 import { RANKINGS, rankingPath } from "@/lib/rankings";
+import { DATABASE_HUBS, type DatabaseHub } from "@/lib/database-hubs";
+import { guildsOn } from "@/lib/guild-switch";
+import { playerPagesOn } from "@/lib/player-pages";
 
 /**
  * /llms.txt and /llms-full.txt are generated here from the same lists the site reads (the tool catalog, the MCP
@@ -58,6 +61,26 @@ const LIMITATIONS = [
 
 const bullet = (title: string, path: string, text: string) => `- [${title}](${url(path)}): ${text}`;
 
+const HUB_SOURCE: Record<DatabaseHub["source"], string> = {
+  players: "From what players' Everloot addons report; a fact is public once 3 installs agree.",
+  files: "Read from the game files of the current build: found in game files, unconfirmed.",
+};
+
+/**
+ * Every list /database links, from the same list the hub and the sitemap read, so a new kind is named here once it
+ * is added there; a hub left out of the sitemap is left out here too. The landing page itself is a catalog tool above.
+ * Then the guild and player lookups, while their switches have them on.
+ */
+function database(): string[] {
+  return [
+    "## Database",
+    ...DATABASE_HUBS.filter((h) => !h.unlisted).map((h) => bullet(h.label, h.href, HUB_SOURCE[h.source])),
+    ...(guildsOn() ? [bullet("Guilds", "/guilds", "WoW: Forever guilds by progression: a ladder per raid from the kills two members' uploads agree on.")] : []),
+    ...(playerPagesOn() ? [bullet("Find a player", "/players", "A character by the start of its name: the race, class, level and guild the Everloot addon last saw.")] : []),
+    "",
+  ];
+}
+
 /** The paging and key sentence for the corpus API; it names limits only once the data guard is on. */
 function corpusAccess(): string {
   return guardOn()
@@ -98,6 +121,7 @@ function linking(): string[] {
     `- Quest: ${url("/database/quests/{questId}")}`,
     `- Object (chest, herb, ore vein, fishing pool): ${url("/database/objects/{objectId}")}`,
     `- Vendor: ${url("/database/vendors/{npcId}")}`,
+    `- Spell: ${url("/database/spells/{spellId}")}`,
     `- Zone: ${url("/database/zones/{mapId}-{zone-name}")}, for example ${url("/database/zones/1436-westfall")}`,
     `- Item category: ${url("/database/items/{class}/{subclass}")}, for example ${url("/database/items/trade-goods/cloth")}`,
     `- Talent calculator: ${url("/tools/talents/{class}")}, for example ${url("/tools/talents/mage")}`,
@@ -121,6 +145,7 @@ function sharedMap(): string[] {
     ...PAGES.map((p) => bullet(p.title, p.path, p.text)),
     `- Talent calculator per class: ${TALENT_CLASSES.map((c) => `[${cap(c)}](${url(`/tools/talents/${c}`)})`).join(", ")}.`,
     "",
+    ...database(),
     ...linking(),
     ...connect(),
     ...docs(),

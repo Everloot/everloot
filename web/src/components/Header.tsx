@@ -105,7 +105,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
       if (searchOpen) { setSearchOpen(false); searchButton.current?.focus(); }
     }}>
       {/* The data column's width and gutters (globals.css), so the logo lines up with the data tables. */}
-      <div className="mx-auto flex h-header max-w-data items-center gap-3 px-4 lg:gap-4 lg:px-6">
+      <div className="mx-auto flex h-header max-w-data items-center gap-1 px-2 sm:gap-3 sm:px-4 lg:gap-4 lg:px-6">
         <Link href="/" className="inline-flex min-h-11 shrink-0 items-center gap-2 text-lg font-bold tracking-tight text-fg" onClick={closeAll}>
           {/* The favicon's diamond, outlined in the accent green. */}
           <svg aria-hidden="true" viewBox="8 8 48 48" width="16" height="16" className="text-accent">
@@ -167,7 +167,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
           </form>
         </div>
 
-        <div className="ml-auto flex shrink-0 items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-0 sm:gap-2">
           <button
             ref={searchButton}
             type="button"
@@ -177,7 +177,8 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
             onClick={() => setSearchOpen(!searchOpen)}
             className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center text-fg-2 hover:text-accent xl:hidden"
           ><SearchIcon /></button>
-          <GameVersionLabel className="hidden shrink-0 sm:block" />
+          {/* Below 1280 px the right group has no room for both builds; the menu panel shows them. */}
+          <GameVersionLabel className="hidden shrink-0 xl:block" />
           <AccountControls savedBuilds={savedBuilds} profiles={profiles} accountSwitching={accountSwitching} />
           <button ref={toggle} type="button" aria-label={open ? "Close menu" : "Menu"} aria-expanded={open} aria-controls="site-navigation" onClick={() => setOpen(!open)} className="btn min-h-8 shrink-0 px-3 text-sm lg:hidden">
             {open ? "Close" : "Menu"}
@@ -227,6 +228,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
                 </div>
               ))}
             </div>
+            <GameVersionLabel className="px-3" />
             <AccountControls place="menu" />
           </div>
         </nav>

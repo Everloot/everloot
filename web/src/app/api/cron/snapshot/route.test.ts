@@ -1,6 +1,6 @@
 import { beforeEach, expect, test, vi } from "vitest";
-const store = vi.hoisted(() => ({ snapshotWork: vi.fn(), writeCronRun: vi.fn(), writeSnapshot: vi.fn(), writeMarket: vi.fn(), writeCompletion: vi.fn(), writeCensus: vi.fn(), prune: vi.fn() }));
-vi.mock("@/lib/upload-store", () => ({ uploadStore: { snapshotWork: store.snapshotWork, writeCronRun: store.writeCronRun, writeSnapshot: store.writeSnapshot, writeMarket: store.writeMarket, writeCompletion: store.writeCompletion, writeCensus: store.writeCensus },
+const store = vi.hoisted(() => ({ loadCorpus: vi.fn(), snapshotWork: vi.fn(), writeCronRun: vi.fn(), writeSnapshot: vi.fn(), writeMarket: vi.fn(), writeCompletion: vi.fn(), writeCensus: vi.fn(), prune: vi.fn() }));
+vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: store.loadCorpus, snapshotWork: store.snapshotWork, writeCronRun: store.writeCronRun, writeSnapshot: store.writeSnapshot, writeMarket: store.writeMarket, writeCompletion: store.writeCompletion, writeCensus: store.writeCensus },
   sharingStore: { loadState: async () => ({ grants: [], suppressions: [] }) },
 }));
 vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { prune: store.prune } }));
@@ -14,18 +14,19 @@ const coverage = vi.hoisted(() => ({ writeCoverage: vi.fn() }));
 vi.mock("@/lib/coverage-store", () => ({ writeCoverage: coverage.writeCoverage }));
 const settled = vi.hoisted(() => ({ writeSettled: vi.fn(), week: vi.fn(() => "2026-W43") }));
 vi.mock("@/lib/settled-store", () => ({ writeSettled: settled.writeSettled, currentSettledWeek: settled.week }));
-const view = vi.hoisted(() => ({ writeItemView: vi.fn() }));
-vi.mock("@/lib/item-view-store", () => ({ writeItemView: view.writeItemView }));
-const aggregates = vi.hoisted(() => ({ writeAggregates: vi.fn() }));
-vi.mock("@/lib/aggregate-store", () => ({ writeAggregates: aggregates.writeAggregates }));
-const auctions = vi.hoisted(() => ({ writeAuctionHistory: vi.fn() }));
-vi.mock("@/lib/auction-history-store", () => ({ writeAuctionHistory: auctions.writeAuctionHistory }));
-const professions = vi.hoisted(() => ({ writeProfessions: vi.fn() }));
+const view = vi.hoisted(() => ({ writeItemView: vi.fn(), buildItemView: vi.fn() }));
+vi.mock("@/lib/item-view-store", () => view);
+const aggregates = vi.hoisted(() => ({ writeAggregates: vi.fn(), anonymousAggregates: vi.fn() }));
+vi.mock("@/lib/aggregate-store", () => aggregates);
+const auctions = vi.hoisted(() => ({ writeAuctionHistory: vi.fn(), buildAuctionHistory: vi.fn() }));
+vi.mock("@/lib/auction-history-store", () => auctions);
+const professions = vi.hoisted(() => ({ writeProfessions: vi.fn(), buildProfessions: vi.fn() }));
 vi.mock("@/lib/profession-store", () => professions);
-const mapPins = vi.hoisted(() => ({ writeMapPins: vi.fn() }));
+const mapPins = vi.hoisted(() => ({ writeMapPins: vi.fn(), buildMapPins: vi.fn() }));
 vi.mock("@/lib/map-pins-store", () => mapPins);
 import { GET } from "./route";
 beforeEach(() => {
+  store.loadCorpus.mockReset();
   professions.writeProfessions.mockReset().mockResolvedValue({ written: false });
   mapPins.writeMapPins.mockReset().mockResolvedValue({ written: false });
   vi.stubEnv("CRON_SECRET", "synthetic-cron-key");
@@ -257,7 +258,7 @@ test("the item view is written after the snapshot with what that run added; a ce
   store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-10-02T00:00:00.000Z" });
   view.writeItemView.mockResolvedValue({ written: true, items: 12 });
   expect(await (await GET(req())).json()).toMatchObject({ ok: true, itemView: { written: true, items: 12 } });
-  expect(view.writeItemView).toHaveBeenCalledWith({ added: 2, rebuild: false, dataAsOf: "2026-10-02T00:00:00.000Z" });
+  expect(view.writeItemView).toHaveBeenCalledWith({ added: 2, rebuild: false, dataAsOf: "2026-10-02T00:00:00.000Z" }, expect.anything());
   vi.spyOn(console, "error").mockImplementation(() => {});
   store.writeCensus.mockRejectedValue(new Error("r2 down"));
   view.writeItemView.mockRejectedValue(new Error("r2 down"));
@@ -273,9 +274,9 @@ test("the stored aggregates are written after the item view with what that run a
   aggregates.writeAggregates.mockImplementation(async () => { order.push("aggregates"); return { written: true, bytes: 4096 }; });
   expect(await (await GET(req())).json()).toMatchObject({ ok: true, itemView: { written: true }, aggregates: { written: true, bytes: 4096 } });
   expect(order).toEqual(["itemView", "aggregates"]);
-  expect(aggregates.writeAggregates).toHaveBeenCalledWith({ added: 2, rebuild: false, dataAsOf: "2026-10-02T00:00:00.000Z" });
+  expect(aggregates.writeAggregates).toHaveBeenCalledWith({ added: 2, rebuild: false, dataAsOf: "2026-10-02T00:00:00.000Z" }, expect.anything());
   await GET(req("Bearer synthetic-cron-key", "?rebuild=1"));
-  expect(aggregates.writeAggregates).toHaveBeenLastCalledWith(expect.objectContaining({ rebuild: true }));
+  expect(aggregates.writeAggregates).toHaveBeenLastCalledWith(expect.objectContaining({ rebuild: true }), expect.anything());
   vi.spyOn(console, "error").mockImplementation(() => {});
   aggregates.writeAggregates.mockRejectedValue(new Error("r2 down"));
   const res = await GET(req());
@@ -287,20 +288,20 @@ test("the stored aggregates are written after the item view with what that run a
 test("an idle run still asks for the stored aggregates, so a missing file is written", async () => {
   store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: "2026-W43" });
   await GET(req());
-  expect(aggregates.writeAggregates).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-10-01" });
+  expect(aggregates.writeAggregates).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-10-01" }, expect.anything());
 });
 
 test("the stored auction history is written after the snapshot with what that run added; a failure is logged and the run succeeds", async () => {
   store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-10-02T00:00:00.000Z" });
   auctions.writeAuctionHistory.mockResolvedValue({ written: true, items: 7 });
   expect(await (await GET(req())).json()).toMatchObject({ ok: true, auctionHistory: { written: true, items: 7 } });
-  expect(auctions.writeAuctionHistory).toHaveBeenCalledWith({ added: 2, rebuild: false, dataAsOf: "2026-10-02T00:00:00.000Z" });
+  expect(auctions.writeAuctionHistory).toHaveBeenCalledWith({ added: 2, rebuild: false, dataAsOf: "2026-10-02T00:00:00.000Z" }, expect.anything());
   await GET(req("Bearer synthetic-cron-key", "?rebuild=1"));
-  expect(auctions.writeAuctionHistory).toHaveBeenLastCalledWith(expect.objectContaining({ rebuild: true }));
+  expect(auctions.writeAuctionHistory).toHaveBeenLastCalledWith(expect.objectContaining({ rebuild: true }), expect.anything());
   // An idle run still asks with the snapshot's time, so a missing file or one built from an older snapshot is written.
   store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: "2026-W43" });
   await GET(req());
-  expect(auctions.writeAuctionHistory).toHaveBeenLastCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-10-01" });
+  expect(auctions.writeAuctionHistory).toHaveBeenLastCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-10-01" }, expect.anything());
   vi.spyOn(console, "error").mockImplementation(() => {});
   auctions.writeAuctionHistory.mockRejectedValue(new Error("r2 down"));
   const res = await GET(req());
@@ -314,15 +315,41 @@ test("profession and map views follow aggregates, including idle runs and rebuil
     store.writeSnapshot.mockResolvedValue({ uploads: 3, added: 2, dataAsOf: "2026-11-09" });
     await GET(req("Bearer synthetic-cron-key", rebuild ? "?rebuild=1" : ""));
     for (const write of [professions.writeProfessions, mapPins.writeMapPins]) {
-      expect(write).toHaveBeenLastCalledWith({ added: 2, rebuild, dataAsOf: "2026-11-09" });
+      expect(write).toHaveBeenLastCalledWith({ added: 2, rebuild, dataAsOf: "2026-11-09" }, expect.anything());
       expect(write.mock.invocationCallOrder.at(-1)).toBeGreaterThan(aggregates.writeAggregates.mock.invocationCallOrder.at(-1)!);
     }
   }
   store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-11-09" });
   await GET(req());
-  expect(professions.writeProfessions).toHaveBeenLastCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-11-09" });
+  expect(professions.writeProfessions).toHaveBeenLastCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-11-09" }, expect.anything());
   vi.spyOn(console, "error").mockImplementation(() => {});
   professions.writeProfessions.mockRejectedValue(new Error("offline"));
   mapPins.writeMapPins.mockRejectedValue(new Error("offline"));
   expect(await (await GET(req())).json()).toMatchObject({ ok: true, professions: null, mapPins: null });
+});
+
+test("the stored views share one corpus read per run, and an idle run reads none", async () => {
+  const corpus = { uploads: 9, records: [{ kind: "item_seen" }], dataAsOf: "2026-10-02T00:00:00.000Z" };
+  store.loadCorpus.mockResolvedValue(corpus);
+  store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-10-02T00:00:00.000Z" });
+  const writers = [view.writeItemView, aggregates.writeAggregates, auctions.writeAuctionHistory, professions.writeProfessions, mapPins.writeMapPins];
+  for (const write of writers) write.mockImplementation(async (_opts: unknown, deps: { build: () => Promise<unknown> }) => { await deps.build(); return { written: true }; });
+  const builders = [aggregates.anonymousAggregates, auctions.buildAuctionHistory, professions.buildProfessions, mapPins.buildMapPins];
+  expect(await (await GET(req())).json()).toMatchObject({ ok: true, itemView: { written: true }, aggregates: { written: true }, auctionHistory: { written: true }, professions: { written: true }, mapPins: { written: true } });
+  expect(store.loadCorpus).toHaveBeenCalledOnce();
+  expect(view.buildItemView).toHaveBeenCalledWith("2026-10-02T00:00:00.000Z", expect.any(Date), corpus);
+  for (const build of builders) expect(build).toHaveBeenCalledWith(corpus);
+  // A run whose views are all current builds nothing, so it reads no corpus.
+  for (const write of writers) write.mockResolvedValue({ written: false });
+  store.loadCorpus.mockClear();
+  await GET(req());
+  expect(store.loadCorpus).not.toHaveBeenCalled();
+  // An unreachable corpus fails each view that needs it, logged, and the run still succeeds.
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], unreachable: true });
+  for (const write of writers) write.mockImplementation(async (_opts: unknown, deps: { build: () => Promise<unknown> }) => { await deps.build(); return { written: true }; });
+  const res = await GET(req());
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ ok: true, itemView: null, aggregates: null, auctionHistory: null, professions: null, mapPins: null });
+  expect(store.loadCorpus).toHaveBeenCalledOnce();
 });

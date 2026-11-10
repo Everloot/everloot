@@ -5,6 +5,7 @@ import { GET as llmsFull } from "@/app/llms-full.txt/route";
 import { GET as llms } from "@/app/llms.txt/route";
 import { tools, toolHref } from "@/data/tools";
 import { FULL_VERSION, llmsFullTxt, llmsTxt } from "./llms";
+import { DATABASE_HUBS } from "./database-hubs";
 
 const registered = liveToolNames();
 
@@ -125,4 +126,24 @@ test("device-only lists stay out of both files", async () => {
   for (const text of [llmsTxt(), await llmsFullTxt([])]) {
     for (const tool of tools.filter((t) => t.private)) expect(text).not.toContain(`https://everloot.app${toolHref(tool)})`);
   }
+});
+
+test("both files name every database kind the hub lists, from the same list, and how to link a spell page", async () => {
+  for (const text of [llmsTxt(), await llmsFullTxt()]) {
+    for (const hub of DATABASE_HUBS) expect(text, hub.href).toContain(`- [${hub.label}](https://everloot.app${hub.href}): `);
+    for (const kind of ["spells", "achievements", "factions", "titles", "quest-chains", "vendors", "objects"]) expect(text, kind).toContain(`https://everloot.app/database/${kind})`);
+    expect(text).toContain("- Spell: https://everloot.app/database/spells/{spellId}");
+    expect(text).toContain("https://everloot.app/chat)");
+  }
+});
+
+test("the guild and player lookups are named only while their switches are on", () => {
+  expect(llmsTxt()).not.toContain("https://everloot.app/guilds)");
+  expect(llmsTxt()).not.toContain("https://everloot.app/players)");
+  vi.stubEnv("EVERLOOT_GUILDS", "1");
+  vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+  try {
+    expect(llmsTxt()).toContain("- [Guilds](https://everloot.app/guilds): ");
+    expect(llmsTxt()).toContain("- [Find a player](https://everloot.app/players): ");
+  } finally { vi.unstubAllEnvs(); }
 });

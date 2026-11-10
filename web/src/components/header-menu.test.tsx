@@ -74,6 +74,14 @@ test("the phone menu lists the same places", async () => {
   expect(panel.querySelector('form[action="/search"]')).not.toBeNull();
 });
 
+test("the phone menu shows both builds, which the bar only has room for from 1280 px", async () => {
+  const toggle = Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "Menu")!;
+  await act(async () => toggle.click());
+  const links = Array.from(container.querySelector("#site-navigation")!.querySelectorAll("a")).map((a) => a.textContent ?? "");
+  expect(links.some((t) => t.startsWith("files read "))).toBe(true);
+  expect(links.some((t) => t.startsWith("newest seen "))).toBe(true);
+});
+
 test("/ focuses the search field unless the visitor is typing", async () => {
   const field = container.querySelector<HTMLInputElement>("#site-search")!;
   // jsdom has no layout, so offsetParent is null; stand in for a visible field.

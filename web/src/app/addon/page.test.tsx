@@ -44,6 +44,21 @@ async function render(answer: () => Promise<Response>) {
 
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
+test("the addon choices lead with the app, then website, then zip; desktop starts neutral", async () => {
+  const html = await render(() => Promise.resolve(Response.json(releases)));
+  const choices = [...html.matchAll(/<a[^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>/g)]
+    .map((match) => ({ href: match[1], text: match[2]!.trim() }));
+  const start = choices.findIndex((choice) => choice.text === "Install with the CurseForge app");
+  expect(start).toBeGreaterThanOrEqual(0);
+  expect(choices.slice(start, start + 3)).toEqual([
+    { href: "https://www.curseforge.com/wow/addons/everloot", text: "Install with the CurseForge app" },
+    { href: "https://www.curseforge.com/wow/addons/everloot", text: "CurseForge website" },
+    { href: addon.downloadPath, text: "Download the zip" },
+  ]);
+  expect(html).toContain('href="#desktop-files"');
+  expect(visible(html)).toContain("Choose your download");
+});
+
 test("the download is clearly labelled Alpha with live-client checks pending", async () => {
   const html = await render(() => Promise.resolve(Response.json(releases)));
   expect(visible(html)).toContain("Alpha");
@@ -72,7 +87,8 @@ test("the addon and every desktop build are offered with version, date, size and
   expect(html).toContain(`href="${addon.downloadPath}"`);
   // The same tested zip is on CurseForge, for players who install with its app.
   expect(html).toContain('href="https://www.curseforge.com/wow/addons/everloot"');
-  expect(text).toContain("Get it on CurseForge");
+  expect(text).toContain("CurseForge website");
+  expect(text).toContain("Opens the CurseForge page. Press Install there to add it in the app.");
   expect(text).toContain(`Version ${addon.version}, Alpha, released 2026-10-18`);
   expect(text).toContain("Version 0.1.0, released 2026-10-19");
   for (const [label, size] of [["Windows installer", "108 MB"], ["Windows portable", "108 MB"], ["macOS disk image", "125 MB"], ["Linux AppImage", "122 MB"]]) {
@@ -148,7 +164,7 @@ test("rebuilt without the repository's files, as on the Worker, the page offers 
     vi.stubEnv("EVERLOOT_DOWNLOADS", nextConfig.env!.EVERLOOT_DOWNLOADS);
     const html = await render(() => Promise.resolve(Response.json(releases)));
     expect(html).toContain(`href="${addon.downloadPath}"`);
-    expect(visible(html)).toContain(`Download addon ${addon.version} (.zip, `);
+    expect(visible(html)).toContain(`Addon ${addon.version} (.zip, `);
     expect(html).toContain(served.sha256);
     expect(html).toContain(`href="${DL}/addon-v${addon.version}/SHA256SUMS"`);
     expect(visible(html)).not.toContain("not available on this site");

@@ -9,7 +9,7 @@ local O = {}
 E.Options = O
 
 -- In page order. `command` is the /everloot word; `field` is a top-level EverlootDB key instead of a toggle;
--- `defaultOff` reads a missing field as off.
+-- `defaultOff` reads a missing field as off; `live` applies at once, without a reload.
 O.ROWS = {
   { key = "window", label = "Everloot window",
     text = "The window from the minimap button and /everloot window. It shows what this file holds and records nothing; off leaves recording as it is." },
@@ -55,6 +55,13 @@ if E.Pulls then
   O.ROWS[#O.ROWS + 1] = { key = "pulls", command = "pulls", label = "Boss pulls",
     text = "After each boss pull: your group's names, classes, roles and the game's damage meter totals. Sent from the upload page or the Desktop App. Off deletes its rows." }
 end
+-- What the item tooltip shows (prices.lua reads them through E.TooltipShows on every hover). They record nothing.
+O.ROWS[#O.ROWS + 1] = { key = "tooltipMarket", field = true, live = true, label = "Item tooltip: prices",
+  text = "Community market value, min buyout and historical price, your own last scan and the vendor price. Records nothing; applies at once." }
+O.ROWS[#O.ROWS + 1] = { key = "tooltipHistory", field = true, live = true, label = "Item tooltip: your history",
+  text = "Your last sale, average sale and units sold, and what you paid where your gold ledger knows it, over the ledger's last 90 days, from your characters on this realm. Read from this file. Records nothing; applies at once." }
+O.ROWS[#O.ROWS + 1] = { key = "tooltipSources", field = true, live = true, label = "Item tooltip: sources",
+  text = "Who drops it, who sells it, the recipes it is a reagent for and the zones you met its sources in. Records nothing; applies at once." }
 
 -- "What you've added": rows of each kind in the saved file now, shown under the switches.
 O.ADDED = {
@@ -79,7 +86,7 @@ function O.Set(row, on)
   else
     EverlootDB.toggles[row.key] = on
   end
-  O.changed = true
+  O.changed = O.changed or not row.live
   O.Refresh()
 end
 

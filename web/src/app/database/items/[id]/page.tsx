@@ -72,7 +72,7 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
 }
 
 /** Who vouches for a relation row: the installs that agree, or (the quiet marker) the game files. */
-const evidence = (e: Edge) => (e.evidence === "observed" ? evidenceLabel(e) : <Badge tone="files" />);
+const evidence = (e: Edge) => (e.evidence === "observed" ? evidenceLabel(e) : <Badge tone="files" href={e.build ? `/changes?show=builds&q=${e.build}` : undefined} />);
 
 export default async function ItemPage(props: Props) {
   const params = await props.params;

@@ -14,6 +14,10 @@ E.Roster = R
 
 local MAX_TEXT = 64
 
+--- Bumped by every write to EverlootDB.roster, so a reader that caches by realm membership (the ledger's item history)
+--- sees a change without walking the roster.
+R.revision = 0
+
 --- One guarded call to a global game function: its values, or nothing on a missing function or an error.
 local function call(name, ...)
   local fn = _G[name]
@@ -61,6 +65,7 @@ function R.Update()
   EverlootDB.roster = EverlootDB.roster or {}
   local row = EverlootDB.roster[key] or {}
   EverlootDB.roster[key] = row
+  R.revision = R.revision + 1
   row.name = text((call("UnitName", "player"))) or row.name
   row.realm = text((call("GetRealmName"))) or row.realm
   row.class = class
@@ -114,6 +119,7 @@ end
 --- Removes one character from the roster.
 function R.Forget(key)
   if EverlootDB and EverlootDB.roster then EverlootDB.roster[key] = nil end
+  R.revision = R.revision + 1
 end
 
 E:RegisterModule("roster", function()

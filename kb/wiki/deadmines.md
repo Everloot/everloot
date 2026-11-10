@@ -44,8 +44,9 @@ Stormwind's government, and the farmers of Westfall paid for it.
 The history above is background lore, not a report of a run in Forever. Use the file-derived facts on this page as
 preparation; they do not establish which encounters or difficulties are available in the live game.
 
-The level, the entrance and the encounters come from the game files Everloot reads, build 1.60.1.70707, and are not
-confirmed in the game. [The database page](/database/instances/36-deadmines) lists the encounters; which of them
+The level, the entrance and the encounters were read from build 1.60.1.70707 on 2026-11-01; the At a glance table
+is regenerated from the current build. These file-derived facts are not confirmed in the game.
+[The database page](/database/instances/36-deadmines) lists the encounters; which of them
 Forever has, and in what order, is not known.
 
 Player reports confirm the entrance and encounters once separate installs agree. The recorded loot and quest

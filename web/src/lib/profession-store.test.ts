@@ -34,15 +34,26 @@ test("the cron writes the same facts as the corpus and a request reads the file 
   expect(store.loadCorpus).not.toHaveBeenCalled();
 });
 
-test("an idle run only checks for the file; missing files and rebuilds write it", async () => {
+test("an idle run only checks the file's stamp; a missing, unstamped or older file and a rebuild write it", async () => {
   const build = vi.fn(async () => buildProfessions(corpus));
-  const doFetch = vi.fn(async () => new Response(null));
+  const stamped = (stamp?: string) => new Response(null, { headers: stamp ? { "x-amz-meta-data-as-of": stamp } : {} });
+  const doFetch = vi.fn(async (input: RequestInfo | URL) => (input as Request).method === "PUT" ? new Response(null) : stamped(asOf));
   expect(await writeProfessions({ added: 0, dataAsOf: asOf }, { cloud, fetch: doFetch, build })).toEqual({ written: false });
   expect(build).not.toHaveBeenCalled();
   doFetch.mockResolvedValueOnce(new Response(null, { status: 404 }));
   await writeProfessions({ added: 0, dataAsOf: asOf }, { cloud, fetch: doFetch, build });
+  // A file from before the stamp, or one built from an older snapshot (a write that failed after new uploads).
+  doFetch.mockResolvedValueOnce(stamped());
+  await writeProfessions({ added: 0, dataAsOf: asOf }, { cloud, fetch: doFetch, build });
+  doFetch.mockResolvedValueOnce(stamped("2026-11-08T00:00:00.000Z"));
+  await writeProfessions({ added: 0, dataAsOf: asOf }, { cloud, fetch: doFetch, build });
   await writeProfessions({ added: 0, rebuild: true, dataAsOf: asOf }, { cloud, fetch: doFetch, build });
-  expect(build).toHaveBeenCalledTimes(2);
+  expect(build).toHaveBeenCalledTimes(4);
+  const puts = doFetch.mock.calls.map(([req]) => req as Request).filter((req) => req.method === "PUT");
+  expect(puts.map((req) => req.headers.get("x-amz-meta-data-as-of"))).toEqual([asOf, asOf, asOf, asOf]);
+  // With no snapshot time the stamp says so, and a matching idle run still skips.
+  doFetch.mockResolvedValueOnce(stamped("none"));
+  expect(await writeProfessions({ added: 0, dataAsOf: null }, { cloud, fetch: doFetch, build })).toEqual({ written: false });
 });
 
 test("the file is kept for five minutes and revalidated by ETag", async () => {
@@ -67,4 +78,22 @@ test.each(["missing", "invalid", "failed"])("a %s file falls back and unreadable
 
 test("a failed write does not claim success", async () => {
   await expect(writeProfessions({ added: 1, dataAsOf: asOf }, { cloud, fetch: async () => new Response(null, { status: 503 }) })).rejects.toThrow("write failed");
+});
+
+test("the file holds the reported rows only; the derived steps come from the build reading it", async () => {
+  const ids = ["a", "b", "c"];
+  const reagents = [{ item: "Peacebloom", count: 1 }];
+  const records = [
+    ...[1, 10, 12].map((rank, i) => ({ kind: "recipe_observed", installId: ids[i], profession: "Alchemy", recipe: "Lesser Healing Potion", rank, difficulty: i === 2 ? "medium" : "optimal", reagents, capturedAt: asOf })),
+    ...ids.map((installId) => ({ kind: "trainer_seen", installId, profession: "Alchemy", recipe: "Lesser Healing Potion", requiredRank: 1 })),
+  ];
+  const set = buildProfessions({ records, dataAsOf: asOf });
+  expect(set.facts.derived.length).toBeGreaterThan(0);
+  const body = encodeProfessions(set, asOf);
+  expect(JSON.parse(body).set.facts).not.toHaveProperty("derived");
+  expect(parseProfessions(body)?.set).toEqual(set);
+  // A file written by an older build, with steps that build derived, gets this build's steps.
+  const old = JSON.parse(body);
+  old.set.facts.derived = [{ profession: "Alchemy", recipe: "Stale Step", skillMin: 1, skillMax: 2, points: 1, reagents: [], reporters: 3, trainingCopper: null }];
+  expect(parseProfessions(JSON.stringify(old))?.set.facts.derived).toEqual(set.facts.derived);
 });
