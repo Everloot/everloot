@@ -29,6 +29,16 @@ local original = {} -- per button: the frame type's own SetPoint and ClearAllPoi
 local polling, noticeScheduled, hooked = false, false, false
 local function noop() end
 
+--- LibDBIcon locks each button at MEDIUM strata, level 8 (SetFixedFrameStrata / SetFixedFrameLevel), and a locked
+--- frame ignores SetFrameStrata and SetFrameLevel. Left locked, every button stayed under the DIALOG-strata panel
+--- and showed through it greyed out. Unlocked first, the button takes the drawer's strata and its own level.
+local function raise(b, level)
+  if b.SetFixedFrameStrata then b:SetFixedFrameStrata(false) end
+  if b.SetFixedFrameLevel then b:SetFixedFrameLevel(false) end
+  if b.SetFrameStrata then b:SetFrameStrata("DIALOG") end
+  if level and b.SetFrameLevel then b:SetFrameLevel(level) end
+end
+
 local function after(seconds, f)
   if C_Timer and C_Timer.After then pcall(C_Timer.After, seconds, f) end
 end
@@ -113,7 +123,7 @@ local function layout()
     if b:IsShown() then
       local column, row = shown % COLUMNS, math.floor(shown / COLUMNS)
       own.SetPoint(b, "TOPLEFT", f, "TOPLEFT", PAD + column * CELL, -(PAD + row * CELL))
-      if b.SetFrameLevel then b:SetFrameLevel(base + shown) end
+      raise(b, base + shown)
       b:SetAlpha(1)
       shown = shown + 1
     end
@@ -142,8 +152,8 @@ local function collect(b)
   b.SetPoint, b.ClearAllPoints = noop, noop
   b:SetScript("OnDragStart", nil)
   b:SetScript("OnDragStop", nil)
-  -- LibDBIcon sets its own strata; the drawer's, or the panel would cover the button. Layout sets the level.
-  if b.SetFrameStrata then b:SetFrameStrata("DIALOG") end
+  -- LibDBIcon sets and locks its own strata; the drawer's, or the panel would cover the button. Layout sets the level.
+  raise(b)
   collectedSet[b] = true
   D.collected[#D.collected + 1] = b
   table.sort(D.collected, function(x, y) return x:GetName() < y:GetName() end)

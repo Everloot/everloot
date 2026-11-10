@@ -47,7 +47,11 @@ function Frame.IsMouseOver(self) return rawget(self, 'mouse') == true end
 function Frame.SetPoint(self, point, rel, relPoint, x, y) table.insert(self.points, { point, rel, relPoint, x, y }) end
 function Frame.ClearAllPoints(self) self.points = {} end
 function Frame.SetAlpha(self, a) self.alpha = a end
-function Frame.SetFrameLevel(self, l) self.level = l end
+-- As in the game: a frame whose strata or level is fixed ignores SetFrameStrata / SetFrameLevel.
+function Frame.SetFrameLevel(self, l) if not rawget(self, 'fixedLevel') then self.level = l end end
+function Frame.SetFrameStrata(self, s) if not rawget(self, 'fixedStrata') then self.strata = s end end
+function Frame.SetFixedFrameLevel(self, v) self.fixedLevel = v end
+function Frame.SetFixedFrameStrata(self, v) self.fixedStrata = v end
 function Frame.GetFrameLevel(self) return rawget(self, 'level') or 1 end
 function Frame.SetBackdrop(self, b) self.backdrop = b end
 function Frame.SetColorTexture(self, r, g, b, a) self.color = { r, g, b, a } end
@@ -114,6 +118,9 @@ function libdbicon.CreateIcon(name)
   b:SetScript('OnDragStart', function() end)
   b:SetScript('OnDragStop', function() end)
   b:SetPoint('CENTER', Minimap, 'CENTER', 80, 0)
+  -- LibDBIcon 55-57 lock every button at MEDIUM strata, level 8.
+  b:SetFrameStrata('MEDIUM'); b:SetFixedFrameStrata(true)
+  b:SetFrameLevel(8); b:SetFixedFrameLevel(true)
   libdbicon.objects[name] = b
   libdbicon.fire(b, name)
   return b
@@ -191,6 +198,8 @@ def test_libdbicon_buttons_are_collected_and_laid_out_and_nothing_else_is():
     -- each button draws above the one before it so no ring shadow dims the icon beside or below it.
     assert(beta.points[1][4] - alpha.points[1][4] >= 36, 'cells wider than a ring')
     assert(alpha.level > D.frame:GetFrameLevel() and beta.level == alpha.level + 1, 'later buttons draw above earlier ones')
+    -- LibDBIcon's strata lock is lifted, or every button stays under the panel and shows through it greyed out.
+    assert(alpha.strata == 'DIALOG' and beta.strata == 'DIALOG', 'buttons draw in the drawer strata, above its panel')
     assert(rawget(D.frame, 'backdrop') and D.frame.backdrop.edgeFile, 'the drawer has a panel without the window loaded')
     -- The accent bar: two pixels wide, the window's green, down the edge that faces the crest (the drawer opens to
     -- the crest's left, so its right edge).

@@ -215,6 +215,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   dates from before the feed existed are marked estimated.
 
 ### Fixed
+- Addon: the other addons' buttons in the Everloot minimap drawer no longer look greyed out. LibDBIcon locks each
+  button under the drawer's panel, so the drawer now lifts that lock before raising them above it.
 - Site: the header shows the build whose files the site reads and the newest build seen, each linked to what it means.
 - Site: /api/suggest spends the per-IP quota and shares one edge cache entry for `Thunder` and `thunder `, the coverage 400 and waitlist 503 are `no-store` (the 503 adds `Retry-After`), and the docs list every route that sends CORS from one file.
 - Site: when a database or tools page can't be read, you now get a "Database unavailable" or "Tool unavailable" page that says it could not be read, not that it is empty, with a Try again button and a link back to the section, instead of the generic error page.
