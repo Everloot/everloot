@@ -104,6 +104,7 @@ export const DOCS_TABS: DocsTab[] = [
         title: "Build on Everloot", icon: "code",
         pages: [
           { href: "/docs/tooltips", title: "Embeddable tooltips", lede: "One script tag, and your links to Everloot pages show a game-style card on hover." },
+          { href: "/docs/addon-authors", title: "Use the data in your addon", lede: "For addon authors: the licence and credit line, three ways to get the data, and how to build an offline pack." },
           { href: "/docs/licence", title: "Licence and credit", lede: "What you may do with Everloot's data and code, and the credit line to use." },
         ],
       },
