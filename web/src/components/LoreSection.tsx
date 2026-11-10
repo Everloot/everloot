@@ -1,13 +1,17 @@
 import Link from "next/link";
+import EdgeDegraded from "@/components/EdgeDegraded";
 import { Card, SectionHeading } from "@/components/ui";
 import { loreSlug, UNAVAILABLE, type LoreMatch, type Unavailable } from "@/lib/lore";
 
 /**
  * The "Lore" block of an entity page: the first paragraph of the matching archive page and a link to it.
- * Nothing at all when there is no match or the archive cannot be opened (the page is about collected data).
+ * Nothing shown when there is no match or the archive cannot be opened (the page is about collected data). When the
+ * archive or the names cannot be read the page is marked degraded (components/EdgeDegraded.tsx), so the edge keeps it
+ * a minute, not as long as a page that answered, and the link comes back once they can.
  */
 export default function LoreSection({ match }: { match: LoreMatch | null | Unavailable }) {
-  if (match === null || match === UNAVAILABLE) return null;
+  if (match === UNAVAILABLE) return <EdgeDegraded when />;
+  if (match === null) return null;
   return (
     <section aria-labelledby="lore">
       <SectionHeading id="lore">Lore</SectionHeading>

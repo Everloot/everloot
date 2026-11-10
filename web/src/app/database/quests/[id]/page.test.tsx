@@ -17,7 +17,7 @@ vi.mock("@/lib/game-assets", () => ({
   loadSiteAssets: async () => null,
   loadItemTips: async () => new Map(),
 }));
-vi.mock("@/lib/lore", () => ({ loreForEntity: async () => null }));
+vi.mock("@/lib/lore", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/lore")>()), loreForEntity: async () => null }));
 
 import QuestPage from "./page";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";

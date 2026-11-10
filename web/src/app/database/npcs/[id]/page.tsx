@@ -22,7 +22,7 @@ import { unknownNpc } from "../../unknown";
 import { entitySummary, observedLine } from "@/lib/evidence";
 import { loadItemFacts } from "@/lib/rollup-compute";
 import { itemNames } from "@/lib/names";
-import { loreForEntity } from "@/lib/lore";
+import { loreFor } from "@/lib/lore-links";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
 import EntityLink from "@/components/EntityLink";
 import LoreSection from "@/components/LoreSection";
@@ -103,7 +103,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
   const assets = dropped.length > 0 || goods.length > 0 || zone ? await loadSiteAssets() : null;
   const tips = await loadItemTips(assets, [...dropped.map((row) => row.itemId), ...goods.map((o) => o.itemId)]);
   const art = zone ? assets?.maps.find((m) => m.kind === "zone" && m.uiMapId === zone.mapId && !m.heldBack) : undefined;
-  const lore = !unreachable && page.name ? await loreForEntity("npc", page.name) : null;
+  const lore = !unreachable && page.name ? await loreFor("npc", npcId, page.name) : null;
   // The loot table with each number's windows, installs and dates; its public rows are the rates above.
   const loot = await loadLootTables();
   const lootTable = npcLootTable(loot.tables, npcId);

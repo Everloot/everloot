@@ -19,7 +19,7 @@ import { unknownQuest } from "../../unknown";
 import { entitySummary, observedLine } from "@/lib/evidence";
 import { loadItemFacts } from "@/lib/rollup-compute";
 import { itemNames, npcNames } from "@/lib/names";
-import { loreForEntity } from "@/lib/lore";
+import { loreFor } from "@/lib/lore-links";
 import { loadItemTips, loadQuestNames, loadSiteAssets } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
@@ -74,7 +74,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
   const items = itemFacts && !itemFacts.unreachable ? itemNames(itemFacts) : new Map<number, string>();
   const assets = page.rewards.length > 0 ? await loadSiteAssets() : null;
   const tips = await loadItemTips(assets, facts.unreachable ? [] : page.rewards);
-  const lore = !facts.unreachable && page.title ? await loreForEntity("quest", page.title) : null;
+  const lore = !facts.unreachable && page.title ? await loreFor("quest", page.questId, page.title) : null;
   const trail = [...trailFor("/database/quests")!, { name: title, path: `/database/quests/${page.questId}` }];
   const people: Person[] = facts.unreachable ? [] : [
     ...(page.giverNpcId !== null ? [{ role: "Giver", npcId: page.giverNpcId, map: where(page.giverNpcId) }] : []),

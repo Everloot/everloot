@@ -36,7 +36,11 @@ vi.mock("@/lib/rollup-compute", () => ({
   loadWorldFacts: async () => ({ npcs: [], quests: [], vendors: [], unreachable: false }),
   loadInstanceFacts: async () => ({ entrances: [], encounters: [], sightings: [], unreachable: false, dataAsOf: null }),
 }));
-vi.mock("@/lib/names", () => ({ loadNames: async () => ({ items: new Map(), npcs: new Map(), quests: questNames.reported }), objectNames: () => new Map() }));
+vi.mock("@/lib/names", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/names")>()),
+  loadNames: async () => ({ items: new Map(), npcs: new Map(), quests: questNames.reported }),
+  objectNames: () => new Map(),
+}));
 vi.mock("@/lib/objects", () => ({ loadObjectFacts: async () => ({ rates: [], measuredZeros: [], names: [], unreachable: false }) }));
 
 const questNames = vi.hoisted(() => ({ reported: new Map<number, string>(), wiki: new Map<number, { name: string }>() }));

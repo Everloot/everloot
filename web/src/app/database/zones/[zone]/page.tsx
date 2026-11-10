@@ -34,6 +34,7 @@ import {
   type ZoneEntrance, type ZoneNpc, type ZoneQuest, type ZoneTreasure,
 } from "@/lib/zones";
 import { zoneLore } from "@/lib/zone-lore";
+import { UNAVAILABLE } from "@/lib/lore";
 import { EmptyTab, FREQUENCY, percent } from "../../entity";
 import { listQuery, PER_PAGE, type Search } from "../../list-parts";
 
@@ -83,7 +84,7 @@ export default async function ZonePage(props: Props) {
   const [facts, seen, loot, { rates }] = await Promise.all([loadWorldFacts(), loadSightings(), loadLootTables(), computeRollups()]);
   // Entrances come from the game files, so they show even when storage is down; player reports do not.
   const here = zoneContents(facts.unreachable ? { npcs: [], quests: [], vendors: [] } : facts, undefined, facts.unreachable ? {} : seen).get(zone.mapId);
-  const lore = await zoneLore(zone.name);
+  const lore = await zoneLore(zone.mapId, zone.name);
   const shape = WORLD_MAP.zones.find((z) => z.uiMapId === zone.mapId)!;
   const assets = await loadSiteAssets();
   const art = assets?.maps.find((m) => m.kind === "zone" && m.uiMapId === zone.mapId && !m.heldBack) ?? null;
@@ -234,7 +235,7 @@ export default async function ZonePage(props: Props) {
 
   return (
     <Container width="data">
-      <EdgeDegraded when={facts.unreachable || seen.unreachable || loot.unreachable || gathering?.unreachable === true} />
+      <EdgeDegraded when={facts.unreachable || seen.unreachable || loot.unreachable || gathering?.unreachable === true || lore === UNAVAILABLE} />
       <JsonLd data={entityPageJsonLd({ name: zone.name, path: canonical, identifier: `zone:${zone.mapId}` })} />
       <article>
         {/* The database title row: name, continent, and the map link as a quiet control (the header keeps the one filled button). */}
@@ -271,14 +272,14 @@ export default async function ZonePage(props: Props) {
             entrances={entrances}
           />
 
-          {lore && (
+          {lore && lore !== UNAVAILABLE && (
             <section aria-labelledby="lore">
               <SectionHeading id="lore">Lore</SectionHeading>
               <Card as="div">
                 <p className="max-w-[65ch] text-fg">{lore.text}</p>
                 <p className="mt-3 text-sm text-muted">
                   From the archive of the Warcraft Wiki, 2023 · {lore.licence} ·{" "}
-                  <Link href={lore.href} className={link}>Read the full lore page</Link>
+                  <Link href={lore.href} className={link}>Read {lore.name} in the lore archive</Link>
                 </p>
               </Card>
             </section>
