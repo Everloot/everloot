@@ -54,7 +54,7 @@ C.Limits = {
 
 local CATALOG_KINDS = { "achievement_catalog", "reputation_catalog", "title_catalog", "quest_chain_catalog" }
 local KINDS = { "achievement_catalog", "reputation_catalog", "title_catalog", "quest_chain_catalog",
-  "achievement_owned", "reputation_owned", "title_owned", "quest_owned" }
+  "achievement_owned", "reputation_owned", "title_owned", "quest_owned", "boss_kill_owned" }
 
 -- Every call this module may make to the game. A test scans the source against this list.
 local API = {

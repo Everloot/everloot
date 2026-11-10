@@ -1,0 +1,206 @@
+{
+  "build": "1.60.1.70634",
+  "label": "Found in game files, unconfirmed; game data copyright Blizzard Entertainment, Inc.",
+  "instances": [
+    {
+      "id": 13,
+      "name": "Test Dungeon",
+      "raid": false
+    },
+    {
+      "id": 33,
+      "name": "Shadowfang Keep",
+      "raid": false
+    },
+    {
+      "id": 34,
+      "name": "Stormwind Stockade",
+      "raid": false
+    },
+    {
+      "id": 36,
+      "name": "Deadmines",
+      "raid": false
+    },
+    {
+      "id": 43,
+      "name": "Wailing Caverns",
+      "raid": false
+    },
+    {
+      "id": 47,
+      "name": "Razorfen Kraul",
+      "raid": false
+    },
+    {
+      "id": 48,
+      "name": "Blackfathom Deeps",
+      "raid": false
+    },
+    {
+      "id": 70,
+      "name": "Uldaman",
+      "raid": false
+    },
+    {
+      "id": 90,
+      "name": "Gnomeregan",
+      "raid": false
+    },
+    {
+      "id": 109,
+      "name": "Sunken Temple",
+      "raid": false
+    },
+    {
+      "id": 129,
+      "name": "Razorfen Downs",
+      "raid": false
+    },
+    {
+      "id": 189,
+      "name": "Scarlet Monastery",
+      "raid": false
+    },
+    {
+      "id": 209,
+      "name": "Zul'Farrak",
+      "raid": false
+    },
+    {
+      "id": 229,
+      "name": "Blackrock Spire",
+      "raid": false
+    },
+    {
+      "id": 230,
+      "name": "Blackrock Depths",
+      "raid": false
+    },
+    {
+      "id": 249,
+      "name": "Onyxia's Lair",
+      "raid": true
+    },
+    {
+      "id": 289,
+      "name": "Scholomance",
+      "raid": false
+    },
+    {
+      "id": 309,
+      "name": "Zul'Gurub",
+      "raid": true
+    },
+    {
+      "id": 329,
+      "name": "Stratholme",
+      "raid": false
+    },
+    {
+      "id": 349,
+      "name": "Maraudon",
+      "raid": false
+    },
+    {
+      "id": 389,
+      "name": "Ragefire Chasm",
+      "raid": false
+    },
+    {
+      "id": 409,
+      "name": "Molten Core",
+      "raid": true
+    },
+    {
+      "id": 429,
+      "name": "Dire Maul",
+      "raid": false
+    },
+    {
+      "id": 469,
+      "name": "Blackwing Lair",
+      "raid": true
+    },
+    {
+      "id": 509,
+      "name": "Ruins of Ahn'Qiraj",
+      "raid": true
+    },
+    {
+      "id": 531,
+      "name": "Ahn'Qiraj Temple",
+      "raid": true
+    },
+    {
+      "id": 533,
+      "name": "Naxxramas",
+      "raid": true
+    },
+    {
+      "id": 2720,
+      "name": "The Searing Basin",
+      "raid": false
+    },
+    {
+      "id": 2784,
+      "name": "Demon Fall Canyon",
+      "raid": false
+    },
+    {
+      "id": 2789,
+      "name": "The Tainted Scar",
+      "raid": true
+    },
+    {
+      "id": 2791,
+      "name": "Storm Cliffs",
+      "raid": true
+    },
+    {
+      "id": 2804,
+      "name": "The Crystal Vale",
+      "raid": true
+    },
+    {
+      "id": 2832,
+      "name": "Nightmare Grove",
+      "raid": true
+    },
+    {
+      "id": 2856,
+      "name": "Scarlet Enclave",
+      "raid": true
+    },
+    {
+      "id": 2875,
+      "name": "Karazhan Crypts",
+      "raid": false
+    },
+    {
+      "id": 2921,
+      "name": "Naxxramas",
+      "raid": false
+    },
+    {
+      "id": 2959,
+      "name": "City of Dalaran",
+      "raid": false
+    },
+    {
+      "id": 2998,
+      "name": "Excavation Site: Wetlands",
+      "raid": false
+    },
+    {
+      "id": 2999,
+      "name": "Ruins of Lordaeron",
+      "raid": false
+    },
+    {
+      "id": 3065,
+      "name": "The Hall of Thanes",
+      "raid": false
+    }
+  ]
+}
