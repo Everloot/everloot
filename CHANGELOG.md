@@ -334,6 +334,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   share images. A new link is private, every page is noindex, and the hide form takes a page down without an
   account. A character two accounts link stays frozen until it is settled: write to hello@everloot.app, we reply
   within 7 days. The data policy, /privacy and the account page say so.
+- Docs: OPEN_DATA.md and RELEASING.md no longer say the open data export sits in the roadmap's Next section; they point to ROADMAP.md.
 
 ### Added
 - Site: the open data export, at `/database/download`. The published data as NDJSON files anyone can download
