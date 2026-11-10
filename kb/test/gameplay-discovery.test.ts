@@ -133,7 +133,7 @@ test("release-only and lore discovery never read the corpus", async () => {
   expect(corpus).not.toHaveBeenCalled();
 });
 
-test("unavailable corpus reuses the files-only merged index", async () => {
+test("unavailable corpus answers from the files catalog without merging", async () => {
   const db = openDb(":memory:"); dbs.push(db);
   const catalog = buildCatalogIndex({ map: WORLD_MAP_DATA });
   const merge = vi.spyOn(catalogModule, "mergeCatalogIndexes");
@@ -141,5 +141,32 @@ test("unavailable corpus reuses the files-only merged index", async () => {
   for (let i = 0; i < 2; i++) {
     await createToolHandlers(db, { catalog: () => catalog, corpus }).get_by_name({ name: "Linen Cloth", kind: "item" });
   }
+  expect(merge).not.toHaveBeenCalled();
+});
+
+test("alternating lore and item calls keep one merged index", async () => {
+  const db = openDb(":memory:"); dbs.push(db);
+  const catalog = buildCatalogIndex({ map: WORLD_MAP_DATA });
+  const merge = vi.spyOn(catalogModule, "mergeCatalogIndexes");
+  const corpus = vi.fn(async () => ({ records: [...rows], dataAsOf: "2026-11-12T00:00:00Z" }));
+  const h = createToolHandlers(db, { catalog: () => catalog, corpus, recheck: [] });
+  for (let i = 0; i < 3; i++) {
+    await h.search_knowledge({ query: "Linen Cloth", version: "lore", limit: 5 });
+    await h.search_knowledge({ query: "Linen Cloth", kind: "item", limit: 5 });
+  }
   expect(merge).toHaveBeenCalledTimes(1);
+});
+
+test("a new snapshot time rebuilds the gameplay index", async () => {
+  const db = openDb(":memory:"); dbs.push(db);
+  const catalog = buildCatalogIndex({ map: WORLD_MAP_DATA });
+  const build = vi.spyOn(catalogModule, "gameplayIndex");
+  // Times no other test uses: the index memo is per module, so a shared key would be a hit from an earlier test.
+  let asOf = "2026-11-13T00:00:00Z";
+  const corpus = vi.fn(async () => ({ records: [...rows], dataAsOf: asOf }));
+  const h = createToolHandlers(db, { catalog: () => catalog, corpus, recheck: [] });
+  await h.get_by_name({ name: "Linen Cloth", kind: "item" });
+  asOf = "2026-11-13T00:10:00Z";
+  await h.get_by_name({ name: "Linen Cloth", kind: "item" });
+  expect(build).toHaveBeenCalledTimes(2);
 });

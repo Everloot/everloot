@@ -811,6 +811,9 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
       }
       gameplay = gameplayMemo.index;
     }
+    // No gameplay index: the files catalog answers as it is, so a lore or release-only call between two gameplay
+    // calls never evicts the merged index.
+    if (!gameplay && catalog) return catalog;
     if (!mergedMemo || mergedMemo.catalog !== catalog || mergedMemo.gameplay !== gameplay) {
       mergedMemo = { catalog, gameplay, index: mergeCatalogIndexes(catalog, gameplay) };
     }
@@ -825,7 +828,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
   const readFacts = <T>(tool: ToolName, render: (facts: T) => string) => fromTooledUploads(tool, render, options.corpus, recheck);
   const handlers: ToolHandlers = {
     search_knowledge: async (args) => {
-      const result = await searchResult(db, args, await catalogOf(args.version !== "lore" && gameplayKind(args.kind)));
+      const result = await searchResult(db, args, await catalogOf((!args.version || args.version === "forever") && gameplayKind(args.kind)));
       const ids = await confirmedOf(result.hits);
       return { text: await textOfSearch(db, result, ids), structured: { hits: annotate(await withPages(db, result.hits), ids) } };
     },
