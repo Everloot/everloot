@@ -75,10 +75,10 @@ export async function loadItemFacts(read?: Corpus): Promise<ItemFacts & { unreac
 }
 
 /** NPC, quest, and vendor rows from the same uploads. */
-export async function loadWorldFacts(read?: Corpus): Promise<WorldFacts & { unreachable: boolean }> {
+export async function loadWorldFacts(read?: Corpus): Promise<WorldFacts & { unreachable: boolean; dataAsOf?: string | null }> {
   const agg = await loadAggregates(read);
-  if (!agg) return { npcs: [], quests: [], vendors: [], unreachable: true };
-  return { ...agg.world, unreachable: false };
+  if (!agg) return { npcs: [], quests: [], vendors: [], unreachable: true, dataAsOf: null };
+  return { ...agg.world, unreachable: false, dataAsOf: agg.dataAsOf };
 }
 
 /** Dungeon entrances and encounters players' clients saw, and objects seen on the minimap, each public at 3 installs. */

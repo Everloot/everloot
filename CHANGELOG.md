@@ -54,6 +54,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   redirects for good to the slug page it already had, keeping the skill range and class context in the query; an unknown id
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
 - Addon: the Gold Overview shows earned, spent and profit for the selected period and character or account, with daily averages, top items and pending sales.
+- Site: vendor, achievement, quest chain, zone and instance pages carry In short and Copy for AI like the other database
+  pages, each line saying how many installs agree and when, or that nobody has reported it yet; a vendor links its NPC's
+  card as Raw JSON. An achievement page also links the Collections tool and says under its criteria what Confirmed means
+  and whether this one is.
 - Site: a "Write a wiki page" guide under Docs › Guides says how a wiki page is proposed and reviewed, with the page
   types, the front matter, the rules and the check from the wiki README; the wiki hub and the lore archive link to it.
 - Site: a faction page and a title page carry In short, Copy for AI, a "Player reports" fact that stays an empty meter
