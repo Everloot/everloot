@@ -29,6 +29,7 @@ export const GUIDE_SETS = [["code", "order"], ["code2", "order2"]] as const;
 /** Addresses under /guides that are pages of their own, so no guide may take them as its slug. */
 export const RESERVED_GUIDE_SLUGS: Readonly<Record<string, string>> = {
   write: "/guides/write is the page where a player writes a community guide",
+  "darkmoon-faire": "/guides/darkmoon-faire is the community turn-in reference",
 };
 
 const id = z.number().int().positive();

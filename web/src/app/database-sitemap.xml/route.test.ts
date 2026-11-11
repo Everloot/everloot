@@ -7,7 +7,8 @@ vi.mock("@/lib/upload-store", async (importOriginal) => ({
   uploadStore: { loadCorpus: store.loadCorpus },
 }));
 // Source-backed item names and the game files' spell names; none unless a test sets them.
-const names = vi.hoisted(() => ({ matched: null as unknown, spells: null as { version: string; names: Map<number, string> } | null }));
+const names = vi.hoisted(() => ({ wiki: null as unknown, matched: null as unknown, spells: null as { version: string; names: Map<number, string> } | null }));
+vi.mock("@/lib/wiki-entity-names", async (original) => ({ ...await original<typeof import("@/lib/wiki-entity-names")>(), loadWikiEntityNames: async (kind: string) => kind === "npc" ? names.wiki : null }));
 vi.mock("@/lib/game-assets", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/game-assets")>()),
   loadItemNames: async () => names.matched,
@@ -50,10 +51,17 @@ const records = [
 ];
 
 beforeEach(() => { store.loadCorpus.mockReset().mockResolvedValue({ uploads: 3, records, dataAsOf: "2026-10-09T00:00:00.000Z" }); });
-afterEach(() => { names.matched = null; names.spells = null; });
+afterEach(() => { names.wiki = null; names.matched = null; names.spells = null; });
 
 const urls = (xml: string) => [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]!);
 const chunkAt = (n: string) => chunk(new Request("https://everloot.app/"), { params: Promise.resolve({ n }) });
+
+test("a wiki-matched unanimous NPC report is eligible; wiki-only names add no NPC ids", async () => {
+  names.wiki = { version: "x", names: new Map([["half known", { name: "Half Known", wikiPage: "https://warcraft.wiki.gg/wiki/Half" }], ["unreported", { name: "Unreported", wikiPage: "https://warcraft.wiki.gg/wiki/Unreported" }]]) };
+  const listed = await (await chunkAt("0.xml")).text();
+  expect(listed).toContain("/database/npcs/78");
+  expect(listed).not.toContain("Unreported");
+});
 
 test("the database sitemap lists every detail page that asks to be indexed, by type and id, and nothing else", async () => {
   names.matched = matched([2589]);

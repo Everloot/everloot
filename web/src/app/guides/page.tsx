@@ -126,6 +126,10 @@ export default async function GuidesIndex({ searchParams }: Props) {
   return (
     <Container>
       <PageHeader trail={trailFor("/guides")!} title="Guides" lede={LEDE} />
+      <section className="mt-6" aria-label="Community reference">
+        <Link href="/guides/darkmoon-faire" className={LINK}>Darkmoon Faire: storage box and ticket items</Link>
+        <p className="mt-1 text-sm text-muted">Community-sourced checklist, unverified in Forever. Separate from the reviewed class guides below.</p>
+      </section>
       {any && <FilterBar label="Guide filters" controls={controls} active={active} clearHref="/guides" />}
       {error && <p className="mt-4 text-sm text-muted">{error} This page shows every guide instead.</p>}
       <div className="mt-8 space-y-10">

@@ -69,7 +69,7 @@ export function folderProblems(root, expected, { index, allowed, skip = [] }) {
  * names from the Warcraft Wiki.
  */
 export const NAME_FILES = {
-  "wiki-npc-names.json": { schema: "everloot.wiki-npc-names/1", wiki: true },
+  "wiki-npc-names.json": { schema: "everloot.wiki-npc-names/2", wiki: true },
   "wiki-spell-names.json": { schema: "everloot.wiki-spell-names/1", wiki: true },
   "item-names.json": { schema: "everloot.item-names/1", wiki: true },
   "quest-names.json": { schema: "everloot.quest-names/1", wiki: true },

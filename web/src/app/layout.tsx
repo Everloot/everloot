@@ -5,6 +5,7 @@ import { fontVariables } from "./fonts";
 import Header from "@/components/Header";
 import { guildsOn } from "@/lib/guild-switch";
 import Footer from "@/components/Footer";
+import BugReport from "@/components/BugReport";
 import CookieConsent from "@/components/CookieConsent";
 import DocumentBoundary from "@/components/DocumentBoundary";
 import OptionalScripts from "@/components/OptionalScripts";
@@ -83,6 +84,7 @@ export default function RootLayout({
           <DocumentBoundary>{children}</DocumentBoundary>
         </main>
         <Footer />
+        <BugReport />
         {/* AdSense loads on every public page so Google's certified consent message can run where the law requires
             it (EEA, UK, Switzerland, US states). Ads themselves appear only where a page places an AdSlot.
             It loads once the page has, so it neither competes with the page's own files nor runs before its first paint.

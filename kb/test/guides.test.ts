@@ -441,6 +441,11 @@ describe("files", () => {
     expect(problemsOf([file(GUIDE), file(twin, "guides/fire-leveling.md")])).toEqual([{ file: "guides/fire-leveling.md", line: lineOf(twin, "id:"), message: expect.stringContaining("id 1 is already used by guides/frost-leveling.md") }]);
   });
 
+  test("a talent guide cannot shadow the Darkmoon reference route", () => {
+    const source = GUIDE.replace("slug: frost-leveling", "slug: darkmoon-faire");
+    expect(problemsOf([file(source, "guides/darkmoon-faire.md")])).toContainEqual(expect.objectContaining({ message: expect.stringContaining('slug "darkmoon-faire" is reserved') }));
+  });
+
   test("write is never a guide's slug: /guides/write is the page where a player writes a community guide", () => {
     const write = GUIDE.replace("slug: frost-leveling", "slug: write");
     const reserved = { file: "guides/write.md", line: lineOf(write, "slug:"), message: RESERVED };

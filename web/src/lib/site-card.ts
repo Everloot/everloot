@@ -1,6 +1,7 @@
-import { loadWikiEntityNames } from "./wiki-entity-names";
+import { loadWikiEntityNames, shownNpcName } from "./wiki-entity-names";
 import type { TooltipType } from "@everloot/protocol";
 import { npcPage, vendorPage } from "../../../kb/src/world-pages";
+import { loadWorldFacts } from "./rollup-compute";
 import { loadStoredAggregates } from "./aggregate-store";
 import { categoryOf } from "../../../kb/src/item-taxonomy";
 import { loadSiteAssets, PRIVATE_MALFORMED, PRIVATE_UNREACHABLE, readItemTips, readQuestNames, readSpellNames, tipLabel } from "./game-assets";
@@ -66,7 +67,9 @@ export async function loadSiteCard(type: SiteCardType, id: number): Promise<Site
   // A quest players agree on no title for: the quest page shows the Warcraft Wiki's, for a quest the game files list.
   if (type === "npc" && (result.status !== 200 || result.body.title === `NPC ${id}`)) {
     const wiki = await loadWikiEntityNames("npc");
-    const name = wiki?.names.get(id)?.name;
+    const facts = await loadWorldFacts();
+    if (facts.unreachable) return UNAVAILABLE;
+    const name = shownNpcName(id, facts, wiki).name;
     if (name) return plain(type, id, name, result.status === 200 ? result.body.lines.filter((l) => !l.startsWith("No agreed name")) : [], NAME_FROM.wiki);
   }
   const agreedTitle = result.status === 200 && !result.body.lines.includes(NO_QUEST_TITLE);
