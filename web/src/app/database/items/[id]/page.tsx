@@ -28,6 +28,7 @@ import { loadNames, nameOf } from "@/lib/names";
 import { loreForShownItem } from "@/lib/lore-links";
 import EntityLink from "@/components/EntityLink";
 import LoreSection from "@/components/LoreSection";
+import DarkmoonItemNote from "@/components/DarkmoonItemNote";
 import { CategoryPage, categoryMetadata } from "../category-page";
 import { itemIndexable } from "@/lib/indexable";
 import { entityTitle, itemDescription } from "@/lib/entity-meta";
@@ -312,6 +313,7 @@ export default async function ItemPage(props: Props) {
         </EntitySidebar>
         <MarketBox itemId={itemId} rows={auctions} />
         <Tabs label={`${title}: relations`} tabs={tabs} className="mt-6" />
+        <DarkmoonItemNote name={name?.name} />
         <div className="mt-6 space-y-6 empty:hidden">
           <LoreSection match={lore} />
           {!facts.unreachable && (page.name !== null || page.drops.length > 0) && <AdSlot slot="inContent" />}
