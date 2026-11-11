@@ -94,11 +94,12 @@ export default function CookieConsent({ adsenseClient, analytics = {} }: { adsen
     const banner = panel.current;
     if (!visible || !banner) return;
     const root = document.documentElement;
-    const before = [root.style.scrollPaddingBottom, document.body.style.paddingBottom];
+    const before = [root.style.scrollPaddingBottom, document.body.style.paddingBottom, root.style.getPropertyValue("--cookie-clearance")];
     const fit = () => {
       const covered = `${banner.getBoundingClientRect().height + parseFloat(getComputedStyle(banner).bottom) + 8}px`;
       root.style.scrollPaddingBottom = covered;
       document.body.style.paddingBottom = covered;
+      root.style.setProperty("--cookie-clearance", covered);
     };
     fit();
     const observer = new ResizeObserver(fit);
@@ -106,6 +107,8 @@ export default function CookieConsent({ adsenseClient, analytics = {} }: { adsen
     return () => {
       observer.disconnect();
       [root.style.scrollPaddingBottom, document.body.style.paddingBottom] = before;
+      if (before[2]) root.style.setProperty("--cookie-clearance", before[2]);
+      else root.style.removeProperty("--cookie-clearance");
     };
   }, [visible]);
 
