@@ -249,10 +249,12 @@ describe("compact consent", () => {
       expect(document.documentElement.style.scrollPaddingBottom).toBe("138px");
       // The last controls on the page need room below them to scroll clear of it too.
       expect(document.body.style.paddingBottom).toBe("138px");
+      expect(document.documentElement.style.getPropertyValue("--cookie-clearance")).toBe("138px");
       banner.getBoundingClientRect = () => ({ top: 430, height: 284 }) as DOMRect;
       resized!();
       expect(document.documentElement.style.scrollPaddingBottom).toBe("308px");
       expect(document.body.style.paddingBottom).toBe("308px");
+      expect(document.documentElement.style.getPropertyValue("--cookie-clearance")).toBe("308px");
       // A larger root font makes the 1rem inset larger, and the padding follows it.
       banner.style.bottom = "32px";
       resized!();
@@ -260,6 +262,7 @@ describe("compact consent", () => {
       await act(async () => button("Reject optional cookies").click());
       expect(document.documentElement.style.scrollPaddingBottom).toBe("12px");
       expect(document.body.style.paddingBottom).toBe("4px");
+      expect(document.documentElement.style.getPropertyValue("--cookie-clearance")).toBe("");
     } finally {
       document.body.style.paddingBottom = "";
     }

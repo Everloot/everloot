@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: a visible bug button on every page opens the existing GitHub report form, with Discord and email alternatives and private page URLs omitted.
 - Site: item pages' social cards show the item's game icon (text-only when the art is off or unreadable), and on wide screens entity pages move their summary, facts and map into a right column.
 - Site: show labelled, linked Warcraft Wiki NPC names when one or two installs unanimously report a matching name.
 - Docs: describe NPC name agreement, the private version 2 catalog and the inert spell wiki path.
