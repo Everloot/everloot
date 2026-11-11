@@ -1,0 +1,34 @@
+{
+  "source": {
+    "title": "Jerome DMF Calculator Sheet",
+    "url": "https://docs.google.com/spreadsheets/d/17RyCVOfrmgrJxbRma-FL4LyGNukmAm08zsVVI5oc8dI/edit#gid=1168890044",
+    "sheet": "Tickets",
+    "range": "A3:H26",
+    "readOn": "2026-11-10",
+    "currentReputation": 0,
+    "status": "community-unverified"
+  },
+  "boxTicketGoal": 50,
+  "turnins": [
+    { "name": "Small Furry Paw", "quantity": 5, "tickets": 1, "minLevel": 1, "sheetMaxTurnins": 5 },
+    { "name": "Coarse Weightstone", "quantity": 10, "tickets": 1, "minLevel": 1, "sheetMaxTurnins": 5 },
+    { "name": "Copper Modulator", "quantity": 5, "tickets": 1, "minLevel": 1, "sheetMaxTurnins": 5 },
+    { "name": "Embossed Leather Boots", "quantity": 3, "tickets": 1, "minLevel": 1, "sheetMaxTurnins": 5 },
+    { "name": "Torn Bear Pelt", "quantity": 5, "tickets": 4, "minLevel": 10, "sheetMaxTurnins": 11 },
+    { "name": "Heavy Grinding Stone", "quantity": 7, "tickets": 4, "minLevel": 10, "sheetMaxTurnins": 11 },
+    { "name": "Whirring Bronze Gizmo", "quantity": 7, "tickets": 4, "minLevel": 10, "sheetMaxTurnins": 11 },
+    { "name": "Toughened Leather Armor", "quantity": 3, "tickets": 4, "minLevel": 10, "sheetMaxTurnins": 11 },
+    { "name": "Soft Bushy Tail", "quantity": 5, "tickets": 8, "minLevel": 20, "sheetMaxTurnins": 17 },
+    { "name": "Green Iron Bracers", "quantity": 3, "tickets": 8, "minLevel": 20, "sheetMaxTurnins": 17 },
+    { "name": "Barbaric Harness", "quantity": 3, "tickets": 8, "minLevel": 20, "sheetMaxTurnins": 17 },
+    { "name": "Vibrant Plume", "quantity": 5, "tickets": 12, "minLevel": 30, "sheetMaxTurnins": 25 },
+    { "name": "Big Black Mace", "quantity": 1, "tickets": 12, "minLevel": 30, "sheetMaxTurnins": 25 },
+    { "name": "Mechanical Repair Kit", "quantity": 6, "tickets": 12, "minLevel": 30, "sheetMaxTurnins": 25 },
+    { "name": "Turtle Scale Leggings", "quantity": 1, "tickets": 12, "minLevel": 30, "sheetMaxTurnins": 25 },
+    { "name": "Evil Bat Eye", "quantity": 10, "tickets": 20, "minLevel": 40, "sheetMaxTurnins": null },
+    { "name": "Glowing Scorpid Blood", "quantity": 10, "tickets": 20, "minLevel": 40, "sheetMaxTurnins": null },
+    { "name": "Dense Grinding Stone", "quantity": 8, "tickets": 20, "minLevel": 40, "sheetMaxTurnins": null },
+    { "name": "Thorium Widget", "quantity": 6, "tickets": 20, "minLevel": 40, "sheetMaxTurnins": null },
+    { "name": "Rugged Armor Kit", "quantity": 8, "tickets": 20, "minLevel": 40, "sheetMaxTurnins": null }
+  ]
+}

@@ -515,6 +515,12 @@ describe("a guide's page", () => {
 });
 
 describe("the guide index", () => {
+  test("links the community Darkmoon reference separately from reviewed class plans", async () => {
+    const html = await index();
+    expect(html).toContain('href="/guides/darkmoon-faire"');
+    expect(visible(html)).toContain("Community-sourced checklist, unverified in Forever");
+    expect(dom(html).querySelectorAll('[data-guide="darkmoon-faire"]')).toHaveLength(0);
+  });
   const listed = (html: string) => [...dom(html).querySelectorAll("[data-guide]")].map((li) => li.getAttribute("data-guide"));
 
   test("lists the published guides by class with the state of any that is not current, never a draft; an empty index says so and stays out of search", async () => {
