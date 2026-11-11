@@ -7,7 +7,7 @@ local E = Everloot
 -- The game passes the folder name as the first argument of each file; a folder extracted as Everloot-0.3.20 is still this addon.
 local addonName = ... or "Everloot"
 
-E.VERSION = "0.3.22"
+E.VERSION = "0.3.23"
 E.MAX_ROWS_PER_KIND = 2000
 -- Boss pull timing, dungeon and raid runs, and pull summaries (docs/design/specs/2026-11-02-pull-and-run-records-design.md).
 -- Off in every build made from this file, nightlies included: openworld.lua then writes encounter rows as before,
