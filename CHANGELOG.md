@@ -469,7 +469,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - MCP: rank answering claims before subject matches, state unavailable requested facts,
   and report separate answerability rates.
 
-## [0.3.23] - 2026-11-10
+## [0.3.23] - 2026-11-11
 
 Release channel: Alpha
 
