@@ -1,0 +1,34 @@
+name: Backup role
+on:
+  pull_request:
+    paths: ['supabase/**', '.github/workflows/backup-role.yml']
+permissions:
+  contents: read
+jobs:
+  backup-role:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: disposable-ci-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGDATABASE: postgres
+      PGPASSWORD: disposable-ci-only
+    steps:
+      - uses: actions/checkout@v7
+      - name: Apply twice and verify effective permissions and real RLS reads
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/backup_exporter_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261110180000_backup_exporter_role.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261110180000_backup_exporter_role.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/backup_exporter.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/backup_exporter_behavior.sql
