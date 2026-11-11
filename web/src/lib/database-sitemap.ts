@@ -1,4 +1,4 @@
-import { loadWikiEntityNames } from "./wiki-entity-names";
+import { loadWikiEntityNames, shownNpcName } from "./wiki-entity-names";
 import { itemPage } from "../../../kb/src/item-page";
 import { objectPage } from "../../../kb/src/object-page";
 import { npcPage, questPage, vendorPage } from "../../../kb/src/world-pages";
@@ -80,9 +80,9 @@ export async function databasePaths(): Promise<string[] | null> {
   const npcRows = byKey(world.npcs, (r) => r.npcId);
   const npcWiki = await loadWikiEntityNames("npc");
   const spellWiki = await loadWikiEntityNames("spell");
-  const npcs = ascending([...npcRows.keys(), ...(npcWiki?.names.keys() ?? [])]).filter((id) => {
+  const npcs = ascending(npcRows.keys()).filter((id) => {
     const page = npcPage(id, { ...none, npcs: npcRows.get(id) ?? [] });
-    return npcIndexable({ ...page, name: page.name ?? npcWiki?.names.get(id)?.name ?? null }, false);
+    return npcIndexable({ ...page, name: shownNpcName(id, { ...none, npcs: npcRows.get(id) ?? [] }, npcWiki).name ?? null }, false);
   });
   const questRows = byKey(world.quests, (r) => r.questId);
   const quests = ascending(questRows.keys()).filter((id) => questIndexable(questPage(id, { ...none, quests: questRows.get(id)!, npcs: world.npcs }), false));

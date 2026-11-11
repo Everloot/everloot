@@ -15,10 +15,12 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: a visible bug button on every page opens the existing GitHub report form, with Discord and email alternatives and private page URLs omitted.
 - Site: item pages' social cards show the item's game icon (text-only when the art is off or unreadable), and on wide screens entity pages move their summary, facts and map into a right column.
+- Site: show labelled, linked Warcraft Wiki NPC names when one or two installs unanimously report a matching name.
+- Docs: describe NPC name agreement, the private version 2 catalog and the inert spell wiki path.
 - Site: show labelled Warcraft Wiki names for NPCs and unnamed spells, and anonymous unconfirmed item stat values from one or two players.
 - Docs: document wiki name fallbacks and labelled partial stat reports.
-- Addon: Collection lists dungeons, raids and unconfirmed world bosses, with local boss kills and weekly lockouts.
 - Site: keep local boss-kill history out of public upload batches.
 - Docs: explain how to regenerate Collection instance data and its agreement snapshot.
 - Site: search engines and AI assistants now find more of the site: spell pages that create, cost or teach
@@ -33,34 +35,20 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the armory opens at `/armory`: a page for every WoW Forever character and guild that Blizzard's API returns,
   read hourly, with guild rosters, three boards (item level, gear score, honorable kills), a form to hide a character
   and a form to ask for one. Each page says "Data from Blizzard Entertainment", carries no ad and is not indexed yet.
-- Addon: the Collection tab gains a Quests section, each quest chain you have started with how many of its quests are
-  done, and a This character / Account switch. Account counts every character you log in with and names the one that
-  has each achievement, title, reputation, lockout or chain. It reads what the completion tracker already keeps;
-  nothing new is recorded or uploaded.
 - Knowledge base: the open data export's game-files folder gains one file per committed catalog (achievements, factions,
   titles, quest lines, mounts, encounters, recipes, class gear and its restrictions, class spells, races, legacy perks,
   talent nodes, raid buffs): ids, the names the files hold and each file's build, every row counted, with a schema each
   and a manifest line. The README and the download page no longer list the catalogs as missing. Nothing observed changes.
-- Addon: `/everloot where` finds an item's drops and vendors or an NPC's locations in your own saved sightings, with counts and a site link.
 - Site: every record kind has a docs page, `/docs/api/records/<kind>`, generated from its schema: each field with its type,
   whether it is required and its description, nested fields included, whether the kind is in the public corpus, where it
   goes, and the cross-field rules the server checks. The sidebar lists them and the schemas table links each kind to its page.
 - Site: the API docs list the site-internal routes, `/api/suggest` and `/api/map/pins`, with a note that they serve the site's pages, may change without notice and are not part of the protocol.
-- Addon: the window's Professions tab has a Crafting costs page: each recipe you have recorded with its reagents' cost
-  at market value (or a cheaper vendor price), the product's value per item and an estimated profit assuming one item
-  per craft, sorted by that estimate or name, with the price file's age. A reagent without a price shows the cost as unknown, never zero. Pick a recipe
-  and a count for a what-to-buy list of reagents and their total.
 - Site: the account guide and the addon page link the sample character page (/showcase/character), so a player can see
   what a character page holds before linking one. The sample stays out of search and the sitemap.
-- Addon: item tooltips show your own history with the item on this realm, from the gold ledger in your saved file:
-  your last sale (day and price per unit), your average sale and units sold over the last 90 days, sales waiting for
-  their mailbox letter, and what you paid where the ledger knows it. An item you never sold says nothing. Three new
-  switches on the settings page turn prices, your history and sources in tooltips on or off; all start on.
 - Site: a profession page answers to its skill line id, `/tools/professions/171` or `/tools/professions/171-alchemy`, and
   redirects for good to the slug page it already had, keeping the skill range and class context in the query; an unknown id
   is a 404 and no existing URL changes. The MCP profession_path and recipe_thresholds links carry the id in that form.
 - Site: NPC pages show agreed goods and quests with their reports, link to the vendor, and show level, type and reaction even before players agree on a name.
-- Addon: the Gold Overview shows earned, spent and profit for the selected period and character or account, with daily averages, top items and pending sales.
 - Site: vendor, achievement, quest chain, zone and instance pages carry In short and Copy for AI like the other database
   pages, each line saying how many installs agree and when, or that nobody has reported it yet; a vendor links its NPC's
   card as Raw JSON. An achievement page also links the Collections tool and says under its criteria what Confirmed means
@@ -214,14 +202,11 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: Quest pages link their chain, previous and next quests, and reported zone; chain lists explain quests whose names are not reported yet.
 - Site: object, instance, faction, title, achievement and vendor pages now link the Warcraft Wiki lore page of the same name, item pages do too when the name shown is the wiki's, and lore pages link back to the database page (zone, instance, object, faction, title, achievement, NPC, item or quest). A link needs an exact name that only one page has on each side; a name two pages share gets no link. Zone pages follow the same rule, and a Warcraft Wiki copy is indexed and listed in the lore sitemap exactly when it links back.
 - Site: spell and vendor links show hover cards, with the spell text and build or the vendor's agreed goods count.
-- Addon: shopping lists. The Everloot tab at the auction house has a Shopping list page: named lists of items with a wanted count and an optional max price per unit, each beside the price file's market value and its age, and a Search button that sends one auction-house search per press when the client's throttle allows (the lowest buyout found shows in the row; you buy from the Buy tab yourself). The Professions tab's what-to-buy list adds a recipe's reagents. Saved in your file only, up to 10 lists of 50 items; bags and bank are not read.
 - Site: the home page now states the site's promise, "Every fact shows how many players saw it, and when", with three counts under it: the installs that have reported, the facts they have confirmed and the facts waiting on one or two more installs, each with the data date and build, or "unrecorded" when the stored coverage score cannot be read. An empty loot tab on an NPC, item or object page now ends on how many installs it takes, beside the Get the addon link, and the MCP server's instructions state the same promise.
 - Site: /database/recent and its RSS feed list the entities whose facts reached three installs in the last 30 days;
   dates from before the feed existed are marked estimated.
 
 ### Fixed
-- Addon: the other addons' buttons in the Everloot minimap drawer no longer look greyed out. LibDBIcon locks each
-  button under the drawer's panel, so the drawer now lifts that lock before raising them above it.
 - Site: the header shows the build whose files the site reads and the newest build seen, each linked to what it means.
 - Site: /api/suggest spends the per-IP quota and shares one edge cache entry for `Thunder` and `thunder `, the coverage 400 and waitlist 503 are `no-store` (the 503 adds `Retry-After`), and the docs list every route that sends CORS from one file.
 - Site: when a database or tools page can't be read, you now get a "Database unavailable" or "Tool unavailable" page that says it could not be read, not that it is empty, with a Try again button and a link back to the section, instead of the generic error page.
@@ -346,11 +331,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   price apart and name it; "All houses" lists every house's rows side by side. `/api/market/prices` without `house`
   answers only from scans that recorded no house. Days folded before this change still mix houses until they age out.
 - Site: the local gold ledger keeps two characters with the same name and realm from different installs apart.
-- Addon: tooltips, `/everloot price` and crafting costs read the community price of your character's own auction house,
-  or the open auctioneer's, and say which. An older price file keyed by realm alone is not read, since its values may mix
-  both factions; the tooltip and `/everloot price` say so, also beside your own scan. Your own scans are kept per realm
-  and house; an older scan that did not record its house says so. Update the addon and the Desktop App together, then
-  `/reload`: the 0.3.22 addon release or earlier shows no community prices from the new price file.
 - Site: the home page banner no longer makes the page a few pixels wider than the window on a computer with a
   scrollbar, so the page has nothing to scroll sideways at any width.
 
@@ -358,9 +338,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: keep build links reachable below 1280px, omit empty game-art frames, show coin images and
   quality borders, round the header build pill, and compact the cookie strip with equal Accept and Reject.
 - Site: the home and addon pages no longer say live-client verification is pending: the addon was checked in the live Forever client on 0.3.22.
-- Addon: the settings are split into four short pages under Everloot in the game's AddOns list: General, Auction
-  house, Shared with Everloot and Your characters. Everloot itself is an overview of what your saved file holds.
-  The Ask box left the settings page, because an answer needs the Desktop App and two reloads; `/ask` still works.
 - Site: hover cards on item, NPC, quest and object links open faster. The card's frame shows at once with the name
   and quality colour the link already has, then fills in; a card you hovered before opens whole with no wait; and the
   site keeps each card ready for every visitor instead of working it out again on each hover. A card that could not be
@@ -483,7 +460,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - MCP: rank answering claims before subject matches, state unavailable requested facts,
   and report separate answerability rates.
 
-## [desktop-v0.1.22] - 2026-11-10
+## [desktop-v0.1.22] - 2026-11-11
 
 A Reports page for your local ledger, a guide that covers every page, and price files fetched and written per auction
 house. Addon 0.3.23 reads that per-house file: update the addon and the Desktop App together, then `/reload`, or
@@ -503,6 +480,49 @@ tooltips show no community prices. Builds are still unsigned.
 - The command-line uploader: the command line's `main` takes its uploader, price refresher, file watcher and console as an optional argument,
   with the real ones as defaults, so the watch and prices loop is tested with fakes (upload then prices on each settled
   write, prices alone, a failed refresh that keeps the previous file, upload never writing prices). Nothing it sends changes.
+
+## [0.3.23] - 2026-11-11
+
+Release channel: Alpha
+
+Shopping lists at the auction house, a Crafting costs page with each recipe's reagent cost and profit, your own sale
+history in item tooltips, and a Gold Overview with profit for the period. Collection adds your quest chains and a
+Dungeons & raids section that lists your own boss kills, kept on your computer. The settings are split into four short
+pages under Everloot in the game's AddOns list. Community prices now come from your own faction's auction house:
+update the Everloot Desktop App to 0.1.22 at the same time and `/reload`, or tooltips show no community prices. Not yet
+known in the Forever client: whether open-world boss kills are reported (`/everloot status` counts them).
+
+### Added
+- Collection lists dungeons, raids and unconfirmed world bosses, with local boss kills and weekly lockouts.
+- The Collection tab gains a Quests section, each quest chain you have started with how many of its quests are
+  done, and a This character / Account switch. Account counts every character you log in with and names the one that
+  has each achievement, title, reputation, lockout or chain. It reads what the completion tracker already keeps;
+  nothing new is recorded or uploaded.
+- `/everloot where` finds an item's drops and vendors or an NPC's locations in your own saved sightings, with counts and a site link.
+- The window's Professions tab has a Crafting costs page: each recipe you have recorded with its reagents' cost
+  at market value (or a cheaper vendor price), the product's value per item and an estimated profit assuming one item
+  per craft, sorted by that estimate or name, with the price file's age. A reagent without a price shows the cost as unknown, never zero. Pick a recipe
+  and a count for a what-to-buy list of reagents and their total.
+- Item tooltips show your own history with the item on this realm, from the gold ledger in your saved file:
+  your last sale (day and price per unit), your average sale and units sold over the last 90 days, sales waiting for
+  their mailbox letter, and what you paid where the ledger knows it. An item you never sold says nothing. Three new
+  switches on the settings page turn prices, your history and sources in tooltips on or off; all start on.
+- The Gold Overview shows earned, spent and profit for the selected period and character or account, with daily averages, top items and pending sales.
+- Shopping lists. The Everloot tab at the auction house has a Shopping list page: named lists of items with a wanted count and an optional max price per unit, each beside the price file's market value and its age, and a Search button that sends one auction-house search per press when the client's throttle allows (the lowest buyout found shows in the row; you buy from the Buy tab yourself). The Professions tab's what-to-buy list adds a recipe's reagents. Saved in your file only, up to 10 lists of 50 items; bags and bank are not read.
+
+### Fixed
+- The other addons' buttons in the Everloot minimap drawer no longer look greyed out. LibDBIcon locks each
+  button under the drawer's panel, so the drawer now lifts that lock before raising them above it.
+- Tooltips, `/everloot price` and crafting costs read the community price of your character's own auction house,
+  or the open auctioneer's, and say which. An older price file keyed by realm alone is not read, since its values may mix
+  both factions; the tooltip and `/everloot price` say so, also beside your own scan. Your own scans are kept per realm
+  and house; an older scan that did not record its house says so. Update the addon and the Desktop App together, then
+  `/reload`: the 0.3.22 addon release or earlier shows no community prices from the new price file.
+
+### Changed
+- The settings are split into four short pages under Everloot in the game's AddOns list: General, Auction
+  house, Shared with Everloot and Your characters. Everloot itself is an overview of what your saved file holds.
+  The Ask box left the settings page, because an answer needs the Desktop App and two reloads; `/ask` still works.
 
 ## [desktop-v0.1.21] - 2026-11-10
 

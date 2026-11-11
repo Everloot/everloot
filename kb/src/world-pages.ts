@@ -8,6 +8,7 @@
 import type { RecheckScope } from "./coverage.js";
 import { pendingForNpc, pendingLine, pendingLootFromRecords, type PendingCount, type PendingLoot } from "./pending-loot.js";
 import { recheckRows, tallyVotes, WORLD_AGREEMENT } from "./fact-states.js";
+import { normName } from "./name-normalization.js";
 import { npcZones, scopeSince, type ScopedFact } from "./recheck-scopes.js";
 
 export { WORLD_AGREEMENT } from "./fact-states.js";
@@ -259,6 +260,15 @@ export function npcNameReporters(npcId: number, facts: WorldFacts): number {
   const tally = tallyVotes(names.map((row) => ({ installId: row.installId, value: row.label, ...at(row) })), since ? { recheckSince: since } : {});
   const most = Math.max(0, ...tally.groups.map((group) => group.voters.size));
   return most < WORLD_AGREEMENT ? most : 0;
+}
+
+/** A unanimous, below-threshold candidate for the site's wiki comparison. Never returns identities. */
+export function npcReportedName(npcId: number, facts: WorldFacts): string | null {
+  const { names, since } = npcRows(npcId, facts);
+  const rows = recheckRows(names.map((r) => ({ ...r, value: r.label })), since, { value: (r) => r.value }).rows;
+  const tally = tallyVotes(rows.map((r) => ({ ...r, value: normName(r.value) })));
+  const group = tally.groups[0];
+  return tally.groups.length === 1 && group && group.voters.size < WORLD_AGREEMENT ? String(group.value) : null;
 }
 
 export function npcPage(npcId: number, facts: WorldFacts): NpcPage {
