@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: filter auction browsing by region, including unknown-region records, with matching counts and compact realm names that preserve the full recorded label on hover.
 - Site: private operations dashboard with owner-excluded contribution activity, source health, cost estimates and compact realm badges; optional per-upload character attribution stays under the contributor's control.
 - Site: a visible bug button on every page opens the existing GitHub report form, with Discord and email alternatives and private page URLs omitted.
 - Site: item pages' social cards show the item's game icon (text-only when the art is off or unreadable), and on wide screens entity pages move their summary, facts and map into a right column.

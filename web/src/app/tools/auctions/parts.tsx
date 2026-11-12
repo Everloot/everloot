@@ -123,7 +123,7 @@ export function UnnamedReason({ id, names }: { id: number; names: ItemNames }) {
 export const PENDING_RULE = "A player is counted when they scanned the same item there on one day in the last 7 days; installs behind one upload address count once.";
 
 /** Realms with scans but no public price yet, each with how many of the 3 players have scanned there. Counts only. */
-export function PendingRealms({ realms }: { realms: PendingRealm[] }) {
+export function PendingRealms({ realms, href = realmHref }: { realms: PendingRealm[]; href?: (realm: PendingRealm) => string }) {
   return (
     <section aria-labelledby="ah-pending" className="mt-4">
       <h2 id="ah-pending" className="text-cell font-medium text-fg">Not public yet</h2>
@@ -132,7 +132,7 @@ export function PendingRealms({ realms }: { realms: PendingRealm[] }) {
         {realms.map((r) => (
           <li key={r.slug} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-cell">
             <span aria-hidden="true"><AgreementMeter count={r.reporters} /></span>
-            <Link href={realmHref(r)} className="text-fg hover:underline underline-offset-4"><RealmName name={r.realm} /></Link>
+            <Link href={href(r)} className="text-fg hover:underline underline-offset-4"><RealmName name={r.realm} /></Link>
             <span className="text-fg-2">{r.reporters} of {AGREEMENT_NEEDED} players have scanned; prices go public at {AGREEMENT_NEEDED}</span>
           </li>
         ))}

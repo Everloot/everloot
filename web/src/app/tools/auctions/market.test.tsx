@@ -199,8 +199,8 @@ test("with no realm public yet, the hub lists each realm with scans and how many
   const html = await hub({});
   const words = text(html);
   expect(words).toContain("No realm has public prices yet");
-  expect(words).toContain("CAMWOW US1 Realm 9 RP2 of 3 players have scanned; prices go public at 3");
-  expect(words).toContain("CAMWOW US1 Realm 4 PvP1 of 3 players have scanned; prices go public at 3");
+  expect(words).toContain("US1 · Realm 9 RP2 of 3 players have scanned; prices go public at 3");
+  expect(words).toContain("US1 · Realm 4 PvP1 of 3 players have scanned; prices go public at 3");
   expect(words).toContain("A player is counted when they scanned the same item there on one day in the last 7 days; installs behind one upload address count once.");
   expect(html).toContain('href="/tools/auctions/camwow-us1-realm-9-rp"');
   expect(html).toContain('data-agreement="2"');

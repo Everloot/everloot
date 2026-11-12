@@ -2,7 +2,7 @@ import type { AuctionHouse } from "@everloot/protocol";
 import { QUALITIES, resolveClass, resolveSubclass, slotOf, type ItemClass, type ItemRow, type ItemSubclass } from "../../../../../kb/src/item-taxonomy";
 import { CLIENT_TAXONOMY as T } from "@/lib/items";
 import { HOUSES, houseParam, houseSlug, priceMove, type MarketRow, type Move } from "@/lib/auction-house";
-import { rulesetParam, type RulesetSlug } from "@/lib/realms";
+import { regionParam, rulesetParam, type RegionFilter, type RulesetSlug } from "@/lib/realms";
 
 /**
  * The Auction House's browse view: the category tree (the game's own: class, then subclass, then slot for
@@ -27,6 +27,7 @@ export interface AhQuery {
   house: AuctionHouse | null;
   /** The ruleset tab on the all-realms page; absent is every realm. */
   ruleset?: RulesetSlug;
+  region?: RegionFilter;
   cls?: ItemClass;
   sub?: ItemSubclass;
   slot?: string;
@@ -57,6 +58,8 @@ export function ahQuery(search: Search): AhQuery | null {
   if (house === undefined) return null;
   const ruleset = rulesetParam(one(search, "ruleset"));
   if (ruleset === undefined) return null;
+  const region = regionParam(one(search, "region"));
+  if (region === undefined) return null;
   const clsSlug = one(search, "class"), subSlug = one(search, "sub"), slot = one(search, "slot"), quality = one(search, "quality");
   const cls = clsSlug === undefined ? undefined : resolveClass(T, clsSlug);
   if (cls === null || (subSlug !== undefined && !cls)) return null;
@@ -74,7 +77,7 @@ export function ahQuery(search: Search): AhQuery | null {
   if (page !== undefined && !/^[1-9]\d{0,4}$/.test(page)) return null;
   const q = one(search, "q")?.trim().slice(0, 60);
   return {
-    ...(q ? { q } : {}), house, ...(ruleset ? { ruleset } : {}),
+    ...(q ? { q } : {}), house, ...(region ? { region } : {}), ...(ruleset ? { ruleset } : {}),
     ...(cls ? { cls } : {}), ...(sub ? { sub } : {}), ...(slot ? { slot } : {}), ...(quality ? { quality } : {}),
     ...(lvl ? { lvl } : {}), ...(moved ? { moved: true } : {}),
     ...(sorted ? { sort: { key: sorted[2] as AhSort, desc: sorted[1] === "-" } } : {}),
@@ -87,6 +90,7 @@ export function ahHref(path: string, q: Partial<AhQuery>): string {
   const params = new URLSearchParams();
   if (q.q) params.set("q", q.q);
   if (q.house) params.set("house", houseSlug(q.house));
+  if (q.region) params.set("region", q.region);
   if (q.ruleset) params.set("ruleset", q.ruleset);
   if (q.cls) params.set("class", q.cls.slug);
   if (q.cls && q.sub) params.set("sub", q.sub.slug);
