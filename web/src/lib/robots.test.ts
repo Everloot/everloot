@@ -1,6 +1,23 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "vitest";
 
+test("SEO-tool crawlers are disallowed while search and public access stay allowed", () => {
+  const robots = readFileSync("public/robots.txt", "utf8").replaceAll("\r\n", "\n");
+  const groups = robots.split(/\n\s*\n/).map((group) => ({
+    agents: [...group.matchAll(/^User-agent:\s*(.+)$/gm)].map((m) => m[1].trim()),
+    rules: [...group.matchAll(/^(Allow|Disallow):\s*(.+)$/gm)].map((m) => `${m[1]}: ${m[2].trim()}`),
+  }));
+  for (const agent of ["MJ12bot", "DotBot"]) {
+    expect(groups.find((group) => group.agents.includes(agent))?.rules).toEqual(["Disallow: /"]);
+  }
+  for (const agent of ["*", "Googlebot", "Bingbot", "OAI-SearchBot", "ChatGPT-User", "Claude-SearchBot", "Claude-User", "PerplexityBot"]) {
+    const group = groups.find((group) => group.agents.includes(agent))
+      ?? groups.find((group) => group.agents.includes("*"));
+    expect(group?.rules).toContain("Allow: /");
+    expect(group?.rules).not.toContain("Disallow: /");
+  }
+});
+
 test("public item subclasses and pagination are crawlable while filter permutations stay excluded", () => {
   const robots = readFileSync("public/robots.txt", "utf8").replaceAll("\r\n", "\n");
   const publicRules = robots.split("# AI search")[0];

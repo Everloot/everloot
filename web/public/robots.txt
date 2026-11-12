@@ -21,6 +21,11 @@ User-agent: Google-Extended
 User-agent: Applebot-Extended
 Disallow: /
 
+# SEO-tool crawlers do not need to index the site.
+User-agent: MJ12bot
+User-agent: DotBot
+Disallow: /
+
 # No ads run on the lore archive (Warcraft Wiki text); the AdSense crawler has no reason to read it.
 User-agent: Mediapartners-Google
 Disallow: /lore

@@ -4,7 +4,7 @@
  * the CDN-specific header carries the edge lifetime). A Worker's own responses skip
  * Cloudflare's cache, so the entry keeps them in the Cache API instead, for the same lifetime.
  *
- * Only a GET without credentials (a Cookie or an Authorization header), answered 200 with
+ * Only a GET (or HEAD using its GET copy) without credentials (a Cookie or an Authorization header), answered 200 with
  * `CDN-Cache-Control: max-age=N`, no `Set-Cookie` and no `Vary` on credentials, is kept. The pages that hold a
  * session or the account (data/protected-paths.json) never reach the cache at all. The key carries the content
  * versions the entry is built with, not the deployed commit: a deploy that changes another page, a test or an
@@ -249,12 +249,20 @@ export async function cachedResponse(
   ctx: EdgeCacheContext,
 ): Promise<Response> {
   request = withoutCredentials(request);
-  if (!edgeCacheable(request) || !versionsComplete(versions)) return handler(request);
+  const head = request.method === "HEAD";
+  const get = head ? new Request(request, { method: "GET" }) : request;
+  // Refuse credentials and private routes before changing what reaches the handler. HEAD keeps its
+  // credentials even on hover-card routes: withoutCredentials only opts GET into that exception.
+  if (!edgeCacheable(get) || !versionsComplete(versions)) return handler(request);
+  request = get;
   const key = edgeCacheKey(request, cacheVersionFor(new URL(request.url).pathname, versions));
   const hit = await store.match(key);
-  if (hit) return fromCache(hit);
+  if (hit) {
+    const res = fromCache(hit);
+    return head ? new Response(null, res) : res;
+  }
   const res = await handler(request);
   const ttl = edgeTtl(res);
   if (ttl) ctx.waitUntil(cacheCopy(res.clone(), ttl).then((copy) => store.put(key, copy)));
-  return res;
+  return head ? new Response(null, res) : res;
 }
