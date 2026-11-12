@@ -61,6 +61,7 @@ test("region browsing isolates recorded markets, scopes counts, and preserves th
   expect(us).not.toContain('/tools/auctions/camwow-eu2-realm-4-pvp');
   expect(us).not.toContain('/tools/auctions/forever/1366');
   expect(us).toContain('name="region" value="us"');
+  expect(us).toMatch(/<td[^>]*><a href="\/tools\/auctions\/camwow-us1-realm-4-pvp\?house=horde&amp;region=us"/);
   expect(us).toContain('title="CAMWOW US1 Realm 4 PvP"');
   expect(us).toContain('US1 · Realm 4');
   expect(headerQuery(us, "Units").get("region")).toBe("us");
@@ -78,6 +79,15 @@ test("region browsing isolates recorded markets, scopes counts, and preserves th
   const numeric = await hub({ region: "eu", q: "765", house: "horde" });
   expect(numeric).toContain('/tools/auctions/camwow-eu2-realm-4-pvp/765');
   expect(numeric).not.toContain('/tools/auctions/camwow-us1-realm-4-pvp');
+});
+
+test("pending realm links retain the selected region and exclude other regions", async () => {
+  const records = ["CAMWOW US1 Realm 9 RP", "CAMWOW EU1 Realm 9 RP"].flatMap((realm) =>
+    scans(dayAgo(0), [[2589, 200, 205]]).slice(0, 1).map((r) => ({ ...r, realm })));
+  store.loadMarket.mockResolvedValue({ state: foldMarket(emptyMarket(), records, today), dataAsOf: today.toISOString() });
+  const html = await hub({ region: "us" });
+  expect(html).toContain('href="/tools/auctions/camwow-us1-realm-9-rp?region=us"');
+  expect(html).not.toContain('/tools/auctions/camwow-eu1-realm-9-rp');
 });
 
 test("with the week's movers on and no sort named, the table is sorted by the change, so Units links to an explicit units sort the server reads back", async () => {

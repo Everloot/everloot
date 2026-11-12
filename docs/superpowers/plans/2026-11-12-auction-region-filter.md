@@ -13,7 +13,7 @@
 - [x] Add failing query and rendered-page tests for US/EU/unknown isolation, scoped counts and navigation preservation.
 - [x] Implement query parsing/serialization, board filtering, region menu and region-aware empty states.
 - [x] Add compact realm labels and recorded-market explanation without modifying canonical identities.
-- [ ] Run auction/realm regression tests, strict types and lint; review the diff.
+- [x] Run auction/realm regression tests, strict types and lint; review the diff. Full website suite: 5,605 passed, 30 skipped; production build passed. Review navigation findings fixed with two red/green checks; final focused suite: 62 passed and strict types passed.
 - [ ] Merge after required checks, verify deployment and production response, then update the shared handoff.
 
 Database receipt metrics and named attribution were implemented separately in #1158. Their production migration activation requires a database-write credential and is tracked separately from this filter change.
