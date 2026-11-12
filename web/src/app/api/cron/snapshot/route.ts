@@ -15,6 +15,7 @@ import { buildProfessions, writeProfessions } from "@/lib/profession-store";
 import { buildDatabaseActivity } from "@/lib/database-activity";
 import { writeDatabaseActivity } from "@/lib/database-activity-store";
 import { buildMapPins, writeMapPins } from "@/lib/map-pins-store";
+import { writeGuildLadder } from "@/lib/guild-ladder-store";
 
 /**
  * GET /api/cron/snapshot — the Worker's Cron Trigger (src/lib/cf-crons.ts, every 10 minutes) extends the corpus snapshot with new uploads,
@@ -170,13 +171,20 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("database activity failed", err);
     }
+    // Guild authority is checked even on idle runs; hides stay live in the page/tool reader.
+    let guildLadder: { written: boolean; bytes?: number } | null = null;
+    try {
+      guildLadder = await writeGuildLadder({ added: result.added, rebuild, dataAsOf: result.dataAsOf });
+    } catch (err) {
+      console.error("guild ladder failed", err);
+    }
     // A rollup with uploads left over is pending: the next run folds them even when no new upload arrived.
     await uploadStore.writeCronRun(
       completion.remaining > 0 || completion.rebuilding || (market.remaining ?? 0) > 0 || (census?.remaining ?? 0) > 0,
       result.dataAsOf,
       settled?.written ? week : work.settledWeek ?? null,
     );
-    return NextResponse.json({ ok: true, rebuild, ...result, market, completion, coverage, settled, census, itemView, aggregates, auctionHistory, professions, mapPins, databaseActivity });
+    return NextResponse.json({ ok: true, rebuild, ...result, market, completion, coverage, settled, census, itemView, aggregates, auctionHistory, professions, mapPins, databaseActivity, guildLadder });
   } catch (err) {
     console.error("snapshot failed", err);
     return NextResponse.json({ ok: false, error: "snapshot failed" }, { status: 500 });

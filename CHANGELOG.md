@@ -339,6 +339,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Desktop App: restoring the oldest backup keeps the selected save and an undo copy, even within the same second.
 
 ### Changed
+
+- Site: Read guild ladders from the stored snapshot while checking publication authority and hides on every request.
 - Site: ask MJ12bot and DotBot not to crawl the site while keeping search engines and AI search access allowed.
 - Site: cache public auction browse pages for five minutes while reusing realm boards per market rollup.
 - Site: HEAD requests reuse cached public pages and warm their GET copy on a miss, without returning a body.

@@ -27,9 +27,12 @@ vi.mock("@/lib/map-pins-store", () => mapPins);
 const activity = vi.hoisted(() => ({ writeDatabaseActivity: vi.fn(), buildDatabaseActivity: vi.fn() }));
 vi.mock("@/lib/database-activity-store", () => ({ writeDatabaseActivity: activity.writeDatabaseActivity }));
 vi.mock("@/lib/database-activity", () => ({ buildDatabaseActivity: activity.buildDatabaseActivity }));
+const guilds = vi.hoisted(() => ({ writeGuildLadder: vi.fn() }));
+vi.mock("@/lib/guild-ladder-store", () => guilds);
 import { GET } from "./route";
 beforeEach(() => {
   store.loadCorpus.mockReset();
+  guilds.writeGuildLadder.mockReset().mockResolvedValue({ written: false });
   activity.writeDatabaseActivity.mockReset().mockResolvedValue({ written: false });
   professions.writeProfessions.mockReset().mockResolvedValue({ written: false });
   mapPins.writeMapPins.mockReset().mockResolvedValue({ written: false });
@@ -374,4 +377,12 @@ test("database activity is isolated, has a response key and shares the lazy corp
   const res = await GET(req());
   expect(res.status).toBe(200);
   expect(await res.json()).toMatchObject({ ok: true, databaseActivity: null });
+});
+
+test("the snapshot refreshes the guild ladder even when no new uploads arrive and isolates a failed write", async () => {
+  store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-11-12", settledWeek: "2026-W43" });
+  expect((await GET(req())).status).toBe(200);
+  expect(guilds.writeGuildLadder).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-11-12" });
+  guilds.writeGuildLadder.mockRejectedValueOnce(new Error("publication unavailable"));
+  expect((await GET(req())).status).toBe(200);
 });
