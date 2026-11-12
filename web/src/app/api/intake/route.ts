@@ -18,6 +18,7 @@ import { isRecorderInstall } from "../../../../../kb/src/recorder-installs";
 import { RECORDER_KINDS, RECORDER_SOURCE, recorderCharacter } from "@/lib/polestar-recorder";
 import { settledForIntake, settledTally, settledTallyOn } from "@/lib/settled-store";
 import { matchSettled } from "../../../../../kb/src/settled-list";
+import { outcomeReason, recordIntakeTelemetry, type IntakeTelemetry } from "@/lib/ops/telemetry";
 
 /**
  * POST /api/intake — step 1: parse + store the accepted records, return a receipt.
@@ -41,6 +42,21 @@ async function admission(check: () => Promise<QuotaResult>) {
 }
 
 export async function POST(req: Request) {
+  const telemetry: Omit<IntakeTelemetry, "reason"> = {};
+  try {
+    const response = await handleIntake(req, telemetry);
+    // Read only the final receipt, after every required store has confirmed persistence.
+    const body = await response.clone().json().catch(() => null) as { ok?: boolean; accepted?: unknown[]; rejected?: unknown[] } | null;
+    recordIntakeTelemetry({ ...telemetry, reason: outcomeReason(response.status),
+      records: body?.ok ? body.accepted?.length ?? 0 : 0, rejectedRecords: body?.rejected?.length ?? 0 });
+    return response;
+  } catch (error) {
+    recordIntakeTelemetry({ reason: "internal_failure" });
+    throw error;
+  }
+}
+
+async function handleIntake(req: Request, telemetry: Omit<IntakeTelemetry, "reason">) {
   const requestDenied = await admission(() => intakeQuota.request(req));
   if (requestDenied) return requestDenied;
   recordUsage("api.intake");
@@ -75,6 +91,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, ...receipt }, { status: 422 });
   }
   const upload: CanonicalUpload = parsed.upload;
+  const telemetryRecords = new Map(receipt.accepted.map((entry, i) => [entry.index, upload.records[i]]));
   // Rows converted from a Polestar Recorder file come with a character id the browser hashed; the server gives them
   // their install id, so a player cannot pick several. See lib/polestar-recorder.ts.
   const recorder = upload.source === RECORDER_SOURCE;
@@ -249,6 +266,10 @@ export async function POST(req: Request) {
     );
   }
   const installId = [...installs][0];
+  telemetry.installId = installId;
+  const acceptedRows = accepted.map(entry => telemetryRecords.get(entry.index)).filter((row): row is NonNullable<typeof row> => !!row);
+  telemetry.realms = [...new Set(acceptedRows.map(row => "realm" in row && typeof row.realm === "string" ? row.realm : "").filter(Boolean))];
+  telemetry.kinds = [...new Set(acceptedRows.map(row => row.kind))];
   // The index keeps the install id as Postgres text, which cannot hold a NUL or half of a UTF-16 pair. The protocol
   // allows any 8 to 64 characters, so without this the index insert refuses the row after the object is written,
   // and the upload answers 503 on every retry.
