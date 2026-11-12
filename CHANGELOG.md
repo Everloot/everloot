@@ -333,6 +333,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the local gold ledger keeps two characters with the same name and realm from different installs apart.
 - Site: the home page banner no longer makes the page a few pixels wider than the window on a computer with a
   scrollbar, so the page has nothing to scroll sideways at any width.
+- Desktop App: restoring the oldest backup keeps the selected save and an undo copy, even within the same second.
 
 ### Changed
 - Site: keep build links reachable below 1280px, omit empty game-art frames, show coin images and
