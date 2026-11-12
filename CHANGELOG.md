@@ -339,6 +339,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Changed
 - Site: ask MJ12bot and DotBot not to crawl the site while keeping search engines and AI search access allowed.
+- Site: cache public auction browse pages for five minutes while reusing realm boards per market rollup.
 - Site: HEAD requests reuse cached public pages and warm their GET copy on a miss, without returning a body.
 - Site: keep build links reachable below 1280px, omit empty game-art frames, show coin images and
   quality borders, round the header build pill, and compact the cookie strip with equal Accept and Reject.
