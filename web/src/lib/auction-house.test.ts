@@ -155,3 +155,16 @@ test("a realm with scans but no public price is pending, counted by upload addre
   expect(pendingRealms(emptyMarket(), now)).toEqual([]);
   expect(JSON.stringify(pendingRealms(pending, now))).not.toMatch(/install-|aaaa/);
 });
+
+test("realm boards reuse each state, house and UTC day without changing their values", () => {
+  const rollup = structuredClone(state);
+  for (const house of [null, "Alliance", "Horde", "Neutral"] as const) {
+    const first = realmBoards(rollup, now, house);
+    expect(realmBoards(rollup, new Date(now.getTime() + 1000), house)).toBe(first);
+    expect(first).toEqual(realmBoards(structuredClone(state), now, house));
+    const tomorrow = new Date(now.getTime() + 86_400_000);
+    const next = realmBoards(rollup, tomorrow, house);
+    expect(next).not.toBe(first);
+    expect(next).toEqual(realmBoards(structuredClone(state), tomorrow, house));
+  }
+});
