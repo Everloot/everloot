@@ -15,7 +15,7 @@ import {
   AH_PATH, HOUSES, agreementSoFar, crossRealmHref, findBoard, houseCounts, itemHref, itemIdParam, money, onRuleset, pendingRealms, percent, realmBoards,
   realmHref, rulesetSummaries, slugWords,
 } from "@/lib/auction-house";
-import { AFTER_LAUNCH, RULESET_LABEL, isRulesetSlug, mappedRulesets, realmRuleset } from "@/lib/realms";
+import { AFTER_LAUNCH, REGION_LABEL, RULESET_LABEL, inRegion, isRulesetSlug, mappedRulesets, realmRegion, realmRuleset, type RegionFilter } from "@/lib/realms";
 import { auctionNames, itemArt, type ItemTip } from "./art";
 import {
   AH_PER_PAGE, DEFAULT_SORT, activeFilters, ahHref, ahQuery, browseRows, categoryRow, categoryTree, inCategory,
@@ -34,7 +34,7 @@ const bracket = (r: { min: number; max: number }) => (r.min === r.max ? String(r
 const WIDE_SORTS: AhSort[] = ["name", "ilvl", "req"];
 
 /** Only the plain view is indexed; a filter, a house, a ruleset, a sort or a later page points its canonical at it. */
-export const isPlainView = (q: AhQuery) => activeFilters(q) === 0 && !q.house && !q.ruleset && !q.sort && q.page === 1;
+export const isPlainView = (q: AhQuery) => activeFilters(q) === 0 && !q.house && !q.region && !q.ruleset && !q.sort && q.page === 1;
 
 /** A house tab's item count: read out everywhere, drawn from 640 px up so the four tabs fit a phone. */
 function HouseCount({ n }: { n: number }) {
@@ -67,16 +67,16 @@ function TreeItem({ node, depth }: { node: TreeNode; depth: number }) {
 export async function browseView({ slug, search }: { slug: string | null; search: Search }) {
   const q = ahQuery(search);
   if (!q) notFound();
-  // An item id typed in the search box goes to the item's own page.
+  // Keep numeric searches in the browse view when a region is selected, so it cannot be lost in a redirect.
   const typedId = q.q ? itemIdParam(q.q) : null;
-  if (typedId) redirect(slug ? itemHref({ slug }, typedId) : crossRealmHref(typedId));
+  if (typedId && !q.region) redirect(slug ? itemHref({ slug }, typedId) : crossRealmHref(typedId));
 
   const path = slug ? realmHref({ slug }) : AH_PATH;
   const now = new Date();
   const market = await uploadStore.loadMarket();
   const state = market.state;
-  const realmWide = state ? realmBoards(state, now) : [];
-  const boards = state ? realmBoards(state, now, q.house) : [];
+  const realmWide = state ? realmBoards(state, now).filter((b) => inRegion(b.realm.name, q.region)) : [];
+  const boards = state ? realmBoards(state, now, q.house).filter((b) => inRegion(b.realm.name, q.region)) : [];
   // A realm is on one ruleset, so the ruleset tabs are the all-realms page's only.
   const ruleset = slug ? null : q.ruleset ?? null;
   const rulesetName = ruleset ? RULESET_LABEL[ruleset] : null;
@@ -90,7 +90,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
   const wide = Boolean(q.q || q.lvl) || WIDE_SORTS.includes(q.sort?.key as AhSort);
 
   // The ruleset tabs and their summary, counted across every house so they do not change with the house tab.
-  const summaries = state && !slug ? rulesetSummaries(state, now) : [];
+  const summaries = state && !slug ? rulesetSummaries(state, now, null, q.region) : [];
   // The summary is the unfiltered first page's; a search or filter shows only its results.
   const summaryRows = activeFilters(q) || q.page > 1 ? [] : ruleset ? summaries.filter((r) => r.ruleset === ruleset) : summaries;
   // The summary's movers are named in the same read as the results, so the page reads the corpus once.
@@ -123,7 +123,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
   const trail: Crumb[] = [...trailFor(AH_PATH)!, ...(slug ? [{ name: title, path }] : [])];
   const showRealm = !slug;
 
-  const counts = state ? houseCounts(state, now, slug ?? undefined, ruleset) : new Map<AuctionHouse | null, number>();
+  const counts = state ? houseCounts(state, now, slug ?? undefined, ruleset, q.region) : new Map<AuctionHouse | null, number>();
   const houseTabs = [
     { href: here({ house: null }), label: <>All<span className="sr-only sm:not-sr-only sm:ml-1"> houses</span><HouseCount n={counts.get(null) ?? 0} /></>, current: !q.house },
     ...HOUSES.map((h) => ({ href: here({ house: h }), label: <>{h}<HouseCount n={counts.get(h) ?? 0} /></>, current: q.house === h })),
@@ -138,7 +138,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
 
   // Realms with scans but no public price, on the all-realms page's plain first page: counted across every house.
   const pending = state && !slug && !q.house && activeFilters(q) === 0 && q.page === 1
-    ? pendingRealms(state, now).filter((p) => !ruleset || realmRuleset(p.realm) === ruleset)
+    ? pendingRealms(state, now).filter((p) => inRegion(p.realm, q.region) && (!ruleset || realmRuleset(p.realm) === ruleset))
     : [];
 
   const inCat = rows.filter((r) => inCategory(r.value.itemId, q));
@@ -148,6 +148,15 @@ export async function browseView({ slug, search }: { slug: string | null; search
     if (x !== undefined && x !== null) qualityCount.set(x, (qualityCount.get(x) ?? 0) + 1);
   }
   const controls: FilterControl[] = [
+    {
+      type: "menu", key: "region", label: "Region",
+      options: [
+        { label: "All regions", href: ahHref(AH_PATH, { ...q, region: undefined, page: 1 }), on: !q.region, reset: true },
+        ...(Object.keys(REGION_LABEL) as RegionFilter[]).map((region) => ({
+          label: REGION_LABEL[region], href: ahHref(AH_PATH, { ...q, region, page: 1 }), on: q.region === region,
+        })),
+      ],
+    },
     {
       type: "menu", key: "realm", label: "Realm",
       options: [
@@ -175,7 +184,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
   ];
   // The search box keeps every other filter (not the page) as hidden fields.
   const keep = Object.fromEntries(new URLSearchParams(ahHref("", { ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
-  const clearHref = ahHref(path, { house: q.house, ruleset: q.ruleset });
+  const clearHref = ahHref(path, { house: q.house, region: q.region, ruleset: q.ruleset });
 
   const listings = shown.some((b) => b.row.listings !== null);
   const columns: Column<BrowseRow>[] = [
@@ -183,7 +192,8 @@ export async function browseView({ slug, search }: { slug: string | null; search
       key: "name", header: "Item", sortable: true,
       cell: ({ row }) => <ItemLink id={row.value.itemId} href={itemHref(row.realm, row.value.itemId)} tip={tips.get(row.value.itemId)} names={names} />,
     },
-    ...(showRealm ? [{ key: "realm", header: "Realm", nowrap: true, cell: ({ row }: BrowseRow) => <Link href={ahHref(realmHref(row.realm), { house: q.house })} className="text-fg-2 hover:text-fg hover:underline underline-offset-4"><RealmName name={row.realm.name} /></Link> }] : []),
+    ...(showRealm ? [{ key: "realm", header: "Realm", nowrap: true, cell: ({ row }: BrowseRow) => <Link href={ahHref(realmHref(row.realm), { house: q.house, region: q.region })} className="text-fg-2 hover:text-fg hover:underline underline-offset-4"><RealmName name={row.realm.name} /></Link> }] : []),
+    ...(showRealm ? [{ key: "region", header: "Region", nowrap: true, cell: ({ row }: BrowseRow) => REGION_LABEL[realmRegion(row.realm.name) ?? "unknown"] }] : []),
     // Every row is one house's price; with every house shown, the row says which.
     ...(!q.house ? [{ key: "house", header: "House", nowrap: true, cell: ({ row }: BrowseRow) => row.house }] : []),
     { key: "ilvl", header: "iLvl", numeric: true, sortable: true, cell: ({ row }) => tips.get(row.value.itemId)?.level || <span className="text-muted">—</span> },
@@ -224,14 +234,15 @@ export async function browseView({ slug, search }: { slug: string | null; search
   } else if (rows.length === 0 && ruleset && AFTER_LAUNCH.has(ruleset) && !mapped.has(ruleset)) {
     body = <EmptyState message={`${rulesetName} opens after launch, and no realm is on ${rulesetName} yet.`} />;
   } else if (rows.length === 0 && ruleset) {
-    body = <EmptyState message={`No public prices on ${rulesetName} realms${q.house ? ` in the ${q.house} auction house` : ""} yet: a price shows once 3 players scan the same item on one of them.`} />;
+    body = <EmptyState message={`No public prices on ${rulesetName} realms${q.region ? ` in ${REGION_LABEL[q.region]}` : ""}${q.house ? ` in the ${q.house} auction house` : ""} yet: a price shows once 3 players scan the same item on one of them.`} />;
   } else if (rows.length === 0) {
-    const where = `${q.house ? `the ${q.house} auction house on ` : ""}${realmName ?? (q.house ? "any realm" : "")}`;
+    const where = `${q.house ? `the ${q.house} auction house on ` : ""}${realmName ?? (q.house ? "any realm" : "")}${q.region && !realmName ? ` in ${REGION_LABEL[q.region]}` : ""}`;
     body = slug
       ? <EmptyState count={agreementSoFar(state, slug, undefined, q.house)} message={`No public prices in ${where} yet: a price shows once 3 players scan the same item there.`} />
       : <EmptyState message={q.house
         ? `No public prices in ${where} yet: a price shows once 3 players scan the same item in that house.`
-        : "No realm has public prices yet: a realm shows here once 3 players scan the same item there."} count={pending[0]?.reporters ?? 0} />;
+      : q.region ? `No public prices in ${REGION_LABEL[q.region]} yet: a price shows once 3 players scan the same item in one recorded market.`
+      : "No realm has public prices yet: a realm shows here once 3 players scan the same item there."} count={pending[0]?.reporters ?? 0} />;
   } else {
     const empty = (
       <div className="flex flex-wrap items-center gap-2 py-4 text-cell text-fg-2">
@@ -309,7 +320,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
           <div className="min-w-0">
             <FilterBar label="Auction filters" controls={controls} active={activeFilters(q)} clearHref={clearHref} />
             <div className="mt-2">{body}</div>
-            {pending.length > 0 && <PendingRealms realms={pending} />}
+            {pending.length > 0 && <PendingRealms realms={pending} href={(realm) => ahHref(realmHref(realm), { region: q.region })} />}
             {pages > 1 && <div className="mt-2">{strip}</div>}
           </div>
         </div>
@@ -321,6 +332,9 @@ export async function browseView({ slug, search }: { slug: string | null; search
             </Disclosure>
             <Disclosure summary="Why is my realm or house missing?">
               <p>A realm or house shows up once 3 players have scanned the same item there. Players are counted by upload address, so several installs in one home count once. A scan carries prices and quantities only, never seller names.</p>
+            </Disclosure>
+            <Disclosure summary="Do different realm labels share an auction house?">
+              <p>Forever uses regional ruleset communities. Everloot keeps each recorded realm label and auction house separate until their shared market is verified. Matching regions or PvP labels alone do not prove that prices come from the same market. Region filters use the region recorded in the realm name or the verified realm map; other records stay under Unknown region.</p>
             </Disclosure>
           </div>
         </div>

@@ -24,6 +24,17 @@ const ctx: BrowseContext = { now, name: (id) => NAMES.get(id), levels: (id) => L
 const query = (search: Record<string, string>) => ahQuery(search)!;
 const ids = (q: AhQuery) => browseRows(rows, q, ctx).map((b) => b.row.value.itemId);
 
+test("region selection round-trips through URLs and rejects unsupported regions", () => {
+  for (const region of ["us", "eu", "kr", "tw", "unknown"]) {
+    const q = query({ region, house: "horde", sort: "-market", page: "2" });
+    expect(q).toMatchObject({ region, house: "Horde", page: 2 });
+    expect(ahHref("/tools/auctions", q)).toBe(`/tools/auctions?house=horde&region=${region}&sort=-market&page=2`);
+    expect(categoryTree(rows, q, "/tools/auctions")[0].href).toContain(`region=${region}`);
+  }
+  expect(query({}).region).toBeUndefined();
+  for (const region of ["US", "mars", "us,eu"]) expect(ahQuery({ region })).toBeNull();
+});
+
 test("the query string reads the house, the category path, the filters and the sort, and refuses what is not one", () => {
   const q = query({ house: "horde", class: "armor", sub: "leather", slot: "legs", quality: "poor", lvl: "1-10", moved: "1", sort: "-market", page: "2" });
   expect(q).toMatchObject({ house: "Horde", slot: "legs", quality: "poor", lvl: { min: 1, max: 10 }, moved: true, sort: { key: "market", desc: true }, page: 2 });

@@ -4,7 +4,7 @@ import {
   MARKET_LIMITS, TRIM_FACTOR, TRIM_MIN_DAYS, agreed, formatCopper, houseKey, itemListings, itemMarket, parseHouse, realmName, validRealm,
   type ItemDays, type MarketState, type MarketValue, type PublicDay, type RealmDays,
 } from "../../../kb/src/market";
-import { AFTER_LAUNCH, DEFAULT_RULESET, RULESET_SLUGS, isRulesetSlug, mappedRulesets, realmInfo, realmRuleset, rulesetFromName, type RulesetSlug } from "./realms";
+import { AFTER_LAUNCH, DEFAULT_RULESET, RULESET_SLUGS, inRegion, isRulesetSlug, mappedRulesets, realmInfo, realmRuleset, rulesetFromName, type RegionFilter, type RulesetSlug } from "./realms";
 
 /**
  * The Auction House pages' view of the market rollup (kb/src/market.ts): realms, the rows each one
@@ -186,10 +186,10 @@ export function realmBoards(state: MarketState, now: Date = new Date(), house: A
 }
 
 /** Items with a public value on each house of a realm (or across realms without `slug`, or a ruleset's realms), for the house switch. */
-export function houseCounts(state: MarketState, now: Date, slug?: string, ruleset: RulesetSlug | null = null): Map<AuctionHouse | null, number> {
+export function houseCounts(state: MarketState, now: Date, slug?: string, ruleset: RulesetSlug | null = null, region?: RegionFilter): Map<AuctionHouse | null, number> {
   const count = (boards: RealmBoard[]) => {
     const mine = slug === undefined ? onRuleset(boards, ruleset) : boards.filter((b) => b.realm.slug === slug);
-    return new Set(mine.flatMap((b) => b.rows.map((r) => r.value.itemId))).size;
+    return new Set(mine.filter((b) => inRegion(b.realm.name, region)).flatMap((b) => b.rows.map((r) => r.value.itemId))).size;
   };
   return new Map<AuctionHouse | null, number>([null, ...HOUSES].map((h) => [h, count(realmBoards(state, now, h))]));
 }
@@ -243,8 +243,8 @@ export const MOVES_SHOWN = 3;
  * One line per ruleset for the hub: the launch rulesets always, Hardcore once a realm is mapped to it or a realm
  * with prices is named for it, and "forever" when a realm with prices has neither. Counts come from public values only.
  */
-export function rulesetSummaries(state: MarketState, now: Date, house: AuctionHouse | null = null): RulesetSummary[] {
-  const groups = boardsByRuleset(realmBoards(state, now, house));
+export function rulesetSummaries(state: MarketState, now: Date, house: AuctionHouse | null = null, region?: RegionFilter): RulesetSummary[] {
+  const groups = boardsByRuleset(realmBoards(state, now, house).filter((b) => inRegion(b.realm.name, region)));
   const mapped = new Set<string>([...mappedRulesets(), ...groups.keys()]);
   const shown: string[] = RULESET_SLUGS.filter((r) => !AFTER_LAUNCH.has(r) || mapped.has(r));
   if (groups.has(DEFAULT_RULESET)) shown.push(DEFAULT_RULESET);
