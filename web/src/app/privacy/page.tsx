@@ -46,7 +46,7 @@ export default function PrivacyPage() {
   const armory = armoryOn();
   // Linked characters, public character pages, the guild item's character page and private sync: 6 November.
   // The census paragraph gained nameplates on 9 November, which dates the page.
-  const updated = "2026-11-09";
+  const updated = "2026-11-12";
   return (
     <article>
       <Container width="reading">
@@ -193,6 +193,22 @@ export default function PrivacyPage() {
                 a link-preview service (Discord, X and others) has already fetched stays with that service. Anyone
                 can hide a character on the <Link href="/players/opt-out">hide form</Link>, without an account; a
                 hidden character cannot be linked and has no public page.
+              </li>
+              <li>
+                <strong>Contribution identity (optional):</strong> after a browser upload, you may explicitly
+                choose one of your own linked characters with a public page as the context for those upload
+                receipts. This allows authorized human operators to see its name, realm, class, level and
+                public page alongside that request in the private operations dashboard. The server checks
+                your account, the character link and a matching key in the file. This is an account-linked,
+                self-reported request context, not Blizzard verification or a claim that the character
+                authored every record. Other characters observed in the file do not become submitters,
+                and previous uploads are not named automatically. Anonymous uploads continue to work.
+                Default agent summaries contain aggregate counts only and cannot retrieve named detail.
+                Make the character private, hide or unlink it, delete your account, or remove all your
+                contribution identity choices on the <Link href="/upload">upload page</Link> to withdraw
+                its named association. Each detail read checks current visibility and suppression.
+                We keep the private receipt association until you remove it, unlink the character,
+                delete your account or the associated upload is deleted, whichever happens first.
               </li>
               <li id="private-sync">
                 <strong>Private sync (optional):</strong> with an API key made with <em>Sync my linked

@@ -1,5 +1,8 @@
 # Operations
 
+The private dashboard, contributor attribution and restricted aggregate endpoint are documented in
+[PRIVATE_OPERATIONS.md](PRIVATE_OPERATIONS.md).
+
 How the live site is run. The launch on 2026-11-04 is the historical runbook in
 [LAUNCH_DAY.md](LAUNCH_DAY.md). This page names settings and secrets and does not give their values,
 and it does not describe dashboard steps.

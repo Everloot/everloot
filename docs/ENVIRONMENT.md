@@ -55,6 +55,21 @@ one is not recorded here.
 
 | Name | Read in | What it is for | Required |
 |---|---|---|---|
+| `EVERLOOT_OPS_USER_IDS` | `web/src/lib/ops/access.ts` | Explicit website-account dashboard grants | Optional |
+| `EVERLOOT_OPS_CONTRIBUTOR_USER_IDS` | `web/src/lib/ops/access.ts` | Separate website-account named-contributor grants | Optional |
+| `EVERLOOT_OPS_AGENT_TOKEN_HASHES` | `web/src/lib/ops/access.ts` | Revocable aggregate-reader token digests | Optional |
+| `EVERLOOT_OPS_ACCESS_ISSUER` | `web/src/lib/ops/access.ts` | Trusted operations identity issuer | Optional |
+| `EVERLOOT_OPS_ACCESS_AUDIENCE` | `web/src/lib/ops/access.ts` | Operations application audience | Optional |
+| `EVERLOOT_OPS_ACCESS_HUMAN_SUBJECTS` | `web/src/lib/ops/access.ts` | Explicit signed human subject grants | Optional |
+| `EVERLOOT_OPS_ACCESS_HUMAN_EMAILS` | `web/src/lib/ops/access.ts` | Explicit issuer-attested human email grants | Optional |
+| `EVERLOOT_OPS_ACCESS_CONTRIBUTOR_SUBJECTS` | `web/src/lib/ops/access.ts` | Separate signed subject grants for named contributors | Optional |
+| `EVERLOOT_OPS_ACCESS_CONTRIBUTOR_EMAILS` | `web/src/lib/ops/access.ts` | Separate issuer-attested email grants for named contributors | Optional |
+| `EVERLOOT_OPS_ACCESS_SERVICE_SUBJECTS` | `web/src/lib/ops/access.ts` | Explicit aggregate-only service identity grants | Optional |
+| `EVERLOOT_OPS_HMAC_SECRET` | `web/src/lib/ops/metrics.ts` | Stable private installation pseudonym namespace | For operations metrics |
+| `EVERLOOT_OPS_EXCLUDED_INSTALLS` | `web/src/lib/ops/metrics.ts` | Private owner and test installation exclusions | Optional |
+| `EVERLOOT_OPS_METRICS` | `web/src/lib/ops/telemetry.ts` | Best-effort successful receipt and outcome instrumentation | Switch |
+| `EVERLOOT_OPS_CF_ANALYTICS_TOKEN` | `web/src/lib/ops/collector.ts` | Scoped Worker analytics reader | For CPU estimates |
+| `EVERLOOT_OPS_WORKER_NAME` | `web/src/lib/ops/collector.ts` | Target of Worker CPU estimates | For CPU estimates |
 | `SUPABASE_URL` | `web/src/lib/supabase/server.ts` and every store | The storage project every storage-backed page uses | Yes |
 | `SUPABASE_SERVICE_ROLE_KEY` | `web/src/lib/supabase/server.ts` and every store | Server-side access to that project | Yes |
 | `R2_ACCOUNT_ID` | `web/src/lib/upload-store.ts` and the other bucket stores | The object storage account for uploads | Yes |

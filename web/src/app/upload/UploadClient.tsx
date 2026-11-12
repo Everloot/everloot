@@ -4,6 +4,7 @@ import { track } from "@/lib/analytics/track";
 import { parseEverlootLua, parsePolestarTable } from "@/lib/sv-parse";
 import { convertRecorder, type RecorderPayload } from "@/lib/polestar-recorder";
 import { censusSummary, prepareUpload, sendBatches, type SharingChoices, type UploadSession } from "@/lib/upload-batches";
+import { contributionFiles } from "@/lib/ops/attribution-input";
 import type { SharingCategory } from "../../../../kb/src/publication";
 import { parseSettledList, settledSkip, type SettledList } from "../../../../kb/src/settled-list";
 import Card from "@/components/ui/Card";
@@ -48,14 +49,23 @@ export default function UploadClient({ playerPages = false, pullSummaries = fals
   const [withdrawToken, setWithdrawToken] = useState("");
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawStatus, setWithdrawStatus] = useState("");
+  const [contributionOptions, setContributionOptions] = useState<{ userId: string; links: { id: string; name: string; realm: string }[] } | null>(null);
+  const [contributionConsent, setContributionConsent] = useState(false);
+  const [contributionLink, setContributionLink] = useState("");
+  const [contributionFile, setContributionFile] = useState(0);
+  const [contributionBusy, setContributionBusy] = useState(false);
+  const [contributionStatus, setContributionStatus] = useState("");
   const prepared = useMemo(() => {
     if (!payload) return { value: null, error: null };
     const skip = settledSkip(settled, (payload as { clientBuild?: unknown }).clientBuild);
     try { return { value: prepareUpload(payload, choices, tokens.split(/\s+/).filter(Boolean), undefined, skip, { runRecords: pullSummaries }), error: null }; }
     catch (e) { return { value: null, error: e instanceof Error ? e.message : "Could not prepare this file." }; }
   }, [payload, choices, tokens, settled, pullSummaries]);
-  const busy = sending || loading;
-  function resetSession() { saved.current = null; setSession(null); setError(null); }
+  const busy = sending || loading || contributionBusy;
+  function resetSession() {
+    saved.current = null; setSession(null); setError(null);
+    setContributionConsent(false); setContributionFile(0); setContributionStatus("");
+  }
   async function loadFile(file: File) {
     if (busy) return;
     const id = ++loadId.current;
@@ -107,9 +117,34 @@ export default function UploadClient({ playerPages = false, pullSummaries = fals
     } catch (e) { setWithdrawStatus(e instanceof Error ? e.message : "Network error. Retry withdrawal."); }
     finally { setWithdrawing(false); }
   }
+  async function loadContributionOptions() {
+    setContributionBusy(true); setContributionStatus(""); setContributionConsent(false);
+    try {
+      const response = await fetch("/api/me/contributions", { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Sign in to manage contribution identity.");
+      setContributionOptions(result); setContributionLink(result.links[0]?.id ?? "");
+    } catch (e) { setContributionOptions(null); setContributionStatus(e instanceof Error ? e.message : "Contribution choices unavailable."); }
+    finally { setContributionBusy(false); }
+  }
+  async function saveContribution(revoke = false) {
+    if (!contributionOptions || (!revoke && (!contributionConsent || !contributionLink || !complete || !contributionChoice?.completionKeys.length))) return;
+    setContributionBusy(true); setContributionStatus("");
+    try {
+      const response = await fetch("/api/me/contributions", { method: revoke ? "DELETE" : "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expectedUserId: contributionOptions.userId, ...(revoke ? {} : { ...contributionChoice, linkId: contributionLink, consent: true }) }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Contribution choice was not saved.");
+      setContributionStatus(revoke ? "All your contribution identity choices were removed." : "Request attribution saved for these upload receipts only.");
+      setContributionConsent(false);
+    } catch (e) { setContributionStatus(e instanceof Error ? e.message : "Contribution choice was not saved."); }
+    finally { setContributionBusy(false); }
+  }
   const accepted = session?.receipts.reduce((n, receipt) => n + (receipt.accepted?.length ?? 0), 0) ?? 0;
   const rejected = session?.receipts.reduce((n, receipt) => n + (receipt.rejected?.length ?? 0), 0) ?? 0;
   const complete = !!session && session.next === session.batches.length;
+  const contributionChoices = session ? contributionFiles(session, payload) : [];
+  const contributionChoice = contributionChoices[contributionFile];
   const recorder = (payload as Partial<RecorderPayload> | null)?.recorder;
   const skipped = recorder ? Object.entries(recorder.skipped).sort(([a], [b]) => a.localeCompare(b)) : [];
   const capped = recorder ? Object.entries(recorder.capped).sort(([a], [b]) => a.localeCompare(b)) : [];
@@ -199,6 +234,34 @@ export default function UploadClient({ playerPages = false, pullSummaries = fals
         {!!rejected && <ul className="mt-2">{session.receipts.flatMap((receipt, batch) => (receipt.rejected ?? []).map((item) =>
           <li key={`${batch}-${item.index}`}>Batch {batch + 1}, record {item.index}: {item.reason}</li>))}</ul>}
       </Card></div>}
+      <Card>
+        <SectionHeading>Contribution identity (optional)</SectionHeading>
+        <p className="text-sm text-fg-2">Uploads remain anonymous unless you separately choose a linked public character for the uploaded request. This lets authorized human operators see that character beside these receipts in the private operations dashboard. It does not mean this character authored every record in a mixed-character file, and it never names past uploads automatically.</p>
+        {complete && !contributionChoices.some(file => file.completionKeys.length) && <p className="mt-3 text-sm text-fg-2">This file has no matching character key for attribution. Keep these uploads anonymous; observed character names cannot establish a submitter.</p>}
+        <button className={outlineButton + " mt-3"} disabled={contributionBusy || busy} onClick={() => void loadContributionOptions()}>Manage contribution identity</button>
+        {contributionOptions && <div className="mt-3 space-y-3 text-sm text-fg-2">
+          {contributionOptions.links.length === 0 && <p>No eligible character yet. <a href="/account" className="underline">Link your own character and turn on its public page</a> before opting in.</p>}
+          {complete && contributionChoices.length > 1 && <label className="block">Uploaded installation
+              <select className={input + " mt-1"} value={contributionFile} onChange={e => { setContributionFile(Number(e.target.value)); setContributionConsent(false); }}>
+                {contributionChoices.map((file, index) => <option key={file.installId} value={index}>Installation {index + 1}: {file.uploadIds.length} receipts</option>)}
+              </select>
+          </label>}
+          {complete && contributionChoice?.completionKeys.length > 0 && contributionOptions.links.length > 0 && <fieldset disabled={contributionBusy || busy} className="space-y-3">
+            <label className="block">Your public linked character
+              <select className={input + " mt-1"} value={contributionLink} onChange={e => { setContributionLink(e.target.value); setContributionConsent(false); }}>
+                {contributionOptions.links.map(link => <option key={link.id} value={link.id}>{link.name} · {link.realm}</option>)}
+              </select>
+            </label>
+            <label className="flex items-start gap-3"><input aria-label="Share contribution character" type="checkbox" checked={contributionConsent} onChange={e => setContributionConsent(e.target.checked)} />
+              I choose to show this character as the context for these upload receipts to authorized human operators. The server checks that its own key is in this file. This choice does not mean this character authored every record.
+            </label>
+            <button className={outlineButton} disabled={!contributionConsent || !contributionLink} onClick={() => void saveContribution()}>Attribute these upload receipts</button>
+          </fieldset>}
+          <p>Turning its page private, hiding or unlinking the character removes its named association from the dashboard. You can also remove all your choices here.</p>
+          <button className={outlineButton} disabled={contributionBusy} onClick={() => void saveContribution(true)}>Remove all my contribution identity choices</button>
+        </div>}
+        {contributionStatus && <p role="status" className="mt-3 text-sm text-fg-2">{contributionStatus}</p>}
+      </Card>
       <Card>
       <details className="text-sm text-fg-2">
         <summary className="cursor-pointer font-semibold">Withdraw named sharing</summary>
