@@ -4,7 +4,6 @@ const store = vi.hoisted(() => ({ loadCorpus: vi.fn(), api: vi.fn() }));
 vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: store.loadCorpus } }));
 vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { api: store.api } }));
 
-import { cachedResponse, type EdgeCacheVersions } from "@/lib/cf-edge-cache";
 import { GET } from "./route";
 import { ALL_RECORD_KINDS, CENSUS_KINDS, COMPLETION_KINDS, GUILD_KILL_KINDS, LINK_KINDS, PLAYER_KINDS, PUBLIC_RECORD_KINDS, PULL_KINDS } from "@everloot/protocol";
 import { ANON_PAGE, KEY_PAGE } from "@/lib/data-guard";
@@ -203,19 +202,14 @@ test("the body is the protocol's corpusPublicResponse", async () => {
   expect(parsed.success ? null : parsed.error.issues).toBeNull();
 });
 
-// Exercise the Worker's real cache wrapper with the real corpus handler.
-const versions: EdgeCacheVersions = { template: "t", data: "d", knowledge: "k", addon: "a" };
+// Exercise the route against the Worker's Cache API, with admission on every call.
 function edge() {
   const entries = new Map<string, Response>();
-  const waits: Promise<unknown>[] = [];
-  return async (request: Request) => {
-    const response = await cachedResponse(request, versions, GET, {
-      match: async (key) => entries.get(key.url)?.clone(),
-      put: async (key, value) => { entries.set(key.url, value); },
-    }, { waitUntil: (p) => { waits.push(p); } });
-    await Promise.all(waits);
-    return response;
-  };
+  vi.stubGlobal("caches", { default: {
+    match: async (key: Request) => entries.get(key.url)?.clone(),
+    put: async (key: Request, value: Response) => { entries.set(key.url, value); },
+  } });
+  return GET;
 }
 
 test("successful public responses are kept at the edge for five minutes", async () => {
@@ -230,7 +224,8 @@ test("the same query renders once and its cached answer equals the original", as
   const first = await serve(req("?kinds=auction_scan&limit=1"));
   const second = await serve(req("?kinds=auction_scan&limit=1"));
   expect(await second.json()).toEqual(await first.json());
-  expect(second.headers.get("x-everloot-edge-cache")).toBe("HIT");
+  expect(second.headers.get("x-everloot-corpus-cache")).toBe("HIT");
+  expect(second.headers.get("content-type")).toBe(first.headers.get("content-type"));
   expect(store.loadCorpus).toHaveBeenCalledTimes(1);
 });
 
@@ -238,7 +233,7 @@ test("normalized kinds and numeric pagination share a key; different pages and k
   const serve = edge();
   const first = await serve(req("?kinds=loot,auction_scan&offset=00&limit=01"));
   const second = await serve(req("?limit=1&kinds=auction_scan,loot&offset=0"));
-  expect(second.headers.get("x-everloot-edge-cache")).toBe("HIT");
+  expect(second.headers.get("x-everloot-corpus-cache")).toBe("HIT");
   expect(await second.json()).toEqual(await first.json());
   expect(store.loadCorpus).toHaveBeenCalledTimes(1);
   await serve(req("?kinds=auction_scan&offset=0&limit=1"));
@@ -254,7 +249,7 @@ test.each(["?kinds=private", "?limit=0", "?offset=-1"])("bad query %s is never c
     expect(res.status).toBe(400);
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect(res.headers.get("cdn-cache-control")).toBeNull();
-    expect(res.headers.get("x-everloot-edge-cache")).toBeNull();
+    expect(res.headers.get("x-everloot-corpus-cache")).toBeNull();
   }
   expect(store.loadCorpus).not.toHaveBeenCalled();
 });
@@ -270,7 +265,7 @@ test("an unavailable corpus is never cached and can recover on the next request"
   expect(store.loadCorpus).toHaveBeenCalledTimes(2);
 });
 
-test("quota-controlled responses never enter the shared cache or skip admission", async () => {
+test("quota-controlled responses reuse public data but never skip admission", async () => {
   vi.stubEnv("EVERLOOT_DATA_GUARD", "1");
   const serve = edge();
   const first = await serve(req());
@@ -290,7 +285,7 @@ test.each(["cookie", "authorization"])("a request with %s bypasses a warmed publ
   const res = await serve(new Request(req(), { headers: { [header]: "private" } }));
   expect(res.headers.get("cache-control")).toBe("no-store");
   expect(res.headers.get("cdn-cache-control")).toBeNull();
-  expect(res.headers.get("x-everloot-edge-cache")).toBeNull();
+  expect(res.headers.get("x-everloot-corpus-cache")).toBeNull();
   expect(store.loadCorpus).toHaveBeenCalledTimes(2);
 });
 
@@ -300,9 +295,48 @@ test("canonical pagination links cannot leak another caller's ignored query para
   const serve = edge();
   const first = await serve(req("?kinds=loot&limit=01&tracking=caller-a"));
   const second = await serve(req("?offset=0&limit=1&kinds=loot&tracking=caller-b"));
-  expect(second.headers.get("x-everloot-edge-cache")).toBe("HIT");
+  expect(second.headers.get("x-everloot-corpus-cache")).toBe("HIT");
   const body = await first.json();
   expect(body.next).toBe("https://everloot.app/api/corpus/public?kinds=loot&limit=1&offset=1");
   expect(await second.json()).toEqual(body);
+  expect(store.loadCorpus).toHaveBeenCalledTimes(1);
+});
+
+
+test("guard on: repeated anonymous queries reuse the corpus but spend quota each time", async () => {
+  vi.stubEnv("EVERLOOT_DATA_GUARD", "1");
+  store.loadCorpus.mockResolvedValue({ uploads: 3, records: many });
+  const serve = edge();
+  const first = await serve(req("?kinds=loot&limit=5000"));
+  const second = await serve(req("?kinds=loot&limit=500"));
+  const body = await first.json();
+  expect(body.records).toHaveLength(ANON_PAGE);
+  expect(await second.json()).toEqual(body);
+  expect(second.headers.get("x-everloot-corpus-cache")).toBe("HIT");
+  expect(second.headers.get("cache-control")).toBe("no-store");
+  expect(second.headers.get("cdn-cache-control")).toBeNull();
+  expect(store.loadCorpus).toHaveBeenCalledTimes(1);
+  expect(store.api).toHaveBeenCalledTimes(2);
+});
+
+test("a new deploy or pseudonym secret never serves the old stored answer", async () => {
+  const serve = edge();
+  vi.stubEnv("EVERLOOT_COMMIT_SHA", "first");
+  vi.stubEnv("EVERLOOT_CHARACTER_KEY", "a".repeat(32));
+  const first = await (await serve(req())).json();
+  vi.stubEnv("EVERLOOT_CHARACTER_KEY", "b".repeat(32));
+  const second = await (await serve(req())).json();
+  expect(second.records[0].installId).not.toBe(first.records[0].installId);
+  vi.stubEnv("EVERLOOT_COMMIT_SHA", "second");
+  await serve(req());
+  expect(store.loadCorpus).toHaveBeenCalledTimes(3);
+});
+
+test("a Cache API failure falls back to the fresh public answer", async () => {
+  vi.stubGlobal("caches", { default: {
+    match: async () => { throw new Error("cache unavailable"); },
+    put: async () => { throw new Error("cache unavailable"); },
+  } });
+  expect((await GET(req())).status).toBe(200);
   expect(store.loadCorpus).toHaveBeenCalledTimes(1);
 });
