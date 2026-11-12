@@ -170,3 +170,16 @@ test.each([
   const { requestedPredicate } = await import("../src/files-evidence.js");
   expect(requestedPredicate(question, ["Hidden: BETA Survey - Level 30"])).toBe(expected);
 });
+
+test("filesEvidence preserves literal punctuation, whole-word boundaries and Unicode case folding", () => {
+  const index = { build: "test", extractedAt: null, facts: [
+    { kind: "boss" as const, name: "Hogger", claim: "Hogger: boss." },
+    { kind: "boss" as const, name: "A+B", claim: "A+B: boss." },
+    { kind: "boss" as const, name: "Kelvin", claim: "Kelvin: boss." },
+    { kind: "boss" as const, name: "Storm", claim: "Storm: boss." },
+  ] };
+  expect(filesEvidence("HOGGER and a+b", index, 8).map((e) => e.claim)).toEqual(["Hogger: boss.", "A+B: boss."]);
+  expect(filesEvidence("Hoggers and AAAB", index, 8)).toEqual([]);
+  expect(filesEvidence("Kelvin and ſtorm", index, 8).map((e) => e.claim)).toEqual(["Kelvin: boss.", "Storm: boss."]);
+  expect(filesEvidence("éHogger2", index, 8)).toEqual([]);
+});

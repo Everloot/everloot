@@ -217,7 +217,14 @@ export function readFilesIndex(gameDataDir: string): FilesIndex {
 }
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const mentions = (question: string, name: string) => new RegExp(`(^|[^\\p{L}\\p{N}])${escape(name)}(?=$|[^\\p{L}\\p{N}])`, "iu").test(question);
+const ASCII = /^[\x00-\x7f]*$/;
+function mentions(question: string, name: string): boolean {
+  // Most file names are absent from a question. Avoid compiling thousands of Unicode boundary
+  // regexps on a cold Worker just to reject them. ASCII case folding agrees with /iu; non-ASCII
+  // stays on the original path (e.g. Kelvin's sign and long s also match K and S under /iu).
+  if (ASCII.test(question) && ASCII.test(name) && !question.toLowerCase().includes(name.toLowerCase())) return false;
+  return new RegExp(`(^|[^\\p{L}\\p{N}])${escape(name)}(?=$|[^\\p{L}\\p{N}])`, "iu").test(question);
+}
 
 const nameWordsCache = new WeakMap<FilesIndex, Set<string>>();
 /** Every word of every name the files carry: a question's spelling of them is never read as another word. */
