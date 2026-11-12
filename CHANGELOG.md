@@ -336,6 +336,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   scrollbar, so the page has nothing to scroll sideways at any width.
 
 ### Changed
+- Site: HEAD requests reuse cached public pages and warm their GET copy on a miss, without returning a body.
 - Site: keep build links reachable below 1280px, omit empty game-art frames, show coin images and
   quality borders, round the header build pill, and compact the cookie strip with equal Accept and Reject.
 - Site: the home and addon pages no longer say live-client verification is pending: the addon was checked in the live Forever client on 0.3.22.
