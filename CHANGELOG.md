@@ -337,6 +337,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Desktop App: restoring the oldest backup keeps the selected save and an undo copy, even within the same second.
 
 ### Changed
+- Site: ask MJ12bot and DotBot not to crawl the site while keeping search engines and AI search access allowed.
 - Site: keep build links reachable below 1280px, omit empty game-art frames, show coin images and
   quality borders, round the header build pill, and compact the cookie strip with equal Accept and Reject.
 - Site: the home and addon pages no longer say live-client verification is pending: the addon was checked in the live Forever client on 0.3.22.
