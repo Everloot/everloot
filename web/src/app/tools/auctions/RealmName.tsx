@@ -6,16 +6,18 @@ const RULESET_TEXT: Record<RulesetSlug, string> = {
 };
 
 /**
- * A realm's name with its ruleset split off, as the game's realm list splits it: "CAMWOW US1 Realm 4" and, in the
- * ruleset's colour, "PvP". A realm with no ruleset is its plain name.
+ * Recorded CAMWOW labels are shortened for display, with the full identity available as an abbreviation title.
+ * The ruleset keeps its own colour. Other names remain intact.
  */
 export function RealmName({ name }: { name: string }) {
   const { base, ruleset } = realmParts(name);
   if (!ruleset) return <>{name}</>;
+  const compact = /^CAMWOW ([A-Z]{2}\d+) Realm (\d+)$/i.exec(base);
+  const label = compact ? `${compact[1]} · Realm ${compact[2]}` : base;
   return (
-    <>
-      {base}{" "}
+    <abbr title={name} className="no-underline">
+      {label}{" "}
       <span data-ruleset={ruleset} className={`font-medium ${RULESET_TEXT[ruleset]}`}>{RULESET_LABEL[ruleset]}</span>
-    </>
+    </abbr>
   );
 }

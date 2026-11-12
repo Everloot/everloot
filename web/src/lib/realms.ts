@@ -1,4 +1,4 @@
-import { REALMS, RULESET_SLUGS, type RealmEntry, type Region, type RulesetSlug } from "../data/realms";
+import { REALMS, REGIONS, RULESET_SLUGS, type RealmEntry, type Region, type RulesetSlug } from "../data/realms";
 
 /**
  * The realm map (../data/realms.ts) as the pages read it: which ruleset and region a realm is on. A realm the map
@@ -85,6 +85,18 @@ export function realmRegion(realm: string): Region | null {
   const named = /(?:^|\s)(us|eu|kr|tw)\d*(?:\s|$)/i.exec(realm.trim())?.[1]?.toLowerCase();
   return realmInfo(realm)?.region ?? (named as Region | undefined) ?? null;
 }
+
+export type RegionFilter = Region | "unknown";
+export const REGION_LABEL: Record<RegionFilter, string> = { us: "US", eu: "EU", kr: "KR", tw: "TW", unknown: "Unknown region" };
+
+/** Missing or empty means all regions; unrecognized values are rejected. */
+export function regionParam(raw: string | undefined): RegionFilter | null | undefined {
+  if (raw === undefined || raw === "") return null;
+  return raw === "unknown" || (REGIONS as readonly string[]).includes(raw) ? raw as RegionFilter : undefined;
+}
+
+export const inRegion = (realm: string, region: RegionFilter | null | undefined): boolean =>
+  !region || (realmRegion(realm) ?? "unknown") === region;
 
 /** Rulesets with at least one realm mapped to them. */
 export function mappedRulesets(): Set<RulesetSlug> {
