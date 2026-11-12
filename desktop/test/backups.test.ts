@@ -73,6 +73,53 @@ test("restore puts a backup back over the matching account file and keeps a copy
   expect(readFileSync(list[0].file, "utf8")).toBe("EverlootDB = { broken = 1 }");
 });
 
+test("restores the oldest of ten backups while keeping an undo copy", () => {
+  const d = dir();
+  const sv = join(d, "WTF", "Account", "MYACC", "SavedVariables", "Everloot.lua");
+  mkdirSync(join(sv, ".."), { recursive: true });
+  const data = join(d, "data");
+  let oldest = "";
+  for (let i = 0; i < 10; i++) {
+    writeFileSync(sv, `EverlootDB = { v = ${i} }`);
+    const backup = backupSavedVariables(sv, data, 10, new Date(Date.UTC(2026, 9, 18, 3, i)));
+    if (i === 0) oldest = backup;
+  }
+  const previous = "EverlootDB = { unsent = 42 }";
+  writeFileSync(sv, previous);
+  expect(restoreBackup(oldest, data, [sv], new Date("2026-10-18T09:00:00Z"))).toBe(sv);
+  expect(readFileSync(sv, "utf8")).toBe("EverlootDB = { v = 0 }");
+  const backups = listBackups(data);
+  expect(backups).toHaveLength(10);
+  const undo = backups.find((b) => readFileSync(b.file, "utf8") === previous);
+  expect(undo).toBeDefined();
+  restoreBackup(undo!.file, data, [sv], new Date("2026-10-18T10:00:00Z"));
+  expect(readFileSync(sv, "utf8")).toBe(previous);
+});
+
+test("restoring within the backup timestamp second preserves the selected bytes", () => {
+  const d = dir();
+  const sv = join(d, "WTF", "Account", "MYACC", "SavedVariables", "Everloot.lua");
+  mkdirSync(join(sv, ".."), { recursive: true });
+  const data = join(d, "data");
+  const now = new Date("2026-10-18T03:00:00.123Z");
+  const selected = "EverlootDB = { selected = 1 }";
+  const previous = "EverlootDB = { unsent = 42 }";
+  writeFileSync(sv, selected);
+  const backup = backupSavedVariables(sv, data, 10, now);
+  writeFileSync(sv, previous);
+  restoreBackup(backup, data, [sv], now);
+  expect(readFileSync(sv, "utf8")).toBe(selected);
+  expect(readFileSync(backup, "utf8")).toBe(selected);
+  const backups = listBackups(data);
+  expect(backups).toHaveLength(2);
+  expect(backups.every((b) => b.account === "MYACC" && b.at)).toBe(true);
+  const undo = backups.find((b) => readFileSync(b.file, "utf8") === previous);
+  expect(undo).toBeDefined();
+  restoreBackup(undo!.file, data, [sv], now);
+  expect(readFileSync(sv, "utf8")).toBe(previous);
+  expect(listBackups(data)).toHaveLength(3);
+});
+
 test("restore refuses files outside the backups folder and accounts that are not watched", () => {
   const d = dir();
   const data = join(d, "data");

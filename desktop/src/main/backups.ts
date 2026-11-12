@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import type { BackupInfo } from "../shared/types";
 import { accountOf } from "./engine";
@@ -21,8 +21,14 @@ export function backupSavedVariables(file: string, dataFolder: string, keep = BA
   // gets no second copy, so ten starts in a row cannot push the useful history out.
   const newest = readdirSync(dir).filter(own).sort().at(-1);
   if (newest && sameBytes(join(dir, newest), file)) return join(dir, newest);
-  const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
-  const target = join(dir, `${account}-${stamp}.lua`);
+  // Keep the dated filename format, but never replace a copy made in the same second.
+  let at = now.getTime();
+  let target: string;
+  do {
+    const stamp = new Date(at).toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+    target = join(dir, `${account}-${stamp}.lua`);
+    at += 1_000;
+  } while (existsSync(target));
   copyFileSync(file, `${target}.tmp`);
   renameSync(`${target}.tmp`, target);
   const mine = readdirSync(dir).filter(own).sort();
@@ -90,9 +96,11 @@ export function restoreBackup(backupFile: string, dataFolder: string, watchedFil
   const account = m ? m[1] : "";
   const live = watchedFiles.find((f) => safeAccount(accountOf(f)) === account);
   if (!live) throw new Error(`No watched account file for ${account || basename(target)}`);
+  // Retention may remove the selected backup when the undo copy is created.
+  const selected = readFileSync(target);
   if (existsSync(live)) backupSavedVariables(live, dataFolder, BACKUPS_KEPT, now);
   mkdirSync(join(live, ".."), { recursive: true });
-  copyFileSync(target, `${live}.tmp`);
+  writeFileSync(`${live}.tmp`, selected);
   renameSync(`${live}.tmp`, live);
   return live;
 }
