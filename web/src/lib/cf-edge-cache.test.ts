@@ -33,7 +33,7 @@ test("only plain GETs without credentials use the shared cache; a cookie or auth
 });
 
 test("the pages that hold a session or the account never reach the shared cache", () => {
-  for (const path of ["/chat", "/chat/abc", "/account", "/settings", "/tools/builds", "/tools/builds/12", "/tools/alts", "/guides/write"]) {
+  for (const path of ["/chat", "/chat/abc", "/account", "/settings", "/tools/builds", "/tools/builds/12", "/tools/alts", "/guides/write", "/ops", "/ops/contributors", "/api/ops/summary"]) {
     expect(edgeCacheable(new Request(`https://everloot.app${path}`)), path).toBe(false);
     expect(isPrivatePath(path), path).toBe(true);
   }

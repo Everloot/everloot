@@ -5,7 +5,7 @@
  */
 export const CF_CRONS: Readonly<Record<string, readonly string[]>> = {
   "*/10 * * * *": ["/api/cron/snapshot", "/api/cron/blue"],
-  "23 * * * *": ["/api/cron/indexnow"],
+  "23 * * * *": ["/api/cron/indexnow", "/api/cron/ops"],
   // Every 30 minutes, off the 10-minute marks so it never starts with the snapshot run (profile pipeline).
   "7,37 * * * *": ["/api/cron/profiles"],
 };

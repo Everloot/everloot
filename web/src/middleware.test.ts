@@ -7,8 +7,21 @@ const rewrittenTo = (res: Response) => res.headers.get("x-middleware-rewrite");
 
 afterEach(() => { vi.unstubAllEnvs(); });
 
-test("only / goes through the middleware", () => {
-  expect(config.matcher).toBe("/");
+test("middleware covers the home rewrite and private operations boundaries", () => {
+  expect(config.matcher).toEqual(["/", "/ops/:path*", "/api/ops/:path*"]);
+});
+
+test("operations responses forbid private and CDN caching independently of profile/session state", () => {
+  for (const profiles of ["0", "1"]) {
+    vi.stubEnv("EVERLOOT_PROFILES", profiles);
+    for (const path of ["/ops", "/ops/", "/api/ops/summary", "/api/ops/contributors/opaque"]) {
+      const response = middleware(new NextRequest(`https://everloot.app${path}`, { headers: { cookie: "everloot.session_token=fixture" } }));
+      expect(rewrittenTo(response)).toBeNull();
+      expect(response.headers.get("cache-control")).toBe("private, no-store, max-age=0");
+      expect(response.headers.get("cdn-cache-control")).toBe("no-store");
+      expect(response.headers.get("x-robots-tag")).toBe("noindex, nofollow, noarchive");
+    }
+  }
 });
 
 test("with a session cookie, / is the signed-in home, marked as the rewrite", () => {

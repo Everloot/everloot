@@ -55,7 +55,22 @@ test("nameplates are named for the census only: the player pages item never read
   const item = playerPages.slice(0, playerPages.indexOf("</li>"));
   expect(item).toContain("target, mouse over or group with");
   expect(item).not.toMatch(/nameplate/i);
-  expect(text).toContain("Last updated: November 9, 2026");
+  expect(text).toContain("Last updated: November 12, 2026");
+});
+
+test("contribution identity requires explicit receipt opt-in and explains scope, audience and withdrawal", () => {
+  for (const claim of [
+    "Contribution identity (optional):",
+    "you may explicitly choose one of your own linked characters with a public page",
+    "authorized human operators",
+    "self-reported request context",
+    "previous uploads are not named automatically",
+    "Anonymous uploads continue to work.",
+    "Default agent summaries contain aggregate counts only and cannot retrieve named detail.",
+    "remove all your contribution identity choices on the upload page",
+    "Each detail read checks current visibility and suppression.",
+    "whichever happens first",
+  ]) expect(text).toContain(claim);
 });
 
 test("saved builds: what is kept, that characters are typed labels, that a shared link is public, and deletion", () => {

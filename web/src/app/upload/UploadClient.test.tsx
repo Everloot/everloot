@@ -47,6 +47,43 @@ async function click(label: string) {
 const rejected = () => Response.json({ ok: false, accepted: [], rejected: [{ index: 0, reason: "Try again later" }] }, { status: 422 });
 const accepted = () => Response.json({ ok: true, persisted: true, uploadId: "saved", accepted: [{ index: 0, kind: "loot" }], rejected: [] });
 
+test("contribution attribution is a separate unchecked choice after a durable upload", async () => {
+  const text = JSON.stringify({ addonVersion: "0.3.12", records: [
+    { kind: "loot", installId: "my-install", eventId: "epoch:1", capturedAt: "2026-11-12T00:00:00Z", sourceNpcId: 1, items: [] },
+    { kind: "profession_owned", installId: "my-install", characterKey: "1234abcd" },
+    { kind: "profession_owned", installId: "my-install", characterKey: "5678abcd" },
+  ] });
+  const file = new File([text], "Everloot.json");
+  Object.defineProperty(file, "text", { value: async () => text });
+  const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+  Object.defineProperty(input, "files", { value: [file], configurable: true });
+  await act(async () => input.dispatchEvent(new Event("change", { bubbles: true })));
+  send.mockResolvedValueOnce(accepted());
+  await click("Send upload");
+  expect(send).toHaveBeenCalledTimes(1);
+  send.mockResolvedValueOnce(Response.json({ userId: "my-account", links: [{ id: "my-link", name: "Mychar", realm: "Realm" }] }));
+  await click("Manage contribution identity");
+  const consent = container.querySelector<HTMLInputElement>('input[aria-label="Share contribution character"]')!;
+  expect(consent.checked).toBe(false);
+  const save = [...container.querySelectorAll("button")].find(b => b.textContent === "Attribute these upload receipts")!;
+  expect(save.disabled).toBe(true);
+  await act(async () => consent.click());
+  send.mockResolvedValueOnce(Response.json({ ok: true }));
+  await click("Attribute these upload receipts");
+  const [url, init] = send.mock.calls[2];
+  expect(url).toBe("/api/me/contributions");
+  expect(JSON.parse(init.body)).toMatchObject({ expectedUserId: "my-account", consent: true, linkId: "my-link", uploadIds: ["saved"], installId: "my-install", completionKeys: ["1234abcd", "5678abcd"] });
+  expect(container.textContent).toContain("Request attribution saved");
+  expect(container.textContent).toContain("does not mean this character authored every record");
+});
+
+test("a file without its own character key stays anonymous and explains the limit", async () => {
+  await load(1); send.mockResolvedValueOnce(accepted()); await click("Send upload");
+  expect(container.textContent).toContain("This file has no matching character key for attribution");
+  expect(container.textContent).not.toContain("Observed character names establish");
+  expect(send).toHaveBeenCalledTimes(1);
+});
+
 test("a rejected batch and saved batch remain visible while retry sends only the failed later batch", async () => {
   await load(3);
   send.mockResolvedValueOnce(rejected()).mockResolvedValueOnce(accepted())
