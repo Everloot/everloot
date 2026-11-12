@@ -153,9 +153,22 @@ export function cacheVersionFor(pathname: string, versions: EdgeCacheVersions): 
  */
 export function edgeCacheKey(req: Request, version: string): Request {
   const url = new URL(req.url);
+  // The corpus reads the first kinds/offset/limit only. Normalize valid spellings, leaving invalid
+  // numbers distinct so they can never hit a successful page instead of returning 400.
+  if (url.pathname === "/api/corpus/public") {
+    const kinds = url.searchParams.get("kinds");
+    if (kinds !== null) url.searchParams.set("kinds", [...new Set(kinds.split(",").map((k) => k.trim()).filter(Boolean))].sort().join(","));
+    if (!url.searchParams.has("offset")) url.searchParams.set("offset", "0");
+    for (const name of ["offset", "limit"]) {
+      const raw = url.searchParams.get(name);
+      if (raw !== null && /^\d{1,9}$/.test(raw)) url.searchParams.set(name, String(Number(raw)));
+    }
+  }
   const kept = ITEM_LIST_PATH.test(url.pathname)
     ? [...url.searchParams].filter(([k]) => ITEM_LIST_PARAMS.has(k))
-    : [...url.searchParams].filter(([k]) => !isTracking(k));
+    : url.pathname === "/api/corpus/public"
+      ? [...url.searchParams].filter(([k]) => ["kinds", "offset", "limit"].includes(k))
+      : [...url.searchParams].filter(([k]) => !isTracking(k));
   // Array.prototype.sort is stable: equal names stay in request order.
   kept.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   // The suggest box answers `Thunder` and `thunder ` alike (app/api/suggest/route.ts), so they share a key.

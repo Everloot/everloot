@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
  */
 
 const NO_STORE = { "Cache-Control": "no-store" };
+const CACHE = { "Cache-Control": "public, max-age=60", "CDN-Cache-Control": "max-age=300" };
 
 /**
  * `?kinds=a,b` returns only those record kinds, so an MCP tool fetches what it reads, not the whole corpus.
@@ -21,7 +22,7 @@ const NO_STORE = { "Cache-Control": "no-store" };
 export async function GET(req: Request) {
   recordUsage("api.corpus_public");
   const param = new URL(req.url).searchParams.get("kinds");
-  const kinds = param === null ? null : [...new Set(param.split(",").map((k) => k.trim()).filter(Boolean))];
+  const kinds = param === null ? null : [...new Set(param.split(",").map((k) => k.trim()).filter(Boolean))].sort();
   if (kinds && (kinds.length === 0 || kinds.some((k) => !PUBLIC_KINDS.includes(k)))) {
     return NextResponse.json({ ok: false, error: "Unknown record kind." }, { status: 400, headers: NO_STORE });
   }
@@ -33,9 +34,17 @@ export async function GET(req: Request) {
   if (corpus.unreachable) return NextResponse.json({ ok: false, error: "Public corpus unavailable." }, { status: 503, headers: NO_STORE });
   const wanted = new Set(kinds ?? PUBLIC_KINDS);
   const secret = publicInstallSecret();
-  const { items, page } = pageOf(req, corpus.records.filter((r) => wanted.has(r.kind)), at);
+  // Canonical pagination links and the kinds echo must agree across equivalent cache keys.
+  const url = new URL(req.url);
+  url.search = "";
+  if (kinds) url.searchParams.set("kinds", kinds.join(","));
+  url.searchParams.set("offset", String(at.offset));
+  if (at.limit !== null) url.searchParams.set("limit", String(at.limit));
+  url.searchParams.sort();
+  const { items, page } = pageOf(new Request(url), corpus.records.filter((r) => wanted.has(r.kind)), at);
+  const shared = admitted.tier === "open" && !req.headers.has("cookie") && !req.headers.has("authorization");
   return NextResponse.json(
     { ok: true, ...corpus, ...(kinds ? { kinds } : {}), records: items.map((r) => published(r, secret)), ...page, attribution: attribution("/database") },
-    { headers: { ...NO_STORE, ...attributionHeaders() } },
+    { headers: { ...(shared ? CACHE : NO_STORE), ...attributionHeaders() } },
   );
 }
