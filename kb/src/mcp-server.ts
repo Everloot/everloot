@@ -197,6 +197,9 @@ function tooledFacts<T>(
   return facts;
 }
 
+/** Public anonymous facts already aggregated by the host; null keeps the observed layer unavailable. */
+export type AnswerSourcesLoader = () => Promise<{ facts: AnswerSourcesFacts; dataAsOf: string | null } | null>;
+
 /**
  * The site's own public records, read in process. The /mcp route on the web deployment passes one, so
  * gameplay answers skip the HTTP self-fetch and its byte ceiling. Null means the store was unreadable.
@@ -846,7 +849,7 @@ function professionSkillLineId(profession: string): number | undefined {
 }
 
 /** The readers a host lends the tools: the site's store in process, or nothing for a standalone server. */
-export interface ToolOptions { catalog?: CatalogLoader; corpus?: CorpusLoader; market?: MarketLoader; auctionHistory?: AuctionHistoryLoader; gameData?: GameDataLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; coverage?: CoverageLoader; settledSummary?: SettledSummaryLoader; guilds?: GuildReader; recheck?: readonly RecheckScope[];
+export interface ToolOptions { answerSources?: AnswerSourcesLoader; catalog?: CatalogLoader; corpus?: CorpusLoader; market?: MarketLoader; auctionHistory?: AuctionHistoryLoader; gameData?: GameDataLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; coverage?: CoverageLoader; settledSummary?: SettledSummaryLoader; guilds?: GuildReader; recheck?: readonly RecheckScope[];
   /** Everloot's own install ids (trusted-source.ts): a browsing day one of them scanned is public under 3, as in the market rollup. */
   trusted?: ReadonlySet<string> }
 
@@ -978,12 +981,15 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
       });
     },
     answer_sources: async (args) => {
-      const read = await readTooledFacts<AnswerSourcesFacts>("answer_sources", options.corpus, recheck);
+      // A supplied stored reader is authoritative: a miss must not replay the corpus.
+      const read = options.answerSources
+        ? await options.answerSources().catch(() => null)
+        : await readTooledFacts<AnswerSourcesFacts>("answer_sources", options.corpus, recheck);
       const files = options.gameData ? await options.gameData() : null;
       const result = await answerSources(db, args, read?.facts ?? null, read?.dataAsOf ?? null, files);
       // The fallback is said in the text; the structured answer keeps its published shape.
       const { someWords: _someWords, respelled: _respelled, ...structured } = result;
-      const observations = read !== null ? true : observationsConfigured(options.corpus) ? "unreachable" : false;
+      const observations = read !== null ? true : (options.answerSources || observationsConfigured(options.corpus)) ? "unreachable" : false;
       return { text: `${formatAnswerSources(result, observations)}${read ? `\n${answerFooter(read.dataAsOf)}` : ""}`, structured };
     },
     profession_path: (args) => {
