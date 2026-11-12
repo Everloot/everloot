@@ -23,7 +23,7 @@ begin
     if not has_function_privilege('service_role',f,'EXECUTE') then raise exception 'server cannot execute %',f; end if;
     if not (select prosecdef and proconfig @> array['search_path=""','lock_timeout=3s'] from pg_proc where oid=f) then raise exception 'unsafe function %',f; end if;
   end loop;
-  if n <> 18 then raise exception 'expected 18 functions, got %', n; end if;
+  if n <> 22 then raise exception 'expected 22 functions, got %', n; end if;
 end $$;
 
 -- Invented fixtures. Keep the original batch for the hide regression.

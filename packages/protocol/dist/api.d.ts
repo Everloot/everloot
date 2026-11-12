@@ -1027,6 +1027,7 @@ export declare const intakeRequest: z.ZodObject<{
         eventId: z.ZodOptional<z.ZodString>;
         capturedAt: z.ZodString;
         kind: z.ZodLiteral<"player_seen">;
+        surname: z.ZodOptional<z.ZodString>;
         name: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
         realm: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
         race: z.ZodString;
@@ -2347,6 +2348,7 @@ export declare const API_SCHEMAS: {
             eventId: z.ZodOptional<z.ZodString>;
             capturedAt: z.ZodString;
             kind: z.ZodLiteral<"player_seen">;
+            surname: z.ZodOptional<z.ZodString>;
             name: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
             realm: z.ZodString & z.ZodType<string, string, z.core.$ZodTypeInternals<string, string>>;
             race: z.ZodString;

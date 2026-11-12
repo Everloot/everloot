@@ -607,6 +607,8 @@ export function validGuildName(name) {
 /** One character, as the addon last saw it. The site keeps the newest row per character and realm. */
 export const playerSeen = base.extend({
     kind: z.literal("player_seen"),
+    surname: z.string().min(2).max(96).refine((value) => /^\p{L}{2,24}$/u.test(value), { message: "not a character surname" }).optional()
+        .describe("Forever's surname, UnitName's second return: 2 to 24 letters. Optional for older uploads; used only for named armory discovery."),
     name: z.string().min(2).max(48).refine(validPlayerName, { message: "not a character name" })
         .describe("UnitName: letters only, 2 to 12 of them."),
     realm: CENSUS_REALM.describe("GetRealmName(): the realm the addon runs on. Players from another realm are not recorded."),

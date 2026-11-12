@@ -9,6 +9,11 @@ const row = {
 const reasons = (rows: unknown[]) => parseRecords(rows).receipt.rejected.map((r) => r.reason);
 
 describe("player_seen records", () => {
+  test("a Forever surname is retained for armory discovery while legacy rows still parse", () => {
+    const full = { ...row, surname: "Morningstar" };
+    expect(parseRecords([full, row]).records).toEqual([full, row]);
+    expect(parseRecords([{ ...row, surname: "Two Words" }]).receipt.rejected).toHaveLength(1);
+  });
   test("it is a record kind and not a public corpus kind", () => {
     expect(PLAYER_KINDS).toEqual(["player_seen"]);
     expect(ALL_RECORD_KINDS).toContain("player_seen");

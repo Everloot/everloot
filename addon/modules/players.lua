@@ -23,7 +23,7 @@
 --     group once;
 --   * at most 300 new characters a UTC day, at most 1,000 rows in the file (the oldest rows go first);
 --   * about 200 bytes a row, so a full file adds about 200 KB to SavedVariables.
--- Players from another realm are skipped: UnitName names their realm, and one realm string is all a row holds.
+-- Forever's UnitName returns first name and surname. GetRealmName supplies realm context separately.
 -- Kill rows go through E:Store like the anonymous encounter rows, so they pause at the file-wide cap and carry
 -- its event ids; the daily cap of 60 is this module's own. /everloot players off deletes them with the rest.
 -- GetInstanceInfo and UnitFactionGroup are on the call list for the kill row only: the instance the kill was in
@@ -65,8 +65,8 @@ local function rows()
   return list
 end
 
-local function keyOf(name, realm)
-  return name:lower() .. "\0" .. realm
+local function keyOf(name, realm, surname)
+  return name:lower() .. "\0" .. realm .. "\0" .. (surname or ""):lower()
 end
 
 local function stamp()
@@ -99,7 +99,7 @@ end
 local function reindex()
   index = {}
   for _, row in ipairs(rows()) do
-    if type(row.name) == "string" and type(row.realm) == "string" then index[keyOf(row.name, row.realm)] = row end
+    if type(row.name) == "string" and type(row.realm) == "string" then index[keyOf(row.name, row.realm, row.surname)] = row end
   end
 end
 
@@ -113,8 +113,8 @@ end
 
 --- Keep what was read: change the row if the character has changed, move its date if it is a new day, add it
 --- if it is new. Over the file's cap the oldest rows go.
-local function keep(name, realm, race, class, level, guild)
-  local key = keyOf(name, realm)
+local function keep(name, realm, race, class, level, guild, surname)
+  local key = keyOf(name, realm, surname)
   local row = index[key]
   if row then
     local changed = row.level ~= level or row.race ~= race or row.class ~= class or (guild ~= nil and row.guild ~= guild)
@@ -135,26 +135,28 @@ local function keep(name, realm, race, class, level, guild)
   row = {
     installId = EverlootDB.installId, eventId = eventId(), capturedAt = stamp(),
     name = name, realm = realm, race = race, class = class, level = level, guild = guild,
+    surname = surname,
   }
   local list = rows()
   list[#list + 1] = row
   index[key] = row
   while #list > MAX_ROWS do
     local old = table.remove(list, 1)
-    if index[keyOf(old.name, old.realm)] == old then index[keyOf(old.name, old.realm)] = nil end
+    if index[keyOf(old.name, old.realm, old.surname)] == old then index[keyOf(old.name, old.realm, old.surname)] = nil end
   end
 end
 
 --- Read one player unit. `newLevel` is for yourself at level-up, before UnitLevel has it.
 local function read(unit, newLevel)
-  -- The realm-aware call, not the plain one: the plain call gives the server, which is never empty,
-  -- so a client that answers with the server would drop every player. A unit on another realm
-  -- carries a realm that is not ours, and that is the only thing that makes it another realm.
+  -- Current Forever clients return a surname in the second position. Legacy realm-shaped values
+  -- remain context only and never become part of a Blizzard character slug.
   local name, unitRealm = UnitName(unit, true)
   name, unitRealm = E.Readable(name), E.Readable(unitRealm)
   local ourRealm = E.Readable(GetRealmName())
   local ourServer = E.Readable((select(2, UnitName("player"))))
-  local anotherRealm = unitRealm and unitRealm ~= "" and unitRealm ~= ourRealm and unitRealm ~= ourServer
+  local surname = token(unitRealm, NAME, 2, 96) and unitRealm or nil
+  if surname and #(surname:gsub("[\128-\191]", "")) > 24 then surname = nil end
+  local anotherRealm = not surname and unitRealm and unitRealm ~= "" and unitRealm ~= ourRealm and unitRealm ~= ourServer
   if not token(name, NAME, 2, 48) or anotherRealm then return true end
   local level = tonumber(E.Readable(newLevel)) or E.Readable(UnitLevel(unit))
   if type(level) ~= "number" or level < 1 or level > MAX_LEVEL then return false end
@@ -164,7 +166,7 @@ local function read(unit, newLevel)
   if not token(race, RACE, 2, 24) or not token(class, CLASS, 3, 16) or not realm then return true end
   local guild = E.Readable((GetGuildInfo(unit)))
   if not token(guild, GUILD, 2, 96) then guild = nil end
-  keep(name, realm, race, class, math.floor(level), guild)
+  keep(name, realm, race, class, math.floor(level), guild, surname)
   return true
 end
 

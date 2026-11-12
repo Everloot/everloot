@@ -7,6 +7,7 @@ required, or tightening a limit is a major release.
 ## [Unreleased]
 
 ### Added
+- 2.2.0 (record protocol 1.14.0): optional `player_seen.surname` retains Forever's full character identity for armory discovery. Older named uploads remain accepted. No anonymous record gains a name.
 - 2.1.0 (record protocol unchanged, 1.13.0): `marketPage` and `auctionHistory` gain optional `realmStatus` (`exact`,
   `alias`, `ambiguous` or `unknown`), `askedRealm` and `candidates`, so a client can tell a realm name no scan uses
   from a realm with no public day. `auctionHistory` gains optional `scanDays`, the public full-scan days

@@ -14,7 +14,7 @@ export function generateMetadata(): Metadata {
   return armoryMetadata({ title: "Add a character to the armory", description: "Ask Everloot to read a WoW: Forever character from Blizzard's API.", path: ARMORY_SUBMIT_PATH });
 }
 
-type Search = { region?: string | string[]; name?: string | string[]; surname?: string | string[]; done?: string | string[]; error?: string | string[] };
+type Search = { region?: string | string[]; name?: string | string[]; surname?: string | string[]; armoryUrl?: string | string[]; done?: string | string[]; error?: string | string[] };
 
 const ERROR: Record<string, string> = {
   limit: "Too many requests from this connection. Try again in an hour.",
@@ -48,6 +48,12 @@ export default async function ArmorySubmitPage(props: { searchParams: Promise<Se
         <form action="/armory/submit/send" method="post" className="space-y-4">
           <CharacterFields region={first(params.region)} name={first(params.name)} surname={first(params.surname)} />
           <button type="submit" className="btn btn-primary min-h-11">Add this character</button>
+        </form>
+
+        <form action="/armory/submit/send" method="post" className="space-y-3">
+          <label htmlFor="armory-url" className="block text-sm text-fg">Or paste a Blizzard armory link</label>
+          <input id="armory-url" name="armoryUrl" type="url" required maxLength={500} defaultValue={first(params.armoryUrl)} placeholder="https://worldofwarcraft.blizzard.com/forever/…" className="w-full min-h-11 rounded-control border border-edge bg-canvas px-3 text-fg" />
+          <button type="submit" className="btn btn-secondary min-h-11">Add from link</button>
         </form>
 
         <p className="text-sm text-muted">

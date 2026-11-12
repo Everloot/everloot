@@ -42,6 +42,30 @@ function setup(count = 1) {
   };
   return { store, api };
 }
+it("backfills details without a conditional profile read, counting optional calls", async () => {
+  const { store, api } = setup();
+  api.get.mockImplementation(async (path) => ({ status: 200, lastModified: "new", body: path.endsWith("statistics") ? { health: 843 } : path.endsWith("ember-vale-0") ? { ...bodyFor(path) as object, statistics: { href: "https://eu.api.blizzard.com/profile/wow/character/ember-vale-0/statistics" } } : bodyFor(path) }));
+  const s = await runCrawl({ region: "eu", budget: 7, store, api, details: true });
+  expect(api.get.mock.calls[0]?.[2]).toBeUndefined();
+  expect(s.calls).toBe(4);
+  expect(store.upsertCharacters.mock.calls[0]?.[1][0]).toMatchObject({ details: { revision: 1, statistics: { rows: [{ label: "Health", value: 843 }] } } });
+});
+it.each([403, 500])("optional endpoint HTTP %i preserves the base character and never deletes it", async (status) => {
+  const { store, api } = setup();
+  api.get.mockImplementation(async (path) => {
+    if (path.endsWith("statistics")) throw new ApiError(status, "api");
+    return { status: 200, lastModified: "new", body: path.endsWith("ember-vale-0") ? { ...bodyFor(path) as object, statistics: { href: "https://eu.api.blizzard.com/profile/wow/character/ember-vale-0/statistics" } } : bodyFor(path) };
+  });
+  const s = await runCrawl({ region: "eu", budget: 7, store, api, details: true });
+  expect(s.characters.fetched).toBe(1);
+  expect(store.missing).not.toHaveBeenCalled();
+  expect(store.upsertCharacters.mock.calls[0]?.[1][0]).toMatchObject({ details: { revision: 1, ...(status === 500 ? { retry: true } : {}) } });
+});
+it("detail mode reserves the entire maximum before starting a character", async () => {
+  const { store, api } = setup();
+  await runCrawl({ region: "eu", budget: 6, store, api, details: true });
+  expect(api.get).not.toHaveBeenCalled();
+});
 it("stops before partial rows at budget", async () => {
   const { store, api } = setup(20);
   const s = await runCrawl({ region: "eu", budget: 7, store, api });

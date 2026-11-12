@@ -50,11 +50,11 @@ export function playerDateProblem(capturedAt: string, now: Date): string | null 
 }
 
 /** What the table stores for one row: the UTC day only (never the time), and never a day after today. */
-export interface PlayerUpsert { name: string; realm: string; race: string; class: string; level: number; guild?: string; seen: string }
+export interface PlayerUpsert { name: string; surname?: string; realm: string; race: string; class: string; level: number; guild?: string; seen: string }
 
 export function playerUpsert(row: PlayerRow, now: Date): PlayerUpsert {
   const seen = new Date(Math.min(Date.parse(row.capturedAt), now.getTime())).toISOString().slice(0, 10);
-  return { name: row.name, realm: row.realm.trim(), race: row.race, class: row.class, level: row.level, ...(row.guild ? { guild: row.guild } : {}), seen };
+  return { name: row.name, ...(row.surname ? { surname: row.surname } : {}), realm: row.realm.trim(), race: row.race, class: row.class, level: row.level, ...(row.guild ? { guild: row.guild } : {}), seen };
 }
 
 export const PLAYERS_PER_UPLOAD = UPLOAD_LIMITS.playersPerUpload;

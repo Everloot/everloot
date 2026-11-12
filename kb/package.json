@@ -27,6 +27,7 @@
     "zstd-napi": "^0.0.13"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.2.17",
     "@types/better-sqlite3": "^9.6.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.20.5",

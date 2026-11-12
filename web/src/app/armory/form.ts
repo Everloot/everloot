@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { characterSlugOf, isArmoryRegion } from "@/lib/armory";
+import { characterFromArmoryUrl, characterSlugOf, isArmoryRegion } from "@/lib/armory";
 
 /**
  * The hide and add forms post here without JavaScript, so a handler answers with a redirect back to its form: `done`
@@ -18,6 +18,15 @@ export async function readCharacterForm(req: Request): Promise<CharacterForm> {
   const slug = characterSlugOf(name, surname);
   if (!isArmoryRegion(region) || !slug) return { ok: false, fields: { region, name, surname } };
   return { ok: true, region, name, surname, slug };
+}
+
+export async function readSubmissionForm(req: Request): Promise<CharacterForm> {
+  const form = await req.clone().formData().catch(() => null);
+  if (!form) return { ok: false, fields: null };
+  const raw = form.get("armoryUrl");
+  if (typeof raw !== "string" || !raw.trim()) return readCharacterForm(req);
+  const identity = characterFromArmoryUrl(raw);
+  return identity ? { ok: true, ...identity } : { ok: false, fields: { armoryUrl: raw.slice(0, 500) } };
 }
 
 export function back(req: Request, path: string, query: Record<string, string>): Response {

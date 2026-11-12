@@ -68,7 +68,7 @@ export class ArmoryStore {
     });
   }
   character(region: Region, slug: string) {
-    return this.rpc<{ last_modified: string | null }[]>("armory_character", {
+    return this.rpc<{ last_modified: string | null; details?: unknown }[]>("armory_character", {
       p_region: region,
       p_slug: slug,
     });

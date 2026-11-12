@@ -52,5 +52,5 @@ export async function armoryCrawl(flags: Map<string, string>): Promise<void> {
       serviceKey: required("SUPABASE_SERVICE_ROLE_KEY"),
     });
   }
-  await runCrawl({ region, budget, api, store, dryRun, log: console.log });
+  await runCrawl({ region, budget, api, store, dryRun, details: true, log: console.log });
 }

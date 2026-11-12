@@ -67,6 +67,20 @@ export function characterSlugOf(name: string, surname: string): string | null {
   return NAME_RULE.test(n) && SURNAME_RULE.test(s) ? `${n}-${s}`.toLowerCase() : null;
 }
 
+/** Parse an official armory link locally, without fetching user-supplied URLs. */
+export function characterFromArmoryUrl(value: string): { region: ArmoryRegion; slug: string; name: string; surname: string } | null {
+  if (value.length > 500) return null;
+  try {
+    const u = new URL(value.trim());
+    if (u.protocol !== "https:" || u.host !== "worldofwarcraft.blizzard.com" || u.username || u.password) return null;
+    const match = /^\/(?:[a-z]{2}-[a-z]{2}\/)?forever\/(us|eu)\/armory\/character\/([^/]+)\/?$/.exec(u.pathname);
+    if (!match || !isArmoryRegion(match[1])) return null;
+    const [n = "", s = "", extra] = decodeURIComponent(match[2]!).normalize("NFC").split("-");
+    const slug = characterSlugOf(n, s);
+    return slug && !extra ? { region: match[1], slug, ...namesFromSlug(slug) } : null;
+  } catch { return null; }
+}
+
 /**
  * A name and surname read off a character slug, each part with a capital: for a roster member stored without its
  * names, which the roster allows. `ølvir-stål` reads "Ølvir" and "Stål"; a single-word slug has no surname.

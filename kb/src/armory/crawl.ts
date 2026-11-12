@@ -1,5 +1,6 @@
 import { ApiError, type ForeverApi, type Region } from "./api.js";
 import { ZodError } from "zod";
+import { ArmoryDetails, DETAIL_KEYS, detailPath, normalizeDetails, type DetailKey } from "./details.js";
 import {
   parseCharacter,
   parseGuild,
@@ -49,6 +50,7 @@ export async function runCrawl(cfg: {
   now?: () => number;
   log?: (line: string) => void;
   dryRun?: boolean;
+  details?: boolean;
 }): Promise<Summary> {
   if (!Number.isSafeInteger(cfg.budget) || cfg.budget < 0)
     throw Error("budget must be a nonnegative integer");
@@ -227,7 +229,11 @@ export async function runCrawl(cfg: {
           ? await store.character(region, q.slug)
           : await store.guild(region, q.slug)
         : [];
-      const modified = stored[0]?.last_modified;
+      const oldDetails = kind === "character" ? ArmoryDetails.safeParse(stored[0] && "details" in stored[0] ? stored[0].details : null) : null;
+      const agedDetails = oldDetails?.success && [oldDetails.data.statistics, oldDetails.data.talents, oldDetails.data.professions, oldDetails.data.avatar]
+        .some((section) => section && now() - Date.parse(section.asOf) >= 20 * 86_400_000);
+      const backfill = cfg.details && kind === "character" && (!oldDetails?.success || oldDetails.data.retry || agedDetails);
+      const modified = backfill ? null : stored[0]?.last_modified;
       const result = await read(
         kind === "guild" ? `${base}/roster` : base,
         modified ? { ifModifiedSince: modified } : undefined,
@@ -288,6 +294,35 @@ export async function runCrawl(cfg: {
           await skip(kind, q.slug, "slug_mismatch");
           return;
         }
+        if (cfg.details) {
+          const responses: Partial<Record<DetailKey, unknown>> = {};
+          const failed = new Set<DetailKey>();
+          let retry = false;
+          for (const key of DETAIL_KEYS) {
+            const path = detailPath(result.body, key, region, q.slug);
+            if (!path) continue;
+            try {
+              const response = await read(path);
+              if (response.status === 200) responses[key] = response.body;
+            } catch (error) {
+              // A permission denied by an optional endpoint does not invalidate the public profile token.
+              if (error instanceof ApiError && (error.phase === "oauth" || error.status === 401)) throw error;
+              if (error instanceof ApiError && error.status === 403) { logError(`optional ${key} unavailable`, error); continue; }
+              retry = true;
+              failed.add(key);
+              logError(`optional ${key} unavailable`, error);
+            }
+          }
+          const details = normalizeDetails(responses, new Date(now()).toISOString());
+          if (oldDetails?.success) {
+            for (const [key, endpoint] of [["statistics", "statistics"], ["talents", "specializations"], ["professions", "professions"], ["avatar", "media"]] as const) {
+              const previous = oldDetails.data[key];
+              if (failed.has(endpoint) && previous && now() - Date.parse(previous.asOf) < 30 * 86_400_000) Object.assign(details, { [key]: previous });
+            }
+          }
+          if (retry) details.retry = true;
+          Object.assign(parsed, { details });
+        }
         // armory_take returns distinct queued identities; the equality check above preserves that.
         pending.push(parsed);
         if (pending.length >= 100) await flush();
@@ -308,7 +343,7 @@ export async function runCrawl(cfg: {
   }
   async function process(kind: Kind, rows: QueueRow[]) {
     let index = 0;
-    const cost = kind === "guild" ? 2 : 3;
+    const cost = kind === "guild" ? 2 : cfg.details ? 7 : 3;
     await Promise.all(
       Array.from({ length: 8 }, async () => {
         while (!fatal && index < rows.length) {

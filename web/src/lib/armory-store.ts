@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ARMORY_RECHECK_DAYS, namesFromSlug, SEARCH_RULE, type ArmoryMetricKey } from "./armory";
 import { authQuery } from "./supabase/server";
+import { ArmoryDetails, type ProfileDetails } from "../../../kb/src/armory/details";
 
 /**
  * Where the armory rows live: Supabase in production (the functions of 20261109120000_armory.sql, called with the
@@ -19,6 +20,8 @@ export interface ArmoryCharacter {
   lastLogin: string | null; equippedItemLevel: number | null; averageItemLevel: number | null;
   itemLevel: number | null; gearScore: number | null; honorableKills: number | null; pvpRank: number | null;
   equipment: ArmoryItem[]; fetchedAt: string; checkedAt: string;
+  details?: ProfileDetails;
+  addonSeen?: string | null;
 }
 
 export interface ArmoryGuild {
@@ -44,6 +47,7 @@ export interface ArmoryRank { metric: ArmoryMetricKey; rank: number; of: number 
 export interface ArmoryCount { region: string; rulesetId: number; ruleset: string; characters: number; guilds: number; newest: string | null }
 
 export interface ArmoryStore {
+  refresh(region: string, slug: string): Promise<"queued" | "queued-already" | "cooldown" | "unavailable">;
   character(region: string, slug: string): Promise<ArmoryCharacter | null>;
   guild(region: string, slug: string): Promise<ArmoryGuild | null>;
   /** The guild's members, with item level and Gear Score for those stored; hidden characters left out. */
@@ -80,12 +84,16 @@ const CharacterRow = z.object({
   faction: z.string(), gender: textOrNull, guild_slug: textOrNull, guild_name: textOrNull, last_login: textOrNull,
   equipped_item_level: numOrNull, average_item_level: numOrNull, item_level: numOrNull, gear_score: numOrNull,
   honorable_kills: numOrNull, pvp_rank: numOrNull, equipment: z.array(ItemRow), fetched_at: z.string(), checked_at: z.string(),
+  details: ArmoryDetails.optional().catch(undefined),
+  addon_seen: textOrNull.optional(),
 }).transform((r): ArmoryCharacter => ({
   region: r.region, slug: r.slug, characterId: r.character_id, name: r.name, surname: r.surname, level: r.level,
   rulesetId: r.ruleset_id, ruleset: r.ruleset, raceId: r.race_id, race: r.race, classId: r.class_id, class: r.class,
   faction: r.faction, gender: r.gender, guildSlug: r.guild_slug, guildName: r.guild_name, lastLogin: r.last_login,
   equippedItemLevel: r.equipped_item_level, averageItemLevel: r.average_item_level, itemLevel: r.item_level, gearScore: r.gear_score,
   honorableKills: r.honorable_kills, pvpRank: r.pvp_rank, equipment: r.equipment, fetchedAt: r.fetched_at, checkedAt: r.checked_at,
+  details: r.details,
+  addonSeen: r.addon_seen ?? null,
 }));
 
 const GuildRow = z.object({
@@ -139,6 +147,9 @@ export function createCloudArmoryStore(query: Query = authQuery): ArmoryStore {
   const rpc = async <S extends z.ZodTypeAny>(fn: string, args: Record<string, unknown>, shape: S): Promise<z.output<S>> =>
     shape.parse(await query<unknown>(`rpc/${fn}`, { method: "POST", body: JSON.stringify(args) }));
   return {
+    async refresh(region, slug) {
+      return rpc("armory_refresh", { p_region: region, p_slug: slug }, z.enum(["queued", "queued-already", "cooldown", "unavailable"]));
+    },
     async character(region, slug) { return (await rpc("armory_character", { p_region: region, p_slug: slug }, z.array(CharacterRow)))[0] ?? null; },
     async guild(region, slug) { return (await rpc("armory_guild", { p_region: region, p_slug: slug }, z.array(GuildRow)))[0] ?? null; },
     async roster(region, slug) { return rpc("armory_roster", { p_region: region, p_slug: slug }, z.array(MemberRow)); },
@@ -162,7 +173,7 @@ const unavailableReason = new WeakMap<ArmoryStore, string>();
 /** A store with nothing behind it: every call fails, so each page shows storage as out of reach. */
 export function createUnavailableArmoryStore(reason: string): ArmoryStore {
   const fail = async (): Promise<never> => { throw new Error(reason); };
-  const store = { character: fail, guild: fail, roster: fail, search: fail, searchGuilds: fail, board: fail, rank: fail, counts: fail, hide: fail, enqueue: fail };
+  const store = { character: fail, guild: fail, roster: fail, search: fail, searchGuilds: fail, board: fail, rank: fail, counts: fail, hide: fail, enqueue: fail, refresh: fail };
   unavailableReason.set(store, reason);
   return store;
 }
@@ -270,6 +281,15 @@ export function createMemoryArmoryStore(now: () => Date = () => new Date()): Mem
       if (stored && now().getTime() - Date.parse(stored.checkedAt) < ARMORY_RECHECK_DAYS * 86_400_000) return false;
       queue.set(qk, { region, kind, slug, source });
       return true;
+    },
+    async refresh(region, slug) {
+      const stored = characters.get(key(region, slug));
+      if (!stored || hides.has(key(region, slug))) return "unavailable";
+      const qk = `${region}/character/${slug}`;
+      if (queue.has(qk)) return "queued-already";
+      if (now().getTime() - Date.parse(stored.checkedAt) < 3_600_000) return "cooldown";
+      queue.set(qk, { region, kind: "character", slug, source: "refresh" });
+      return "queued";
     },
   };
 }

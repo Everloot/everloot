@@ -102,6 +102,8 @@ const root = join(__dirname, "../../../..");
 
 // The pages that show Blizzard's art, and the modules that read it for them. Nothing else may.
 const SHOWS_ART = new Set([
+  // Lightweight armory equipment icons and race/class portrait fallback.
+  "web/src/app/armory/profile.tsx", "web/src/app/armory/[region]/[slug]/page.tsx",
   // Approved entity share icons use the same page art switch and item visibility rule.
   "web/src/lib/og-card.tsx", "web/src/app/database/items/[id]/opengraph-image.tsx",
   "web/src/lib/talents/assets.ts", "web/src/lib/game-assets.ts", "web/src/lib/game-assets.fixture.ts",

@@ -4,6 +4,7 @@ import { pageMetadata } from "@/lib/seo";
 import { latestAddonRelease } from "@/lib/addon-release";
 import { REPO_URL } from "@/lib/source";
 import { playerPagesOn } from "@/lib/player-pages";
+import { armoryOn } from "@/lib/armory";
 import { pullSummariesOn } from "@/lib/pull-summaries";
 import { Card, Container, SectionHeading } from "@/components/ui";
 import YourEverlootHeader from "@/components/YourEverloot";
@@ -30,6 +31,10 @@ export default function UploadPage() {
         trail={trailFor("/upload")!}
       />
       <div className="space-y-6">
+        {armoryOn() && <p className="text-sm text-fg-2">
+          Want a character profile? <Link href="/armory/submit" className={link}>Add your full character name or Blizzard armory link</Link>.
+          {" "}<Link href="/account" className={link}>Connect your linked character</Link> to choose which addon details to share on it.
+        </p>}
         <p className="text-fg-2">
           Open-world sightings stay anonymous, and guild data publishes only through your officers.
           Uploaded observations are published under CC BY-SA 4.0, credited to Everloot contributors.
