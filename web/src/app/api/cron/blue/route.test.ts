@@ -34,7 +34,7 @@ it.each([false, true])("persists both stores and invalidates only with added pos
   const response = await GET(new Request("https://everloot.app/api/cron/blue", { headers: { authorization: "Bearer test-secret" } }));
   expect(response.status).toBe(200);
   expect(await response.json()).toEqual({ ok: true, fetched: 10, added: added ? 1 : 0, requests: { list: 8, robots: 2 } });
-  expect(ingestBluePosts).toHaveBeenCalledWith(expect.objectContaining({ store, minIntervalMs: 480_000 }));
+  expect(ingestBluePosts).toHaveBeenCalledWith(expect.objectContaining({ store, minIntervalMs: 480_000, deadlineMs: 15_000 }));
   expect(writeBlueStore).toHaveBeenCalledWith(store);
   expect(revalidateTag).toHaveBeenCalledTimes(added ? 1 : 0);
   if (added) expect(revalidateTag).toHaveBeenCalledWith("blue");

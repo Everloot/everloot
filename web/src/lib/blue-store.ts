@@ -5,6 +5,8 @@ import { r2Client, r2Config } from "./upload-store";
 
 export const BLUE_POSTS_KEY = "changes/blue-posts.json";
 const STATE_KEY = "changes/blue-fetch-state.json";
+// Each R2 call is bounded, so a stalled one fails the run (which retries) instead of holding it to the platform's limit.
+const STORE_TIMEOUT_MS = 10_000;
 
 export function blueStorage() {
   const config = r2Config();
@@ -28,7 +30,7 @@ export async function readBlueStore(): Promise<BlueStore> {
   const storage = blueStorage();
   if (!storage) throw new Error("Blue tracker needs R2 configuration");
   async function read(key: string, seed: unknown) {
-    const response = await fetch(await storage!.sign(key), { cache: "no-store" });
+    const response = await fetch(await storage!.sign(key), { cache: "no-store", signal: AbortSignal.timeout(STORE_TIMEOUT_MS) });
     if (response.status === 404) return seed;
     if (!response.ok) throw new Error(`Blue store read failed (${response.status})`);
     return response.json();
@@ -46,7 +48,7 @@ export async function writeBlueStore(store: BlueStore): Promise<void> {
   for (const [key, value] of [[BLUE_POSTS_KEY, { posts: store.posts }], [STATE_KEY, { fetched: store.fetched }]] as const) {
     const response = await fetch(await storage.sign(key, {
       method: "PUT", body: JSON.stringify(value), headers: { "content-type": "application/json" },
-    }), { cache: "no-store" });
+    }), { cache: "no-store", signal: AbortSignal.timeout(STORE_TIMEOUT_MS) });
     if (!response.ok) throw new Error(`Blue store write failed (${response.status})`);
   }
 }
