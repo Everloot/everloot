@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { DEFAULT_NEGOTIATED_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS } from "@modelcontextprotocol/sdk/types.js";
 import type { EdgeCacheStore } from "./cf-edge-cache";
 
 interface Version { release: string; dataAsOf: string }
@@ -17,9 +18,11 @@ const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(va
 export function publicMcpCache(version: () => Promise<Version | null>, suppliedStore?: EdgeCacheStore) {
   return async (req: Request, body: string, respond: () => Promise<Response>): Promise<Response> => {
     if (req.method !== "POST" || new URL(req.url).pathname !== "/mcp/public" ||
-      ["authorization", "cookie", "mcp-session-id", "mcp-protocol-version"].some((h) => req.headers.has(h)) ||
+      ["authorization", "cookie", "mcp-session-id"].some((h) => req.headers.has(h)) ||
       req.headers.get("content-type")?.split(";")[0].trim() !== "application/json" ||
       !req.headers.get("accept")?.split(",").map((v) => v.trim()).includes("application/json") || !req.headers.get("accept")?.split(",").map((v) => v.trim()).includes("text/event-stream")) return respond();
+    const protocol = req.headers.get("mcp-protocol-version") ?? DEFAULT_NEGOTIATED_PROTOCOL_VERSION;
+    if (!SUPPORTED_PROTOCOL_VERSIONS.includes(protocol)) return respond();
     let rpc: Record<string, unknown>;
     try { const parsed: unknown = JSON.parse(body); if (!object(parsed)) return respond(); rpc = parsed; } catch { return respond(); }
     if (rpc.jsonrpc !== "2.0" || rpc.method !== "tools/call" || !["string", "number"].includes(typeof rpc.id) ||
@@ -32,7 +35,7 @@ export function publicMcpCache(version: () => Promise<Version | null>, suppliedS
       before = await version();
       if (!before?.release || !before.dataAsOf) return respond();
       // Keep the exact text too: capitalization affects entity extraction and text echoed in the answer.
-      const hash = digest([rpc.params.name, canonical(rpc.params.arguments, true), canonical(rpc.params.arguments, false), before]);
+      const hash = digest([protocol, rpc.params.name, canonical(rpc.params.arguments, true), canonical(rpc.params.arguments, false), before]);
       key = new Request(`${new URL(req.url).origin}/__mcp-result/${hash}`);
       const hit = await store.match(key);
       if (hit) {

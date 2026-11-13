@@ -7,7 +7,7 @@ const cache = () => {
 };
 const req = (headers: Record<string, string | undefined> = {}) => new Request("https://everloot.app/mcp/public", { method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream", ...Object.fromEntries(Object.entries(headers).filter((entry): entry is [string, string] => entry[1] !== undefined)) } });
 const body = (id = 1, args = { question: "Thrall", limit: 3 }, name = "answer_sources") => JSON.stringify({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } });
-const response = () => Response.json({ jsonrpc: "2.0", id: 1, result: { content: [{ type: "text", text: "answer" }], structuredContent: { dataAsOf: "date-1" } } });
+const response = (dataAsOf = "date-1") => Response.json({ jsonrpc: "2.0", id: 1, result: { content: [{ type: "text", text: "answer" }], structuredContent: { dataAsOf } } });
 afterEach(() => vi.unstubAllEnvs());
 
 test("a repeated answer keeps its result and live id, with release and data versions isolated", async () => {
@@ -36,7 +36,7 @@ test.each(["my_builds", "guild_rankings", "guild_search", "gold_ledger", "comple
 });
 
 test.each([Response.json({ error: "rate limit" }, { status: 429 }), Response.json({ jsonrpc: "2.0", id: 1, error: { code: -1 } }), Response.json({ jsonrpc: "2.0", id: 1, result: { isError: true } }), Response.json({ result: {} }, { headers: { "set-cookie": "session=secret" } })])("errors and session responses are never stored", async (res) => {
-  const store = cache(); await publicMcpCache(async () => ({ release: "sha", dataAsOf: "date" }), store)(req(), body(), async () => res.clone());
+  const store = cache(); await publicMcpCache(async () => ({ release: "sha", dataAsOf: "date" }), store)(req(), body(1, undefined, "class_races"), async () => res.clone());
   expect(store.put).not.toHaveBeenCalled();
 });
 
@@ -49,7 +49,7 @@ test("case and whitespace variants cannot change displayed answers by colliding"
 test("missing data, changed data during computation and cache failures fall back safely", async () => {
   const store = cache(); const compute = vi.fn(async () => response());
   await publicMcpCache(async () => null, store)(req(), body(), compute); expect(store.match).not.toHaveBeenCalled();
-  let n = 0; await publicMcpCache(async () => ({ release: "sha", dataAsOf: String(n++) }), store)(req(), body(), compute); expect(store.put).not.toHaveBeenCalled();
+  let n = 0; await publicMcpCache(async () => ({ release: "sha", dataAsOf: String(n++) }), store)(req(), body(), async () => response("0")); expect(store.put).not.toHaveBeenCalled();
   store.match.mockRejectedValueOnce(new Error("cache unavailable"));
   expect((await publicMcpCache(async () => ({ release: "sha", dataAsOf: "date" }), store)(req(), body(), compute)).status).toBe(200);
 });
@@ -62,9 +62,9 @@ test("real transport: cached answers preserve output, each id, CORS, origin and 
     const store = cache();
     const read = vi.fn(async () => ({ facts: { items: { rates: [], names: [], npcs: [] }, world: { npcs: [], quests: [], vendors: [] } }, dataAsOf: "date-1" }));
     const handle = createMcpHttpHandler({ db, bearerToken: null, path: "/mcp/public", maxRequestBodyBytes: 4096,
-      rateLimitPerMinute: 2, allowedOrigins: ["https://chatgpt.com", "https://claude.ai"], answerSources: read,
+      rateLimitPerMinute: 3, allowedOrigins: ["https://chatgpt.com", "https://claude.ai"], answerSources: read,
       cacheResponse: publicMcpCache(async () => ({ release: "sha", dataAsOf: "date-1" }), store) });
-    const call = (id: number, origin: string) => new Request(req({ origin }), { body: body(id) });
+    const call = (id: number, origin: string) => new Request(req({ origin, "mcp-protocol-version": "2025-06-18" }), { body: body(id) });
     const first = await handle(call(1, "https://chatgpt.com")); const initial = await first.json();
     expect(initial.result.isError).not.toBe(true);
     expect(initial.result.structuredContent.dataAsOf).toBe("date-1");
@@ -74,8 +74,11 @@ test("real transport: cached answers preserve output, each id, CORS, origin and 
     expect(second.headers.get("cache-control")).toBe("no-store");
     expect(read).toHaveBeenCalledTimes(1);
     expect(store.put).toHaveBeenCalledTimes(1);
-    expect((await handle(call(3, "https://chatgpt.com"))).status).toBe(429);
-    expect((await handle(call(4, "https://bad.example"))).status).toBe(403);
+    const invalid = call(3, "https://chatgpt.com");
+    invalid.headers.set("mcp-protocol-version", "unsupported");
+    expect((await handle(invalid)).status).toBe(400);
+    expect((await handle(call(4, "https://chatgpt.com"))).status).toBe(429);
+    expect((await handle(call(5, "https://bad.example"))).status).toBe(403);
     expect(store.match).toHaveBeenCalledTimes(2);
   } finally { db.close(); }
 });
@@ -88,4 +91,20 @@ test("invalid SDK requests and stale/degraded observations cannot populate a res
     await run(req(headers), body(), async () => response());
   }
   expect(store.match).toHaveBeenCalledTimes(1);
+});
+
+
+test("supported protocol versions cache separately and unsupported ones bypass", async () => {
+  const store = cache(); const compute = vi.fn(async () => response());
+  const run = publicMcpCache(async () => ({ release: "sha", dataAsOf: "date-1" }), store);
+  const headers = { "mcp-protocol-version": "2025-06-18" };
+  await run(req(headers), body(1), compute);
+  expect(await (await run(req(headers), body(2), compute)).json()).toEqual({ ...(await response().json()), id: 2 });
+  expect(compute).toHaveBeenCalledTimes(1);
+  await run(req({ "mcp-protocol-version": "2025-03-26" }), body(3), compute);
+  expect(compute).toHaveBeenCalledTimes(2);
+  await run(req({ "mcp-protocol-version": "unsupported" }), body(4), compute);
+  expect(compute).toHaveBeenCalledTimes(3);
+  expect(store.match).toHaveBeenCalledTimes(3);
+  expect(store.put).toHaveBeenCalledTimes(2);
 });
