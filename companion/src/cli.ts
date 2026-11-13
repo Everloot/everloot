@@ -21,7 +21,7 @@ import { findEverlootFiles } from "./savedvariables";
 import { createSiteCollects } from "./site-collects";
 import { createSentState } from "./sent-state";
 import { refreshPrices } from "./prices";
-import { uploadFile, type UploadResult } from "./uploader";
+import { RateLimited, uploadFile, type UploadResult } from "./uploader";
 import { watchFile } from "./watch-file";
 
 export interface CliArgs {
@@ -106,6 +106,60 @@ export interface MainDeps {
 
 const host: MainDeps = { uploadFile, refreshPrices, watchFile, console };
 
+/** One queue for this endpoint: a rate limit pauses every account, and saves never overlap uploads. */
+function watchUploads(send: (file: string) => Promise<void>, failed: (file: string, err: unknown) => void) {
+  const backoff = [60_000, 300_000, 900_000];
+  const jobs = new Map<string, { due: number; failures: number; dirty: boolean }>();
+  let notBefore = 0, busy = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const drain = async () => {
+    if (busy) return;
+    busy = true;
+    clearTimeout(timer);
+    try {
+      for (;;) {
+        const next = [...jobs].find(([, job]) => Math.max(job.due, notBefore) <= Date.now());
+        if (!next) break;
+        const [file, job] = next;
+        try {
+          await send(file);
+          if (job.dirty) {
+            job.dirty = false; job.failures = 0; job.due = Date.now();
+          } else jobs.delete(file);
+        } catch (err) {
+          failed(file, err);
+          const limited = err instanceof RateLimited;
+          const message = err instanceof Error ? err.message : "";
+          // Body-stream network failures retain fetch's TypeError; other network/timeout/HTTP failures are wrapped.
+          // Parse/validation/auth errors stop without a retry.
+          const transient = limited || err instanceof TypeError || /^Could not reach /.test(message) || / did not answer within /.test(message) || /\(HTTP 5\d\d\)/.test(message);
+          if (limited) notBefore = Math.max(notBefore, Date.now() + (err.retryAfterMs ?? backoff[0]));
+          const wait = backoff[job.failures++];
+          if (transient && wait !== undefined) job.due = Date.now() + wait;
+          else if (job.dirty) {
+            // A newer save gets its own attempt even if this snapshot exhausted its retries.
+            job.dirty = false; job.failures = 0; job.due = Date.now();
+          } else jobs.delete(file);
+        }
+      }
+    } finally {
+      busy = false;
+      if (jobs.size) {
+        const due = Math.min(...[...jobs.values()].map((job) => Math.max(job.due, notBefore)));
+        timer = setTimeout(() => void drain(), Math.min(2_147_483_647, Math.max(0, due - Date.now())));
+      }
+    }
+  };
+  return {
+    enqueue(file: string) {
+      const job = jobs.get(file);
+      if (job) job.dirty = true;
+      else jobs.set(file, { due: Date.now(), failures: 0, dirty: false });
+    },
+    drain,
+  };
+}
+
 export async function main(argv: string[], deps: MainDeps = host): Promise<void> {
   const args = parseArgs(argv);
   const statePath = args.state ?? defaultStatePath({ platform: process.platform, env: process.env, home: homedir() });
@@ -159,19 +213,24 @@ export async function main(argv: string[], deps: MainDeps = host): Promise<void>
   };
   if (args.command === "prices") return prices();
   const send = async (file: string) => {
-    try {
-      deps.console.log(uploadSummary(file, await deps.uploadFile(file, { endpoint: args.endpoint, state, collects, sharesInstall: sharesInstallWith(file, files) })));
-      if (args.command === "watch") await prices();
-    } catch (err) {
-      deps.console.error(`${file}: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    deps.console.log(uploadSummary(file, await deps.uploadFile(file, { endpoint: args.endpoint, state, collects, sharesInstall: sharesInstallWith(file, files) })));
+    if (args.command === "watch") await prices();
   };
+  const failed = (file: string, err: unknown) => deps.console.error(`${file}: ${err instanceof Error ? err.message : String(err)}`);
   deps.console.log(uploadNotice());
-  for (const file of files) await send(file);
   if (args.command === "watch") {
+    const queue = watchUploads(send, failed);
     // The game writes SavedVariables at logout or /reload; wait for the write to settle.
-    for (const file of files) deps.watchFile(file, debounce(() => void send(file), 5000));
+    for (const file of files) {
+      queue.enqueue(file);
+      deps.watchFile(file, debounce(() => { queue.enqueue(file); void queue.drain(); }, 5000));
+    }
+    await queue.drain();
     deps.console.log(`Watching ${files.length} file(s). Leave this running while you play; Ctrl+C stops it.`);
+  } else {
+    for (const file of files) {
+      try { await send(file); } catch (err) { failed(file, err); }
+    }
   }
 }
 

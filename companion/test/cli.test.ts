@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import { debounce, defaultStatePath, main, parseArgs, sharesInstallWith, uploadNotice, uploadSummary, type MainDeps } from "../src/cli";
 import { loopbackSite } from "./loopback-mcp";
+import { RateLimited, uploadFile } from "../src/uploader";
+import { createSentState, receiptKeyForSite } from "../src/sent-state";
 
 test("arguments name a command, a file or a game folder, and an endpoint", () => {
   expect(parseArgs(["upload", "--file", "Everloot.lua"])).toEqual({ command: "upload", file: "Everloot.lua", endpoint: "https://everloot.app" });
@@ -215,6 +217,173 @@ describe("the upload, watch and prices loop, with a fake uploader and price writ
     expect(f.listeners.size).toBe(0);
     expect(f.out).not.toContain(uploadNotice());
     expect(f.errors).toEqual([]);
+  });
+
+  test("watch retries a failed logout upload without another file write", async () => {
+    vi.useFakeTimers();
+    const { d, file, args } = game();
+    const f = fakes();
+    let requests = 0;
+    f.deps.uploadFile = (path, options) => uploadFile(path, { ...options, fetch: async () => {
+      requests++;
+      if (requests === 1) throw new TypeError("fetch failed");
+      return Response.json({ ok: true, persisted: true, uploadId: "u-1", accepted: [{ index: 0, kind: "loot" }], rejected: [] });
+    } });
+    await main(["watch", ...args], f.deps);
+    writeFileSync(file, `EverlootDB = {["version"] = "0.3.4", ["installId"] = "abcd-1234-ef56-7890", ["records"] = {["loot"] = {{["eventId"] = "epoch:1", ["capturedAt"] = "2026-10-09T00:00:00Z", ["sourceNpcId"] = 42, ["sourceEvidence"] = "loot-api", ["items"] = {{["itemId"] = 5, ["count"] = 1}}}}}}`);
+    f.listeners.get(file)!();
+    await vi.advanceTimersByTimeAsync(5000);
+    const confirmed = () => createSentState(join(d, "sent.json")).has(receiptKeyForSite("abcd-1234-ef56-7890", "http://localhost:1"), "epoch:1");
+    expect(confirmed()).toBe(false);
+    await vi.advanceTimersByTimeAsync(59_999);
+    expect(requests).toBe(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(requests).toBe(2);
+    expect(confirmed()).toBe(true);
+  });
+
+  test("a 429 postpones every account until Retry-After", async () => {
+    vi.useFakeTimers();
+    const { d, file, args } = game();
+    const other = join(d, "WTF", "Account", "ZOTHER", "SavedVariables", "Everloot.lua");
+    mkdirSync(join(d, "WTF", "Account", "ZOTHER", "SavedVariables"), { recursive: true });
+    writeFileSync(other, readFileSync(file));
+    const f = fakes();
+    let limited = true;
+    f.deps.uploadFile = async (path) => {
+      f.calls.push(`upload ${path}`);
+      if (limited) { limited = false; throw new RateLimited("wait", 120_000); }
+      return UPLOAD;
+    };
+    await main(["watch", ...args], f.deps);
+    expect(f.calls).toEqual([`upload ${file}`]);
+    f.listeners.get(other)!();
+    await vi.advanceTimersByTimeAsync(119_999);
+    expect(f.calls).toEqual([`upload ${file}`]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(f.calls.filter((c) => c.startsWith("upload "))).toContain(`upload ${other}`);
+    expect(f.calls.filter((c) => c === `upload ${file}`)).toHaveLength(2);
+  });
+
+  test("a save during a pending retry schedules one subsequent upload", async () => {
+    vi.useFakeTimers();
+    const { file, args } = game();
+    const f = fakes();
+    let attempts = 0;
+    let finish!: () => void;
+    let active = 0, peak = 0;
+    f.deps.uploadFile = async () => {
+      attempts++; active++; peak = Math.max(peak, active);
+      try {
+        if (attempts === 1) throw new Error("Could not reach http://localhost:1. Keep your file and retry.");
+        if (attempts === 2) await new Promise<void>((resolve) => { finish = resolve; });
+        return UPLOAD;
+      } finally { active--; }
+    };
+    await main(["watch", ...args], f.deps);
+    f.listeners.get(file)!(); f.listeners.get(file)!();
+    await vi.advanceTimersByTimeAsync(59_999);
+    expect(attempts).toBe(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(attempts).toBe(2);
+    f.listeners.get(file)!();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(attempts).toBe(2);
+    finish();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(attempts).toBe(3);
+    expect(peak).toBe(1);
+    await vi.advanceTimersByTimeAsync(1_000_000);
+    expect(attempts).toBe(3);
+  });
+
+  test("watch bounds transient retries and waits for a new save after permanent errors", async () => {
+    vi.useFakeTimers();
+    const { file, args } = game();
+    const f = fakes();
+    let attempts = 0;
+    f.deps.uploadFile = async () => { attempts++; throw new Error("server error (HTTP 503)"); };
+    await main(["watch", ...args], f.deps);
+    await vi.advanceTimersByTimeAsync(60_000 + 300_000 + 900_000);
+    expect(attempts).toBe(4);
+    await vi.advanceTimersByTimeAsync(3_600_000);
+    expect(attempts).toBe(4);
+    f.deps.uploadFile = async () => { attempts++; throw new Error("invalid key (HTTP 401)"); };
+    f.listeners.get(file)!();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(attempts).toBe(5);
+    await vi.advanceTimersByTimeAsync(3_600_000);
+    expect(attempts).toBe(5);
+  });
+
+  test("watch serializes accounts and retains a save during the initial upload", async () => {
+    vi.useFakeTimers();
+    const { d, file, args } = game();
+    const other = join(d, "WTF", "Account", "ZOTHER", "SavedVariables", "Everloot.lua");
+    mkdirSync(join(d, "WTF", "Account", "ZOTHER", "SavedVariables"), { recursive: true });
+    writeFileSync(other, readFileSync(file));
+    const f = fakes();
+    let finish!: () => void;
+    const uploads: string[] = [];
+    let active = 0, peak = 0;
+    f.deps.uploadFile = async (path) => {
+      uploads.push(path); active++; peak = Math.max(peak, active);
+      if (uploads.length === 1) await new Promise<void>((resolve) => { finish = resolve; });
+      active--;
+      return UPLOAD;
+    };
+    const started = main(["watch", ...args], f.deps);
+    f.listeners.get(file)!(); f.listeners.get(other)!();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(uploads).toEqual([file]);
+    finish();
+    await started;
+    expect(uploads.filter((path) => path === file)).toHaveLength(2);
+    expect(uploads).toContain(other);
+    expect(peak).toBe(1);
+  });
+
+  test("a save during the last failed retry still gets its own upload", async () => {
+    vi.useFakeTimers();
+    const { file, args } = game();
+    const f = fakes();
+    let attempts = 0;
+    let finish!: () => void;
+    f.deps.uploadFile = async () => {
+      attempts++;
+      if (attempts === 4) await new Promise<void>((resolve) => { finish = resolve; });
+      if (attempts <= 4) throw new Error("server error (HTTP 503)");
+      return UPLOAD;
+    };
+    await main(["watch", ...args], f.deps);
+    await vi.advanceTimersByTimeAsync(60_000 + 300_000 + 900_000);
+    expect(attempts).toBe(4);
+    f.listeners.get(file)!();
+    await vi.advanceTimersByTimeAsync(5000);
+    finish();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(attempts).toBe(5);
+  });
+
+  test("watch retries a connection reset while reading an upload receipt", async () => {
+    vi.useFakeTimers();
+    const { d, file, args } = game();
+    writeFileSync(file, `EverlootDB = {["version"] = "0.3.4", ["installId"] = "abcd-1234-ef56-7890", ["records"] = {["loot"] = {{["eventId"] = "epoch:1", ["capturedAt"] = "2026-10-09T00:00:00Z", ["sourceNpcId"] = 42, ["sourceEvidence"] = "loot-api", ["items"] = {{["itemId"] = 5, ["count"] = 1}}}}}}`);
+    const f = fakes();
+    let requests = 0;
+    f.deps.uploadFile = (path, options) => uploadFile(path, { ...options, fetch: async () => {
+      requests++;
+      if (requests === 1) return new Response(new ReadableStream({ start(controller) { controller.error(new TypeError("terminated")); } }));
+      return Response.json({ ok: true, persisted: true, uploadId: "u-1", accepted: [{ index: 0, kind: "loot" }], rejected: [] });
+    } });
+    await main(["watch", ...args], f.deps);
+    const confirmed = () => createSentState(join(d, "sent.json")).has(receiptKeyForSite("abcd-1234-ef56-7890", "http://localhost:1"), "epoch:1");
+    expect(confirmed()).toBe(false);
+    await vi.advanceTimersByTimeAsync(59_999);
+    expect(requests).toBe(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(requests).toBe(2);
+    expect(confirmed()).toBe(true);
   });
 
   test("a price refresh that throws says the previous ones stay, and the loop keeps running", async () => {
