@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
+import { isAdFreePath } from "@/lib/document-boundary";
 
 // Blizzard's Developer API Terms: the armory pages carry no ad. Every file in this folder, tests included except this
 // one, is read for an ad component or the ad script.
@@ -15,6 +16,16 @@ test("no armory file places an ad", () => {
   expect(sources.length).toBeGreaterThan(5);
   const offenders = sources.filter((f) => AD.test(readFileSync(f, "utf8"))).map((f) => relative(here, f));
   expect(offenders).toEqual([]);
+});
+
+// Not placing a slot is not enough: AdSense Auto ads fills any page its script loads on. The armory is on the ad-free
+// list, so the script never loads there (components/OptionalScripts.tsx) and a move to it loads a new document.
+test("the armory is an ad-free path, so the ad script never loads on it", () => {
+  for (const path of ["/armory", "/armory/us/a-character", "/armory/eu/guilds/a-guild", "/armory/rankings/item-level", "/armory/submit"]) {
+    expect(isAdFreePath(path), path).toBe(true);
+  }
+  expect(isAdFreePath("/armoryx")).toBe(false);
+  expect(isAdFreePath("/database/items/954")).toBe(false);
 });
 
 test("the check bites", () => {

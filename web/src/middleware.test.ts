@@ -9,7 +9,9 @@ afterEach(() => { vi.unstubAllEnvs(); });
 
 test("middleware covers the home rewrite, private operations and the ad-free pages under every version prefix", () => {
   expect(config.matcher).toEqual([
-    "/", "/ops/:path*", "/api/ops/:path*", "/blizzard-auctions/:path*", "/beta/blizzard-auctions/:path*", "/ptr/blizzard-auctions/:path*",
+    "/", "/ops/:path*", "/api/ops/:path*",
+    "/blizzard-auctions/:path*", "/beta/blizzard-auctions/:path*", "/ptr/blizzard-auctions/:path*",
+    "/armory/:path*", "/beta/armory/:path*", "/ptr/armory/:path*",
   ]);
 });
 
@@ -40,6 +42,21 @@ test("a client-side move or prefetch to an ad-free page gets no page, only an un
   expect(middleware(new NextRequest("https://everloot.app/blizzard-auctions/954", { headers: pageLoad })).headers.get("x-middleware-next")).toBe("1");
   expect(middleware(new NextRequest("https://everloot.app/blizzard-auctions/954?_rsc=x")).headers.get("x-middleware-next")).toBe("1");
   expect(adFreeDocumentOnly(new NextRequest("https://everloot.app/database/items/954", { headers: { RSC: "1" } }))).toBeNull();
+});
+
+test("the armory shows Blizzard API data, so it is ad-free too: a client fetch gets no page, a page load and its forms pass", () => {
+  for (const path of ["/armory", "/armory/eu/some-character", "/armory/rankings/item-level"]) {
+    const fetched = middleware(new NextRequest(`https://everloot.app${path}`, { headers: { "Next-Url": "/database/items/954" } }));
+    expect(fetched.headers.get("content-type")).toBe("text/plain; charset=utf-8");
+    expect(fetched.headers.get("cache-control")).toBe("private, no-store, max-age=0");
+    const loaded = middleware(new NextRequest(`https://everloot.app${path}`, { headers: { "Sec-Fetch-Dest": "document", "Sec-Fetch-Mode": "navigate" } }));
+    expect(loaded.headers.get("x-middleware-next")).toBe("1");
+  }
+  // The armory's forms are plain HTML posts, which a browser sends as a document request.
+  for (const path of ["/armory/submit/send", "/armory/hide/send", "/armory/eu/some-character/refresh"]) {
+    const posted = middleware(new NextRequest(`https://everloot.app${path}`, { method: "POST", headers: { "Sec-Fetch-Dest": "document", "Sec-Fetch-Mode": "navigate" } }));
+    expect(posted.headers.get("x-middleware-next")).toBe("1");
+  }
 });
 
 test("a signed-in page load of an ad-free page gets that page, not the signed-in home", () => {
