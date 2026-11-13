@@ -4,16 +4,16 @@ import { preload } from "react-dom";
 import JsonLd from "@/components/JsonLd";
 import { webApplicationJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
-import { mapBoundsFromRecords } from "../../../../kb/src/map-bounds";
 import { allZones } from "../../../../kb/src/world-map-near";
 import { zoneToMap } from "../../../../kb/src/world-coords";
-import { STORAGE_UNREACHABLE, uploadStore } from "@/lib/upload-store";
+import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import EdgeDegraded from "@/components/EdgeDegraded";
+import { loadMapPins } from "@/lib/map-pins-store";
 import { dataAgeLabel } from "@/lib/data-age";
 import {
   categoryCounts, continentPath, parseDeepLink, parseMapUrl, parseViewState, parseZoneLink, visibleItems, type MapItems,
 } from "@/lib/map-view";
-import { CONTINENTS, continentCandidates, continentMap, continentPinSet, continentTreasureCandidates, observedFacts, WORLD_MAP } from "@/lib/world-map";
+import { CONTINENTS, continentCandidates, continentMapFromBounds, continentPinSet, continentTreasureCandidates, WORLD_MAP } from "@/lib/world-map";
 import { instanceHref, instanceRows, loadSightings } from "@/lib/instances";
 import { publicZones, zoneHref } from "@/lib/zones";
 import WorldMapView from "@/components/WorldMapView";
@@ -91,11 +91,10 @@ export async function renderMapScreen(query: MapQuery, pageContinent: number | n
   const path = continentPath(continentId);
   const title = pageContinent === null ? TITLE : continentTitle(pageContinent);
 
-  const [corpus, sightings] = await Promise.all([uploadStore.loadCorpus(), loadSightings()]);
-  const records = corpus.unreachable ? [] : corpus.records;
+  const [corpus, sightings] = await Promise.all([loadMapPins(), loadSightings()]);
   const seen = sightings.unreachable ? {} : sightings;
-  const map = continentMap(continentId, mapBoundsFromRecords(records), WORLD_MAP, spoilers);
-  const facts = observedFacts(records);
+  const map = continentMapFromBounds(continentId, corpus.bounds, WORLD_MAP, spoilers);
+  const facts = corpus.facts;
   const all = continentPinSet(continentId, facts, spoilers, WORLD_MAP, seen);
   // Each instance's page, for an entrance card's Open instance page.
   const instancePages = Object.fromEntries([...instanceRows(seen).values()].map((r) => [r.instanceMapId, instanceHref(r.instanceMapId, r.name)]));
