@@ -112,15 +112,17 @@ test("the public pages rendered on every request are kept at the CDN; the pages 
     const got = await headersFor(path);
     expect(got["CDN-Cache-Control"], path).toBe(value);
   }
-  // Every page that renders from the whole corpus without cookies: five minutes, so a page drawn while storage was
-  // unreachable does not stay an hour (#816). Each type's list and one of its details; the drops list has no detail.
+  // Public lists keep their existing freshness; database detail pages keep a complete render for an hour.
   const brieflyKept = [
     "/database", "/census", "/rankings", "/rankings/gear-score", "/rankings/item-level", "/rankings/era-us-pvp-level-60",
     "/database/drops",
     ...["npcs", "quests", "objects", "vendors", "spells", "achievements", "titles", "factions", "quest-chains", "zones", "instances", "coverage"]
-      .flatMap((type) => [`/database/${type}`, `/database/${type}/dun-morogh`]),
+      .map((type) => `/database/${type}`),
   ];
   for (const path of brieflyKept) expect((await headersFor(path))["CDN-Cache-Control"], path).toBe(brief);
+  for (const type of ["npcs", "quests", "objects", "vendors", "spells", "achievements", "titles", "factions", "quest-chains", "zones", "instances", "coverage"]) {
+    expect((await headersFor(`/database/${type}/123`))["CDN-Cache-Control"], type).toBe(hour);
+  }
   for (const path of ["/chat", "/account", "/settings", "/sign-in", "/api/tools/search_knowledge", "/changes/feed.xml", "/tools/profession-planner"]) {
     expect(await headersFor(path), path).not.toHaveProperty("CDN-Cache-Control");
   }
@@ -136,6 +138,7 @@ test("only the public pages rendered per request are marked for the shared CDN c
   // records a visitor can see are re-authorized on every read (kb/src/corpus.ts publicRecords) and the people
   // results on /search are drawn in the browser, so no visitor's names are in a cached page.
   expect(marked).toEqual([
+    ...["npcs", "quests", "objects", "vendors", "spells", "achievements", "titles", "factions", "quest-chains", "zones", "instances", "coverage"].map((type) => `/database/${type}/:detail`),
     "/census",
     "/changes",
     "/database",
