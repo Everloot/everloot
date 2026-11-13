@@ -36,7 +36,16 @@ hooksecurefunc = function(a, b, c)
 end
 -- Forever's auction house, with the signatures in the client's API documentation. Owner and bidder fields exist
 -- in the data and are never read.
-listings = { [901] = { buyoutAmount = 7000, bidAmount = 0, bidder = 'Player-1-AAAA' }, [902] = { buyoutAmount = nil } }
+woolKey = { itemID = 2592, itemLevel = 0, itemSuffix = 0, battlePetSpeciesID = 0 }
+listings = {
+ [901] = { buyoutAmount = 7000, bidAmount = 0, bidder = 'Player-1-AAAA', itemKey = woolKey, itemLink = '|cffffffff|Hitem:2592::::::::60:::::|h[Wool Cloth]|h|r' },
+ [902] = { buyoutAmount = nil },
+ -- A listing whose link the client did not fill: the item key names it.
+ [903] = { buyoutAmount = 900, itemKey = woolKey },
+}
+-- The item's search results the player is looking at; owners are there in the data and never read.
+searchResults = { { auctionID = 900, quantity = 1, owners = { 'Jaina' } }, { auctionID = 901, quantity = 20, owners = { 'Jaina' } } }
+itemNames = { [2592] = 'Wool Cloth', [2589] = 'Linen Cloth' }
 -- The three action functions are recording traps: only the test, standing in for the player's click, may call
 -- them (inside click()). Any call from the addon is recorded and fails the test at the end.
 forbidden = {}
@@ -50,6 +59,10 @@ C_AuctionHouse = {
  StartCommoditiesPurchase = action('StartCommoditiesPurchase'),
  ConfirmCommoditiesPurchase = action('ConfirmCommoditiesPurchase'),
  GetAuctionInfoByID = function(auctionID) return listings[auctionID] end,
+ GetNumItemSearchResults = function(itemKey) return itemKey == woolKey and #searchResults or 0 end,
+ GetItemSearchResultInfo = function(itemKey, i) return itemKey == woolKey and searchResults[i] or nil end,
+ MakeItemKey = function(itemID) return { itemID = itemID, itemLevel = 0, itemSuffix = 0, battlePetSpeciesID = 0 } end,
+ GetItemKeyInfo = function(itemKey) local name = itemNames[itemKey.itemID]; return name and { itemID = itemKey.itemID, itemName = name } or nil end,
 }
 -- Timers run only when the test says so.
 timers = {}
@@ -237,6 +250,40 @@ event('COMMODITY_PRICE_UNAVAILABLE')
 click(C_AuctionHouse.ConfirmCommoditiesPurchase, 2589, 200)
 money = money - 2000; event('PLAYER_MONEY')
 assert(#events('auction_spend') == 4, 'an unavailable price leaves no quote')
+
+-- Each buyout's ledger row names the item and count it bought; the uploaded money_event keeps its nine-field shape.
+local function bought()
+ local list = {}
+ for _, e in ipairs(EverlootDB.ledger.events) do if e.category == 'auction_spend' then list[#list + 1] = e end end
+ return list
+end
+local rows = bought()
+assert(#rows == 4, 'four buyouts in the ledger, got ' .. #rows)
+assert(rows[1].itemName == 'Silk' and rows[1].count == 1 and rows[1].copper == 5000, 'legacy buyout: name and count from the listing')
+assert(rows[2].itemName == 'Wool Cloth' and rows[2].count == 20 and rows[2].copper == 7000, 'item buyout: name from the link, count from the search result')
+assert(rows[3].itemName == 'Linen Cloth' and rows[3].count == 200 and rows[3].copper == 2000, 'commodity: the house names the item id, the confirm gives the quantity')
+assert(rows[4].itemName == 'Wool Cloth' and rows[4].count == 20, 'a fresh buyout after rejected ones')
+for _, row in ipairs(events('auction_spend')) do
+ assert(row.itemName == nil and row.count == nil, 'the uploaded record carries no item')
+end
+-- A listing without a link is named by its item key; one not in the search results has no count, and the row keeps the name.
+click(C_AuctionHouse.PlaceBid, 903, 900)
+money = money - 900; event('PLAYER_MONEY')
+rows = bought()
+assert(rows[5].itemName == 'Wool Cloth' and rows[5].count == nil and rows[5].copper == 900, 'name from the item key, no count')
+-- An item the house cannot name: the purchase is still recorded, without an item.
+click(C_AuctionHouse.StartCommoditiesPurchase, 9999, 3)
+event('COMMODITY_PRICE_UPDATED', 10, 30)
+click(C_AuctionHouse.ConfirmCommoditiesPurchase, 9999, 3)
+money = money - 30; event('PLAYER_MONEY')
+rows = bought()
+assert(rows[6].copper == 30 and rows[6].itemName == nil and rows[6].count == 3, 'unnamed commodity: amount and count only')
+-- The tooltip's average paid now has something to read: Wool Cloth bought 20 + 20 for 7000 + 7000.
+local h = Everloot.Ledger.ItemHistory('Test Realm', 'Wool Cloth')
+assert(h and h.bought == 40 and h.averagePaid == 350 and h.purchases == 2, 'average paid per unit from named purchases with a count')
+for _, e in ipairs(EverlootDB.ledger.events) do
+ for _, value in pairs(e) do assert(value ~= 'Jaina' and value ~= 'Player-1-AAAA', 'no owner or bidder in the ledger') end
+end
 
 assert(#forbidden == 0, 'the addon called a buy or bid function: ' .. table.concat(forbidden, ','))
 for _, row in ipairs(events()) do

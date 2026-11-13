@@ -77,7 +77,9 @@ Between the prices and the sources, the tooltip shows your own history with the 
 in your saved file for your characters on this realm: the day and price per unit of your last sale, the average
 sale price per unit and the units sold over the ledger's last 90 days, and sales from the last two days whose
 mailbox letter you have not taken yet (sold, no price until the letter). The average paid shows only for a
-purchase whose ledger entry names the item and its count. An item you never sold or bought gets no history line,
+purchase whose ledger entry names the item and its count: a buyout keeps the item's name from the listing's link
+(or the auction house's name for it) and the count from the search results you bought from, and a commodity
+purchase keeps the item and quantity you confirmed. An item you never sold or bought gets no history line,
 never a zero. The ledger is indexed by item once and again only after it changes, so a hover reads one entry.
 Nothing new is recorded or uploaded for it.
 
