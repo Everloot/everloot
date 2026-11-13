@@ -7,6 +7,7 @@ import { compareBaseline, readBaseline, writeBaselineReport } from "./baseline-r
 import { buildCoverageReport, readCoverageBaseline, writeCoverageReport } from "./coverage-report.js";
 import { BlizzardClient } from "./blizzard/client.js";
 import { armoryCrawl } from "./armory/index.js";
+import { blizzardAuctions } from "./blizzard-auctions/index.js";
 import {
   backfillBluePosts, ingestBluePosts, loadFetchState, loadOverrides, loadStore, saveFetchState, saveStore, type BlueGame, type BlueRegion, type IngestResult,
 } from "./blue-posts.js";
@@ -354,6 +355,10 @@ async function main(): Promise<number> {
   switch (cmd) {
     case "armory-crawl": {
       await armoryCrawl(flags);
+      return 0;
+    }
+    case "blizzard-auctions": {
+      await blizzardAuctions(flags);
       return 0;
     }
     case "import-wiki": {

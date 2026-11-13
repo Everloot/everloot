@@ -17,6 +17,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 ### Added
 - Site: filter auction browsing by region, including unknown-region records, with matching counts and compact realm names that preserve the full recorded label on hover.
 - Site: private operations dashboard with owner-excluded contribution activity, source health, cost estimates and compact realm badges; optional per-upload character attribution stays under the contributor's control.
+- Site: item pages can show Blizzard API auction house prices in their own section, headed "Blizzard auction house data, as of" the time Blizzard published them, credited to Blizzard Entertainment and kept apart from player-reported prices; a page showing it carries no ad. An hourly job (off until the maintainer turns it on) stores per-item summaries and deletes anything older than 30 days.
 - Site: a visible bug button on every page opens the existing GitHub report form, with Discord and email alternatives and private page URLs omitted.
 - Site: item pages' social cards show the item's game icon (text-only when the art is off or unreadable), and on wide screens entity pages move their summary, facts and map into a right column.
 - Site: show labelled, linked Warcraft Wiki NPC names when one or two installs unanimously report a matching name.

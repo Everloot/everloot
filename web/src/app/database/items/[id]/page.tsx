@@ -33,6 +33,8 @@ import { CategoryPage, categoryMetadata } from "../category-page";
 import { itemIndexable } from "@/lib/indexable";
 import { entityTitle, itemDescription } from "@/lib/entity-meta";
 import { MarketBox, loadMarketBox } from "@/app/tools/auctions/MarketBox";
+import { loadBlizzardPrices } from "@/lib/blizzard-auctions";
+import { BlizzardAuctions } from "./blizzard-auctions";
 import { pendingLine } from "../../../../../../kb/src/pending-loot";
 import { itemDropSources } from "../../../../../../kb/src/loot-tables";
 import { loadLootTables, loadReportedItemFacts } from "@/lib/rollup-compute";
@@ -80,7 +82,7 @@ export default async function ItemPage(props: Props) {
   if (/^[a-z][a-z0-9-]*$/.test(params.id)) return CategoryPage({ classSlug: params.id, search: (await props.searchParams) ?? {} });
   if (!/^[1-9]\d*$/.test(params.id)) notFound();
   const itemId = Number(params.id);
-  const [{ facts, agreed, matched, showsTip, degraded }, edges, itemSeen, auctions] = await Promise.all([loadShownNames(), loadEdges(), loadItemSeen(), loadMarketBox(itemId)]);
+  const [{ facts, agreed, matched, showsTip, degraded }, edges, itemSeen, auctions, blizzard] = await Promise.all([loadShownNames(), loadEdges(), loadItemSeen(), loadMarketBox(itemId), loadBlizzardPrices(itemId)]);
   const page = itemPage(itemId, facts);
   if (unknownItem(itemId, facts, edgesFrom([...edges.observed, ...edges.client], "item", itemId), itemSeen)) notFound();
   // Named by players (3 installs agree); the badge and the facts card say so.
@@ -312,11 +314,13 @@ export default async function ItemPage(props: Props) {
           />
         </EntitySidebar>
         <MarketBox itemId={itemId} rows={auctions} />
+        <BlizzardAuctions rows={blizzard} />
         <Tabs label={`${title}: relations`} tabs={tabs} className="mt-6" />
         <DarkmoonItemNote name={name?.name} />
         <div className="mt-6 space-y-6 empty:hidden">
           <LoreSection match={lore} />
-          {!facts.unreachable && (page.name !== null || page.drops.length > 0) && <AdSlot slot="inContent" />}
+          {/* Blizzard Developer API Terms: a page showing Blizzard data carries no ad. */}
+          {!facts.unreachable && (page.name !== null || page.drops.length > 0) && !blizzard.length && <AdSlot slot="inContent" />}
         </div>
       </EntityLayout>
     </Container>

@@ -10,7 +10,8 @@ declare
     'character_facts', 'character_sync_consent', 'character_track',
     'armory_characters', 'armory_guilds', 'armory_hides', 'armory_members', 'armory_queue'
   ];
-  excluded constant text[] := array['players', 'link_codes', 'settled_fact_voters'];
+  -- Blizzard auction prices: backups outlive the 30 days Blizzard's terms allow (20261113120000_blizzard_auctions.sql).
+  excluded constant text[] := array['players', 'link_codes', 'settled_fact_voters', 'blizzard_auction_houses', 'blizzard_auction_prices'];
   tbl text;
   role_name text;
 begin

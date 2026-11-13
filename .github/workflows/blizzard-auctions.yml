@@ -1,0 +1,71 @@
+name: Refresh Blizzard auction prices
+# Off until the maintainer sets the repository variable BLIZZARD_AUCTIONS to "on" (after applying
+# supabase/migrations/20261113120000_blizzard_auctions.sql). Each pass is about 35 Blizzard API calls per region.
+on:
+  schedule:
+    - cron: '41 * * * *'
+  workflow_dispatch:
+permissions: {}
+jobs:
+  refresh:
+    if: github.repository == 'Everloot/everloot' && vars.BLIZZARD_AUCTIONS == 'on'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        region: [us, eu]
+    concurrency:
+      group: blizzard-auctions-${{ matrix.region }}
+      cancel-in-progress: false
+    steps:
+      - name: Check configuration
+        id: config
+        env:
+          BNET_CLIENT_ID: ${{ secrets.BNET_CLIENT_ID }}
+          BNET_CLIENT_SECRET: ${{ secrets.BNET_CLIENT_SECRET }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$BNET_CLIENT_ID" ] || [ -z "$BNET_CLIENT_SECRET" ] || [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo '::notice::Blizzard or Supabase secrets are not configured; skipping the refresh.'
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v7
+        if: steps.config.outputs.ready == 'true'
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        if: steps.config.outputs.ready == 'true'
+        with:
+          node-version: '22.23.2'
+          cache: npm
+          cache-dependency-path: |
+            kb/package-lock.json
+            web/package-lock.json
+            packages/protocol/package-lock.json
+      - run: npm ci
+        if: steps.config.outputs.ready == 'true'
+        working-directory: packages/protocol
+      - run: npm run build
+        if: steps.config.outputs.ready == 'true'
+        working-directory: packages/protocol
+      - run: npm ci
+        if: steps.config.outputs.ready == 'true'
+        working-directory: web
+      - run: npm ci
+        if: steps.config.outputs.ready == 'true'
+        working-directory: kb
+      - name: Read Blizzard auction houses
+        if: steps.config.outputs.ready == 'true'
+        working-directory: kb
+        run: npm run kb -- blizzard-auctions --region ${{ matrix.region }} --budget 100
+        env:
+          BNET_CLIENT_ID: ${{ secrets.BNET_CLIENT_ID }}
+          BNET_CLIENT_SECRET: ${{ secrets.BNET_CLIENT_SECRET }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
