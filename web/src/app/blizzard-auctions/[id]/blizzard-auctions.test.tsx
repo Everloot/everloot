@@ -14,8 +14,6 @@ vi.mock("@/lib/shown-item-names", () => ({
 vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NOT_FOUND"); },
 }));
-const request = vi.hoisted(() => ({ headers: new Headers() }));
-vi.mock("next/headers", () => ({ headers: async () => request.headers }));
 
 import BlizzardAuctionPage, { dynamic, metadata } from "./page";
 import { BlizzardAuctions, blizzardTime } from "./blizzard-auctions";
@@ -31,7 +29,6 @@ const dom = (html: string) => new JSDOM(html).window.document;
 const render = async (id = "2589") => renderToStaticMarkup(await BlizzardAuctionPage({ params: Promise.resolve({ id }) }));
 
 beforeEach(() => {
-  request.headers = new Headers();
   blizzard.load.mockReset().mockResolvedValue({ ok: true, rows });
   vi.stubEnv("NEXT_PUBLIC_ADSENSE_CLIENT", "ca-pub-test");
 });
@@ -49,22 +46,6 @@ test("the section names its source and the oldest snapshot time, and each row ke
   ]);
   expect(trs.map((tr) => tr.querySelector("time")!.getAttribute("datetime"))).toEqual(["2026-11-13T12:22:37.000Z", "2026-11-13T12:20:05.000Z"]);
   expect(blizzardTime("2026-01-02T03:04:59Z")).toBe("2 Jan 2026, 03:04 UTC");
-});
-
-test("a client-side move or prefetch (an RSC request) gets no prices, only a reload into a document of its own", async () => {
-  for (const [name, value] of [["RSC", "1"], ["Next-Router-Prefetch", "1"]] as const) {
-    request.headers = new Headers({ [name]: value });
-    blizzard.load.mockClear();
-    const html = await render();
-    expect(blizzard.load).not.toHaveBeenCalled();
-    expect(html).not.toContain("data-blizzard-auctions");
-    expect(html).not.toContain("31");
-    expect(html).toContain("Loading the Blizzard auction house data");
-  }
-  // A document request reads and shows them.
-  request.headers = new Headers();
-  expect(await render()).toContain("data-blizzard-auctions");
-  expect(blizzard.load).toHaveBeenCalledWith(2589);
 });
 
 test("a failed read says it could not be read, apart from an item with no data yet", () => {

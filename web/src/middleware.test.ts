@@ -1,14 +1,45 @@
 import { NextRequest } from "next/server";
 import { afterEach, expect, test, vi } from "vitest";
-import { config, middleware } from "./middleware";
+import { adFreeDocumentOnly, config, middleware } from "./middleware";
 
 const request = (cookie?: string) => new NextRequest("https://everloot.app/", { headers: cookie ? { cookie } : {} });
 const rewrittenTo = (res: Response) => res.headers.get("x-middleware-rewrite");
 
 afterEach(() => { vi.unstubAllEnvs(); });
 
-test("middleware covers the home rewrite and private operations boundaries", () => {
-  expect(config.matcher).toEqual(["/", "/ops/:path*", "/api/ops/:path*"]);
+test("middleware covers the home rewrite, private operations and the ad-free pages under every version prefix", () => {
+  expect(config.matcher).toEqual([
+    "/", "/ops/:path*", "/api/ops/:path*", "/blizzard-auctions/:path*", "/beta/blizzard-auctions/:path*", "/ptr/blizzard-auctions/:path*",
+  ]);
+});
+
+test("a client-side move or prefetch to an ad-free page gets no page, only an uncached answer that makes the router load a document", async () => {
+  const navigations: Record<string, string>[] = [
+    { RSC: "1", "Next-Url": "/database/items/954" },
+    { RSC: "1", "Next-Router-State-Tree": "%5B%22%22%5D" },
+    { RSC: "1", "Next-Router-Prefetch": "1" },
+    { "Next-Router-Prefetch": "1" },
+    { "Next-Router-State-Tree": "%5B%22%22%5D" },
+    { RSC: "1", "Next-Router-Segment-Prefetch": "/_tree" },
+    // What reaches middleware in Next 15.5 once it has removed its flight headers (checked over HTTP).
+    { "Next-Url": "/database/items/954" },
+    { "Sec-Fetch-Dest": "empty", "Sec-Fetch-Mode": "cors" },
+  ];
+  for (const headers of navigations) {
+    const response = middleware(new NextRequest("https://everloot.app/blizzard-auctions/954", { headers }));
+    expect(response.headers.get("content-type")).toBe("text/plain; charset=utf-8");
+    expect(response.headers.get("x-middleware-next")).toBeNull();
+    expect(response.headers.get("x-middleware-rewrite")).toBeNull();
+    expect(response.headers.get("cache-control")).toBe("private, no-store, max-age=0");
+    expect(response.headers.get("cdn-cache-control")).toBe("no-store");
+    expect(await response.text()).not.toMatch(/\d{3,}/);
+  }
+  // A document request passes through to the page, and other pages' RSC requests are left alone.
+  expect(middleware(new NextRequest("https://everloot.app/blizzard-auctions/954")).headers.get("x-middleware-next")).toBe("1");
+  const pageLoad = { "Sec-Fetch-Dest": "document", "Sec-Fetch-Mode": "navigate" };
+  expect(middleware(new NextRequest("https://everloot.app/blizzard-auctions/954", { headers: pageLoad })).headers.get("x-middleware-next")).toBe("1");
+  expect(middleware(new NextRequest("https://everloot.app/blizzard-auctions/954?_rsc=x")).headers.get("x-middleware-next")).toBe("1");
+  expect(adFreeDocumentOnly(new NextRequest("https://everloot.app/database/items/954", { headers: { RSC: "1" } }))).toBeNull();
 });
 
 test("operations responses forbid private and CDN caching independently of profile/session state", () => {
