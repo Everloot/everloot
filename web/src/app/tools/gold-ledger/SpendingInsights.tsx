@@ -2,7 +2,7 @@ import Coins, { CoinText } from "@/components/ui/Coins";
 import { Card, DataTable, SectionHeading, type Column } from "@/components/ui";
 import {
   categoryLabel, change, characterKey,
-  type PeriodCategory, type PeriodStats, type Receipt, type SaleItem, type SalesSummary,
+  type PeriodCategory, type PeriodStats, type Receipt, type ResaleItem, type SaleItem, type SalesSummary,
 } from "@/lib/money-ledger";
 import { formatCopper } from "../../../../../kb/src/gold-ledger";
 
@@ -212,6 +212,26 @@ export function AuctionSales({ sales, who }: { sales: SalesSummary; who: string 
       {sales.items.length > 0 && (
         <DataTable caption="Best sellers by gold received" columns={columns} rows={sales.items} rowKey={(r) => r.itemName} />
       )}
+      {sales.resale.length > 0 && <Resale rows={sales.resale} />}
+    </section>
+  );
+}
+
+const each = (copper: number, units: number) => <CoinText text={formatCopper(Math.floor(copper / units))} />;
+
+/** Items bought and sold at the auction house: what each unit cost, what it brought after the cut, and the difference. */
+function Resale({ rows }: { rows: ResaleItem[] }) {
+  const columns: Column<ResaleItem>[] = [
+    { key: "item", header: "Item", cell: (r) => r.itemName },
+    { key: "bought", header: "Bought", numeric: true, cell: (r) => <>{r.bought.toLocaleString("en-US")} <span className="text-fg-2">at</span> {each(r.paid, r.bought)}</> },
+    { key: "sold", header: "Sold, after cut", numeric: true, cell: (r) => <>{r.sold.toLocaleString("en-US")} <span className="text-fg-2">at</span> {each(r.received, r.sold)}</> },
+    { key: "margin", header: "Margin each", numeric: true, cell: (r) => <Coins copper={r.margin} /> },
+    { key: "profit", header: "Profit", numeric: true, cell: (r) => <span className={r.profit < 0 ? "text-danger" : undefined}><Coins copper={r.profit} /></span> },
+  ];
+  return (
+    <section aria-labelledby="ledger-resale" className="space-y-2">
+      <SectionHeading id="ledger-resale" note="Items you both bought and sold at the auction house in these 90 days. Profit counts only units bought and sold: the average received after the cut minus the average paid, times the smaller count.">Resale</SectionHeading>
+      <DataTable caption="Resale by item, largest profit first" columns={columns} rows={rows} rowKey={(r) => r.itemName} />
     </section>
   );
 }

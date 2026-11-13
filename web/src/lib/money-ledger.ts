@@ -93,10 +93,18 @@ export interface Receipt {
   ownAlt?: true;
   /** The item the money was for, when the ledger row names one. */
   itemName?: string;
+  /** How many of the item, when the ledger row says. */
+  count?: number;
 }
 
 /** One item's paid auction sales: units, the gold received after the house cut, and the cut itself. */
 export interface SaleItem { itemName: string; units: number; total: number; cut: number; sales: number }
+
+/**
+ * An item both bought and sold at the auction house in the window: units and copper each way, and the margin per
+ * unit (average received after the cut minus average paid). `profit` counts only the units both bought and sold.
+ */
+export interface ResaleItem { itemName: string; bought: number; paid: number; sold: number; received: number; margin: number; profit: number }
 
 /** The ledger's paid auction sales within RIVER_DAYS, and the sales still waiting for their letter. */
 export interface SalesSummary {
@@ -109,6 +117,8 @@ export interface SalesSummary {
   units: number;
   /** Sales the sold notice announced in the last 48 hours whose letter has not been taken yet. */
   pending: number;
+  /** Items both bought (auction purchases that name the item and count) and sold, largest profit first, at most SALE_ITEMS_SHOWN. */
+  resale: ResaleItem[];
 }
 
 export interface GoldSeries {
@@ -188,9 +198,9 @@ type MoneyEvent = Omit<Receipt, "at"> & { at: string; ms: number | null };
 type SaleRow = Who & { ms: number; itemName: string; units: number; total: number; cut: number; paid: boolean };
 
 /** Paid sales from the last RIVER_DAYS UTC days by item, and the sales still waiting for their letter. */
-function summarizeSales(rows: SaleRow[], now: number, from: number): SalesSummary {
+function summarizeSales(rows: SaleRow[], now: number, from: number, purchases: MoneyEvent[] = []): SalesSummary {
   const byItem = new Map<string, SaleItem>();
-  const out: SalesSummary = { items: [], total: 0, cut: 0, sales: 0, units: 0, pending: 0 };
+  const out: SalesSummary = { items: [], total: 0, cut: 0, sales: 0, units: 0, pending: 0, resale: [] };
   for (const s of rows) {
     if (s.ms > now) continue;
     if (!s.paid) { if (now - s.ms <= PENDING_MS) out.pending += 1; continue; }
@@ -200,6 +210,20 @@ function summarizeSales(rows: SaleRow[], now: number, from: number): SalesSummar
     byItem.set(s.itemName, item);
     out.total += s.total; out.cut += s.cut; out.sales += 1; out.units += s.units;
   }
+  // Resale: auction purchases that name the item and its count, in the same window, against that item's sales.
+  const bought = new Map<string, { units: number; copper: number }>();
+  for (const e of purchases) {
+    if (e.category !== "auction_spend" || e.ownAlt || !e.itemName || !e.count || e.ms === null || e.ms < from || e.ms > now) continue;
+    const b = bought.get(e.itemName) ?? { units: 0, copper: 0 };
+    b.units += e.count; b.copper += e.copper;
+    bought.set(e.itemName, b);
+  }
+  out.resale = [...bought].flatMap(([itemName, b]) => {
+    const s = byItem.get(itemName);
+    if (!s || !s.units) return [];
+    const margin = Math.floor(s.total / s.units) - Math.floor(b.copper / b.units);
+    return [{ itemName, bought: b.units, paid: b.copper, sold: s.units, received: s.total, margin, profit: margin * Math.min(b.units, s.units) }];
+  }).sort((a, b) => b.profit - a.profit || a.itemName.localeCompare(b.itemName)).slice(0, SALE_ITEMS_SHOWN);
   out.items = [...byItem.values()].sort((a, b) => b.total - a.total || a.itemName.localeCompare(b.itemName)).slice(0, SALE_ITEMS_SHOWN);
   return out;
 }
@@ -257,7 +281,7 @@ function summarizeFlows(money: MoneyEvent[], series: GoldSeries[], now: number, 
     moved,
     firstAt: first ? first.at : null,
     largest,
-    sales: summarizeSales(sales, now, start),
+    sales: summarizeSales(sales, now, start, money),
   };
 }
 
@@ -404,6 +428,7 @@ export function summarizeMoney(records: ReadonlyArray<Record<string, unknown>>, 
       at: isoSeconds(ms), ms, ...who(row), category: e.category,
       direction: directionOf(e.category), copper: e.copper, ...(e.ownAlt === true ? { ownAlt: true as const } : {}),
       ...(itemName(e.itemName) ? { itemName: e.itemName as string } : {}),
+      ...(whole(e.count, 1) ? { count: e.count } : {}),
     });
   }
   // Auction sales by item: paid ones carry the count, the gold after the cut and the cut; a pending one only its item.
@@ -532,6 +557,6 @@ function isCharacterMoney(value: unknown): boolean {
     && (v.firstAt === null || (typeof v.firstAt === "string" && Number.isFinite(Date.parse(v.firstAt))))
     && typeof week === "object" && week !== null && isNumber(week.in) && isNumber(week.out) && isNumber(week.net)
     && typeof largest === "object" && largest !== null && PERIODS.every((p) => Array.isArray(largest[p]))
-    && typeof sales === "object" && sales !== null && Array.isArray(sales.items)
+    && typeof sales === "object" && sales !== null && Array.isArray(sales.items) && Array.isArray(sales.resale)
     && ["total", "cut", "sales", "units", "pending"].every((k) => isNumber(sales[k]));
 }

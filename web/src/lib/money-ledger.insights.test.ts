@@ -106,9 +106,31 @@ describe("auction sales", () => {
         { itemName: "Copper Ore", units: 5, total: 4_750, cut: 250, sales: 1 },
         { itemName: "Linen Cloth", units: 40, total: 3_610, cut: 190, sales: 2 },
       ],
-      total: 8_360, cut: 440, sales: 3, units: 45, pending: 1,
+      total: 8_360, cut: 440, sales: 3, units: 45, pending: 1, resale: [],
     });
     expect(narrowLedger(ledger, "1:Jaina-Moon Guard").sales).toMatchObject({ total: 4_750, sales: 1, pending: 0 });
+  });
+
+  test("resale sets each item's average paid against its average received after the cut, for units both bought and sold", () => {
+    const ledger = read([
+      ev("a", "2026-11-09T10:00:00Z", "auction_spend", 1_000, { itemName: "Linen Cloth", count: 20 }), // 50 each
+      ev("a", "2026-11-09T11:00:00Z", "auction_spend", 1_200, { itemName: "Linen Cloth", count: 20 }), // 60 each
+      ev("a", "2026-11-09T12:00:00Z", "auction_spend", 900, { itemName: "Copper Ore", count: 10 }), // 90 each
+      ev("a", "2026-11-09T13:00:00Z", "auction_spend", 500), // no item: not resale
+      ev("a", "2026-11-09T14:00:00Z", "auction_spend", 700, { itemName: "Silk Cloth" }), // no count: not resale
+      ev("a", "2026-07-01T10:00:00Z", "auction_spend", 99, { itemName: "Copper Ore", count: 1 }), // before the window
+    ], [
+      sale("b", "2026-11-11T10:00:00Z", "Linen Cloth", 30, 2_400, 120), // 80 each after the cut, sold by another character
+      sale("a", "2026-11-11T11:00:00Z", "Copper Ore", 5, 400, 20), // 80 each: a loss of 10
+      sale("a", "2026-11-11T12:00:00Z", "Silk Cloth", 5, 400, 20),
+    ]);
+    expect(ledger.sales.resale).toEqual([
+      // Average paid 2200 / 40 = 55; 30 sold and 40 bought, so 30 units count.
+      { itemName: "Linen Cloth", bought: 40, paid: 2_200, sold: 30, received: 2_400, margin: 25, profit: 750 },
+      { itemName: "Copper Ore", bought: 10, paid: 900, sold: 5, received: 400, margin: -10, profit: -50 },
+    ]);
+    // One character alone: Thrall bought the linen but did not sell it.
+    expect(narrowLedger(ledger, "1:Thrall-Moon Guard").sales.resale.map((r) => r.itemName)).toEqual(["Copper Ore"]);
   });
 });
 
