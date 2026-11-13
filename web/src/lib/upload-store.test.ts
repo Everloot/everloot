@@ -499,7 +499,7 @@ describe("market rollup", () => {
       [MARKET, "PUT", () => new Response(null, { status: 200 })],
     ]);
     const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now });
-    expect(await store.writeMarket()).toEqual({ added: 3, scans: 3, remaining: 0, dropped: 0, trimmedDays: 0 });
+    expect(await store.writeMarket()).toEqual({ added: 3, scans: 3, remaining: 0, dropped: 0, released: 0, trimmedDays: 0 });
     const put = calls.find((c) => c.method === "PUT")!;
     expect(put.headers.get("if-none-match")).toBe("*");
     const body = JSON.parse(put.body);
@@ -518,7 +518,7 @@ describe("market rollup", () => {
       [MARKET, "PUT", () => new Response(null, { status: 200 })],
     ]);
     const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now });
-    expect(await store.writeMarket()).toEqual({ added: 1, scans: 1, remaining: 0, dropped: 0, trimmedDays: 0 });
+    expect(await store.writeMarket()).toEqual({ added: 1, scans: 1, remaining: 0, dropped: 0, released: 0, trimmedDays: 0 });
     // The listing starts at the watermark, not 62 days back: the index is never read whole again.
     expect(calls.find((c) => c.url.startsWith(INDEX))!.url).toContain("received_at=gte.2026-10-04T00%3A00%3A00%2B00%3A00");
     expect(calls.some((c) => c.url.endsWith("uploads/a.json"))).toBe(false);
@@ -535,7 +535,7 @@ describe("market rollup", () => {
       [MARKET, "PUT", () => new Response(null, { status: 200 })],
     ]);
     const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now });
-    expect(await store.writeMarket()).toEqual({ added: 1, scans: 1, remaining: 0, dropped: 0, trimmedDays: 0 });
+    expect(await store.writeMarket()).toEqual({ added: 1, scans: 1, remaining: 0, dropped: 0, released: 0, trimmedDays: 0 });
     expect(calls.find((c) => c.url.startsWith(INDEX))!.url).toContain("received_at=gte.2026-08-03T12%3A00%3A00.000Z");
     expect(calls.some((c) => c.url.endsWith("uploads/a.json"))).toBe(false);
     const body = JSON.parse(calls.find((c) => c.method === "PUT")!.body);
@@ -552,7 +552,7 @@ describe("market rollup", () => {
       [MARKET, "PUT", () => new Response(null, { status: 200 })],
     ]);
     expect(await createUploadStore({ cloud, localDir: "unused", fetch: first.fn, now, marketBatch: 2 }).writeMarket())
-      .toEqual({ added: 2, scans: 2, remaining: 1, dropped: 0, trimmedDays: 0 });
+      .toEqual({ added: 2, scans: 2, remaining: 1, dropped: 0, released: 0, trimmedDays: 0 });
     expect(first.calls.some((c) => c.url.endsWith("uploads/c.json"))).toBe(false);
     const written = JSON.parse(first.calls.find((c) => c.method === "PUT")!.body);
     expect(written).toMatchObject({ lastReceivedAt: "2026-10-04T01:00:00+00:00", lastIds: ["b"] });
@@ -566,7 +566,7 @@ describe("market rollup", () => {
       [MARKET, "PUT", () => new Response(null, { status: 200 })],
     ]);
     expect(await createUploadStore({ cloud, localDir: "unused", fetch: second.fn, now, marketBatch: 2 }).writeMarket())
-      .toEqual({ added: 2, scans: 2, remaining: 0, dropped: 0, trimmedDays: 0 });
+      .toEqual({ added: 2, scans: 2, remaining: 0, dropped: 0, released: 0, trimmedDays: 0 });
     expect(second.calls.some((c) => c.url.endsWith("uploads/b.json"))).toBe(false);
     const body = JSON.parse(second.calls.find((c) => c.method === "PUT")!.body);
     expect(body).toMatchObject({ lastReceivedAt: "2026-10-04T02:00:00+00:00", lastIds: ["c"] });
@@ -658,7 +658,7 @@ describe("market rollup", () => {
       lastReceivedAt: "2026-10-04T00:00:00+00:00", lastIds: ["a"],
     });
     const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now, marketMaxBytes: whole.length - 1 });
-    expect(await store.writeMarket()).toEqual({ added: 1, scans: 1, remaining: 0, dropped: 0, trimmedDays: 1 });
+    expect(await store.writeMarket()).toEqual({ added: 1, scans: 1, remaining: 0, dropped: 0, released: 0, trimmedDays: 1 });
     const body = JSON.parse(calls.find((c) => c.method === "PUT")!.body);
     expect(Object.keys(body.state.realms.forever.items["2589"].closed)).toEqual(["2026-09-11"]);
     expect(Object.keys(body.state.realms.forever.items["2589"].open["2026-10-04"])).toEqual(["install-1"]);
@@ -690,7 +690,7 @@ describe("market rollup", () => {
     await expect(createUploadStore({ cloud, localDir: "unused", fetch: stuck.fn, now }).writeMarket()).rejects.toThrow(/rebuild/);
     expect(stuck.calls.some((c) => c.method === "PUT")).toBe(false);
     const rebuilt = fakeFetch(routes());
-    expect(await createUploadStore({ cloud, localDir: "unused", fetch: rebuilt.fn, now }).writeMarket({ rebuild: true })).toEqual({ added: 1, scans: 1, remaining: 0, dropped: 0, trimmedDays: 0 });
+    expect(await createUploadStore({ cloud, localDir: "unused", fetch: rebuilt.fn, now }).writeMarket({ rebuild: true })).toEqual({ added: 1, scans: 1, remaining: 0, dropped: 0, released: 0, trimmedDays: 0 });
     expect(rebuilt.calls.find((c) => c.method === "PUT")!.headers.get("if-match")).toBe('"fixture"');
   });
 });

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 // The pins change when the corpus snapshot does (the cron runs every ten minutes); the CDN answers repeat
 // requests in between, so every visitor to /map does not rebuild them.
-const CACHE = { "Cache-Control": "public, max-age=0, s-maxage=300", "X-Robots-Tag": "noindex" };
+const CACHE = { "CDN-Cache-Control": "public, max-age=300", "Cache-Control": "public, max-age=0, s-maxage=300", "X-Robots-Tag": "noindex" };
 const NO_STORE = { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" };
 
 /**

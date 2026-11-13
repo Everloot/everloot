@@ -35,5 +35,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ class: s
     })()
     : await renderCard({ label: "Everloot", title: `WoW Forever ${catalog.className} Talent Calculator`, subtitle: "Plan a build and share it with its game build attached" });
   image.headers.set("Cache-Control", q.has("s") ? "private, no-store" : "public, max-age=86400, s-maxage=604800, immutable");
+  if (!q.has("s")) image.headers.set("CDN-Cache-Control", "public, max-age=86400");
   return image;
 }
