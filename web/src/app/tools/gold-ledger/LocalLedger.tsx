@@ -2,13 +2,14 @@
 
 import Coins, { CoinText } from "@/components/ui/Coins";
 import { useEffect, useId, useState } from "react";
-import { Card, DataTable, SectionHeading, type Column } from "@/components/ui";
+import { Card, DataTable, SectionHeading, Segmented, type Column } from "@/components/ui";
 import { parseEverlootLua, parseEverlootTable } from "@/lib/sv-parse";
 import {
-  RIVER_DAYS, categoryLabel, characterKey, installHint, isMoneyLedger, narrowLedger, rosterLabel, summarizeMoney,
-  type CategoryTotal, type GoldSeries, type MoneyLedger, type Receipt, type RiverDay, type RosterRow,
+  PERIODS, categoryLabel, characterKey, installHint, isMoneyLedger, narrowLedger, periodStats, rosterLabel, summarizeMoney,
+  type CategoryTotal, type GoldSeries, type MoneyLedger, type Period, type Receipt, type RiverDay, type RosterRow,
 } from "@/lib/money-ledger";
 import { formatCopper } from "../../../../../kb/src/gold-ledger";
+import SpendingInsights, { AuctionSales } from "./SpendingInsights";
 
 /** Where "Remember on this browser" keeps the summary. The raw file is never stored. */
 export const STORAGE_KEY = "everloot:gold-ledger";
@@ -104,27 +105,35 @@ export default function LocalLedger() {
 
 function LedgerView({ ledger }: { ledger: MoneyLedger }) {
   const [key, setKey] = useState<string | null>(null);
+  const [period, setPeriod] = useState<Period>(30);
   const selectId = useId();
   const chosen = ledger.roster.find((r) => characterKey(r) === key);
   const shown = narrowLedger(ledger, key);
+  const stats = periodStats(shown, period);
   // "Thrall (Moon Guard)" when one character is chosen, else "all characters"; the install tells apart two of one name.
   const who = chosen ? rosterLabel(chosen, ledger.roster) : "all characters";
   return (
     <div className="space-y-8">
       <p className="text-sm text-muted">Read {when(ledger.madeAt)}. A missing line means the addon did not record it, not zero.</p>
-      {ledger.roster.length > 1 && (
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <label htmlFor={selectId} className="text-muted">Character</label>
-          <select id={selectId} value={chosen ? characterKey(chosen) : ""} onChange={(e) => setKey(e.target.value || null)}
-            className="min-h-11 rounded-control border border-edge bg-canvas px-3 text-base text-fg">
-            <option value="">All characters</option>
-            {ledger.roster.map((r) => <option key={characterKey(r)} value={characterKey(r)}>{rosterLabel(r, ledger.roster)}</option>)}
-          </select>
-        </div>
-      )}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
+        {ledger.roster.length > 1 && (
+          <div className="flex flex-wrap items-center gap-3">
+            <label htmlFor={selectId} className="text-muted">Character</label>
+            <select id={selectId} value={chosen ? characterKey(chosen) : ""} onChange={(e) => setKey(e.target.value || null)}
+              className="min-h-11 rounded-control border border-edge bg-canvas px-3 text-base text-fg">
+              <option value="">All characters</option>
+              {ledger.roster.map((r) => <option key={characterKey(r)} value={characterKey(r)}>{rosterLabel(r, ledger.roster)}</option>)}
+            </select>
+          </div>
+        )}
+        <Segmented label="Period" value={period} onChange={setPeriod}
+          options={PERIODS.map((p) => ({ value: p, label: `${p} days` }))} />
+      </div>
       <WeekCard week={shown.week} who={who} />
+      <SpendingInsights stats={stats} largest={shown.largest[period]} who={who} />
+      <River days={stats.river} who={who} />
+      <AuctionSales sales={shown.sales} who={who} />
       <Roster rows={ledger.roster} />
-      <River days={shown.river} who={who} />
       <Categories rows={shown.categories} who={who} moved={chosen || ledger.roster.length < 2 ? 0 : shown.moved} />
       <Receipts rows={shown.receipts} total={shown.eventCount} />
       <History series={shown.history} />
@@ -141,7 +150,7 @@ function WeekCard({ week, who }: { week: MoneyLedger["week"]; who: string }) {
   return (
     <Card as="section" aria-labelledby="ledger-week">
       <SectionHeading id="ledger-week" note={`The last 7 days, ${who}.`}>This week</SectionHeading>
-      <dl className="grid grid-cols-3 gap-x-6">
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
         {facts.map((f) => (
           <div key={f.label} className="min-w-0">
             <dt className="text-sm text-muted">{f.label}</dt>
@@ -177,8 +186,8 @@ function River({ days, who }: { days: RiverDay[]; who: string }) {
   const height = (copper: number) => (copper ? `${Math.max(2, Math.round((copper / high) * 64))}px` : "0px");
   return (
     <Card as="section" aria-labelledby="ledger-river">
-      <SectionHeading id="ledger-river" note={`Money in and out per day, the last ${RIVER_DAYS} days (UTC), ${who}.`}>Money river</SectionHeading>
-      {!any ? <p className="text-sm text-fg-2">No money events in the last {RIVER_DAYS} days.</p> : (
+      <SectionHeading id="ledger-river" note={`Money in and out per day, the last ${days.length} days (UTC), ${who}.`}>Money river</SectionHeading>
+      {!any ? <p className="text-sm text-fg-2">No money events in the last {days.length} days.</p> : (
         <>
           <ol data-river className="flex items-stretch gap-px">
             {days.map((d) => {
@@ -240,23 +249,45 @@ function Receipts({ rows, total }: { rows: Receipt[]; total: number }) {
   );
 }
 
+const LINE = { width: 600, height: 64, pad: 4 };
+
+/**
+ * A character's gold as a line over time: points sit at their real times (snapshots and daily closes are uneven), from
+ * zero at the bottom. Each point has a hover target larger than the line, naming its day and gold.
+ */
+function GoldLine({ points }: { points: GoldSeries["points"] }) {
+  const times = points.map((p) => Date.parse(p.at));
+  const t0 = Math.min(...times), span = Math.max(1, Math.max(...times) - t0);
+  const high = Math.max(1, ...points.map((p) => p.copper));
+  const x = (t: number) => LINE.pad + ((t - t0) / span) * (LINE.width - 2 * LINE.pad);
+  const y = (c: number) => LINE.height - LINE.pad - (c / high) * (LINE.height - 2 * LINE.pad);
+  const xy = points.map((p, i) => [points.length === 1 ? LINE.width / 2 : x(times[i]!), y(p.copper)] as const);
+  return (
+    <svg data-gold-line viewBox={`0 0 ${LINE.width} ${LINE.height}`} preserveAspectRatio="none" aria-hidden="true"
+      className="mt-2 h-16 w-full border-b border-line text-accent">
+      <polyline points={xy.map(([a, b]) => `${a.toFixed(1)},${b.toFixed(1)}`).join(" ")} fill="none" stroke="currentColor"
+        strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+      {xy.map(([a], i) => (
+        <rect key={i} x={a - 6} y={0} width={12} height={LINE.height} fill="transparent">
+          <title>{`${day(points[i]!.at)}: ${formatCopper(points[i]!.copper)}`}</title>
+        </rect>
+      ))}
+    </svg>
+  );
+}
+
 function History({ series }: { series: GoldSeries[] }) {
   return (
     <Card as="section" aria-labelledby="ledger-history">
-      <SectionHeading id="ledger-history" note="Gold at each snapshot the addon took.">Gold history</SectionHeading>
+      <SectionHeading id="ledger-history" note="Gold at each snapshot and each day's closing gold the addon kept.">Gold history</SectionHeading>
       {series.length === 0 ? <p className="text-sm text-fg-2">No gold snapshots yet.</p> : (
         <ul className="space-y-5">
           {series.map((s) => {
-            const high = Math.max(1, ...s.points.map((p) => p.copper));
             const first = s.points[0]!, last = s.points.at(-1)!;
             return (
               <li key={characterKey(s)}>
                 <p className="text-sm text-fg">{s.character} <span className="text-muted">{s.realm}{installHint(s, series) && ` ${installHint(s, series)}`}</span></p>
-                <div aria-hidden="true" className="mt-2 flex h-12 items-end gap-px border-b border-line">
-                  {s.points.map((p, i) => (
-                    <div key={i} className="min-w-0 flex-1 rounded-t-sm bg-accent" style={{ height: `${Math.max(2, Math.round((p.copper / high) * 48))}px` }} title={`${day(p.at)}: ${formatCopper(p.copper)}`} />
-                  ))}
-                </div>
+                <GoldLine points={s.points} />
                 <p className="mt-1 font-mono text-xs tabular-nums text-muted">
                   {s.points.length === 1
                     ? <><Coins copper={first.copper} /> on {day(first.at)}</>

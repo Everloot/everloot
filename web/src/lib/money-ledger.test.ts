@@ -58,9 +58,10 @@ describe("summarizeMoney", () => {
     ]);
   });
 
-  test("the river is the last 30 UTC days, today last, money in and out per category", () => {
+  test("the river is the last 90 UTC days, today last, money in and out per category", () => {
     expect(ledger.river).toHaveLength(RIVER_DAYS);
-    expect(ledger.river[0]!.date).toBe("2026-09-25");
+    expect(RIVER_DAYS).toBe(90);
+    expect(ledger.river[0]!.date).toBe("2026-07-27");
     expect(ledger.river.at(-1)).toEqual({ date: "2026-10-24", in: 1_800, out: 0, byCategory: { loot: 1_500, vendor: 300 } });
     expect(ledger.river.find((d) => d.date === "2026-10-22")).toMatchObject({ in: 0, out: 40_000 });
     expect(ledger.river.find((d) => d.date === "2026-10-10")).toMatchObject({ in: 5_000, out: 0 });
