@@ -105,6 +105,47 @@ test("the window's local ledger shows repairs, vendor purchases and transfers be
   expect(fetchSpy).not.toHaveBeenCalled();
 });
 
+test("the spending insights follow the period and the auction sales show the house cut", async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const withLedger = LUA.replace(/\n}$/, `
+  ["roster"] = { ["k1"] = { ["name"] = "Thrall", ["realm"] = "Moon Guard" } },
+  ["ledger"] = {
+    ["events"] = {
+      { ["at"] = ${now - 20 * 86400}, ["key"] = "k1", ["category"] = "repair", ["copper"] = 90000 },
+      { ["at"] = ${now - 60}, ["key"] = "k1", ["category"] = "auction_spend", ["copper"] = 30000 },
+    },
+    ["sales"] = {
+      { ["at"] = ${now - 120}, ["key"] = "k1", ["itemName"] = "Linen Cloth", ["count"] = 20, ["total"] = 19000, ["cut"] = 1000, ["status"] = "paid" },
+      { ["at"] = ${now - 30}, ["key"] = "k1", ["itemName"] = "Silk Cloth", ["status"] = "pending" },
+    },
+  },
+}`);
+  await act(async () => root.render(<LocalLedger />));
+  await drop(withLedger);
+  const spending = () => container.querySelector('[aria-labelledby="ledger-spending"]')!.textContent!;
+  // 30 days by default: both payments, the repair the larger.
+  expect(spending()).toContain("Repairs");
+  expect(spending()).toContain("Auction purchases");
+  expect(spending()).toMatch(/Spent.*12 gold 0 silver 0 copper/);
+  expect(container.querySelectorAll("[data-daily-spending] > li")).toHaveLength(30);
+  const largest = [...container.querySelectorAll('[aria-labelledby="ledger-largest"] tbody tr')].map((tr) => tr.textContent);
+  expect(largest[0]).toContain("Repairs");
+
+  const seven = [...container.querySelectorAll<HTMLButtonElement>('[aria-label="Period"] button')].find((b) => b.textContent === "7 days")!;
+  await act(async () => { seven.click(); });
+  expect(seven.getAttribute("aria-pressed")).toBe("true");
+  expect(spending()).not.toContain("Repairs");
+  expect(spending()).toMatch(/Spent.*3 gold 0 silver 0 copper/);
+  expect(container.querySelectorAll("[data-daily-spending] > li")).toHaveLength(7);
+  expect(container.querySelectorAll("[data-river] > li")).toHaveLength(7);
+
+  const sales = container.querySelector('[aria-labelledby="ledger-sales"]')!.textContent!;
+  expect(sales).toContain("Linen Cloth");
+  expect(sales).toMatch(/House cut.*10 silver 0 copper.*\(5%\)/);
+  expect(sales).toContain("1 sale is waiting in the mailbox");
+  expect(fetchSpy).not.toHaveBeenCalled();
+});
+
 test("a file that is not an Everloot export says so", async () => {
   await act(async () => root.render(<LocalLedger />));
   await drop("SomethingElseDB = {}", "Other.lua");
@@ -140,14 +181,14 @@ test("choosing a character narrows the week, categories and receipts to them and
   expect([...select.options].map((o) => o.textContent)).toEqual(["All characters", "Thrall (Moon Guard)", "Jaina (Moon Guard)"]);
   const notes = () => container.textContent!;
   const receipts = () => [...container.querySelectorAll('[aria-labelledby="ledger-receipts"] tbody tr')].map((tr) => tr.textContent);
-  expect(notes()).toContain("The last 7 days, all characters.");
+  expect(notes()).toContain("The last 7 × 24 hours up to now, all characters.");
   expect(receipts()).toHaveLength(3);
 
   await act(async () => {
     select.value = "1:Thrall-Moon Guard";
     select.dispatchEvent(new Event("change", { bubbles: true }));
   });
-  expect(notes()).toContain("The last 7 days, Thrall (Moon Guard).");
+  expect(notes()).toContain("The last 7 × 24 hours up to now, Thrall (Moon Guard).");
   expect(notes()).toContain("Every money event in the file, Thrall (Moon Guard).");
   expect(notes()).not.toContain("all characters");
   expect(receipts()).toHaveLength(2);
