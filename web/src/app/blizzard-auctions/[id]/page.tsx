@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { Container } from "@/components/ui";
 import { loadBlizzardPrices } from "@/lib/blizzard-auctions";
 import { shownItemName } from "@/lib/items";
 import { loadShownNames } from "@/lib/shown-item-names";
 import { BlizzardAuctions } from "./blizzard-auctions";
+import { isClientNavigation } from "./client-navigation";
+import FullReload from "./full-reload";
 
 /**
  * One item's Blizzard API auction prices (issue #1122), on a page of their own. Blizzard's Developer API Terms allow
@@ -29,6 +32,7 @@ type Props = { params: Promise<{ id: string }> };
 export default async function BlizzardAuctionPage(props: Props) {
   const { id } = await props.params;
   if (!/^[1-9]\d{0,8}$/.test(id)) notFound();
+  if (isClientNavigation(await headers())) return <Container><FullReload /></Container>;
   const itemId = Number(id);
   const [read, { agreed, matched }] = await Promise.all([loadBlizzardPrices(itemId), loadShownNames()]);
   const name = shownItemName(itemId, agreed, matched?.names)?.name ?? `Item ${itemId}`;

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { isProtectedPath } from "@/lib/document-boundary";
+import { isAdFreePath, isProtectedPath } from "@/lib/document-boundary";
 import { readConsent, writeConsent, syncOptionalScripts, hasRejectionFragment, withRejectionFragment, rejectionSessionKey, type ConsentCategory, type ConsentChoice } from "./consent";
 import { needsAnalyticsConsent, type AnalyticsConfig } from "@/lib/analytics/config";
 import { loadConsented, loadCookieless, privacySignals, unloadConsented } from "@/lib/analytics/load";
@@ -15,7 +15,8 @@ const ticked = (choices: Choices) => ({ advertising: choices.advertising === "ac
 
 export function CookiePreferencesButton() {
   const pathname = usePathname();
-  if (pathname && isProtectedPath(pathname)) return <a href="/privacy#choices" className="inline-flex items-center min-h-11 text-sm text-fg-2 hover:text-accent transition-colors">Cookie preferences</a>;
+  // Pages that load no consent banner (protected and ad-free ones) link to the choices instead of opening it.
+  if (pathname && (isProtectedPath(pathname) || isAdFreePath(pathname))) return <a href="/privacy#choices" className="inline-flex items-center min-h-11 text-sm text-fg-2 hover:text-accent transition-colors">Cookie preferences</a>;
   return (
     <button type="button" className="inline-flex items-center min-h-11 text-sm text-fg-2 hover:text-accent transition-colors" onClick={() => window.dispatchEvent(new Event(OPEN_PREFERENCES))}>
       Cookie preferences

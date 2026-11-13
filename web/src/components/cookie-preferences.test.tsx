@@ -7,7 +7,8 @@ import { PREFIXES, SERVED } from "@/lib/build-versions";
 
 test("key pages link to the public preference controls instead of offering an inactive button", () => {
   // Under the served version's prefix too, while it has one (/beta before launch).
-  for (const pathname of ["/chat", "/account", `${PREFIXES[SERVED.id] ?? ""}/settings`]) {
+  // The ad-free Blizzard pages load no consent banner either, so they link too.
+  for (const pathname of ["/chat", "/account", `${PREFIXES[SERVED.id] ?? ""}/settings`, "/blizzard-auctions/2589"]) {
     route.pathname = pathname;
     expect(renderToStaticMarkup(<CookiePreferencesButton />)).toContain('href="/privacy#choices"');
   }

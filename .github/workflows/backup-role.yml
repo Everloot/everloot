@@ -33,13 +33,11 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/tests/backup_exporter.sql
           psql -v ON_ERROR_STOP=1 -f supabase/tests/backup_exporter_behavior.sql
       # Blizzard auction prices (issue #1122): applied after the backup role, as in production, and twice; then the
-      # 30-day purge, the reader, the effective grants and the backup exclusion. Re-running the backup role
-      # migration afterwards must leave the tables closed.
+      # 30-day purge, the reader, the effective grants and the backup exclusion, which the new migration enforces
+      # itself (the applied backup role migration is left as it is).
       - name: Blizzard auction prices, applied twice
         run: |
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113120000_blizzard_auctions.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261113120000_blizzard_auctions.sql
-          psql -v ON_ERROR_STOP=1 -f supabase/tests/blizzard_auctions.sql
-          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261110180000_backup_exporter_role.sql
           psql -v ON_ERROR_STOP=1 -f supabase/tests/blizzard_auctions.sql
           psql -v ON_ERROR_STOP=1 -f supabase/tests/backup_exporter.sql

@@ -23,9 +23,10 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
+          # Missing secrets say nothing about rows already stored, so the purge fails visibly rather than pass.
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
-            echo '::notice::Supabase secrets are not configured; nothing can be stored, so nothing to purge.'
-            exit 0
+            echo '::error::Supabase secrets are missing, so Blizzard auction data older than 30 days cannot be deleted.'
+            exit 1
           fi
           body="$RUNNER_TEMP/purge.json"
           status=$(curl -sS --max-time 60 -o "$body" -w '%{http_code}' -X POST "${SUPABASE_URL%/}/rest/v1/rpc/blizzard_auctions_purge" \
