@@ -278,9 +278,17 @@ click(C_AuctionHouse.ConfirmCommoditiesPurchase, 9999, 3)
 money = money - 30; event('PLAYER_MONEY')
 rows = bought()
 assert(rows[6].copper == 30 and rows[6].itemName == nil and rows[6].count == 3, 'unnamed commodity: amount and count only')
--- The tooltip's average paid now has something to read: Wool Cloth bought 20 + 20 for 7000 + 7000.
+-- A listing far down the loaded results (the buy window loads more pages) still gives its count.
+for i = 3, 600 do searchResults[i] = { auctionID = 10000 + i, quantity = 2, owners = { 'Jaina' } } end
+searchResults[501] = { auctionID = 904, quantity = 7, owners = { 'Jaina' } }
+listings[904] = { buyoutAmount = 350, itemKey = woolKey, itemLink = '|cffffffff|Hitem:2592::::::::60:::::|h[Wool Cloth]|h|r' }
+click(C_AuctionHouse.PlaceBid, 904, 350)
+money = money - 350; event('PLAYER_MONEY')
+rows = bought()
+assert(rows[7].itemName == 'Wool Cloth' and rows[7].count == 7 and rows[7].copper == 350, 'count from result 501')
+-- The tooltip's average paid now has something to read: Wool Cloth bought 20 + 20 + 7 for 7000 + 7000 + 350.
 local h = Everloot.Ledger.ItemHistory('Test Realm', 'Wool Cloth')
-assert(h and h.bought == 40 and h.averagePaid == 350 and h.purchases == 2, 'average paid per unit from named purchases with a count')
+assert(h and h.bought == 47 and h.averagePaid == 305 and h.purchases == 3, 'average paid per unit from named purchases with a count')
 for _, e in ipairs(EverlootDB.ledger.events) do
  for _, value in pairs(e) do assert(value ~= 'Jaina' and value ~= 'Player-1-AAAA', 'no owner or bidder in the ledger') end
 end

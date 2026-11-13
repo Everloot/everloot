@@ -265,15 +265,15 @@ local function keyName(itemKey)
 end
 
 --- How many items one listing holds, from the item's search results the player is looking at, or nil. Only each
---- result's auctionID and quantity are read; owners and bidders are not.
-local MAX_RESULTS = 500
+--- result's auctionID and quantity are read; owners and bidders are not. Every loaded result is searched (the buy
+--- window can load more pages), once, on the player's own purchase click.
 local function listingQuantity(itemKey, auctionID)
   if type(itemKey) ~= "table" or not (C_AuctionHouse and C_AuctionHouse.GetNumItemSearchResults
     and C_AuctionHouse.GetItemSearchResultInfo) then return nil end
   local okCount, n = pcall(C_AuctionHouse.GetNumItemSearchResults, itemKey)
   n = okCount and E.Readable(n)
   if not whole(n) then return nil end
-  for i = 1, math.min(n, MAX_RESULTS) do
+  for i = 1, n do
     local ok, result = pcall(C_AuctionHouse.GetItemSearchResultInfo, itemKey, i)
     if ok and type(result) == "table" and E.Readable(result.auctionID) == auctionID then
       local quantity = E.Readable(result.quantity)
