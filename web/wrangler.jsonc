@@ -61,6 +61,10 @@
     // Workers sets no NODE_ENV, and code that reads it through a variable (secure cookies, the stores' production
     // checks) would take the development path (runtime audit, 10/28).
     "NODE_ENV": "production",
+    // OpenNext's revalidation queue retries a page whose background refresh fails (a timeout, a 5xx) up to 6 times with
+    // growing pauses, and each try renders the page again. A page that outlasts the queue's 10 s limit fails every try, so two
+    // tries cost a third of that work, and the next visitor to the stale page starts a fresh attempt anyway.
+    "NEXT_CACHE_DO_QUEUE_MAX_RETRIES": "2",
     "EVERLOOT_PLATFORM": "cloudflare",
     "EVERLOOT_DEPLOY_ENV": "production",
     // Feature switches, as in production. Pages built ahead of time read them during the build too, so
