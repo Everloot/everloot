@@ -345,6 +345,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: reuse successful public corpus API answers at the edge for five minutes, with separate keys for each normalized query.
 - Site: World map pages read stored player pins and zone cross-checks without replaying the public corpus.
 - Site: reuse anonymous public MCP answers for ten minutes and search independent lore names in parallel.
+- Site: Read guild ladders from the stored snapshot while checking publication authority and hides on every request.
 - Site: Keep public tooltip, map, search and planner-card responses at the edge for their declared lifetimes.
 - Site: Keep complete public database detail pages at the edge for an hour; degraded pages still refresh within a minute.
 - Site: ask MJ12bot and DotBot not to crawl the site while keeping search engines and AI search access allowed.

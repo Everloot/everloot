@@ -1,11 +1,14 @@
+import { createHash } from "node:crypto";
+import { canonicalJson } from "../../../kb/src/corpus";
 import { validGuildName, type IntakeRecord } from "@everloot/protocol";
-import { guildBoard, guildFactsFromRecords, type GuildBoard, type GuildFacts } from "../../../kb/src/guild-board";
+import { guildBoard, type GuildBoard, type GuildFacts } from "../../../kb/src/guild-board";
 import {
-  agreedKills, guildDirectory, guildKey, guildKillsFromRecords, guildLadder, guildProgression, guildRanks, guildSlug, instanceDefs, LADDER_PAGE,
-  mergeKills, officerKills, searchGuilds,
-  type AgreedKill, type GuildFaction, type GuildKillRow, type GuildPage, type GuildProgress, type GuildReader, type GuildSummary, type InstanceDef, type LadderFilter, type LadderRow,
+  agreedKills, guildDirectory, guildKey, guildLadder, guildProgression, guildRanks, guildSlug, LADDER_PAGE,
+  mergeKills, searchGuilds,
+  type AgreedKill, type GuildFaction, type GuildPage, type GuildProgress, type GuildReader, type GuildSummary, type InstanceDef, type LadderFilter, type LadderRow,
 } from "../../../kb/src/guilds";
-import { instanceFactsFromRecords } from "../../../kb/src/instances";
+import { buildGuildRollup, type GuildRollup } from "./guild-rollup";
+import { loadStoredGuildLadder } from "./guild-ladder-store";
 import { loadGuildAlts, memberKey, type GuildAlt } from "./guild-alts";
 import { playerPagesOn, playerPath, rulesetOf, type Player } from "./player-pages";
 import { unstable_cache } from "next/cache";
@@ -19,7 +22,7 @@ import { uploadStore } from "./upload-store";
 /**
  * The guild ladder's page data (docs/design/specs/2026-10-24-guild-board-design.md). Everything here is off until
  * EVERLOOT_GUILDS=1: with it unset the pages answer 404 and read nothing. The rollup itself is kb/src/guilds.ts;
- * this file reads the upload corpus and the players table and composes what a page shows.
+ * this file reads the stored guild ladder and the players table and composes what a page shows.
  *
  * Three sources: guild_kill rows from members (agreed by 2 installs), the officer board (kb/src/guild-board.ts) and
  * the seen roster from the players table. A guild hidden through the hide form leaves all three.
@@ -81,19 +84,6 @@ export async function hiddenGuildsForIntake(): Promise<Set<string> | null> {
 
 export const factionLabel = (f: GuildFaction | null): "Alliance" | "Horde" | null => (f === "alliance" ? "Alliance" : f === "horde" ? "Horde" : null);
 
-/** What one corpus read rolls up to, kept until the corpus changes. */
-interface Rollup {
-  key: string;
-  rows: GuildKillRow[];
-  instances: InstanceDef[];
-  facts: GuildFacts;
-  /** The officer boards, by guild key, for every guild an officer upload names. Names unchecked: never shown as they are. */
-  boards: Map<string, GuildBoard>;
-  /** Every character the officers' facts name, as `playerHideKey` keys. */
-  names: Set<string>;
-  officers: AgreedKill[];
-}
-
 export interface GuildData {
   unreachable: boolean;
   dataAsOf: string | null;
@@ -111,28 +101,6 @@ export interface GuildData {
 
 const UNREAD: GuildData = { unreachable: true, dataAsOf: null, instances: [], kills: [], progress: [], boards: new Map(), hidden: new Set(), namesWithheld: true };
 
-/** A board worth keeping: something in it was agreed by two officer uploads. */
-const published = (b: GuildBoard) => b.memberCount !== null || b.roster.length > 0 || b.progression.length > 0 || b.loot.length > 0 || b.present.length > 0;
-
-function rollup(key: string, records: readonly unknown[], asOf: Date): Rollup {
-  const facts = guildFactsFromRecords(records as unknown[]);
-  const instances = instanceDefs(instanceFactsFromRecords(records as unknown[]), asOf);
-  const named = new Map<string, { guildName: string; realm: string }>();
-  for (const r of [...facts.counts, ...facts.members, ...facts.bosses, ...facts.loot, ...facts.attendance]) {
-    if (r.guildName.trim() && r.realm.trim()) named.set(guildKey(r.realm, r.guildName), { guildName: r.guildName, realm: r.realm });
-  }
-  const boards = new Map<string, GuildBoard>();
-  for (const [k, g] of named) {
-    const board = guildBoard(g.guildName, g.realm, facts);
-    if (published(board)) boards.set(k, board);
-  }
-  const names = new Set([
-    ...facts.members.map((m) => playerHideKey(m.realm, m.name)), ...facts.loot.map((l) => playerHideKey(l.realm, l.recipient)),
-    ...facts.attendance.map((a) => playerHideKey(a.realm, a.name)), ...facts.gear.map((g) => playerHideKey(g.realm, g.character)),
-  ]);
-  return { key, rows: guildKillsFromRecords(records), instances, facts, boards, names, officers: officerKills([...boards.values()], instances) };
-}
-
 /**
  * The officers' facts without the characters who asked to be hidden: their roster line, the loot they received,
  * their attendance and their item level. `hidden` null means the hide list could not be read, so no name is kept.
@@ -148,14 +116,14 @@ export function withoutHiddenPlayers(facts: GuildFacts, hidden: ReadonlySet<stri
   };
 }
 
-let memo: Rollup | null = null;
+let memo: GuildRollup | null = null;
 let shownMemo: { key: string; boards: Map<string, GuildBoard> } | null = null;
 
 /**
  * The boards a page may show, rebuilt from the facts without hidden characters. Kept while the corpus and the hidden
  * characters it names stay the same, so an opt-out takes effect on the next read even when the corpus has not changed.
  */
-function shownBoards(r: Rollup, hiddenPlayers: ReadonlySet<string> | null): Map<string, GuildBoard> {
+function shownBoards(r: GuildRollup, hiddenPlayers: ReadonlySet<string> | null): Map<string, GuildBoard> {
   const named = hiddenPlayers === null ? "unread" : [...hiddenPlayers].filter((k) => r.names.has(k)).sort().join("\u0001");
   const key = `${r.key}|${named}`;
   if (shownMemo?.key === key) return shownMemo.boards;
@@ -178,26 +146,37 @@ async function hiddenPlayersOrNull(): Promise<Set<string> | null> {
 
 /**
  * The ladder's data from the stored uploads: the instances with agreed bosses, every agreed kill and each guild's
- * progression. The rollup is kept per corpus read, as lib/rankings.ts does; the hidden set is read each time, so a
+ * progression. The cron's stored rollup is used while its publication authority is current; otherwise the live corpus
+ * supplies it until the cron catches up. The hidden set is read each time, so a
  * hide takes effect at once. A hide list that cannot be read makes the whole answer unreachable: guilds are withheld,
  * never shown unfiltered (pages show the unavailable state, the tools answer unavailable, the export skips its files).
  */
 export async function loadGuildData(): Promise<GuildData> {
-  const corpus = await uploadStore.loadCorpus();
-  if (corpus.unreachable) return UNREAD;
-  const dataAsOf = corpus.dataAsOf ?? null;
+  const stored = await loadStoredGuildLadder();
+  let dataAsOf: string | null;
+  let rolled: GuildRollup;
+  if (stored) {
+    dataAsOf = stored.dataAsOf;
+    rolled = stored.rollup;
+  } else {
+    const corpus = await uploadStore.loadCorpus();
+    if (corpus.unreachable) return UNREAD;
+    dataAsOf = corpus.dataAsOf ?? null;
+    // Publication may remove a member inside a snapshot without changing its row count.
+    const key = createHash("sha256").update(canonicalJson(corpus.records)).update(dataAsOf ?? "").digest("hex");
+    if (memo === null || memo.key !== key) memo = buildGuildRollup(key, corpus.records, dataAsOf ? new Date(dataAsOf) : new Date());
+    rolled = memo;
+  }
   const asOf = dataAsOf ? new Date(dataAsOf) : new Date();
-  const key = `${corpus.uploads}|${dataAsOf ?? ""}|${corpus.records.length}`;
-  if (memo === null || memo.key !== key) memo = rollup(key, corpus.records, asOf);
   const [hidden, hiddenPlayers] = await Promise.all([hiddenGuildsForIntake(), hiddenPlayersOrNull()]);
   if (hidden === null) return UNREAD;
-  const members = agreedKills(memo.rows, asOf, memo.instances).filter((k) => !hidden.has(hiddenKey(k)));
-  const officers = memo.officers.filter((k) => !hidden.has(hiddenKey(k)));
+  const members = agreedKills(rolled.rows, asOf, rolled.instances).filter((k) => !hidden.has(hiddenKey(k)));
+  const officers = rolled.officers.filter((k) => !hidden.has(hiddenKey(k)));
   const kills = mergeKills(members, officers);
   // A character hidden after the corpus was rolled up is left out here, on every read; without the list, no name is shown.
-  const boards = new Map([...shownBoards(memo, hiddenPlayers)].filter(([, b]) => !hidden.has(hiddenKey(b))));
+  const boards = new Map([...shownBoards(rolled, hiddenPlayers)].filter(([, b]) => !hidden.has(hiddenKey(b))));
   return {
-    unreachable: false, dataAsOf, instances: memo.instances, kills, progress: guildProgression(kills, memo.instances), boards, hidden,
+    unreachable: false, dataAsOf, instances: rolled.instances, kills, progress: guildProgression(kills, rolled.instances), boards, hidden,
     namesWithheld: hiddenPlayers === null,
   };
 }

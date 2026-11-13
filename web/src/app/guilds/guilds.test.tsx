@@ -10,7 +10,7 @@ vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_
 vi.mock("next/cache", () => ({ unstable_cache: <T extends (...args: never[]) => unknown>(fn: T) => fn, revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 
 const AS_OF = "2026-10-24T10:00:00.000Z";
-const holder = vi.hoisted(() => ({ store: null as PlayerStore | null, records: [] as unknown[], unreachable: false, reads: 0 }));
+const holder = vi.hoisted(() => ({ store: null as PlayerStore | null, records: [] as unknown[], unreachable: false, reads: 0, stored: null as unknown }));
 vi.mock("@/lib/player-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/player-store")>()), playerStore: () => holder.store }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
@@ -23,6 +23,8 @@ vi.mock("@/lib/upload-store", async (importOriginal) => ({
     },
   },
 }));
+
+vi.mock("@/lib/guild-ladder-store", () => ({ loadStoredGuildLadder: async () => holder.stored }));
 
 const base = (installId: string, i: number) => ({ installId, eventId: `${installId}:${i}`, capturedAt: "2026-10-20T20:00:00Z" });
 /** Molten Core and its two bosses, as three installs agree on them. */
@@ -53,6 +55,7 @@ beforeEach(async () => {
   holder.records = [...world, ...memberKills, ...officers];
   holder.unreachable = false;
   holder.reads = 0;
+  holder.stored = null;
   await holder.store.upsert([
     { name: "Thrallina", realm: "Forever Pioneer", race: "Orc", class: "SHAMAN", level: 25, guild: "Night Watch", seen: "2026-10-21" },
     { name: "Throgar", realm: "Forever Pioneer", race: "Orc", class: "WARRIOR", level: 30, guild: "Night Watch", seen: "2026-10-23" },
@@ -690,4 +693,38 @@ test("a realm page is kept out of search engines until guild indexing is on, and
   vi.stubEnv("EVERLOOT_GUILDS_INDEX", "1");
   expect((await meta()).robots).toEqual({ index: true, follow: true });
   expect((await meta({ page: "2" })).robots).toEqual({ index: false, follow: false });
+});
+
+
+test("stored guild data matches the corpus pages and a later guild or player hide takes effect immediately", async () => {
+  on();
+  const before = await hub();
+  const beforeGuild = await guildPage("forever-pioneer", "iron-oath");
+  const beforeRealm = await realmPage("forever-pioneer");
+  expect(beforeGuild).toContain(">Ada<");
+  const { buildGuildRollup } = await import("@/lib/guild-rollup");
+  holder.stored = { dataAsOf: AS_OF, rollup: buildGuildRollup("stored", holder.records, new Date(AS_OF)) };
+  holder.unreachable = true;
+  holder.reads = 0;
+  expect(await hub()).toBe(before);
+  expect(await guildPage("forever-pioneer", "iron-oath")).toBe(beforeGuild);
+  expect(await realmPage("forever-pioneer")).toBe(beforeRealm);
+  await holder.store!.suppressGuild("Forever Pioneer", "Night Watch");
+  expect(await hub()).not.toContain(">Night Watch</a>");
+  await holder.store!.suppress("Forever Pioneer", "Ada");
+  expect(await guildPage("forever-pioneer", "iron-oath")).not.toContain(">Ada<");
+  const { guildReader } = await import("@/lib/guilds");
+  expect(await guildReader.page("Night Watch", "Forever Pioneer")).toMatchObject({ hidden: true });
+  expect(holder.reads).toBe(0);
+});
+
+test("a stored ladder is withheld when the live guild hide list cannot be checked", async () => {
+  on();
+  const { buildGuildRollup } = await import("@/lib/guild-rollup");
+  holder.stored = { dataAsOf: AS_OF, rollup: buildGuildRollup("stored", holder.records, new Date(AS_OF)) };
+  vi.spyOn(holder.store!, "hiddenGuilds").mockRejectedValue(new Error("unavailable"));
+  const { guildReader } = await import("@/lib/guilds");
+  expect(await guildReader.ladder()).toBeNull();
+  expect(await hub()).not.toContain(">Night Watch</a>");
+  expect(holder.reads).toBe(0);
 });
