@@ -92,3 +92,30 @@ test("the file holds the reported rows only; the recheck list comes from the bui
   old.set.facts.recheck = [{ kind: "npc", ids: [7], since: "2026-01-01T00:00:00.000Z", reason: "stale" }];
   expect(parseMapPins(JSON.stringify(old))?.set.facts.recheck).toBe(RECHECK_SCOPES);
 });
+
+test("the stored map includes rolled-up bounds without install identifiers", async () => {
+  const records = ["private-a", "private-b", "private-c"].map((installId) => ({
+    kind: "map_bounds", installId, capturedAt: asOf, mapId: 1429, continentId: 0,
+    left: 100, top: 200, right: 300, bottom: 400,
+  }));
+  const body = encodeMapPins(buildMapPins({ records, dataAsOf: asOf }), asOf);
+  const read = parseMapPins(body)!;
+  expect(read.set).toHaveProperty("bounds", [{ mapId: 1429, continentId: 0, left: 100, top: 200, right: 300, bottom: 400, installs: 3, agreed: true }]);
+  expect(body).not.toContain("private-");
+  const old = JSON.parse(body);
+  delete old.set.bounds;
+  expect(parseMapPins(JSON.stringify(old))).toBeNull();
+});
+
+test("legacy and malformed bound snapshots fall back to the corpus", async () => {
+  const valid = JSON.parse(encodeMapPins(buildMapPins(corpus), asOf));
+  for (const broken of [
+    { ...valid, version: 1 },
+    { ...valid, set: { ...valid.set, bounds: null } },
+    { ...valid, set: { ...valid.set, bounds: [{ mapId: 1429 }] } },
+  ]) {
+    forgetStoredMapPins();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(broken))));
+    expect(await loadMapPins()).toEqual({ ...buildMapPins(corpus), unreachable: false });
+  }
+});

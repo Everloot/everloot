@@ -1,5 +1,5 @@
 import mapJson from "@/data/game-data/map.json";
-import { rollupMapBounds, type MapBoundsRow } from "../../../kb/src/map-bounds";
+import { rollupMapBounds, type MapBoundsRow, type ZoneBounds } from "../../../kb/src/map-bounds";
 import { objectSpawns } from "../../../kb/src/object-spawns";
 import { checkReportedBounds, placeEntrances, placeFlights, worldToMap, zoneTable, zoneToMap, type BoundsCheck, type EntrancePin } from "../../../kb/src/world-coords";
 import { WorldMapData } from "../../../kb/src/world-map-data";
@@ -34,6 +34,11 @@ export const WORLD_MAP: WorldMapData = WorldMapData.parse(mapJson);
 
 /** One continent's map from the game-file data. In-game reports only add the cross-check; no install ids reach the result. */
 export function continentMap(continentId: number, boundsRows: MapBoundsRow[], data: WorldMapData = WORLD_MAP, spoilers = false): ContinentMap {
+  return continentMapFromBounds(continentId, rollupMapBounds(boundsRows), data, spoilers);
+}
+
+/** The same map cross-check from anonymous bounds rolled up by the snapshot job. */
+export function continentMapFromBounds(continentId: number, bounds: ZoneBounds[], data: WorldMapData = WORLD_MAP, spoilers = false): ContinentMap {
   const held = new Set(data.heldBackZones.map((z) => z.uiMapId));
   // Held-back zones are left out of the data altogether unless spoilers are on.
   const zones = zoneTable({ zones: spoilers ? [...data.zones, ...data.heldBackZones] : data.zones });
@@ -56,7 +61,7 @@ export function continentMap(continentId: number, boundsRows: MapBoundsRow[], da
     viewBox = { x: Math.min(...xs) - pad, y: Math.min(...ys) - pad, width: Math.max(...xs) - Math.min(...xs) + 2 * pad, height: Math.max(...ys) - Math.min(...ys) + 2 * pad };
   }
 
-  const checks = checkReportedBounds(zones, rollupMapBounds(boundsRows)).filter((c) => zones.find((z) => z.mapId === c.mapId)?.continentId === continentId);
+  const checks = checkReportedBounds(zones, bounds).filter((c) => zones.find((z) => z.mapId === c.mapId)?.continentId === continentId);
   return {
     continentId,
     name: data.continents.find((c) => c.id === continentId)?.name ?? CONTINENTS.find((c) => c.id === continentId)?.name ?? `Continent ${continentId}`,

@@ -15,7 +15,6 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
-- Site: Keep complete public database detail pages at the edge for an hour; degraded pages still refresh within a minute.
 - Site: filter auction browsing by region, including unknown-region records, with matching counts and compact realm names that preserve the full recorded label on hover.
 - Site: private operations dashboard with owner-excluded contribution activity, source health, cost estimates and compact realm badges; optional per-upload character attribution stays under the contributor's control.
 - Site: a visible bug button on every page opens the existing GitHub report form, with Discord and email alternatives and private page URLs omitted.
@@ -341,7 +340,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Changed
 - Site: answer sourced questions from stored public facts without replaying the upload corpus.
+- Site: Keep complete public database detail pages at the edge for an hour; degraded pages still refresh within a minute.
 - Site: reuse successful public corpus API answers at the edge for five minutes, with separate keys for each normalized query.
+- Site: World map pages read stored player pins and zone cross-checks without replaying the public corpus.
 - Site: ask MJ12bot and DotBot not to crawl the site while keeping search engines and AI search access allowed.
 - Site: cache public auction browse pages for five minutes while reusing realm boards per market rollup.
 - Site: HEAD requests reuse cached public pages and warm their GET copy on a miss, without returning a body.
