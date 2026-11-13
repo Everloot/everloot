@@ -345,6 +345,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: World map pages read stored player pins and zone cross-checks without replaying the public corpus.
 - Site: reuse anonymous public MCP answers for ten minutes and search independent lore names in parallel.
 - Site: Keep public tooltip, map, search and planner-card responses at the edge for their declared lifetimes.
+- Site: Keep complete public database detail pages at the edge for an hour; degraded pages still refresh within a minute.
 - Site: ask MJ12bot and DotBot not to crawl the site while keeping search engines and AI search access allowed.
 - Site: cache public auction browse pages for five minutes while reusing realm boards per market rollup.
 - Site: HEAD requests reuse cached public pages and warm their GET copy on a miss, without returning a body.

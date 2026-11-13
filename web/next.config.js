@@ -194,6 +194,10 @@ const nextConfig = {
       { source: "/database", headers: briefCdnHeaders },
       ...["npcs", "quests", "objects", "vendors", "spells", "achievements", "titles", "factions", "quest-chains", "drops", "zones", "instances", "coverage"]
         .map((type) => ({ source: `/database/${type}/:path*`, headers: briefCdnHeaders })),
+      // Complete public detail pages may be an hour old (approved freshness trade-off).
+      // The Worker still caps degraded HTML at 60 seconds; lists keep their shorter policy.
+      ...["npcs", "quests", "objects", "vendors", "spells", "achievements", "titles", "factions", "quest-chains", "zones", "instances", "coverage"]
+        .map((type) => ({ source: `/database/${type}/:detail`, headers: databaseItemsCdnHeaders })),
       { source: "/census", headers: briefCdnHeaders },
       { source: "/rankings/:path*", headers: briefCdnHeaders },
       // The sitemaps set these on their own successful responses (lib/database-sitemap.ts), so their 503s stay uncached.
