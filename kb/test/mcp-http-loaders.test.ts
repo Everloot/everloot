@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { openDb, type DB } from "../src/db.js";
 import { buildFilesIndex } from "../src/files-evidence.js";
 import { createMcpHttpHandler, toolOptionsOf } from "../src/mcp-http-server.js";
@@ -56,4 +56,19 @@ test("toolOptionsOf: the loaders only; the mount's token, origins, limits and ac
   const picked = toolOptionsOf({ bearerToken: "secret", allowedOrigins: ["https://x"], rateLimitPerMinute: 5, maxRequestBodyBytes: 1, extraTools, gameData, recheck: [] } as never);
   expect(picked).toEqual({ gameData, recheck: [] });
   expect(JSON.stringify(Object.keys(picked))).not.toContain("bearer");
+});
+
+
+test("HTTP answer_sources uses its stored reader and never falls back to the corpus, including failure", async () => {
+  const db = openDb(":memory:");
+  databases.push(db);
+  const corpus = vi.fn(async () => { throw new Error("must not replay corpus"); });
+  const answerSources = vi.fn(async () => ({ facts: { items: { rates: [], names: [], npcs: [] }, world: { npcs: [], quests: [], vendors: [] } }, dataAsOf: "2026-11-10T00:00:00Z" }));
+  const handle = createMcpHttpHandler({ db, bearerToken: null, maxRequestBodyBytes: 4096, rateLimitPerMinute: 50, allowedOrigins: [], corpus, answerSources });
+  const ask = async () => (await (await handle(call({ name: "answer_sources", arguments: { question: "Synthetic Stockade", limit: 3 } }))).json()).result;
+  expect((await ask()).structuredContent.dataAsOf).toBe("2026-11-10T00:00:00Z");
+  answerSources.mockRejectedValueOnce(new Error("stored reader down"));
+  expect((await ask()).content[0].text).toContain("Player observations could not be read");
+  expect(answerSources).toHaveBeenCalledTimes(2);
+  expect(corpus).not.toHaveBeenCalled();
 });

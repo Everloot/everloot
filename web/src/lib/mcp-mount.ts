@@ -1,5 +1,6 @@
 import { createMcpHttpHandler } from "../../../kb/src/mcp-http-server";
 import type { ToolOptions } from "../../../kb/src/mcp-server";
+import { loadStoredAggregates } from "./aggregate-store";
 import { catalogIndex } from "./catalog-index";
 import { loadTimeline } from "./changes";
 import { loadCoverageForTool } from "./coverage-answer";
@@ -38,6 +39,13 @@ export function toolLoaders(): ToolOptions {
   return {
     // The curated scopes: page tools count only reports after a scope's date, as the coverage score does.
     recheck: RECHECK_SCOPES,
+    // The cron stores anonymous facts only. Never replay or republish the corpus for an answer.
+    answerSources: async () => {
+      const set = await loadStoredAggregates({ strict: true });
+      // Stored item rates already apply these scopes; never count rates made under an older ruling.
+      if (!set || JSON.stringify(set.world.recheck ?? []) !== JSON.stringify(RECHECK_SCOPES)) return null;
+      return { facts: { items: set.items, world: set.world }, dataAsOf: set.dataAsOf };
+    },
     // The stored report the home page counts; the live computation only when it is missing or for another build.
     coverage: () => loadCoverageForTool(),
     settledSummary: async (build) => {

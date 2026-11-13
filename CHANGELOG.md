@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: filter auction browsing by region, including unknown-region records, with matching counts and compact realm names that preserve the full recorded label on hover.
 - Site: private operations dashboard with owner-excluded contribution activity, source health, cost estimates and compact realm badges; optional per-upload character attribution stays under the contributor's control.
 - Site: a visible bug button on every page opens the existing GitHub report form, with Discord and email alternatives and private page URLs omitted.
 - Site: item pages' social cards show the item's game icon (text-only when the art is off or unreadable), and on wide screens entity pages move their summary, facts and map into a right column.
@@ -338,8 +339,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Desktop App: restoring the oldest backup keeps the selected save and an undo copy, even within the same second.
 
 ### Changed
+- Site: answer sourced questions from stored public facts without replaying the upload corpus.
 - Site: reuse successful public corpus API answers at the edge for five minutes, with separate keys for each normalized query.
 - Site: ask MJ12bot and DotBot not to crawl the site while keeping search engines and AI search access allowed.
+- Site: cache public auction browse pages for five minutes while reusing realm boards per market rollup.
 - Site: HEAD requests reuse cached public pages and warm their GET copy on a miss, without returning a body.
 - Site: keep build links reachable below 1280px, omit empty game-art frames, show coin images and
   quality borders, round the header build pill, and compact the cookie strip with equal Accept and Reject.

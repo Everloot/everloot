@@ -181,6 +181,10 @@ const nextConfig = {
       // Changes and search read no cookies, but new blue posts and newly agreed names should show within minutes.
       { source: "/changes", headers: briefCdnHeaders },
       { source: "/search", headers: briefCdnHeaders },
+      // Public market browse pages read no session; item pages retain their own policy.
+      ...["/tools/auctions", "/tools/auctions/:realm"].map((source) => ({
+        source, headers: [{ key: "CDN-Cache-Control", value: "max-age=300" }],
+      })),
       // The profession hub and pages read no cookies; a page renders every recipe with the corpus's gathering areas on each request
       // (2 to 5 s). Five minutes, so a page drawn while storage was unreachable does not stay long.
       { source: "/tools/professions/:path*", headers: briefCdnHeaders },
