@@ -10,6 +10,7 @@ export async function sampleCard(size: CharacterCardSize): Promise<Response> {
   if (!showcaseOn()) return new Response("Not found", { status: 404, headers: { "X-Robots-Tag": "noindex" } });
   const image = await renderCharacterCard(buildShowcase(sampleShowcase(new Date()), new Date()), size);
   image.headers.set("Cache-Control", "public, max-age=3600");
+  image.headers.set("CDN-Cache-Control", "public, max-age=3600");
   image.headers.set("X-Robots-Tag", "noindex");
   return image;
 }

@@ -12,7 +12,7 @@ import { shownItemIcons } from "@/lib/item-icons";
  */
 export const dynamic = "force-dynamic";
 
-const HEADERS = { "Cache-Control": "public, max-age=60, s-maxage=60, stale-while-revalidate=300", "X-Robots-Tag": "noindex" };
+const HEADERS = { "CDN-Cache-Control": "public, max-age=60", "Cache-Control": "public, max-age=60, s-maxage=60, stale-while-revalidate=300", "X-Robots-Tag": "noindex" };
 const ERROR_HEADERS = { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" };
 
 export async function GET(req: Request) {

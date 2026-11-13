@@ -61,3 +61,13 @@ test("its card is the class's own picture, as any bad code's is, not the build's
     expect(cards.renderCard, value).toHaveBeenCalledOnce();
   }
 });
+
+test("public talent cards opt into the edge while every saved share-code card stays private", async () => {
+  const publicCard = await cardFor(code);
+  expect(publicCard.headers.get("cdn-cache-control")).toBe("public, max-age=86400");
+  for (const share of ["", "missing"]) {
+    const privateCard = await card(new Request(`https://everloot.app/tools/talents/mage/card?s=${share}`), { params: Promise.resolve({ class: "mage" }) });
+    expect(privateCard.headers.get("cache-control")).toBe("private, no-store");
+    expect(privateCard.headers.get("cdn-cache-control")).toBeNull();
+  }
+});

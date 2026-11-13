@@ -25,7 +25,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "Storage unreachable. Keep the list you have and retry later." }, { status: 503, headers: { "cache-control": "no-store" } });
   }
   const etag = `"${createHash("sha256").update(body).digest("hex").slice(0, 32)}"`;
-  const headers = { etag, "cache-control": "public, max-age=600, s-maxage=600, stale-while-revalidate=3600" };
+  const headers = { "CDN-Cache-Control": "public, max-age=600", etag, "cache-control": "public, max-age=600, s-maxage=600, stale-while-revalidate=3600" };
   const match = req.headers.get("if-none-match");
   if (match && match.split(",").map((t) => t.trim().replace(/^W\//, "")).includes(etag)) return new NextResponse(null, { status: 304, headers });
   return new NextResponse(body, { status: 200, headers: { ...headers, "content-type": "application/json" } });
