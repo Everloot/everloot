@@ -447,6 +447,23 @@ test("ingest: a run stops at its request budget, and the next run opens the topi
   expect(forumIds(done.store)).toEqual(["forum:500001", "forum:500030", "forum:502002"]);
 });
 
+test("ingest: a run stops at its time budget before the next request, saves its place, and the next run continues", async () => {
+  const many = () => jsonRes(list([
+    { id: 500, bumped: "2026-10-17T11:00:00.000Z", tracked: "community-manager" },
+    { id: 502, bumped: "2026-10-17T09:00:00.000Z", posters: [102] },
+  ]));
+  const slow = fakeServer({ "list:us:wow-forever": many });
+  // Each polite pause costs 2 s on a fake clock; the budget of 5 s lets the first requests of a host through and no more.
+  let t = 0;
+  const cut = await run(slow, { deadlineMs: 5_000, clock: () => t, sleep: async (ms) => { t += ms + 500; } });
+  expect(slow.calls.length).toBeLessThan(5);
+  expect(cut.skipped.some((s) => s.startsWith("stopped: time budget of 5 s spent"))).toBe(true);
+  expect(cut.errors).toEqual([]);
+  const next = fakeServer({ "list:us:wow-forever": many });
+  const done = await run(next, { store: cut.store, now: minutes(30) });
+  expect(forumIds(done.store)).toEqual(["forum:500001", "forum:500030", "forum:502002"]);
+});
+
 test("ingest: a list asked less than 25 minutes ago is skipped; Bluesky validators are sent back", async () => {
   const first = await run(fakeServer({ bluesky: () => jsonRes(feed(), { headers: { etag: '"v1"' } }) }));
   const quick = fakeServer();

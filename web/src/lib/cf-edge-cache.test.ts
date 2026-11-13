@@ -1,6 +1,7 @@
 import { expect, test, vi } from "vitest";
 import { classContextParams } from "./class-context";
-import { DEGRADED_TTL, ITEM_LIST_PARAMS, cacheCopy, cacheVersionFor, cachedResponse, edgeCacheKey, edgeCacheable, edgeDegraded, edgeTtl, forCache, fromCache, isPrivatePath, versionsComplete, withoutCredentials } from "./cf-edge-cache";
+import { DEGRADED_TTL, ITEM_LIST_PARAMS, cacheCopy, cacheVersionFor, cachedResponse, edgeCacheKey, edgeCacheable, edgeDegraded, edgeTtl, forCache, fromCache, isPrivatePath, lightHead, versionsComplete, withoutCredentials } from "./cf-edge-cache";
+import { itemIdParam, slugParam } from "./auction-house";
 import { itemsHref } from "./items";
 
 const page = (headers: Record<string, string>, status = 200) => new Response("<html></html>", { status, headers });
@@ -476,7 +477,7 @@ test("a HEAD miss renders GET once and stores the complete GET for the next visi
   const ctx = fakeContext();
   const seen: string[] = [];
   const handler = async (req: Request) => { seen.push(req.method); return cachedPage("<html>auction prices</html>", { "x-page": "auctions" }); };
-  const url = "https://everloot.app/tools/auctions/camwow-us1-realm-4-pvp";
+  const url = "https://everloot.app/database/zones/12";
   const head = await cachedResponse(new Request(url, { method: "HEAD" }), VERSIONS, handler, store, ctx);
   await Promise.all(ctx.waits);
   expect(seen).toEqual(["GET"]);
@@ -521,5 +522,72 @@ test("database detail pages retain analytics and session cookies and bypass shar
     const prepared = withoutCredentials(request);
     expect(prepared.headers.get("cookie")).toBe(cookie);
     expect(edgeCacheable(prepared)).toBe(false);
+  }
+});
+
+test("a HEAD for an Auction House page with no stored copy is answered without rendering", async () => {
+  for (const path of [
+    "/tools/auctions", "/tools/auctions/camwow-us1-realm-4-pvp", "/tools/auctions/camwow-us1-realm-4-pvp/2589",
+    "/tools/auctions/item/2589", "/tools/auctions/camwow-us1-realm-4-pvp/2589?utm_source=x", "/tools/auctions/camwow-us1-realm-4-pvp?fbclid=1",
+    "/tools/auctions/camwow-us1-realm-4-pvp/2589?anything=1",
+  ]) {
+    const handler = vi.fn(async () => cachedPage("<html>slow</html>"));
+    const res = await cachedResponse(new Request(`https://everloot.app${path}`, { method: "HEAD" }), VERSIONS, handler, fakeStore(), fakeContext());
+    expect(handler, path).not.toHaveBeenCalled();
+    expect(res.status, path).toBe(200);
+    expect(res.body, path).toBeNull();
+    expect(res.headers.get("cache-control"), path).toBe("private, no-store");
+  }
+});
+
+test("a HEAD with a stored copy still answers from it, and a GET is never answered without rendering", async () => {
+  const store = fakeStore();
+  const ctx = fakeContext();
+  const handler = vi.fn(async () => cachedPage("<html>auction prices</html>", { "x-page": "auctions" }));
+  const url = "https://everloot.app/tools/auctions/camwow-us1-realm-4-pvp";
+  await cachedResponse(new Request(url), VERSIONS, handler, store, ctx);
+  await Promise.all(ctx.waits);
+  const head = await cachedResponse(new Request(url, { method: "HEAD" }), VERSIONS, handler, store, ctx);
+  expect(handler).toHaveBeenCalledTimes(1);
+  expect(head.headers.get("x-page")).toBe("auctions");
+  expect(head.headers.get("x-everloot-edge-cache")).toBe("HIT");
+  const other = await cachedResponse(new Request("https://everloot.app/tools/auctions/item/2589"), VERSIONS, handler, fakeStore(), fakeContext());
+  expect(handler).toHaveBeenCalledTimes(2);
+  expect(await other.text()).toBe("<html>auction prices</html>");
+});
+
+test("a HEAD the pages would redirect, answer 404 or filter goes to the page; so does Next's own revalidation", async () => {
+  for (const path of [
+    "/tools/auctions/CamWoW-US1", "/tools/auctions/camwow%20us1", "/tools/auctions/-camwow", "/tools/auctions/camwow/", "/tools/auctions/",
+    "/tools/auctions/camwow/0", "/tools/auctions/camwow/012", "/tools/auctions/camwow/12345678901", "/tools/auctions/camwow/abc", "/tools/auctions/camwow/2589/",
+    "/tools/auctions?realm=camwow", "/tools/auctions?q=sword", "/tools/auctions/camwow?page=2", "/tools/auctions/a/b/1", "/tools/auctionsx",
+    `/tools/auctions/${"a".repeat(41)}`, "/tools/auctions/%E0%A4%A",
+  ]) {
+    const handler = vi.fn(async () => cachedPage("<html></html>"));
+    await cachedResponse(new Request(`https://everloot.app${path}`, { method: "HEAD" }), VERSIONS, handler, fakeStore(), fakeContext());
+    expect(handler, path).toHaveBeenCalledTimes(1);
+  }
+  for (const header of ["x-prerender-revalidate", "x-isr"]) {
+    const handler = vi.fn(async () => cachedPage("<html></html>"));
+    await cachedResponse(new Request("https://everloot.app/tools/auctions/camwow/2589", { method: "HEAD", headers: { [header]: "1" } }), VERSIONS, handler, fakeStore(), fakeContext());
+    expect(handler, header).toHaveBeenCalledTimes(1);
+  }
+});
+
+test("the light HEAD says 200 only for URLs the pages' own validators accept without a redirect", () => {
+  const paths = [
+    "/tools/auctions/camwow-us1-realm-4-pvp/2589", "/tools/auctions/CamWoW/2589", "/tools/auctions/camwow/02589", "/tools/auctions/camwow/0",
+    "/tools/auctions/item/99", "/tools/auctions/-x/5", "/tools/auctions/ñandú-1/5", "/tools/auctions/a%20b/5", "/tools/auctions/a--b/5",
+    `/tools/auctions/${"a".repeat(40)}/5`, `/tools/auctions/${"a".repeat(41)}/5`, "/tools/auctions/camwow/4294967296", "/tools/auctions/camwow/12345678901",
+  ];
+  for (const path of paths) {
+    const [, , , realm, id] = path.split("/");
+    // What app/tools/auctions/[realm]/[itemId]/page.tsx does before it reads any data.
+    const slug = slugParam(realm);
+    const itemId = itemIdParam(id);
+    const decoded = (() => { try { return decodeURIComponent(realm); } catch { return null; } })();
+    const pageAnswers200 = Boolean(slug && itemId && String(itemId) === id && decoded === slug);
+    const light = lightHead(new Request(`https://everloot.app${path}`, { method: "HEAD" }));
+    expect(light !== null, path).toBe(pageAnswers200);
   }
 });

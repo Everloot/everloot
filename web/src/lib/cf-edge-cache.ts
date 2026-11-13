@@ -266,8 +266,48 @@ export async function cachedResponse(
     const res = fromCache(hit);
     return head ? new Response(null, res) : res;
   }
+  // A HEAD that finds no copy would render the whole page to answer with no body. For the pages that cost seconds of CPU
+  // to render, a crawler's HEAD is answered from the URL alone (see lightHead).
+  if (head) {
+    const light = lightHead(request);
+    if (light) return light;
+  }
   const res = await handler(request);
   const ttl = edgeTtl(res);
   if (ttl) ctx.waitUntil(cacheCopy(res.clone(), ttl).then((copy) => store.put(key, copy)));
   return head ? new Response(null, res) : res;
+}
+
+/**
+ * The Auction House pages (app/tools/auctions) each render from the market rollup, 5 s of wall time and up to 10 s of
+ * CPU on a cold isolate, and crawlers ask HEAD of thousands of realm and item URLs only to learn that the page exists.
+ * A HEAD for one of them with no stored copy is answered here, from the URL alone, without rendering: 200 when the page
+ * would answer 200, which the pages decide from the URL before they read any data (an unknown realm or an item
+ * nobody priced is still a 200 page). A URL a page would redirect or answer 404 (an upper-case or malformed realm, an
+ * item id that is not a plain number, a trailing slash, filters in the query string on the list pages) is not
+ * matched and goes to the page as before. Next's own revalidation of a stored page is a HEAD too, with these
+ * headers, and must render: it is the request that refreshes the page.
+ */
+const AUCTION_LIST_PATH = /^\/tools\/auctions(?:\/([^/]+))?$/;
+const AUCTION_ITEM_PATH = /^\/tools\/auctions\/([^/]+)\/[1-9]\d{0,9}$/;
+const AUCTION_REALM_SLUG = /^[\p{L}\p{N}][\p{L}\p{N}-]*$/u;
+const REVALIDATION_HEADERS = ["x-prerender-revalidate", "x-isr"];
+
+function plainRealm(raw: string): boolean {
+  let decoded: string;
+  try { decoded = decodeURIComponent(raw); } catch { return false; }
+  // The page redirects to the lower-case slug, so only a slug already in that form is a page.
+  return decoded === decoded.toLowerCase() && decoded.length <= 40 && AUCTION_REALM_SLUG.test(decoded);
+}
+
+/** The body-less 200 a HEAD for an Auction House page gets without a render; null when the page must answer it. */
+export function lightHead(request: Request): Response | null {
+  if (REVALIDATION_HEADERS.some((h) => request.headers.has(h))) return null;
+  const url = new URL(request.url);
+  const item = AUCTION_ITEM_PATH.exec(url.pathname);
+  const list = item ? null : AUCTION_LIST_PATH.exec(url.pathname);
+  // The item page reads no query string; the list and realm pages read their filters from it (a tracking tag aside).
+  const filtered = [...url.searchParams.keys()].some((k) => !isTracking(k));
+  if (item ? !plainRealm(item[1]) : !list || (list[1] !== undefined && !plainRealm(list[1])) || filtered) return null;
+  return new Response(null, { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store", "x-everloot-head": "light" } });
 }

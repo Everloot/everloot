@@ -1,6 +1,7 @@
 import { CoinText } from "@/components/ui/Coins";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cache } from "react";
 import { notFound, permanentRedirect } from "next/navigation";
 import { pageMetadata } from "@/lib/seo";
 import { formatCopper, MARKET_RULE, reportersText } from "../../../../../../../kb/src/market";
@@ -28,8 +29,15 @@ export async function generateStaticParams() {
   return [];
 }
 
-async function load(params: Props["params"]) {
-  const raw = await params;
+// generateMetadata and the page both load this; one request reads the rollup and the item's art and names once, not twice.
+// Keyed by the two path strings (the params promises are not the same object in both calls).
+const load = async (params: Props["params"]) => {
+  const { realm, itemId } = await params;
+  return loadFor(realm, itemId);
+};
+
+const loadFor = cache(async (rawRealm: string, rawItemId: string) => {
+  const raw = { realm: rawRealm, itemId: rawItemId };
   const slug = slugParam(raw.realm);
   const itemId = itemIdParam(raw.itemId);
   if (!slug || !itemId || String(itemId) !== raw.itemId) notFound();
@@ -45,7 +53,7 @@ async function load(params: Props["params"]) {
   const { tips } = await itemArt(row || others.length ? [itemId] : []);
   const names = await auctionNames([itemId], tips);
   return { raw, slug, itemId, now, market, board, row, others, houses, tip: tips.get(itemId), names, realm: board?.realm.name ?? slugWords(slug), label: itemLabel(itemId, names) };
-}
+});
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const { slug, itemId, row, realm, label } = await load(props.params);
