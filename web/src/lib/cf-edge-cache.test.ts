@@ -496,3 +496,13 @@ test("HEAD preserves every cache refusal and passes the original request to the 
     expect(ctx.waits).toHaveLength(0);
   }
 });
+
+
+test("database detail pages retain analytics and session cookies and bypass shared copies", () => {
+  for (const cookie of ["_ga=analytics", "cf_clearance=challenge", "evl_session=private"]) {
+    const request = new Request("https://everloot.app/database/npcs/721", { headers: { cookie } });
+    const prepared = withoutCredentials(request);
+    expect(prepared.headers.get("cookie")).toBe(cookie);
+    expect(edgeCacheable(prepared)).toBe(false);
+  }
+});
