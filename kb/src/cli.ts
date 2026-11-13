@@ -21,6 +21,7 @@ import { writeClientMounts } from "./client-mounts.js";
 import { writeClientClassGear } from "./client-class-gear.js";
 import { writeClientClassSpells } from "./client-class-spells.js";
 import { writeClientRecipes } from "./client-recipes.js";
+import { writeClientBags } from "./client-bags.js";
 import { writeClientFactions } from "./client-factions.js";
 import { writeClientTitles } from "./client-titles.js";
 import { writeClientQuestLines } from "./client-quest-lines.js";
@@ -210,6 +211,9 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   client-recipes <snapshot.sqlite> [--out ../web/src/data/game-data/client-recipes.json]
     (every recipe on each profession's skill line with the item it makes, its reagents and the files' skill ranks,
     one build-stamped file the profession pages list. Pages only, as above)
+  client-bags <snapshot.sqlite> [--out ../web/src/data/game-data/client-bags.json]
+    (every container with its slot count, quality and subclass, and the files' word for each subclass, one
+    build-stamped file for the bag calculator and the tooltip's "N Slot Bag" line. Ids and numbers only, as above)
   client-factions <snapshot.sqlite> [--out ../web/src/data/game-data/client-factions.json]
     (every faction with its parent and whether it shows in the reputation pane. Pages and search, as above)
   client-titles <snapshot.sqlite> [--out ../web/src/data/game-data/client-titles.json]
@@ -736,6 +740,13 @@ async function main(): Promise<number> {
       const path = flags.get("out") || "../web/src/data/game-data/client-recipes.json";
       const table = writeClientRecipes(args[0], path);
       console.log(`${table.build.product} ${table.build.version}: ${table.professions.length} professions, ${table.professions.reduce((n, p) => n + p.recipes.length, 0)} recipes -> ${path}`);
+      return 0;
+    }
+    case "client-bags": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-bags.json";
+      const table = writeClientBags(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${Object.keys(table.bags).length} bags -> ${path}`);
       return 0;
     }
     case "client-factions": {

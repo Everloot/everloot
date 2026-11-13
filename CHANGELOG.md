@@ -207,6 +207,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the home page now states the site's promise, "Every fact shows how many players saw it, and when", with three counts under it: the installs that have reported, the facts they have confirmed and the facts waiting on one or two more installs, each with the data date and build, or "unrecorded" when the stored coverage score cannot be read. An empty loot tab on an NPC, item or object page now ends on how many installs it takes, beside the Get the addon link, and the MCP server's instructions state the same promise.
 - Site: /database/recent and its RSS feed list the entities whose facts reached three installs in the last 30 days;
   dates from before the feed existed are marked estimated.
+- Site: /tools/bags shows the cheapest bag of each size on one realm's auction house and what each added slot costs over your smallest bag, and item tooltips print a bag's "14 Slot Bag" line; slot counts come from the game files, prices from players' scans.
 
 ### Fixed
 - Site: auction prices keep updating when the market rollup is full: the oldest open scan day closes early (its public prices kept) instead of new scans being refused, one uploader cannot take more than a third of the room, and dropped scans no longer leave empty days behind.

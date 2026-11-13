@@ -18,6 +18,7 @@ import { writeClientMounts } from "../client-mounts.js";
 import { writeClientClassGear } from "../client-class-gear.js";
 import { writeClientClassSpells } from "../client-class-spells.js";
 import { writeClientRecipes } from "../client-recipes.js";
+import { writeClientBags } from "../client-bags.js";
 import { writeClientFactions } from "../client-factions.js";
 import { writeClientTitles } from "../client-titles.js";
 import { writeClientQuestLines } from "../client-quest-lines.js";
@@ -84,6 +85,7 @@ export async function extractFromCdn(product: string, region: string, curatedPat
         writeClientClassGear(snapshot, join(root, GAME_DATA_DIR, "client-class-gear.json"));
         writeClientClassSpells(snapshot, join(root, GAME_DATA_DIR, "client-class-spells.json"));
         writeClientRecipes(snapshot, join(root, GAME_DATA_DIR, "client-recipes.json"));
+        writeClientBags(snapshot, join(root, GAME_DATA_DIR, "client-bags.json"));
         writeClientFactions(snapshot, join(root, GAME_DATA_DIR, "client-factions.json"));
         writeClientTitles(snapshot, join(root, GAME_DATA_DIR, "client-titles.json"));
         writeClientQuestLines(snapshot, join(root, GAME_DATA_DIR, "client-quest-lines.json"));

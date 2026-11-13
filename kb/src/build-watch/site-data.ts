@@ -13,6 +13,7 @@
  *   web/src/data/game-data/client-class-gear.json  npm run kb -- client-class-gear (what each class can equip)
  *   web/src/data/game-data/client-class-spells.json  npm run kb -- client-class-spells (the spells on each class's skill lines)
  *   web/src/data/game-data/client-recipes.json     npm run kb -- client-recipes (each profession's recipes)
+ *   web/src/data/game-data/client-bags.json        npm run kb -- client-bags (containers and their slot counts)
  *   web/src/data/game-data/client-factions.json    npm run kb -- client-factions (factions, parents, reputation pane flag)
  *   web/src/data/game-data/client-titles.json      npm run kb -- client-titles (character titles)
  *   web/src/data/game-data/client-quest-lines.json  npm run kb -- client-quest-lines (quest lines and their quest ids)
@@ -205,6 +206,6 @@ export function differingFiles(generated: string, committed: string, files: stri
 export function generatedFiles(root: string): string[] {
   const dir = dataDir(root);
   const talents = existsSync(join(dir, "talents")) ? readdirSync(join(dir, "talents")).filter((f) => f.endsWith(".json")).sort().map((f) => `${GAME_DATA_DIR}/talents/${f}`) : [];
-  const top = ["map.json", "client-layer.json", "races.json", "client-achievements.json", "client-encounters.json", "client-mounts.json", "client-class-gear.json", "client-class-spells.json", "client-recipes.json", "client-factions.json", "client-titles.json", "client-quest-lines.json", "spell-values.json", "client-digests.json", ...raidFiles(root)].filter((f) => existsSync(join(dir, f))).map((f) => `${GAME_DATA_DIR}/${f}`);
+  const top = ["map.json", "client-layer.json", "races.json", "client-achievements.json", "client-encounters.json", "client-mounts.json", "client-class-gear.json", "client-class-spells.json", "client-recipes.json", "client-bags.json", "client-factions.json", "client-titles.json", "client-quest-lines.json", "spell-values.json", "client-digests.json", ...raidFiles(root)].filter((f) => existsSync(join(dir, f))).map((f) => `${GAME_DATA_DIR}/${f}`);
   return [...talents, ...top, ...(existsSync(join(root, RAID_LUA)) ? [RAID_LUA] : [])];
 }

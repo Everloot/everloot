@@ -8,7 +8,8 @@ import { CLIENT_TABLES, readClientManifest, readClientMeta, readClientRows, type
 
 /** The columns later steps read, per table (relation edges, item taxonomy, objects, the icon manifest). */
 export const NEEDED_FIELDS: Partial<Record<keyof typeof CLIENT_TABLES, readonly string[]>> = {
-  ItemSparse: ["Display_lang", "OverallQualityID", "AllowableClass"],
+  // The bag calculator and the tooltip's slot line (client-bags) read ContainerSlots.
+  ItemSparse: ["Display_lang", "OverallQualityID", "AllowableClass", "ContainerSlots"],
   Item: ["ClassID", "SubclassID", "InventoryType", "IconFileDataID"],
   SpellName: ["Name_lang"],
   SpellMisc: ["SpellID", "SpellIconFileDataID"],

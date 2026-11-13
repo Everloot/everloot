@@ -23,7 +23,7 @@ changes these files and nothing else; the `publish` job refuses any other path:
 - `addon/modules/raid_data.lua`
 - `web/src/data/game-data/map.json`, `client-layer.json`, `races.json`, `spell-values.json`, `client-digests.json`
 - `web/src/data/game-data/client-achievements.json`, `client-encounters.json`, `client-mounts.json`,
-  `client-class-gear.json`, `client-class-spells.json`, `client-recipes.json`, `client-factions.json`,
+  `client-class-gear.json`, `client-class-spells.json`, `client-recipes.json`, `client-bags.json`, `client-factions.json`,
   `client-titles.json`, `client-quest-lines.json`
 - `web/src/data/game-data/changes/<product>-<build>.json`, the changelog entry, and one import plus one name in
   `PUBLISHED_CHANGES` in `web/src/lib/talents/freshness-records.ts`
