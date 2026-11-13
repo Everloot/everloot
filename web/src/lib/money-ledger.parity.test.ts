@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, test } from "vitest";
 import { LEDGER_INCOME as DESKTOP_INCOME, LEDGER_LABELS as DESKTOP_LABELS, LEDGER_SPENDING as DESKTOP_SPENDING } from "../../../desktop/src/shared/ledger";
 import { summarizeCharacters } from "../../../desktop/src/main/characters";
-import { LEDGER_INCOME, LEDGER_LABELS, LEDGER_SPENDING, characterKey, narrowLedger, summarizeMoney } from "./money-ledger";
+import { LEDGER_INCOME, LEDGER_LABELS, LEDGER_SPENDING, categoryLabel, characterKey, narrowLedger, rosterLabel, summarizeMoney } from "./money-ledger";
 import { parseEverlootLua, parseEverlootTable } from "./sv-parse";
 
 // The same events the addon's ledger_contract.py feeds through E.Ledger: both sides must reach these totals.
@@ -116,8 +116,47 @@ describe("a file with the window's local ledger", () => {
     expect(ledger.roster.find((r) => r.character === "Jaina")).toMatchObject({ install: 1, copper: 9000 });
     const history = ledger.history.find((h) => characterKey(h) === "1:Thrall-Moon Guard")!;
     expect(history.points).toEqual([
-      { at: "2026-11-01T10:00:00Z", copper: 40000 }, { at: "2026-11-09T23:59:59Z", copper: 50000 }, { at: "2026-11-10T23:59:59Z", copper: 45000 },
+      { at: "2026-11-01T10:00:00Z", copper: 40000 }, { at: "2026-11-09T12:00:00Z", copper: 50000 }, { at: "2026-11-10T12:00:00Z", copper: 45000 },
     ]);
+  });
+
+  test("two roster characters with one name and realm (deleted and made again) stay two characters", () => {
+    const twins = LUA.replace(`["k-jaina"] = {`, `["k-thrall-old"] = { ["name"] = "Thrall", ["realm"] = "Moon Guard", ["copper"] = 10, ["lastSeen"] = ${s("2026-10-01T00:00:00Z")} },
+    ["k-jaina"] = {`).replace(`["events"] = {`, `["events"] = {
+      { ["at"] = ${s("2026-10-05T09:00:00Z")}, ["key"] = "k-thrall-old", ["category"] = "repair", ["copper"] = 111 },`);
+    const ledger = read(twins);
+    const own = ledger.roster.filter((r) => r.install === 1 && r.character === "Thrall");
+    // The one seen longest ago is character 1; the uploaded records, which carry only the name, join neither.
+    expect(own.map((r) => [r.twin ?? null, r.copper])).toEqual(expect.arrayContaining([[1, 10], [2, 52000], [null, 40000]]));
+    expect(narrowLedger(ledger, "1:Thrall-Moon Guard#1").receipts.map((r) => r.copper)).toEqual([111]);
+    expect(narrowLedger(ledger, "1:Thrall-Moon Guard#2").receipts.map((r) => r.category)).toEqual(["mail_out", "vendor_spend", "repair", "quest"]);
+    // This file also holds a Thrall from another install, so the label names both.
+    expect(rosterLabel(own.find((r) => r.twin === 2)!, ledger.roster)).toBe("Thrall (Moon Guard, install 1, character 2)");
+    expect(rosterLabel(own.find((r) => r.twin === 2)!, own.filter((r) => r.twin))).toBe("Thrall (Moon Guard, character 2)");
+  });
+
+  test("times a date cannot hold, days that do not exist and today's moving close do not break the file", () => {
+    const today = new Date(NOW).toISOString().slice(0, 10);
+    const odd = LUA
+      .replace(`["lastSeen"] = ${s("2026-11-11T21:00:00Z")}`, `["lastSeen"] = 9007199254740991`)
+      .replace(`["events"] = {`, `["events"] = {
+      { ["at"] = 9007199254740991, ["key"] = "k-thrall", ["category"] = "repair", ["copper"] = 999 },`)
+      .replace(`["2026-11-10"] = 45000`, `["2026-11-10"] = 45000, ["2026-99-99"] = 7, ["2026-02-30"] = 8, ["${today}"] = 46000`);
+    const ledger = read(odd);
+    expect(ledger.receipts.some((r) => r.copper === 999)).toBe(false);
+    expect(ledger.roster.find((r) => r.character === "Jaina")).toMatchObject({ copper: 9000, at: null });
+    const points = ledger.history.find((h) => characterKey(h) === "1:Thrall-Moon Guard")!.points;
+    expect(points.map((p) => p.copper)).not.toContain(7);
+    expect(points.map((p) => p.copper)).not.toContain(8);
+    // Today's close is the gold as of now, not an observation from later today.
+    expect(points.at(-1)).toEqual({ at: new Date(NOW).toISOString().replace(/\.\d{3}Z$/, "Z"), copper: 46000 });
+  });
+
+  test("a category named like an object property is shown as text", () => {
+    const records = ["__proto__", "constructor", "toString"].map((category) => ({ kind: "money_event", installId: "i", character: "A", realm: "B", category, copper: 5, capturedAt: "2026-11-10T00:00:00Z" }));
+    const ledger = summarizeMoney(records, NOW);
+    expect(ledger.categories.map((c) => categoryLabel(c.category)).sort()).toEqual(["  proto  ", "constructor", "toString"]);
+    expect(ledger.categories.every((c) => typeof categoryLabel(c.category) === "string")).toBe(true);
   });
 
   test("the same name and realm from another install stays its own character", () => {

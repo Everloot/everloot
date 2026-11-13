@@ -45,6 +45,7 @@ export interface RosterRow {
   install: number;
   character: string;
   realm: string;
+  twin?: number;
   /** Gold in the newest snapshot, in copper; null when the file has money events but no snapshot. */
   copper: number | null;
   /** The highest peak any snapshot recorded, in copper. */
@@ -74,6 +75,7 @@ export interface Receipt {
   install: number;
   character: string;
   realm: string;
+  twin?: number;
   category: string;
   direction: Direction;
   copper: number;
@@ -85,6 +87,7 @@ export interface GoldSeries {
   install: number;
   character: string;
   realm: string;
+  twin?: number;
   points: { at: string; copper: number }[];
 }
 
@@ -123,13 +126,17 @@ export type CharacterMoney = Pick<MoneyLedger, "river" | "week" | "categories" |
  */
 export interface LocalTables { installId?: string; ledger?: unknown; roster?: unknown }
 
-type Who = { install: number; character: string; realm: string };
+/**
+ * `twin` tells apart two characters of the local roster that share a name and realm on one install (one deleted and
+ * made again): numbered 1, 2, ... from the one seen longest ago. A character with no twin has none.
+ */
+type Who = { install: number; character: string; realm: string; twin?: number };
 
-/** One character's key in byCharacter: install, name and realm ("1:Thrall-Moon Guard"). */
-export const characterKey = (r: Who) => `${r.install}:${r.character}-${r.realm}`;
+/** One character's key in byCharacter: install, name and realm ("1:Thrall-Moon Guard"), and "#2" for a twin. */
+export const characterKey = (r: Who) => `${r.install}:${r.character}-${r.realm}${r.twin ? `#${r.twin}` : ""}`;
 
 /** The same character on the same install: never by name and realm alone. */
-const sameCharacter = (a: Who, b: Who) => a.install === b.install && a.character === b.character && a.realm === b.realm;
+const sameCharacter = (a: Who, b: Who) => characterKey(a) === characterKey(b);
 
 export function directionOf(category: string): Direction {
   return LEDGER_SPENDING.includes(category) ? "out" : "in";
@@ -193,6 +200,12 @@ function summarizeFlows(money: MoneyEvent[], series: GoldSeries[], now: number, 
 }
 
 const isoSeconds = (ms: number) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z");
+/** A time() value in seconds as milliseconds, or null when it is not one a date can hold. */
+const MAX_SECONDS = 8_640_000_000_000;
+const secondsMs = (v: unknown): number | null => (whole(v, 0) && v <= MAX_SECONDS ? v * 1000 : null);
+/** A real UTC calendar day "YYYY-MM-DD", or false. */
+const isDay = (ymd: string) => /^\d{4}-\d{2}-\d{2}$/.test(ymd) && Number.isFinite(Date.parse(`${ymd}T00:00:00Z`))
+  && new Date(`${ymd}T00:00:00Z`).toISOString().startsWith(ymd);
 
 /**
  * The ledger for one Everloot.lua: its parsed records (parseEverlootLua(text).records) and, when given, the local
@@ -207,40 +220,50 @@ export function summarizeMoney(records: ReadonlyArray<Record<string, unknown>>, 
   // The file's own install is install 1, so the ledger's characters keep their number whatever the records hold.
   if (own) installs.set(own, 1);
 
-  const rosterRow = (r: Record<string, unknown>): RosterRow | null => {
+  // `twin` comes only from the local roster below, never from a record's own fields.
+  const rosterRow = (r: Record<string, unknown>, twin?: number): RosterRow | null => {
     const character = str(r.character), realm = str(r.realm);
     if (!character || !realm) return null;
     const raw = str(r.installId);
     const install = installs.get(raw) ?? installs.size + 1;
     installs.set(raw, install);
-    const id = characterKey({ install, character, realm });
+    const id = characterKey({ install, character, realm, twin });
     let row = roster.get(id);
-    if (!row) { row = { install, character, realm, copper: null, peakCopper: null, at: null }; roster.set(id, row); }
+    if (!row) { row = { install, character, realm, ...(twin ? { twin } : {}), copper: null, peakCopper: null, at: null }; roster.set(id, row); }
     return row;
   };
   const point = (row: RosterRow, at: string, copper: number) => {
     const id = characterKey(row);
-    const s = series.get(id) ?? { install: row.install, character: row.character, realm: row.realm, points: [] };
+    const s = series.get(id) ?? { install: row.install, character: row.character, realm: row.realm, ...(row.twin ? { twin: row.twin } : {}), points: [] };
     s.points.push({ at, copper });
     series.set(id, s);
   };
+  const who = (row: RosterRow) => ({ install: row.install, character: row.character, realm: row.realm, ...(row.twin ? { twin: row.twin } : {}) });
 
-  // The local roster names each ledger key; a key it cannot name is left out, as the addon leaves it out.
-  const named = new Map<string, Record<string, unknown>>();
+  // The local roster names each ledger key; a key it cannot name is left out, as the addon leaves it out. Two keys
+  // with one name and realm stay two characters (twins), and records, which carry only the name, join neither.
+  const named = new Map<string, { id: Record<string, unknown>; twin?: number }>();
   const rosterTable = own ? table(local.roster) : null;
-  for (const [key, raw] of Object.entries(rosterTable ?? {})) {
+  const entries = Object.entries(rosterTable ?? {}).flatMap(([key, raw]) => {
     const r = table(raw);
     const character = str(r?.name), realm = str(r?.realm);
-    if (!r || !character || !realm) continue;
-    const who = { installId: own, character, realm };
-    named.set(key, who);
-    const row = rosterRow(who)!;
-    // The roster keeps gold only while the gold module is on, with the time the character was last seen.
-    if (whole(r.copper, 0)) {
-      const at = whole(r.lastSeen, 1) ? isoSeconds(r.lastSeen * 1000) : null;
-      if (row.copper === null || (at && (!row.at || Date.parse(at) >= Date.parse(row.at)))) { row.copper = r.copper; if (at) row.at = at; }
-      row.peakCopper = Math.max(row.peakCopper ?? 0, r.copper, whole(r.peakCopper, 0) ? r.peakCopper : 0);
-    }
+    return r && character && realm ? [{ key, r, character, realm, seen: secondsMs(r.lastSeen) ?? 0 }] : [];
+  });
+  const twins = new Map<string, typeof entries>();
+  for (const e of entries) twins.set(`${e.character}\0${e.realm}`, [...(twins.get(`${e.character}\0${e.realm}`) ?? []), e]);
+  for (const group of twins.values()) {
+    group.sort((a, b) => a.seen - b.seen || a.key.localeCompare(b.key));
+    group.forEach(({ key, r, character, realm, seen }, i) => {
+      const ref = { id: { installId: own, character, realm }, twin: group.length > 1 ? i + 1 : undefined };
+      named.set(key, ref);
+      const row = rosterRow(ref.id, ref.twin)!;
+      // The roster keeps gold only while the gold module is on, with the time the character was last seen.
+      if (whole(r.copper, 0)) {
+        const at = seen ? isoSeconds(seen) : null;
+        if (row.copper === null || (at && (!row.at || Date.parse(at) >= Date.parse(row.at)))) { row.copper = r.copper; if (at) row.at = at; }
+        row.peakCopper = Math.max(row.peakCopper ?? 0, r.copper, whole(r.peakCopper, 0) ? r.peakCopper : 0);
+      }
+    });
   }
 
   const ledgerTable = table(local.ledger);
@@ -248,22 +271,23 @@ export function summarizeMoney(records: ReadonlyArray<Record<string, unknown>>, 
   const ledgerEvents = ledgerTable?.events;
   for (const raw of Array.isArray(ledgerEvents) ? ledgerEvents as unknown[] : []) {
     const e = table(raw);
-    const who = e && typeof e.key === "string" ? named.get(e.key) : undefined;
-    if (!e || !who || !whole(e.at, 0) || !whole(e.copper, 1) || typeof e.category !== "string" || !LEDGER_CATEGORIES.has(e.category)) continue;
-    const row = rosterRow(who)!;
-    const ms = e.at * 1000;
+    const ref = e && typeof e.key === "string" ? named.get(e.key) : undefined;
+    const ms = e ? secondsMs(e.at) : null;
+    if (!e || !ref || ms === null || !whole(e.copper, 1) || typeof e.category !== "string" || !LEDGER_CATEGORIES.has(e.category)) continue;
+    const row = rosterRow(ref.id, ref.twin)!;
     ledgerRows.push({
-      at: isoSeconds(ms), ms, install: row.install, character: row.character, realm: row.realm, category: e.category,
+      at: isoSeconds(ms), ms, ...who(row), category: e.category,
       direction: directionOf(e.category), copper: e.copper, ...(e.ownAlt === true ? { ownAlt: true as const } : {}),
     });
   }
-  // Each character's closing gold per UTC day is a point in its history.
+  // Each character's closing gold per UTC day is a point in its history, placed at noon UTC (the same calendar day
+  // in every time zone the page may show it in) and never later than now: today's close is still moving.
   for (const [key, closes] of Object.entries(table(ledgerTable?.daily) ?? {})) {
-    const who = named.get(key);
-    if (!who) continue;
-    const row = rosterRow(who)!;
+    const ref = named.get(key);
+    if (!ref) continue;
+    const row = rosterRow(ref.id, ref.twin)!;
     for (const [ymd, copper] of Object.entries(table(closes) ?? {})) {
-      if (/^\d{4}-\d{2}-\d{2}$/.test(ymd) && whole(copper, 0)) point(row, `${ymd}T23:59:59Z`, copper);
+      if (isDay(ymd) && whole(copper, 0)) point(row, isoSeconds(Math.min(Date.parse(`${ymd}T12:00:00Z`), now)), copper);
     }
   }
   const ledgerFrom = ledgerRows.reduce((min, e) => Math.min(min, e.ms!), Infinity);
@@ -289,7 +313,7 @@ export function summarizeMoney(records: ReadonlyArray<Record<string, unknown>>, 
       const row = rosterRow(r);
       if (!row || !category || copper <= 0) continue;
       // Undated events count in the category totals only.
-      money.push({ at, ms: Number.isFinite(ms) ? ms : null, install: row.install, character: row.character, realm: row.realm, category, direction: directionOf(category), copper });
+      money.push({ at, ms: Number.isFinite(ms) ? ms : null, ...who(row), category, direction: directionOf(category), copper });
     }
   }
 
@@ -321,14 +345,18 @@ export function rosterLabel(row: RosterRow, roster: readonly RosterRow[]): strin
   return `${row.character} (${row.realm}${hint ? `, ${hint}` : ""})`;
 }
 
-/** "install 2" when another row shares this row's name and realm, else "". */
+/**
+ * "install 2" when a row of another install shares this row's name and realm, "character 2" for a twin on one
+ * install (both when both apply), else "".
+ */
 export function installHint(row: Who, rows: readonly Who[]): string {
-  const twin = rows.some((r) => r.install !== row.install && r.character === row.character && r.realm === row.realm);
-  return twin ? `install ${row.install}` : "";
+  const other = rows.some((r) => r.install !== row.install && r.character === row.character && r.realm === row.realm);
+  return [other ? `install ${row.install}` : "", row.twin ? `character ${row.twin}` : ""].filter(Boolean).join(", ");
 }
 
 /** A category as the page shows it: the addon's name for it ("auction_spend" → "Auction purchases"), else its own name with spaces. */
-export const categoryLabel = (category: string) => LEDGER_LABELS[category] ?? category.replaceAll("_", " ");
+export const categoryLabel = (category: string): string =>
+  Object.hasOwn(LEDGER_LABELS, category) ? LEDGER_LABELS[category]! : String(category).replaceAll("_", " ");
 
 /** Checks a summary read back from localStorage still has the shape this version writes. */
 export function isMoneyLedger(value: unknown): value is MoneyLedger {
