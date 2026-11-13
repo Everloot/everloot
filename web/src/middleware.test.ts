@@ -42,6 +42,18 @@ test("a client-side move or prefetch to an ad-free page gets no page, only an un
   expect(adFreeDocumentOnly(new NextRequest("https://everloot.app/database/items/954", { headers: { RSC: "1" } }))).toBeNull();
 });
 
+test("a signed-in page load of an ad-free page gets that page, not the signed-in home", () => {
+  for (const [v2, cookie] of [["0", "everloot_session=fixture"], ["1", "everloot.session_token=fixture"]]) {
+    vi.stubEnv("EVERLOOT_PROFILES", "1");
+    vi.stubEnv("EVERLOOT_AUTH_V2", v2);
+    const response = middleware(new NextRequest("https://everloot.app/blizzard-auctions/954", { headers: { cookie, "Sec-Fetch-Dest": "document" } }));
+    expect(rewrittenTo(response)).toBeNull();
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    // `/` itself is still rewritten.
+    expect(rewrittenTo(middleware(request(cookie)))).toContain("/home");
+  }
+});
+
 test("operations responses forbid private and CDN caching independently of profile/session state", () => {
   for (const profiles of ["0", "1"]) {
     vi.stubEnv("EVERLOOT_PROFILES", profiles);

@@ -57,7 +57,8 @@ export function middleware(req: NextRequest) {
     response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
     return response;
   }
-  if (!profilesOn()) return NextResponse.next();
+  // The signed-in home replaces only `/`; every other matched page (the ad-free ones) passes through as it is.
+  if (path !== "/" || !profilesOn()) return NextResponse.next();
   const names = process.env.EVERLOOT_AUTH_V2 === "1" ? BETTER_AUTH_COOKIES : [LEGACY_COOKIE, ...BETTER_AUTH_COOKIES];
   if (!names.some((name) => req.cookies.get(name)?.value)) return NextResponse.next();
   const headers = new Headers(req.headers);
