@@ -48,6 +48,15 @@ test("public item subclasses and pagination are crawlable while filter permutati
     }
     expect(blocked(`${path}?pageSize=2`)).toBe(true);
   }
+  // The Blizzard auction pages are not for search (and each read costs a storage call); the item pages stay open.
+  expect(blocked("/blizzard-auctions/2589")).toBe(true);
+  expect(blocked("/database/items/2589")).toBe(false);
+});
+
+test("the AdSense crawler is kept off the pages without ads", () => {
+  const robots = readFileSync("public/robots.txt", "utf8").replaceAll("\r\n", "\n");
+  const group = robots.split(/\n\s*\n/).find((g) => /^User-agent:\s*Mediapartners-Google$/m.test(g))!;
+  expect([...group.matchAll(/^Disallow:\s*(.+)$/gm)].map((m) => m[1].trim())).toEqual(["/lore", "/blizzard-auctions/"]);
 });
 
 test("training is disallowed without blocking search and user-requested AI access", () => {

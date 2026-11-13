@@ -1019,11 +1019,18 @@ not stored. The job stays off until the maintainer sets the repository variable 
 - **Apart from player prices.** The summaries have their own tables. They never enter the market rollup built
   from addon scans, the addon price file, the CC BY-SA dataset, open data, MCP tools, chat answers, API answers,
   sitemaps or exports. `web/src/lib/blizzard-auctions.test.ts` fails if another file reads them.
-- **Labelled and credited.** An item page shows them in their own section, "Blizzard auction house data, as of"
-  the time Blizzard published them, with "Data from Blizzard Entertainment", beside the player-reported prices.
-- **No ads.** An item page showing that section places no ad slot. The site's consent message may still appear.
-- **Thirty days.** Each item keeps one row per house and UTC day, its newest listing that day. Every pass deletes
-  rows and houses older than 30 days. Backups skip these tables, since a backup outlives 30 days.
+- **Labelled and credited, on a page of their own.** `/blizzard-auctions/<item id>` shows them under "Blizzard
+  auction house data, as of" the time Blizzard published them (each row also shows its own), with "Data from
+  Blizzard Entertainment". The item page shows the player-reported prices and only links there; it reads no
+  Blizzard data. A read that fails says so, apart from an item with no data yet.
+- **No ads.** AdSense loads on every other public page for the consent message, so the Blizzard page is an
+  ad-free page (`web/src/data/ad-free-paths.json`): it loads no ads, analytics or consent banner, and a move to it
+  from any page with ads loads a fresh document. It is noindex, disallowed in robots.txt and in no sitemap.
+- **Thirty days.** A house's items and commodities are two documents, each stored with its own publish time. Each
+  item keeps one row per house, document and UTC day, its newest listing that day. Rows and houses older than 30
+  days are deleted every pass, and by a purge job that runs on schedule whether the refresh is on or not, with
+  the Supabase secrets alone. The page never reads a row older than 30 days, and no shared cache keeps it.
+  Backups skip these tables, since a backup outlives 30 days.
 
 ## Chat
 

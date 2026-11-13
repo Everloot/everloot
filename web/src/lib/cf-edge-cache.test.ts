@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { classContextParams } from "./class-context";
 import { DEGRADED_TTL, ITEM_LIST_PARAMS, cacheCopy, cacheVersionFor, cachedResponse, edgeCacheKey, edgeCacheable, edgeDegraded, edgeTtl, forCache, fromCache, isPrivatePath, versionsComplete, withoutCredentials } from "./cf-edge-cache";
 import { itemsHref } from "./items";
@@ -275,6 +275,23 @@ test("the session, account and cart routes are private by route, however they ar
   }
   // A longer name that only starts the same is another route.
   for (const path of ["/meet", "/menu", "/sign-in-help", "/cartography", "/api/authors", "/api/message"]) expect(isPrivatePath(path), path).toBe(false);
+});
+
+test("the Blizzard auction page never reaches the shared cache: a copy would outlive the data's 30 days", async () => {
+  for (const path of ["/blizzard-auctions/2589", "/Blizzard-Auctions/2589", "/%62lizzard-auctions/2589"]) {
+    expect(isPrivatePath(path), path).toBe(true);
+    expect(edgeCacheable(new Request(`https://everloot.app${path}`)), path).toBe(false);
+  }
+  // Even were it to send an edge lifetime, the entry renders it every time and stores nothing.
+  const store = { match: vi.fn(async () => undefined), put: vi.fn(async () => {}) };
+  const ctx = { waitUntil: vi.fn() };
+  const versions = { template: "t", data: "d", knowledge: "k", addon: "a" };
+  const handler = vi.fn(async () => new Response("<p>prices</p>", { headers: { "content-type": "text/html", "cdn-cache-control": "max-age=3600" } }));
+  await cachedResponse(new Request("https://everloot.app/blizzard-auctions/2589"), versions, handler, store, ctx);
+  expect(handler).toHaveBeenCalledTimes(1);
+  expect(store.match).not.toHaveBeenCalled();
+  expect(ctx.waitUntil).not.toHaveBeenCalled();
+  expect(isPrivatePath("/blizzard-auctionsx")).toBe(false);
 });
 
 test("a session or cart route is never looked up in or stored in the shared cache, even with a public-looking response and a planted copy", async () => {

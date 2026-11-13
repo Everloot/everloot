@@ -1,6 +1,7 @@
 import { expect, it, vi } from "vitest";
-import { ForeverApi, type ApiResult } from "../armory/api.js";
-import { runAuctions } from "./job.js";
+import { ApiError, ForeverApi, type ApiResult } from "../armory/api.js";
+import { StoreError } from "../armory/store.js";
+import { PartialFailure, runAuctions } from "./job.js";
 import { AuctionStore, type JobStore } from "./store.js";
 import { listings, summarize } from "./summary.js";
 
@@ -58,7 +59,7 @@ function fakeApi(over: Record<string, () => Promise<ApiResult>> = {}) {
 const fakeStore = (put: JobStore["put"] = async (_r, _h, rows) => rows.length) => ({ put: vi.fn(put), purge: vi.fn(async () => 7) });
 const now = () => new Date("2026-11-13T13:41:00Z");
 
-it("reads each house once through the first ruleset listing it, stamps Blizzard's time, and purges", async () => {
+it("reads each house once through the first ruleset listing it, stamps each document with its own time, and purges", async () => {
   const api = fakeApi();
   const store = fakeStore();
   const log: string[] = [];
@@ -75,13 +76,38 @@ it("reads each house once through the first ruleset listing it, stamps Blizzard'
     "/data/wow/ruleset/15/auctions/116/commodities",
   ]);
   expect(store.put.mock.calls.map(([region, house, rows]) => [region, house, rows.length])).toEqual([
-    ["us", { house_id: 110, name: "Alliance Auction House", snapshot_at: "2026-11-13T12:22:40.000Z" }, 3],
-    ["us", { house_id: 113, name: "Horde Auction House", snapshot_at: "2026-11-13T12:22:32.000Z" }, 0],
-    ["us", { house_id: 116, name: "Horde Auction House", snapshot_at: "2026-11-13T13:41:00.000Z" }, 2],
+    ["us", { house_id: 110, name: "Alliance Auction House", kind: "items", snapshot_at: "2026-11-13T12:22:32.000Z" }, 2],
+    ["us", { house_id: 110, name: "Alliance Auction House", kind: "commodities", snapshot_at: "2026-11-13T12:22:40.000Z" }, 1],
+    ["us", { house_id: 113, name: "Horde Auction House", kind: "items", snapshot_at: "2026-11-13T12:22:32.000Z" }, 0],
+    ["us", { house_id: 113, name: "Horde Auction House", kind: "commodities", snapshot_at: "2026-11-13T12:22:32.000Z" }, 0],
+    ["us", { house_id: 116, name: "Horde Auction House", kind: "items", snapshot_at: "2026-11-13T13:41:00.000Z" }, 2],
+    ["us", { house_id: 116, name: "Horde Auction House", kind: "commodities", snapshot_at: "2026-11-13T13:41:00.000Z" }, 0],
   ]);
   expect(store.purge).toHaveBeenCalledTimes(1);
   expect(result).toEqual({ calls: 9, houses: 3, written: 5, unchanged: 0, failed: 0, purged: 7 });
   expect(log.at(-1)).toBe("us: 9 Blizzard API calls of 100; 3 houses, 5 item rows, 0 unchanged, 0 failed; 7 rows past 30 days purged");
+});
+
+it("takes a newer commodities document while the items one is unchanged, each with its own time", async () => {
+  // A store that, like blizzard_auctions_put, keeps one time per house document and refuses one that is not newer.
+  const stored = new Map<string, string>();
+  const store = fakeStore(async (_r, h, rows) => {
+    const key = `${h.house_id}:${h.kind}`;
+    if ((stored.get(key) ?? "") >= h.snapshot_at) return null;
+    stored.set(key, h.snapshot_at);
+    return rows.length;
+  });
+  await runAuctions({ region: "us", budget: 100, api: fakeApi(), store, log: () => {}, now });
+  const later = fakeApi({
+    "/data/wow/ruleset/1/auctions/110/commodities": async () => ok(commodities, "Fri, 13 Nov 2026 13:22:40 GMT"),
+  });
+  const log: string[] = [];
+  const result = await runAuctions({ region: "us", budget: 100, api: later, store, log: (l) => log.push(l), now });
+  expect(log).toContain("house 110 (Alliance Auction House) items: unchanged since 2026-11-13T12:22:32.000Z");
+  expect(log).toContain("house 110 (Alliance Auction House) commodities: 1 items as of 2026-11-13T13:22:40.000Z");
+  expect(stored.get("110:items")).toBe("2026-11-13T12:22:32.000Z");
+  expect(stored.get("110:commodities")).toBe("2026-11-13T13:22:40.000Z");
+  expect(result).toMatchObject({ written: 1, failed: 0 });
 });
 
 it("stops at the call budget and still purges", async () => {
@@ -91,22 +117,45 @@ it("stops at the call budget and still purges", async () => {
   const result = await runAuctions({ region: "eu", budget: 4, api, store, log: (l) => log.push(l), now });
   expect(api.get).toHaveBeenCalledTimes(4);
   expect(result.calls).toBe(4);
-  expect(store.put).not.toHaveBeenCalled();
+  // The fourth call read house 110's items, which are stored; its commodities wait for the next pass.
+  expect(store.put.mock.calls.map(([, h]) => [h.house_id, h.kind])).toEqual([[110, "items"]]);
   expect(store.purge).toHaveBeenCalledTimes(1);
   expect(log).toContain("budget of 4 calls spent; the rest waits for the next pass");
 });
 
-it("skips a house on a transient error, counts an unchanged snapshot, and purges after a fatal error before rethrowing", async () => {
-  const { ApiError } = await import("../armory/api.js");
+it("skips a house on a transient Blizzard error, finishes the others and the purge, then reports the partial failure", async () => {
   const api = fakeApi({ "/data/wow/ruleset/1/auctions/113": async () => { throw new ApiError(503, "api"); } });
   const store = fakeStore(async (_r, house) => (house.house_id === 116 ? null : 1));
-  const result = await runAuctions({ region: "us", budget: 100, api, store, log: () => {}, now });
-  expect(result).toMatchObject({ houses: 2, written: 1, unchanged: 1, failed: 1 });
+  const log: string[] = [];
+  const failure = await runAuctions({ region: "us", budget: 100, api, store, log: (l) => log.push(l), now }).catch((e: unknown) => e);
+  expect(failure).toBeInstanceOf(PartialFailure);
+  expect((failure as PartialFailure).result).toMatchObject({ houses: 2, written: 2, unchanged: 2, failed: 1, purged: 7 });
+  expect(store.purge).toHaveBeenCalledTimes(1);
+  expect(log).toContain("house 113: Blizzard API HTTP 503, skipped this pass");
 
   const broken = fakeApi({ "/data/wow/ruleset/index": async () => { throw new ApiError(401, "oauth"); } });
   const after = fakeStore();
   await expect(runAuctions({ region: "us", budget: 100, api: broken, store: after, log: () => {}, now })).rejects.toThrow("OAuth");
   expect(after.purge).toHaveBeenCalledTimes(1);
+});
+
+it("isolates a house whose storage write fails on a 503 or lock timeout; a missing function stops the pass after the purge", async () => {
+  const api = fakeApi();
+  const store = fakeStore(async (_r, house, rows) => {
+    if (house.house_id === 110) throw new StoreError(503);
+    return rows.length;
+  });
+  const failure = await runAuctions({ region: "us", budget: 100, api, store, log: () => {}, now }).catch((e: unknown) => e);
+  expect(failure).toBeInstanceOf(PartialFailure);
+  // 113 and 116 were still read and stored after 110 failed.
+  expect(store.put.mock.calls.map(([, h]) => h.house_id)).toEqual([110, 113, 113, 116, 116]);
+  expect((failure as PartialFailure).result).toMatchObject({ houses: 2, written: 2, failed: 1 });
+  expect(store.purge).toHaveBeenCalledTimes(1);
+
+  const missing = fakeStore(async () => { throw new StoreError(404); });
+  await expect(runAuctions({ region: "us", budget: 100, api: fakeApi(), store: missing, log: () => {}, now })).rejects.toThrow("HTTP 404");
+  expect(missing.put).toHaveBeenCalledTimes(1);
+  expect(missing.purge).toHaveBeenCalledTimes(1);
 });
 
 it("calls Blizzard in the dynamic Forever namespace", async () => {
@@ -122,7 +171,7 @@ it("calls Blizzard in the dynamic Forever namespace", async () => {
 it("uses the migration's function names, arguments and the service key", async () => {
   const fetchImpl = vi.fn(async () => Response.json(2));
   const store = new AuctionStore({ url: "https://example.test/", serviceKey: "test-key", fetchImpl: fetchImpl as unknown as typeof fetch });
-  const house = { house_id: 110, name: "Alliance Auction House", snapshot_at: "2026-11-13T12:22:32.000Z" };
+  const house = { house_id: 110, name: "Alliance Auction House", kind: "commodities" as const, snapshot_at: "2026-11-13T12:22:32.000Z" };
   const rows = [{ item_id: 954, min_unit: 150, typical_unit: 172, quantity: 26, auctions: 3 }];
   expect(await store.put("us", house, rows)).toBe(2);
   expect(await store.purge()).toBe(2);

@@ -27,6 +27,8 @@
 --
 -- Privacy exclusions, never granted here (the dump already skips them):
 --   players, link_codes, settled_fact_voters.
+-- Retention exclusions, never granted either: blizzard_auction_houses and blizzard_auction_prices (Blizzard's
+-- terms allow nothing older than 30 days; a backup lives longer).
 --
 -- Needs the public tables to already exist. Safe to apply twice.
 
@@ -54,7 +56,8 @@ grant usage on schema public to backup_exporter;
 do $$
 declare
   r record;
-  excluded constant text[] := array['players', 'link_codes', 'settled_fact_voters'];
+  -- The Blizzard auction tables may hold nothing past 30 days, which a backup would outlive (20261113120000).
+  excluded constant text[] := array['players', 'link_codes', 'settled_fact_voters', 'blizzard_auction_houses', 'blizzard_auction_prices'];
   backup_policy_name constant text := 'backup_exporter_select';
 begin
   for r in

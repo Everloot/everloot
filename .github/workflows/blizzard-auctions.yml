@@ -1,12 +1,52 @@
 name: Refresh Blizzard auction prices
-# Off until the maintainer sets the repository variable BLIZZARD_AUCTIONS to "on" (after applying
+# The refresh is off until the maintainer sets the repository variable BLIZZARD_AUCTIONS to "on" (after applying
 # supabase/migrations/20261113120000_blizzard_auctions.sql). Each pass is about 35 Blizzard API calls per region.
+# The 30-day purge runs on every trigger whatever the variable says, with the Supabase secrets alone, so retention
+# never depends on Blizzard credentials or a refresh that works.
 on:
   schedule:
     - cron: '41 * * * *'
   workflow_dispatch:
 permissions: {}
 jobs:
+  purge:
+    if: github.repository == 'Everloot/everloot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    concurrency:
+      group: blizzard-auctions-purge
+      cancel-in-progress: false
+    steps:
+      - name: Delete Blizzard auction data older than 30 days
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo '::notice::Supabase secrets are not configured; nothing can be stored, so nothing to purge.'
+            exit 0
+          fi
+          body="$RUNNER_TEMP/purge.json"
+          status=$(curl -sS --max-time 60 -o "$body" -w '%{http_code}' -X POST "${SUPABASE_URL%/}/rest/v1/rpc/blizzard_auctions_purge" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H 'Content-Type: application/json' --data '{}')
+          case "$status" in
+            2??) echo "Purged $(cat "$body") Blizzard auction rows past 30 days." ;;
+            404)
+              # PGRST202: the function is missing; 42P01: a table is. The migration is not applied, so nothing is stored.
+              code=$(jq -r '.code // empty' "$body" 2>/dev/null || true)
+              if [ "$code" = PGRST202 ] || [ "$code" = 42P01 ]; then
+                echo "::notice::blizzard_auctions_purge is not there ($code): the migration is not applied, nothing to purge."
+              else
+                echo "::error::Purge answered HTTP 404 without a known code: $(head -c 300 "$body")"
+                exit 1
+              fi ;;
+            *)
+              echo "::error::Purge failed with HTTP $status: $(head -c 300 "$body")"
+              exit 1 ;;
+          esac
+
   refresh:
     if: github.repository == 'Everloot/everloot' && vars.BLIZZARD_AUCTIONS == 'on'
     runs-on: ubuntu-latest

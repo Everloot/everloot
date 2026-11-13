@@ -2,9 +2,13 @@ import type { Region } from "../armory/api.js";
 import { StoreError } from "../armory/store.js";
 import type { PriceRow } from "./summary.js";
 
+/** A house is served as two documents, each published at its own time. */
+export type DocumentKind = "items" | "commodities";
+
 export interface HouseSnapshot {
   house_id: number;
   name: string;
+  kind: DocumentKind;
   snapshot_at: string;
 }
 
@@ -38,7 +42,7 @@ export class AuctionStore {
     return (text ? JSON.parse(text) : null) as T;
   }
 
-  /** Replace a house's summaries with a newer snapshot. Null when the stored snapshot is as new or newer. */
+  /** Replace one of a house's documents with a newer snapshot. Null when the stored one is as new or newer. */
   put(region: Region, house: HouseSnapshot, rows: PriceRow[]) {
     return this.rpc<number | null>("blizzard_auctions_put", { p_region: region, p_house: house, p_rows: rows });
   }

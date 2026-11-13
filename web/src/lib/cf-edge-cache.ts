@@ -13,6 +13,7 @@
  * own headers either way.
  */
 import PROTECTED_PATHS from "../data/protected-paths.json";
+import AD_FREE_PATHS from "../data/ad-free-paths.json";
 
 export const ORIGINAL_CACHE_CONTROL = "x-everloot-browser-cache-control";
 
@@ -24,8 +25,12 @@ export const ORIGINAL_CACHE_CONTROL = "x-everloot-browser-cache-control";
  */
 const SESSION_PATHS: readonly string[] = ["/api/auth", "/api/me", "/me", "/sign-in", "/sign-up", "/reset-password", "/cart", "/api/cart"];
 
-/** The pages that hold a session or the account. They are never looked up in, or stored in, the shared cache. */
-const PRIVATE_PATHS: readonly string[] = [...PROTECTED_PATHS, ...SESSION_PATHS];
+/**
+ * The pages that hold a session or the account, and the ad-free pages (data/ad-free-paths.json): the Blizzard
+ * auction page may show nothing older than 30 days, and a shared copy would outlive that. They are never looked up
+ * in, or stored in, the shared cache.
+ */
+const PRIVATE_PATHS: readonly string[] = [...PROTECTED_PATHS, ...AD_FREE_PATHS, ...SESSION_PATHS];
 export function isPrivatePath(pathname: string): boolean {
   // The router reads the decoded path, so `/%6De` is `/me`: match what it will serve. An undecodable path is refused.
   let route: string;
