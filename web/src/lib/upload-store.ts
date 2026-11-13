@@ -985,20 +985,27 @@ export function createUploadStore(opts: {
     const current = await readSnapshot();
     if (current && !current.etag) throw new Error("snapshot has no ETag: cannot safely update it");
     if (current?.etag?.startsWith("W/")) throw new Error("snapshot has a weak ETag: cannot safely update it");
+    const etag = current?.etag;
     const prev = opts.rebuild ? null : current;
     const seen = prev?.seenUploadIds ? new Set(prev.seenUploadIds) : null;
     const rows = await listIndex(seen ? undefined : prev?.lastReceivedAt ?? undefined);
     const fresh = rows.filter((r) => seen ? !seen.has(r.id) : !(prev && r.received_at === prev.lastReceivedAt && prev.lastIds.includes(r.id)));
     // Rebuilds preserve known conflict tombstones, including after a raw file is removed.
-    const start = prev ? stateOf(prev) : current
+    let start: CorpusState | undefined = prev ? stateOf(prev) : current
       ? { ...mergeCorpus(undefined, []), conflicts: stateOf(current).conflicts } : undefined;
+    // The parsed snapshot's events were replayed into `start`; nothing reads them again. Releasing them here keeps the
+    // old file's objects, the replayed copy and the merged copy from all being in memory while the new uploads are read.
+    if (current) { current.corpusState = undefined; current.records = []; }
     const read = await readObjects(fresh.map((r) => r.object_key), start);
+    start = undefined;
     if (read.missed) throw new Error("upload object unreadable");
     const lastReceivedAt = rows.length > 0 ? rows[rows.length - 1].received_at : prev?.lastReceivedAt ?? null;
     const lastIds = rows.length > 0 ? rows.filter((r) => r.received_at === lastReceivedAt).map((r) => r.id) : prev?.lastIds ?? [];
-    const snapshot: Snapshot = {
-      generatedAt: now().toISOString(),
-      uploads: (prev?.uploads ?? 0) + fresh.length,
+    const generatedAt = now().toISOString();
+    const uploads = (prev?.uploads ?? 0) + fresh.length;
+    const body = JSON.stringify({
+      generatedAt,
+      uploads,
       // The records are the replay state's events, stored once. The empty array keeps the file readable by the
       // previous reader, which required it.
       records: [],
@@ -1008,17 +1015,20 @@ export function createUploadStore(opts: {
       seenUploadIds: seen || !prev ? [...new Set([...(prev?.seenUploadIds ?? []), ...rows.map((r) => r.id)])].sort() : undefined,
       lastReceivedAt,
       lastIds,
-    };
+    } satisfies Omit<Snapshot, "etag" | "records"> & { records: [] });
     const put = await r2Fetch(SNAPSHOT_KEY, {
       method: "PUT",
-      body: JSON.stringify(snapshot),
+      body,
       // R2 supports conditional PutObject; a race fails instead of losing tombstones.
       // https://developers.cloudflare.com/r2/api/s3/api/
-      headers: { "content-type": "application/json", ...(current ? { "if-match": current.etag! } : { "if-none-match": "*" }) },
+      headers: { "content-type": "application/json", ...(current ? { "if-match": etag! } : { "if-none-match": "*" }) },
     });
     if (!put.ok) throw new Error(`snapshot write failed (${put.status})`);
-    cached = null; completionCached = null; censusCached = null;
-    return { uploads: snapshot.uploads, added: fresh.length, dataAsOf: snapshot.generatedAt };
+    // The state just written is what a read of the file would replay, so the corpus the rollups read next is this one,
+    // not the file downloaded and parsed again (a second whole copy, and another read of the same R2 object).
+    cached = { at: Date.now(), corpus: { uploads, state: read.state, dataAsOf: validTime(generatedAt) } };
+    completionCached = null; censusCached = null;
+    return { uploads, added: fresh.length, dataAsOf: generatedAt };
   }
 
   async function loadCorpus(): Promise<Corpus> {
