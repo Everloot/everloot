@@ -213,6 +213,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: auction prices keep updating when the market rollup is full: the oldest open scan day closes early (its public prices kept) instead of new scans being refused, one uploader cannot take more than a third of the room, and dropped scans no longer leave empty days behind.
 - Site: avoid compiling game-file name matchers for absent ASCII names when answering sourced questions, reducing cold-start CPU work.
 - Site: the header shows the build whose files the site reads and the newest build seen, each linked to what it means.
+- Companion: retry failed watch uploads with bounded backoff, honor Retry-After across accounts, and queue saves without overlapping sends.
 - Site: /api/suggest spends the per-IP quota and shares one edge cache entry for `Thunder` and `thunder `, the coverage 400 and waitlist 503 are `no-store` (the 503 adds `Retry-After`), and the docs list every route that sends CORS from one file.
 - Site: when a database or tools page can't be read, you now get a "Database unavailable" or "Tool unavailable" page that says it could not be read, not that it is empty, with a Try again button and a link back to the section, instead of the generic error page.
 - Site: item list pagination is crawlable while filter URLs stay blocked.
