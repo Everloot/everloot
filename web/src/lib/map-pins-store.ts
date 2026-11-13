@@ -1,3 +1,4 @@
+import { mapBoundsFromRecords, rollupMapBounds, type ZoneBounds } from "../../../kb/src/map-bounds";
 import { AwsClient } from "aws4fetch";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
 import { RECHECK_SCOPES } from "./recheck-scopes";
@@ -5,13 +6,14 @@ import { observedFacts } from "./world-map";
 import { uploadStore, type R2Config } from "./upload-store";
 
 /**
- * Anonymous facts stored by the snapshot cron; pages fall back to the corpus until the file can be read. The file holds
+ * Anonymous facts and rolled-up zone bounds stored by the snapshot cron; pages fall back to the corpus until the file can be read. The file holds
  * the reported rows only: `facts.recheck` is the build's curated recheck list (recheck-scopes.ts), set again on read,
  * so a deploy that changes the list shows at once instead of after the next upload.
  */
-export interface MapPinsView { dataAsOf: string | null; facts: ReturnType<typeof observedFacts>; }
+export interface MapPinsView { dataAsOf: string | null; facts: ReturnType<typeof observedFacts>; bounds: ZoneBounds[]; }
 
-export const MAP_PINS_KEY = "snapshots/map-pins.json";
+/** A new key makes even an idle cron create the bounds-bearing format; older deployments keep their own file. */
+export const MAP_PINS_KEY = "snapshots/map-pins-v2.json";
 /** How long one server instance keeps the file before asking for it again: the cron rewrites it at most every 10 minutes. */
 const KEEP_MS = 5 * 60_000;
 /** A missing or unreadable file is asked for again after a minute, not after the full KEEP_MS. */
@@ -27,23 +29,29 @@ const r2Url = (cloud: R2Config) => `https://${cloud.r2AccountId}.r2.cloudflarest
 const r2 = (cloud: R2Config) => new AwsClient({ accessKeyId: cloud.r2AccessKeyId, secretAccessKey: cloud.r2SecretAccessKey, service: "s3", region: "auto" });
 
 export function buildMapPins(corpus: { records: unknown[]; dataAsOf?: string | null }): MapPinsView {
-  return { dataAsOf: corpus.dataAsOf ?? null, facts: observedFacts(corpus.records) };
+  return { dataAsOf: corpus.dataAsOf ?? null, facts: observedFacts(corpus.records), bounds: rollupMapBounds(mapBoundsFromRecords(corpus.records)) };
 }
 
 export function encodeMapPins(set: MapPinsView, generatedAt: string): string {
   const { recheck: _recheck, ...facts } = set.facts;
-  return JSON.stringify({ version: 1, generatedAt, set: { ...set, facts } });
+  return JSON.stringify({ version: 2, generatedAt, set: { ...set, facts } });
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const arrays = (v: unknown, ...keys: string[]) => isObject(v) && keys.every((k) => Array.isArray(v[k]));
 
+/** A corrupt cross-check must fall back rather than change what the map reports. */
+const validBounds = (v: unknown): v is ZoneBounds => isObject(v) &&
+  ["mapId", "continentId", "left", "top", "right", "bottom", "installs"].every((k) => typeof v[k] === "number" && Number.isFinite(v[k])) &&
+  typeof v.agreed === "boolean";
+
 /** Unknown or unreadable files fall back to the corpus. A `recheck` list in an older file is ignored. */
 export function parseMapPins(text: string): { generatedAt: string; set: MapPinsView } | null {
   try {
     const raw: unknown = JSON.parse(text);
-    if (!isObject(raw) || raw.version !== 1 || typeof raw.generatedAt !== "string" || !isObject(raw.set)) return null;
+    if (!isObject(raw) || raw.version !== 2 || typeof raw.generatedAt !== "string" || !isObject(raw.set)) return null;
     const s = raw.set;
+    if (!Array.isArray(s.bounds) || !s.bounds.every(validBounds)) return null;
     if (!(s.dataAsOf === null || typeof s.dataAsOf === "string") || !arrays(s.facts, "npcs", "quests", "vendors")) return null;
     const set = s as unknown as MapPinsView;
     return { generatedAt: raw.generatedAt, set: { ...set, facts: { ...set.facts, recheck: RECHECK_SCOPES } } };

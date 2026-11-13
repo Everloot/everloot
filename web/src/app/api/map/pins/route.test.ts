@@ -99,7 +99,7 @@ test("each continent's answer stays under 150 KB gzipped, with spoilers on and w
 });
 
 test("stored facts give the same answer with zero corpus reads", async () => {
-  const { buildMapPins, encodeMapPins, forgetStoredMapPins } = await import("@/lib/map-pins-store");
+  const { buildMapPins, encodeMapPins, forgetStoredMapPins, MAP_PINS_KEY } = await import("@/lib/map-pins-store");
   const { buildAggregates } = await import("@/lib/aggregate-set");
   const { encodeAggregates, forgetStoredAggregates } = await import("@/lib/aggregate-store");
   // An NPC, a vendor three installs agree on, both on Eastern Kingdoms, and an NPC in a held-back zone on Kalimdor.
@@ -125,7 +125,7 @@ test("stored facts give the same answer with zero corpus reads", async () => {
     const url = (input as Request).url;
     return new Response(url.endsWith("snapshots/aggregates.json")
       ? encodeAggregates(buildAggregates(corpus as unknown as import("@/lib/upload-store").Corpus), "now")
-      : url.endsWith("snapshots/map-pins.json")
+      : url.endsWith(MAP_PINS_KEY)
         ? encodeMapPins(buildMapPins(corpus), "now") : "{}" );
   }));
   expect(await Promise.all(queries.map(async (q) => (await GET(req(q))).json()))).toEqual(before);
