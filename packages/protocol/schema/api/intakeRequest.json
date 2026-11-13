@@ -2942,6 +2942,12 @@
                 "type": "string",
                 "const": "player_seen"
               },
+              "surname": {
+                "description": "Forever's surname, UnitName's second return: 2 to 24 letters. Optional for older uploads; used only for named armory discovery.",
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 96
+              },
               "name": {
                 "type": "string",
                 "minLength": 2,

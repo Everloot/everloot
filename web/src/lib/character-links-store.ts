@@ -61,6 +61,7 @@ export async function redeemLink(userId: string, row: LinkRow, secret: string, c
 
 /** One of the account's own links, as its owner's list shows it. No key, hash, code or other account. */
 export interface OwnLink {
+  armory?: { path: string | null };
   id: string; name: string; realm: string; race: string; class: string; faction: "Alliance" | "Horde"; level: number;
   status: "linked" | "frozen"; linked_at: string; last_upload_at: string;
   /**

@@ -37,6 +37,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   its creature, the same rows its NPC page shows, or how many installs have looted it so far. In the list, an instance
   the game files place no entrance for says so beside its id, with the reason on hover.
 - Site: every database page now tells search engines its name, id and address, so results link the right page.
+- Site: lightweight armory profiles with equipment slots, supported character details, manual Blizzard-link submission, queued refreshes and consent-controlled links to shared addon data.
+- Addon: named sharing retains Forever surnames so uploads can discover full armory identities, including guildless characters; anonymous collection stays unchanged.
 - Site: the armory opens at `/armory`: a page for every WoW Forever character and guild that Blizzard's API returns,
   read hourly, with guild rosters, three boards (item level, gear score, honorable kills), a form to hide a character
   and a form to ask for one. Each page says "Data from Blizzard Entertainment", carries no ad and is not indexed yet.

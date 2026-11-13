@@ -2,6 +2,7 @@ import { guildKey, guildSlug } from "../../../kb/src/guilds";
 import { linkRealmKey } from "./character-links";
 import { DEFAULT_RULESET, realmSlug, type Player, type PlayerUpsert } from "./player-pages";
 import { readAllRows } from "./postgrest-pages";
+import { armoryOn } from "./armory";
 
 /**
  * Where the player rows live: Supabase in production (the functions in 20261021130000_players.sql and
@@ -122,7 +123,7 @@ export function createCloudPlayerStore(url: string, key: string, doFetch: typeof
   }
   return {
     async upsert(rows) {
-      if (rows.length) await rpc("upsert_players", { p_ruleset: DEFAULT_RULESET, p_rows: rows });
+      if (rows.length) await rpc(armoryOn() ? "upsert_players_armory" : "upsert_players", { p_ruleset: DEFAULT_RULESET, p_rows: rows });
     },
     async get(ruleset, realm, name) {
       const rows = await rpc<Stored[]>("get_player", { p_ruleset: ruleset, p_realm_slug: realm, p_name: name });

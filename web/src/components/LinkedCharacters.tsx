@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import CopyButton from "@/components/ui/CopyButton";
+import ArmoryConnection from "@/components/ArmoryConnection";
 
 /** One link as GET /api/me/characters/links lists it. */
 export interface ListedLink {
+  armory?: { path: string | null };
   id: string; name: string; realm: string; race: string; class: string; faction: string; level: number;
   status: "linked" | "frozen"; linked_at: string; last_upload_at: string;
   /**
@@ -232,6 +234,7 @@ export default function LinkedCharacters() {
               </div>
               <p className="text-fg-2">Linked {day(link.linked_at)}, last sent {day(link.last_upload_at)}.</p>
               {link.status === "frozen" && <p className="text-fg">{FROZEN_TEXT}</p>}
+              {link.status === "linked" && link.armory && <ArmoryConnection id={link.id} name={link.name} path={link.armory.path} onSaved={load} />}
               {link.status === "linked" && link.page && (
                 <div className="space-y-2">
                   <p className="text-fg-2">{PAGE_TEXT}</p>

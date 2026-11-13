@@ -6,6 +6,8 @@ import { characterSecret } from "@/lib/census-intake";
 import { privateSyncOn, SYNC_CATEGORIES } from "@/lib/private-sync";
 import { ownCharacterFacts } from "@/lib/private-sync-store";
 import { uploadStore } from "@/lib/upload-store";
+import { armoryOn } from "@/lib/armory";
+import { ownArmoryLinks } from "@/lib/armory-links";
 
 /**
  * POST /api/me/characters/links: `{ records: [character_link rows] }`, from the signed-in upload page (session
@@ -31,6 +33,10 @@ export async function GET() {
     const account = await linkSession();
     if (account instanceof Response) return account;
     const links = await listLinks(account);
+    if (armoryOn()) {
+      const armory = await ownArmoryLinks(account);
+      for (const link of links) link.armory = { path: armory.get(link.id) ?? null };
+    }
     if (privateSyncOn()) {
       await Promise.all(links.map(async (link) => {
         const by = new Map((await ownCharacterFacts(account, link.id)).map((c) => [c.category, c]));

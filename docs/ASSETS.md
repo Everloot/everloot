@@ -27,6 +27,7 @@ text card when art is disabled, missing or unreadable. Other share cards stay te
 
 | Page | What appears |
 | --- | --- |
+| `/armory/<region>/<character>` | Small API-provided avatar when available, otherwise an existing race/class icon; equipment icons and tooltips under the same item visibility rules as database pages. No full character model. API media stays within the armory's credited, ad-free, page-only boundary. |
 | `/tools/talents/<class>` | Talent icons, tooltips, node frames and spec backgrounds |
 | `/database/drops`, `/database/vendors/<id>`, `/tools/auctions` | Item icon beside each item link, the item's tooltip on hover and keyboard focus |
 | `/database/items/<id>` | The item's tooltip as a card, once players have reported the item; the icon of each spell that creates or uses the item, beside that relation; the item's name, quality colour and icon where the game files and the Warcraft Wiki give the same name |

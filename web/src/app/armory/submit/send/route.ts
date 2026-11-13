@@ -1,7 +1,7 @@
 import { ARMORY_SUBMIT_PATH, armoryOn } from "@/lib/armory";
 import { armoryStore } from "@/lib/armory-store";
 import { intakeQuota } from "@/lib/intake-quota";
-import { back, notAForm, notFoundAnswer, readCharacterForm } from "../../form";
+import { back, notAForm, notFoundAnswer, readSubmissionForm } from "../../form";
 
 /**
  * POST /armory/submit/send: put one character in the crawler's queue (armory_enqueue, source "website"). The crawler
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   if (!armoryOn()) return notFoundAnswer();
-  const form = await readCharacterForm(req);
+  const form = await readSubmissionForm(req);
   if (!form.ok) return form.fields ? back(req, ARMORY_SUBMIT_PATH, { error: "invalid", ...form.fields }) : notAForm();
   const kept = { region: form.region, name: form.name, surname: form.surname };
   try {

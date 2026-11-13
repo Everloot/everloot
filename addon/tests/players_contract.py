@@ -13,7 +13,7 @@ from pathlib import Path
 
 from lupa.lua51 import LuaRuntime
 
-from protocol_schema import SCHEMA_DIR, check_rows, to_plain
+from protocol_schema import SCHEMA_DIR, check_all, check_rows, to_plain
 
 root = Path(__file__).parents[1]
 toc = (root / "Everloot.toc").read_text(encoding="utf-8")
@@ -227,7 +227,7 @@ for _, u in ipairs({
  player(9, { player = false }),
  me,
  player(10, { level = -1 }), player(11, { level = 0 }), player(12, { level = 61 }),
- player(13, { realmName = 'Elsewhere' }),
+ player(13, { realmName = 'Elsewhere Realm' }),
  player(14, { race = false }), player(15, { class = '' }), player(16, { class = 'Warrior' }), player(17, { class = 'XY' }),
  player(18, { race = 'X' }), player(19, { race = 'Night Elf' }),
  player(20, { name = 'Bob1' }), player(21, { name = 'Two Words' }), player(22, { name = 'A' }), player(23, { name = false }), player(24, { name = '' }),
@@ -573,3 +573,23 @@ assert(#rows() == before + 1, 'a unit on another realm is not a row; got ' .. (#
 
 print("Lua 5.1 players: off by default, no roster/gear/position calls, one row per character kept in place, throttled reads, "
       "300 new a day, 1000 rows with the oldest dropped, rows match the protocol schema, guild kills at most 60 a day, off deletes, census stays anonymous")
+
+# Forever returns first name and surname, not realm, from UnitName.
+lua = fresh()
+lua.execute("""
+realm = 'US1 Realm 4 PvP'
+me.realmName = 'Morningstar'
+SlashCmdList.EVERLOOT('players on')
+reload()
+event('PLAYER_LOGIN')
+assert(rows()[1].surname == 'Morningstar', 'own surname reaches the named upload')
+GT = GT + 1
+units.target = player(1, { name='Ember', realmName='Stone' })
+event('PLAYER_TARGET_CHANGED')
+GT = GT + 1
+units.target = player(2, { name='Ember', realmName='Vale' })
+event('PLAYER_TARGET_CHANGED')
+assert(#rows() == 3, 'same first name and different surnames are separate characters')
+assert(rows()[2].surname == 'Stone' and rows()[3].surname == 'Vale', 'encountered surnames retained')
+""")
+check_all(lua)
