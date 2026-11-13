@@ -12,6 +12,7 @@ import { filesIndex } from "./files-index";
 import { guildReader, guildsOn } from "./guilds";
 import { accountMcpTools } from "./my-builds-tool";
 import { getRelease } from "./release";
+import { publicMcpCache } from "./mcp-response-cache";
 import { RECHECK_SCOPES } from "./recheck-scopes";
 import { loadCensus } from "./rollup-compute";
 import { readSettledList } from "./settled-store";
@@ -110,6 +111,12 @@ export function createMount(options: { path: string; bearer: boolean }) {
           ...toolLoaders(),
           // my_builds, for a player's own key only; the keyless tool list stays the protocol's.
           extraTools: accountMcpTools,
+          ...(!options.bearer ? { cacheResponse: publicMcpCache(async () => {
+            const commit = process.env.EVERLOOT_COMMIT_SHA;
+            const facts = await toolLoaders().answerSources!();
+            return commit && facts?.dataAsOf
+              ? { release: `${commit}.${release.manifest.sha256}`, dataAsOf: facts.dataAsOf } : null;
+          }) } : {}),
         });
       } catch (err) {
         console.error("[mcp] knowledge release unavailable", err);
