@@ -9,6 +9,8 @@ type decided from its terms, a last-verified date, and confirmed version coverag
 
 The armory crawler reads Blizzard's Forever character profiles, equipment, PvP summaries, guilds and rosters through the official API. It keeps these only in the separate Supabase armory for credited, ad-free pages: recheck within 20 days, purge after 30 days, delete on 404 or a hide request. Armory data never enters addon tables, exports, the CC BY-SA corpus or MCP answers.
 
+The auction job reads Blizzard's Forever auction houses (`/data/wow/ruleset/{id}/auctions/{house}` and its `/commodities`) hourly and keeps per-item price summaries in separate Supabase tables for one credited, ad-free page per item (`/blizzard-auctions/<id>`, linked from the item page); it purges after 30 days and never feeds the player market, the addon price file, exports or MCP answers. See DATA_POLICY "Blizzard auction prices".
+
 ## Read this first
 
 - **WoW: Forever is in beta** (since 2026-09-17). Full launch is **2026-11-04**. All "Forever: yes"

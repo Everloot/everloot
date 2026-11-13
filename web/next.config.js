@@ -171,6 +171,14 @@ const nextConfig = {
       ...protectedSources.map((source) => ({ source, headers: [{ key: "Content-Security-Policy", value: protectedCsp }] })),
       // The same key's spelling, so it replaces the site's value rather than adding a second header.
       ...microphoneSources.map((source) => ({ source, headers: [{ key: "Permissions-Policy", value: permissionsPolicy("(self)") }] })),
+      // The Blizzard auction page (app/blizzard-auctions): no shared cache may keep it, since Blizzard data may not
+      // outlive 30 days and a failed read must not be served as the page; the edge cache skips it by route as well
+      // (lib/cf-edge-cache.ts). Not for search either: robots.txt keeps crawlers off it.
+      ...servedSources("/blizzard-auctions").map((source) => ({ source, headers: [
+        { key: "Cache-Control", value: "private, no-store" },
+        { key: "CDN-Cache-Control", value: "private, no-store" },
+        { key: "X-Robots-Tag", value: "noindex, nofollow" },
+      ] })),
       // These pages read no cookies, so the CDN can serve them. Next overwrites Cache-Control on
       // dynamic pages, so the CDN-specific headers are used.
       { source: "/database/items", headers: databaseItemsCdnHeaders },

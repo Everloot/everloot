@@ -157,6 +157,7 @@ the Worker. The browser bundle keeps the `NEXT_PUBLIC_*` values.
 | `CLOUDFLARE_ACCOUNT_ID` | `.github/workflows/deploy-worker.yml` | The account the Worker deploys to | For deploys |
 | `ANSWER_EVAL_MODEL` | `.github/workflows/build-watch.yml` | The model the answer evaluation runs against; the job is skipped while empty | No |
 | `ANSWER_EVAL_BASE_URL` | `.github/workflows/build-watch.yml` | That provider's endpoint; has a default | No |
+| `BLIZZARD_AUCTIONS` | `.github/workflows/blizzard-auctions.yml` | The hourly Blizzard auction house pull runs only while this is `on` (and the Battle.net and Supabase secrets exist) | No |
 | `NEXT_PUBLIC_*` | `.github/workflows/deploy-worker.yml` | The eleven build-time names above, passed to the build | See above |
 
 ## Local development and tests (`web/.env.local`)

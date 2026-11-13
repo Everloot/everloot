@@ -130,7 +130,8 @@ test("the public pages rendered on every request are kept at the CDN; the pages 
 
 test("only the public pages rendered per request are marked for the shared CDN cache", async () => {
   const marked = (await nextConfig.headers!())
-    .filter((entry) => entry.headers.some((header) => header.key === "CDN-Cache-Control"))
+    // `private, no-store` (the Blizzard auction page) keeps a page out of the cache; any other value marks it.
+    .filter((entry) => entry.headers.some((header) => header.key === "CDN-Cache-Control" && !/\bno-store\b/.test(header.value)))
     .map((entry) => entry.source)
     .sort();
   // A fixed allowlist: a new CDN-marked source is a deliberate decision, and this test makes it one. Everyone

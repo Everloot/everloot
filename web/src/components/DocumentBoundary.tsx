@@ -6,8 +6,9 @@ import { crossesDocumentBoundary, reloadDocument } from "@/lib/document-boundary
 
 /**
  * Wraps the root layout's page. A client-side move between a public page and a protected one (chat, account,
- * settings) keeps the document, and with it the first page's Content-Security-Policy, so the page is not
- * mounted there: the boundary renders nothing and reloads, and the new document comes with the right policy.
+ * settings) keeps the document, and with it the first page's Content-Security-Policy; a move from a page with ads
+ * to an ad-free one (the Blizzard auction page) keeps the AdSense script it loaded. So the page is not mounted
+ * there: the boundary renders nothing and reloads, and the new document comes with the right policy and scripts.
  * The server and the first client render always agree, because a document's own page never crosses.
  */
 export default function DocumentBoundary({ children }: { children: React.ReactNode }) {

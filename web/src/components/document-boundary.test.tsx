@@ -153,6 +153,30 @@ test("Alts on this device loads no ads, analytics or consent banner, and a move 
   expect(reload).toHaveBeenCalledTimes(2);
 });
 
+test("the Blizzard auction page loads no ads or analytics, and a move to it from any page with ads reloads first", async () => {
+  for (const path of ["/blizzard-auctions/2589", ...underServed("/blizzard-auctions/2589")]) {
+    at(path, path);
+    const host = await mount(<OptionalScripts><span>scripts</span></OptionalScripts>);
+    expect(host.textContent, path).toBe("");
+    act(() => root?.unmount());
+  }
+  // From the item page (AdSense loaded) to the Blizzard page, from a protected page to it, and back to the item page.
+  const moves = [["/database/items/2589", "/blizzard-auctions/2589"], ["/", "/blizzard-auctions/2589"], ["/chat", "/blizzard-auctions/2589"], ["/blizzard-auctions/2589", "/database/items/2589"]] as const;
+  for (const [loadedAt, now] of moves) {
+    at(loadedAt, now);
+    const host = await mount(<DocumentBoundary><Page /></DocumentBoundary>);
+    expect(host.textContent, now).toBe("");
+    act(() => root?.unmount());
+  }
+  expect(mounted).not.toHaveBeenCalled();
+  expect(reload).toHaveBeenCalledTimes(moves.length);
+  // Between two Blizzard pages there is no line to cross.
+  at("/blizzard-auctions/2589", "/blizzard-auctions/954");
+  await mount(<DocumentBoundary><Page /></DocumentBoundary>);
+  expect(mounted).toHaveBeenCalledTimes(1);
+  expect(reload).toHaveBeenCalledTimes(moves.length);
+});
+
 test("writing a guide loads no ads, analytics or consent banner beside the drafts, and a move to or from the guides reloads first", async () => {
   for (const path of ["/guides/write", ...underServed("/guides/write")]) {
     at(path, path);

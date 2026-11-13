@@ -2,7 +2,7 @@ import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
 import { describe, expect, test } from "vitest";
 import nextConfig from "../../next.config.js";
 import { PREFIXES, SERVED } from "./build-versions";
-import { crossesDocumentBoundary, documentPathname, isProtectedPath } from "./document-boundary";
+import { crossesDocumentBoundary, documentPathname, isAdFreePath, isProtectedPath } from "./document-boundary";
 
 // The served version's prefix (/beta before launch, none once Live is served) shows the same pages; another
 // version's prefix shows its notice. Read from the routing table, so the switch at launch changes no test here.
@@ -100,6 +100,22 @@ describe("crossesDocumentBoundary", () => {
     expect(crossesDocumentBoundary("/tools/alts", fakeWindow("/tools/alts", "https://everloot.app/tools/builds"))).toBe(false);
   });
 
+  test("the Blizzard auction page is its own kind: ad-free with the public policy; any move to or from it crosses", () => {
+    for (const path of ["/blizzard-auctions/2589", "/blizzard-auctions", ...underServed("/blizzard-auctions/2589")]) {
+      expect(isAdFreePath(path), path).toBe(true);
+      expect(isProtectedPath(path), path).toBe(false);
+    }
+    for (const path of ["/blizzard-auctionsx", "/database/items/2589", "/tools/auctions", ...underOthers("/blizzard-auctions/2589")]) expect(isAdFreePath(path), path).toBe(false);
+    // Protected pages carry no ads either.
+    expect(isAdFreePath("/chat")).toBe(true);
+    const at = (path: string) => fakeWindow(path, `https://everloot.app${path}`);
+    expect(crossesDocumentBoundary("/blizzard-auctions/2589", at("/database/items/2589"))).toBe(true);
+    expect(crossesDocumentBoundary("/database/items/2589", at("/blizzard-auctions/2589"))).toBe(true);
+    expect(crossesDocumentBoundary("/blizzard-auctions/2589", at("/chat"))).toBe(true);
+    expect(crossesDocumentBoundary("/chat", at("/blizzard-auctions/2589"))).toBe(true);
+    expect(crossesDocumentBoundary("/blizzard-auctions/954", at("/blizzard-auctions/2589"))).toBe(false);
+  });
+
   test("going from the guides to writing one crosses it, and so does a link from the draft's preview to a guide; settings does not", () => {
     expect(crossesDocumentBoundary("/guides/write", fakeWindow("/guides/write", "https://everloot.app/guides"))).toBe(true);
     expect(crossesDocumentBoundary("/guides/frost-leveling", fakeWindow("/guides/frost-leveling", "https://everloot.app/guides/write?guide=1"))).toBe(true);
@@ -142,6 +158,21 @@ describe("Plans on this device's document", () => {
     for (const path of ["/tools", "/tools/talents", "/tools/talents/mage", "/tools/buildsx"]) {
       expect((await headersFor(path))["Content-Security-Policy"], path).toBe(site);
     }
+  });
+});
+
+describe("the Blizzard auction page's document", () => {
+  test("keeps the public policy, is kept by no shared cache and is not for search", async () => {
+    const site = await headersFor("/");
+    for (const path of ["/blizzard-auctions/2589", ...underServed("/blizzard-auctions/2589")]) {
+      const got = await headersFor(path);
+      expect(got["Content-Security-Policy"], path).toBe(site["Content-Security-Policy"]);
+      expect(got["Cache-Control"], path).toBe("private, no-store");
+      expect(got["CDN-Cache-Control"], path).toBe("private, no-store");
+      expect(got["X-Robots-Tag"], path).toBe("noindex, nofollow");
+    }
+    // The item page keeps its edge lifetime.
+    expect((await headersFor("/database/items/2589"))["CDN-Cache-Control"]).toMatch(/^max-age=/);
   });
 });
 

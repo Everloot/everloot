@@ -312,6 +312,12 @@ export default async function ItemPage(props: Props) {
           />
         </EntitySidebar>
         <MarketBox itemId={itemId} rows={auctions} />
+        {/* Blizzard Developer API Terms: no ads on a page showing Blizzard data. This page carries ads, so it reads none
+            and only links to the ad-free page. A plain link, not next/link: the router's prefetch would fetch that
+            page's data into this document, and the move must load a fresh document without AdSense. */}
+        <p className="mt-2 mb-6 text-meta">
+          <a href={`/blizzard-auctions/${itemId}`} className={LINK}>Blizzard auction house data for this item</a>
+        </p>
         <Tabs label={`${title}: relations`} tabs={tabs} className="mt-6" />
         <DarkmoonItemNote name={name?.name} />
         <div className="mt-6 space-y-6 empty:hidden">
