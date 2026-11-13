@@ -142,6 +142,18 @@ export const tools: Tool[] = [
     keywords: [],
   },
   {
+    slug: "bags",
+    group: "Look up",
+    line: "The cheapest bag of each size on your auction house, and what each added slot costs. Slot counts from the game files, prices from player scans.",
+    href: "/tools/bags",
+    title: "Bag upgrades",
+    shortTitle: "Bag upgrades",
+    tagline: "The cheapest bag of each size on your auction house, and what each added slot costs.",
+    description: "The cheapest bag of each size on your auction house, and what each added slot costs. Slot counts from the game files, prices from player scans.",
+    status: "collecting",
+    keywords: [],
+  },
+  {
     slug: "census",
     group: "Look up",
     line: "Races, classes and levels, counted from players who turned the census on.",

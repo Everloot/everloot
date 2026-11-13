@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { CURRENT_BUILD, TABLES } from "@/data/game-data/raid";
+import { CLIENT_BAGS } from "@/data/game-data/client-bags";
 import {
   assetUrl, BANNER_MAP, buildFolder, classAndProfessionIcons, continentArt, creditWhat, emblems, FETCH_TIMEOUT_MS, forgetPrivateReads, iconUrl,
   instanceThumbs, itemIconUrl, itemShard, itemTip, gameNameFor, launchArt, loadingArt, loadItemNames, loadItemSetNames, loadItemTips, loadQuestNames, loadSpellNames, loadSiteAssets, parseSiteManifest, poiIcons, PRIVATE_MALFORMED, PRIVATE_UNREACHABLE, privateStoreFromEnv, raidArt, readItemTips, readQuestNames, readSpellNames, type ItemNames,
@@ -189,6 +190,17 @@ test("an item tooltip reads like the game's and marks the stat amounts the table
   expect(odd.partial).toBe(false);
   expect(qualityColor(3)).toMatch(/^#/);
   expect(itemTip(shard0["9"], { base: BASE, version: "v", label: "l" }).color).toBe(qualityColor(1));
+});
+
+test("a bag's tooltip prints its slot count from the game files' bag table in place of the bare Bag line", () => {
+  const [id, bag] = Object.entries(CLIENT_BAGS.bags).find(([, b]) => b.subclass === 0)!;
+  const record = { ...shard0["9"], n: "A bag", s: 18, c: 1, sc: 0 };
+  expect(itemTipText(record).lines).toContain("Bag");
+  const lines = itemTip(record, { base: BASE, version: "v", label: "l" }, Number(id)).lines;
+  expect(lines).toContain(`${bag.slots} Slot Bag`);
+  expect(lines).not.toContain("Bag");
+  // An item the bag table does not list keeps its lines.
+  expect(itemTip(shard0["9"], { base: BASE, version: "v", label: "l" }, 9).lines).toEqual(itemTipText(shard0["9"]).lines);
 });
 
 test("every placeholder kind comes with its reason in plain words, once", () => {

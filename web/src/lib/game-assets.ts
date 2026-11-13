@@ -2,6 +2,7 @@ import { AwsClient } from "aws4fetch";
 import { z } from "zod";
 import { CLASSES } from "@/design/tokens";
 import type { BuffTable } from "@/data/game-data/raid";
+import { withBagSlots } from "@/lib/bags";
 import { itemTipText, qualityColor } from "@/lib/item-names";
 import { ICON_CATEGORIES, type PoiIcons } from "@/lib/map-marks";
 import { assetPath, assetsBaseUrl, MANIFEST_SCHEMA } from "@/lib/talents/assets";
@@ -265,8 +266,10 @@ export interface ItemTip {
   binding: number;
 }
 
-export function itemTip(r: ItemRecord, assets: Pick<SiteAssets, "base" | "version" | "label">): ItemTip {
-  const text = itemTipText(r);
+/** With `itemId`, a container's tooltip also gets its "14 Slot Bag" line from the game files' bag table (lib/bags.ts). */
+export function itemTip(r: ItemRecord, assets: Pick<SiteAssets, "base" | "version" | "label">, itemId?: number): ItemTip {
+  const tip = itemTipText(r);
+  const text = itemId === undefined ? tip : { ...tip, lines: withBagSlots(tip.lines, itemId) };
   return {
     ...text, color: qualityColor(r.q), icon: r.i ? itemIconUrl(assets.base, r.i) : null, label: `${assets.label} · build ${assets.version}`,
     level: r.l, required: r.r, binding: r.b,
@@ -315,7 +318,7 @@ export async function readItemTips(assets: SiteAssets | null, ids: readonly numb
       const raw = body.data[String(id)];
       if (raw === undefined) continue;
       const r = ItemRecordSchema.safeParse(raw);
-      if (r.success) out.set(id, itemTip(r.data, assets));
+      if (r.success) out.set(id, itemTip(r.data, assets, id));
       else result.degraded = true;
     }
   }));
