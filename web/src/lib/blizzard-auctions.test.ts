@@ -54,6 +54,8 @@ const ALLOWED = [
   "web/src/app/blizzard-auctions/[id]/page.tsx",
   // Links to the page only; database/items/[id]/blizzard-link.test.tsx checks it reads nothing.
   "web/src/app/database/items/[id]/page.tsx",
+  // Names the page's path in its matcher only, to answer client fetches of it without the page; reads nothing.
+  "web/src/middleware.ts",
   "kb/src/cli.ts",
 ];
 /** The hourly job's own folder. */
