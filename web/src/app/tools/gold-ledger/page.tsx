@@ -77,8 +77,9 @@ export default async function GoldLedgerPage(
             Addon 0.2.4 records loot, quest rewards, vendor sales, flight costs, auction sales taken from the mailbox
             (after the house cut), postage and auction buyouts. Bids, deposits, other mail, other spending, and gameplay
             stay unrecorded until an event is seen. The difference is unrecorded. This is the same answer as the
-            gold_ledger tool. The upload carries nine categories in all, barber and respec costs included; the addon&apos;s window shows six more
-            (repairs, vendor purchases, trades in and out, mail in and out) from a ledger that stays on your computer.
+            gold_ledger tool. The upload carries nine categories in all, barber and respec costs included; the addon&apos;s window, and your
+            ledger above when you drop your file, show six more (repairs, vendor purchases, trades in and out, mail in and out) from a
+            ledger that stays on your computer.
           </p>
         </Disclosure>
       </div>

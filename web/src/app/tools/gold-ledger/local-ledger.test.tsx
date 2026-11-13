@@ -73,6 +73,38 @@ test("reads Everloot.lua in the browser and shows the ledger, sending nothing", 
   expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
 });
 
+test("the window's local ledger shows repairs, vendor purchases and transfers between your characters, sending nothing", async () => {
+  const at = Math.floor(Date.now() / 1000) - 60;
+  const withLedger = LUA.replace(/\n}$/, `
+  ["roster"] = {
+    ["k1"] = { ["name"] = "Thrall", ["realm"] = "Moon Guard", ["copper"] = 1300000, ["lastSeen"] = ${at} },
+    ["k2"] = { ["name"] = "Jaina", ["realm"] = "Moon Guard" },
+  },
+  ["ledger"] = {
+    ["events"] = {
+      { ["at"] = ${at}, ["key"] = "k1", ["category"] = "repair", ["copper"] = 4321 },
+      { ["at"] = ${at}, ["key"] = "k1", ["category"] = "vendor_spend", ["copper"] = 600 },
+      { ["at"] = ${at}, ["key"] = "k1", ["category"] = "mail_out", ["copper"] = 20000, ["ownAlt"] = true },
+      { ["at"] = ${at}, ["key"] = "k2", ["category"] = "mail_in", ["copper"] = 20000, ["ownAlt"] = true },
+    },
+  },
+}`);
+  await act(async () => root.render(<LocalLedger />));
+  await drop(withLedger);
+  const categories = container.querySelector('[aria-labelledby="ledger-categories"]')!.textContent!;
+  expect(categories).toContain("Repairs");
+  expect(categories).toContain("43 silver 21 copper");
+  expect(categories).toContain("Vendor purchases");
+  expect(categories).not.toContain("Mail out");
+  expect(categories).toMatch(/2 gold 0 silver 0 copper.* moved between your own characters/);
+  const receipts = container.querySelector('[aria-labelledby="ledger-receipts"]')!.textContent!;
+  expect(receipts).toContain("Mail out, your character");
+  // The roster's gold is newer than the file's snapshot, and Jaina has no snapshot at all.
+  expect(container.querySelector('[aria-labelledby="ledger-roster"]')!.textContent).toContain("130 gold 0 silver 0 copper");
+  expect(container.querySelector('[aria-labelledby="ledger-roster"]')!.textContent).toContain("Jaina");
+  expect(fetchSpy).not.toHaveBeenCalled();
+});
+
 test("a file that is not an Everloot export says so", async () => {
   await act(async () => root.render(<LocalLedger />));
   await drop("SomethingElseDB = {}", "Other.lua");
