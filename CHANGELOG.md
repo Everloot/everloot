@@ -340,6 +340,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Changed
 - Site: answer sourced questions from stored public facts without replaying the upload corpus.
+- Site: reuse successful public corpus API answers at the edge for five minutes, with separate keys for each normalized query.
 - Site: World map pages read stored player pins and zone cross-checks without replaying the public corpus.
 - Site: ask MJ12bot and DotBot not to crawl the site while keeping search engines and AI search access allowed.
 - Site: cache public auction browse pages for five minutes while reusing realm boards per market rollup.
