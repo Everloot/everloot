@@ -24,6 +24,7 @@ beforeEach(() => {
 test("a continent's answer holds what the map draws besides the zones, cached at the CDN and never indexed", async () => {
   const res = await GET(req("?continent=1"));
   expect(res.status).toBe(200);
+  expect(res.headers.get("cdn-cache-control")).toBe("public, max-age=300");
   expect(res.headers.get("cache-control")).toBe("public, max-age=0, s-maxage=300");
   expect(res.headers.get("x-robots-tag")).toBe("noindex");
   const body = await res.json();
@@ -75,6 +76,7 @@ test("unreachable storage still answers with the game-file items, marked so and 
   const res = await GET(req("?continent=0"));
   expect(res.status).toBe(200);
   expect(res.headers.get("cache-control")).toBe("no-store");
+  expect(res.headers.get("cdn-cache-control")).toBeNull();
   const body = await res.json();
   expect(body).toMatchObject({ unreachable: true, dataAsOf: null, pins: [] });
   expect(readPinSet(body)!.flightMasters.length).toBeGreaterThan(0);

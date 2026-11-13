@@ -12,9 +12,9 @@ import { recordUsage } from "@/lib/usage-metrics";
 export const dynamic = "force-dynamic";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET", "Access-Control-Max-Age": "86400" };
-const CACHE = { "Cache-Control": "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400" };
+const CACHE = { "CDN-Cache-Control": "public, max-age=3600", "Cache-Control": "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400" };
 // A 404 is cached briefly: players may report the page any minute.
-const CACHE_404 = { "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600" };
+const CACHE_404 = { "CDN-Cache-Control": "public, max-age=300", "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600" };
 const NO_STORE = { "Cache-Control": "no-store" };
 
 export function OPTIONS(): Response {
