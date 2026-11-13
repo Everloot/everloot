@@ -339,6 +339,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Desktop App: restoring the oldest backup keeps the selected save and an undo copy, even within the same second.
 
 ### Changed
+- Site: reuse public MCP discovery metadata within each mount while keeping request ids, access checks and account tools separate.
 - Site: answer sourced questions from stored public facts without replaying the upload corpus.
 - Site: reuse successful public corpus API answers at the edge for five minutes, with separate keys for each normalized query.
 - Site: World map pages read stored player pins and zone cross-checks without replaying the public corpus.
