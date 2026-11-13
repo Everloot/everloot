@@ -158,6 +158,7 @@ test("unreachable storage is a 503 that is not cached", async () => {
   const res = await call("item", "19019");
   expect(res.status).toBe(503);
   expect(res.headers.get("cache-control")).toBe("no-store");
+  expect(res.headers.get("cdn-cache-control")).toBeNull();
 });
 
 test("any site may read it with GET: CORS is open, nothing else is", async () => {
@@ -173,6 +174,8 @@ test("any site may read it with GET: CORS is open, nothing else is", async () =>
 });
 
 test("the CDN keeps a card for an hour and serves it stale for a day; a 404 is kept briefly", async () => {
+  expect((await call("item", "19019")).headers.get("cdn-cache-control")).toBe("public, max-age=3600");
+  expect((await call("item", "123456")).headers.get("cdn-cache-control")).toBe("public, max-age=300");
   const cache = (await call("item", "19019")).headers.get("cache-control") ?? "";
   expect(cache).toContain("public");
   expect(cache).toContain("s-maxage=3600");

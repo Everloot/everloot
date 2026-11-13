@@ -45,6 +45,7 @@ test("an item row carries its game icon where its page shows one; NPCs and quest
 
 test("it is the site's route: never indexed, and /api/suggest keeps to the names players agree on", async () => {
   const res = await GET(new Request("https://everloot.app/search/suggest?q=thunderfury"));
+  expect(res.headers.get("cdn-cache-control")).toBe("public, max-age=60");
   expect(res.headers.get("x-robots-tag")).toBe("noindex");
   const api = await (await apiGET(new Request("https://everloot.app/api/suggest?q=thunderfury"))).json();
   expect(api.results).toEqual([]);
@@ -55,5 +56,6 @@ test("a wrong scope or an overlong query is a 400 that is not cached", async () 
     const res = await GET(new Request(`https://everloot.app/search/suggest${q}`));
     expect(res.status, q).toBe(400);
     expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(res.headers.get("cdn-cache-control")).toBeNull();
   }
 });
