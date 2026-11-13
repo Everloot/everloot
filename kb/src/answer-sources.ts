@@ -187,15 +187,18 @@ async function knowledgeHits(
   // "where do I learn mining" asks for a trainer: the pages name them "an orc mining trainer", never "learn".
   const trainer = question.replace(/\b(?:learn|train)\b/giu, "trainer");
   // Fetched past the limit so the pages left out above do not shrink the answer.
-  if (trainer !== question) {
-    add(await search(db, trainer, limit + 5));
-    for (const hit of out) trainers.add(hit.id);
-  }
-  add(await search(db, question, limit + 5));
   const names = question.match(/\p{Lu}[\p{L}'-]+(?:\s+\p{Lu}[\p{L}'-]+)*/gu) ?? [];
-  // A standalone asking word or game name is not another entity in the question. Searching "What"
-  // alone falls back to that literal word and introduces unrelated book and quest pages.
-  for (const name of names) if (name.length >= 3 && !/^(?:who|what|which|where|when|why|how|show|tell|please|qué|quién|dónde|cómo|wow|forever|world|warcraft)$/iu.test(name)) add(await search(db, name, 3));
+  const entities = names.filter((name) => name.length >= 3 && !/^(?:who|what|which|where|when|why|how|show|tell|please|qué|quién|dónde|cómo|wow|forever|world|warcraft)$/iu.test(name));
+  // Issue independent queries together, but add their results in the original order: truncation and ties stay identical.
+  const [training, whole, ...named] = await Promise.all([
+    trainer !== question ? search(db, trainer, limit + 5) : Promise.resolve([]),
+    search(db, question, limit + 5),
+    ...entities.map((name) => search(db, name, 3)),
+  ]);
+  add(training);
+  for (const hit of out) trainers.add(hit.id);
+  add(whole);
+  for (const hits of named) add(hits);
   // A hit whose title holds every asked word is the page asked about. Without one, the hits may have matched a typo
   // a page or two share ("scarlet monestary"), so the words are read again; a reading that changes nothing keeps them.
   const asked = contentTerms(question);
