@@ -4,11 +4,11 @@
  "credit": "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.",
  "build": {
   "product": "wowf",
-  "buildId": 70888,
-  "version": "1.60.1.70888",
-  "buildConfig": "0597e74b01a3f779d849ffe9b3270196",
+  "buildId": 70938,
+  "version": "1.60.1.70938",
+  "buildConfig": "3627b099867bfde3e37a17cf44f69cdc",
   "definitions": "86c0801007bb",
-  "extractedAt": "2026-11-10T17:17:03.601Z"
+  "extractedAt": "2026-11-13T02:53:06.160Z"
  },
  "note": "criteria and text are the game files'; category names come from player reports",
  "achievements": {
