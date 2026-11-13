@@ -232,7 +232,11 @@ They share one branch and one pull request, one commit per stage, because each s
 - Rollup size at scale: open days hold one scan per install for 7 days; closed days about 10k items ×
   60 days × 4 numbers per realm. The fold caps 40 realms, 20,000 items per realm, 25 installs per
   item-day and 60,000 open install scans in all (closed days do not count, since 2026-11-04), and
-  counts what it drops. Above 10 MB (`MARKET_MAX_BYTES`) the oldest closed days are trimmed, a day at
+  counts what it drops. **Since 2026-11-13** a full rollup makes room instead of refusing new scans: the
+  oldest open day closes early (public medians kept, unpublished scans dropped), and a reporter holding
+  more than 20,000 open scans gives up its own oldest day first. Only a scan for the oldest open day itself
+  is dropped. Before this, the cap filled on 11/09 and every new day was refused until 11/07 closed, so
+  prices stopped at 11/08. Above 10 MB (`MARKET_MAX_BYTES`) the oldest closed days are trimmed, a day at
   a time, until `market.json` fits; it is refused only if it still does not.
 - Hardening (review of PR 15), all in `kb/src/market.ts` unless noted:
   - **Reporters.** A day is public at 3 reporters, not 3 installs. A reporter is a keyed (HMAC) 64-bit
