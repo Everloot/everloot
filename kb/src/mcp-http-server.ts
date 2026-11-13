@@ -1,3 +1,6 @@
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { ListToolsRequestSchema, type InitializeResult, type ListToolsResult, type JSONRPCResultResponse } from "@modelcontextprotocol/sdk/types.js";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type { ReleaseSource } from "./release-db.js";
@@ -68,6 +71,25 @@ export function createPublicMcpServer(config: { db: ReleaseSource } & ToolOption
   return { server, transport };
 }
 
+/** Snapshot only public discovery, using the same SDK handlers as the full server. */
+async function publicDiscovery(config: PublicMcpConfig) {
+  const server = createKnowledgeServer(config.db, toolOptionsOf(config));
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  try {
+    await server.connect(serverTransport);
+    const ask = (method: string, params: Record<string, unknown>) => new Promise<JSONRPCResultResponse["result"]>((resolve, reject) => {
+      clientTransport.onmessage = (message) => {
+        if ("result" in message) resolve(message.result);
+        else if ("error" in message) reject(new Error(message.error.message));
+      };
+      clientTransport.send({ jsonrpc: "2.0", id: 1, method, params }).catch(reject);
+    });
+    const initialize = await ask("initialize", { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "discovery", version: "1" } }) as InitializeResult;
+    const tools = await ask("tools/list", {}) as ListToolsResult;
+    return { initialize, tools };
+  } finally { await server.close(); }
+}
+
 function bearerOk(header: string | null, token: string): boolean {
   const presented = header?.startsWith("Bearer ") ? header.slice(7) : "";
   return token.length > 0 && presented.length > 0 && timingSafeEqual(
@@ -78,6 +100,8 @@ function bearerOk(header: string | null, token: string): boolean {
 
 export function createMcpHttpHandler(config: PublicMcpConfig) {
   let hits: number[] = [];
+  // One promise per mount also coalesces simultaneous first requests. Never store account tools here.
+  let discovery: ReturnType<typeof publicDiscovery> | undefined;
   return async function handleRequest(req: Request): Promise<Response> {
     const origin = req.headers.get("origin");
     const headers = new Headers({ "Vary": "Origin", "Cache-Control": "no-store" });
@@ -127,7 +151,21 @@ export function createMcpHttpHandler(config: PublicMcpConfig) {
       return reply(500, "Internal server error");
     }
     const respond = async () => {
-      const { server, transport } = createPublicMcpServer(config, extraTools);
+      let method: unknown;
+      try { method = JSON.parse(body)?.method; } catch { /* The SDK returns its usual parse error. */ }
+      const publicOnly = extraTools.length === 0 && (method === "initialize" || method === "tools/list");
+      let server;
+      let transport;
+      if (publicOnly) {
+        const snapshot = await (discovery ??= publicDiscovery(config).catch((error) => { discovery = undefined; throw error; }));
+        server = new Server(snapshot.initialize.serverInfo, {
+          capabilities: snapshot.initialize.capabilities, instructions: snapshot.initialize.instructions,
+        });
+        server.setRequestHandler(ListToolsRequestSchema, async () => snapshot.tools);
+        transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+      } else {
+        ({ server, transport } = createPublicMcpServer(config, extraTools));
+      }
       try {
         await server.connect(transport);
         const response = await transport.handleRequest(new Request(req.url, { method: "POST", headers: req.headers, body }));
