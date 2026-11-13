@@ -211,6 +211,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   dates from before the feed existed are marked estimated.
 
 ### Fixed
+- Site: auction prices keep updating when the market rollup is full: the oldest open scan day closes early (its public prices kept) instead of new scans being refused, one uploader cannot take more than a third of the room, and dropped scans no longer leave empty days behind.
 - Site: avoid compiling game-file name matchers for absent ASCII names when answering sourced questions, reducing cold-start CPU work.
 - Site: the header shows the build whose files the site reads and the newest build seen, each linked to what it means.
 - Site: /api/suggest spends the per-IP quota and shares one edge cache entry for `Thunder` and `thunder `, the coverage 400 and waitlist 503 are `no-store` (the 503 adds `Retry-After`), and the docs list every route that sends CORS from one file.
@@ -341,6 +342,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Desktop App: restoring the oldest backup keeps the selected save and an undo copy, even within the same second.
 
 ### Changed
+- Site: answer sourced questions from stored public facts without replaying the upload corpus.
+- Site: reuse successful public corpus API answers at the edge for five minutes, with separate keys for each normalized query.
+- Site: World map pages read stored player pins and zone cross-checks without replaying the public corpus.
+- Site: reuse anonymous public MCP answers for ten minutes and search independent lore names in parallel.
+- Site: Keep public tooltip, map, search and planner-card responses at the edge for their declared lifetimes.
+- Site: Keep complete public database detail pages at the edge for an hour; degraded pages still refresh within a minute.
 - Site: ask MJ12bot and DotBot not to crawl the site while keeping search engines and AI search access allowed.
 - Site: cache public auction browse pages for five minutes while reusing realm boards per market rollup.
 - Site: HEAD requests reuse cached public pages and warm their GET copy on a miss, without returning a body.

@@ -18,6 +18,7 @@ test("serves the build's list with an ETag, and answers a matching If-None-Match
   expect(await res.json()).toEqual(LIST);
   const etag = res.headers.get("etag")!;
   expect(etag).toMatch(/^"[a-f0-9]{32}"$/);
+  expect(res.headers.get("cdn-cache-control")).toBe("public, max-age=600");
   expect(res.headers.get("cache-control")).toContain("public");
   const again = await GET(req(`?build=${BUILD}`, { "if-none-match": `W/${etag}` }));
   expect(again.status).toBe(304);
@@ -35,10 +36,12 @@ test("a malformed build is refused before storage is read, and unreachable stora
     const res = await GET(req(q));
     expect(res.status).toBe(400);
     expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(res.headers.get("cdn-cache-control")).toBeNull();
   }
   expect(read.list).not.toHaveBeenCalled();
   read.list.mockRejectedValue(new Error("r2 down"));
   const res = await GET(req(`?build=${BUILD}`));
   expect(res.status).toBe(503);
   expect(res.headers.get("cache-control")).toBe("no-store");
+  expect(res.headers.get("cdn-cache-control")).toBeNull();
 });

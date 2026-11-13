@@ -1,5 +1,6 @@
 import { createMcpHttpHandler } from "../../../kb/src/mcp-http-server";
 import type { ToolOptions } from "../../../kb/src/mcp-server";
+import { loadStoredAggregates } from "./aggregate-store";
 import { catalogIndex } from "./catalog-index";
 import { loadTimeline } from "./changes";
 import { loadCoverageForTool } from "./coverage-answer";
@@ -11,6 +12,7 @@ import { filesIndex } from "./files-index";
 import { guildReader, guildsOn } from "./guilds";
 import { accountMcpTools } from "./my-builds-tool";
 import { getRelease } from "./release";
+import { publicMcpCache } from "./mcp-response-cache";
 import { RECHECK_SCOPES } from "./recheck-scopes";
 import { loadCensus } from "./rollup-compute";
 import { readSettledList } from "./settled-store";
@@ -38,6 +40,13 @@ export function toolLoaders(): ToolOptions {
   return {
     // The curated scopes: page tools count only reports after a scope's date, as the coverage score does.
     recheck: RECHECK_SCOPES,
+    // The cron stores anonymous facts only. Never replay or republish the corpus for an answer.
+    answerSources: async () => {
+      const set = await loadStoredAggregates({ strict: true });
+      // Stored item rates already apply these scopes; never count rates made under an older ruling.
+      if (!set || JSON.stringify(set.world.recheck ?? []) !== JSON.stringify(RECHECK_SCOPES)) return null;
+      return { facts: { items: set.items, world: set.world }, dataAsOf: set.dataAsOf };
+    },
     // The stored report the home page counts; the live computation only when it is missing or for another build.
     coverage: () => loadCoverageForTool(),
     settledSummary: async (build) => {
@@ -102,6 +111,12 @@ export function createMount(options: { path: string; bearer: boolean }) {
           ...toolLoaders(),
           // my_builds, for a player's own key only; the keyless tool list stays the protocol's.
           extraTools: accountMcpTools,
+          ...(!options.bearer ? { cacheResponse: publicMcpCache(async () => {
+            const commit = process.env.EVERLOOT_COMMIT_SHA;
+            const facts = await toolLoaders().answerSources!();
+            return commit && facts?.dataAsOf
+              ? { release: `${commit}.${release.manifest.sha256}`, dataAsOf: facts.dataAsOf } : null;
+          }) } : {}),
         });
       } catch (err) {
         console.error("[mcp] knowledge release unavailable", err);

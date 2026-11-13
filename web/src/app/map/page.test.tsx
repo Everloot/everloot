@@ -13,8 +13,8 @@ vi.mock("@/lib/world-map", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/world-map")>();
   return {
     ...real,
-    continentMap: (...args: Parameters<typeof real.continentMap>) =>
-      world.empty ? { ...real.continentMap(...args), viewBox: null, zones: [], entrances: [] } : real.continentMap(...args),
+    continentMapFromBounds: (...args: Parameters<typeof real.continentMapFromBounds>) =>
+      world.empty ? { ...real.continentMapFromBounds(...args), viewBox: null, zones: [], entrances: [] } : real.continentMapFromBounds(...args),
   };
 });
 vi.mock("next/link", () => ({
@@ -38,6 +38,8 @@ vi.mock("@/components/WorldMapView", async (importOriginal) => {
 import MapPage, { generateMetadata as mapMeta } from "./page";
 import ContinentMapPage, { generateMetadata as continentMeta } from "./[continent]/page";
 import { WORLD_MAP } from "@/lib/world-map";
+import { AGGREGATES_KEY, anonymousAggregates, encodeAggregates, forgetStoredAggregates } from "@/lib/aggregate-store";
+import { buildMapPins, encodeMapPins, forgetStoredMapPins, MAP_PINS_KEY } from "@/lib/map-pins-store";
 import { CATEGORY_GROUPS, type MapItems } from "@/lib/map-view";
 
 const renderWith = async (query: Record<string, string>) => renderToStaticMarkup(await MapPage({ searchParams: Promise.resolve(query) }));
@@ -350,4 +352,38 @@ test("a spot out of range keeps the zone but drops the spot", async () => {
   const html = await renderWith({ zone: "1411", x: "500", y: "50" });
   expect(html).toMatch(/data-map-zone[^>]*><p[^>]*>Durotar/);
   expect(html).not.toContain("x=500");
+});
+
+test("both map pages render identical stored pins and bounds without reading the corpus", async () => {
+  const corpus = { uploads: 3, dataAsOf: "2026-10-17T00:00:00Z", records: [
+    ...["a", "b", "c"].map((i) => report(i, elwynn.right)),
+    ...sightings(7, 1429, 40, 60, "Guard Marlow"),
+  ] };
+  // Compare the old corpus path to the stored snapshot path, with every page prop and visible line unchanged.
+  forgetStoredMapPins();
+  forgetStoredAggregates();
+  const env = { R2_ACCOUNT_ID: "acct", R2_ACCESS_KEY_ID: "id", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "uploads" };
+  for (const key of Object.keys(env)) vi.stubEnv(key, "");
+  store.loadCorpus.mockResolvedValue(corpus);
+  const before = [await render(), await render("0"), await render("1")];
+  expect(before[0]).toContain("1 zone match within a yard");
+  expect(before[0]).toContain("Guard Marlow");
+  for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
+  const snapshot = encodeMapPins(buildMapPins(corpus), "snapshot");
+  const aggregates = encodeAggregates(anonymousAggregates(corpus as unknown as import("@/lib/upload-store").Corpus), "snapshot");
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+    const url = input instanceof Request ? input.url : String(input);
+    return new Response(url.endsWith(MAP_PINS_KEY) ? snapshot : url.endsWith(AGGREGATES_KEY) ? aggregates : "{}", { status: url.endsWith(MAP_PINS_KEY) || url.endsWith(AGGREGATES_KEY) ? 200 : 404 });
+  }));
+  store.loadCorpus.mockClear();
+  try {
+    const after = [await render(), await render("0"), await render("1")];
+    expect(after).toEqual(before);
+    expect(store.loadCorpus).not.toHaveBeenCalled();
+  } finally {
+    forgetStoredMapPins();
+    forgetStoredAggregates();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  }
 });

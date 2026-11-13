@@ -34,5 +34,6 @@ export async function GET(req: Request) {
     })()
     : await renderCard({ label: "Everloot", title: "WoW Forever Raid Buff Planner", subtitle: "Fill a raid and see which buffs each group gets" });
   image.headers.set("Cache-Control", "public, max-age=86400, s-maxage=604800, immutable");
+  image.headers.set("CDN-Cache-Control", "public, max-age=86400");
   return image;
 }

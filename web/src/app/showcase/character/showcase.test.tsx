@@ -283,6 +283,7 @@ describe("share card", () => {
     const { GET: wide } = await import("./card.png/route");
     const { GET: square } = await import("./card-square.png/route");
     const w = await wide();
+    expect(w.headers.get("cdn-cache-control")).toBe("public, max-age=3600");
     expect(w.headers.get("content-type")).toBe("image/png");
     expect(w.headers.get("x-robots-tag")).toBe("noindex");
     expect(await pngSize(w)).toEqual({ width: 1200, height: 630 });

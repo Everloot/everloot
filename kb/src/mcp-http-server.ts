@@ -40,6 +40,8 @@ export interface PublicMcpConfig extends ToolOptions {
    * tools, for a player's own key). Without it, or when it returns none, the server lists the public tools alone.
    */
   extraTools?: (req: Request, body: string) => readonly ExtraTool[] | Promise<readonly ExtraTool[]>;
+  /** Host cache, invoked only after origin, authentication, quota and bounded-body checks. */
+  cacheResponse?: (req: Request, body: string, respond: () => Promise<Response>) => Promise<Response>;
 }
 
 /**
@@ -47,7 +49,7 @@ export interface PublicMcpConfig extends ToolOptions {
  * list lacks, and the mount's own settings (its bearer token, origins, limits) never reach the tool layer.
  */
 const TOOL_OPTION_KEYS = {
-  catalog: true, corpus: true, market: true, auctionHistory: true, gameData: true, completion: true, changes: true, ecosystem: true, census: true,
+  answerSources: true, catalog: true, corpus: true, market: true, auctionHistory: true, gameData: true, completion: true, changes: true, ecosystem: true, census: true,
   coverage: true, settledSummary: true, guilds: true, recheck: true, trusted: true,
 } as const satisfies Record<keyof ToolOptions, true>;
 
@@ -124,16 +126,21 @@ export function createMcpHttpHandler(config: PublicMcpConfig) {
     } catch {
       return reply(500, "Internal server error");
     }
-    const { server, transport } = createPublicMcpServer(config, extraTools);
-    try {
-      await server.connect(transport);
-      const response = await transport.handleRequest(new Request(req.url, { method: "POST", headers: req.headers, body }));
-      headers.forEach((value, key) => response.headers.set(key, value));
-      return response;
-    } catch {
-      return reply(500, "Internal server error");
-    } finally {
-      await server.close();
-    }
+    const respond = async () => {
+      const { server, transport } = createPublicMcpServer(config, extraTools);
+      try {
+        await server.connect(transport);
+        const response = await transport.handleRequest(new Request(req.url, { method: "POST", headers: req.headers, body }));
+        headers.forEach((value, key) => response.headers.set(key, value));
+        return response;
+      } catch {
+        return reply(500, "Internal server error");
+      } finally {
+        await server.close();
+      }
+    };
+    const response = await (config.cacheResponse ? config.cacheResponse(req, body, respond) : respond());
+    headers.forEach((value, key) => response.headers.set(key, value));
+    return response;
   };
 }

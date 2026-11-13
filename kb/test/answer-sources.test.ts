@@ -199,3 +199,11 @@ test.each([
   expect(result.unavailable).toBeUndefined();
   db.close();
 });
+
+test.each(["Thrall and Peacebloom", "where do I learn Mining", "What is Thrall"])("parallel lookups preserve the full answer: %s", async (question) => {
+  const db = await seed();
+  try {
+    const answer = await answerSources(db, { question, limit: 3 }, null, null);
+    expect({ answer, text: formatAnswerSources(answer, false) }).toMatchSnapshot();
+  } finally { db.close(); }
+});
