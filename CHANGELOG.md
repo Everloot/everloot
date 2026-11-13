@@ -21,6 +21,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: a visible bug button on every page opens the existing GitHub report form, with Discord and email alternatives and private page URLs omitted.
 - Site: item pages' social cards show the item's game icon (text-only when the art is off or unreadable), and on wide screens entity pages move their summary, facts and map into a right column.
 - Site: show labelled, linked Warcraft Wiki NPC names when one or two installs unanimously report a matching name.
+- Addon: auction house buyouts now keep the item and count they bought in the local gold ledger (item listings by their link or the house's name and the search result's quantity; commodities by the confirmed item and quantity), so the tooltip's "Your average paid" line and per-item purchase reports have something to read. The uploaded record is unchanged. Needs an in-game check before release.
 - Docs: describe NPC name agreement, the private version 2 catalog and the inert spell wiki path.
 - Site: show labelled Warcraft Wiki names for NPCs and unnamed spells, and anonymous unconfirmed item stat values from one or two players.
 - Docs: document wiki name fallbacks and labelled partial stat reports.

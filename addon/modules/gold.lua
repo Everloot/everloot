@@ -13,7 +13,8 @@
 -- recipient or sender is compared with the roster's names on the player's realm and
 -- then dropped, never kept.
 -- Each event also goes to the local ledger (ledger.lua) under the character key, with
--- an auction sale kept by item (name, count, deposit, cut) there only; the uploaded
+-- an auction sale kept by item (name, count, deposit, cut) and a buyout by the item and
+-- count it bought (when the listing or the house names them) there only; the uploaded
 -- money_event keeps its shape. The sold notice (a system line naming only the item)
 -- adds a pending sale there; the letter's sale fills it in. The day's closing gold is
 -- written there as it changes.
@@ -28,6 +29,7 @@ local auctionMail = nil -- { letter = copper the letter pays, sale = the sale mi
 local postage = nil -- price quoted for a letter the server has not confirmed yet
 local buyout = nil -- copper a buyout is about to take
 local buyoutGen = 0 -- which pending buyout an expiry timer belongs to
+local buyoutItem = nil -- { itemName, count } the pending buyout buys, when the listing says; read only with buyout
 local quote = nil -- total the auction house last quoted for a commodity purchase
 local repairPending = false -- a repair was asked for at the merchant; the next drop there is a repair
 local repairGen = 0 -- which repair an expiry timer belongs to
@@ -179,7 +181,7 @@ local function moneyChanged(copper)
     local delta = copper - lastMoney
     if auctionMail and delta == auctionMail.letter then storeSale(auctionMail)
     elseif plainMail and delta == plainMail.letter then storeMoney("mail_in", delta, { ownAlt = plainMail.ownAlt })
-    elseif buyout and delta == -buyout then storeMoney("auction_spend", buyout)
+    elseif buyout and delta == -buyout then storeMoney("auction_spend", buyout, buyoutItem)
     elseif trade and delta == trade.inn - trade.out then storeTrade(trade); settled = true
     elseif merchantOpen and delta > 0 then storeMoney("vendor", delta)
     elseif merchantOpen and delta < 0 then
@@ -232,8 +234,10 @@ end
 --- A pending buyout lasts a few seconds: a bid the house rejects never moves money, and a later change
 --- of the same amount (a repair) must not be called a purchase.
 local BUYOUT_SECONDS = 5
-local function setBuyout(copper)
+--- `item` ({ itemName, count }, either may be nil) is what the purchase buys, kept on the ledger row only.
+local function setBuyout(copper, item)
   buyout = copper
+  buyoutItem = item
   buyoutGen = buyoutGen + 1
   if copper and C_Timer and C_Timer.After then
     local mine = buyoutGen
@@ -241,28 +245,76 @@ local function setBuyout(copper)
   end
 end
 
+--- A name the ledger can keep, or nil.
+local function itemName(value)
+  value = E.Readable(value)
+  return type(value) == "string" and value ~= "" and value or nil
+end
+
+--- The item name inside an item link ("|cff...|Hitem:...|h[Silk Cloth]|h|r"), or nil.
+local function linkName(link)
+  link = E.Readable(link)
+  return type(link) == "string" and itemName(link:match("|h%[(.-)%]|h")) or nil
+end
+
+--- The auction house's own name for an item key, or nil.
+local function keyName(itemKey)
+  if type(itemKey) ~= "table" or not (C_AuctionHouse and C_AuctionHouse.GetItemKeyInfo) then return nil end
+  local ok, info = pcall(C_AuctionHouse.GetItemKeyInfo, itemKey)
+  return ok and type(info) == "table" and itemName(info.itemName) or nil
+end
+
+--- How many items one listing holds, from the item's search results the player is looking at, or nil. Only each
+--- result's auctionID and quantity are read; owners and bidders are not. Every loaded result is searched (the buy
+--- window can load more pages), once, on the player's own purchase click.
+local function listingQuantity(itemKey, auctionID)
+  if type(itemKey) ~= "table" or not (C_AuctionHouse and C_AuctionHouse.GetNumItemSearchResults
+    and C_AuctionHouse.GetItemSearchResultInfo) then return nil end
+  local okCount, n = pcall(C_AuctionHouse.GetNumItemSearchResults, itemKey)
+  n = okCount and E.Readable(n)
+  if not whole(n) then return nil end
+  for i = 1, n do
+    local ok, result = pcall(C_AuctionHouse.GetItemSearchResultInfo, itemKey, i)
+    if ok and type(result) == "table" and E.Readable(result.auctionID) == auctionID then
+      local quantity = E.Readable(result.quantity)
+      return whole(quantity) and quantity or nil
+    end
+  end
+  return nil
+end
+
 --- Called after a bid on a listing. Only a bid at the buyout price is a purchase; a lower bid can be refunded.
 local function bidPlaced(listType, index, bid)
   buyout = nil
   if not GetAuctionItemInfo or not whole(bid) then return end
   -- name, texture, count, quality, canUse, level, levelColHeader, minBid, minIncrement, buyoutPrice
-  local ok, _, _, _, _, _, _, _, _, _, price = pcall(GetAuctionItemInfo, listType, index)
-  if ok and whole(price) and bid == price then setBuyout(bid) end
+  local ok, name, _, count, _, _, _, _, _, _, price = pcall(GetAuctionItemInfo, listType, index)
+  count = ok and E.Readable(count)
+  if ok and whole(price) and bid == price then setBuyout(bid, { itemName = itemName(name), count = whole(count) and count or nil }) end
 end
 
 --- Forever: called after C_AuctionHouse.PlaceBid(auctionID, bidAmount). Only a bid at the listing's
 --- buyout is a purchase. The listing is read back with GetAuctionInfoByID; no owner or bidder is read.
+--- The item is named from the listing's link, or the house's name for its item key.
 local function itemBidPlaced(auctionID, bid)
   buyout = nil
   if not whole(bid) or not (C_AuctionHouse and C_AuctionHouse.GetAuctionInfoByID) then return end
   local ok, info = pcall(C_AuctionHouse.GetAuctionInfoByID, auctionID)
-  if ok and type(info) == "table" and whole(info.buyoutAmount) and bid == info.buyoutAmount then setBuyout(bid) end
+  if ok and type(info) == "table" and whole(info.buyoutAmount) and bid == info.buyoutAmount then
+    setBuyout(bid, { itemName = linkName(info.itemLink) or keyName(info.itemKey), count = listingQuantity(info.itemKey, auctionID) })
+  end
 end
 
 --- Forever: a commodity purchase pays the total the house last quoted (COMMODITY_PRICE_UPDATED).
---- Called after ConfirmCommoditiesPurchase. If the money that leaves differs, nothing is attributed.
-local function commodityConfirmed()
-  setBuyout(quote)
+--- Called after ConfirmCommoditiesPurchase(itemID, quantity). If the money that leaves differs, nothing is
+--- attributed. The item is named by the house's name for the item id.
+local function commodityConfirmed(itemID, quantity)
+  local key
+  if type(itemID) == "number" and C_AuctionHouse and C_AuctionHouse.MakeItemKey then
+    local ok, made = pcall(C_AuctionHouse.MakeItemKey, itemID)
+    key = ok and made or nil
+  end
+  setBuyout(quote, quote and { itemName = keyName(key), count = whole(quantity) and quantity or nil } or nil)
   quote = nil
 end
 
