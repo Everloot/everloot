@@ -1010,6 +1010,21 @@ These pages are separate from the addon sightings and the linked-character gear 
   row, roster memberships and queued character requests are deleted. The hide is kept so later API
   reads and rosters cannot put the character back.
 
+## Blizzard auction prices
+
+An hourly job reads every Forever auction house from the Blizzard Developer API and keeps one summary per item
+and house: the lowest unit buyout, the quantity-weighted median unit price, units and listings. Raw auctions are
+not stored. The job stays off until the maintainer sets the repository variable `BLIZZARD_AUCTIONS` to `on`.
+
+- **Apart from player prices.** The summaries have their own tables. They never enter the market rollup built
+  from addon scans, the addon price file, the CC BY-SA dataset, open data, MCP tools, chat answers, API answers,
+  sitemaps or exports. `web/src/lib/blizzard-auctions.test.ts` fails if another file reads them.
+- **Labelled and credited.** An item page shows them in their own section, "Blizzard auction house data, as of"
+  the time Blizzard published them, with "Data from Blizzard Entertainment", beside the player-reported prices.
+- **No ads.** An item page showing that section places no ad slot. The site's consent message may still appear.
+- **Thirty days.** Each item keeps one row per house and UTC day, its newest listing that day. Every pass deletes
+  rows and houses older than 30 days. Backups skip these tables, since a backup outlives 30 days.
+
 ## Chat
 
 /chat answers questions about the game from Everloot's data. Everloot search needs no model and sends
