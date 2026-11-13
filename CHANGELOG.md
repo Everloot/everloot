@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: the gold ledger page now reads the addon's own local ledger and roster from the dropped Everloot.lua, in the browser: repairs, vendor purchases, trades and mail show beside the uploaded categories, gold moved between your own characters stays out of the combined totals, and daily closing gold joins the history. Nothing is uploaded.
 - Site: filter auction browsing by region, including unknown-region records, with matching counts and compact realm names that preserve the full recorded label on hover.
 - Site: private operations dashboard with owner-excluded contribution activity, source health, cost estimates and compact realm badges; optional per-upload character attribution stays under the contributor's control.
 - Site: a visible bug button on every page opens the existing GitHub report form, with Discord and email alternatives and private page URLs omitted.

@@ -3,7 +3,7 @@
 import Coins, { CoinText } from "@/components/ui/Coins";
 import { useEffect, useId, useState } from "react";
 import { Card, DataTable, SectionHeading, type Column } from "@/components/ui";
-import { parseEverlootLua } from "@/lib/sv-parse";
+import { parseEverlootLua, parseEverlootTable } from "@/lib/sv-parse";
 import {
   RIVER_DAYS, categoryLabel, characterKey, installHint, isMoneyLedger, narrowLedger, rosterLabel, summarizeMoney,
   type CategoryTotal, type GoldSeries, type MoneyLedger, type Receipt, type RiverDay, type RosterRow,
@@ -46,7 +46,11 @@ export default function LocalLedger() {
     setError(null); setReading(true);
     try {
       if (file.size > MAX_BYTES) throw new Error("This file is over 20 MB, which is larger than an Everloot.lua should be.");
-      const next = summarizeMoney(parseEverlootLua(await file.text()).records);
+      const text = await file.text();
+      const parsed = parseEverlootLua(text);
+      // The window's own ledger and roster sit beside the records; the upload never reads them, and neither leaves here.
+      const { ledger: local, roster } = parseEverlootTable(text);
+      const next = summarizeMoney(parsed.records, Date.now(), { installId: parsed.installId, ledger: local, roster });
       setLedger(next);
       if (remember) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     } catch (e) {
@@ -121,7 +125,7 @@ function LedgerView({ ledger }: { ledger: MoneyLedger }) {
       <WeekCard week={shown.week} who={who} />
       <Roster rows={ledger.roster} />
       <River days={shown.river} who={who} />
-      <Categories rows={shown.categories} who={who} />
+      <Categories rows={shown.categories} who={who} moved={chosen || ledger.roster.length < 2 ? 0 : shown.moved} />
       <Receipts rows={shown.receipts} total={shown.eventCount} />
       <History series={shown.history} />
     </div>
@@ -199,7 +203,7 @@ function River({ days, who }: { days: RiverDay[]; who: string }) {
   );
 }
 
-function Categories({ rows, who }: { rows: CategoryTotal[]; who: string }) {
+function Categories({ rows, who, moved }: { rows: CategoryTotal[]; who: string; moved: number }) {
   const columns: Column<CategoryTotal>[] = [
     { key: "category", header: "Category", nowrap: true, cell: (r) => categoryLabel(r.category) },
     { key: "direction", header: "In or out", cell: (r) => r.direction },
@@ -211,6 +215,11 @@ function Categories({ rows, who }: { rows: CategoryTotal[]; who: string }) {
       <SectionHeading id="ledger-categories" note={`Every money event in the file, ${who}.`}>Categories</SectionHeading>
       <DataTable caption="Money per category" columns={columns} rows={rows} rowKey={(r) => r.category}
         empty={<p className="px-4 py-6 text-sm text-fg-2">This file has no money events yet.</p>} />
+      {moved > 0 && (
+        <p className="mt-2 text-sm text-muted">
+          <Coins copper={moved} /> moved between your own characters by trade or mail is left out: the gold stayed yours.
+        </p>
+      )}
     </section>
   );
 }
@@ -219,7 +228,7 @@ function Receipts({ rows, total }: { rows: Receipt[]; total: number }) {
   const columns: Column<Receipt>[] = [
     { key: "at", header: "When", nowrap: true, cell: (r) => when(r.at) },
     { key: "character", header: "Character", nowrap: true, cell: (r) => r.character },
-    { key: "category", header: "Category", nowrap: true, cell: (r) => categoryLabel(r.category) },
+    { key: "category", header: "Category", nowrap: true, cell: (r) => <>{categoryLabel(r.category)}{r.ownAlt && <span className="text-muted">, your character</span>}</> },
     { key: "copper", header: "Amount", numeric: true, cell: (r) => <span className={r.direction === "out" ? "text-warning" : "text-fg"}>{r.direction === "out" ? "-" : "+"}<CoinText text={formatCopper(r.copper)} /></span> },
   ];
   return (

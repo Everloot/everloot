@@ -172,10 +172,11 @@ test("a sighting row that calls itself a gold snapshot is not a character's gold
   expect(summarizeMoney(parseEverlootLua(lua).records, NOW).roster).toEqual([]);
 });
 
-test("in and out follow the server ledger: vendor sales are money in", () => {
-  expect(["flight", "postage", "barber", "respec", "auction_spend"].map(directionOf)).toEqual(Array(5).fill("out"));
-  expect(["loot", "quest", "vendor", "auction"].map(directionOf)).toEqual(["in", "in", "in", "in"]);
-  expect(categoryLabel("auction_spend")).toBe("auction spend");
+test("in and out follow the addon's ledger: vendor sales are money in, vendor purchases out", () => {
+  expect(["flight", "postage", "barber", "respec", "auction_spend", "repair", "vendor_spend", "trade_out", "mail_out"].map(directionOf)).toEqual(Array(9).fill("out"));
+  expect(["loot", "quest", "vendor", "auction", "trade_in", "mail_in"].map(directionOf)).toEqual(Array(6).fill("in"));
+  expect(categoryLabel("auction_spend")).toBe("Auction purchases");
+  expect(categoryLabel("something_new")).toBe("something new");
 });
 
 test("thin keeps the first and last point", () => {
