@@ -149,7 +149,7 @@ function WeekCard({ week, who }: { week: MoneyLedger["week"]; who: string }) {
   ];
   return (
     <Card as="section" aria-labelledby="ledger-week">
-      <SectionHeading id="ledger-week" note={`The last 7 days, ${who}.`}>This week</SectionHeading>
+      <SectionHeading id="ledger-week" note={`The last 7 × 24 hours up to now, ${who}. The periods below count whole UTC days.`}>This week</SectionHeading>
       <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
         {facts.map((f) => (
           <div key={f.label} className="min-w-0">
@@ -262,10 +262,12 @@ function GoldLine({ points }: { points: GoldSeries["points"] }) {
   const x = (t: number) => LINE.pad + ((t - t0) / span) * (LINE.width - 2 * LINE.pad);
   const y = (c: number) => LINE.height - LINE.pad - (c / high) * (LINE.height - 2 * LINE.pad);
   const xy = points.map((p, i) => [points.length === 1 ? LINE.width / 2 : x(times[i]!), y(p.copper)] as const);
+  // One snapshot has no segment to draw, so it shows as a level line: the gold known, with no change over time.
+  const line = points.length === 1 ? [[LINE.pad, xy[0]![1]] as const, [LINE.width - LINE.pad, xy[0]![1]] as const] : xy;
   return (
     <svg data-gold-line viewBox={`0 0 ${LINE.width} ${LINE.height}`} preserveAspectRatio="none" aria-hidden="true"
       className="mt-2 h-16 w-full border-b border-line text-accent">
-      <polyline points={xy.map(([a, b]) => `${a.toFixed(1)},${b.toFixed(1)}`).join(" ")} fill="none" stroke="currentColor"
+      <polyline points={line.map(([a, b]) => `${a.toFixed(1)},${b.toFixed(1)}`).join(" ")} fill="none" stroke="currentColor"
         strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
       {xy.map(([a], i) => (
         <rect key={i} x={a - 6} y={0} width={12} height={LINE.height} fill="transparent">

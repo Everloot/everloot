@@ -181,14 +181,14 @@ test("choosing a character narrows the week, categories and receipts to them and
   expect([...select.options].map((o) => o.textContent)).toEqual(["All characters", "Thrall (Moon Guard)", "Jaina (Moon Guard)"]);
   const notes = () => container.textContent!;
   const receipts = () => [...container.querySelectorAll('[aria-labelledby="ledger-receipts"] tbody tr')].map((tr) => tr.textContent);
-  expect(notes()).toContain("The last 7 days, all characters.");
+  expect(notes()).toContain("The last 7 × 24 hours up to now, all characters.");
   expect(receipts()).toHaveLength(3);
 
   await act(async () => {
     select.value = "1:Thrall-Moon Guard";
     select.dispatchEvent(new Event("change", { bubbles: true }));
   });
-  expect(notes()).toContain("The last 7 days, Thrall (Moon Guard).");
+  expect(notes()).toContain("The last 7 × 24 hours up to now, Thrall (Moon Guard).");
   expect(notes()).toContain("Every money event in the file, Thrall (Moon Guard).");
   expect(notes()).not.toContain("all characters");
   expect(receipts()).toHaveLength(2);

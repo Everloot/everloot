@@ -103,6 +103,20 @@ function CategoryList({ rows, total, days }: { rows: PeriodCategory[]; total: nu
 }
 
 const CHART_PX = 128;
+const GAP_PX = 2;
+
+/**
+ * Each segment's height in a column of `column` pixels, bottom first, so the stack never grows past the column: the
+ * 2px gaps between segments are kept only when every segment still gets at least a pixel, and the heights share
+ * what is left in proportion to the copper. `gap` is the space above a segment (none above the top one).
+ */
+export function stack(parts: { category: string; copper: number }[], column: number): { category: string; px: number; gap: number }[] {
+  const total = parts.reduce((n, p) => n + p.copper, 0);
+  if (!parts.length || total <= 0 || column <= 0) return [];
+  const gap = column - GAP_PX * (parts.length - 1) >= parts.length ? GAP_PX : 0;
+  const room = column - gap * (parts.length - 1);
+  return parts.map((p, i) => ({ category: p.category, px: (room * p.copper) / total, gap: i === parts.length - 1 ? 0 : gap }));
+}
 
 /** Each day's spending as a stacked column, one colour per category, with a legend naming the colours. */
 function DailySpending({ stats }: { stats: PeriodStats }) {
@@ -125,10 +139,10 @@ function DailySpending({ stats }: { stats: PeriodStats }) {
           return (
             <li key={d.date} className="flex h-full min-w-0 max-w-16 flex-1 flex-col-reverse" title={detail ? `${label} (${detail})` : label}>
               <span className="sr-only">{detail ? `${label}. ${detail}.` : label}</span>
-              <div aria-hidden="true" className="flex flex-col-reverse gap-0.5" style={{ height: column }}>
-                {parts.map((p) => (
-                  <div key={p.category} className="min-h-[2px] w-full first:rounded-b-none last:rounded-t-sm"
-                    style={{ flexGrow: p.copper, flexBasis: 0, backgroundColor: colorOf(p.category) }} />
+              <div aria-hidden="true" className="flex flex-col-reverse" style={{ height: column }}>
+                {stack(parts, column).map((p, i) => (
+                  <div key={p.category} className={`w-full shrink-0 ${i === parts.length - 1 ? "rounded-t-sm" : ""}`}
+                    style={{ height: p.px, marginTop: p.gap, backgroundColor: colorOf(p.category) }} />
                 ))}
               </div>
             </li>

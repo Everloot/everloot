@@ -291,7 +291,9 @@ export function periodStats(ledger: Pick<MoneyLedger, "river" | "firstAt">, days
   const before = ledger.river.length >= days * 2 ? ledger.river.slice(-days * 2, -days) : null;
   const from = river[0]?.date ?? "", to = river.at(-1)?.date ?? "";
   const firstDay = ledger.firstAt ? ledger.firstAt.slice(0, 10) : null;
-  const covered = before !== null && firstDay !== null && firstDay <= before[0]!.date;
+  // The period before counts only when the data began by its first midnight: a first event late on that day leaves the
+  // day mostly unseen.
+  const covered = before !== null && ledger.firstAt !== null && Date.parse(ledger.firstAt) <= Date.parse(`${before[0]!.date}T00:00:00Z`);
   const sum = (list: RiverDay[], direction: Direction) => list.reduce((n, d) => n + d[direction], 0);
   const byCategory = (list: RiverDay[], direction: Direction) => {
     const out = new Map<string, number>();
@@ -409,13 +411,14 @@ export function summarizeMoney(records: ReadonlyArray<Record<string, unknown>>, 
   const ledgerSales = ledgerTable?.sales;
   for (const raw of Array.isArray(ledgerSales) ? ledgerSales as unknown[] : []) {
     const s = table(raw);
-    const who = s && typeof s.key === "string" ? named.get(s.key) : undefined;
-    if (!s || !who || !whole(s.at, 0) || !itemName(s.itemName)) continue;
+    const ref = s && typeof s.key === "string" ? named.get(s.key) : undefined;
+    const ms = s ? secondsMs(s.at) : null;
+    if (!s || !ref || ms === null || !itemName(s.itemName)) continue;
     const paid = s.status === "paid";
     if (paid ? !(whole(s.count, 1) && whole(s.total, 1)) : s.status !== "pending") continue;
-    const row = rosterRow(who)!;
+    const row = rosterRow(ref.id, ref.twin)!;
     sales.push({
-      install: row.install, character: row.character, realm: row.realm, ms: s.at * 1000, itemName: s.itemName as string,
+      ...who(row), ms, itemName: s.itemName as string,
       units: paid ? s.count as number : 0, total: paid ? s.total as number : 0, cut: paid && whole(s.cut, 0) ? s.cut : 0, paid,
     });
   }
@@ -503,12 +506,32 @@ export function isMoneyLedger(value: unknown): value is MoneyLedger {
   const v = value as Record<string, unknown>;
   // A summary saved before rows kept their install has none: it is read again from the file rather than merged by name.
   // One saved before the local ledger was read has no `moved`, and is read again too.
+  // One saved before the spending insights has a 30-day river and no largest payments or sales: read again too. The
+  // parts the page computes on are checked for every character, so an edited summary cannot break the page.
   return typeof v.madeAt === "string" && Array.isArray(v.roster) && v.roster.every((r) => typeof (r as { install?: unknown })?.install === "number")
-    && Array.isArray(v.river) && Array.isArray(v.categories)
-    && Array.isArray(v.receipts) && Array.isArray(v.history) && typeof v.eventCount === "number" && typeof v.moved === "number"
-    // One saved before the spending insights has a 30-day river and no largest payments or sales: read again too.
-    && v.river.length === RIVER_DAYS && typeof v.largest === "object" && v.largest !== null
-    && PERIODS.every((p) => Array.isArray((v.largest as Record<number, unknown>)[p]))
-    && typeof v.sales === "object" && v.sales !== null && Array.isArray((v.sales as { items?: unknown }).items)
-    && typeof v.week === "object" && v.week !== null && typeof v.byCharacter === "object" && v.byCharacter !== null;
+    && isCharacterMoney(v) && typeof v.byCharacter === "object" && v.byCharacter !== null && !Array.isArray(v.byCharacter)
+    && Object.values(v.byCharacter).every(isCharacterMoney);
+}
+
+const isNumber = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+
+/** The shape of the money parts a narrowed ledger replaces, as periodStats and the insights read them. */
+function isCharacterMoney(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  const week = v.week as Record<string, unknown> | null;
+  const sales = v.sales as Record<string, unknown> | null;
+  const largest = v.largest as Record<number, unknown> | null;
+  return Array.isArray(v.river) && v.river.length === RIVER_DAYS
+    && v.river.every((d: unknown) => {
+      const day = d as Record<string, unknown> | null;
+      return !!day && typeof day.date === "string" && isNumber(day.in) && isNumber(day.out) && typeof day.byCategory === "object" && day.byCategory !== null;
+    })
+    && Array.isArray(v.categories) && Array.isArray(v.receipts) && Array.isArray(v.history)
+    && isNumber(v.eventCount) && isNumber(v.moved)
+    && (v.firstAt === null || (typeof v.firstAt === "string" && Number.isFinite(Date.parse(v.firstAt))))
+    && typeof week === "object" && week !== null && isNumber(week.in) && isNumber(week.out) && isNumber(week.net)
+    && typeof largest === "object" && largest !== null && PERIODS.every((p) => Array.isArray(largest[p]))
+    && typeof sales === "object" && sales !== null && Array.isArray(sales.items)
+    && ["total", "cut", "sales", "units", "pending"].every((k) => isNumber(sales[k]));
 }

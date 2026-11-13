@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { SPENDING_COLOR } from "../app/tools/gold-ledger/SpendingInsights";
+import { SPENDING_COLOR, stack } from "../app/tools/gold-ledger/SpendingInsights";
 import { LEDGER_SPENDING, RIVER_DAYS, change, isMoneyLedger, narrowLedger, periodStats, summarizeMoney } from "./money-ledger";
 
 // 2026-11-12 noon UTC; the 7-day period is 11-06..11-12, the one before 10-30..11-05.
@@ -50,6 +50,14 @@ describe("periodStats", () => {
     expect(month.outPerDay).toBe(Math.round(7_000 / 24));
     expect(periodStats(ledger, 90).previous).toBeNull();
     expect(periodStats(read([]), 30)).toMatchObject({ in: 0, out: 0, outPerDay: 0, previous: null, spending: [] });
+  });
+
+  test("the period before counts only when the data began by its first midnight", () => {
+    // 7 days before 11-06..11-12 is 10-30..11-05.
+    const late = read([ev("a", "2026-10-30T23:59:59Z", "quest", 1), ev("a", "2026-11-10T10:00:00Z", "repair", 5)]);
+    expect(periodStats(late, 7).previous).toBeNull();
+    const onTime = read([ev("a", "2026-10-30T00:00:00Z", "quest", 1), ev("a", "2026-11-10T10:00:00Z", "repair", 5)]);
+    expect(periodStats(onTime, 7).previous).toEqual({ in: 1, out: 0 });
   });
 
   test("change is a whole percent, or null with nothing before", () => {
@@ -111,6 +119,25 @@ test("a summary remembered before the insights (a 30-day river) is read from the
   expect(isMoneyLedger({ ...fresh, river: fresh.river.slice(-30) })).toBe(false);
   const { sales: _sales, ...noSales } = fresh;
   expect(isMoneyLedger(noSales)).toBe(false);
+  // Edited values the page computes on are refused rather than crashing it.
+  expect(isMoneyLedger({ ...fresh, firstAt: 37 })).toBe(false);
+  expect(isMoneyLedger({ ...fresh, firstAt: "not a time" })).toBe(false);
+  expect(isMoneyLedger({ ...fresh, sales: { ...fresh.sales, cut: "x" } })).toBe(false);
+  expect(isMoneyLedger({ ...fresh, river: fresh.river.map((d, i) => (i ? d : { ...d, out: "1" })) })).toBe(false);
+  const withOne = read([ev("a", "2026-11-10T10:00:00Z", "repair", 5)]);
+  const key = Object.keys(withOne.byCharacter)[0]!;
+  expect(isMoneyLedger(withOne)).toBe(true);
+  expect(isMoneyLedger({ ...withOne, byCharacter: { [key]: { ...withOne.byCharacter[key], largest: {} } } })).toBe(false);
+});
+
+test("a stacked column never grows past its height: gaps go first, then the heights share what is left", () => {
+  const nine = Object.keys(SPENDING_COLOR).map((category) => ({ category, copper: 1 }));
+  const tiny = stack(nine, 2);
+  expect(tiny.reduce((n, p) => n + p.px + p.gap, 0)).toBeCloseTo(2);
+  expect(tiny.every((p) => p.gap === 0)).toBe(true);
+  const tall = stack([{ category: "repair", copper: 3 }, { category: "flight", copper: 1 }], 100);
+  expect(tall).toEqual([{ category: "repair", px: 73.5, gap: 2 }, { category: "flight", px: 24.5, gap: 0 }]);
+  expect(stack([], 50)).toEqual([]);
 });
 
 test("every spending category the addon writes has its own chart colour", () => {
