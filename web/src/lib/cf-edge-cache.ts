@@ -27,7 +27,7 @@ const SESSION_PATHS: readonly string[] = ["/api/auth", "/api/me", "/me", "/sign-
 
 /**
  * The pages that hold a session or the account, and the ad-free pages (data/ad-free-paths.json): the Blizzard
- * auction page may show nothing older than 30 days, and a shared copy would outlive that. They are never looked up
+ * auction page and the armory may show nothing older than 30 days, and a shared copy would outlive that. They are never looked up
  * in, or stored in, the shared cache.
  */
 const PRIVATE_PATHS: readonly string[] = [...PROTECTED_PATHS, ...AD_FREE_PATHS, ...SESSION_PATHS];

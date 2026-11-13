@@ -71,5 +71,9 @@ export function middleware(req: NextRequest) {
 
 // The ad-free pages under every version prefix (data/build-versions.json); adFreeDocumentOnly decides by the served one.
 export const config = {
-  matcher: ["/", "/ops/:path*", "/api/ops/:path*", "/blizzard-auctions/:path*", "/beta/blizzard-auctions/:path*", "/ptr/blizzard-auctions/:path*"],
+  matcher: [
+    "/", "/ops/:path*", "/api/ops/:path*",
+    "/blizzard-auctions/:path*", "/beta/blizzard-auctions/:path*", "/ptr/blizzard-auctions/:path*",
+    "/armory/:path*", "/beta/armory/:path*", "/ptr/armory/:path*",
+  ],
 };
