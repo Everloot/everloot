@@ -163,6 +163,7 @@ test("only the public pages rendered per request are marked for the shared CDN c
     "/search",
     "/tools/auctions",
     "/tools/auctions/:realm",
+    "/tools/auctions/:realm/:itemId",
     "/tools/professions/:path*",
   ].sort());
   // The pages that hold a session, the account or a collection never join that list, whatever a future edit adds.
@@ -251,11 +252,11 @@ test("every path in the CORS list sends Access-Control-Allow-Origin, and the API
   }
 });
 
-test("auction browse pages are shared for five minutes, leaving item pages unchanged", async () => {
-  for (const path of ["/tools/auctions", "/tools/auctions/forever", "/tools/auctions/era-us-pvp"]) {
+test("auction browse and item pages are shared for five minutes, deeper paths are not", async () => {
+  for (const path of ["/tools/auctions", "/tools/auctions/forever", "/tools/auctions/era-us-pvp", "/tools/auctions/item/2589", "/tools/auctions/forever/2589"]) {
     expect((await headersFor(path))["CDN-Cache-Control"], path).toBe("max-age=300");
   }
-  for (const path of ["/tools/auctions/item/2589", "/tools/auctions/forever/2589"]) {
+  for (const path of ["/tools/auctions/forever/2589/extra"]) {
     expect(await headersFor(path), path).not.toHaveProperty("CDN-Cache-Control");
   }
 });
