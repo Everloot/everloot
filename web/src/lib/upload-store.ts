@@ -456,7 +456,7 @@ export function createUploadStore(opts: {
    * read window once more and skips those. `rebuild` starts from empty and folds the whole window in one run.
    * A missed object writes nothing, so the next run reads it again.
    */
-  async function writeMarket(opts: { rebuild?: boolean; idle?: boolean } = {}): Promise<{ added: number; scans: number; remaining?: number; dropped?: number; trimmedDays?: number; skipped?: boolean }> {
+  async function writeMarket(opts: { rebuild?: boolean; idle?: boolean } = {}): Promise<{ added: number; scans: number; remaining?: number; dropped?: number; released?: number; trimmedDays?: number; skipped?: boolean }> {
     if (!cloud) throw new Error("the market rollup needs the cloud store");
     const current = await readMarketSnapshot();
     if (current && (!current.etag || current.etag.startsWith("W/"))) throw new Error("market rollup has no strong ETag: cannot safely update it");
@@ -475,7 +475,7 @@ export function createUploadStore(opts: {
     const fresh = opts.rebuild ? unseen : unseen.slice(0, marketBatch);
     let state = prev?.state ?? emptyMarket();
     let scans = 0;
-    const stats: FoldStats = { dropped: 0 };
+    const stats: FoldStats = { dropped: 0, released: 0 };
     for (let i = 0; i < fresh.length; i += MARKET_FOLD_BATCH) {
       const { payloads, missed } = await readPayloads(fresh.slice(i, i + MARKET_FOLD_BATCH).map((r) => r.object_key));
       if (missed) throw new Error("upload object unreadable");
@@ -512,7 +512,7 @@ export function createUploadStore(opts: {
     });
     if (!put.ok) throw new Error(`market write failed (${put.status})`);
     marketCached = null;
-    return { added: fresh.length, scans, remaining: unseen.length - fresh.length, dropped: stats.dropped, trimmedDays };
+    return { added: fresh.length, scans, remaining: unseen.length - fresh.length, dropped: stats.dropped, released: stats.released, trimmedDays };
   }
 
   async function loadMarket(): Promise<Market> {

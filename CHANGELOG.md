@@ -209,6 +209,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   dates from before the feed existed are marked estimated.
 
 ### Fixed
+- Site: auction prices keep updating when the market rollup is full: the oldest open scan day closes early (its public prices kept) instead of new scans being refused, one uploader cannot take more than a third of the room, and dropped scans no longer leave empty days behind.
 - Site: avoid compiling game-file name matchers for absent ASCII names when answering sourced questions, reducing cold-start CPU work.
 - Site: the header shows the build whose files the site reads and the newest build seen, each linked to what it means.
 - Site: /api/suggest spends the per-IP quota and shares one edge cache entry for `Thunder` and `thunder `, the coverage 400 and waitlist 503 are `no-store` (the 503 adds `Retry-After`), and the docs list every route that sends CORS from one file.

@@ -256,6 +256,79 @@ test("past the size limit the oldest closed days go first, a day at a time, and 
   expect(marketBytes(all.state)).toBeGreaterThan(0);
 });
 
+test("a full rollup closes its oldest open day early to take a newer scan: that day's public values stay", () => {
+  const older = foldMarket(emptyMarket(), three("2026-10-18", [100, 300, 500]), NOW);
+  const stats = { dropped: 0, released: 0 };
+  const state = foldMarket(older, three("2026-10-20", [100, 300, 500]), NOW, { entries: 3 }, stats);
+  expect(stats).toEqual({ dropped: 0, released: 3 });
+  expect(state.realms.forever!.items["2589"]!.closed).toEqual({ "2026-10-18": [300, 310, 100, 3] });
+  expect(Object.keys(state.realms.forever!.items["2589"]!.open)).toEqual(["2026-10-20"]);
+  expect(itemMarket(state, "Forever", 2589, NOW).points.map((p) => p.day)).toEqual(["2026-10-18", "2026-10-20"]);
+});
+
+test("an oldest open day that never reached 3 reporters is discarded to make room", () => {
+  const pending = foldMarket(emptyMarket(), three("2026-10-18", [100, 300, 500]).slice(0, 2), NOW);
+  const stats = { dropped: 0, released: 0 };
+  const state = foldMarket(pending, three("2026-10-20", [100, 300, 500]), NOW, { entries: 3 }, stats);
+  expect(stats).toEqual({ dropped: 0, released: 2 });
+  expect(state.realms.forever!.items["2589"]!.closed).toEqual({});
+  expect(itemMarket(state, "Forever", 2589, NOW).points.map((p) => p.day)).toEqual(["2026-10-20"]);
+});
+
+test("a full rollup never closes the day a scan is for, or a newer one: that scan is dropped", () => {
+  const full = foldMarket(emptyMarket(), three("2026-10-20", [100, 300, 500]), NOW, { entries: 3 });
+  const stats = { dropped: 0, released: 0 };
+  const late = [snapshot("install-d", "2026-10-18", [[2589, 1, 1, 5, 5]]), snapshot("install-d", "2026-10-20", [[2589, 1, 1, 5, 5]])];
+  const state = foldMarket(full, late, NOW, { entries: 3 }, stats);
+  expect(stats).toEqual({ dropped: 2, released: 0 });
+  expect(Object.keys(state.realms.forever!.items["2589"]!.open)).toEqual(["2026-10-20"]);
+});
+
+test("a dropped scan leaves nothing behind: no empty day, and no item held against the item cap", () => {
+  const full = foldMarket(emptyMarket(), [snapshot("install-a", "2026-10-20", [[1, 1, 10, 5, 5]])], NOW, { entries: 1 });
+  const stats = { dropped: 0 };
+  const state = foldMarket(full, [snapshot("install-b", "2026-10-20", [[2, 1, 10, 5, 5]])], NOW, { entries: 1 }, stats);
+  expect(stats.dropped).toBe(1);
+  expect(Object.keys(state.realms.forever!.items)).toEqual(["1"]);
+});
+
+test("an empty open day an older fold left behind is removed, and its item with it", () => {
+  const state = foldMarket(emptyMarket(), three("2026-10-20", [100, 300, 500]), NOW);
+  state.realms.forever!.items["765"] = { open: { "2026-10-19": {} }, closed: {} };
+  state.realms.forever!.items["2589"]!.open["2026-10-19"] = {};
+  const next = foldMarket(state, [], NOW);
+  expect(Object.keys(next.realms.forever!.items)).toEqual(["2589"]);
+  expect(Object.keys(next.realms.forever!.items["2589"]!.open)).toEqual(["2026-10-20"]);
+});
+
+test("a reporter past its share makes room from its own oldest day, never from another reporter's", () => {
+  const held = foldMarket(emptyMarket(), [
+    snapshot("install-x", "2026-10-17", [[1, 1, 10, 5, 5], [2, 1, 10, 5, 5]], { reporter: reporter(1) }),
+    snapshot("install-y", "2026-10-17", [[3, 1, 10, 5, 5]], { reporter: reporter(2) }),
+    snapshot("install-x", "2026-10-18", [[1, 1, 10, 6, 6], [2, 1, 10, 6, 6]], { reporter: reporter(1) }),
+  ], NOW, { entriesPerReporter: 4 });
+  const stats = { dropped: 0, released: 0 };
+  const state = foldMarket(held, [snapshot("install-x", "2026-10-20", [[1, 1, 10, 7, 7]], { reporter: reporter(1) })], NOW, { entriesPerReporter: 4 }, stats);
+  expect(stats).toEqual({ dropped: 0, released: 2 });
+  const items = state.realms.forever!.items;
+  expect(Object.keys(items["1"]!.open)).toEqual(["2026-10-18", "2026-10-20"]);
+  expect(Object.keys(items["2"]!.open)).toEqual(["2026-10-18"]);
+  expect(Object.keys(items["3"]!.open)).toEqual(["2026-10-17"]);
+  expect(MARKET_LIMITS.entriesPerReporter).toBe(20_000);
+});
+
+test("a reporter whose whole share is on one day is dropped there, and other reporters still fold", () => {
+  const items = [1, 2, 3, 4, 5].map((id) => [id, 1, 10, 5, 5]);
+  const stats = { dropped: 0, released: 0 };
+  const state = foldMarket(emptyMarket(), [
+    snapshot("install-x", "2026-10-20", items, { reporter: reporter(1) }),
+    snapshot("install-y", "2026-10-20", [[1, 1, 10, 6, 6]], { reporter: reporter(2) }),
+  ], NOW, { entriesPerReporter: 3, entries: 4 }, stats);
+  expect(stats).toEqual({ dropped: 2, released: 0 });
+  expect(Object.keys(state.realms.forever!.items).sort()).toEqual(["1", "2", "3"]);
+  expect(Object.keys(state.realms.forever!.items["1"]!.open["2026-10-20"]!)).toEqual(["install-x", "install-y"]);
+});
+
 test("only well-formed auction parts are read: strings, floats, huge arrays and extra fields are dropped", () => {
   const bad = [
     snapshot("install-a", "2026-10-20", [[2589, 1, 10, 5.5, 5]]),
