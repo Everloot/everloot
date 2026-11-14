@@ -6,6 +6,7 @@ import { objectList } from "../../../../../kb/src/object-page";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
 import { loadObjectFacts } from "@/lib/objects";
 import { objectNames } from "@/lib/names";
+import { MAX_QUERY } from "@/lib/lore";
 import { LINK } from "../entity";
 import { listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, sortParam, sortRows, Unreadable, type ListQuery, type Search } from "../list-parts";
 
@@ -25,15 +26,22 @@ const NO_NAME = "No agreed name yet. A name needs 3 installs reporting the same 
 
 const href = (q: Partial<ListQuery<Sort>>) => listHref("/database/objects", [["q", q.q], ["sort", sortParam(q.sort)], ["page", q.page && q.page > 1 ? String(q.page) : undefined]]);
 
+/** Keep the full search query when following an all-matches link; shared sort/page validation still applies. */
+function objectQuery(search: Search) {
+  const q = listQuery(search, SORTS);
+  if (q && typeof search.q === "string") q.q = search.q.trim().slice(0, MAX_QUERY) || undefined;
+  return q;
+}
+
 export async function generateMetadata(props: { searchParams?: Promise<Search> }): Promise<Metadata> {
-  const q = listQuery((await props.searchParams) ?? {}, SORTS);
+  const q = objectQuery((await props.searchParams) ?? {});
   return listMetadata(META, Boolean(q) && !q!.q && !q!.sort, q?.page);
 }
 
 type Row = ReturnType<typeof objectList>[number];
 
 export default async function ObjectsPage(props: { searchParams?: Promise<Search> }) {
-  const q = listQuery((await props.searchParams) ?? {}, SORTS);
+  const q = objectQuery((await props.searchParams) ?? {});
   if (!q) notFound();
   const facts = await loadObjectFacts();
   const all = facts.unreachable ? [] : objectList(facts);
@@ -41,7 +49,7 @@ export default async function ObjectsPage(props: { searchParams?: Promise<Search
   // Numbers still find unnamed objects; text matches only names players agree on.
   const id = q.q && /^#?\d+$/.test(q.q) ? Number(q.q.replace("#", "")) : null;
   const text = q.q?.toLowerCase();
-  const matched = text ? all.filter((o) => id !== null ? o.objectId === id : names.get(o.objectId)?.toLowerCase().includes(text)) : all;
+  const matched = text ? all.filter((o) => o.objectId === id || names.get(o.objectId)?.toLowerCase().includes(text)) : all;
   const sort = q.sort ?? DEFAULT_SORT;
   const key = (o: Row): string | number | null => sort.key === "name" ? names.get(o.objectId)?.toLowerCase() ?? null
     : sort.key === "windows" ? o.windows : sort.key === "items" ? o.items : sort.key === "installs" ? o.reporters : o.objectId;

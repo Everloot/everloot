@@ -112,3 +112,29 @@ test("name-filtered object pagination keeps the encoded query and sort", async (
   expect(second).toContain('href="/database/objects/2050"');
   expect(second).not.toContain('href="/database/objects/2000"');
 });
+
+
+test("object-list links preserve numeric name matches as well as the exact id", async () => {
+  const records = ["a", "b", "c"].flatMap((install) => [
+    { ...loot(`install-${install}`, 55, [2770]), sourceObjectName: "Copper Vein" },
+    { ...loot(`install-${install}`, 56, [2770]), sourceObjectName: "Cache 55" },
+  ]);
+  store.loadCorpus.mockResolvedValue(corpus(records));
+  const list = await html(ObjectsPage({ searchParams: Promise.resolve({ q: "55" }) }));
+  expect(list).toContain('href="/database/objects/55"');
+  expect(list).toContain('href="/database/objects/56"');
+});
+
+test("long name queries retain the full search text when filtering and changing sort", async () => {
+  const prefix = "A".repeat(60);
+  const name = `${prefix} Copper`;
+  const records = ["a", "b", "c"].flatMap((install) => [
+    { ...loot(`install-${install}`, 55, [2770]), sourceObjectName: name },
+    { ...loot(`install-${install}`, 56, [2770]), sourceObjectName: `${prefix} Silver` },
+  ]);
+  store.loadCorpus.mockResolvedValue(corpus(records));
+  const list = await html(ObjectsPage({ searchParams: Promise.resolve({ q: name }) }));
+  expect(list).toContain('href="/database/objects/55"');
+  expect(list).not.toContain('href="/database/objects/56"');
+  expect(list).toContain(`href="/database/objects?q=${prefix}+Copper&amp;sort=-name"`);
+});
