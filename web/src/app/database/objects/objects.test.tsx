@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
@@ -75,4 +76,66 @@ test("an object name 3 installs agree on replaces the id on its page, title and 
   store.loadCorpus.mockResolvedValue(corpus([named("install-a", "Copper Vein"), named("install-b", "Copper Vein"), loot("install-c", 1731, [2770])]));
   expect(await html(ObjectPage(props("1731")))).toContain("Object 1731");
   expect(await html(ObjectsPage({}))).toContain("Object 1731</a>");
+});
+
+test("the object list filters agreed names case-insensitively and preserves the public gate and numeric lookup", async () => {
+  const records = ["a", "b", "c"].flatMap((install) => [
+    { ...loot(`install-${install}`, 1731, [2770]), sourceObjectName: "Copper Vein" },
+    { ...loot(`install-${install}`, 1732, [2770]), sourceObjectName: "Rich Copper Vein" },
+    { ...loot(`install-${install}`, 1733, [2770]), sourceObjectName: "Silver Vein" },
+  ]);
+  records.push(...["a", "b"].map((install) => ({ ...loot(`install-${install}`, 1734, [2770]), sourceObjectName: "Copper Vein Hidden" })));
+  store.loadCorpus.mockResolvedValue(corpus(records));
+  const filtered = await html(ObjectsPage({ searchParams: Promise.resolve({ q: "cOpPeR" }) }));
+  expect(filtered).toContain('href="/database/objects/1731"');
+  expect(filtered).toContain('href="/database/objects/1732"');
+  expect(filtered).not.toContain('href="/database/objects/1733"');
+  expect(filtered).not.toContain('href="/database/objects/1734"');
+  expect(new DOMParser().parseFromString(filtered, "text/html").body.textContent).toContain("2 objects");
+  expect(filtered).toContain("q=cOpPeR");
+  for (const q of ["1731", "#1731"]) {
+    const numeric = await html(ObjectsPage({ searchParams: Promise.resolve({ q }) }));
+    expect(numeric).toContain('href="/database/objects/1731"');
+    expect(numeric).not.toContain('href="/database/objects/1732"');
+  }
+  store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], unreachable: true });
+  expect(await html(ObjectsPage({ searchParams: Promise.resolve({ q: "copper" }) }))).toContain("Storage unreachable");
+});
+
+test("name-filtered object pagination keeps the encoded query and sort", async () => {
+  const records = Array.from({ length: 51 }, (_, i) => ["a", "b", "c"].map((install) => ({
+    ...loot(`install-${install}`, 2000 + i, [2770]), sourceObjectName: `Chest & Cache ${i}`,
+  }))).flat();
+  store.loadCorpus.mockResolvedValue(corpus(records));
+  const first = await html(ObjectsPage({ searchParams: Promise.resolve({ q: "Chest & Cache", sort: "id" }) }));
+  expect(first).toContain('href="/database/objects?q=Chest+%26+Cache&amp;sort=id&amp;page=2"');
+  const second = await html(ObjectsPage({ searchParams: Promise.resolve({ q: "Chest & Cache", sort: "id", page: "2" }) }));
+  expect(second).toContain('href="/database/objects/2050"');
+  expect(second).not.toContain('href="/database/objects/2000"');
+});
+
+
+test("object-list links preserve numeric name matches as well as the exact id", async () => {
+  const records = ["a", "b", "c"].flatMap((install) => [
+    { ...loot(`install-${install}`, 55, [2770]), sourceObjectName: "Copper Vein" },
+    { ...loot(`install-${install}`, 56, [2770]), sourceObjectName: "Cache 55" },
+  ]);
+  store.loadCorpus.mockResolvedValue(corpus(records));
+  const list = await html(ObjectsPage({ searchParams: Promise.resolve({ q: "55" }) }));
+  expect(list).toContain('href="/database/objects/55"');
+  expect(list).toContain('href="/database/objects/56"');
+});
+
+test("long name queries retain the full search text when filtering and changing sort", async () => {
+  const prefix = "A".repeat(60);
+  const name = `${prefix} Copper`;
+  const records = ["a", "b", "c"].flatMap((install) => [
+    { ...loot(`install-${install}`, 55, [2770]), sourceObjectName: name },
+    { ...loot(`install-${install}`, 56, [2770]), sourceObjectName: `${prefix} Silver` },
+  ]);
+  store.loadCorpus.mockResolvedValue(corpus(records));
+  const list = await html(ObjectsPage({ searchParams: Promise.resolve({ q: name }) }));
+  expect(list).toContain('href="/database/objects/55"');
+  expect(list).not.toContain('href="/database/objects/56"');
+  expect(list).toContain(`href="/database/objects?q=${prefix}+Copper&amp;sort=-name"`);
 });

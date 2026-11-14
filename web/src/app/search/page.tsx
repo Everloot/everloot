@@ -48,8 +48,8 @@ type Params = { q?: string | string[]; page?: string | string[]; type?: string |
 /** Rows a scoped search (`in=item`) lists; the overview lists 8 per type. */
 const SCOPED_LIMIT = 50;
 
-/** The paginated database list that takes the same `?q=`, for the scopes that have one (objects have no list). */
-const DATABASE_LIST = { item: "items", npc: "npcs", quest: "quests" } as const;
+/** The paginated database list that takes the same `?q=`, for each database scope. */
+const DATABASE_LIST = { item: "items", npc: "npcs", quest: "quests", object: "objects" } as const;
 
 /** What the search covers, each with the list it opens; shown before a query, under the field. No count: a count would read a store on every request. */
 const KINDS: { type: SearchType; href: string }[] = [
