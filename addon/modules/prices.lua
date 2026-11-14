@@ -246,7 +246,7 @@ local LEGACY_TIP = "no community price: the price file is from before houses wer
 local function priceLines(realm, itemId)
   local out = {}
   local function add(text, color, left, right, wrap)
-    out[#out + 1] = { text = text, r = color[1], g = color[2], b = color[3], left = left, right = right, wrap = wrap }
+    out[#out + 1] = { text = text, r = color[1], g = color[2], b = color[3], left = left, right = right, wrap = wrap, compact = color == WARN }
   end
   local entry = communityFor(realm)
   local row = communityRow(entry, itemId)
@@ -257,6 +257,7 @@ local function priceLines(realm, itemId)
     local house = entry.house .. " house"
     add("Everloot market " .. (row.market and E.Coins(row.market) or unrecorded) .. " · per unit · " .. house, LABEL,
       "Market value · " .. house, row.market and coinIcons(row.market) or quiet(unrecorded))
+    out[#out].compact = true
     add("  min " .. E.Coins(row.min), LABEL, "  Min buyout", coinIcons(row.min))
     add("  historical " .. E.Coins(row.historical), LABEL, "  Historical", coinIcons(row.historical))
     add(string.format("  %d units listed%s, %d reporters on %s", row.quantity, thin and " (thin)" or "", row.reporters, row.day), META)
@@ -283,6 +284,7 @@ local function priceLines(realm, itemId)
   if item then
     local hours = math.floor((time() - own.at) / 3600)
     add("Your scan: min " .. E.Coins(item[4]) .. " · per unit", OWN, "Your scan · min buyout", coinIcons(item[4]))
+    out[#out].compact = true
     add("  value " .. E.Coins(item[5]), OWN, "  Value", coinIcons(item[5]))
     add(string.format("  %d units listed, scanned %s, %s", item[3], hours < 1 and "under 1 h ago" or (hours .. " h ago"),
       own.house and (own.house .. " house") or "house not recorded"), META)
@@ -483,6 +485,8 @@ end
 local TOOLTIP_HEADER = "|TInterface\\AddOns\\Everloot\\media\\crest:14:14:0:0:128:128:36:92:36:92|t Everloot"
 
 local function addLines(tooltip, itemId)
+  local mode = type(EverlootDB) == "table" and EverlootDB.tooltip or "full"
+  if mode == "off" then return end
   local realm = GetRealmName and GetRealmName()
   if type(realm) ~= "string" or realm == "" then return end
   -- Without the file the tooltip stays quiet, so the first item tooltip says once per install, in chat, where
@@ -494,6 +498,12 @@ local function addLines(tooltip, itemId)
   end
   local lines, entry
   if market then lines, entry = priceLines(realm, itemId) else lines, entry = {}, communityFor(realm) end
+  if mode == "compact" then
+    local compact = {}
+    for _, line in ipairs(lines) do if line.compact then compact[#compact + 1] = line end end
+    lines = compact
+    history, sources = false, false
+  end
   local priced = #lines
   if history then
     for _, line in ipairs(historyLines(realm, itemId)) do lines[#lines + 1] = line end

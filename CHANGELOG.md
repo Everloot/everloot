@@ -218,6 +218,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: /tools/bags shows the cheapest bag of each size on one realm's auction house and what each added slot costs over your smallest bag, and item tooltips print a bag's "14 Slot Bag" line; slot counts come from the game files, prices from players' scans.
 
 ### Fixed
+- Addon: Settings stays inside the Everloot window, counts every populated record kind and names item facts; a Full / Compact / Off selector controls tooltip detail without changing recording. Needs an in-game layout check before release.
 - Site: bag upgrade pickers offer publicly priced sizes and preserve bags selected in saved links, without suggesting unpriced test containers.
 - Docs: the project overview links current downloads and explains paired addon/Desktop App updates for community prices.
 - Site: malformed URL fragments keep the default or current database tab usable, including click and keyboard navigation.

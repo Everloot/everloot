@@ -43,6 +43,13 @@ function Frame.SetPoint(self, ...) self.point = { ... } end
 function Frame.SetWidth(self, w) self.width = w end
 function Frame.SetSize(self, w, h) self.width, self.height = w, h end
 function Frame.GetText(self) return self.text end
+function Frame.GetWidth(self) return rawget(self, 'width') or 560 end
+function Frame.GetHeight(self) return rawget(self, 'height') or 220 end
+function Frame.GetStringHeight(self) return 12 * math.max(1, math.ceil(#(rawget(self, 'text') or '') * 6 / (rawget(self, 'width') or 560))) end
+function Frame.GetVerticalScroll(self) return rawget(self, 'offset') or 0 end
+function Frame.SetVerticalScroll(self, v) self.offset = v end
+function Frame.SetParent(self, parent) self.parentSet = parent end
+
 function Frame.Show(self) self.shown = true end
 function Frame.Hide(self) self.shown = false end
 function Frame.IsShown(self) return self.shown == true end
