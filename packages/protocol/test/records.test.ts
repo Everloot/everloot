@@ -422,6 +422,25 @@ describe("intake contract", () => {
     expect(bare.rejected.map((row) => row.reason)).toContain("loot needs a source: npc, object or item");
   });
 
+  test("an empty-window row is an empty kill window on an npc and nothing else", () => {
+    const empty = { ...base, kind: "loot", sourceEvidence: "empty-window", lootType: "kill", sourceNpcId: 1234, items: [] };
+    const result = parseRecords([
+      empty,
+      { ...empty, items: [{ itemId: 2589, count: 1 }] },
+      { ...empty, copper: 12 },
+      { ...empty, lootType: "skinning" },
+      { ...empty, lootType: undefined },
+      { ...empty, sourceNpcId: undefined, sourceObjectId: 1618 },
+      { ...empty, sourceItemId: 2455 },
+      { ...empty, sourceEvidence: "target" },
+    ]);
+    expect(result.records).toEqual([expect.objectContaining({ sourceEvidence: "empty-window", sourceNpcId: 1234, items: [] })]);
+    expect(result.receipt.rejected.map((r) => r.index)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(result.receipt.rejected.slice(0, 6).map((r) => r.reason)).toEqual(Array(6).fill(
+      "an empty-window row is a kill window on an npc with no items and no coin",
+    ));
+  });
+
   test("accepts a gold snapshot and a loot money event", () => {
     const r = validateUpload({
       addonVersion: "0.1.0",

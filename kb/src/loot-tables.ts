@@ -1,12 +1,13 @@
 /**
  * The NPC loot table and the item-source table (docs/design/specs/2026-10-21-loot-tables-design.md, section 9).
- * One reading of the addon's loot windows, the ones the loot API attributed (`sourceEvidence: "loot-api"`), with
+ * One reading of the addon's loot windows, the ones the loot API attributed (`sourceEvidence: "loot-api"`) and the
+ * empty ones the addon tied to their corpse (`empty-window`, which only add to a source's windows), with
  * every number's denominator and dates beside it. A rate is windows holding the item over the source's windows,
  * shown once 3 installs looted the source: the public rows are `rollupDrops`' public rates. Below that, a page says
  * how many windows from how many installs it has, and no item is tied to a source. Recorder windows never enter
  * here; `pending-loot.ts` counts them apart.
  */
-import { countsAsKillOrGather, INDEPENDENT_INSTALLS } from "./drop-rollup.js";
+import { countsAsKillOrGather, INDEPENDENT_INSTALLS, isCountedLootEvidence } from "./drop-rollup.js";
 
 /** A source's windows: how many, from how many installs, and the first and last capture day (UTC). */
 export interface WindowSpan { windows: number; installs: number; first: string | null; last: string | null }
@@ -66,7 +67,7 @@ export function lootTablesFromRecords(records: readonly unknown[], asOf: Date | 
   for (const raw of records) {
     if (!raw || typeof raw !== "object") continue;
     const row = raw as Record<string, unknown>;
-    if (row.kind !== "loot" || row.sourceEvidence !== "loot-api" || !Array.isArray(row.items)) continue;
+    if (row.kind !== "loot" || !isCountedLootEvidence(row) || !Array.isArray(row.items)) continue;
     if (!countsAsKillOrGather(row.lootType)) continue;
     const installId = typeof row.installId === "string" ? row.installId.trim() : "";
     const key = positive(row.sourceNpcId) ? `npc:${row.sourceNpcId}` : positive(row.sourceObjectId) ? `obj:${row.sourceObjectId}` : null;
@@ -176,4 +177,4 @@ export function shortLine(short: { windows: number; installs: number }): string 
 }
 
 /** How the rates under a table were made. */
-export const METHOD_LINE = "Observed frequency is the loot windows holding the item out of the loot windows opened on the source, from windows the game's loot API attributed, recorded by the Everloot addon. A window is a loot, not a kill.";
+export const METHOD_LINE = "Observed frequency is the loot windows holding the item out of the loot windows opened on the source, from windows the game's loot API attributed and windows that held nothing, recorded by the Everloot addon. A window is a loot, not a kill.";
