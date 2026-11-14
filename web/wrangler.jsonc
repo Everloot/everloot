@@ -95,7 +95,7 @@
     "PROTOCOL_SCHEMA_DIR": "/bundle/repo/protocol-schema",
     // web/src/lib/release.ts serves KNOWLEDGE_D1 only when its release_meta row names this sha256 (the release's
     // manifest), so a database from another release, or a half-finished import, answers "unavailable".
-    "KNOWLEDGE_RELEASE_SHA256": "6bcd27976d32ce83ccd392e3753d41e2951fcd1004c6a67b3014777eb3861a38"
+    "KNOWLEDGE_RELEASE_SHA256": "1bb05d2c17ffcbf14d2a249ba7f6c64c6164c337a4b220a170e89a989d3d8aa0"
   },
   "observability": {
     "enabled": true,
