@@ -218,6 +218,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: /tools/bags shows the cheapest bag of each size on one realm's auction house and what each added slot costs over your smallest bag, and item tooltips print a bag's "14 Slot Bag" line; slot counts come from the game files, prices from players' scans.
 
 ### Fixed
+- Site: bag upgrade pickers offer publicly priced sizes and preserve bags selected in saved links, without suggesting unpriced test containers.
 - Docs: the project overview links current downloads and explains paired addon/Desktop App updates for community prices.
 - Site: malformed URL fragments keep the default or current database tab usable, including click and keyboard navigation.
 - Site: the armory loads no ads or analytics: AdSense Auto ads was filling its pages, which show Blizzard API data. A move to it from another page now loads a new document, like the Blizzard auction page.
