@@ -61,9 +61,12 @@
       "maximum": 10000000000
     },
     "sourceEvidence": {
-      "description": "Legacy target guesses are withheld from public loot observations.",
+      "description": "Where the source came from (`loot-api`: the loot API named it; `empty-window`: a kill window with nothing in it, which the loot API cannot name, so the addon took the one dead creature the player could loot, and the row has no items and no coin, so it only adds a window to the count of its source). Legacy target guesses are withheld from public loot observations.",
       "type": "string",
-      "const": "loot-api"
+      "enum": [
+        "loot-api",
+        "empty-window"
+      ]
     },
     "items": {
       "maxItems": 50,
@@ -130,5 +133,5 @@
     "kind",
     "items"
   ],
-  "description": "Everloot upload record: loot. The server also checks: loot needs a source: npc, object or item; a loot position needs mapId, x and y together."
+  "description": "Everloot upload record: loot. The server also checks: loot needs a source: npc, object or item; a loot position needs mapId, x and y together; an empty-window row is a kill window on an npc with no items and no coin."
 }

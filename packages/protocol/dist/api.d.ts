@@ -517,7 +517,10 @@ export declare const intakeRequest: z.ZodObject<{
             skinning: "skinning";
         }>>;
         copper: z.ZodOptional<z.ZodNumber>;
-        sourceEvidence: z.ZodOptional<z.ZodLiteral<"loot-api">>;
+        sourceEvidence: z.ZodOptional<z.ZodEnum<{
+            "empty-window": "empty-window";
+            "loot-api": "loot-api";
+        }>>;
         items: z.ZodArray<z.ZodObject<{
             itemId: z.ZodNumber;
             count: z.ZodNumber;
@@ -1838,7 +1841,10 @@ export declare const API_SCHEMAS: {
                 skinning: "skinning";
             }>>;
             copper: z.ZodOptional<z.ZodNumber>;
-            sourceEvidence: z.ZodOptional<z.ZodLiteral<"loot-api">>;
+            sourceEvidence: z.ZodOptional<z.ZodEnum<{
+                "empty-window": "empty-window";
+                "loot-api": "loot-api";
+            }>>;
             items: z.ZodArray<z.ZodObject<{
                 itemId: z.ZodNumber;
                 count: z.ZodNumber;

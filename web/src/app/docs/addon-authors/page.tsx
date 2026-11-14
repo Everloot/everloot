@@ -163,7 +163,7 @@ export default function AddonAuthorsPage() {
           [<C key="d">capturedAt</C>, "When the window opened in game, as an ISO time."],
           [<C key="e">eventId</C>, <>The record&apos;s id within its install. With <C>installId</C> it names one window once.</>],
           [<C key="f">installId</C>, <>A pseudonym for the install: <C>pub-</C> and 32 hex. Stable for one install, never the addon&apos;s own id. It is absent when the server has no key to make one.</>],
-          [<C key="g">sourceEvidence</C>, <><C>loot-api</C> when the game&apos;s loot API named the source. The site counts only those windows.</>],
+          [<C key="g">sourceEvidence</C>, <><C>loot-api</C> when the game&apos;s loot API named the source. <C>empty-window</C> for a kill window with nothing in it, which the loot API cannot name: the addon took the one dead creature the player could loot, and the row has no items and no coin. The site counts only those two.</>],
         ]}
       />
       <Callout kind="note">
