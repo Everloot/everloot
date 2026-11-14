@@ -56,7 +56,7 @@ test("the game file recipes show in skill brackets, labelled, with the item and 
   store.loadCorpus.mockResolvedValue(empty);
   const html = await render();
   expect(html).toContain("Alchemy recipes");
-  expect(html).toContain("Found in game files, unconfirmed, build 1.60.1.70888");
+  expect(html).toContain("Found in game files, unconfirmed, build 1.60.1.70938");
   expect(html).toContain('data-skill-group="1"');
   expect(html).toContain("Skill 1–75");
   // The recipe spell links to its spell page, the item it makes to its item page under the name rule.
