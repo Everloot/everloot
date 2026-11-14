@@ -195,7 +195,7 @@ const oneSource = (r: { sourceNpcId: number | null; sourceObjectId: number | nul
 };
 const dropRow = z.object({
   ...SOURCE, itemId: ID,
-  lootWindows: z.number().int().positive().describe("Loot windows the game's loot API attributed to the source, from every install together."),
+  lootWindows: z.number().int().positive().describe("Loot windows the game's loot API attributed to the source, and empty windows the addon tied to its corpse, from every install together."),
   windowsWithItem: z.number().int().positive().describe("Of those windows, how many held the item."),
   rate: z.number().min(0).max(1).describe("windowsWithItem / lootWindows. A share of loot windows, not a kill-based drop chance."),
   installs: INSTALLS.describe(`Installs that opened a loot window on the source. At least ${WORLD_AGREEMENT}.`),

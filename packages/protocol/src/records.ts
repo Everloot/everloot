@@ -14,7 +14,11 @@ import { validRealm } from "./realm.js";
  * the generated JSON Schema's description, so a reader of the schema files knows the server checks them.
  */
 export const RULES = {
-  loot: ["loot needs a source: npc, object or item", "a loot position needs mapId, x and y together"],
+  loot: [
+    "loot needs a source: npc, object or item",
+    "a loot position needs mapId, x and y together",
+    "an empty-window row is a kill window on an npc with no items and no coin",
+  ],
   achievement_catalog: ["criteria cannot outnumber criteriaCount"],
   achievement_owned: [
     "quantity and required come together",
@@ -82,7 +86,7 @@ export const lootWindow = base.extend({
   sourceItemId: z.number().int().positive().optional().describe("The item that was disenchanted or opened (a lockbox, a clam, a bag). Older addons send none."),
   lootType: z.enum(LOOT_TYPES).optional().describe("What opened the window, from the spell cast just before it (`LOOT_TYPES`). Absent on windows from older addons and converted Recorder files; those are never sorted into a type by guessing."),
   copper: z.number().int().min(1).max(10_000_000_000).optional().describe("The coin in the window, in copper. Absent when the window held none or the addon could not read it."),
-  sourceEvidence: z.literal("loot-api").optional().describe("Legacy target guesses are withheld from public loot observations."),
+  sourceEvidence: z.enum(["loot-api", "empty-window"]).optional().describe("Where the source came from (`loot-api`: the loot API named it; `empty-window`: a kill window with nothing in it, which the loot API cannot name, so the addon took the one dead creature the player could loot, and the row has no items and no coin, so it only adds a window to the count of its source). Legacy target guesses are withheld from public loot observations."),
   items: z.array(z.object({ itemId: z.number().int().positive(), count: z.number().int().min(1).max(1000) })).max(50),
   mapId: z.number().int().nonnegative().optional().describe("With an object source: the map the player stood on when the object was opened. Older addons send none."),
   x: z.number().min(0).max(100).optional().describe("The player's x on that map, 0 to 100."),
@@ -93,6 +97,9 @@ export const lootWindow = base.extend({
   message: RULES.loot[0],
 }).refine((r) => (r.mapId === undefined) === (r.x === undefined) && (r.x === undefined) === (r.y === undefined), {
   message: RULES.loot[1],
+}).refine((r) => r.sourceEvidence !== "empty-window" || (r.items.length === 0 && r.copper === undefined && r.lootType === "kill"
+  && r.sourceNpcId !== undefined && r.sourceObjectId === undefined && r.sourceItemId === undefined), {
+  message: RULES.loot[2],
 });
 
 export const questEvent = base.extend({
