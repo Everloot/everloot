@@ -2,7 +2,7 @@
 
 The window's Gold view (modules/view_gold.lua): every character's gold by realm and a chart with one bar per day of
 the period picked (today, 7 days, 30 days, all = the ledger's 90), the ledger by category, day and receipt, auction
-sales one by one (with the house's cut) or by item (with sales per day and the last sold day), and the gold per hour session. It reads the
+sales one by one (with the house's cut) or by item (with paid transactions/day, units/day and the last sold day), and the gold per hour session. It reads the
 roster, the ledger store and the gph session and displays them; the buttons run the commands the player could type.
 A saved file without a roster or ledger shows each section's empty line, never an error.
 """
@@ -155,13 +155,13 @@ assert(shown(g.sales) == 4 and g.sales[2].count.text == '× 20' and g.sales[3].c
 assert(g.sales[3].cut.text == '-', 'a sale recorded without a cut shows none')
 assert(g.groupButton.text == 'By item')
 click(g.groupButton)
-assert(g.grouped and shown(g.sales) == 1 and g.sales[1].count.text == '× 30' and g.sales[1].when.text == '2 sales', 'grouped view counts paid sales only')
+assert(g.grouped and shown(g.sales) == 1 and g.sales[1].count.text == '× 30' and g.sales[1].when.text == '2.0 tx/day', 'grouped view counts paid sales only')
 assert(money(g.sales[1].total.text, {{57, 'Silver'}}, {{0, 'Copper'}}) and g.groupButton.text == 'Each sale')
--- The period is Today (one day): two sales a day, last sold today; the cut and deposit cells are blank by item.
-assert(g.sales[1].status.text == '2.0/day · 11-07' and g.sales[1].cut.text == '' and g.sales[1].deposit.text == '', g.sales[1].status.text)
+-- Today: two transactions and thirty units per day; the deposit cell holds the last sold date.
+assert(g.sales[1].status.text == '30.0 units/day' and g.sales[1].cut.text == '' and g.sales[1].deposit.text == '11-07', g.sales[1].status.text)
 assert(g.sales.head.text:find('^Auction sales by item'), g.sales.head.text)
 click(g.periods['30d'])
-assert(g.grouped and g.sales[1].status.text == '0.1/day · 11-07', 'two sales over thirty days: ' .. g.sales[1].status.text)
+assert(g.grouped and g.sales[1].when.text == '0.1 tx/day' and g.sales[1].status.text == '1.0 units/day', 'two sales over thirty days: ' .. g.sales[1].status.text)
 click(g.periods.today)
 
 -- Session: the gph lines and the commands' own buttons.
@@ -355,3 +355,30 @@ end
 """)
 
 print("Lua 5.1 Gold view: periods, scopes, summary, item ties, pending, live ledger changes and empty state")
+
+# Two paid transactions containing twenty units have different daily rates. Notices are not paid sales.
+lua = fresh(SAVED, API)
+lua.execute("""
+local U = Everloot.Window
+assert(U.Open('gold'))
+local g, me = EverlootWindow.gold, Everloot.CharacterKey()
+EverlootDB.ledger.sales = {
+  {at=now-3600, key=me, itemName='Linen Cloth', count=8, total=800, unit=100, status='paid'},
+  {at=now-1800, key=me, itemName='Linen Cloth', count=12, total=1200, unit=100, status='paid'},
+  {at=now-900, key=me, itemName='Linen Cloth', count=99, total=9900, status='pending'},
+  {at=now-600, key=me, itemName='Linen Cloth', count=77, total=7700, status='unmatched'},
+}
+local function click(b) b.scripts.OnClick(b) end
+click(g.tabs.sales)
+click(g.periods.today)
+click(g.groupButton)
+assert(g.sales[1].count.text == '× 20', g.sales[1].count.text)
+assert(g.sales[1].when.text == '2.0 tx/day', g.sales[1].when.text)
+assert(g.sales[1].status.text == '20.0 units/day', g.sales[1].status.text)
+assert(g.sales[1].deposit.text == '11-07', g.sales[1].deposit.text)
+click(g.periods['7d'])
+assert(g.sales[1].when.text == '0.3 tx/day' and g.sales[1].status.text == '2.9 units/day')
+click(g.groupButton)
+assert(g.sales[1].status.text == 'unmatched' and g.sales[1].deposit.text == '-', 'individual view restored')
+assert(not U.failed, U.failed)
+""")
