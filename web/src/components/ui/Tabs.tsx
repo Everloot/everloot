@@ -14,7 +14,12 @@ export interface TabItem {
 
 /** The tab a hash names, or null when it names none of them. */
 export function tabFromHash(hash: string, ids: string[]): string | null {
-  const id = decodeURIComponent(hash.replace(/^#/, ""));
+  let id: string;
+  try {
+    id = decodeURIComponent(hash.replace(/^#/, ""));
+  } catch {
+    return null;
+  }
   return ids.includes(id) ? id : null;
 }
 
