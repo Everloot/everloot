@@ -78,7 +78,6 @@ export async function extractFromCdn(product: string, region: string, curatedPat
         web("build-raid-game-data.ts", run.dir, snapshot, root);
         writeFileSync(join(root, GAME_DATA_DIR, "map.json"), `${JSON.stringify(writeWorldMapData(snapshot), null, 2)}\n`);
         writeClientLayer(snapshot, join(root, GAME_DATA_DIR, "client-layer.json"));
-        web("build-version.mjs", join(root, GAME_DATA_DIR, "client-layer.json"), join(root, GAME_DATA_DIR, "build-version.json"));
         writeRaceTable(snapshot, join(root, GAME_DATA_DIR, "races.json"));
         writeClientAchievements(snapshot, join(root, GAME_DATA_DIR, "client-achievements.json"));
         writeClientEncounters(snapshot, join(root, GAME_DATA_DIR, "client-encounters.json"));

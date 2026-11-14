@@ -206,6 +206,6 @@ export function differingFiles(generated: string, committed: string, files: stri
 export function generatedFiles(root: string): string[] {
   const dir = dataDir(root);
   const talents = existsSync(join(dir, "talents")) ? readdirSync(join(dir, "talents")).filter((f) => f.endsWith(".json")).sort().map((f) => `${GAME_DATA_DIR}/talents/${f}`) : [];
-  const top = ["build-version.json", "map.json", "client-layer.json", "races.json", "client-achievements.json", "client-encounters.json", "client-mounts.json", "client-class-gear.json", "client-class-spells.json", "client-recipes.json", "client-bags.json", "client-factions.json", "client-titles.json", "client-quest-lines.json", "spell-values.json", "client-digests.json", ...raidFiles(root)].filter((f) => existsSync(join(dir, f))).map((f) => `${GAME_DATA_DIR}/${f}`);
+  const top = ["map.json", "client-layer.json", "races.json", "client-achievements.json", "client-encounters.json", "client-mounts.json", "client-class-gear.json", "client-class-spells.json", "client-recipes.json", "client-bags.json", "client-factions.json", "client-titles.json", "client-quest-lines.json", "spell-values.json", "client-digests.json", ...raidFiles(root)].filter((f) => existsSync(join(dir, f))).map((f) => `${GAME_DATA_DIR}/${f}`);
   return [...talents, ...top, ...(existsSync(join(root, RAID_LUA)) ? [RAID_LUA] : [])];
 }
