@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { parseEverlootLua } from "../../web/src/lib/sv-parse";
 import { linkRealmKey } from "../../web/src/lib/character-links";
-import { parseSyncRow, SYNC_CHARACTERS_PER_REQUEST, SYNC_ROWS_PER_REQUEST, type SyncCategory, type SyncRow } from "../../web/src/lib/private-sync";
+import { parseSyncRow, SYNC_CHARACTERS_PER_REQUEST, SYNC_ROWS_PER_REQUEST, type SyncCategory, type SyncRow } from "@everloot/protocol/private-sync";
 import { receiptKeyForSite, type SentState } from "./sent-state";
 
 /**
