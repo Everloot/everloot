@@ -47,6 +47,19 @@ test("the public rows are rollupDrops' public rates, number for number", () => {
     .toEqual(theirs.map((r) => [r.sourceNpcId ?? r.sourceObjectId, r.itemId, r.drops, r.kills, r.rate, r.reporters]).sort());
 });
 
+test("empty-window rows add to the NPC's windows on the page as in the rates, and a malformed one adds nothing", () => {
+  const empty = (installId: string) => ({ ...loot(installId, { npc: 7 }, []), sourceEvidence: "empty-window", lootType: "kill" });
+  const records = [
+    ...["a", "b", "c"].map((id) => loot(`install-${id}`, { npc: 7 }, [[11, 1]])),
+    ...["a", "b", "c", "a", "b"].map((id) => empty(`install-${id}`)),
+    { ...empty("install-c"), items: [{ itemId: 11, count: 1 }] },
+  ];
+  const table = npcLootTable(lootTablesFromRecords(records, asOf), 7);
+  expect(table.rows).toEqual([expect.objectContaining({ itemId: 11, withItem: 3, windows: 8, rate: 3 / 8 })]);
+  const theirs = rollupDrops(lootWindowsFromRecords(records)).rates;
+  expect(theirs).toEqual([expect.objectContaining({ itemId: 11, drops: 3, kills: 8 })]);
+});
+
 test("an object source gets its rows on the item page too", () => {
   const records = ["a", "b", "c"].map((id) => loot(`install-${id}`, { obj: 1731 }, [[2770, 2]]));
   const sources = itemDropSources(lootTablesFromRecords(records, asOf), 2770);

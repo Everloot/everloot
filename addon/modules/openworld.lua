@@ -411,11 +411,61 @@ local function lootTypeOf(group, cast)
   return "kill"
 end
 
-local function lootCapture()
-  -- Source pairs are GUID, quantity, GUID, quantity. Never infer loot from the target.
+-- The units an empty window can have come from: the corpse the player interacted with, pointed at or targeted.
+local EMPTY_WINDOW_UNITS = { "softinteract", "mouseover", "target" }
+
+-- The corpse of an empty window, or nil. The loot API names sources by slot, so a window with no slot names none.
+-- The corpse is then the one dead creature among these units that the player may loot (not tap-denied). Two
+-- different ones, a client without UnitIsDead or UnitIsTapDenied, or a GUID it cannot read: nil, and nothing is
+-- recorded.
+local function emptyWindowCorpse()
+  if not (UnitGUID and UnitIsDead and UnitIsTapDenied) then return nil end
+  local found
+  for _, unit in ipairs(EMPTY_WINDOW_UNITS) do
+    local okGuid, guid = pcall(UnitGUID, unit)
+    guid = okGuid and E.Readable(guid) or nil
+    if type(guid) == "string" and guid:find("^Creature%-") and npcIdFromGuid(guid) then
+      local okDead, dead = pcall(UnitIsDead, unit)
+      local okTap, denied = pcall(UnitIsTapDenied, unit)
+      if okDead and E.Readable(dead) == true and okTap and E.Readable(denied) == false then
+        if found and found ~= guid then return nil end
+        found = guid
+      end
+    end
+  end
+  return found
+end
+
+-- A kill window with nothing in it: one row with no items and no coin, `sourceEvidence = "empty-window"`, so the
+-- corpse counts in its source's windows and a drop rate stops leaving out the kills that dropped nothing. Only a
+-- plain kill window: not an item, fishing, or a cast (skinning, pick-pocket, gathering), and one row per corpse.
+local function emptyWindowCapture(cast, isFromItem)
+  if isFromItem or (cast and (cast.lootKind or cast.gatherKind)) then return end
+  if IsFishingLoot then
+    local ok, fishing = pcall(IsFishingLoot)
+    if not ok or E.Readable(fishing) ~= false then return end
+  end
+  local guid = emptyWindowCorpse()
+  if not guid then return end
+  if EverlootDB.lootSources[guid .. ":kill"] or EverlootDB.lootSources[guid] then return end
+  local row = {
+    installId = EverlootDB.installId,
+    capturedAt = date("!%Y-%m-%dT%H:%M:%SZ"),
+    sourceNpcId = npcIdFromGuid(guid),
+    lootType = "kill",
+    items = {},
+    sourceEvidence = "empty-window",
+  }
+  if E:Store("loot", row, nil, CREATURES) then EverlootDB.lootSources[guid .. ":kill"] = true end
+end
+
+local function lootCapture(_, isFromItem)
+  -- Source pairs are GUID, quantity, GUID, quantity. Never infer loot from the target, except for a window with
+  -- nothing in it, which has no source to read (emptyWindowCapture).
   if not (GetLootSourceInfo and GetLootSlotInfo and GetLootSlotLink) then return end
   local cast = gatherContext()
   EverlootDB.lootSources = EverlootDB.lootSources or {}
+  if (GetNumLootItems and GetNumLootItems() or 0) == 0 then return emptyWindowCapture(cast, isFromItem) end
   local groups = {}
   local function groupFor(guid)
     local npcId, objectId = npcIdFromGuid(guid), objectIdFromGuid(guid)
@@ -871,7 +921,7 @@ E:RegisterModule("openworld", function()
   local function onEvent(_, event, arg1, arg2, arg3, arg4, arg5, arg6)
     if event == "PLAYER_TARGET_CHANGED" then guarded("targetSighting", targetSighting, "target")
     elseif event == "UPDATE_MOUSEOVER_UNIT" then guarded("targetSighting", targetSighting, "mouseover")
-    elseif event == "LOOT_OPENED" then guarded("lootCapture", lootCapture)
+    elseif event == "LOOT_OPENED" then guarded("lootCapture", lootCapture, arg1, arg2)
     elseif event == "QUEST_ACCEPTED" then guarded("questCapture", questCapture, arg1, arg2)
     elseif event == "UNIT_SPELLCAST_SENT" then pcall(castSent, arg1, arg2, arg3, arg4)
     elseif (event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_FAILED_QUIET" or event == "UNIT_SPELLCAST_INTERRUPTED")
