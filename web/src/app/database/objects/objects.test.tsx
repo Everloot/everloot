@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
@@ -90,7 +91,7 @@ test("the object list filters agreed names case-insensitively and preserves the 
   expect(filtered).toContain('href="/database/objects/1732"');
   expect(filtered).not.toContain('href="/database/objects/1733"');
   expect(filtered).not.toContain('href="/database/objects/1734"');
-  expect(filtered.replace(/<[^>]+>/g, "")).toContain("2 objects");
+  expect(new DOMParser().parseFromString(filtered, "text/html").body.textContent).toContain("2 objects");
   expect(filtered).toContain("q=cOpPeR");
   for (const q of ["1731", "#1731"]) {
     const numeric = await html(ObjectsPage({ searchParams: Promise.resolve({ q }) }));
