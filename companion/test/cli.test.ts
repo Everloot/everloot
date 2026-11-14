@@ -209,6 +209,112 @@ describe("the upload, watch and prices loop, with a fake uploader and price writ
     expect(f.errors).toEqual([]);
   });
 
+  test("watch waits for the first account save", async () => {
+    vi.useFakeTimers();
+    const { d, file, args } = game();
+    const save = readFileSync(file);
+    rmSync(join(d, "WTF"), { recursive: true });
+    const f = fakes();
+    await main(["watch", ...args], f.deps);
+    expect(f.calls).toEqual([]);
+    expect(f.listeners.size).toBe(0);
+    mkdirSync(join(d, "WTF", "Account", "TEST", "SavedVariables"), { recursive: true });
+    writeFileSync(file, save);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(f.calls).toEqual([`upload ${file}`, "prices"]);
+    expect([...f.listeners.keys()]).toEqual([file]);
+  });
+
+  test("watch discovers and uploads a second account without restart", async () => {
+    vi.useFakeTimers();
+    const { d, file, args } = game();
+    const f = fakes();
+    const priceFiles: string[][] = [];
+    f.deps.refreshPrices = async ({ svFiles }) => {
+      priceFiles.push([...svFiles]);
+      return { realms: 1, items: 2 };
+    };
+    await main(["watch", ...args], f.deps);
+    const other = join(d, "WTF", "Account", "SECOND", "SavedVariables", "Everloot.lua");
+    mkdirSync(join(d, "WTF", "Account", "SECOND", "SavedVariables"), { recursive: true });
+    writeFileSync(other, readFileSync(file));
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(f.calls).toEqual([`upload ${file}`, `upload ${other}`]);
+    expect([...f.listeners.keys()]).toEqual([file, other]);
+    expect(priceFiles).toEqual([[file], [file, other]]);
+    f.listeners.get(other)!();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(f.calls).toEqual([`upload ${file}`, `upload ${other}`, `upload ${other}`]);
+  });
+
+  test("repeated discovery does not duplicate watchers or uploads", async () => {
+    vi.useFakeTimers();
+    const { file, args } = game();
+    const f = fakes();
+    const watch = vi.fn(f.deps.watchFile);
+    f.deps.watchFile = watch;
+    await main(["watch", ...args], f.deps);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(watch).toHaveBeenCalledTimes(1);
+    expect(f.calls).toEqual([`upload ${file}`, "prices"]);
+  });
+
+  test("discovery queues a new account behind an upload already in progress", async () => {
+    vi.useFakeTimers();
+    const { d, file, args } = game();
+    const f = fakes();
+    let finish!: () => void;
+    let active = 0, peak = 0;
+    f.deps.uploadFile = async (path) => {
+      f.calls.push(`upload ${path}`);
+      active++; peak = Math.max(peak, active);
+      if (path === file) await new Promise<void>((resolve) => { finish = resolve; });
+      active--;
+      return UPLOAD;
+    };
+    const started = main(["watch", ...args], f.deps);
+    const other = join(d, "WTF", "Account", "SECOND", "SavedVariables", "Everloot.lua");
+    mkdirSync(join(d, "WTF", "Account", "SECOND", "SavedVariables"), { recursive: true });
+    writeFileSync(other, readFileSync(file));
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(f.calls).toEqual([`upload ${file}`]);
+    finish();
+    await started;
+    expect(f.calls).toEqual([`upload ${file}`, "prices", `upload ${other}`, "prices"]);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(f.calls.filter((call) => call === `upload ${other}`)).toHaveLength(1);
+    expect(peak).toBe(1);
+  });
+
+  test("watch shutdown closes watchers and clears discovery, debounce and retry timers", async () => {
+    vi.useFakeTimers();
+    const { file, args } = game();
+    const f = fakes();
+    const close = vi.fn();
+    f.deps.watchFile = (path, listener) => { f.listeners.set(path, listener); return close; };
+    f.deps.uploadFile = async () => { throw new TypeError("fetch failed"); };
+    const stop = await main(["watch", ...args], f.deps);
+    f.listeners.get(file)!();
+    expect(typeof stop).toBe("function");
+    if (typeof stop === "function") { stop(); stop(); }
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  test("watch with --file keeps watching only that file without discovery", async () => {
+    vi.useFakeTimers();
+    const { d, file } = game();
+    const f = fakes();
+    await main(["watch", "--file", file, "--game", d, "--state", join(d, "sent.json")], f.deps);
+    const other = join(d, "WTF", "Account", "SECOND", "SavedVariables", "Everloot.lua");
+    mkdirSync(join(d, "WTF", "Account", "SECOND", "SavedVariables"), { recursive: true });
+    writeFileSync(other, readFileSync(file));
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect([...f.listeners.keys()]).toEqual([file]);
+    expect(f.calls).toEqual([`upload ${file}`, "prices"]);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   test("prices runs the price writer alone, with no upload and no watcher", async () => {
     const { args } = game();
     const f = fakes();

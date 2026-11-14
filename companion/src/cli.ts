@@ -82,12 +82,14 @@ export function sharesInstallWith(file: string, files: readonly string[]): (inst
   });
 }
 
-export function debounce(run: () => void, ms: number): () => void {
+export function debounce(run: () => void, ms: number): (() => void) & { cancel(): void } {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  return () => {
+  const schedule = () => {
     if (timer) clearTimeout(timer);
     timer = setTimeout(run, ms);
   };
+  schedule.cancel = () => clearTimeout(timer);
+  return schedule;
 }
 
 /** Printed before anything is sent: how uploads are licensed and where the code is (AGPL section 13). */
@@ -110,14 +112,14 @@ const host: MainDeps = { uploadFile, refreshPrices, watchFile, console };
 function watchUploads(send: (file: string) => Promise<void>, failed: (file: string, err: unknown) => void) {
   const backoff = [60_000, 300_000, 900_000];
   const jobs = new Map<string, { due: number; failures: number; dirty: boolean }>();
-  let notBefore = 0, busy = false;
+  let notBefore = 0, busy = false, stopped = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const drain = async () => {
-    if (busy) return;
+    if (busy || stopped) return;
     busy = true;
     clearTimeout(timer);
     try {
-      for (;;) {
+      while (!stopped) {
         const next = [...jobs].find(([, job]) => Math.max(job.due, notBefore) <= Date.now());
         if (!next) break;
         const [file, job] = next;
@@ -144,7 +146,7 @@ function watchUploads(send: (file: string) => Promise<void>, failed: (file: stri
       }
     } finally {
       busy = false;
-      if (jobs.size) {
+      if (!stopped && jobs.size) {
         const due = Math.min(...[...jobs.values()].map((job) => Math.max(job.due, notBefore)));
         timer = setTimeout(() => void drain(), Math.min(2_147_483_647, Math.max(0, due - Date.now())));
       }
@@ -152,21 +154,23 @@ function watchUploads(send: (file: string) => Promise<void>, failed: (file: stri
   };
   return {
     enqueue(file: string) {
+      if (stopped) return;
       const job = jobs.get(file);
       if (job) job.dirty = true;
       else jobs.set(file, { due: Date.now(), failures: 0, dirty: false });
     },
     drain,
+    stop() { stopped = true; clearTimeout(timer); jobs.clear(); },
   };
 }
 
-export async function main(argv: string[], deps: MainDeps = host): Promise<void> {
+export async function main(argv: string[], deps: MainDeps = host): Promise<void | (() => void)> {
   const args = parseArgs(argv);
   const statePath = args.state ?? defaultStatePath({ platform: process.platform, env: process.env, home: homedir() });
   const state = createSentState(statePath);
   const collects = createSiteCollects(join(dirname(statePath), "site-collects.json"));
   const files = args.file ? [args.file] : findEverlootFiles(args.game!);
-  if (files.length === 0) throw new Error(`No Everloot.lua under ${join(args.game ?? "", "WTF", "Account")}. Log out once so the game writes it.`);
+  if (files.length === 0 && args.command !== "watch") throw new Error(`No Everloot.lua under ${join(args.game ?? "", "WTF", "Account")}. Log out once so the game writes it.`);
   if (args.command === "bridge") {
     const mcp = { url: args.mcp!, token: readFileSync(args.tokenFile!, "utf8").trim() };
     // Providers the user enabled in config.json beside the state file; none means answers from the evidence alone. They are read
@@ -220,13 +224,42 @@ export async function main(argv: string[], deps: MainDeps = host): Promise<void>
   deps.console.log(uploadNotice());
   if (args.command === "watch") {
     const queue = watchUploads(send, failed);
-    // The game writes SavedVariables at logout or /reload; wait for the write to settle.
-    for (const file of files) {
-      queue.enqueue(file);
-      deps.watchFile(file, debounce(() => { queue.enqueue(file); void queue.drain(); }, 5000));
-    }
+    const watched = new Set<string>();
+    const cleanup: (() => void)[] = [];
+    let stopped = false;
+    const register = (found: string[]) => {
+      // Add every discovered account before uploading, so prices and shared-install checks see all of them.
+      for (const file of found) if (!files.includes(file)) files.push(file);
+      for (const file of found) {
+        if (watched.has(file)) continue;
+        // The game writes SavedVariables at logout or /reload; wait for the write to settle.
+        const changed = debounce(() => { queue.enqueue(file); void queue.drain(); }, 5000);
+        const close = deps.watchFile(file, changed);
+        watched.add(file);
+        cleanup.push(() => { close(); changed.cancel(); });
+        queue.enqueue(file);
+      }
+    };
+    register([...files]);
+    const discovery = args.game && !args.file ? setInterval(() => {
+      if (stopped) return;
+      try {
+        register(findEverlootFiles(args.game!));
+        void queue.drain();
+      } catch (err) {
+        deps.console.error(`Could not look for account saves: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }, 10_000) : undefined;
     await queue.drain();
+    if (files.length === 0) deps.console.log("Waiting for the first Everloot.lua. Log out once so the game writes it.");
     deps.console.log(`Watching ${files.length} file(s). Leave this running while you play; Ctrl+C stops it.`);
+    return () => {
+      if (stopped) return;
+      stopped = true;
+      clearInterval(discovery);
+      queue.stop();
+      for (const close of cleanup) close();
+    };
   } else {
     for (const file of files) {
       try { await send(file); } catch (err) { failed(file, err); }
@@ -235,7 +268,15 @@ export async function main(argv: string[], deps: MainDeps = host): Promise<void>
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main(process.argv.slice(2)).catch((err) => {
+  main(process.argv.slice(2)).then((stop) => {
+    if (!stop) return;
+    const shutdown = () => {
+      stop();
+      process.exit(0);
+    };
+    process.once("SIGINT", shutdown);
+    process.once("SIGTERM", shutdown);
+  }).catch((err) => {
     console.error(err instanceof Error ? err.message : String(err));
     process.exit(1);
   });
