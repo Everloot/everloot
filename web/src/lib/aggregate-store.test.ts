@@ -277,3 +277,31 @@ test("the answers read the stored set instead of the corpus; with no file, or a 
   expect((await loadItemFacts()).names).toEqual(live.items.names);
   expect(store.loadCorpus).toHaveBeenCalledOnce();
 });
+
+test("concurrent cold aggregate readers download and parse one shared set", async () => {
+  const text = encodeAggregates(buildAggregates(corpus(anonymousRows())), AS_OF);
+  const fetcher = vi.fn(async () => new Response(text));
+  const values = await Promise.all(Array.from({ length: 8 }, (_, i) => loadStoredAggregates({ cloud: CLOUD, fetch: fetcher, strict: i % 2 === 0 })));
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  for (const value of values) {
+    expect(value).toBe(values[0]);
+    expect(plain(value!)).toEqual(plain(parseAggregates(text)!.set));
+  }
+});
+
+test("concurrent refreshes share the read while strict readers still reject stale data on failure", async () => {
+  let now = 0;
+  const text = encodeAggregates(buildAggregates(corpus(anonymousRows())), AS_OF);
+  const fetcher = vi.fn(async () => new Response(text));
+  const deps = { cloud: CLOUD, fetch: fetcher, now: () => now };
+  const first = await loadStoredAggregates(deps);
+  now = 5 * 60_000;
+  fetcher.mockImplementation(async () => new Response("down", { status: 503 }));
+  const values = await Promise.all([loadStoredAggregates(deps), loadStoredAggregates({ ...deps, strict: true })]);
+  expect(values).toEqual([first, null]);
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  now += 60_000;
+  fetcher.mockImplementation(async () => new Response(text));
+  expect(await loadStoredAggregates(deps)).toBe(first);
+  expect(fetcher).toHaveBeenCalledTimes(3);
+});

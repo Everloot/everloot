@@ -351,6 +351,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Companion: watch mode waits for the first account save and finds new accounts without a restart, refreshing prices for every discovered account.
 
 ### Changed
+- Site: Reuse cold-start aggregate and game-art reads and load the build label from a small generated stamp.
 - Site: auction item pages (`/tools/auctions/:realm/:itemId`) are kept in the edge cache for five minutes, like the browse pages, so repeat requests and crawlers stop re-rendering them.
 - Site: reuse public MCP discovery metadata within each mount while keeping request ids, access checks and account tools separate.
 - Site: answer sourced questions from stored public facts without replaying the upload corpus.
