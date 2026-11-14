@@ -36,6 +36,7 @@ so `web/scripts/cf-deploy.mjs` passes every var except the `*_DIR` paths to the 
 | `EVERLOOT_CHAT_WORKSPACE` | `web/src/lib/chat/workspace.ts` | The signed-in chat workspace | Switch |
 | `EVERLOOT_CHARACTER_LINKS` | `web/src/lib/character-links.ts` | Linking an in-game character to an account | Switch |
 | `EVERLOOT_SHOWCASE` | `web/src/lib/character-showcase.ts` | The character showcase pages and share cards | Switch |
+| `EVERLOOT_BOSS_KILL_SYNC` | `web/src/lib/boss-kill-sync.ts` | Private owner-only boss kills; unset/off until migration `20261114120000_private_boss_kills.sql` is approved and applied; also needs private sync | Switch |
 | `EVERLOOT_PRIVATE_SYNC` | `web/src/lib/private-sync.ts` | Private sync of a linked character's data | Switch |
 | `EVERLOOT_LEADERBOARDS` | `web/src/lib/leaderboard-switch.ts` | The item level and gear score rankings | Switch |
 | `NEWS_DIR` | `web/src/lib/news.ts` | Where the bundled news posts are inside the Worker | Yes |

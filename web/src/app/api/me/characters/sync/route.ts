@@ -1,3 +1,5 @@
+import { parseBossKillRow } from "@/lib/boss-kill-sync";
+import { syncBossKills } from "@/lib/boss-kill-sync-store";
 import { NextResponse } from "next/server";
 import { validPlayerName } from "@everloot/protocol";
 import { hashKey, presentedKey } from "@/lib/api-keys";
@@ -17,6 +19,7 @@ import { syncAccount, syncCharacterFacts, unavailable, type CharacterOutcome } f
  * per category, and each is kept only when the key's account holds that character's live link with sync on for the
  * category, and only when it is newer than the stored one. A character the account has no live link for is
  * `not_linked` in the receipt, whoever else may hold it. The install id becomes a keyed hash here and goes no further.
+ * Own boss_kill_owned rows use a separate, always-private consent and table, only with EVERLOOT_BOSS_KILL_SYNC=1.
  * 404 until EVERLOOT_PRIVATE_SYNC=1.
  *
  * Each key may send SYNC_PER_KEY_HOUR requests an hour (intakeQuota.syncKey); past that, 429 with Retry-After. Only
@@ -27,7 +30,7 @@ export const dynamic = "force-dynamic";
 /** The install scope's hourly limit (consume_intake_quota), which the sync bucket borrows. */
 const SYNC_PER_KEY_HOUR = 20;
 
-type Receipt = { index: number } & (CharacterOutcome | { result: "invalid" | "retry" });
+type Receipt = { index: number } & (CharacterOutcome | { result: "synced"; categories: Record<string, string> } | { result: "invalid" | "retry" });
 
 interface Group { name: string; realm: string; records: unknown[] }
 
@@ -72,12 +75,26 @@ export async function POST(req: Request) {
       const realm = list[index]!.realm.trim();
       if (failed) { characters.push({ index, result: "retry" }); continue; }
       const rows = records.flatMap((r) => { const row = parseSyncRow(r); return row ? [row] : []; });
-      skipped += records.length - rows.length;
+      const bossRows = records.flatMap((r) => { const row = parseBossKillRow(r); return row ? [row] : []; });
+      skipped += records.length - rows.length - bossRows.length;
+      const keys = new Map<string, string>();
+      let mixed = false;
+      for (const r of [...rows, ...bossRows]) {
+        if (!("characterKey" in r)) continue;
+        if (keys.has(r.installId) && keys.get(r.installId) !== r.characterKey) mixed = true;
+        keys.set(r.installId, r.characterKey);
+      }
+      if (mixed) { characters.push({ index, result: "invalid" }); continue; }
       const built = buildCharacterFacts(name, realm, rows, now);
       if (!built) { characters.push({ index, result: "invalid" }); continue; }
       skipped += built.skipped;
       try {
-        characters.push({ index, ...(await syncCharacterFacts(account, rulesetOf(linkRealmKey(realm)), realm, name, built.class, built.facts, secret)) });
+        const result = await syncCharacterFacts(account, rulesetOf(linkRealmKey(realm)), realm, name, built.class, built.facts, secret);
+        if (result.result === "synced" && bossRows.length) {
+          const outcome = await syncBossKills(account, rulesetOf(linkRealmKey(realm)), realm, name, bossRows, secret, now);
+          if (outcome === "not_linked") { characters.push({ index, result: "not_linked" }); continue; }
+          characters.push({ index, result: "synced", categories: { ...result.categories, boss_kills: outcome } });
+        } else characters.push({ index, ...result });
       } catch {
         failed = true;
         characters.push({ index, result: "retry" });
