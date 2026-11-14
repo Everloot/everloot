@@ -194,7 +194,7 @@ for i, c in ipairs(subs) do
 end
 assert(table.concat(names, '|') == 'General|Auction house|Shared with Everloot|Your characters', table.concat(names, '|'))
 -- The overview: no switches, what the file holds, where the switches went, Reload now.
-assert(#O.page.boxes == 0 and #O.page.added == #O.ADDED, 'the overview holds no switches, only what you have added')
+assert(#O.page.boxes == 0 and #O.page.added == #O.AddedRows(), 'the overview holds no switches, only what you have added')
 assert(string.find(O.page.intro.text, 'General, Auction house, Shared with Everloot and Your characters', 1, true), 'the overview says where the switches are')
 assert(O.page.reload and O.page.note)
 assert(rawget(O.page, 'ask') == nil, 'no ask box')
@@ -221,7 +221,7 @@ for i, c in ipairs(subs) do
   page:Show()
   for _, box in ipairs(page.boxes) do
     assert(box.points and box.points.TOPLEFT, box.row.key .. ' is laid out on the first visit')
-    assert(box.checked == O.IsOn(box.row), box.row.key .. ' shows the saved state on the first visit')
+    assert((box.row.choices and box.text == "Full") or box.checked == O.IsOn(box.row), box.row.key .. ' shows the saved state on the first visit')
   end
   checkRows(page)
 end
@@ -255,7 +255,7 @@ SlashCmdList.EVERLOOT('options')
 assert(opened == nil, 'not sent to a list that lacks switches')
 assert(O.whole and O.whole.shown and #O.whole.boxes == #O.ROWS and O.close, 'a window with every switch')
 for _, box in ipairs(O.whole.boxes) do
-  assert(box.points and box.points.TOPLEFT and box.checked == O.IsOn(box.row), box.row.key .. ' laid out and ticked in the window')
+  assert(box.points and box.points.TOPLEFT and ((box.row.choices and box.text == "Full") or box.checked == O.IsOn(box.row)), box.row.key .. ' laid out and ticked in the window')
 end
 """)
 
@@ -266,7 +266,7 @@ local O = Everloot.Options
 SlashCmdList.EVERLOOT('options')
 assert(O.whole and O.whole.shown and #O.whole.boxes == #O.ROWS, 'the window holds every switch')
 for _, box in ipairs(O.whole.boxes) do
-  assert(box.points and box.points.TOPLEFT and box.checked == O.IsOn(box.row), box.row.key .. ' laid out and ticked in the window')
+  assert(box.points and box.points.TOPLEFT and ((box.row.choices and box.text == "Full") or box.checked == O.IsOn(box.row)), box.row.key .. ' laid out and ticked in the window')
 end
 """)
 
@@ -278,7 +278,7 @@ SlashCmdList.EVERLOOT('options')
 assert(opened == 42 and not SettingsPanel.shown, 'asked, but the panel stayed closed')
 assert(O.whole and O.whole.shown and #O.whole.boxes == #O.ROWS, 'the window holds every switch')
 for _, box in ipairs(O.whole.boxes) do
-  assert(box.points and box.points.TOPLEFT and box.checked == O.IsOn(box.row), box.row.key .. ' laid out and ticked in the window')
+  assert(box.points and box.points.TOPLEFT and ((box.row.choices and box.text == "Full") or box.checked == O.IsOn(box.row)), box.row.key .. ' laid out and ticked in the window')
 end
 """)
 
@@ -363,9 +363,9 @@ page:Show()
 checkRows(page)
 
 -- What you've added: one line per kind of row in the saved file, filled when the page shows.
-assert(#page.added == #O.ADDED and #O.ADDED == 8, 'one line per kind')
-for i, a in ipairs(O.ADDED) do
-  assert(page.added[i].text == a[2] .. ': ' .. tostring(Everloot:Count(a[1])), page.added[i].text)
+assert(#page.added == #O.AddedRows(), 'one line per populated kind')
+for i, text in ipairs(O.AddedRows()) do
+  assert(page.added[i].text == text, page.added[i].text)
 end
 assert(page.addedHeading.text == "What you've added", 'the block has its title')
 -- The controls behave as before: a switch and Reload now. The Ask box is gone from settings (/ask still works).
@@ -583,6 +583,36 @@ EverlootDB.records.census_seen = { {}, {} }
 census.checked = false
 census.scripts.OnClick(census)
 assert(EverlootDB.toggles.census == false and EverlootDB.records.census_seen == nil, 'no StaticPopup: the command runs')
+""")
+
+# Every populated record kind is counted, including future kinds, and the mode cycles without changing switches.
+lua = fresh(SETTINGS, window=True)
+lua.execute("""
+local O = Everloot.Options
+EverlootDB.records.guild_kill = { {}, {} }
+EverlootDB.records.future_kind = { {} }
+O.page:Show()
+local lines = {}
+for _, line in ipairs(O.page.added) do if line.shown ~= false then lines[#lines + 1] = line.text end end
+local text = table.concat(lines, '|')
+assert(text:find('Guild kills: 2', 1, true) and text:find('future_kind: 1', 1, true), 'every populated kind is counted: ' .. text)
+EverlootDB.records.future_kind = {}
+O.Refresh()
+for _, line in ipairs(O.page.added) do assert(line.shown == false or not line.text:find('future_kind', 1, true), 'empty kinds disappear') end
+local mode, world
+for _, box in ipairs(O.page.boxes) do
+  if box.row.key == 'tooltip' then mode = box end
+  if box.row.key == 'openworld' then world = box end
+end
+assert(world.description.text:find('stats on the item tooltips', 1, true), 'World names item facts')
+assert(mode and mode.text == 'Full', 'the default tooltip mode is full')
+mode.scripts.OnClick(mode)
+assert(EverlootDB.tooltip == 'compact' and mode.text == 'Compact', 'one click selects compact')
+mode.scripts.OnClick(mode)
+assert(EverlootDB.tooltip == 'off' and mode.text == 'Off', 'next click selects off')
+mode.scripts.OnClick(mode)
+assert(EverlootDB.tooltip == 'full' and mode.text == 'Full', 'next click selects full')
+assert(EverlootDB.tooltipMarket == nil and EverlootDB.tooltipSources == nil, 'the individual switches keep their values')
 """)
 
 print("Lua 5.1 options: Settings API, interface options or a window; one switch per module; command rows run their command; every switch inside a scrolling list at any width; the window's crest heading, fonts, surface and dark window, or the game's own without its file; Reload now; player names asked once, after the loading screen and out of combat")

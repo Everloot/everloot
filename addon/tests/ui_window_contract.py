@@ -211,7 +211,15 @@ f.nav.ghost.scripts.OnClick(f.nav.ghost)
 assert(f.views.collection.shown == false and f.note.shown and f.note.text:find('did not load'), 'an unregistered view says so')
 assert(not f.note.text:find('oon'), 'no coming soon')
 f.nav.settings.scripts.OnClick(f.nav.settings)
-assert(Everloot.Options.page and Everloot.Options.page.shown, 'Settings opens the options page')
+assert(f.views.settings and f.views.settings.shown and not f.home.shown, 'Settings stays in the Everloot window')
+assert(f.subtitle.text == 'Settings' and f.nav.settings.on.shown, 'Settings is the selected view')
+local embedded = f.views.settings.page
+assert(embedded and embedded.parentSet == f.views.settings, 'the settings page belongs to this view')
+assert(#embedded.boxes == #Everloot.Options.ROWS, 'every settings row is available inside the window')
+local seen = {}
+for _, box in ipairs(embedded.boxes) do seen[box.row.key] = true end
+for _, row in ipairs(Everloot.Options.ROWS) do assert(seen[row.key], row.key .. ' is reachable') end
+assert(embedded.reload and rawget(embedded, 'ask') == nil, 'Reload stays, Ask stays out')
 f.nav.home.scripts.OnClick(f.nav.home)
 assert(f.home.shown and f.note.shown == false)
 

@@ -180,7 +180,13 @@ main = json.loads((Path(__file__).parent / "fixtures" / "gate_off_main.json").re
 mine = snapshot(root)
 for case in main:
     for part in main[case]:
-        assert mine[case][part] == main[case][part], f"gate off, {case} install: {part} differs from main's (fixtures/gate_off_main.json)"
+        actual = mine[case][part]
+        if part == "options":
+            # #921 adds a display-only detail selector for every install, independently of pull recording.
+            # Keep the historical fixture and compare every original switch, in order.
+            assert actual.count("tooltip") == 1
+            actual = [key for key in actual if key != "tooltip"]
+        assert actual == main[case][part], f"gate off, {case} install: {part} differs from main's (fixtures/gate_off_main.json)"
 assert mine.keys() == main.keys()
 
 # --- Pull timing: start and length on the anonymous encounter row ---
