@@ -454,6 +454,8 @@ export const recipeSeen = base.extend({
 export const recipeObserved = base.extend({
   kind: z.literal("recipe_observed"),
   profession: z.string().min(1).max(40),
+  /** Language-independent profession identity when reported by the client. */
+  skillLineId: z.number().int().positive().optional(),
   rank: z.number().int().min(1).max(500),
   maxRank: z.number().int().min(1).max(500).optional(),
   recipe: z.string().min(1).max(120),
@@ -473,7 +475,11 @@ export const recipeObserved = base.extend({
 export const trainerSeen = base.extend({
   kind: z.literal("trainer_seen"),
   profession: z.string().min(1).max(40),
+  /** Language-independent profession identity when reported by the client. */
+  skillLineId: z.number().int().positive().optional(),
   recipe: z.string().min(1).max(120),
+  spellId: z.number().int().positive().optional(),
+  productItemId: z.number().int().positive().optional(),
   requiredRank: z.number().int().min(1).max(500),
   costCopper: z.number().int().nonnegative().max(2_000_000_000).optional(),
   trainerNpcId: z.number().int().positive().optional().describe("The trainer whose window listed it. Older addons send none."),

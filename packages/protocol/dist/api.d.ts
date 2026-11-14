@@ -888,6 +888,7 @@ export declare const intakeRequest: z.ZodObject<{
         capturedAt: z.ZodString;
         kind: z.ZodLiteral<"recipe_observed">;
         profession: z.ZodString;
+        skillLineId: z.ZodOptional<z.ZodNumber>;
         rank: z.ZodNumber;
         maxRank: z.ZodOptional<z.ZodNumber>;
         recipe: z.ZodString;
@@ -910,7 +911,10 @@ export declare const intakeRequest: z.ZodObject<{
         capturedAt: z.ZodString;
         kind: z.ZodLiteral<"trainer_seen">;
         profession: z.ZodString;
+        skillLineId: z.ZodOptional<z.ZodNumber>;
         recipe: z.ZodString;
+        spellId: z.ZodOptional<z.ZodNumber>;
+        productItemId: z.ZodOptional<z.ZodNumber>;
         requiredRank: z.ZodNumber;
         costCopper: z.ZodOptional<z.ZodNumber>;
         trainerNpcId: z.ZodOptional<z.ZodNumber>;
@@ -2212,6 +2216,7 @@ export declare const API_SCHEMAS: {
             capturedAt: z.ZodString;
             kind: z.ZodLiteral<"recipe_observed">;
             profession: z.ZodString;
+            skillLineId: z.ZodOptional<z.ZodNumber>;
             rank: z.ZodNumber;
             maxRank: z.ZodOptional<z.ZodNumber>;
             recipe: z.ZodString;
@@ -2234,7 +2239,10 @@ export declare const API_SCHEMAS: {
             capturedAt: z.ZodString;
             kind: z.ZodLiteral<"trainer_seen">;
             profession: z.ZodString;
+            skillLineId: z.ZodOptional<z.ZodNumber>;
             recipe: z.ZodString;
+            spellId: z.ZodOptional<z.ZodNumber>;
+            productItemId: z.ZodOptional<z.ZodNumber>;
             requiredRank: z.ZodNumber;
             costCopper: z.ZodOptional<z.ZodNumber>;
             trainerNpcId: z.ZodOptional<z.ZodNumber>;
