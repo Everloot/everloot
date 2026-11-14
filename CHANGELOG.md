@@ -352,6 +352,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Companion: watch mode waits for the first account save and finds new accounts without a restart, refreshing prices for every discovered account.
 
 ### Changed
+- Addon: grouped auction sales show paid transactions per day and paid units per day separately beside the last sold date. Pending and unmatched notices affect neither rate; in-game layout verification is required before release.
 - Site: Reuse cold-start aggregate and game-art reads and load the build label from a small generated stamp.
 - Site: auction item pages (`/tools/auctions/:realm/:itemId`) are kept in the edge cache for five minutes, like the browse pages, so repeat requests and crawlers stop re-rendering them.
 - Site: reuse public MCP discovery metadata within each mount while keeping request ids, access checks and account tools separate.
