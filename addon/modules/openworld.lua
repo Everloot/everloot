@@ -422,8 +422,12 @@ local function emptyWindowCorpse()
   if not (UnitGUID and UnitIsDead and UnitIsTapDenied) then return nil end
   local found
   for _, unit in ipairs(EMPTY_WINDOW_UNITS) do
-    local okGuid, guid = pcall(UnitGUID, unit)
-    guid = okGuid and E.Readable(guid) or nil
+    local okGuid, raw = pcall(UnitGUID, unit)
+    -- A unit that is absent reads nil and is skipped; one whose GUID errors or is secret stops the guess, since it
+    -- may be the corpse that opened the window while another unit names a different one.
+    if not okGuid then return nil end
+    local guid = E.Readable(raw)
+    if raw ~= nil and guid == nil then return nil end
     if type(guid) == "string" and guid:find("^Creature%-") and npcIdFromGuid(guid) then
       local okDead, dead = pcall(UnitIsDead, unit)
       local okTap, denied = pcall(UnitIsTapDenied, unit)
@@ -438,9 +442,10 @@ end
 
 -- A kill window with nothing in it: one row with no items and no coin, `sourceEvidence = "empty-window"`, so the
 -- corpse counts in its source's windows and a drop rate stops leaving out the kills that dropped nothing. Only a
--- plain kill window: not an item, fishing, or a cast (skinning, pick-pocket, gathering), and one row per corpse.
+-- plain kill window: not an item, fishing, or a gathering or loot cast (skinning, pick-pocket, herb, ore, chest), and
+-- one row per corpse. Any other cast (a combat spell just before looting) is `gatherKind = "other"` and still counts.
 local function emptyWindowCapture(cast, isFromItem)
-  if isFromItem or (cast and (cast.lootKind or cast.gatherKind)) then return end
+  if isFromItem or (cast and (cast.lootKind or (cast.gatherKind and cast.gatherKind ~= "other"))) then return end
   if IsFishingLoot then
     local ok, fishing = pcall(IsFishingLoot)
     if not ok or E.Readable(fishing) ~= false then return end

@@ -291,7 +291,20 @@ UnitIsTapDenied = function(unit) return denied[unit] == true end
 UnitGUID = function() error('secret') end
 emptyWindow()
 assert(#rows() == count, 'an unreadable GUID records nothing')
+-- An ordinary combat spell cast just before looting is not a gathering or loot cast: the empty corpse still counts.
+UnitGUID = function(unit) return guids[unit] end
+clearUnits(); corpseAt('target', 'Creature-0-1-2-3-809-0000000001')
+event('UNIT_SPELLCAST_SENT', 'player', 'Wolf', 'Cast-31', 133)
+event('UNIT_SPELLCAST_SUCCEEDED', 'player', 'Cast-31', 133)
+emptyWindow()
+assert(#rows() == count + 1 and last().sourceNpcId == 809, 'a combat cast before looting still counts the empty corpse')
+count = #rows()
+-- An interact unit that cannot be read stops the guess, even when the target is a readable dead creature.
+clearUnits(); corpseAt('target', 'Creature-0-1-2-3-810-0000000001')
+UnitGUID = function(unit) if unit == 'softinteract' then error('secret') end return guids[unit] end
+emptyWindow()
+assert(#rows() == count, 'an unreadable interact unit: no guess')
 UnitGUID, UnitIsDead, UnitIsTapDenied, IsFishingLoot = function() end, nil, nil, nil
 """)
 counts = check_all(lua)
-assert counts == {"loot": 37}, counts
+assert counts == {"loot": 38}, counts
