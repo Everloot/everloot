@@ -20,6 +20,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./private-sync": {
+      "types": "./dist/private-sync.d.ts",
+      "default": "./dist/private-sync.js"
+    },
     "./schema/*": "./schema/*"
   },
   "files": [
