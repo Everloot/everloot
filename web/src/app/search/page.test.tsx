@@ -135,13 +135,19 @@ test("a scoped search that found more than it lists says how many it shows and l
   siteSearch.groups = [];
 });
 
-test("a scoped search that lists every match, or has no database list to open, adds no footer", async () => {
+test("a scoped search that lists every match adds no footer", async () => {
   siteSearch.groups = [{ type: "item", heading: "Items", total: 3, results: manyResults(3) }];
   expect(await render({ q: "potion", in: "item" })).not.toContain("Showing");
-  siteSearch.groups = [{ type: "object", heading: "Objects", total: 2, results: manyResults(1) }];
-  const objects = await render({ q: "chest", in: "object" });
-  expect(objects).not.toContain("Showing");
-  expect(objects).not.toContain("/database/objects");
+  siteSearch.groups = [];
+});
+
+test("truncated object results link from the overview through the scoped search to every encoded name match", async () => {
+  siteSearch.groups = [{ type: "object", heading: "Objects", total: 51, results: [{ label: "Chest & Cache", href: "/database/objects/55", exact: false, id: 55 }] }];
+  const overview = await render({ q: "Chest & Cache" });
+  expect(overview).toContain('href="/search?q=Chest%20%26%20Cache&amp;in=object"');
+  const scoped = await render({ q: "Chest & Cache", in: "object" });
+  expect(scoped).toContain("Showing 1 of 51");
+  expect(scoped).toContain('href="/database/objects?q=Chest%20%26%20Cache"');
   siteSearch.groups = [];
 });
 

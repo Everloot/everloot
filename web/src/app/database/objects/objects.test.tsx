@@ -76,3 +76,39 @@ test("an object name 3 installs agree on replaces the id on its page, title and 
   expect(await html(ObjectPage(props("1731")))).toContain("Object 1731");
   expect(await html(ObjectsPage({}))).toContain("Object 1731</a>");
 });
+
+test("the object list filters agreed names case-insensitively and preserves the public gate and numeric lookup", async () => {
+  const records = ["a", "b", "c"].flatMap((install) => [
+    { ...loot(`install-${install}`, 1731, [2770]), sourceObjectName: "Copper Vein" },
+    { ...loot(`install-${install}`, 1732, [2770]), sourceObjectName: "Rich Copper Vein" },
+    { ...loot(`install-${install}`, 1733, [2770]), sourceObjectName: "Silver Vein" },
+  ]);
+  records.push(...["a", "b"].map((install) => ({ ...loot(`install-${install}`, 1734, [2770]), sourceObjectName: "Copper Vein Hidden" })));
+  store.loadCorpus.mockResolvedValue(corpus(records));
+  const filtered = await html(ObjectsPage({ searchParams: Promise.resolve({ q: "cOpPeR" }) }));
+  expect(filtered).toContain('href="/database/objects/1731"');
+  expect(filtered).toContain('href="/database/objects/1732"');
+  expect(filtered).not.toContain('href="/database/objects/1733"');
+  expect(filtered).not.toContain('href="/database/objects/1734"');
+  expect(filtered.replace(/<[^>]+>/g, "")).toContain("2 objects");
+  expect(filtered).toContain("q=cOpPeR");
+  for (const q of ["1731", "#1731"]) {
+    const numeric = await html(ObjectsPage({ searchParams: Promise.resolve({ q }) }));
+    expect(numeric).toContain('href="/database/objects/1731"');
+    expect(numeric).not.toContain('href="/database/objects/1732"');
+  }
+  store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], unreachable: true });
+  expect(await html(ObjectsPage({ searchParams: Promise.resolve({ q: "copper" }) }))).toContain("Storage unreachable");
+});
+
+test("name-filtered object pagination keeps the encoded query and sort", async () => {
+  const records = Array.from({ length: 51 }, (_, i) => ["a", "b", "c"].map((install) => ({
+    ...loot(`install-${install}`, 2000 + i, [2770]), sourceObjectName: `Chest & Cache ${i}`,
+  }))).flat();
+  store.loadCorpus.mockResolvedValue(corpus(records));
+  const first = await html(ObjectsPage({ searchParams: Promise.resolve({ q: "Chest & Cache", sort: "id" }) }));
+  expect(first).toContain('href="/database/objects?q=Chest+%26+Cache&amp;sort=id&amp;page=2"');
+  const second = await html(ObjectsPage({ searchParams: Promise.resolve({ q: "Chest & Cache", sort: "id", page: "2" }) }));
+  expect(second).toContain('href="/database/objects/2050"');
+  expect(second).not.toContain('href="/database/objects/2000"');
+});

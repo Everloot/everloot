@@ -38,9 +38,10 @@ export default async function ObjectsPage(props: { searchParams?: Promise<Search
   const facts = await loadObjectFacts();
   const all = facts.unreachable ? [] : objectList(facts);
   const names = objectNames(facts);
-  // The box takes an id: an object is found by its number, whether or not players agree on a name yet.
+  // Numbers still find unnamed objects; text matches only names players agree on.
   const id = q.q && /^#?\d+$/.test(q.q) ? Number(q.q.replace("#", "")) : null;
-  const matched = q.q ? all.filter((o) => o.objectId === id) : all;
+  const text = q.q?.toLowerCase();
+  const matched = text ? all.filter((o) => id !== null ? o.objectId === id : names.get(o.objectId)?.toLowerCase().includes(text)) : all;
   const sort = q.sort ?? DEFAULT_SORT;
   const key = (o: Row): string | number | null => sort.key === "name" ? names.get(o.objectId)?.toLowerCase() ?? null
     : sort.key === "windows" ? o.windows : sort.key === "items" ? o.items : sort.key === "installs" ? o.reporters : o.objectId;
@@ -65,7 +66,7 @@ export default async function ObjectsPage(props: { searchParams?: Promise<Search
   const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "object" : "objects"} page={q.page} perPage={PER_PAGE} href={(page) => href({ ...q, page })} label="Object pages" />;
   const empty = facts.unreachable ? <Unreadable />
     : q.q ? <>
-        <NoMatches noun="objects" chips={[{ label: `Id: ${q.q}`, href: here({ q: undefined }) }]} clearHref="/database/objects" />
+        <NoMatches noun="objects" chips={[{ label: `${id !== null ? "Id" : "Name"}: ${q.q}`, href: here({ q: undefined }) }]} clearHref="/database/objects" />
         {id !== null && <p className="pb-4 text-cell"><Link href={`/database/objects/${id}`} className={LINK}>Open object {id}</Link></p>}
       </>
     : <NoObservations>No object has public loot observations yet; each needs loot windows from 3 installs.</NoObservations>;
@@ -76,7 +77,7 @@ export default async function ObjectsPage(props: { searchParams?: Promise<Search
         <DataTitle title="Objects" trail={trailFor("/database/objects")!} aside={strip} />
         <FilterBar
           label="Object filters"
-          search={{ action: "/database/objects", value: q.q, placeholder: "Object id", label: "Find an object by id", keep }}
+          search={{ action: "/database/objects", value: q.q, placeholder: "Name or id", label: "Find an object by name or id", keep }}
           controls={[]}
           active={q.q ? 1 : 0}
           clearHref="/database/objects"

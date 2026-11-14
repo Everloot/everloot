@@ -101,12 +101,16 @@ function instanceHits(q: string): (SearchResult & { id: number; r: number })[] {
   }).sort((a, b) => a.r - b.r || a.label.localeCompare(b.label));
 }
 
-/** An object is found by its id when it has public loot observations; its name is the agreed one, if any. */
-async function objectById(id: number | null, names: Map<number, string>): Promise<SearchResult[]> {
-  if (id === null) return [];
+/** Names and ids from the same public object list as /database/objects; unavailable facts yield no hits. */
+async function objectHits(q: string, id: number | null, names: Map<number, string>): Promise<(SearchResult & { r: number })[]> {
   const facts = await loadObjectFacts();
-  return !facts.unreachable && objectList(facts).some((o) => o.objectId === id)
-    ? [{ label: names.get(id) ?? `Object ${id}`, href: entityHref("object", id), note: `id ${id}`, exact: true, id }] : [];
+  if (facts.unreachable) return [];
+  const publicIds = new Set(objectList(facts).map((o) => o.objectId));
+  const out: (SearchResult & { r: number })[] = [];
+  if (id !== null && publicIds.has(id)) out.push({ label: names.get(id) ?? `Object ${id}`, href: entityHref("object", id), note: `id ${id}`, exact: true, id, r: -1 });
+  const named = [...names].filter(([n]) => publicIds.has(n) && n !== id).map(([n, name]) => ({ id: n, name }));
+  for (const { entry, exact, r } of byName(named, q)) out.push({ label: entry.name, href: entityHref("object", entry.id), note: `id ${entry.id}`, exact, id: entry.id, r });
+  return out;
 }
 
 /**
@@ -126,7 +130,7 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names
   // Neither read depends on the other. Scoped searches do not need the completion catalogue.
   const [names, catalog] = await Promise.all([given ?? loadNames(), only ? null : loadCatalog()]);
   for (const kind of ["item", "npc", "quest"] as const) if (want(kind)) found.set(kind, agreed(kind, names[`${kind}s`], q, id));
-  if (want("object")) { const objects = await objectById(id, names.objects); found.set("object", { results: objects, total: objects.length }); }
+  if (want("object")) { const objects = await objectHits(q, id, names.objects); found.set("object", { results: objects, total: objects.length }); }
 
   if (!only) {
     // Achievements, factions, titles and quest chains three players reported, by name or id; none when the rollup cannot be read.
@@ -258,7 +262,7 @@ export async function suggest(raw: string, scope?: Scope, names?: Names): Promis
   const ranked: { s: Suggestion; r: number; t: number }[] = [];
   for (const [t, type] of order.entries()) {
     if (type === "object") {
-      for (const o of await objectById(id, all.objects)) ranked.push({ s: { type, id: o.id!, label: o.label, href: o.href }, r: -1, t });
+      for (const o of (await objectHits(q, id, all.objects)).slice(0, SUGGEST_LIMIT)) ranked.push({ s: { type, id: o.id!, label: o.label, href: o.href }, r: o.r, t });
       continue;
     }
     for (const x of agreed(type, all[`${type}s`], q, id).results.slice(0, SUGGEST_LIMIT)) {
