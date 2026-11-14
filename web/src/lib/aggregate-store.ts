@@ -118,7 +118,7 @@ let kept: { at: number; set: AggregateSet | null; generatedAt?: string; etag?: s
  * A failed re-read keeps the set already read for another minute; a missing file or an unknown shape drops it.
  * Strict readers (complete hover cards) receive null during a failed re-read, including that retry minute.
  */
-export async function loadStoredAggregates(deps: { cloud?: R2Config | null; fetch?: typeof fetch; now?: () => number; strict?: boolean } = {}): Promise<AggregateSet | null> {
+async function readStoredAggregates(deps: { cloud?: R2Config | null; fetch?: typeof fetch; now?: () => number; strict?: boolean } = {}): Promise<AggregateSet | null> {
   const now = (deps.now ?? Date.now)();
   if (kept && now - kept.at < KEEP_MS) return deps.strict && kept.failed ? null : kept.set;
   try {
@@ -147,5 +147,13 @@ export async function loadStoredAggregates(deps: { cloud?: R2Config | null; fetc
   return deps.strict && kept.failed ? null : kept.set;
 }
 
+/** One shared download/parse; strictness is applied separately for every waiting reader. */
+let pending: Promise<AggregateSet | null> | null = null;
+export async function loadStoredAggregates(deps: Parameters<typeof readStoredAggregates>[0] = {}): Promise<AggregateSet | null> {
+  if (!pending) pending = readStoredAggregates({ ...deps, strict: false }).finally(() => { pending = null; });
+  const set = await pending;
+  return deps.strict && kept?.failed ? null : set;
+}
+
 /** For tests: forget the kept file. */
-export const forgetStoredAggregates = () => { kept = null; };
+export const forgetStoredAggregates = () => { kept = null; pending = null; };

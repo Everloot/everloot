@@ -7,7 +7,7 @@
   "scripts": {
     "typecheck": "node node_modules/typescript-native/bin/tsc --noEmit",
     "dev": "next dev",
-    "prebuild": "node scripts/fetch-release.mjs",
+    "prebuild": "node scripts/build-version.mjs && node scripts/fetch-release.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "oxlint --max-warnings 5",

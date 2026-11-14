@@ -169,18 +169,33 @@ export function parseSiteManifest(json: unknown, base: string): SiteAssets | nul
   };
 }
 
-/** Fetches and reads the manifest. Never throws: any failure or a timeout is null. Nothing is fetched when the URL is unset. */
+const siteAssets = new Map<string, { at: number; value: SiteAssets }>();
+const pendingSiteAssets = new Map<string, Promise<SiteAssets | null>>();
+/** For tests: forget manifest reads. */
+export const forgetSiteAssets = () => { siteAssets.clear(); pendingSiteAssets.clear(); };
+
+/** Fetches and reads one manifest per build URL and hour. Failures stay retryable and never throw. */
 export async function loadSiteAssets(base: string | null = assetsBaseUrl(), fetcher: typeof fetch = fetch): Promise<SiteAssets | null> {
   if (!base) return null;
-  try {
-    const res = await fetcher(`${base}/manifest.json`, {
-      headers: { accept: "application/json" }, next: { revalidate: REVALIDATE_SECONDS }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    if (!res.ok) return null;
-    return parseSiteManifest(await res.json(), base);
-  } catch {
-    return null;
-  }
+  const hit = siteAssets.get(base);
+  if (hit && Date.now() - hit.at < REVALIDATE_SECONDS * 1000) return hit.value;
+  const pending = pendingSiteAssets.get(base);
+  if (pending) return pending;
+  const read = (async () => {
+    try {
+      const res = await fetcher(`${base}/manifest.json`, {
+        headers: { accept: "application/json" }, next: { revalidate: REVALIDATE_SECONDS }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (!res.ok) return null;
+      const value = parseSiteManifest(await res.json(), base);
+      if (value) siteAssets.set(base, { at: Date.now(), value });
+      return value;
+    } catch {
+      return null;
+    }
+  })().finally(() => { pendingSiteAssets.delete(base); });
+  pendingSiteAssets.set(base, read);
+  return read;
 }
 
 /* ---------- Items, from the private bucket ---------- */

@@ -12,6 +12,14 @@ beforeEach(() => { a = mkdtempSync(join(tmpdir(), "everloot-site-a-")); b = mkdt
 afterEach(() => { rmSync(a, { recursive: true, force: true }); rmSync(b, { recursive: true, force: true }); });
 const build = { nodes: [node(1, "Mutilate")], raid: raid("1.60.1.1"), map: worldMap(1), spells: { 101: {} } };
 
+it("includes the generated build stamp in a build update", () => {
+  commitBuild(a, 1, build);
+  const path = `${GAME_DATA_DIR}/build-version.json`;
+  writeFileSync(join(a, path), JSON.stringify({ product: "wowf", version: "1.60.1.2" }));
+  expect(generatedFiles(a)).toContain(path);
+  expect(differingFiles(a, b, [path])).toEqual([path]);
+});
+
 describe("readSiteData", () => {
   it("is null before there are talent files", () => {
     expect(readSiteData(a)).toBeNull();
