@@ -9,7 +9,7 @@ import { webApplicationJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import { uploadStore } from "@/lib/upload-store";
 import { AH_PATH, HOUSES, agreementSoFar, busiestHouse, findBoard, houseParam, houseSlug, itemHref, money, realmBoards, slugParam, type MarketRow } from "@/lib/auction-house";
-import { BAGS_BUILD, BAG_SIZES, BAG_SLOTS, bagsParam, cheapestBySize, pricedSizes, upgrades, type Upgrade } from "@/lib/bags";
+import { BAGS_BUILD, BAG_SLOTS, bagsParam, cheapestBySize, pricedSizes, upgrades, type Upgrade } from "@/lib/bags";
 import { MARKET_RULE, formatCopper } from "../../../../../kb/src/market";
 import { auctionNames, itemArt, type ItemTip } from "../auctions/art";
 import { Contribute, ItemLink, RealmName } from "../auctions/parts";
@@ -55,6 +55,7 @@ export default async function BagsPage(props: { searchParams: Promise<Search> })
   const cheapest = board ? cheapestBySize(board.rows) : new Map<number, MarketRow>();
   // Sizes some house prices, so a size only bags that bind when picked up come in never lists.
   const sizes = [...new Set([...pricedSizes(realms), ...cheapest.keys()])].sort((a, b) => a - b);
+  const pickerSizes = [...new Set([...sizes, ...current])].filter((slots) => slots > 0).sort((a, b) => a - b);
   const sizeRows: SizeRow[] = sizes.map((slots) => ({ slots, row: cheapest.get(slots) ?? null }));
   const swaps = upgrades(cheapest, current);
 
@@ -153,7 +154,7 @@ export default async function BagsPage(props: { searchParams: Promise<Search> })
                     <span className="sr-only">Bag {i + 1}</span>
                     <select name={`b${i + 1}`} defaultValue={String(slots)} className={field}>
                       <option value="0">Empty</option>
-                      {BAG_SIZES.map((n) => <option key={n} value={String(n)}>{n} slots</option>)}
+                      {pickerSizes.map((n) => <option key={n} value={String(n)}>{n} slots</option>)}
                     </select>
                   </label>
                 ))}
