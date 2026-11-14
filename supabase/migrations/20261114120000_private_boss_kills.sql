@@ -11,9 +11,14 @@ create table if not exists public.character_boss_kills (
 );
 alter table public.character_boss_kills enable row level security;
 revoke all on public.character_boss_kills from public, anon, authenticated, service_role;
-grant select on public.character_boss_kills to backup_exporter;
-drop policy if exists backup_exporter_select on public.character_boss_kills;
-create policy backup_exporter_select on public.character_boss_kills for select to backup_exporter using (true);
+-- Production may not have backup_exporter yet (20261110180000 waits for approval); grant only where it exists.
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'backup_exporter') then
+    grant select on public.character_boss_kills to backup_exporter;
+    drop policy if exists backup_exporter_select on public.character_boss_kills;
+    create policy backup_exporter_select on public.character_boss_kills for select to backup_exporter using (true);
+  end if;
+end $$;
 
 create or replace function public.set_boss_kill_consent(p_user_id uuid, p_link_id uuid, p_granted boolean)
 returns text language plpgsql security definer set search_path = '' set lock_timeout = '3s' as $$
