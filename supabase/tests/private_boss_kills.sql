@@ -42,7 +42,10 @@ begin
  perform pg_temp.check_it(public.sync_boss_kills(a,'forever','forever pioneer','Thrallina',repeat('a',64),'2026-11-02T10:00:00Z',kills)='duplicate','duplicate');
  perform pg_temp.check_it(public.sync_boss_kills(a,'forever','forever pioneer','Thrallina',repeat('a',64),'2026-11-03T10:00:00Z',kills)='stored','newer');
  perform pg_temp.check_it(public.sync_boss_kills(a,'forever','forever pioneer','Thrallina',repeat('a',64),'2026-11-02T10:00:00Z',kills)='older','older');
- perform pg_temp.check_it(public.own_boss_kills(a,l)->'kills'=kills,'owner reads exact kills');
+ perform pg_temp.check_it(public.sync_boss_kills(a,'forever','forever pioneer','Thrallina',repeat('a',64),'2026-11-03T10:00:00Z',jsonb_set(kills,'{0,killCount}','3'))='stored','equal-second cumulative update');
+ perform pg_temp.check_it(public.sync_boss_kills(a,'forever','forever pioneer','Thrallina',repeat('a',64),'2026-11-03T10:00:00Z',kills)='older','equal-second stale snapshot cannot regress counts');
+ perform pg_temp.check_it(public.sync_boss_kills(a,'forever','forever pioneer','Thrallina',repeat('b',64),'2026-11-03T10:00:00Z',jsonb_set(kills,'{0,killCount}','4'))='older','equal-second other install cannot replace history');
+ perform pg_temp.check_it(public.own_boss_kills(a,l)->'kills'=jsonb_set(kills,'{0,killCount}','3'),'owner reads exact updated kills');
  perform pg_temp.check_it(not (public.own_boss_kills(a,l) ? 'source_ref'),'source stays private');
  perform pg_temp.check_it(not exists(select from public.public_character_facts('forever','forever-pioneer','Thrallina')),'no public fact created');
  begin

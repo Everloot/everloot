@@ -65,7 +65,22 @@ begin
   select * into v_old from public.character_boss_kills where link_id = v_link.id;
   if not found or not v_old.consented then return 'no_consent'; end if;
   if v_old.captured_at = p_captured_at and v_old.kills = p_kills then return 'duplicate'; end if;
-  if v_old.captured_at >= p_captured_at then return 'older'; end if;
+  if v_old.captured_at > p_captured_at then return 'older'; end if;
+  if v_old.captured_at = p_captured_at then
+    -- Addon timestamps have second precision. A later same-second cumulative snapshot is valid only from
+    -- the same source, retaining every old encounter without decreasing its count or last-kill time.
+    if v_old.source_ref <> p_source_ref or exists (
+      select 1 from jsonb_array_elements(v_old.kills) old_kill where not exists (
+        select 1 from jsonb_array_elements(p_kills) new_kill
+        where new_kill->'encounterId' = old_kill->'encounterId'
+          and new_kill->'instanceMapId' = old_kill->'instanceMapId'
+          and new_kill->'difficulty' = old_kill->'difficulty'
+          and (new_kill->>'killCount')::bigint >= (old_kill->>'killCount')::bigint
+          and (new_kill->>'lastKillAt')::timestamptz >= (old_kill->>'lastKillAt')::timestamptz
+          and (new_kill->>'firstKillAt')::timestamptz <= (old_kill->>'firstKillAt')::timestamptz
+      )
+    ) then return 'older'; end if;
+  end if;
   update public.character_boss_kills set captured_at = p_captured_at, kills = p_kills, source_ref = p_source_ref where link_id = v_link.id;
   return 'stored';
 end $$;
