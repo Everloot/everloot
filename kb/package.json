@@ -17,7 +17,7 @@
   "dependencies": {
     "@everloot/protocol": "file:../packages/protocol",
     "@modelcontextprotocol/sdk": "^1.32.2",
-    "@rhyster/wow-casc-dbc": "2.16.21",
+    "@rhyster/wow-casc-dbc": "2.16.23",
     "better-sqlite3": "^13.0.3",
     "js-yaml": "^4.1.0",
     "sax": "^1.6.1",
@@ -27,7 +27,7 @@
     "zstd-napi": "^0.0.13"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.2.17",
+    "@electric-sql/pglite": "0.5.16",
     "@types/better-sqlite3": "^9.6.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.20.5",
