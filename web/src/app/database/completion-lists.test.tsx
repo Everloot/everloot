@@ -38,7 +38,7 @@ vi.mock("@/lib/rollup-compute", () => ({
 }));
 vi.mock("@/lib/names", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/names")>()),
-  loadNames: async () => ({ items: new Map(), npcs: new Map(), quests: questNames.reported }),
+  loadNames: async () => ({ items: new Map(), npcs: new Map(), quests: questNames.reported, objects: new Map() }),
   objectNames: () => new Map(),
 }));
 vi.mock("@/lib/objects", () => ({ loadObjectFacts: async () => ({ rates: [], measuredZeros: [], names: [], unreachable: false }) }));
