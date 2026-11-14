@@ -20,6 +20,11 @@ kill(2916, 1); kill(2916, 1)
 local r = Everloot:Rows('boss_kill_owned')[1]
 assert(r.encounterId == 2916 and r.instanceMapId == 48 and r.difficulty == 1 and r.killCount == 2)
 assert(r.firstKillAt == r.lastKillAt and r.characterKey == Everloot.CharacterKey())
+-- The saved export carries the opaque join key and cumulative kill timestamps; no player identity or public kind.
+assert(r.eventId and r.kindLoggedAt and r.capturedAt == nil)
+assert(r.name == nil and r.realm == nil and r.guid == nil)
+local retained = EverlootDB.records.boss_kill_owned[1]
+assert(retained == r and retained.killCount == 2, 'SavedVariables preserves the private sync export')
 IsInInstance = function() return false, 'none' end
 kill(2916, 1)
 assert(r.killCount == 2, 'an unrelated outdoor encounter is ignored')

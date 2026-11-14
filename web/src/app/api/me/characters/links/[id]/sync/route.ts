@@ -1,3 +1,5 @@
+import { bossKillSyncOn } from "@/lib/boss-kill-sync";
+import { ownBossKills, setBossKillConsent } from "@/lib/boss-kill-sync-store";
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { fail, linkAccount, linkSession, NO_STORE, ownLinkPath } from "@/lib/character-links-store";
@@ -11,9 +13,10 @@ import { validId } from "@/lib/saved-builds";
  * link answers exactly as an unknown one, 404.
  *
  * GET: each category with whether sync is on, whether its public section is switched on, and the date of the stored
- * capture. Never the facts' source, a hash or the account.
+ * capture. With EVERLOOT_BOSS_KILL_SYNC=1, bossKills also holds the owner's private history and its own consent.
+ * Never the facts' source, a hash or the account.
  * POST `{ gear?: boolean, talents?: ..., professions?, reputations?, raids?, achievements? }`, from this site (Origin
- * checked): turns each named category's sync on or off. Off deletes that category's stored facts at once. A frozen
+ * checked), plus bossKills when its separate gate is on: turns each named category's sync on or off. Off deletes that category's stored facts at once. A frozen
  * link cannot be turned on (409). Any change clears the page and both cards from the Next cache.
  */
 export const dynamic = "force-dynamic";
@@ -33,6 +36,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const by = new Map(facts.map((f) => [f.category, f]));
     return NextResponse.json({
       id, status: switches.status, pagePublic: switches.pagePublic,
+      ...(bossKillSyncOn() ? { bossKills: await ownBossKills(account, id) } : {}),
       categories: SYNC_CATEGORIES.map((category) => ({
         category, sync: by.get(category)?.consented === true, shown: switches.shown[category], capturedAt: by.get(category)?.fact?.capturedAt ?? null,
       })),
@@ -43,13 +47,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 /** The categories to set, or null for a body that is not one or more category names with booleans. */
-function wanted(body: unknown): Partial<Record<SyncCategory, boolean>> | null {
+type ConsentCategory = SyncCategory | "bossKills";
+function wanted(body: unknown): Partial<Record<ConsentCategory, boolean>> | null {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   const entries = Object.entries(body);
   if (entries.length === 0) return null;
-  const out: Partial<Record<SyncCategory, boolean>> = {};
+  const out: Partial<Record<ConsentCategory, boolean>> = {};
   for (const [key, value] of entries) {
-    if (!isSyncCategory(key) || typeof value !== "boolean") return null;
+    if ((!isSyncCategory(key) && !(key === "bossKills" && bossKillSyncOn())) || typeof value !== "boolean") return null;
     out[key] = value;
   }
   return out;
@@ -69,8 +74,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // The address first: it also says whether the link is this account's, before anything is written.
     const path = await ownLinkPath(account, id);
     if (!path) return fail(404, NONE);
-    for (const [category, granted] of Object.entries(set) as [SyncCategory, boolean][]) {
-      const refusal = await setSyncConsent(account, id, category, granted);
+    for (const [category, granted] of Object.entries(set) as [ConsentCategory, boolean][]) {
+      const refusal = category === "bossKills" ? await setBossKillConsent(account, id, granted) : await setSyncConsent(account, id, category, granted);
+      if (refusal === "unavailable") return unavailable();
       if (refusal === "not_found") return fail(404, NONE);
       if (refusal === "frozen") return fail(409, "This character is frozen because another account also linked it, so sync can't be turned on.");
     }

@@ -134,3 +134,44 @@ describe("consent", () => {
     expect(JSON.stringify(body)).not.toContain(USER.id);
   });
 });
+
+test("boss-kill consent is separate, session-only, and off until its migration is approved", async () => {
+  vi.stubEnv("EVERLOOT_BOSS_KILL_SYNC", "");
+  expect((await send({ bossKills: true })).status).toBe(400);
+  expect(auth.authQuery).not.toHaveBeenCalled();
+  vi.stubEnv("EVERLOOT_BOSS_KILL_SYNC", "1");
+  owned(null);
+  expect((await send({ bossKills: true })).status).toBe(200);
+  const call = auth.authQuery.mock.calls.find((c) => c[0] === "rpc/set_boss_kill_consent");
+  expect(JSON.parse(call![1].body)).toEqual({ p_user_id: USER.id, p_link_id: LINK_ID, p_granted: true });
+  auth.authQuery.mockReset();
+  auth.authQuery.mockResolvedValueOnce([]);
+  expect((await send({ bossKills: true })).status).toBe(404);
+  expect(auth.authQuery).toHaveBeenCalledTimes(1);
+});
+
+test("boss-kill reads are owner-only and no-store, and an absent table returns a retryable 503", async () => {
+  vi.stubEnv("EVERLOOT_BOSS_KILL_SYNC", "1");
+  auth.authQuery.mockResolvedValueOnce([{ ruleset: "forever", name: "Thrallina", realm: "Forever Pioneer", race: "Orc",
+    class: "SHAMAN", faction: "Horde", level: 60, last_upload_at: "2026-11-10T00:00:00Z", status: "linked" }]);
+  auth.authQuery.mockResolvedValueOnce([]);
+  auth.authQuery.mockResolvedValueOnce({ sync: true, kills: [{ encounterId: 2916, killCount: 2 }] });
+  const response = await read();
+  expect(response.status).toBe(200);
+  expect(response.headers.get("cache-control")).toBe("private, no-store");
+  expect((await response.json()).bossKills).toEqual({ sync: true, kills: [{ encounterId: 2916, killCount: 2 }] });
+  const call = auth.authQuery.mock.calls.find((c) => c[0] === "rpc/own_boss_kills");
+  expect(JSON.parse(call![1].body)).toEqual({ p_user_id: USER.id, p_link_id: LINK_ID });
+});
+
+test("a missing boss-kill RPC leaves owner reads unavailable without exposing partial facts", async () => {
+  vi.stubEnv("EVERLOOT_BOSS_KILL_SYNC", "1");
+  auth.authQuery.mockResolvedValueOnce([{ ruleset: "forever", name: "Thrallina", realm: "Forever Pioneer", race: "Orc",
+    class: "SHAMAN", faction: "Horde", level: 60, last_upload_at: "2026-11-10T00:00:00Z", status: "linked" }]);
+  auth.authQuery.mockResolvedValueOnce([]);
+  auth.authQuery.mockRejectedValueOnce(new Error("own_boss_kills missing"));
+  const response = await read();
+  expect(response.status).toBe(503);
+  expect(response.headers.get("cache-control")).toBe("private, no-store");
+  expect(await response.json()).not.toHaveProperty("bossKills");
+});

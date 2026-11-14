@@ -1,3 +1,4 @@
+import { parseBossKillRow, type BossKillRow } from "../../web/src/lib/boss-kill-sync";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { parseEverlootLua } from "../../web/src/lib/sv-parse";
@@ -8,7 +9,7 @@ import { receiptKeyForSite, type SentState } from "./sent-state";
 /**
  * Private sync: sends the player's own linked characters' rows to the account's sync endpoint,
  * POST /api/me/characters/sync, with the account key, and nowhere else. The upload never carries profession_owned,
- * lockout_owned, talent_owned, stats_owned or pvp_owned (web/src/lib/upload-batches.ts keeps them on the computer); this is the only sender of them.
+ * lockout_owned, talent_owned, stats_owned, pvp_owned or boss_kill_owned (web/src/lib/upload-batches.ts keeps them on the computer); this is the only sender of them.
  *
  * Only characters this file linked are sent: the character_link rows `/everloot link` wrote name them, and their
  * completionKey ties the completion module's rows (characterKey) to that name and realm. Gear rows carry the name and
@@ -55,23 +56,25 @@ export interface SyncSendResult {
  */
 export const syncReceiptKey = (installId: string, endpoint: string, character: string) => `sync|${receiptKeyForSite(installId, endpoint)}|${character}`;
 
-const CATEGORY_OF: Record<string, SyncCategory> = {
+type SendCategory = SyncCategory | "boss_kills";
+type SendRow = SyncRow | BossKillRow;
+const CATEGORY_OF: Record<string, SendCategory> = {
   gear_snapshot: "gear", talent_owned: "talents", stats_owned: "stats", pvp_owned: "pvp", profession_owned: "professions", reputation_owned: "reputations",
-  lockout_owned: "raids", achievement_owned: "achievements", title_owned: "achievements",
+  boss_kill_owned: "boss_kills", lockout_owned: "raids", achievement_owned: "achievements", title_owned: "achievements",
 };
 /** Kinds keyed by the completion module's characterKey. */
-const KEYED = new Set(["talent_owned", "stats_owned", "pvp_owned", "profession_owned", "reputation_owned", "lockout_owned", "achievement_owned", "title_owned"]);
+const KEYED = new Set(["boss_kill_owned", "talent_owned", "stats_owned", "pvp_owned", "profession_owned", "reputation_owned", "lockout_owned", "achievement_owned", "title_owned"]);
 
 /** A site that asked to wait, by origin: nothing goes to it before then. Kept while the app runs. */
 const waitUntil = new Map<string, number>();
 
-interface Capture { category: SyncCategory; records: SyncRow[]; entry: string }
+interface Capture { category: SendCategory; records: SendRow[]; entry: string }
 interface Character { id: string; label: string; name: string; realm: string; captures: Capture[] }
 interface Group { character: Character; captures: Capture[] }
 
 const time = (row: { capturedAt: string }) => Date.parse(row.capturedAt);
 const characterId = (name: string, realm: string) => `${name.toLowerCase()}-${linkRealmKey(realm)}`;
-const hashOf = (records: readonly SyncRow[]) => createHash("sha256").update(JSON.stringify(records)).digest("hex").slice(0, 32);
+const hashOf = (records: readonly SendRow[]) => createHash("sha256").update(JSON.stringify(records)).digest("hex").slice(0, 32);
 
 /** The file's linked characters with their rows by category, in file order. */
 function charactersOf(records: Array<Record<string, unknown>>): Character[] {
@@ -85,7 +88,7 @@ function charactersOf(records: Array<Record<string, unknown>>): Character[] {
     if (!had || at >= had.at) links.set(id, { name: r.name, realm: r.realm.trim(), key: r.completionKey, at });
   }
   const byKey = new Map([...links].map(([id, l]) => [l.key, id]));
-  const rows = new Map<string, SyncRow[]>();
+  const rows = new Map<string, SendRow[]>();
   for (const r of records) {
     const kind = String(r.kind);
     if (!Object.hasOwn(CATEGORY_OF, kind)) continue;
@@ -94,7 +97,7 @@ function charactersOf(records: Array<Record<string, unknown>>): Character[] {
     else if (KEYED.has(kind)) id = typeof r.characterKey === "string" ? byKey.get(r.characterKey) : undefined;
     if (!id || !links.has(id)) continue;
     // Only a row the endpoint reads goes; it gets the row as the schema reads it, with nothing else of the file.
-    const row = parseSyncRow(r);
+    const row = parseSyncRow(r) ?? parseBossKillRow(r);
     if (!row) continue;
     const list = rows.get(id) ?? [];
     list.push(row);
@@ -105,7 +108,7 @@ function charactersOf(records: Array<Record<string, unknown>>): Character[] {
     const mine = rows.get(id);
     if (!mine) continue;
     const captures: Capture[] = [];
-    for (const category of ["gear", "stats", "talents", "pvp", "professions", "reputations", "raids", "achievements"] as const) {
+    for (const category of ["gear", "stats", "talents", "pvp", "professions", "reputations", "raids", "achievements", "boss_kills"] as const) {
       let records = mine.filter((r) => CATEGORY_OF[r.kind] === category);
       // The addon keeps a gear sample an hour, and the site keeps one talent build, one stats sheet and one PvP standing; the newest of each goes.
       if ((category === "gear" || category === "stats" || category === "talents" || category === "pvp") && records.length) records = [records.reduce((a, b) => (time(b) > time(a) ? b : a))];
@@ -222,6 +225,7 @@ export async function sendSync(file: string, options: SyncSendOptions): Promise<
           if (outcome === "stored" || outcome === "duplicate" || outcome === "older") kept.add(label);
           // Sync off is not remembered: the player may turn it on later, and the same capture must go then.
           else if (outcome === "no_consent") { off.add(label); continue; }
+          else { waiting.add(label); continue; }
           answered.push(capture.entry);
         }
       } else if (answer?.result === "not_linked") {
