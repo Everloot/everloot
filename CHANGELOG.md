@@ -347,6 +347,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the home page banner no longer makes the page a few pixels wider than the window on a computer with a
   scrollbar, so the page has nothing to scroll sideways at any width.
 - Desktop App: restoring the oldest backup keeps the selected save and an undo copy, even within the same second.
+- Companion: watch mode waits for the first account save and finds new accounts without a restart, refreshing prices for every discovered account.
 
 ### Changed
 - Site: auction item pages (`/tools/auctions/:realm/:itemId`) are kept in the edge cache for five minutes, like the browse pages, so repeat requests and crawlers stop re-rendering them.
