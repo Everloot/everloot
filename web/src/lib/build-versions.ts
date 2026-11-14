@@ -1,4 +1,4 @@
-import clientLayer from "@/data/game-data/client-layer.json";
+import build from "@/data/game-data/build-version.json";
 import routing from "@/data/build-versions.json";
 import { GAME_VERSIONS, type GameVersion, type GameVersionId } from "@/lib/game-version";
 
@@ -19,7 +19,7 @@ export const SERVED: GameVersion = GAME_VERSIONS.find((v) => v.id === routing.se
 export const PREFIXES = routing.prefixes as Partial<Record<GameVersionId, string>>;
 
 /** Whether the committed client layer is this version's build: the site holds one snapshot, of one build. */
-export const hasSnapshot = (v: GameVersion): boolean => v.build !== null && v.build === clientLayer.build.version && v.product === clientLayer.build.product;
+export const hasSnapshot = (v: GameVersion): boolean => v.build !== null && v.build === build.version && v.product === build.product;
 
 /** A version's own address for a page: the served version keeps the unprefixed path, the others carry their prefix. */
 export function versionHref(v: GameVersion, path = "/"): string {
