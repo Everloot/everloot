@@ -52,3 +52,35 @@ assert(EverlootDB.toggles.auctions == false, '/everloot auctions off must disabl
 from protocol_schema import check_all  # noqa: E402
 check_all(lua)
 print("Lua 5.1 auctions: bid-only skipped, per-unit price, stack size kept")
+
+# A player-triggered full scan reports both ways to send the saved file.
+lua = LuaRuntime()
+lua.execute("""
+date = function() return '2026-11-15T00:00:00Z' end
+time = function() return 1000000 end
+printed = {}
+print = function(message) printed[#printed + 1] = tostring(message) end
+SlashCmdList = {}
+GetRealmName = function() return 'Forever' end
+CreateFrame = function() return {
+ RegisterEvent=function() end, SetScript=function(self, _, f) self.onEvent=f end,
+ HookScript=function(self, _, f) self.hooks=self.hooks or {}; table.insert(self.hooks,f) end
+} end
+C_Timer = { After = function() end }
+C_AuctionHouse = {
+ ReplicateItems = function() end,
+ GetNumReplicateItems = function() return 1 end,
+ GetReplicateItemInfo = function() return 'Item', nil, 1, nil, nil, nil, nil, nil, nil, 100, nil, nil, nil, nil, nil, nil, 2589, true end
+}
+""")
+for file in ["core.lua", "modules/auctions.lua"]:
+    lua.execute((root / file).read_text(encoding="utf-8"))
+lua.execute("""
+Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'AUCTION_HOUSE_SHOW') end
+Everloot:StartScan()
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'REPLICATE_ITEM_LIST_UPDATE') end
+assert(not Everloot:Scanning(), 'the scan finished')
+local message = printed[#printed]
+assert(string.find(message, 'Desktop App', 1, true) and string.find(message, 'everloot.app/upload', 1, true), 'scan completion names both upload routes')
+""")

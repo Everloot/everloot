@@ -290,6 +290,7 @@ assert(replicateCalls == 0, 'opening the house never scans')
 
 -- The look: the Everloot window's flat dark panel and bronze tooltip edge, a small crest and Everloot in fel green.
 local p = T.panel
+assert(string.find(p.intro.text, 'Desktop App', 1, true) and string.find(p.intro.text, 'everloot.app/upload', 1, true), 'scan introduction names both upload routes')
 assert(p.backdrop and p.backdrop.bgFile == 'Interface\\\\Buttons\\\\WHITE8X8' and p.backdrop.edgeFile == 'Interface\\\\Tooltips\\\\UI-Tooltip-Border', 'the window backdrop')
 assert(p.bg[1] < 0.1 and p.border[1] > p.border[3], 'dark inside a bronze edge')
 assert(p.crest and p.crest.path == 'Interface\\\\AddOns\\\\Everloot\\\\media\\\\crest' and p.crest.width <= 32, 'a modest crest heads the panel')
@@ -313,6 +314,7 @@ local status = T.panel.status.text
 assert(string.find(status, 'Next scan in 12:55.', 1, true), status)
 assert(string.find(status, 'Last scan on this realm: 2 items, 2 min ago.', 1, true), status)
 assert(string.find(status, 'Not saved yet', 1, true), 'a scan from this session is not in the saved file yet')
+assert(string.find(status, 'Desktop App', 1, true) and string.find(status, 'everloot.app/upload', 1, true), 'unsaved scan names both upload routes')
 T.panel.scanButton.scripts.OnClick()
 assert(replicateCalls == 1, 'no second scan inside the cooldown')
 
@@ -476,6 +478,7 @@ EverlootDB.lastScans.Forever.at = 999000
 Everloot.ownScanCache = nil
 T.Refresh()
 assert(string.find(T.panel.status.text, 'Saved in your file', 1, true), T.panel.status.text)
+assert(string.find(T.panel.status.text, 'Desktop App', 1, true) and string.find(T.panel.status.text, 'everloot.app/upload', 1, true), 'saved scan names both upload routes')
 """)
 
 # --- Without the window's file (an older install): the game's dialog look, the same rows ---
