@@ -80,6 +80,7 @@ const NAMES: Record<string, string> = {
   "/tools/guild-board": "Guild board",
   "/tools/auctions": "Auction House",
   "/tools/bags": "Bag upgrades",
+  "/tools/level": "Level guide",
   "/tools/gold-ledger": "Gold ledger",
   "/tools/professions": "Profession hubs",
   "/tools/farming-routes": "Farming",
@@ -137,6 +138,10 @@ export function trailFor(pathname: string): Crumb[] | null {
   const profession = path.match(/^\/tools\/professions\/([a-z-]+)$/);
   if (profession && PROFESSIONS.includes(profession[1])) {
     return [...trailFor("/tools/professions")!, { name: profession[1].split("-").map(titleCase).join(" "), path }];
+  }
+  const level = path.match(/^\/tools\/level\/([0-9]+)$/);
+  if (level && Number(level[1]) >= 1 && Number(level[1]) <= 60 && trailFor("/tools/level")) {
+    return [...trailFor("/tools/level")!, { name: `Level ${Number(level[1])}`, path }];
   }
   if (!NAMES[path]) return null;
   const trail: Crumb[] = [];

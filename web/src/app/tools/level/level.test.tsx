@@ -1,3 +1,4 @@
+import { trailFor } from "@/lib/breadcrumbs";
 // @vitest-environment jsdom
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -20,7 +21,7 @@ test("exports exactly 60 static routes and rejects malformed params", async () =
 });
 test("renders data honesty, database links, breadcrumbs and correct indexing", async () => {
   const html = renderToStaticMarkup(await Page({ params: Promise.resolve({ level: "60" }) }));
-  expect(html).toContain("Not confirmed yet"); expect(html).toContain("BreadcrumbList");
+  expect(html).toContain("Not confirmed yet"); expect(trailFor("/tools/level/60")?.map((c) => c.name)).toEqual(["Home", "Level guide", "Level 60"]);
   expect(html).not.toContain('aria-labelledby="level-spells"'); expect(html).not.toContain('aria-labelledby="level-zones"');
   expect(html).toContain("/database/instances/"); expect(html).toContain("/tools/talents/mage");
   expect(html).toContain("/classes/mage");

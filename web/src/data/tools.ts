@@ -19,13 +19,6 @@ export interface Tool {
 
 export const tools: Tool[] = [
   {
-    slug: "level", group: "Plan", title: "Level guide", shortTitle: "Level guide",
-    line: "See talent points and recorded instance levels at your level, and share them with your group.",
-    tagline: "What opens at your level?",
-    description: "Choose a level from 1 to 60 for talent points and instance levels from the game files. Training and zone levels without supporting data are marked unconfirmed.",
-    status: "collecting", keywords: ["wow forever level guide"],
-  },
-  {
     slug: "talents",
     group: "Plan",
     line: "Plan a talent build for any class and share it with its game build attached.",
@@ -67,6 +60,13 @@ export const tools: Tool[] = [
     description: "Your characters kept in this browser, with their realm, class, level, professions, notes and plans. Add them by hand or from your Everloot.lua. No account needed, and nothing is uploaded.",
     status: "live",
     keywords: [],
+  },
+  {
+    slug: "level", group: "Plan", title: "Level guide", shortTitle: "Level guide",
+    line: "See talent points and recorded instance levels at your level, and share them with your group.",
+    tagline: "What opens at your level?",
+    description: "Choose a level from 1 to 60 for talent points and instance levels from the game files. Training and zone levels without supporting data are marked unconfirmed.",
+    status: "collecting", keywords: ["wow forever level guide"],
   },
   {
     slug: "raid",

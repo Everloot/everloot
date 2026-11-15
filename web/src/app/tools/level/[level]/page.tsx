@@ -1,3 +1,4 @@
+import { trailFor } from "@/lib/breadcrumbs";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Container, PageHeader } from "@/components/ui";
@@ -28,7 +29,7 @@ export default async function LevelPage({ params }: Props) {
   return <Container>
     <PageHeader title={`What opens at level ${level}?`}
       lede="Talent points and instance levels from the WoW: Forever game files. Training and zone levels are not confirmed yet."
-      trail={[{ name: "Home", path: "/" }, { name: "Tools", path: "/tools" }, { name: "Level guide", path: "/tools/level" }, { name: `Level ${level}`, path: `/tools/level/${level}` }]} />
+      trail={trailFor(`/tools/level/${level}`)!} />
     <LevelView level={level} unlocks={buildLevelUnlocks(data, level)} classes={data.classes} />
   </Container>;
 }
