@@ -363,6 +363,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Knowledge base: open data drop rates and measured zeros follow the same recheck cutoffs as the site, leaving other exported facts and corpus counts unchanged.
 
 ### Changed
+- Site: cap each Worker request at 30 seconds of CPU after the CPU performance fixes.
 - Site: the site shows no ads. About, the FAQ, the terms, the privacy policy, the privacy guide and the accessibility statement now say so and no longer describe Google AdSense.
 - Site: the Blizzard auction house page names each house by its ruleset and faction ("PvP, Alliance", "Roleplay PvP, Horde") instead of "Alliance, house 110", and lists them US first, then by ruleset. Blizzard's API does not say which ruleset a house serves; the mapping was matched by price in both regions.
 - Addon: auction scan messages name everloot.app/upload alongside the Desktop App as a way to send the saved file.
