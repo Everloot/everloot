@@ -14,6 +14,8 @@ vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
 }));
 vi.mock("next/navigation", () => ({ usePathname: () => "/guides", notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
+// Class-plan fixtures keep references hidden; reference-guides.test.tsx covers both publication states.
+vi.mock("@/lib/reference-guide-status", () => ({ REFERENCE_GUIDES_PUBLISHED: false }));
 
 // Every class reads the made-up test tree, at the build a test sets and with the nodes it takes out; the change
 // records are the ones a test puts in. Not game data.

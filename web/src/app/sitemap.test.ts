@@ -16,6 +16,10 @@ import { GET } from "./sitemap.xml/route";
 import sitemap from "@/lib/site-sitemap";
 import { approvedAddonNames } from "@/data/addon-repos";
 import { rankingWeeks } from "@/lib/rankings";
+import { REFERENCE_GUIDES, REFERENCE_GUIDES_PUBLISHED } from "@/lib/reference-guides";
+
+const referenceGate = vi.hoisted(() => ({ published: false }));
+vi.mock("@/lib/reference-guide-status", () => ({ get REFERENCE_GUIDES_PUBLISHED() { return referenceGate.published; } }));
 
 const facts = vi.hoisted(() => ({ rates: [] as unknown[], names: [] as { installId: string; itemId: number; name: string }[], npcs: [] as unknown[], unreachable: false }));
 const world = vi.hoisted(() => ({ npcs: [] as unknown[], quests: [] as unknown[], vendors: [] as unknown[], unreachable: false }));
@@ -48,6 +52,19 @@ vi.mock("@/lib/game-assets", async (importOriginal) => {
 
 const entries = (await sitemap())!;
 const byPath = new Map(entries.map((e) => [new URL(e.url).pathname, e]));
+
+test("the actual sitemap follows the reference publication gate", () => {
+  for (const guide of REFERENCE_GUIDES) expect(byPath.has(`/guides/${guide.slug}`)).toBe(REFERENCE_GUIDES_PUBLISHED);
+});
+
+test("publishing references adds all six URLs and the guide hub to the actual sitemap", async () => {
+  referenceGate.published = true;
+  try {
+    const paths = new Set((await sitemap())!.map((entry) => new URL(entry.url).pathname));
+    expect(paths.has("/guides")).toBe(true);
+    for (const guide of REFERENCE_GUIDES) expect(paths.has(`/guides/${guide.slug}`)).toBe(true);
+  } finally { referenceGate.published = false; }
+});
 
 test("public catalogue tools that are not coming-soon are in the sitemap, with rankings subject to its row count", () => {
   expect(byPath.has("/tools/farming-routes")).toBe(true);

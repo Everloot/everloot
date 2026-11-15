@@ -14,6 +14,7 @@ import { RANKINGS, rankingPath } from "@/lib/rankings";
 import { DATABASE_HUBS, type DatabaseHub } from "@/lib/database-hubs";
 import { guildsOn } from "@/lib/guild-switch";
 import { playerPagesOn } from "@/lib/player-pages";
+import { publicReferenceGuides, referenceHref } from "@/lib/reference-guides";
 
 /**
  * /llms.txt and /llms-full.txt are generated here from the same lists the site reads (the tool catalog, the MCP
@@ -143,6 +144,7 @@ function sharedMap(): string[] {
     "",
     "## Pages",
     ...PAGES.map((p) => bullet(p.title, p.path, p.text)),
+    ...publicReferenceGuides().map((guide) => bullet(guide.title, referenceHref(guide.slug), guide.summary)),
     `- Talent calculator per class: ${TALENT_CLASSES.map((c) => `[${cap(c)}](${url(`/tools/talents/${c}`)})`).join(", ")}.`,
     "",
     ...database(),

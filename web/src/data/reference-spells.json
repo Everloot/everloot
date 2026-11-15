@@ -1,0 +1,152 @@
+{
+  "build": {
+    "product": "wowf",
+    "buildId": 70938,
+    "version": "1.60.1.70938",
+    "buildConfig": "3627b099867bfde3e37a17cf44f69cdc",
+    "extractedAt": "2026-11-14T04:53:40.386Z"
+  },
+  "source": "https://assets.everloot.app/wowf-70938-3627b099/manifest.json",
+  "label": "Found in game files, unconfirmed in play. Talent-dependent abilities require the matching talent.",
+  "credit": "Game data \u00a9 Blizzard Entertainment, Inc.",
+  "layouts": {
+    "warrior": {
+      "defensive": {
+        "id": 12975,
+        "name": "Last Stand",
+        "definitionId": 135501,
+        "evidence": "When activated, this ability temporarily grants you 30% of your maximum health for 20 sec. After the effect expires, the health is lost."
+      },
+      "crowd-control": {
+        "id": 12809,
+        "name": "Concussion Blow",
+        "definitionId": 135496,
+        "evidence": "Stuns the target for 5 sec."
+      },
+      "cooldowns": {
+        "id": 12328,
+        "name": "Death Wish",
+        "definitionId": 135458,
+        "evidence": "When activated, increases your Physical damage done by 20% and makes you immune to Fear effects, but increases all damage you take by 5%. Lasts 30 sec."
+      }
+    },
+    "paladin": {
+      "defensive": {
+        "id": 20925,
+        "name": "Holy Shield",
+        "definitionId": 135153,
+        "evidence": "Increases chance to block by 30% for 10 sec, and deals 75 Holy damage for each attack blocked while active.  Damage caused by Holy Shield causes 20% additional threat. Each block expends a charge. 4 charges."
+      },
+      "cooldowns": {
+        "id": 20216,
+        "name": "Divine Favor",
+        "definitionId": 134820,
+        "evidence": "When activated, gives your next Flash of Light, Holy Light, or Holy Shock spell a 100% critical effect chance."
+      }
+    },
+    "hunter": {
+      "crowd-control": {
+        "id": 19577,
+        "name": "Intimidation",
+        "definitionId": 134426,
+        "evidence": "Command your pet to Stun the target for 3 sec on its next successful attack, which also gains 100% increased critical strike chance. Generates high threat."
+      },
+      "cooldowns": {
+        "id": 19574,
+        "name": "Bestial Wrath",
+        "definitionId": 134423,
+        "evidence": "Send your pet into a rage causing 50% additional damage for 18 sec.  While enraged, the beast does not feel pity or remorse or fear and it cannot be stopped unless killed."
+      }
+    },
+    "rogue": {
+      "crowd-control": {
+        "id": 14251,
+        "name": "Riposte",
+        "definitionId": 135265,
+        "evidence": "A strike that becomes active after parrying an opponent's attack.  This attack deals 150% weapon damage and disarms the target for [?]."
+      },
+      "cooldowns": {
+        "id": 13750,
+        "name": "Adrenaline Rush",
+        "definitionId": 135254,
+        "evidence": "Increases your Energy regeneration rate by 100% for 15 sec."
+      }
+    },
+    "priest": {
+      "interrupt": {
+        "id": 15487,
+        "name": "Silence",
+        "definitionId": 135354,
+        "evidence": "Silences the target, preventing them from casting spells for 5 sec and interrupting their spellcasts for 3 sec."
+      },
+      "cooldowns": {
+        "id": 10060,
+        "name": "Power Infusion",
+        "definitionId": 135366,
+        "evidence": "Infuses the target with power, increasing their spell damage and healing done by 20% for 15 sec."
+      }
+    },
+    "shaman": {
+      "cooldowns": {
+        "id": 16188,
+        "name": "Nature's Swiftness",
+        "definitionId": 134187,
+        "evidence": "When activated, your next Nature spell with a casting time less than 10 sec. becomes an instant cast spell."
+      }
+    },
+    "mage": {
+      "defensive": {
+        "id": 11958,
+        "name": "Ice Block",
+        "definitionId": 135299,
+        "evidence": "You become encased in a block of ice, protecting you from all physical attacks and spells for 10 sec, but during that time you cannot attack, move, or cast spells."
+      },
+      "crowd-control": {
+        "id": 11113,
+        "name": "Blast Wave",
+        "definitionId": 135313,
+        "evidence": "A wave of flame radiates outward from the caster, damaging all enemies caught within the blast for 148 to 178 Fire damage, and Dazing them for 50% reduced movement speed for 6 sec."
+      },
+      "cooldowns": {
+        "id": 12042,
+        "name": "Arcane Power",
+        "definitionId": 135328,
+        "evidence": "For the next 15 sec, your spells deal 30% more damage while costing 30% more mana to cast."
+      }
+    },
+    "warlock": {
+      "defensive": {
+        "id": 19028,
+        "name": "Soul Link",
+        "definitionId": 135423,
+        "evidence": "When active, 30% of all damage taken by the caster is taken by your Imp, Voidwalker, Succubus, Incubus, or Felhunter Demon instead. In addition, both the Demon and the master will inflict 3% more damage. Lasts as long as the Demon is active."
+      },
+      "crowd-control": {
+        "id": 18223,
+        "name": "Curse of Exhaustion",
+        "definitionId": 135444,
+        "evidence": "Reduces the target's movement speed by 30% for 12 sec.  Only one Curse per Warlock can be active on any one target."
+      },
+      "cooldowns": {
+        "id": 18708,
+        "name": "Fel Domination",
+        "definitionId": 135426,
+        "evidence": "Your next Imp, Voidwalker, Succubus, Incubus, or Felhunter Summon spell has its casting time reduced by 5.5 sec and its Mana cost reduced by 50%."
+      }
+    },
+    "druid": {
+      "interrupt": {
+        "id": 1238122,
+        "name": "Feral Charge",
+        "definitionId": 134405,
+        "evidence": "[?]\nCharge an enemy, immobilizing them and interrupting any spell they are casting for 4 sec.\n\n[?]"
+      },
+      "cooldowns": {
+        "id": 17116,
+        "name": "Nature's Swiftness",
+        "definitionId": 134382,
+        "evidence": "When activated, your next Nature spell becomes an instant cast spell."
+      }
+    }
+  }
+}

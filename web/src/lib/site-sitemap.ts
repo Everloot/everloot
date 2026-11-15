@@ -26,6 +26,7 @@ import { wikiSitemapPaths } from "@/lib/wiki";
 import { LEGACY_PERKS } from "@/data/game-data/legacy-perks";
 import { CLIENT_PROFESSIONS, professionHref, RECIPES_EXTRACTED_AT } from "@/lib/professions";
 import { approvedAddonNames } from "@/data/addon-repos";
+import { publicReferenceGuides, referenceHref } from "@/lib/reference-guides";
 
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://everloot.app";
 
@@ -43,6 +44,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap | null> {
   // Each addon profile that exists: the owner-approved names (src/data/addon-repos.ts). An addon the installs report
   // but the owner has not approved has no page, so it is not listed. Polestar's profile is its guide page above.
   const addonRoutes = approvedAddonNames().filter((name) => name.toLowerCase() !== "polestar").map((name) => `/addons/${encodeURIComponent(name)}`);
+  const referenceRoutes = publicReferenceGuides().map((guide) => referenceHref(guide.slug));
+  staticRoutes.push(...referenceRoutes, ...(referenceRoutes.length ? ["/guides"] : []));
 
   const talentRoutes = TALENT_CLASSES.map((slug) => `/tools/talents/${slug}`);
   // Item categories from the client layer: each class and subclass that holds items, first page only, and only

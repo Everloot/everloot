@@ -216,6 +216,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: /database/recent and its RSS feed list the entities whose facts reached three installs in the last 30 days;
   dates from before the feed existed are marked estimated.
 - Site: /tools/bags shows the cheapest bag of each size on one realm's auction house and what each added slot costs over your smallest bag, and item tooltips print a bag's "14 Slot Bag" line; slot counts come from the game files, prices from players' scans.
+- Site: add six unreviewed reference drafts with a shared publication gate, class keyboard layouts, starter macros and device-saved checklists.
 
 ### Fixed
 - Addon: Settings stays inside the Everloot window, counts every populated record kind and names item facts; a Full / Compact / Off selector controls tooltip detail without changing recording. Needs an in-game layout check before release.

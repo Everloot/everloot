@@ -7,6 +7,7 @@ import { MAX_LEVEL, ROLES, classLabel } from "@/lib/class-context";
 import { GUIDE_STATE_LABEL, guideFreshness, guideIndexable, type GuideFreshness } from "@/lib/guide-freshness";
 import { ACTIVITY_LABEL, ROLE_LABEL, guideHref, guidesFor, loadGuides, publishedGuides, type Guide } from "@/lib/guides";
 import { pageMetadata } from "@/lib/seo";
+import { publicReferenceGuides, referenceHref } from "@/lib/reference-guides";
 import { TALENT_CLASSES, isTalentClass, loadCatalog, type TalentClassSlug } from "@/lib/talents/catalogs";
 import { PUBLISHED_CHANGES, classTalentChanges } from "@/lib/talents/freshness-records";
 import { GUIDE_ACTIVITIES, type GuideActivity, type GuideRole } from "../../../../kb/src/guides/guide";
@@ -23,7 +24,9 @@ const LEDE = "Everloot's reviewed guides, each a talent plan for one class: who 
 const LINK = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
 /** 120 to 160 characters, and honest about the guides (guides.test.tsx). */
-const description = (guides: number) => guides
+const description = (guides: number) => publicReferenceGuides().length
+  ? "Reviewed WoW: Forever reference pages for new players: terms, keybinds, macros, stats, PvP and raid preparation, alongside Everloot’s class guides."
+  : guides
   ? `${guides} reviewed WoW: Forever ${guides === 1 ? "guide" : "guides"} from Everloot, each a talent plan for one class: who it is for, why it fits and how to play it.`
   : "Everloot's reviewed WoW: Forever guides, each a talent plan for one class: who it is for, why it fits and how to play it. No guide is reviewed yet.";
 
@@ -94,7 +97,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   const { given } = readFilter(await searchParams);
   const guides = publishedGuides(loadGuides());
   // Indexed once it lists a guide that is itself indexed, and only as the plain list.
-  const indexable = !given && (await withFreshness(guides)).some(({ guide, freshness }) => guideIndexable(guide, freshness));
+  const indexable = !given && (publicReferenceGuides().length > 0 || (await withFreshness(guides)).some(({ guide, freshness }) => guideIndexable(guide, freshness)));
   return { ...pageMetadata({ title: TITLE, description: description(guides.length), path: "/guides" }), robots: { index: indexable, follow: true } };
 }
 
@@ -125,7 +128,8 @@ export default async function GuidesIndex({ searchParams }: Props) {
 
   return (
     <Container>
-      <PageHeader trail={trailFor("/guides")!} title="Guides" lede={LEDE} />
+      <PageHeader trail={trailFor("/guides")!} title="Guides" lede={publicReferenceGuides().length ? "Reviewed reference pages for new players, alongside class guides built around a talent plan." : LEDE} />
+      {publicReferenceGuides().length > 0 && <section className="mt-8 space-y-3" aria-labelledby="reference-guides"><SectionHeading id="reference-guides">Reference pages</SectionHeading><ul className="space-y-3">{publicReferenceGuides().map((guide) => <li key={guide.slug}><Link href={referenceHref(guide.slug)} className={LINK}>{guide.title}</Link><p className="mt-1 text-sm text-muted">{guide.summary}</p></li>)}</ul></section>}
       <section className="mt-6" aria-label="Community reference">
         <Link href="/guides/darkmoon-faire" className={LINK}>Darkmoon Faire: storage box and ticket items</Link>
         <p className="mt-1 text-sm text-muted">Community-sourced checklist, unverified in Forever. Separate from the reviewed class guides below.</p>
