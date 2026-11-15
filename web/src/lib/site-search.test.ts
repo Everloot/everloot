@@ -84,6 +84,23 @@ test("an object is found by id, and only when it has public loot observations", 
   expect((await search("55")).find((g) => g.type === "object")).toBeUndefined();
 });
 
+test("objects match agreed names in exact, prefix and substring order in search and suggestions", async () => {
+  mocks.names.objects = new Map([[1, "Old Copper Vein"], [2, "Copper Vein Rich"], [3, "Copper Vein"], [4, "Copper Vein Hidden"]]);
+  mocks.objects.rates = [1, 2, 3, 4].map((sourceObjectId) => ({ sourceObjectId, itemId: 9, kills: 10, drops: 3, rate: 0.3, reporters: sourceObjectId === 4 ? 2 : 3, public: sourceObjectId !== 4 }));
+  const { siteSearch, suggest } = await import("./site-search");
+  const group = (await siteSearch("  COPPER VEIN  ", { only: "object", limit: 2 }))[0];
+  expect(group).toMatchObject({ type: "object", total: 3 });
+  expect(group.results.map((r) => [r.id, r.exact])).toEqual([[3, true], [2, false]]);
+  expect((await search("vein")).find((g) => g.type === "object")?.total).toBe(3);
+  expect((await suggest("copper vein", "object")).map((r) => r.id)).toEqual([3, 2, 1]);
+  expect((await suggest("copper vein")).filter((r) => r.type === "object").map((r) => r.id)).toEqual([3, 2, 1]);
+  expect(await suggest("#3", "object")).toEqual([{ type: "object", id: 3, label: "Copper Vein", href: "/database/objects/3" }]);
+  expect(await suggest("#4", "object")).toEqual([]);
+  mocks.objects.unreachable = true;
+  expect(await siteSearch("copper", { only: "object" })).toEqual([]);
+  expect(await suggest("copper", "object")).toEqual([]);
+});
+
 test("zones are the released ones, linking to the map", async () => {
   const zones = (await search("elwynn")).find((g) => g.type === "zone")!.results;
   expect(zones[0]).toMatchObject({ label: "Elwynn Forest", href: "/database/zones/1429-elwynn-forest", exact: false });

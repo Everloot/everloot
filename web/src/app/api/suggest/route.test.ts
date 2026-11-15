@@ -1,7 +1,7 @@
 import { expect, test, vi } from "vitest";
 
 const quota = vi.hoisted(() => ({ mcp: vi.fn() }));
-const mocks = vi.hoisted(() => ({ names: { items: new Map([[2, "Thrall's Blade"]]), npcs: new Map([[77, "Thrall"]]), quests: new Map<number, string>() } }));
+const mocks = vi.hoisted(() => ({ names: { items: new Map([[2, "Thrall's Blade"]]), npcs: new Map([[77, "Thrall"]]), objects: new Map<number, string>(), quests: new Map<number, string>() } }));
 const loadNames = vi.hoisted(() => vi.fn(async () => mocks.names));
 vi.mock("@/lib/names", () => ({ loadNames }));
 // The real search, watched, so a test can tell whether one ran.
