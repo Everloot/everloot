@@ -42,20 +42,32 @@
         "name": "Divine Favor",
         "definitionId": 134820,
         "evidence": "When activated, gives your next Flash of Light, Holy Light, or Holy Shock spell a 100% critical effect chance."
+      },
+      "crowd-control": {
+        "id": 20066,
+        "name": "Repentance",
+        "definitionId": 135224,
+        "evidence": "Puts the enemy target in a state of meditation, incapacitating them for up to 6 sec. Any damage caused will awaken the target. Only works against Humanoids."
       }
     },
     "hunter": {
       "crowd-control": {
-        "id": 19577,
-        "name": "Intimidation",
-        "definitionId": 134426,
-        "evidence": "Command your pet to Stun the target for 3 sec on its next successful attack, which also gains 100% increased critical strike chance. Generates high threat."
+        "id": 19503,
+        "name": "Scatter Shot",
+        "definitionId": 134465,
+        "evidence": "A short-range shot that deals 50% weapon damage and disorients the target for 4 sec.  Any damage caused will remove the effect.  Turns off your attack when used."
       },
       "cooldowns": {
         "id": 19574,
         "name": "Bestial Wrath",
         "definitionId": 134423,
         "evidence": "Send your pet into a rage causing 50% additional damage for 18 sec.  While enraged, the beast does not feel pity or remorse or fear and it cannot be stopped unless killed."
+      },
+      "defensive": {
+        "id": 19263,
+        "name": "Deterrence",
+        "definitionId": 134451,
+        "evidence": "When activated, increases your Dodge and Parry chance by 25% for 10 sec."
       }
     },
     "rogue": {
@@ -70,6 +82,12 @@
         "name": "Adrenaline Rush",
         "definitionId": 135254,
         "evidence": "Increases your Energy regeneration rate by 100% for 15 sec."
+      },
+      "defensive": {
+        "id": 14278,
+        "name": "Ghostly Strike",
+        "definitionId": 135284,
+        "evidence": "A strike that deals 125% (180% if a Dagger is equipped in your Main Hand) weapon damage, increases your chance to dodge by 15% for 7 sec, and causes your next Ambush or Garrote cast within 7 sec to not require Stealth.  Awards 1 combo point."
       }
     },
     "priest": {
@@ -84,6 +102,18 @@
         "name": "Power Infusion",
         "definitionId": 135366,
         "evidence": "Infuses the target with power, increasing their spell damage and healing done by 20% for 15 sec."
+      },
+      "defensive": {
+        "id": 15473,
+        "name": "Shadowform",
+        "definitionId": 135347,
+        "evidence": "Assume Shadowform, increasing your Shadow damage by 10%, reducing the Mana cost of all Shadow spells by 50%, increasing the critical strike damage bonus of your Shadow spells by 100%, and reducing Physical damage taken by you by 15%. However, you may not cast healing spells while in this form."
+      },
+      "crowd-control": {
+        "id": 15407,
+        "name": "Mind Flay",
+        "definitionId": 135356,
+        "evidence": "Assault the target's mind with Shadow energy, causing 63 Shadow damage over 3 sec  and slowing their movement speed by 50%."
       }
     },
     "shaman": {
@@ -146,6 +176,12 @@
         "name": "Nature's Swiftness",
         "definitionId": 134382,
         "evidence": "When activated, your next Nature spell becomes an instant cast spell."
+      },
+      "defensive": {
+        "id": 24858,
+        "name": "Moonkin Form",
+        "definitionId": 134398,
+        "evidence": "Shapeshift into Moonkin Form, increasing Omen of Clarity's chance to trigger by 100%, Armor contribution from items by 360%, and all party or raid members within 45 yards have their Critical Strike chance increased by 3%. Also protects the caster from Polymorph effects and prevents the use of healing spells.\n\nThe act of shapeshifting frees the caster of Polymorph and Movement Impairing effects."
       }
     }
   }

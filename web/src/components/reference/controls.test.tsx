@@ -34,6 +34,7 @@ test("checklists restore valid choices and ignore malformed saved data", async (
   localStorage.setItem("test", "{broken");
   await mount(<Checklist storageKey="test" items={[{ id: "bag", text: "Pack your bag" }]} />);
   expect(host.querySelector("input")!.checked).toBe(false);
+  expect(host.textContent).not.toContain("cannot save");
 });
 
 test("Copy writes exactly the displayed macro, and reports clipboard failure", async () => {
@@ -41,7 +42,8 @@ test("Copy writes exactly the displayed macro, and reports clipboard failure", a
   vi.stubGlobal("navigator", { clipboard: { writeText } });
   await mount(<CopyMacro text={STARTER_MACROS[0].text} label="Warrior" />);
   await act(async () => host.querySelector("button")!.click());
-  expect(writeText).toHaveBeenCalledWith(host.querySelector("code")!.textContent);
+  expect(writeText).toHaveBeenCalledWith(host.querySelector("pre")!.textContent);
+  expect(host.querySelector("pre")!.tabIndex).toBe(0);
   expect(host.textContent).toContain("Copied");
   writeText.mockRejectedValue(Error("denied"));
   await act(async () => host.querySelector("button")!.click());
@@ -56,9 +58,12 @@ test("class tabs support arrows and keyboard buttons expose persistent role info
   tabs[0].focus();
   await act(async () => tabs[0].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })));
   expect(tabs[1].getAttribute("aria-selected")).toBe("true");
+  expect(tabs[1].className).not.toBe(tabs[0].className);
   expect(document.activeElement).toBe(tabs[1]);
   const key = host.querySelector<HTMLButtonElement>('[data-key="Q"]')!;
   expect(key.getAttribute("aria-label")).toContain("Interrupt");
   await act(async () => key.click());
   expect(host.querySelector('[role="status"]')!.textContent).toContain("Not confirmed yet");
+  expect(key.hasAttribute("aria-describedby")).toBe(false);
+  expect(host.querySelector('[data-key="1"]')!.getAttribute("aria-label")).toContain("Unassigned");
 });

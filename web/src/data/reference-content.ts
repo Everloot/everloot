@@ -16,8 +16,8 @@ export const RAID_CHECKLIST: ChecklistItem[] = [
   { id: "amulet", text: "For Onyxia, earn the Drakefire Amulet and carry it in your inventory. Blizzard says it need not be equipped." },
   { id: "amulet-record", text: "Compare item 16309 with the amulet in game. This candidate’s Forever identity is not confirmed here.", href: "/database/items/16309", linkText: "Item 16309 — found in the client relationship data" },
   { id: "first-aid", text: "Check First Aid recipe output 14530 in game before treating it as a usable raid supply.", href: "/database/items/14530", linkText: "First Aid output item 14530" },
-  { id: "alchemy", text: "Check Alchemy recipe output 13446 for its effect, requirements and cooldown before packing it.", href: "/database/items/13446", linkText: "Alchemy output item 13446" },
-  { id: "mana", text: "If your role uses mana, check Alchemy recipe output 13444 before adding it to your supplies.", href: "/database/items/13444", linkText: "Alchemy output item 13444" },
+  { id: "first-aid-13446", text: "Check First Aid recipe output 13446 for its effect, requirements and cooldown before packing it.", href: "/database/items/13446", linkText: "First Aid output item 13446" },
+  { id: "alchemy-13444", text: "Check Alchemy recipe output 13444 for its effect and whether it suits your role before adding it to your supplies.", href: "/database/items/13444", linkText: "Alchemy output item 13444" },
   { id: "fire", text: "For Onyxia, inspect your fire resistance. Blizzard recommends building it before entering; no required total is established here." },
   { id: "other-resist", text: "Ask the raid leader about other resistance needs. Targets for Barrow Deeps and Hyjal Summit are not confirmed here." },
 ];

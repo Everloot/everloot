@@ -54,6 +54,25 @@ test("every raid checklist item link names an item present in held client data",
   }
 });
 
+test("raid supply labels match the held profession, without an unverified mana claim", () => {
+  for (const id of [14530, 13446, 13444]) {
+    const profession = recipes.professions.find((p) => p.recipes.some((r) => r[1] === id))!;
+    const row = RAID_CHECKLIST.find((item) => item.href === `/database/items/${id}`)!;
+    expect(row.text).toContain(`${profession.name} recipe output ${id}`);
+    expect(row.linkText).toContain(`${profession.name} output item ${id}`);
+  }
+  expect(RAID_CHECKLIST.find((item) => item.href?.endsWith("13444"))!.text).not.toMatch(/mana/i);
+});
+
+test("clear control and defensive spells are represented and talent examples are qualified", () => {
+  expect(CLASS_LAYOUTS.paladin["crowd-control"]).toBeDefined();
+  expect(CLASS_LAYOUTS.hunter.defensive).toBeDefined();
+  expect(CLASS_LAYOUTS.rogue.defensive).toBeDefined();
+  const html = renderToStaticMarkup(<ReferencePage slug="macros" />);
+  expect(html).toContain("Talent-dependent examples");
+  expect(html).toContain("not starting-level abilities");
+});
+
 test("every suggested or macro spell exists for its class in the held Forever extract", () => {
   for (const [classSlug, layout] of Object.entries(CLASS_LAYOUTS)) {
     for (const spell of Object.values(layout)) {

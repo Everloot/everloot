@@ -45,7 +45,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap | null> {
   // but the owner has not approved has no page, so it is not listed. Polestar's profile is its guide page above.
   const addonRoutes = approvedAddonNames().filter((name) => name.toLowerCase() !== "polestar").map((name) => `/addons/${encodeURIComponent(name)}`);
   const referenceRoutes = publicReferenceGuides().map((guide) => referenceHref(guide.slug));
-  staticRoutes.push(...referenceRoutes, ...(referenceRoutes.length ? ["/guides"] : []));
+  staticRoutes.push(...referenceRoutes);
 
   const talentRoutes = TALENT_CLASSES.map((slug) => `/tools/talents/${slug}`);
   // Item categories from the client layer: each class and subclass that holds items, first page only, and only
@@ -85,6 +85,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap | null> {
     return guideIndexable(g, guideFreshness(g, catalog, classTalentChanges(PUBLISHED_CHANGES, catalog.classId), today)) ? [g] : [];
   }))).flat();
   const guideRoutes: { path: string; lastModified?: Date }[] = indexedGuides.length ? [{ path: "/guides" }, ...indexedGuides.map((g) => ({ path: guideHref(g.slug), lastModified: g.reviewed ? new Date(g.reviewed.on) : undefined }))] : [];
+  if (referenceRoutes.length && !guideRoutes.some((route) => route.path === "/guides")) staticRoutes.push("/guides");
   const classRoutes = classesIndexable(guides) ? ["/classes", ...TALENT_CLASSES.filter((slug) => classHubIndexable(slug, guides)).map((slug) => `/classes/${slug}`)] : [];
   // The class chooser once both its files are reviewed, as its robots say. The group planner says noindex as built.
   const chooserRoutes = chooserIndexable(loadChooser()) ? ["/classes/choose"] : [];

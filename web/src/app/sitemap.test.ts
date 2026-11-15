@@ -148,7 +148,12 @@ test("a guide is listed only while its page asks to be indexed, dated by its rev
     expect(listed(withGuides).sort()).toEqual([...hubs, "/guides", "/guides/frost-leveling"].sort());
     expect(withGuides.find((e) => e.url.endsWith("/guides/frost-leveling"))?.lastModified).toEqual(new Date("2026-10-20"));
     expect(withGuides.find((e) => e.url.endsWith("/guides"))?.lastModified).toBeUndefined();
+    referenceGate.published = true;
+    const both = (await sitemap())!;
+    expect(both.filter((entry) => entry.url.endsWith("/guides"))).toHaveLength(1);
+    for (const guide of REFERENCE_GUIDES) expect(both.some((entry) => entry.url.endsWith(`/guides/${guide.slug}`))).toBe(true);
   } finally {
+    referenceGate.published = false;
     vi.unstubAllEnvs();
   }
 });
