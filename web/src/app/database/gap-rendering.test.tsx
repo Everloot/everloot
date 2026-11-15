@@ -31,6 +31,7 @@ test("unreadable storage reads unrecorded, never zero", async () => {
   expect(drops).toContain("Storage unreachable");
   expect(drops).not.toContain("0 windows");
   expect(drops).not.toContain("<table");
+  expect(drops).not.toContain("95% Wilson");
   const db = await html(DatabasePage);
   expect(db).toContain("unrecorded");
   expect(db).not.toMatch(/>0<\/div>/);
@@ -55,6 +56,7 @@ test("an empty readable corpus says nothing is public yet, with the empty state 
   expect(drops).not.toContain("0 windows");
   expect(drops).toContain("data-empty-state");
   expect(drops).toContain("No public frequencies yet");
+  expect(drops).not.toContain("95% Wilson");
   expect(await html(DatabasePage)).not.toContain(">0<");
 });
 
@@ -82,4 +84,17 @@ test("three installs with empty windows publish a measured zero; two installs pu
   expect(drops).toContain("NPC 42");
   expect(drops).not.toContain("NPC 77");
   expect(drops).not.toContain("Item 9");
+});
+
+
+test("the drops list shows the sample range and few-windows mark for 3 of 4", async () => {
+  store.loadCorpus.mockResolvedValue({ uploads: 3, dataAsOf: "2026-10-09T00:00:00.000Z", records: [
+    loot("install-aaa", 42, [{ itemId: 9, count: 4 }], 1),
+    loot("install-bbb", 42, [{ itemId: 9, count: 1 }], 1),
+    loot("install-ccc", 42, [{ itemId: 9, count: 1 }], 1),
+    loot("install-ccc", 42, [], 2),
+  ] });
+  const drops = await html(() => DropsPage({}));
+  expect(drops).toContain("75.0% (30.1%–95.4%) · few windows");
+  expect(drops).toContain("95% Wilson");
 });
