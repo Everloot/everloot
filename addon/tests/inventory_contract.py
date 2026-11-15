@@ -31,7 +31,7 @@ C_Container = {
  GetContainerItemInfo = function(b,s) return (contents[b] or {})[s] end
 }
 GetInboxNumItems = function() return MAIL_COUNT or 1, MAIL_TOTAL or 1 end
-GetInboxHeaderInfo = function() return nil,nil,'Sender','Subject',0,0,1,1 end
+GetInboxHeaderInfo = function() if MISSING_HEADER then return end; return nil,nil,'Sender','Subject',0,0,1,1 end
 GetInboxItemLink = function(m,a) if a==1 and not MISSING_LINK then return 'item:2589' end end
 GetInboxItem = function(m,a) if a==1 then return 'Cloth',2589,123,2 end end
 ''')
@@ -66,7 +66,9 @@ assert(row.bank.items[2592]==5 and row.mail.items[2589]==2, 'open bank and mail 
 event('BANKFRAME_CLOSED'); event('MAIL_CLOSED')
 NOW=1001; MISSING_LINK=true; event('MAIL_SHOW')
 assert(row.mail.items[2589]==2 and row.mail.observedAt==1000, 'uncached attachments preserve complete mail snapshot')
-MISSING_LINK=false; event('MAIL_CLOSED')
+MISSING_HEADER=true; event('MAIL_INBOX_UPDATE')
+assert(row.mail.items[2589]==2 and row.mail.observedAt==1000, 'missing mail header preserves complete snapshot')
+MISSING_HEADER=false; MISSING_LINK=false; event('MAIL_CLOSED')
 NOW=1100; contents[0]={}; event('BAG_UPDATE_DELAYED')
 assert(next(row.bags.items)==nil and row.bags.observedAt==1100, 'complete empty snapshot replaces previous stock')
 assert(row.bank.observedAt==1000 and row.mail.observedAt==1000, 'separate observation times')
@@ -94,7 +96,9 @@ C_Container.GetContainerNumSlots=function() error('unavailable') end
 event('BAG_UPDATE_DELAYED')
 assert(row.bags.observedAt==1200, 'API errors preserve snapshot')
 C_Container.GetContainerNumSlots=function(b) return slots[b] or 0 end
-slots[0]=10000; contents[0]={}; event('BAG_UPDATE_DELAYED')
+slots[0]=0; contents[0]={}; event('BAG_UPDATE_DELAYED')
+assert(row.bags.items[2589]==8 and row.bags.observedAt==1200, 'unavailable backpack never becomes empty')
+slots[0]=10000; event('BAG_UPDATE_DELAYED')
 assert(row.bags.observedAt==1200, 'slot cap never stores a partial snapshot')
 slots[0]=1; contents[0]={{itemID=2589,stackCount=2147483648}}; event('BAG_UPDATE_DELAYED')
 assert(row.bags.observedAt==1200, 'item count cap preserves previous data')

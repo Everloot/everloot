@@ -47,7 +47,7 @@ local function containers(bags, bank)
   local items = {}
   for _, bag in ipairs(bags) do
     local ok, slots = call(slotsFn, bag)
-    if not ok or not whole(slots, 0, MAX_SLOTS) or (bank and bag == -1 and slots == 0) then return nil end
+    if not ok or not whole(slots, 0, MAX_SLOTS) or ((bag == 0 or (bank and bag == -1)) and slots == 0) then return nil end
     for slot = 1, slots do
       if infoFn then
         local got, info = call(infoFn, bag, slot)
@@ -99,8 +99,9 @@ local function readMail()
     or type(GetInboxItemLink) ~= "function" or type(GetInboxItem) ~= "function" then return nil end
   local items = {}
   for mail = 1, count do
-    local headerOK, _, _, _, _, _, _, _, attached = call(GetInboxHeaderInfo, mail)
-    if not headerOK or not whole(attached or 0, 0, MAX_ATTACHMENTS) then return nil end
+    local headerOK, _, _, _, subject, _, _, daysLeft, attached = call(GetInboxHeaderInfo, mail)
+    if not headerOK or type(subject) ~= "string" or type(daysLeft) ~= "number" or daysLeft ~= daysLeft
+      or daysLeft < 0 or daysLeft > 365 or not whole(attached or 0, 0, MAX_ATTACHMENTS) then return nil end
     local found = 0
     for slot = 1, MAX_ATTACHMENTS do
       local got, link = call(GetInboxItemLink, mail, slot)
