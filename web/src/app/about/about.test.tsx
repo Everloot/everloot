@@ -16,8 +16,9 @@ test("How it stays free separates Everloot's free search from an optional AI pro
   expect(free).toMatch(/AI model.*your own provider account.*pricing and limits/s);
   expect(free).toContain("not an API key");
   expect(free).toContain('href="/chat"');
-  // The funding statement is kept as it was.
-  expect(free).toContain("clearly labelled");
+  // The site shows no ads, so AH Ledger's free community terms cover its prices.
+  expect(free).toContain("There are no ads.");
+  expect(free).not.toMatch(/AdSense|Google ads/);
   expect(free).toContain("popups or interstitials");
 });
 

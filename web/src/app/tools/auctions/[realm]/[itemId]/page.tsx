@@ -20,6 +20,9 @@ import {
 import { auctionNames, itemArt } from "../../art";
 import { Contribute, DayTable, Facts, HousePrices, PriceChart, PriceFacts, RealmPrices, UnnamedReason, itemQuality } from "../../parts";
 import TimeAgo from "../../TimeAgo";
+import AhledgerPrices from "../../AhledgerPrices";
+import { ahledgerMarkets } from "@/lib/ahledger";
+import { REGION_LABEL, RULESET_LABEL, realmRegion, realmRuleset } from "@/lib/realms";
 
 type Props = { params: Promise<{ realm: string; itemId: string }> };
 
@@ -72,6 +75,10 @@ export default async function RealmItemPage(props: Props) {
   const path = itemHref({ slug }, itemId);
   const trail = [...trailFor(AH_PATH)!, { name: realm, path: realmHref({ slug }) }, { name: label, path }];
   const v = row?.value;
+  // AH Ledger's markets for this realm's ruleset and region, both factions; none for a realm the map cannot place.
+  const ruleset = realmRuleset(realm);
+  const region = realmRegion(realm);
+  const ahledger = region ? ahledgerMarkets(ruleset, region) : [];
   const moves = row ? ([1, 7] as const).flatMap((span) => {
     const move = priceMove(row, span, now);
     return move ? [{ label: `${span}-day change`, value: percent(move.change), note: `${move.from.day} to ${move.to.day}` }] : [];
@@ -160,6 +167,14 @@ export default async function RealmItemPage(props: Props) {
                 panel: <div className="pt-4"><DayTable points={row.points} caption={`Public days for ${label} on ${realm}, ${row.house} auction house`} /></div>,
               }] : []),
             ]}
+          />
+        )}
+
+        {ahledger.length > 0 && region && (
+          <AhledgerPrices
+            itemId={itemId}
+            title={`AH Ledger prices, ${RULESET_LABEL[ruleset as keyof typeof RULESET_LABEL]} ${REGION_LABEL[region]}`}
+            regions={[{ label: REGION_LABEL[region], markets: ahledger }]}
           />
         )}
 

@@ -122,7 +122,7 @@ export default function Page() {
         <li>If you sign in, an essential login cookie keeps you signed in for at most 30 days after your last visit. Signing out ends it.</li>
         <li>Optional analytics cookies are off unless you accept them in the cookie banner. You can reopen Cookie preferences from the footer on any page.</li>
         <li>Cloudflare Web Analytics sets no cookies. It does not run if your browser sends Do Not Track or Global Privacy Control.</li>
-        <li>Ads come from Google AdSense, each labelled &quot;Advertisement&quot;. There are no ads on the upload page, the privacy page, account pages or the lore archive.</li>
+        <li>Everloot shows no ads and loads no advertising script, so nothing sets advertising cookies.</li>
       </List>
       <P>
         The full list of tools, what each one does and how long things are kept is in the{" "}

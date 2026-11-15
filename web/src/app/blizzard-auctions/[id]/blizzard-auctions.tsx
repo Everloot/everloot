@@ -1,6 +1,7 @@
 import { CoinText } from "@/components/ui/Coins";
 import { DataTable, type Column } from "@/components/ui";
 import type { BlizzardPrice, BlizzardRead } from "@/lib/blizzard-auctions";
+import { houseLabel, houseOrder } from "@/lib/blizzard-houses";
 import { formatCopper } from "../../../../../kb/src/market";
 
 const UTC = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" });
@@ -24,7 +25,8 @@ export function BlizzardAuctions({ read }: { read: BlizzardRead }) {
       </section>
     );
   }
-  const { rows } = read;
+  // US first, then EU; within a region by ruleset, then Alliance, Horde, Blackwater.
+  const rows = [...read.rows].sort((a, b) => (a.region === b.region ? houseOrder(a.houseId) - houseOrder(b.houseId) : a.region === "us" ? -1 : 1));
   if (!rows.length) {
     return (
       <section aria-labelledby="item-blizzard-auctions" data-blizzard-auctions="empty" className="mt-6 mb-6 max-w-[640px]">
@@ -36,7 +38,7 @@ export function BlizzardAuctions({ read }: { read: BlizzardRead }) {
   const asOf = rows.reduce((oldest, r) => (r.snapshotAt < oldest ? r.snapshotAt : oldest), rows[0].snapshotAt);
   const columns: Column<BlizzardPrice>[] = [
     { key: "region", header: "Region", nowrap: true, cell: (r) => r.region.toUpperCase() },
-    { key: "house", header: "House", nowrap: true, cell: (r) => `${r.houseName.replace(/ Auction House$/, "")}, house ${r.houseId}` },
+    { key: "house", header: "Auction house", nowrap: true, cell: (r) => houseLabel(r.houseId, r.houseName) },
     { key: "min", header: "Lowest buyout", numeric: true, cell: (r) => <CoinText text={formatCopper(r.minUnit)} /> },
     { key: "typical", header: "Typical", numeric: true, cell: (r) => <CoinText text={formatCopper(r.typicalUnit)} /> },
     { key: "quantity", header: "Listed", numeric: true, cell: (r) => r.quantity.toLocaleString("en-US") },
