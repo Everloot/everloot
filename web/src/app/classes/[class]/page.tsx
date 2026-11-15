@@ -115,6 +115,7 @@ export default async function ClassHubPage({ params }: Params) {
 
         <section aria-labelledby="plan">
           <SectionHeading id="plan">Plan and look up</SectionHeading>
+          <p className="mb-3 text-sm"><Link href={`/tools/level/1?class=${slug}`} className={LINK}>What opens at your level as a {name}</Link></p>
           <ul className="space-y-2 text-sm">
             {links.map((l) => (
               <li key={l.key}>

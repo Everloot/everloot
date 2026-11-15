@@ -25,6 +25,7 @@ import { loadNews, newsSitemapPaths } from "@/lib/news";
 import { wikiSitemapPaths } from "@/lib/wiki";
 import { LEGACY_PERKS } from "@/data/game-data/legacy-perks";
 import { CLIENT_PROFESSIONS, professionHref, RECIPES_EXTRACTED_AT } from "@/lib/professions";
+import { levelSitemapPaths } from "./level-page-data";
 import { approvedAddonNames } from "@/data/addon-repos";
 
 const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://everloot.app";
@@ -39,7 +40,7 @@ const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://everloot.app";
  * sitemap the CDN keeps for an hour, as the database sitemap does.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap | null> {
-  const staticRoutes = ["/", "/wow-forever", "/methodology", "/about", "/privacy", "/terms", "/security", "/accessibility", "/contact", "/upload", "/addon", "/lore", "/lore/coverage", "/changes", "/map", "/map/eastern-kingdoms", "/map/kalimdor", ...DATABASE_HUB_PATHS, "/database/recent", "/tools", "/tools/collections", "/tools/guild-board", "/tools/auctions", "/tools/bags", "/tools/gold-ledger", "/tools/legacy", "/addons", "/addons/popular", "/census", "/addons/ecosystem", "/addons/polestar", "/addons/polestar/packs", "/addons/polestar/wanted", "/chat"];
+  const staticRoutes = [...await levelSitemapPaths(), "/", "/wow-forever", "/methodology", "/about", "/privacy", "/terms", "/security", "/accessibility", "/contact", "/upload", "/addon", "/lore", "/lore/coverage", "/changes", "/map", "/map/eastern-kingdoms", "/map/kalimdor", ...DATABASE_HUB_PATHS, "/database/recent", "/tools", "/tools/collections", "/tools/guild-board", "/tools/auctions", "/tools/bags", "/tools/gold-ledger", "/tools/legacy", "/addons", "/addons/popular", "/census", "/addons/ecosystem", "/addons/polestar", "/addons/polestar/packs", "/addons/polestar/wanted", "/chat"];
   // Each addon profile that exists: the owner-approved names (src/data/addon-repos.ts). An addon the installs report
   // but the owner has not approved has no page, so it is not listed. Polestar's profile is its guide page above.
   const addonRoutes = approvedAddonNames().filter((name) => name.toLowerCase() !== "polestar").map((name) => `/addons/${encodeURIComponent(name)}`);

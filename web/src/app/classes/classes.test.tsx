@@ -220,12 +220,12 @@ describe("class hubs", () => {
     const destinations = (context: Parameters<typeof contextLinks>[0]) => contextLinks(context).filter((l) => l.key !== "hub").map((l) => l.href);
     address.search = "level=25&role=damage";
     await mount(await ClassPage({ params: Promise.resolve({ class: "mage" }) }));
-    expect(hrefs()).toEqual(destinations({ classSlug: "mage", level: 25, role: "damage" }));
+    expect(hrefs()).toEqual(["/tools/level/1?class=mage", ...destinations({ classSlug: "mage", level: 25, role: "damage" })]);
     expect(hrefs()).toContain("/database/items?class=mage&level=25&role=damage");
     // An address the hub cannot read leaves its links with the class alone.
     address.search = "level=99&role=damage";
     await mount(await ClassPage({ params: Promise.resolve({ class: "mage" }) }));
-    expect(hrefs()).toEqual(destinations({ classSlug: "mage" }));
+    expect(hrefs()).toEqual(["/tools/level/1?class=mage", ...destinations({ classSlug: "mage" })]);
   });
 
   test("who can be the class comes from Blizzard's race table, with the new combinations marked", async () => {

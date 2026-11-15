@@ -334,3 +334,12 @@ test("a ranking board is listed once its unfiltered view asks to be indexed (10 
     rankings.weeks = [];
   }
 });
+
+
+test("level pages with real data are listed and empty levels stay out", () => {
+  const paths = entries.map((e) => new URL(e.url).pathname);
+  expect(paths).toContain("/tools/level");
+  expect(paths).toContain("/tools/level/10");
+  expect(paths).toContain("/tools/level/60");
+  expect(paths).not.toContain("/tools/level/1");
+});
