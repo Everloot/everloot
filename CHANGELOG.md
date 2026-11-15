@@ -361,6 +361,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Knowledge base: open data drop rates and measured zeros follow the same recheck cutoffs as the site, leaving other exported facts and corpus counts unchanged.
 
 ### Changed
+- Addon: auction scan messages name everloot.app/upload alongside the Desktop App as a way to send the saved file.
 - Site: explain how the CurseForge app and Desktop App keep downloads current on the addon page.
 - Site: upload and addon install steps name the Windows and macOS Forever save-file and AddOns paths.
 - Addon: grouped auction sales show paid transactions per day and paid units per day separately beside the last sold date. Pending and unmatched notices affect neither rate; in-game layout verification is required before release.
