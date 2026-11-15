@@ -56,6 +56,7 @@ one is not recorded here.
 
 | Name | Read in | What it is for | Required |
 |---|---|---|---|
+| `AHLEDGER_API_KEY` | `web/src/app/api/ahledger/[market]/route.ts` | AH Ledger's free read key (`ahlk_...`) for the auction pages' AH Ledger prices: 300 requests a minute and the full answer after 2026-12-10, when calls without a key drop to 30 a minute. Free only while the site shows no ads (`docs/sources/LEDGER.md`) | Optional |
 | `EVERLOOT_OPS_USER_IDS` | `web/src/lib/ops/access.ts` | Explicit website-account dashboard grants | Optional |
 | `EVERLOOT_OPS_CONTRIBUTOR_USER_IDS` | `web/src/lib/ops/access.ts` | Separate website-account named-contributor grants | Optional |
 | `EVERLOOT_OPS_AGENT_TOKEN_HASHES` | `web/src/lib/ops/access.ts` | Revocable aggregate-reader token digests | Optional |
