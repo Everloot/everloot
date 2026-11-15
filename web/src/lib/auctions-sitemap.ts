@@ -9,9 +9,10 @@ export const AUCTIONS_CHUNK = 40_000;
 /** The indexable Auction House pages, or null when the market rollup cannot be read. */
 export async function auctionPaths(): Promise<string[] | null> {
   const market = await uploadStore.loadMarket();
+  if (!market.state) return null;
   const dates = await reportDates();
   const reports = dates.length ? [REPORT_PATH, ...dates.map(reportHref)] : [];
-  return market.state ? [...sitemapPaths(realmBoards(market.state)), ...reports] : reports.length ? reports : null;
+  return [...sitemapPaths(realmBoards(market.state)), ...reports];
 }
 
 export function auctionsUnavailable(): Response {

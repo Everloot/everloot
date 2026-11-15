@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { AwsClient } from "aws4fetch";
 import type { AuctionReport, ReportItem } from "./auction-report";
 import { storedViewNeedsWrite, STAMP } from "./stored-view-freshness";
@@ -19,7 +20,7 @@ function storage(deps: Deps) {
  return { client, url, request };
 }
 export const isReportDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && Number.isFinite(Date.parse(`${s}T00:00:00Z`)) && new Date(`${s}T00:00:00Z`).toISOString().slice(0,10) === s;
-export async function reportDates(deps: Deps = {}): Promise<string[]> {
+async function readReportDates(deps: Deps = {}): Promise<string[]> {
  const s = storage(deps); if (!s) return [];
  try {
   const res = await s.request(INDEX); if (!res.ok) return [];
@@ -28,7 +29,7 @@ export async function reportDates(deps: Deps = {}): Promise<string[]> {
  } catch { return []; }
 }
 /** No corpus or market fallback: missing snapshots stay unavailable until the next successful cron. */
-export async function storedAuctionReport(date: string, deps: Deps = {}): Promise<AuctionReport | null> {
+async function readAuctionReport(date: string, deps: Deps = {}): Promise<AuctionReport | null> {
  if (!isReportDate(date)) return null;
  const s = storage(deps); if (!s) return null;
  try {
@@ -37,6 +38,9 @@ export async function storedAuctionReport(date: string, deps: Deps = {}): Promis
   return report.date === date && Array.isArray(report.houses) && report.goods > 0 ? report : null;
  } catch { return null; }
 }
+export const reportDates = cache(readReportDates);
+export const storedAuctionReport = cache(readAuctionReport);
+
 /** Freeze each completed UTC day on first publication. The day stamp advances even on an idle midnight cron;
  * a failed PUT cannot advance the index. Historical files are retained after the market's rolling window expires. */
 export async function writeAuctionReports(now = new Date(), deps: Deps & { build?: () => Promise<AuctionReport[]> } = {}): Promise<{ written: boolean; reports?: number }> {
@@ -64,11 +68,11 @@ export async function writeAuctionReports(now = new Date(), deps: Deps & { build
    items.set(id, { name: name ?? `Item ${id}`, category: cls === 7 ? subclasses.get(`${cls}:${sub}`) ?? undefined : undefined });
   }
   const reports = buildAuctionReports(market.state, now, items);
-  const featured = reports.map(r => r.risers[0]?.itemId ?? r.mostListed[0]?.itemId).filter((id): id is number => id !== undefined);
+  const featured = reports.map(r => r.risers.slice().sort((a,b) => b.change!-a.change!)[0]?.itemId ?? r.mostListed[0]?.itemId).filter((id): id is number => id !== undefined);
   const assets = featured.length ? await loadSiteAssets() : null;
   const tips = await loadItemTips(assets, [...new Set(featured)]);
   for (const report of reports) {
-   const id = report.risers[0]?.itemId ?? report.mostListed[0]?.itemId;
+   const id = report.risers.slice().sort((a,b) => b.change!-a.change!)[0]?.itemId ?? report.mostListed[0]?.itemId;
    report.icon = id ? tips.get(id)?.icon ?? null : null;
   }
   return reports;

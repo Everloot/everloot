@@ -1,3 +1,5 @@
+import { percent } from "./auction-house";
+import { reportRegion, reportRuleset } from "./auction-report";
 import { assetsBaseUrl } from "@/lib/talents/assets";
 import { FETCH_TIMEOUT_MS, REVALIDATE_SECONDS } from "@/lib/game-assets";
 import { ImageResponse } from "next/og";
@@ -205,7 +207,7 @@ async function fetchCardIcon(url?: string | null): Promise<string | null> {
 export async function renderAuctionReportCard(report: import("./auction-report").AuctionReport, tall = false): Promise<ImageResponse> {
   const icon = await fetchCardIcon(report.icon);
   const c = tokens.dark;
-  const move = (r: import("./auction-report").ReportGood) => `${r.name} ${r.change! >= 0 ? "+" : ""}${Math.round(r.change! * 100)}% · ${r.region} ${r.ruleset} · ${r.realm} ${r.house}`;
+  const move = (r: import("./auction-report").ReportGood) => `${r.name} ${percent(r.change!)} · ${reportRegion(r.region)} ${reportRuleset(r.ruleset)} · ${r.realm} ${r.house}`;
   const houses = new Map<string, string[]>();
   for (const h of report.houses) {
     const [region, realm, house, ruleset] = h.split(" · ");
@@ -215,19 +217,20 @@ export async function renderAuctionReportCard(report: import("./auction-report")
   const lines = tall ? [
     ...report.risers.slice().sort((a,b) => b.change!-a.change!).slice(0,3).map(r => `Riser: ${move(r)}`),
     ...report.fallers.slice().sort((a,b) => a.change!-b.change!).slice(0,3).map(r => `Faller: ${move(r)}`),
-    ...report.mostListed.slice(0,2).map(r => `${r.name}: ${r.listings} listed auctions · ${r.region} ${r.ruleset} · ${r.realm} ${r.house}`),
+    ...report.mostListed.slice(0,2).map(r => `${r.name}: ${r.listings} listed auctions · ${reportRegion(r.region)} ${reportRuleset(r.ruleset)} · ${r.realm} ${r.house}`),
     ...report.categories.slice(0,3).map(r => `${r.name}: ${r.down} fell, ${r.up} rose / ${r.total} item-house prices`),
-    ...report.spreads.slice(0,1).map(r => `${r.name} · ${r.region} ${r.ruleset}: ${r.cheapest}c (${r.cheapHouse}) to ${r.dearest}c (${r.dearHouse})`),
+    ...report.spreads.slice(0,1).map(r => `${r.name} · ${reportRegion(r.region)} ${reportRuleset(r.ruleset)}: ${r.cheapest}c (${r.cheapHouse}) to ${r.dearest}c (${r.dearHouse})`),
   ] : [];
   return new ImageResponse(<div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", padding: tall ? "60px" : "40px 60px", background: c.canvas, color: c.fg, fontFamily: "Geist" }}>
     <div style={{ display: "flex", fontSize: 28, color: c.accent }}>Everloot · Daily auction report · {report.date} UTC{icon && <img alt="" src={icon} width={48} height={48} style={{ marginLeft: 16 }} />}</div>
-    <div style={{ display: "flex", fontSize: tall ? 52 : 32, fontWeight: 700, marginTop: 22 }}>{report.headline}</div>
+    <div style={{ display: "block", lineClamp: 2, fontSize: tall ? 52 : 32, fontWeight: 700, marginTop: 22 }}>{report.headline}</div>
     <div style={{ display: "flex", fontSize: 28, marginTop: 18 }}>{report.houses.length} houses covered · {report.goods} goods tracked</div>
-    <div style={{ display: "flex", fontSize: 22, color: c.muted, marginTop: 16 }}>Listed asking prices from scans, not sales. Thin days excluded from moves and spreads.</div>
+    <div style={{ display: "flex", fontSize: 22, color: c.muted, marginTop: 16 }}>Listed asking prices from scans, not sales. Thin days and outliers excluded from comparisons.</div>
     <div style={{ display: "flex", flexDirection: "column", marginTop: tall ? 24 : 0, gap: 10 }}>{lines.map((line,i) => <div key={i} style={{ display: "block", lineClamp: 2, fontSize: 24, paddingBottom: 8, borderBottom: `1px solid ${c.line}` }}>{line}</div>)}</div>
-    <div style={{ display: "flex", flexDirection: "column", marginTop: 20, fontSize: tall ? 22 : Math.min(16, 190 / Math.max(1, houses.size)), color: c.muted, gap: 4 }}>
-      {[...houses].map(([realm, list]) => <div key={realm} style={{ display: "flex" }}>{realm}: {list.join(", ")}</div>)}
+    <div style={{ display: "flex", flexDirection: "column", marginTop: 20, fontSize: tall ? 20 : 16, color: c.muted, gap: 4 }}>
+      {[...houses].slice(0, tall ? 12 : 8).map(([realm, list]) => <div key={realm} style={{ display: "flex" }}>{realm}: {list.join(", ")}</div>)}
+      {houses.size > (tall ? 12 : 8) && <div style={{ display: "flex" }}>More houses covered; full list: everloot.app/tools/auctions/report/{report.date}</div>}
     </div>
-    <div style={{ display: "flex", fontSize: tall ? 22 : 18, color: c.muted, marginTop: "auto", paddingTop: 18 }}>everloot.app · {report.scannedThrough ?? `${report.date} UTC (exact time not retained)`}{report.includesOwnScans ? " · Includes Everloot's own scans" : ""}</div>
+    <div style={{ display: "flex", flexDirection: "column", flexShrink: 0, fontSize: tall ? 20 : 16, color: c.muted, marginTop: "auto", paddingTop: 18 }}><span>everloot.app · {report.scannedThrough ?? `${report.date} UTC (exact time not retained)`}{report.includesOwnScans ? " · Includes Everloot's own scans" : ""}</span><span>Coverage received by {report.publishedAt}. Later uploads excluded.</span></div>
   </div>, { width: 1200, height: tall ? 1800 : 630, fonts: [...FONTS] });
 }
