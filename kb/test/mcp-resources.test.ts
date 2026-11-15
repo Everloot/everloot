@@ -64,10 +64,12 @@ test("everloot://methodology states the counting rules the site's page states", 
   const text = (await read("everloot://methodology")).text;
   expect(text).toBe(methodologyText(SOURCE_URL));
   for (const rule of [
-    "three different installs", "/64 block", "Unrecorded is not zero", "0 drops in 40 kills", "not a measured zero",
-    "drops divided by recorded kills", "found in game files, unconfirmed", "everloot://builds", "Character names", "install id",
+    "three different installs", "/64 block", "Unrecorded is not zero", "0 windows with the item in 40 loot windows", "not a measured zero",
+    "loot windows with the item divided by recorded loot windows", "found in game files, unconfirmed", "everloot://builds", "Character names", "install id",
     "list of addons", "player counts yet", `${SOURCE_URL}/blob/main/docs/DATA_POLICY.md`, MCP_CREDIT, GAME_DATA_CREDIT,
   ]) expect(text).toContain(rule);
+  expect(text).not.toContain("recorded kills");
+  expect(text).not.toContain("40 kills");
 });
 
 test("everloot://data-policy is the short form of docs/DATA_POLICY.md, with the link to the full one", async () => {
