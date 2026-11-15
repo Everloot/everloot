@@ -14,6 +14,7 @@ export default function DarkmoonGuide() {
     <Container width="data">
       <PageHeader title="Darkmoon Faire: items to save for a storage box" lede="A community checklist for comparing ticket turn-ins before you buy or sell." />
       <p className="mt-4 text-sm text-muted">{DARKMOON_STATUS}. Source read {DARKMOON.source.readOn}.</p>
+      <p className="mt-4 text-sm"><Link href="/tools/timers#darkmoon" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Darkmoon dates in the client calendar</Link> · Live Forever timing is not confirmed yet.</p>
       <section className="mt-8 space-y-3" aria-labelledby="box-goal">
         <SectionHeading id="box-goal">Start with the reward and your available turn-ins</SectionHeading>
         <p>Jerome’s calculator uses {DARKMOON.boxTicketGoal} tickets as the goal for one storage box. The box’s exact item identity, capacity and ticket cost still need verification in Forever. Check the reward in game before spending gold.</p>

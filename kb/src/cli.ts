@@ -18,6 +18,7 @@ import { clientCoverage, formatCoverage } from "./client-coverage.js";
 import { formatScanReport, loadManifest, scanBuild } from "./client-scan.js";
 import { writeClientAchievements } from "./client-achievements.js";
 import { writeClientEncounters } from "./client-encounters.js";
+import { writeClientCalendar } from "./client-calendar.js";
 import { writeClientMounts } from "./client-mounts.js";
 import { writeClientClassGear } from "./client-class-gear.js";
 import { writeClientClassSpells } from "./client-class-spells.js";
@@ -202,6 +203,7 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   client-encounters <snapshot.sqlite> [--out ../web/src/data/game-data/client-encounters.json]
     (every boss encounter the game files list per instance, from DungeonEncounter, one build-stamped file the
     instance pages merge with player reports player-first. Pages only, as above)
+  client-calendar <snapshot.sqlite> [--out ../web/src/data/game-data/client-calendar.json]
   client-mounts <snapshot.sqlite> [--out ../web/src/data/game-data/client-mounts.json]
   client-class-gear <snapshot.sqlite> [--out ../web/src/data/game-data/client-class-gear.json]
     (every mount the game files list with its spell and riding skill, one build-stamped file the collections tool
@@ -717,6 +719,13 @@ async function main(): Promise<number> {
       const instances = Object.keys(table.instances).length;
       const encounters = Object.values(table.instances).reduce((n, list) => n + list.length, 0);
       console.log(`${table.build.product} ${table.build.version}: ${encounters} encounters in ${instances} instances -> ${path}`);
+      return 0;
+    }
+    case "client-calendar": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-calendar.json";
+      const table = writeClientCalendar(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.events.length} holidays -> ${path}`);
       return 0;
     }
     case "client-mounts": {

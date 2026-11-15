@@ -1085,3 +1085,12 @@ answered:
 - The local answer store keeps the question as it was looked up ("here" as its zone), for follow-ups, and never the
   class or level. Nothing on the site keeps any of them; the question ledger counts tools, as above.
 - Any wider use (collecting them, counting them by class or zone) is not built and needs its own line here first.
+
+## Client event calendar
+
+The timers page may display holiday names, calendar clock fields, durations and repeat rules from
+Holidays, HolidayNames and HolidayDescriptions, build-stamped and labelled found in game files,
+unconfirmed. This does not establish live availability. Regional UTC mapping is not confirmed;
+client dates are excluded from calendar downloads until that mapping is established. Game text
+remains pages-only and stays out of the API, MCP and bulk exports. Reset reference calendars
+carry the unconfirmed Forever label in both the event summary and description.

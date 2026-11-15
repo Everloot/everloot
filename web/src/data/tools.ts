@@ -18,6 +18,7 @@ export interface Tool {
 }
 
 export const tools: Tool[] = [
+
   {
     slug: "talents",
     group: "Plan",
@@ -266,6 +267,14 @@ export const tools: Tool[] = [
     description: "Upload Everloot addon files. Public observations require corroboration; named sharing requires a reviewed grant.",
     status: "live",
     keywords: ["everloot upload", "wow forever addon"],
+  },
+  {
+    slug: "timers", group: "Plan",
+    line: "Client holiday dates and regional reset references, with unconfirmed Forever timing labelled.",
+    title: "Timers and event calendar", shortTitle: "Timers and calendar",
+    tagline: "Client dates and reset references.",
+    description: "Browse holiday dates from the client and regional reset reference countdowns. Forever timing is unconfirmed.",
+    status: "live", keywords: ["wow forever timers", "wow forever calendar"],
   },
 ];
 

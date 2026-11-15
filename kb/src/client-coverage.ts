@@ -33,7 +33,7 @@ export const NEEDED_FIELDS: Partial<Record<keyof typeof CLIENT_TABLES, readonly 
   CurrencyTypes: ["Name_lang"],
   CreatureFamily: ["Name_lang", "IconFileID"],
   CreatureType: ["Name_lang"],
-  Holidays: ["HolidayNameID"],
+  Holidays: ["HolidayNameID", "HolidayDescriptionID", "Date", "Duration", "Looping", "Region", "CalendarFilterType"],
   HolidayNames: ["Name_lang"],
   HolidayDescriptions: ["Description_lang"],
   QuestInfo: ["InfoName_lang", "Type"],
