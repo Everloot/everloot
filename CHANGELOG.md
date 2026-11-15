@@ -361,7 +361,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Knowledge base: open data drop rates and measured zeros follow the same recheck cutoffs as the site, leaving other exported facts and corpus counts unchanged.
 
 ### Changed
-- Site: show likely ranges and few-window marks beside public loot frequencies.
+- Site: show likely ranges and few-window marks in NPC, item-source, loot-list and zone tables.
 - Addon: grouped auction sales show paid transactions per day and paid units per day separately beside the last sold date. Pending and unmatched notices affect neither rate; in-game layout verification is required before release.
 - Site: share private character-sync validation with the companion through a separate protocol export; public uploads still reject private-only rows.
 - Site: Reuse cold-start aggregate and game-art reads and load the build label from a small generated stamp.

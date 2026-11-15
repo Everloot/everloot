@@ -21,9 +21,9 @@ export function rateWithRange(withItem: number, windows: number, installs: numbe
 
 
 /** The method and the corpus time, under a table. */
-function Method({ dataAsOf, lead }: { dataAsOf: string | null; lead?: string }) {
+function Method({ dataAsOf, lead, ranges = true }: { dataAsOf: string | null; lead?: string; ranges?: boolean }) {
   const asOf = dataAsOf ? ` Data as of ${dataAsOf.slice(0, 10)}.` : "";
-  return <p className={NOTE}>{lead ? `${lead}. ` : ""}{METHOD_LINE} Ranges describe the recorded sample (95% Wilson); windows may not be independent.{asOf}</p>;
+  return <p className={NOTE}>{lead ? `${lead}. ` : ""}{METHOD_LINE}{ranges ? " Ranges describe the recorded sample (95% Wilson); windows may not be independent." : ""}{asOf}</p>;
 }
 
 /** The Drops tab of an NPC page. */
@@ -33,7 +33,7 @@ export function NpcLootPanel({ table, title, item, dataAsOf }: { table: NpcLootT
   if (table.rows.length === 0) {
     return <>
       <p className="py-3 text-meta text-fg">No items observed in {spanPhrase(table.span)}.</p>
-      <Method dataAsOf={dataAsOf} />
+      <Method dataAsOf={dataAsOf} ranges={false} />
     </>;
   }
   const columns: Column<LootTableRow>[] = [

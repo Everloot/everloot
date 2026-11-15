@@ -92,7 +92,7 @@ export default async function DropsPage(props: { searchParams?: Promise<Search> 
           />
         </div>
         </>}
-        <p className="py-2 text-meta text-fg-2">Ranges describe the recorded sample (95% Wilson); windows may not be independent.</p>
+        {!stats.unreachable && shown.some((r) => r.rate !== null) && <p className="py-2 text-meta text-fg-2">Ranges describe the recorded sample (95% Wilson); windows may not be independent.</p>}
         {pages > 1 && <div className="mt-2">{strip}</div>}
       </article>
     </Container>

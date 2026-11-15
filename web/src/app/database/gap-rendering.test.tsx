@@ -31,6 +31,7 @@ test("unreadable storage reads unrecorded, never zero", async () => {
   expect(drops).toContain("Storage unreachable");
   expect(drops).not.toContain("0 windows");
   expect(drops).not.toContain("<table");
+  expect(drops).not.toContain("95% Wilson");
   const db = await html(DatabasePage);
   expect(db).toContain("unrecorded");
   expect(db).not.toMatch(/>0<\/div>/);
@@ -55,6 +56,7 @@ test("an empty readable corpus says nothing is public yet, with the empty state 
   expect(drops).not.toContain("0 windows");
   expect(drops).toContain("data-empty-state");
   expect(drops).toContain("No public frequencies yet");
+  expect(drops).not.toContain("95% Wilson");
   expect(await html(DatabasePage)).not.toContain(">0<");
 });
 
