@@ -248,7 +248,7 @@ end
 
 local STATUS_TEXT = { paid = "paid", pending = "sold, gold pending", unmatched = "unmatched" }
 
--- By item, each row's rate is its paid sales over the period's days and its last sold day; the sales list is
+-- By item, rates count paid transactions and paid units over the period's days; the sales list is
 -- newest first, so the first paid sale of an item is its last.
 local function drawSales(g, keys)
   local from, to = E.Ledger.Period(g.period)
@@ -267,11 +267,11 @@ local function drawSales(g, keys)
     row.unit:SetText(priced and U.MoneyShort(s.unit) or "-")
     row.total:SetText(priced and U.MoneyShort(s.total) or "-")
     if g.grouped then
-      row.deposit:SetText("")
-      row.cut:SetText("")
-      row.when:SetText(s.sales .. (s.sales == 1 and " sale" or " sales"))
       local last = lastSold[s.itemName]
-      row.status:SetText(string.format("%.1f/day", s.sales / days) .. (last and (" · " .. date("!%m-%d", last)) or ""))
+      row.deposit:SetText(last and date("!%m-%d", last) or "-")
+      row.cut:SetText("")
+      row.when:SetText(string.format("%.1f tx/day", s.sales / days))
+      row.status:SetText(string.format("%.1f units/day", s.count / days))
     else
       row.deposit:SetText(type(s.deposit) == "number" and U.MoneyShort(s.deposit) or "-")
       row.cut:SetText(type(s.cut) == "number" and U.MoneyShort(s.cut) or "-")
@@ -279,7 +279,7 @@ local function drawSales(g, keys)
       row.status:SetText(STATUS_TEXT[s.status] or "-")
     end
   end, NO_SALES)
-  g.sales.head:SetText(g.grouped and "Auction sales by item  |cffc9c3b0sales, per day · last sold|r" or "Auction sales")
+  g.sales.head:SetText(g.grouped and "Auction sales by item  |cffc9c3b0last sold · transactions/day · units/day|r" or "Auction sales")
   g.groupButton:SetText(g.grouped and "Each sale" or "By item")
 end
 

@@ -223,6 +223,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: bag upgrade pickers offer publicly priced sizes and preserve bags selected in saved links, without suggesting unpriced test containers.
 - Docs: the project overview links current downloads and explains paired addon/Desktop App updates for community prices.
 - Site: malformed URL fragments keep the default or current database tab usable, including click and keyboard navigation.
+- Site: find public chests and gathering nodes by agreed name in search, suggestions and the object list, with links to every match.
 - Site: the armory loads no ads or analytics: AdSense Auto ads was filling its pages, which show Blizzard API data. A move to it from another page now loads a new document, like the Blizzard auction page.
 - Site: auction prices keep updating when the market rollup is full: the oldest open scan day closes early (its public prices kept) instead of new scans being refused, one uploader cannot take more than a third of the room, and dropped scans no longer leave empty days behind.
 - Site: avoid compiling game-file name matchers for absent ASCII names when answering sourced questions, reducing cold-start CPU work.
@@ -355,8 +356,11 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   scrollbar, so the page has nothing to scroll sideways at any width.
 - Desktop App: restoring the oldest backup keeps the selected save and an undo copy, even within the same second.
 - Companion: watch mode waits for the first account save and finds new accounts without a restart, refreshing prices for every discovered account.
+- Knowledge base: open data drop rates and measured zeros follow the same recheck cutoffs as the site, leaving other exported facts and corpus counts unchanged.
 
 ### Changed
+- Addon: grouped auction sales show paid transactions per day and paid units per day separately beside the last sold date. Pending and unmatched notices affect neither rate; in-game layout verification is required before release.
+- Site: share private character-sync validation with the companion through a separate protocol export; public uploads still reject private-only rows.
 - Site: Reuse cold-start aggregate and game-art reads and load the build label from a small generated stamp.
 - Site: auction item pages (`/tools/auctions/:realm/:itemId`) are kept in the edge cache for five minutes, like the browse pages, so repeat requests and crawlers stop re-rendering them.
 - Site: reuse public MCP discovery metadata within each mount while keeping request ids, access checks and account tools separate.

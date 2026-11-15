@@ -1015,6 +1015,7 @@ async function main(): Promise<number> {
       if (!corpus) throw new Error("open-data: no records. Set EVERLOOT_PUBLIC_CORPUS_URL (and EVERLOOT_API_KEY for the whole feed) or EVERLOOT_UPLOADS, or pass --records <file>");
       const { manifest, paths } = writeOpenData(args[0], {
         records: corpus.records, dataAsOf: corpus.dataAsOf, generatedAt: new Date().toISOString(),
+        recheck: readRecheck(flags.get("root") || "..").scopes,
         gameFiles: { build: CLIENT_LAYER.build, edges: CLIENT_EDGES, taxonomy: CLIENT_TAXONOMY, map: WORLD_MAP_DATA, catalogs: readOpenDataGameFiles(flags.get("game-data") || "../web/src/data/game-data") },
       });
       for (const f of manifest.files) console.log(`${f.path}: ${f.rows} rows${f.candidates === null ? "" : ` of ${f.candidates} (${f.candidatesAre})`}`);

@@ -1,6 +1,7 @@
 import { GATHER_KINDS, INSTANCE_TYPES, NPC_ROLES, RELS, ENTITY_KINDS } from "@everloot/protocol";
 import { z } from "zod";
-import { rollupDrops, lootWindowsFromRecords } from "../drop-rollup.js";
+import type { RecheckScope } from "../coverage.js";
+import { rollupDrops, lootWindowsFromRecords, recheckLootRecords } from "../drop-rollup.js";
 import { observedEdges, type Edge } from "../edges.js";
 import { tallyVotes, WORLD_AGREEMENT } from "../fact-states.js";
 import { confirmedEntrances, instanceBosses, instanceFactsFromRecords } from "../instances.js";
@@ -206,8 +207,8 @@ const zeroRow = z.object({
   installs: INSTALLS,
 }).strict().superRefine(oneSource);
 
-function drops(records: readonly unknown[]): Dataset[] {
-  const rolled = rollupDrops(lootWindowsFromRecords([...records]));
+function drops(records: readonly unknown[], recheck: readonly RecheckScope[]): Dataset[] {
+  const rolled = rollupDrops(lootWindowsFromRecords(recheckLootRecords([...records], recheck)));
   const sources = (r: { sourceNpcId?: number; sourceObjectId?: number }) => ({ sourceNpcId: r.sourceNpcId ?? null, sourceObjectId: r.sourceObjectId ?? null });
   const rates = rolled.rates.filter((r) => r.public && r.drops > 0).map((r) => ({
     ...sources(r), itemId: r.itemId, lootWindows: r.kills, windowsWithItem: r.drops, rate: r.rate, installs: r.reporters,
@@ -546,6 +547,8 @@ function gameFiles(g: GameFilesInput): Dataset[] {
 export interface OpenDataInput {
   /** Public records, as the corpus API serves them (an install id, or its pseudonym, on each). */
   records: readonly unknown[];
+  /** Apply the same drop-rate restart scopes as the site, without discarding older non-loot facts. */
+  recheck?: readonly RecheckScope[];
   /** When the uploads behind the records were current; null when the source did not say. */
   dataAsOf: string | null;
   /** The time the export is made; a time after the records' own is the ceiling when `dataAsOf` is null. */
@@ -568,7 +571,7 @@ export function buildOpenData(input: OpenDataInput): OpenData {
   const asOf = new Date(input.dataAsOf ?? input.generatedAt);
   const installs = new Set(records.map((r) => r.installId.trim()).filter(Boolean));
   const datasets = [
-    npcs(records), quests(records), vendorOffers(records), ...drops(records), relations(records, asOf), ...instances(records, asOf), ...objects(records, asOf), itemNames(records),
+    npcs(records), quests(records), vendorOffers(records), ...drops(records, input.recheck ?? []), relations(records, asOf), ...instances(records, asOf), ...objects(records, asOf), itemNames(records),
     ...gameFiles(input.gameFiles),
   ];
   return { datasets, source: { records: records.length, installs: installs.size, kinds: [...OPEN_DATA_KINDS] }, installIds: installs };
