@@ -341,6 +341,13 @@ export async function respell(
       const split = splits.findIndex((_, i) => counts[2 + i]! > 0);
       if (split !== -1) to = splits[split]!;
     }
+    // Body-only spellings can recur in lists; a nearby title spelling names the subject directly.
+    if (!to && !inTitle) {
+      const titleCounts = await pageCounts(db, near.map((w) => `name : "${w}"`));
+      const most = Math.max(0, ...titleCounts);
+      const tied = near.filter((_, i) => titleCounts[i] === most);
+      if (most > 0) to = tied.length > 1 ? await inContext(db, tied, others(question, word)) : tied[0]!;
+    }
     // A word a page title carries is a name ("Sneed"), never another word's typo ("seed").
     if (!to && !inTitle && onPages <= RARE) {
       // The spelling most pages use; on a tie, the one the question's other words fit. A word a page or two carry is
