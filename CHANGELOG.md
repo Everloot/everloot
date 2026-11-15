@@ -354,6 +354,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   scrollbar, so the page has nothing to scroll sideways at any width.
 - Desktop App: restoring the oldest backup keeps the selected save and an undo copy, even within the same second.
 - Companion: watch mode waits for the first account save and finds new accounts without a restart, refreshing prices for every discovered account.
+- Knowledge base: open data drop rates and measured zeros follow the same recheck cutoffs as the site, leaving other exported facts and corpus counts unchanged.
 
 ### Changed
 - Site: Reuse cold-start aggregate and game-art reads and load the build label from a small generated stamp.
