@@ -84,6 +84,8 @@ export default async function AddonPage() {
         meta={<><Badge tone="neutral">AGPL-3.0</Badge><span>Free and open source</span></>}
       />
 
+      <p className="text-sm text-fg-2">The CurseForge app keeps the addon current. The Desktop App updates itself and the addon.</p>
+
       <div className="space-y-12">
         <div className="grid items-start gap-6 md:grid-cols-2">
           <Card as="section" aria-labelledby="addon" className="space-y-6">
