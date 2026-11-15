@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 const reads = vi.hoisted(() => ({ items: vi.fn(), world: vi.fn(), tips: vi.fn() }));
 vi.mock("./rollup-compute", () => ({ loadItemFacts: reads.items, loadWorldFacts: reads.world }));
+vi.mock("./objects", () => ({ loadObjectFacts: async () => ({ rates: [], measuredZeros: [], names: [], unreachable: false }) }));
 vi.mock("./game-assets", () => ({
   loadItemNames: async () => null,
   PRIVATE_UNREACHABLE: Symbol("private bucket unreachable"),

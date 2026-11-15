@@ -28,7 +28,7 @@ O.ROWS = {
   { key = "census", group = "shared", command = "census", label = "Census",
     text = "Race, class, level and faction of your characters and of players near you, nameplates included. Never names, guilds, gear or places. Off deletes its rows." },
   { key = "openworld", group = "shared", label = "World",
-    text = "NPCs, loot, quests, vendors and items you see, and where you stood at NPC windows and herbs, ore and chests. Anonymous: no character or guild names." },
+    text = "NPCs, loot, quests, vendors and items you see, and where you stood at NPC windows and herbs, ore and chests, and the stats on the item tooltips you see. Anonymous: no character or guild names." },
   { key = "professions", group = "shared", label = "Recipes and trainers",
     text = "At profession and trainer windows you open: each recipe you know with its colour at your rank, product and reagents, and each trainer recipe's required rank and cost. Never crafts or trains. Stays in this file until it is sent." },
   { key = "mapbounds", group = "shared", label = "Zone map corners",
@@ -65,6 +65,10 @@ O.ROWS[#O.ROWS + 1] = { key = "tooltipSources", group = "general", field = true,
 
 -- The settings pages, in the game's list under Everloot. Everloot itself is the overview: what this file holds and
 -- where the switches are. A client without sub-pages keeps every switch on one page, in O.ROWS order.
+O.ROWS[#O.ROWS + 1] = { key = "tooltip", group = "general", field = true, live = true,
+  choices = { "full", "compact", "off" }, label = "Item tooltip: detail",
+  text = "Click to choose Full, Compact (market value and your scan) or Off. Compact keeps price-age warnings. Records nothing; applies at once." }
+
 O.GROUPS = {
   { key = "general", name = "General",
     intro = "The Everloot window, the minimap button and what the item tooltip shows. Nothing on this page records anything." },
@@ -89,11 +93,45 @@ end
 
 -- "What you've added": rows of each kind in the saved file now, shown under the switches.
 O.ADDED = {
-  { "loot", "Loot windows" }, { "npc_sighting", "NPC sightings" }, { "quest", "Quests" }, { "recipe_observed", "Recipe colours" },
-  { "item_fact", "Item facts" }, { "auction_scan", "Auction scans" }, { "census_seen", "Players seen" }, { "map_bounds", "Zones mapped" },
+  loot = "Loot windows", npc_sighting = "NPC sightings", quest = "Quests", recipe_observed = "Recipe colours",
+  item_fact = "Item facts", auction_scan = "Auction scans", census_seen = "Players seen", map_bounds = "Zones mapped",
+  npc = "NPCs", object_sighting = "Objects", instance_entrance = "Instance entrances", encounter = "Encounters",
+  instance_run = "Instance runs", guild_snapshot = "Guild snapshots", raid_lockout = "Raid lockouts",
+  attendance = "Attendance", loot_award = "Loot awards", gear_snapshot = "Gear snapshots", vendor = "Vendors",
+  collection_catalog = "Collection catalogue", collection_owned = "Your collection", auction_snapshot = "Auction snapshots",
+  recipe_seen = "Recipes", trainer_seen = "Trainer recipes", price_seen = "Prices seen", gold_snapshot = "Gold snapshots",
+  money_event = "Gold changes", addon_seen = "Addons", talent_snapshot = "Talent builds", guild_kill = "Guild kills",
+  achievement_catalog = "Achievement catalogue", reputation_catalog = "Reputation catalogue", title_catalog = "Title catalogue",
+  quest_chain_catalog = "Quest chains", achievement_owned = "Your achievements", reputation_owned = "Your reputation",
+  title_owned = "Your titles", quest_owned = "Your quests", census_self = "Your census", player_seen = "Player pages",
+  character_link = "Character links", pull_summary = "Boss pulls", profession_owned = "Your professions",
+  lockout_owned = "Your lockouts", talent_owned = "Your active talents", stats_owned = "Your stats",
+  pvp_owned = "Your PvP standing", boss_kill_owned = "Your boss kills",
 }
 
+function O.AddedRows()
+  local kinds, rows = {}, {}
+  for kind, store in pairs(EverlootDB.records or {}) do
+    if type(store) == "table" and #store > 0 then kinds[#kinds + 1] = kind end
+  end
+  table.sort(kinds)
+  for _, kind in ipairs(kinds) do rows[#rows + 1] = (O.ADDED[kind] or kind) .. ": " .. tostring(E:Count(kind)) end
+  return rows
+end
+
+function O.Choice(row)
+  local value = EverlootDB[row.key]
+  for _, choice in ipairs(row.choices) do if choice == value then return value end end
+  return row.choices[1]
+end
+
+local function choiceLabel(row)
+  local label = O.Choice(row):gsub("^%l", string.upper)
+  return label
+end
+
 function O.IsOn(row)
+  if row.choices then return O.Choice(row) ~= "off" end
   if row.field then
     if row.defaultOff then return EverlootDB[row.key] == true end
     return EverlootDB[row.key] ~= false
@@ -168,11 +206,22 @@ function O.Click(row, on)
   O.Set(row, on)
 end
 
+local words
+
 function O.Refresh()
   for _, page in ipairs(O.pages or {}) do
-    for _, box in ipairs(page.boxes or {}) do box:SetChecked(O.IsOn(box.row)) end
-    for i, a in ipairs(O.ADDED) do
-      if page.added and page.added[i] then page.added[i]:SetText(a[2] .. ": " .. tostring(E:Count(a[1]))) end
+    for _, box in ipairs(page.boxes or {}) do
+      if box.row.choices then box:SetText(choiceLabel(box.row)) else box:SetChecked(O.IsOn(box.row)) end
+    end
+    if page.added then
+      page.addedRows = O.AddedRows()
+      for i, text in ipairs(page.addedRows) do
+        if not page.added[i] then page.added[i] = words(page.content, "GameFontHighlightSmall", 11, "muted") end
+        page.added[i]:SetText(text)
+        page.added[i]:Show()
+      end
+      for i = #page.addedRows + 1, #page.added do page.added[i]:Hide() end
+      if page:IsShown() then page.layout() end
     end
     if page.note then
       page.note:SetText(O.changed and "Changes apply after a reload." or ("Everloot " .. E.VERSION .. ". Changes apply after a reload."))
@@ -191,7 +240,7 @@ end
 
 -- Text in the Everloot window's fonts and colours (modules/window.lua loads after this file, before the page is
 -- built), else in the game's own template.
-local function words(parent, template, size, tone)
+words = function(parent, template, size, tone)
   local W = E.Window
   if W and W.Text then return W.Text(parent, size, nil, W.COLORS[tone]) end
   local s = parent:CreateFontString(nil, "ARTWORK", template)
@@ -230,9 +279,12 @@ local function build(frameName, name, subtitle, introText, rows, added)
   scroll:SetScrollChild(content)
   if W and W.Surface then W.Surface(scroll) end
   page.scroll = scroll
+  page.content = content
   page.boxes = {}
   for _, row in ipairs(rows) do
-    local box = CreateFrame("CheckButton", nil, content, "UICheckButtonTemplate")
+    local box = CreateFrame(row.choices and "Button" or "CheckButton", nil, content,
+      row.choices and "UIPanelButtonTemplate" or "UICheckButtonTemplate")
+    if row.choices then box:SetSize(70, 24) end
     box.row = row
     local label = words(box, "GameFontNormal", 13, "text")
     label:SetPoint("TOPLEFT", box, "TOPRIGHT", 4, -4)
@@ -241,7 +293,15 @@ local function build(frameName, name, subtitle, introText, rows, added)
     text:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -2)
     text:SetText(row.text)
     box.label, box.description = label, text
-    box:SetScript("OnClick", function(self) O.Click(row, self:GetChecked() and true or false) end)
+    box:SetScript("OnClick", function(self)
+      if row.choices then
+        local value = O.Choice(row)
+        for i, choice in ipairs(row.choices) do
+          if choice == value then EverlootDB[row.key] = row.choices[i % #row.choices + 1]; break end
+        end
+        O.Refresh()
+      else O.Click(row, self:GetChecked() and true or false) end
+    end)
     page.boxes[#page.boxes + 1] = box
   end
   -- False, not nil, on the pages without it: a frame's methods would answer for a missing field.
@@ -250,7 +310,7 @@ local function build(frameName, name, subtitle, introText, rows, added)
     page.addedHeading = words(content, "GameFontNormal", 13, "text")
     page.addedHeading:SetText("What you've added")
     page.added = {}
-    for i = 1, #O.ADDED do page.added[i] = words(content, "GameFontHighlightSmall", 11, "muted") end
+    page.addedRows = {}
   end
   local function layout(_, width)
     width = math.max(1, width or scroll:GetWidth())
@@ -258,21 +318,24 @@ local function build(frameName, name, subtitle, introText, rows, added)
     local y = PAD
     for _, box in ipairs(page.boxes) do
       box:SetPoint("TOPLEFT", content, "TOPLEFT", PAD, -y)
-      box.label:SetWidth(math.max(1, width - 2 * PAD - 38))
-      box.description:SetWidth(math.max(1, width - 2 * PAD - 38))
+      box.label:SetWidth(math.max(1, width - 2 * PAD - (box.row.choices and 76 or 38)))
+      box.description:SetWidth(math.max(1, width - 2 * PAD - (box.row.choices and 76 or 38)))
       y = y + math.max(32, 4 + box.label:GetStringHeight() + 2 + box.description:GetStringHeight()) + 12
     end
     if page.addedHeading then
       page.addedHeading:SetPoint("TOPLEFT", content, "TOPLEFT", PAD, -y)
       y = y + 22
-      for _, line in ipairs(page.added) do
+      for i = 1, #page.addedRows do
+        local line = page.added[i]
+        line:SetWidth(math.max(1, width - 2 * PAD))
         line:SetPoint("TOPLEFT", content, "TOPLEFT", PAD, -y)
-        y = y + 16
+        y = y + math.max(16, line:GetStringHeight())
       end
     end
     content:SetHeight(y + PAD)
     scroll:SetVerticalScroll(math.min(scroll:GetVerticalScroll(), math.max(0, y - scroll:GetHeight())))
   end
+  page.layout = layout
   scroll:HookScript("OnSizeChanged", layout)
   scroll:EnableMouseWheel(true)
   scroll:SetScript("OnMouseWheel", function(self, delta)
@@ -290,7 +353,7 @@ local function build(frameName, name, subtitle, introText, rows, added)
   note:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -32, 16)
   note:SetJustifyV("TOP")
   page.note = note
-  page:SetScript("OnShow", function() layout(); O.Refresh() end)
+  page:SetScript("OnShow", function() O.Refresh(); layout() end)
   -- A new frame starts shown, and the game's list shows a page only when it is picked: hidden until then, so
   -- every first visit runs OnShow and lays out and ticks the switches from the saved file.
   page:Hide()
@@ -302,6 +365,17 @@ end
 --- The one page with every switch: older clients, /everloot options as a window, and the fallback below.
 local function single()
   return build("EverlootOptionsPage", "Everloot", "Settings", O.INTRO, O.ROWS, true)
+end
+
+--- A separate instance uses the same rows and command handlers without moving the game's settings panels.
+function O.BuildWindow(parent)
+  O.Register()
+  local page = build(nil, "Everloot", "Settings", O.INTRO, O.ROWS, true)
+  page:SetParent(parent)
+  page:SetAllPoints(parent)
+  O.pages[#O.pages + 1] = page
+  parent.page = page
+  page:Show()
 end
 
 function O.Register()

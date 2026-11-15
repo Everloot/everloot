@@ -32,12 +32,17 @@ U.NAV = {
   { key = "gold", label = "Gold", icon = "INV_Misc_Coin_02" },
   { key = "collection", label = "Collection", icon = "INV_Misc_Bag_10" },
   { key = "professions", label = "Professions", icon = "Trade_BlackSmithing" },
-  { key = "settings", label = "Settings", icon = "Trade_Engineering", bottom = true, open = function() E.Options.Open() end },
+  { key = "settings", label = "Settings", icon = "Trade_Engineering", bottom = true },
 }
 
 -- A view is { build = function(f, parent) end, refresh = function(f) end }, keyed like U.NAV. It is built once, the
 -- first time it is selected, into a frame stored at f.views[key].
-U.Views = {}
+U.Views = {
+  settings = {
+    build = function(_, parent) E.Options.BuildWindow(parent) end,
+    refresh = function() E.Options.Refresh() end,
+  },
+}
 
 -- A game call's values, each one a secret value would be read as missing; nothing when the call errors.
 local function readable(fn, ...)

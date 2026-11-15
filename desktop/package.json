@@ -24,7 +24,7 @@
     "@anthropic-ai/sdk": "0.137.0",
     "@modelcontextprotocol/sdk": "1.32.2",
     "@types/node": "^22.10.0",
-    "electron": "44.10.2",
+    "electron": "44.11.1",
     "electron-builder": "26.18.0",
     "esbuild": "0.28.2",
     "fflate": "0.8.3",
