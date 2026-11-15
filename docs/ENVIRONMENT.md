@@ -126,7 +126,7 @@ the Worker. The browser bundle keeps the `NEXT_PUBLIC_*` values.
 | `NEXT_PUBLIC_SITE_URL` | `web/src/lib/seo.ts`, the sitemaps and feeds, `web/src/app/layout.tsx` | The site's public address | Repository variable | Yes |
 | `NEXT_PUBLIC_GAME_ASSETS_URL` | `web/src/lib/talents/assets.ts` | The public asset folder for the talent calculator (ASSETS.md); text tiles without it | Repository variable | No |
 | `NEXT_PUBLIC_BULK_URL` | `web/src/lib/docs/connect-data.ts` | The public address of the bulk export; `/connect` says there is none without it | Repository variable | No |
-| `NEXT_PUBLIC_ADSENSE_CLIENT` | `web/src/components/AdSlot.tsx`, `web/src/app/layout.tsx` | Ad slots; off without it | Repository variable | No |
+| `NEXT_PUBLIC_ADSENSE_CLIENT` | `web/src/components/AdSlot.tsx`, `web/src/app/layout.tsx` | Ad slots; off without it. Unset since 2026-11-15: the site shows no ads, which AH Ledger's free community terms require | Repository variable | No |
 | `NEXT_PUBLIC_CF_BEACON_TOKEN` | `web/src/lib/analytics/config.ts` | Cookieless web analytics | Repository variable | No |
 | `NEXT_PUBLIC_GA_ID` | `web/src/lib/analytics/config.ts` | Google Analytics, after consent | Repository variable | No |
 | `NEXT_PUBLIC_METRICOOL_HASH` | `web/src/lib/analytics/config.ts` | Metricool's tracker, after consent | Repository variable | No |

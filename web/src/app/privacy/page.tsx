@@ -19,7 +19,7 @@ const SECTIONS: TocItem[] = [
   { id: "controller", label: "Who is responsible" },
   { id: "collect", label: "Information we collect" },
   { id: "analytics", label: "Analytics" },
-  { id: "advertising", label: "Advertising and Google AdSense" },
+  { id: "advertising", label: "Advertising" },
   { id: "choices", label: "Your privacy choices" },
   { id: "rights", label: "Your rights" },
   { id: "retention", label: "How long we keep things" },
@@ -46,7 +46,7 @@ export default function PrivacyPage() {
   const armory = armoryOn();
   // Linked characters, public character pages, the guild item's character page and private sync: 6 November.
   // The census paragraph gained nameplates on 9 November, which dates the page.
-  const updated = "2026-11-12";
+  const updated = "2026-11-15";
   return (
     <article>
       <Container width="reading">
@@ -355,8 +355,7 @@ export default function PrivacyPage() {
                 <strong>Cookies:</strong> an essential login cookie if you sign in (plus a
                 short-lived one, 10 minutes, that holds the sign-in state while you are at
                 Battle.net), and your cookie choice, which is saved in your browser. Optional analytics
-                cookies are off unless you accept them. Advertising cookies come from
-                Google AdSense and are covered below.
+                cookies are off unless you accept them. There are no advertising cookies.
               </li>
             </ul>
           </Section>
@@ -397,32 +396,8 @@ export default function PrivacyPage() {
 
           <Section id="advertising">
             <p>
-              Everloot shows ads from Google AdSense, each one labelled
-              &ldquo;Advertisement&rdquo;, on the tools, the patch notes, the home page and
-              database pages that have content. There are no ads on the upload page, this
-              page, account pages or the lore archive. Google and its partners may use
-              cookies to serve ads based on your prior visits to this site or other
-              sites. In the EEA, the UK and Switzerland, Google&apos;s consent message asks
-              you first and ads use only what you allow. In US states with privacy
-              laws, the same message lets you opt out of the sale or sharing of your
-              information. You can opt out of personalized advertising anywhere by
-              visiting{" "}
-              <a
-                href="https://www.google.com/settings/ads"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Google Ads Settings
-              </a>
-              . For more detail, see{" "}
-              <a
-                href="https://policies.google.com/technologies/ads"
-                target="_blank"
-                rel="noreferrer"
-              >
-                How Google uses advertising cookies
-              </a>
-              .
+              Everloot shows no ads and loads no advertising script, so no ad network
+              receives your visit and nothing here sets advertising cookies.
             </p>
           </Section>
 
@@ -431,8 +406,7 @@ export default function PrivacyPage() {
               You can accept or reject optional cookies in the banner and reopen Cookie
               preferences from the footer on any page. The choice is stored locally.
               The banner covers analytics; rejecting it loads none of the analytics
-              scripts. Advertising consent, where the law requires it, is Google&apos;s
-              message described above. If an optional script already loaded,
+              scripts. If an optional script already loaded,
               withdrawing consent reloads the page without it and deletes the
               Google Analytics and PostHog cookies and stored keys it set on this
               site where your browser allows. Cloudflare Web Analytics, which sets
