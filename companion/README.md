@@ -3,7 +3,9 @@
 A command-line helper that runs beside the game. It uploads the addon's SavedVariables file
 (`upload`, or `watch` while you play) and answers `/ask` questions through a file bridge
 (`bridge`). Node and TypeScript. [Everloot Desktop App](../desktop/README.md) is the same thing as a
-tray app with an installer, built on these modules; the builds are not code-signed yet.
+tray app with an installer, built on these modules. As of 2026-11, those builds are not code-signed;
+check a download against the `SHA256SUMS` file attached to its
+[desktop release](https://github.com/Everloot/everloot/releases?q=desktop-v).
 
 ## Run it
 

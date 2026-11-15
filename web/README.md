@@ -27,6 +27,25 @@ where each is set, is in [docs/ENVIRONMENT.md](../docs/ENVIRONMENT.md).
 The tests build their own small lore release and use in-memory stores, so they need no
 credentials.
 
+## Build for the Worker
+
+From `web/`, run `npm run cf:build` to build the OpenNext Worker bundle, or
+`npm run cf:preview` to build it and preview it locally. The
+[deploy workflow](../.github/workflows/deploy-worker.yml) runs `npm run cf:deploy`,
+which builds and deploys to production; use the preview command for local work.
+Variable names are in [`.env.example`](../.env.example) and the names-only
+[environment table](../docs/ENVIRONMENT.md).
+
+## What CI checks
+
+[Release checks](../.github/workflows/checks.yml) runs these commands in `web/`:
+
+- `npm test`, including the [design guard](src/design/guard.test.ts),
+  [metadata test](src/app/metadata.test.ts), [site sitemap test](src/app/sitemap.test.ts)
+  and [database sitemap test](src/app/database-sitemap.xml/route.test.ts).
+- `npm run typecheck` and `npm run lint`, as defined in [`package.json`](package.json).
+- `npm run build`, the Next.js build. The Worker build runs in the deploy workflow.
+
 ## Where things live
 
 | Path | What |
