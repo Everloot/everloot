@@ -1,0 +1,340 @@
+{
+ "source": "https://everloot.app/api/edges",
+ "capturedAt": "2026-11-15T09:50:34.086Z",
+ "dataAsOf": "2026-11-15T09:40:18.574Z",
+ "licence": "CC BY-SA 4.0",
+ "sources": {
+  "2407": [
+   {
+    "rel": "dropped_by",
+    "kind": "object",
+    "id": 75293,
+    "lastSeen": "2026-11-08T03:40:23.000Z"
+   }
+  ],
+  "2409": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 255964,
+    "lastSeen": "2026-11-08T07:09:56.000Z"
+   }
+  ],
+  "2553": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 4316,
+    "lastSeen": "2026-11-07T09:24:22.000Z"
+   }
+  ],
+  "2555": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 11318,
+    "lastSeen": "2026-11-07T16:27:34.000Z"
+   }
+  ],
+  "2601": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 5761,
+    "lastSeen": "2026-11-09T21:03:44.000Z"
+   }
+  ],
+  "3396": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 9524,
+    "lastSeen": "2026-11-08T14:00:00.000Z"
+   }
+  ],
+  "3610": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 3242,
+    "lastSeen": "2026-11-06T05:29:17.000Z"
+   }
+  ],
+  "3612": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 4805,
+    "lastSeen": "2026-11-10T09:10:57.000Z"
+   }
+  ],
+  "4293": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 3467,
+    "lastSeen": "2026-11-06T17:24:20.000Z"
+   }
+  ],
+  "4297": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 505,
+    "lastSeen": "2026-11-13T05:58:26.000Z"
+   }
+  ],
+  "4347": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 5755,
+    "lastSeen": "2026-11-07T23:10:51.000Z"
+   }
+  ],
+  "4348": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 5756,
+    "lastSeen": "2026-11-07T14:06:46.000Z"
+   }
+  ],
+  "4409": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 250484,
+    "lastSeen": "2026-11-08T07:42:44.000Z"
+   }
+  ],
+  "6044": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 3862,
+    "lastSeen": "2026-11-14T05:18:30.000Z"
+   }
+  ],
+  "6330": [
+   {
+    "rel": "sold_by",
+    "kind": "npc",
+    "id": 4553,
+    "lastSeen": "2026-11-11T01:11:17.000Z"
+   }
+  ],
+  "6344": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 3637,
+    "lastSeen": "2026-11-07T12:07:07.000Z"
+   }
+  ],
+  "6347": [
+   {
+    "rel": "dropped_by",
+    "kind": "object",
+    "id": 2849,
+    "lastSeen": "2026-11-11T06:53:30.000Z"
+   }
+  ],
+  "6348": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 2959,
+    "lastSeen": "2026-11-05T08:37:42.000Z"
+   }
+  ],
+  "6368": [
+   {
+    "rel": "sold_by",
+    "kind": "npc",
+    "id": 4553,
+    "lastSeen": "2026-11-11T01:11:17.000Z"
+   }
+  ],
+  "6375": [
+   {
+    "rel": "dropped_by",
+    "kind": "object",
+    "id": 75293,
+    "lastSeen": "2026-11-07T12:24:25.000Z"
+   }
+  ],
+  "6391": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 3242,
+    "lastSeen": "2026-11-06T05:28:43.000Z"
+   },
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 3653,
+    "lastSeen": "2026-11-07T13:43:36.000Z"
+   }
+  ],
+  "7360": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 3875,
+    "lastSeen": "2026-11-14T07:41:51.000Z"
+   }
+  ],
+  "10424": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 4128,
+    "lastSeen": "2026-11-13T22:23:39.000Z"
+   }
+  ],
+  "11039": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 3375,
+    "lastSeen": "2026-11-10T22:05:16.000Z"
+   }
+  ],
+  "21099": [
+   {
+    "rel": "sold_by",
+    "kind": "npc",
+    "id": 4553,
+    "lastSeen": "2026-11-15T08:41:02.000Z"
+   }
+  ],
+  "21219": [
+   {
+    "rel": "sold_by",
+    "kind": "npc",
+    "id": 4553,
+    "lastSeen": "2026-11-15T08:41:02.000Z"
+   }
+  ],
+  "250187": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 3255,
+    "lastSeen": "2026-11-06T17:48:32.000Z"
+   }
+  ],
+  "250188": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 428,
+    "lastSeen": "2026-11-11T04:26:20.000Z"
+   }
+  ],
+  "251344": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 3653,
+    "lastSeen": "2026-11-07T11:08:45.000Z"
+   }
+  ],
+  "251349": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 3673,
+    "lastSeen": "2026-11-08T17:25:52.000Z"
+   }
+  ],
+  "252774": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 3914,
+    "lastSeen": "2026-11-14T08:09:10.000Z"
+   }
+  ],
+  "252775": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 3653,
+    "lastSeen": "2026-11-07T22:59:24.000Z"
+   }
+  ],
+  "252792": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 3670,
+    "lastSeen": "2026-11-07T11:35:48.000Z"
+   }
+  ],
+  "252795": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 4279,
+    "lastSeen": "2026-11-08T23:42:55.000Z"
+   }
+  ],
+  "252796": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 3673,
+    "lastSeen": "2026-11-07T14:22:37.000Z"
+   }
+  ],
+  "252797": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 5775,
+    "lastSeen": "2026-11-08T20:59:54.000Z"
+   }
+  ],
+  "253904": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 3671,
+    "lastSeen": "2026-11-08T17:42:37.000Z"
+   }
+  ],
+  "253946": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 3886,
+    "lastSeen": "2026-11-14T05:24:19.000Z"
+   },
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 3887,
+    "lastSeen": "2026-11-08T23:30:32.000Z"
+   }
+  ],
+  "273098": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 3671,
+    "lastSeen": "2026-11-07T13:27:23.000Z"
+   }
+  ],
+  "273105": [
+   {
+    "rel": "dropped_by",
+    "kind": "npc",
+    "id": 4278,
+    "lastSeen": "2026-11-14T06:56:22.000Z"
+   }
+  ]
+ }
+}

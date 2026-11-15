@@ -270,7 +270,7 @@ export default async function ProfessionPage(props: Props) {
         )}
 
         {pending && <EmptyState message={`No recipe ranges for ${p.name} yet: paths and ranges appear once 3 installs report the same recipes.`} />}
-        {view.unreachable ? <Card><p>{STORAGE_UNREACHABLE}</p></Card> : <ShoppingList profession={p.name} recipes={plannerRecipes} from={fromSkill} to={toSkill} />}
+        {view.unreachable ? <Card><p>{STORAGE_UNREACHABLE}</p></Card> : <ShoppingList slug={p.slug} profession={p.name} recipes={plannerRecipes} from={fromSkill} to={toSkill} />}
 
         {!pending && (
           <section aria-labelledby="prof-ranges">

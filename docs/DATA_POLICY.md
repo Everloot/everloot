@@ -449,16 +449,22 @@ The rules:
 - The maintainer review is the pull request that sets or changes the rule or adds a source. A file for a new
   build is checked against the last run's counts (`npm run kb -- name-gaps`) before it is uploaded.
 
-**Profession planning search asset.** The profession search uses a narrow, build-stamped name snapshot
-of recipe spells and the items already shown on Everloot's profession pages. This snapshot is committed
-and emitted as static JSON at build time for the site's own browser filtering. It is an exception to the
-private-only storage rule above for these displayed names; the full private name ledger, tooltip facts
-and unreleased item names remain private. Recipe facts are from `client-recipes.json`, labelled found
-in game files, unconfirmed. Teaching-item links, when exported, use numeric item-effect and learn-spell
-relations; absent links and acquisition sources say not confirmed yet. No names are added to the public
-API, MCP or bulk data export. Refresh the narrow snapshot with
-`cd web && npx tsx scripts/snapshot-profession-names.mjs` after updating the recipe build; a mismatch
-keeps names unknown rather than borrowing them from a different build.
+**Profession planning search asset.** The profession search uses a narrow, build-stamped name
+snapshot of recipe spells and the items already shown on Everloot's profession pages. A separate
+matching-build export adds numeric teaching-item links and their readable ItemSparse names, labelled
+game files, unconfirmed. This snapshot is committed and emitted as static JSON at build time for the
+site's own browser filtering. It is an exception to the private-only storage rule above for these
+displayed names; the full private name ledger and tooltip facts remain private. Recipe facts are
+from `client-recipes.json`, labelled found in game files, unconfirmed. Teaching-item links use
+numeric item-effect learning triggers and base-difficulty learn-spell relations; encrypted blocks
+are skipped, and absent links and acquisition sources say not confirmed yet. Acquisition links are a
+dated snapshot of existing public observed sold-by, dropped-by and reward-from relations, requiring
+at least three installs. They retain their observed date and source-entity link, without exposing
+install identifiers. Refresh with `cd web && node scripts/snapshot-recipe-sources.mjs`. No names are
+added to the public API, MCP or bulk data export. Refresh the narrow snapshot with `cd web && npx
+tsx scripts/snapshot-profession-names.mjs` after updating the recipe build or changing any
+name/spoiler eligibility rule; a mismatch keeps names unknown rather than borrowing them from a
+different build. Refresh teaching items with `cd kb && npx tsx scripts/export-recipe-items.mts`.
 
 **Third extension: game icons and tooltip text in embeddable cards.** Decided 2026-10-19 (Carlos
 approved it with the site structure plan). The hover card any site can show through
