@@ -12,7 +12,7 @@ source = (root / '.github/workflows/release.yml').read_text(encoding='utf-8')
 nightly = (root / '.github/workflows/nightly.yml').read_text(encoding='utf-8')
 assert 'ref: ${{ needs.plan.outputs.sha }}' not in nightly, 'nightly checks out trusted main, not an output-controlled ref'
 assert 'test "$(git rev-parse HEAD)" = "${PLANNED_SHA}"' in nightly, 'main must still match the planned source revision'
-publish = source.split('      - name: Create the release\n', 1)[1].split('        run: |\n', 1)[1]
+publish = source.split('      - name: Create the release\n', 1)[1].split('        run: |\n', 1)[1].split('\n      - ', 1)[0] + '\n'
 script = textwrap.dedent(publish)
 bash = shutil.which('bash') if os.name != 'nt' else 'C:/Program Files/Git/bin/bash.exe'
 with tempfile.TemporaryDirectory(prefix='everloot-release-') as temp:
