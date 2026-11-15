@@ -328,3 +328,21 @@ test("an unreadable rollup is unavailable, not zero", async () => {
     expect(html).not.toContain("0c");
   }
 });
+
+test("item prices show one-day and seven-day moves from solid days", async () => {
+  const html = text(renderToStaticMarkup(await RealmItemPage(item("forever", "765"))));
+  expect(html).toContain("1-day change+10%");
+  expect(html).toContain("7-day change+22%");
+});
+
+test.each(["missing", "thin"])("item prices omit the one-day move when yesterday is %s", async (kind) => {
+  const rows = [
+    ...scans(dayAgo(0), [[765, 30, 33]]),
+    ...scans(dayAgo(7), [[765, 25, 27]]),
+    ...(kind === "thin" ? scans(dayAgo(1), [[765, 28, 30]]).map((r) => ({ ...r, items: r.items.map((v) => [v[0], 1, 1, v[3], v[4]]) })) : []),
+  ];
+  store.loadMarket.mockResolvedValue({ state: foldMarket(emptyMarket(), rows, today), dataAsOf: today.toISOString() });
+  const html = text(renderToStaticMarkup(await RealmItemPage(item("forever", "765"))));
+  expect(html).not.toContain("1-day change");
+  expect(html).toContain("7-day change+22%");
+});

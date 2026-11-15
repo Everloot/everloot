@@ -15,7 +15,7 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, Disclosure, EmptyState, PageHeader, SectionHeading, Tabs } from "@/components/ui";
 import {
   AH_PATH, HOUSES, agreementSoFar, busiestHouse, crossRealmHref, findBoard, houseSlug, indexable, itemAcrossRealms, itemByHouse, itemHref, itemIdParam,
-  itemLabel, money, realmBoards, realmHref, slugParam, slugWords,
+  itemLabel, money, percent, priceMove, realmBoards, realmHref, slugParam, slugWords,
 } from "@/lib/auction-house";
 import { auctionNames, itemArt } from "../../art";
 import { Contribute, DayTable, Facts, HousePrices, PriceChart, PriceFacts, RealmPrices, UnnamedReason, itemQuality } from "../../parts";
@@ -72,6 +72,10 @@ export default async function RealmItemPage(props: Props) {
   const path = itemHref({ slug }, itemId);
   const trail = [...trailFor(AH_PATH)!, { name: realm, path: realmHref({ slug }) }, { name: label, path }];
   const v = row?.value;
+  const moves = row ? ([1, 7] as const).flatMap((span) => {
+    const move = priceMove(row, span, now);
+    return move ? [{ label: `${span}-day change`, value: percent(move.change), note: `${move.from.day} to ${move.to.day}` }] : [];
+  }) : [];
 
   return (
     <Container>
@@ -128,6 +132,7 @@ export default async function RealmItemPage(props: Props) {
               { label: "Min buyout", value: <CoinText text={formatCopper(v.min)} />, note: `On ${v.day}` },
               { label: "Historical", value: <CoinText text={formatCopper(v.historical)} />, note: "60-day median" },
               { label: "Units listed", value: v.quantity.toLocaleString("en-US"), note: v.thin ? "Thin: left out of the market value" : `On ${v.day}` },
+              ...moves,
             ]} />
             <section aria-labelledby="ah-chart">
               <SectionHeading id="ah-chart">Last 60 days, {row.house} auction house</SectionHeading>
