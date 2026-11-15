@@ -30,6 +30,11 @@
       "minLength": 1,
       "maxLength": 40
     },
+    "skillLineId": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
     "rank": {
       "type": "integer",
       "minimum": 1,

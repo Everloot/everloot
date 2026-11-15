@@ -113,7 +113,7 @@ local function windowProfession()
   end
   -- The intake accepts ranks 1 to 500: anything above is not written.
   if not whole(rank) or rank > MAX_RANK then return nil, "no skill level" end
-  return name, rank, (whole(maxRank) and maxRank <= MAX_RANK) and maxRank or nil
+  return name, rank, (whole(maxRank) and maxRank <= MAX_RANK) and maxRank or nil, whole(skillLine) and skillLine or nil
 end
 
 --- Write the row a recipe's highest rank at its last colour is waiting in, if any.
@@ -138,7 +138,7 @@ end
 
 --- One recipe into a row: "stored", "known" (nothing new), "pending" (reagent names not loaded),
 --- "alternatives" (stored without reagents), "unlearned" (not written) or "skipped".
-local function readRecipe(id, profession, rank, maxRank)
+local function readRecipe(id, profession, rank, maxRank, skillLineId)
   id = E.Readable(id)
   if not whole(id) then return "skipped" end
   local T = C_TradeSkillUI
@@ -155,6 +155,7 @@ local function readRecipe(id, profession, rank, maxRank)
   if learned == false then return "unlearned" end
   -- Do not reuse the legacy name key: it would lose identity and learned-state information.
   local recipe = profession .. "|" .. recipeId
+  if skillLineId then recipe = recipe .. "|skill:" .. skillLineId end
   local key = "id|" .. recipe .. "|" .. colour .. "|" .. tostring(learned)
   local span = EverlootDB.recipeSpan[key]
   if span and rank >= span.min and rank <= span.max then return "known" end
@@ -189,6 +190,7 @@ local function readRecipe(id, profession, rank, maxRank)
     installId = EverlootDB.installId,
     capturedAt = date("!%Y-%m-%dT%H:%M:%SZ"),
     profession = profession,
+    skillLineId = skillLineId,
     rank = rank,
     maxRank = maxRank,
     recipe = info.name,
@@ -233,7 +235,7 @@ end
 readWindow = function()
   if not E:IsEnabled("professions") then return end
   if #missingTradeSkillApi() > 0 then updateNote(); return end
-  local profession, rank, maxRank = windowProfession()
+  local profession, rank, maxRank, skillLineId = windowProfession()
   if not profession then lastWindow = "nothing recorded: " .. tostring(rank); updateNote(); return end
   local okIds, ids = false, nil
   if type(C_TradeSkillUI.GetAllRecipeIDs) == "function" then okIds, ids = pcall(C_TradeSkillUI.GetAllRecipeIDs) end
@@ -260,7 +262,7 @@ readWindow = function()
     if mine ~= pass or not windowOpen or not E:IsEnabled("professions") then return end
     local last = (C_Timer and C_Timer.After) and math.min(total, nextIndex + CHUNK - 1) or total
     for i = nextIndex, last do
-      local ok, result = pcall(readRecipe, ids[i], profession, rank, maxRank)
+      local ok, result = pcall(readRecipe, ids[i], profession, rank, maxRank, skillLineId)
       result = ok and result or "skipped"
       if result == "stored" then stats.stored = stats.stored + 1
       elseif result == "alternatives" then stats.alternatives = stats.alternatives + 1
@@ -282,6 +284,29 @@ local function scheduleRead()
     scheduled = false
     if windowOpen then pcall(readWindow) end
   end)
+end
+
+--- Match the trainer's localized requirement against the player's profession book.
+--- Do not infer an ID from an English name or from another open trade-skill window.
+local function professionSkillLine(name)
+  if type(GetProfessions) ~= "function" or type(GetProfessionInfo) ~= "function" then return nil end
+  local ok, indices = pcall(function() return { GetProfessions() } end)
+  if not ok then return nil end
+  for _, index in pairs(indices) do
+    local got, bookName, _, _, _, _, _, skillLine = pcall(GetProfessionInfo, index)
+    if got and bookName == name and whole(skillLine) then return skillLine end
+  end
+end
+
+--- A trainer link can identify a spell or an item; these namespaces are never interchangeable.
+local function trainerIdentity(index)
+  if type(GetTrainerServiceItemLink) ~= "function" then return nil, nil end
+  local ok, link = pcall(GetTrainerServiceItemLink, index)
+  link = E.Readable(link)
+  if not ok or type(link) ~= "string" then return nil, nil end
+  local spell = tonumber(link:match("|Hspell:(%d+)[^%d]"))
+  local item = tonumber(link:match("|Hitem:(%d+)[^%d]"))
+  return whole(spell) and spell or nil, whole(item) and item or nil
 end
 
 --- Only services with a profession requirement are recipes; class spells and headers have none.
@@ -308,13 +333,22 @@ local function trainer()
       local okCost, cost = false, nil
       if GetTrainerServiceCost then okCost, cost = pcall(GetTrainerServiceCost, i) end
       cost = (okCost and type(cost) == "number" and cost >= 0) and cost or nil
+      local skillLineId = professionSkillLine(profession)
+      local spellId, productItemId = trainerIdentity(i)
       local key = profession .. "|" .. name .. "|" .. rank .. "|" .. tostring(cost)
       if trainerNpcId then key = key .. "|" .. trainerNpcId end
+      -- Older installs already know the name-only key. Enrich once when identities become readable.
+      if skillLineId then key = key .. "|skill:" .. skillLineId end
+      if spellId then key = key .. "|spell:" .. spellId end
+      if productItemId then key = key .. "|item:" .. productItemId end
       if not EverlootDB.trainerSeen[key] then
         local stored = E:Store("trainer_seen", {
           installId = EverlootDB.installId,
           capturedAt = date("!%Y-%m-%dT%H:%M:%SZ"),
           profession = profession,
+          skillLineId = skillLineId,
+          spellId = spellId,
+          productItemId = productItemId,
           recipe = name,
           requiredRank = rank,
           costCopper = cost,

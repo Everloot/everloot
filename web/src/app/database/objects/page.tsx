@@ -6,6 +6,7 @@ import { objectList } from "../../../../../kb/src/object-page";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
 import { loadObjectFacts } from "@/lib/objects";
 import { objectNames } from "@/lib/names";
+import { MAX_QUERY } from "@/lib/lore";
 import { LINK } from "../entity";
 import { listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, sortParam, sortRows, Unreadable, type ListQuery, type Search } from "../list-parts";
 
@@ -25,22 +26,30 @@ const NO_NAME = "No agreed name yet. A name needs 3 installs reporting the same 
 
 const href = (q: Partial<ListQuery<Sort>>) => listHref("/database/objects", [["q", q.q], ["sort", sortParam(q.sort)], ["page", q.page && q.page > 1 ? String(q.page) : undefined]]);
 
+/** Keep the full search query when following an all-matches link; shared sort/page validation still applies. */
+function objectQuery(search: Search) {
+  const q = listQuery(search, SORTS);
+  if (q && typeof search.q === "string") q.q = search.q.trim().slice(0, MAX_QUERY) || undefined;
+  return q;
+}
+
 export async function generateMetadata(props: { searchParams?: Promise<Search> }): Promise<Metadata> {
-  const q = listQuery((await props.searchParams) ?? {}, SORTS);
+  const q = objectQuery((await props.searchParams) ?? {});
   return listMetadata(META, Boolean(q) && !q!.q && !q!.sort, q?.page);
 }
 
 type Row = ReturnType<typeof objectList>[number];
 
 export default async function ObjectsPage(props: { searchParams?: Promise<Search> }) {
-  const q = listQuery((await props.searchParams) ?? {}, SORTS);
+  const q = objectQuery((await props.searchParams) ?? {});
   if (!q) notFound();
   const facts = await loadObjectFacts();
   const all = facts.unreachable ? [] : objectList(facts);
   const names = objectNames(facts);
-  // The box takes an id: an object is found by its number, whether or not players agree on a name yet.
+  // Numbers still find unnamed objects; text matches only names players agree on.
   const id = q.q && /^#?\d+$/.test(q.q) ? Number(q.q.replace("#", "")) : null;
-  const matched = q.q ? all.filter((o) => o.objectId === id) : all;
+  const text = q.q?.toLowerCase();
+  const matched = text ? all.filter((o) => o.objectId === id || names.get(o.objectId)?.toLowerCase().includes(text)) : all;
   const sort = q.sort ?? DEFAULT_SORT;
   const key = (o: Row): string | number | null => sort.key === "name" ? names.get(o.objectId)?.toLowerCase() ?? null
     : sort.key === "windows" ? o.windows : sort.key === "items" ? o.items : sort.key === "installs" ? o.reporters : o.objectId;
@@ -65,7 +74,7 @@ export default async function ObjectsPage(props: { searchParams?: Promise<Search
   const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "object" : "objects"} page={q.page} perPage={PER_PAGE} href={(page) => href({ ...q, page })} label="Object pages" />;
   const empty = facts.unreachable ? <Unreadable />
     : q.q ? <>
-        <NoMatches noun="objects" chips={[{ label: `Id: ${q.q}`, href: here({ q: undefined }) }]} clearHref="/database/objects" />
+        <NoMatches noun="objects" chips={[{ label: `${id !== null ? "Id" : "Name"}: ${q.q}`, href: here({ q: undefined }) }]} clearHref="/database/objects" />
         {id !== null && <p className="pb-4 text-cell"><Link href={`/database/objects/${id}`} className={LINK}>Open object {id}</Link></p>}
       </>
     : <NoObservations>No object has public loot observations yet; each needs loot windows from 3 installs.</NoObservations>;
@@ -76,7 +85,7 @@ export default async function ObjectsPage(props: { searchParams?: Promise<Search
         <DataTitle title="Objects" trail={trailFor("/database/objects")!} aside={strip} />
         <FilterBar
           label="Object filters"
-          search={{ action: "/database/objects", value: q.q, placeholder: "Object id", label: "Find an object by id", keep }}
+          search={{ action: "/database/objects", value: q.q, placeholder: "Name or id", label: "Find an object by name or id", keep }}
           controls={[]}
           active={q.q ? 1 : 0}
           clearHref="/database/objects"
