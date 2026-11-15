@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   ...pageMetadata({ title: "Terms of Use", description, path: "/terms" }),
 };
 
-const UPDATED = "2026-10-24";
+const UPDATED = "2026-11-15";
 const HISTORY_URL = `${REPO_URL}/commits/main/web/src/app/terms/page.tsx`;
 
 const SECTIONS: TocItem[] = [
@@ -64,7 +64,7 @@ export default function TermsPage() {
 
           <Section id="use">
             <p>
-              Browsing is free and needs no account. A few clearly labelled ads pay for hosting. You may use the site, the API and
+              Browsing is free, needs no account and shows no ads. You may use the site, the API and
               the MCP server for any lawful purpose, within the rate limits on the{" "}
               <Link href="/docs/api/keys">Limits and keys page</Link>. Do not try to get around those limits, probe or attack
               the service, send uploads you have forged or altered, or use other players&apos; data in ways the{" "}

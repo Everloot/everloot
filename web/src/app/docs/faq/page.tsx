@@ -18,7 +18,7 @@ export default function Page() {
     <DocPage href="/docs/faq">
       <H2 id="is-it-free">Is Everloot free?</H2>
       <P>
-        Browsing is free and needs no account. A few clearly labelled ads pay for hosting. The addon and the Desktop App are free
+        Browsing is free, needs no account and shows no ads. The addon and the Desktop App are free
         and open source under the AGPL-3.0. See <Link href="/addon" className={docLink}>the downloads</Link> and the{" "}
         <Link href="/terms" className={docLink}>terms</Link>.
       </P>
