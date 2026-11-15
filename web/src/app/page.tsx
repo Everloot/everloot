@@ -6,6 +6,7 @@ import JsonLd from "@/components/JsonLd";
 import GlintHero from "@/components/glint/GlintHero";
 import LoreSearchForm from "@/components/LoreSearchForm";
 import HomeAsk from "@/components/HomeAsk";
+import StartHere from "@/components/start/StartHere";
 import HomeTrust from "@/components/HomeTrust";
 import { loadCoverageSummary } from "@/lib/coverage-summary";
 import { AgreementMeter, Banner, Card, CodeBlock, SectionHeading, type Agreement } from "@/components/ui";
@@ -113,6 +114,8 @@ export default async function Home() {
           </div>
         </Banner>
       </section>
+
+      <StartHere />
 
       {/* The promise with its live numbers, from the stored coverage score. */}
       <HomeTrust summary={coverage} />

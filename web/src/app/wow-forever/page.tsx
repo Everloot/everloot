@@ -7,6 +7,8 @@ import { latestBuildLine } from "@/lib/changes-facts";
 import { loadTimeline, postPath } from "@/lib/changes";
 import { RACE_TABLE, RACIAL_NOTES, traitsFor, type RaceTrait } from "@/lib/race-traits";
 import { pageMetadata } from "@/lib/seo";
+import StartHere from "@/components/start/StartHere";
+import RulesetChooser from "@/components/start/RulesetChooser";
 import JsonLd from "@/components/JsonLd";
 import { videoGamePageJsonLd } from "@/lib/jsonld";
 import { trailFor } from "@/lib/breadcrumbs";
@@ -150,6 +152,8 @@ export default async function WowForeverPage() {
           they have said.
         </p>
 
+        <StartHere />
+
         <section aria-labelledby="launch" className="max-w-reading">
           <SectionHeading id="launch">When does WoW: Forever launch?</SectionHeading>
           <div className="space-y-4">
@@ -214,6 +218,7 @@ export default async function WowForeverPage() {
             Which rulesets are there?
           </SectionHeading>
           <div className="space-y-4">
+            <RulesetChooser />
             <Card padding="none">
               <DataTable caption="WoW: Forever rulesets" columns={rulesetColumns} rows={[...RULESETS]} rowKey={(r) => r.name} />
             </Card>
