@@ -115,6 +115,12 @@ GetTrainerServiceSkillReq = function(i) local s = services[i]; if s[7] then retu
 -- moneyCost, isProfession
 GetTrainerServiceCost = function(i) return services[i][9] or 0, false end
 GetTrainerServiceStepIndex = function() return stepIndex end
+GetProfessions = function() return 1 end
+GetProfessionInfo = function() return 'Alchemy', 'icon', 60, 75, 0, 0, 171 end
+GetTrainerServiceItemLink = function(i)
+ if i == 2 then return '|cff71d5ff|Hspell:2330|h[Lesser Healing Potion]|h|r' end
+ if i == 3 then return '|cffffffff|Hitem:2457:0|h[Elixir of Minor Agility]|h|r' end
+end
 """)
 root = Path(__file__).parents[1]
 toc = (root / "Everloot.toc").read_text(encoding="utf-8")
@@ -134,8 +140,11 @@ assert(#rows() == 0 and getInfoCalls == 0)
 -- Alchemy: colours at the rank, product and basic reagents from the schematic. Optional and finishing slots,
 -- currency slots, a recipe with no colour and a recipe whose reagent name is not loaded yet record nothing wrong.
 itemsLoaded = false
+-- Upgrading an existing install must emit one enriched row despite its legacy span.
+EverlootDB.recipeSpan = { ['id|Alchemy|1002|optimal|true'] = { min = 60, max = 60 } }
 fire('TRADE_SKILL_SHOW')
 local lesser = byName('Lesser Healing Potion')
+assert(lesser.skillLineId == 171, 'recipe carries the profession skill line')
 assert(lesser.profession == 'Alchemy' and lesser.rank == 60 and lesser.maxRank == 75 and lesser.difficulty == 'optimal')
 assert(lesser.productItemId == 858 and #lesser.reagents == 2, 'two basic reagents')
 assert(lesser.reagents[1].item == 'Briarthorn' and lesser.reagents[1].count == 1 and lesser.reagents[2].item == 'Minor Healing Potion')
@@ -236,7 +245,7 @@ child = { professionID = 2823, parentProfessionID = 171, parentProfessionName = 
  expansionName = 'Classic', skillLevel = 80, maxSkillLevel = 150, skillModifier = 0, isPrimaryProfession = true }
 listed = { 1002 }
 fire('TRADE_SKILL_LIST_UPDATE')
-assert(rows()[#rows()].profession == 'Alchemy' and rows()[#rows()].rank == 80)
+assert(rows()[#rows()].profession == 'Alchemy' and rows()[#rows()].rank == 80 and rows()[#rows()].skillLineId == 171)
 assert(Everloot:Status():find('Alchemy 80/150, 1 recipes listed, 1 new rows', 1, true), Everloot:Status())
 
 -- A long list is read in chunks across frames.
@@ -266,10 +275,16 @@ event('TRADE_SKILL_CLOSE')
 drain()
 assert(getInfoCalls - before == 50, 'a closed window ends the read')
 
+GetProfessions = function() return 1 end
+GetProfessionInfo = function() return 'Alchemy', 'icon', 60, 75, 0, 0, 171 end
 -- Trainer: each recipe's required rank and cost; headers, class spells and the profession step row are skipped.
+EverlootDB.trainerSeen = { ['Alchemy|Lesser Healing Potion|55|250'] = true }
 event('TRAINER_SHOW')
 local trained = EverlootDB.records.trainer_seen
+local function trainerByName(name) for _, row in ipairs(trained) do if row.recipe == name then return row end end end
 assert(trained and #trained == 2, 'two trainer recipes; got ' .. tostring(trained and #trained))
+assert(trained[1].skillLineId == 171 and trained[1].spellId == 2330 and trained[1].productItemId == nil)
+assert(trained[2].skillLineId == 171 and trained[2].productItemId == 2457 and trained[2].spellId == nil)
 assert(trained[1].profession == 'Alchemy' and trained[1].recipe == 'Lesser Healing Potion' and trained[1].requiredRank == 55 and trained[1].costCopper == 250)
 assert(trained[2].recipe == 'Elixir of Minor Agility' and trained[2].requiredRank == 50, 'a recipe not yet learnable is still listed with its rank')
 event('TRAINER_UPDATE'); event('TRAINER_SHOW')
@@ -285,6 +300,38 @@ UnitGUID = function() return 'Player-1-00000001' end
 event('TRAINER_SHOW')
 assert(#EverlootDB.records.trainer_seen == 4, 'a GUID that is not a creature adds no trainer id and nothing new')
 UnitGUID = nil
+
+-- Localized names match the localized profession book; item and spell IDs stay distinct.
+local beforeLocalized = #trained
+services[2][1], services[2][7] = 'Poción de sanación inferior', 'Alquimia'
+GetProfessionInfo = function() return 'Alquimia', 'icon', 60, 75, 0, 0, 171 end
+event('TRAINER_SHOW')
+assert(trained[beforeLocalized + 1].skillLineId == 171 and trained[beforeLocalized + 1].spellId == 2330)
+-- Optional APIs missing, throwing or invalid do not stop legacy observations or guess IDs.
+GetProfessions = nil
+GetTrainerServiceItemLink = function() error('unavailable') end
+services[2][1] = 'No identity'
+event('TRAINER_SHOW')
+local noIdentity = trainerByName('No identity')
+assert(noIdentity and noIdentity.skillLineId == nil and noIdentity.spellId == nil)
+GetProfessions = function() return 1 end
+GetProfessionInfo = function() return 'Alquimia', 'icon', 60, 75, 0, 0, 0 end
+GetTrainerServiceItemLink = function() return '|Hspell:0|h[invalid]|h' end
+services[2][1] = 'Invalid identity'
+event('TRAINER_SHOW')
+local invalidIdentity = trainerByName('Invalid identity')
+assert(invalidIdentity and invalidIdentity.skillLineId == nil and invalidIdentity.spellId == nil and invalidIdentity.productItemId == nil)
+GetTrainerServiceItemLink = nil
+services[2][1] = 'Missing link'
+event('TRAINER_SHOW')
+assert(trainerByName('Missing link').spellId == nil)
+local beforeEnriched = #trained
+GetProfessionInfo = function() return 'Alquimia', 'icon', 60, 75, 0, 0, 171 end
+GetTrainerServiceItemLink = function(i) if i == 2 then return '|Hspell:2330|h[Poción]|h' end end
+event('TRAINER_SHOW')
+assert(#trained == beforeEnriched + 1 and trained[#trained].skillLineId == 171 and trained[#trained].spellId == 2330)
+event('TRAINER_SHOW')
+assert(#trained == beforeEnriched + 1, 'identity enrichment happens once')
 
 -- Missing calls record nothing, never error, and the status says which.
 local saved = C_TradeSkillUI.GetFilteredRecipeIDs
@@ -345,7 +392,7 @@ assert(#rows() == count + 4, 'a new difficulty at the same rank adds a row')
 child.skillLevel = 101
 fire('TRADE_SKILL_LIST_UPDATE')
 assert(#rows() == count + 4, 'a new rank at the same colour waits')
-assert(EverlootDB.recipeWaiting['Alchemy|7101'].rank == 101)
+assert(EverlootDB.recipeWaiting['Alchemy|7101|skill:171'].rank == 101)
 -- A bad optional learned value stays unknown; it must never become true or false by truthiness.
 -- Unknown is a new state: the waiting learned row is written first, then the unknown one.
 learned = 'false'
@@ -364,7 +411,7 @@ local invalidCalls = 0
 C_TradeSkillUI.GetRecipeInfo = function(id) if id ~= 7101 then invalidCalls = invalidCalls + 1; return nil end; return getInfo(id) end
 fire('TRADE_SKILL_LIST_UPDATE')
 assert(invalidCalls == 0, 'invalid list ID reached API')
-assert(#rows() == count + 8 and EverlootDB.recipeWaiting['Alchemy|7101'].rank == 102)
+assert(#rows() == count + 8 and EverlootDB.recipeWaiting['Alchemy|7101|skill:171'].rank == 102)
 issecretvalue = nil
 -- Missing, throwing or invalid complete-list APIs fall back honestly to the filtered list.
 for _, mode in ipairs({ 'missing', 'throws', 'invalid' }) do
