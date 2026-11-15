@@ -81,6 +81,8 @@ const ALLOWED = [
   "web/src/app/tools/auctions/AhledgerPrices.tsx",
   "web/src/app/tools/auctions/item/[itemId]/page.tsx",
   "web/src/app/tools/auctions/[realm]/[itemId]/page.tsx",
+  // Names AH Ledger only to say how the house-to-ruleset mapping was worked out; it keeps none of its prices.
+  "web/src/lib/blizzard-houses.ts",
 ];
 const SCANNED = ["web/src", "kb/src", "kb/scripts", "packages/protocol/src", "integrations", "addon", "companion/src", "desktop/src", "scripts"];
 const SKIP_DIRS = new Set(["node_modules", "dist", "build", ".next", "media"]);
