@@ -1,5 +1,6 @@
 import { GATHER_KINDS, INSTANCE_TYPES, NPC_ROLES, RELS, ENTITY_KINDS } from "@everloot/protocol";
 import { z } from "zod";
+import { lootWindowNote } from "../loot-tables.js";
 import type { RecheckScope } from "../coverage.js";
 import { rollupDrops, lootWindowsFromRecords, recheckLootRecords } from "../drop-rollup.js";
 import { observedEdges, type Edge } from "../edges.js";
@@ -194,9 +195,9 @@ const SOURCE = { sourceNpcId: ID.nullable(), sourceObjectId: ID.nullable() };
 const oneSource = (r: { sourceNpcId: number | null; sourceObjectId: number | null }, ctx: z.RefinementCtx) => {
   if ((r.sourceNpcId === null) === (r.sourceObjectId === null)) ctx.addIssue({ code: "custom", message: "exactly one of sourceNpcId and sourceObjectId is set" });
 };
-const dropRow = z.object({
+const dropRow = (recheck: readonly RecheckScope[]) => z.object({
   ...SOURCE, itemId: ID,
-  lootWindows: z.number().int().positive().describe("Loot windows the game's loot API attributed to the source, and empty windows the addon tied to its corpse, from every install together."),
+  lootWindows: z.number().int().positive().describe(`Loot windows attributed to the source, from every install together. ${lootWindowNote(recheck)}`),
   windowsWithItem: z.number().int().positive().describe("Of those windows, how many held the item."),
   rate: z.number().min(0).max(1).describe("windowsWithItem / lootWindows. A share of loot windows, not a kill-based drop chance."),
   installs: INSTALLS.describe(`Installs that opened a loot window on the source. At least ${WORLD_AGREEMENT}.`),
@@ -217,7 +218,7 @@ function drops(records: readonly unknown[], recheck: readonly RecheckScope[]): D
   return [
     {
       name: "drop-rates", layer: "observed", about: "How often an item was in the loot windows opened on an NPC or an object, once 3 or more installs opened windows on it.",
-      schema: dropRow, rows: rates, candidates: rolled.rates.filter((r) => r.drops > 0).length, candidatesAre: "source and item pairs seen in at least one loot window",
+      schema: dropRow(recheck), rows: rates, candidates: rolled.rates.filter((r) => r.drops > 0).length, candidatesAre: "source and item pairs seen in at least one loot window",
     },
     {
       name: "drop-measured-zeros", layer: "observed", about: "Sources whose loot windows held no item at all, once 3 or more installs opened windows on them.",
