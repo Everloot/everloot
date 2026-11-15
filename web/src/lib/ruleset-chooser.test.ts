@@ -3,7 +3,7 @@ import { suggestRuleset } from "./ruleset-chooser";
 
 test.each([
   [false, false, "Normal"], [true, false, "PvP"],
-  [false, true, "Roleplay"], [true, true, "Roleplay PvP"],
+  [false, true, "Roleplaying"], [true, true, "RP-PvP"],
 ] as const)("world PvP %s and roleplay %s suggest %s", (pvp, roleplay, name) => {
   for (const friends of [false, true]) {
     const result = suggestRuleset({ pvp, roleplay, friends });

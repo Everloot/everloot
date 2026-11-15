@@ -26,6 +26,7 @@ test("nine to ten useful jobs have real routes with or without a remembered clas
     }
   }
   expect(startTiles(false, true).find((t) => t.key === "character")?.href).toBe("/players");
+  expect(startTiles(false, true).find((t) => t.key === "character")?.note).toBe("Look up characters the addon has seen.");
 });
 
 test("talents and class hubs open directly on the remembered class", () => {

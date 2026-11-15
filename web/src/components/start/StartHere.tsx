@@ -6,16 +6,16 @@ import { startTiles } from "@/lib/start-here";
 import { ClassSelect, ClassStartLink, StartClassProvider } from "./StartClass";
 
 /** Server-rendered jobs, without images, request-time reads or speculative route prefetches. */
-export default function StartHere() {
+export default function StartHere({ compact = false }: { compact?: boolean } = {}) {
   return (
     <section aria-labelledby="start-here">
       <SectionHeading id="start-here">Start here</SectionHeading>
       <StartClassProvider>
         <ClassSelect />
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <ul className={compact ? "grid gap-3 sm:grid-cols-2" : "grid gap-3 sm:grid-cols-2 xl:grid-cols-5"}>
           {startTiles(armoryOn(), playerPagesOn()).map((tile) => (
             <li key={tile.key} className="min-w-0">
-              <Card className="h-full !p-4">
+              <Card padding="none" className="h-full p-4">
                 <p className="font-semibold">
                   {tile.key === "talents" || tile.key === "class"
                     ? <ClassStartLink tile={tile}>{tile.label}</ClassStartLink>

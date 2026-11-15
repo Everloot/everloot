@@ -19,8 +19,9 @@ export function StartClassProvider({ children }: { children: ReactNode }) {
   const choose = (value: string) => {
     const read = parseClassContext(value ? { class: value } : {});
     if (!read.ok) return;
-    setContext(read.context);
-    const kept = read.context ? rememberClassContext(storage(), read.context) : forgetClassContext(storage());
+    const next = read.context && context?.classSlug === read.context.classSlug ? context : read.context;
+    setContext(next);
+    const kept = next ? rememberClassContext(storage(), next) : forgetClassContext(storage());
     setFailure(kept ? null : `This browser could not ${read.context ? "remember your class" : "forget your class"}. Your choice works on this page only.`);
   };
   return <Choice.Provider value={{ context, choose, failure }}>{children}</Choice.Provider>;
@@ -38,7 +39,7 @@ export function ClassSelect() {
           <option value="">All classes</option>
           {CLASSES.map((slug) => <option key={slug} value={slug}>{classLabel(slug)}</option>)}
         </select>
-        <span id={`${id}-note`} className="text-muted">Remember on this device for talent and class links.</span>
+        <span id={`${id}-note`} className="text-muted">Remember on this device for talent and class links. Changing class replaces any remembered level and role.</span>
       </div>
       <p role="status" className="text-warning">{failure}</p>
     </div>

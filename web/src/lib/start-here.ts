@@ -13,7 +13,7 @@ export function startTiles(armory: boolean, players = false): StartTile[] {
     { key: "map", label: "World map", note: "Explore zones and instance entrances.", href: "/map" },
     { key: "guides", label: "Guides", note: "See which class guides are reviewed.", href: "/guides" },
     { key: "addon", label: "Get the addon", note: "Record what you see while playing.", href: "/addon" },
-    ...(armory || players ? [{ key: "character", label: armory ? "Armory" : "Characters", note: armory ? "Look up character gear and guilds." : "Find characters players have shared.", href: armory ? "/armory" : "/players" }] : []),
+    ...(armory || players ? [{ key: "character", label: armory ? "Armory" : "Characters", note: armory ? "Look up character gear and guilds." : "Look up characters the addon has seen.", href: armory ? "/armory" : "/players" }] : []),
     { key: "class", label: "Your class hub", note: "Find your class’s tools and guides.", href: "/classes" },
   ];
 }

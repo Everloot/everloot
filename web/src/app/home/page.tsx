@@ -30,9 +30,6 @@ export const metadata: Metadata = {
 };
 
 const QUICK_ACTIONS = [
-  { href: "/tools/talents", label: "Plan a build" },
-  { href: "/database/items", label: "Find an item" },
-  { href: "/tools/auctions", label: "Auction House" },
   { href: "/upload", label: "Upload addon data" },
 ];
 const rail = "text-meta font-semibold text-muted";
@@ -144,7 +141,7 @@ export default async function SignedInHome({ searchParams }: { searchParams?: Pr
         <ul aria-label="Quick actions" className="flex flex-wrap gap-2">
           {QUICK_ACTIONS.map((a) => <li key={a.href}><Link href={a.href} className="btn min-h-9 px-3 text-sm">{a.label}</Link></li>)}
         </ul>
-        <StartHere />
+        <StartHere compact />
         {buildsEnabled && <section aria-labelledby="active-builds" className="space-y-2">
           <h2 id="active-builds" className="text-cell font-semibold text-fg">
             {active ? <>Builds for <span className={CLASS_TEXT[active.classSlug] ?? ""}>{active.name}</span></> : "Your builds"}
