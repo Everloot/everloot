@@ -449,6 +449,17 @@ The rules:
 - The maintainer review is the pull request that sets or changes the rule or adds a source. A file for a new
   build is checked against the last run's counts (`npm run kb -- name-gaps`) before it is uploaded.
 
+**Profession planning search asset.** The profession search uses a narrow, build-stamped name snapshot
+of recipe spells and the items already shown on Everloot's profession pages. This snapshot is committed
+and emitted as static JSON at build time for the site's own browser filtering. It is an exception to the
+private-only storage rule above for these displayed names; the full private name ledger, tooltip facts
+and unreleased item names remain private. Recipe facts are from `client-recipes.json`, labelled found
+in game files, unconfirmed. Teaching-item links, when exported, use numeric item-effect and learn-spell
+relations; absent links and acquisition sources say not confirmed yet. No names are added to the public
+API, MCP or bulk data export. Refresh the narrow snapshot with
+`cd web && npx tsx scripts/snapshot-profession-names.mjs` after updating the recipe build; a mismatch
+keeps names unknown rather than borrowing them from a different build.
+
 **Third extension: game icons and tooltip text in embeddable cards.** Decided 2026-10-19 (Carlos
 approved it with the site structure plan). The hover card any site can show through
 `https://everloot.app/tooltips.js` and `GET /api/tooltip/<type>/<id>` may carry one item's game icon

@@ -45,6 +45,7 @@ export const ClientRecipes = z.object({
   }),
   note: z.literal("ranks are SkillLineAbility's MinSkillLineRank, TrivialSkillLineRankLow (yellow) and TrivialSkillLineRankHigh (grey), 0 where the files give none; green is not stored"),
   /** Each profession by skill line id, with its client name, its recipes by spell id and how many other spells its line lists. */
+  recipeItems: z.record(z.string(), z.array(z.number().int().positive())).optional(),
   professions: z.array(z.object({ id: z.number().int(), name: z.string(), otherSpells: z.number().int(), recipes: z.array(Recipe) })),
 });
 export type ClientRecipes = z.infer<typeof ClientRecipes>;
@@ -88,6 +89,25 @@ export function recipesByProfession(get: Get): ClientRecipes["professions"] {
     .map((p) => ({ id: p.id, name: p.name, otherSpells: p.otherSpells, recipes: [...p.recipes.values()].sort((a, b) => a[0] - b[0]) }));
 }
 
+/** Teaching items linked by ItemXItemEffect → ItemEffect → a LEARN_SPELL (36) effect.
+ * Missing tables mean unknown; names are never used to guess these links. */
+export function recipeItemsBySpell(get: Get): Record<string, number[]> {
+  const learns = new Map<number, Set<number>>();
+  for (const e of get("SpellEffect")?.values() ?? []) {
+    if (num(e.Effect) !== 36 || num(e.EffectTriggerSpell) <= 0) continue;
+    const targets = learns.get(num(e.SpellID)) ?? new Set<number>();
+    targets.add(num(e.EffectTriggerSpell)); learns.set(num(e.SpellID), targets);
+  }
+  const out: Record<string, number[]> = {};
+  for (const link of get("ItemXItemEffect")?.values() ?? []) {
+    const effect = get("ItemEffect")?.get(num(link.ItemEffectID));
+    const item = num(link.ItemID);
+    if (!effect || item <= 0) continue;
+    for (const spell of learns.get(num(effect.SpellID)) ?? []) out[spell] = [...new Set([...(out[spell] ?? []), item])].sort((a,b)=>a-b);
+  }
+  return out;
+}
+
 export function buildClientRecipes(snapshotPath: string): ClientRecipes {
   const meta = readClientMeta(snapshotPath);
   const present = new Set(readClientTables(snapshotPath));
@@ -96,7 +116,7 @@ export function buildClientRecipes(snapshotPath: string): ClientRecipes {
     schema: RECIPES_SCHEMA, label: CLIENT_LABEL, credit: GAME_DATA_CREDIT,
     build: { product: meta.product, buildId: meta.buildId, version: meta.version, buildConfig: meta.buildConfig, definitions: meta.definitions, extractedAt: meta.extractedAt },
     note: "ranks are SkillLineAbility's MinSkillLineRank, TrivialSkillLineRankLow (yellow) and TrivialSkillLineRankHigh (grey), 0 where the files give none; green is not stored",
-    professions: recipesByProfession(get),
+    professions: recipesByProfession(get), recipeItems: recipeItemsBySpell(get),
   });
 }
 

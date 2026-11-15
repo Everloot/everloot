@@ -92,7 +92,7 @@ function usableSighting(row: RecipeSighting): boolean {
   );
 }
 
-function agreeRecipes(sightings: RecipeSighting[], profession: string): AgreedRecipe[] {
+export function agreeRecipes(sightings: RecipeSighting[], profession: string): AgreedRecipe[] {
   const groups = new Map<string, { row: RecipeSighting; installs: Set<string> }>();
   for (const row of sightings) {
     if (!usableSighting(row) || clean(row.profession) !== clean(profession)) continue;

@@ -6,9 +6,9 @@ import AdSlot from "@/components/AdSlot";
 import EmailCapture from "@/components/EmailCapture";
 import ClassContextChip from "@/components/classes/ClassContextChip";
 import GameIcon from "@/components/game/GameIcon";
-import { Badge, Card, Container, Contribute, DataTable, Disclosure, EmptyState, Field, FilterBar, PageHeader, QUALITY_TEXT, SectionHeading, qualityOf, type Column } from "@/components/ui";
+import { Badge, Card, Container, Contribute, DataTable, Disclosure, EmptyState, FilterBar, PageHeader, QUALITY_TEXT, SectionHeading, qualityOf, type Column } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
-import { classContextParams, parseClassContext, withoutClassContext } from "@/lib/class-context";
+import { parseClassContext, withoutClassContext } from "@/lib/class-context";
 import { dataAgeLabel } from "@/lib/data-age";
 import { loadItemTips, loadSiteAssets, loadSpellNames, type ItemTip } from "@/lib/game-assets";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, shownItemName, type ShownItemName } from "@/lib/items";
@@ -18,7 +18,7 @@ import { loadListNames } from "@/lib/item-view";
 import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT } from "@/lib/upload-store";
 import { loadProfessions } from "@/lib/profession-store";
 import EdgeDegraded from "@/components/EdgeDegraded";
-import { formatCopper, handleProfessionPath } from "../../../../../../kb/src/profession-path";
+import { formatCopper, agreeRecipes } from "../../../../../../kb/src/profession-path";
 import { handleRecipeThresholds, recipeThresholdsStructured, type Range } from "../../../../../../kb/src/recipe-thresholds";
 import { farmingAreas, gatherAreas, GATHERING, inLevels } from "@/lib/farming";
 import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
@@ -28,6 +28,7 @@ import { LINK } from "../../../database/entity";
 import { LEVEL_BRACKETS, listHref, range, rangeParam } from "../../../database/list-parts";
 import FarmAreaTable from "../../farming-routes/area-table";
 import ProfessionPicker from "../picker";
+import ShoppingList from "../shopping-list";
 
 export const dynamic = "force-dynamic";
 
@@ -77,7 +78,7 @@ export default async function ProfessionPage(props: Props) {
   const read = parseClassContext(searchParams);
   const context = read.ok ? read.context : null;
   const fromSkill = skill(one(searchParams.from), 1);
-  const toSkill = skill(one(searchParams.to), 75);
+  const toSkill = skill(one(searchParams.to), 300);
   const path = professionHref(p.slug);
   // Leather and cloth come from mob areas, which have levels: `?mobs=11-20` filters them (an old
   // `/tools/farming-routes?category=cloth&level=11-20` lands here with it). `level` is the class context's, not this.
@@ -98,7 +99,7 @@ export default async function ProfessionPage(props: Props) {
 
   // The player layer, as before: three agreeing installs or nothing.
   const facts = view.facts;
-  const answer = view.unreachable ? STORAGE_UNREACHABLE : handleProfessionPath({ profession: p.name, fromSkill, toSkill }, facts.sightings, facts.prices, facts.derived);
+  const plannerRecipes = view.unreachable ? [] : [...agreeRecipes(facts.sightings, p.name).map(r => ({...r, profession: p.name})), ...facts.derived.filter(r => r.profession.toLowerCase() === p.name.toLowerCase())];
   const rangesText = view.unreachable ? STORAGE_UNREACHABLE : handleRecipeThresholds({ profession: p.name }, facts.observations, facts.prices);
   const agreed = view.unreachable ? [] : recipeThresholdsStructured({ profession: p.name }, facts.observations, facts.prices).ranges;
   const byRecipe = new Map(agreed.map((t) => [t.recipe.trim().toLowerCase(), t]));
@@ -268,22 +269,8 @@ export default async function ProfessionPage(props: Props) {
           </section>
         )}
 
-        <section aria-labelledby="prof-path" className="space-y-4">
-          <SectionHeading id="prof-path" as="h2">Leveling path from player uploads</SectionHeading>
-          <Card>
-            <form method="get" action={path} className="space-y-4">
-              {context && classContextParams(context).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="From skill" name="from" defaultValue={fromSkill} inputMode="numeric" mono />
-                <Field label="To skill" name="to" defaultValue={toSkill} inputMode="numeric" mono />
-              </div>
-              <button type="submit" className="btn btn-primary">Show the path</button>
-            </form>
-          </Card>
-          {pending
-            ? <EmptyState message={`No recipe ranges for ${p.name} yet: paths and ranges appear once 3 installs report the same recipes.`} />
-            : <Card><pre className="whitespace-pre-wrap text-sm text-fg">{answer}</pre></Card>}
-        </section>
+        {pending && <EmptyState message={`No recipe ranges for ${p.name} yet: paths and ranges appear once 3 installs report the same recipes.`} />}
+        {view.unreachable ? <Card><p>{STORAGE_UNREACHABLE}</p></Card> : <ShoppingList profession={p.name} recipes={plannerRecipes} from={fromSkill} to={toSkill} />}
 
         {!pending && (
           <section aria-labelledby="prof-ranges">
