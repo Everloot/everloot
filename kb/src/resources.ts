@@ -31,10 +31,10 @@ export function methodologyText(sourceUrl: string): string {
     "",
     "## Unrecorded is not zero",
     "",
-    "If nobody has recorded something, the answer says unrecorded. A zero appears only when it was measured: for example, \"0 drops in 40 kills\" once three installs killed that creature and none of them saw the item. " +
+    "If nobody has recorded something, the answer says unrecorded. A zero appears only when it was measured: for example, \"0 windows with the item in 40 loot windows\" once three installs recorded loot windows from that creature and none of those windows contained the item. " +
       "A storage outage or a missing source is never shown as zero either, and a tool that is not connected to the corpus says so: that is not a measured zero.",
     "",
-    "Loot windows show what dropped, not how many kills it took, so they do not make a drop rate on their own. A rate is drops divided by recorded kills.",
+    "A rate is loot windows with the item divided by recorded loot windows. Loot windows show what dropped, not how many kills it took.",
     "",
     "## Game files and play are kept apart",
     "",
