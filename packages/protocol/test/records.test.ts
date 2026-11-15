@@ -34,6 +34,24 @@ test("recipe observations preserve optional API identity and learned state with 
   }
 });
 
+test("profession observations retain optional numeric identities across localized names", () => {
+  const recipe = { ...base, kind: "recipe_observed", profession: "Alquimia", rank: 60, recipe: "Poción", difficulty: "optimal", reagents: [] };
+  const trainer = { ...base, kind: "trainer_seen", profession: "Alquimia", recipe: "Poción", requiredRank: 55 };
+  for (const row of [recipe, trainer]) {
+    expect(parseRecords([row, { ...row, skillLineId: 171 }]).records).toEqual([row, { ...row, skillLineId: 171 }]);
+    for (const skillLineId of [0, -1, 1.5, "171"]) {
+      expect(parseRecords([{ ...row, skillLineId }]).receipt.rejected).toHaveLength(1);
+    }
+  }
+  const identified = { ...trainer, skillLineId: 171, spellId: 2330, productItemId: 118 };
+  expect(parseRecords([identified]).records).toEqual([identified]);
+  for (const field of ["spellId", "productItemId"]) {
+    for (const value of [0, -1, 1.5, "118"]) {
+      expect(parseRecords([{ ...trainer, [field]: value }]).receipt.rejected).toHaveLength(1);
+    }
+  }
+});
+
 describe("intake contract", () => {
   test("all record kinds exist", () => {
     expect(ALL_RECORD_KINDS).toHaveLength(42);

@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Addon: recipe and trainer observations keep optional profession skill-line IDs; trainer links also retain spell or product IDs when available, alongside localized names.
 - Addon: a kill's loot window with nothing in it is now recorded, tied to the one dead creature you could loot (interact, mouseover or target), as a loot row with no items and no coin, once per corpse, and the site's drop rates, loot tables and open data count it in the source's windows (protocol 2.3.0, `sourceEvidence: "empty-window"`). Until now an empty corpse never reached the site, so drop rates for anything that does not always drop read too high. Needs an in-game check before release.
 - Site: prepare opt-in private boss-kill sync for linked characters; awaiting migration and policy approval.
 - Site: add Start here shortcuts with a remembered class on home and WoW: Forever, plus a three-question ruleset chooser that explains its suggestion.
@@ -223,6 +224,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: bag upgrade pickers offer publicly priced sizes and preserve bags selected in saved links, without suggesting unpriced test containers.
 - Docs: the project overview links current downloads and explains paired addon/Desktop App updates for community prices.
 - Site: malformed URL fragments keep the default or current database tab usable, including click and keyboard navigation.
+- Site: find public chests and gathering nodes by agreed name in search, suggestions and the object list, with links to every match.
 - Site: the armory loads no ads or analytics: AdSense Auto ads was filling its pages, which show Blizzard API data. A move to it from another page now loads a new document, like the Blizzard auction page.
 - Site: auction prices keep updating when the market rollup is full: the oldest open scan day closes early (its public prices kept) instead of new scans being refused, one uploader cannot take more than a third of the room, and dropped scans no longer leave empty days behind.
 - Site: avoid compiling game-file name matchers for absent ASCII names when answering sourced questions, reducing cold-start CPU work.
@@ -358,6 +360,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Knowledge base: open data drop rates and measured zeros follow the same recheck cutoffs as the site, leaving other exported facts and corpus counts unchanged.
 
 ### Changed
+- Addon: grouped auction sales show paid transactions per day and paid units per day separately beside the last sold date. Pending and unmatched notices affect neither rate; in-game layout verification is required before release.
+- Site: share private character-sync validation with the companion through a separate protocol export; public uploads still reject private-only rows.
 - Site: Reuse cold-start aggregate and game-art reads and load the build label from a small generated stamp.
 - Site: auction item pages (`/tools/auctions/:realm/:itemId`) are kept in the edge cache for five minutes, like the browse pages, so repeat requests and crawlers stop re-rendering them.
 - Site: reuse public MCP discovery metadata within each mount while keeping request ids, access checks and account tools separate.
