@@ -185,7 +185,9 @@ for case in main:
             # #921 adds a display-only detail selector for every install, independently of pull recording.
             # Keep the historical fixture and compare every original switch, in order.
             assert actual.count("tooltip") == 1
-            actual = [key for key in actual if key != "tooltip"]
+            # #1128 adds local inventory consent independently of pull recording.
+            assert actual.count("inventoryCapture") == 1
+            actual = [key for key in actual if key not in {"tooltip", "inventoryCapture"}]
         assert actual == main[case][part], f"gate off, {case} install: {part} differs from main's (fixtures/gate_off_main.json)"
 assert mine.keys() == main.keys()
 
