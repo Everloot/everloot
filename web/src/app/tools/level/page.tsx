@@ -3,7 +3,7 @@ import { Container, PageHeader } from "@/components/ui";
 import { LEVELS, levelHref } from "@/lib/level-unlocks";
 import { pageMetadata } from "@/lib/seo";
 export const dynamic = "error";
-export const metadata = pageMetadata({ title: "WoW Forever level guide", description: "Choose a level from 1 to 60 to see talent points and instance ranges in WoW: Forever. Training and zone levels without supporting data are marked unconfirmed.", path: "/tools/level" });
+export const metadata = pageMetadata({ title: "WoW Forever level guide", description: "Choose a level from 1 to 60 to see talent points and instance levels in WoW: Forever. Training and zone levels without supporting data are marked unconfirmed.", path: "/tools/level" });
 export default function LevelIndex() {
   return <Container>
     <PageHeader title="What opens at your level?" lede="Choose your level. Share the page with your group, or filter it to your class."

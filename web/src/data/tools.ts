@@ -20,9 +20,9 @@ export interface Tool {
 export const tools: Tool[] = [
   {
     slug: "level", group: "Plan", title: "Level guide", shortTitle: "Level guide",
-    line: "See talent points and recorded instance ranges at your level, and share them with your group.",
+    line: "See talent points and recorded instance levels at your level, and share them with your group.",
     tagline: "What opens at your level?",
-    description: "Choose a level from 1 to 60 for talent points and instance ranges from the game files. Training and zone levels without supporting data are marked unconfirmed.",
+    description: "Choose a level from 1 to 60 for talent points and instance levels from the game files. Training and zone levels without supporting data are marked unconfirmed.",
     status: "collecting", keywords: ["wow forever level guide"],
   },
   {

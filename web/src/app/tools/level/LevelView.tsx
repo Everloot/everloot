@@ -1,8 +1,9 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CopyButton, SectionHeading } from "@/components/ui";
-import { LEVELS, levelHref, type LevelClass, type LevelPlace, type LevelUnlocks } from "@/lib/level-unlocks";
+import { LEVELS, levelHref, parseLevel, type LevelClass, type LevelPlace, type LevelUnlocks } from "@/lib/level-unlocks";
 const LINK = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const SLOT = "everloot.level.class";
 
@@ -15,6 +16,7 @@ function Places({ places }: { places: readonly LevelPlace[] }) {
 
 /** The server emits all classes. Query and device preferences filter that static result in the browser. */
 export default function LevelView({ level, unlocks, classes }: { level: number; unlocks: LevelUnlocks; classes: readonly LevelClass[] }) {
+  const router = useRouter();
   const [selected, setSelected] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
   useEffect(() => {
@@ -44,6 +46,10 @@ export default function LevelView({ level, unlocks, classes }: { level: number; 
   const spells = unlocks.spells?.filter((s) => matches(s.classSlug));
   const talents = unlocks.talents.filter((t) => matches(t.slug));
   const trainers = unlocks.trainers?.filter((t) => matches(t.classSlug));
+  const samePoints = talents.length === classes.length && talents.length > 0
+    && talents.every((t) => t.gained === talents[0].gained && t.total === talents[0].total);
+  const dungeonSingles = unlocks.dungeons.every((p) => p.min === p.max);
+  const raidSingles = unlocks.raids.every((p) => p.min === p.max);
   return <div className="space-y-10">
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-4">
@@ -52,24 +58,32 @@ export default function LevelView({ level, unlocks, classes }: { level: number; 
             <option value="all">All classes</option>{classes.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
           </select>
         </label>
-        <label className="flex items-center gap-2 text-sm">Jump to level
-          <select aria-label="Jump to level" value={level} onChange={(e) => window.location.assign(levelHref(Number(e.target.value), selected))} className="min-h-11 rounded-control border border-line bg-panel px-3 text-fg">
-            {LEVELS.map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </label>
+        <form key={level} aria-label="Choose level" className="flex items-center gap-2" onSubmit={(event) => {
+          event.preventDefault();
+          const value = new FormData(event.currentTarget).get("level");
+          const target = typeof value === "string" ? parseLevel(value) : null;
+          if (target !== null) router.push(levelHref(target, selected));
+        }}>
+          <label className="flex items-center gap-2 text-sm">Jump to level
+            <select name="level" aria-label="Jump to level" defaultValue={level} className="min-h-11 rounded-control border border-line bg-panel px-3 text-fg">
+              {LEVELS.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+          <button type="submit" className="btn min-h-11">Go</button>
+        </form>
         <CopyButton text={shareLink} label="Copy link" failedLabel="Copy failed" className="btn min-h-11" onResult={(ok) => setCopyStatus(ok ? "Link copied." : "Could not copy. Copy this page’s address from your browser.")} />
         <span role="status" className="text-sm text-muted">{copyStatus}</span>
       </div>
       <nav aria-label="Level navigation" className="flex flex-wrap items-center gap-6 text-sm">
-        {level > 1 && <Link aria-label="Previous level" href={levelHref(level - 1, selected)} className={`inline-flex min-h-11 items-center ${LINK}`}>← Level {level - 1}</Link>}
+        {level > 1 && <Link aria-label={`Previous level, Level ${level - 1}`} href={levelHref(level - 1, selected)} className={`inline-flex min-h-11 items-center ${LINK}`}>← Level {level - 1}</Link>}
         <Link href="/tools/level" className={`inline-flex min-h-11 items-center ${LINK}`}>All levels</Link>
-        {level < 60 && <Link aria-label="Next level" href={levelHref(level + 1, selected)} className={`inline-flex min-h-11 items-center ${LINK}`}>Level {level + 1} →</Link>}
+        {level < 60 && <Link aria-label={`Next level, Level ${level + 1}`} href={levelHref(level + 1, selected)} className={`inline-flex min-h-11 items-center ${LINK}`}>Level {level + 1} →</Link>}
       </nav>
       <p className="text-sm text-muted">Your last class is remembered on this device when browser storage is available.</p>
     </div>
     <section aria-labelledby="level-talents">
       <SectionHeading id="level-talents">Talent points</SectionHeading>
-      {talents.length ? <ul className="space-y-2 text-sm">{talents.map((t) => <li key={t.slug}>
+      {samePoints ? <p className="text-sm text-fg">All classes: {talents[0].gained} new {talents[0].gained === 1 ? "point" : "points"}, {talents[0].total} total.</p> : talents.length ? <ul className="space-y-2 text-sm">{talents.map((t) => <li key={t.slug}>
         <span>{t.name}: {t.gained} new {t.gained === 1 ? "point" : "points"}, {t.total} total. </span>
         <Link href={`/tools/talents/${t.slug}`} className={LINK}>{t.name} talent calculator</Link>{" · "}
         <Link href={`/classes/${t.slug}`} className={LINK}>{t.name} hub</Link>
@@ -82,14 +96,14 @@ export default function LevelView({ level, unlocks, classes }: { level: number; 
         : <p className="text-sm text-muted">No trainer spells recorded at this level for this selection.</p>}
     </section> : <p className="text-sm text-muted">Not confirmed yet: trainer spells and ranks. The class spell data has no learning levels or trainer offerings.</p>}
     <section aria-labelledby="level-dungeons">
-      <SectionHeading id="level-dungeons">Dungeons with a recorded range covering {level}</SectionHeading>
-      {unlocks.dungeons.length ? <Places places={unlocks.dungeons} /> : <p className="text-sm text-muted">No dungeon in the available data has a recorded range covering this level.</p>}
-      <p className="mt-3 text-sm text-muted">ContentTuning ranges from the game files, unconfirmed. These are not confirmed entry requirements or recommendations; a single recorded level is shown as given.</p>
+      <SectionHeading id="level-dungeons">{dungeonSingles ? `Dungeons with a game-file level of ${level}` : `Dungeons with game-file levels covering ${level}`}</SectionHeading>
+      {unlocks.dungeons.length ? <Places places={unlocks.dungeons} /> : <p className="text-sm text-muted">No dungeon has a matching game-file level recorded.</p>}
+      <p className="mt-3 text-sm text-muted">Game-file ContentTuning levels are shown as recorded, unconfirmed. A single level does not establish when entry opens or the full playable level range.</p>
     </section>
     {level === 60 && <section aria-labelledby="level-raids">
-      <SectionHeading id="level-raids">Raids with a recorded range covering 60</SectionHeading>
-      {unlocks.raids.length ? <Places places={unlocks.raids} /> : <p className="text-sm text-muted">No raid range covering 60 is recorded yet.</p>}
-      <p className="mt-3 text-sm text-muted">Found in game files, unconfirmed. Raids without a recorded level range are left out.</p>
+      <SectionHeading id="level-raids">{raidSingles ? "Raids with a game-file level of 60" : "Raids with game-file levels covering 60"}</SectionHeading>
+      {unlocks.raids.length ? <Places places={unlocks.raids} /> : <p className="text-sm text-muted">No matching raid level is recorded yet.</p>}
+      <p className="mt-3 text-sm text-muted">Found in game files, unconfirmed. Raids without recorded levels are left out.</p>
     </section>}
     {unlocks.zones ? <section aria-labelledby="level-zones"><SectionHeading id="level-zones">Zones covering this level</SectionHeading>
       {unlocks.zones.length ? <Places places={unlocks.zones} /> : <p className="text-sm text-muted">No zone range covering this level is recorded.</p>}

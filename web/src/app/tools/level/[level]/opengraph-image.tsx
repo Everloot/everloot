@@ -10,5 +10,5 @@ export function generateStaticParams() { return LEVELS.map((level) => ({ level: 
 export default async function Image({ params }: { params: Promise<{ level: string }> }) {
   const level = parseLevel((await params).level);
   if (level === null) notFound();
-  return renderCard({ label: "Everloot", title: `What opens at level ${level}?`, subtitle: "WoW: Forever · Talent points and instance ranges from the game files · Training not confirmed yet" });
+  return renderCard({ label: "Everloot", title: `What opens at level ${level}?`, subtitle: "WoW: Forever · Talent points and instance levels from the game files · Training not confirmed yet" });
 }

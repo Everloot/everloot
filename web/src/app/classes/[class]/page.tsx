@@ -14,7 +14,7 @@ import { classGuides, classRaces, hubIndexable } from "@/lib/class-hub";
 import { guideHref } from "@/lib/guides";
 import { RACE_TABLE, RACIAL_NOTES, traitsFor } from "@/lib/race-traits";
 import { pageMetadata } from "@/lib/seo";
-import { TALENT_CLASSES, isTalentClass } from "@/lib/talents/catalogs";
+import { TALENT_CLASSES, isTalentClass, loadCatalog } from "@/lib/talents/catalogs";
 import { CENSUS_CLASSES } from "../../../../../kb/src/census";
 import type { GuideActivity, GuideRole } from "../../../../../kb/src/guides/guide";
 
@@ -78,6 +78,7 @@ export default async function ClassHubPage({ params }: Params) {
   const { class: slug } = await params;
   if (!isTalentClass(slug)) notFound();
   const name = classLabel(slug);
+  const firstPointLevel = (await loadCatalog(slug)).rules.firstPointLevel;
   const path = `/classes/${slug}`;
   const guides = classGuides(slug);
   const races = classRaces(slug);
@@ -115,7 +116,7 @@ export default async function ClassHubPage({ params }: Params) {
 
         <section aria-labelledby="plan">
           <SectionHeading id="plan">Plan and look up</SectionHeading>
-          <p className="mb-3 text-sm"><Link href={`/tools/level/1?class=${slug}`} className={LINK}>What opens at your level as a {name}</Link></p>
+          <p className="mb-3 text-sm"><Link href={`/tools/level/${firstPointLevel}?class=${slug}`} className={LINK}>What opens at your level as a {name}</Link></p>
           <ul className="space-y-2 text-sm">
             {links.map((l) => (
               <li key={l.key}>

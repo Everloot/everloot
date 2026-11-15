@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const data = await loadLevelData();
   return {
     ...pageMetadata({ title: `What opens at level ${level} in WoW Forever`,
-      description: `Just hit level ${level} in WoW: Forever? See talent points and dungeon ranges from the game files, with unconfirmed training and zone levels clearly marked.`,
+      description: `Just hit level ${level} in WoW: Forever? See talent points and dungeon levels from the game files, with unconfirmed training and zone levels clearly marked.`,
       path: `/tools/level/${level}`, image: `/tools/level/${level}/opengraph-image` }),
     robots: { index: buildLevelUnlocks(data, level).hasData, follow: true },
   };
@@ -27,7 +27,7 @@ export default async function LevelPage({ params }: Props) {
   const data = await loadLevelData();
   return <Container>
     <PageHeader title={`What opens at level ${level}?`}
-      lede="Talent points and instance ranges from the WoW: Forever game files. Training and zone level data are still incomplete."
+      lede="Talent points and instance levels from the WoW: Forever game files. Training and zone levels are not confirmed yet."
       trail={[{ name: "Home", path: "/" }, { name: "Tools", path: "/tools" }, { name: "Level guide", path: "/tools/level" }, { name: `Level ${level}`, path: `/tools/level/${level}` }]} />
     <LevelView level={level} unlocks={buildLevelUnlocks(data, level)} classes={data.classes} />
   </Container>;

@@ -341,5 +341,6 @@ test("level pages with real data are listed and empty levels stay out", () => {
   expect(paths).toContain("/tools/level");
   expect(paths).toContain("/tools/level/10");
   expect(paths).toContain("/tools/level/60");
+  expect(entries.find((e) => new URL(e.url).pathname === "/tools/level/60")?.lastModified).toBeInstanceOf(Date);
   expect(paths).not.toContain("/tools/level/1");
 });

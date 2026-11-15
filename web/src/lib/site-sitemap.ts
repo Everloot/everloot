@@ -103,6 +103,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap | null> {
   });
   const modified = (path: string): Date | undefined => {
     if (path === "/changes") return newestChange ? new Date(newestChange) : undefined;
+    if (path === "/tools/level" || path.startsWith("/tools/level/")) return new Date(Math.max(+TALENT_DATA_EXTRACTED_AT, +MAP_DATA_EXTRACTED_AT));
     if (path === "/map" || path.startsWith("/map/")) return MAP_DATA_EXTRACTED_AT;
     if (path.startsWith("/database/items")) return new Date(CLIENT_LAYER.build.extractedAt);
     if (path === "/tools/raid" || path === "/tools/talents" || path.startsWith("/tools/talents/")) return TALENT_DATA_EXTRACTED_AT;

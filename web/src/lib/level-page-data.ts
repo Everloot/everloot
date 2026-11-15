@@ -22,7 +22,9 @@ export const loadLevelData = cache(async (): Promise<LevelData> => ({
   trainers: null,
 }));
 
-export async function levelSitemapPaths(): Promise<string[]> {
-  const data = await loadLevelData();
-  return LEVELS.filter((n) => buildLevelUnlocks(data, n).hasData).map((n) => `/tools/level/${n}`);
+// Route handlers do not share React's render cache. Keep this immutable file-derived list per module instance.
+let sitemapPaths: Promise<string[]> | undefined;
+export function levelSitemapPaths(): Promise<string[]> {
+  return sitemapPaths ??= loadLevelData().then((data) =>
+    LEVELS.filter((n) => buildLevelUnlocks(data, n).hasData).map((n) => `/tools/level/${n}`));
 }
