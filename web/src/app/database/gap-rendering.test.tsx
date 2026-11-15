@@ -83,3 +83,16 @@ test("three installs with empty windows publish a measured zero; two installs pu
   expect(drops).not.toContain("NPC 77");
   expect(drops).not.toContain("Item 9");
 });
+
+
+test("the drops list shows the sample range and few-windows mark for 3 of 4", async () => {
+  store.loadCorpus.mockResolvedValue({ uploads: 3, dataAsOf: "2026-10-09T00:00:00.000Z", records: [
+    loot("install-aaa", 42, [{ itemId: 9, count: 4 }], 1),
+    loot("install-bbb", 42, [{ itemId: 9, count: 1 }], 1),
+    loot("install-ccc", 42, [{ itemId: 9, count: 1 }], 1),
+    loot("install-ccc", 42, [], 2),
+  ] });
+  const drops = await html(() => DropsPage({}));
+  expect(drops).toContain("75.0% (30.1%–95.4%) · few windows");
+  expect(drops).toContain("95% Wilson");
+});

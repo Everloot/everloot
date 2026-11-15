@@ -20,6 +20,7 @@ import { zoneCoverageHref } from "@/lib/coverage-view";
 import { gatheredObjects, zoneFarmLinks } from "@/lib/farming";
 import { itemNames } from "@/lib/names";
 import { loadProfessions } from "@/lib/profession-store";
+import { rateWithRange } from "../../loot-tables";
 import { METHOD_LINE } from "../../../../../../kb/src/loot-tables";
 import { zoneItems, type ZoneItem, type ZoneItemSource } from "@/lib/zone-items";
 import { wikiHref, zoneWikiPage } from "@/lib/wiki";
@@ -35,7 +36,7 @@ import {
 } from "@/lib/zones";
 import { zoneLore } from "@/lib/zone-lore";
 import { UNAVAILABLE } from "@/lib/lore";
-import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, FREQUENCY, percent } from "../../entity";
+import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, FREQUENCY } from "../../entity";
 import { listQuery, PER_PAGE, type Search } from "../../list-parts";
 
 export const dynamic = "force-dynamic";
@@ -161,14 +162,10 @@ export default async function ZonePage(props: Props) {
     { key: "turnin", header: "Turn-in", cell: (q) => npcLink(q.turnInNpcId) },
   ];
   const sourceLink = (s: ZoneItemSource) => <EntityLink kind={s.from.kind} id={s.from.id} name={s.from.name} />;
-  // One source: its numbers are the row's. Several: the row counts the distinct sources and a range of their frequencies,
+  // One source: its numbers are the row's. Several: the row counts the distinct sources and each source's frequency and likely range,
   // and each source's own windows, frequency and installs open under it (the numbers of two sources are never added).
   const manySources = (i: ZoneItem) => i.sources.length > 1;
-  const rateRange = (i: ZoneItem) => {
-    const rates = i.sources.map((s) => s.rate);
-    const [low, high] = [Math.min(...rates), Math.max(...rates)];
-    return low === high ? percent(high) : `${percent(low)} to ${percent(high)}`;
-  };
+  const rateRange = (i: ZoneItem) => i.sources.map((s) => rateWithRange(s.withItem, s.windows, s.installs)).join("; ");
   const itemColumns: Column<ZoneItem>[] = [
     { key: "item", header: "Item", cell: (i) => <EntityLink kind="item" id={i.itemId} name={itemName.get(i.itemId) ?? tips.get(i.itemId)?.name} icon={tips.get(i.itemId)?.icon} /> },
     { key: "from", header: "From", cell: (i) => (!manySources(i) ? sourceLink(i.sources[0]) : (
@@ -181,7 +178,7 @@ export default async function ZonePage(props: Props) {
           {i.sources.map((s) => (
             <li key={`${s.from.kind}-${s.from.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
               {sourceLink(s)}
-              <span className="font-mono tabular-nums">{percent(s.rate)} · {s.withItem} of {s.windows} windows · {s.installs} installs</span>
+              <span className="font-mono tabular-nums">{rateWithRange(s.withItem, s.windows, s.installs)} · {s.withItem} of {s.windows} windows · {s.installs} installs</span>
             </li>
           ))}
         </ul>
@@ -225,7 +222,7 @@ export default async function ZonePage(props: Props) {
         {items.length > 0 && <div className="px-4 pb-2 sm:px-6"><ResultStrip total={items.length} noun={items.length === 1 ? "item" : "items"} page={query.page} perPage={PER_PAGE} href={itemsHref} label="Item pages" /></div>}
         <DataTable dense caption={`Items players looted from confirmed NPCs and objects in ${zone.name}`} columns={itemColumns} rows={shownItems} rowKey={(i) => String(i.itemId)} empty={empty("No item has an agreed drop from a confirmed NPC or object here yet. A rate needs loot windows from 3 installs.")} />
         {itemPages > 1 && <div className="px-4 pt-2 sm:px-6"><ResultStrip total={items.length} noun={items.length === 1 ? "item" : "items"} page={query.page} perPage={PER_PAGE} href={itemsHref} label="Item pages" /></div>}
-        {items.length > 0 && <p className="px-4 py-2 text-meta text-fg-2 sm:px-6">{METHOD_LINE}{loot.dataAsOf ? ` Data as of ${loot.dataAsOf.slice(0, 10)}.` : ""}</p>}
+        {items.length > 0 && <p className="px-4 py-2 text-meta text-fg-2 sm:px-6">{METHOD_LINE} Ranges describe the recorded sample (95% Wilson); windows may not be independent.{loot.dataAsOf ? ` Data as of ${loot.dataAsOf.slice(0, 10)}.` : ""}</p>}
       </> },
     { id: "dungeons", label: "Dungeons and raids", count: entrances.length, panel: <DataTable dense caption={`Dungeon and raid entrances in ${zone.name}`} columns={entranceColumns} rows={entrances} rowKey={(e) => `${e.names.join("|")}-${e.x}-${e.y}`} empty={empty(noEntrance)} /> },
     { id: "objects", label: "Objects", count: treasures.length, panel: <DataTable dense caption={`Treasures players saw on the minimap in ${zone.name}`} columns={treasureColumns} rows={treasures} rowKey={(t) => `${t.objectId}-${t.x}-${t.y}`} empty={empty("No treasure has a confirmed position here yet. A pin needs 3 installs at the same spot.")} /> },

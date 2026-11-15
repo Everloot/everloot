@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { DataTable, installsNeeded, type Column } from "@/components/ui";
 import { datedPhrase, METHOD_LINE, missingLine, shortLine, spanPhrase, type ItemDropSources, type LootTableRow, type NpcLootTable } from "../../../../kb/src/loot-tables";
+import { DROP_SETTLE_MIN_WINDOWS, measureDropRate } from "../../../../kb/src/drop-rate-settling";
 import { EmptyTab, FREQUENCY, percent } from "./entity";
 
 /**
@@ -11,10 +12,18 @@ import { EmptyTab, FREQUENCY, percent } from "./entity";
 
 const NOTE = "py-2 text-meta text-fg-2";
 
+/** Descriptive 95% Wilson range of the recorded windows, not a kill probability. */
+export function rateWithRange(withItem: number, windows: number, installs: number): string {
+  const { rate, interval } = measureDropRate({ drops: withItem, kills: windows, reporters: installs }, "");
+  if (rate === null || interval === null) return "Not recorded";
+  return `${percent(rate)} (${percent(interval.lower)}–${percent(interval.upper)})${windows < DROP_SETTLE_MIN_WINDOWS ? " · few windows" : ""}`;
+}
+
+
 /** The method and the corpus time, under a table. */
 function Method({ dataAsOf, lead }: { dataAsOf: string | null; lead?: string }) {
   const asOf = dataAsOf ? ` Data as of ${dataAsOf.slice(0, 10)}.` : "";
-  return <p className={NOTE}>{lead ? `${lead}. ` : ""}{METHOD_LINE}{asOf}</p>;
+  return <p className={NOTE}>{lead ? `${lead}. ` : ""}{METHOD_LINE} Ranges describe the recorded sample (95% Wilson); windows may not be independent.{asOf}</p>;
 }
 
 /** The Drops tab of an NPC page. */
@@ -31,7 +40,7 @@ export function NpcLootPanel({ table, title, item, dataAsOf }: { table: NpcLootT
     { key: "item", header: "Item", cell: (r) => item(r.itemId) },
     { key: "with", header: "Windows with it", numeric: true, cell: (r) => r.withItem },
     { key: "windows", header: "Out of", numeric: true, cell: (r) => r.windows },
-    { key: "rate", header: FREQUENCY, numeric: true, cell: (r) => percent(r.rate) },
+    { key: "rate", header: FREQUENCY, numeric: true, cell: (r) => rateWithRange(r.withItem, r.windows, r.installs) },
     { key: "installs", header: "Installs", numeric: true, cell: (r) => r.installs },
   ];
   return <>
@@ -48,7 +57,7 @@ export function ItemSourcesPanel({ sources, title, source, dataAsOf }: { sources
     { key: "source", header: "Source", cell: source },
     { key: "with", header: "Windows with it", numeric: true, cell: (r) => r.withItem },
     { key: "windows", header: "Loot windows", numeric: true, cell: (r) => r.windows },
-    { key: "rate", header: FREQUENCY, numeric: true, cell: (r) => percent(r.rate) },
+    { key: "rate", header: FREQUENCY, numeric: true, cell: (r) => rateWithRange(r.withItem, r.windows, r.installs) },
     { key: "installs", header: "Installs", numeric: true, cell: (r) => r.installs },
     { key: "dated", header: "Windows dated", nowrap: true, cell: (r) => datedPhrase(r).replace(/^dated /, "") || "[?]" },
   ];

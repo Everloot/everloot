@@ -7,7 +7,7 @@ import { loadNames } from "@/lib/names";
 import EntityLink from "@/components/EntityLink";
 import ItemTip from "@/components/game/ItemTip";
 import { Container, DataTable, DataTitle, ResultStrip, type Column } from "@/components/ui";
-import { percent } from "../entity";
+import { rateWithRange } from "../loot-tables";
 import { listHref, listMetadata, listQuery, NoObservations, PER_PAGE, sortParam, sortRows, Unreadable, type ListQuery, type Search } from "../list-parts";
 
 const META = { title: "WoW Forever Loot Observations", description: "Observed item frequency per recorded WoW: Forever loot window, with observation and install counts. These are not kill-based drop probabilities.", path: "/database/drops" };
@@ -63,7 +63,7 @@ export default async function DropsPage(props: { searchParams?: Promise<Search> 
     },
     { key: "windows", header: "Loot windows", numeric: true, sortable: true, cell: (r) => r.kills },
     { key: "drops", header: "Item observations", numeric: true, sortable: true, cell: (r) => r.drops },
-    { key: "rate", header: "Observed frequency", numeric: true, sortable: true, cell: (r) => (r.rate === null ? "0 observed" : percent(r.rate)) },
+    { key: "rate", header: "Observed frequency", numeric: true, sortable: true, cell: (r) => (r.rate === null ? "0 observed" : rateWithRange(r.drops, r.kills, r.reporters)) },
     { key: "installs", header: "Installs", numeric: true, sortable: true, cell: (r) => r.reporters },
   ];
 
@@ -87,11 +87,12 @@ export default async function DropsPage(props: { searchParams?: Promise<Search> 
             rowKey={(r) => r.key}
             sort={sort ? { key: sort.key, direction: sort.desc ? "desc" : "asc" } : undefined}
             sortHref={(k, dir) => href({ sort: { key: k as Sort, desc: dir === "desc" } })}
-            meta={(r) => [r.sourceNpcId !== undefined ? names.npcs.get(r.sourceNpcId) ?? `NPC ${r.sourceNpcId}` : names.objects.get(r.sourceObjectId!) ?? `Object ${r.sourceObjectId}`, `${r.rate === null ? "0 observed" : percent(r.rate)} of ${r.kills} loot windows`].join(" · ")}
+            meta={(r) => [r.sourceNpcId !== undefined ? names.npcs.get(r.sourceNpcId) ?? `NPC ${r.sourceNpcId}` : names.objects.get(r.sourceObjectId!) ?? `Object ${r.sourceObjectId}`, `${r.rate === null ? "0 observed" : rateWithRange(r.drops, r.kills, r.reporters)} of ${r.kills} loot windows`].join(" · ")}
             empty={<NoObservations>No public frequencies yet; one shows here once 3 installs record loot windows from the same creature or object.</NoObservations>}
           />
         </div>
         </>}
+        <p className="py-2 text-meta text-fg-2">Ranges describe the recorded sample (95% Wilson); windows may not be independent.</p>
         {pages > 1 && <div className="mt-2">{strip}</div>}
       </article>
     </Container>
