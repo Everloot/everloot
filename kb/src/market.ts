@@ -54,6 +54,7 @@ export const TRIM_FACTOR = 3;
 export const TRIM_MIN_DAYS = 5;
 /** Most rows one realm's price file carries: the items with the most units listed. */
 export const MAX_PRICE_ROWS = 2000;
+export const MAX_PRICE_ITEMS = 100;
 export const MARKET_LIMITS = {
   realms: 40,
   itemsPerRealm: 20_000,
@@ -640,13 +641,15 @@ export function busiestHouseMarket(state: MarketState, realm: string, itemId: nu
 /**
  * The companion's price file for one realm: [itemId, market|null, min, historical, quantity, day, reporters].
  * Tuples keep the file small; at most `limit` rows, the items with the most units listed. A thin item
- * has no market value (null), only its minimum.
+ * has no market value (null), only its minimum. Optional item ids narrow the public rows before the cap.
  */
-export function marketPrices(state: MarketState, realm: string, now: Date, limit = MAX_PRICE_ROWS, house?: AuctionHouse | null) {
+export function marketPrices(state: MarketState, realm: string, now: Date, limit = MAX_PRICE_ROWS, house?: AuctionHouse | null, itemIds?: readonly number[]) {
+  const selected = itemIds ? new Set(itemIds) : null;
   return {
     realm: realmName(state, realm),
     ...(house ? { house } : {}),
-    items: realmMarket(state, realm, now, house).slice(0, limit)
+    items: realmMarket(state, realm, now, house)
+      .filter((v) => !selected || selected.has(v.itemId)).slice(0, limit)
       .map((v) => [v.itemId, v.market, v.min, v.historical, v.quantity, v.day, v.reporters] as const),
   };
 }
