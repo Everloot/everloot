@@ -276,6 +276,8 @@ frame:SetScript("OnEvent", function(_, event, arg1)
     local upgraded = EverlootDB ~= nil
     EverlootDB = EverlootDB or {}
     for k, v in pairs(defaults) do if EverlootDB[k] == nil then EverlootDB[k] = v end end
+    -- New installs leave other addons' buttons alone; existing installs keep their drawer choice.
+    if EverlootDB.toggles.buttons == nil then EverlootDB.toggles.buttons = upgraded end
     -- The census starts on only for a new install; one from before it keeps it off until the player turns it on.
     if upgraded and EverlootDB.toggles.census == nil then EverlootDB.toggles.census = false end
     -- A toggle added after this file was created takes its default: off-by-default stays off.
