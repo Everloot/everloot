@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Card, Input, SectionHeading } from "@/components/ui";
+import { Badge, Card, Input, SectionHeading } from "@/components/ui";
 import { formatCopper } from "../../../../../kb/src/profession-path";
 import { cheapestPrices, planShopping, type ListedPrice, type PlannerRecipe, type SearchRecipe } from "@/lib/profession-planner";
 import { SELECT_CLASS } from "./controls";
@@ -12,7 +12,7 @@ const HOUSES = ["Alliance","Horde","Neutral"];
 type Preferences = { realm: string; ruleset: string; houses: string[] };
 const defaults: Preferences = { realm:"",ruleset:"pvp",houses:HOUSES };
 function remember(p: Preferences) { try { localStorage.setItem(KEY,JSON.stringify(p)); } catch { /* Device storage can be unavailable. */ } }
-export default function ShoppingList({ profession, slug, recipes, from = 1, to = 300 }: { profession: string; slug: string; recipes: PlannerRecipe[]; from?: number; to?: number }) {
+export default function ShoppingList({ profession, recipes, catalog = [], from = 1, to = 300 }: { profession: string; recipes: PlannerRecipe[]; catalog?: SearchRecipe[]; from?: number; to?: number }) {
   const totalRef = useRef<HTMLParagraphElement>(null);
   const [ready,setReady] = useState(false);
   const [start,setStart] = useState(String(from));
@@ -23,7 +23,6 @@ export default function ShoppingList({ profession, slug, recipes, from = 1, to =
   const priceRequested=marketRequest>0;
   const [marketVersion,setMarketVersion] = useState(0);
   const [markets,setMarkets] = useState<Record<string,string[]>>({});
-  const [catalog,setCatalog] = useState<SearchRecipe[]>([]);
   const [listed,setListed] = useState<{key:string;rows:ListedPrice[];asOf:string|null;failed:string[]}>({key:"",rows:[],asOf:null,failed:[]});
   const [status,setStatus] = useState("Load auction prices to choose a realm.");
   const [copied,setCopied] = useState("");
@@ -34,10 +33,7 @@ export default function ShoppingList({ profession, slug, recipes, from = 1, to =
       const saved = JSON.parse(localStorage.getItem(KEY) ?? "null");
       if (saved && typeof saved.realm==="string" && typeof saved.ruleset==="string" && Array.isArray(saved.houses)) setPrefs({realm:saved.realm,ruleset:saved.ruleset,houses:saved.houses.filter((h:unknown)=>typeof h==="string" && HOUSES.includes(h))});
     } catch { /* Use the visible defaults. */ }
-    const abort = new AbortController();
-    fetch(`/tools/professions/${slug}/recipe-catalog.json`,{signal:abort.signal}).then(r=>{if(!r.ok) throw Error();return r.json();}).then(data=>setCatalog(data.recipes)).catch(()=>{});
-    return ()=>abort.abort();
-  },[slug]);
+  },[]);
   useEffect(()=>{
     if (!priceRequested) return;
     const abort = new AbortController();
@@ -85,7 +81,7 @@ export default function ShoppingList({ profession, slug, recipes, from = 1, to =
   };
   const sourceText = (name:string) => {
     const items=requirements(name);
-    return items.length ? "Teaching item (game files, unconfirmed): " + items.map(x=>`${x.name}: ${x.sources.join(", ") || "source not confirmed yet"}`).join("; ") : "Recipe item requirement: Not confirmed yet";
+    return items.length ? "Teaching item (game files, unconfirmed): " + items.map(x=>`Item ${x.itemId}: source not confirmed yet`).join("; ") : "Recipe item requirement: Not confirmed yet";
   };
   const incompleteHouses=listed.key===priceKey && listed.failed.length>0;
   const pricing=`${incompleteHouses ? "Listed prices from available houses (comparison incomplete)" : "Listed prices, cheapest house you chose"} (${prefs.houses.join(", ") || "none"}), ${prefs.realm || "no realm chosen"}, as of ${listed.key===priceKey && listed.asOf ? listed.asOf : "time not available"}.`;
@@ -113,7 +109,7 @@ export default function ShoppingList({ profession, slug, recipes, from = 1, to =
       </div>
       <fieldset><legend>Houses I can buy from</legend><div className="flex flex-wrap gap-4">{HOUSES.map(h=><label key={h} className="inline-flex min-h-11 items-center gap-2"><input type="checkbox" checked={prefs.houses.includes(h)} onChange={e=>change({...prefs,houses:e.target.checked ? [...prefs.houses,h] : prefs.houses.filter(x=>x!==h)})} />{h}</label>)}</div></fieldset>
       <p className="text-sm text-muted">{pricing} Each material shows its house and scan day. Listed minima are medians of reporters&apos; latest public scan day, not guaranteed live offers. The price feed lists only its most-listed items; missing items have no price yet.</p>
-      <p className="text-sm text-muted">Counts use the agreed path&apos;s whole crafts. Training and recipe item purchase costs are excluded. Teaching-item links from game files are unconfirmed and do not prove the item is required; other learning sources may exist. Missing links and acquisition sources are not confirmed yet. Observed sources show their report date.</p>
+      <p className="text-sm text-muted">Counts use the agreed path&apos;s whole crafts. Training and recipe item purchase costs are excluded. Teaching-item links from game files are unconfirmed and do not prove the item is required; other learning sources may exist. Missing links and acquisition sources are not confirmed yet.</p>
       {status && <p role="status" className="text-sm text-muted">{status}</p>}
       {error && <p role="status" className="text-danger">{error}</p>}
       {!ready && <p data-empty-state className="text-muted">The shopping list runs on your device. Enable JavaScript to plan a range.</p>}
@@ -126,8 +122,7 @@ export default function ShoppingList({ profession, slug, recipes, from = 1, to =
           <p>{step.fromSkill}–{step.toSkill}: {step.recipe} · {step.crafts} crafts</p>
           <p className="text-sm text-muted">Listed materials per craft: {step.copper===null ? "no price yet" : formatCopper(step.copper/step.crafts)}{step.trainingCopper!==undefined && ` · Agreed training cost (unscoped): ${step.trainingCopper===null ? "not recorded" : formatCopper(step.trainingCopper)}`}</p>
           <p className="text-sm text-muted">{sourceText(step.recipe)}</p>
-          {requirements(step.recipe).map(x=><Link key={x.itemId} href={`/database/items/${x.itemId}`} className="mr-3 text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{x.name}</Link>)}
-          {requirements(step.recipe).flatMap(x=>x.sourceLinks ?? []).map(x=><Link key={x.href} href={x.href} className="mr-3 text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{x.label}</Link>)}
+          {requirements(step.recipe).map(x=><Link key={x.itemId} href={`/database/items/${x.itemId}`} className="mr-3 text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{x.name}{x.unconfirmed && <Badge tone="files" />}</Link>)}
           <button type="button" className="btn mt-2" onClick={()=>{setSkipped(s=>[...s,step.recipe]);totalRef.current?.focus();}}>Skip this recipe: {step.recipe}</button>
         </li>)}</ul>
         {plan.gaps.map(g=><p key={g.fromSkill}>No alternative agreed recipe for {g.fromSkill}–{g.toSkill}. This range is not included in the materials.</p>)}

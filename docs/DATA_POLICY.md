@@ -449,23 +449,6 @@ The rules:
 - The maintainer review is the pull request that sets or changes the rule or adds a source. A file for a new
   build is checked against the last run's counts (`npm run kb -- name-gaps`) before it is uploaded.
 
-**Profession planning search asset.** The profession search uses a narrow, build-stamped name
-snapshot of recipe spells and the items already shown on Everloot's profession pages. A separate
-matching-build export adds numeric teaching-item links and their readable ItemSparse names, labelled
-game files, unconfirmed. This snapshot is committed and emitted as static JSON at build time for the
-site's own browser filtering. It is an exception to the private-only storage rule above for these
-displayed names; the full private name ledger and tooltip facts remain private. Recipe facts are
-from `client-recipes.json`, labelled found in game files, unconfirmed. Teaching-item links use
-numeric item-effect learning triggers and base-difficulty learn-spell relations; encrypted blocks
-are skipped, and absent links and acquisition sources say not confirmed yet. Acquisition links are a
-dated snapshot of existing public observed sold-by, dropped-by and reward-from relations, requiring
-at least three installs. They retain their observed date and source-entity link, without exposing
-install identifiers. Refresh with `cd web && node scripts/snapshot-recipe-sources.mjs`. No names are
-added to the public API, MCP or bulk data export. Refresh the narrow snapshot with `cd web && npx
-tsx scripts/snapshot-profession-names.mjs` after updating the recipe build or changing any
-name/spoiler eligibility rule; a mismatch keeps names unknown rather than borrowing them from a
-different build. Refresh teaching items with `cd kb && npx tsx scripts/export-recipe-items.mts`.
-
 **Third extension: game icons and tooltip text in embeddable cards.** Decided 2026-10-19 (Carlos
 approved it with the site structure plan). The hover card any site can show through
 `https://everloot.app/tooltips.js` and `GET /api/tooltip/<type>/<id>` may carry one item's game icon
@@ -570,6 +553,8 @@ the MCP server, the API and the bulk download. The relations are *created by* (a
 effect, `SpellEffect`), *reagent for* (`SpellReagents`), *part of set* (`ItemSet`), *same icon*
 (items that share an icon file, `Item.IconFileDataID`) and, since 2026-10-18, *profession* (the
 skill line that teaches a spell, `SkillLineAbility` and `SkillLine`, with the profession's name).
+Profession planning also uses numeric teaching-item links (`ItemEffect` learning trigger 6 or base-difficulty
+`SpellEffect` learn-spell effect 36, joined through `ItemXItemEffect`), with no item or spell names in git.
 They are facts: ids and the relation between them, with no Blizzard text and no art. The rules:
 
 - Every entry is labelled *found in game files, unconfirmed* and stamped with the build it came from,

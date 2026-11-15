@@ -6,9 +6,9 @@ import AdSlot from "@/components/AdSlot";
 import EmailCapture from "@/components/EmailCapture";
 import ClassContextChip from "@/components/classes/ClassContextChip";
 import GameIcon from "@/components/game/GameIcon";
-import { Badge, Card, Container, Contribute, DataTable, Disclosure, EmptyState, FilterBar, PageHeader, QUALITY_TEXT, SectionHeading, qualityOf, type Column } from "@/components/ui";
+import { Badge, Card, Container, Contribute, DataTable, Disclosure, EmptyState, Field, FilterBar, PageHeader, QUALITY_TEXT, SectionHeading, qualityOf, type Column } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
-import { parseClassContext, withoutClassContext } from "@/lib/class-context";
+import { classContextParams, parseClassContext, withoutClassContext } from "@/lib/class-context";
 import { dataAgeLabel } from "@/lib/data-age";
 import { loadItemTips, loadSiteAssets, loadSpellNames, type ItemTip } from "@/lib/game-assets";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, shownItemName, type ShownItemName } from "@/lib/items";
@@ -28,6 +28,8 @@ import { LINK } from "../../../database/entity";
 import { LEVEL_BRACKETS, listHref, range, rangeParam } from "../../../database/list-parts";
 import FarmAreaTable from "../../farming-routes/area-table";
 import ProfessionPicker from "../picker";
+import RecipeSearch from "../recipe-search";
+import { buildRecipeCatalog, teachingItemIds } from "@/lib/recipe-catalog";
 import ShoppingList from "../shopping-list";
 
 export const dynamic = "force-dynamic";
@@ -92,7 +94,7 @@ export default async function ProfessionPage(props: Props) {
     loadProfessions(), loadSiteAssets(), loadListNames(), loadSpellNames(CLIENT_LAYER.build.version),
   ]);
   // Names, icons and qualities of the items the recipes make and use, under the item name rule (shown-item-names.ts).
-  const ids = recipeItemIds(p.recipes).filter(shown.showsTip);
+  const ids = [...new Set([...recipeItemIds(p.recipes), ...teachingItemIds(p.recipes.map(r => r.spellId))])].filter(shown.showsTip);
   const tips: Map<number, ItemTip> = await loadItemTips(ids.length ? assets : null, ids);
   const names = new Map<number, ShownItemName | null>(ids.map((id) => [id, shownItemName(id, shown.agreed, shown.matched?.names, tips.get(id))]));
   const fileQuality = new Map(CLIENT_TAXONOMY.items.map((row) => [row[0], row[4]]));
@@ -123,6 +125,7 @@ export default async function ProfessionPage(props: Props) {
     `${listHref(path, [...Object.keys(searchParams).filter((k) => k !== "mobs").map((k): [string, string] => [k, one(searchParams[k])]), ["mobs", rangeParam(l)]])}#gather`;
 
   const spellName = (id: number) => spellNames?.names.get(id);
+  const catalog = buildRecipeCatalog(p, id => names.get(id)?.name ?? `Item ${id}`, spellName, id => names.get(id)?.source === "files");
   const players = (r: RecipeView) => { const n = spellName(r.spellId); return n ? byRecipe.get(n.trim().toLowerCase()) : undefined; };
   const icons = new Map([...(assets?.professions ?? new Map<string, { icon: string }>())].map(([k, v]) => [k, v.icon]));
 
@@ -269,8 +272,22 @@ export default async function ProfessionPage(props: Props) {
           </section>
         )}
 
+        <RecipeSearch rows={catalog} />
+        <section aria-labelledby="prof-path" className="space-y-4">
+          <SectionHeading id="prof-path" as="h2">Leveling path from player uploads</SectionHeading>
+          <Card>
+            <form method="get" action={path} className="space-y-4">
+              {context && classContextParams(context).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="From skill" name="from" defaultValue={fromSkill} inputMode="numeric" mono />
+                <Field label="To skill" name="to" defaultValue={toSkill} inputMode="numeric" mono />
+              </div>
+              <button type="submit" className="btn btn-primary">Show the path</button>
+            </form>
+          </Card>
+        </section>
         {pending && <EmptyState message={`No recipe ranges for ${p.name} yet: paths and ranges appear once 3 installs report the same recipes.`} />}
-        {view.unreachable ? <Card><p>{STORAGE_UNREACHABLE}</p></Card> : <ShoppingList slug={p.slug} profession={p.name} recipes={plannerRecipes} from={fromSkill} to={toSkill} />}
+        {view.unreachable ? <Card><p>{STORAGE_UNREACHABLE}</p></Card> : <ShoppingList catalog={catalog} profession={p.name} recipes={plannerRecipes} from={fromSkill} to={toSkill} />}
 
         {!pending && (
           <section aria-labelledby="prof-ranges">

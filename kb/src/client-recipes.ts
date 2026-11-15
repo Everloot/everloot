@@ -44,8 +44,6 @@ export const ClientRecipes = z.object({
     definitions: z.string().nullable(), extractedAt: z.string(),
   }),
   note: z.literal("ranks are SkillLineAbility's MinSkillLineRank, TrivialSkillLineRankLow (yellow) and TrivialSkillLineRankHigh (grey), 0 where the files give none; green is not stored"),
-  /** Teaching items by recipe spell; absent in older exports. */
-  recipeItems: z.record(z.string(), z.array(z.number().int().positive())).optional(),
   /** Each profession by skill line id, with its recipes and other spell count. */
   professions: z.array(z.object({ id: z.number().int(), name: z.string(), otherSpells: z.number().int(), recipes: z.array(Recipe) })),
 });
@@ -111,15 +109,9 @@ export function recipeItemsBySpell(get: Get): Record<string, number[]> {
   return out;
 }
 
-/** Only teaching items linked to recipes this consumer actually lists; absent names remain unknown. */
-export function recipeItemDetails(get: Get, spells: ReadonlySet<number>): { links: Record<string,number[]>; names: Record<string,string> } {
-  const links=Object.fromEntries(Object.entries(recipeItemsBySpell(get)).filter(([spell])=>spells.has(Number(spell))));
-  const names: Record<string,string>={};
-  for(const item of new Set(Object.values(links).flat())) {
-    const name=get("ItemSparse")?.get(item)?.Display_lang;
-    if(typeof name==="string" && name.trim()) names[item]=name.trim();
-  }
-  return {links,names};
+/** Only numeric teaching-item links for the recipe spells this consumer lists. */
+export function recipeItemDetails(get: Get, spells: ReadonlySet<number>): { links: Record<string, number[]> } {
+  return { links: Object.fromEntries(Object.entries(recipeItemsBySpell(get)).filter(([spell]) => spells.has(Number(spell)))) };
 }
 
 export function buildClientRecipes(snapshotPath: string): ClientRecipes {
@@ -130,7 +122,7 @@ export function buildClientRecipes(snapshotPath: string): ClientRecipes {
     schema: RECIPES_SCHEMA, label: CLIENT_LABEL, credit: GAME_DATA_CREDIT,
     build: { product: meta.product, buildId: meta.buildId, version: meta.version, buildConfig: meta.buildConfig, definitions: meta.definitions, extractedAt: meta.extractedAt },
     note: "ranks are SkillLineAbility's MinSkillLineRank, TrivialSkillLineRankLow (yellow) and TrivialSkillLineRankHigh (grey), 0 where the files give none; green is not stored",
-    professions: recipesByProfession(get), recipeItems: recipeItemsBySpell(get),
+    professions: recipesByProfession(get),
   });
 }
 

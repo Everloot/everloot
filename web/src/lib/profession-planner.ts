@@ -1,11 +1,11 @@
 import { professionPath, type AgreedRecipe } from "../../../kb/src/profession-path";
 export type PlannerRecipe = AgreedRecipe & { profession: string };
-export type RecipeItem = { itemId: number; name: string; sources: string[]; sourceLinks?: {label:string;href:string}[] };
+export type RecipeItem = { itemId: number; name: string; unconfirmed?: boolean; sources: string[]; sourceLinks?: {label:string;href:string}[] };
 export interface SearchRecipe {
-  profession: string; slug: string; spellId: number; name: string; itemName: string | null;
+  profession: string; slug: string; spellId: number; name: string; itemName: string | null; itemUnconfirmed?: boolean;
   yellow: number | null; grey: number | null;
   recipeItems: RecipeItem[];
-  reagents: { itemId: number; name: string; count: number }[];
+  reagents: { itemId: number; name: string; count: number; unconfirmed?: boolean }[];
 }
 export type ListedPrice = { itemId: number; house: string; copper: number; day: string };
 export function cheapestPrices(rows: ListedPrice[], houses: string[]): Record<number, ListedPrice> {

@@ -14,8 +14,6 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { parseClassContext, withClassContext, withoutClassContext } from "@/lib/class-context";
 import { CLIENT_PROFESSIONS, professionByName, professionHref, RECIPES_BUILD } from "@/lib/professions";
 
-import RecipeSearch from "./recipe-search";
-
 export const dynamic = "force-dynamic";
 
 const TITLE = "WoW Forever Profession Hubs";
@@ -63,7 +61,6 @@ export default async function ProfessionsPage(props: { searchParams: Promise<Sea
       <ClassContextChip read={read} here={withoutClassContext("/tools/professions", searchParams)} className="-mt-2 mb-6" />
 
       <div className="space-y-8">
-        <RecipeSearch />
         <section aria-labelledby="prof-list" className="space-y-4">
           <SectionHeading id="prof-list">Professions</SectionHeading>
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-professions>
