@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(__file__))
 from discord_bridge import (  # noqa: E402
-    defuse_mentions, feed_commits, feed_pull_request, is_bridged, issue_body, issue_status,
+    already_posted, announces_release, defuse_mentions, feed_commits, feed_pull_request, is_bridged, issue_body, issue_status,
     known_issues_text, over_daily_limit, snowflake_time, status_reply,
 )
 
@@ -80,5 +80,17 @@ assert feed_commits([c("feat(web): talent tiles\n\nbody"), c("Changes: refresh b
 assert feed_commits([c("fix: x", user=None)]) == ["[`abcdef1`](https://x/c) fix: x · Carlos"]
 assert not feed_pull_request({"head": {"ref": "data/changes"}})
 assert feed_pull_request({"head": {"ref": "game-build/wow_classic-70450-1a2b3c4d"}})
+
+# Releases: addon and desktop tags are announced, once; nightly builds and the protocol package are not.
+assert announces_release("addon-v0.3.23") and announces_release("desktop-v0.1.22")
+assert announces_release("addon-v0.4.0-beta.1")
+assert not announces_release("nightly-20261115.37")
+assert not announces_release("protocol-v2.2.0")
+assert not announces_release("addon-v0.3.23/../../x") and not announces_release("") and not announces_release(None)
+post = lambda tag, author="1": {"author": {"id": author}, "embeds": [{"title": "x", "footer": {"text": tag}}]}
+assert already_posted("desktop-v0.1.22", [post("addon-v0.3.23"), post("desktop-v0.1.22")], "1")
+assert not already_posted("desktop-v0.1.22", [post("desktop-v0.1.22", author="2")], "1")
+assert not already_posted("desktop-v0.1.22", [post("desktop-v0.1.21"), {"author": {"id": "1"}, "embeds": []}], "1")
+assert not already_posted("addon-v0.3.23", [{"author": {"id": "1"}, "content": "hi"}], "1")
 
 print("discord_bridge: all tests passed")

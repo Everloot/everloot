@@ -2,7 +2,9 @@
 
   schedule, issues  new #bug-reports posts become GitHub issues; issue status flows back to the post
                     as a tag and a reply; #known-issues lists open issues labelled known-issue
-  release           posts the release to #version-updates
+  release           posts an addon or desktop release to #updates, once. Releases made with the workflow
+                    token start no workflows, so the release workflows also dispatch this one with
+                    release_tag; whichever arrives second finds the post and skips it
   discussion        posts the new discussion to #discussions
   push to main      posts the commits to #github-feed
   pull_request_target (opened)  posts the pull request to #github-feed
@@ -112,6 +114,19 @@ def known_issues_text(issues: list[dict]) -> str:
     if more > 0:
         rows.append(f"…and {more} more on GitHub.")
     return "\n".join(rows)
+
+
+ANNOUNCED_TAG = re.compile(r"(addon|desktop)-v[0-9][0-9A-Za-z.-]*")
+
+
+def announces_release(tag: str) -> bool:
+    """Addon and desktop releases go to #updates; nightly builds and the protocol package don't."""
+    return bool(ANNOUNCED_TAG.fullmatch(tag or ""))
+
+
+def already_posted(tag: str, messages: list[dict], me: str) -> bool:
+    return any(m["author"]["id"] == me and any((e.get("footer") or {}).get("text") == tag for e in m.get("embeds") or [])
+               for m in messages)
 
 
 def feed_commits(commits: list[dict]) -> list[str]:
@@ -260,6 +275,13 @@ def update_known_issues() -> None:
 
 def post_release(release: dict) -> None:
     tag = release["tag_name"]
+    if not announces_release(tag):
+        print(f"{tag}: not announced in Discord")
+        return
+    me = discord("GET", "/users/@me")["id"]
+    if already_posted(tag, discord("GET", f"/channels/{VERSION_UPDATES}/messages?limit=50"), me):
+        print(f"{tag}: already in #updates")
+        return
     addon = tag.startswith("addon-")
     msg = say(VERSION_UPDATES, {"title": release.get("name") or tag, "url": release["html_url"],
                                 "description": (release.get("body") or "")[:3500], "footer": {"text": tag}},
@@ -292,8 +314,13 @@ def main() -> None:
     name = os.environ["GITHUB_EVENT_NAME"]
     with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as f:
         event = json.load(f)
+    tag = os.environ.get("RELEASE_TAG", "")
     if name == "release":
         post_release(event["release"])
+    elif name == "workflow_dispatch" and tag:
+        if not announces_release(tag):
+            raise RuntimeError(f"release_tag {tag!r} is not an addon-v* or desktop-v* tag")
+        post_release(github("GET", f"/repos/{REPO}/releases/tags/{tag}"))
     elif name == "discussion":
         post_discussion(event["discussion"])
     elif name == "push":
