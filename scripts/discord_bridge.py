@@ -2,6 +2,7 @@
 
   schedule, issues  new #bug-reports posts become GitHub issues; issue status flows back to the post
                     as a tag and a reply; #known-issues lists open issues labelled known-issue
+  schedule          also catches up stable addon/app releases from the last seven days, without pings
   release           posts the release to #version-updates
   discussion        posts the new discussion to #discussions
   push to main      posts the commits to #github-feed
@@ -258,9 +259,9 @@ def update_known_issues() -> None:
         discord("POST", f"/channels/{KNOWN_ISSUES}/messages", {"embeds": [embed], "allowed_mentions": NO_PINGS})
 
 
-def post_release(release: dict) -> None:
+def post_release(release: dict, *, ping: bool = True) -> None:
     tag = release["tag_name"]
-    addon = tag.startswith("addon-")
+    addon = ping and tag.startswith("addon-")
     msg = say(VERSION_UPDATES, {"title": release.get("name") or tag, "url": release["html_url"],
                                 "description": (release.get("body") or "")[:3500], "footer": {"text": tag}},
               content=f"<@&{PING_ADDON}>" if addon else "", roles=[PING_ADDON] if addon else [])
@@ -268,6 +269,46 @@ def post_release(release: dict) -> None:
         discord("POST", f"/channels/{VERSION_UPDATES}/messages/{msg['id']}/crosspost")
     except RuntimeError as e:
         print(f"crosspost: {e}")
+
+
+def catch_up_releases(now: datetime | None = None) -> None:
+    """Backfill seven days of stable app/addon releases, silently. No workflows need changing."""
+    now = now or datetime.now(timezone.utc)
+    since = now - timedelta(days=7)
+    me = discord("GET", "/users/@me")["id"]
+    seen = set()
+    before = ""
+    # Read all announcement history: unrelated messages must not hide a release footer.
+    while True:
+        messages = discord("GET", f"/channels/{VERSION_UPDATES}/messages?limit=100" + before)
+        for message in messages:
+            if message.get("author", {}).get("id") == me:
+                for embed in message.get("embeds", []):
+                    tag = embed.get("footer", {}).get("text")
+                    if tag:
+                        seen.add(tag)
+        if len(messages) < 100:
+            break
+        before = "&before=" + messages[-1]["id"]
+    page = 1
+    while True:
+        releases = github("GET", f"/repos/{REPO}/releases?per_page=100&page={page}")
+        for release in releases:
+            tag = release.get("tag_name", "")
+            if (not tag.startswith(("addon-v", "desktop-v")) or "nightly" in tag.lower()
+                    or release.get("draft") or release.get("prerelease") or tag in seen):
+                continue
+            try:
+                published = datetime.fromisoformat((release.get("published_at") or "").replace("Z", "+00:00"))
+                recent = since <= published <= now
+            except (ValueError, TypeError):
+                recent = False
+            if recent:
+                post_release(release, ping=False)
+                seen.add(tag)
+        if len(releases) < 100:
+            break
+        page += 1
 
 
 def post_discussion(d: dict) -> None:
@@ -311,6 +352,7 @@ def main() -> None:
         for issue in bridged_issues(2):
             sync_status(issue, tags)
         update_known_issues()
+        catch_up_releases()
 
 
 if __name__ == "__main__":

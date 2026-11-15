@@ -81,4 +81,75 @@ assert feed_commits([c("fix: x", user=None)]) == ["[`abcdef1`](https://x/c) fix:
 assert not feed_pull_request({"head": {"ref": "data/changes"}})
 assert feed_pull_request({"head": {"ref": "game-build/wow_classic-70450-1a2b3c4d"}})
 
-print("discord_bridge: all tests passed")
+
+# Scheduled release catch-up uses fake HTTP only; never send a real Discord post.
+import json
+import tempfile
+from unittest.mock import patch
+import discord_bridge as bridge
+
+stamp = datetime.now(timezone.utc)
+def release(tag, age=1, **extra):
+    return {"tag_name": tag, "published_at": (stamp - timedelta(days=age)).isoformat(),
+            "html_url": "https://github.com/Everloot/everloot/releases/tag/" + tag,
+            "body": "Release notes", **extra}
+
+releases = [release("addon-v1"), release("desktop-v1"), release("addon-v2"),
+            release("addon-v3", prerelease=True), release("nightly-20261115"),
+            release("addon-v4-nightly.1"), release("protocol-v1"),
+            release("desktop-v0", age=8), release("desktop-vfuture", age=-1),
+            release("desktop-vdraft", draft=True), release("addon-vbad", published_at=None)]
+posted = []
+reads = []
+def fake_github(method, path, body=None):
+    assert method == "GET", (method, path)
+    reads.append(path)
+    if path.endswith("page=1"): return releases + [release("addon-v1")] * (100 - len(releases))
+    if path.endswith("page=2"): return [release("desktop-v2")]
+    raise AssertionError(path)
+
+def fake_discord(method, path, body=None):
+    if method == "GET" and path == "/users/@me": return {"id": "bot"}
+    if method == "GET" and "messages?" in path:
+        if "before=" in path:
+            return [{"id": "1", "author": {"id": "bot"}, "embeds": [{"footer": {"text": "desktop-v1"}}]}] + [
+                {"id": "posted", "author": {"id": "bot"}, "embeds": p["embeds"]} for p in posted]
+        return [{"id": str(200-i), "author": {"id": "other"},
+                 "embeds": [{"footer": {"text": "addon-v2"}}]} for i in range(100)]
+    if method == "POST" and path.endswith("/messages"):
+        posted.append(body)
+        return {"id": "new"}
+    if method == "POST" and path.endswith("/crosspost"): return {}
+    raise AssertionError((method, path))
+
+with tempfile.NamedTemporaryFile(mode="w", suffix=".json") as event:
+    json.dump({}, event); event.flush()
+    with patch.dict(os.environ, GITHUB_EVENT_NAME="schedule", GITHUB_EVENT_PATH=event.name), \
+         patch.object(bridge, "github", side_effect=fake_github), \
+         patch.object(bridge, "discord", side_effect=fake_discord), \
+         patch.object(bridge, "forum_tags", return_value={}), \
+         patch.object(bridge, "open_new_reports"), \
+         patch.object(bridge, "bridged_issues", return_value=[]), \
+         patch.object(bridge, "update_known_issues"):
+        bridge.main()
+        bridge.main()  # A later sync sees the posted footers and sends nothing twice.
+assert sorted(p["embeds"][0]["footer"]["text"] for p in posted) == ["addon-v1", "addon-v2", "desktop-v2"]
+assert all(p["allowed_mentions"] == {"parse": [], "roles": []} and not p.get("content") for p in posted)
+assert len(reads) == 4
+print("discord_bridge: scheduled release catch-up tests passed")
+
+# The seven-day boundary is inclusive; older and future dates do not backfill.
+posted.clear()
+boundaries = [release("addon-vboundary", age=7), release("desktop-vnow", age=0),
+              release("addon-vexpired", published_at=(stamp-timedelta(days=7, seconds=1)).isoformat())]
+with patch.object(bridge, "github", return_value=boundaries), \
+     patch.object(bridge, "discord", side_effect=fake_discord):
+    bridge.catch_up_releases(stamp)
+assert sorted(p["embeds"][0]["footer"]["text"] for p in posted) == ["addon-vboundary", "desktop-vnow"]
+# Direct release events retain the existing addon role notification.
+posted.clear()
+with patch.object(bridge, "discord", side_effect=fake_discord):
+    bridge.post_release(release("addon-vdirect"))
+assert posted[0]["content"] == f"<@&{bridge.PING_ADDON}>"
+assert posted[0]["allowed_mentions"] == {"parse": [], "roles": [bridge.PING_ADDON]}
+print("discord_bridge: all tests passed (including date boundaries and direct releases)")
