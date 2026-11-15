@@ -7,6 +7,8 @@
  * how many windows from how many installs it has, and no item is tied to a source. Recorder windows never enter
  * here; `pending-loot.ts` counts them apart.
  */
+import recheckFile from "../curated/recheck.json";
+import { RecheckFile, type RecheckScope } from "./coverage.js";
 import { countsAsKillOrGather, INDEPENDENT_INSTALLS, isCountedLootEvidence } from "./drop-rollup.js";
 
 /** A source's windows: how many, from how many installs, and the first and last capture day (UTC). */
@@ -176,5 +178,17 @@ export function shortLine(short: { windows: number; installs: number }): string 
   return `${plural(short.windows, "loot window", "loot windows")} with this item from ${plural(short.installs, "install", "installs")}, on sources fewer than ${INDEPENDENT_INSTALLS} installs have looted. A rate needs windows from ${INDEPENDENT_INSTALLS} installs on the same source.`;
 }
 
+/** The wording changes at the drops restart, never at a hard-coded release date. */
+export function lootWindowNote(scopes: readonly RecheckScope[]): string {
+  return scopes.some((s) => s.type === "drops")
+    ? "Empty loot windows are counted, including empty corpses tied to a source by the addon."
+    : "Windows recorded before the drops restart did not include empty corpses, so rates for items that do not always drop can read high.";
+}
+
 /** How the rates under a table were made. */
-export const METHOD_LINE = "Observed frequency is the loot windows holding the item out of the loot windows opened on the source, from windows the game's loot API attributed and windows that held nothing, recorded by the Everloot addon. A window is a loot, not a kill.";
+export function methodLine(scopes: readonly RecheckScope[]): string {
+  return `Observed frequency is the loot windows holding the item out of the loot windows opened on the source, recorded by the Everloot addon. ${lootWindowNote(scopes)} A window is a loot, not a kill.`;
+}
+
+const parsedRecheck = RecheckFile.safeParse(recheckFile);
+export const METHOD_LINE = methodLine(parsedRecheck.success ? parsedRecheck.data.scopes : []);

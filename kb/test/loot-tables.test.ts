@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { lootWindowsFromRecords, rollupDrops } from "../src/drop-rollup.js";
-import { itemDropSources, lootTablesFromRecords, missingLine, npcLootTable, objectLootRows, shortLine } from "../src/loot-tables.js";
+import { itemDropSources, lootTablesFromRecords, methodLine, missingLine, npcLootTable, objectLootRows, shortLine } from "../src/loot-tables.js";
 import { pendingForNpc, pendingLootFromRecords } from "../src/pending-loot.js";
 
 const asOf = "2026-10-21T00:00:00.000Z";
@@ -157,4 +157,17 @@ test("an object's rows come only once 3 installs looted it, with the same number
   expect(rows[0]).toEqual(itemDropSources(rated, 12).rows[0]);
   expect(objectLootRows(rated, 5)).toEqual([]);
   expect(objectLootRows(rated, 404)).toEqual([]);
+});
+
+test("rate notes warn that pre-restart windows missed empty corpses", () => {
+  expect(methodLine([])).toContain("did not include empty corpses");
+  expect(methodLine([])).toContain("rates for items that do not always drop can read high");
+  expect(methodLine([{ type: "quests", since: asOf, source: "test" }])).toContain("did not include empty corpses");
+});
+
+test("rate notes say empty windows count once a drops restart scope exists", () => {
+  const text = methodLine([{ type: "drops", since: asOf, source: "test" }]);
+  expect(text).toContain("Empty loot windows are counted");
+  expect(text).not.toContain("can read high");
+  expect(text).toContain("A window is a loot, not a kill");
 });
