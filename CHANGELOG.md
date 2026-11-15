@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Addon: recipe and trainer observations keep optional profession skill-line IDs; trainer links also retain spell or product IDs when available, alongside localized names.
 - Addon: a kill's loot window with nothing in it is now recorded, tied to the one dead creature you could loot (interact, mouseover or target), as a loot row with no items and no coin, once per corpse, and the site's drop rates, loot tables and open data count it in the source's windows (protocol 2.3.0, `sourceEvidence: "empty-window"`). Until now an empty corpse never reached the site, so drop rates for anything that does not always drop read too high. Needs an in-game check before release.
 - Site: prepare opt-in private boss-kill sync for linked characters; awaiting migration and policy approval.
 - Site: the gold ledger page shows where your gold went for the last 7, 30 or 90 days: spent, earned, net and spent per day against the period before, each spending category's share and change, a daily spending chart by category, the largest single payments, auction sales by item with the house cut and sales still waiting in the mailbox, and resale: each item you both bought and sold with its average paid, average received after the cut and profit. Gold history is a line over real time, and the week card stacks on phones.
@@ -360,6 +361,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 ### Changed
 - Addon: grouped auction sales show paid transactions per day and paid units per day separately beside the last sold date. Pending and unmatched notices affect neither rate; in-game layout verification is required before release.
 - Site: profession shopping lists total materials for a chosen skill range, let players skip recipes, compare listed prices from selected auction houses, and search recipes by name, recipe item or material with a skill filter.
+- Site: share private character-sync validation with the companion through a separate protocol export; public uploads still reject private-only rows.
 - Site: Reuse cold-start aggregate and game-art reads and load the build label from a small generated stamp.
 - Site: auction item pages (`/tools/auctions/:realm/:itemId`) are kept in the edge cache for five minutes, like the browse pages, so repeat requests and crawlers stop re-rendering them.
 - Site: reuse public MCP discovery metadata within each mount while keeping request ids, access checks and account tools separate.
