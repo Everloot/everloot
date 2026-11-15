@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, expect, test, vi } from "vitest";
 import { Checklist, CopyMacro, KeyboardMap } from "./controls";
-import { STARTER_MACROS } from "@/data/reference-spells";
+import { CLASS_LAYOUTS } from "@/data/reference-spells";
 
 let root: Root | undefined;
 let host: HTMLDivElement;
@@ -40,7 +40,7 @@ test("checklists restore valid choices and ignore malformed saved data", async (
 test("Copy writes exactly the displayed macro, and reports clipboard failure", async () => {
   const writeText = vi.fn().mockResolvedValue(undefined);
   vi.stubGlobal("navigator", { clipboard: { writeText } });
-  await mount(<CopyMacro text={STARTER_MACROS[0].text} label="Warrior" />);
+  await mount(<CopyMacro text="/cast Example spell" label="Warrior" />);
   await act(async () => host.querySelector("button")!.click());
   expect(writeText).toHaveBeenCalledWith(host.querySelector("pre")!.textContent);
   expect(host.querySelector("pre")!.tabIndex).toBe(0);
@@ -52,7 +52,7 @@ test("Copy writes exactly the displayed macro, and reports clipboard failure", a
 });
 
 test("class tabs support arrows and keyboard buttons expose persistent role information", async () => {
-  await mount(<KeyboardMap />);
+  await mount(<KeyboardMap layouts={CLASS_LAYOUTS} />);
   const tabs = host.querySelectorAll<HTMLButtonElement>('[role="tab"]');
   expect(tabs).toHaveLength(9);
   tabs[0].focus();
@@ -66,4 +66,15 @@ test("class tabs support arrows and keyboard buttons expose persistent role info
   expect(host.querySelector('[role="status"]')!.textContent).toContain("Not confirmed yet");
   expect(key.hasAttribute("aria-describedby")).toBe(false);
   expect(host.querySelector('[data-key="1"]')!.getAttribute("aria-label")).toContain("Unassigned");
+});
+
+test("keyboard names and private tooltip text carry the unconfirmed marker; ids remain readable without names", async () => {
+  await mount(<KeyboardMap layouts={{ warrior: { defensive: { id: 12975, name: "Example private ability", evidence: "Example private restriction" }, cooldowns: { id: 12328 } } }} />);
+  const defensive = host.querySelector<HTMLButtonElement>('[data-key="F"]')!;
+  expect(defensive.getAttribute("aria-label")).toContain("Example private ability");
+  expect(host.querySelector('[data-badge="files"]')?.getAttribute("title")).toBe("From the game files, not yet confirmed by players");
+  expect(host.textContent).toContain("Spell 12328");
+  await act(async () => defensive.click());
+  expect(host.querySelector('[role="status"]')!.textContent).toContain("Example private restriction");
+  expect(host.querySelector('[role="status"] [data-badge="files"]')).not.toBeNull();
 });

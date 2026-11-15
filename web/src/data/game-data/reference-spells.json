@@ -1,0 +1,109 @@
+{
+  "build": {
+    "product": "wowf",
+    "buildId": 70938,
+    "version": "1.60.1.70938",
+    "buildConfig": "3627b099867bfde3e37a17cf44f69cdc",
+    "extractedAt": "2026-11-14T04:53:40.386Z"
+  },
+  "label": "Found in game files, unconfirmed in play. Talent-dependent abilities require the matching talent.",
+  "credit": "Game data \u00a9 Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence.",
+  "layouts": {
+    "warrior": {
+      "defensive": {
+        "id": 12975
+      },
+      "crowd-control": {
+        "id": 12809
+      },
+      "cooldowns": {
+        "id": 12328
+      }
+    },
+    "paladin": {
+      "defensive": {
+        "id": 20925
+      },
+      "cooldowns": {
+        "id": 20216
+      },
+      "crowd-control": {
+        "id": 20066
+      }
+    },
+    "hunter": {
+      "crowd-control": {
+        "id": 19503
+      },
+      "cooldowns": {
+        "id": 19574
+      },
+      "defensive": {
+        "id": 19263
+      }
+    },
+    "rogue": {
+      "crowd-control": {
+        "id": 14251
+      },
+      "cooldowns": {
+        "id": 13750
+      },
+      "defensive": {
+        "id": 14278
+      }
+    },
+    "priest": {
+      "interrupt": {
+        "id": 15487
+      },
+      "cooldowns": {
+        "id": 10060
+      },
+      "defensive": {
+        "id": 15473
+      },
+      "crowd-control": {
+        "id": 15407
+      }
+    },
+    "shaman": {
+      "cooldowns": {
+        "id": 16188
+      }
+    },
+    "mage": {
+      "defensive": {
+        "id": 11958
+      },
+      "crowd-control": {
+        "id": 11113
+      },
+      "cooldowns": {
+        "id": 12042
+      }
+    },
+    "warlock": {
+      "defensive": {
+        "id": 19028
+      },
+      "crowd-control": {
+        "id": 18223
+      },
+      "cooldowns": {
+        "id": 18708
+      }
+    },
+    "druid": {
+      "interrupt": {
+        "id": 1238122
+      },
+      "cooldowns": {
+        "id": 17116
+      },
+      "defensive": {
+        "id": 24858
+      }
+    }
+  }
+}

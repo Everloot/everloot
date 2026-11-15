@@ -13,7 +13,7 @@ export const FIRST_WEEK: ChecklistItem[] = [
 // Preparation prompts are advice. Recipe membership proves an item's presence, not its live effects.
 export const RAID_CHECKLIST: ChecklistItem[] = [
   { id: "raid", text: "Choose a raid and confirm your group’s meeting time, entrance and assigned role." },
-  { id: "amulet", text: "For Onyxia, earn the Drakefire Amulet and carry it in your inventory. Blizzard says it need not be equipped." },
+  { id: "amulet", text: "For Onyxia, earn the amulet Blizzard requires and carry it in your inventory. Blizzard says it need not be equipped." },
   { id: "amulet-record", text: "Compare item 16309 with the amulet in game. This candidate’s Forever identity is not confirmed here.", href: "/database/items/16309", linkText: "Item 16309 — found in the client relationship data" },
   { id: "first-aid", text: "Check First Aid recipe output 14530 in game before treating it as a usable raid supply.", href: "/database/items/14530", linkText: "First Aid output item 14530" },
   { id: "first-aid-13446", text: "Check First Aid recipe output 13446 for its effect, requirements and cooldown before packing it.", href: "/database/items/13446", linkText: "First Aid output item 13446" },

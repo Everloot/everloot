@@ -65,3 +65,5 @@ game-file export is stamped separately (currently 1.60.1.70634); refresh it from
 `python scripts/build-instance-map-names.py /path/to/snapshot.sqlite` at the repository root, then regenerate Lua.
 World bosses 2789, 2791, 2804 and 2832 always come from the game files, explicitly unconfirmed.
 `web/scripts/instance-data.test.ts` checks that the committed Lua matches these sources exactly.
+
+`reference-spells.json` is a manually selected subset of `client-class-spells.json` for the reference guides: spell ids only, grouped by class and suggested role. It carries the build stamp and Blizzard credit above; names and tooltip text stay in private storage under DATA_POLICY.md’s “Item set and spell names from the game files” rule and “The talent catalog” tooltip asset rule. Definition ids for private talent tooltips are looked up from the existing talent catalogs, never duplicated here. Roles and key placements are editorial suggestions, not additional extracted spell facts.

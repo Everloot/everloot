@@ -102,6 +102,8 @@ const root = join(__dirname, "../../../..");
 
 // The pages that show Blizzard's art, and the modules that read it for them. Nothing else may.
 const SHOWS_ART = new Set([
+  // Reference pages follow the spell page rule: private spell names and tooltip text, pages only, unconfirmed.
+  "web/src/lib/reference-spell-names.ts",
   // Lightweight armory equipment icons and race/class portrait fallback.
   "web/src/app/armory/profile.tsx", "web/src/app/armory/[region]/[slug]/page.tsx",
   // Approved entity share icons use the same page art switch and item visibility rule.

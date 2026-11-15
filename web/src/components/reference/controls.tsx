@@ -2,9 +2,9 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { CodeBlock, CopyButton } from "@/components/ui";
+import { Badge, CodeBlock, CopyButton } from "@/components/ui";
 import { tabClass } from "@/components/ui/tab-style";
-import { CLASS_LAYOUTS, REFERENCE_CLASSES, type AbilityRole } from "@/data/reference-spells";
+import { REFERENCE_CLASSES, type AbilityRole, type ReferenceLayouts } from "@/data/reference-spells";
 
 const BUTTON = "rounded-control border border-line bg-panel px-3 py-2 text-sm text-fg hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent";
 export interface ChecklistItem { id: string; text: string; href?: string; linkText?: string }
@@ -56,13 +56,13 @@ const KEYS: { key: string; role?: AbilityRole; movement?: string }[][] = [
 ];
 const className = (name: string) => name[0].toUpperCase() + name.slice(1);
 
-export function KeyboardMap() {
+export function KeyboardMap({ layouts }: { layouts: ReferenceLayouts }) {
   const [selected, setSelected] = useState(0);
   const [detail, setDetail] = useState<ReactNode>("Select a key to read its purpose. Every suggested binding can be changed in game.");
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
   const id = useId();
   const classSlug = REFERENCE_CLASSES[selected];
-  const layout = CLASS_LAYOUTS[classSlug];
+  const layout = layouts[classSlug] ?? {};
   function select(index: number, focus = false) {
     setSelected(index); setDetail("Select a key to read its purpose. Every suggested binding can be changed in game.");
     if (focus) tabs.current[index]?.focus();
@@ -81,12 +81,12 @@ export function KeyboardMap() {
       <p className="text-sm text-muted">Suggested layout, not the client defaults. This map covers a left-hand keyboard cluster. Number keys are left for your own attacks or heals.</p>
       <div className="space-y-2" aria-label={`${className(classSlug)} keyboard map`}>{KEYS.map((row, i) => <div key={i} className="flex flex-wrap gap-2">{row.map(({ key, role, movement }) => {
         const spell = role ? layout[role] : undefined;
-        const purpose = movement ?? (role ? `${ROLES[role]}: ${spell?.name ?? "Not confirmed yet"}` : "Unassigned: choose your own ability");
-        return <button key={key} type="button" data-key={key} aria-label={`${key}: ${purpose}`} className={`${BUTTON} min-h-16 min-w-16 flex-1`} onClick={() => setDetail(<>{key}: {purpose}{spell && <span className="mt-2 block">Game-file tooltip: {spell.evidence.replaceAll("[?]", "[Not confirmed yet]")}</span>}</>)}><span className="block font-mono font-semibold">{key}</span><span className="block text-xs text-muted">{movement ?? (role ? ROLES[role] : "Unassigned")}</span></button>;
+        const purpose = movement ?? (role ? `${ROLES[role]}: ${(spell ? spell.name ?? `Spell ${spell.id}` : "Not confirmed yet")}` : "Unassigned: choose your own ability");
+        return <button key={key} type="button" data-key={key} aria-label={`${key}: ${purpose}`} className={`${BUTTON} min-h-16 min-w-16 flex-1`} onClick={() => setDetail(<>{key}: {purpose}{spell?.name && <Badge tone="files" />}{spell?.evidence && <span className="mt-2 block">Game-file tooltip: {spell.evidence.replaceAll("[?]", "[Not confirmed yet]")}</span>}</>)}><span className="block font-mono font-semibold">{key}</span><span className="block text-xs text-muted">{movement ?? (role ? ROLES[role] : "Unassigned")}</span></button>;
       })}</div>)}</div>
       <p role="status" className="rounded-card border border-line bg-panel p-4">{detail}</p>
       <p className="text-sm text-muted">Unresolved tooltip values are marked “Not confirmed yet”. Restrictions in the tooltip still apply.</p>
-      <dl className="space-y-3">{Object.entries(ROLES).map(([role, label]) => { const spell = layout[role as AbilityRole]; return <div key={role}><dt className="font-semibold">{label}</dt><dd>{spell ? <Link href={`/database/spells/${spell.id}`} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{spell.name}</Link> : "Not confirmed yet — left empty in this draft."}</dd></div>; })}</dl>
+      <dl className="space-y-3">{Object.entries(ROLES).map(([role, label]) => { const spell = layout[role as AbilityRole]; return <div key={role}><dt className="font-semibold">{label}</dt><dd>{spell ? <><Link href={`/database/spells/${spell.id}`} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{spell.name ?? `Spell ${spell.id}`}</Link>{spell.name && <> <Badge tone="files" /></>}</> : "Not confirmed yet — left empty in this draft."}</dd></div>; })}</dl>
     </div>
   </div>;
 }
