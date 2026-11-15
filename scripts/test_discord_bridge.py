@@ -4,8 +4,10 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(__file__))
+import discord_bridge  # noqa: E402
 from discord_bridge import (  # noqa: E402
-    already_posted, announces_release, defuse_mentions, feed_commits, feed_pull_request, is_bridged, issue_body, issue_status,
+    already_posted, announces_release, defuse_mentions, feed_commits, greeting, idea_reply, idea_status, joins_to_greet, kind_of,
+    weekly_text, feed_pull_request, is_bridged, issue_body, issue_status,
     known_issues_text, over_daily_limit, snowflake_time, status_reply,
 )
 
@@ -92,5 +94,89 @@ assert already_posted("desktop-v0.1.22", [post("addon-v0.3.23"), post("desktop-v
 assert not already_posted("desktop-v0.1.22", [post("desktop-v0.1.22", author="2")], "1")
 assert not already_posted("desktop-v0.1.22", [post("desktop-v0.1.21"), {"author": {"id": "1"}, "embeds": []}], "1")
 assert not already_posted("addon-v0.3.23", [{"author": {"id": "1"}, "content": "hi"}], "1")
+
+# Suggestions: `planned` label and the close reason decide the tag; the kind comes from the label.
+assert idea_status(issue(labels=["idea", "from-discord"])) == "Under review"
+assert idea_status(issue(labels=["idea", "planned"])) == "Planned"
+assert idea_status(issue("closed", ["idea", "planned"], reason="completed")) == "Shipped"
+assert idea_status(issue("closed", ["idea"], reason="not_planned")) == "Declined"
+for s in ("Under review", "Planned", "Shipped", "Declined"):
+    assert "issues/9" in idea_reply(s, issue())
+assert kind_of(issue(labels=["idea", "from-discord"])) == "idea" and kind_of(issue(labels=["bug", "from-discord"])) == "bug"
+assert "in #suggestions:" in issue_body(thread, starter, [], "suggestions")
+
+# Greeting: only Discord's "joined" messages (type 7) from the last hour that the bot hasn't answered.
+now = datetime(2026, 11, 15, 12, 0, tzinfo=timezone.utc)
+def snow(at):  # a snowflake for a time
+    return str((int(at.timestamp() * 1000) - 1420070400000) << 22)
+join = {"id": snow(now - timedelta(minutes=20)), "type": 7, "author": {"id": "42"}}
+old_join = {"id": snow(now - timedelta(hours=3)), "type": 7, "author": {"id": "43"}}
+chat = {"id": snow(now - timedelta(minutes=5)), "type": 0, "author": {"id": "44"}}
+assert joins_to_greet([chat, join, old_join], "bot", now) == [join]
+reply = {"id": snow(now), "type": 19, "author": {"id": "bot"}, "message_reference": {"message_id": join["id"]}}
+assert joins_to_greet([reply, join], "bot", now) == []
+assert "<@42>" in greeting("42") and "<@204042107856486401>" in greeting("42")
+
+# Weekly post: new things everywhere plus addon and app fixes, newest first, the limit shared across areas.
+pr = lambda title, n=1, day=1: {"title": title, "html_url": f"https://github.com/Everloot/everloot/pull/{n}",
+                                "pull_request": {"merged_at": f"2026-11-{day:02d}T10:00:00Z"}}
+week = weekly_text([pr("feat(web): show one-day auction price changes", 1, 3), pr("chore(web): bump hono"), pr("fix(addon): name uploads", 2),
+                    pr("fix(web): sitemap answers 503"), pr("perf(mcp): cache answers", 3), pr("feat(companion): tray icon", 4),
+                    pr("feat(web): newer thing", 5, 9), pr("data(game-data): refresh")], "MORE")
+assert week.splitlines() == ["**Site**", "• [Newer thing](https://github.com/Everloot/everloot/pull/5)",
+                             "• [Show one-day auction price changes](https://github.com/Everloot/everloot/pull/1)",
+                             "**Addon**", "• [Name uploads](https://github.com/Everloot/everloot/pull/2)",
+                             "**Desktop App**", "• [Tray icon](https://github.com/Everloot/everloot/pull/4)"], week
+assert weekly_text([pr("chore(kb): x"), pr("docs(web): y"), pr("fix(web): z")], "MORE") == ""
+many = weekly_text([pr(f"feat(web): thing {i}", i, 1 + i % 28) for i in range(30)] + [pr("feat(addon): one", 99)], "MORE", limit=15)
+assert many.count("• ") == 15 and "[One]" in many and many.endswith("…and 16 more: MORE"), many
+
+# Wiring: a sync run against fake Discord and GitHub turns one new post in each forum into the right issue,
+# greets a fresh join once, and leaves the rest alone.
+calls = []
+BUG_TAGS = [{"name": n, "id": "b" + n} for n in ("Addon", "Website", "MCP / AI", "Desktop") + discord_bridge.STATUS_TAGS]
+IDEA_TAG_LIST = [{"name": n, "id": "i" + n} for n in discord_bridge.IDEA_TAGS]
+fresh = {"id": snow(datetime.now(timezone.utc) - timedelta(minutes=2)), "type": 7, "author": {"id": "77"}}
+def fake_discord(method, path, body=None):
+    calls.append((method, path, body))
+    if path == "/users/@me":
+        return {"id": "bot"}
+    if path == f"/channels/{discord_bridge.BUGS}":
+        return {"available_tags": BUG_TAGS}
+    if path == f"/channels/{discord_bridge.IDEAS}":
+        return {"available_tags": IDEA_TAG_LIST}
+    if path.endswith("/threads/active"):
+        return {"threads": [{"id": "900", "parent_id": discord_bridge.BUGS, "owner_id": "5", "name": "Map pins vanish", "applied_tags": ["bAddon"]},
+                            {"id": "901", "parent_id": discord_bridge.IDEAS, "owner_id": "6", "name": "Dark mode", "applied_tags": []}]}
+    if "/threads/archived/" in path:
+        return {"threads": []}
+    if path in ("/channels/900/messages/900", "/channels/901/messages/901"):
+        return {"author": {"username": "player"}, "content": "text", "attachments": []}
+    if path.startswith(f"/channels/{discord_bridge.GENERAL}/messages?"):
+        return [fresh]
+    if path.startswith(f"/channels/{discord_bridge.KNOWN_ISSUES}/messages"):
+        return [] if method == "GET" else {}
+    return {"id": "m1"}
+opened = []
+def fake_github(method, path, body=None):
+    if method == "POST" and path.endswith("/issues"):
+        opened.append(body)
+        return {"number": len(opened), "html_url": f"https://github.com/Everloot/everloot/issues/{len(opened)}"}
+    return []
+discord_bridge.discord, discord_bridge.github = fake_discord, fake_github
+os.environ.update(GITHUB_EVENT_NAME="schedule", GITHUB_EVENT_PATH=__file__,SCHEDULE="*/10 * * * *")
+real_load = discord_bridge.json.load
+discord_bridge.json.load = lambda f: {}
+try:
+    discord_bridge.main()
+finally:
+    discord_bridge.json.load = real_load
+assert [(o["title"], o["labels"]) for o in opened] == [("Map pins vanish", ["bug", "from-discord", "needs-triage", "addon"]),
+                                                         ("Dark mode", ["idea", "from-discord", "needs-triage"])], opened
+tagged = {path: body["applied_tags"] for method, path, body in calls if method == "PATCH" and body and "applied_tags" in body}
+assert tagged == {"/channels/900": ["bAddon", "bTracked"], "/channels/901": ["iUnder review"]}, tagged
+greets = [body for method, path, body in calls if method == "POST" and path == f"/channels/{discord_bridge.GENERAL}/messages"]
+assert len(greets) == 1 and greets[0]["message_reference"] == {"message_id": fresh["id"]}
+assert greets[0]["allowed_mentions"] == {"parse": [], "users": ["77", discord_bridge.MAINTAINER]}
 
 print("discord_bridge: all tests passed")
