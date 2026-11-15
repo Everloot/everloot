@@ -240,3 +240,8 @@ test("manual install steps name the Forever AddOns folder on Windows and macOS",
   expect(text).toContain(String.raw`World of Warcraft\_forever_\Interface\AddOns`);
   expect(text).toContain("/Applications/World of Warcraft/_forever_/Interface/AddOns");
 });
+
+test("the download page explains how the addon and Desktop App stay current", async () => {
+  const text = visible(await render(() => Promise.resolve(Response.json(releases))));
+  expect(text).toContain("The CurseForge app keeps the addon current. The Desktop App updates itself and the addon.");
+});
