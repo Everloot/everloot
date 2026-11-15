@@ -365,6 +365,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 ### Changed
 - Site: the site shows no ads. About, the FAQ, the terms, the privacy policy, the privacy guide and the accessibility statement now say so and no longer describe Google AdSense.
 - Site: the Blizzard auction house page names each house by its ruleset and faction ("PvP, Alliance", "Roleplay PvP, Horde") instead of "Alliance, house 110", and lists them US first, then by ruleset. Blizzard's API does not say which ruleset a house serves; the mapping was matched by price in both regions.
+- Addon: auction scan messages name everloot.app/upload alongside the Desktop App as a way to send the saved file.
 - Site: explain how the CurseForge app and Desktop App keep downloads current on the addon page.
 - Site: upload and addon install steps name the Windows and macOS Forever save-file and AddOns paths.
 - Site: show likely ranges and few-window marks in NPC, item-source, loot-list and zone tables.

@@ -51,8 +51,8 @@ function T.StatusLines()
   local minutes = math.floor((time() - own.at) / 60)
   lines[2] = string.format("Last scan on this realm: %d items, %s.", items,
     minutes < 1 and "just now" or minutes < 60 and (minutes .. " min ago") or (math.floor(minutes / 60) .. " h ago"))
-  lines[3] = own.at < sessionStart and "Saved in your file: the Desktop App sends it."
-    or "Not saved yet: Share now, or log out, and the Desktop App sends it."
+  lines[3] = own.at < sessionStart and "Saved in your file: the Desktop App, or everloot.app/upload, sends it."
+    or "Not saved yet: Share now, or log out, and the Desktop App, or everloot.app/upload, sends it."
   return lines
 end
 
@@ -512,7 +512,7 @@ local function buildPanel(house)
   intro:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -46)
   intro:SetWidth(COLUMN)
   intro:SetText("One click reads this house's prices. They show in your tooltips at once and reach everloot.app when "
-    .. "your file is saved: Share now or log out, and the Desktop App sends it. A price counts on the site once three players agree.")
+    .. "your file is saved: Share now or log out, and the Desktop App, or everloot.app/upload, sends it. A price counts on the site once three players agree.")
   panel.intro = intro
 
   local scanButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
