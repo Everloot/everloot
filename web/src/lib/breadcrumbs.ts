@@ -80,6 +80,7 @@ const NAMES: Record<string, string> = {
   "/tools/guild-board": "Guild board",
   "/tools/auctions": "Auction House",
   "/tools/bags": "Bag upgrades",
+  "/tools/timers": "Timers and event calendar",
   "/tools/gold-ledger": "Gold ledger",
   "/tools/professions": "Profession hubs",
   "/tools/farming-routes": "Farming",
