@@ -445,3 +445,15 @@ test("readRecordsFile takes a saved corpus answer, a bare list and NDJSON, and r
   writeFileSync(file, JSON.stringify({ nothing: true }));
   expect(() => readRecordsFile(file)).toThrow(/neither a list of records/);
 });
+
+test("the exported loot-window schema describes the restart state", () => {
+  const schemaFor = (recheck: RecheckScope[]) => {
+    const dataset = buildOpenData(input([], { recheck })).datasets.find((d) => d.name === "drop-rates")!;
+    return z.toJSONSchema(dataset.schema);
+  };
+  expect(JSON.stringify(schemaFor([]))).toContain("did not include empty corpses");
+  expect(JSON.stringify(schemaFor([{ type: "quests", since: AT, source: "test" }]))).toContain("can read high");
+  const restarted = JSON.stringify(schemaFor([{ type: "drops", since: AT, source: "test" }]));
+  expect(restarted).toContain("Empty loot windows are counted");
+  expect(restarted).not.toContain("can read high");
+});
