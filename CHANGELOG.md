@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: drop API and open data rows include likely rate ranges and sample precision.
 - Site: auction item pages show AH Ledger's latest price for the item on each Forever market, both factions, US and EU on the all-realms page and the realm's own ruleset on a realm's page, read live from AH Ledger's API with its credit link and never stored.
 - Addon: recipe and trainer observations keep optional profession skill-line IDs; trainer links also retain spell or product IDs when available, alongside localized names.
 - Addon: a kill's loot window with nothing in it is now recorded, tied to the one dead creature you could loot (interact, mouseover or target), as a loot row with no items and no coin, once per corpse, and the site's drop rates, loot tables and open data count it in the source's windows (protocol 2.3.0, `sourceEvidence: "empty-window"`). Until now an empty corpse never reached the site, so drop rates for anything that does not always drop read too high. Needs an in-game check before release.
