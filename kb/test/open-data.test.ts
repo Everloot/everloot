@@ -3,6 +3,8 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
+import { lootWindowsFromRecords, recheckLootRecords, rollupDrops } from "../src/drop-rollup.js";
+import type { RecheckScope } from "../src/coverage.js";
 import { readCatalogFiles } from "../src/catalog-index.js";
 import { buildOpenData, OPEN_DATA_KINDS, type Dataset, type OpenDataInput } from "../src/open-data/build.js";
 import { readOpenDataGameFiles, type OpenDataCatalogs } from "../src/open-data/game-data.js";
@@ -127,6 +129,30 @@ const rows = (datasets: Dataset[], layer: string, name: string) => byName(datase
 let dir: string;
 beforeEach(() => { dir = join(mkdtempSync(join(tmpdir(), "everloot-open-data-")), "out"); });
 afterEach(() => { rmSync(join(dir, ".."), { recursive: true, force: true }); });
+
+test("drop exports apply the same recheck cutoff as the site while preserving other datasets", () => {
+  const records = [
+    ...corpus(),
+    ...each(3, (id) => ({ ...base(id), eventId: `new-${id}`, capturedAt: NOW, kind: "loot", sourceEvidence: "empty-window", lootType: "kill", sourceNpcId: 300, items: [] })),
+    ...each(3, (id) => ({ ...base(id), eventId: `item-${id}`, capturedAt: NOW, kind: "loot", sourceEvidence: "loot-api", sourceNpcId: 300, items: [{ itemId: 7300, count: 1 }] })),
+  ];
+  const recheck: RecheckScope[] = [{ type: "drops", since: "2026-10-11T00:00:00.000Z", source: "test", ids: [300, 8300] }];
+  const before = buildOpenData(input(records));
+  const after = buildOpenData(input(records, { recheck }));
+  const expected = rollupDrops(lootWindowsFromRecords(recheckLootRecords(records, recheck)));
+  const rate = rows(after.datasets, "observed", "drop-rates").find((r) => r.sourceNpcId === 300)!;
+  const siteRate = expected.rates.find((r) => r.sourceNpcId === 300 && r.itemId === 7300)!;
+  expect(rate).toEqual({ sourceNpcId: 300, sourceObjectId: null, itemId: 7300, lootWindows: siteRate.kills, windowsWithItem: siteRate.drops, rate: siteRate.rate, installs: siteRate.reporters });
+  expect(rate.rate).toBe(0.5);
+  expect(rows(before.datasets, "observed", "drop-rates").find((r) => r.sourceNpcId === 300)!.rate).toBeCloseTo(2 / 3);
+  expect(rows(after.datasets, "observed", "drop-measured-zeros")).toEqual([]);
+  expect(after.source).toEqual(before.source);
+  expect(after.datasets.filter((d) => !d.name.startsWith("drop-"))).toEqual(before.datasets.filter((d) => !d.name.startsWith("drop-")));
+});
+
+test("an empty recheck scope list leaves the export unchanged", () => {
+  expect(buildOpenData(input(corpus(), { recheck: [] }))).toEqual(buildOpenData(input()));
+});
 
 test("only facts three installs agree on come out; one-install and two-install facts of every kind stay out", () => {
   const { datasets } = buildOpenData(input());
