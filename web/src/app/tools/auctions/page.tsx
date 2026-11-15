@@ -37,6 +37,7 @@ export default async function AuctionHousePage(props: Props) {
   return (
     <>
       <JsonLd data={webApplicationJsonLd({ name: "Auction House", path: "/tools/auctions", description: DESCRIPTION })} />
+      <p className="mb-4"><a href="/tools/auctions/report" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Daily market report and share image</a></p>
       {view}
     </>
   );
