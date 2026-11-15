@@ -257,7 +257,7 @@ test("an item two sources drop is one row and one in the count, with each source
   const detail = page.slice(page.indexOf("data-item-sources"));
   expect(detail).toContain('href="/database/npcs/100"');
   expect(detail).toContain('href="/database/objects/77"');
-  expect(detail).toContain("100.0% · 3 of 3 windows · 3 installs");
+  expect(detail).toContain("100.0% (43.9%–100.0%) · few windows · 3 of 3 windows · 3 installs");
   // The single-source item keeps its own columns.
   expect(page).toContain('href="/database/items/2589"');
 });

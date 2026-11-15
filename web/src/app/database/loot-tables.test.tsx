@@ -87,3 +87,31 @@ test("two installs: the pages say what is missing, and no rate or source is show
   expect(item).not.toContain("/database/npcs/40");
   expect(item).not.toContain("%");
 });
+
+test("NPC and item-source rows show a 95% range and mark only samples with few windows", async () => {
+  const { NpcLootPanel, ItemSourcesPanel } = await import("./loot-tables");
+  const base = { sourceNpcId: 40, itemId: 750, first: null, last: null };
+  for (const [withItem, windows, installs, expected, few] of [
+    [3, 4, 3, "75.0% (30.1%–95.4%)", true],
+    [750, 1000, 5, "75.0% (72.2%–77.6%)", false],
+  ] as const) {
+    const row = { ...base, withItem, windows, installs, rate: withItem / windows };
+    const table = { npcId: 40, state: "rated" as const, span: { windows, installs, first: null, last: null }, rows: [row], missingInstalls: 0 };
+    for (const panel of [
+      <NpcLootPanel key="npc" table={table} title="Creature" item={() => "Item"} dataAsOf={null} />,
+      <ItemSourcesPanel key="item" sources={{ rows: [row], short: null }} title="Item" source={() => "Creature"} dataAsOf={null} />,
+    ]) {
+      const markup = text(renderToStaticMarkup(panel));
+      expect(markup).toContain(expected);
+      expect(markup.includes("few windows")).toBe(few);
+    }
+  }
+});
+
+
+test("the few-windows label stops at the minimum window count even when other settling criteria fail", async () => {
+  const { rateWithRange } = await import("./loot-tables");
+  expect(rateWithRange(1, 49, 3)).toContain("few windows");
+  expect(rateWithRange(1, 50, 3)).not.toContain("few windows");
+  expect(rateWithRange(0, 0, 3)).toBe("Not recorded");
+});

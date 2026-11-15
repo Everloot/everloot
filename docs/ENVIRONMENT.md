@@ -56,6 +56,7 @@ one is not recorded here.
 
 | Name | Read in | What it is for | Required |
 |---|---|---|---|
+| `AHLEDGER_API_KEY` | `web/src/app/api/ahledger/[market]/route.ts` | AH Ledger's free read key (`ahlk_...`) for the auction pages' AH Ledger prices: 300 requests a minute and the full answer after 2026-12-10, when calls without a key drop to 30 a minute. Free only while the site shows no ads (`docs/sources/LEDGER.md`) | Optional |
 | `EVERLOOT_OPS_USER_IDS` | `web/src/lib/ops/access.ts` | Explicit website-account dashboard grants | Optional |
 | `EVERLOOT_OPS_CONTRIBUTOR_USER_IDS` | `web/src/lib/ops/access.ts` | Separate website-account named-contributor grants | Optional |
 | `EVERLOOT_OPS_AGENT_TOKEN_HASHES` | `web/src/lib/ops/access.ts` | Revocable aggregate-reader token digests | Optional |
@@ -126,7 +127,7 @@ the Worker. The browser bundle keeps the `NEXT_PUBLIC_*` values.
 | `NEXT_PUBLIC_SITE_URL` | `web/src/lib/seo.ts`, the sitemaps and feeds, `web/src/app/layout.tsx` | The site's public address | Repository variable | Yes |
 | `NEXT_PUBLIC_GAME_ASSETS_URL` | `web/src/lib/talents/assets.ts` | The public asset folder for the talent calculator (ASSETS.md); text tiles without it | Repository variable | No |
 | `NEXT_PUBLIC_BULK_URL` | `web/src/lib/docs/connect-data.ts` | The public address of the bulk export; `/connect` says there is none without it | Repository variable | No |
-| `NEXT_PUBLIC_ADSENSE_CLIENT` | `web/src/components/AdSlot.tsx`, `web/src/app/layout.tsx` | Ad slots; off without it | Repository variable | No |
+| `NEXT_PUBLIC_ADSENSE_CLIENT` | `web/src/components/AdSlot.tsx`, `web/src/app/layout.tsx` | Ad slots; off without it. Unset since 2026-11-15: the site shows no ads, which AH Ledger's free community terms require | Repository variable | No |
 | `NEXT_PUBLIC_CF_BEACON_TOKEN` | `web/src/lib/analytics/config.ts` | Cookieless web analytics | Repository variable | No |
 | `NEXT_PUBLIC_GA_ID` | `web/src/lib/analytics/config.ts` | Google Analytics, after consent | Repository variable | No |
 | `NEXT_PUBLIC_METRICOOL_HASH` | `web/src/lib/analytics/config.ts` | Metricool's tracker, after consent | Repository variable | No |
@@ -158,7 +159,7 @@ the Worker. The browser bundle keeps the `NEXT_PUBLIC_*` values.
 | `CLOUDFLARE_ACCOUNT_ID` | `.github/workflows/deploy-worker.yml` | The account the Worker deploys to | For deploys |
 | `ANSWER_EVAL_MODEL` | `.github/workflows/build-watch.yml` | The model the answer evaluation runs against; the job is skipped while empty | No |
 | `ANSWER_EVAL_BASE_URL` | `.github/workflows/build-watch.yml` | That provider's endpoint; has a default | No |
-| `BLIZZARD_AUCTIONS` | `.github/workflows/blizzard-auctions.yml` | The hourly Blizzard auction house pull runs only while this is `on` (and the Battle.net and Supabase secrets exist) | No |
+| `BLIZZARD_AUCTIONS` | `.github/workflows/blizzard-auctions.yml` | The hourly Blizzard auction house pull runs only while this is `on` (and the Battle.net and Supabase secrets exist). GitHub starts scheduled runs late or drops them under load (every 4 to 7 hours in November 2026), so the maintainer also starts it each hour with `workflow_dispatch` from a machine of their own; a second pass in the hour writes nothing for an unchanged house | No |
 | `NEXT_PUBLIC_*` | `.github/workflows/deploy-worker.yml` | The eleven build-time names above, passed to the build | See above |
 
 ## Local development and tests (`web/.env.local`)

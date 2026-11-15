@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: auction item pages show AH Ledger's latest price for the item on each Forever market, both factions, US and EU on the all-realms page and the realm's own ruleset on a realm's page, read live from AH Ledger's API with its credit link and never stored.
 - Addon: recipe and trainer observations keep optional profession skill-line IDs; trainer links also retain spell or product IDs when available, alongside localized names.
 - Addon: a kill's loot window with nothing in it is now recorded, tied to the one dead creature you could loot (interact, mouseover or target), as a loot row with no items and no coin, once per corpse, and the site's drop rates, loot tables and open data count it in the source's windows (protocol 2.3.0, `sourceEvidence: "empty-window"`). Until now an empty corpse never reached the site, so drop rates for anything that does not always drop read too high. Needs an in-game check before release.
 - Site: prepare opt-in private boss-kill sync for linked characters; awaiting migration and policy approval.
@@ -361,9 +362,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Knowledge base: open data drop rates and measured zeros follow the same recheck cutoffs as the site, leaving other exported facts and corpus counts unchanged.
 
 ### Changed
+- Site: the site shows no ads. About, the FAQ, the terms, the privacy policy, the privacy guide and the accessibility statement now say so and no longer describe Google AdSense.
+- Site: the Blizzard auction house page names each house by its ruleset and faction ("PvP, Alliance", "Roleplay PvP, Horde") instead of "Alliance, house 110", and lists them US first, then by ruleset. Blizzard's API does not say which ruleset a house serves; the mapping was matched by price in both regions.
 - Addon: auction scan messages name everloot.app/upload alongside the Desktop App as a way to send the saved file.
 - Site: explain how the CurseForge app and Desktop App keep downloads current on the addon page.
 - Site: upload and addon install steps name the Windows and macOS Forever save-file and AddOns paths.
+- Site: show likely ranges and few-window marks in NPC, item-source, loot-list and zone tables.
 - Addon: grouped auction sales show paid transactions per day and paid units per day separately beside the last sold date. Pending and unmatched notices affect neither rate; in-game layout verification is required before release.
 - Site: share private character-sync validation with the companion through a separate protocol export; public uploads still reject private-only rows.
 - Site: Reuse cold-start aggregate and game-art reads and load the build label from a small generated stamp.

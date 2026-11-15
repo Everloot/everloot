@@ -169,7 +169,7 @@ test("an instance's page lists each boss's loot: the creature's own loot table, 
     expect(loot).toContain('href="/database/npcs/11517"');
     const row = loot.split("<tr").find((r) => r.includes('href="/database/items/14149"')) ?? "";
     // Six windows, all six holding the item, from 3 installs.
-    expect(text(row)).toMatch(/\|6\|6\|100(\.0)?%\|3\|/);
+    expect(text(row)).toContain("|6|6|100.0% (61.0%–100.0%) · few windows|3|");
     expect(text(loot)).toContain("Data as of 2026-11-05.");
   } finally {
     state.seen = { unreachable: true };
