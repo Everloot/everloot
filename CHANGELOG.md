@@ -361,6 +361,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Desktop App: restoring the oldest backup keeps the selected save and an undo copy, even within the same second.
 - Companion: watch mode waits for the first account save and finds new accounts without a restart, refreshing prices for every discovered account.
 - Knowledge base: open data drop rates and measured zeros follow the same recheck cutoffs as the site, leaving other exported facts and corpus counts unchanged.
+- Site: search links every matching achievement, faction, title, quest chain, zone and instance through bounded result pages.
 
 ### Changed
 - Site: the site shows no ads. About, the FAQ, the terms, the privacy policy, the privacy guide and the accessibility statement now say so and no longer describe Google AdSense.

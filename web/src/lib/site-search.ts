@@ -24,7 +24,7 @@ import { zoneHref } from "./zones";
 export interface SearchResult { label: string; href: string; note?: string; exact: boolean; id?: number; quality?: number | null; meta?: string }
 export type SearchType = "class" | "item" | "npc" | "quest" | "object" | "achievement" | "faction" | "title" | "chain" | "zone" | "instance" | "guide" | "lore" | "tool" | "doc";
 /** `total` counts every match; `results` holds the first `limit` of them. */
-export interface SearchGroup { type: SearchType; heading: string; results: SearchResult[]; total: number }
+export interface SearchGroup { type: SearchType; heading: string; results: SearchResult[]; total: number; page?: number }
 export const GROUP_LIMIT = 8;
 export const LORE_LIMIT = 5;
 
@@ -38,6 +38,11 @@ const ORDER: SearchType[] = ["class", "item", "npc", "quest", "object", "achieve
 export const SCOPES = ["item", "npc", "quest", "object"] as const satisfies readonly SearchType[];
 export type Scope = (typeof SCOPES)[number];
 export const isScope = (v: unknown): v is Scope => (SCOPES as readonly unknown[]).includes(v);
+/** These groups keep search's matching rules and page within search rather than a database list. */
+export const PAGED_SCOPES = ["achievement", "faction", "title", "chain", "zone", "instance"] as const;
+export type ResultScope = Scope | (typeof PAGED_SCOPES)[number];
+export const isPagedScope = (v: unknown): v is (typeof PAGED_SCOPES)[number] => (PAGED_SCOPES as readonly unknown[]).includes(v);
+export const isResultScope = (v: unknown): v is ResultScope => isScope(v) || isPagedScope(v);
 /** 0 exact, 1 starts with, 2 contains, null no match; both sides lowercase. */
 function rank(name: string, q: string): number | null {
   if (name === q) return 0;
@@ -117,9 +122,9 @@ async function objectHits(q: string, id: number | null, names: Map<number, strin
  * Everything the site knows by this name or id, grouped by type. Names are the ones players agree on, or
  * `names` when a page passes the ones it shows (never the API's caller); zones are the released ones on the map,
  * lore comes from the archive, tools from the tool list. A group with an exact id or name match comes first; an
- * empty group is left out. `only` keeps one database type; `limit` is the rows per group.
+ * empty group is left out. `only` keeps one result type; `limit` is the rows per group. Paged scopes clamp the page to the last match and return at most 50 rows.
  */
-export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names: given }: { only?: Scope; limit?: number; names?: Names | Promise<Names> } = {}): Promise<SearchGroup[]> {
+export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page = 1, names: given }: { only?: ResultScope; limit?: number; page?: number; names?: Names | Promise<Names> } = {}): Promise<SearchGroup[]> {
   const text = raw.trim().slice(0, MAX_QUERY);
   const q = text.toLowerCase();
   if (!q) return [];
@@ -127,12 +132,14 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names
   const found = new Map<SearchType, { results: SearchResult[]; total: number; heading?: string }>();
   const want = (t: SearchType) => !only || only === t;
 
-  // Neither read depends on the other. Scoped searches do not need the completion catalogue.
-  const [names, catalog] = await Promise.all([given ?? loadNames(), only ? null : loadCatalog()]);
+  const paged = isPagedScope(only);
+  if (paged) limit = Number.isFinite(limit) ? Math.max(1, Math.min(50, Math.floor(limit))) : 50;
+  // Neither read depends on the other. Item, NPC, quest and object scopes do not need the completion catalogue.
+  const [names, catalog] = await Promise.all([given ?? loadNames(), only && !paged ? null : loadCatalog()]);
   for (const kind of ["item", "npc", "quest"] as const) if (want(kind)) found.set(kind, agreed(kind, names[`${kind}s`], q, id));
   if (want("object")) { const objects = await objectHits(q, id, names.objects); found.set("object", { results: objects, total: objects.length }); }
 
-  if (!only) {
+  if (!only || paged) {
     // Achievements, factions, titles and quest chains three players reported, by name or id; none when the rollup cannot be read.
     if (catalog) {
       const hit = (label: string, href: string, n: number, exact: boolean): SearchResult => ({ label, href, note: `id ${n}`, exact, id: n });
@@ -163,6 +170,9 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names
     const instances = instanceHits(q).map(({ r: _r, ...hit }) => hit);
     found.set("instance", { results: instances, total: instances.length });
 
+  }
+
+  if (!only) {
     // A class named anywhere in the words ("best race for a warlock") leads to its page: guides, talents, who can play it.
     const words = new Set(q.split(/[^a-z]+/).flatMap((w) => [w, w.replace(/s$/, "")]));
     const classes = CLASSES.filter((slug) => words.has(slug))
@@ -209,9 +219,11 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, names
   return ORDER
     .map((type) => {
       const f = found.get(type) ?? { results: [], total: 0 };
-      return { type, heading: f.heading ?? HEADINGS[type], results: f.results.slice(0, limit).map(strip), total: f.total };
+      const current = paged ? Math.min(Math.max(1, Math.floor(page) || 1), Math.max(1, Math.ceil(f.total / limit))) : 1;
+      const start = (current - 1) * limit;
+      return { type, heading: f.heading ?? HEADINGS[type], results: f.results.slice(start, start + limit).map(strip), total: f.total, ...(paged ? { page: current } : {}) };
     })
-    .filter((g) => g.results.length > 0)
+    .filter((g) => want(g.type) && g.results.length > 0)
     .map((g, i) => ({ g, i, tier: tier(g) }))
     .sort((a, b) => a.tier - b.tier || a.i - b.i)
     .map(({ g }) => g);
