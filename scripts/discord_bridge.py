@@ -355,7 +355,10 @@ def update_known_issues() -> None:
     me = discord("GET", "/users/@me")["id"]
     thread = next((t for t in forum_threads(HELP) if t["owner_id"] == me and t["name"] == KNOWN_TITLE), None)
     if thread is None:  # someone deleted it: post the list again (unpinned; a maintainer pins it)
-        discord("POST", f"/channels/{HELP}/threads", {"name": KNOWN_TITLE, "message": {"embeds": [embed], "allowed_mentions": NO_PINGS}})
+        try:
+            discord("POST", f"/channels/{HELP}/threads", {"name": KNOWN_TITLE, "message": {"embeds": [embed], "allowed_mentions": NO_PINGS}})
+        except RuntimeError as e:  # #help requires a tag, which binds the bot too; the rest of the sync goes on
+            print(f"known issues: no pinned post in #help and could not post one ({e})")
         return
     mine = [m for m in discord("GET", f"/channels/{thread['id']}/messages?limit=20") if m["author"]["id"] == me]
     old = (mine[0]["embeds"] or [{}])[0] if mine else {}
