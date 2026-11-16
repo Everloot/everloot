@@ -57,7 +57,9 @@ async function browseRead<T>(
   if (!url || !key) return { ok: false, reason: "failed" };
   const rows: T[] = [];
   try {
-    const signal = AbortSignal.timeout(2_500);
+    // One budget for every page: a busy house is about 6,600 rows (5,300 item listings, 1,300 commodities on 11/16),
+    // so seven reads in a row; 2.5 s, the single-item budget, would turn a slow read into a failure.
+    const signal = AbortSignal.timeout(8_000);
     for (let offset = 0; ; offset += 1000) {
       const response = await fetchImpl(`${url.replace(/\/$/, "")}/rest/v1/rpc/${rpc}?limit=1000&offset=${offset}`, {
         method: "POST", cache: "no-store", signal,
