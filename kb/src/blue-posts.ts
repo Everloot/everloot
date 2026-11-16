@@ -303,6 +303,14 @@ export interface IngestOptions {
   sleep?: (ms: number) => Promise<void>;
   /** Requests a run may make in all, robots.txt included. Default 40. */
   maxRequests?: number;
+  /**
+   * Milliseconds a run may spend before it starts no new request, as `maxRequests` does: it ends like a spent request
+   * budget and the next run continues from the saved place. Unset means no limit (the one-off backfill). A scheduled
+   * run that outlasts the platform's wall limit is cut off before its results are saved, and loses all its progress.
+   */
+  deadlineMs?: number;
+  /** The clock `deadlineMs` reads; tests drive it. Default Date.now. */
+  clock?: () => number;
   /** List pages per topic list and run. Default 4 (400 topics). */
   maxListPages?: number;
   /** The staff list is read again once it is older than this. Default 24 hours. */
@@ -349,6 +357,8 @@ function session(opts: IngestOptions) {
   const delay = opts.delayMs ?? 1500;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const budget = opts.maxRequests ?? 40;
+  const clock = opts.clock ?? Date.now;
+  const started = clock();
   const overrides = opts.overrides ?? emptyOverrides();
   const s = {
     store: opts.store,
@@ -373,7 +383,12 @@ function session(opts: IngestOptions) {
   /** One GET with the rules every request follows. `stateKey` receives a Retry-After. */
   const get = async (kind: string, host: string, url: string, headers: Record<string, string>, stateKey: string): Promise<Response> => {
     if (spent() >= budget) throw new BudgetSpent(`request budget of ${budget} spent`);
-    if (lastRequest.has(host)) await sleep(delay);
+    const outOfTime = () => opts.deadlineMs !== undefined && clock() - started >= opts.deadlineMs;
+    if (outOfTime()) throw new BudgetSpent(`time budget of ${Math.round(opts.deadlineMs! / 1000)} s spent`);
+    if (lastRequest.has(host)) {
+      await sleep(delay);
+      if (outOfTime()) throw new BudgetSpent(`time budget of ${Math.round(opts.deadlineMs! / 1000)} s spent`);
+    }
     lastRequest.add(host);
     s.requests[kind] = (s.requests[kind] ?? 0) + 1;
     const res = await opts.fetcher(url, { headers: { "User-Agent": USER_AGENT, ...headers } });
@@ -508,7 +523,9 @@ export async function ingestBluePosts(opts: IngestOptions): Promise<IngestResult
     try {
       await readBluesky(x, opts, minInterval);
     } catch (err) {
-      s.errors.push({ source: "bluesky", error: message(err) });
+      // A spent budget is a normal stop, not a source failure: the forum pass below ends at once too.
+      if (err instanceof BudgetSpent) s.skipped.push(`bluesky: ${message(err)}`);
+      else s.errors.push({ source: "bluesky", error: message(err) });
     }
   }
 

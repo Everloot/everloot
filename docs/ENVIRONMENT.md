@@ -21,6 +21,7 @@ so `web/scripts/cf-deploy.mjs` passes every var except the `*_DIR` paths to the 
 | Name | Read in | What it is for | Required |
 |---|---|---|---|
 | `NODE_ENV` | `web/src/lib/upload-store.ts` and the other stores, the auth routes | Production paths: secure cookies, "storage unavailable" instead of a local fallback | Yes |
+| `NEXT_CACHE_DO_QUEUE_MAX_RETRIES` | `@opennextjs/cloudflare` (the revalidation queue's Durable Object) | Times a failed background page refresh is retried; the library's default is 6 | No |
 | `EVERLOOT_PLATFORM` | `web/src/lib/platform.ts`, `web/src/lib/auth/db.ts` | Names the host so the code trusts the edge's client address and uses the Hyperdrive binding | Yes |
 | `EVERLOOT_DEPLOY_ENV` | `web/src/lib/platform.ts`, `web/src/lib/analytics/config.ts` | Names the environment for analytics; product analytics load only in production | Yes |
 | `EVERLOOT_DATA_GUARD` | `web/src/lib/data-guard.ts` | Bulk-read limits and free API keys (DATA_POLICY.md) | Switch |

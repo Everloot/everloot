@@ -598,6 +598,83 @@ describe("market rollup", () => {
       .toEqual({ state: null, dataAsOf: null, unreachable: true });
   });
 
+  describe("the pages' read of the rollup", () => {
+    const state = { version: 3, realms: {} };
+    const rollup = () => Response.json({ version: 3, generatedAt: "2026-10-04T11:50:00.000Z", state, seenUploadIds: [] });
+
+    test("pages that arrive together share one read", async () => {
+      let reads = 0;
+      const fn = (async () => { reads++; await new Promise((r) => setTimeout(r, 5)); return rollup(); }) as typeof fetch;
+      const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now });
+      const all = await Promise.all(Array.from({ length: 20 }, () => store.loadMarket()));
+      expect(reads).toBe(1);
+      expect(all.every((m) => JSON.stringify(m.state) === JSON.stringify(state))).toBe(true);
+      await store.loadMarket();
+      expect(reads).toBe(1);
+    });
+
+    test("when the rollup cannot be read, the copy held answers for a while and the read waits before it is tried again", async () => {
+      let healthy = true;
+      let reads = 0;
+      const fn = (async () => { reads++; return healthy ? rollup() : new Response("down", { status: 500 }); }) as typeof fetch;
+      const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now, cacheMs: 20, marketStaleMs: 400, marketRetryMs: 150 });
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      expect((await store.loadMarket()).state).toEqual(state);
+      healthy = false;
+      await sleep(30);
+      // Past its cache time the read fails, and the copy held is served, not an unrecorded market.
+      expect(await store.loadMarket()).toMatchObject({ dataAsOf: "2026-10-04T11:50:00.000Z" });
+      expect(reads).toBe(2);
+      await store.loadMarket();
+      await store.loadMarket();
+      expect(reads).toBe(2);
+      await sleep(160);
+      await store.loadMarket();
+      expect(reads).toBe(3);
+      // Past the stale limit it is unrecorded again.
+      await sleep(400);
+      expect(await store.loadMarket()).toEqual({ state: null, dataAsOf: null, unreachable: true });
+      // And it recovers on the first good read.
+      healthy = true;
+      await sleep(160);
+      expect((await store.loadMarket()).state).toEqual(state);
+    });
+
+    test("a read that never answers does not hold a page past its limit, nor the pages after it", async () => {
+      let hang = true;
+      let reads = 0;
+      const fn = (async () => { reads++; return hang ? new Promise<Response>(() => {}) : rollup(); }) as typeof fetch;
+      const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now, marketReadMs: 60 });
+      const t0 = Date.now();
+      const [first, second] = await Promise.all([store.loadMarket(), store.loadMarket()]);
+      expect(Date.now() - t0).toBeLessThan(1000);
+      expect(first).toEqual({ state: null, dataAsOf: null, unreachable: true });
+      expect(second).toEqual({ state: null, dataAsOf: null, unreachable: true });
+      expect(reads).toBe(1);
+      // The stuck read is dropped after its limit: the next page starts its own and gets the answer.
+      hang = false;
+      expect((await store.loadMarket()).state).toEqual(state);
+      expect(reads).toBe(2);
+    });
+  });
+
+  test("every R2 call carries a time limit: 25 s to read, 45 s to write, and the caller's own when it gives one", async () => {
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    try {
+      const fn = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const req = new Request(input, init);
+        return req.method === "PUT" ? new Response(null) : new Response("{}", { headers: { etag: '"x"' } });
+      }) as typeof fetch;
+      const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now });
+      await store.writeCronRun(false, null, null);
+      await store.loadMarket();
+      expect(timeout.mock.calls.map(([ms]) => ms)).toEqual([45_000, 12_000]);
+      timeout.mockClear();
+      await store.snapshotWork().catch(() => {});
+      expect(timeout.mock.calls.every(([ms]) => ms === 25_000 || ms === 10_000)).toBe(true);
+    } finally { timeout.mockRestore(); }
+  });
+
   test("local mode folds the local uploads on read", async () => {
     const dir = mkdtempSync(join(tmpdir(), "everloot-market-"));
     mkdirSync(join(dir, "uploads"));

@@ -190,6 +190,12 @@ export function r2Client(cloud: R2Config): AwsClient {
 
 const PAGE = 1000; // PostgREST's default row cap on Supabase
 const PARALLEL_READS = 16;
+// R2 calls are bounded (r2Fetch). The pages' read of the market rollup gives up sooner, since a visitor or crawler waits on it.
+const R2_READ_TIMEOUT_MS = 25_000;
+const R2_WRITE_TIMEOUT_MS = 45_000;
+const MARKET_PAGE_READ_MS = 12_000;
+const MARKET_STALE_MS = 60 * 60_000;
+const MARKET_RETRY_MS = 30_000;
 const SNAPSHOT_KEY = "snapshots/corpus.json";
 const MARKET_KEY = "snapshots/market.json";
 const COMPLETION_KEY = "snapshots/completion.json";
@@ -217,6 +223,10 @@ export function createUploadStore(opts: {
   marketMaxBytes?: number;
   /** Largest completion.json the rollup may read; a write trims to stay under it. Tests lower it. */
   completionMaxBytes?: number;
+  /** How long a page waits on the market rollup's read, how long a held copy answers when it cannot be read, and the pause before the next try. Tests shorten them. */
+  marketReadMs?: number;
+  marketStaleMs?: number;
+  marketRetryMs?: number;
   /** Uploads one market run folds at most; the next run continues from where it stopped. */
   marketBatch?: number;
   /** Uploads one completion run folds at most; the next run continues from where it stopped. */
@@ -234,9 +244,14 @@ export function createUploadStore(opts: {
   const cacheMs = opts.cacheMs ?? 5 * 60 * 1000;
   let cached: { at: number; corpus: RawCorpus } | null = null;
   let marketCached: { at: number; market: Market } | null = null;
+  let marketRead: { at: number; promise: Promise<Market | null> } | null = null;
+  let marketRetryAt = 0;
   let completionCached: { at: number; read: CompletionRead } | null = null;
   let censusCached: { at: number; read: CensusRead } | null = null;
   const marketMaxBytes = opts.marketMaxBytes ?? MARKET_MAX_BYTES;
+  const marketReadMs = opts.marketReadMs ?? MARKET_PAGE_READ_MS;
+  const marketStaleMs = opts.marketStaleMs ?? MARKET_STALE_MS;
+  const marketRetryMs = opts.marketRetryMs ?? MARKET_RETRY_MS;
   const marketBatch = opts.marketBatch ?? MARKET_UPLOADS_PER_RUN;
   const completionMaxBytes = opts.completionMaxBytes ?? COMPLETION_MAX_BYTES;
   const completionBatch = opts.completionBatch ?? COMPLETION_UPLOADS_PER_RUN;
@@ -256,8 +271,15 @@ export function createUploadStore(opts: {
     ...extra,
   });
 
-  async function r2Fetch(key: string, init: RequestInit): Promise<Response> {
-    return doFetch(await r2!.sign(objectUrl(key), init));
+  /**
+   * One R2 call, always bounded: a read the platform never answers would otherwise hold its request to the Worker's
+   * limit (and, for the pages, end as a canceled request instead of an answer). The cron's reads and writes get the
+   * longer default; a caller that must give up sooner passes its own limit.
+   */
+  async function r2Fetch(key: string, init: RequestInit, timeoutMs?: number): Promise<Response> {
+    const read = init.method === undefined || init.method === "GET" || init.method === "HEAD";
+    const bounded = init.signal ? init : { ...init, signal: AbortSignal.timeout(timeoutMs ?? (read ? R2_READ_TIMEOUT_MS : R2_WRITE_TIMEOUT_MS)) };
+    return doFetch(await r2!.sign(objectUrl(key), bounded));
   }
 
   async function putUpload(uploadId: string, installId: string, payload: StoredUpload, publicationGrants: string[] = []): Promise<boolean> {
@@ -431,8 +453,8 @@ export function createUploadStore(opts: {
    * shape the code does not know, or over the size limit): a rebuild may then replace it, a normal
    * run may not.
    */
-  async function readMarketSnapshot(): Promise<{ snapshot: MarketSnapshot | null; etag?: string } | null> {
-    const res = await r2Fetch(MARKET_KEY, { method: "GET", headers: { "accept-encoding": "identity" } });
+  async function readMarketSnapshot(timeoutMs?: number): Promise<{ snapshot: MarketSnapshot | null; etag?: string } | null> {
+    const res = await r2Fetch(MARKET_KEY, { method: "GET", headers: { "accept-encoding": "identity" } }, timeoutMs);
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`market read failed (${res.status})`);
     const etag = res.headers.get("etag") ?? undefined;
@@ -515,26 +537,58 @@ export function createUploadStore(opts: {
     return { added: fresh.length, scans, remaining: unseen.length - fresh.length, dropped: stats.dropped, released: stats.released, trimmedDays };
   }
 
-  async function loadMarket(): Promise<Market> {
-    if (marketCached && Date.now() - marketCached.at < cacheMs) return marketCached.market;
-    let market: Market;
+  /** The rollup as the storage has it now; null when it cannot be read (no rollup yet, unusable, or storage out of reach). */
+  async function readMarket(): Promise<Market | null> {
     try {
       if (unavailable) throw new Error("Production storage is not configured");
       if (cloud) {
         // No rollup yet (before the first cron run) is unavailable, not "no scans uploaded".
-        const read = await readMarketSnapshot();
+        const read = await readMarketSnapshot(marketReadMs);
         if (!read?.snapshot) throw new Error("market rollup not built yet or unusable");
-        market = { state: read.snapshot.state, dataAsOf: validTime(read.snapshot.generatedAt) };
-      } else {
-        const local = await readLocalPayloads();
-        if (!local) throw new Error("local uploads unreadable");
-        market = { state: foldMarket(emptyMarket(), marketScans(local.payloads), now(), {}, undefined, trusted), dataAsOf: now().toISOString() };
+        return { state: read.snapshot.state, dataAsOf: validTime(read.snapshot.generatedAt) };
       }
+      const local = await readLocalPayloads();
+      if (!local) throw new Error("local uploads unreadable");
+      return { state: foldMarket(emptyMarket(), marketScans(local.payloads), now(), {}, undefined, trusted), dataAsOf: now().toISOString() };
     } catch {
-      return { state: null, dataAsOf: null, unreachable: true };
+      return null;
     }
-    marketCached = { at: Date.now(), market };
-    return market;
+  }
+
+  /**
+   * The market rollup the pages and tools read, kept `cacheMs` per isolate. Pages that arrive while it is being read
+   * share that one read instead of each downloading and parsing the whole file at once (which is how a burst of
+   * crawlers filled the isolate's memory and asked R2 for one object many times over). Each waits at most
+   * MARKET_PAGE_READ_MS: a read started by a request that was canceled never finishes, and must not hold the others.
+   * When the rollup cannot be read, the copy already held answers for up to MARKET_STALE_MS (figures an hour old, not
+   * an unrecorded market) and the read is not tried again for MARKET_RETRY_MS.
+   */
+  async function loadMarket(): Promise<Market> {
+    const at = Date.now();
+    if (marketCached && at - marketCached.at < cacheMs) return marketCached.market;
+    const stale = marketCached && at - marketCached.at < marketStaleMs ? marketCached.market : null;
+    if (stale && at < marketRetryAt) return stale;
+    if (!marketRead || at - marketRead.at > marketReadMs) {
+      const run = { at, promise: readMarket().then((market) => {
+        if (market) marketCached = { at: Date.now(), market };
+        return market;
+      }) };
+      marketRead = run;
+      void run.promise.finally(() => { if (marketRead === run) marketRead = null; });
+    }
+    const run = marketRead;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const market = await Promise.race([
+      run.promise,
+      // A read that outlasts the wait is dropped, so the next page starts its own instead of waiting on it again.
+      new Promise<null>((resolve) => { timer = setTimeout(() => { if (marketRead === run) marketRead = null; resolve(null); }, marketReadMs); }),
+    ]).finally(() => clearTimeout(timer));
+    if (market) return market;
+    if (stale) {
+      marketRetryAt = Date.now() + marketRetryMs;
+      return stale;
+    }
+    return { state: null, dataAsOf: null, unreachable: true };
   }
 
   /** Census rows of some upload payloads, folded into `previous` (the daily caps and last-write rule live in mergeCensusRows). */
@@ -931,20 +985,27 @@ export function createUploadStore(opts: {
     const current = await readSnapshot();
     if (current && !current.etag) throw new Error("snapshot has no ETag: cannot safely update it");
     if (current?.etag?.startsWith("W/")) throw new Error("snapshot has a weak ETag: cannot safely update it");
+    const etag = current?.etag;
     const prev = opts.rebuild ? null : current;
     const seen = prev?.seenUploadIds ? new Set(prev.seenUploadIds) : null;
     const rows = await listIndex(seen ? undefined : prev?.lastReceivedAt ?? undefined);
     const fresh = rows.filter((r) => seen ? !seen.has(r.id) : !(prev && r.received_at === prev.lastReceivedAt && prev.lastIds.includes(r.id)));
     // Rebuilds preserve known conflict tombstones, including after a raw file is removed.
-    const start = prev ? stateOf(prev) : current
+    let start: CorpusState | undefined = prev ? stateOf(prev) : current
       ? { ...mergeCorpus(undefined, []), conflicts: stateOf(current).conflicts } : undefined;
+    // The parsed snapshot's events were replayed into `start`; nothing reads them again. Releasing them here keeps the
+    // old file's objects, the replayed copy and the merged copy from all being in memory while the new uploads are read.
+    if (current) { current.corpusState = undefined; current.records = []; }
     const read = await readObjects(fresh.map((r) => r.object_key), start);
+    start = undefined;
     if (read.missed) throw new Error("upload object unreadable");
     const lastReceivedAt = rows.length > 0 ? rows[rows.length - 1].received_at : prev?.lastReceivedAt ?? null;
     const lastIds = rows.length > 0 ? rows.filter((r) => r.received_at === lastReceivedAt).map((r) => r.id) : prev?.lastIds ?? [];
-    const snapshot: Snapshot = {
-      generatedAt: now().toISOString(),
-      uploads: (prev?.uploads ?? 0) + fresh.length,
+    const generatedAt = now().toISOString();
+    const uploads = (prev?.uploads ?? 0) + fresh.length;
+    const body = JSON.stringify({
+      generatedAt,
+      uploads,
       // The records are the replay state's events, stored once. The empty array keeps the file readable by the
       // previous reader, which required it.
       records: [],
@@ -954,17 +1015,20 @@ export function createUploadStore(opts: {
       seenUploadIds: seen || !prev ? [...new Set([...(prev?.seenUploadIds ?? []), ...rows.map((r) => r.id)])].sort() : undefined,
       lastReceivedAt,
       lastIds,
-    };
+    } satisfies Omit<Snapshot, "etag" | "records"> & { records: [] });
     const put = await r2Fetch(SNAPSHOT_KEY, {
       method: "PUT",
-      body: JSON.stringify(snapshot),
+      body,
       // R2 supports conditional PutObject; a race fails instead of losing tombstones.
       // https://developers.cloudflare.com/r2/api/s3/api/
-      headers: { "content-type": "application/json", ...(current ? { "if-match": current.etag! } : { "if-none-match": "*" }) },
+      headers: { "content-type": "application/json", ...(current ? { "if-match": etag! } : { "if-none-match": "*" }) },
     });
     if (!put.ok) throw new Error(`snapshot write failed (${put.status})`);
-    cached = null; completionCached = null; censusCached = null;
-    return { uploads: snapshot.uploads, added: fresh.length, dataAsOf: snapshot.generatedAt };
+    // The state just written is what a read of the file would replay, so the corpus the rollups read next is this one,
+    // not the file downloaded and parsed again (a second whole copy, and another read of the same R2 object).
+    cached = { at: Date.now(), corpus: { uploads, state: read.state, dataAsOf: validTime(generatedAt) } };
+    completionCached = null; censusCached = null;
+    return { uploads, added: fresh.length, dataAsOf: generatedAt };
   }
 
   async function loadCorpus(): Promise<Corpus> {

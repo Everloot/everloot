@@ -8,6 +8,12 @@ import accounts from "../../../../../../kb/curated/blue-accounts.json";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
+// A run that outlasts about half a minute is cut off by the platform before it saves anything, so its whole pass is
+// repeated and never advances. The pass stops starting requests after this long and saves its place instead; the next
+// run (10 minutes later) carries on. One request may still be in flight at the deadline, so its own timeout follows.
+const DEADLINE_MS = 15_000;
+const REQUEST_TIMEOUT_MS = 8_000;
+
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return NextResponse.json({ ok: false, error: "CRON_SECRET is not set" }, { status: 503 });
@@ -20,7 +26,8 @@ export async function GET(req: Request) {
       overrides: parseOverrides(accounts),
       now: new Date(),
       minIntervalMs: 8 * 60_000,
-      fetcher: (url, init) => fetch(url, { ...init, cache: "no-store", redirect: "manual", signal: AbortSignal.timeout(15_000) }),
+      deadlineMs: DEADLINE_MS,
+      fetcher: (url, init) => fetch(url, { ...init, cache: "no-store", redirect: "manual", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }),
     });
     await writeBlueStore(result.store);
     if (result.added.length) revalidateTag("blue");
