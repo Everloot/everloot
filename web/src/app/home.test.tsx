@@ -93,3 +93,17 @@ test("the hero asks: a GET form to /chat whose question goes in ask (prefilled t
   expect(hero).toMatch(/<label for="home-ask" class="sr-only">/);
   expect(hero.match(/btn-primary/g)).toHaveLength(1);
 });
+
+
+test("Start here follows the hero with server-rendered job links and no new images or draft quiz", () => {
+  const start = html.indexOf('aria-labelledby="start-here"');
+  const block = html.slice(start, html.indexOf("</section>", start));
+  expect(start).toBeGreaterThan(html.indexOf('id="hero-title"'));
+  expect(start).toBeLessThan(html.indexOf('id="promise"'));
+  expect(block.match(/<li /g)).toHaveLength(9);
+  expect(block.match(/<a /g)).toHaveLength(9);
+  expect(block).toContain('href="/tools/talents"');
+  expect(block).toContain('href="/classes"');
+  expect(block).not.toContain("/classes/choose");
+  expect(block).not.toContain("<img");
+});
