@@ -348,7 +348,7 @@ export function sitemapPaths(boards: RealmBoard[]): string[] {
 }
 
 /** Public days that can carry a move: not thin, and not an outlier the market value trims. */
-function solidDays(points: PublicDay[]): PublicDay[] {
+export function solidDays(points: PublicDay[]): PublicDay[] {
   const solid = points.filter((p) => !p.thin);
   if (solid.length < TRIM_MIN_DAYS) return solid;
   const sorted = solid.map((p) => p.market).sort((a, b) => a - b);
