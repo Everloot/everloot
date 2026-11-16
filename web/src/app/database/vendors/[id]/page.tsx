@@ -15,9 +15,9 @@ import { entitySummary, reportedLine } from "@/lib/evidence";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { VendorGoods } from "../goods";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
-import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
+import { Container, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
 import { hasCard } from "@/lib/tooltip";
-import { EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, MapName, ShowOnMap, Unreachable, zoneName } from "../../entity";
+import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, known, LINK, PinTable, Unreachable, zoneName, type Pin } from "../../entity";
 import { vendorIndexable } from "@/lib/indexable";
 import { entityTitle, vendorDescription } from "@/lib/entity-meta";
 import { loreFor } from "@/lib/lore-links";
@@ -42,7 +42,7 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
   };
 }
 
-interface Place { href: string; mapId: number; x: number; y: number }
+interface Place extends Pin { href: string }
 
 export default async function VendorPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -54,7 +54,7 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
   const npc = facts.unreachable ? null : npcPage(page.vendorNpcId, facts);
   const places: Place[] = !npc ? [] : npc.pins.flatMap((pin) => {
     const href = pinLink(pin.mapId, pin.x, pin.y);
-    return href ? [{ href, mapId: pin.mapId, x: pin.x, y: pin.y }] : [];
+    return href ? [{ href, mapId: pin.mapId, x: pin.x, y: pin.y, reporters: pin.reporters }] : [];
   });
   const assets = await loadSiteAssets();
   const tips = await loadItemTips(assets, facts.unreachable ? [] : page.offers.map((o) => o.itemId));
@@ -81,7 +81,7 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
 
   return (
     <Container width="data">
-      <article>
+      <EntityLayout>
         <JsonLd data={entityPageJsonLd({ name: title, path: `/database/vendors/${page.vendorNpcId}`, identifier: `vendor:${page.vendorNpcId}` })} />
         <EntityHeader
           trail={trail}
@@ -105,13 +105,16 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
             />
           )}
         />
-        <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
-        <OpenData
-          text={[`${vendorName ?? `Vendor NPC ${page.vendorNpcId}`} (vendor ${page.vendorNpcId})`, ...summary, `Source: https://everloot.app/database/vendors/${page.vendorNpcId}`].join("\n")}
-          // The vendor is an NPC: its hover card is the public JSON there is, once players have reported the NPC.
-          jsonHref={npc && hasCard.npc(npc) ? `/api/tooltip/npc/${page.vendorNpcId}` : undefined}
-        />
+        <EntitySidebar>
+          <InShort summary="In short" bullets={summary} note={<Link href="/database#reading" className={LINK}>How to read these numbers</Link>} />
+          <OpenData
+            text={[`${vendorName ?? `Vendor NPC ${page.vendorNpcId}`} (vendor ${page.vendorNpcId})`, ...summary, `Source: https://everloot.app/database/vendors/${page.vendorNpcId}`].join("\n")}
+            // The vendor is an NPC: its hover card is the public JSON there is, once players have reported the NPC.
+            jsonHref={npc && hasCard.npc(npc) ? `/api/tooltip/npc/${page.vendorNpcId}` : undefined}
+          />
+        </EntitySidebar>
         <Tabs
+          className="mt-6"
           label={`${title}: relations`}
           tabs={[
             {
@@ -125,28 +128,16 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
             {
               id: "map", label: "Map", count: facts.unreachable ? undefined : places.length,
               panel: facts.unreachable ? <Unreachable />
-                : places.length ? (
-                  <DataTable
-                    dense
-                    caption={`Where ${title} stands`}
-                    columns={[
-                      { key: "map", header: "Map", cell: (p: Place) => <MapName mapId={p.mapId} /> },
-                      { key: "where", header: "Position", numeric: true, cell: (p: Place) => `${p.x}, ${p.y}` },
-                      { key: "show", header: MAP_LINK_HEADER, cell: (p: Place) => <ShowOnMap href={p.href} mapId={p.mapId} x={p.x} y={p.y} /> },
-                    ]}
-                    rows={places}
-                    rowKey={(p) => p.href}
-                  />
-                )
+                : places.length ? <PinTable caption={`Where ${title} stands`} rows={places} rowKey={(p) => p.href} />
                 : <EmptyTab message="No agreed position yet. A pin needs 3 installs at the same spot." />,
             },
           ]}
         />
         <div className="mt-6 space-y-6 empty:hidden">
           <LoreSection match={lore} />
+          {!facts.unreachable && page.offers.length > 0 && <AdSlot slot="inContent" />}
         </div>
-        {!facts.unreachable && page.offers.length > 0 && <div className="mt-6"><AdSlot slot="inContent" /></div>}
-      </article>
+      </EntityLayout>
     </Container>
   );
 }

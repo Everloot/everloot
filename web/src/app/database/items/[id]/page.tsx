@@ -14,7 +14,6 @@ import { loadEdges } from "@/lib/edges";
 import { loadItemSeen } from "@/lib/item-seen";
 import { itemSourceValue } from "./item-source";
 import { RelationTarget, SameIcon } from "@/components/EntityRelations";
-import { pinLink } from "@/lib/world-map";
 import { gameNameFor, loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames, unknownItemIcon } from "@/lib/game-assets";
 import { Badge, Container, DataTable, EvidenceLine, Facts, InShort, OpenData, QUALITY_TEXT, Tabs, TooltipFrame, TooltipLines, qualityOf, reportedLabel, type Column, type Fact, type TabItem } from "@/components/ui";
 import { isDevelopmentItemName } from "../../../../../../kb/src/dev-item-names";
@@ -36,7 +35,7 @@ import { MarketBox, loadMarketBox } from "@/app/tools/auctions/MarketBox";
 import { pendingLine } from "../../../../../../kb/src/pending-loot";
 import { itemDropSources } from "../../../../../../kb/src/loot-tables";
 import { loadLootTables, loadReportedItemFacts } from "@/lib/rollup-compute";
-import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityIcon, EntityTop, known, LINK, MAP_LINK_HEADER, MapName, ShowOnMap, Unreachable } from "../../entity";
+import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityIcon, EntityTop, known, LINK, PinTable, Unreachable } from "../../entity";
 import { ItemSourcesPanel } from "../../loot-tables";
 import { unknownItem } from "../../unknown";
 import { itemSummary } from "@/lib/evidence";
@@ -152,12 +151,9 @@ export default async function ItemPage(props: Props) {
   // Each source's windows, installs and dates; its rows are the public rates in page.drops.
   const loot = await loadLootTables();
   const sources = itemDropSources(loot.tables, itemId);
-  const pinColumns: Column<(typeof page.pins)[number]>[] = [
+  // The shared pin table, with the NPC that stands there before its columns.
+  const pinLead: Column<(typeof page.pins)[number]>[] = [
     { key: "npc", header: "NPC", cell: (p) => <EntityLink kind="npc" id={p.npcId} name={p.name ?? names.npcs.get(p.npcId)} /> },
-    { key: "map", header: "Map", cell: (p) => <MapName mapId={p.mapId} /> },
-    { key: "at", header: "Position", numeric: true, cell: (p) => `${p.x}, ${p.y}` },
-    { key: "installs", header: "Installs", numeric: true, cell: (p) => p.reporters },
-    { key: "show", header: MAP_LINK_HEADER, cell: (p) => { const href = pinLink(p.mapId, p.x, p.y); return href ? <ShowOnMap href={href} mapId={p.mapId} x={p.x} y={p.y} /> : null; } },
   ];
 
   // A development leftover sharing an icon ("Monster - Item, Flower - White") stays out, as it does in the item lists.
@@ -193,7 +189,7 @@ export default async function ItemPage(props: Props) {
     ...(rel("reward_from").length ? [relationTab("reward-from", "Reward from", "reward_from", "Quest", "")] : []),
     ...(page.pins.length ? [{
       id: "map", label: "Map", count: page.pins.length,
-      panel: <DataTable dense caption={`Where ${title} is found on the map`} columns={pinColumns} rows={page.pins} rowKey={(p) => `${p.npcId}-${p.mapId}`} />,
+      panel: <PinTable caption={`Where ${title} is found on the map`} lead={pinLead} rows={page.pins} rowKey={(p) => `${p.npcId}-${p.mapId}`} />,
     }] : []),
     ...(related.length ? [{
       id: "related", label: "Related", count: related.length,

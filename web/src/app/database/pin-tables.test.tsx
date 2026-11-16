@@ -64,6 +64,12 @@ test("a vendor's places and a quest's giver link the map the same way", async ()
   expect(vendor).toContain('<span title="UiMap 1429">Elwynn Forest</span>');
   expect(vendor).toContain(HEADER);
   expect(vendor).toContain(LABEL);
+  // The same pin table as the NPC page (the Map tab's, the last table on both): the installs that agree are a
+  // column, and the page has the wide-screen column.
+  const npc = await html(NpcPage(props("1")));
+  const headers = (markup: string) => markup.split("<thead>").at(-1)?.split("</thead>")[0];
+  expect(headers(vendor)).toBe(headers(npc));
+  expect(vendor).toContain("data-entity-sidebar");
   expect(vendor).not.toContain("Map 1429 at");
   const quest = await html(QuestPage(props("176")));
   expect(quest).toContain(HEADER);

@@ -15,8 +15,8 @@ import { computeRollups, loadLootTables, loadWorldFacts } from "@/lib/rollup-com
 import { pinLink, WORLD_MAP } from "@/lib/world-map";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
 import { trailFor } from "@/lib/breadcrumbs";
-import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, type Column } from "@/components/ui";
-import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, MapName, ShowOnMap, Unreachable } from "../../entity";
+import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
+import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, known, LINK, PinTable, Unreachable } from "../../entity";
 import { NpcLootPanel } from "../../loot-tables";
 import { VendorGoods } from "../../vendors/goods";
 import { npcRelations } from "../relations";
@@ -50,13 +50,6 @@ export async function generateMetadata(props: { params: Promise<{ id: string }> 
 
 /** `UnitClassification` in words, as the game shows it. */
 const RANK_LABELS: Record<NpcRank, string> = { normal: "Normal", elite: "Elite", rare: "Rare", rare_elite: "Rare elite", boss: "Boss" };
-
-const pinColumns: Column<NpcPin>[] = [
-  { key: "map", header: "Map", cell: (p) => <MapName mapId={p.mapId} /> },
-  { key: "at", header: "Position", numeric: true, cell: (p) => `${p.x}, ${p.y}` },
-  { key: "installs", header: "Installs", numeric: true, cell: (p) => p.reporters },
-  { key: "show", header: MAP_LINK_HEADER, cell: (p) => { const href = pinLink(p.mapId, p.x, p.y); return href ? <ShowOnMap href={href} mapId={p.mapId} x={p.x} y={p.y} /> : null; } },
-];
 
 /**
  * In place of a tooltip, a small picture of the zone with the NPC's point on it, linked to the world map.
@@ -212,7 +205,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
             {
               id: "map", label: "Map", count: unreachable ? undefined : page.pins.length,
               panel: unreachable ? <Unreachable />
-                : page.pins.length ? <DataTable dense caption={`Where ${title} stands`} columns={pinColumns} rows={page.pins} rowKey={(p) => String(p.mapId)} />
+                : page.pins.length ? <PinTable caption={`Where ${title} stands`} rows={page.pins} rowKey={(p) => String(p.mapId)} />
                 : <EmptyTab message="No agreed position yet. A pin needs 3 installs at the same spot." />,
             },
           ]}
