@@ -20,10 +20,10 @@ Nothing touches the game client. The window never shows an ad.
 
 Downloads are on [everloot.app/addon](https://everloot.app/addon) and the
 [releases page](https://github.com/Everloot/everloot/releases) under `desktop-v*`: a Windows installer
-and a portable exe, a macOS disk image, a Linux AppImage. The builds are not code-signed yet, so
+and a portable exe, a macOS disk image, a Linux AppImage. As of 2026-11, the builds are not code-signed, so
 Windows shows a SmartScreen notice (More info, Run anyway). On macOS, open System Settings, Privacy &
-Security and choose Open Anyway (on macOS 14 and earlier, right-click the app and choose Open). The `SHA256SUMS` file on each release lets you check
-a download.
+Security and choose Open Anyway (on macOS 14 and earlier, right-click the app and choose Open). The `SHA256SUMS` file attached to each
+[desktop release](https://github.com/Everloot/everloot/releases?q=desktop-v) lets you check a download.
 
 On first run the app shows what leaves your computer, finds your World of Warcraft folder (or you
 browse to the folder of your game version that holds `WTF`, under `World of Warcraft`), and

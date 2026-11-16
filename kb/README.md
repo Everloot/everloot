@@ -75,6 +75,16 @@ is a diagnostic for a source database and never part of a serving path.
 `serve-mcp-http` binds loopback only and takes `--token` or `EVERLOOT_MCP_TOKEN`. A bearer token is
 transport authentication; it is not evidence that any particular client can connect.
 
+## MCP server release
+
+The MCP server ships with the site. Its version must match in the registry manifest
+[`server.json`](../server.json), the public
+[server card](../web/public/.well-known/mcp/server-card.json), and `SERVER_VERSION` in
+[`src/mcp-server.ts`](src/mcp-server.ts). The
+[MCP release steps](../docs/RELEASING.md#mcp-server) cover the bump and registry publication.
+The versions in [`kb/package.json`](package.json) and the
+[protocol package](../packages/protocol/package.json) are separate from the MCP server version.
+
 ## Blizzard API
 
 Create a free client at https://develop.battle.net/access/clients and put it in `kb/.env`:
