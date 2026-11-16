@@ -13,12 +13,13 @@ spec.loader.exec_module(upload)
 
 
 class UploadTests(unittest.TestCase):
-    def test_alpha_and_stable_use_the_release_notes_channel(self):
-        # An Alpha uploads as a CurseForge Beta, since CurseForge's Files tab hides alpha files by default.
-        for notes, channel, name in [("Release channel: Alpha\nPending live checks.", "beta", "Everloot 0.3.14 Beta"),
-                                     ("Stable fixes.", "release", "Everloot 0.3.14")]:
+    def test_every_upload_is_a_release_and_an_alpha_says_so_in_its_name(self):
+        # The CurseForge app syncs only Release files by default, so an Alpha is a Release named "... Alpha".
+        for notes, name in [("Release channel: Alpha\nPending live checks.", "Everloot 0.3.14 Alpha"),
+                            ("Stable fixes.", "Everloot 0.3.14"),
+                            ("Mentions Release channel: Alpha mid-line only.", "Everloot 0.3.14")]:
             data = upload.metadata("0.3.14", notes)
-            self.assertEqual(data["releaseType"], channel)
+            self.assertEqual(data["releaseType"], "release")
             self.assertEqual(data["displayName"], name)
             self.assertEqual(data["gameVersions"], [17053])
             self.assertEqual(data["changelog"], notes)
