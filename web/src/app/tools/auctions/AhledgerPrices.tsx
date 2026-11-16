@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import Coins from "@/components/ui/Coins";
 import { DataTable, Segmented, type Column } from "@/components/ui";
-import { AHLEDGER_SITE, ahledgerItemUrl, ahledgerMarketLabel, type AhledgerPrice } from "@/lib/ahledger";
+import { AHLEDGER_SITE, ahledgerCredit, ahledgerItemUrl, ahledgerMarketLabel, type AhledgerPrice } from "@/lib/ahledger";
 
 /** One region's markets: "US" and the market ids AH Ledger lists there. */
 export interface AhledgerRegion { label: string; markets: string[] }
 
-type Row = { market: string; price: AhledgerPrice | null };
+type Row = { market: string; price: AhledgerPrice | null; credit?: string };
 type Read = { state: "loading" } | { state: "failed" } | { state: "rows"; rows: Row[] };
 
 const UTC = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" });
@@ -16,8 +16,8 @@ const UTC = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", h
 async function readMarket(market: string, itemId: number): Promise<Row> {
   const res = await fetch(`/api/ahledger/${market}?items=${itemId}`);
   if (!res.ok) throw new Error(String(res.status));
-  const body = (await res.json()) as { prices?: AhledgerPrice[] };
-  return { market, price: body.prices?.find((p) => p.itemId === itemId) ?? null };
+  const body = (await res.json()) as { prices?: AhledgerPrice[]; credit?: { url: string } };
+  return { market, price: body.prices?.find((p) => p.itemId === itemId) ?? null, credit: ahledgerCredit({ attribution: body.credit }).url };
 }
 
 /**
@@ -77,7 +77,7 @@ export default function AhledgerPrices({ itemId, regions, title = "AH Ledger pri
         <DataTable dense caption={`${title}, ${region}`} columns={columns} rows={read.rows} rowKey={(r) => r.market} />
       )}
       <p className="mt-2 text-meta text-fg-2">
-        <a href={AHLEDGER_SITE} rel="noopener">Prices from AHledger</a>
+        <a href={read.state === "rows" ? read.rows[0]?.credit ?? AHLEDGER_SITE : AHLEDGER_SITE} rel="noopener">Prices from AHledger</a>
       </p>
     </section>
   );

@@ -77,8 +77,17 @@ test("a tooltip answer keeps only the price fields, and rows without an id are d
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const ALLOWED = [
   "web/src/lib/ahledger.ts",
+  "web/src/lib/ahledger-proxy.ts",
   "web/src/app/api/ahledger/[market]/route.ts",
+  "web/src/app/api/ahledger/[market]/[view]/route.ts",
+  "web/src/app/api/ahledger/economy/route.ts",
   "web/src/app/tools/auctions/AhledgerPrices.tsx",
+  "web/src/app/tools/auctions/AhledgerPanel.tsx",
+  "web/src/app/tools/auctions/AhledgerHistory.tsx",
+  "web/src/app/tools/auctions/AhledgerCrafting.tsx",
+  "web/src/app/tools/auctions/AhledgerMarket.tsx",
+  "web/src/app/tools/auctions/page.tsx",
+  "web/src/app/tools/professions/[profession]/page.tsx",
   "web/src/app/tools/auctions/item/[itemId]/page.tsx",
   "web/src/app/tools/auctions/[realm]/[itemId]/page.tsx",
   // Names AH Ledger only to say how the house-to-ruleset mapping was worked out; it keeps none of its prices.

@@ -111,3 +111,76 @@ export function itemsParam(raw: string | null): number[] | null {
   const ids = [...new Set(parts.map(Number))];
   return ids.length === parts.length ? ids : null;
 }
+
+export interface AhledgerCredit { text: string; url: string }
+
+/** Never trust attribution HTML or an off-site credit URL. */
+export function ahledgerCredit(body: unknown): AhledgerCredit {
+  let url = AHLEDGER_SITE;
+  try {
+    const candidate = new URL(String(record(record(body).attribution).url));
+    if (candidate.protocol === "https:" && candidate.hostname === "ahledger.com" && !candidate.port && !candidate.username && !candidate.password) url = candidate.href;
+  } catch { /* Missing or malformed attribution uses the site's home page. */ }
+  return { text: "Prices from AHledger", url };
+}
+
+/** Browser and edge lifetimes stay separate, including private history answers. */
+export function upstreamCacheHeaders(header: string | null): Record<string, string> {
+  const h = (header ?? "").toLowerCase();
+  const age = /(?:^|[\s,])max-age=(\d+)(?=\s|,|$)/.exec(h)?.[1];
+  if (!age || /\b(no-store|no-cache)\b/.test(h)) return { "Cache-Control": "no-store" };
+  if (/\bprivate\b/.test(h)) return { "Cache-Control": `private, max-age=${age}` };
+  const life = lifetimes(header);
+  if (!life) return { "Cache-Control": "no-store" };
+  const shared = /(?:^|[\s,])s-maxage=(\d+)(?=\s|,|$)/.exec(h)?.[1];
+  return { "Cache-Control": `public, max-age=${life.browser}`, ...(shared ? { "CDN-Cache-Control": `max-age=${shared}` } : {}) };
+}
+
+export const AHLEDGER_PROFESSIONS = ["Alchemy", "Blacksmithing", "Cooking", "Enchanting", "Engineering", "First Aid", "Herbalism", "Leatherworking", "Mining", "Skinning", "Tailoring"] as const;
+export const isAhledgerProfession = (name: string): boolean => AHLEDGER_PROFESSIONS.some((p) => p === name);
+
+const record = (v: unknown): Record<string, unknown> => v !== null && typeof v === "object" ? v as Record<string, unknown> : {};
+const text = (v: unknown): string | null => typeof v === "string" ? v : null;
+const id = (v: unknown): number | null => typeof v === "number" && Number.isSafeInteger(v) && v > 0 ? v : null;
+const date = (v: unknown): string | null => typeof v === "string" && Number.isFinite(Date.parse(v)) ? v : null;
+const rows = (body: unknown, key: string): unknown[] => {
+  const value = record(body)[key];
+  if (!Array.isArray(value) || record(body).notice || record(body).error) throw new Error("AH Ledger response could not be read.");
+  return value;
+};
+
+export interface AhledgerPoint { t: string; min: number | null; median: number | null; p25: number | null; p75: number | null }
+export interface AhledgerHistory { median7d: number | null; median30d: number | null; salesPerDay: number | null; windowDays: number | null; series: AhledgerPoint[] }
+
+export function priceHistory(body: unknown): AhledgerHistory {
+  const latest = record(record(body).latest), sales = record(record(body).sales);
+  const series = rows(body, "series").flatMap((raw) => {
+    const p = record(raw), t = date(p.t);
+    return t ? [{ t, min: num(p.min), median: num(p.median), p25: num(p.p25), p75: num(p.p75) }] : [];
+  }).sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
+  return { median7d: num(latest.median7d), median30d: num(latest.median30d), salesPerDay: num(sales.estimatedPerDay), windowDays: num(sales.windowDays), series };
+}
+
+export interface AhledgerCraft { spellId: number; name: string; cost: number | null; netValue: number | null; margin: number | null; salesPerDay: number | null; profitPerDay: number | null }
+export function craftingMargins(body: unknown): AhledgerCraft[] {
+  return rows(body, "recipes").flatMap((raw) => {
+    const r = record(raw), recipe = record(r.recipe), spellId = id(recipe.spellId);
+    return spellId === null ? [] : [{ spellId, name: text(recipe.name) ?? `Spell ${spellId}`, cost: num(r.cost), netValue: num(r.netValue), margin: num(r.margin), salesPerDay: num(r.resultSalesPerDay), profitPerDay: num(r.profitPerDay) }];
+  }).sort((a, b) => (b.profitPerDay ?? -Infinity) - (a.profitPerDay ?? -Infinity));
+}
+
+export interface AhledgerDeal { itemId: number; name: string; minBuyout: number | null; referenceMedian: number | null; basis: string | null; quantity: number | null; saving: number | null }
+export function dealPrices(body: unknown): AhledgerDeal[] {
+  return rows(body, "deals").flatMap((raw) => {
+    const r = record(raw), item = record(r.item), itemId = id(item.id);
+    return itemId === null ? [] : [{ itemId, name: text(item.name) ?? `Item ${itemId}`, minBuyout: num(r.minBuyout), referenceMedian: num(r.referenceMedian), basis: ["7d", "30d", "scan"].includes(String(r.basis)) ? String(r.basis) : null, quantity: num(r.quantity), saving: num(r.saving) }];
+  }).sort((a, b) => (b.saving ?? -Infinity) - (a.saving ?? -Infinity)).slice(0, 20);
+}
+
+export interface AhledgerEconomy { market: string; current: number | null; weekAgo: number | null }
+export function economyMarkets(body: unknown): AhledgerEconomy[] {
+  return rows(body, "markets").flatMap((raw) => {
+    const r = record(raw);
+    return typeof r.market === "string" && isAhledgerMarket(r.market) ? [{ market: r.market, current: num(record(r.current).value), weekAgo: num(record(r.weekAgo).value) }] : [];
+  });
+}

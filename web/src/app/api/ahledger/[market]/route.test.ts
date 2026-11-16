@@ -3,6 +3,7 @@ import { GET } from "./route";
 
 const tooltip = {
   market: { slug: "forever/pvp/horde/us", label: "PvP Horde US" },
+  attribution: { url: "https://ahledger.com/test-credit" },
   items: [{ id: 2589, name: "Linen Cloth", icon: "https://render.worldofwarcraft.com/x.jpg", median: 43, minBuyout: 20, quantity: 9085, observedAt: "2026-11-15T15:03:06.000Z", salesPerDay: 18095.4 }],
 };
 const call = (market: string, query: string, headers: Record<string, string> = {}) =>
@@ -27,17 +28,17 @@ test("reads AH Ledger's tooltip with the key and answers the price fields with A
   expect(await res.json()).toEqual({
     ok: true, market: "forever.pvp.horde.us", label: "PvP Horde",
     prices: [{ itemId: 2589, minBuyout: 20, median: 43, quantity: 9085, salesPerDay: 18095.4, observedAt: "2026-11-15T15:03:06.000Z" }],
-    credit: { text: "Prices from AHledger", url: "https://ahledger.com" },
+    credit: { text: "Prices from AHledger", url: "https://ahledger.com/test-credit" },
   });
 });
 
-test("without a key it still reads, unauthenticated; an answer AH Ledger marks private is not cached", async () => {
+test("without a key it still reads, unauthenticated; a private answer stays in the browser only", async () => {
   const fetchImpl = vi.fn(async () => Response.json(tooltip, { headers: { "Cache-Control": "private, max-age=60" } }));
   vi.stubGlobal("fetch", fetchImpl);
   const res = await call("forever.pvp.horde.us", "?items=2589");
   const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
   expect(new Headers(init.headers).has("authorization")).toBe(false);
-  expect(res.headers.get("cache-control")).toBe("no-store");
+  expect(res.headers.get("cache-control")).toBe("private, max-age=60");
   expect(res.headers.get("cdn-cache-control")).toBeNull();
 });
 

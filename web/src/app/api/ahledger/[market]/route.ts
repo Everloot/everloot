@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AHLEDGER_API, AHLEDGER_SITE, MAX_ITEMS, ahledgerMarketLabel, isAhledgerMarket, itemsParam, lifetimes, tooltipPrices } from "@/lib/ahledger";
+import { AHLEDGER_API, MAX_ITEMS, ahledgerCredit, ahledgerMarketLabel, isAhledgerMarket, itemsParam, upstreamCacheHeaders, tooltipPrices } from "@/lib/ahledger";
 export const dynamic = "force-dynamic";
 
 const NO_STORE = { "Cache-Control": "no-store" };
@@ -8,7 +8,7 @@ const NO_STORE = { "Cache-Control": "no-store" };
  * GET /api/ahledger/<market>?items=2589,2592 — AH Ledger's latest price for each item on one market (lib/ahledger.ts),
  * read from its tooltip endpoint with Everloot's key and answered with only the fields the auction pages show and the
  * credit link. Nothing is stored: the answer carries AH Ledger's own lifetimes, a browser keeps it for its max-age and
- * the edge for its s-maxage (lib/cf-edge-cache.ts), and an answer AH Ledger marks private is passed on uncached.
+ * the edge for its s-maxage (lib/cf-edge-cache.ts), and a private answer stays in the browser only.
  * For Everloot's own pages: a browser request from another site is refused.
  */
 export async function GET(req: Request, { params }: { params: Promise<{ market: string }> }) {
@@ -44,15 +44,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ market: 
   } catch {
     return NextResponse.json({ ok: false, error: "AH Ledger could not answer." }, { status: 502, headers: NO_STORE });
   }
-  const life = lifetimes(upstream.headers.get("cache-control"));
-  const headers = life
-    ? { "Cache-Control": `public, max-age=${life.browser}`, "CDN-Cache-Control": `max-age=${life.shared}` }
-    : NO_STORE;
+  const headers = upstreamCacheHeaders(upstream.headers.get("cache-control"));
   return NextResponse.json({
     ok: true,
     market,
     label: ahledgerMarketLabel(market),
     prices: tooltipPrices(body),
-    credit: { text: "Prices from AHledger", url: AHLEDGER_SITE },
+    credit: ahledgerCredit(body),
   }, { headers });
 }
