@@ -371,6 +371,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: upload and addon install steps name the Windows and macOS Forever save-file and AddOns paths.
 - Site: show likely ranges and few-window marks in NPC, item-source, loot-list and zone tables.
 - Addon: grouped auction sales show paid transactions per day and paid units per day separately beside the last sold date. Pending and unmatched notices affect neither rate; in-game layout verification is required before release.
+- Site: profession shopping lists total materials for a chosen skill range, let players skip recipes, compare listed prices from selected auction houses, and search recipes by name, recipe item or material with a skill filter.
 - Site: share private character-sync validation with the companion through a separate protocol export; public uploads still reject private-only rows.
 - Site: Reuse cold-start aggregate and game-art reads and load the build label from a small generated stamp.
 - Site: auction item pages (`/tools/auctions/:realm/:itemId`) are kept in the edge cache for five minutes, like the browse pages, so repeat requests and crawlers stop re-rendering them.
