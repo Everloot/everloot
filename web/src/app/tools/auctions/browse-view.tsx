@@ -281,6 +281,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
           )}
           aside={strip}
         />
+        {!slug && <p className="mb-3 text-sm"><Link href="/tools/auctions/report" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Daily market report and share image</Link></p>}
         {!slug && state && (
           <>
             <LinkTabs
