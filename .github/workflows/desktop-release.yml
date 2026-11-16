@@ -79,6 +79,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/checkout@v7
       - name: The changelog has a section for this version
@@ -101,3 +102,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${GITHUB_REF_NAME}" out/* --title "Everloot Desktop App ${GITHUB_REF_NAME#desktop-v}" --notes-file release-notes.md
+      - name: Announce the release in Discord
+        # The release above was made with the workflow token, which starts no other workflow.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: gh workflow run discord-bridge.yml --repo "${GITHUB_REPOSITORY}" --ref "${DEFAULT_BRANCH}" -f release_tag="${GITHUB_REF_NAME}"
