@@ -2,12 +2,12 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import JsonLd from "@/components/JsonLd";
 import GameIcon from "@/components/game/GameIcon";
-import { AgreementMeter, GET_THE_ADDON, QUALITY_TEXT, type Quality } from "@/components/ui";
+import { AgreementMeter, DataTable, GET_THE_ADDON, QUALITY_TEXT, type Column, type Quality } from "@/components/ui";
 import { UNCONFIRMED_TITLE } from "@/components/ui/Badge";
 import { trailFor } from "@/lib/breadcrumbs";
 import { breadcrumbJsonLd, type Crumb } from "@/lib/jsonld";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
-import { WORLD_MAP } from "@/lib/world-map";
+import { pinLink, WORLD_MAP } from "@/lib/world-map";
 
 // The layout every database entity page shares (item, NPC, object, quest, spell, vendor, achievement, faction, title,
 // quest chain, zone and instance), read like an item database: a compact title with its type line, the tooltip box
@@ -135,6 +135,26 @@ export const MAP_LINK_HEADER = <span className="sr-only">Map link</span>;
 /** A pin table's link to the map. Each one says where it goes (WCAG 2.4.4), since every row's link reads the same. */
 export function ShowOnMap({ href, mapId, x, y }: { href: string; mapId: number; x: number; y: number }) {
   return <Link href={href} className={LINK} aria-label={`Show ${zoneName(mapId)} at ${x}, ${y} on the map`}>Show on the map</Link>;
+}
+
+/** A position 3 installs agree on: the UiMap and the point on it, with how many installs reported it. */
+export interface Pin { mapId: number; x: number; y: number; reporters: number }
+
+/**
+ * The one pin table of the entity pages: where an NPC, a vendor or an object stands, where the NPCs an item drops
+ * from stand. The zone by name, the position, the installs that agree and the link to the map, in that order on
+ * every page; `lead` puts a page's own columns before them (the item page's NPC). A pin on a map the world map
+ * does not draw keeps its row and has no link.
+ */
+export function PinTable<P extends Pin>({ caption, rows, rowKey, lead = [] }: { caption: string; rows: P[]; rowKey: (pin: P) => string; lead?: Column<P>[] }) {
+  const columns: Column<P>[] = [
+    ...lead,
+    { key: "map", header: "Map", cell: (p) => <MapName mapId={p.mapId} /> },
+    { key: "at", header: "Position", numeric: true, cell: (p) => `${p.x}, ${p.y}` },
+    { key: "installs", header: "Installs", numeric: true, cell: (p) => p.reporters },
+    { key: "show", header: MAP_LINK_HEADER, cell: (p) => { const href = pinLink(p.mapId, p.x, p.y); return href ? <ShowOnMap href={href} mapId={p.mapId} x={p.x} y={p.y} /> : null; } },
+  ];
+  return <DataTable dense caption={caption} columns={columns} rows={rows} rowKey={rowKey} />;
 }
 
 /** A CSS-only wide rail; its tracks exist on the first server render. */

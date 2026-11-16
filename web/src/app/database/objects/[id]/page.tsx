@@ -7,7 +7,6 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { hasCard } from "@/lib/tooltip";
 import { objectPage, type ObjectDrop, type ObjectFacts, type ObjectPage as ObjectFactsPage } from "../../../../../../kb/src/object-page";
 import { pendingLine } from "../../../../../../kb/src/pending-loot";
-import { pinLink } from "@/lib/world-map";
 import { objectIndexable } from "@/lib/indexable";
 import { entityTitle, objectDescription } from "@/lib/entity-meta";
 import { formatMeasuredZero } from "../../../../../../kb/src/item-page";
@@ -17,7 +16,7 @@ import LoreSection from "@/components/LoreSection";
 import { pageMetadata } from "@/lib/seo";
 import { Container, DataTable, Facts, InShort, installsNeeded, OpenData, Tabs, TooltipFrame, type Column } from "@/components/ui";
 import type { Crumb } from "@/lib/jsonld";
-import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, FREQUENCY, known, LINK, MAP_LINK_HEADER, MapName, percent, ShowOnMap, Unreachable } from "../../entity";
+import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, FREQUENCY, known, LINK, percent, PinTable, Unreachable } from "../../entity";
 import { entitySummary, observedLine } from "@/lib/evidence";
 
 export const dynamic = "force-dynamic";
@@ -46,14 +45,6 @@ const columns: Column<ObjectDrop>[] = [
   { key: "drops", header: "Drops", numeric: true, cell: (d) => d.drops },
   { key: "rate", header: FREQUENCY, numeric: true, cell: (d) => percent(d.rate) },
   { key: "installs", header: "Installs", numeric: true, cell: (d) => d.reporters },
-];
-
-type ObjectPin = NonNullable<ObjectFactsPage["pins"]>[number];
-const pinColumns: Column<ObjectPin>[] = [
-  { key: "map", header: "Map", cell: (p) => <MapName mapId={p.mapId} /> },
-  { key: "at", header: "Position", numeric: true, cell: (p) => `${p.x}, ${p.y}` },
-  { key: "installs", header: "Installs", numeric: true, cell: (p) => p.reporters },
-  { key: "show", header: MAP_LINK_HEADER, cell: (p) => { const href = pinLink(p.mapId, p.x, p.y); return href ? <ShowOnMap href={href} mapId={p.mapId} x={p.x} y={p.y} /> : null; } },
 ];
 
 export default async function ObjectPage(props: { params: Promise<{ id: string }> }) {
@@ -124,7 +115,7 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
           }, {
             id: "map", label: "Map", count: facts.unreachable ? undefined : pins.length,
             panel: facts.unreachable ? <Unreachable />
-              : pins.length ? <DataTable dense caption={`Where players saw ${title} on the minimap`} columns={pinColumns} rows={pins} rowKey={(p) => `${p.mapId}-${p.x}-${p.y}`} />
+              : pins.length ? <PinTable caption={`Where players saw ${title} on the minimap`} rows={pins} rowKey={(p) => `${p.mapId}-${p.x}-${p.y}`} />
               : <EmptyTab message="No agreed position yet. A pin needs 3 installs at the same spot." />,
           }]}
         />
