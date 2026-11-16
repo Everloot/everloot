@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Container } from "@/components/ui";
-import { loadBlizzardPrices } from "@/lib/blizzard-auctions";
+import { loadBlizzardPrices, loadBlizzardHistory } from "@/lib/blizzard-auctions";
 import { shownItemName } from "@/lib/items";
 import { loadShownNames } from "@/lib/shown-item-names";
 import { BlizzardAuctions } from "./blizzard-auctions";
+import { BlizzardHistory } from "./history";
 
 /**
  * One item's Blizzard API auction prices (issue #1122), on a page of their own. Blizzard's Developer API Terms allow
@@ -30,7 +31,7 @@ export default async function BlizzardAuctionPage(props: Props) {
   const { id } = await props.params;
   if (!/^[1-9]\d{0,8}$/.test(id)) notFound();
   const itemId = Number(id);
-  const [read, { agreed, matched }] = await Promise.all([loadBlizzardPrices(itemId), loadShownNames()]);
+  const [read, history, { agreed, matched }] = await Promise.all([loadBlizzardPrices(itemId), loadBlizzardHistory(itemId), loadShownNames()]);
   const name = shownItemName(itemId, agreed, matched?.names)?.name ?? `Item ${itemId}`;
   return (
     <Container>
@@ -41,6 +42,8 @@ export default async function BlizzardAuctionPage(props: Props) {
         the prices players&apos; addons report are shown.
       </p>
       <BlizzardAuctions read={read} />
+      <p className="text-meta"><a href="/blizzard-auctions" className="text-fg underline underline-offset-4">Browse Blizzard auction house data</a></p>
+      <BlizzardHistory read={history} />
       <p className="mt-2 text-meta text-fg-2">Data from Blizzard Entertainment</p>
     </Container>
   );

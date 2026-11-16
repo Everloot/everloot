@@ -1,13 +1,14 @@
 """Links the Everloot Discord server and this repository. Run by .github/workflows/discord-bridge.yml.
 
-  schedule, issues  new #bug-reports and #suggestions posts become GitHub issues; issue status flows
-                    back to the post as a tag and a reply; #known-issues lists open issues labelled
-                    known-issue; someone who joined in the last hour gets a hello in #general
+  schedule, issues  #help posts tagged Bug and every #ideas post become GitHub issues; issue status
+                    flows back to the post as a tag and a reply; the pinned "Start here" post in #help
+                    keeps a list of open issues labelled known-issue; someone who joined in the last
+                    hour gets a hello in #general
   weekly schedule   a short list of last week's merged site, addon, app and AI changes in #updates
   release           posts an addon or desktop release to #updates, once. Releases made with the workflow
                     token start no workflows, so the release workflows also dispatch this one with
                     release_tag; whichever arrives second finds the post and skips it
-  discussion        posts the new discussion to #discussions
+  discussion        posts the new discussion to #github-feed
   push to main      posts the commits to #github-feed
   pull_request_target (opened)  posts the pull request to #github-feed
 
@@ -26,23 +27,22 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 GUILD = "1561174605580992603"
-BUGS = "1561179041204150272"  # forum #bug-reports
-KNOWN_ISSUES = "1561179153322082497"
+HELP = "1561179041204150272"  # forum #help: questions and bug reports (was #bug-reports)
 VERSION_UPDATES = "1561179149702398044"
-DISCUSSIONS = "1561254298170556589"
 GITHUB_FEED = "1561179069083680868"
 PING_ADDON = "1561178952108613752"
-IDEAS = "1561179043687174246"  # forum #suggestions
+IDEAS = "1561179043687174246"  # forum #ideas (was #suggestions)
 GENERAL = "1561178989463339099"  # also where Discord posts "X joined"
 WELCOME = "1561178970580586686"
-SUPPORT = "1561179038389637177"
-WOW_TALK = "1561179005590179961"
 MAINTAINER = "204042107856486401"  # pinged when someone joins, to say hello in person
 GOLD = 0xF2B632
 
 AREA_LABELS = {"Addon": "addon", "Website": "web", "MCP / AI": "mcp", "Desktop": "companion"}
 STATUS_TAGS = ("Tracked", "Confirmed", "Fixed", "Can't reproduce", "Needs info", "Closed")
 IDEA_TAGS = ("Under review", "Planned", "Shipped", "Declined")
+BUG_TAG = "Bug"  # in #help only posts with this tag go to GitHub; questions stay in Discord
+# The bot's pinned post in #help (a forum pins one post). Its latest bot message is the known-issues list.
+KNOWN_TITLE = "Start here: questions, bugs and known issues"
 GREET_WINDOW = timedelta(hours=1)
 WEEKLY_CRON = "0 16 * * 1"  # Mondays; must match discord-bridge.yml
 WEEKLY_AREAS = {"web": "Site", "addon": "Addon", "desktop": "Desktop App", "companion": "Desktop App", "mcp": "AI connectors"}
@@ -97,7 +97,7 @@ def is_bridged(issue: dict) -> bool:
     return issue.get("user", {}).get("login") == BRIDGE_LOGIN and "from-discord" in labels and bool(MARKER.search(issue.get("body") or ""))
 
 
-def issue_body(thread: dict, starter: dict, areas: list[str], forum: str = "bug-reports") -> str:
+def issue_body(thread: dict, starter: dict, areas: list[str], forum: str = "help") -> str:
     author = starter["author"].get("global_name") or starter["author"]["username"]
     link = f"https://discord.com/channels/{GUILD}/{thread['id']}"
     text = defuse_mentions(starter.get("content") or "(no text)")
@@ -120,7 +120,7 @@ def over_daily_limit(thread: dict, tracked: list[dict], now: datetime) -> bool:
 
 def known_issues_text(issues: list[dict]) -> str:
     if not issues:
-        return "No known issues right now. Found one? Post it in <#%s>." % BUGS
+        return "No known issues right now. Found one? Post it in <#%s> with the Bug tag." % HELP
     rows = []
     for i in issues[:25]:
         areas = [k for k, v in AREA_LABELS.items() if v in {label["name"] for label in i["labels"]}]
@@ -145,7 +145,7 @@ def already_posted(tag: str, messages: list[dict], me: str) -> bool:
 
 
 def idea_status(issue: dict) -> str:
-    """The #suggestions tag a bridged idea should show: a maintainer adds `planned`, closing as completed ships it."""
+    """The #ideas tag a bridged idea should show: a maintainer adds `planned`, closing as completed ships it."""
     if issue["state"] == "closed":
         return "Shipped" if issue.get("state_reason") == "completed" else "Declined"
     return "Planned" if "planned" in {label["name"] for label in issue.get("labels", [])} else "Under review"
@@ -172,8 +172,8 @@ def joins_to_greet(messages: list[dict], me: str, now: datetime) -> list[dict]:
 
 
 def greeting(user_id: str) -> str:
-    return (f"Welcome to Everloot, <@{user_id}>! Start with <#{WELCOME}>. Questions about the addon, the app or the site go in "
-            f"<#{SUPPORT}>, game talk in <#{WOW_TALK}>, and you can just say hi here. <@{MAINTAINER}> will be by to say hello.")
+    return (f"Welcome to Everloot, <@{user_id}>! Start with <#{WELCOME}>. Questions, problems and bug reports go in <#{HELP}>, "
+            f"ideas in <#{IDEAS}>, and you can just say hi here. <@{MAINTAINER}> will be by to say hello.")
 
 
 def weekly_text(prs: list[dict], more_url: str, limit: int = 15) -> str:
@@ -258,12 +258,13 @@ def say(channel: str, embed: dict, content: str = "", roles=()) -> dict:
     return discord("POST", f"/channels/{channel}/messages", body)
 
 
-# The two forums mirrored with GitHub issues. Each post becomes an issue labelled with its kind.
+# The two forums mirrored with GitHub issues. A post becomes an issue labelled with its kind; in #help only
+# posts tagged Bug do (if the tag is missing, nothing is opened).
 KINDS = {
-    "bug": {"forum": BUGS, "name": "bug-reports", "tags": STATUS_TAGS, "status": issue_status, "reply": status_reply,
-            "noun": "bug reports"},
-    "idea": {"forum": IDEAS, "name": "suggestions", "tags": IDEA_TAGS, "status": idea_status, "reply": idea_reply,
-             "noun": "suggestions"},
+    "bug": {"forum": HELP, "name": "help", "tags": STATUS_TAGS, "status": issue_status, "reply": status_reply,
+            "noun": "bug reports", "only": BUG_TAG},
+    "idea": {"forum": IDEAS, "name": "ideas", "tags": IDEA_TAGS, "status": idea_status, "reply": idea_reply,
+             "noun": "ideas"},
 }
 
 
@@ -304,6 +305,8 @@ def open_new_posts(kind: str, tags: dict) -> None:
     now = datetime.now(timezone.utc)
     for t in sorted(threads, key=lambda t: int(t["id"])):
         if t["owner_id"] == me or status_ids & set(t.get("applied_tags", [])):
+            continue
+        if k.get("only") and tags.get(k["only"]) not in t.get("applied_tags", []):
             continue
         if t["id"] in already:  # issue exists but tagging failed last time: just tag it
             discord("PATCH", f"/channels/{t['id']}", {"archived": False, "applied_tags": t.get("applied_tags", []) + [tags[first]]})
@@ -350,13 +353,23 @@ def update_known_issues() -> None:
              "description": known_issues_text(issues), "color": GOLD,
              "footer": {"text": "Updated automatically from GitHub issues labelled known-issue"}}
     me = discord("GET", "/users/@me")["id"]
-    mine = [m for m in discord("GET", f"/channels/{KNOWN_ISSUES}/messages?limit=20") if m["author"]["id"] == me]
+    thread = next((t for t in forum_threads(HELP) if t["owner_id"] == me and t["name"] == KNOWN_TITLE), None)
+    if thread is None:  # someone deleted it: post the list again (unpinned; a maintainer pins it)
+        try:
+            discord("POST", f"/channels/{HELP}/threads", {"name": KNOWN_TITLE, "message": {"embeds": [embed], "allowed_mentions": NO_PINGS}})
+        except RuntimeError as e:  # #help requires a tag, which binds the bot too; the rest of the sync goes on
+            print(f"known issues: no pinned post in #help and could not post one ({e})")
+        return
+    mine = [m for m in discord("GET", f"/channels/{thread['id']}/messages?limit=20") if m["author"]["id"] == me]
+    old = (mine[0]["embeds"] or [{}])[0] if mine else {}
+    if old.get("description") == embed["description"]:
+        return
+    if (thread.get("thread_metadata") or {}).get("archived"):
+        discord("PATCH", f"/channels/{thread['id']}", {"archived": False})
     if mine:
-        old = mine[0]["embeds"][0] if mine[0]["embeds"] else {}
-        if old.get("description") != embed["description"]:
-            discord("PATCH", f"/channels/{KNOWN_ISSUES}/messages/{mine[0]['id']}", {"embeds": [embed], "allowed_mentions": NO_PINGS})
+        discord("PATCH", f"/channels/{thread['id']}/messages/{mine[0]['id']}", {"embeds": [embed], "allowed_mentions": NO_PINGS})
     else:
-        discord("POST", f"/channels/{KNOWN_ISSUES}/messages", {"embeds": [embed], "allowed_mentions": NO_PINGS})
+        discord("POST", f"/channels/{thread['id']}/messages", {"embeds": [embed], "allowed_mentions": NO_PINGS})
 
 
 def greet_new_members() -> None:
@@ -414,7 +427,7 @@ def post_release(release: dict) -> None:
 
 
 def post_discussion(d: dict) -> None:
-    say(DISCUSSIONS, {"title": d["title"][:250], "url": d["html_url"], "description": (d.get("body") or "")[:500],
+    say(GITHUB_FEED, {"title": d["title"][:250], "url": d["html_url"], "description": (d.get("body") or "")[:500],
                       "author": {"name": d["user"]["login"]}, "footer": {"text": d["category"]["name"]}})
 
 

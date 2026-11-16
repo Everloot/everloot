@@ -39,6 +39,7 @@ export default async function AuctionHousePage(props: Props) {
   return (
     <>
       <JsonLd data={webApplicationJsonLd({ name: "Auction House", path: "/tools/auctions", description: DESCRIPTION })} />
+      <p className="mb-3 text-meta"><a href="/blizzard-auctions" className="text-fg underline underline-offset-4">Blizzard auction house data</a></p>
       {view}
       <Container width="data">
         <div className="space-y-8 pb-8">

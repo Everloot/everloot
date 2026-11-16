@@ -2,10 +2,54 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test, vi } from "vitest";
-import { loadBlizzardPrices } from "./blizzard-auctions";
+import { loadBlizzardPrices, loadBlizzardHouseItems, loadBlizzardHistory } from "./blizzard-auctions";
 
 const env = { SUPABASE_URL: "https://example.test/", SUPABASE_SERVICE_ROLE_KEY: "test-key" };
 const row = { region: "us", house_id: 110, house_name: "Alliance Auction House", snapshot_at: "2026-11-13T12:22:37+00:00", min_unit: 150, typical_unit: "172", quantity: 26, auctions: 3 };
+
+test("browse readers distinguish missing functions, failures and empty results", async () => {
+  for (const load of [
+    (fetcher: typeof fetch) => loadBlizzardHouseItems("eu", 110, env, fetcher),
+    (fetcher: typeof fetch) => loadBlizzardHistory(954, env, fetcher),
+  ]) {
+    expect(await load(async () => Response.json([]))).toEqual({ ok: true, rows: [] });
+    expect(await load(async () => Response.json({ code: "PGRST202" }, { status: 404 }))).toEqual({ ok: false, reason: "unavailable" });
+    for (const fetcher of [
+      async () => Response.json({ code: "42P01" }, { status: 404 }),
+      async () => new Response("bad", { status: 500 }),
+      async () => Response.json([{}]),
+      async () => { throw new Error("offline"); },
+    ]) expect(await load(fetcher)).toEqual({ ok: false, reason: "failed" });
+  }
+});
+
+test("house browsing reads beyond the PostgREST row limit, without shared caching", async () => {
+  const houseRow = { ...row, item_id: 954, kind: "items" };
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json(Array.from({ length: 1000 }, () => houseRow)))
+    .mockResolvedValueOnce(Response.json([{ ...houseRow, item_id: 955 }]));
+  const read = await loadBlizzardHouseItems("eu", 110, env, fetcher);
+  expect(read.ok && read.rows.length).toBe(1001);
+  expect(fetcher.mock.calls[1][0]).toContain("offset=1000");
+  const init = fetcher.mock.calls[0][1]!;
+  expect(init.cache).toBe("no-store");
+  expect(JSON.parse(String(init.body))).toEqual({ p_region: "eu", p_house_id: 110 });
+  expect(new Headers(init.headers).get("apikey")).toBe("test-key");
+});
+
+test("history keeps the day, document kind and house with normalized prices", async () => {
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json([{ ...row, kind: "commodities", day: "2026-11-13" }]));
+  const read = await loadBlizzardHistory(954, env, fetcher);
+  expect(read.ok && read.rows[0]).toMatchObject({ region: "us", houseId: 110, kind: "commodities", day: "2026-11-13", typicalUnit: 172 });
+  expect(String(fetcher.mock.calls[0][0])).toContain("blizzard_auction_item_history");
+  expect(await loadBlizzardHistory(954, {}, fetcher)).toEqual({ ok: false, reason: "failed" });
+});
+
+test("a later page failure discards the partial house read", async () => {
+  const fetcher = vi.fn<typeof fetch>()
+    .mockResolvedValueOnce(Response.json(Array.from({ length: 1000 }, () => ({ ...row, item_id: 954, kind: "items" }))))
+    .mockResolvedValueOnce(new Response("unavailable", { status: 503 }));
+  expect(await loadBlizzardHouseItems("us", 110, env, fetcher)).toEqual({ ok: false, reason: "failed" });
+});
 
 test("reads one item's rows through blizzard_auction_item with the service key", async () => {
   const fetchImpl = vi.fn(async () => Response.json([row]));
@@ -52,6 +96,12 @@ const ALLOWED = [
   "web/src/lib/blizzard-auctions.ts",
   "web/src/app/blizzard-auctions/[id]/blizzard-auctions.tsx",
   "web/src/app/blizzard-auctions/[id]/page.tsx",
+  "web/src/app/blizzard-auctions/[id]/history.tsx",
+  "web/src/app/blizzard-auctions/page.tsx",
+  // Plain link to the ad-free document only; no Blizzard reader on the player-price page.
+  "web/src/app/tools/auctions/page.tsx",
+  // Breadcrumb route label only.
+  "web/src/lib/breadcrumbs.ts",
   // Links to the page only; database/items/[id]/blizzard-link.test.tsx checks it reads nothing.
   "web/src/app/database/items/[id]/page.tsx",
   // Names the page's path in its matcher only, to answer client fetches of it without the page; reads nothing.

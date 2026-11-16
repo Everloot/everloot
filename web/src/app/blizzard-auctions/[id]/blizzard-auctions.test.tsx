@@ -6,8 +6,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { BlizzardPrice } from "@/lib/blizzard-auctions";
 
-const blizzard = vi.hoisted(() => ({ load: vi.fn() }));
-vi.mock("@/lib/blizzard-auctions", () => ({ loadBlizzardPrices: blizzard.load }));
+const blizzard = vi.hoisted(() => ({ load: vi.fn(), history: vi.fn() }));
+vi.mock("@/lib/blizzard-auctions", () => ({ loadBlizzardPrices: blizzard.load, loadBlizzardHistory: blizzard.history }));
 vi.mock("@/lib/shown-item-names", () => ({
   loadShownNames: async () => ({ agreed: new Map([[2589, "Linen Cloth"]]), matched: null }),
 }));
@@ -30,6 +30,7 @@ const render = async (id = "2589") => renderToStaticMarkup(await BlizzardAuction
 
 beforeEach(() => {
   blizzard.load.mockReset().mockResolvedValue({ ok: true, rows });
+  blizzard.history.mockReset().mockResolvedValue({ ok: true, rows: [] });
   vi.stubEnv("NEXT_PUBLIC_ADSENSE_CLIENT", "ca-pub-test");
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -80,6 +81,8 @@ test("the page credits Blizzard, names the item, links back with a plain link an
   expect(doc.body.textContent).toContain("Data from Blizzard Entertainment");
   expect(doc.querySelector('[data-blizzard-auctions="rows"]')).not.toBeNull();
   expect(doc.querySelector('a[href="/database/items/2589"]')!.textContent).toBe("Back to the item page");
+  expect(doc.querySelector('a[href="/blizzard-auctions"]')).not.toBeNull();
+  expect(blizzard.history).toHaveBeenCalledWith(2589);
   expect(html).not.toMatch(/adsbygoogle|googlesyndication/);
   expect(doc.querySelector('aside[aria-label="Advertisement"]')).toBeNull();
   // Each state carries the credit and no ad.

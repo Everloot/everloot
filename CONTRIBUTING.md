@@ -125,9 +125,9 @@ Maintainers set labels. The descriptions are the ones in the repository's label 
   `game-data` (read from the game files), `ecosystem`, `infra`, `security`, `privacy`, `data`.
 - **State:** `needs-triage` (not looked at yet), `needs-info` (waiting for more detail from the reporter),
   `confirmed` (a maintainer reproduced it), `cant-reproduce` (closed: we could not reproduce it),
-  `known-issue` (listed in Discord #known-issues), `needs-decision` (waiting for a maintainer decision),
+  `known-issue` (listed in the pinned Start here post in Discord #help), `needs-decision` (waiting for a maintainer decision),
   `spoiler` (touches unreleased content found in game files).
-- **Automation:** `from-discord` (reported in the Discord #bug-reports forum), `site-down` (everloot.app
+- **Automation:** `from-discord` (reported in the Discord #help or #ideas forum), `site-down` (everloot.app
   failed its health check), `night-shift`, `dependencies` (Dependabot updates). A `night-shift` issue is a
   small, self-contained fix that the overnight loop takes as one reviewed pull request. It is never merged
   without a maintainer.
