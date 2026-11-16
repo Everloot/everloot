@@ -1,7 +1,8 @@
 name: Discord bridge
 # Links the Everloot Discord and this repository (scripts/discord_bridge.py):
-#   every 10 min and on issue changes   #bug-reports and #suggestions posts <-> GitHub issues, #known-issues
-#                                       list, a hello in #general for anyone who joined in the last hour
+#   every 10 min and on issue changes   #help posts tagged Bug and #ideas posts <-> GitHub issues, the known-
+#                                       issues list in the pinned #help post, a hello in #general for anyone who joined
+#                                       in the last hour
 #   Mondays 16:00 UTC (or by hand with weekly)   last week's merged changes for players, in #updates
 #   release / discussion / push to main / new pull request   a post in the matching channel
 #   workflow_dispatch with release_tag   posts that release; release.yml and desktop-release.yml call it,

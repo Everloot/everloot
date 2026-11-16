@@ -1557,7 +1557,7 @@ async function onClick(ev: MouseEvent): Promise<void> {
   if (el.closest("#accountSignOut")) { state = await api.accountSignOut(); flash = "Signed out on this computer. The key still works until you revoke it on everloot.app."; render(); return; }
   if (el.closest("#reportBug") && state) {
     const r = await api.reportBug(diagnostics(state));
-    if (r === "copied") notice("Diagnostics copied. Paste them into the Discord #bug-reports channel or a GitHub issue.");
+    if (r === "copied") notice("Diagnostics copied. Paste them into a Discord #help post tagged Bug, or a GitHub issue.");
     return;
   }
   // A click anywhere outside the open popover closes it; its own links still work.
