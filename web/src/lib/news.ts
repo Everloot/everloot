@@ -114,9 +114,15 @@ export function renderNewsFeed(posts: NewsPost[], site: { baseUrl: string; now: 
 /** Reading time in whole minutes (at least one), at 220 words a minute over the post's prose. */
 export const readingMinutes = (blocks: Block[]): number => Math.max(1, Math.round(postText(blocks).split(/\s+/).filter(Boolean).length / 220));
 
-/** The publishers a post cites, from its sources' titles ("Blizzard: …" → "Blizzard"), in order, once each. */
+/** The site a source address is on: Everloot's own pages read "Everloot"; any other site reads as its host. */
+const siteName = (url: string): string => {
+  const host = new URL(url).hostname.replace(/^www\./, "");
+  return /(?:^|\.)everloot\.app$/.test(host) ? "Everloot" : host;
+};
+
+/** The publishers a post cites, from its sources' titles ("Blizzard: …" → "Blizzard") or else their sites, in order, once each. */
 export function sourceNames(post: Pick<NewsPost, "sources">): string[] {
-  const names = post.sources.map((s) => (s.title.includes(":") ? s.title.slice(0, s.title.indexOf(":")) : new URL(s.url).hostname.replace(/^www\./, "")).trim());
+  const names = post.sources.map((s) => (s.title.includes(":") ? s.title.slice(0, s.title.indexOf(":")) : siteName(s.url)).trim());
   return [...new Set(names.filter(Boolean))];
 }
 

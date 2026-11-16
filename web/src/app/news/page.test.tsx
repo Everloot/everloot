@@ -244,6 +244,7 @@ test("cards name the publishers a post cites, mark an unconfirmed post with the 
   post("cited", "2026-10-25", ["tags: [wow-forever]", "sources:", '  - title: "Blizzard: an article"', "    url: https://news.blizzard.com/a", '  - title: "Blizzard forums: a thread"', "    url: https://us.forums.blizzard.com/en/wow/t/x/1"]);
   post("plain", "2026-10-24", ["tags: [site]"]);
   post("blue", "2026-10-23", ["tags: [blue-post, forever]"]);
+  post("own", "2026-10-22", ["tags: [site]", "sources:", "  - title: Item database", "    url: https://everloot.app/database/items", "  - title: Database sitemap", "    url: https://everloot.app/database-sitemap.xml"]);
   vi.stubEnv("NEWS_DIR", dir); vi.stubEnv("WIKI_DIR", WIKI);
   const { default: NewsHub } = await import("./page");
   const hub = renderToStaticMarkup(await NewsHub());
@@ -252,6 +253,9 @@ test("cards name the publishers a post cites, mark an unconfirmed post with the 
   expect(card("lead")).toContain('<p data-news-sources="true" class="text-meta text-muted">Source: Wowhead</p>');
   expect(card("cited")).toContain('<p data-news-sources="true" class="text-meta text-muted mt-auto pt-1">Source: Blizzard, Blizzard forums</p>');
   expect(card("plain")).not.toContain("data-news-sources");
+  // A post citing Everloot's own pages names Everloot as its source, not the site's host.
+  expect(card("own")).toContain(">Source: Everloot</p>");
+  expect(hub).not.toContain("everloot.app</p>");
   // Dashed means unconfirmed; the chip says so to a screen reader too.
   expect(card("lead")).toMatch(/<span data-news-chip="true" title="Unconfirmed" class="[^"]*border-dashed border-edge">Datamine<span class="sr-only">, unconfirmed<\/span><\/span>/);
   expect(card("cited")).toMatch(/<span data-news-chip="true" class="[^"]*border-line">WoW forever<\/span>/);
