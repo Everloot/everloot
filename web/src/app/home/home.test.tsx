@@ -188,3 +188,14 @@ test("a new player: no handle, no character, the active character follows the ma
     show_characters: true, show_builds: true, show_status: true, main_character_id: THRALL, active_character_id: null };
   expect(renderToStaticMarkup(await SignedInHome({}))).toContain(`name="character" value="${THRALL}"`);
 });
+
+
+test("signed-in home exposes the same start jobs", async () => {
+  const html = renderToStaticMarkup(await SignedInHome({}));
+  const start = html.indexOf('aria-labelledby="start-here"');
+  const block = html.slice(start, html.indexOf("</section>", start));
+  expect(block.match(/<li /g)).toHaveLength(9);
+  expect(block).toContain('href="/tools/talents"');
+  expect(block).toContain('href="/classes"');
+  expect(block).not.toContain("/classes/choose");
+});

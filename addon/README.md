@@ -169,7 +169,12 @@ innkeeper) records where you stand as that NPC's place (`positionKind = "interac
 service, once per NPC, role and zone. Targeting still records `positionKind = "player"`, which never becomes a
 pin. Looting an object adds where you stand (`mapId`, `x`, `y`), a `gatherKind` (herb, ore, chest, fishing,
 other) from the spell you cast just before (`UNIT_SPELLCAST_SENT`) and the object's name from that cast's
-target (`sourceObjectName`). Trainer rows carry `trainerNpcId`. Targeting rows are kept once per NPC, zone and
+target (`sourceObjectName`). A kill's loot window with nothing in it is recorded too, so drop rates count the
+corpses that dropped nothing: the game names no source for an empty window, so the addon takes the one dead
+creature you could loot among the units you interacted with, pointed at or targeted, and writes a loot row with no
+items and no coin (`sourceEvidence = "empty-window"`), once per corpse. Two different dead creatures there, a
+corpse tapped by someone else, an empty container, fishing or a skinning or pick-pocket cast record nothing.
+Trainer rows carry `trainerNpcId`. Targeting rows are kept once per NPC, zone and
 spot (rounded to 1 on the 0..100 scale). Window rows and object loot rows each have their own 2,000-row cap,
 apart from targeting rows and creature loot, so `/everloot status` can show `npc_sighting (targeting)` paused
 while windows still record. A rare or a treasure the minimap shows (`C_VignetteInfo`) is recorded at its own

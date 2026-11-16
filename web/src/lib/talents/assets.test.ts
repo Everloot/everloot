@@ -161,6 +161,9 @@ const SHOWS_ART = new Set([
   // The tools index's card icons, and the class, profession and faction icons Plans and Alts on this device draw
   // (read on the server by the two pages through workspace-icons.ts, passed to the client as URLs).
   "web/src/app/tools/page.tsx", "web/src/app/tools/builds/page.tsx", "web/src/app/tools/alts/page.tsx", "web/src/lib/workspace-icons.ts",
+  // The daily market report's stored view: one icon for the report's featured good, which has a public auction value,
+  // under the same rule as the Auction House pages (tools/auctions/art.ts).
+  "web/src/lib/auction-report-store.ts",
 ]);
 
 test("nothing outside the pages that show the art can read the asset URL or the manifest modules", () => {

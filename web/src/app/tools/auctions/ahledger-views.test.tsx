@@ -1,0 +1,115 @@
+// @vitest-environment jsdom
+import { act, type ReactNode } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { renderToStaticMarkup } from "react-dom/server";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import AhledgerHistory from "./AhledgerHistory";
+import AhledgerCrafting from "./AhledgerCrafting";
+import { AhledgerDeals, AhledgerEconomySummary } from "./AhledgerMarket";
+
+let container: HTMLDivElement, root: Root;
+beforeEach(() => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  container = document.createElement("div"); document.body.append(container); root = createRoot(container);
+});
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
+const history = { median7d: 123456, median30d: 234567, salesPerDay: 3.5, windowDays: 7, series: [
+  { t: "2026-11-14T00:00:00Z", min: 10, median: 15, p25: 12, p75: 18 },
+  { t: "2026-11-15T00:00:00Z", min: 11, median: 16, p25: 13, p75: 19 },
+] };
+const credit = { text: "Prices from AHledger", url: "https://ahledger.com/test-credit" };
+const panels: { name: string; panel: () => ReactNode; field: string; empty: unknown; message: string }[] = [
+  { name: "history", panel: () => <AhledgerHistory itemId={42} />, field: "history", empty: { ...history, median7d: null, median30d: null, salesPerDay: null, series: [] }, message: "No price history" },
+  { name: "crafting", panel: () => <AhledgerCrafting profession="Enchanting" />, field: "recipes", empty: [], message: "No crafting margins" },
+  { name: "deals", panel: () => <AhledgerDeals />, field: "deals", empty: [], message: "No deals meet" },
+  { name: "economy", panel: () => <AhledgerEconomySummary />, field: "markets", empty: [], message: "No full scans" },
+];
+
+for (const p of panels) {
+  test(`${p.name}: server HTML has only the loading shell and credit; no fetch or prices`, () => {
+    const fetchImpl = vi.fn(); vi.stubGlobal("fetch", fetchImpl);
+    const html = renderToStaticMarkup(p.panel());
+    expect(html).toContain('data-ahledger="loading"');
+    expect(html).toContain('href="https://ahledger.com"');
+    expect(html).not.toMatch(/123456|234567|Test item|Test recipe|<table|data-history-line/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  test(`${p.name}: loading and empty answers keep a credit link`, async () => {
+    let finish!: (r: Response) => void;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((resolve) => { finish = resolve; })));
+    await act(async () => root.render(p.panel()));
+    expect(container.textContent).toContain("Reading AH Ledger");
+    expect(container.querySelector('a[href="https://ahledger.com"]')).not.toBeNull();
+    await act(async () => finish(Response.json({ ok: true, [p.field]: p.empty, credit })));
+    expect(container.textContent).toContain(p.message);
+    expect(container.querySelector('a[href="https://ahledger.com/test-credit"]')?.textContent).toBe("Prices from AHledger");
+  });
+
+  test(`${p.name}: failed reads say failed, not empty, and keep credit`, async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("busy", { status: 503 })));
+    await act(async () => root.render(p.panel()));
+    expect(container.querySelector("[data-ahledger]")?.getAttribute("data-ahledger")).toBe("failed");
+    expect(container.textContent).toContain("could not be read");
+    expect(container.textContent).not.toContain(p.message);
+    expect(container.querySelector('a[href="https://ahledger.com"]')).not.toBeNull();
+  });
+}
+
+test("history reads the realm's initial market, renders both lines and band, and switches one market at a time", async () => {
+  const fetchImpl = vi.fn(async () => Response.json({ ok: true, history, credit })); vi.stubGlobal("fetch", fetchImpl);
+  await act(async () => root.render(<AhledgerHistory itemId={42} defaultMarket="forever.pvp.alliance.eu" />));
+  expect(fetchImpl.mock.calls).toHaveLength(1);
+  expect((fetchImpl.mock.calls[0] as unknown[])[0]).toBe("/api/ahledger/forever.pvp.alliance.eu/history?item=42");
+  expect(container.querySelectorAll("[data-history-line]")).toHaveLength(2);
+  expect(container.querySelector("[data-history-band]")).not.toBeNull();
+  expect(container.querySelector("linearGradient")).toBeNull();
+  expect(container.textContent).toContain("7-day median"); expect(container.textContent).toContain("30-day median");
+  expect(container.textContent).toContain("3.5 (7-day window)");
+  const faction = container.querySelectorAll("select")[2];
+  await act(async () => { faction.value = "horde"; faction.dispatchEvent(new Event("change", { bubbles: true })); });
+  expect(fetchImpl.mock.calls).toHaveLength(2);
+  expect((fetchImpl.mock.calls[1] as unknown[])[0]).toBe("/api/ahledger/forever.pvp.horde.eu/history?item=42");
+});
+
+test("crafting renders monetary margins and unpriced rows, with unsupported professions making no request", async () => {
+  const fetchImpl = vi.fn(async () => Response.json({ ok: true, recipes: [{ spellId: 42, name: "Test recipe", cost: null, netValue: 20, margin: null, salesPerDay: null, profitPerDay: null }], credit })); vi.stubGlobal("fetch", fetchImpl);
+  await act(async () => root.render(<AhledgerCrafting profession="Fishing" />));
+  expect(fetchImpl).not.toHaveBeenCalled(); expect(container.innerHTML).toBe("");
+  await act(async () => root.render(<AhledgerCrafting profession="Enchanting" />));
+  expect(container.textContent).toContain("unpriced"); expect(container.textContent).toContain("unrecorded");
+  expect(container.textContent).toContain("upper bound");
+  expect(container.querySelector('a[href="/database/spells/42"]')?.textContent).toBe("Test recipe");
+});
+
+test("deals link to Everloot items and show the reference basis, then region and ruleset changes fetch that market", async () => {
+  const fetchImpl = vi.fn(async () => Response.json({ ok: true, deals: [{ itemId: 42, name: "Test item", minBuyout: 10, referenceMedian: 20, basis: "7d", quantity: 5, saving: 50 }], credit })); vi.stubGlobal("fetch", fetchImpl);
+  await act(async () => root.render(<AhledgerDeals />));
+  expect(container.querySelector('a[href="/tools/auctions/item/42"]')?.textContent).toBe("Test item");
+  expect(container.textContent).toContain("7d");
+  await act(async () => { const el = container.querySelectorAll("select")[0]; el.value = "kr"; el.dispatchEvent(new Event("change", { bubbles: true })); });
+  await act(async () => { const el = container.querySelectorAll("select")[1]; el.value = "rppvp"; el.dispatchEvent(new Event("change", { bubbles: true })); });
+  expect((fetchImpl.mock.calls.at(-1) as unknown[])[0]).toBe("/api/ahledger/forever.rppvp.alliance.kr/deals");
+});
+
+test("economy compares current and week-ago values per labelled market and rejects an off-site credit", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => Response.json({ ok: true, markets: [{ market: "forever.pvp.horde.eu", current: 123456, weekAgo: null }], credit: { url: "https://evil.test" } })));
+  await act(async () => root.render(<AhledgerEconomySummary />));
+  expect(container.textContent).toContain("PvP Horde EU"); expect(container.textContent).toContain("unrecorded");
+  expect(container.querySelector('a[href="https://ahledger.com"]')).not.toBeNull();
+});
+
+test("a stale market response cannot replace the newly selected market's answer", async () => {
+  let finishOld!: (res: Response) => void;
+  vi.stubGlobal("fetch", vi.fn().mockImplementationOnce(() => new Promise<Response>((resolve) => { finishOld = resolve; })).mockImplementation(async () => Response.json({ ok: true, deals: [], credit })));
+  await act(async () => root.render(<AhledgerDeals />));
+  await act(async () => { const el = container.querySelectorAll("select")[2]; el.value = "horde"; el.dispatchEvent(new Event("change", { bubbles: true })); });
+  await act(async () => finishOld(Response.json({ ok: true, deals: [{ itemId: 42, name: "Stale test item" }], credit })));
+  expect(container.textContent).not.toContain("Stale test item"); expect(container.textContent).toContain("No deals meet");
+});
+
+test("an unreadable success body is a failed read", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => Response.json({ notice: "unavailable" })));
+  await act(async () => root.render(<AhledgerDeals />));
+  expect(container.textContent).toContain("could not be read");
+});

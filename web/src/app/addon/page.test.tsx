@@ -234,3 +234,14 @@ test("the page names no internal path and no AI", async () => {
   const text = visible(await render(() => Promise.resolve(Response.json(releases))));
   expect(text).not.toMatch(/R21|Users[\/]|\.t3|\bAI\b|Claude|ChatGPT|GPT|Codex/);
 });
+
+test("manual install steps name the Forever AddOns folder on Windows and macOS", async () => {
+  const text = visible(await render(() => Promise.resolve(Response.json(releases))));
+  expect(text).toContain(String.raw`World of Warcraft\_forever_\Interface\AddOns`);
+  expect(text).toContain("/Applications/World of Warcraft/_forever_/Interface/AddOns");
+});
+
+test("the download page explains how the addon and Desktop App stay current", async () => {
+  const text = visible(await render(() => Promise.resolve(Response.json(releases))));
+  expect(text).toContain("The CurseForge app keeps the addon current. The Desktop App updates itself and the addon.");
+});

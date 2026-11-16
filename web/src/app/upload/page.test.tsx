@@ -38,3 +38,10 @@ test("the Recorder text keeps the disclosure: names stay local and a fact needs 
   expect(text).toContain("a report, not a fact");
   expect(text).not.toMatch(/guarantee|\bAI\b|Claude/);
 });
+
+test("players can find the Forever save file on Windows and macOS", () => {
+  const text = renderToStaticMarkup(<UploadPage />).replace(/<[^>]+>/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ");
+  expect(text).toContain(String.raw`World of Warcraft\_forever_\WTF\Account\<ACCOUNT>\SavedVariables\Everloot.lua`);
+  expect(text).toContain("/Applications/World of Warcraft/_forever_/WTF/Account/<ACCOUNT>/SavedVariables/Everloot.lua");
+  expect(text).toContain("Replace <ACCOUNT> with your account folder name");
+});

@@ -36,6 +36,24 @@ test("an empty window still counts in the kills of an item that did drop", () =>
   expect(rates[0]).toMatchObject({ itemId: 11, kills: 3, drops: 2, reporters: 3, public: true });
 });
 
+test("empty-window rows add windows to the source and lower the rate; nothing else they claim counts", () => {
+  const hit = (installId: string) => ({ kind: "loot", sourceEvidence: "loot-api", lootType: "kill", installId, sourceNpcId: 7, items: [{ itemId: 11, count: 1 }] });
+  const empty = (installId: string) => ({ kind: "loot", sourceEvidence: "empty-window", lootType: "kill", installId, sourceNpcId: 7, items: [] });
+  const records = [
+    hit("a"), hit("b"), hit("c"), empty("a"), empty("b"), empty("c"), empty("c"), empty("a"),
+    // Refused by the protocol; the rollup ignores them too rather than count a guessed source.
+    { ...empty("a"), items: [{ itemId: 11, count: 1 }] },
+    { ...empty("b"), copper: 40 },
+    { ...empty("c"), lootType: "skinning" },
+    { kind: "loot", installId: "a", sourceNpcId: 7, items: [] },
+  ];
+  expect(lootWindowsFromRecords(records)).toHaveLength(8);
+  const { rates, measuredZeros } = rollupDrops(lootWindowsFromRecords(records));
+  expect(measuredZeros).toHaveLength(0);
+  expect(rates).toEqual([expect.objectContaining({ sourceNpcId: 7, itemId: 11, kills: 8, drops: 3, reporters: 3, public: true })]);
+  expect(rates[0]!.rate).toBeCloseTo(3 / 8);
+});
+
 test("two installs do not publish a zero, and an object with no item is the same zero", () => {
   const quiet = rollupDrops([
     { installId: "a", sourceNpcId: 7, items: [] },

@@ -426,7 +426,7 @@ if (!app.requestSingleInstanceLock()) {
       cancelId: 2,
       title: "Report a bug",
       message: "Report a bug in Everloot",
-      detail: "Opens a bug report on GitHub with the app version and these diagnostics filled in: your settings (where the token file is, never the token), the files watched, each job's last state and the last log lines, with your user folder hidden. You read and edit it before sending; it needs a GitHub account. Or copy the diagnostics and post them in the Discord #bug-reports channel.",
+      detail: "Opens a bug report on GitHub with the app version and these diagnostics filled in: your settings (where the token file is, never the token), the files watched, each job's last state and the last log lines, with your user folder hidden. You read and edit it before sending; it needs a GitHub account. Or copy the diagnostics and post them in the Discord #help forum with the Bug tag.",
     });
     if (answer.response === 1) { clipboard.writeText(text); return "copied"; }
     if (answer.response !== 0) return null;

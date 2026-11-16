@@ -257,8 +257,7 @@ kill time and kill count, under the same opaque character key. It records succes
 while Completion is on. Outside an instance it accepts only encounter ids of the shipped world-boss catalog;
 whether Forever emits that event outdoors is unconfirmed, and `/everloot status` counts the world-boss kills seen.
 These rows stay on this computer: the upload page holds them back and public intake has no schema for them.
-Turning Completion off deletes them. Desktop App private sync is approved as a follow-up; it does not send these
-rows yet. No public kill data is inferred from this local history.
+Turning Completion off deletes them. Draft amendment for maintainer review: once enabled, the Desktop App may sync these kills to the signed-in owner only with that character's separate boss-kill consent; they remain private, revoking consent deletes the synced history, and public uploads still refuse them. No public kill data is inferred from this local history.
 
 The census counts who plays what. It is on in a new install of the addon, which says so once in chat; an
 install from before the census keeps it off until `/everloot census on`. It leaves the player's computer
@@ -554,6 +553,8 @@ the MCP server, the API and the bulk download. The relations are *created by* (a
 effect, `SpellEffect`), *reagent for* (`SpellReagents`), *part of set* (`ItemSet`), *same icon*
 (items that share an icon file, `Item.IconFileDataID`) and, since 2026-10-18, *profession* (the
 skill line that teaches a spell, `SkillLineAbility` and `SkillLine`, with the profession's name).
+Profession planning also uses numeric teaching-item links (`ItemEffect` learning trigger 6 or base-difficulty
+`SpellEffect` learn-spell effect 36, joined through `ItemXItemEffect`), with no item or spell names in git.
 They are facts: ids and the relation between them, with no Blizzard text and no art. The rules:
 
 - Every entry is labelled *found in game files, unconfirmed* and stamped with the build it came from,

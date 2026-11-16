@@ -35,7 +35,7 @@ export const OPEN_DATA_NOT_YET: readonly string[] = [
 
 /** How to read a number in a row. */
 export const OPEN_DATA_READING: readonly string[] = [
-  "A drop rate is the share of loot windows the game's loot API attributed to a source that held the item. It is not a kill-based drop chance, and a window is a loot, not a kill.",
+  "A drop rate is the share of a source's loot windows that held the item: the windows the game's loot API attributed to it, and the empty ones the addon tied to their corpse. It is not a kill-based drop chance, and a window is a loot, not a kill. Windows from addons older than the empty-window release leave out the corpses that held nothing, so their rates read high.",
   "A position on a map is on the 0 to 100 map scale and is the median of the installs' positions. Positions in the game-files folder are in world yards.",
   "The installs count is how many installs agree, not how many people: three installs are not proof of three players.",
 ];

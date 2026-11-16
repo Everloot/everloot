@@ -313,3 +313,56 @@ describe("how often a key may sync", () => {
     expect(syncCalls()).toEqual([]);
   });
 });
+
+const bossKill = { kind: "boss_kill_owned", installId: INSTALL, characterKey: CHARACTER_KEY,
+  capturedAt: "2026-11-05T10:00:00Z", encounterId: 2916, instanceMapId: 48, difficulty: 1,
+  firstKillAt: "2026-11-05T10:00:00Z", lastKillAt: "2026-11-06T10:00:00Z", killCount: 2 };
+
+test("boss kills have a separate private receipt with the gate off, without touching their absent table", async () => {
+  vi.stubEnv("EVERLOOT_BOSS_KILL_SYNC", "");
+  answers([]);
+  const response = await send(thrallina([bossKill]));
+  expect(response.status).toBe(200);
+  expect((await response.json()).characters[0].categories).toEqual({ boss_kills: "no_consent" });
+  expect(auth.authQuery.mock.calls.some((c) => String(c[0]).includes("boss_kills"))).toBe(false);
+});
+
+test("boss kills use the authenticated account and opaque source hash, never public character facts", async () => {
+  vi.stubEnv("EVERLOOT_BOSS_KILL_SYNC", "1");
+  answers([], "stored");
+  const response = await send(thrallina([bossKill]));
+  expect(response.status).toBe(200);
+  expect((await response.json()).characters[0].categories).toEqual({ boss_kills: "stored" });
+  const call = auth.authQuery.mock.calls.find((c) => c[0] === "rpc/sync_boss_kills");
+  expect(call).toBeDefined();
+  const data = JSON.parse(call![1].body);
+  expect(data).toMatchObject({ p_user_id: ACCOUNT, p_name: "Thrallina", p_realm: "Forever Pioneer",
+    p_source_ref: createHmac("sha256", SECRET).update(`source:${INSTALL}`).digest("hex") });
+  expect(data.p_kills).toEqual([{ encounterId: 2916, instanceMapId: 48, difficulty: 1,
+    firstKillAt: bossKill.firstKillAt, lastKillAt: bossKill.lastKillAt, killCount: 2 }]);
+  expect(data.p_captured_at).toBe(bossKill.lastKillAt);
+  expect(JSON.stringify(data.p_kills)).not.toContain(CHARACTER_KEY);
+  expect(JSON.stringify(data)).not.toContain(INSTALL);
+  expect(syncCalls()[0].p_facts).toEqual([]);
+});
+
+test("a missing boss-kill table is retriable, never silently acknowledged", async () => {
+  vi.stubEnv("EVERLOOT_BOSS_KILL_SYNC", "1");
+  answers([]);
+  auth.authQuery.mockRejectedValueOnce(new Error("function sync_boss_kills does not exist"));
+  const response = await send(thrallina([bossKill]));
+  expect(response.status).toBe(503);
+  expect((await response.json()).characters[0].result).toBe("retry");
+});
+
+test("boss kills do not write when the account has no live link, or when a group mixes character keys", async () => {
+  vi.stubEnv("EVERLOOT_BOSS_KILL_SYNC", "1");
+  answers([{ category: null, outcome: "not_linked" }]);
+  const response = await send(thrallina([bossKill]));
+  expect((await response.json()).characters[0].result).toBe("not_linked");
+  expect(auth.authQuery.mock.calls.some((c) => c[0] === "rpc/sync_boss_kills")).toBe(false);
+  answers();
+  const mixed = await send(thrallina([profession, { ...bossKill, characterKey: "ffffffff" }]));
+  expect((await mixed.json()).characters[0].result).toBe("invalid");
+  expect(auth.authQuery.mock.calls.some((c) => c[0] === "rpc/sync_boss_kills")).toBe(false);
+});

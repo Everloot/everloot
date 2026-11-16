@@ -84,6 +84,8 @@ export default async function AddonPage() {
         meta={<><Badge tone="neutral">AGPL-3.0</Badge><span>Free and open source</span></>}
       />
 
+      <p className="text-sm text-fg-2">The CurseForge app keeps the addon current. The Desktop App updates itself and the addon.</p>
+
       <div className="space-y-12">
         <div className="grid items-start gap-6 md:grid-cols-2">
           <Card as="section" aria-labelledby="addon" className="space-y-6">
@@ -115,8 +117,12 @@ export default async function AddonPage() {
                     <li>Quit the game.</li>
                     <li>Extract the zip. It holds one folder, <code className="font-mono">Everloot</code>.</li>
                     <li>
-                      Move that folder into <code className="font-mono">Interface/AddOns</code>, inside the folder of the game
-                      version you play under <code className="font-mono">World of Warcraft</code>.
+                      Move that folder into <code className="font-mono">Interface/AddOns</code> under <code className="font-mono">_forever_</code>:
+                      <ul className="mt-1 space-y-1">
+                        <li>Windows: <code className="break-all font-mono">{String.raw`World of Warcraft\_forever_\Interface\AddOns`}</code></li>
+                        <li>macOS (usual location): <code className="break-all font-mono">/Applications/World of Warcraft/_forever_/Interface/AddOns</code></li>
+                      </ul>
+                      If you installed the game somewhere else, start from that World of Warcraft folder instead.
                     </li>
                     <li>Start the game, check Everloot is ticked in the AddOns list, and type <code className="font-mono">/everloot status</code> in chat.</li>
                   </ol>

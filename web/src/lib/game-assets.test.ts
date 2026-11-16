@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { CURRENT_BUILD, TABLES } from "@/data/game-data/raid";
 import { CLIENT_BAGS } from "@/data/game-data/client-bags";
 import {
-  assetUrl, BANNER_MAP, buildFolder, classAndProfessionIcons, continentArt, creditWhat, emblems, FETCH_TIMEOUT_MS, forgetPrivateReads, iconUrl,
+  assetUrl, BANNER_MAP, buildFolder, classAndProfessionIcons, continentArt, creditWhat, emblems, FETCH_TIMEOUT_MS, forgetPrivateReads, forgetSiteAssets, iconUrl,
   instanceThumbs, itemIconUrl, itemShard, itemTip, gameNameFor, launchArt, loadingArt, loadItemNames, loadItemSetNames, loadItemTips, loadQuestNames, loadSpellNames, loadSiteAssets, parseSiteManifest, poiIcons, PRIVATE_MALFORMED, PRIVATE_UNREACHABLE, privateStoreFromEnv, raidArt, readItemTips, readQuestNames, readSpellNames, type ItemNames,
 } from "./game-assets";
 import { itemTipText, qualityColor, tipLines, WHY } from "./item-names";
@@ -13,7 +13,7 @@ const BASE = "https://assets.example.test/wow_classic_beta-70450-84bea423";
 const FOLDER = "wow_classic_beta-70450-84bea423";
 const privateFiles = { [`${FOLDER}/items.json`]: itemIndex, [`${FOLDER}/items/0.json`]: shard0 };
 
-beforeEach(() => forgetPrivateReads());
+beforeEach(() => { forgetPrivateReads(); forgetSiteAssets(); });
 afterEach(() => vi.unstubAllEnvs());
 
 test("URL builders put every file under the build's folder", () => {
@@ -88,6 +88,7 @@ test("a failing, non-OK, garbled or slow manifest is null and never throws", asy
   // Every read carries a timeout, so a bucket that never answers cannot hold the page.
   const signal = (fetcher.mock.calls[0][1] as RequestInit).signal!;
   expect(signal).toBeInstanceOf(AbortSignal);
+  forgetSiteAssets();
   vi.useFakeTimers();
   try {
     const hang = vi.fn((_url: string, init: RequestInit) => new Promise<Response>((_, reject) => init.signal!.addEventListener("abort", () => reject(init.signal!.reason))));
@@ -452,4 +453,29 @@ test("a relation target takes its name from the loaded files, and says whether t
   expect(of("spell", 3275)).toEqual({ name: "Linen Bandage", source: "files" });
   expect(of("item_set", 1)).toBeUndefined();
   expect(of("item", 176)).toBeUndefined();
+});
+
+
+test("manifest reads share one fetch and reuse the same Maps until expiry, separately for each URL", async () => {
+  vi.useFakeTimers();
+  try {
+    const fetcher = vi.fn(async () => Response.json(siteManifest));
+    const values = await Promise.all(Array.from({ length: 8 }, () => loadSiteAssets(BASE, fetcher)));
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const expected = parseSiteManifest(siteManifest, BASE);
+    for (const value of values) {
+      expect(value).toBe(values[0]);
+      expect(value).toEqual(expected);
+    }
+    expect(await loadSiteAssets(BASE, fetcher)).toBe(values[0]);
+    const other = await loadSiteAssets(`${BASE}-other`, fetcher);
+    expect(other?.classes.get("warrior")?.icon).toContain(`${BASE}-other/`);
+    await vi.advanceTimersByTimeAsync(3600_000);
+    const refreshed = await loadSiteAssets(BASE, fetcher);
+    expect(refreshed).toEqual(expected);
+    expect(refreshed).not.toBe(values[0]);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  } finally {
+    vi.useRealTimers();
+  }
 });

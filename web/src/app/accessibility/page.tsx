@@ -88,10 +88,6 @@ export default function AccessibilityPage() {
                 through the audit for keyboard and screen-reader use.
               </li>
               <li>The item, creature and quest pages and the lore archive, which are generated from game data and wiki text, for heading structure and image descriptions.</li>
-              <li>
-                The ads and the consent message are Google&apos;s; their accessibility is Google&apos;s and we cannot change
-                it. There are no ads on this page, the upload page, the privacy policy, account pages or the lore archive.
-              </li>
             </ul>
           </Section>
 

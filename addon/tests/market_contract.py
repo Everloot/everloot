@@ -194,6 +194,18 @@ assert(both:find('Everloot market 2s 5c · per unit · Alliance house\\n  min 2s
   'the community prices say their unit and scope, with min and historical under them: ' .. both)
 assert(both:find('Your scan: min 1s 0c') and not both:find('Your scan[^\\n]*Alliance house'), 'the own scan keeps its own label: ' .. both)
 assert(not both:find('9s 0c'), 'the Horde house of the same realm is another market, never shown to an Alliance character: ' .. both)
+local originalSources, originalDrops = Everloot.SourceLines, Everloot.DropLines
+Everloot.SourceLines = function() error('compact and off must not read source details') end
+Everloot.DropLines = function() error('compact and off must not read drop details') end
+EverlootDB.tooltip = 'compact'
+local compact = tooltipFor(2589)
+assert(compact:find('Everloot market 2s 5c') and compact:find('Your scan: min 1s 0c'), 'compact retains market and own scan')
+assert(#compact < #both and not compact:find('historical') and not compact:find('  value'), 'compact drops extra price lines')
+EverlootDB.tooltip = 'off'
+assert(tooltipFor(2589) == '', 'off draws no Everloot tooltip lines')
+Everloot.SourceLines, Everloot.DropLines = originalSources, originalDrops
+EverlootDB.tooltip = 'full'
+assert(tooltipFor(2589) == both, 'full restores the original tooltip')
 local herb = tooltipFor(765)
 assert(herb:find('market unrecorded'), 'a null market value is unrecorded, never zero: ' .. herb)
 assert(herb:find('Alliance house'), 'a thin or unrecorded row still says its house: ' .. herb)

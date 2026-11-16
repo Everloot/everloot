@@ -5,6 +5,8 @@ import { webApplicationJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import { crossRealmHref, itemIdParam, realmHref, realmSlug, slugParam } from "@/lib/auction-house";
 import { browseView } from "./browse-view";
+import { AhledgerDeals, AhledgerEconomySummary } from "./AhledgerMarket";
+import { Container } from "@/components/ui";
 
 // The filters live in the query string, so the page is rendered for each request (the rollup is cached by the store).
 export const dynamic = "force-dynamic";
@@ -37,7 +39,14 @@ export default async function AuctionHousePage(props: Props) {
   return (
     <>
       <JsonLd data={webApplicationJsonLd({ name: "Auction House", path: "/tools/auctions", description: DESCRIPTION })} />
+      <p className="mb-3 text-meta"><a href="/blizzard-auctions" className="text-fg underline underline-offset-4">Blizzard auction house data</a></p>
       {view}
+      <Container width="data">
+        <div className="space-y-8 pb-8">
+          <AhledgerDeals />
+          <AhledgerEconomySummary />
+        </div>
+      </Container>
     </>
   );
 }

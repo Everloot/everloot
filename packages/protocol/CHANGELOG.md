@@ -7,6 +7,10 @@ required, or tightening a limit is a major release.
 ## [Unreleased]
 
 ### Added
+- 2.3.0 (record protocol 1.15.0): `loot.sourceEvidence` may be `empty-window`, a loot window with nothing in it. The
+  loot API names no source for an empty window, so the addon takes the one dead creature the player could loot. Such a
+  row is a `kill` window on an NPC with no items and no coin; anything else is refused. It adds a window to the
+  source's count, so drop rates stop leaving out the corpses that held nothing. Older rows and readers are unaffected.
 - 2.2.0 (record protocol 1.14.0): optional `player_seen.surname` retains Forever's full character identity for armory discovery. Older named uploads remain accepted. No anonymous record gains a name.
 - 2.1.0 (record protocol unchanged, 1.13.0): `marketPage` and `auctionHistory` gain optional `realmStatus` (`exact`,
   `alias`, `ambiguous` or `unknown`), `askedRealm` and `candidates`, so a client can tell a realm name no scan uses

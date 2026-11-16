@@ -111,3 +111,47 @@ test("an empty tab is drawn quieter: muted, regular weight, no hover; the strip 
   expect(tab("Sources")).toContain("hover:text-fg");
   expect(html).toContain("[scrollbar-width:none]");
 });
+
+test.each(["#%", "#%E0%A4%A"])("a malformed fragment %s on initial mount keeps tabs usable", async (hash) => {
+  window.history.replaceState(null, "", hash);
+  await act(async () => root.render(<Tabs label="Item relations" tabs={TABS} />));
+  expect(selected()).toBe("Created by (1)");
+  expect(visiblePanel()).toBe("Blacksmithing");
+  await act(async () => tabs()[2].click());
+  expect(visiblePanel()).toBe("Game files");
+  expect(window.location.hash).toBe("#sources");
+  await act(async () => tabs()[2].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })));
+  expect(visiblePanel()).toBe("Blacksmithing");
+  expect(document.activeElement).toBe(tabs()[0]);
+  expect(window.location.hash).toBe("#created-by");
+});
+
+test.each(["#%", "#%E0%A4%A"])("a malformed fragment %s on hashchange keeps the current tab usable", async (hash) => {
+  await act(async () => root.render(<Tabs label="Item relations" tabs={TABS} />));
+  await act(async () => tabs()[2].click());
+  await act(async () => {
+    window.history.replaceState(null, "", hash);
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+  });
+  expect(selected()).toBe("Sources");
+  expect(visiblePanel()).toBe("Game files");
+  await act(async () => tabs()[2].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true })));
+  expect(visiblePanel()).toBe("Nobody yet");
+  expect(document.activeElement).toBe(tabs()[1]);
+  expect(window.location.hash).toBe("#dropped-by");
+  await act(async () => tabs()[0].click());
+  expect(visiblePanel()).toBe("Blacksmithing");
+  expect(window.location.hash).toBe("#created-by");
+  await act(async () => {
+    window.history.replaceState(null, "", "#%73ources");
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+  });
+  expect(visiblePanel()).toBe("Game files");
+});
+
+test("a valid encoded fragment opens its decoded tab", async () => {
+  window.history.replaceState(null, "", "#%73ources");
+  await act(async () => root.render(<Tabs label="Item relations" tabs={TABS} />));
+  expect(selected()).toBe("Sources");
+  expect(visiblePanel()).toBe("Game files");
+});

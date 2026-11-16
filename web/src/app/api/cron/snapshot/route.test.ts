@@ -1,3 +1,4 @@
+vi.mock("@/lib/auction-report-store", () => ({ writeAuctionReports: vi.fn().mockResolvedValue({ written: false }) }));
 import { beforeEach, expect, test, vi } from "vitest";
 const store = vi.hoisted(() => ({ loadCorpus: vi.fn(), snapshotWork: vi.fn(), writeCronRun: vi.fn(), writeSnapshot: vi.fn(), writeMarket: vi.fn(), writeCompletion: vi.fn(), writeCensus: vi.fn(), prune: vi.fn() }));
 vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: store.loadCorpus, snapshotWork: store.snapshotWork, writeCronRun: store.writeCronRun, writeSnapshot: store.writeSnapshot, writeMarket: store.writeMarket, writeCompletion: store.writeCompletion, writeCensus: store.writeCensus },

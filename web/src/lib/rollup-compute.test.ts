@@ -13,7 +13,11 @@ const fns = vi.hoisted(() => ({
   trends: vi.fn(() => ({})),
 }));
 // No recheck scopes: the cut-off hands the same records back, so the windows are read once.
-vi.mock("../../../kb/src/drop-rollup", () => ({ itemFactsFromRecords: fns.itemFacts, recheckLootRecords: (records: unknown[]) => records }));
+vi.mock("../../../kb/src/drop-rollup", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../kb/src/drop-rollup")>()),
+  itemFactsFromRecords: fns.itemFacts,
+  recheckLootRecords: (records: unknown[]) => records,
+}));
 vi.mock("../../../kb/src/world-pages", () => ({ worldFactsFromRecords: fns.worldFacts }));
 vi.mock("../../../kb/src/addon-rollup", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../kb/src/addon-rollup")>()),

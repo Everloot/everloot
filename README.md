@@ -195,11 +195,14 @@ files are under [`/schema/`](https://everloot.app/schema/index.json).
 
 Live. WoW: Forever launched on 2026-11-04 and everloot.app has served player uploads since that day.
 
-Addon 0.3.21 (released 2026-11-06, Alpha channel) is published on
-[CurseForge](https://www.curseforge.com/wow/addons/everloot) and on
-[everloot.app/addon](https://everloot.app/addon). Everloot Desktop App 0.1.20 is on the same page
-and on the releases page; its builds are not code-signed yet, so Windows and macOS show a warning on
-first run ([`desktop/README.md`](desktop/README.md) says what to click). Everything read from the
+Get the current addon (Alpha channel) and Everloot Desktop App from
+[everloot.app/addon](https://everloot.app/addon); the addon is also on
+[CurseForge](https://www.curseforge.com/wow/addons/everloot). Update the addon and the Desktop App
+together, then `/reload`: community prices use per-auction-house files, and mismatched versions
+can leave tooltips without community prices (see the
+[paired-update release notes](CHANGELOG.md#desktop-v0122---2026-11-11)). Desktop builds are not
+code-signed yet, so Windows and macOS show a warning on first run
+([`desktop/README.md`](desktop/README.md) says what to click). Everything read from the
 game files (talents, raid buffs, the map) stays marked unconfirmed until players see it in game, and
 the in-game capability checks in
 [`docs/2026-10-28-live-client-capability-checklist.md`](docs/2026-10-28-live-client-capability-checklist.md)

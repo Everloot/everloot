@@ -89,3 +89,36 @@ test("with no rollup the page says prices are unrecorded, not zero", async () =>
   store.loadMarket.mockResolvedValue({ state: null, dataAsOf: null });
   expect(text(await page({ realm: "forever", house: "horde" }))).toContain("Market values are unavailable right now. They are unrecorded, not zero.");
 });
+
+
+test("bag pickers offer publicly priced sizes across houses, not unpriced test containers", async () => {
+  const document = new JSDOM(await page({ realm: "forever", house: "horde" })).window.document;
+  const pickers = document.querySelectorAll<HTMLSelectElement>('select[name^="b"]');
+  expect(pickers).toHaveLength(4);
+  for (const picker of pickers) {
+    const values = [...picker.options].map((option) => option.value);
+    expect(values).toContain("0");
+    expect(values).toContain(String(small));
+    expect(values).toContain(String(mid)); // Priced on Alliance, even while viewing Horde.
+    expect(values).not.toContain("98");
+    expect(values).not.toContain("40");
+  }
+});
+
+
+test("a URL-selected unpriced bag stays selected while unused unpriced sizes stay hidden", async () => {
+  const document = new JSDOM(await page({ realm: "forever", house: "horde", b1: "98" })).window.document;
+  const selected = document.querySelector<HTMLSelectElement>('select[name="b1"]')!;
+  expect(selected.value).toBe("98");
+  expect([...selected.options].filter((option) => option.value === "0")).toHaveLength(1);
+  expect([...selected.options].map((option) => option.value)).not.toContain("40");
+  expect(text(document.documentElement.outerHTML)).toContain("Filling an empty bag slot");
+});
+
+test("saved bags remain selectable when market prices are unavailable", async () => {
+  store.loadMarket.mockResolvedValue({ state: null, dataAsOf: null });
+  const document = new JSDOM(await page({ b1: "98", b2: "40", b3: "invalid" })).window.document;
+  expect(document.querySelector<HTMLSelectElement>('select[name="b1"]')!.value).toBe("98");
+  expect(document.querySelector<HTMLSelectElement>('select[name="b2"]')!.value).toBe("40");
+  expect(document.querySelector<HTMLSelectElement>('select[name="b3"]')!.value).toBe("0");
+});

@@ -2,7 +2,7 @@ import { expect, test, vi } from "vitest";
 
 // Players agree on no name yet; the pages show the game files and Warcraft Wiki matches.
 const mocks = vi.hoisted(() => ({
-  agreed: { items: new Map<number, string>(), npcs: new Map([[448, "Hogger"]]), quests: new Map<number, string>() },
+  agreed: { items: new Map<number, string>(), npcs: new Map([[448, "Hogger"]]), objects: new Map<number, string>(), quests: new Map<number, string>() },
   matched: new Map([[19019, { name: "Thunderfury, Blessed Blade of the Windseeker", color: "#ff8000", wikiPage: "x" }], [647, { name: "Destiny", color: "#a335ee", wikiPage: "y" }]]),
   quests: new Map([[176, { name: "Wanted: Hogger", wikiPage: "z" }]]),
 }));

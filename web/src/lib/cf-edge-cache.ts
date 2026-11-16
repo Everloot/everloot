@@ -292,12 +292,14 @@ const AUCTION_LIST_PATH = /^\/tools\/auctions(?:\/([^/]+))?$/;
 const AUCTION_ITEM_PATH = /^\/tools\/auctions\/([^/]+)\/[1-9]\d{0,9}$/;
 const AUCTION_REALM_SLUG = /^[\p{L}\p{N}][\p{L}\p{N}-]*$/u;
 const REVALIDATION_HEADERS = ["x-prerender-revalidate", "x-isr"];
+// Static folders beside [realm] in app/tools/auctions: not realms, and the market reports answer 404 with no report stored.
+const AUCTION_NOT_REALMS = new Set(["report"]);
 
 function plainRealm(raw: string): boolean {
   let decoded: string;
   try { decoded = decodeURIComponent(raw); } catch { return false; }
   // The page redirects to the lower-case slug, so only a slug already in that form is a page.
-  return decoded === decoded.toLowerCase() && decoded.length <= 40 && AUCTION_REALM_SLUG.test(decoded);
+  return decoded === decoded.toLowerCase() && decoded.length <= 40 && AUCTION_REALM_SLUG.test(decoded) && !AUCTION_NOT_REALMS.has(decoded);
 }
 
 /** The body-less 200 a HEAD for an Auction House page gets without a render; null when the page must answer it. */

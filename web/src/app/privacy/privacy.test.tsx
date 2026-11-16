@@ -55,7 +55,7 @@ test("nameplates are named for the census only: the player pages item never read
   const item = playerPages.slice(0, playerPages.indexOf("</li>"));
   expect(item).toContain("target, mouse over or group with");
   expect(item).not.toMatch(/nameplate/i);
-  expect(text).toContain("Last updated: November 12, 2026");
+  expect(text).toContain("Last updated: November 15, 2026");
 });
 
 test("contribution identity requires explicit receipt opt-in and explains scope, audience and withdrawal", () => {
@@ -221,4 +221,10 @@ test("the boss pulls item shows once the site collects them, and says what the d
   } finally {
     vi.unstubAllEnvs();
   }
+});
+
+test("the policy says the site shows no ads and names no ad network", () => {
+  expect(text).toContain("Everloot shows no ads and loads no advertising script");
+  expect(text).toContain("There are no advertising cookies.");
+  expect(text).not.toMatch(/AdSense|Google Ads Settings/);
 });

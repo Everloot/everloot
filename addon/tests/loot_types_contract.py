@@ -220,6 +220,91 @@ C_Item = nil
 GetLootSlotType = nil
 window('Creature-0-1-2-3-600-0000000001', { { 2589, 1 } })
 assert(last().sourceNpcId == 600 and last().copper == nil)
+
+-- An empty window: the loot API names no source, so the corpse is the one dead, lootable creature among the
+-- interact, mouseover and target units. One row with no items and no coin, evidence `empty-window`.
+guids, dead, denied = {}, {}, {}
+UnitGUID = function(unit) return guids[unit] end
+UnitIsDead = function(unit) return dead[unit] == true end
+UnitIsTapDenied = function(unit) return denied[unit] == true end
+function emptyWindow(fromItem)
+  slots = {}
+  event('LOOT_OPENED', false, fromItem or false)
+  event('LOOT_CLOSED')
+end
+function corpseAt(unit, guid) guids[unit], dead[unit], denied[unit] = guid, true, false end
+function clearUnits() guids, dead, denied = {}, {}, {} end
+
+count = #rows()
+corpseAt('target', 'Creature-0-1-2-3-800-0000000001')
+emptyWindow()
+assert(#rows() == count + 1, 'an empty window on a dead, lootable target is one row')
+assert(last().sourceNpcId == 800 and last().lootType == 'kill' and last().sourceEvidence == 'empty-window')
+assert(#last().items == 0 and last().copper == nil and last().sourceObjectId == nil)
+emptyWindow()
+assert(#rows() == count + 1, 'the same corpse opened twice is one window')
+
+-- The interact unit alone, or two units naming the same corpse, are enough.
+clearUnits(); corpseAt('softinteract', 'Creature-0-1-2-3-801-0000000001')
+emptyWindow()
+assert(#rows() == count + 2 and last().sourceNpcId == 801)
+clearUnits(); corpseAt('target', 'Creature-0-1-2-3-802-0000000001'); corpseAt('mouseover', 'Creature-0-1-2-3-802-0000000001')
+emptyWindow()
+assert(#rows() == count + 3 and last().sourceNpcId == 802)
+
+-- Anything that is not one lootable corpse records nothing.
+count = #rows()
+clearUnits(); corpseAt('target', 'Creature-0-1-2-3-803-0000000001'); corpseAt('mouseover', 'Creature-0-1-2-3-804-0000000001')
+emptyWindow()
+assert(#rows() == count, 'two different dead creatures: no guess')
+clearUnits(); corpseAt('target', 'Creature-0-1-2-3-805-0000000001'); denied.target = true
+emptyWindow()
+assert(#rows() == count, 'a corpse tapped by someone else is not ours to count')
+clearUnits(); corpseAt('target', 'Creature-0-1-2-3-806-0000000001'); dead.target = false
+emptyWindow()
+assert(#rows() == count, 'a living target is not the corpse')
+clearUnits(); corpseAt('target', 'Player-1-00000001')
+emptyWindow()
+assert(#rows() == count, 'only a creature')
+clearUnits(); corpseAt('target', 'Creature-0-1-2-3-807-0000000001')
+emptyWindow(true)
+assert(#rows() == count, 'an empty container is not a kill')
+IsFishingLoot = function() return true end
+emptyWindow()
+assert(#rows() == count, 'an empty fishing window is not a kill')
+IsFishingLoot = function() return false end
+event('UNIT_SPELLCAST_SENT', 'player', 'Wolf', 'Cast-30', 8613)
+event('UNIT_SPELLCAST_SUCCEEDED', 'player', 'Cast-30', 8613)
+emptyWindow()
+assert(#rows() == count, 'an empty skinning window is not a kill window')
+-- A corpse that already gave a kill window with loot is not counted again as empty.
+window('Creature-0-1-2-3-807-0000000001', { { 2589, 1 } })
+count = #rows()
+emptyWindow()
+assert(#rows() == count, 'one kill window per corpse')
+-- A client without the unit calls records nothing and does not error.
+clearUnits(); corpseAt('target', 'Creature-0-1-2-3-808-0000000001')
+UnitIsTapDenied = nil
+emptyWindow()
+assert(#rows() == count, 'no tap check, no row')
+UnitIsTapDenied = function(unit) return denied[unit] == true end
+UnitGUID = function() error('secret') end
+emptyWindow()
+assert(#rows() == count, 'an unreadable GUID records nothing')
+-- An ordinary combat spell cast just before looting is not a gathering or loot cast: the empty corpse still counts.
+UnitGUID = function(unit) return guids[unit] end
+clearUnits(); corpseAt('target', 'Creature-0-1-2-3-809-0000000001')
+event('UNIT_SPELLCAST_SENT', 'player', 'Wolf', 'Cast-31', 133)
+event('UNIT_SPELLCAST_SUCCEEDED', 'player', 'Cast-31', 133)
+emptyWindow()
+assert(#rows() == count + 1 and last().sourceNpcId == 809, 'a combat cast before looting still counts the empty corpse')
+count = #rows()
+-- An interact unit that cannot be read stops the guess, even when the target is a readable dead creature.
+clearUnits(); corpseAt('target', 'Creature-0-1-2-3-810-0000000001')
+UnitGUID = function(unit) if unit == 'softinteract' then error('secret') end return guids[unit] end
+emptyWindow()
+assert(#rows() == count, 'an unreadable interact unit: no guess')
+UnitGUID, UnitIsDead, UnitIsTapDenied, IsFishingLoot = function() end, nil, nil, nil
 """)
 counts = check_all(lua)
-assert counts == {"loot": 33}, counts
+assert counts == {"loot": 38}, counts

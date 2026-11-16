@@ -10,7 +10,7 @@ import { z } from "zod";
  * the generated JSON Schema's description, so a reader of the schema files knows the server checks them.
  */
 export declare const RULES: {
-    readonly loot: readonly ["loot needs a source: npc, object or item", "a loot position needs mapId, x and y together"];
+    readonly loot: readonly ["loot needs a source: npc, object or item", "a loot position needs mapId, x and y together", "an empty-window row is a kill window on an npc with no items and no coin"];
     readonly achievement_catalog: readonly ["criteria cannot outnumber criteriaCount"];
     readonly achievement_owned: readonly ["quantity and required come together", "quantity cannot exceed required", "criteriaMet cannot exceed criteriaTotal", "only a completed achievement has a date", "earnedOn is a real calendar date"];
     readonly reputation_owned: readonly ["floor cannot exceed ceiling"];
@@ -110,7 +110,10 @@ export declare const lootWindow: z.ZodObject<{
         skinning: "skinning";
     }>>;
     copper: z.ZodOptional<z.ZodNumber>;
-    sourceEvidence: z.ZodOptional<z.ZodLiteral<"loot-api">>;
+    sourceEvidence: z.ZodOptional<z.ZodEnum<{
+        "empty-window": "empty-window";
+        "loot-api": "loot-api";
+    }>>;
     items: z.ZodArray<z.ZodObject<{
         itemId: z.ZodNumber;
         count: z.ZodNumber;
@@ -539,6 +542,7 @@ export declare const recipeObserved: z.ZodObject<{
     capturedAt: z.ZodString;
     kind: z.ZodLiteral<"recipe_observed">;
     profession: z.ZodString;
+    skillLineId: z.ZodOptional<z.ZodNumber>;
     rank: z.ZodNumber;
     maxRank: z.ZodOptional<z.ZodNumber>;
     recipe: z.ZodString;
@@ -563,7 +567,10 @@ export declare const trainerSeen: z.ZodObject<{
     capturedAt: z.ZodString;
     kind: z.ZodLiteral<"trainer_seen">;
     profession: z.ZodString;
+    skillLineId: z.ZodOptional<z.ZodNumber>;
     recipe: z.ZodString;
+    spellId: z.ZodOptional<z.ZodNumber>;
+    productItemId: z.ZodOptional<z.ZodNumber>;
     requiredRank: z.ZodNumber;
     costCopper: z.ZodOptional<z.ZodNumber>;
     trainerNpcId: z.ZodOptional<z.ZodNumber>;
@@ -1051,7 +1058,10 @@ export declare const recordSchemas: {
             skinning: "skinning";
         }>>;
         copper: z.ZodOptional<z.ZodNumber>;
-        sourceEvidence: z.ZodOptional<z.ZodLiteral<"loot-api">>;
+        sourceEvidence: z.ZodOptional<z.ZodEnum<{
+            "empty-window": "empty-window";
+            "loot-api": "loot-api";
+        }>>;
         items: z.ZodArray<z.ZodObject<{
             itemId: z.ZodNumber;
             count: z.ZodNumber;
@@ -1474,6 +1484,7 @@ export declare const recordSchemas: {
         capturedAt: z.ZodString;
         kind: z.ZodLiteral<"recipe_observed">;
         profession: z.ZodString;
+        skillLineId: z.ZodOptional<z.ZodNumber>;
         rank: z.ZodNumber;
         maxRank: z.ZodOptional<z.ZodNumber>;
         recipe: z.ZodString;
@@ -1497,7 +1508,10 @@ export declare const recordSchemas: {
         capturedAt: z.ZodString;
         kind: z.ZodLiteral<"trainer_seen">;
         profession: z.ZodString;
+        skillLineId: z.ZodOptional<z.ZodNumber>;
         recipe: z.ZodString;
+        spellId: z.ZodOptional<z.ZodNumber>;
+        productItemId: z.ZodOptional<z.ZodNumber>;
         requiredRank: z.ZodNumber;
         costCopper: z.ZodOptional<z.ZodNumber>;
         trainerNpcId: z.ZodOptional<z.ZodNumber>;
@@ -1781,7 +1795,10 @@ export declare const anyRecord: z.ZodDiscriminatedUnion<[z.ZodObject<{
         skinning: "skinning";
     }>>;
     copper: z.ZodOptional<z.ZodNumber>;
-    sourceEvidence: z.ZodOptional<z.ZodLiteral<"loot-api">>;
+    sourceEvidence: z.ZodOptional<z.ZodEnum<{
+        "empty-window": "empty-window";
+        "loot-api": "loot-api";
+    }>>;
     items: z.ZodArray<z.ZodObject<{
         itemId: z.ZodNumber;
         count: z.ZodNumber;
@@ -2149,6 +2166,7 @@ export declare const anyRecord: z.ZodDiscriminatedUnion<[z.ZodObject<{
     capturedAt: z.ZodString;
     kind: z.ZodLiteral<"recipe_observed">;
     profession: z.ZodString;
+    skillLineId: z.ZodOptional<z.ZodNumber>;
     rank: z.ZodNumber;
     maxRank: z.ZodOptional<z.ZodNumber>;
     recipe: z.ZodString;
@@ -2171,7 +2189,10 @@ export declare const anyRecord: z.ZodDiscriminatedUnion<[z.ZodObject<{
     capturedAt: z.ZodString;
     kind: z.ZodLiteral<"trainer_seen">;
     profession: z.ZodString;
+    skillLineId: z.ZodOptional<z.ZodNumber>;
     recipe: z.ZodString;
+    spellId: z.ZodOptional<z.ZodNumber>;
+    productItemId: z.ZodOptional<z.ZodNumber>;
     requiredRank: z.ZodNumber;
     costCopper: z.ZodOptional<z.ZodNumber>;
     trainerNpcId: z.ZodOptional<z.ZodNumber>;

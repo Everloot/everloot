@@ -146,12 +146,24 @@ export function countsAsKillOrGather(lootType: unknown): boolean {
   return lootType === undefined || lootType === "kill" || lootType === "gather" || lootType === "fishing";
 }
 
+/**
+ * Where a window's source came from. `loot-api`: the loot API named it. `empty-window`: the window held nothing, so the
+ * API named nothing, and the addon took the one dead creature the player could loot; the protocol lets such a row hold
+ * no item and no coin, so it only adds a window to the source's count. Any other row (a Recorder file, an old target
+ * guess) is not an attributed observation.
+ */
+export function isCountedLootEvidence(row: Record<string, unknown>): boolean {
+  if (row.sourceEvidence === "loot-api") return true;
+  return row.sourceEvidence === "empty-window" && Array.isArray(row.items) && row.items.length === 0 && row.copper === undefined
+    && row.lootType === "kill" && typeof row.sourceNpcId === "number";
+}
+
 export function lootWindowsFromRecords(records: unknown[]): LootRow[] {
   const windows: LootRow[] = [];
   for (const raw of records) {
     if (!raw || typeof raw !== "object") continue;
     const row = raw as Record<string, unknown>;
-    if (row.kind !== "loot" || row.sourceEvidence !== "loot-api" || typeof row.installId !== "string" || !Array.isArray(row.items)) continue;
+    if (row.kind !== "loot" || !isCountedLootEvidence(row) || typeof row.installId !== "string" || !Array.isArray(row.items)) continue;
     if (!countsAsKillOrGather(row.lootType)) continue;
     windows.push({
       installId: row.installId,
@@ -166,7 +178,7 @@ export function lootWindowsFromRecords(records: unknown[]): LootRow[] {
 }
 
 const lootSource = (row: Record<string, unknown>): { key: string; id: number } | null => {
-  if (row.kind !== "loot" || row.sourceEvidence !== "loot-api") return null;
+  if (row.kind !== "loot" || !isCountedLootEvidence(row)) return null;
   const id = typeof row.sourceNpcId === "number" ? row.sourceNpcId : typeof row.sourceObjectId === "number" ? row.sourceObjectId : null;
   return id === null ? null : { key: typeof row.sourceNpcId === "number" ? `npc:${id}` : `obj:${id}`, id };
 };

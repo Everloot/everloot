@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { emptyMarket, foldMarket } from "../../../../kb/src/market";
 import { itemIndex, shard0, siteManifest } from "@/lib/game-assets.fixture";
-import { forgetPrivateReads } from "@/lib/game-assets";
+import { forgetPrivateReads, forgetSiteAssets } from "@/lib/game-assets";
 import { CREDIT } from "@/lib/talents/assets";
 
 const store = vi.hoisted(() => ({ loadCorpus: vi.fn(), loadMarket: vi.fn() }));
@@ -96,6 +96,7 @@ function bucket(manifest: unknown = siteManifest) {
 
 beforeEach(() => {
   forgetPrivateReads();
+  forgetSiteAssets();
   // One install's vendor row for NPC 1: short of agreement, but enough that its vendor page exists (an NPC no upload names as a vendor is a 404).
   const vendorRow = { kind: "vendor", installId: "install-a", eventId: "vendor-1", capturedAt: "2026-10-09T00:00:00.000Z", vendorNpcId: 1, items: [{ itemId: 2589, priceCopper: 10 }] };
   store.loadCorpus.mockReset().mockResolvedValue({ uploads: 3, records: [...["install-a", "install-b", "install-c"].map(loot), vendorRow], dataAsOf: "2026-10-09T00:00:00.000Z" });
@@ -167,6 +168,7 @@ test("item page: the tooltip card for an item players reported; an id nobody rep
   // Item 25 is in the same shard, but no install reported it: a typed id must not reveal it.
   fetcher.mockClear();
   forgetPrivateReads();
+  forgetSiteAssets();
   const typed = await render(() => ItemPage({ params: Promise.resolve({ id: "25" }) }));
   expect(typed).not.toMatch(/Worn Shortsword|<img|data-game-credit/);
   // The one read is the file of names the game files and the wiki agree on (none for item 25 here): no manifest, no shard.

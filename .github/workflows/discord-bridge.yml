@@ -1,12 +1,18 @@
 name: Discord bridge
 # Links the Everloot Discord and this repository (scripts/discord_bridge.py):
-#   every 10 min and on issue changes   #bug-reports posts <-> GitHub issues, #known-issues list
+#   every 10 min and on issue changes   #help posts tagged Bug and #ideas posts <-> GitHub issues, the known-
+#                                       issues list in the pinned #help post, a hello in #general for anyone who joined
+#                                       in the last hour
+#   Mondays 16:00 UTC (or by hand with weekly)   last week's merged changes for players, in #updates
 #   release / discussion / push to main / new pull request   a post in the matching channel
+#   workflow_dispatch with release_tag   posts that release; release.yml and desktop-release.yml call it,
+#   because a release made with the workflow token starts no workflow (the release trigger never fires)
 # pull_request_target runs the base branch's script and only reads the event as text; it never checks
 # out or runs code from the pull request.
 on:
   schedule:
     - cron: '*/10 * * * *'
+    - cron: '0 16 * * 1'  # WEEKLY_CRON in scripts/discord_bridge.py
   issues:
     types: [opened, edited, closed, reopened, labeled, unlabeled]
   release:
@@ -18,6 +24,15 @@ on:
   pull_request_target:
     types: [opened]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: An addon-v* or desktop-v* tag to post in #updates (skipped if it is already there). Empty runs the sync.
+        required: false
+        type: string
+      weekly:
+        description: Post last week's changes in #updates now (skipped if this week's post is there)
+        required: false
+        type: boolean
 permissions:
   contents: read
   issues: write
@@ -27,8 +42,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # Sync runs queue behind each other; posts (releases, commits, pull requests) never wait or get dropped.
+    # A release_tag dispatch and the weekly post are posts, so a queued sync can't replace them.
     concurrency:
-      group: ${{ contains(fromJSON('["schedule", "workflow_dispatch", "issues"]'), github.event_name) && 'discord-bridge-sync' || format('discord-bridge-{0}', github.run_id) }}
+      group: ${{ contains(fromJSON('["schedule", "workflow_dispatch", "issues"]'), github.event_name) && !inputs.release_tag && !inputs.weekly && github.event.schedule != '0 16 * * 1' && 'discord-bridge-sync' || format('discord-bridge-{0}', github.run_id) }}
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v7
@@ -39,3 +55,6 @@ jobs:
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          WEEKLY: ${{ inputs.weekly }}
+          SCHEDULE: ${{ github.event.schedule }}

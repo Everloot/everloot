@@ -1,4 +1,5 @@
 import { CoinText } from "@/components/ui/Coins";
+import AhledgerCrafting from "../../auctions/AhledgerCrafting";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
@@ -18,7 +19,7 @@ import { loadListNames } from "@/lib/item-view";
 import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT } from "@/lib/upload-store";
 import { loadProfessions } from "@/lib/profession-store";
 import EdgeDegraded from "@/components/EdgeDegraded";
-import { formatCopper, handleProfessionPath } from "../../../../../../kb/src/profession-path";
+import { formatCopper, agreeRecipes } from "../../../../../../kb/src/profession-path";
 import { handleRecipeThresholds, recipeThresholdsStructured, type Range } from "../../../../../../kb/src/recipe-thresholds";
 import { farmingAreas, gatherAreas, GATHERING, inLevels } from "@/lib/farming";
 import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
@@ -28,6 +29,9 @@ import { LINK } from "../../../database/entity";
 import { LEVEL_BRACKETS, listHref, range, rangeParam } from "../../../database/list-parts";
 import FarmAreaTable from "../../farming-routes/area-table";
 import ProfessionPicker from "../picker";
+import RecipeSearch from "../recipe-search";
+import { buildRecipeCatalog, teachingItemIds } from "@/lib/recipe-catalog";
+import ShoppingList from "../shopping-list";
 
 export const dynamic = "force-dynamic";
 
@@ -77,7 +81,7 @@ export default async function ProfessionPage(props: Props) {
   const read = parseClassContext(searchParams);
   const context = read.ok ? read.context : null;
   const fromSkill = skill(one(searchParams.from), 1);
-  const toSkill = skill(one(searchParams.to), 75);
+  const toSkill = skill(one(searchParams.to), 300);
   const path = professionHref(p.slug);
   // Leather and cloth come from mob areas, which have levels: `?mobs=11-20` filters them (an old
   // `/tools/farming-routes?category=cloth&level=11-20` lands here with it). `level` is the class context's, not this.
@@ -91,14 +95,14 @@ export default async function ProfessionPage(props: Props) {
     loadProfessions(), loadSiteAssets(), loadListNames(), loadSpellNames(CLIENT_LAYER.build.version),
   ]);
   // Names, icons and qualities of the items the recipes make and use, under the item name rule (shown-item-names.ts).
-  const ids = recipeItemIds(p.recipes).filter(shown.showsTip);
+  const ids = [...new Set([...recipeItemIds(p.recipes), ...teachingItemIds(p.recipes.map(r => r.spellId))])].filter(shown.showsTip);
   const tips: Map<number, ItemTip> = await loadItemTips(ids.length ? assets : null, ids);
   const names = new Map<number, ShownItemName | null>(ids.map((id) => [id, shownItemName(id, shown.agreed, shown.matched?.names, tips.get(id))]));
   const fileQuality = new Map(CLIENT_TAXONOMY.items.map((row) => [row[0], row[4]]));
 
   // The player layer, as before: three agreeing installs or nothing.
   const facts = view.facts;
-  const answer = view.unreachable ? STORAGE_UNREACHABLE : handleProfessionPath({ profession: p.name, fromSkill, toSkill }, facts.sightings, facts.prices, facts.derived);
+  const plannerRecipes = view.unreachable ? [] : [...agreeRecipes(facts.sightings, p.name).map(r => ({...r, profession: p.name})), ...facts.derived.filter(r => r.profession.toLowerCase() === p.name.toLowerCase())];
   const rangesText = view.unreachable ? STORAGE_UNREACHABLE : handleRecipeThresholds({ profession: p.name }, facts.observations, facts.prices);
   const agreed = view.unreachable ? [] : recipeThresholdsStructured({ profession: p.name }, facts.observations, facts.prices).ranges;
   const byRecipe = new Map(agreed.map((t) => [t.recipe.trim().toLowerCase(), t]));
@@ -122,6 +126,7 @@ export default async function ProfessionPage(props: Props) {
     `${listHref(path, [...Object.keys(searchParams).filter((k) => k !== "mobs").map((k): [string, string] => [k, one(searchParams[k])]), ["mobs", rangeParam(l)]])}#gather`;
 
   const spellName = (id: number) => spellNames?.names.get(id);
+  const catalog = buildRecipeCatalog(p, id => names.get(id)?.name ?? `Item ${id}`, spellName, id => names.get(id)?.source === "files");
   const players = (r: RecipeView) => { const n = spellName(r.spellId); return n ? byRecipe.get(n.trim().toLowerCase()) : undefined; };
   const icons = new Map([...(assets?.professions ?? new Map<string, { icon: string }>())].map(([k, v]) => [k, v.icon]));
 
@@ -208,6 +213,7 @@ export default async function ProfessionPage(props: Props) {
 
       <div className="space-y-8">
         <ProfessionPicker professions={CLIENT_PROFESSIONS} icons={icons} current={p.slug} context={context} />
+        <AhledgerCrafting profession={p.name} />
 
         <section aria-labelledby="prof-recipes" className="space-y-4" data-recipes={p.slug}>
           <SectionHeading id="prof-recipes" as="h2">Recipes from the game files</SectionHeading>
@@ -268,6 +274,7 @@ export default async function ProfessionPage(props: Props) {
           </section>
         )}
 
+        <RecipeSearch rows={catalog} />
         <section aria-labelledby="prof-path" className="space-y-4">
           <SectionHeading id="prof-path" as="h2">Leveling path from player uploads</SectionHeading>
           <Card>
@@ -280,10 +287,9 @@ export default async function ProfessionPage(props: Props) {
               <button type="submit" className="btn btn-primary">Show the path</button>
             </form>
           </Card>
-          {pending
-            ? <EmptyState message={`No recipe ranges for ${p.name} yet: paths and ranges appear once 3 installs report the same recipes.`} />
-            : <Card><pre className="whitespace-pre-wrap text-sm text-fg">{answer}</pre></Card>}
         </section>
+        {pending && <EmptyState message={`No recipe ranges for ${p.name} yet: paths and ranges appear once 3 installs report the same recipes.`} />}
+        {view.unreachable ? <Card><p>{STORAGE_UNREACHABLE}</p></Card> : <ShoppingList catalog={catalog} profession={p.name} recipes={plannerRecipes} from={fromSkill} to={toSkill} />}
 
         {!pending && (
           <section aria-labelledby="prof-ranges">

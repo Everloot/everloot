@@ -104,3 +104,14 @@ test("the race tables show Forever's final racials from Blizzard's October 26 no
   expect(races).toContain(`href="${RACIAL_NOTES.sourceUrl}"`);
   expect(text).toContain("Updated 26 October");
 });
+
+
+test("new players see start jobs before launch details and the chooser beside the ruleset table", async () => {
+  const html = await at("2026-11-15T12:00:00Z");
+  const jobs = section(html, "start-here");
+  expect(jobs.match(/<li /g)).toHaveLength(9);
+  expect(jobs).not.toContain("/classes/choose");
+  expect(html.indexOf('aria-labelledby="start-here"')).toBeLessThan(html.indexOf('aria-labelledby="launch"'));
+  expect(section(html, "rulesets")).toContain("Find your ruleset");
+  expect(section(html, "rulesets")).toContain("Not confirmed yet");
+});

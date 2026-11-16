@@ -562,6 +562,7 @@ test("a HEAD the pages would redirect, answer 404 or filter goes to the page; so
     "/tools/auctions/camwow/0", "/tools/auctions/camwow/012", "/tools/auctions/camwow/12345678901", "/tools/auctions/camwow/abc", "/tools/auctions/camwow/2589/",
     "/tools/auctions?realm=camwow", "/tools/auctions?q=sword", "/tools/auctions/camwow?page=2", "/tools/auctions/a/b/1", "/tools/auctionsx",
     `/tools/auctions/${"a".repeat(41)}`, "/tools/auctions/%E0%A4%A",
+    "/tools/auctions/report", "/tools/auctions/report/2026-11-15", "/tools/auctions/report/123",
   ]) {
     const handler = vi.fn(async () => cachedPage("<html></html>"));
     await cachedResponse(new Request(`https://everloot.app${path}`, { method: "HEAD" }), VERSIONS, handler, fakeStore(), fakeContext());

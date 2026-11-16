@@ -37,7 +37,7 @@ test("a catalog chain links its ordered previous and next quests with source and
   expect(fact(out, "Chain")).toContain('href="/database/quest-chains/900"');
   expect(fact(out, "Chain")).toContain("Found in game files, unconfirmed");
   expect(fact(out, "Chain")).toContain("0 of 3 installs reported");
-  expect(fact(out, "Chain")).toContain("2026-11-10");
+  expect(fact(out, "Chain")).toContain("2026-11-13");
   expect(fact(out, "Previous quest")).toContain('href="/database/quests/7"');
   expect(fact(out, "Next quest")).toContain('href="/database/quests/9"');
 });

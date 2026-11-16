@@ -305,3 +305,22 @@ describe("sending linked characters", () => {
     expect(r.synced).toHaveLength(11);
   });
 });
+
+test("linked boss kills travel only through private sync and updated cumulative counts are sent again", async () => {
+  const kill = { characterKey: THRALL, encounterId: 2916, instanceMapId: 48, difficulty: 1,
+    firstKillAt: "2026-11-05T10:00:00Z", lastKillAt: "2026-11-05T10:00:00Z", killCount: 1 };
+  const data = { character_link: [link("Thrallina", THRALL)], boss_kill_owned: [kill, { ...kill, characterKey: "ffffffff" }] };
+  const { file, state, write } = workspace(data);
+  const api = site((characters) => Response.json({ characters: characters.map((_, index) => ({ index, result: "synced", categories: { boss_kills: "stored" } })) }));
+  await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send });
+  expect(api.calls).toHaveLength(1);
+  expect(api.calls[0]!.url).toBe(`${SITE}/api/me/characters/sync`);
+  expect(api.calls[0]!.characters[0]!.records).toHaveLength(1);
+  expect(api.calls[0]!.characters[0]!.records[0]).toMatchObject({ kind: "boss_kill_owned", killCount: 1 });
+  await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send });
+  expect(api.calls).toHaveLength(1);
+  write({ ...data, boss_kill_owned: [{ ...kill, lastKillAt: "2026-11-06T10:00:00Z", killCount: 2 }] });
+  await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send });
+  expect(api.calls).toHaveLength(2);
+  expect(api.calls[1]!.characters[0]!.records[0]).toMatchObject({ killCount: 2 });
+});

@@ -15,6 +15,16 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: Add daily auction reports with archived asking-price movers, house spreads, RSS and downloadable share cards.
+- Site: browse Blizzard auction house data by region and house, search item names, sort and page through current prices, and read 30 days of daily unit prices per house on the ad-free item pages.
+- Site: add AH Ledger 30-day item price history, profession crafting margins, auction deals and per-market listed-value comparisons, read in the browser with source credit and upstream cache lifetimes.
+- Site: document Worker builds, release checks, MCP version files and dated desktop signing status in the package READMEs.
+- Site: auction item pages show AH Ledger's latest price for the item on each Forever market, both factions, US and EU on the all-realms page and the realm's own ruleset on a realm's page, read live from AH Ledger's API with its credit link and never stored.
+- Site: auction item pages show the one-day and seven-day price changes when solid public days support them.
+- Addon: recipe and trainer observations keep optional profession skill-line IDs; trainer links also retain spell or product IDs when available, alongside localized names.
+- Addon: a kill's loot window with nothing in it is now recorded, tied to the one dead creature you could loot (interact, mouseover or target), as a loot row with no items and no coin, once per corpse, and the site's drop rates, loot tables and open data count it in the source's windows (protocol 2.3.0, `sourceEvidence: "empty-window"`). Until now an empty corpse never reached the site, so drop rates for anything that does not always drop read too high. Needs an in-game check before release.
+- Site: prepare opt-in private boss-kill sync for linked characters; awaiting migration and policy approval.
+- Site: add Start here shortcuts with a remembered class on home and WoW: Forever, plus a three-question ruleset chooser that explains its suggestion.
 - Site: the gold ledger page shows where your gold went for the last 7, 30 or 90 days: spent, earned, net and spent per day against the period before, each spending category's share and change, a daily spending chart by category, the largest single payments, auction sales by item with the house cut and sales still waiting in the mailbox, and resale: each item you both bought and sold with its average paid, average received after the cut and profit. Gold history is a line over real time, and the week card stacks on phones.
 - Site: the gold ledger page now reads the addon's own local ledger and roster from the dropped Everloot.lua, in the browser: repairs, vendor purchases, trades and mail show beside the uploaded categories, gold moved between your own characters stays out of the combined totals, and daily closing gold joins the history. Nothing is uploaded.
 - Site: filter auction browsing by region, including unknown-region records, with matching counts and compact realm names that preserve the full recorded label on hover.
@@ -216,11 +226,13 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: /tools/bags shows the cheapest bag of each size on one realm's auction house and what each added slot costs over your smallest bag, and item tooltips print a bag's "14 Slot Bag" line; slot counts come from the game files, prices from players' scans.
 
 ### Fixed
-- Site: the snapshot job holds less of the corpus in memory while it extends the snapshot. It drops the parsed old snapshot once its events are replayed, and the rollups that run after it (item view, aggregates, auction history, professions, map pins, database activity) read the state it just wrote instead of downloading and parsing the same file again. On a 20 MB synthetic snapshot the memory still held mid-run falls by about 28 MB (39 to 11 MB while the new uploads are read, 60 to 31 MB at the write), and a second read of the file is gone.
-- Site: the Auction House's background page refresh is tried twice, not six times, when it fails. Each try rendered the page again, and a page that outlasts the queue's 10-second limit failed every time (`NEXT_CACHE_DO_QUEUE_MAX_RETRIES`).
-- Site: the market rollup the Auction House pages read is read once at a time, with a time limit. Pages that arrived together each downloaded and parsed the whole file, which filled the isolate's memory and asked R2 for one object many times over; a read that never answered held its page until the platform cut it off. When the rollup cannot be read, the copy already held answers for up to an hour instead of the page saying the market is unrecorded. Every R2 call from the site now has a time limit (25 seconds to read, 45 to write).
-- Site: a HEAD request for an Auction House page that has no stored copy is answered from the URL, without rendering the page. Crawlers ask HEAD of thousands of realm and item addresses, and each one rendered the whole page (seconds of CPU) to send back no body. A URL the page would redirect or answer 404, or a list page with filters, still goes to the page.
-- Site: the blue-post tracker's scheduled run stops starting requests after 15 seconds and saves where it got to, and every storage call has a time limit. A busy pass of up to 40 polite requests could outlast the platform's limit and be cut off before it saved anything, so it repeated the same work every run and never advanced.
+- Site: the MCP methodology describes drop rates as a share of recorded loot windows, including its measured-zero example.
+- Site: loot-table notes and open-data descriptions warn that rates can read high before the drops restart, and switch to counted-empty-window wording when a drops recheck scope exists.
+- Addon: Settings stays inside the Everloot window, counts every populated record kind and names item facts; a Full / Compact / Off selector controls tooltip detail without changing recording. Needs an in-game layout check before release.
+- Site: bag upgrade pickers offer publicly priced sizes and preserve bags selected in saved links, without suggesting unpriced test containers.
+- Docs: the project overview links current downloads and explains paired addon/Desktop App updates for community prices.
+- Site: malformed URL fragments keep the default or current database tab usable, including click and keyboard navigation.
+- Site: find public chests and gathering nodes by agreed name in search, suggestions and the object list, with links to every match.
 - Site: the armory loads no ads or analytics: AdSense Auto ads was filling its pages, which show Blizzard API data. A move to it from another page now loads a new document, like the Blizzard auction page.
 - Site: auction prices keep updating when the market rollup is full: the oldest open scan day closes early (its public prices kept) instead of new scans being refused, one uploader cannot take more than a third of the room, and dropped scans no longer leave empty days behind.
 - Site: avoid compiling game-file name matchers for absent ASCII names when answering sourced questions, reducing cold-start CPU work.
@@ -352,8 +364,26 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the home page banner no longer makes the page a few pixels wider than the window on a computer with a
   scrollbar, so the page has nothing to scroll sideways at any width.
 - Desktop App: restoring the oldest backup keeps the selected save and an undo copy, even within the same second.
+- Companion: watch mode waits for the first account save and finds new accounts without a restart, refreshing prices for every discovered account.
+- Knowledge base: open data drop rates and measured zeros follow the same recheck cutoffs as the site, leaving other exported facts and corpus counts unchanged.
+- Site: the blue-post tracker's scheduled run stops starting requests after 15 seconds and saves where it got to, and every storage call has a time limit. A busy pass of up to 40 polite requests could outlast the platform's limit and be cut off before it saved anything, so it repeated the same work every run and never advanced.
+- Site: a HEAD request for an Auction House page that has no stored copy is answered from the URL, without rendering the page. Crawlers ask HEAD of thousands of realm and item addresses, and each one rendered the whole page (seconds of CPU) to send back no body. A URL the page would redirect or answer 404, or a list page with filters, still goes to the page.
+- Site: the market rollup the Auction House pages read is read once at a time, with a time limit. Pages that arrived together each downloaded and parsed the whole file, which filled the isolate's memory and asked R2 for one object many times over; a read that never answered held its page until the platform cut it off. When the rollup cannot be read, the copy already held answers for up to an hour instead of the page saying the market is unrecorded. Every R2 call the upload store makes now has a time limit (25 seconds to read, 45 to write).
+- Site: the Auction House's background page refresh is tried twice, not six times, when it fails. Each try rendered the page again, and a page that outlasts the queue's 10-second limit failed every time (`NEXT_CACHE_DO_QUEUE_MAX_RETRIES`).
+- Site: the snapshot job holds less of the corpus in memory while it extends the snapshot. It drops the parsed old snapshot once its events are replayed, and the rollups that run after it (item view, aggregates, auction history, professions, map pins, database activity) read the state it just wrote instead of downloading and parsing the same file again. On a 20 MB synthetic snapshot the memory still held mid-run falls by about 28 MB (39 to 11 MB while the new uploads are read, 60 to 31 MB at the write), and a second read of the file is gone.
 
 ### Changed
+- Site: the site shows no ads. About, the FAQ, the terms, the privacy policy, the privacy guide and the accessibility statement now say so and no longer describe Google AdSense.
+- Site: the Blizzard auction house page names each house by its ruleset and faction ("PvP, Alliance", "Roleplay PvP, Horde") instead of "Alliance, house 110", and lists them US first, then by ruleset. Blizzard's API does not say which ruleset a house serves; the mapping was matched by price in both regions.
+- Addon: auction scan messages name everloot.app/upload alongside the Desktop App as a way to send the saved file.
+- Site: explain how the CurseForge app and Desktop App keep downloads current on the addon page.
+- Site: upload and addon install steps name the Windows and macOS Forever save-file and AddOns paths.
+- Site: show likely ranges and few-window marks in NPC, item-source, loot-list and zone tables.
+- Addon: grouped auction sales show paid transactions per day and paid units per day separately beside the last sold date. Pending and unmatched notices affect neither rate; in-game layout verification is required before release.
+- Site: profession shopping lists total materials for a chosen skill range, let players skip recipes, compare listed prices from selected auction houses, and search recipes by name, recipe item or material with a skill filter.
+- Site: share private character-sync validation with the companion through a separate protocol export; public uploads still reject private-only rows.
+- Site: Reuse cold-start aggregate and game-art reads and load the build label from a small generated stamp.
+- Site: auction item pages (`/tools/auctions/:realm/:itemId`) are kept in the edge cache for five minutes, like the browse pages, so repeat requests and crawlers stop re-rendering them.
 - Site: reuse public MCP discovery metadata within each mount while keeping request ids, access checks and account tools separate.
 - Site: answer sourced questions from stored public facts without replaying the upload corpus.
 - Site: reuse successful public corpus API answers at the edge for five minutes, with separate keys for each normalized query.

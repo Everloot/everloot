@@ -4,11 +4,11 @@
   "credit": "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.",
   "build": {
     "product": "wowf",
-    "buildId": 70707,
-    "version": "1.60.1.70707",
-    "buildConfig": "7feb61f3c994bcb168526b8db521514a",
-    "definitions": "6083ea62ec17",
-    "extractedAt": "2026-11-01T16:07:29.475Z"
+    "buildId": 70938,
+    "version": "1.60.1.70938",
+    "buildConfig": "3627b099867bfde3e37a17cf44f69cdc",
+    "definitions": "fe771f93091b",
+    "extractedAt": "2026-11-14T04:39:58.844Z"
   },
   "traitSystemId": 45,
   "currencies": [
@@ -885,14 +885,14 @@
   "tables": [
     {
       "table": "SpellName",
-      "rows": 32007,
-      "hash": "6146e9429939",
+      "rows": 32123,
+      "hash": "835961748126",
       "encryptedBlocks": 14
     },
     {
       "table": "TraitCond",
-      "rows": 172,
-      "hash": "4c6d3b4f7a63",
+      "rows": 171,
+      "hash": "8622479aa3c3",
       "encryptedBlocks": 0
     },
     {
@@ -909,26 +909,26 @@
     },
     {
       "table": "TraitDefinition",
-      "rows": 659,
-      "hash": "328f665a596c",
+      "rows": 665,
+      "hash": "71ec05f87e42",
       "encryptedBlocks": 0
     },
     {
       "table": "TraitEdge",
       "rows": 99,
-      "hash": "7ae86fb7976a",
+      "hash": "35081d81ce99",
       "encryptedBlocks": 0
     },
     {
       "table": "TraitNode",
-      "rows": 556,
-      "hash": "72881d567725",
+      "rows": 559,
+      "hash": "de3168445868",
       "encryptedBlocks": 0
     },
     {
       "table": "TraitNodeEntry",
-      "rows": 659,
-      "hash": "a5094af5a011",
+      "rows": 666,
+      "hash": "a63f04d5bf64",
       "encryptedBlocks": 0
     },
     {
@@ -957,14 +957,14 @@
     },
     {
       "table": "TraitNodeGroupXTraitNode",
-      "rows": 2145,
-      "hash": "97023810c5c6",
+      "rows": 2159,
+      "hash": "22b38d965575",
       "encryptedBlocks": 0
     },
     {
       "table": "TraitNodeXTraitCond",
-      "rows": 1,
-      "hash": "392ac8a057b6",
+      "rows": 0,
+      "hash": "e3b0c44298fc",
       "encryptedBlocks": 0
     },
     {
@@ -975,8 +975,8 @@
     },
     {
       "table": "TraitNodeXTraitNodeEntry",
-      "rows": 559,
-      "hash": "3a530cbab66c",
+      "rows": 562,
+      "hash": "36b711428432",
       "encryptedBlocks": 0
     },
     {

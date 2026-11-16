@@ -1,9 +1,14 @@
 """Links the Everloot Discord server and this repository. Run by .github/workflows/discord-bridge.yml.
 
-  schedule, issues  new #bug-reports posts become GitHub issues; issue status flows back to the post
-                    as a tag and a reply; #known-issues lists open issues labelled known-issue
-  release           posts the release to #version-updates
-  discussion        posts the new discussion to #discussions
+  schedule, issues  #help posts tagged Bug and every #ideas post become GitHub issues; issue status
+                    flows back to the post as a tag and a reply; the pinned "Start here" post in #help
+                    keeps a list of open issues labelled known-issue; someone who joined in the last
+                    hour gets a hello in #general
+  weekly schedule   a short list of last week's merged site, addon, app and AI changes in #updates
+  release           posts an addon or desktop release to #updates, once. Releases made with the workflow
+                    token start no workflows, so the release workflows also dispatch this one with
+                    release_tag; whichever arrives second finds the post and skips it
+  discussion        posts the new discussion to #github-feed
   push to main      posts the commits to #github-feed
   pull_request_target (opened)  posts the pull request to #github-feed
 
@@ -17,20 +22,32 @@ import re
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
 GUILD = "1561174605580992603"
-BUGS = "1561179041204150272"  # forum #bug-reports
-KNOWN_ISSUES = "1561179153322082497"
+HELP = "1561179041204150272"  # forum #help: questions and bug reports (was #bug-reports)
 VERSION_UPDATES = "1561179149702398044"
-DISCUSSIONS = "1561254298170556589"
 GITHUB_FEED = "1561179069083680868"
 PING_ADDON = "1561178952108613752"
+IDEAS = "1561179043687174246"  # forum #ideas (was #suggestions)
+GENERAL = "1561178989463339099"  # also where Discord posts "X joined"
+WELCOME = "1561178970580586686"
+MAINTAINER = "204042107856486401"  # pinged when someone joins, to say hello in person
 GOLD = 0xF2B632
 
 AREA_LABELS = {"Addon": "addon", "Website": "web", "MCP / AI": "mcp", "Desktop": "companion"}
 STATUS_TAGS = ("Tracked", "Confirmed", "Fixed", "Can't reproduce", "Needs info", "Closed")
+IDEA_TAGS = ("Under review", "Planned", "Shipped", "Declined")
+BUG_TAG = "Bug"  # in #help only posts with this tag go to GitHub; questions stay in Discord
+# The bot's pinned post in #help (a forum pins one post). Its latest bot message is the known-issues list.
+KNOWN_TITLE = "Start here: questions, bugs and known issues"
+GREET_WINDOW = timedelta(hours=1)
+WEEKLY_CRON = "0 16 * * 1"  # Mondays; must match discord-bridge.yml
+WEEKLY_AREAS = {"web": "Site", "addon": "Addon", "desktop": "Desktop App", "companion": "Desktop App", "mcp": "AI connectors"}
+# New things in every area, and fixes players notice in the addon and the app; the site's fixes are mostly plumbing.
+WEEKLY_TITLE = re.compile(r"^(?:feat\((web|addon|desktop|companion|mcp)\)|fix\((addon|desktop|companion)\)): (\S.*)$")
 REPORTS_PER_DAY = 3
 MARKER = re.compile(r"<!-- discord-thread:(\d+) -->")
 BRIDGE_LOGIN = "github-actions[bot]"
@@ -80,12 +97,12 @@ def is_bridged(issue: dict) -> bool:
     return issue.get("user", {}).get("login") == BRIDGE_LOGIN and "from-discord" in labels and bool(MARKER.search(issue.get("body") or ""))
 
 
-def issue_body(thread: dict, starter: dict, areas: list[str]) -> str:
+def issue_body(thread: dict, starter: dict, areas: list[str], forum: str = "help") -> str:
     author = starter["author"].get("global_name") or starter["author"]["username"]
     link = f"https://discord.com/channels/{GUILD}/{thread['id']}"
     text = defuse_mentions(starter.get("content") or "(no text)")
     quoted = "\n".join("> " + line for line in text.splitlines()) or "> (no text)"
-    lines = [f"Reported on Discord by **{defuse_mentions(author)}** in #bug-reports: {link}", "", quoted, ""]
+    lines = [f"Reported on Discord by **{defuse_mentions(author)}** in #{forum}: {link}", "", quoted, ""]
     if areas:
         lines.append("Area: " + ", ".join(areas))
     for a in starter.get("attachments", []):
@@ -103,7 +120,7 @@ def over_daily_limit(thread: dict, tracked: list[dict], now: datetime) -> bool:
 
 def known_issues_text(issues: list[dict]) -> str:
     if not issues:
-        return "No known issues right now. Found one? Post it in <#%s>." % BUGS
+        return "No known issues right now. Found one? Post it in <#%s> with the Bug tag." % HELP
     rows = []
     for i in issues[:25]:
         areas = [k for k, v in AREA_LABELS.items() if v in {label["name"] for label in i["labels"]}]
@@ -112,6 +129,78 @@ def known_issues_text(issues: list[dict]) -> str:
     if more > 0:
         rows.append(f"…and {more} more on GitHub.")
     return "\n".join(rows)
+
+
+ANNOUNCED_TAG = re.compile(r"(addon|desktop)-v[0-9][0-9A-Za-z.-]*")
+
+
+def announces_release(tag: str) -> bool:
+    """Addon and desktop releases go to #updates; nightly builds and the protocol package don't."""
+    return bool(ANNOUNCED_TAG.fullmatch(tag or ""))
+
+
+def already_posted(tag: str, messages: list[dict], me: str) -> bool:
+    return any(m["author"]["id"] == me and any((e.get("footer") or {}).get("text") == tag for e in m.get("embeds") or [])
+               for m in messages)
+
+
+def idea_status(issue: dict) -> str:
+    """The #ideas tag a bridged idea should show: a maintainer adds `planned`, closing as completed ships it."""
+    if issue["state"] == "closed":
+        return "Shipped" if issue.get("state_reason") == "completed" else "Declined"
+    return "Planned" if "planned" in {label["name"] for label in issue.get("labels", [])} else "Under review"
+
+
+def idea_reply(status: str, issue: dict) -> str:
+    url = issue["html_url"]
+    return {
+        "Under review": f"Thanks for the idea! It's on GitHub now: {url}\nThe tag on this post changes when it's planned, shipped or declined.",
+        "Planned": f"Planned: this idea is on the list. {url}",
+        "Shipped": f"Shipped: {url}\nIt goes out with the next release; watch <#{VERSION_UPDATES}>.",
+        "Declined": f"Not planned for now: {url}\nThe reason is on GitHub. Reply here if you want to add something.",
+    }[status]
+
+
+def kind_of(issue: dict) -> str:
+    return "idea" if "idea" in {label["name"] for label in issue.get("labels", [])} else "bug"
+
+
+def joins_to_greet(messages: list[dict], me: str, now: datetime) -> list[dict]:
+    """Discord's own "X joined" messages from the last hour that the bot hasn't answered yet."""
+    answered = {(m.get("message_reference") or {}).get("message_id") for m in messages if m["author"]["id"] == me}
+    return [m for m in messages if m.get("type") == 7 and m["id"] not in answered and now - snowflake_time(m["id"]) <= GREET_WINDOW]
+
+
+def greeting(user_id: str) -> str:
+    return (f"Welcome to Everloot, <@{user_id}>! Start with <#{WELCOME}>. Questions, problems and bug reports go in <#{HELP}>, "
+            f"ideas in <#{IDEAS}>, and you can just say hi here. <@{MAINTAINER}> will be by to say hello.")
+
+
+def weekly_text(prs: list[dict], more_url: str, limit: int = 15) -> str:
+    """The newest merged pull requests players would notice, grouped by area; empty when there is nothing to tell."""
+    groups: dict[str, list[str]] = {}
+    newest = sorted(prs, key=lambda pr: (pr.get("pull_request") or {}).get("merged_at") or "", reverse=True)
+    for pr in newest:
+        m = WEEKLY_TITLE.match(pr["title"].strip())
+        if m:
+            text = m.group(3)
+            groups.setdefault(WEEKLY_AREAS[m.group(1) or m.group(2)], []).append(f"• [{text[0].upper() + text[1:]}]({pr['html_url']})")
+    total = sum(len(v) for v in groups.values())
+    # Share the limit across areas, newest first within each, so one busy area doesn't crowd out the rest.
+    keep: dict[str, int] = {area: 0 for area in groups}
+    while sum(keep.values()) < min(limit, total):
+        for area in groups:
+            if keep[area] < len(groups[area]) and sum(keep.values()) < limit:
+                keep[area] += 1
+    lines, shown = [], 0
+    for area in dict.fromkeys(WEEKLY_AREAS.values()):
+        take = groups.get(area, [])[:keep.get(area, 0)]
+        if take:
+            lines += [f"**{area}**"] + take
+            shown += len(take)
+    if total > shown:
+        lines.append(f"…and {total - shown} more: {more_url}")
+    return "\n".join(lines)[:4000]
 
 
 def feed_commits(commits: list[dict]) -> list[str]:
@@ -169,21 +258,31 @@ def say(channel: str, embed: dict, content: str = "", roles=()) -> dict:
     return discord("POST", f"/channels/{channel}/messages", body)
 
 
+# The two forums mirrored with GitHub issues. A post becomes an issue labelled with its kind; in #help only
+# posts tagged Bug do (if the tag is missing, nothing is opened).
+KINDS = {
+    "bug": {"forum": HELP, "name": "help", "tags": STATUS_TAGS, "status": issue_status, "reply": status_reply,
+            "noun": "bug reports", "only": BUG_TAG},
+    "idea": {"forum": IDEAS, "name": "ideas", "tags": IDEA_TAGS, "status": idea_status, "reply": idea_reply,
+             "noun": "ideas"},
+}
+
+
 # ---------------------------------------------------------------- jobs
 
 REPO = os.environ.get("GITHUB_REPOSITORY", "Everloot/everloot")
 
 
-def forum_tags() -> dict:
-    return {t["name"]: t["id"] for t in discord("GET", f"/channels/{BUGS}")["available_tags"]}
+def forum_tags(forum: str) -> dict:
+    return {t["name"]: t["id"] for t in discord("GET", f"/channels/{forum}")["available_tags"]}
 
 
-def bug_threads() -> list[dict]:
+def forum_threads(forum: str) -> list[dict]:
     active = discord("GET", f"/guilds/{GUILD}/threads/active")["threads"]
-    archived = discord("GET", f"/channels/{BUGS}/threads/archived/public?limit=50")["threads"]
+    archived = discord("GET", f"/channels/{forum}/threads/archived/public?limit=50")["threads"]
     seen, out = set(), []
     for t in active + archived:
-        if t["parent_id"] == BUGS and t["id"] not in seen:
+        if t["parent_id"] == forum and t["id"] not in seen:
             seen.add(t["id"])
             out.append(t)
     return out
@@ -195,33 +294,37 @@ def bridged_issues(since_days: int) -> list[dict]:
     return [i for i in issues if "pull_request" not in i and is_bridged(i)]
 
 
-def open_new_reports(tags: dict) -> None:
+def open_new_posts(kind: str, tags: dict) -> None:
+    k = KINDS[kind]
+    first = k["status"]({"state": "open", "labels": []})
     me = discord("GET", "/users/@me")["id"]
-    status_ids = {tags[s] for s in STATUS_TAGS if s in tags}
-    threads = bug_threads()
+    status_ids = {tags[s] for s in k["tags"] if s in tags}
+    threads = forum_threads(k["forum"])
     already = {MARKER.search(i["body"]).group(1) for i in bridged_issues(30)}
     tracked = [t for t in threads if status_ids & set(t.get("applied_tags", []))]
     now = datetime.now(timezone.utc)
     for t in sorted(threads, key=lambda t: int(t["id"])):
         if t["owner_id"] == me or status_ids & set(t.get("applied_tags", [])):
             continue
+        if k.get("only") and tags.get(k["only"]) not in t.get("applied_tags", []):
+            continue
         if t["id"] in already:  # issue exists but tagging failed last time: just tag it
-            discord("PATCH", f"/channels/{t['id']}", {"archived": False, "applied_tags": t.get("applied_tags", []) + [tags["Tracked"]]})
+            discord("PATCH", f"/channels/{t['id']}", {"archived": False, "applied_tags": t.get("applied_tags", []) + [tags[first]]})
             continue
         if over_daily_limit(t, tracked, now):
             recent = discord("GET", f"/channels/{t['id']}/messages?limit=20")
             if not any(m["author"]["id"] == me for m in recent):
                 discord("POST", f"/channels/{t['id']}/messages", {"allowed_mentions": NO_PINGS,
-                        "content": f"You've posted {REPORTS_PER_DAY} bug reports in the last day, so this one goes to GitHub tomorrow. Thanks for testing so much!"})
+                        "content": f"You've posted {REPORTS_PER_DAY} {k['noun']} in the last day, so this one goes to GitHub tomorrow. Thanks for all of them!"})
             continue
         starter = discord("GET", f"/channels/{t['id']}/messages/{t['id']}")
         names = {v: k for k, v in tags.items()}
         areas = [names[x] for x in t.get("applied_tags", []) if names.get(x) in AREA_LABELS]
-        labels = ["bug", "from-discord", "needs-triage"] + [AREA_LABELS[a] for a in areas]
+        labels = [kind, "from-discord", "needs-triage"] + [AREA_LABELS[a] for a in areas]
         issue = github("POST", f"/repos/{REPO}/issues", {"title": defuse_mentions(t["name"])[:200],
-                                                         "body": issue_body(t, starter, areas), "labels": labels})
-        discord("PATCH", f"/channels/{t['id']}", {"archived": False, "applied_tags": (t.get("applied_tags", []) + [tags["Tracked"]])[:5]})
-        discord("POST", f"/channels/{t['id']}/messages", {"allowed_mentions": NO_PINGS, "content": status_reply("Tracked", issue)})
+                                                         "body": issue_body(t, starter, areas, k["name"]), "labels": labels})
+        discord("PATCH", f"/channels/{t['id']}", {"archived": False, "applied_tags": (t.get("applied_tags", []) + [tags[first]])[:5]})
+        discord("POST", f"/channels/{t['id']}/messages", {"allowed_mentions": NO_PINGS, "content": k["reply"](first, issue)})
         tracked.append(t)
         print(f"thread {t['id']} -> issue #{issue['number']}")
 
@@ -233,13 +336,14 @@ def sync_status(issue: dict, tags: dict) -> None:
     except RuntimeError as e:
         print(f"issue #{issue['number']}: thread {thread_id} is gone ({e})")
         return
-    want = issue_status(issue)
-    status_ids = {tags[s] for s in STATUS_TAGS}
+    k = KINDS[kind_of(issue)]
+    want = k["status"](issue)
+    status_ids = {tags[s] for s in k["tags"]}
     keep = [x for x in thread.get("applied_tags", []) if x not in status_ids]
     if [x for x in thread.get("applied_tags", []) if x in status_ids] == [tags[want]]:
         return
     discord("PATCH", f"/channels/{thread_id}", {"archived": False, "applied_tags": (keep + [tags[want]])[:5]})
-    discord("POST", f"/channels/{thread_id}/messages", {"allowed_mentions": NO_PINGS, "content": status_reply(want, issue)})
+    discord("POST", f"/channels/{thread_id}/messages", {"allowed_mentions": NO_PINGS, "content": k["reply"](want, issue)})
     print(f"issue #{issue['number']}: thread {thread_id} -> {want}")
 
 
@@ -249,17 +353,69 @@ def update_known_issues() -> None:
              "description": known_issues_text(issues), "color": GOLD,
              "footer": {"text": "Updated automatically from GitHub issues labelled known-issue"}}
     me = discord("GET", "/users/@me")["id"]
-    mine = [m for m in discord("GET", f"/channels/{KNOWN_ISSUES}/messages?limit=20") if m["author"]["id"] == me]
+    thread = next((t for t in forum_threads(HELP) if t["owner_id"] == me and t["name"] == KNOWN_TITLE), None)
+    if thread is None:  # someone deleted it: post the list again (unpinned; a maintainer pins it)
+        try:
+            discord("POST", f"/channels/{HELP}/threads", {"name": KNOWN_TITLE, "message": {"embeds": [embed], "allowed_mentions": NO_PINGS}})
+        except RuntimeError as e:  # #help requires a tag, which binds the bot too; the rest of the sync goes on
+            print(f"known issues: no pinned post in #help and could not post one ({e})")
+        return
+    mine = [m for m in discord("GET", f"/channels/{thread['id']}/messages?limit=20") if m["author"]["id"] == me]
+    old = (mine[0]["embeds"] or [{}])[0] if mine else {}
+    if old.get("description") == embed["description"]:
+        return
+    if (thread.get("thread_metadata") or {}).get("archived"):
+        discord("PATCH", f"/channels/{thread['id']}", {"archived": False})
     if mine:
-        old = mine[0]["embeds"][0] if mine[0]["embeds"] else {}
-        if old.get("description") != embed["description"]:
-            discord("PATCH", f"/channels/{KNOWN_ISSUES}/messages/{mine[0]['id']}", {"embeds": [embed], "allowed_mentions": NO_PINGS})
+        discord("PATCH", f"/channels/{thread['id']}/messages/{mine[0]['id']}", {"embeds": [embed], "allowed_mentions": NO_PINGS})
     else:
-        discord("POST", f"/channels/{KNOWN_ISSUES}/messages", {"embeds": [embed], "allowed_mentions": NO_PINGS})
+        discord("POST", f"/channels/{thread['id']}/messages", {"embeds": [embed], "allowed_mentions": NO_PINGS})
+
+
+def greet_new_members() -> None:
+    me = discord("GET", "/users/@me")["id"]
+    for m in joins_to_greet(discord("GET", f"/channels/{GENERAL}/messages?limit=50"), me, datetime.now(timezone.utc)):
+        user = m["author"]["id"]
+        discord("POST", f"/channels/{GENERAL}/messages", {"content": greeting(user), "message_reference": {"message_id": m["id"]},
+                                                         "allowed_mentions": {"parse": [], "users": [user, MAINTAINER]}})
+        print(f"greeted {user}")
+
+
+def post_weekly() -> None:
+    start = (datetime.now(timezone.utc) - timedelta(days=7)).date().isoformat()
+    week = f"Week of {start}"
+    me = discord("GET", "/users/@me")["id"]
+    if already_posted(week, discord("GET", f"/channels/{VERSION_UPDATES}/messages?limit=50"), me):
+        print(f"{week}: already in #updates")
+        return
+    q = urllib.parse.quote(f"repo:{REPO} is:pr is:merged base:main merged:>={start}")
+    prs = []
+    for page in (1, 2, 3):  # a busy week merges 200+
+        items = github("GET", f"/search/issues?q={q}&per_page=100&page={page}")["items"]
+        prs += items
+        if len(items) < 100:
+            break
+    text = weekly_text(prs, f"https://github.com/{REPO}/pulls?q=is%3Apr+is%3Amerged")
+    if not text:
+        print(f"{week}: nothing for players to read")
+        return
+    msg = say(VERSION_UPDATES, {"title": "New on Everloot this week", "url": f"https://github.com/{REPO}/blob/main/CHANGELOG.md",
+                                "description": text, "footer": {"text": week}})
+    try:
+        discord("POST", f"/channels/{VERSION_UPDATES}/messages/{msg['id']}/crosspost")
+    except RuntimeError as e:
+        print(f"crosspost: {e}")
 
 
 def post_release(release: dict) -> None:
     tag = release["tag_name"]
+    if not announces_release(tag):
+        print(f"{tag}: not announced in Discord")
+        return
+    me = discord("GET", "/users/@me")["id"]
+    if already_posted(tag, discord("GET", f"/channels/{VERSION_UPDATES}/messages?limit=50"), me):
+        print(f"{tag}: already in #updates")
+        return
     addon = tag.startswith("addon-")
     msg = say(VERSION_UPDATES, {"title": release.get("name") or tag, "url": release["html_url"],
                                 "description": (release.get("body") or "")[:3500], "footer": {"text": tag}},
@@ -271,7 +427,7 @@ def post_release(release: dict) -> None:
 
 
 def post_discussion(d: dict) -> None:
-    say(DISCUSSIONS, {"title": d["title"][:250], "url": d["html_url"], "description": (d.get("body") or "")[:500],
+    say(GITHUB_FEED, {"title": d["title"][:250], "url": d["html_url"], "description": (d.get("body") or "")[:500],
                       "author": {"name": d["user"]["login"]}, "footer": {"text": d["category"]["name"]}})
 
 
@@ -292,8 +448,13 @@ def main() -> None:
     name = os.environ["GITHUB_EVENT_NAME"]
     with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as f:
         event = json.load(f)
+    tag = os.environ.get("RELEASE_TAG", "")
     if name == "release":
         post_release(event["release"])
+    elif name == "workflow_dispatch" and tag:
+        if not announces_release(tag):
+            raise RuntimeError(f"release_tag {tag!r} is not an addon-v* or desktop-v* tag")
+        post_release(github("GET", f"/repos/{REPO}/releases/tags/{tag}"))
     elif name == "discussion":
         post_discussion(event["discussion"])
     elif name == "push":
@@ -301,15 +462,18 @@ def main() -> None:
     elif name == "pull_request_target":
         post_pull_request(event["pull_request"])
     elif name == "issues":
-        tags = forum_tags()
         if is_bridged(event["issue"]):
-            sync_status(event["issue"], tags)
+            sync_status(event["issue"], forum_tags(KINDS[kind_of(event["issue"])]["forum"]))
         update_known_issues()
+    elif os.environ.get("SCHEDULE") == WEEKLY_CRON or os.environ.get("WEEKLY") == "true":
+        post_weekly()
     else:  # schedule, workflow_dispatch
-        tags = forum_tags()
-        open_new_reports(tags)
+        greet_new_members()
+        tags = {kind: forum_tags(k["forum"]) for kind, k in KINDS.items()}
+        for kind in KINDS:
+            open_new_posts(kind, tags[kind])
         for issue in bridged_issues(2):
-            sync_status(issue, tags)
+            sync_status(issue, tags[kind_of(issue)])
         update_known_issues()
 
 

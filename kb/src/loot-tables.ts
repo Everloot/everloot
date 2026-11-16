@@ -1,12 +1,15 @@
 /**
  * The NPC loot table and the item-source table (docs/design/specs/2026-10-21-loot-tables-design.md, section 9).
- * One reading of the addon's loot windows, the ones the loot API attributed (`sourceEvidence: "loot-api"`), with
+ * One reading of the addon's loot windows, the ones the loot API attributed (`sourceEvidence: "loot-api"`) and the
+ * empty ones the addon tied to their corpse (`empty-window`, which only add to a source's windows), with
  * every number's denominator and dates beside it. A rate is windows holding the item over the source's windows,
  * shown once 3 installs looted the source: the public rows are `rollupDrops`' public rates. Below that, a page says
  * how many windows from how many installs it has, and no item is tied to a source. Recorder windows never enter
  * here; `pending-loot.ts` counts them apart.
  */
-import { countsAsKillOrGather, INDEPENDENT_INSTALLS } from "./drop-rollup.js";
+import recheckFile from "../curated/recheck.json";
+import { RecheckFile, type RecheckScope } from "./coverage.js";
+import { countsAsKillOrGather, INDEPENDENT_INSTALLS, isCountedLootEvidence } from "./drop-rollup.js";
 
 /** A source's windows: how many, from how many installs, and the first and last capture day (UTC). */
 export interface WindowSpan { windows: number; installs: number; first: string | null; last: string | null }
@@ -66,7 +69,7 @@ export function lootTablesFromRecords(records: readonly unknown[], asOf: Date | 
   for (const raw of records) {
     if (!raw || typeof raw !== "object") continue;
     const row = raw as Record<string, unknown>;
-    if (row.kind !== "loot" || row.sourceEvidence !== "loot-api" || !Array.isArray(row.items)) continue;
+    if (row.kind !== "loot" || !isCountedLootEvidence(row) || !Array.isArray(row.items)) continue;
     if (!countsAsKillOrGather(row.lootType)) continue;
     const installId = typeof row.installId === "string" ? row.installId.trim() : "";
     const key = positive(row.sourceNpcId) ? `npc:${row.sourceNpcId}` : positive(row.sourceObjectId) ? `obj:${row.sourceObjectId}` : null;
@@ -175,5 +178,17 @@ export function shortLine(short: { windows: number; installs: number }): string 
   return `${plural(short.windows, "loot window", "loot windows")} with this item from ${plural(short.installs, "install", "installs")}, on sources fewer than ${INDEPENDENT_INSTALLS} installs have looted. A rate needs windows from ${INDEPENDENT_INSTALLS} installs on the same source.`;
 }
 
+/** The wording changes at the drops restart, never at a hard-coded release date. */
+export function lootWindowNote(scopes: readonly RecheckScope[]): string {
+  return scopes.some((s) => s.type === "drops")
+    ? "Empty loot windows are counted, including empty corpses tied to a source by the addon."
+    : "Windows recorded before the drops restart did not include empty corpses, so rates for items that do not always drop can read high.";
+}
+
 /** How the rates under a table were made. */
-export const METHOD_LINE = "Observed frequency is the loot windows holding the item out of the loot windows opened on the source, from windows the game's loot API attributed, recorded by the Everloot addon. A window is a loot, not a kill.";
+export function methodLine(scopes: readonly RecheckScope[]): string {
+  return `Observed frequency is the loot windows holding the item out of the loot windows opened on the source, recorded by the Everloot addon. ${lootWindowNote(scopes)} A window is a loot, not a kill.`;
+}
+
+const parsedRecheck = RecheckFile.safeParse(recheckFile);
+export const METHOD_LINE = methodLine(parsedRecheck.success ? parsedRecheck.data.scopes : []);

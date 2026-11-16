@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { lootWindowsFromRecords, rollupDrops } from "../src/drop-rollup.js";
-import { itemDropSources, lootTablesFromRecords, missingLine, npcLootTable, objectLootRows, shortLine } from "../src/loot-tables.js";
+import { itemDropSources, lootTablesFromRecords, methodLine, missingLine, npcLootTable, objectLootRows, shortLine } from "../src/loot-tables.js";
 import { pendingForNpc, pendingLootFromRecords } from "../src/pending-loot.js";
 
 const asOf = "2026-10-21T00:00:00.000Z";
@@ -45,6 +45,19 @@ test("the public rows are rollupDrops' public rates, number for number", () => {
   const theirs = rollupDrops(lootWindowsFromRecords(records)).rates.filter((r) => r.public);
   expect(ours.map((r) => [r.sourceNpcId ?? r.sourceObjectId, r.itemId, r.withItem, r.windows, r.rate, r.installs]).sort())
     .toEqual(theirs.map((r) => [r.sourceNpcId ?? r.sourceObjectId, r.itemId, r.drops, r.kills, r.rate, r.reporters]).sort());
+});
+
+test("empty-window rows add to the NPC's windows on the page as in the rates, and a malformed one adds nothing", () => {
+  const empty = (installId: string) => ({ ...loot(installId, { npc: 7 }, []), sourceEvidence: "empty-window", lootType: "kill" });
+  const records = [
+    ...["a", "b", "c"].map((id) => loot(`install-${id}`, { npc: 7 }, [[11, 1]])),
+    ...["a", "b", "c", "a", "b"].map((id) => empty(`install-${id}`)),
+    { ...empty("install-c"), items: [{ itemId: 11, count: 1 }] },
+  ];
+  const table = npcLootTable(lootTablesFromRecords(records, asOf), 7);
+  expect(table.rows).toEqual([expect.objectContaining({ itemId: 11, withItem: 3, windows: 8, rate: 3 / 8 })]);
+  const theirs = rollupDrops(lootWindowsFromRecords(records)).rates;
+  expect(theirs).toEqual([expect.objectContaining({ itemId: 11, drops: 3, kills: 8 })]);
 });
 
 test("an object source gets its rows on the item page too", () => {
@@ -144,4 +157,17 @@ test("an object's rows come only once 3 installs looted it, with the same number
   expect(rows[0]).toEqual(itemDropSources(rated, 12).rows[0]);
   expect(objectLootRows(rated, 5)).toEqual([]);
   expect(objectLootRows(rated, 404)).toEqual([]);
+});
+
+test("rate notes warn that pre-restart windows missed empty corpses", () => {
+  expect(methodLine([])).toContain("did not include empty corpses");
+  expect(methodLine([])).toContain("rates for items that do not always drop can read high");
+  expect(methodLine([{ type: "quests", since: asOf, source: "test" }])).toContain("did not include empty corpses");
+});
+
+test("rate notes say empty windows count once a drops restart scope exists", () => {
+  const text = methodLine([{ type: "drops", since: asOf, source: "test" }]);
+  expect(text).toContain("Empty loot windows are counted");
+  expect(text).not.toContain("can read high");
+  expect(text).toContain("A window is a loot, not a kill");
 });

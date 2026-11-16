@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test, vi } from "vitest";
 
-vi.mock("@/data/game-data/client-layer.json", () => ({ default: { build: { product: "wowf", version: "1.60.1.80001" } } }));
+vi.mock("@/data/game-data/build-version.json", () => ({ default: { product: "wowf", version: "1.60.1.80001" } }));
 vi.mock("../../../kb/changes/builds.json", () => ({ default: { builds: [
   { product: "wowf", version: "1.60.1.80002", buildId: 80002, firstSeen: "2026-11-09" },
   { product: "wowf", version: "1.60.1.80001", buildId: 80001, firstSeen: "2026-11-08" },
@@ -24,7 +24,7 @@ test("the header labels both sources and links to their explanations", () => {
 
 test("with no build read, the label says unknown and links to how the files are read", async () => {
   vi.resetModules();
-  vi.doMock("@/data/game-data/client-layer.json", () => ({ default: { build: { product: "wowf", version: null } } }));
+  vi.doMock("@/data/game-data/build-version.json", () => ({ default: { product: "wowf", version: null } }));
   const { default: Label } = await import("./GameVersionLabel");
   const html = renderToStaticMarkup(<Label />);
   expect(html).toMatch(/href="\/methodology#files"[^>]*>files read unknown<\/a>/);

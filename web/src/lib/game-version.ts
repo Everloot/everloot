@@ -1,4 +1,4 @@
-import clientLayer from "@/data/game-data/client-layer.json";
+import build from "@/data/game-data/build-version.json";
 import { LAUNCH } from "@/data/wow-forever";
 
 /**
@@ -22,7 +22,7 @@ export interface GameVersion {
   note: string | null;
 }
 
-const layer = clientLayer.build;
+const layer = build;
 
 export const GAME_VERSIONS: readonly GameVersion[] = [
   { id: "live", label: "Live", product: layer.product, build: layer.version, available: true, note: null },

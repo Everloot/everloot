@@ -6,8 +6,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { BlizzardPrice } from "@/lib/blizzard-auctions";
 
-const blizzard = vi.hoisted(() => ({ load: vi.fn() }));
-vi.mock("@/lib/blizzard-auctions", () => ({ loadBlizzardPrices: blizzard.load }));
+const blizzard = vi.hoisted(() => ({ load: vi.fn(), history: vi.fn() }));
+vi.mock("@/lib/blizzard-auctions", () => ({ loadBlizzardPrices: blizzard.load, loadBlizzardHistory: blizzard.history }));
 vi.mock("@/lib/shown-item-names", () => ({
   loadShownNames: async () => ({ agreed: new Map([[2589, "Linen Cloth"]]), matched: null }),
 }));
@@ -30,6 +30,7 @@ const render = async (id = "2589") => renderToStaticMarkup(await BlizzardAuction
 
 beforeEach(() => {
   blizzard.load.mockReset().mockResolvedValue({ ok: true, rows });
+  blizzard.history.mockReset().mockResolvedValue({ ok: true, rows: [] });
   vi.stubEnv("NEXT_PUBLIC_ADSENSE_CLIENT", "ca-pub-test");
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -41,11 +42,25 @@ test("the section names its source and the oldest snapshot time, and each row ke
   expect(heading.querySelector("time")!.getAttribute("datetime")).toBe("2026-11-13T12:20:05.000Z");
   const trs = [...doc.querySelectorAll("tbody tr")];
   expect(trs.map((tr) => tr.textContent)).toEqual([
-    expect.stringContaining("Alliance, house 110"),
-    expect.stringContaining("Blackwater, house 116"),
+    expect.stringContaining("PvP, Alliance"),
+    expect.stringContaining("PvP, Blackwater"),
   ]);
   expect(trs.map((tr) => tr.querySelector("time")!.getAttribute("datetime"))).toEqual(["2026-11-13T12:22:37.000Z", "2026-11-13T12:20:05.000Z"]);
   expect(blizzardTime("2026-01-02T03:04:59Z")).toBe("2 Jan 2026, 03:04 UTC");
+});
+
+test("rows run US then EU, each by ruleset then faction, and an unknown house keeps Blizzard's name", () => {
+  const at = "2026-11-13T12:20:05.000Z";
+  const row = (region: "us" | "eu", houseId: number, houseName: string): BlizzardPrice =>
+    ({ region, houseId, houseName, snapshotAt: at, minUnit: 1, typicalUnit: 1, quantity: 1, auctions: 1 });
+  const read = { ok: true as const, rows: [
+    row("eu", 113, "Horde Auction House"), row("us", 999, "Alliance Auction House"), row("us", 124, "Horde Auction House"),
+    row("us", 111, "Alliance Auction House"), row("us", 110, "Alliance Auction House"), row("us", 121, "Blackwater Auction House"),
+  ] };
+  const doc = dom(renderToStaticMarkup(<BlizzardAuctions read={read} />));
+  expect([...doc.querySelectorAll("tbody tr")].map((tr) => tr.querySelectorAll("td")[1].textContent)).toEqual([
+    "PvP, Alliance", "Normal, Alliance", "Roleplay, Blackwater", "Roleplay PvP, Horde", "Alliance, house 999", "PvP, Horde",
+  ]);
 });
 
 test("a failed read says it could not be read, apart from an item with no data yet", () => {
@@ -66,6 +81,8 @@ test("the page credits Blizzard, names the item, links back with a plain link an
   expect(doc.body.textContent).toContain("Data from Blizzard Entertainment");
   expect(doc.querySelector('[data-blizzard-auctions="rows"]')).not.toBeNull();
   expect(doc.querySelector('a[href="/database/items/2589"]')!.textContent).toBe("Back to the item page");
+  expect(doc.querySelector('a[href="/blizzard-auctions"]')).not.toBeNull();
+  expect(blizzard.history).toHaveBeenCalledWith(2589);
   expect(html).not.toMatch(/adsbygoogle|googlesyndication/);
   expect(doc.querySelector('aside[aria-label="Advertisement"]')).toBeNull();
   // Each state carries the credit and no ad.
