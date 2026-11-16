@@ -16,6 +16,7 @@ import {
 import { auctionNames, itemArt } from "../../art";
 import { Contribute, Facts, PriceFacts, RealmPrices, UnnamedReason, count, itemQuality } from "../../parts";
 import AhledgerPrices from "../../AhledgerPrices";
+import AhledgerHistory from "../../AhledgerHistory";
 import { ahledgerRegionMarkets } from "@/lib/ahledger";
 
 type Props = { params: Promise<{ itemId: string }> };
@@ -116,6 +117,7 @@ export default async function CrossRealmItemPage(props: Props) {
         )}
 
         <AhledgerPrices itemId={itemId} regions={[{ label: "US", markets: ahledgerRegionMarkets("us") }, { label: "EU", markets: ahledgerRegionMarkets("eu") }]} />
+        <AhledgerHistory itemId={itemId} />
 
         <Contribute />
 

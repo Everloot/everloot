@@ -1,4 +1,5 @@
 import { CoinText } from "@/components/ui/Coins";
+import AhledgerCrafting from "../../auctions/AhledgerCrafting";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
@@ -212,6 +213,7 @@ export default async function ProfessionPage(props: Props) {
 
       <div className="space-y-8">
         <ProfessionPicker professions={CLIENT_PROFESSIONS} icons={icons} current={p.slug} context={context} />
+        <AhledgerCrafting profession={p.name} />
 
         <section aria-labelledby="prof-recipes" className="space-y-4" data-recipes={p.slug}>
           <SectionHeading id="prof-recipes" as="h2">Recipes from the game files</SectionHeading>

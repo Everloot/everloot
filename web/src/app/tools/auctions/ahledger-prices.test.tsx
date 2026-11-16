@@ -34,7 +34,7 @@ test("the page's HTML holds no AH Ledger price: the panel reads them in the brow
 });
 
 test("each market's row links to AH Ledger's item page; a market without a price says so; the region switch reads that region", async () => {
-  const fetchImpl = vi.fn(async (url: string) => Response.json({ ok: true, prices: url.includes("alliance") ? [] : [price] }));
+  const fetchImpl = vi.fn(async (url: string) => Response.json({ ok: true, prices: url.includes("alliance") ? [] : [price], credit: { url: "https://ahledger.com/test-credit" } }));
   vi.stubGlobal("fetch", fetchImpl);
   await act(async () => root.render(<AhledgerPrices itemId={2589} regions={regions} />));
   expect(fetchImpl.mock.calls.map(([u]) => u)).toEqual(["/api/ahledger/forever.pvp.alliance.us?items=2589", "/api/ahledger/forever.pvp.horde.us?items=2589"]);
@@ -46,7 +46,7 @@ test("each market's row links to AH Ledger's item page; a market without a price
   expect(text).toContain("18,095.4");
   expect(text).toContain("15 Nov, 15:03 UTC");
   expect(container.querySelector('a[href="https://ahledger.com/items/2589/forever.pvp.horde.us"]')).not.toBeNull();
-  expect(container.querySelector('a[href="https://ahledger.com"]')?.textContent).toBe("Prices from AHledger");
+  expect(container.querySelector('a[href="https://ahledger.com/test-credit"]')?.textContent).toBe("Prices from AHledger");
 
   const eu = [...container.querySelectorAll("button")].find((b) => b.textContent === "EU")!;
   await act(async () => eu.click());

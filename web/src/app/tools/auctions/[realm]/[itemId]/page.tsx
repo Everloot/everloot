@@ -21,6 +21,7 @@ import { auctionNames, itemArt } from "../../art";
 import { Contribute, DayTable, Facts, HousePrices, PriceChart, PriceFacts, RealmPrices, UnnamedReason, itemQuality } from "../../parts";
 import TimeAgo from "../../TimeAgo";
 import AhledgerPrices from "../../AhledgerPrices";
+import AhledgerHistory from "../../AhledgerHistory";
 import { ahledgerMarkets } from "@/lib/ahledger";
 import { REGION_LABEL, RULESET_LABEL, realmRegion, realmRuleset } from "@/lib/realms";
 
@@ -177,6 +178,7 @@ export default async function RealmItemPage(props: Props) {
             regions={[{ label: REGION_LABEL[region], markets: ahledger }]}
           />
         )}
+        {ahledger[0] && <AhledgerHistory itemId={itemId} defaultMarket={ahledger[0]} />}
 
         <Contribute />
 
