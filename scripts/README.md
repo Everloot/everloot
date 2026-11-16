@@ -7,7 +7,7 @@ Repository-level tools. Site-specific maintainer scripts are in `web/scripts/`.
 | `package-addon.py` | Builds `web/public/downloads/Everloot-<version>.zip` from `addon/`. CI checks the committed zip matches. |
 | `check_internal_paths.py` | CI guard: fails when a file names a maintainer's private workspace, secrets folder or personal paths. Its tests are `test_check_internal_paths.py`. |
 | `check_dco.py` | CI guard on pull requests: fails when a commit has no `Signed-off-by:` line and prints the fix. Its tests are `test_check_dco.py`. |
-| `discord_bridge.py` | Run by the Discord bridge workflow: turns `#bug-reports` posts into GitHub issues and posts status changes back, keeps `#known-issues` current, and posts releases, discussions, commits and pull requests to their channels. Its tests are `test_discord_bridge.py`. |
+| `discord_bridge.py` | Run by the Discord bridge workflow: turns `#help` posts tagged Bug and `#ideas` posts into GitHub issues and posts status changes back, keeps the pinned Known issues post in `#help` current, greets new members, and posts releases, a weekly summary, discussions, commits and pull requests to their channels. Its tests are `test_discord_bridge.py`. |
 | `check_changes_files.py` | Used by `.github/workflows/changes.yml`: exits 0 only if the data pull request touches nothing but `kb/changes/blue-posts.json` and `kb/changes/builds.json`. Its tests are `test_check_changes_files.py`. |
 | `check_pr_title.py` | CI guard on pull requests: fails unless the title reads `type(scope): plain sentence` (see CONTRIBUTING.md). Its tests are `test_check_pr_title.py`. |
 | `check_md_links.py` | CI guard: fails when a relative link or image in a tracked Markdown file points at a missing file. |

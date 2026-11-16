@@ -103,7 +103,8 @@ assert idea_status(issue("closed", ["idea"], reason="not_planned")) == "Declined
 for s in ("Under review", "Planned", "Shipped", "Declined"):
     assert "issues/9" in idea_reply(s, issue())
 assert kind_of(issue(labels=["idea", "from-discord"])) == "idea" and kind_of(issue(labels=["bug", "from-discord"])) == "bug"
-assert "in #suggestions:" in issue_body(thread, starter, [], "suggestions")
+assert "in #ideas:" in issue_body(thread, starter, [], "ideas")
+assert "in #help:" in issue_body(thread, starter, [])
 
 # Greeting: only Discord's "joined" messages (type 7) from the last hour that the bot hasn't answered.
 now = datetime(2026, 11, 15, 12, 0, tzinfo=timezone.utc)
@@ -134,19 +135,22 @@ assert many.count("• ") == 15 and "[One]" in many and many.endswith("…and 16
 # Wiring: a sync run against fake Discord and GitHub turns one new post in each forum into the right issue,
 # greets a fresh join once, and leaves the rest alone.
 calls = []
-BUG_TAGS = [{"name": n, "id": "b" + n} for n in ("Addon", "Website", "MCP / AI", "Desktop") + discord_bridge.STATUS_TAGS]
+BUG_TAGS = [{"name": n, "id": "b" + n} for n in ("Bug", "Question", "Addon", "Website", "MCP / AI", "Desktop") + discord_bridge.STATUS_TAGS]
 IDEA_TAG_LIST = [{"name": n, "id": "i" + n} for n in discord_bridge.IDEA_TAGS]
 fresh = {"id": snow(datetime.now(timezone.utc) - timedelta(minutes=2)), "type": 7, "author": {"id": "77"}}
 def fake_discord(method, path, body=None):
     calls.append((method, path, body))
     if path == "/users/@me":
         return {"id": "bot"}
-    if path == f"/channels/{discord_bridge.BUGS}":
+    if path == f"/channels/{discord_bridge.HELP}":
         return {"available_tags": BUG_TAGS}
     if path == f"/channels/{discord_bridge.IDEAS}":
         return {"available_tags": IDEA_TAG_LIST}
     if path.endswith("/threads/active"):
-        return {"threads": [{"id": "900", "parent_id": discord_bridge.BUGS, "owner_id": "5", "name": "Map pins vanish", "applied_tags": ["bAddon"]},
+        return {"threads": [{"id": "900", "parent_id": discord_bridge.HELP, "owner_id": "5", "name": "Map pins vanish", "applied_tags": ["bBug", "bAddon"]},
+                            {"id": "902", "parent_id": discord_bridge.HELP, "owner_id": "8", "name": "How do I upload?", "applied_tags": ["bQuestion"]},
+                            {"id": "903", "parent_id": discord_bridge.HELP, "owner_id": "bot", "name": "Known issues", "applied_tags": [],
+                             "thread_metadata": {"archived": True}},
                             {"id": "901", "parent_id": discord_bridge.IDEAS, "owner_id": "6", "name": "Dark mode", "applied_tags": []}]}
     if "/threads/archived/" in path:
         return {"threads": []}
@@ -154,8 +158,8 @@ def fake_discord(method, path, body=None):
         return {"author": {"username": "player"}, "content": "text", "attachments": []}
     if path.startswith(f"/channels/{discord_bridge.GENERAL}/messages?"):
         return [fresh]
-    if path.startswith(f"/channels/{discord_bridge.KNOWN_ISSUES}/messages"):
-        return [] if method == "GET" else {}
+    if path.startswith("/channels/903/messages"):
+        return [{"id": "903", "author": {"id": "bot"}, "embeds": [{"description": "old list"}]}] if method == "GET" else {}
     return {"id": "m1"}
 opened = []
 def fake_github(method, path, body=None):
@@ -174,7 +178,12 @@ finally:
 assert [(o["title"], o["labels"]) for o in opened] == [("Map pins vanish", ["bug", "from-discord", "needs-triage", "addon"]),
                                                          ("Dark mode", ["idea", "from-discord", "needs-triage"])], opened
 tagged = {path: body["applied_tags"] for method, path, body in calls if method == "PATCH" and body and "applied_tags" in body}
-assert tagged == {"/channels/900": ["bAddon", "bTracked"], "/channels/901": ["iUnder review"]}, tagged
+assert tagged == {"/channels/900": ["bBug", "bAddon", "bTracked"], "/channels/901": ["iUnder review"]}, tagged
+# The question (902) stays in Discord; the known-issues post (903) is unarchived and edited in place, not re-posted.
+assert not any("/channels/902" in path for method, path, body in calls if method != "GET"), calls
+assert ("PATCH", "/channels/903", {"archived": False}) in calls
+assert any(method == "PATCH" and path == "/channels/903/messages/903" for method, path, body in calls)
+assert not any(method == "POST" and path == f"/channels/{discord_bridge.HELP}/threads" for method, path, body in calls)
 greets = [body for method, path, body in calls if method == "POST" and path == f"/channels/{discord_bridge.GENERAL}/messages"]
 assert len(greets) == 1 and greets[0]["message_reference"] == {"message_id": fresh["id"]}
 assert greets[0]["allowed_mentions"] == {"parse": [], "users": ["77", discord_bridge.MAINTAINER]}
