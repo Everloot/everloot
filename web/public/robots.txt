@@ -10,7 +10,7 @@ Disallow: /database/items?page=*&*
 Disallow: /database/items/*?page=*&*
 
 # Blizzard API auction data: not for search, and each read costs a storage call.
-Disallow: /blizzard-auctions/
+Disallow: /blizzard-auctions
 
 # AI search and user-requested fetches follow the public rules above.
 # Training crawlers are blocked, matching the Cloudflare training policy.
@@ -32,7 +32,7 @@ Disallow: /
 # No ads run on the lore archive (Warcraft Wiki text) or the Blizzard auction pages; the AdSense crawler has no reason to read them.
 User-agent: Mediapartners-Google
 Disallow: /lore
-Disallow: /blizzard-auctions/
+Disallow: /blizzard-auctions
 
 Sitemap: https://everloot.app/sitemap.xml
 Sitemap: https://everloot.app/database-sitemap.xml

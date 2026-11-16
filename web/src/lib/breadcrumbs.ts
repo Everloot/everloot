@@ -6,6 +6,7 @@ import { CLASSES } from "@/design/tokens";
  * tool's trail still goes from Home straight to the tool. Pages without an entry have no breadcrumb.
  */
 const NAMES: Record<string, string> = {
+  "/blizzard-auctions": "Blizzard auction house data",
   "/database/objects": "Objects",
   "/database/items": "Items",
   "/guides": "Guides",

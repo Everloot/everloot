@@ -164,7 +164,7 @@ describe("Plans on this device's document", () => {
 describe("the Blizzard auction page's document", () => {
   test("keeps the public policy, is kept by no shared cache and is not for search", async () => {
     const site = await headersFor("/");
-    for (const path of ["/blizzard-auctions/2589", ...underServed("/blizzard-auctions/2589")]) {
+    for (const path of ["/blizzard-auctions", ...underServed("/blizzard-auctions"), "/blizzard-auctions/2589", ...underServed("/blizzard-auctions/2589")]) {
       const got = await headersFor(path);
       expect(got["Content-Security-Policy"], path).toBe(site["Content-Security-Policy"]);
       expect(got["Cache-Control"], path).toBe("private, no-store");
