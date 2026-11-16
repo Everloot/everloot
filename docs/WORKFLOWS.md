@@ -117,13 +117,16 @@ Cron times are UTC.
 
 ### Discord bridge (`discord-bridge.yml`)
 
-- **Trigger.** `*/10 * * * *`; issues opened, edited, closed, reopened, labeled or unlabeled; a
+- **Trigger.** `*/10 * * * *` and `0 16 * * 1` (Mondays); issues opened, edited, closed, reopened, labeled or unlabeled; a
   release published; a discussion created; a push to `main`; a pull request opened
   (`pull_request_target`); and by hand. Sync runs queue behind each other; posts never wait.
 - **What it does.** Runs `scripts/discord_bridge.py` from the default branch. The scheduled and
-  issue-driven runs mirror `#bug-reports` posts with GitHub issues and keep the `#known-issues`
-  list. A release, discussion, commit to `main` or new pull request becomes a post in the matching
-  channel. The `pull_request_target` run reads the event as text only; it never checks out or runs
+  issue-driven runs mirror `#bug-reports` and `#suggestions` posts with GitHub issues (labelled
+  `bug` or `idea`; add `planned` to an idea to tag it Planned), keep the `#known-issues` list, and
+  answer Discord's "joined" message in `#general` with a hello that pings the maintainer. The Monday
+  run posts last week's merged `feat`/`fix`/`perf` pull requests for the site, addon, app and MCP in
+  `#updates`. An addon or desktop release (dispatched by its release workflow), discussion, commit
+  to `main` or new pull request becomes a post in the matching channel. The `pull_request_target` run reads the event as text only; it never checks out or runs
   code from the pull request.
 - **What it needs.** `DISCORD_BOT_TOKEN` (secret). The built-in token writes issues.
 - **A failure means.** A post was not made or a sync did not finish; the next scheduled run tries
