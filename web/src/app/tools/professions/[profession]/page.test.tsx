@@ -136,7 +136,7 @@ test("agreed reagents priced by auction scans show a cost per craft", async () =
   expect(await render()).toContain("Reagents: 2 Peacebloom. Estimated cost per craft: 60c.");
 });
 
-test("the path on the page routes through steps derived from colours and trainer ranks", async () => {
+test("the page keeps agreed colour ranges beside the device-side shopping planner", async () => {
   const ids = ["install-aaaa", "install-bbbb", "install-cccc"];
   const reagents = [{ item: "Peacebloom", count: 1 }];
   store.loadCorpus.mockResolvedValue({
@@ -146,7 +146,11 @@ test("the path on the page routes through steps derived from colours and trainer
       ...ids.map((id) => ({ kind: "trainer_seen", installId: id, profession: "Alchemy", recipe: "Lesser Healing Potion", requiredRank: 1 })),
     ],
   });
-  expect(await render("alchemy", { from: "1", to: "11" })).toContain("1–11  Lesser Healing Potion  10 crafts × 1");
+  const html = await render("alchemy", { from: "1", to: "11" });
+  expect(html).toContain("Shopping list");
+  expect(html).toContain("Lesser Healing Potion (Alchemy), 3 installs");
+  expect(html).toContain('value="11"');
+  expect(html).not.toContain("install-aaaa");
 });
 
 const three = ["install-aaaa", "install-bbbb", "install-cccc"];

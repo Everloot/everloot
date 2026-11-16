@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: Add daily auction reports with archived asking-price movers, house spreads, RSS and downloadable share cards.
 - Site: browse Blizzard auction house data by region and house, search item names, sort and page through current prices, and read 30 days of daily unit prices per house on the ad-free item pages.
 - Site: document Worker builds, release checks, MCP version files and dated desktop signing status in the package READMEs.
 - Site: auction item pages show AH Ledger's latest price for the item on each Forever market, both factions, US and EU on the all-realms page and the realm's own ruleset on a realm's page, read live from AH Ledger's API with its credit link and never stored.
@@ -22,6 +23,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Addon: recipe and trainer observations keep optional profession skill-line IDs; trainer links also retain spell or product IDs when available, alongside localized names.
 - Addon: a kill's loot window with nothing in it is now recorded, tied to the one dead creature you could loot (interact, mouseover or target), as a loot row with no items and no coin, once per corpse, and the site's drop rates, loot tables and open data count it in the source's windows (protocol 2.3.0, `sourceEvidence: "empty-window"`). Until now an empty corpse never reached the site, so drop rates for anything that does not always drop read too high. Needs an in-game check before release.
 - Site: prepare opt-in private boss-kill sync for linked characters; awaiting migration and policy approval.
+- Site: add Start here shortcuts with a remembered class on home and WoW: Forever, plus a three-question ruleset chooser that explains its suggestion.
 - Site: the gold ledger page shows where your gold went for the last 7, 30 or 90 days: spent, earned, net and spent per day against the period before, each spending category's share and change, a daily spending chart by category, the largest single payments, auction sales by item with the house cut and sales still waiting in the mailbox, and resale: each item you both bought and sold with its average paid, average received after the cut and profit. Gold history is a line over real time, and the week card stacks on phones.
 - Site: the gold ledger page now reads the addon's own local ledger and roster from the dropped Everloot.lua, in the browser: repairs, vendor purchases, trades and mail show beside the uploaded categories, gold moved between your own characters stays out of the combined totals, and daily closing gold joins the history. Nothing is uploaded.
 - Site: filter auction browsing by region, including unknown-region records, with matching counts and compact realm names that preserve the full recorded label on hover.
@@ -372,6 +374,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: upload and addon install steps name the Windows and macOS Forever save-file and AddOns paths.
 - Site: show likely ranges and few-window marks in NPC, item-source, loot-list and zone tables.
 - Addon: grouped auction sales show paid transactions per day and paid units per day separately beside the last sold date. Pending and unmatched notices affect neither rate; in-game layout verification is required before release.
+- Site: profession shopping lists total materials for a chosen skill range, let players skip recipes, compare listed prices from selected auction houses, and search recipes by name, recipe item or material with a skill filter.
 - Site: share private character-sync validation with the companion through a separate protocol export; public uploads still reject private-only rows.
 - Site: Reuse cold-start aggregate and game-art reads and load the build label from a small generated stamp.
 - Site: auction item pages (`/tools/auctions/:realm/:itemId`) are kept in the edge cache for five minutes, like the browse pages, so repeat requests and crawlers stop re-rendering them.

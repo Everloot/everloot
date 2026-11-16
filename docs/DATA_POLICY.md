@@ -553,6 +553,8 @@ the MCP server, the API and the bulk download. The relations are *created by* (a
 effect, `SpellEffect`), *reagent for* (`SpellReagents`), *part of set* (`ItemSet`), *same icon*
 (items that share an icon file, `Item.IconFileDataID`) and, since 2026-10-18, *profession* (the
 skill line that teaches a spell, `SkillLineAbility` and `SkillLine`, with the profession's name).
+Profession planning also uses numeric teaching-item links (`ItemEffect` learning trigger 6 or base-difficulty
+`SpellEffect` learn-spell effect 36, joined through `ItemXItemEffect`), with no item or spell names in git.
 They are facts: ids and the relation between them, with no Blizzard text and no art. The rules:
 
 - Every entry is labelled *found in game files, unconfirmed* and stamped with the build it came from,

@@ -1,3 +1,5 @@
+import { reportDates } from "./auction-report-store";
+import { reportHref, REPORT_PATH } from "./auction-report";
 import { realmBoards, sitemapPaths } from "@/lib/auction-house";
 import { uploadStore } from "@/lib/upload-store";
 
@@ -7,7 +9,10 @@ export const AUCTIONS_CHUNK = 40_000;
 /** The indexable Auction House pages, or null when the market rollup cannot be read. */
 export async function auctionPaths(): Promise<string[] | null> {
   const market = await uploadStore.loadMarket();
-  return market.state ? sitemapPaths(realmBoards(market.state)) : null;
+  if (!market.state) return null;
+  const dates = await reportDates();
+  const reports = dates.length ? [REPORT_PATH, ...dates.map(reportHref)] : [];
+  return [...sitemapPaths(realmBoards(market.state)), ...reports];
 }
 
 export function auctionsUnavailable(): Response {
