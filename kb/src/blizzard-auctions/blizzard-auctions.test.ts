@@ -54,9 +54,18 @@ function fakeApi(over: Record<string, () => Promise<ApiResult>> = {}) {
     "/data/wow/ruleset/15/auctions/116": ok(items, null),
     "/data/wow/ruleset/15/auctions/116/commodities": ok({}, null),
   };
-  return { get: vi.fn(async (path: string): Promise<ApiResult> => (over[path] ? over[path]() : responses[path] ?? { status: 404, body: null, lastModified: null })) };
+  // Like Blizzard: a document whose Last-Modified is not after If-Modified-Since answers 304 with no body.
+  return {
+    get: vi.fn(async (path: string, _kind: "dynamic", opts?: { ifModifiedSince?: string }): Promise<ApiResult> => {
+      const doc = over[path] ? await over[path]() : responses[path] ?? { status: 404, body: null, lastModified: null };
+      if (doc.status === 200 && doc.lastModified && opts?.ifModifiedSince && Date.parse(doc.lastModified) <= Date.parse(opts.ifModifiedSince))
+        return { status: 304, body: null, lastModified: doc.lastModified };
+      return doc;
+    }),
+  };
 }
-const fakeStore = (put: JobStore["put"] = async (_r, _h, rows) => rows.length) => ({ put: vi.fn(put), purge: vi.fn(async () => 7) });
+const fakeStore = (put: JobStore["put"] = async (_r, _h, rows) => rows.length, stamps: JobStore["stamps"] = async () => new Map()) =>
+  ({ put: vi.fn(put), purge: vi.fn(async () => 7), stamps: vi.fn(stamps) });
 const now = () => new Date("2026-11-13T13:41:00Z");
 
 it("reads each house once through the first ruleset listing it, stamps each document with its own time, and purges", async () => {
@@ -108,6 +117,39 @@ it("takes a newer commodities document while the items one is unchanged, each wi
   expect(stored.get("110:items")).toBe("2026-11-13T12:22:32.000Z");
   expect(stored.get("110:commodities")).toBe("2026-11-13T13:22:40.000Z");
   expect(result).toMatchObject({ written: 1, failed: 0 });
+});
+
+it("asks for each document only if it is newer than the stored one, so a held document costs a 304 and no write", async () => {
+  const api = fakeApi({
+    "/data/wow/ruleset/1/auctions/110/commodities": async () => ok(commodities, "Fri, 13 Nov 2026 13:22:40 GMT"),
+  });
+  const store = fakeStore(undefined, async () => new Map([
+    [110, { items: "2026-11-13T12:22:32.000Z", commodities: "2026-11-13T12:22:40+00:00" }],
+    [113, { items: null, commodities: null }],
+  ]));
+  const log: string[] = [];
+  const result = await runAuctions({ region: "us", budget: 100, api, store, log: (l) => log.push(l), now });
+  expect(store.stamps).toHaveBeenCalledWith("us");
+  const sent = Object.fromEntries(api.get.mock.calls.map(([p, , o]) => [p, o?.ifModifiedSince ?? null]));
+  expect(sent["/data/wow/ruleset/1/auctions/110"]).toBe("Fri, 13 Nov 2026 12:22:32 GMT");
+  expect(sent["/data/wow/ruleset/1/auctions/110/commodities"]).toBe("Fri, 13 Nov 2026 12:22:40 GMT");
+  expect(sent["/data/wow/ruleset/1/auctions/113"]).toBeNull();
+  expect(sent["/data/wow/ruleset/15/auctions/116"]).toBeNull();
+  // House 110: the items document is held (304, nothing written); the newer commodities one is read and written.
+  expect(store.put.mock.calls.map(([, h]) => `${h.house_id}:${h.kind}`)).toEqual(["110:commodities", "113:items", "113:commodities", "116:items", "116:commodities"]);
+  expect(log).toContain("house 110 (Alliance Auction House) items: unchanged since 2026-11-13T12:22:32.000Z");
+  expect(result).toMatchObject({ calls: 9, houses: 3, unchanged: 1, failed: 0 });
+});
+
+it("reads every document in full when the stored times cannot be read", async () => {
+  const api = fakeApi();
+  const store = fakeStore(undefined, async () => { throw new StoreError(404); });
+  const log: string[] = [];
+  const result = await runAuctions({ region: "us", budget: 100, api, store, log: (l) => log.push(l), now });
+  expect(api.get.mock.calls.every(([, , o]) => o === undefined)).toBe(true);
+  expect(store.put).toHaveBeenCalledTimes(6);
+  expect(log.some((l) => l.startsWith("stored document times unavailable (") && l.endsWith("); reading every document in full"))).toBe(true);
+  expect(result).toMatchObject({ written: 5, failed: 0 });
 });
 
 it("stops at the call budget and still purges", async () => {
@@ -175,6 +217,9 @@ it("uses the migration's function names, arguments and the service key", async (
   const rows = [{ item_id: 954, min_unit: 150, typical_unit: 172, quantity: 26, auctions: 3 }];
   expect(await store.put("us", house, rows)).toBe(2);
   expect(await store.purge()).toBe(2);
+  const stamped = new AuctionStore({ url: "https://example.test", serviceKey: "test-key", fetchImpl: (async () =>
+    Response.json([{ house_id: 110, items_at: "2026-11-13T12:22:32+00:00", commodities_at: null }])) as unknown as typeof fetch });
+  expect(await stamped.stamps("eu")).toEqual(new Map([[110, { items: "2026-11-13T12:22:32+00:00", commodities: null }]]));
   const calls = fetchImpl.mock.calls.map((call) => {
     const [url, init] = call as unknown as [string, RequestInit];
     return { url, args: JSON.parse(String(init.body)), key: new Headers(init.headers).get("apikey") };

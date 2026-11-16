@@ -1,6 +1,6 @@
 import { ApiError, type ApiResult, type Region } from "../armory/api.js";
 import { StoreError } from "../armory/store.js";
-import type { DocumentKind, JobStore } from "./store.js";
+import type { DocumentKind, JobStore, Stamps } from "./store.js";
 import { summarize } from "./summary.js";
 
 /**
@@ -13,6 +13,10 @@ import { summarize } from "./summary.js";
  * snapshot with its own time, so a newer commodities document is never refused because the items one was newer,
  * and every row keeps the age of the document it came from.
  *
+ * Each document is asked for with If-Modified-Since set to its stored time, so one already held answers 304 with no
+ * body (a house's commodities are about 8 MB). Reading the stored times is only a saving: when it fails, or the
+ * function is not applied yet, every document is read in full as before.
+ *
  * A house that fails on a recoverable error (Blizzard or storage answering 429/5xx, a network failure, a lock
  * timeout) is counted and skipped; the other houses and the purge still run, and the pass then exits non-zero.
  * Anything else (bad credentials, the functions missing) stops the pass, after the purge.
@@ -20,7 +24,7 @@ import { summarize } from "./summary.js";
 export interface AuctionJob {
   region: Region;
   budget: number;
-  api: { get(path: string, kind: "dynamic"): Promise<ApiResult> };
+  api: { get(path: string, kind: "dynamic", opts?: { ifModifiedSince?: string }): Promise<ApiResult> };
   store: JobStore;
   log: (line: string) => void;
   now?: () => Date;
@@ -51,10 +55,10 @@ const DOCUMENTS: [DocumentKind, string][] = [["items", ""], ["commodities", "/co
 export async function runAuctions(job: AuctionJob): Promise<JobResult> {
   const now = job.now ?? (() => new Date());
   const result: JobResult = { calls: 0, houses: 0, written: 0, unchanged: 0, failed: 0, purged: 0 };
-  const get = async (path: string) => {
+  const get = async (path: string, ifModifiedSince?: string) => {
     if (result.calls >= job.budget) throw new BudgetSpent();
     result.calls++;
-    return job.api.get(path, "dynamic");
+    return job.api.get(path, "dynamic", ifModifiedSince ? { ifModifiedSince } : undefined);
   };
   let fatal: unknown = null;
   try {
@@ -70,14 +74,26 @@ export async function runAuctions(job: AuctionJob): Promise<JobResult> {
         if (Number.isSafeInteger(h.id) && !houses.has(h.id as number))
           houses.set(h.id as number, { ruleset, name: typeof h.name === "string" ? h.name : "Auction House" });
     }
+    let stamps = new Map<number, Stamps>();
+    try {
+      stamps = await job.store.stamps(job.region);
+    } catch (error) {
+      job.log(`stored document times unavailable (${(error as Error).message}); reading every document in full`);
+    }
     for (const [houseId, { ruleset, name }] of [...houses].sort((a, b) => a[0] - b[0])) {
       const path = `/data/wow/ruleset/${ruleset}/auctions/${houseId}`;
       try {
         let found = false;
         for (const [kind, suffix] of DOCUMENTS) {
-          const doc = await get(`${path}${suffix}`);
+          const held = Date.parse(stamps.get(houseId)?.[kind] ?? "");
+          const doc = await get(`${path}${suffix}`, Number.isFinite(held) ? new Date(held).toUTCString() : undefined);
           if (doc.status === 404) continue;
           found = true;
+          if (doc.status === 304) {
+            result.unchanged++;
+            job.log(`house ${houseId} (${name}) ${kind}: unchanged since ${new Date(held).toISOString()}`);
+            continue;
+          }
           // Blizzard's Last-Modified is when this document was published; the fetch time stands in when it is missing.
           const stamp = doc.lastModified ? Date.parse(doc.lastModified) : NaN;
           const snapshot = new Date(Number.isFinite(stamp) ? stamp : now().getTime()).toISOString();
