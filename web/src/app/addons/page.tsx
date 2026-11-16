@@ -241,12 +241,9 @@ export default async function AddonsPage(props: { searchParams?: Promise<Search>
             </p>
 
             <Explainer summary="How the ranking works">
-              <p>
-                Projects are ranked by GitHub stars; ties go to more commits in the last 4 weeks, then to the name. Change
-                compares current stars with the oldest daily count kept from the 7 days before the newest one, so it is
-                counted from the last refresh, not from today. The addon tracker&apos;s Rising board shows the same change.
-              </p>
-              <p>Installs are copies of the Everloot addon that reported the addon, shown from 3. A dash means we do not have the number.</p>
+              <p>Projects rank by GitHub stars, with ties broken by recent commits and then name.</p>
+              <p>A profile page, its title and download links appear only for a project checked by hand and added to the owner-approved list.</p>
+              <p><Link href="/docs/guides/addon-directory" className={link}>How to get listed and how the ranking works</Link>, including the full counting and privacy rules.</p>
             </Explainer>
           </div>
         </div>

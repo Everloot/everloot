@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: explain addon directory rankings, approved listings and how to report wrong data in two linked guides.
 - Site: document Worker builds, release checks, MCP version files and dated desktop signing status in the package READMEs.
 - Site: auction item pages show AH Ledger's latest price for the item on each Forever market, both factions, US and EU on the all-realms page and the realm's own ruleset on a realm's page, read live from AH Ledger's API with its credit link and never stored.
 - Site: auction item pages show the one-day and seven-day price changes when solid public days support them.

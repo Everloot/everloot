@@ -215,3 +215,12 @@ test("in the first listed week nothing claims to be new", async () => {
   store.loadCorpus.mockResolvedValue(corpus(["install-aaa", "install-bbb", "install-ccc"].map((id) => seen(id, "Questie", "Questie"))));
   expect(await html()).not.toContain(">New<");
 });
+
+
+test("links the directory rules and states the approval requirement", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([]));
+  const page = await html();
+  expect(page).toContain('href="/docs/guides/addon-directory"');
+  expect(page).toContain("approved list");
+  expect(page).toContain("checked by hand");
+});
