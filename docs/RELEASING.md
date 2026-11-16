@@ -59,9 +59,9 @@ The workflow then:
    changelog section followed by GitHub's generated list of pull requests since the previous
    `addon-v*` tag.
 5. uploads that same tested archive to CurseForge project `1762765`, for Forever `1.60.1`.
-   The `CF_API_KEY` repository secret authenticates the upload. The exact changelog line
-   `Release channel: Alpha` uploads the file as a Beta there ("Everloot <version> Beta"): CurseForge's Files tab hides
-   alpha files by default, so Alpha uploads left it reading "No Results". Otherwise the file is a Release.
+   The `CF_API_KEY` repository secret authenticates the upload. Every upload is a CurseForge Release file, because the
+   CurseForge app syncs only Release files by default (Beta and Alpha files reach only players who opt in). The exact
+   changelog line `Release channel: Alpha` names the file "Everloot <version> Alpha" instead of "Everloot <version>".
    Nightlies stay on GitHub only. CurseForge approval may take time after upload.
 
 Only the last job holds `contents: write`; the build and test job is read only. If a run fails,
