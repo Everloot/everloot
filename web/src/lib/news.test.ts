@@ -53,6 +53,11 @@ test("the page body drops its own Sources and Related lists and keeps the call t
   // Without front-matter sources the body's own Sources section stays.
   expect(bodyForPage({ blocks, sources: [] }).blocks.some((b) => b.type === "heading" && b.text === "Sources")).toBe(true);
   expect(sourceNames({ sources })).toEqual(["Blizzard", "Wowhead"]);
+  // A source without a publisher in its title is named by its site; Everloot's own pages read "Everloot", once.
+  expect(sourceNames({ sources: [
+    { title: "Item database", url: "https://everloot.app/database/items" }, { title: "Database sitemap", url: "https://www.everloot.app/database-sitemap.xml" },
+    { title: "Beta", url: "https://beta.everloot.app/" }, { title: "A thread", url: "https://us.forums.blizzard.com/en/wow/t/x/1" }, { title: "Not ours", url: "https://everloot.app.example.org/" },
+  ] })).toEqual(["Everloot", "us.forums.blizzard.com", "everloot.app.example.org"]);
   expect(readingMinutes(blocks)).toBe(1);
   const news = loadNews(FIXTURES);
   expect(relatedPosts(news, { slug: "test-post" }, ["older-post", "test-draft"], 3).map((p) => p.slug)).toEqual(["older-post"]);
