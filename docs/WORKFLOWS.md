@@ -122,8 +122,8 @@ Cron times are UTC.
   (`pull_request_target`); and by hand. Sync runs queue behind each other; posts never wait.
 - **What it does.** Runs `scripts/discord_bridge.py` from the default branch. The scheduled and
   issue-driven runs mirror `#help` posts tagged Bug and `#ideas` posts with GitHub issues (labelled
-  `bug` or `idea`; add `planned` to an idea to tag it Planned), keep the pinned Known issues post in
-  `#help`, and
+  `bug` or `idea`; add `planned` to an idea to tag it Planned), keep the known-issues list in the pinned
+  Start here post in `#help`, and
   answer Discord's "joined" message in `#general` with a hello that pings the maintainer. The Monday
   run posts last week's merged `feat`/`fix`/`perf` pull requests for the site, addon, app and MCP in
   `#updates`. An addon or desktop release (dispatched by its release workflow), discussion, commit

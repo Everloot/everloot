@@ -1,9 +1,9 @@
 """Links the Everloot Discord server and this repository. Run by .github/workflows/discord-bridge.yml.
 
   schedule, issues  #help posts tagged Bug and every #ideas post become GitHub issues; issue status
-                    flows back to the post as a tag and a reply; a pinned "Known issues" post in #help
-                    lists open issues labelled known-issue; someone who joined in the last hour gets a
-                    hello in #general
+                    flows back to the post as a tag and a reply; the pinned "Start here" post in #help
+                    keeps a list of open issues labelled known-issue; someone who joined in the last
+                    hour gets a hello in #general
   weekly schedule   a short list of last week's merged site, addon, app and AI changes in #updates
   release           posts an addon or desktop release to #updates, once. Releases made with the workflow
                     token start no workflows, so the release workflows also dispatch this one with
@@ -41,7 +41,8 @@ AREA_LABELS = {"Addon": "addon", "Website": "web", "MCP / AI": "mcp", "Desktop":
 STATUS_TAGS = ("Tracked", "Confirmed", "Fixed", "Can't reproduce", "Needs info", "Closed")
 IDEA_TAGS = ("Under review", "Planned", "Shipped", "Declined")
 BUG_TAG = "Bug"  # in #help only posts with this tag go to GitHub; questions stay in Discord
-KNOWN_TITLE = "Known issues"  # the bot's pinned post in #help
+# The bot's pinned post in #help (a forum pins one post). Its latest bot message is the known-issues list.
+KNOWN_TITLE = "Start here: questions, bugs and known issues"
 GREET_WINDOW = timedelta(hours=1)
 WEEKLY_CRON = "0 16 * * 1"  # Mondays; must match discord-bridge.yml
 WEEKLY_AREAS = {"web": "Site", "addon": "Addon", "desktop": "Desktop App", "companion": "Desktop App", "mcp": "AI connectors"}
@@ -353,9 +354,8 @@ def update_known_issues() -> None:
              "footer": {"text": "Updated automatically from GitHub issues labelled known-issue"}}
     me = discord("GET", "/users/@me")["id"]
     thread = next((t for t in forum_threads(HELP) if t["owner_id"] == me and t["name"] == KNOWN_TITLE), None)
-    if thread is None:  # first run, or someone deleted it: make the pinned post again
-        thread = discord("POST", f"/channels/{HELP}/threads", {"name": KNOWN_TITLE, "message": {"embeds": [embed], "allowed_mentions": NO_PINGS}})
-        discord("PATCH", f"/channels/{thread['id']}", {"flags": 2})
+    if thread is None:  # someone deleted it: post the list again (unpinned; a maintainer pins it)
+        discord("POST", f"/channels/{HELP}/threads", {"name": KNOWN_TITLE, "message": {"embeds": [embed], "allowed_mentions": NO_PINGS}})
         return
     mine = [m for m in discord("GET", f"/channels/{thread['id']}/messages?limit=20") if m["author"]["id"] == me]
     old = (mine[0]["embeds"] or [{}])[0] if mine else {}

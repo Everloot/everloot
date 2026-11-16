@@ -149,7 +149,7 @@ def fake_discord(method, path, body=None):
     if path.endswith("/threads/active"):
         return {"threads": [{"id": "900", "parent_id": discord_bridge.HELP, "owner_id": "5", "name": "Map pins vanish", "applied_tags": ["bBug", "bAddon"]},
                             {"id": "902", "parent_id": discord_bridge.HELP, "owner_id": "8", "name": "How do I upload?", "applied_tags": ["bQuestion"]},
-                            {"id": "903", "parent_id": discord_bridge.HELP, "owner_id": "bot", "name": "Known issues", "applied_tags": [],
+                            {"id": "903", "parent_id": discord_bridge.HELP, "owner_id": "bot", "name": discord_bridge.KNOWN_TITLE, "applied_tags": [],
                              "thread_metadata": {"archived": True}},
                             {"id": "901", "parent_id": discord_bridge.IDEAS, "owner_id": "6", "name": "Dark mode", "applied_tags": []}]}
     if "/threads/archived/" in path:
@@ -159,7 +159,8 @@ def fake_discord(method, path, body=None):
     if path.startswith(f"/channels/{discord_bridge.GENERAL}/messages?"):
         return [fresh]
     if path.startswith("/channels/903/messages"):
-        return [{"id": "903", "author": {"id": "bot"}, "embeds": [{"description": "old list"}]}] if method == "GET" else {}
+        return [{"id": "904", "author": {"id": "bot"}, "embeds": [{"description": "old list"}]},
+                {"id": "903", "author": {"id": "bot"}, "embeds": [], "content": "How #help works"}] if method == "GET" else {}
     return {"id": "m1"}
 opened = []
 def fake_github(method, path, body=None):
@@ -179,10 +180,12 @@ assert [(o["title"], o["labels"]) for o in opened] == [("Map pins vanish", ["bug
                                                          ("Dark mode", ["idea", "from-discord", "needs-triage"])], opened
 tagged = {path: body["applied_tags"] for method, path, body in calls if method == "PATCH" and body and "applied_tags" in body}
 assert tagged == {"/channels/900": ["bBug", "bAddon", "bTracked"], "/channels/901": ["iUnder review"]}, tagged
-# The question (902) stays in Discord; the known-issues post (903) is unarchived and edited in place, not re-posted.
+# The question (902) stays in Discord; the list (the latest bot message in the pinned post 903) is unarchived and
+# edited in place; the post's opening text is left alone.
 assert not any("/channels/902" in path for method, path, body in calls if method != "GET"), calls
 assert ("PATCH", "/channels/903", {"archived": False}) in calls
-assert any(method == "PATCH" and path == "/channels/903/messages/903" for method, path, body in calls)
+assert any(method == "PATCH" and path == "/channels/903/messages/904" for method, path, body in calls)
+assert not any(path == "/channels/903/messages/903" for method, path, body in calls if method != "GET")
 assert not any(method == "POST" and path == f"/channels/{discord_bridge.HELP}/threads" for method, path, body in calls)
 greets = [body for method, path, body in calls if method == "POST" and path == f"/channels/{discord_bridge.GENERAL}/messages"]
 assert len(greets) == 1 and greets[0]["message_reference"] == {"message_id": fresh["id"]}
