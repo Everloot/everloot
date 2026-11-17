@@ -148,6 +148,55 @@ export declare const dropsResponse: z.ZodObject<{
     }, z.core.$strip>;
 }, z.core.$strip>;
 export type DropsResponse = z.infer<typeof dropsResponse>;
+/** GET /api/rollups/disenchant: what each disenchant band yields, from the disenchants players recorded. */
+export declare const disenchantResponse: z.ZodObject<{
+    generatedAt: z.ZodString;
+    dataAsOf: z.ZodNullable<z.ZodString>;
+    unreachable: z.ZodBoolean;
+    build: z.ZodString;
+    bands: z.ZodArray<z.ZodObject<{
+        bandId: z.ZodNumber;
+        itemClass: z.ZodEnum<{
+            armor: "armor";
+            weapon: "weapon";
+        }>;
+        quality: z.ZodEnum<{
+            epic: "epic";
+            rare: "rare";
+            uncommon: "uncommon";
+        }>;
+        minLevel: z.ZodNumber;
+        maxLevel: z.ZodNumber;
+        label: z.ZodString;
+        state: z.ZodEnum<{
+            none: "none";
+            rated: "rated";
+            short: "short";
+        }>;
+        windows: z.ZodNumber;
+        installs: z.ZodNumber;
+        first: z.ZodNullable<z.ZodString>;
+        last: z.ZodNullable<z.ZodString>;
+        missingInstalls: z.ZodNumber;
+        materials: z.ZodArray<z.ZodObject<{
+            itemId: z.ZodNumber;
+            withMaterial: z.ZodNumber;
+            chance: z.ZodNumber;
+            perDisenchant: z.ZodNumber;
+            min: z.ZodNumber;
+            max: z.ZodNumber;
+        }, z.core.$strip>>;
+    }, z.core.$strip>>;
+    unplaced: z.ZodNumber;
+    attribution: z.ZodObject<{
+        licence: z.ZodString;
+        licenceUrl: z.ZodString;
+        credit: z.ZodString;
+        source: z.ZodString;
+        terms: z.ZodString;
+    }, z.core.$strip>;
+}, z.core.$strip>;
+export type DisenchantResponse = z.infer<typeof disenchantResponse>;
 declare const edge: z.ZodObject<{
     fromKind: z.ZodEnum<{
         icon: "icon";
@@ -1467,6 +1516,53 @@ export declare const API_SCHEMAS: {
         queued: z.ZodNullable<z.ZodNumber>;
         totalRates: z.ZodNumber;
         totalMeasuredZeros: z.ZodNumber;
+        attribution: z.ZodObject<{
+            licence: z.ZodString;
+            licenceUrl: z.ZodString;
+            credit: z.ZodString;
+            source: z.ZodString;
+            terms: z.ZodString;
+        }, z.core.$strip>;
+    }, z.core.$strip>;
+    readonly disenchantResponse: z.ZodObject<{
+        generatedAt: z.ZodString;
+        dataAsOf: z.ZodNullable<z.ZodString>;
+        unreachable: z.ZodBoolean;
+        build: z.ZodString;
+        bands: z.ZodArray<z.ZodObject<{
+            bandId: z.ZodNumber;
+            itemClass: z.ZodEnum<{
+                armor: "armor";
+                weapon: "weapon";
+            }>;
+            quality: z.ZodEnum<{
+                epic: "epic";
+                rare: "rare";
+                uncommon: "uncommon";
+            }>;
+            minLevel: z.ZodNumber;
+            maxLevel: z.ZodNumber;
+            label: z.ZodString;
+            state: z.ZodEnum<{
+                none: "none";
+                rated: "rated";
+                short: "short";
+            }>;
+            windows: z.ZodNumber;
+            installs: z.ZodNumber;
+            first: z.ZodNullable<z.ZodString>;
+            last: z.ZodNullable<z.ZodString>;
+            missingInstalls: z.ZodNumber;
+            materials: z.ZodArray<z.ZodObject<{
+                itemId: z.ZodNumber;
+                withMaterial: z.ZodNumber;
+                chance: z.ZodNumber;
+                perDisenchant: z.ZodNumber;
+                min: z.ZodNumber;
+                max: z.ZodNumber;
+            }, z.core.$strip>>;
+        }, z.core.$strip>>;
+        unplaced: z.ZodNumber;
         attribution: z.ZodObject<{
             licence: z.ZodString;
             licenceUrl: z.ZodString;

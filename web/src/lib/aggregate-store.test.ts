@@ -59,6 +59,8 @@ function anonymousRows(): IntakeRecord[] {
     row({ kind: "loot", sourceNpcId: 101, sourceEvidence: "loot-api", lootType: "kill", items: [] });
     row({ kind: "loot", sourceItemId: 5523, sourceEvidence: "loot-api", lootType: "kill", items: [{ itemId: 1003, count: 1 }] });
     row({ kind: "loot", sourceObjectId: 500, sourceEvidence: "loot-api", lootType: "gather", gatherKind: "herb", mapId: 1429, x: 30, y: 30, sourceObjectName: "Peacebloom", items: [{ itemId: 2447, count: 1 }] });
+    // A disenchant of an uncommon armor piece the game files place in band 4 (item level 5 to 15).
+    row({ kind: "loot", sourceItemId: 763, sourceEvidence: "loot-api", lootType: "disenchant", items: [{ itemId: 10940, count: 1 + (i % 2) }] });
     row({ kind: "quest", questId: 7, title: "Kobold Camp Cleanup", level: 2, giverNpcId: 300, turnInNpcId: 300, rewardItemIds: [1002], category: "Elwynn Forest", faction: "alliance" });
     row({ kind: "vendor", vendorNpcId: 200, items: [{ itemId: 159, priceCopper: 25 }, { itemId: 4540, priceCopper: 25, limitedStock: 5 }] });
     for (const [itemId, name] of [[1001, "Kobold Candle"], [1002, "Militia Dagger"], [1003, "Linen Cloth"], [159, "Refreshing Spring Water"], [2447, "Peacebloom"], [2996, "Bolt of Linen Cloth"]] as const) {
@@ -120,7 +122,7 @@ test("the fixture fills every table, so the round trip below checks each one", (
     npcs: set.world.npcs, quests: set.world.quests, vendors: set.world.vendors,
     entrances: set.instances.entrances, encounters: set.instances.encounters, sightings: set.sightings,
     itemFacts: [...set.itemFacts], crafted: [...set.crafted], addons: set.addons.addons, trends: Object.keys(set.addonTrends),
-    edges: set.edges, loot: [...set.loot.sources],
+    edges: set.edges, loot: [...set.loot.sources], disenchant: [...set.disenchant.bands],
   }).filter(([, v]) => v.length === 0).map(([k]) => k);
   expect(empty).toEqual([]);
 });
@@ -133,6 +135,15 @@ test("the stored file reads back as exactly the set the cron worked out", () => 
   expect(read!.set.itemFacts).toBeInstanceOf(Map);
   expect(read!.set.crafted).toBeInstanceOf(Set);
   expect(read!.set.loot.sources).toBeInstanceOf(Map);
+  expect(read!.set.disenchant.bands.get(4)?.installs).toBeInstanceOf(Set);
+});
+
+test("a file written before the disenchant tables reads with none, not as no file", () => {
+  const good = JSON.parse(encodeAggregates(buildAggregates(corpus(anonymousRows())), AS_OF));
+  const { disenchant: _gone, ...older } = good.set;
+  const read = parseAggregates(JSON.stringify({ ...good, set: older }));
+  expect(read?.set.disenchant).toEqual({ bands: new Map(), items: new Map(), unplaced: 0, playerBands: new Map() });
+  expect(parseAggregates(JSON.stringify({ ...good, set: { ...good.set, disenchant: { unplaced: 0 } } }))).toBeNull();
 });
 
 test("text that is not the file, or a shape this code does not know, reads as no file", () => {

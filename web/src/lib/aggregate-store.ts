@@ -71,7 +71,12 @@ export function parseAggregates(text: string): { generatedAt: string; set: Aggre
   }
   if (!isObject(raw) || raw.version !== 1 || typeof raw.generatedAt !== "string" || !isObject(raw.set)) return null;
   const s = raw.set;
-  const ok = typeof s.key === "string" && [s.uploads, s.records, s.windows].every(Number.isFinite) &&
+  // A file written before the disenchant tables existed reads as no disenchants yet, not as an unreadable file: the
+  // pages would otherwise rebuild the whole set until the cron's next write.
+  if (s.disenchant === undefined) s.disenchant = { bands: new Map(), items: new Map(), unplaced: 0, playerBands: new Map() };
+  const dis = s.disenchant;
+  const ok = isObject(dis) && dis.bands instanceof Map && dis.items instanceof Map && dis.playerBands instanceof Map && Number.isFinite(dis.unplaced) &&
+    typeof s.key === "string" && [s.uploads, s.records, s.windows].every(Number.isFinite) &&
     (s.dataAsOf === null || typeof s.dataAsOf === "string") &&
     arrays(s.drops, "rates", "measuredZeros", "rejected") && arrays(s.items, "rates", "names", "npcs") &&
     arrays(s.world, "npcs", "quests", "vendors") && arrays(s.instances, "entrances", "encounters") &&
