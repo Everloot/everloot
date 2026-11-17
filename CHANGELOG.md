@@ -374,6 +374,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the snapshot job holds less of the corpus in memory while it extends the snapshot. It drops the parsed old snapshot once its events are replayed, and the rollups that run after it (item view, aggregates, auction history, professions, map pins, database activity) read the state it just wrote instead of downloading and parsing the same file again. On a 20 MB synthetic snapshot the memory still held mid-run falls by about 28 MB (39 to 11 MB while the new uploads are read, 60 to 31 MB at the write), and a second read of the file is gone.
 
 ### Changed
+- CurseForge: every addon upload is a Release file; an Alpha is named "Everloot <version> Alpha". The CurseForge app
+  syncs only Release files by default, so with every file a Beta, Everloot was missing for most app users. GitHub still
+  marks an Alpha a pre-release, and the site still calls the addon an Alpha.
 - Site: the hourly Blizzard auction refresh asks Blizzard for each house document only when it is newer than the one stored (If-Modified-Since), so a document it already holds costs a 304 with no body instead of several MB.
 - Site: the entity pages' pin tables (where an NPC, a vendor or an object stands, which NPCs an item was found on) are one table with the same columns everywhere, the vendor's now with the installs that agree, and the vendor page keeps its summary and open data in the same wide-screen column as the other entity pages.
 - Site: the site shows no ads. About, the FAQ, the terms, the privacy policy, the privacy guide and the accessibility statement now say so and no longer describe Google AdSense.
