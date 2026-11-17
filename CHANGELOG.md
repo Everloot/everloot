@@ -377,6 +377,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the Auction House's background page refresh is tried twice, not six times, when it fails. Each try rendered the page again, and a page that outlasts the queue's 10-second limit failed every time (`NEXT_CACHE_DO_QUEUE_MAX_RETRIES`).
 - Site: the snapshot job holds less of the corpus in memory while it extends the snapshot. It drops the parsed old snapshot once its events are replayed, and the rollups that run after it (item view, aggregates, auction history, professions, map pins, database activity) read the state it just wrote instead of downloading and parsing the same file again. On a 20 MB synthetic snapshot the memory still held mid-run falls by about 28 MB (39 to 11 MB while the new uploads are read, 60 to 31 MB at the write), and a second read of the file is gone.
 - Site: search links every matching achievement, faction, title, quest chain, zone and instance through bounded result pages.
+- MCP: Price answers identify their auction house, with an unknown faction when only the realm is recorded.
 
 ### Changed
 - Site: the addon is offered as a regular release from 0.3.24: the home, addon and upload pages no longer call it an Alpha.
