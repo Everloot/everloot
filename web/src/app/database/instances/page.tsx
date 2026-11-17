@@ -66,7 +66,7 @@ export default async function InstancesPage(props: { searchParams?: Promise<Sear
   const columns: Column<InstanceRow>[] = [
     { key: "name", header: "Name", sortable: true, cell: (r) => {
       const src = thumb(r);
-      const named = <Link href={instanceHref(r.instanceMapId, r.name)} className={link}>{instanceTitle(r)}</Link>;
+      const named = <Link prefetch={false} href={instanceHref(r.instanceMapId, r.name)} className={link}>{instanceTitle(r)}</Link>;
       // An instance with no name is listed by its id, with a line saying why; one named only by a kill statistic says so.
       const name = r.statisticBoss ? (
         <span className="inline-flex flex-wrap items-baseline gap-x-2" title={FILES_NAME}>{named}<span className="inline-flex items-baseline gap-1.5 text-meta text-muted"><Badge tone="files" />name from the game files</span></span>
@@ -79,7 +79,7 @@ export default async function InstancesPage(props: { searchParams?: Promise<Sear
     { key: "level", header: "Level", numeric: true, sortable: true, cell: (r) => levelLabel(r.level) ?? dash },
     { key: "zone", header: "Entered from", cell: (r) => {
       const at = r.files[0] ?? r.confirmed[0];
-      return at ? <Link href={zoneHref(at.mapId, at.zoneName)} className={link}>{at.zoneName}</Link> : dash;
+      return at ? <Link prefetch={false} href={zoneHref(at.mapId, at.zoneName)} className={link}>{at.zoneName}</Link> : dash;
     } },
     { key: "confirmed", header: "Entrance confirmed", numeric: true, cell: (r) => (seen.unreachable ? PLACEHOLDER : r.confirmed.length ? `${Math.max(...r.confirmed.map((p) => p.installs))} installs` : dash) },
     // Player-first: the reported count, else the files' count marked unconfirmed, else a dash.
@@ -90,8 +90,8 @@ export default async function InstancesPage(props: { searchParams?: Promise<Sear
     { key: "guide", header: "Guide", cell: (r) => {
       const prep = guides.get(r.instanceMapId);
       const links = [
-        ...(prep ? [<Link key="prep" href={wikiHref(prep.slug)} className={link}>Prep page</Link>] : []),
-        ...(r.raid ? [<Link key="raid" href="/tools/raid" className={link}>Raid builder</Link>] : []),
+        ...(prep ? [<Link prefetch={false} key="prep" href={wikiHref(prep.slug)} className={link}>Prep page</Link>] : []),
+        ...(r.raid ? [<Link prefetch={false} key="raid" href="/tools/raid" className={link}>Raid builder</Link>] : []),
       ];
       return links.length ? <span className="inline-flex flex-wrap gap-x-3">{links}</span> : dash;
     } },
