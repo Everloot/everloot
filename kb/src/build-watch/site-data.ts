@@ -34,6 +34,8 @@ import { changeFileName, type ChangeEntry } from "./changes.js";
 
 export const GAME_DATA_DIR = "web/src/data/game-data";
 export const RAID_LUA = "addon/modules/raid_data.lua";
+/** The addon's disenchant bands, written beside client-disenchant.json (kb/src/disenchant-lua.ts). */
+export const DISENCHANT_LUA = "addon/modules/disenchant_data.lua";
 export const RAID_TS = `${GAME_DATA_DIR}/raid.ts`;
 
 /** A talent file as `trim-talent-catalog.mjs` writes it: structure and names, no text, no numbers. */
@@ -209,5 +211,5 @@ export function generatedFiles(root: string): string[] {
   const dir = dataDir(root);
   const talents = existsSync(join(dir, "talents")) ? readdirSync(join(dir, "talents")).filter((f) => f.endsWith(".json")).sort().map((f) => `${GAME_DATA_DIR}/talents/${f}`) : [];
   const top = ["map.json", "client-layer.json", "races.json", "client-achievements.json", "client-encounters.json", "client-mounts.json", "client-class-gear.json", "client-class-spells.json", "client-recipes.json", "client-bags.json", "client-terrain.json", "client-disenchant.json", "client-factions.json", "client-titles.json", "client-quest-lines.json", "spell-values.json", "client-digests.json", ...raidFiles(root)].filter((f) => existsSync(join(dir, f))).map((f) => `${GAME_DATA_DIR}/${f}`);
-  return [...talents, ...top, ...(existsSync(join(root, RAID_LUA)) ? [RAID_LUA] : [])];
+  return [...talents, ...top, ...[RAID_LUA, DISENCHANT_LUA].filter((f) => existsSync(join(root, f)))];
 }

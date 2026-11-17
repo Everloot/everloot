@@ -54,6 +54,8 @@ if E.Pulls then
     text = "After each boss pull: your group's names, classes, roles and the game's damage meter totals. Sent from the upload page or the Desktop App. Off deletes its rows." }
 end
 -- What the item tooltip shows (prices.lua reads them through E.TooltipShows on every hover). They record nothing.
+O.ROWS[#O.ROWS + 1] = { key = "tooltipDisenchant", group = "general", field = true, live = true, label = "Item tooltip: disenchant estimate",
+  text = "Observed material yields and estimated value at this character's house prices. Records nothing; applies at once." }
 O.ROWS[#O.ROWS + 1] = { key = "tooltipMarket", group = "general", field = true, live = true, label = "Item tooltip: prices",
   text = "Community market value, min buyout and historical price, your own last scan and the vendor price. Records nothing; applies at once." }
 O.ROWS[#O.ROWS + 1] = { key = "tooltipHistory", group = "general", field = true, live = true, label = "Item tooltip: your history",
@@ -578,7 +580,7 @@ O.SETUP = {
   everything = {
     toggles = { openworld = true, professions = true, mapbounds = true, auctions = true, window = true,
       gold = true, roster = true, guild = true },
-    fields = { scanPrompt = true, minimapButton = true, tooltip = "full", tooltipMarket = true, tooltipHistory = true, tooltipSources = true },
+    fields = { scanPrompt = true, minimapButton = true, tooltip = "full", tooltipMarket = true, tooltipHistory = true, tooltipSources = true, tooltipDisenchant = true },
   },
   collect = {
     toggles = { openworld = true, professions = true, mapbounds = true, auctions = true, window = false, buttons = false,
