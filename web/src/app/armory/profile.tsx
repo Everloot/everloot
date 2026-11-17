@@ -65,5 +65,27 @@ export function ProfileDetailsView({ character: c }: { character: ArmoryCharacte
       <p className="text-sm"><Link href="/tools/professions" className={link}>Find profession leveling routes</Link></p>
       <ArmoryCredit at={details.professions.asOf} />
     </section>}
+    {details.achievements && <section aria-labelledby="armory-achievements" className="space-y-3">
+      <SectionHeading id="armory-achievements">Achievements</SectionHeading>
+      {details.achievements.rows.length === 0 ? <p className="text-sm text-fg-2">None completed when it was read.</p>
+        : <ul className="divide-y divide-line">{details.achievements.rows.map((a) => <li key={a.id} className="flex min-h-11 items-center justify-between gap-3 py-2 text-sm">
+          <Link href={`/database/achievements/${a.id}`} className={link}>{a.name}</Link>
+          <time dateTime={a.completedAt} className="shrink-0 font-mono text-meta tabular-nums text-fg-2">{a.completedAt.slice(0, 10)}</time>
+        </li>)}</ul>}
+      <ArmoryCredit at={details.achievements.asOf} />
+    </section>}
+    {details.reputations && details.reputations.rows.length > 0 && <section aria-labelledby="armory-reputations" className="space-y-3">
+      <SectionHeading id="armory-reputations">Reputations</SectionHeading>
+      <ul className="divide-y divide-line">{details.reputations.rows.map((r) => <li key={r.id} className="flex min-h-11 items-center justify-between gap-3 py-2 text-sm">
+        <Link href={`/database/factions/${r.id}`} className={link}>{r.name}</Link>
+        <span className="shrink-0 text-fg-2">{r.standing}</span>
+      </li>)}</ul>
+      <ArmoryCredit at={details.reputations.asOf} />
+    </section>}
+    {details.quests && <section aria-labelledby="armory-quests" className="space-y-3">
+      <SectionHeading id="armory-quests">Quests</SectionHeading>
+      <p className="text-sm text-fg"><span className="font-mono tabular-nums">{details.quests.completed.length.toLocaleString("en-US")}</span> completed quests</p>
+      <ArmoryCredit at={details.quests.asOf} />
+    </section>}
   </>;
 }

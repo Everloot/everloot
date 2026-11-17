@@ -2,11 +2,15 @@ import { it, expect, vi } from "vitest";
 import { ApiError } from "./api.js";
 import { StoreError } from "./store.js";
 import { runCrawl } from "./crawl.js";
+import type { ProfileDetails } from "./details.js";
 import profile from "./fixtures/character.json";
 import equipment from "./fixtures/equipment.json";
 import pvp from "./fixtures/pvp.json";
 import guild from "./fixtures/guild.json";
 import roster from "./fixtures/roster.json";
+import achievements from "./fixtures/achievements.json";
+import reputations from "./fixtures/reputations.json";
+import completed from "./fixtures/quests-completed.json";
 function bodyFor(path: string): unknown {
   if (path.endsWith("equipment")) return equipment;
   if (path.endsWith("pvp-summary")) return pvp;
@@ -45,7 +49,7 @@ function setup(count = 1) {
 it("backfills details without a conditional profile read, counting optional calls", async () => {
   const { store, api } = setup();
   api.get.mockImplementation(async (path) => ({ status: 200, lastModified: "new", body: path.endsWith("statistics") ? { health: 843 } : path.endsWith("ember-vale-0") ? { ...bodyFor(path) as object, statistics: { href: "https://eu.api.blizzard.com/profile/wow/character/ember-vale-0/statistics" } } : bodyFor(path) }));
-  const s = await runCrawl({ region: "eu", budget: 7, store, api, details: true });
+  const s = await runCrawl({ region: "eu", budget: 10, store, api, details: true });
   expect(api.get.mock.calls[0]?.[2]).toBeUndefined();
   expect(s.calls).toBe(4);
   expect(store.upsertCharacters.mock.calls[0]?.[1][0]).toMatchObject({ details: { revision: 1, statistics: { rows: [{ label: "Health", value: 843 }] } } });
@@ -56,14 +60,66 @@ it.each([403, 500])("optional endpoint HTTP %i preserves the base character and 
     if (path.endsWith("statistics")) throw new ApiError(status, "api");
     return { status: 200, lastModified: "new", body: path.endsWith("ember-vale-0") ? { ...bodyFor(path) as object, statistics: { href: "https://eu.api.blizzard.com/profile/wow/character/ember-vale-0/statistics" } } : bodyFor(path) };
   });
-  const s = await runCrawl({ region: "eu", budget: 7, store, api, details: true });
+  const s = await runCrawl({ region: "eu", budget: 10, store, api, details: true });
   expect(s.characters.fetched).toBe(1);
   expect(store.missing).not.toHaveBeenCalled();
   expect(store.upsertCharacters.mock.calls[0]?.[1][0]).toMatchObject({ details: { revision: 1, ...(status === 500 ? { retry: true } : {}) } });
 });
+const progressLinks = (slug: string) => Object.fromEntries(["achievements", "reputations", "quests"].map((key) =>
+  [key, { href: `https://eu.api.blizzard.com/profile/wow/character/${slug}/${key}?namespace=profile-forever-eu` }]));
+function progressApi(api: ReturnType<typeof setup>["api"], failing?: string) {
+  api.get.mockImplementation(async (path) => {
+    if (failing && path.endsWith(failing)) throw new ApiError(500, "api");
+    const body = path.endsWith("/achievements") ? achievements : path.endsWith("/reputations") ? reputations
+      : path.endsWith("/quests/completed") ? completed
+      : path.endsWith("ember-vale-0") ? { ...bodyFor(path) as object, ...progressLinks("ember-vale-0") } : bodyFor(path);
+    return { status: 200, lastModified: "new", body };
+  });
+}
+it("reads achievements, reputations and completed quests from advertised links", async () => {
+  const { store, api } = setup();
+  progressApi(api);
+  const s = await runCrawl({ region: "eu", budget: 10, store, api, details: true });
+  expect(s.calls).toBe(6);
+  expect(api.get.mock.calls.map((c) => c[0])).toEqual(expect.arrayContaining([
+    "/profile/wow/character/ember-vale-0/achievements",
+    "/profile/wow/character/ember-vale-0/reputations",
+    "/profile/wow/character/ember-vale-0/quests/completed",
+  ]));
+  expect(api.get.mock.calls.map((c) => c[0])).not.toContain("/profile/wow/character/ember-vale-0/quests");
+  const details = (store.upsertCharacters.mock.calls[0]?.[1][0] as { details: ProfileDetails }).details;
+  expect(details.achievements?.rows.map((r) => r.id)).toEqual([6, 7]);
+  expect(details.reputations?.rows[0]).toEqual({ id: 530, name: "Darkspear Trolls", standing: "Friendly", tier: 4 });
+  expect(details.quests?.completed).toEqual([788, 789, 804, 805, 817]);
+});
+it("a stored character without progress is read in full, not answered with a 304", async () => {
+  const { store, api } = setup();
+  const asOf = new Date().toISOString();
+  store.character.mockResolvedValue([{ last_modified: "date", details: { revision: 1, statistics: { asOf, rows: [] } } }]);
+  progressApi(api);
+  await runCrawl({ region: "eu", budget: 10, store, api, details: true });
+  expect(api.get.mock.calls[0]?.[2]).toBeUndefined();
+  store.character.mockResolvedValue([{ last_modified: "date", details: { revision: 1, quests: { asOf, completed: [1] } } }]);
+  api.get.mockClear();
+  await runCrawl({ region: "eu", budget: 10, store, api, details: true });
+  expect(api.get.mock.calls[0]?.[2]).toEqual({ ifModifiedSince: "date" });
+});
+it("keeps a recent progress section when its endpoint fails, and drops one older than 30 days", async () => {
+  for (const [days, kept] of [[2, true], [31, false]] as const) {
+    const { store, api } = setup();
+    const asOf = new Date(Date.now() - days * 86_400_000).toISOString();
+    store.character.mockResolvedValue([{ last_modified: "date", details: { revision: 1, retry: true, quests: { asOf, completed: [42] } } }]);
+    progressApi(api, "/quests/completed");
+    await runCrawl({ region: "eu", budget: 10, store, api, details: true });
+    const details = (store.upsertCharacters.mock.calls[0]?.[1][0] as { details: ProfileDetails }).details;
+    expect(details.retry).toBe(true);
+    expect(details.achievements?.rows).toHaveLength(2);
+    expect(details.quests).toEqual(kept ? { asOf, completed: [42] } : undefined);
+  }
+});
 it("detail mode reserves the entire maximum before starting a character", async () => {
   const { store, api } = setup();
-  await runCrawl({ region: "eu", budget: 6, store, api, details: true });
+  await runCrawl({ region: "eu", budget: 9, store, api, details: true });
   expect(api.get).not.toHaveBeenCalled();
 });
 it("stops before partial rows at budget", async () => {

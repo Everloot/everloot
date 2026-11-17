@@ -93,7 +93,7 @@ export default function Page() {
           [<C key="e2">/everloot gph start</C>, <>Starts a gold per hour session in a small window. <C>gph pause</C>, <C>gph stop</C> (saves it), <C>gph reset</C>, <C>gph show</C> (or <C>gph</C> alone), <C>gph hide</C>, <C>gph history</C> (the last five) and <C>gph cut on|off</C> (the 5% auction cut). Sessions stay in your file and are never uploaded.</>],
           [<C key="f">/everloot completion on</C>, <>Turns on the completion tracker, which reads your achievements, reputation, titles and completed quests. <C>completion</C> reads now; <C>completion off</C> turns it off and deletes every row it wrote.</>],
           [<C key="g">/everloot census off</C>, <>Turns off the census, which is on in a new install and counts race, class, level and faction, never a name. It deletes every row the census wrote. <C>census</C> says whether it is on; <C>census on</C> turns it back on.</>],
-          [<C key="g2">/everloot players on</C>, <>Turns on the players module, the one part that records other players&apos; names: name, realm, race, class, level and guild of characters you target, mouse over or group with. Its rows are sent only from the upload page and can appear on <Link href="/docs/guides/privacy#player-pages" className={docLink}>player pages</Link>. <C>players</C> says whether it is on; <C>players off</C> turns it off and deletes every row it wrote.</>],
+          [<C key="g2">/everloot players on</C>, <>Turns on the players module, the one part that records other players&apos; names: name, realm, race, class, level and guild of characters you target, mouse over or group with. Its rows are sent from the upload page, or by the <Link href="/docs/guides/desktop" className={docLink}>Desktop App</Link> while its player pages setting is on, and can appear on <Link href="/docs/guides/privacy#player-pages" className={docLink}>player pages</Link>. <C>players</C> says whether it is on; <C>players off</C> turns it off and deletes every row it wrote.</>],
           [<C key="g3">/everloot pulls on</C>, <>In the builds that carry it, records a summary of each boss pull. <C>pulls</C> says whether it is on and how many pulls it holds; <C>pulls off</C> turns it off and deletes every pull.</>],
           [<C key="h">/everloot addons on</C>, <>Records the list of your installed addons. <C>addons off</C> stops it and deletes every recorded addon row.</>],
           [<C key="h2">/everloot link &lt;code&gt;</C>, <>Links the character you are playing to your everloot.app account with the code the site shows you. <C>link</C> says how many links this file holds; <C>link clear</C> deletes them.</>],
@@ -107,8 +107,9 @@ export default function Page() {
       <Callout kind="tip">
         <p>
           In a new install, auction capture and the census are on. The census says so once in chat; an install from
-          before the census keeps it off. The completion tracker, the players module and the installed addon list are
-          off until you turn them on. Nothing in the addon buys, bids on or posts anything at the auction house.
+          before the census keeps it off. Addon releases after 0.3.23 also turn the players module on in a new install
+          and say so once; an install from before keeps its choice. The completion tracker and the installed addon list
+          are off until you turn them on. Nothing in the addon buys, bids on or posts anything at the auction house.
         </p>
       </Callout>
 

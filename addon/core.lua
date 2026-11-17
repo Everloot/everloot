@@ -105,9 +105,26 @@ end
 local defaults = {
   version = E.VERSION,
   installId = nil,
-  toggles = { openworld = true, guild = true, gear = true, auctions = true, gold = true, roster = true, addons = false, talents = true, completion = false, census = true, players = false, professions = true },
+  toggles = { openworld = true, guild = true, auctions = true, gold = true, roster = true, addons = false, completion = false, census = true, players = true, professions = true },
   records = {},
 }
+
+-- Kinds this addon no longer records, because Blizzard's character API supplies them to everloot.app
+-- (docs/design/specs/2026-11-17-blizzard-api-first.md). Any left in the saved file are deleted at load, with the
+-- state that only their modules used. The site still accepts them from older addons.
+E.RETIRED_KINDS = { "gear_snapshot", "talent_snapshot", "achievement_owned", "reputation_owned", "quest_owned",
+  "profession_owned", "talent_owned", "stats_owned", "pvp_owned" }
+
+--- Deletes the retired kinds' rows, their paused flags and their modules' saved state. Nothing writes them again,
+--- so after the first load of this release it finds nothing.
+function E.DropRetired()
+  for _, kind in ipairs(E.RETIRED_KINDS) do
+    EverlootDB.records[kind] = nil
+    if type(EverlootDB.paused) == "table" then EverlootDB.paused[kind] = nil end
+  end
+  EverlootDB.gearSampledAt, EverlootDB.talentsSeen = nil, nil
+  EverlootDB.toggles.gear, EverlootDB.toggles.talents = nil, nil
+end
 
 local function newInstallId()
   local t = {}
@@ -227,11 +244,11 @@ function E:Status()
     lines[#lines + 1] = string.format("  %s: %s", m.name, m.note)
   end
   for _, kind in ipairs({ "npc_sighting", "loot", "quest", "vendor", "item_seen", "item_fact",
-    "object_sighting", "instance_entrance", "encounter", "instance_run", "guild_snapshot", "raid_lockout", "attendance", "loot_award", "gear_snapshot",
+    "object_sighting", "instance_entrance", "encounter", "instance_run", "guild_snapshot", "raid_lockout", "attendance", "loot_award",
     "collection_catalog", "collection_owned", "auction_scan", "auction_snapshot", "recipe_seen", "recipe_observed", "trainer_seen", "price_seen",
-    "gold_snapshot", "money_event", "addon_seen", "map_bounds", "talent_snapshot",
+    "gold_snapshot", "money_event", "addon_seen", "map_bounds",
     "achievement_catalog", "reputation_catalog", "title_catalog", "quest_chain_catalog",
-    "achievement_owned", "reputation_owned", "title_owned", "quest_owned", "census_self", "census_seen", "player_seen", "character_link", "pull_summary" }) do
+    "title_owned", "census_self", "census_seen", "player_seen", "character_link", "pull_summary" }) do
     local count = self:Count(kind)
     if count > 0 and (E.RUN_RECORDS or not RUN_KINDS[kind]) then lines[#lines + 1] = string.format("  rows %s: %d", kind, count) end
   end
@@ -267,6 +284,9 @@ function E:LoginLine()
   return text .. ". /everloot status for details."
 end
 
+-- What the players module records and where it goes, said once per install and again on /everloot players on.
+local PLAYERS_TEXT = "It records the name, realm, race, class, level and guild of your characters and of players you target, mouse over or group with, one row per character and the day you saw it, and the bosses your guild kills (the guild, the boss and the time, no names). Never where they are, their gear or what they do. The everloot.app upload page, after its preview, sends it, and so does the Everloot Desktop App while its \"Send the player pages with the uploads\" setting is on. If the site has player pages on, these characters can appear there, and anyone can hide a character at everloot.app/players/opt-out."
+
 -- What pull summaries hold and where they go, said once per install and again on /everloot pulls on.
 local PULLS_TEXT = "After each boss pull in a dungeon or raid it records your group: each member's name, class and role, and the damage, healing, damage taken and deaths the game's own damage meter shows, with the boss, kill or wipe and how long it took. Never their gear, guild, position or chat. The everloot.app upload page, after its preview, or the Everloot Desktop App sends it; the site keeps it privately for a year, shows it nowhere yet, and anyone can have a character hidden."
 
@@ -280,11 +300,14 @@ frame:SetScript("OnEvent", function(_, event, arg1)
     if EverlootDB.toggles.buttons == nil then EverlootDB.toggles.buttons = upgraded end
     -- The census starts on only for a new install; one from before it keeps it off until the player turns it on.
     if upgraded and EverlootDB.toggles.census == nil then EverlootDB.toggles.census = false end
+    -- Player names likewise: on for a new install, and an install from before keeps its choice (off unless turned on).
+    if upgraded and EverlootDB.toggles.players == nil then EverlootDB.toggles.players = false end
     -- A toggle added after this file was created takes its default: off-by-default stays off.
     for k, v in pairs(defaults.toggles) do if EverlootDB.toggles[k] == nil then EverlootDB.toggles[k] = v end end
     -- Pull summaries are on by default, in the builds that carry them; the others write no switch for them.
     if E.Pulls and EverlootDB.toggles.pulls == nil then EverlootDB.toggles.pulls = true end
     if not EverlootDB.installId then EverlootDB.installId = newInstallId() end
+    E.DropRetired()
     EverlootDB.version = E.VERSION
     EverlootDB.clientBuild = clientBuild()
     E:InitModules()
@@ -293,6 +316,11 @@ frame:SetScript("OnEvent", function(_, event, arg1)
     if EverlootDB.toggles.census and not EverlootDB.censusNotice then
       print("Everloot: census on. It records the race, class, level and faction of your characters and of players near you: ones you target, mouse over or group with, and ones the game shows a nameplate for (your nameplate settings decide which). Never their names, guilds, gear or where they are. It stays in this file unless the Everloot Desktop App, if you allowed the census there, or the everloot.app upload page sends it. /everloot census off stops it and deletes the rows.")
       EverlootDB.censusNotice = true
+    end
+    -- Player names are on in a new install, so it is told once what they record and how to turn them off.
+    if EverlootDB.toggles.players and not EverlootDB.playersNotice then
+      print("Everloot: player names on. " .. PLAYERS_TEXT .. " /everloot players off stops it and deletes the rows.")
+      EverlootDB.playersNotice = true
     end
     -- Pull summaries name the group, so they are announced once per install too, in the builds that carry them.
     if E.Pulls and EverlootDB.toggles.pulls and not EverlootDB.pullsNotice then
@@ -476,13 +504,11 @@ SlashCmdList["EVERLOOT"] = function(msg)
   elseif msg == "completion on" or msg == "completion off" then
     EverlootDB.toggles.completion = (msg == "completion on")
     if EverlootDB.toggles.completion then
-      print("Everloot: completion tracker on. It reads your achievements, reputation, titles and completed quests, and never changes them. It also records your professions, this week's raid lockouts, active talent build, character sheet stats and PvP standing. Achievements, reputation, titles and quests leave this computer from the everloot.app upload page; achievements, reputation and titles also go through the Everloot Desktop App's private sync for a character you linked. Professions, raid lockouts, the talent build, stats and PvP never go in an upload; they leave only through private sync. everloot.app keeps only the categories you switched on there. /reload to apply.")
+      print("Everloot: completion tracker on. It reads the game's achievement, reputation, title and quest chain lists, and never changes them. It records the titles you hold, this week's raid lockouts and your boss kills. Your own achievements, reputation and completed quests are not recorded: the Everloot window reads them from the game, and everloot.app gets them from Blizzard's API. The lists and your titles leave this computer from the everloot.app upload page; titles also go through the Everloot Desktop App's private sync for a character you linked. Raid lockouts never go in an upload; they leave only through private sync. Your boss kills stay on this computer. everloot.app keeps only the categories you switched on there. /reload to apply.")
     else
       -- Turning it off withdraws what it wrote: every completion row is deleted from this file.
       if E.Completion then E.Completion.Withdraw() end
       if E.Owned then E.Owned.Withdraw() end
-      if E.CharStats then E.CharStats.Withdraw() end
-      if E.Pvp then E.Pvp.Withdraw() end
       print("Everloot: completion tracker off; all recorded completion rows were deleted from this file. /reload to apply.")
     end
   elseif msg == "completion" and E.Completion then
@@ -503,7 +529,9 @@ SlashCmdList["EVERLOOT"] = function(msg)
     -- A choice made by hand answers the one-time question too (modules/options.lua), so it is never asked after.
     EverlootDB.playersAsked = true
     if EverlootDB.toggles.players then
-      print("Everloot: players on. It records the name, realm, race, class, level and guild of your characters and of players you target, mouse over or group with, one row per character and the day you saw it, and the bosses your guild kills (the guild, the boss and the time, no names). Never where they are, their gear or what they do. It is sent only from the everloot.app upload page, after its preview. If the site has player pages on, these characters can appear there, and anyone can have a character hidden. /reload to apply.")
+      -- This message says what the once-per-install notice says, so that notice is not repeated after it.
+      EverlootDB.playersNotice = true
+      print("Everloot: players on. " .. PLAYERS_TEXT .. " /reload to apply.")
     else
       -- Turning it off withdraws what it wrote: every player row is deleted from this file.
       if E.Players then E.Players.Withdraw() end

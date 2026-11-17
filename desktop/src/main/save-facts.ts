@@ -148,13 +148,13 @@ function charactersIn(db: Record<string, unknown>): CharacterBase | null {
 
 /** Every account file's characters at `now`, in file order. A file that cannot be read shows on the Upload page. */
 export function charactersFromFiles(files: string[], now = Date.now()): CharactersInfo {
-  const all: CharactersInfo = { characters: [], progress: [], talents: [] };
+  const all: CharactersInfo = { characters: [], progress: [] };
   for (const file of files) {
     let base: CharacterBase | null;
     try { base = saveFacts(file).characters; } catch { continue; }
     if (!base) continue;
     const one = charactersAt(base, now);
-    all.characters.push(...one.characters); all.progress.push(...one.progress); all.talents.push(...one.talents);
+    all.characters.push(...one.characters); all.progress.push(...one.progress);
   }
   return all;
 }

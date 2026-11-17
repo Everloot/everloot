@@ -1,9 +1,9 @@
-import { GearBoardPage, gearBoardMetadata } from "../gear-board";
+import { permanentRedirect } from "next/navigation";
+import { armoryBoardPath } from "@/lib/armory";
 
+/** The synced gear board gave way to the armory board, which ranks every character Blizzard's API knows (308). */
 export const dynamic = "force-dynamic";
 
-export const generateMetadata = () => gearBoardMetadata("item-level");
-
-export default async function Page({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
-  return GearBoardPage({ metric: "item-level", searchParams });
+export default function Page(): never {
+  permanentRedirect(armoryBoardPath("item-level"));
 }

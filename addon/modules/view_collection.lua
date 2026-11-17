@@ -1,6 +1,9 @@
--- Everloot window, Collection: achievements, reputation, titles, instances and quest chains, from the rows the
--- completion tracker (completion.lua) and owned.lua wrote, read through Everloot:Rows. This character by default;
--- Account joins every character in the roster (roster.lua) and names the one that holds each item.
+-- Everloot window, Collection: achievements, reputation, titles, instances and quest chains. The lists are the catalog
+-- rows the completion tracker (completion.lua) wrote; titles, lockouts and boss kills are the rows it and owned.lua
+-- wrote, read through Everloot:Rows. Achievements, reputation and completed quests are not recorded: they are read
+-- from the game when the view draws (E.Completion.Achievement, Standings, CompletedQuests), so they are this
+-- character's only. This character by default; Account joins every character in the roster (roster.lua) for titles,
+-- lockouts and boss kills, and names the one that holds each item.
 -- Display only: it reads, the one button runs /everloot completion on, the command the player could type, and
 -- nothing here records. It registers no events; the window builds it the first time Collection is opened.
 
@@ -15,9 +18,10 @@ local SECTIONS = { { "achievements", "Achievements" }, { "reputation", "Reputati
   { "raids", "Dungeons & raids" }, { "quests", "Quests" } }
 local SCOPES = { { "character", "This character", 110 }, { "account", "Account", 80 } }
 local EXALTED = 8
-local OFF_TEXT = "The completion tracker reads your achievements, reputation, titles, completed quests, professions, raid "
-  .. "lockouts, active talent build, character sheet stats and PvP standing, from the game's own windows, never writing "
-  .. "back. Your boss kills stay on this computer. Collection rows leave only from the upload page; professions, lockouts, talents, stats and PvP never go in an upload."
+local OFF_TEXT = "The completion tracker reads the game's achievement, reputation, title and quest chain lists, and records "
+  .. "the titles you hold, this week's raid lockouts and your boss kills, never writing back. This page shows your "
+  .. "achievements, reputation and quests from the game as it draws; they are not recorded. The lists and your titles leave "
+  .. "from the upload page; lockouts and boss kills never go in an upload."
 local TURNED_ON = "Turned on. /reload to start reading."
 local NOTHING_READ = "Nothing read yet. Open the achievements, reputation or titles window, then /reload."
 local NO_CHAINS = "No quest chains read yet. They are read at login and each time you turn in a quest."
@@ -80,17 +84,12 @@ local function held(detail, s, key)
   return (detail ~= "" and (detail .. " · ") or "") .. s.holder(key)
 end
 
--- Each key's rows of one owned kind, by the catalog id in `field`: [key][id] = row.
-local function owned(kind, s, field)
-  local out = {}
-  for _, k in ipairs(s.keys) do out[k] = {} end
-  for _, r in ipairs(E:Rows(kind)) do
-    if type(r) == "table" and out[r.characterKey] and r[field] ~= nil then out[r.characterKey][r[field]] = r end
-  end
-  return out
+-- The summary of a section read from the game: in the account scope it says the list is this character's.
+local function live(summary, s)
+  return s.holder and (summary .. " · this character") or summary
 end
 
--- Each key's ids from the list-of-ids rows of one kind (titles, completed quests): [key][id] = true.
+-- Each key's ids from the list-of-ids rows of one kind (titles): [key][id] = true.
 local function known(kind, s, field)
   local out = {}
   for _, k in ipairs(s.keys) do out[k] = {} end
@@ -104,23 +103,21 @@ end
 
 -- Each section returns its items ({ name, detail, done, bar = { floor, ceiling, standing } }) and its summary line.
 -- In the account scope an item is done when any key holds it; the first key in scope order that does is named.
+-- Achievements, reputation and quests are read from the game, so they are this character's (s.keys[1]) in either scope.
 local function achievements(s)
-  local mine = owned("achievement_owned", s, "achievementId")
+  local C, me = E.Completion, s.keys[1]
   local items, done, points = {}, 0, 0
   for _, a in ipairs(E:Rows("achievement_catalog")) do
     if type(a) == "table" then
-      local o, holder
-      for _, k in ipairs(s.keys) do
-        local r = mine[k][a.achievementId]
-        if r and r.completed == true then o, holder = r, k; break end
-      end
+      local completed, when
+      if C and C.Achievement then completed, when = C.Achievement(a.achievementId) end
       local pts = number(a.points) and a.points or nil
-      local item = { name = name(a.name), detail = (pts or "-") .. " pts · " .. name(a.category), done = o ~= nil }
+      local item = { name = name(a.name), detail = (pts or "-") .. " pts · " .. name(a.category), done = completed == true }
       if item.done then
         done, points = done + 1, points + (pts or 0)
-        item.when = type(o.earnedOn) == "string" and o.earnedOn or nil
+        item.when = when
         if item.when then item.detail = item.detail .. " · " .. item.when end
-        item.detail = held(item.detail, s, holder)
+        item.detail = held(item.detail, s, me)
       end
       items[#items + 1] = item
     end
@@ -131,39 +128,28 @@ local function achievements(s)
     if a.done and a.when ~= b.when then return (a.when or "") > (b.when or "") end
     return byName(a, b)
   end)
-  return items, "Achievements: " .. done .. " of " .. #items .. " · " .. points .. " points"
+  return items, live("Achievements: " .. done .. " of " .. #items .. " · " .. points .. " points", s)
 end
 
--- The higher standing of two rows: reaction first, then the points within it.
-local function higher(a, b)
-  if not b then return true end
-  local ra, rb = number(a.reaction) and a.reaction or -1, number(b.reaction) and b.reaction or -1
-  if ra ~= rb then return ra > rb end
-  return (number(a.standing) and a.standing or -1) > (number(b.standing) and b.standing or -1)
-end
-
--- In the account scope a faction shows the key with the highest standing.
+-- A faction the reputation window does not list now (under a collapsed header) shows "-".
 local function reputation(s)
-  local mine = owned("reputation_owned", s, "factionId")
+  local C, me = E.Completion, s.keys[1]
+  local standing = C and C.Standings and C.Standings() or {}
   local items, exalted = {}, 0
   for _, r in ipairs(E:Rows("reputation_catalog")) do
     if type(r) == "table" and not r.major then
-      local o, holder
-      for _, k in ipairs(s.keys) do
-        local row = mine[k][r.factionId]
-        if row and higher(row, o) then o, holder = row, k end
-      end
+      local o = standing[r.factionId]
       local item = { name = name(r.name), detail = "-", done = false }
-      if o and number(o.standing) and number(o.floor) and number(o.ceiling) then
+      if o and number(o.standing) and number(o.floor) and number(o.ceiling) and o.floor <= o.ceiling then
         item.bar = { o.floor, o.ceiling, o.standing }
-        item.detail = held(o.standing .. " / " .. o.ceiling, s, holder)
+        item.detail = held(o.standing .. " / " .. o.ceiling, s, me)
       end
       if o and number(o.reaction) and o.reaction >= EXALTED then item.done, exalted = true, exalted + 1 end
       items[#items + 1] = item
     end
   end
   table.sort(items, byName)
-  return items, "Reputation: " .. #items .. (#items == 1 and " faction" or " factions") .. " · " .. exalted .. " exalted"
+  return items, live("Reputation: " .. #items .. (#items == 1 and " faction" or " factions") .. " · " .. exalted .. " exalted", s)
 end
 
 local function titles(s)
@@ -241,11 +227,11 @@ local function raids(s)
   return items, "Dungeons & raids / as of " .. data.asOf:sub(1, 10)
 end
 
--- One row per chain the tracker read: its quests done of its total. In the account scope a chain shows the key
--- furthest along it; quests done on different characters are not added together. A chain the tracker cut at its
--- quest limit ("+") is never counted complete.
+-- One row per chain the tracker read: this character's quests done of its total, from the game's list of completed
+-- quests. A chain the tracker cut at its quest limit ("+") is never counted complete.
 local function quests(s)
-  local ids = known("quest_owned", s, "questIds")
+  local C, me = E.Completion, s.keys[1]
+  local completed = C and C.CompletedQuests and C.CompletedQuests() or {}
   -- quest id -> the chains holding it, so each key's completed quests are walked once, not once per chain.
   local chains, byQuest = {}, {}
   for _, q in ipairs(E:Rows("quest_chain_catalog")) do
@@ -263,29 +249,19 @@ local function quests(s)
     end
   end
   local counts = {}
-  for _, k in ipairs(s.keys) do
-    local mine = {}
-    for id in pairs(ids[k]) do
-      for _, c in ipairs(byQuest[id] or {}) do mine[c] = (mine[c] or 0) + 1 end
-    end
-    counts[k] = mine
+  for id in pairs(completed) do
+    for _, c in ipairs(byQuest[id] or {}) do counts[c] = (counts[c] or 0) + 1 end
   end
   local items, complete = {}, 0
   for c, q in ipairs(chains) do
-    do
-      local total, most, holder = #q.questIds, 0, nil
-      for _, k in ipairs(s.keys) do
-        local n = counts[k][c] or 0
-        if n > most then most, holder = n, k end
-      end
-      local item = { name = name(q.name), done = most >= total and not q.truncated, bar = { 0, total, most } }
-      item.detail = held(most .. " of " .. total .. (q.truncated and "+" or ""), s, holder)
-      if item.done then complete = complete + 1 end
-      items[#items + 1] = item
-    end
+    local total, n = #q.questIds, counts[c] or 0
+    local item = { name = name(q.name), done = n >= total and not q.truncated, bar = { 0, total, n } }
+    item.detail = held(n .. " of " .. total .. (q.truncated and "+" or ""), s, n > 0 and me or nil)
+    if item.done then complete = complete + 1 end
+    items[#items + 1] = item
   end
   table.sort(items, byName)
-  return items, "Quests: " .. complete .. " of " .. #items .. (#items == 1 and " chain" or " chains") .. " complete"
+  return items, live("Quests: " .. complete .. " of " .. #items .. (#items == 1 and " chain" or " chains") .. " complete", s)
 end
 
 local READ = { achievements = achievements, reputation = reputation, titles = titles, raids = raids, quests = quests }

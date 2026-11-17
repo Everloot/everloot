@@ -15,7 +15,9 @@ SCHEMA_DIR = Path(os.environ.get("EVERLOOT_PROTOCOL_SCHEMA") or Path(__file__).p
 
 # Kinds the addon writes that never leave the computer: no uploader sends them (web/src/lib/upload-batches.ts
 # LOCAL_ONLY_KINDS) and the intake has no schema for them, by design. owned_contract.py checks their shape.
-LOCAL_ONLY_KINDS = {"profession_owned", "lockout_owned", "talent_owned", "stats_owned", "pvp_owned", "boss_kill_owned"}
+# The addon no longer writes profession_owned, talent_owned, stats_owned or pvp_owned (core.lua E.RETIRED_KINDS); the
+# uploaders still keep them on the computer for files from older addons.
+LOCAL_ONLY_KINDS = {"lockout_owned", "boss_kill_owned"}
 
 _validators = {}
 

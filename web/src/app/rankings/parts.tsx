@@ -2,8 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Card, DataTable, EmptyState, Explainer, type Column } from "@/components/ui";
 import { guildsOn } from "@/lib/guild-switch";
-import { leaderboardsOn } from "@/lib/leaderboard-switch";
-import { GEAR_BOARDS, gearBoardPath } from "@/lib/leaderboards";
+import { ARMORY_BOARDS, ARMORY_METRICS, armoryBoardPath, armoryOn } from "@/lib/armory";
 import { CENSUS_MIN_CHARACTERS, CENSUS_MIN_INSTALLS, CENSUS_MIN_REPORTERS, CENSUS_ROUND_TO, HIDDEN_LABEL } from "../../../../kb/src/census";
 import type { CensusCount, Faction } from "../../../../kb/src/census";
 import {
@@ -37,16 +36,16 @@ const CLASS_FILL: Record<string, string> = {
 /**
  * The list of rankings: a rail on wide screens, a bar of links that scrolls sideways on a phone. Plain links,
  * so it works without JavaScript. `row` keeps it a bar at every width (the hub puts it under the title). With
- * EVERLOOT_GUILDS on, Population ends with the guild ladder; with EVERLOOT_LEADERBOARDS on, the gear boards lead.
+ * EVERLOOT_GUILDS on, Population ends with the guild ladder; with the armory on, its character boards lead.
  */
 export function RankingRail({ current, row = false }: { current?: string; row?: boolean }) {
   const col = row ? "" : "lg:block";
   const withGuilds = guildsOn()
     ? RAIL_GROUPS.map((g, i) => (i === 0 ? { ...g, links: [...g.links, { label: "Guilds by progression", href: "/guilds" }] } : g))
     : RAIL_GROUPS;
-  // With EVERLOOT_LEADERBOARDS on, the gear boards come first: named characters, each by its owner's choice.
-  const groups = leaderboardsOn()
-    ? [{ title: "Characters", links: (["item-level", "gear-score"] as const).map((m) => ({ label: GEAR_BOARDS[m].title, href: gearBoardPath(m) })) }, ...withGuilds]
+  // With the armory on, its boards come first: characters ranked from Blizzard's API.
+  const groups = armoryOn()
+    ? [{ title: "Characters", links: ARMORY_METRICS.map((m) => ({ label: ARMORY_BOARDS[m].title, href: armoryBoardPath(m) })) }, ...withGuilds]
     : withGuilds;
   return (
     <nav aria-label="Rankings" data-rankings-rail className="min-w-0">

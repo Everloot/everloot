@@ -1,0 +1,44 @@
+{
+  "_links": {
+    "self": {
+      "href": "https://eu.api.blizzard.com/profile/wow/character/ember-vale/quests/completed?namespace=profile-forever-eu"
+    }
+  },
+  "quests": [
+    {
+      "key": {
+        "href": "https://eu.api.blizzard.com/data/wow/quest/788?namespace=static-forever-eu"
+      },
+      "name": "Quest 788",
+      "id": 788
+    },
+    {
+      "key": {
+        "href": "https://eu.api.blizzard.com/data/wow/quest/789?namespace=static-forever-eu"
+      },
+      "name": "Quest 789",
+      "id": 789
+    },
+    {
+      "key": {
+        "href": "https://eu.api.blizzard.com/data/wow/quest/804?namespace=static-forever-eu"
+      },
+      "name": "Quest 804",
+      "id": 804
+    },
+    {
+      "key": {
+        "href": "https://eu.api.blizzard.com/data/wow/quest/805?namespace=static-forever-eu"
+      },
+      "name": "Quest 805",
+      "id": 805
+    },
+    {
+      "key": {
+        "href": "https://eu.api.blizzard.com/data/wow/quest/817?namespace=static-forever-eu"
+      },
+      "name": "Quest 817",
+      "id": 817
+    }
+  ]
+}

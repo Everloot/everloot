@@ -53,7 +53,12 @@ ME = "%08x" % zlib.adler32(b"abcd-1234:Player-1-0001")
 API = ("UnitGUID = function() return 'Player-1-0001' end\n"
        "date = os.date\n"
        "RAID_CLASS_COLORS.MAGE = { r = 0.25, g = 0.78, b = 0.92 }\n"
-       "RAID_CLASS_COLORS.ROGUE = { r = 1, g = 0.96, b = 0.41 }\n")
+       "RAID_CLASS_COLORS.ROGUE = { r = 1, g = 0.96, b = 0.41 }\n"
+       # This character's progress, read from the game (completion.lua's live reads): achievements 1 and 2 earned, 3 not,
+       # Orgrimmar exalted and Darkspear Trolls friendly.
+       "GetAchievementInfo = function(id) if id >= 1 and id <= 4 then return id, 'Name', 10, id <= 2, 1, 1, 26 end end\n"
+       "factions = { { factionID = 76, reaction = 8 }, { factionID = 530, reaction = 5 } }\n"
+       "C_Reputation = { GetNumFactions = function() return #factions end, GetFactionDataByIndex = function(i) return factions[i] end }\n")
 SAVED = f"""{{ installId = 'abcd-1234', toggles = {{}}, records = {{
     recipe_observed = {{ {{ profession = 'Cooking' }}, {{ profession = 'Cooking' }} }},
     lockout_owned = {{ {{ characterKey = 'bbbb0002', instance = 'Karazhan', resetAt = '2030-01-01T00:00:00Z' }}, {{ characterKey = 'bbbb0002', instance = 'Gruul', resetAt = '2030-01-02T00:00:00Z' }}, {{ characterKey = 'bbbb0002', instance = 'Magtheridon', resetAt = '1970-01-02T00:00:00Z' }}, {{ characterKey = 'zzzz', instance = 'Other' }},
@@ -61,10 +66,9 @@ SAVED = f"""{{ installId = 'abcd-1234', toggles = {{}}, records = {{
       {{ characterKey = '{ME}', instance = 'Onyxia', bossesKilledCount = 1, bossesTotal = 1, resetAt = '2030-01-01T00:00:00Z' }},
       {{ characterKey = '{ME}', instance = 'Zul Gurub', bossesKilledCount = 0, bossesTotal = 10, resetAt = '1970-01-02T00:00:00Z' }} }},
     achievement_catalog = {{ {{ achievementId = 1, name = 'Level 10' }}, {{ achievementId = 2, name = 'Explore Durotar' }}, {{ achievementId = 3, name = 'Journeyman Fisherman' }}, {{ achievementId = 4, name = 'Zul Farrak' }} }},
-    achievement_owned = {{ {{ characterKey = '{ME}', achievementId = 1, completed = true }}, {{ characterKey = '{ME}', achievementId = 2, completed = true }},
-      {{ characterKey = '{ME}', achievementId = 3, completed = false }}, {{ characterKey = 'zzzz9999', achievementId = 4, completed = true }} }},
+    achievement_owned = {{ {{ characterKey = 'zzzz9999', achievementId = 4, completed = true }} }},
     reputation_catalog = {{ {{ factionId = 76, name = 'Orgrimmar' }}, {{ factionId = 530, name = 'Darkspear Trolls' }}, {{ factionId = 2600, name = 'A Major Faction', major = true }} }},
-    reputation_owned = {{ {{ characterKey = '{ME}', factionId = 76, reaction = 8 }}, {{ characterKey = '{ME}', factionId = 530, reaction = 5 }}, {{ characterKey = 'zzzz9999', factionId = 530, reaction = 8 }} }},
+    reputation_owned = {{ {{ characterKey = 'zzzz9999', factionId = 530, reaction = 8 }} }},
     title_catalog = {{ {{ titleId = 1, name = 'Private' }}, {{ titleId = 2, name = 'Corporal' }}, {{ titleId = 3, name = 'Scout' }} }},
     title_owned = {{ {{ characterKey = '{ME}', titleIds = {{ 2 }} }}, {{ characterKey = 'zzzz9999', titleIds = {{ 1, 3 }} }} }} }},
   ledger = {{ events = {{
@@ -79,7 +83,7 @@ SAVED = f"""{{ installId = 'abcd-1234', toggles = {{}}, records = {{
     aaaa0001 = {{ name = 'Alt', realm = 'Forever', class = 'ROGUE', level = 12, copper = 500 }},
     bbbb0002 = {{ name = 'Mage', realm = 'Nightfall', class = 'MAGE', level = 30 }},
   }} }}"""
-lua = fresh(SAVED, API)
+lua = fresh(SAVED, API, extra=("modules/completion.lua",))
 lua.execute("""
 local U = Everloot.Window
 assert(U.frame == nil and EverlootWindow == nil, 'nothing is built at load')
@@ -157,8 +161,9 @@ EverlootDB.records.lockout_owned[2].resetAt = '1970-01-03T00:00:00Z'
 Everloot.Window.Refresh()
 assert(r.rows[5].lockouts.text == '1 raid', 'one live, two past their reset: ' .. r.rows[5].lockouts.text)
 
--- The Missing strip with the tracker on: this character's counts from the same owned and catalog rows Collection
--- reads; the other character's rows never count. Onyxia is cleared, Molten Core has bosses left, Zul Gurub reset.
+-- The Missing strip with the tracker on: this character's counts as Collection reads them, achievements and factions
+-- from the game and titles and lockouts from rows; the other character's rows never count, and an older addon's
+-- achievement and reputation rows were deleted at load. Onyxia is cleared, Molten Core has bosses left, Zul Gurub reset.
 local function line(i) return m.lines[i].label.text end
 assert(line(1) == 'Achievements left: 2' and line(2) == 'Factions not exalted: 1' and line(3) == 'Titles not held: 2'
   and line(4) == 'Recipes to read: 2' and line(5) == 'Raids not cleared: 1', line(1) .. ' / ' .. line(2) .. ' / ' .. line(3) .. ' / ' .. line(5))

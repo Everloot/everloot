@@ -1,6 +1,7 @@
 """Run with: uv run --with lupa --with jsonschema python addon/tests/players_contract.py
 
-The players module: off by default, one row per character kept in place, and nothing read about another
+The players module: on in a new install, which says so once, and off in an install from before that keeps its choice;
+one row per character kept in place, and nothing read about another
 player beyond name, realm, race, class, level and guild. Reads are throttled (10 minutes per player, a quarter
 of a second between reads), new characters are capped at 300 a UTC day, and the file holds at most 1,000 rows
 with the oldest going first. A boss kill inside a dungeon or raid while your character is in a guild is one
@@ -146,10 +147,28 @@ end
     return lua
 
 
-# --- Off by default: nothing registered, nothing read, nothing recorded ---
+# --- A new install has player names on and says once, in chat, what they record and how to turn them off ---
 lua = fresh()
 lua.execute("""
-assert(EverlootDB.toggles.players == false, 'players is off by default')
+assert(EverlootDB.toggles.players == true, 'a new install starts with players on')
+assert(EverlootDB.playersNotice == true and EverlootDB.playersAsked == nil, 'told once; the one-time question is not owed')
+local said = {}
+for _, line in ipairs(printed) do if string.find(line, 'player names on', 1, true) then said[#said + 1] = line end end
+assert(#said == 1, 'said once at the first load: ' .. #said)
+for _, part in ipairs({ 'name, realm, race, class, level and guild', 'upload page', 'Everloot Desktop App', '/everloot players off',
+  'deletes the rows', 'everloot.app/players/opt-out' }) do
+ assert(string.find(said[1], part, 1, true), part .. ': ' .. said[1])
+end
+printed = {}
+Everloot.frame.onEvent(nil,'ADDON_LOADED','Everloot')
+for _, line in ipairs(printed) do assert(not string.find(line, 'player names on', 1, true), 'not said again after a reload') end
+""")
+
+# --- Off: nothing registered, nothing read, nothing recorded ---
+lua = fresh("{ installId = 'abcd-1234', toggles = { players = false }, records = {} }")
+lua.execute("""
+assert(EverlootDB.toggles.players == false, 'an install that turned players off keeps it off')
+for _, line in ipairs(printed) do assert(not string.find(line, 'player names on', 1, true), 'no notice while off') end
 for _, name in ipairs({ 'PLAYER_TARGET_CHANGED', 'UPDATE_MOUSEOVER_UNIT', 'GROUP_ROSTER_UPDATE', 'PLAYER_LOGIN', 'PLAYER_LEVEL_UP', 'ENCOUNTER_END' }) do
  assert(registered[name] == nil, 'off registers nothing: ' .. name)
 end
@@ -166,9 +185,10 @@ SlashCmdList.EVERLOOT('players')
 assert(string.find(printed[#printed], 'players: off', 1, true), 'the status line says off')
 """)
 
-# An install from before this module, even one with the census on, keeps players off.
+# An install from before this module, even one with the census on, keeps players off and is not told it is on.
 lua = fresh("{ installId = 'abcd-1234', toggles = { openworld = true, census = true }, records = {} }")
 lua.execute("assert(EverlootDB.toggles.players == false and EverlootDB.toggles.census == true, 'an upgraded install starts with players off')")
+lua.execute("assert(EverlootDB.playersNotice == nil, 'and is not told it is on')")
 
 # --- On: your own character and the players you see ---
 lua = fresh()
@@ -179,7 +199,8 @@ assert(EverlootDB.toggles.players == true, '/everloot players on turns it on')
 assert(EverlootDB.playersAsked == true, 'a choice made by hand answers the one-time question (options_contract.py)')
 local said = printed[#printed]
 assert(string.find(said, 'name, realm, race, class, level and guild', 1, true) and string.find(said, 'upload page', 1, true)
-  and string.find(said, 'Never where they are', 1, true) and string.find(said, 'hidden', 1, true), said)
+  and string.find(said, 'Everloot Desktop App', 1, true) and string.find(said, 'Never where they are', 1, true)
+  and string.find(said, 'hide a character', 1, true), said)
 reload()
 assert(registered.PLAYER_TARGET_CHANGED and registered.UPDATE_MOUSEOVER_UNIT and registered.GROUP_ROSTER_UPDATE and registered.PLAYER_LEVEL_UP and registered.ENCOUNTER_END)
 assert(not registered.NAME_PLATE_UNIT_ADDED and not registered.GUILD_ROSTER_UPDATE, 'no nameplate or roster events')
@@ -571,7 +592,7 @@ event('UPDATE_MOUSEOVER_UNIT')
 assert(#rows() == before + 1, 'a unit on another realm is not a row; got ' .. (#rows() - before))
 """)
 
-print("Lua 5.1 players: off by default, no roster/gear/position calls, one row per character kept in place, throttled reads, "
+print("Lua 5.1 players: on in a new install and said once, kept off in an older one, no roster/gear/position calls, one row per character kept in place, throttled reads, "
       "300 new a day, 1000 rows with the oldest dropped, rows match the protocol schema, guild kills at most 60 a day, off deletes, census stays anonymous")
 
 # Forever returns first name and surname, not realm, from UnitName.

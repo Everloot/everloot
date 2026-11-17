@@ -245,8 +245,8 @@ function Collections({ data }: { data: CollectionsData }) {
       <Facts
         label="Progress"
         items={[
-          { label: "Achievements", value: number(data.achievements), numeric: true },
-          { label: "Achievement points", value: number(data.points), numeric: true },
+          { label: "Achievements", value: data.achievements === null ? <span className="text-sm text-fg-2">{NOT_RECORDED_LINE}</span> : number(data.achievements), numeric: data.achievements !== null },
+          { label: "Achievement points", value: data.points === null ? <span className="text-sm text-fg-2">{NOT_RECORDED_LINE}</span> : number(data.points), numeric: data.points !== null },
           { label: "Quests completed", value: data.quests === null ? <span className="text-sm text-fg-2">{NOT_RECORDED_LINE}</span> : number(data.quests), numeric: data.quests !== null },
           { label: "Titles", value: number(data.titles.length), numeric: true },
         ]}

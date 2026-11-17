@@ -6,7 +6,6 @@ import { OPERATOR } from "@/lib/jsonld";
 import { longDate } from "@/data/wow-forever";
 import { trailFor } from "@/lib/breadcrumbs";
 import { ARMORY_KEPT_DAYS, armoryOn } from "@/lib/armory";
-import { leaderboardsOn } from "@/lib/leaderboard-switch";
 import { pullSummariesOn } from "@/lib/pull-summaries";
 import { Container, PageHeader, Prose, SectionHeading, ReadingLayout, type TocItem } from "@/components/ui";
 
@@ -40,13 +39,12 @@ function Section({ id, children }: { id: string; children: React.ReactNode }) {
 export default function PrivacyPage() {
   // The boss pulls item shows only once the site collects them (EVERLOOT_PULL_SUMMARIES), and dates the page with it.
   const pulls = pullSummariesOn();
-  // The gear rankings item shows only once the boards are on (EVERLOOT_LEADERBOARDS); the switch-on change dates the page.
-  const ranked = leaderboardsOn();
   // The armory item shows only once the armory pages are on (EVERLOOT_ARMORY).
   const armory = armoryOn();
   // Linked characters, public character pages, the guild item's character page and private sync: 6 November.
   // The census paragraph gained nameplates on 9 November, which dates the page.
-  const updated = "2026-11-15";
+  // Private sync narrowed to raids and titles, and Blizzard's data on character pages: 17 November.
+  const updated = "2026-11-17";
   return (
     <article>
       <Container width="reading">
@@ -213,10 +211,11 @@ export default function PrivacyPage() {
               <li id="private-sync">
                 <strong>Private sync (optional):</strong> with an API key made with <em>Sync my linked
                 characters</em>, the Everloot Desktop App sends your linked characters&apos; own progress from your
-                addon file: equipped gear, the character sheet&apos;s stats, the active talent build, PvP rank and
-                honorable kills, this week&apos;s raid lockouts, the achievements that character earned and the titles
-                it holds, reputations and professions. You choose, per character, which of these
-                are kept. Every category starts off. A synced row is kept only when your account holds a live link to
+                addon file: this week&apos;s raid lockouts and the titles the character holds. You choose, per
+                character, which of these are kept. Since 17 November 2026 the site no longer keeps the gear, the
+                character sheet&apos;s stats, the active talent build, PvP, earned achievements, reputations or
+                professions an older Desktop App still sends: it drops them, and what was synced for them is deleted,
+                because Blizzard&apos;s character API supplies them. Every category starts off. A synced row is kept only when your account holds a live link to
                 that character and that category is on, whichever computer sent it; anything else is dropped. We keep
                 only the newest capture of each category, with a keyed one-way hash of the install that sent it so it
                 can be found and deleted, never the install id itself. You see it on a signed-in preview of the
@@ -224,15 +223,15 @@ export default function PrivacyPage() {
                 it is self-reported and not checked against Blizzard. Turning a category&apos;s sync off deletes what
                 was synced for it at once; unlinking the character or deleting your account deletes all of it.
               </li>
-              {ranked && <li id="gear-rankings">
-                <strong>Gear rankings (optional):</strong> if you turn on <em>Rank my gear</em> for a linked
-                character whose page is public and whose gear sync is on, its name, realm, level, race and class, its
-                item level and Gear Score worked out from that synced gear, its rank and the gear&apos;s date show on the
-                public item level and Gear Score rankings. The items themselves show only if you show gear on the page.
-                The rankings are scored every 30 minutes, and while the character is ranked its level, item level and
-                Gear Score are kept as a daily history that its page shows as a chart. Turning the switch, the page or
-                gear sync off takes the character off the rankings and hides the chart on the next request; unlinking
-                deletes the history. It is off by default.
+              {armory && <li id="character-blizzard">
+                <strong>Blizzard&apos;s data on your character&apos;s page (optional):</strong> when a linked character
+                is connected to its armory profile, its public page can show what Blizzard&apos;s character API
+                returns for it: gear, stats, talents, professions, PvP, completed achievements, reputations and
+                completed quests. Each part shows only while the page is public and you show that part on your account
+                page, and it carries the time of Blizzard&apos;s read and the credit &quot;Data from Blizzard
+                Entertainment&quot;. It is read from the armory each time and never copied into your account, so it
+                goes when the armory deletes it. The synced gear rankings and their daily history were retired on 17
+                November 2026 and deleted; the armory rankings replace them.
               </li>}
               <li id="chat-projects">
                 <strong>Chat projects (optional):</strong> while signed in, Chat can keep your

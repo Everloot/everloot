@@ -12,17 +12,17 @@ const GROUPS: { slots: string; budget: number }[] = [
   { slots: "Ranged, thrown, wand or relic", budget: GROUP_BUDGET.ranged },
 ];
 
-/** How the gear rankings count (docs/DATA_POLICY.md, "Gear rankings"); shown only while the boards are on. */
+/** How the item level and Gear Score rankings count; shown only while EVERLOOT_LEADERBOARDS is on. */
 export function GearSection() {
   return (
     <section aria-labelledby="gear-rankings">
       <SectionHeading id="gear-rankings">Item level and Gear Score</SectionHeading>
       <div className="space-y-4 text-fg-2">
         <p>
-          The <Link href="/rankings/item-level" className={link}>item level</Link> and{" "}
-          <Link href="/rankings/gear-score" className={link}>Gear Score</Link> rankings list only characters whose player linked them,
-          made the page public, turned gear sync on and chose Rank my gear. The gear is what that player&apos;s own addon last sent, in the
-          last 30 days. It is not checked with Blizzard.
+          The armory&apos;s <Link href="/armory/rankings/item-level" className={link}>item level</Link> and{" "}
+          <Link href="/armory/rankings/gear-score" className={link}>Gear Score</Link> rankings rank the characters Blizzard&apos;s
+          character API returns, from the equipment it reports. They replaced, on 17 November 2026, the rankings of gear that linked
+          players synced from their own addon, and the old addresses lead to them.
         </p>
         <p>
           Both numbers are averages over the same 17 equipment slots, shirt and tabard left out. An empty slot counts 0, so one good item

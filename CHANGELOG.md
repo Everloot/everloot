@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: armory character pages show completed achievements, faction standings and the number of completed quests from Blizzard's character API, each with the time of its read; the crawler keeps only those fields and deletes each part 30 days after its last read.
 - Site: zone and dungeon pages show their terrain types (Desert, Snowy, Swamp, Haunted, Strongholds and Cities and the rest) and the gear whose effect works there, and `/database/terrain` lists every terrain type's zones and instances and every item, enchant and set bonus that changes run, mount or swim speed, all read from the game files.
 - Site: Add daily auction reports with archived asking-price movers, house spreads, RSS and downloadable share cards.
 - Site: browse Blizzard auction house data by region and house, search item names, sort and page through current prices, and read 30 days of daily unit prices per house on the ad-free item pages.
@@ -232,6 +233,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: /tools/bags shows the cheapest bag of each size on one realm's auction house and what each added slot costs over your smallest bag, and item tooltips print a bag's "14 Slot Bag" line; slot counts come from the game files, prices from players' scans.
 
 ### Fixed
+- Site: Database list links load on click instead of prefetching into the edge rate limit.
 - Site: Herbs opens with gathering areas, with new Forever Herbalism crafts below them.
 - Site: the armory no longer drops a character whose gear includes an item Blizzard sends without an item level (a common head item, seen 11/17); the item is kept with no level and counts as an empty slot in the item level and gear score.
 - Site: news cards and bylines name Everloot, not everloot.app, as the source of a post that cites the site's own pages.
@@ -384,7 +386,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: search links every matching achievement, faction, title, quest chain, zone and instance through bounded result pages.
 
 ### Changed
+- Site: a linked character connected to its armory profile shows Blizzard's gear, stats, talents, professions, PvP, achievements, reputations and completed quests on its page and the owner's preview, each part behind the page's existing switch, labelled "From Blizzard's API" with the read time; private sync keeps only raid lockouts and titles and drops the retired categories older Desktop Apps still send; `/rankings/item-level` and `/rankings/gear-score` redirect to the armory boards.
 - Site: the AH Ledger panels (price history, crafting margins, deals) remember the market a visitor last picked, in their own browser, and open on it on every page; a realm page still opens on its realm. The crafting table no longer prefetches recipe pages, which sit behind the bot check and logged an error for each recipe in view.
+- Addon: gear, talent builds, professions, character sheet stats, PvP standing, achievements, reputation and completed quests are no longer recorded, since Blizzard's character API supplies them to everloot.app; the first load deletes any such rows from the saved file. Titles, raid lockouts, boss kills, the catalogs, gold, the census, player names and world data stay. The window's Collection and Home read achievements, reputation and quest chains from the game instead. Player names are on in a new install, said once in chat and in the feature chooser; an install from before keeps its choice. Needs an in-game check before release.
+- Desktop App: a new install starts with "Send the player pages with the uploads" on, and an install from before keeps its choice. Private sync stops sending gear, talents, professions, stats, PvP, reputations and achievements; raids, boss kills and titles still go. The Characters page no longer shows gear, achievements, reputations, quests, professions or talent builds.
 - CurseForge: every addon upload is a Release file; an Alpha is named "Everloot <version> Alpha". The CurseForge app
   syncs only Release files by default, so with every file a Beta, Everloot was missing for most app users. GitHub still
   marks an Alpha a pre-release, and the site still calls the addon an Alpha.

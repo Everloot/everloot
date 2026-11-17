@@ -10,8 +10,9 @@ import { armoryOn } from "@/lib/armory";
 import { ownArmoryLinks } from "@/lib/armory-links";
 
 /**
- * POST /api/me/characters/links: `{ records: [character_link rows] }`, from the signed-in upload page (session
- * cookie, this site's Origin) or the Desktop App (`Authorization: Bearer evl_...` with link:own). Each row's code
+ * POST /api/me/characters/links: `{ records: [character_link rows] }`, from the Desktop App (`Authorization: Bearer
+ * evl_...` with link:own), or from a signed-in session on this site's Origin (the upload page keeps link rows on the
+ * computer and posts none). Each row's code
  * must be live and this account's; only then does the census answer count: when the census knows the character it
  * must agree on race, class and faction, and a mismatch spends the code. The GUID becomes a keyed hash here and goes
  * no further. A new link is private. A character another account has linked too is frozen on both. Each row gets its
@@ -24,9 +25,10 @@ export const dynamic = "force-dynamic";
  * key. Each link's name, realm, race, class, faction, level, status (linked or frozen) and dates; never its keyed
  * hashes, and nothing about another account, not even which one also linked a frozen character.
  *
- * With EVERLOOT_PRIVATE_SYNC=1 each link also lists its sync per category (on or off, and the stored capture's date)
- * and, with the pages on, its section switches, for the account page's controls. Never the synced facts: those are
- * on the owner's preview.
+ * With EVERLOOT_PRIVATE_SYNC=1 each link also lists its sync per kept category (on or off, and the stored capture's
+ * date) and, with the pages on, its section switches, for the account page's controls. Never the synced facts: those
+ * are on the owner's preview. With EVERLOOT_ARMORY=1, each link's armory association and, with the pages on, the
+ * switches of Blizzard's parts.
  */
 export async function GET() {
   try {

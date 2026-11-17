@@ -1,5 +1,8 @@
 import { expect, test } from "vitest";
-import { detailPath, normalizeDetails } from "./details.js";
+import { ArmoryDetails, detailPath, MAX_QUESTS, normalizeDetails } from "./details.js";
+import achievements from "./fixtures/achievements.json";
+import reputations from "./fixtures/reputations.json";
+import completed from "./fixtures/quests-completed.json";
 
 const at = "2026-11-12T12:00:00.000Z";
 test("only follows links for this character on this region's Blizzard API", () => {
@@ -27,4 +30,43 @@ test("missing or malformed optional responses cannot manufacture progress or rem
   expect(normalizeDetails({}, at)).toEqual({ revision: 1 });
   const d = normalizeDetails({ statistics: { intellect: "69", health: -1 }, specializations: {}, professions: { primaries: [{ profession: { name: "Alchemy" } }] }, media: { assets: [{ key: "avatar", value: "https://evil.test/avatar.jpg" }] } }, at);
   expect(d).toEqual({ revision: 1 });
+});
+test("reads completed quests from the advertised quests link only", () => {
+  const path = "/profile/wow/character/ember-vale/quests";
+  expect(detailPath({ quests: { href: `https://eu.api.blizzard.com${path}?namespace=profile-forever-eu` } }, "quests", "eu", "ember-vale")).toBe(`${path}/completed`);
+  expect(detailPath({ quests: { href: `https://eu.api.blizzard.com${path}/completed` } }, "quests", "eu", "ember-vale")).toBeNull();
+  expect(detailPath({}, "quests", "eu", "ember-vale")).toBeNull();
+});
+test("keeps completed achievements, faction standings and quest ids, never the whole response", () => {
+  const d = normalizeDetails({ achievements, reputations, quests: completed }, at);
+  expect(d.achievements).toEqual({ asOf: at, rows: [
+    { id: 6, name: "Level 10", completedAt: new Date(1762000000000).toISOString() },
+    { id: 7, name: "Level 20", completedAt: new Date(1762500000000).toISOString() },
+  ] });
+  expect(d.reputations).toEqual({ asOf: at, rows: [
+    { id: 530, name: "Darkspear Trolls", standing: "Friendly", tier: 4 },
+    { id: 76, name: "Orgrimmar", standing: "Neutral", tier: 3 },
+  ] });
+  expect(d.quests).toEqual({ asOf: at, completed: [788, 789, 804, 805, 817] });
+  const stored = JSON.stringify(d);
+  for (const absent of ["criteria", "href", "total_points", "raw", "Quest 788"]) expect(stored).not.toContain(absent);
+  expect(ArmoryDetails.parse(d)).toEqual(d);
+});
+test("an answer with nothing completed is a read; a malformed one is not", () => {
+  const d = normalizeDetails({ achievements: { achievements: [{ id: 8, achievement: { name: "Level 30", id: 8 } }], total_points: 0 }, reputations: { reputations: [] }, quests: { quests: [] } }, at);
+  expect(d).toEqual({ revision: 1, achievements: { asOf: at, rows: [] }, reputations: { asOf: at, rows: [] }, quests: { asOf: at, completed: [] } });
+  expect(normalizeDetails({ achievements: {}, reputations: { reputations: "x" }, quests: null }, at)).toEqual({ revision: 1 });
+  const odd = normalizeDetails({
+    achievements: { achievements: [{ id: -1, achievement: { name: "Bad" }, completed_timestamp: 1 }, { id: 6, achievement: { name: "" }, completed_timestamp: 1 }, { id: 7, achievement: { name: "Ok" }, completed_timestamp: "soon" }] },
+    reputations: { reputations: [{ faction: { id: 1, name: "No standing" }, standing: {} }, { faction: { id: 2, name: "Two" }, standing: { name: "Honored", tier: 5.5 } }] },
+  }, at);
+  expect(odd.achievements?.rows).toEqual([]);
+  expect(odd.reputations?.rows).toEqual([{ id: 2, name: "Two", standing: "Honored" }]);
+});
+test("bounds and de-duplicates long lists", () => {
+  const ids = Array.from({ length: MAX_QUESTS + 500 }, (_, i) => ({ id: MAX_QUESTS + 500 - i }));
+  const d = normalizeDetails({ quests: { quests: [...ids, { id: 1 }, { id: 1 }, { id: "2" }, { id: 0 }] } }, at);
+  expect(d.quests?.completed).toHaveLength(MAX_QUESTS);
+  expect(d.quests?.completed.slice(0, 3)).toEqual([1, 2, 3]);
+  expect(ArmoryDetails.safeParse({ revision: 1, quests: { asOf: at, completed: Array.from({ length: MAX_QUESTS + 1 }, (_, i) => i + 1) } }).success).toBe(false);
 });

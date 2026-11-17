@@ -181,7 +181,11 @@ mine = snapshot(root)
 for case in main:
     for part in main[case]:
         actual = mine[case][part]
+        expected = main[case][part]
         if part == "options":
+            # The Blizzard API first change (docs/design/specs/2026-11-17-blizzard-api-first.md) removes the gear and
+            # talents switches for every install, independently of pull recording. Compare every other original switch.
+            expected = [key for key in expected if key not in {"gear", "talents"}]
             # #921 adds a display-only detail selector for every install, independently of pull recording.
             # Keep the historical fixture and compare every original switch, in order.
             assert actual.count("tooltip") == 1
@@ -193,7 +197,20 @@ for case in main:
             # recording. Keep the historical fixture and compare every other word.
             assert sum("/everloot setup, " in line for line in actual) == sum(line.startswith("Everloot commands:") for line in actual)
             actual = [line.replace("/everloot setup, ", "") for line in actual]
-        assert actual == main[case][part], f"gate off, {case} install: {part} differs from main's (fixtures/gate_off_main.json)"
+            # The same change turns player names on in a new install, which says so once at the first load; an
+            # upgraded install keeps them off and is not told. Compare every other line.
+            notices = [line for line in actual if line.startswith("Everloot: player names on.")]
+            assert len(notices) == (1 if case == "new" else 0), notices
+            actual = [line for line in actual if line not in notices]
+        if part == "saved":
+            # The same change, in the saved file: no gear or talents switch, and in a new install player names on and
+            # their notice given. Compare every other value.
+            assert "gear" not in actual["toggles"] and "talents" not in actual["toggles"], actual["toggles"]
+            assert actual["toggles"]["players"] is (case == "new") and actual.get("playersNotice") is (True if case == "new" else None)
+            expected = {**expected, "toggles": {k: v for k, v in expected["toggles"].items() if k not in {"gear", "talents", "players"}}}
+            actual = {k: v for k, v in actual.items() if k != "playersNotice"}
+            actual["toggles"] = {k: v for k, v in actual["toggles"].items() if k != "players"}
+        assert actual == expected, f"gate off, {case} install: {part} differs from main's (fixtures/gate_off_main.json)"
 assert mine.keys() == main.keys()
 
 # --- Pull timing: start and length on the anonymous encounter row ---

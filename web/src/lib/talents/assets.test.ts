@@ -149,9 +149,9 @@ const SHOWS_ART = new Set([
   "web/src/lib/site-card.ts", "web/src/lib/item-icons.ts",
   // A character page's equipped items: names and icons under the same rule, for the gear the page shows.
   "web/src/lib/showcase-gear-art.ts",
-  // The gear rankings check each ranked item's level against the tooltip facts, only for items whose pages show them,
-  // and print only the two averages: no item, icon or tooltip text reaches a board.
-  "web/src/lib/leaderboards.ts",
+  // Blizzard's equipment on a linked character's page and its owner's preview: item tips as the armory page draws them.
+  "web/src/app/characters/armory-part.tsx", "web/src/app/characters/[ruleset]/[realm]/[name]/page.tsx",
+  "web/src/app/me/characters/links/[id]/page.tsx",
   // The item lists' stored view: the same shown names as shown-item-names.ts, read from the cron's file instead of the corpus.
   "web/src/lib/item-view.ts",
   // The same names and quest titles for the entity tokens on a wiki page.

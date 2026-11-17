@@ -57,7 +57,7 @@ export async function publishedFacts({ ruleset, character: c }: Found, now = new
   if (!privateSyncOn()) return {};
   try {
     const facts = await publicCharacterFacts(ruleset, c.realm, c.name);
-    return facts.length ? factSections(facts, await loadFactNames(facts, c.class), now) : {};
+    return facts.length ? factSections(facts, await loadFactNames(facts), now) : {};
   } catch {
     return {};
   }

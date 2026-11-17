@@ -1,15 +1,15 @@
--- Everloot talents: the player's own talent build, read through the game's trait API.
+-- Everloot talents: the player's own talent build, read live through the game's trait API for /everloot talents,
+-- /everloot selftest, the plan panel and the planner. It records nothing: Blizzard's character API supplies talents
+-- (docs/design/specs/2026-11-17-blizzard-api-first.md), so talent_snapshot rows are no longer written.
 -- Reads the active spec group and, once dual spec is unlocked (level 40), the second one: config id,
 -- tree id, and every spent node with its ranks and choice. Also asks the game for its own loadout
--- string (C_Traits.GenerateImportString) and stores it with a status saying whether that worked.
+-- string (C_Traits.GenerateImportString) with a status saying whether that worked.
 -- Read only: nothing here spends a point, imports a loadout or touches the talent window.
 -- Every call is guarded, because Forever's trait API may differ from retail's.
 
 local E = Everloot
 local T = {}
 E.Talents = T
-
-local DEBOUNCE_SECONDS = 2
 
 --- Value of a guarded call, or nil. Only the first return value is kept.
 local function call(fn, ...)
@@ -157,7 +157,7 @@ function T.SerializationVersion()
   return nil
 end
 
---- One snapshot row (without event fields) for a spec group, or nil, reason.
+--- One spec group's build as /everloot talents prints it, or nil, reason.
 function T.Snapshot(entry)
   local class, level = T.Player()
   if not class then return nil, "no player yet" end
@@ -167,7 +167,7 @@ function T.Snapshot(entry)
   for _, nodeId in ipairs(state.order) do
     local node = state.nodes[nodeId]
     if node.ranks > 0 then
-      -- Points are the sum of the stored ranks, which the intake checks.
+      -- Points are the sum of the ranks listed.
       local ranks = math.min(node.ranks, 50)
       nodes[#nodes + 1] = { nodeId = nodeId, ranks = ranks, choice = node.choice }
       points = points + ranks
@@ -191,61 +191,3 @@ function T.Snapshot(entry)
     nodes = nodes,
   }
 end
-
-local function signature(row)
-  local parts = { tostring(row.clientBuild), row.class, tostring(row.group), tostring(row.treeId), tostring(row.loadoutString) }
-  for _, node in ipairs(row.nodes) do parts[#parts + 1] = node.nodeId .. ":" .. node.ranks .. ":" .. tostring(node.choice) end
-  return table.concat(parts, "|")
-end
-
---- Store a row for each spec group whose build changed since the last stored one.
-local function record()
-  if not E:IsEnabled("talents") then return "off" end
-  if not T.HasTraitApi() then return "trait API unavailable" end
-  EverlootDB.talentsSeen = type(EverlootDB.talentsSeen) == "table" and EverlootDB.talentsSeen or {}
-  local stored = 0
-  for _, entry in ipairs(T.Groups()) do
-    local row = T.Snapshot(entry)
-    -- A build with no spent points is not a build worth recording.
-    if row and row.points > 0 then
-      -- One seen-signature per character and group, so a second character's login does not store both again.
-      local charKey = E.CharacterKey and E.CharacterKey()
-      local key = (charKey and (charKey .. ":") or "") .. tostring(entry.group)
-      local sig = signature(row)
-      if EverlootDB.talentsSeen[key] ~= sig then
-        row.installId = EverlootDB.installId
-        row.capturedAt = date("!%Y-%m-%dT%H:%M:%SZ")
-        if E:Store("talent_snapshot", row) then EverlootDB.talentsSeen[key] = sig; stored = stored + 1 end
-      end
-    end
-  end
-  return "stored " .. stored
-end
-T.Record = record
-
-local pending = false
---- Trait events come in bursts; read once after they settle.
-local function schedule()
-  if C_Timer and type(C_Timer.After) == "function" then
-    if pending then return end
-    pending = true
-    C_Timer.After(DEBOUNCE_SECONDS, function() pending = false; pcall(record) end)
-  else
-    pcall(record)
-  end
-end
-
-E:RegisterModule("talents", function()
-  if not T.HasTraitApi() then error("trait API unavailable", 0) end
-  local f = E.frame
-  local events = { "PLAYER_ENTERING_WORLD", "TRAIT_CONFIG_UPDATED", "ACTIVE_PLAYER_SPECIALIZATION_CHANGED",
-    "PLAYER_TALENT_UPDATE", "PLAYER_LEVEL_UP" }
-  local watched = {}
-  for _, name in ipairs(events) do
-    if pcall(function() f:RegisterEvent(name) end) then watched[name] = true end
-  end
-  f:HookScript("OnEvent", function(_, event)
-    if watched[event] then schedule() end
-  end)
-  return "ready (your talent build when it changes; /everloot talents to print it)"
-end)

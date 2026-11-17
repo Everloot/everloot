@@ -14,7 +14,8 @@ export function defaultSettings(): Settings {
     upload: true,
     prices: true,
     census: true,
-    players: false,
+    // On in a new install (docs/design/specs/2026-11-17-blizzard-api-first.md); loadSettings keeps an older install's choice.
+    players: true,
     ask: { enabled: false, mcpUrl: `${DEFAULT_ENDPOINT}/mcp`, tokenFile: null },
     market: { realms: [], dismissed: [] },
     consentedAt: null,
@@ -76,8 +77,11 @@ export function loadSettings(path: string): LoadedSettings {
     const parsed: unknown = readJsonFile(path);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new SyntaxError("not an object");
     // A setup finished before the census switch agreed to a list without it: the census stays off until the player turns it on.
-    const agreedBefore = !("census" in parsed) && Boolean((parsed as { consentedAt?: unknown }).consentedAt);
-    const base = agreedBefore ? { ...defaultSettings(), census: false } : defaultSettings();
+    // Player pages likewise: a file saved before they were on by default keeps them off, as its install had them.
+    const consented = Boolean((parsed as { consentedAt?: unknown }).consentedAt);
+    const base = { ...defaultSettings() };
+    if (consented && !("census" in parsed)) base.census = false;
+    if (!("players" in parsed)) base.players = false;
     return { settings: mergeSettings(base, parsed), error: null };
   } catch (err) {
     let kept = "";
@@ -85,7 +89,8 @@ export function loadSettings(path: string): LoadedSettings {
     if (err instanceof SyntaxError) {
       try { const backup = `${path}.corrupt-${randomUUID()}`; renameSync(path, backup); kept = `; the damaged file is kept as ${basename(backup)}`; } catch { /* left in place */ }
     }
-    return { settings: defaultSettings(), error: `settings.json could not be read (${err instanceof Error ? err.message : String(err)}); using defaults${kept}` };
+    // The file was an existing install's, whose player pages choice is lost with it: they start off, not at the new-install default.
+    return { settings: { ...defaultSettings(), players: false }, error: `settings.json could not be read (${err instanceof Error ? err.message : String(err)}); using defaults${kept}` };
   }
 }
 
