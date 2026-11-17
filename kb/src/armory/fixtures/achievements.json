@@ -1,0 +1,71 @@
+{
+  "_links": {
+    "self": {
+      "href": "https://eu.api.blizzard.com/profile/wow/character/ember-vale/achievements?namespace=profile-forever-eu"
+    }
+  },
+  "total_quantity": 4,
+  "total_points": 0,
+  "achievements": [
+    {
+      "id": 6,
+      "achievement": {
+        "key": {
+          "href": "https://eu.api.blizzard.com/data/wow/achievement/6?namespace=static-forever-eu"
+        },
+        "name": "Level 10",
+        "id": 6
+      },
+      "criteria": {
+        "id": 1,
+        "is_completed": true
+      },
+      "completed_timestamp": 1762000000000
+    },
+    {
+      "id": 7,
+      "achievement": {
+        "key": {
+          "href": "https://eu.api.blizzard.com/data/wow/achievement/7?namespace=static-forever-eu"
+        },
+        "name": "Level 20",
+        "id": 7
+      },
+      "criteria": {
+        "id": 2,
+        "is_completed": true
+      },
+      "completed_timestamp": 1762500000000
+    },
+    {
+      "id": 8,
+      "achievement": {
+        "key": {
+          "href": "https://eu.api.blizzard.com/data/wow/achievement/8?namespace=static-forever-eu"
+        },
+        "name": "Level 30",
+        "id": 8
+      },
+      "criteria": {
+        "id": 3,
+        "is_completed": false,
+        "amount": 26
+      }
+    },
+    {
+      "id": 9,
+      "achievement": {
+        "key": {
+          "href": "https://eu.api.blizzard.com/data/wow/achievement/9?namespace=static-forever-eu"
+        },
+        "name": "Level 40",
+        "id": 9
+      },
+      "criteria": {
+        "id": 4,
+        "is_completed": false,
+        "amount": 26
+      }
+    }
+  ]
+}
