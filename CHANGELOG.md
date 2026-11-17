@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: AH Ledger crafting margins can be sorted and filtered, with shareable market URLs.
 - Site: armory character pages show completed achievements, faction standings and the number of completed quests from Blizzard's character API, each with the time of its read; the crawler keeps only those fields and deletes each part 30 days after its last read.
 - Site: zone and dungeon pages show their terrain types (Desert, Snowy, Swamp, Haunted, Strongholds and Cities and the rest) and the gear whose effect works there, and `/database/terrain` lists every terrain type's zones and instances and every item, enchant and set bonus that changes run, mount or swim speed, all read from the game files.
 - Site: Add daily auction reports with archived asking-price movers, house spreads, RSS and downloadable share cards.
@@ -22,14 +23,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: add AH Ledger 30-day item price history, profession crafting margins, auction deals and per-market listed-value comparisons, read in the browser with source credit and upstream cache lifetimes.
 - Site: explain addon directory rankings, approved listings and how to report wrong data in two linked guides.
 - Site: document Worker builds, release checks, MCP version files and dated desktop signing status in the package READMEs.
-- Addon: Optional local bag, bank and mail snapshots keep item counts and observation times; capture starts off and snapshots never upload.
 - Site: the market prices API accepts up to 100 item IDs to fetch public prices beyond the most-listed 2,000 items.
 - Site: drop API and open data rows include descriptive 95% Wilson ranges and sample precision, not guaranteed drop chances.
 - Site: auction item pages show AH Ledger's latest price for the item on each Forever market, both factions, US and EU on the all-realms page and the realm's own ruleset on a realm's page, read live from AH Ledger's API with its credit link and never stored.
 - Site: auction item pages show the one-day and seven-day price changes when solid public days support them.
-- Addon: every install, new or updated, is asked once which features to use: Everything, Collect data only (collection and the auction scans you start, with no tooltip lines, window, minimap button or helpers, for players who keep Auctionator or other addons), or Choose myself. The window says where to get the Desktop App, and `/everloot setup` asks again. Needs an in-game check before release.
-- Addon: recipe and trainer observations keep optional profession skill-line IDs; trainer links also retain spell or product IDs when available, alongside localized names.
-- Addon: a kill's loot window with nothing in it is now recorded, tied to the one dead creature you could loot (interact, mouseover or target), as a loot row with no items and no coin, once per corpse, and the site's drop rates, loot tables and open data count it in the source's windows (protocol 2.3.0, `sourceEvidence: "empty-window"`). Until now an empty corpse never reached the site, so drop rates for anything that does not always drop read too high. Needs an in-game check before release.
 - Site: prepare opt-in private boss-kill sync for linked characters; awaiting migration and policy approval.
 - Site: add Start here shortcuts with a remembered class on home and WoW: Forever, plus a three-question ruleset chooser that explains its suggestion.
 - Site: the gold ledger page shows where your gold went for the last 7, 30 or 90 days: spent, earned, net and spent per day against the period before, each spending category's share and change, a daily spending chart by category, the largest single payments, auction sales by item with the house cut and sales still waiting in the mailbox, and resale: each item you both bought and sold with its average paid, average received after the cut and profit. Gold history is a line over real time, and the week card stacks on phones.
@@ -40,7 +37,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: a visible bug button on every page opens the existing GitHub report form, with Discord and email alternatives and private page URLs omitted.
 - Site: item pages' social cards show the item's game icon (text-only when the art is off or unreadable), and on wide screens entity pages move their summary, facts and map into a right column.
 - Site: show labelled, linked Warcraft Wiki NPC names when one or two installs unanimously report a matching name.
-- Addon: auction house buyouts now keep the item and count they bought in the local gold ledger (item listings by their link or the house's name and the search result's quantity; commodities by the confirmed item and quantity), so the tooltip's "Your average paid" line and per-item purchase reports have something to read. The uploaded record is unchanged. Needs an in-game check before release.
 - Docs: describe NPC name agreement, the private version 2 catalog and the inert spell wiki path.
 - Site: show labelled Warcraft Wiki names for NPCs and unnamed spells, and anonymous unconfirmed item stat values from one or two players.
 - Docs: document wiki name fallbacks and labelled partial stat reports.
@@ -56,7 +52,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   the game files place no entrance for says so beside its id, with the reason on hover.
 - Site: every database page now tells search engines its name, id and address, so results link the right page.
 - Site: lightweight armory profiles with equipment slots, supported character details, manual Blizzard-link submission, queued refreshes and consent-controlled links to shared addon data.
-- Addon: named sharing retains Forever surnames so uploads can discover full armory identities, including guildless characters; anonymous collection stays unchanged.
 - Site: the armory opens at `/armory`: a page for every WoW Forever character and guild that Blizzard's API returns,
   read hourly, with guild rosters, three boards (item level, gear score, honorable kills), a form to hide a character
   and a form to ask for one. Each page says "Data from Blizzard Entertainment", carries no ad and is not indexed yet.
@@ -233,12 +228,13 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: /tools/bags shows the cheapest bag of each size on one realm's auction house and what each added slot costs over your smallest bag, and item tooltips print a bag's "14 Slot Bag" line; slot counts come from the game files, prices from players' scans.
 
 ### Fixed
+- Site: Database list links load on click instead of prefetching into the edge rate limit.
+- Site: Herbs opens with gathering areas, with new Forever Herbalism crafts below them.
 - Site: the armory no longer drops a character whose gear includes an item Blizzard sends without an item level (a common head item, seen 11/17); the item is kept with no level and counts as an empty slot in the item level and gear score.
 - Site: news cards and bylines name Everloot, not everloot.app, as the source of a post that cites the site's own pages.
 - Site: the MCP methodology describes drop rates as a share of recorded loot windows, including its measured-zero example.
 - Site: loot-table notes and open-data descriptions warn that rates can read high before the drops restart, and switch to counted-empty-window wording when a drops recheck scope exists.
 - Site: find lore pages from nearby title spellings in the MCP search tools and chat answers, including Leroy Jenkins.
-- Addon: Settings stays inside the Everloot window, counts every populated record kind and names item facts; a Full / Compact / Off selector controls tooltip detail without changing recording. Needs an in-game layout check before release.
 - Site: bag upgrade pickers offer publicly priced sizes and preserve bags selected in saved links, without suggesting unpriced test containers.
 - Docs: the project overview links current downloads and explains paired addon/Desktop App updates for community prices.
 - Site: malformed URL fragments keep the default or current database tab usable, including click and keyboard navigation.
@@ -247,7 +243,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: auction prices keep updating when the market rollup is full: the oldest open scan day closes early (its public prices kept) instead of new scans being refused, one uploader cannot take more than a third of the room, and dropped scans no longer leave empty days behind.
 - Site: avoid compiling game-file name matchers for absent ASCII names when answering sourced questions, reducing cold-start CPU work.
 - Site: the header shows the build whose files the site reads and the newest build seen, each linked to what it means.
-- Companion: retry failed watch uploads with bounded backoff, honor Retry-After across accounts, and queue saves without overlapping sends.
 - Site: /api/suggest spends the per-IP quota and shares one edge cache entry for `Thunder` and `thunder `, the coverage 400 and waitlist 503 are `no-store` (the 503 adds `Retry-After`), and the docs list every route that sends CORS from one file.
 - Site: when a database or tools page can't be read, you now get a "Database unavailable" or "Tool unavailable" page that says it could not be read, not that it is empty, with a Try again button and a link back to the section, instead of the generic error page.
 - Site: item list pagination is crawlable while filter URLs stay blocked.
@@ -373,8 +368,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the local gold ledger keeps two characters with the same name and realm from different installs apart.
 - Site: the home page banner no longer makes the page a few pixels wider than the window on a computer with a
   scrollbar, so the page has nothing to scroll sideways at any width.
-- Desktop App: restoring the oldest backup keeps the selected save and an undo copy, even within the same second.
-- Companion: watch mode waits for the first account save and finds new accounts without a restart, refreshing prices for every discovered account.
 - Knowledge base: open data drop rates and measured zeros follow the same recheck cutoffs as the site, leaving other exported facts and corpus counts unchanged.
 - Site: the blue-post tracker's scheduled run stops starting requests after 15 seconds and saves where it got to, and every storage call has a time limit. A busy pass of up to 40 polite requests could outlast the platform's limit and be cut off before it saved anything, so it repeated the same work every run and never advanced.
 - Site: a HEAD request for an Auction House page that has no stored copy is answered from the URL, without rendering the page. Crawlers ask HEAD of thousands of realm and item addresses, and each one rendered the whole page (seconds of CPU) to send back no body. A URL the page would redirect or answer 404, or a list page with filters, still goes to the page.
@@ -382,29 +375,26 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the Auction House's background page refresh is tried twice, not six times, when it fails. Each try rendered the page again, and a page that outlasts the queue's 10-second limit failed every time (`NEXT_CACHE_DO_QUEUE_MAX_RETRIES`).
 - Site: the snapshot job holds less of the corpus in memory while it extends the snapshot. It drops the parsed old snapshot once its events are replayed, and the rollups that run after it (item view, aggregates, auction history, professions, map pins, database activity) read the state it just wrote instead of downloading and parsing the same file again. On a 20 MB synthetic snapshot the memory still held mid-run falls by about 28 MB (39 to 11 MB while the new uploads are read, 60 to 31 MB at the write), and a second read of the file is gone.
 - Site: search links every matching achievement, faction, title, quest chain, zone and instance through bounded result pages.
+- MCP: Price answers identify their auction house, with an unknown faction when only the realm is recorded.
 
 ### Changed
 - Addon: easier reading in the Everloot window, settings, auction house tab and plan workspace: words use the game's own Friz Quadrata and nothing is smaller than 12 px (was 10 to 11 px, mostly in Arial Narrow); Arial Narrow stays only for figures, dates and the tight Home lists, also at 12 px. Home's character columns and the Collection list were re-spaced so the larger text still fits. Home's Missing list now sits under the realm line, so a long class or realm name ("CAMWOW US1 Realm 4 PvP") no longer runs into it. Needs an in-game check before release.
 - Addon: the minimap button is built like every other addon's (LibDBIcon's gold ring, dark background and the crest's diamond) and sits on the minimap's edge at the top-left instead of off its corner; drag it around the edge to move it, and the spot is kept. The button drawer is a slimmer panel with a one-pixel edge, evens its rows (eight buttons are two rows of four) and opens on the side away from the map. Needs an in-game check before release.
 - Addon: the Everloot window has a grip in its bottom-right corner, as the game's chat windows do: drag it to make the whole window bigger or smaller (three quarters to one and a half times, never larger than the screen), right-click it for the normal size; the size is kept. Collection draws its lists as completionist addons do: a green check for done, a red cross for missing, headings in the game's gold and a percentage in each summary ("Titles: 1 of 3 (33%)"). Needs an in-game check before release.
+- Site: the addon is offered as a regular release from 0.3.24: the home, addon and upload pages no longer call it an Alpha.
 - Site: a linked character connected to its armory profile shows Blizzard's gear, stats, talents, professions, PvP, achievements, reputations and completed quests on its page and the owner's preview, each part behind the page's existing switch, labelled "From Blizzard's API" with the read time; private sync keeps only raid lockouts and titles and drops the retired categories older Desktop Apps still send; `/rankings/item-level` and `/rankings/gear-score` redirect to the armory boards.
 - Site: the AH Ledger panels (price history, crafting margins, deals) remember the market a visitor last picked, in their own browser, and open on it on every page; a realm page still opens on its realm. The crafting table no longer prefetches recipe pages, which sit behind the bot check and logged an error for each recipe in view.
-- Addon: gear, talent builds, professions, character sheet stats, PvP standing, achievements, reputation and completed quests are no longer recorded, since Blizzard's character API supplies them to everloot.app; the first load deletes any such rows from the saved file. Titles, raid lockouts, boss kills, the catalogs, gold, the census, player names and world data stay. The window's Collection and Home read achievements, reputation and quest chains from the game instead. Player names are on in a new install, said once in chat and in the feature chooser; an install from before keeps its choice. Needs an in-game check before release.
-- Desktop App: a new install starts with "Send the player pages with the uploads" on, and an install from before keeps its choice. Private sync stops sending gear, talents, professions, stats, PvP, reputations and achievements; raids, boss kills and titles still go. The Characters page no longer shows gear, achievements, reputations, quests, professions or talent builds.
 - CurseForge: every addon upload is a Release file; an Alpha is named "Everloot <version> Alpha". The CurseForge app
   syncs only Release files by default, so with every file a Beta, Everloot was missing for most app users. GitHub still
   marks an Alpha a pre-release, and the site still calls the addon an Alpha.
 - Site: the hourly Blizzard auction refresh asks Blizzard for each house document only when it is newer than the one stored (If-Modified-Since), so a document it already holds costs a 304 with no body instead of several MB.
 - Site: the entity pages' pin tables (where an NPC, a vendor or an object stands, which NPCs an item was found on) are one table with the same columns everywhere, the vendor's now with the installs that agree, and the vendor page keeps its summary and open data in the same wide-screen column as the other entity pages.
-- Addon: new installs leave other addons' minimap buttons in place by default; existing players keep their drawer setting and can still use /everloot buttons on.
 - Site: set the Worker CPU limit to 30 seconds.
 - Site: the site shows no ads. About, the FAQ, the terms, the privacy policy, the privacy guide and the accessibility statement now say so and no longer describe Google AdSense.
 - Site: the Blizzard auction house page names each house by its ruleset and faction ("PvP, Alliance", "Roleplay PvP, Horde") instead of "Alliance, house 110", and lists them US first, then by ruleset. Blizzard's API does not say which ruleset a house serves; the mapping was matched by price in both regions.
-- Addon: auction scan messages name everloot.app/upload alongside the Desktop App as a way to send the saved file.
 - Site: explain how the CurseForge app and Desktop App keep downloads current on the addon page.
 - Site: upload and addon install steps name the Windows and macOS Forever save-file and AddOns paths.
 - Site: show likely ranges and few-window marks in NPC, item-source, loot-list and zone tables.
-- Addon: grouped auction sales show paid transactions per day and paid units per day separately beside the last sold date. Pending and unmatched notices affect neither rate; in-game layout verification is required before release.
 - Site: profession shopping lists total materials for a chosen skill range, let players skip recipes, compare listed prices from selected auction houses, and search recipes by name, recipe item or material with a skill filter.
 - Site: share private character-sync validation with the companion through a separate protocol export; public uploads still reject private-only rows.
 - Site: Reuse cold-start aggregate and game-art reads and load the build label from a small generated stamp.
@@ -544,6 +534,48 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - MCP: `coverage` and `everloot_plan` answer with a summary first and page the rest, so a broad question stays under 12 KB (the audit measured 82 KB for every zone's quests and 38 KB for the plan). `coverage` without a zone gives the totals, each type and one line per zone, 20 zones at a time, now with structured totals and denominators; `everloot_plan` with any argument names each row, 40 at a time, and states the tracker's revision (it records no date). `detail`, `offset` and `limit` read the rest, every page stays under 12,000 bytes even at the largest `limit`, and says how many it shows of how many and gives `nextOffset`. One zone answers as before, and `everloot_plan` with no arguments still returns the whole tracker. A zone filter that matches no released zone is unmeasured, not zeros.
 - MCP: rank answering claims before subject matches, state unavailable requested facts,
   and report separate answerability rates.
+
+## [desktop-v0.1.23] - 2026-11-17
+
+Goes with addon 0.3.24. Private sync now sends only raid lockouts, boss kills and titles: Blizzard's character API gives
+everloot.app gear, talents, professions, stats, PvP, achievements and reputation. A new install sends the player pages
+with the uploads, which helps the armory find more characters; an install from before keeps its choice, and Settings
+turns it off.
+
+### Changed
+- A new install starts with "Send the player pages with the uploads" on, and an install from before keeps its choice. Private sync stops sending gear, talents, professions, stats, PvP, reputations and achievements; raids, boss kills and titles still go. The Characters page no longer shows gear, achievements, reputations, quests, professions or talent builds.
+
+### Fixed
+- The command-line uploader: retry failed watch uploads with bounded backoff, honor Retry-After across accounts, and queue saves without overlapping sends.
+- Restoring the oldest backup keeps the selected save and an undo copy, even within the same second.
+- The command-line uploader: watch mode waits for the first account save and finds new accounts without a restart, refreshing prices for every discovered account.
+
+## [0.3.24] - 2026-11-17
+
+Choose what Everloot does for you. On its first load every install asks once: Everything, Collect data only (drops,
+vendors, recipes and the auction scans you start, with no tooltip lines, window, minimap button or helpers, so
+Auctionator and your other addons stay in charge), or Choose myself. `/everloot setup` asks again. The addon is
+lighter: it no longer records gear, talents, professions, stats, PvP, achievements, reputation or completed quests,
+because Blizzard's character API gives everloot.app those, and it deletes them from your saved file. Empty loot
+windows are now recorded, so drop rates restart counting from this release. Player names are on in a new install;
+`/everloot players off` turns them off and deletes the rows. Checked in the live Forever client on 2026-11-17.
+
+### Added
+- Optional local bag, bank and mail snapshots keep item counts and observation times; capture starts off and snapshots never upload.
+- Every install, new or updated, is asked once which features to use: Everything, Collect data only (collection and the auction scans you start, with no tooltip lines, window, minimap button or helpers, for players who keep Auctionator or other addons), or Choose myself. The window says where to get the Desktop App, and `/everloot setup` asks again.
+- Recipe and trainer observations keep optional profession skill-line IDs; trainer links also retain spell or product IDs when available, alongside localized names.
+- A kill's loot window with nothing in it is now recorded, tied to the one dead creature you could loot (interact, mouseover or target), as a loot row with no items and no coin, once per corpse, and the site's drop rates, loot tables and open data count it in the source's windows (protocol 2.3.0, `sourceEvidence: "empty-window"`). Until now an empty corpse never reached the site, so drop rates for anything that does not always drop read too high.
+- Auction house buyouts now keep the item and count they bought in the local gold ledger (item listings by their link or the house's name and the search result's quantity; commodities by the confirmed item and quantity), so the tooltip's "Your average paid" line and per-item purchase reports have something to read. The uploaded record is unchanged.
+- Named sharing retains Forever surnames so uploads can discover full armory identities, including guildless characters; anonymous collection stays unchanged.
+
+### Changed
+- Gear, talent builds, professions, character sheet stats, PvP standing, achievements, reputation and completed quests are no longer recorded, since Blizzard's character API supplies them to everloot.app; the first load deletes any such rows from the saved file. Titles, raid lockouts, boss kills, the catalogs, gold, the census, player names and world data stay. The window's Collection and Home read achievements, reputation and quest chains from the game instead. Player names are on in a new install, said once in chat and in the feature chooser; an install from before keeps its choice.
+- New installs leave other addons' minimap buttons in place by default; existing players keep their drawer setting and can still use /everloot buttons on.
+- Auction scan messages name everloot.app/upload alongside the Desktop App as a way to send the saved file.
+- Grouped auction sales show paid transactions per day and paid units per day separately beside the last sold date. Pending and unmatched notices affect neither rate.
+
+### Fixed
+- Settings stays inside the Everloot window, counts every populated record kind and names item facts; a Full / Compact / Off selector controls tooltip detail without changing recording.
 
 ## [desktop-v0.1.22] - 2026-11-11
 

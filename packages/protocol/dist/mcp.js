@@ -173,9 +173,15 @@ const realmLookup = {
     askedRealm: z.string().optional().describe("The realm as asked, when it was read as an alias."),
     candidates: z.array(z.string()).optional().describe("For ambiguous or unknown: the realms with public prices to ask with instead, closest first."),
 };
+const priceHouse = z.object({
+    realm: z.string(),
+    faction: z.enum(["Alliance", "Horde", "Neutral"]).nullable()
+        .describe("The selected full-scan auction house; null when unknown. Browsing points are realm-only and are not assigned to this house."),
+});
 const marketDay = z.object({ day: z.string(), min: z.number().int(), market: z.number().int(), quantity: z.number().int(), reporters: z.number().int(), thin: z.boolean() });
 export const auctionHistory = z.object({
     realm: z.string(),
+    house: priceHouse.optional().describe("The house of scanDays, not of the separate realm-only browsing points. Older servers may omit it."),
     itemId: z.number().int(),
     points: z.array(z.object({
         day: z.string(),
@@ -348,6 +354,7 @@ export const marketValue = z.object({
 });
 export const marketPage = z.object({
     realm: z.string(),
+    house: priceHouse.optional().describe("The house of value and history; null faction means no known house. Older servers may omit it."),
     itemId: z.number().int(),
     value: marketValue.nullable().describe("Null until 3 reporters scanned the item on the realm, or one of Everloot's own installs did, and for an ambiguous or unknown realm."),
     history: z.array(marketDay),
