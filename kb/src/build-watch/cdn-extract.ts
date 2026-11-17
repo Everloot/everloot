@@ -21,6 +21,7 @@ import { writeClientRecipes } from "../client-recipes.js";
 import { writeClientBags } from "../client-bags.js";
 import { writeClientTerrain } from "../client-terrain.js";
 import { writeClientDisenchant } from "../client-disenchant.js";
+import { disenchantLua } from "../disenchant-lua.js";
 import { writeClientFactions } from "../client-factions.js";
 import { writeClientTitles } from "../client-titles.js";
 import { writeClientQuestLines } from "../client-quest-lines.js";
@@ -89,7 +90,8 @@ export async function extractFromCdn(product: string, region: string, curatedPat
         writeClientRecipes(snapshot, join(root, GAME_DATA_DIR, "client-recipes.json"));
         writeClientBags(snapshot, join(root, GAME_DATA_DIR, "client-bags.json"));
         writeClientTerrain(snapshot, join(root, GAME_DATA_DIR, "client-terrain.json"));
-        writeClientDisenchant(snapshot, join(root, GAME_DATA_DIR, "client-disenchant.json"));
+        const disenchant = writeClientDisenchant(snapshot, join(root, GAME_DATA_DIR, "client-disenchant.json"));
+        writeFileSync(join(root, "addon/modules/disenchant_data.lua"), disenchantLua(disenchant));
         writeClientFactions(snapshot, join(root, GAME_DATA_DIR, "client-factions.json"));
         writeClientTitles(snapshot, join(root, GAME_DATA_DIR, "client-titles.json"));
         writeClientQuestLines(snapshot, join(root, GAME_DATA_DIR, "client-quest-lines.json"));

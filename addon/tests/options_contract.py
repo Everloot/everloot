@@ -209,7 +209,7 @@ for i, c in ipairs(subs) do
   assert(page == O.groupPages[O.GROUPS[i].key] and page.name == O.GROUPS[i].name)
   assert(page.intro.text == O.GROUPS[i].intro and page.title.text ~= nil)
   assert(rawget(page, 'added') == false, 'what you have added stays on the overview')
-  assert(#page.boxes >= 3 and #page.boxes <= 7, O.GROUPS[i].name .. ' has ' .. #page.boxes .. ' switches')
+  assert(#page.boxes >= 3 and #page.boxes <= 8, O.GROUPS[i].name .. ' has ' .. #page.boxes .. ' switches')
   local last = 0
   for _, box in ipairs(page.boxes) do
     assert(box.row.group == O.GROUPS[i].key, box.row.key .. ' is on its own page')

@@ -69,6 +69,7 @@ local community = {}
 
 function E:ResetPrices()
   community = {}
+  if E.Disenchant then E.Disenchant.Reset() end
   if E.ResetDrops then E:ResetDrops() end
   if E.ResetSourceIndex then E.ResetSourceIndex() end
 end
@@ -184,6 +185,7 @@ local function coinIcons(copper)
     or ((silver > 0) and (coin(silver, "Silver") .. " ") or "")
   return text .. coin(coins, "Copper")
 end
+E.PriceCoinIcons = coinIcons
 
 --- A word in the value column (unrecorded, no sell price), in the evidence colour so it never reads as an amount.
 local function quiet(word) return hex(META[1], META[2], META[3]) .. word .. "|r" end
@@ -507,6 +509,13 @@ local function addLines(tooltip, itemId)
   local priced = #lines
   if history then
     for _, line in ipairs(historyLines(realm, itemId)) do lines[#lines + 1] = line end
+  end
+  if E.Disenchant and E.TooltipShows("tooltipDisenchant") then
+    local vendorShown = false
+    for _, line in ipairs(lines) do if line.left == "Vendor" then vendorShown = true end end
+    for _, line in ipairs(E.Disenchant.Lines(realm, itemId, mode == "compact")) do
+      if line.left ~= "Vendor" or not vendorShown then lines[#lines + 1] = line end
+    end
   end
   -- The unit and the realm belong to the price amounts; a drop rate is neither per unit nor per realm.
   local amounts = false

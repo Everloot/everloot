@@ -41,6 +41,8 @@ modules\raid_data.lua
 modules\raid.lua
 modules\prices.lua
 modules\drops.lua
+modules\disenchant_data.lua
+modules\disenchant.lua
 modules\shopping.lua
 modules\auctiontab.lua
 modules\gph.lua
@@ -51,5 +53,6 @@ modules\window.lua
 modules\view_gold.lua
 modules\view_collection.lua
 modules\view_professions.lua
+modules\view_disenchanting.lua
 modules\minimap.lua
 modules\drawer.lua

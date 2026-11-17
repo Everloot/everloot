@@ -12,6 +12,9 @@ build that has a zip in the repository. Earlier builds have none.
 
 ## [Unreleased]
 
+- Addon: Show observed disenchant estimates in item tooltips and a local Disenchanting history with material values and known costs.
+- Desktop: Refresh observed disenchant yields daily and keep the last good data in the game's price file.
+
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
