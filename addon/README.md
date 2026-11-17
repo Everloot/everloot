@@ -305,7 +305,7 @@ to use, before the player-names question. `/everloot setup` asks again at any ti
   switches. For players who keep Auctionator or other addons for those jobs.
 - **Choose myself** changes nothing and opens the settings.
 
-No answer changes the census, player names, the installed addon list or the completion tracker. Those keep their
+No answer changes the census, player names, the installed addon list, the completion tracker or local inventory snapshots. Those keep their
 own switches, since turning them off deletes their rows. Tooltip lines change at once; the rest changes after a
 reload, which the window offers. It also says where the Desktop App is (everloot.app/addon), which uploads after
 logout or `/reload`.

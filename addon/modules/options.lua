@@ -563,9 +563,9 @@ end
 -- them and use Everloot for some of its jobs, or only to collect data (player feedback, 2026-11-16). Each install is
 -- asked once, new and upgraded alike, before the player-names question; /everloot setup asks again at any time.
 -- "Choose myself" keeps every switch as it is and opens these pages. No answer touches the census, player names, the
--- addon list or the completion tracker: they keep their own consent, and turning them off deletes rows.
+-- addon list, the completion tracker or inventory snapshots: they keep their own consent, and turning them off deletes rows.
 O.SETUP_INTRO = "Everloot does several jobs. Use all of them, or only the ones your other addons don't already do. "
-  .. "The census, player names, the addon list and the completion tracker keep their own switches."
+  .. "The census, player names, the addon list, the completion tracker and inventory snapshots keep their own switches."
 O.SETUP_UPLOAD = "The Everloot Desktop App sends what you collect after you log out or /reload, so you never upload "
   .. "files by hand. Download it at everloot.app/addon."
 O.SETUP_CHOICES = {
