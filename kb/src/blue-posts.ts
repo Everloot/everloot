@@ -747,6 +747,8 @@ async function readNews(x: Session, opts: IngestOptions, minInterval: number) {
   const state = x.s.store.fetched[key];
   if (state?.notBefore && Date.parse(state.notBefore) > opts.now.getTime()) return;
   if (state && opts.now.getTime() - Date.parse(state.at) < Math.max(minInterval, HOUR)) return;
+  // Consume the hourly turn before any request, including failed robots/index reads.
+  x.setState(key, { ...state, at: opts.now.toISOString() });
   const robots = await x.get("news", "news", `${NEWS_HOST}/robots.txt`, {}, key);
   if (!robots.ok && robots.status !== 404) throw new Error(`robots.txt: HTTP ${robots.status}`);
   const rules = robots.status === 404 ? "" : await robots.text();
@@ -772,11 +774,12 @@ async function readNews(x: Session, opts: IngestOptions, minInterval: number) {
     x.merge([post]);
     failed.delete(url);
   } catch (err) {
-    // Preserve Retry-After and the cursor on slow-down; a spent budget has not visited this card.
-    if (err instanceof Backoff || err instanceof BudgetSpent) throw err;
+    // A spent budget has not visited this card. Article slow-downs must still advance
+    // past the failed card, while preserving any Retry-After saved by the request.
+    if (err instanceof BudgetSpent) throw err;
     failed.add(url);
-    x.setState(key, { at: opts.now.toISOString(), newsCursor: url, newsFailed: [...failed] });
+    x.setState(key, { ...x.s.store.fetched[key], at: opts.now.toISOString(), newsCursor: url, newsFailed: [...failed] });
     throw err;
   }
-  x.setState(key, { at: opts.now.toISOString(), newsCursor: url, newsFailed: [...failed] });
+  x.setState(key, { ...x.s.store.fetched[key], at: opts.now.toISOString(), newsCursor: url, newsFailed: [...failed] });
 }

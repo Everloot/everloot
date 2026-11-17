@@ -100,7 +100,7 @@ test("an index with article markup but no relevant links reports a source failur
 });
 
 
-test.each([404, 302, "robots"])("an unreadable article (%s) consumes its hourly turn and does not starve later cards", async (status) => {
+test.each([404, 302, 500, "robots"])("an unreadable article (%s) consumes its hourly turn and does not starve later cards", async (status) => {
   const second = "https://news.blizzard.com/en-us/article/2/wow-forever-update";
   const calls: string[] = [];
   const fetcher = async (address: string) => {
@@ -143,4 +143,51 @@ test("new announcements take priority over rotating stored articles, which still
   calls.length = 0;
   await ingestBluePosts({ store: first.store, fetcher, now: new Date(now.getTime() + 60 * 60_000), regions: [], sleep: async () => {} });
   expect(calls).toContain(url);
+});
+
+
+test.each(["robots-403", "index-302", "index-404", "empty-index", "timeout"])("a news %s failure still limits polling to hourly", async (failure) => {
+  const calls: string[] = [];
+  const fetcher = async (address: string) => {
+    calls.push(address);
+    if (!address.startsWith("https://news.")) return Response.json({ feed: [] });
+    if (failure === "timeout") throw new Error("request timed out");
+    if (address.endsWith("robots.txt")) return new Response("", { status: failure === "robots-403" ? 403 : 200 });
+    return new Response("<html>No matching cards</html>", { status: failure === "index-302" ? 302 : failure === "index-404" ? 404 : 200 });
+  };
+  const store = emptyStore();
+  store.fetched.news = { at: "2026-11-17T08:00:00Z", newsCursor: url, newsFailed: [url] };
+  const first = await ingestBluePosts({ store, fetcher, now, regions: [], sleep: async () => {} });
+  expect(first.errors).toContainEqual({ source: "news", error: expect.any(String) });
+  calls.length = 0;
+  const next = await ingestBluePosts({ store: JSON.parse(JSON.stringify(first.store)), fetcher,
+    now: new Date(now.getTime() + 10 * 60_000), regions: [], sleep: async () => {} });
+  expect(calls.some((address) => address.startsWith("https://news."))).toBe(false);
+  expect(next.store.fetched.news).toMatchObject({ newsCursor: url, newsFailed: [url] });
+  calls.length = 0;
+  await ingestBluePosts({ store: next.store, fetcher, now: new Date(now.getTime() + 60 * 60_000), regions: [], sleep: async () => {} });
+  expect(calls.some((address) => address.startsWith("https://news."))).toBe(true);
+});
+
+test("an article backoff preserves Retry-After while allowing later announcements after it expires", async () => {
+  const second = "https://news.blizzard.com/en-us/article/2/wow-forever-update";
+  const calls: string[] = [];
+  const fetcher = async (address: string) => {
+    calls.push(address);
+    if (address.endsWith("robots.txt")) return new Response("");
+    if (address.endsWith("/feed/world-of-warcraft")) return new Response(`<a href="${url}">One</a><a href="${second}">Two</a>`);
+    if (address === url) return new Response(null, { status: 429, headers: { "retry-after": "7200" } });
+    if (address === second) return new Response(fixture("news-article.html"));
+    return Response.json({ feed: [] });
+  };
+  const first = await ingestBluePosts({ store: emptyStore(), fetcher, now, regions: [], sleep: async () => {} });
+  expect(first.store.fetched.news.notBefore).toBe("2026-11-17T12:00:00.000Z");
+  calls.length = 0;
+  await ingestBluePosts({ store: first.store, fetcher, now: new Date(now.getTime() + 60 * 60_000), regions: [], sleep: async () => {} });
+  expect(calls.some((address) => address.startsWith("https://news."))).toBe(false);
+  calls.length = 0;
+  const next = await ingestBluePosts({ store: JSON.parse(JSON.stringify(first.store)), fetcher,
+    now: new Date(now.getTime() + 120 * 60_000), regions: [], sleep: async () => {} });
+  expect(calls).toContain(second);
+  expect(next.store.posts).toContainEqual(expect.objectContaining({ id: "news:2" }));
 });
