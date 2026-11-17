@@ -29,7 +29,7 @@ local NOTHING_MISSING = "Nothing missing here."
 local NO_KEY = "This character cannot be identified yet."
 local DETAIL_W, DETAIL_WIDE = 210, 306   -- the detail column, narrower beside a bar
 -- The game's ready-check marks, as completionist lists draw them: a green check for done, a red cross for missing.
-local DONE_MARK, MISSING_MARK = "Interface\RaidFrame\ReadyCheck-Ready", "Interface\RaidFrame\ReadyCheck-NotReady"
+local DONE_MARK, MISSING_MARK = "Interface\\RaidFrame\\ReadyCheck-Ready", "Interface\\RaidFrame\\ReadyCheck-NotReady"
 local GOLD = { 1, 0.82, 0, 1 } -- the game's heading yellow (GameFontNormal)
 
 local refresh
