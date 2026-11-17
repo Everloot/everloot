@@ -38,8 +38,9 @@ when to upload. On the website you preview everything before it is sent. The Des
 anonymous open-world events, and census rows if you allowed the census on its setup screen; the
 command-line uploader sends only the anonymous events. Neither sends named data (guild, gear, gold,
 collection) or the installed addon list: those stay on your machine. Player rows are a third case:
-the Desktop App sends them only if you turn on "Send the player pages with the uploads" in its
-settings, and until you do, they stay on your machine like the named data. Boss pull summaries
+the Desktop App sends them only while "Send the player pages with the uploads" is on in its
+settings, and while it is off they stay on your machine like the named data. From 17 November 2026 that setting starts
+on in a new Desktop App install; an install that already exists keeps its choice. Boss pull summaries
 (below) are a fourth: the Desktop App sends them, and the command-line uploader does not.
 
 Recipe observations can include the profession API's recipe identifier and whether that recipe is learned,
@@ -85,7 +86,10 @@ the exception, published through the guild pages once two of its members' instal
 exception, described below: they carry character names, and they are never published as part of
 the public records.
 
-The player pages are a separate thing, and they are off until the owner turns them on. When the
+The player pages are a separate thing, and they are off until the owner turns them on. Amended 17 November 2026 by
+the maintainer (`docs/design/specs/2026-11-17-blizzard-api-first.md`): the players module is on in a new addon
+install, which says so once in chat and in its feature chooser, with how to turn it off; an install from before keeps
+its choice. A full name (name and surname) also lets the armory find that character on Blizzard's API. When the
 players module is on in the game, the addon records one row per character: its name, realm, race,
 class, level and guild, and the day it was last seen. It never records where a player was, their
 gear, talents, professions, gold, achievements, earlier levels or guilds, which install reported
@@ -256,6 +260,13 @@ the player's computer except for private sync (see *Private sync and owner-publi
 them back, the site's intake has no schema for them and refuses them, and the Desktop App's Chat does not pass them to a
 model provider. Only the Desktop App's sync sends them, and only for a character the player linked. Turning the module
 off deletes them with the rest.
+
+Amended 17 November 2026 by the maintainer (`docs/design/specs/2026-11-17-blizzard-api-first.md`): from the addon
+release after that date, the addon no longer records `achievement_owned`, `reputation_owned`, `quest_owned`,
+`profession_owned`, `talent_owned`, `stats_owned` or `pvp_owned`, nor `gear_snapshot` and `talent_snapshot`, since
+Blizzard's character API supplies them; that release deletes any it finds in the saved file. `title_owned`,
+`lockout_owned`, `boss_kill_owned` and the catalog kinds stay. The site keeps accepting the dropped kinds from older
+addons until a later protocol release says otherwise.
 
 The Completion tracker also keeps `boss_kill_owned`: encounter id, instance map id, difficulty, first and last
 kill time and kill count, under the same opaque character key. It records successful `ENCOUNTER_END` events only
@@ -885,8 +896,10 @@ player pages and guild pages hold about the character (see "What players see in 
 
 - **What a page shows.** The character's name, level, race, class, faction and realm, as the addon file sent them
   when the character was last linked, and the date of that upload, worded "From the player's own addon upload,
-  <date>". Nothing comes from the player pages, the census, other players' uploads or Blizzard. Gear, talents,
-  professions, reputations, raids and collections are not shown.
+  <date>". Nothing in the player's part comes from the player pages, the census, other players' uploads or
+  Blizzard. From 17 November 2026, when the owner associated the character with its armory entry, the page also
+  shows that entry's gear, stats, talents, professions, PvP, achievements, reputations and completed quests in a
+  part of its own, labelled "From Blizzard's API, <date>" (see *Armory*). It follows the page's switches below.
 - **What it never shows.** The BattleTag, the email address, the account, a profile handle, API keys, the
   character's game id, or the hashes a link is stored under.
 - **Off until the player turns it on.** A new link is private. The player's part shows only while the player has
@@ -920,6 +933,13 @@ The public `talent_snapshot` row carries no character and is never synced.
 Amended 6 November 2026, accepted by the maintainer that day: the active talent build (`talent_owned`).
 Amended 7 November 2026: character-sheet stats and PvP standing (migration
 `20261107140000_private_sync_stats_pvp.sql`); to be accepted by the maintainer in PR review.
+
+Amended 17 November 2026 by the maintainer (`docs/design/specs/2026-11-17-blizzard-api-first.md`): Blizzard's
+character API now supplies gear, talents, professions, stats, PvP, achievements and reputations. The `gear`,
+`talents`, `professions`, `stats`, `pvp` and `reputations` categories are retired: the site stops accepting them and
+deletes what was synced for them. The `achievements` category keeps only titles, which the API does not return.
+Raids and boss kills stay. The list below describes the categories as they were before this amendment; the retired
+ones stop when the migration that deletes them is applied.
 
 A signed-in player can sync their own linked characters' progress to their account and choose which parts of it
 their character's public page shows. Like saved builds and profiles, this is the player's own data, not an
@@ -963,6 +983,11 @@ and the switch below is refused. The stored boards and the daily history below (
 `20261107150000_profile_pipeline.sql`) are proposed: they take effect once the maintainer accepts them and applies
 that migration.
 
+Amended 17 November 2026 by the maintainer: these synced boards give way to the armory boards (`/armory/rankings`),
+which rank every character the armory holds from Blizzard's data. `/rankings/item-level` and `/rankings/gear-score`
+redirect there once the site change ships, the synced gear category is retired (see *Private sync*), and the stored
+boards and their history are deleted with it. Until then the rules below hold.
+
 Two public boards rank linked characters by the gear their owner synced: average item level and Everloot Gear
 Score. This is the ranking contract the owned-character identity ADR asks for, for gear only. Achievements, gold
 and the Everloot Score are not ranked by it.
@@ -1003,8 +1028,13 @@ The armory gives Forever characters and guilds their own pages from the Blizzard
 These pages are separate from the addon sightings and the linked-character gear rankings above.
 
 - **No ads.** Armory pages carry no ad slots. The site's consent message may still appear.
-- **Free, on this site only.** Blizzard data stays in the armory pages. It never enters the addon tables,
-  CC BY-SA dataset, public corpus, open-data snapshots, MCP tools, API answers or exports.
+- **Free, never in our dataset.** Amended 17 November 2026 by the maintainer
+  (`docs/design/specs/2026-11-17-blizzard-api-first.md`): armory data may also be shown on character pages, the
+  Completionist tools, rankings, guild boards, MCP tools and API answers. Wherever it appears it is read from the
+  armory tables, never copied into the addon tables, labelled "From Blizzard's API" with the time of the read and
+  credited "Data from Blizzard Entertainment", and it disappears when the armory deletes it (the thirty days below,
+  a 404 or a hide). An API or MCP answer carries it in its own field with its own notice. It never enters the
+  CC BY-SA dataset, the public corpus, open-data snapshots or bulk exports. Pages that show it carry no ads.
 - **Thirty days.** Characters and guilds are checked again within 20 days. Stored data not refreshed for more
   than 30 days is deleted. A Blizzard response confirming that data has not changed (304) counts as a refresh.
   When Blizzard answers that a character or guild no longer exists (404), its stored row is deleted at once.
