@@ -27,7 +27,7 @@ local NOTHING_READ = "Nothing read yet. Open the achievements, reputation or tit
 local NO_CHAINS = "No quest chains read yet. They are read at login and each time you turn in a quest."
 local NOTHING_MISSING = "Nothing missing here."
 local NO_KEY = "This character cannot be identified yet."
-local DETAIL_W, DETAIL_WIDE = 180, 276   -- the detail column, narrower beside a bar
+local DETAIL_W, DETAIL_WIDE = 210, 306   -- the detail column, narrower beside a bar
 
 local refresh
 
@@ -370,8 +370,8 @@ local function build(f, parent)
     local row = CreateFrame("Frame", nil, list)
     row:SetPoint("TOPLEFT", 4, -8 - (i - 1) * ROW_H)
     row:SetSize(W - 8, ROW_H)
-    for _, col in ipairs({ { "name", 4, 250 }, { "detail", 258, DETAIL_W }, { "done", 540, 50 } }) do
-      local s = text(row, 11, NARROW)
+    for _, col in ipairs({ { "name", 4, 220 }, { "detail", 228, DETAIL_W }, { "done", 540, 50 } }) do
+      local s = text(row, 12, col[1] == "done" and NARROW or nil) -- the count in the narrow figures, words in Friz
       s:SetPoint("LEFT", col[2], 0)
       s:SetWidth(col[3])
       if s.SetWordWrap then s:SetWordWrap(false) end
@@ -390,7 +390,7 @@ local function build(f, parent)
     row.bar = bar
     rows[i] = row
   end
-  rows.empty = text(list, 11, nil, COLORS.muted)
+  rows.empty = text(list, 12, nil, COLORS.muted)
   rows.empty:SetPoint("TOPLEFT", 8, -12)
   rows.empty:SetWidth(W - 16)
   rows.up = button(list, "Up", 48, function() rows.offset = math.max(0, rows.offset - ROWS) end)

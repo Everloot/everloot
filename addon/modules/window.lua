@@ -279,7 +279,7 @@ U.Text, U.Surface, U.Backdrop, U.Heading = text, surface, backdrop, heading
 local function stat(parent, x, path, caption)
   local i = icon(parent, 28, "Interface\\Icons\\" .. path)
   i:SetPoint("TOPLEFT", x, -10)
-  local l = text(parent, 11, FRIZ, COLORS.muted)
+  local l = text(parent, 12, FRIZ, COLORS.muted)
   l:SetPoint("TOPLEFT", i, "TOPRIGHT", 8, 1)
   l:SetText(caption)
   local v = text(parent, 15, NARROW, { 1, 1, 1, 1 })
@@ -298,15 +298,16 @@ U.MISSING = {
   { key = "recipes", label = "Recipes to read", view = "professions", tracker = false },
   { key = "raids", label = "Raids not cleared", view = "collection" },
 }
-local MISSING_TOP, MISSING_LINE = 190, 16
+local MISSING_GAP, MISSING_LINE = 10, 16 -- the gap under the realm line, then one line per count
 local TRACKER_OFF = "The completion tracker is off: achievements, factions, titles and raid lockouts are not read."
 local TRACKER_TURNED_ON = "Turned on. /reload to start reading."
 
--- The roster list on Home: { field, x, width, right aligned, heading }.
+-- The roster list on Home: { field, x, width, right aligned, heading, narrow figures }. Words are in Friz; the
+-- figures, the dates and the dense professions list in the narrow number font, which fits them at 12 px.
 U.ROSTER_ROWS = 10
 U.ROSTER_COLUMNS = {
-  { "name", 4, 88, false, "Name" }, { "level", 94, 22, true, "Lv" }, { "gold", 120, 100, true, "Gold" },
-  { "profs", 224, 104, false, "Professions" }, { "lockouts", 332, 46, false, "Raids" }, { "seen", 382, 54, false, "Seen" },
+  { "name", 4, 88, false, "Name" }, { "level", 94, 22, true, "Lv", true }, { "gold", 120, 76, true, "Gold", true },
+  { "profs", 200, 130, false, "Professions", true }, { "lockouts", 334, 42, false, "Raids" }, { "seen", 380, 56, false, "Seen", true },
 }
 
 local function buildHome(f)
@@ -328,7 +329,7 @@ local function buildHome(f)
   f.class = text(who, 12, FRIZ, COLORS.muted)
   f.class:SetPoint("TOPLEFT", f.name, "BOTTOMLEFT", 0, -4)
   f.class:SetWidth(130)
-  f.realm = text(who, 11, FRIZ, COLORS.muted)
+  f.realm = text(who, 12, FRIZ, COLORS.muted)
   f.realm:SetPoint("TOPLEFT", f.class, "BOTTOMLEFT", 0, -3)
   f.realm:SetWidth(130)
 
@@ -337,7 +338,8 @@ local function buildHome(f)
   local m = { lines = {} }
   f.missing = m
   m.title = text(who, 12)
-  m.title:SetPoint("TOPLEFT", 10, -MISSING_TOP)
+  -- Under the realm, not at a fixed height: a long class or realm ("CAMWOW US1 Realm 4 PvP") wraps to two lines.
+  m.title:SetPoint("TOPLEFT", f.realm, "BOTTOMLEFT", 0, -MISSING_GAP)
   m.title:SetText("Missing")
   for i, item in ipairs(U.MISSING) do
     local b = CreateFrame("Button", nil, who)
@@ -345,14 +347,14 @@ local function buildHome(f)
     b:SetHighlightTexture("Interface\\Buttons\\WHITE8X8")
     local highlight = b.GetHighlightTexture and b:GetHighlightTexture()
     if highlight then highlight:SetVertexColor(1, 1, 1, 0.05) end
-    b.label = text(b, 11, NARROW)
+    b.label = text(b, 12, NARROW) -- "Factions not exalted: 123" in Friz is wider than the sidebar
     b.label:SetPoint("LEFT", 4, 0)
     b.label:SetWidth(130)
     if b.label.SetWordWrap then b.label:SetWordWrap(false) end
     b:SetScript("OnClick", function() U.Select(item.view) end)
     m.lines[i] = b
   end
-  m.off = text(who, 11, FRIZ, COLORS.muted)
+  m.off = text(who, 12, FRIZ, COLORS.muted)
   m.off:SetWidth(130)
   m.off:SetJustifyV("TOP")
   m.turnOn = CreateFrame("Button", nil, who, "UIPanelButtonTemplate")
@@ -396,9 +398,9 @@ local function buildHome(f)
     local x = 6 + (i - 1) * 87
     local row = { icon = icon(prof, 14, "Interface\\Icons\\INV_Misc_QuestionMark") }
     row.icon:SetPoint("TOPLEFT", x, -7)
-    row.name = text(prof, 11)
+    row.name = text(prof, 12, NARROW) -- Leatherworking in Friz is wider than the cell
     row.name:SetPoint("TOPLEFT", x + 18, -7)
-    row.name:SetWidth(64)
+    row.name:SetWidth(68)
     if row.name.SetWordWrap then row.name:SetWordWrap(false) end
     local bar = CreateFrame("StatusBar", nil, prof)
     bar:SetPoint("TOPLEFT", x, -25)
@@ -407,7 +409,7 @@ local function buildHome(f)
     bar:SetStatusBarColor(unpack(COLORS.accent))
     fill(bar, { 0.133, 0.137, 0.114, 1 })
     row.bar = bar
-    row.rank = text(prof, 11, NARROW, { 1, 1, 1, 1 })
+    row.rank = text(prof, 12, NARROW, { 1, 1, 1, 1 })
     row.rank:SetPoint("TOPLEFT", x, -33)
     row.rank:SetWidth(80)
     f.profRows[i] = row
@@ -421,7 +423,7 @@ local function buildHome(f)
   title:SetPoint("TOPLEFT", 8, -6)
   title:SetText("Characters")
   for _, c in ipairs(U.ROSTER_COLUMNS) do
-    local head = text(roster, 10, FRIZ, COLORS.muted)
+    local head = text(roster, 12, FRIZ, COLORS.muted)
     head:SetPoint("TOPLEFT", 4 + c[2], -22)
     head:SetWidth(c[3])
     if c[4] then head:SetJustifyH("RIGHT") end
@@ -432,7 +434,7 @@ local function buildHome(f)
     row:SetPoint("TOPLEFT", 4, -36 - (i - 1) * 16)
     row:SetSize(436, 16)
     for _, c in ipairs(U.ROSTER_COLUMNS) do
-      local s = text(row, 11, NARROW)
+      local s = text(row, 12, c[6] and NARROW or nil)
       s:SetPoint("LEFT", c[2], 0)
       s:SetWidth(c[3])
       if c[4] then s:SetJustifyH("RIGHT") end
@@ -441,7 +443,7 @@ local function buildHome(f)
     end
     r.rows[i] = row
   end
-  r.empty = text(roster, 11, nil, COLORS.muted)
+  r.empty = text(roster, 12, nil, COLORS.muted)
   r.empty:SetPoint("TOPLEFT", 8, -40)
   r.empty:SetText("No characters recorded yet.")
   r.accountTotal = text(roster, 12)
@@ -608,7 +610,8 @@ function U.RefreshMissing()
     if item.tracker == false or on then
       local n = d and d[item.key]
       b.label:SetText(item.label .. ": " .. (type(n) == "number" and tostring(n) or "-"))
-      b:SetPoint("TOPLEFT", 6, -(MISSING_TOP + MISSING_LINE + slot * MISSING_LINE))
+      b:ClearAllPoints()
+      b:SetPoint("TOPLEFT", m.title, "BOTTOMLEFT", -4, -(2 + slot * MISSING_LINE))
       b:Show()
       slot = slot + 1
     else
@@ -619,7 +622,8 @@ function U.RefreshMissing()
     m.off:Hide(); m.turnOn:Hide()
     return
   end
-  m.off:SetPoint("TOPLEFT", 10, -(MISSING_TOP + MISSING_LINE + slot * MISSING_LINE + 2))
+  m.off:ClearAllPoints()
+  m.off:SetPoint("TOPLEFT", m.title, "BOTTOMLEFT", 0, -(4 + slot * MISSING_LINE))
   m.off:SetText(m.turnedOn and TRACKER_TURNED_ON or TRACKER_OFF)
   m.off:Show()
   if m.turnedOn then m.turnOn:Hide() else m.turnOn:Show() end
@@ -740,7 +744,7 @@ function U.Refresh()
     if p then
       row.icon:SetTexture(p.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
       row.name:SetText(p.name)
-      row.name:SetWidth(64)
+      row.name:SetWidth(68)
       row.bar:SetMinMaxValues(0, p.maxRank or math.max(p.rank, 1))
       row.bar:SetValue(p.rank)
       row.rank:SetText(p.rank .. (p.maxRank and (" / " .. p.maxRank) or ""))

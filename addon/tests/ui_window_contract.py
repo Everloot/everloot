@@ -126,7 +126,10 @@ assert(m.title.text == 'Missing' and #m.lines == 5, 'five counts')
 assert(m.lines[4].shown and m.lines[4].label.text == 'Recipes to read: 2', m.lines[4].label.text)
 assert(not m.lines[1].shown and not m.lines[2].shown and not m.lines[3].shown and not m.lines[5].shown, 'tracker counts wait for the tracker')
 assert(m.off.shown and m.off.text:find('tracker is off') and m.turnOn.shown and m.turnOn.text == 'Turn on', m.off.text)
-assert(m.lines[4].point[3] == -206 and m.off.point[3] == -224, 'the shown line packs to the top, the note under it')
+assert(m.lines[4].point[2] == m.title and m.lines[4].point[5] == -2 and m.off.point[2] == m.title and m.off.point[5] == -20,
+  'the shown line packs to the top, the note under it')
+-- Missing hangs under the realm line, so a class or realm that wraps to two lines pushes it down instead of overlapping.
+assert(m.title.point[1] == 'TOPLEFT' and m.title.point[2] == f.realm and m.title.point[3] == 'BOTTOMLEFT', 'under the realm')
 assert(f.perHour.text == '-' and f.session.text:find('not running') and f.gphButton.text == 'Start', 'no session, no number')
 
 local rows = f.profRows
@@ -167,7 +170,7 @@ assert(r.rows[5].lockouts.text == '1 raid', 'one live, two past their reset: ' .
 local function line(i) return m.lines[i].label.text end
 assert(line(1) == 'Achievements left: 2' and line(2) == 'Factions not exalted: 1' and line(3) == 'Titles not held: 2'
   and line(4) == 'Recipes to read: 2' and line(5) == 'Raids not cleared: 1', line(1) .. ' / ' .. line(2) .. ' / ' .. line(3) .. ' / ' .. line(5))
-for i = 1, 5 do assert(m.lines[i].shown and m.lines[i].point[3] == -206 - (i - 1) * 16, 'line ' .. i .. ' in order') end
+for i = 1, 5 do assert(m.lines[i].shown and m.lines[i].point[2] == m.title and m.lines[i].point[5] == -2 - (i - 1) * 16, 'line ' .. i .. ' in order') end
 assert(not m.off.shown and not m.turnOn.shown, 'the note and button leave with the tracker on')
 -- A line opens the tab that lists it: the Collection view for the tracker counts, Professions for the recipes.
 m.lines[2].scripts.OnClick(m.lines[2])

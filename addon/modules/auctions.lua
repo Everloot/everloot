@@ -485,7 +485,7 @@ local function showPrompt()
         frame:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
           tile = true, tileSize = 16, edgeSize = 16, insets = { left = 4, right = 4, top = 4, bottom = 4 } })
       end
-      local text = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+      local text = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
       text:SetPoint("TOPLEFT", 12, -12)
       text:SetWidth(232)
       text:SetJustifyH("LEFT")

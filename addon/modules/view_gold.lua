@@ -64,7 +64,7 @@ local function list(parent, x, y, w, h, title, columns, count)
     row:SetPoint("TOPLEFT", 4, -24 - (i - 1) * ROW_H)
     row:SetSize(w - 8, ROW_H)
     for _, c in ipairs(columns) do
-      local s = text(row, 11, NARROW)
+      local s = text(row, 12, c[4] and NARROW or nil) -- numbers in the narrow figures, words in Friz
       s:SetPoint("LEFT", c[2], 0)
       s:SetWidth(c[3])
       if c[4] then s:SetJustifyH("RIGHT") end
@@ -73,7 +73,7 @@ local function list(parent, x, y, w, h, title, columns, count)
     end
     rows[i] = row
   end
-  rows.empty = text(b, 11, nil, COLORS.muted)
+  rows.empty = text(b, 12, nil, COLORS.muted)
   rows.empty:SetPoint("TOPLEFT", 8, -28)
   rows.empty:SetWidth(w - 16)
   rows.up = button(b, "Up", 48, function() rows.offset = math.max(0, rows.offset - rows.size) end)
@@ -353,8 +353,8 @@ local function build(f, parent)
   -- built once for the longest period; drawOverview places the period's own and hides the rest.
   local o = g.pages.overview
   g.summaryBox = box(o, 0, 0, W, 112)
-  local function summaryText(field, x, y, width, size, color)
-    local s = text(g.summaryBox, size or 11, NARROW, color)
+  local function summaryText(field, x, y, width, size, color, font)
+    local s = text(g.summaryBox, size or 12, font, color)
     s:SetPoint("TOPLEFT", x, y)
     s:SetWidth(width)
     if s.SetWordWrap then s:SetWordWrap(false) end
@@ -362,12 +362,12 @@ local function build(f, parent)
     return s
   end
   summaryText("summaryCaption", 8, -6, 400, 12)
-  summaryText("pending", 412, -6, 184, 11, COLORS.muted)
+  summaryText("pending", 412, -6, 184, 12, COLORS.muted)
   for i, entry in ipairs({ { "earned", "Gold earned" }, { "spent", "Gold spent" }, { "profit", "Profit" } }) do
     local x = 8 + (i - 1) * 196
     summaryText(entry[1] .. "Label", x, -24, 188):SetText(entry[2])
-    summaryText(entry[1], x, -40, 188, 12)
-    summaryText(entry[1] .. "Average", x, -56, 188, 11, COLORS.muted)
+    summaryText(entry[1], x, -40, 188, 12, nil, NARROW)
+    summaryText(entry[1] .. "Average", x, -56, 188, 12, COLORS.muted)
   end
   summaryText("topEarned", 8, -76, W - 16)
   summaryText("topSpent", 8, -92, W - 16)
@@ -376,7 +376,7 @@ local function build(f, parent)
   g.total = text(roster, 12)
   g.total:SetPoint("BOTTOMLEFT", 8, 10)
   local chart = box(o, 296, -118, 308, 190)
-  g.chartHigh = text(chart, 11, nil, COLORS.muted)
+  g.chartHigh = text(chart, 12, nil, COLORS.muted)
   g.chartHigh:SetPoint("TOPLEFT", 10, -8)
   for i = 1, MAX_BARS do
     local bar = CreateFrame("StatusBar", nil, chart)
