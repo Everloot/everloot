@@ -134,6 +134,7 @@ guide at everloot.app/docs/guides/addon; `addon/tests/commands_contract.py` fail
 |---|---|
 | `/everloot window` | Opens or closes the Everloot window (left-click on the minimap button does the same). |
 | `/everloot options` | Opens the settings (right-click on the minimap button does the same): an Everloot overview with four pages under it in the game's AddOns list, General, Auction house, Shared with Everloot and Your characters, one switch per module. |
+| `/everloot setup` | Asks again which features to use: Everything, Collect data only or Choose myself (see Choosing features). |
 | `/everloot planner [talents\|raid]` | Opens the planner workspace on the named tab, where a website plan is pasted and imported. |
 | `/everloot buttons on\|off` | Gathers other addons' minimap buttons into the Everloot button, or leaves them on the minimap; `/reload` to apply. |
 | `/everloot status` | Prints the version, each module and how many rows it holds, and any paused collection. |
@@ -290,6 +291,24 @@ Three switches at the end of the list choose what item tooltips show: **prices**
 vendor), **your history** (your sales and purchases from the gold ledger) and **sources** (drops, vendors,
 reagents, zones). All three are on for a new install, are saved in your SavedVariables, record nothing and apply
 at once, without a reload.
+
+### Choosing features
+
+A few seconds after the first loading screen, every install (new or updated) is asked once which parts of Everloot
+to use, before the player-names question. `/everloot setup` asks again at any time. There are three answers:
+
+- **Everything** turns on the item tooltip lines, the auction house tab and its scan reminder, the Everloot window
+  and minimap button, and the Your characters switches (gold, characters, gear, talents, guild).
+- **Collect data only** keeps World, Recipes and trainers, Zone map corners and Auction scans on, so the Everloot
+  tab at the auction house still sends the scans you start. It turns off the tooltip lines, the scan reminder, the
+  window, the minimap button and its button drawer, the merchant and mailbox helpers and the Your characters
+  switches. For players who keep Auctionator or other addons for those jobs.
+- **Choose myself** changes nothing and opens the settings.
+
+No answer changes the census, player names, the installed addon list, the completion tracker or local inventory snapshots. Those keep their
+own switches, since turning them off deletes their rows. Tooltip lines change at once; the rest changes after a
+reload, which the window offers. It also says where the Desktop App is (everloot.app/addon), which uploads after
+logout or `/reload`.
 
 ## The Everloot window
 

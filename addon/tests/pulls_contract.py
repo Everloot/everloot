@@ -188,6 +188,11 @@ for case in main:
             # #1128 adds local inventory consent independently of pull recording.
             assert actual.count("inventoryCapture") == 1
             actual = [key for key in actual if key not in {"tooltip", "inventoryCapture"}]
+        if part == "printed":
+            # The feature chooser adds /everloot setup to the command list for every install, independently of pull
+            # recording. Keep the historical fixture and compare every other word.
+            assert sum("/everloot setup, " in line for line in actual) == sum(line.startswith("Everloot commands:") for line in actual)
+            actual = [line.replace("/everloot setup, ", "") for line in actual]
         assert actual == main[case][part], f"gate off, {case} install: {part} differs from main's (fixtures/gate_off_main.json)"
 assert mine.keys() == main.keys()
 
