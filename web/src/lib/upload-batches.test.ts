@@ -1,3 +1,4 @@
+import { parseEverlootLua } from "./sv-parse";
 import { readFileSync } from "node:fs";
 import { parseRecords, recordSchemas } from "@everloot/protocol";
 import { expect, test, vi } from "vitest";
@@ -234,4 +235,22 @@ test("with the pull switch off, the preview reads a file as main does: same rows
   const on = prepareUpload({ addonVersion: "0.3.15", records: inputs }, {}, [], undefined, undefined, { runRecords: true });
   expect(on.counts.encounter).toBe(2);
   expect(on.counts.instance_run).toBe(1);
+});
+
+// Inventory is a local saved table, not an upload record, regardless of sharing choices.
+test("local inventory stays out of public upload parsing and every prepared batch", () => {
+  const payload = parseEverlootLua(`EverlootDB = { version = "0.3.23", installId = "local-fixture",
+    inventoryCapture = true, inventory = { privateCharacter = { bags = { complete = true, observedAt = 1234,
+      items = { [2589] = 17 } }, bank = { complete = true, observedAt = 1230, items = {} } } },
+    records = { loot = { { capturedAt = "2026-11-15T00:00:00Z", eventId = "epoch:1", sourceNpcId = 42, items = {} } } } }`);
+  expect(payload.records).toHaveLength(1);
+  for (const sharing of [{}, { gear: true, gold: true, guild: true, collection: true }]) {
+    const session = prepareUpload({ addonVersion: payload.version, records: payload.records }, sharing, ["a".repeat(64)]);
+    expect(session.batches).toHaveLength(1);
+    expect(JSON.parse(session.batches[0]).records).toHaveLength(1);
+    for (const secret of ["inventory", "privateCharacter", "observedAt", "2589"]) expect(session.batches.join("")).not.toContain(secret);
+  }
+  // Even a misplaced inventory row cannot enter public intake.
+  expect(Object.hasOwn(recordSchemas, "inventory")).toBe(false);
+  expect(parseRecords([{ kind: "inventory", characterKey: "privateCharacter", items: { 2589: 17 } }]).receipt.rejected).toHaveLength(1);
 });
