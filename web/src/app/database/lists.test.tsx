@@ -2,12 +2,13 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
 
+const links = vi.hoisted(() => [] as { href: string; prefetch?: boolean }[]);
 const store = vi.hoisted(() => ({ loadCorpus: vi.fn() }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
   uploadStore: { loadCorpus: store.loadCorpus },
 }));
-vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
+vi.mock("next/link", () => ({ default: ({ href, children, prefetch }: { href: string; children: ReactNode; prefetch?: boolean }) => { links.push({ href, prefetch }); return <a href={href}>{children}</a>; } }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
 // The quest titles a page may show from the Warcraft Wiki (none unless a test sets them).
 const wiki = vi.hoisted(() => ({ titles: null as Map<number, { name: string; wikiPage: string }> | null }));
@@ -286,4 +287,20 @@ test("the spell list with no names read says the build's names could not be read
   }
   files.spells = { version: "x", names: new Map([[133, "Fireball"]]) };
   expect(await html(SpellList(search({ q: "frost" })))).toContain("No spells match these filters.");
+});
+
+beforeEach(() => { links.length = 0; });
+
+test("database list row links navigate on click without prefetching", async () => {
+  for (const [Page, prefix] of [
+    [NpcList, "/database/npcs/"], [QuestList, "/database/quests/"],
+    [VendorList, "/database/vendors/"], [ZoneList, "/database/zones/"],
+    [InstanceList, "/database/instances/"],
+  ] as const) {
+    links.length = 0;
+    await html(Page(search()));
+    const rows = links.filter((link) => link.href.startsWith(prefix));
+    expect(rows.length, prefix).toBeGreaterThan(0);
+    expect(rows.every((link) => link.prefetch === false), prefix).toBe(true);
+  }
 });
