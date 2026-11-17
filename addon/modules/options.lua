@@ -495,31 +495,35 @@ function O.AnswerPlayers(on)
   O.Refresh()
 end
 
-local function buildPrompt()
-  local made, f = pcall(CreateFrame, "Frame", "EverlootPlayersPrompt", UIParent, "BackdropTemplate")
-  if not made or not f then f = CreateFrame("Frame", "EverlootPlayersPrompt", UIParent) end
-  f:SetWidth(440)
+--- A question window in the Everloot window's look (its dark panel and crest heading), else the game's dialog with a
+--- plain title. Returns the frame and the heading to place the text under.
+local function dialog(name, width, subtitle)
+  local made, f = pcall(CreateFrame, "Frame", name, UIParent, "BackdropTemplate")
+  if not made or not f then f = CreateFrame("Frame", name, UIParent) end
+  f:SetWidth(width)
   f:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
   f:SetFrameStrata("DIALOG")
   f:SetClampedToScreen(true)
   f:EnableMouse(true)
   local W = E.Window
-  local top
   if W and W.Backdrop and W.Heading then
     W.Backdrop(f)
-    f.crest, f.title = W.Heading(f, "Player names")
+    f.crest, f.title = W.Heading(f, subtitle)
     f.crest:SetPoint("TOPLEFT", f, "TOPLEFT", 12, -10)
-    top = f.crest
-  else
-    if f.SetBackdrop then
-      f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true, tileSize = 16, edgeSize = 16, insets = { left = 4, right = 4, top = 4, bottom = 4 } })
-    end
-    f.title = words(f, "GameFontNormalLarge")
-    f.title:SetPoint("TOPLEFT", 16, -16)
-    f.title:SetText("Everloot: player names")
-    top = f.title
+    return f, f.crest
   end
+  if f.SetBackdrop then
+    f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+      tile = true, tileSize = 16, edgeSize = 16, insets = { left = 4, right = 4, top = 4, bottom = 4 } })
+  end
+  f.title = words(f, "GameFontNormalLarge")
+  f.title:SetPoint("TOPLEFT", 16, -16)
+  f.title:SetText("Everloot: " .. subtitle:lower())
+  return f, f.title
+end
+
+local function buildPrompt()
+  local f, top = dialog("EverlootPlayersPrompt", 440, "Player names")
   local body = words(f, "GameFontHighlightSmall", 12, "text")
   body:SetPoint("TOPLEFT", top, "BOTTOMLEFT", 4, -10)
   body:SetWidth(400)
@@ -555,16 +559,194 @@ function O.AskPlayers()
   O.prompt:Show()
 end
 
+-- The feature chooser. A player who already has an auction addon, a raid helper or a minimap button bag can keep
+-- them and use Everloot for some of its jobs, or only to collect data (player feedback, 2026-11-16). Each install is
+-- asked once, new and upgraded alike, before the player-names question; /everloot setup asks again at any time.
+-- "Choose myself" keeps every switch as it is and opens these pages. No answer touches the census, player names, the
+-- addon list or the completion tracker: they keep their own consent, and turning them off deletes rows.
+O.SETUP_INTRO = "Everloot does several jobs. Use all of them, or only the ones your other addons don't already do. "
+  .. "The census, player names, the addon list and the completion tracker keep their own switches."
+O.SETUP_UPLOAD = "The Everloot Desktop App sends what you collect after you log out or /reload, so you never upload "
+  .. "files by hand. Download it at everloot.app/addon."
+O.SETUP_CHOICES = {
+  { key = "everything", label = "Everything",
+    text = "Item tooltips with prices and sources, the auction house tab, the Everloot window and minimap button, and your characters' gold, gear and talents." },
+  { key = "collect", label = "Collect data only",
+    text = "Records drops, vendors, recipes and the auction scans you start from its tab, for everloot.app. No tooltip lines, window, minimap button or helpers, so Auctionator and your other addons stay in charge." },
+  { key = "choose", label = "Choose myself",
+    text = "Keeps your switches as they are and opens the settings, one switch per feature." },
+}
+-- What each answer sets: `toggles` are module switches, `fields` top-level settings (O.ROWS).
+O.SETUP = {
+  everything = {
+    toggles = { openworld = true, professions = true, mapbounds = true, auctions = true, window = true,
+      gold = true, roster = true, gear = true, talents = true, guild = true },
+    fields = { scanPrompt = true, minimapButton = true, tooltip = "full", tooltipMarket = true, tooltipHistory = true, tooltipSources = true },
+  },
+  collect = {
+    toggles = { openworld = true, professions = true, mapbounds = true, auctions = true, window = false, buttons = false,
+      gold = false, roster = false, gear = false, talents = false, guild = false },
+    fields = { scanPrompt = false, minimapButton = false, tooltip = "off", autoVendor = false, mailCollect = false },
+  },
+}
+
+function O.SetupDue()
+  return EverlootDB.setupAsked ~= true
+end
+
+--- A setting's value as the addon reads it, defaults included.
+local function current(key, toggle)
+  if toggle then return EverlootDB.toggles[key] ~= false end
+  for _, row in ipairs(O.ROWS) do
+    if row.key == key then return row.choices and O.Choice(row) or O.IsOn(row) end
+  end
+  return EverlootDB[key]
+end
+
+--- Sets one answer's switches; true when one of them applies only after a reload.
+function O.ApplySetup(name)
+  local set, reload = O.SETUP[name], false
+  for key, value in pairs(set.toggles) do
+    if current(key, true) ~= value then reload = true end
+    EverlootDB.toggles[key] = value
+  end
+  local live = {}
+  for _, row in ipairs(O.ROWS) do live[row.key] = row.live end
+  for key, value in pairs(set.fields) do
+    if current(key) ~= value and not live[key] then reload = true end
+    EverlootDB[key] = value
+  end
+  return reload
+end
+
+local function setupDone(f, reload)
+  for _, part in ipairs(f.choiceParts) do part:Hide() end
+  f.done:SetText(reload and "Saved. The rest changes after a reload." or "Saved.")
+  f.done:Show()
+  f.reload:Show()
+  f.later:SetText(reload and "Later" or "Close")
+  f.later:Show()
+  f:SetHeight(48 + f.done:GetStringHeight() + 14 + 24 + 16)
+end
+
+--- An answer. Everything and Collect data only set their switches and offer a reload; Choose myself opens the pages.
+function O.AnswerSetup(key)
+  EverlootDB.setupAsked = true
+  local f = O.setup
+  if key == "choose" then
+    if f then f:Hide() end
+    print("Everloot: your switches stay as they are. /everloot setup asks again.")
+    O.Open()
+    O.AskPlayers()
+    return
+  end
+  local reload = O.ApplySetup(key)
+  O.changed = O.changed or reload
+  print("Everloot: " .. (key == "collect"
+    and "collecting data only. Item tooltip lines are off now; the window, the minimap button and the helpers go after a reload."
+    or "every feature on.") .. " /everloot setup or /everloot options changes it.")
+  O.Refresh()
+  if f then setupDone(f, reload) end
+  if not reload then
+    if f then f:Hide() end
+    O.AskPlayers()
+  end
+end
+
+local function buildSetup()
+  local f = dialog("EverlootSetupPrompt", 480, "Features")
+  local intro = words(f, "GameFontHighlightSmall", 12, "text")
+  intro:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -48)
+  intro:SetWidth(448)
+  intro:SetText(O.SETUP_INTRO)
+  f.intro = intro
+  f.choiceParts, f.choices = { intro }, {}
+  local y = 48 + intro:GetStringHeight() + 14
+  for _, choice in ipairs(O.SETUP_CHOICES) do
+    local button = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    button:SetSize(150, 24)
+    button:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -y)
+    button:SetText(choice.label)
+    button:SetScript("OnClick", function() O.AnswerSetup(choice.key) end)
+    local text = words(f, "GameFontHighlightSmall", 11, "muted")
+    text:SetPoint("TOPLEFT", f, "TOPLEFT", 176, -y - 2)
+    text:SetWidth(288)
+    text:SetText(choice.text)
+    button.description = text
+    f.choices[choice.key] = button
+    f.choiceParts[#f.choiceParts + 1] = button
+    f.choiceParts[#f.choiceParts + 1] = text
+    y = y + math.max(24, text:GetStringHeight() + 2) + 12
+  end
+  local upload = words(f, "GameFontHighlightSmall", 11, "text")
+  upload:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -y)
+  upload:SetWidth(448)
+  upload:SetText(O.SETUP_UPLOAD)
+  f.upload = upload
+  f.choiceParts[#f.choiceParts + 1] = upload
+  local height = y + upload:GetStringHeight() + 16
+  f:SetHeight(height)
+  -- After Everything or Collect data only: a reload applies what changed.
+  local done = words(f, "GameFontHighlightSmall", 12, "text")
+  done:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -48)
+  done:SetWidth(448)
+  local reload = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  reload:SetSize(120, 24)
+  reload:SetPoint("TOPLEFT", done, "BOTTOMLEFT", 0, -14)
+  reload:SetText("Reload now")
+  reload:SetScript("OnClick", function() if ReloadUI then ReloadUI() end end)
+  local later = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  later:SetSize(120, 24)
+  later:SetPoint("LEFT", reload, "RIGHT", 10, 0)
+  later:SetText("Later")
+  later:SetScript("OnClick", function() f:Hide(); O.AskPlayers() end)
+  done:Hide(); reload:Hide(); later:Hide()
+  f.done, f.reload, f.later = done, reload, later
+  --- Back to the three answers, for the next time it is asked.
+  function f.reset()
+    for _, part in ipairs(f.choiceParts) do part:Show() end
+    done:Hide(); reload:Hide(); later:Hide()
+    f:SetHeight(height)
+  end
+  return f
+end
+
+--- Shows the chooser when it is due, or always with `again` (/everloot setup); in combat it tries again later.
+function O.AskSetup(again)
+  if not (again or O.SetupDue()) or (O.setup and O.setup:IsShown()) then return end
+  if InCombatLockdown and InCombatLockdown() then
+    if C_Timer and C_Timer.After then
+      C_Timer.After(O.COMBAT_RETRY, function() pcall(O.AskSetup, again) end)
+    else
+      print("Everloot: /everloot setup works out of combat.")
+    end
+    return
+  end
+  if not O.setup then
+    local ok, f = pcall(buildSetup)
+    if not ok or not f then return end
+    O.setup = f
+  end
+  O.setup.reset()
+  O.setup:Show()
+end
+
+--- The questions an install still owes, one at a time: the chooser first, then player names.
+function O.AskNext()
+  if O.SetupDue() then return O.AskSetup() end
+  return O.AskPlayers()
+end
+
 E:RegisterModule("options", function()
   local how = O.Register()
-  -- Only while the question is due, and only with timers: the game's loading screen ends at PLAYER_ENTERING_WORLD.
-  if O.PlayersAskDue() and C_Timer and C_Timer.After then
+  -- Only while a question is due, and only with timers: the game's loading screen ends at PLAYER_ENTERING_WORLD.
+  if (O.SetupDue() or O.PlayersAskDue()) and C_Timer and C_Timer.After then
     local listen = CreateFrame("Frame")
     O.askFrame = listen
     listen:RegisterEvent("PLAYER_ENTERING_WORLD")
     listen:SetScript("OnEvent", function(self)
       self:UnregisterEvent("PLAYER_ENTERING_WORLD")
-      C_Timer.After(O.ASK_DELAY, function() pcall(O.AskPlayers) end)
+      C_Timer.After(O.ASK_DELAY, function() pcall(O.AskNext) end)
     end)
   end
   return "ready (" .. how .. "; /everloot options opens it)"
