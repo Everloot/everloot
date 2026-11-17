@@ -7,10 +7,13 @@ permissions:
 jobs:
   backup-role:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        postgres: ['15', '17']
     timeout-minutes: 5
     services:
       postgres:
-        image: postgres:15
+        image: postgres:${{ matrix.postgres }}
         env:
           POSTGRES_PASSWORD: disposable-ci-only
         ports: ['5432:5432']
@@ -32,6 +35,31 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261110180000_backup_exporter_role.sql
           psql -v ON_ERROR_STOP=1 -f supabase/tests/backup_exporter.sql
           psql -v ON_ERROR_STOP=1 -f supabase/tests/backup_exporter_behavior.sql
+      - name: Creator membership is administrative only
+        if: matrix.postgres == '17'
+        run: |
+          psql -v ON_ERROR_STOP=1 -c 'grant backup_exporter to postgres with admin true, inherit false, set false'
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/backup_exporter.sql
+          psql -v ON_ERROR_STOP=1 -c 'grant backup_exporter to postgres with inherit true'
+          if psql -v ON_ERROR_STOP=1 -f supabase/tests/backup_exporter.sql; then
+            echo 'Assertion accepted inherited backup access'; exit 1
+          fi
+          psql -v ON_ERROR_STOP=1 -c 'grant backup_exporter to postgres with inherit false, set true'
+          if psql -v ON_ERROR_STOP=1 -f supabase/tests/backup_exporter.sql; then
+            echo 'Assertion accepted SET ROLE access'; exit 1
+          fi
+          psql -v ON_ERROR_STOP=1 -c 'grant backup_exporter to postgres with set false'
+          psql -v ON_ERROR_STOP=1 -c 'grant backup_exporter to anon with admin true, inherit false, set false'
+          if psql -v ON_ERROR_STOP=1 -f supabase/tests/backup_exporter.sql; then
+            echo 'Assertion accepted a different administrative member'; exit 1
+          fi
+          psql -v ON_ERROR_STOP=1 -c 'revoke backup_exporter from anon'
+          psql -v ON_ERROR_STOP=1 -c 'grant service_role to backup_exporter with inherit false, set false'
+          if psql -v ON_ERROR_STOP=1 -f supabase/tests/backup_exporter.sql; then
+            echo 'Assertion accepted an application role granted to exporter'; exit 1
+          fi
+          psql -v ON_ERROR_STOP=1 -c 'revoke service_role from backup_exporter'
+          psql -v ON_ERROR_STOP=1 -f supabase/tests/backup_exporter.sql
       # Blizzard auction prices (issue #1122): applied after the backup role, as in production, and twice; then the
       # 30-day purge, the reader, the effective grants and the backup exclusion, which the new migration enforces
       # itself (the applied backup role migration is left as it is).
