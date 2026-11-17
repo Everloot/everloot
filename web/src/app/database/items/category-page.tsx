@@ -184,7 +184,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
             {/* Where the name comes from is in the link's hover card (and words for a screen reader, after the link so the
                 link's text is the name alone), never a printed label; a name only the game files give carries the
                 quiet unconfirmed marker. */}
-            <Link href={`/database/items/${row[0]}`} className={`min-w-0 ${colour} hover:underline underline-offset-4`} style={name?.color ? { color: name.color } : undefined}>
+            <Link prefetch={false} href={`/database/items/${row[0]}`} className={`min-w-0 ${colour} hover:underline underline-offset-4`} style={name?.color ? { color: name.color } : undefined}>
               {name?.name ?? `Item ${row[0]}`}
             </Link>
             {name && name.source !== "files" && <span className="sr-only"> ({NAME_TITLE[name.source].toLowerCase()})</span>}

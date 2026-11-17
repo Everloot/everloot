@@ -7,10 +7,7 @@ Everloot Desktop App, and adds auction prices to item tooltips. It uses only the
 plays the character. Records match the upload contract (`packages/protocol`, see its `schema/records/`) field for
 field.
 
-**Status:** 0.3.23 Alpha. The automated contract tests pass. 0.3.22 was checked in the live Forever client on
-2026-11-10: the Everloot window, the minimap button and its button drawer, and the auction house shopping list. The
-settings pages and Collection's Dungeons & raids section are new in 0.3.23 and were checked on its nightly on
-2026-11-11; whether the game reports open-world boss kills is not yet known. The in-client checks in
+**Status:** 0.3.24, a regular release. The automated contract tests pass. 0.3.24 was checked in the live Forever client on 2026-11-17: the feature chooser, the removal of the kinds Blizzard's API now supplies, the one-time player names notice and an empty loot window. The in-client checks in
 `docs/2026-10-08-beta-client-checklist.md`, `docs/2026-10-18-addon-0.3.2-beta-checklist.md`,
 `docs/2026-10-19-addon-0.3.3-beta-checklist.md` and `docs/2026-10-21-addon-0.3.10-launch-checklist.md` are still open, and the full scan
 (`docs/design/specs/2026-10-16-forever-market-design.md`) has not run in the Forever client.

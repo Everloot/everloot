@@ -2,12 +2,13 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
 
+const links = vi.hoisted(() => [] as { href: string; prefetch?: boolean }[]);
 const store = vi.hoisted(() => ({ loadCorpus: vi.fn() }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
   uploadStore: { loadCorpus: store.loadCorpus },
 }));
-vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
+vi.mock("next/link", () => ({ default: ({ href, children, prefetch }: { href: string; children: ReactNode; prefetch?: boolean }) => { links.push({ href, prefetch }); return <a href={href}>{children}</a>; } }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
 // The quest titles a page may show from the Warcraft Wiki (none unless a test sets them).
 const wiki = vi.hoisted(() => ({ titles: null as Map<number, { name: string; wikiPage: string }> | null }));
@@ -22,6 +23,7 @@ vi.mock("@/lib/game-assets", async (importOriginal) => ({
 import InstanceList, { generateMetadata as instanceMetadata } from "./instances/page";
 import NpcList, { generateMetadata as npcMetadata } from "./npcs/page";
 import ObjectList from "./objects/page";
+import DropsList from "./drops/page";
 import QuestList, { generateMetadata as questMetadata } from "./quests/page";
 import SpellList from "./spells/page";
 import VendorList from "./vendors/page";
@@ -286,4 +288,34 @@ test("the spell list with no names read says the build's names could not be read
   }
   files.spells = { version: "x", names: new Map([[133, "Fireball"]]) };
   expect(await html(SpellList(search({ q: "frost" })))).toContain("No spells match these filters.");
+});
+
+beforeEach(() => { links.length = 0; });
+
+test("database list row links navigate on click without prefetching", async () => {
+  for (const [Page, prefix] of [
+    [NpcList, "/database/npcs/"], [QuestList, "/database/quests/"],
+    [VendorList, "/database/vendors/"], [ZoneList, "/database/zones/"],
+    [InstanceList, "/database/instances/"],
+  ] as const) {
+    links.length = 0;
+    await html(Page(search()));
+    const rows = links.filter((link) => link.href.startsWith(prefix));
+    expect(rows.length, prefix).toBeGreaterThan(0);
+    expect(rows.every((link) => link.prefetch === false), prefix).toBe(true);
+  }
+});
+
+
+test("drops list item, NPC and object row links navigate without prefetching", async () => {
+  store.loadCorpus.mockResolvedValue({ uploads: 3, dataAsOf: "2026-10-10T00:01:00.000Z", records: [
+    ...records,
+    ...three.map((i) => ({ ...base(i), kind: "loot", sourceEvidence: "loot-api", sourceObjectId: 1731, items: [{ itemId: 2770, count: 1 }] })),
+  ] });
+  await html(DropsList(search()));
+  for (const href of ["/database/items/1931", "/database/items/2770", "/database/npcs/448", "/database/objects/1731"]) {
+    const rowLinks = links.filter((link) => link.href === href);
+    expect(rowLinks.length, href).toBeGreaterThan(0);
+    expect(rowLinks.every((link) => link.prefetch === false), href).toBe(true);
+  }
 });
