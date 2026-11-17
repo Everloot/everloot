@@ -8,13 +8,16 @@ import { receiptKeyForSite, type SentState } from "./sent-state";
 
 /**
  * Private sync: sends the player's own linked characters' rows to the account's sync endpoint,
- * POST /api/me/characters/sync, with the account key, and nowhere else. The upload never carries profession_owned,
- * lockout_owned, talent_owned, stats_owned, pvp_owned or boss_kill_owned (web/src/lib/upload-batches.ts keeps them on the computer); this is the only sender of them.
+ * POST /api/me/characters/sync, with the account key, and nowhere else. The upload never carries lockout_owned or
+ * boss_kill_owned (web/src/lib/upload-batches.ts keeps them on the computer); this is the only sender of them.
+ *
+ * Three categories go: raids (lockout_owned), boss kills (boss_kill_owned) and the titles of the achievements category
+ * (title_owned). Blizzard's character API supplies the rest (docs/design/specs/2026-11-17-blizzard-api-first.md), so the
+ * gear, talents, professions, stats, pvp and reputations categories and the achievement rows of the achievements
+ * category are no longer sent, even from a file an older addon wrote them into.
  *
  * Only characters this file linked are sent: the character_link rows `/everloot link` wrote name them, and their
- * completionKey ties the completion module's rows (characterKey) to that name and realm. Gear rows carry the name and
- * realm themselves; only the newest one per character goes, and likewise the newest talent_owned, stats_owned and pvp_owned row. The public
- * talent_snapshot rows carry no name, realm or key at all, so they can be tied to no character and are never sent.
+ * completionKey ties the completion module's rows (characterKey) to that name and realm.
  *
  * The site keeps a category only when the account holds that character's live link and turned the category's sync
  * on. Whatever it answers for a capture (kept, already had, older, sync off, not linked), the same capture is not sent
@@ -58,12 +61,8 @@ export const syncReceiptKey = (installId: string, endpoint: string, character: s
 
 type SendCategory = SyncCategory | "boss_kills";
 type SendRow = SyncRow | BossKillRow;
-const CATEGORY_OF: Record<string, SendCategory> = {
-  gear_snapshot: "gear", talent_owned: "talents", stats_owned: "stats", pvp_owned: "pvp", profession_owned: "professions", reputation_owned: "reputations",
-  boss_kill_owned: "boss_kills", lockout_owned: "raids", achievement_owned: "achievements", title_owned: "achievements",
-};
-/** Kinds keyed by the completion module's characterKey. */
-const KEYED = new Set(["boss_kill_owned", "talent_owned", "stats_owned", "pvp_owned", "profession_owned", "reputation_owned", "lockout_owned", "achievement_owned", "title_owned"]);
+/** The kinds sync sends, each keyed by the completion module's characterKey. */
+const CATEGORY_OF: Record<string, SendCategory> = { boss_kill_owned: "boss_kills", lockout_owned: "raids", title_owned: "achievements" };
 
 /** A site that asked to wait, by origin: nothing goes to it before then. Kept while the app runs. */
 const waitUntil = new Map<string, number>();
@@ -72,7 +71,6 @@ interface Capture { category: SendCategory; records: SendRow[]; entry: string }
 interface Character { id: string; label: string; name: string; realm: string; captures: Capture[] }
 interface Group { character: Character; captures: Capture[] }
 
-const time = (row: { capturedAt: string }) => Date.parse(row.capturedAt);
 const characterId = (name: string, realm: string) => `${name.toLowerCase()}-${linkRealmKey(realm)}`;
 const hashOf = (records: readonly SendRow[]) => createHash("sha256").update(JSON.stringify(records)).digest("hex").slice(0, 32);
 
@@ -92,9 +90,7 @@ function charactersOf(records: Array<Record<string, unknown>>): Character[] {
   for (const r of records) {
     const kind = String(r.kind);
     if (!Object.hasOwn(CATEGORY_OF, kind)) continue;
-    let id: string | undefined;
-    if (kind === "gear_snapshot") id = typeof r.character === "string" && typeof r.realm === "string" ? characterId(r.character, r.realm) : undefined;
-    else if (KEYED.has(kind)) id = typeof r.characterKey === "string" ? byKey.get(r.characterKey) : undefined;
+    const id = typeof r.characterKey === "string" ? byKey.get(r.characterKey) : undefined;
     if (!id || !links.has(id)) continue;
     // Only a row the endpoint reads goes; it gets the row as the schema reads it, with nothing else of the file.
     const row = parseSyncRow(r) ?? parseBossKillRow(r);
@@ -108,10 +104,8 @@ function charactersOf(records: Array<Record<string, unknown>>): Character[] {
     const mine = rows.get(id);
     if (!mine) continue;
     const captures: Capture[] = [];
-    for (const category of ["gear", "stats", "talents", "pvp", "professions", "reputations", "raids", "achievements", "boss_kills"] as const) {
-      let records = mine.filter((r) => CATEGORY_OF[r.kind] === category);
-      // The addon keeps a gear sample an hour, and the site keeps one talent build, one stats sheet and one PvP standing; the newest of each goes.
-      if ((category === "gear" || category === "stats" || category === "talents" || category === "pvp") && records.length) records = [records.reduce((a, b) => (time(b) > time(a) ? b : a))];
+    for (const category of ["raids", "achievements", "boss_kills"] as const) {
+      const records = mine.filter((r) => CATEGORY_OF[r.kind] === category);
       if (!records.length) continue;
       captures.push({ category, records, entry: `${category}|${hashOf(records)}` });
     }

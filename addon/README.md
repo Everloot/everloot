@@ -150,7 +150,7 @@ guide at everloot.app/docs/guides/addon; `addon/tests/commands_contract.py` fail
 | `/everloot addons on\|off` | The installed addon list, off until enabled; off deletes every recorded addon row. |
 | `/everloot completion [on\|off]` | The completion tracker, off until enabled; bare reads now, off deletes every row it wrote. |
 | `/everloot census [on\|off]` | The census, on in a new install; bare says whether it is on and how many rows it holds, off deletes them. |
-| `/everloot players [on\|off]` | The players module, off until enabled; bare says whether it is on and how many characters it holds, off deletes them. |
+| `/everloot players [on\|off]` | The players module, on in a new install; bare says whether it is on and how many characters it holds, off deletes them. |
 | `/everloot pulls [on\|off]` | Boss pull summaries, in the builds that carry them; bare says whether it is on, off deletes every pull. |
 | `/everloot link [code\|clear]` | Links this character to your everloot.app account with the code the site shows; bare counts the links, clear deletes them. |
 | `/everloot selftest` | Checks the talent calls the addon relies on and prints PASS, FAIL, SKIP and INFO lines. |
@@ -242,39 +242,32 @@ holds the cut setting.
 
 ## Completion tracker
 
-Off until `/everloot completion on` (then `/reload`). It reads your achievements, reputation, titles and
-completed quests with the calls Forever's own windows use, in chunks across frames, and waits out combat.
+Off until `/everloot completion on` (then `/reload`). It reads the game's achievement, reputation, title and quest
+chain lists with the calls Forever's own windows use, in chunks across frames, and waits out combat.
 `/everloot completion` reads now; `/everloot completion off` deletes every row it wrote. It never tracks,
 expands, clicks or changes anything.
 
+Your own achievements, reputation, completed quests, professions, talent build, character sheet stats, PvP standing
+and gear are not recorded. Blizzard's character API supplies them to everloot.app
+(`docs/design/specs/2026-11-17-blizzard-api-first.md`), and the window's Collection and Home read achievements,
+reputation and completed quests from the game as they draw. The first load of this release deletes any rows of those
+kinds an older version left in the saved file (`gear_snapshot`, `talent_snapshot`, `achievement_owned`,
+`reputation_owned`, `quest_owned`, `profession_owned`, `talent_owned`, `stats_owned`, `pvp_owned`).
+
 - **Catalog rows** (`achievement_catalog`, `reputation_catalog`, `title_catalog`, `quest_chain_catalog`):
   ids, names, criteria text, standing headers and quest ids. No player data. The site lists an entry after 3
-  installs report it identically.
-- **Owned rows** (`achievement_owned`, `reputation_owned`, `title_owned`, `quest_owned`): your character's
-  progress under an 8-digit key made from your install id and the character's GUID, never the name. They
-  leave this file from the upload page, with the collection choice ticked and a verified grant, or through the
-  Desktop App's private sync described below.
-- **Character rows** (`profession_owned`, `lockout_owned`, `talent_owned`): your professions, this week's raid
-  lockouts and the talent build of your active spec group, under the same key. They are never part of an upload
-  file. The Everloot Desktop App's private sync sends these own-character rows (professions, raid lockouts, the active
-  talent build) only for a character you linked: the app sends that character's rows and everloot.app keeps only the
-  categories you switched on. Each
-  read replaces this character's row, a build with no spent points writes none, and `/everloot completion off`
-  deletes them with the rest. The anonymous `talent_snapshot` of the talents module is unchanged.
-- **Character sheet row** (`stats_owned`): the numbers the character sheet shows (attributes, attack power, hit, crit,
-  haste, expertise, spell power, healing, armor, defense, dodge, parry, block), one row per character under the same key, read out of combat. Percent stats are
-  rounded to 2 decimals and the rest to whole numbers; a stat the game will not give is left out, and with fewer than
-  the five attributes there is no row. Never part of an upload file; the Desktop App's private sync sends it for a linked character and everloot.app keeps it
-  only if you switched on that category; `/everloot completion off` deletes it.
-- **PvP row** (`pvp_owned`): the PvP rank (renown on Forever's PvP rank faction: rank, points, next-rank threshold,
-  top rank), the season and lifetime honorable kills from the Statistics tab, one row per character under the same key.
-  Whole numbers only, no rank title; a field the game will not give is left out, and with neither a rank nor honorable
-  kills there is no row. A read made before the statistics load keeps the character's last kill count. Never part of an upload file; sent and kept the same way as the stats row;
-  `/everloot completion off` deletes it.
-- A changed achievement or standing replaces its earlier row. Titles and completed quests are additions.
-- The file stays bounded: at most 1500 achievements read, 600 progress rows per character, and about 3 MB
-  of completion rows and remembered ids in all. A limit reached stops recording, says so once in chat that
-  session, and `/everloot status` says which one.
+  installs report it identically. Completed quests are read only to find the chains they belong to.
+- **Titles** (`title_owned`): the titles your character holds, under an 8-digit key made from your install id and the
+  character's GUID, never the name. Blizzard's API returns no titles. They leave this file from the upload page, with
+  the collection choice ticked and a verified grant, or through the Desktop App's private sync described below.
+- **Raid lockouts** (`lockout_owned`, owned.lua): this week's saved instances, under the same key. Blizzard's API
+  returns no encounters. They are never part of an upload file. The Everloot Desktop App's private sync sends them
+  only for a character you linked, and everloot.app keeps only the categories you switched on. Each read replaces this
+  character's rows, and `/everloot completion off` deletes them with the rest. Your boss kills (`boss_kill_owned`,
+  boss_kills.lua) stay on this computer too, and are deleted the same way.
+- A changed catalog entry replaces its earlier row. Titles are additions.
+- The file stays bounded: at most 1500 achievements read and about 3 MB of completion rows and remembered ids in
+  all. A limit reached stops recording, says so once in chat that session, and `/everloot status` says which one.
 - Combat (`PLAYER_REGEN_DISABLED` or `InCombatLockdown`) pauses a read between frames; it picks up when
   combat ends. `/everloot completion off` also stops a read that is under way.
 - The reputation list is the rows the reputation window shows now; a collapsed header hides its factions
@@ -298,7 +291,7 @@ A few seconds after the first loading screen, every install (new or updated) is 
 to use, before the player-names question. `/everloot setup` asks again at any time. There are three answers:
 
 - **Everything** turns on the item tooltip lines, the auction house tab and its scan reminder, the Everloot window
-  and minimap button, and the Your characters switches (gold, characters, gear, talents, guild).
+  and minimap button, and the Your characters switches (gold, characters, guild).
 - **Collect data only** keeps World, Recipes and trainers, Zone map corners and Auction scans on, so the Everloot
   tab at the auction house still sends the scans you start. It turns off the tooltip lines, the scan reminder, the
   window, the minimap button and its button drawer, the merchant and mailbox helpers and the Your characters
@@ -308,7 +301,8 @@ to use, before the player-names question. `/everloot setup` asks again at any ti
 No answer changes the census, player names, the installed addon list, the completion tracker or local inventory snapshots. Those keep their
 own switches, since turning them off deletes their rows. Tooltip lines change at once; the rest changes after a
 reload, which the window offers. It also says where the Desktop App is (everloot.app/addon), which uploads after
-logout or `/reload`.
+logout or `/reload`, and that player names are on in a new install, with `/everloot players off` to turn them off
+and everloot.app/players/opt-out to hide a character.
 
 ## The Everloot window
 
@@ -409,15 +403,17 @@ stops it at once and deletes every row it wrote.
 
 ## Players
 
-Off until `/everloot players on` (then `/reload`), and meant to stay off until the player pages on the site are
-switched on (`docs/design/specs/2026-10-20-player-pages-design.md`). This is the one module that reads other
-players' names and guilds, so it is separate from the census, which never does. `/everloot players` says
+On in a new install; an install from before 17 November 2026 keeps its choice, off unless the player turned it on
+(`docs/design/specs/2026-11-17-blizzard-api-first.md`). The names feed the armory's discovery of characters on
+Blizzard's API (`docs/design/specs/2026-10-20-player-pages-design.md` for the player pages). This is the one module
+that reads other players' names and guilds, so it is separate from the census, which never does. A new install says
+once in chat, and in the feature chooser, what it records and how to turn it off. `/everloot players` says
 whether it is on and how many characters it holds; `/everloot players off` stops it at once and deletes every row.
-An install with it off is asked once, in an Everloot window a few seconds after the first loading screen and never in
-combat: **Turn on** runs `/everloot players on`, **Leave off** keeps it off. The window says what is recorded and
-points to `/everloot players off` and the hide form (everloot.app/players/opt-out). Either answer, or
-`/everloot players on|off` typed or set on the settings page, is saved as `playersAsked`, and the question never
-comes back. `addon/tests/options_contract.py` holds the rules.
+An install from before with it off is asked once, in an Everloot window a few seconds after the first loading screen
+and never in combat: **Turn on** runs `/everloot players on`, **Leave off** keeps it off. A new install, already on,
+is never asked. The window says what is recorded and points to `/everloot players off` and the hide form
+(everloot.app/players/opt-out). Either answer, or `/everloot players on|off` typed or set on the settings page, is
+saved as `playersAsked`, and the question never comes back. `addon/tests/options_contract.py` holds the rules.
 
 - **What a row holds** (`player_seen`): name (`UnitName`), realm (`GetRealmName`), race and class tokens
   (`UnitRace`, `UnitClass`), level (`UnitLevel`) and the guild name when the game shows one (`GetGuildInfo`).
@@ -435,9 +431,9 @@ comes back. `addon/tests/options_contract.py` holds the rules.
 - **Load**: a player already read is left alone for 10 minutes, target and mouseover reads are at least a
   quarter of a second apart, at most 300 new characters a UTC day, at most 1,000 rows in the file (the oldest
   go first, about 200 KB). One row per character, kept in place.
-- **Sending**: only from the upload page, which counts the rows first. The Desktop App and the command-line
-  uploader never send them. The site
-  drops them until the owner has turned the player pages on.
+- **Sending**: from the upload page, which counts the rows first, and from the Desktop App while its "Send the player
+  pages with the uploads" setting is on (on in a new Desktop App install). The command-line uploader never sends them.
+  The site drops them until the owner has turned the player pages on.
 
 ## Boss pulls
 
@@ -513,13 +509,12 @@ uses no polling loop. Escape closes it. This workspace still needs a live-client
 check; a passing Lua contract is not an in-game test.
 Drag its header beside the game's talent window to keep the next-point highlights visible.
 
-- **Talents** (on by default). Reads your build through `C_Traits` and `C_ClassTalents`: the active spec
-  group and, once dual spec is unlocked at level 40, the second one. Each build is one
-  `talent_snapshot` record: class, level, spec group, config id, tree id, every spent node with its ranks
-  and choice, and Blizzard's own loadout string from `C_Traits.GenerateImportString` when the client
-  returns one (`exportStatus` says `ok`, `unavailable`, `failed`, `empty` or `unexpected`). A row is
-  written only when the build changes. The rows hold no character name. They are not in the public corpus
-  until the data policy says how talent builds are published. `/everloot talents` prints each group and a share code.
+- **Talents** (read live, never recorded). Reads your build through `C_Traits` and `C_ClassTalents` when a
+  command or the plan panel needs it: the active spec group and, once dual spec is unlocked at level 40, the second
+  one, with every spent node, its ranks and choice, and Blizzard's own loadout string from
+  `C_Traits.GenerateImportString` when the client returns one (`exportStatus` says `ok`, `unavailable`, `failed`,
+  `empty` or `unexpected`). No `talent_snapshot` row is written: Blizzard's API supplies talents to the site.
+  `/everloot talents` prints each group and a share code.
 - **Selftest.** `/everloot selftest` checks each talent API, that it returns sane data, and that the
   loadout export and import functions exist (`ImportLoadout` and `ViewLoadout` are never called). It
   prints `PASS`, `FAIL`, `SKIP` and `INFO` lines and saves them under `selftest` in the SavedVariables file.
@@ -609,7 +604,6 @@ addon/
 │   ├── guild.lua       roster, attendance, saved lockouts (published only through an officer)
 │   ├── roster.lua      your own characters for the window's Home: name, realm, class, level, gold, professions; local only
 │   ├── ledger.lua      the gold ledger's local store for the window's Gold tab; never uploaded
-│   ├── gear.lua        equipped item level sample, at most once an hour
 │   ├── auctions.lua    full auction-house scans you start (Forever); listed buyouts on older clients; on in a new install
 │   ├── gold.lua        your own gold: loot, quests, vendors, flights, mailed auction sales, postage, buyouts
 │   ├── professions.lua recipe colours at your rank (C_TradeSkillUI); required rank and cost from trainer windows
@@ -622,13 +616,11 @@ addon/
 │   ├── auctiontab.lua  the Everloot tab at the auction house: scan, cooldown, Share now, price lookup, shopping lists
 │   ├── addons.lua      your installed addons' names, titles and versions; off until enabled
 │   ├── mapbounds.lua   each zone's corners in world coordinates, once per zone per build
-│   ├── talents.lua     your talent build per spec group, plus the game's own loadout string
-│   ├── completion.lua  achievements, reputation, titles, quest chains: catalogs and your progress; off until enabled
-│   ├── owned.lua       this character's professions, raid lockouts and talent build; runs with the completion tracker
-│   ├── charstats.lua   this character's sheet numbers as the paper doll shows them; runs with the completion tracker
-│   ├── pvp.lua         this character's PvP rank and honorable kills; runs with the completion tracker
+│   ├── talents.lua     your talent build per spec group, read live, plus the game's own loadout string
+│   ├── completion.lua  achievements, reputation, titles, quest chains: catalogs and your titles; off until enabled
+│   ├── owned.lua       this character's raid lockouts; runs with the completion tracker
 │   ├── census.lua      race, class, level and faction of your characters and players you see; on in a new install
-│   ├── players.lua     name, realm, race, class, level and guild of your characters and players you see; off until enabled
+│   ├── players.lua     name, realm, race, class, level and guild of your characters and players you see; on in a new install
 │   ├── pulls.lua       each boss pull: your group's names, classes, roles and damage meter totals; on once released
 │   ├── selftest.lua    /everloot selftest and /everloot talents
 │   ├── plan.lua        share code reader and the display-only plan panel

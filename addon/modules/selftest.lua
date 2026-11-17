@@ -118,8 +118,6 @@ local function run()
     check(#groups > 0, "config ids", #groups .. " spec group(s) readable", "no spec group gave a config id")
     for _, entry in ipairs(groups) do checkGroup(entry) end
     add("INFO", "serialization version", tostring(T.SerializationVersion()))
-    local note = T.Record()
-    add("INFO", "snapshot", tostring(note))
   end
   checkWindow()
   checkRace()

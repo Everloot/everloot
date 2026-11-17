@@ -1,9 +1,12 @@
 """Run with: uv run --with lupa python addon/tests/view_collection_contract.py
 
 The window's Collection view (modules/view_collection.lua): achievements, reputation, titles, raid lockouts and quest
-chains from the rows the completion tracker wrote. It reads and displays only; with the tracker off it says what the
-tracker reads and offers the command that turns it on. This character's rows only, until Account is chosen: then
-every character in the roster counts, the one that holds an item is named, and a key outside the roster never counts.
+chains. The lists are the catalog rows the completion tracker wrote; this character's achievements, reputation and
+completed quests are read from the game as the view draws (no row holds them any more); titles and lockouts are rows.
+It reads and displays only; with the tracker off it says what the tracker reads and offers the command that turns it
+on. This character only, until Account is chosen: then every character in the roster counts for titles and lockouts,
+the one that holds an item is named, and a key outside the roster never counts. The sections read from the game stay
+this character's in either scope, and say so.
 """
 import zlib
 from pathlib import Path
@@ -22,7 +25,23 @@ assert "Coming soon" not in source
 
 NOW = 1794052800  # 2026-11-07 12:00 UTC
 ME = "%08x" % zlib.adler32(b"abcd-1234:Player-1-0001")
-API = f"now = {NOW}\ndate = os.date\nUnitGUID = function() return 'Player-1-0001' end\n"
+# What the game says about this character: achievements 1 and 2 earned, two standings, seven completed quests.
+GAME = """
+earned = { [1] = { 10, 1, 26 }, [2] = { 11, 2, 26 } }
+GetAchievementInfo = function(id)
+ if id < 1 or id > 4 then return nil end
+ local e = earned[id]
+ return id, 'Name', 10, e ~= nil, e and e[1], e and e[2], e and e[3]
+end
+factions = {
+ { name = 'Horde', isHeader = true },
+ { factionID = 76, reaction = 8, currentStanding = 42500, currentReactionThreshold = 42000, nextReactionThreshold = 42999 },
+ { factionID = 530, reaction = 5, currentStanding = 4500, currentReactionThreshold = 3000, nextReactionThreshold = 9000 },
+}
+C_Reputation = { GetNumFactions = function() return #factions end, GetFactionDataByIndex = function(i) return factions[i] end }
+C_QuestLog = { GetAllCompletedQuestIDs = function() return { 101, 102, 201, 103, 104, 401, 402 } end }
+"""
+API = f"now = {NOW}\ndate = os.date\nUnitGUID = function() return 'Player-1-0001' end\n" + GAME
 EXTRA = ("modules/completion.lua", "modules/owned.lua")
 
 RECORDS = f"""{{
@@ -32,22 +51,12 @@ RECORDS = f"""{{
     {{ achievementId = 3, name = 'Journeyman Fisherman', categoryId = 169, category = 'Professions', points = 25, criteriaCount = 5 }},
     {{ achievementId = 4, name = 'Zul Farrak', categoryId = 168, category = 'Dungeons', points = 5, criteriaCount = 1 }},
   }},
-  achievement_owned = {{
-    {{ characterKey = '{ME}', achievementId = 1, completed = true, earnedByMe = true, earnedOn = '2026-10-01', criteriaMet = 0, criteriaTotal = 0 }},
-    {{ characterKey = '{ME}', achievementId = 2, completed = true, earnedByMe = true, earnedOn = '2026-11-02', criteriaMet = 6, criteriaTotal = 6 }},
-    {{ characterKey = '{ME}', achievementId = 3, completed = false, criteriaMet = 1, criteriaTotal = 5 }},
-    {{ characterKey = 'zzzz9999', achievementId = 3, completed = true, earnedOn = '2026-09-01' }},
-    {{ characterKey = 'zzzz9999', achievementId = 4, completed = true, earnedOn = '2026-09-02' }},
-  }},
+  -- A row an older addon wrote is deleted at load and never read: the alt's earned achievement does not count.
+  achievement_owned = {{ {{ characterKey = 'zzzz9999', achievementId = 4, completed = true, earnedOn = '2026-09-02' }} }},
   reputation_catalog = {{
     {{ factionId = 76, name = 'Orgrimmar', header = 'Horde' }},
     {{ factionId = 530, name = 'Darkspear Trolls', header = 'Horde' }},
     {{ factionId = 2600, name = 'A Major Faction', major = true }},
-  }},
-  reputation_owned = {{
-    {{ characterKey = '{ME}', factionId = 76, reaction = 8, standing = 42500, floor = 42000, ceiling = 42999 }},
-    {{ characterKey = '{ME}', factionId = 530, reaction = 5, standing = 4500, floor = 3000, ceiling = 9000 }},
-    {{ characterKey = 'zzzz9999', factionId = 530, reaction = 8, standing = 42999, floor = 42000, ceiling = 42999 }},
   }},
   title_catalog = {{ {{ titleId = 1, name = 'Private' }}, {{ titleId = 2, name = 'Corporal' }}, {{ titleId = 3, name = 'Scout' }} }},
   title_owned = {{ {{ characterKey = '{ME}', titleIds = {{ 2 }} }}, {{ characterKey = 'zzzz9999', titleIds = {{ 1, 3 }} }} }},
@@ -62,12 +71,6 @@ RECORDS = f"""{{
     {{ questLineId = 901, name = 'Kolkar Raiders', questIds = {{ 201, 202 }} }},
     {{ questLineId = 902, name = 'The Long Road', questIds = {{ 301, 302 }}, truncated = true }},
     {{ questLineId = 903, name = 'Wayward Trail', questIds = {{ 401, 402, 403, 404 }} }},
-  }},
-  quest_owned = {{
-    {{ characterKey = '{ME}', questIds = {{ 101, 102, 201 }} }},
-    {{ characterKey = '{ME}', questIds = {{ 103, 104, 401, 402 }} }},
-    {{ characterKey = 'zzzz9999', questIds = {{ 201, 202, 301, 302, 403, 404 }} }},
-    {{ characterKey = 'yyyy0000', questIds = {{ 101, 102, 103, 104, 401, 402, 403, 404 }} }},
   }},
 }}"""
 # Two of this player's own characters; 'yyyy0000' has rows in the file but is not in the roster.
@@ -89,7 +92,9 @@ local c = f.collection
 assert(f.views.collection.shown and f.subtitle.text == 'Collection' and not f.note.shown)
 assert(EverlootDB.toggles.completion == false, 'the tracker starts off')
 assert(c.offPage.shown and not c.onPage.shown, 'off shows the explanation only')
-assert(c.offText.text:find('achievements') and c.offText.text:find('raid lockouts') and c.offText.text:find('never go in an upload'), c.offText.text)
+assert(c.offText.text:find('achievement') and c.offText.text:find('raid lockouts') and c.offText.text:find('never go in an upload')
+  and c.offText.text:find('not recorded'), c.offText.text)
+assert(not c.offText.text:find('talent') and not c.offText.text:find('PvP') and not c.offText.text:find('professions'), c.offText.text)
 assert(c.turnOn.shown and c.turnOn.text == 'Turn on')
 click(c.turnOn)
 assert(EverlootDB.toggles.completion == true, 'Turn on runs /everloot completion on')
@@ -97,10 +102,11 @@ assert(c.offText.text == 'Turned on. /reload to start reading.' and not c.turnOn
 assert(f.shown and not U.failed)
 """)
 
-# --- On: this character's rows, joined with the catalog ---
+# --- On: this character's progress from the game, joined with the catalog ---
 lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{ completion = true }}, records = {RECORDS} }}", API, extra=EXTRA)
 lua.execute(HELPERS + f"""
 assert(Everloot.CharacterKey() == '{ME}', 'the seeded key is this character')
+assert(EverlootDB.records.achievement_owned == nil, 'the old row was deleted at load')
 assert(U.Open('collection') == true)
 local f = EverlootWindow
 local c = f.collection
@@ -163,7 +169,7 @@ click(c.missingOnly)
 
 -- Account with no roster: this character alone, named as such.
 click(c.scopes.account)
-assert(c.scope == 'account' and c.summary.text == 'Quests: 1 of 4 chains complete', c.summary.text)
+assert(c.scope == 'account' and c.summary.text == 'Quests: 1 of 4 chains complete · this character', c.summary.text)
 assert(rows[2].detail.text == '4 of 4 · This character', rows[2].detail.text)
 click(c.scopes.character)
 assert(c.scope == 'character' and rows[2].detail.text == '4 of 4', rows[2].detail.text)
@@ -196,7 +202,7 @@ assert(EverlootWindow.shown and not U.failed)
 
 # --- On, but the client gives no player id yet ---
 lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{ completion = true }}, records = {RECORDS} }}",
-            f"now = {NOW}\ndate = os.date\nUnitGUID = function() return nil end\n", extra=EXTRA)
+            f"now = {NOW}\ndate = os.date\nUnitGUID = function() return nil end\n" + GAME, extra=EXTRA)
 lua.execute(HELPERS + """
 assert(Everloot.CharacterKey() == nil)
 assert(U.Open('collection') == true)
@@ -218,19 +224,16 @@ assert(c.summary.text == 'Achievements: 2 of 4 · 20 points', 'This character is
 click(c.scopes.account)
 assert(c.scope == 'account')
 
--- An achievement either character earned counts; this character is named first when both have it.
-assert(c.summary.text == 'Achievements: 4 of 4 · 50 points', c.summary.text)
+-- Achievements are read from the game: this character's, named, and the summary says so.
+assert(c.summary.text == 'Achievements: 2 of 4 · 20 points · this character', c.summary.text)
 assert(rows[1].name.text == 'Explore Durotar' and rows[1].detail.text == '10 pts · Exploration · 2026-11-02 · Brakka', rows[1].detail.text)
-assert(rows[3].name.text == 'Zul Farrak' and rows[3].detail.text == '5 pts · Dungeons · 2026-09-02 · Velda', rows[3].detail.text)
-assert(rows[4].name.text == 'Journeyman Fisherman' and rows[4].detail.text == '25 pts · Professions · 2026-09-01 · Velda', 'not finished here, finished on the alt')
-click(c.missingOnly)
-assert(shown(rows) == 0 and rows.empty.text == 'Nothing missing here.')
-click(c.missingOnly)
+assert(rows[3].name.text == 'Journeyman Fisherman' and rows[3].detail.text == '25 pts · Professions' and rows[3].done.text == '', rows[3].detail.text)
+assert(rows[4].name.text == 'Zul Farrak' and rows[4].done.text == '', 'an old row of the alt does not count')
 
--- Reputation: the highest standing across the characters, and whose it is.
+-- Reputation: this character's standing, named.
 click(c.sections.reputation)
-assert(c.summary.text == 'Reputation: 2 factions · 2 exalted', c.summary.text)
-assert(rows[1].name.text == 'Darkspear Trolls' and rows[1].detail.text == '42999 / 42999 · Velda' and rows[1].done.text == 'done', rows[1].detail.text)
+assert(c.summary.text == 'Reputation: 2 factions · 1 exalted · this character', c.summary.text)
+assert(rows[1].name.text == 'Darkspear Trolls' and rows[1].detail.text == '4500 / 9000 · Brakka' and rows[1].done.text == '', rows[1].detail.text)
 assert(rows[2].name.text == 'Orgrimmar' and rows[2].detail.text == '42500 / 42999 · Brakka', rows[2].detail.text)
 
 -- Titles: known on any character, named.
@@ -238,25 +241,24 @@ click(c.sections.titles)
 assert(c.summary.text == 'Titles: 3 of 3', c.summary.text)
 assert(rows[1].name.text == 'Corporal' and rows[1].detail.text == 'Brakka' and rows[2].name.text == 'Private' and rows[2].detail.text == 'Velda')
 
--- Quests: the character furthest along each chain; quests done on different characters are not added together.
+-- Quests: this character's, from the game.
 click(c.sections.quests)
-assert(c.summary.text == 'Quests: 2 of 4 chains complete', c.summary.text)
-assert(rows[4].name.text == 'Wayward Trail' and rows[4].detail.text == '2 of 4 · Brakka' and rows[4].done.text == '', 'furthest character, not a union: ' .. rows[4].detail.text)
-assert(rows[4].bar.value == 2)
-assert(rows[1].name.text == 'Kolkar Raiders' and rows[1].detail.text == '2 of 2 · Velda' and rows[1].done.text == 'done', rows[1].detail.text)
-assert(rows[1].bar.value == 2)
-assert(rows[2].name.text == 'The Defias Brotherhood' and rows[2].detail.text == '4 of 4 · Brakka', rows[2].detail.text)
-assert(rows[3].name.text == 'The Long Road' and rows[3].detail.text == '2 of 2+ · Velda' and rows[3].done.text == '', rows[3].detail.text)
+assert(c.summary.text == 'Quests: 1 of 4 chains complete · this character', c.summary.text)
+assert(rows[4].name.text == 'Wayward Trail' and rows[4].detail.text == '2 of 4 · Brakka' and rows[4].done.text == '', rows[4].detail.text)
+assert(rows[1].name.text == 'Kolkar Raiders' and rows[1].detail.text == '1 of 2 · Brakka', rows[1].detail.text)
+assert(rows[2].name.text == 'The Defias Brotherhood' and rows[2].detail.text == '4 of 4 · Brakka' and rows[2].done.text == 'done', rows[2].detail.text)
+assert(rows[3].name.text == 'The Long Road' and rows[3].detail.text == '0 of 2+' and rows[3].done.text == '', rows[3].detail.text)
 click(c.missingOnly)
-assert(shown(rows) == 2 and rows[1].name.text == 'The Long Road' and rows[2].name.text == 'Wayward Trail', 'missing only over the account')
+assert(shown(rows) == 3 and rows[1].name.text == 'Kolkar Raiders', 'missing only')
 click(c.missingOnly)
 
--- Back to this character: the alt's rows stop counting.
+-- Back to this character: the same progress, without the names.
 click(c.scopes.character)
 assert(c.summary.text == 'Quests: 1 of 4 chains complete' and rows[1].detail.text == '1 of 2', c.summary.text)
 assert(rows[4].detail.text == '2 of 4', rows[4].detail.text)
 assert(EverlootWindow.shown and not U.failed)
 """)
 print("Lua 5.1 Collection view: off says what the tracker reads and turns it on; achievements newest first, standing bars, "
-      "missing titles, this week's raids, quest chains done of total; this character's rows only, or the roster's with the "
-      "holder named; empty lines when nothing is read or no key")
+      "missing titles, this week's raids, quest chains done of total; achievements, reputation and quests read from the game "
+      "for this character, titles and lockouts from rows, the roster's with the holder named; empty lines when nothing is "
+      "read or no key")

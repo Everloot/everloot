@@ -190,10 +190,6 @@ export interface ChatInfo {
 export interface ChatProgress { text: string; tool: string | null }
 
 /** One of the player's own characters, from the save file. Never uploaded from here. */
-export interface GearSlot {
-  slot: string;
-  itemLevel: number;
-}
 export interface MoneyRow {
   at: string;
   category: string;
@@ -217,10 +213,6 @@ export interface CharacterRow {
   /** Copper, latest snapshot. */
   gold: number | null;
   peakGold: number | null;
-  gearSlots: number;
-  itemLevel: number | null;
-  /** The latest gear snapshot's slots, in the game's order. */
-  equipped: GearSlot[];
   /** Copper by category, from the file's local ledger and the money events from before it (shared/ledger.ts names the categories). */
   spent: Record<string, number>;
   earned: Record<string, number>;
@@ -233,24 +225,19 @@ export interface CharacterRow {
   /** The newest money events, at most twelve. */
   receipts: MoneyRow[];
 }
-/** Progress rows carry an opaque per-install key instead of a name (intake.ts CHARACTER_KEY). */
+/**
+ * Progress rows carry an opaque per-install key instead of a name (intake.ts CHARACTER_KEY). The addon records titles
+ * and raid lockouts; gear, talents, professions, achievements, reputations and quests come from Blizzard's API on
+ * everloot.app instead (docs/design/specs/2026-11-17-blizzard-api-first.md), so this page no longer reads them.
+ */
 export interface ProgressRow {
   key: string;
   class: string;
   level: number;
-  achievements: number;
-  achievementsInProgress: number;
-  reputations: number;
-  exalted: number;
   titles: number;
-  quests: number;
-  talentPoints: number | null;
-  /** The addon's profession_owned rows for this key: the latest state; never in an upload, not given to Chat, sent only by private sync for a linked character. */
-  professions: ProfessionRow[];
   /** The addon's lockout_owned rows for this key that have not reset yet; never in an upload, not given to Chat, sent only by private sync for a linked character. */
   lockouts: LockoutRow[];
 }
-export interface ProfessionRow { name: string; rank: number; maxRank: number }
 export interface LockoutRow {
   instance: string;
   /** The game's difficulty name ("40 Player"), or "" when it gave none. */
@@ -263,7 +250,6 @@ export interface LockoutRow {
 export interface CharactersInfo {
   characters: CharacterRow[];
   progress: ProgressRow[];
-  talents: { class: string; level: number; points: number }[];
 }
 
 

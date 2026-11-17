@@ -103,118 +103,44 @@ function reload() Everloot.frame.hooks = nil; Everloot.frame.onEvent(nil,'ADDON_
     return lua
 
 
-# --- Both spec groups are recorded, spent ranks only, in the intake shape ---
+# --- Both spec groups are read live, spent ranks only; nothing is recorded ---
+# Blizzard's character API supplies talents (docs/design/specs/2026-11-17-blizzard-api-first.md): the addon reads the
+# build for /everloot talents, selftest and plans, and writes no talent_snapshot row.
 lua = fresh()
 lua.execute("""
-assert(EverlootDB.toggles.talents == true, 'talents are on by default')
-event('PLAYER_ENTERING_WORLD')
-local rows = EverlootDB.records.talent_snapshot
-assert(rows and #rows == 2, 'both spec groups are recorded')
-local a, b = rows[1], rows[2]
+assert(EverlootDB.toggles.talents == nil, 'no talents switch: there is nothing to record')
+event('PLAYER_ENTERING_WORLD'); event('TRAIT_CONFIG_UPDATED'); event('PLAYER_TALENT_UPDATE')
+assert(Everloot:Count('talent_snapshot') == 0, 'no talent build is recorded')
+assert(not string.find(Everloot:Status(), 'talents:', 1, true), 'no talents module in the status')
+local T = Everloot.Talents
+local groups = T.Groups()
+assert(#groups == 2, 'both spec groups are read')
+local a, b = T.Snapshot(groups[1]), T.Snapshot(groups[2])
 assert(a.group == 1 and a.active == true and a.configId == 10 and a.treeId == 786, 'group 1: config and tree')
 assert(a.class == 'MAGE' and a.level == 45 and a.clientBuild == '1.60.1.70450' and a.specId == 1482)
 assert(a.points == 3 and #a.nodes == 2, 'granted and empty nodes are not spent points')
 assert(a.nodes[1].nodeId == 90001 and a.nodes[1].ranks == 2 and a.nodes[1].choice == nil)
 assert(a.nodes[2].nodeId == 90002 and a.nodes[2].ranks == 1 and a.nodes[2].choice == 1, 'a choice node keeps its zero-based entry')
-assert(a.exportStatus == 'ok' and a.loadoutString == EXPORT and a.serializationVersion == 2, 'the game export is stored with its status')
+assert(a.exportStatus == 'ok' and a.loadoutString == EXPORT and a.serializationVersion == 2, 'the game export comes with its status')
 assert(b.group == 2 and b.active == false and b.configId == 20 and b.points == 1 and b.specId == nil, 'group 2')
-assert(a.installId == EverlootDB.installId and a.capturedAt == '2026-10-17T00:00:00Z' and a.eventId)
-local allowed = { installId=1, capturedAt=1, eventId=1, kindLoggedAt=1, class=1, level=1, group=1, active=1, configId=1, treeId=1,
-  specId=1, clientBuild=1, serializationVersion=1, loadoutString=1, exportStatus=1, points=1, nodes=1 }
-for _, row in ipairs(rows) do for key in pairs(row) do assert(allowed[key], 'unexpected field ' .. key) end end
-
--- Unchanged builds are not stored again; a change is.
-event('TRAIT_CONFIG_UPDATED'); reload()
-assert(Everloot:Count('talent_snapshot') == 2, 'same build, same rows')
-NODES[10][90004].ranksPurchased = 1
-event('TRAIT_CONFIG_UPDATED')
-assert(Everloot:Count('talent_snapshot') == 3 and EverlootDB.records.talent_snapshot[3].points == 4, 'a spent point adds one row')
-assert(string.find(Everloot:Status(), 'rows talent_snapshot: 3', 1, true))
 assert(calls.import == 0 and calls.view == 0 and calls.purchase == 0, 'reading never imports, views or spends')
 """)
 
-# --- Two characters on one account: each snapshot is stored once, however often they swap ---
-lua = fresh("GUID = 'Player-1-AAAA'; UnitGUID = function() return GUID end", "{ installId = 'abcd-1234' }")
-lua.execute("""
-event('PLAYER_ENTERING_WORLD')
-assert(Everloot:Count('talent_snapshot') == 2, 'first character: both groups')
-GUID = 'Player-1-BBBB'; reload()
-assert(Everloot:Count('talent_snapshot') == 4, 'second character: its own two rows')
-GUID = 'Player-1-AAAA'; reload()
-GUID = 'Player-1-BBBB'; reload()
-GUID = 'Player-1-AAAA'; reload()
-assert(Everloot:Count('talent_snapshot') == 4, 'swapping back stores nothing again: ' .. Everloot:Count('talent_snapshot'))
-""")
-
-# --- The gear sample keeps its hour per character in SavedVariables: a /reload does not start it again ---
-def gear(guid="Player-1-AAAA", name="Aria"):
-    lua = LuaRuntime()
-    lua.execute(STUBS.replace("__LOADOUT__", GOOD))
-    lua.execute(f"""
-NOW = 1000000
-time = function() return NOW end
-GUID = '{guid}'; NAME = '{name}'
-UnitGUID = function() return GUID end
-UnitName = function() return NAME end
-GetRealmName = function() return 'Realm' end
-GetInventorySlotInfo = function(slot) return slot == 'HeadSlot' and 1 or nil end
-GetInventoryItemLink = function() return 'item:1234' end
-GetDetailedItemLevelInfo = function() return 60 end
-""")
-    for file in ["core.lua", "modules/gear.lua"]:
-        lua.execute((root / file).read_text(encoding="utf-8"))
-    lua.execute("EverlootDB = { installId = 'abcd-1234' }")
-    lua.execute("""
-Everloot.frame.onEvent(nil,'ADDON_LOADED','Everloot')
-function enter() for _, hook in ipairs(Everloot.frame.hooks or {}) do hook(nil, 'PLAYER_ENTERING_WORLD') end end
-function reload() Everloot.frame.hooks = nil; Everloot.frame.onEvent(nil,'ADDON_LOADED','Everloot'); enter() end
-""")
-    return lua
-
-
-lua = gear()
-lua.execute("""
-enter()
-assert(Everloot:Count('gear_snapshot') == 1, 'sampled at login')
-NOW = NOW + 600; reload()
-assert(Everloot:Count('gear_snapshot') == 1, 'a /reload inside the hour does not sample again')
-NOW = NOW + 3000; reload()
-assert(Everloot:Count('gear_snapshot') == 2, 'a reload after the hour does')
-NAME = 'Bram'; GUID = 'Player-1-BBBB'; reload()
-assert(Everloot:Count('gear_snapshot') == 3, 'another character has its own hour')
-NAME = 'Aria'; GUID = 'Player-1-AAAA'; NOW = NOW + 60; reload()
-assert(Everloot:Count('gear_snapshot') == 3, 'and the first one keeps hers')
-local n = 0
-for _ in pairs(EverlootDB.gearSampledAt) do n = n + 1 end
-assert(n == 2, 'one entry per character')
-for key in pairs(EverlootDB.gearSampledAt) do assert(not key:find('Aria') and not key:find('Bram'), 'the key is opaque') end
-""")
-lua = gear()
-lua.execute("""
-UnitGUID = nil
-enter()
-NOW = NOW + 600; reload()
-assert(Everloot:Count('gear_snapshot') == 1 and EverlootDB.gearSampledAt['Aria-Realm'], 'without a character key the name and realm key the hour')
-""")
-
-# --- Before level 40 there is one group; no points, no row ---
+# --- Before level 40 there is one group ---
 lua = fresh("GROUPS = 1; LEVEL = 30")
 lua.execute("""
-event('PLAYER_ENTERING_WORLD')
-assert(Everloot:Count('talent_snapshot') == 1 and EverlootDB.records.talent_snapshot[1].level == 30)
+local groups = Everloot.Talents.Groups()
+assert(#groups == 1 and Everloot.Talents.Snapshot(groups[1]).level == 30)
 """)
-lua = fresh("for _, n in pairs(NODES[10]) do n.ranksPurchased = 0 end")
-lua.execute("event('PLAYER_ENTERING_WORLD'); assert(Everloot:Count('talent_snapshot') == 1, 'only the group with spent points')")
 
 # --- Active config only when the spec group lookup is missing ---
 lua = fresh("C_SpecializationInfo = nil")
 lua.execute("""
-event('PLAYER_ENTERING_WORLD')
-local rows = EverlootDB.records.talent_snapshot
-assert(#rows == 1 and rows[1].group == 1 and rows[1].configId == 10, 'falls back to the active config')
+local groups = Everloot.Talents.Groups()
+assert(#groups == 1 and groups[1].group == 1 and groups[1].configID == 10, 'falls back to the active config')
 """)
 
-# --- The export never breaks the row: each failure becomes a status ---
+# --- The export never breaks the read: each failure becomes a status ---
 for name, stub, status in [
     ("error", "EXPORT = function() error('nope') end", "failed"),
     ("empty", "EXPORT = ''", "empty"),
@@ -223,44 +149,21 @@ for name, stub, status in [
 ]:
     lua = fresh(stub)
     lua.execute(f"""
-event('PLAYER_ENTERING_WORLD')
-local row = EverlootDB.records.talent_snapshot[1]
+local row = Everloot.Talents.Snapshot(Everloot.Talents.Groups()[1])
 assert(row and row.exportStatus == '{status}' and row.loadoutString == nil, '{name}: ' .. tostring(row and row.exportStatus))
 assert(#row.nodes == 2, 'the node list survives a failed export')
-""")
-
-# --- Events come in bursts: one timer, one read ---
-lua = fresh("""
-timers = {}
-C_Timer = { After = function(seconds, fn) table.insert(timers, fn) end }
-""")
-lua.execute("""
-event('TRAIT_CONFIG_UPDATED'); event('TRAIT_CONFIG_UPDATED'); event('PLAYER_TALENT_UPDATE')
-assert(#timers == 1 and Everloot:Count('talent_snapshot') == 0, 'a burst schedules one read')
-timers[1]()
-assert(Everloot:Count('talent_snapshot') == 2)
-event('TRAIT_CONFIG_UPDATED')
-assert(#timers == 2, 'the next burst schedules again')
 """)
 
 # --- Guarded: no trait API, an error inside it, a missing player ---
 lua = fresh("C_Traits = nil")
 lua.execute("""
-event('PLAYER_ENTERING_WORLD')
-assert(Everloot:Count('talent_snapshot') == 0)
-assert(string.find(Everloot:Status(), 'talents: disabled', 1, true), 'no C_Traits disables the module')
+local row, reason = Everloot.Talents.Snapshot({ group = 1, configID = 10, active = true })
+assert(row == nil and reason == 'trait API unavailable', tostring(reason))
 """)
 lua = fresh("C_Traits.GetNodeInfo = function() error('boom') end")
-lua.execute("event('PLAYER_ENTERING_WORLD'); assert(Everloot:Count('talent_snapshot') == 0, 'a failing call stores nothing and does not raise')")
+lua.execute("assert(Everloot.Talents.Snapshot(Everloot.Talents.Groups()[1]) == nil, 'a failing call reads nothing and does not raise')")
 lua = fresh("UnitClass = nil")
-lua.execute("event('PLAYER_ENTERING_WORLD'); assert(Everloot:Count('talent_snapshot') == 0)")
-lua = fresh("", "{ installId = 'abcd-1234', toggles = { openworld = true, talents = false }, records = {} }")
-lua.execute("""
-assert(string.find(Everloot:Status(), 'talents: off by toggle', 1, true))
-event('PLAYER_ENTERING_WORLD'); assert(Everloot:Count('talent_snapshot') == 0)
-""")
-lua = fresh("", "{ installId = 'abcd-1234', toggles = { openworld = true }, records = {} }")
-lua.execute("assert(EverlootDB.toggles.talents == true, 'an upgraded install starts with talents on')")
+lua.execute("assert(Everloot.Talents.Snapshot(Everloot.Talents.Groups()[1]) == nil, 'no player yet')")
 
 # --- Loadout string header: version, then spec id, least-significant bit first ---
 lua = fresh()
@@ -329,7 +232,5 @@ assert(string.find(text, 'spec group 1 (active): 3 points, export ok', 1, true),
 assert(string.find(text, 'share code: EL1-mage-1482-1.60.1.70450-', 1, true), text)
 """)
 
-# Every row the addon wrote is a record the site would accept (packages/protocol/schema).
-from protocol_schema import check_all  # noqa: E402
-check_all(lua)
-print("Lua 5.1 talents: both spec groups, spent nodes, game export and status, guarded calls, selftest pass/fail lines")
+print("Lua 5.1 talents: read live, nothing recorded; both spec groups, spent nodes, game export and status, guarded calls, "
+      "selftest pass/fail lines")

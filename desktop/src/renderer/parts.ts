@@ -33,7 +33,7 @@ export interface Empty { cause: string; step: string; action?: EmptyAction }
 type EmptyContext = { settings: Pick<Settings, "gameFolder" | "upload" | "prices" | "ask">; engine: Pick<EngineState, "files" | "paused"> };
 
 const EMPTY_DEFAULT: Record<EmptyPage, Empty> = {
-  characters: { cause: "Save file read, no named character rows yet", step: "The addon records gold and gear while you play" },
+  characters: { cause: "Save file read, no named character rows yet", step: "The addon records gold while you play" },
   upload: { cause: "Nothing sent yet", step: "The first upload runs after your next logout", action: { label: "Upload now", run: "upload" } },
   market: { cause: "No full scan in your save file yet", step: "At the auction house, press Everloot scan" },
   ask: { cause: "No question waiting", step: "Type /ask in game, then /reload" },
@@ -110,14 +110,14 @@ export function workingStrip(job: Job, s: { engine: Pick<EngineState, "jobs" | "
  */
 export function ghostProfile(): string {
   const cols = Array.from({ length: 7 }, () => '<div class="wk-col"></div>').join("");
-  const rows = Array.from({ length: 3 }, () => '<tr><td><span class="ghost-line"></span></td><td class="num"><span class="ghost-line short"></span></td><td class="num"><span class="ghost-line short"></span></td><td class="num"><span class="ghost-line short"></span></td><td class="num"><span class="ghost-line short"></span></td></tr>').join("");
+  const rows = Array.from({ length: 3 }, () => '<tr><td><span class="ghost-line"></span></td><td class="num"><span class="ghost-line short"></span></td><td class="num"><span class="ghost-line short"></span></td><td class="num"><span class="ghost-line short"></span></td></tr>').join("");
   return `<div class="ghost" aria-hidden="true">
     <div class="char-hero">
       <section class="panel river-card"><div class="row between"><h2>30-day money river</h2><span class="muted small">earned and spent, by day</span></div><div class="river"></div></section>
       <section class="panel week-card"><div class="row between"><h2>This week</h2><span class="muted small">earned above · spent below</span></div><div class="week-bars">${cols}</div></section>
     </div>
-    <section class="panel"><div class="row between"><h2>Roster</h2><span class="muted small">gold, 7 days, item level, last seen</span></div>
-      <div class="tablewrap"><table class="roster"><thead><tr><th>Character</th><th class="num">Gold</th><th class="num">7 days</th><th class="num">Item level</th><th class="num">Last seen</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <section class="panel"><div class="row between"><h2>Roster</h2><span class="muted small">gold, 7 days, last seen</span></div>
+      <div class="tablewrap"><table class="roster"><thead><tr><th>Character</th><th class="num">Gold</th><th class="num">7 days</th><th class="num">Last seen</th></tr></thead><tbody>${rows}</tbody></table></div>
     </section>
   </div>`;
 }
@@ -127,11 +127,6 @@ export function watchPill(e: Pick<EngineState, "files" | "paused">): string {
   if (e.paused) return '<span class="pill-s pill-paused">Paused</span>';
   const n = e.files.length;
   return n ? `<span class="pill-s pill-ok">Watching ${n} file${n === 1 ? "" : "s"}</span>` : '<span class="pill-s pill-off">Not watching</span>';
-}
-
-/** A keyed character's professions, rank of max rank; – when the addon has none for it. */
-export function ownedProfessions(list: ProgressRow["professions"]): string {
-  return list.length ? list.map((x) => `<div>${esc(x.name)} <span class="muted">${x.rank}/${x.maxRank}</span></div>`).join("") : '<span class="muted">–</span>';
 }
 
 /** A keyed character's raid lockouts this week: bosses killed of total and when each resets; – when it has none. */

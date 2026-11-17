@@ -6,12 +6,14 @@
 --                 ids, names, criteria text, standing headers, quest ids. They reflect what this
 --                 character's windows list, so the site shows an entry only after 3 upload addresses report it
 --                 identically and never serves the raw rows.
---   owned rows    achievement_owned, reputation_owned, title_owned, quest_owned: this character's own
---                 progress, under an opaque 8-digit key (not the name). Shown on the site only from the
---                 upload page's "My collection ownership and completion progress" choice with a
---                 verified grant.
--- A changed achievement or standing replaces its earlier row in this file, so the file does not grow
--- with every point of reputation. Titles and completed quests are written as additions.
+--   title_owned   the titles this character holds, under an opaque 8-digit key (not the name). Shown on the site
+--                 only from the upload page's "My collection ownership and completion progress" choice with a
+--                 verified grant, or through the Desktop App's private sync of a linked character.
+-- This character's achievements, reputation and completed quests are no longer recorded (achievement_owned,
+-- reputation_owned, quest_owned): Blizzard's character API supplies them to everloot.app
+-- (docs/design/specs/2026-11-17-blizzard-api-first.md), and the window reads them live (C.Achievement, C.Standings,
+-- C.CompletedQuests below). Completed quests are still read, to find the quest chains they belong to.
+-- A changed catalog entry replaces its earlier row in this file. Titles are written as additions.
 --
 -- Calls, checked against the client's own files for build 1.60.1.70450 (docs/2026-10-19-addon-0.3.3-beta-checklist.md):
 --   GetCategoryList, GetCategoryInfo, GetCategoryNumAchievements, GetAchievementInfo,
@@ -30,7 +32,6 @@ E.Completion = C
 local BUDGET = 250             -- API reads per frame
 local DEBOUNCE_SECONDS = 10    -- events arrive in bursts; read once after they settle
 local COMBAT_RETRY_SECONDS = 15
-local ACHIEVEMENT_REFRESH_SECONDS = 7 * 24 * 60 * 60  -- a login re-reads achievements at most this often
 local MAX_CATEGORIES = 500
 local MAX_PER_CATEGORY = 1000
 local MAX_CRITERIA = 5000      -- web/src/lib/intake.ts
@@ -48,13 +49,12 @@ local MAX_ID = 2000000000
 C.Limits = {
   rows = 6000,            -- per kind: replaces the file-wide 2000 for these kinds
   achievements = 1500,    -- catalog rows read from the achievement list
-  perCharacter = 600,     -- owned achievement and reputation rows for one character
   bytes = 3000000,        -- estimated size of all completion rows together
 }
 
 local CATALOG_KINDS = { "achievement_catalog", "reputation_catalog", "title_catalog", "quest_chain_catalog" }
 local KINDS = { "achievement_catalog", "reputation_catalog", "title_catalog", "quest_chain_catalog",
-  "achievement_owned", "reputation_owned", "title_owned", "quest_owned", "boss_kill_owned" }
+  "title_owned", "boss_kill_owned" }
 
 -- Every call this module may make to the game. A test scans the source against this list.
 local API = {
@@ -164,8 +164,6 @@ local KEY = {
   reputation_catalog = function(r) return tostring(r.factionId) end,
   title_catalog = function(r) return tostring(r.titleId) end,
   quest_chain_catalog = function(r) return tostring(r.questLineId) end,
-  achievement_owned = function(r) return r.characterKey .. ":" .. r.achievementId end,
-  reputation_owned = function(r) return r.characterKey .. ":" .. r.factionId end,
 }
 
 --- The whole content of a row but who and when, as one string. Two rows with the same text say the same thing.
@@ -178,10 +176,6 @@ local SIGNATURE = {
   reputation_catalog = function(r) return parts(r.factionId, r.name, r.header, r.major) end,
   title_catalog = function(r) return parts(r.titleId, r.name) end,
   quest_chain_catalog = function(r) return parts(r.questLineId, r.name, r.truncated, table.concat(r.questIds, ",")) end,
-  achievement_owned = function(r)
-    return parts(r.achievementId, r.completed, r.earnedByMe, r.earnedOn, r.criteriaMet, r.criteriaTotal, r.quantity, r.required, r.class, r.level)
-  end,
-  reputation_owned = function(r) return parts(r.factionId, r.reaction, r.standing, r.floor, r.ceiling, r.class, r.level) end,
 }
 
 --- A rough size in bytes of a row as SavedVariables will hold it.
@@ -198,11 +192,11 @@ end
 
 -- What E:Store adds to every row: its event id and the time it was logged.
 local STORED_FIELDS = weigh({ eventId = string.rep("0", 48), kindLoggedAt = "2026-01-01T00:00:00Z" }) - 16
--- One remembered title or quest id in the seen state ([id] = true).
+-- One remembered title id in the seen state ([id] = true).
 local SEEN_ID = 16
 
 local function newContext()
-  return { dead = {}, index = {}, capped = {}, stats = {}, count = {}, bytes = 0, bytesCounted = false }
+  return { dead = {}, index = {}, capped = {}, stats = {}, bytes = 0, bytesCounted = false }
 end
 
 local function stat(ctx, name, delta)
@@ -218,13 +212,7 @@ local function indexOf(ctx, kind)
   local keyOf = KEY[kind]
   for _, row in ipairs(EverlootDB.records[kind] or {}) do
     local ok, key = pcall(keyOf, row)
-    if ok and key then
-      index[key] = row
-      if row.characterKey then
-        ctx.count[kind] = ctx.count[kind] or {}
-        ctx.count[kind][row.characterKey] = (ctx.count[kind][row.characterKey] or 0) + 1
-      end
-    end
+    if ok and key then index[key] = row end
   end
   return index
 end
@@ -256,10 +244,6 @@ local function put(ctx, kind, row)
   local old = index[key]
   local sig = SIGNATURE[kind](row)
   if old and SIGNATURE[kind](old) == sig then return false end
-  if not old and row.characterKey then
-    local count = (ctx.count[kind] or {})[row.characterKey] or 0
-    if count >= C.Limits.perCharacter then ctx.capped[kind .. " (per character)"] = true; return false end
-  end
   row.installId = EverlootDB.installId
   row.capturedAt = date("!%Y-%m-%dT%H:%M:%SZ")
   local delta = weigh(row) + STORED_FIELDS - (old and weigh(old) or 0)
@@ -274,22 +258,18 @@ local function put(ctx, kind, row)
   end
   index[key] = row
   ctx.bytes = ctx.bytes + delta
-  if row.characterKey and not old then
-    ctx.count[kind] = ctx.count[kind] or {}
-    ctx.count[kind][row.characterKey] = (ctx.count[kind][row.characterKey] or 0) + 1
-  end
   stat(ctx, kind)
   return true
 end
 
---- Append a list-of-ids row (titles, completed quests) when it fits the budget.
+--- Append a list-of-ids row (titles) when it fits the budget.
 local function putAddition(ctx, kind, row)
   if ctx.capped[kind] or ctx.full then return false end
   countBytes(ctx)
   row.installId = EverlootDB.installId
   row.capturedAt = date("!%Y-%m-%dT%H:%M:%SZ")
   -- The ids it carries are also remembered in the seen state.
-  local delta = weigh(row) + STORED_FIELDS + #(row.titleIds or row.questIds or {}) * SEEN_ID
+  local delta = weigh(row) + STORED_FIELDS + #(row.titleIds or {}) * SEEN_ID
   if ctx.bytes + delta > C.Limits.bytes then ctx.full = true; return false end
   if not E:Store(kind, row, C.Limits.rows) then ctx.capped[kind] = true; return false end
   ctx.bytes = ctx.bytes + delta
@@ -326,7 +306,7 @@ local function categoryNames(id, cache)
   return name, parentName
 end
 
-local function readAchievements(ctx, own, identity, spend)
+local function readAchievements(ctx, spend)
   local categories = call("GetCategoryList")
   if type(categories) ~= "table" then stat(ctx, "achievement_unreadable"); return end
   local names = {}
@@ -345,7 +325,7 @@ local function readAchievements(ctx, own, identity, spend)
           ctx.achievementsDone = true
           return
         end
-        local id, name, points, completed, month, day, year, _, _, _, _, isGuild, byMe = call("GetAchievementInfo", categoryId, index)
+        local id, name, points, _, _, _, _, _, _, _, _, isGuild = call("GetAchievementInfo", categoryId, index)
         spend(1)
         name = plain(name, 120)
         if category and name and whole(id, 1, MAX_ID) and not visited[id] and not isGuild then
@@ -354,14 +334,11 @@ local function readAchievements(ctx, own, identity, spend)
           local criteriaCount = call("GetAchievementNumCriteria", id)
           criteriaCount = whole(criteriaCount, 0, MAX_CRITERIA) and criteriaCount or 0
           spend(1)
-          local criteria, met, quantity, required = {}, 0, nil, nil
-          for ci2 = 1, criteriaCount do
-            local text, _, done, have, need = call("GetAchievementCriteriaInfo", id, ci2)
-            if done then met = met + 1 end
-            local want = whole(need, 0, MAX_ID) and need or 0
-            if ci2 <= MAX_CRITERIA_KEPT then criteria[#criteria + 1] = { text = plain(text, 120) or "", required = want } end
-            -- A single criterion with a target above 1 is a progress bar: keep its amount.
-            if criteriaCount == 1 and want > 1 and whole(have, 0, MAX_ID) then quantity, required = math.min(have, want), want end
+          local criteria = {}
+          -- Only the criteria the catalog keeps are asked about; their count comes from GetAchievementNumCriteria.
+          for ci2 = 1, math.min(criteriaCount, MAX_CRITERIA_KEPT) do
+            local text, _, _, _, need = call("GetAchievementCriteriaInfo", id, ci2)
+            criteria[#criteria + 1] = { text = plain(text, 120) or "", required = whole(need, 0, MAX_ID) and need or 0 }
             spend(1)
           end
           points = whole(points, 0, 1000) and points or 0
@@ -371,27 +348,15 @@ local function readAchievements(ctx, own, identity, spend)
             criteriaCount = criteriaCount, criteria = criteria,
           })
           stat(ctx, "achievement_read")
-          if identity then
-            local done = completed and true or false
-            if done or met > 0 or (quantity and quantity > 0) then
-              local earnedByMe, when
-              if done then earnedByMe = byMe and true or false; when = earnedOn(month, day, year) end
-              put(ctx, "achievement_owned", {
-                kind = "achievement_owned", characterKey = identity.key, class = identity.class, level = identity.level,
-                achievementId = id, completed = done, earnedByMe = earnedByMe, earnedOn = when,
-                criteriaMet = met, criteriaTotal = criteriaCount, quantity = quantity, required = required,
-              })
-            end
-          end
         end
       end
     end
   end
-  -- A whole read finished: this build's catalog is recorded, and this character's progress is fresh.
+  -- A whole read finished: this build's catalog is recorded.
   ctx.achievementsDone = true
 end
 
-local function readReputation(ctx, own, identity, spend)
+local function readReputation(ctx, spend)
   local count = call("C_Reputation.GetNumFactions")
   if not whole(count, 0, MAX_FACTIONS) then stat(ctx, "reputation_unreadable"); return end
   local header
@@ -414,14 +379,6 @@ local function readReputation(ctx, own, identity, spend)
         local major = hasMajor and call("C_Reputation.IsMajorFaction", id) and true or nil
         put(ctx, "reputation_catalog", { kind = "reputation_catalog", factionId = id, name = name, header = parent, major = major })
         stat(ctx, "reputation_read")
-        local reaction, standing, floor, ceiling = data.reaction, data.currentStanding, data.currentReactionThreshold, data.nextReactionThreshold
-        if identity and not major and whole(reaction, 1, 20) and whole(standing, -1000000, 10000000)
-          and whole(floor, -1000000, 10000000) and whole(ceiling, -1000000, 10000000) and floor <= ceiling then
-          put(ctx, "reputation_owned", {
-            kind = "reputation_owned", characterKey = identity.key, class = identity.class, level = identity.level,
-            factionId = id, reaction = reaction, standing = standing, floor = floor, ceiling = ceiling,
-          })
-        end
       end
     end
   end
@@ -457,7 +414,9 @@ local function readTitles(ctx, own, identity, spend)
   end
 end
 
-local function readQuests(ctx, own, identity, spend, wantChains)
+--- The quest chains of this character's completed quests. The completed quests themselves are not stored as rows;
+--- the seen state keeps which ones were looked up already, so a pass asks only about the new ones.
+local function readQuests(ctx, own, spend)
   local ids = call("C_QuestLog.GetAllCompletedQuestIDs")
   if type(ids) ~= "table" then stat(ctx, "quest_unreadable"); return end
   local fresh = {}
@@ -467,7 +426,7 @@ local function readQuests(ctx, own, identity, spend, wantChains)
   end
   -- Chains are looked up for quests not looked up yet: those newly completed, and those an earlier pass
   -- left over at its limit. Quests a finished lookup covered are not asked about again.
-  if wantChains then
+  do
     local candidates = {}
     for _, id in ipairs(own.pending) do candidates[#candidates + 1] = id end
     for _, id in ipairs(fresh) do candidates[#candidates + 1] = id end
@@ -507,19 +466,8 @@ local function readQuests(ctx, own, identity, spend, wantChains)
     end
     own.pending = left
   end
-  if not identity then return end
-  for first = 1, #fresh, MAX_IDS_PER_ROW do
-    local batch = {}
-    for i = first, math.min(first + MAX_IDS_PER_ROW - 1, #fresh) do batch[#batch + 1] = fresh[i] end
-    if putAddition(ctx, "quest_owned", {
-      kind = "quest_owned", characterKey = identity.key, class = identity.class, level = identity.level, questIds = batch,
-    }) then
-      for _, id in ipairs(batch) do own.q[id] = true end
-      stat(ctx, "quest_owned", #batch)
-    else
-      break
-    end
-  end
+  -- A quest left over at the limit is carried in own.pending, so every fresh quest counts as handled.
+  for _, id in ipairs(fresh) do own.q[id] = true end
 end
 
 -- ---------------------------------------------------------------------------------------------
@@ -540,11 +488,6 @@ local function warnLimits(ctx)
   if ctx.full then
     warn("bytes", "completion data reached its size budget (about " .. math.floor(C.Limits.bytes / 1000) .. " KB); nothing more is recorded. Upload your file, then /everloot completion off clears it.")
   end
-  for kind in pairs(ctx.capped) do
-    if kind:find("per character", 1, true) then
-      warn(kind, "this character reached " .. C.Limits.perCharacter .. " " .. kind:gsub(" %(per character%)", "") .. " rows; newer progress is not recorded.")
-    end
-  end
   if ctx.stats.achievement_stopped then
     warn("achievements", "completion read the first " .. C.Limits.achievements .. " achievements and stopped there.")
   end
@@ -561,19 +504,15 @@ local function summary(ctx)
       out[#out + 1] = text
     end
   end
-  if state.ready.achievements then part("achievements", "achievement", s.achievement_catalog, s.achievement_owned) end
+  if state.ready.achievements then part("achievements", "achievement", s.achievement_catalog) end
   if state.ready.reputation then
-    part("reputation", "reputation", s.reputation_catalog, s.reputation_owned)
+    part("reputation", "reputation", s.reputation_catalog)
     if ctx.collapsed and ctx.collapsed > 0 then
       out[#out] = out[#out] .. "; " .. ctx.collapsed .. " collapsed headers hide their factions, expand them in the reputation window and run /everloot completion"
     end
   end
   if state.ready.titles then part("titles", "title", s.title_catalog, s.title_owned) end
-  if state.ready.quests then
-    local text = "quests: " .. (s.quest_owned or 0) .. " newly completed"
-    if state.ready.chains then text = text .. ", " .. (s.chain_read or 0) .. " chains found" end
-    out[#out + 1] = text
-  end
+  if state.ready.quests and state.ready.chains then out[#out + 1] = "quests: " .. (s.chain_read or 0) .. " chains found" end
   for kind in pairs(ctx.capped) do out[#out + 1] = kind .. " paused at capacity" end
   if ctx.full then
     out[#out + 1] = "completion data reached its size budget (about " .. math.floor(C.Limits.bytes / 1000) .. " KB), nothing more is recorded; /everloot completion off clears it"
@@ -596,7 +535,7 @@ local function describe()
     lines[#lines + 1] = "quest chains unavailable, missing " .. table.concat(state.missing.chains or {}, ", ") .. " (records no chains)"
   end
   if #(state.missing.player or {}) > 0 then
-    lines[#lines + 1] = "your progress not recorded, missing " .. table.concat(state.missing.player, ", ") .. " (catalogs only)"
+    lines[#lines + 1] = "your titles not recorded, missing " .. table.concat(state.missing.player, ", ") .. " (catalogs only)"
   end
   return table.concat(lines, "; ")
 end
@@ -630,18 +569,16 @@ local function body(domains, finish)
     for other, entry in pairs(seen.own) do
       if other ~= key and type(entry) == "table" and type(entry.seenAt) == "number" and time() - entry.seenAt >= FORGET_CHARACTER_SECONDS then seen.own[other] = nil end
     end
-    if identity then own.seenAt = time() end
+    -- achievedAt dated this character's recorded progress, which is no longer kept.
+    if identity then own.seenAt = time(); own.achievedAt = nil end
     -- A login asks for achievements only when due; that is decided here, out of combat, not in the event.
     if (domains.achievements or (domains.achievementsIfDue and C.AchievementsDue())) and state.ready.achievements then
-      readAchievements(ctx, own, identity, spend)
-      if ctx.achievementsDone then
-        seen.catalogKey = catalogKey()
-        if identity then own.achievedAt = time() end
-      end
+      readAchievements(ctx, spend)
+      if ctx.achievementsDone then seen.catalogKey = catalogKey() end
     end
-    if domains.reputation and state.ready.reputation then readReputation(ctx, own, identity, spend) end
+    if domains.reputation and state.ready.reputation then readReputation(ctx, spend) end
     if domains.titles and state.ready.titles then readTitles(ctx, own, identity, spend) end
-    if domains.quests and state.ready.quests then readQuests(ctx, own, identity, spend, state.ready.chains) end
+    if domains.quests and state.ready.quests and state.ready.chains then readQuests(ctx, own, spend) end
     compact(ctx)
     finish(ctx)
   end)
@@ -700,15 +637,11 @@ function C.Schedule(domains, delay)
   C_Timer.After(delay or DEBOUNCE_SECONDS, startPass)
 end
 
---- A login re-reads the achievements only when this build's catalog is not recorded yet, or this
---- character's progress is a week old (or was never read). Other times: on ACHIEVEMENT_EARNED, or on request.
+--- A login re-reads the achievements only when this build's catalog is not recorded yet. Other times: on
+--- ACHIEVEMENT_EARNED, or on request.
 function C.AchievementsDue()
   local seen = EverlootDB.completionSeen
-  if type(seen) ~= "table" or seen.catalogKey ~= catalogKey() then return true end
-  local key = C.Identity()
-  local own = key and type(seen.own) == "table" and seen.own[key]
-  if not own then return key ~= nil end
-  return type(own.achievedAt) ~= "number" or time() - own.achievedAt >= ACHIEVEMENT_REFRESH_SECONDS
+  return type(seen) ~= "table" or seen.catalogKey ~= catalogKey()
 end
 
 --- Read now, from /everloot completion.
@@ -720,8 +653,48 @@ function C.ReadNow()
   -- Turned on in this session: the module starts at the next /reload, not before.
   if not state.started then print("Everloot: the completion tracker is on; /reload to start it.") return end
   if not state.ready.timer then print("Everloot: completion needs C_Timer.After, which this client lacks.") return end
-  print("Everloot: reading achievements, reputation, titles and quests across the next few seconds.")
+  print("Everloot: reading achievements, reputation, titles and quest chains across the next few seconds.")
   C.Schedule(nil, 0)
+end
+
+-- ---------------------------------------------------------------------------------------------
+-- Live reads for the window (window.lua, view_collection.lua): this character's progress straight from the game,
+-- never stored. Each is one guarded pass over the game's own lists, made when the window draws.
+
+--- Whether this character has completed achievement `id`, and the day it was earned ("YYYY-MM-DD", or nil for a date
+--- that does not exist). Nil when the game cannot say.
+function C.Achievement(id)
+  local _, _, _, completed, month, day, year = call("GetAchievementInfo", id)
+  if completed == nil then return nil end
+  if not completed then return false end
+  return true, earnedOn(month, day, year)
+end
+
+--- This character's standing with each faction the reputation window lists now: [factionId] = { reaction, standing,
+--- floor, ceiling }. A faction under a collapsed header is not listed. Empty when the client cannot list them.
+function C.Standings()
+  local out = {}
+  local count = call("C_Reputation.GetNumFactions")
+  if not whole(count, 0, MAX_FACTIONS) then return out end
+  for index = 1, count do
+    local data = call("C_Reputation.GetFactionDataByIndex", index)
+    if type(data) == "table" and whole(data.factionID, 1, MAX_ID) and whole(data.reaction, 1, 20) then
+      out[data.factionID] = { reaction = data.reaction, standing = data.currentStanding,
+        floor = data.currentReactionThreshold, ceiling = data.nextReactionThreshold }
+    end
+  end
+  return out
+end
+
+--- [questId] = true for each quest this character has completed. Empty when the client cannot list them.
+function C.CompletedQuests()
+  local out = {}
+  local ids = call("C_QuestLog.GetAllCompletedQuestIDs")
+  if type(ids) ~= "table" then return out end
+  for _, id in ipairs(ids) do
+    if whole(id, 1, MAX_ID) then out[id] = true end
+  end
+  return out
 end
 
 --- /everloot completion off: withdraw everything this module wrote.
