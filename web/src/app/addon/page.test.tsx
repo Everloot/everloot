@@ -44,6 +44,15 @@ async function render(answer: () => Promise<Response>) {
 
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
+test("the page describes the in-game window, feature chooser and local-only stores", async () => {
+  const html = await render(() => Promise.resolve(Response.json(releases)));
+  const text = visible(html);
+  for (const term of ["What you get in game", "Home:", "Gold:", "Collection:", "Professions:", "Settings:", "/everloot window", "/everloot setup", "Collect data only", "Collect all", "gold ledger", "character roster", "never uploaded"]) {
+    expect(text).toContain(term);
+  }
+  expect(html).toContain('href="/docs/guides/addon#window"');
+});
+
 test("the addon choices lead with the app, then website, then zip; desktop starts neutral", async () => {
   const html = await render(() => Promise.resolve(Response.json(releases)));
   const choices = [...html.matchAll(/<a[^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>/g)]

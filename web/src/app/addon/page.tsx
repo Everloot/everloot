@@ -233,6 +233,10 @@ export default async function AddonPage() {
                 <li>Prices on the items you look at in the auction house. A full scan runs only when you ask for one.</li>
                 <li>Where you stood when an NPC&apos;s window opened (a vendor, a quest giver, a trainer, a flight master), so that NPC can get a place on the map.</li>
                 <li>The census: the race, class, level and faction of your characters and of players near you, including the ones the game shows a nameplate for. Never a name. It is on in a new install and says so once in chat.</li>
+                <li>Gold in and out: shared only if you tick it on the upload page. The window&apos;s gold ledger, character roster and gold per hour sessions stay local and are never uploaded.</li>
+                <li>Gear: read from the game when needed, never recorded or uploaded by the addon.</li>
+                <li>Your guild&apos;s roster, lockouts, attendance and loot: kept locally and published only through an officer&apos;s upload.</li>
+                <li>Completion, when enabled: game catalogs, your titles, raid lockouts and boss kills. Catalogs and titles can be uploaded; lockouts leave only through private sync, and boss kills stay local. Your achievements, reputation and completed quests are read live, never recorded.</li>
               </ul>
             </Card>
             <Card as="section" aria-labelledby="why-gives" className="space-y-3">
@@ -251,7 +255,7 @@ export default async function AddonPage() {
               <SectionHeading id="why-never" as="h3">What it never collects or publishes</SectionHeading>
               <ul className="list-disc space-y-2 pl-5 text-sm text-fg-2">
                 <li>Your install id, and the address an upload came from, are never published.</li>
-                <li>Gold, gear, guild and collection stay on your computer unless you tick them to share on the upload page. Gold per hour sessions never leave it.</li>
+                <li>The character roster, gold ledger and gold per hour sessions never leave your computer. Each kind of recorded data above has its own sharing rules.</li>
                 <li>For other players the census reads race, class, level and faction, and nothing else.</li>
                 <li>Where you stood when you only targeted an NPC is never used as that NPC&apos;s place.</li>
                 <li>The addon never plays your character, and never buys, bids on or posts anything at the auction house.</li>
@@ -269,6 +273,28 @@ export default async function AddonPage() {
             <Link href="/methodology" className={link}>How we count</Link>.
           </p>
         </section>
+
+        <Card as="section" aria-labelledby="in-game-title" className="space-y-3">
+          <SectionHeading id="in-game-title">What you get in game</SectionHeading>
+          <p className="text-sm text-fg-2">
+            Open the Everloot window with <code>/everloot window</code> or a left-click on the minimap button. Use either
+            again to reopen it after closing it. Right-click the button or type <code>/everloot options</code> for settings.
+          </p>
+          <ul className="list-disc space-y-2 pl-5 text-sm text-fg-2">
+            <li><strong>Home:</strong> your characters, gold, professions and last seen times, realm and account totals, this week&apos;s gold changes and your gold per hour session.</li>
+            <li><strong>Gold:</strong> gold by realm and over time, the money ledger, auction sales and gold per hour.</li>
+            <li><strong>Collection:</strong> achievements, reputation, titles, dungeon and raid progress and quest chains, with the completion tracker on.</li>
+            <li><strong>Professions:</strong> ranks, recorded recipes by difficulty colour, crafting costs and reagents to add to your shopping list.</li>
+            <li><strong>Settings:</strong> switches for each part of the addon and counts of what you&apos;ve recorded.</li>
+            <li>Item tooltips show prices, your own sale and purchase history, and recorded sources.</li>
+            <li>Optional helpers sell grey items and repair with your own gold at merchants, and add a Collect all button at the mailbox.</li>
+          </ul>
+          <p className="text-sm text-fg-2">
+            <code>/everloot setup</code> asks which features to use: Everything, Collect data only or Choose myself.
+            Collect data only keeps recording and auction scans while turning off the window and helpers. You can turn
+            the Everloot window back on in settings. Read the <Link href="/docs/guides/addon#window" className={link}>window guide</Link>.
+          </p>
+        </Card>
 
         <section id="gold-per-hour" aria-labelledby="gold-per-hour-title" className="max-w-reading scroll-mt-20">
           <SectionHeading id="gold-per-hour-title">Gold per hour, now in the addon</SectionHeading>
