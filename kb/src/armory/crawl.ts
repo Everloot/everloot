@@ -39,6 +39,11 @@ export interface Summary {
   enqueued: number;
   purged: number;
 }
+/** Each stored details section and the endpoint that fills it. */
+const SECTIONS = [
+  ["statistics", "statistics"], ["talents", "specializations"], ["professions", "professions"], ["avatar", "media"],
+  ["achievements", "achievements"], ["reputations", "reputations"], ["quests", "quests"],
+] as const;
 const transient = (error: unknown) =>
   (error instanceof ApiError || error instanceof StoreError) && error.transient;
 /** Stored rows need an extra armory_character/armory_guild read; a future armory_take last_modified column could remove it. */
@@ -230,9 +235,11 @@ export async function runCrawl(cfg: {
           : await store.guild(region, q.slug)
         : [];
       const oldDetails = kind === "character" ? ArmoryDetails.safeParse(stored[0] && "details" in stored[0] ? stored[0].details : null) : null;
-      const agedDetails = oldDetails?.success && [oldDetails.data.statistics, oldDetails.data.talents, oldDetails.data.professions, oldDetails.data.avatar]
+      const agedDetails = oldDetails?.success && SECTIONS.map(([section]) => oldDetails.data[section])
         .some((section) => section && now() - Date.parse(section.asOf) >= 20 * 86_400_000);
-      const backfill = cfg.details && kind === "character" && (!oldDetails?.success || oldDetails.data.retry || agedDetails);
+      // Rows read before progress was crawled get it on their next turn instead of after a 304.
+      const noProgress = oldDetails?.success && !oldDetails.data.achievements && !oldDetails.data.reputations && !oldDetails.data.quests;
+      const backfill = cfg.details && kind === "character" && (!oldDetails?.success || oldDetails.data.retry || agedDetails || noProgress);
       const modified = backfill ? null : stored[0]?.last_modified;
       const result = await read(
         kind === "guild" ? `${base}/roster` : base,
@@ -315,7 +322,7 @@ export async function runCrawl(cfg: {
           }
           const details = normalizeDetails(responses, new Date(now()).toISOString());
           if (oldDetails?.success) {
-            for (const [key, endpoint] of [["statistics", "statistics"], ["talents", "specializations"], ["professions", "professions"], ["avatar", "media"]] as const) {
+            for (const [key, endpoint] of SECTIONS) {
               const previous = oldDetails.data[key];
               if (failed.has(endpoint) && previous && now() - Date.parse(previous.asOf) < 30 * 86_400_000) Object.assign(details, { [key]: previous });
             }
@@ -343,7 +350,7 @@ export async function runCrawl(cfg: {
   }
   async function process(kind: Kind, rows: QueueRow[]) {
     let index = 0;
-    const cost = kind === "guild" ? 2 : cfg.details ? 7 : 3;
+    const cost = kind === "guild" ? 2 : cfg.details ? 3 + DETAIL_KEYS.length : 3;
     await Promise.all(
       Array.from({ length: 8 }, async () => {
         while (!fatal && index < rows.length) {

@@ -1,0 +1,41 @@
+{
+  "_links": {
+    "self": {
+      "href": "https://eu.api.blizzard.com/profile/wow/character/ember-vale/reputations?namespace=profile-forever-eu"
+    }
+  },
+  "reputations": [
+    {
+      "faction": {
+        "key": {
+          "href": "https://eu.api.blizzard.com/data/wow/reputation-faction/530?namespace=static-forever-eu"
+        },
+        "name": "Darkspear Trolls",
+        "id": 530
+      },
+      "standing": {
+        "raw": 3100,
+        "value": 100,
+        "max": 12000,
+        "tier": 4,
+        "name": "Friendly"
+      }
+    },
+    {
+      "faction": {
+        "key": {
+          "href": "https://eu.api.blizzard.com/data/wow/reputation-faction/76?namespace=static-forever-eu"
+        },
+        "name": "Orgrimmar",
+        "id": 76
+      },
+      "standing": {
+        "raw": 0,
+        "value": 0,
+        "max": 3000,
+        "tier": 3,
+        "name": "Neutral"
+      }
+    }
+  ]
+}

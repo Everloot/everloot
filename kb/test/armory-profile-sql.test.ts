@@ -21,6 +21,9 @@ test("armory profile migration and behavior on a disposable PostgreSQL database"
     await db.exec("create role backup_exporter; grant usage on schema public to backup_exporter;");
     await db.exec(read("migrations/20261112190000_armory_profiles.sql"));
     await db.exec(read("tests/armory_profiles.sql"));
+    await db.exec(read("migrations/20261117120000_armory_progress.sql"));
+    await db.exec(read("tests/armory_profiles.sql"));
+    await db.exec(read("tests/armory_progress.sql"));
     expect((await db.query("select count(*)::int as n from public.armory_characters")).rows).toEqual([{ n: 0 }]);
   } finally { await db.close(); }
 }, 30_000);

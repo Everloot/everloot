@@ -5,6 +5,10 @@ import { z } from "zod";
 const text = z.string().min(1).max(120);
 const amount = z.number().finite().nonnegative();
 const date = z.string().datetime();
+const gameId = z.number().int().positive().max(2_147_483_647);
+// Forever answered about 48 achievements, 18-23 factions and 495-951 completed quests on 2026-11-17.
+// The caps leave room to grow; full lists at the caps stay near 45 KB of the column's 64 KB.
+export const MAX_ACHIEVEMENTS = 100, MAX_REPUTATIONS = 50, MAX_QUESTS = 3000;
 export const ArmoryDetails = z.object({
   revision: z.literal(1),
   retry: z.literal(true).optional(),
@@ -12,6 +16,10 @@ export const ArmoryDetails = z.object({
   talents: z.object({ asOf: date, trees: z.array(z.object({ name: text, points: amount, talents: z.array(z.object({ name: text, rank: amount })).max(100) })).max(10) }).optional(),
   professions: z.object({ asOf: date, rows: z.array(z.object({ name: text, rank: amount, max: amount.positive() })).max(10) }).optional(),
   avatar: z.object({ asOf: date, url: z.string().url().refine(safePortrait) }).optional(),
+  // Completed achievements only; Forever's points are always 0, so they are not kept.
+  achievements: z.object({ asOf: date, rows: z.array(z.object({ id: gameId, name: text, completedAt: date })).max(MAX_ACHIEVEMENTS) }).optional(),
+  reputations: z.object({ asOf: date, rows: z.array(z.object({ id: gameId, name: text, standing: text, tier: amount.int().optional() })).max(MAX_REPUTATIONS) }).optional(),
+  quests: z.object({ asOf: date, completed: z.array(gameId).max(MAX_QUESTS) }).optional(),
 });
 export type ProfileDetails = z.infer<typeof ArmoryDetails>;
 type ObjectValue = Record<string, unknown>;
@@ -19,6 +27,7 @@ const obj = (v: unknown): ObjectValue => v !== null && typeof v === "object" && 
 const list = (v: unknown): unknown[] => Array.isArray(v) ? v : [];
 const name = (v: unknown) => text.safeParse(v).success ? v as string : null;
 const number = (v: unknown) => amount.safeParse(v).success ? v as number : null;
+const id = (v: unknown) => gameId.safeParse(v).success ? v as number : null;
 
 export function safePortrait(value: string): boolean {
   try {
@@ -28,9 +37,12 @@ export function safePortrait(value: string): boolean {
   } catch { return false; }
 }
 
-export const DETAIL_KEYS = ["statistics", "specializations", "professions", "media"] as const;
+export const DETAIL_KEYS = ["statistics", "specializations", "professions", "media", "achievements", "reputations", "quests"] as const;
 export type DetailKey = typeof DETAIL_KEYS[number];
-/** Follow a profile's advertised link, never a submitted URL or a link to another character. */
+/**
+ * Follow a profile's advertised link, never a submitted URL or a link to another character.
+ * For quests the profile advertises `/quests`; only its fixed `/completed` part is read.
+ */
 export function detailPath(profile: unknown, key: DetailKey, region: string, slug: string): string | null {
   const root = obj(profile);
   const href = obj(root[key] ?? root[key === "media" ? "character_media" : key]).href;
@@ -40,7 +52,7 @@ export function detailPath(profile: unknown, key: DetailKey, region: string, slu
     const base = `/profile/wow/character/${encodeURIComponent(slug)}/`;
     const suffix = key === "media" ? "character-media" : key;
     return u.protocol === "https:" && u.host === `${region}.api.blizzard.com` && !u.username && !u.password &&
-      decodeURIComponent(u.pathname) === decodeURIComponent(`${base}${suffix}`) ? u.pathname : null;
+      decodeURIComponent(u.pathname) === decodeURIComponent(`${base}${suffix}`) ? key === "quests" ? `${u.pathname}/completed` : u.pathname : null;
   } catch { return null; }
 }
 
@@ -87,5 +99,35 @@ export function normalizeDetails(responses: Partial<Record<DetailKey, unknown>>,
   if (skills.length) out.professions = { asOf, rows: skills };
   const avatar = list(obj(responses.media).assets).map(obj).find((a) => a.key === "avatar" && typeof a.value === "string" && safePortrait(a.value));
   if (avatar) out.avatar = { asOf, url: avatar.value as string };
+  // A well-formed answer with nothing completed is still a read, so these keep an empty list.
+  if (Array.isArray(obj(responses.achievements).achievements)) {
+    const seen = new Set<number>();
+    const rows = list(obj(responses.achievements).achievements).flatMap((raw) => {
+      const a = obj(raw), achievement = obj(a.achievement), key = id(a.id ?? achievement.id), title = name(achievement.name);
+      const at = a.completed_timestamp, completedAt = typeof at === "number" && Number.isSafeInteger(at) && at > 0 ? new Date(at) : null;
+      if (key === null || !title || !completedAt || Number.isNaN(completedAt.getTime()) || seen.has(key)) return [];
+      seen.add(key);
+      return [{ id: key, name: title, completedAt: completedAt.toISOString() }];
+    }).slice(0, MAX_ACHIEVEMENTS);
+    out.achievements = { asOf, rows };
+  }
+  if (Array.isArray(obj(responses.reputations).reputations)) {
+    const seen = new Set<number>();
+    const rows = list(obj(responses.reputations).reputations).flatMap((raw) => {
+      const r = obj(raw), faction = obj(r.faction), standing = obj(r.standing), key = id(faction.id), title = name(faction.name), label = name(standing.name);
+      if (key === null || !title || !label || seen.has(key)) return [];
+      seen.add(key);
+      const tier = number(standing.tier);
+      return [{ id: key, name: title, standing: label, ...(tier !== null && Number.isInteger(tier) ? { tier } : {}) }];
+    }).slice(0, MAX_REPUTATIONS);
+    out.reputations = { asOf, rows };
+  }
+  if (Array.isArray(obj(responses.quests).quests)) {
+    const completed = [...new Set(list(obj(responses.quests).quests).flatMap((raw) => {
+      const key = id(obj(raw).id);
+      return key === null ? [] : [key];
+    }))].sort((a, b) => a - b).slice(0, MAX_QUESTS);
+    out.quests = { asOf, completed };
+  }
   return out;
 }
