@@ -380,6 +380,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: search links every matching achievement, faction, title, quest chain, zone and instance through bounded result pages.
 
 ### Changed
+- Site: the AH Ledger panels (price history, crafting margins, deals) remember the market a visitor last picked, in their own browser, and open on it on every page; a realm page still opens on its realm. The crafting table no longer prefetches recipe pages, which sit behind the bot check and logged an error for each recipe in view.
 - CurseForge: every addon upload is a Release file; an Alpha is named "Everloot <version> Alpha". The CurseForge app
   syncs only Release files by default, so with every file a Beta, Everloot was missing for most app users. GitHub still
   marks an Alpha a pre-release, and the site still calls the addon an Alpha.

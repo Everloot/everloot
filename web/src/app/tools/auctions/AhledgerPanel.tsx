@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useId, useState, type ReactNode } from "react";
-import { AHLEDGER_SITE, ahledgerCredit, type AhledgerCredit } from "@/lib/ahledger";
+import { useCallback, useEffect, useId, useState, type ReactNode } from "react";
+import { AHLEDGER_SITE, ahledgerCredit, isAhledgerMarket, type AhledgerCredit } from "@/lib/ahledger";
 
 type Read<T> = { state: "loading" } | { state: "failed" } | { state: "ready"; data: T; credit: AhledgerCredit };
 
-/** Response data lives only in this mounted panel. A change discards the old market's answer. */
-export function useAhledger<T>(url: string, field: string): Read<T> {
-  const [read, setRead] = useState<{ url: string; value: Read<T> }>({ url, value: { state: "loading" } });
+/** Response data lives only in this mounted panel. A change discards the old market's answer. No URL reads nothing yet. */
+export function useAhledger<T>(url: string | null, field: string): Read<T> {
+  const [read, setRead] = useState<{ url: string | null; value: Read<T> }>({ url, value: { state: "loading" } });
   useEffect(() => {
+    if (!url) return;
     const controller = new AbortController();
     setRead({ url, value: { state: "loading" } });
     fetch(url, { signal: controller.signal }).then(async (res) => {
@@ -42,6 +43,29 @@ export function AhledgerPanel({ title, state, credit, controls, children }: {
 
 const SELECT = "min-h-10 rounded-control border border-line bg-canvas px-2 text-sm text-fg";
 export const DEFAULT_AHLEDGER_MARKET = "forever.normal.alliance.us";
+
+/** The market this browser last picked in any AH Ledger panel. Nothing is sent anywhere. */
+export const AHLEDGER_MARKET_SLOT = "everloot.ahledger.market.v1";
+
+/**
+ * The panel's market and the visitor's choice of another, which this browser remembers. A page's own market (the
+ * realm's, on a realm page) comes first; otherwise the remembered one, else the default. Null until the browser's copy
+ * is read, so no panel asks AH Ledger for a market it is about to replace.
+ */
+export function useAhledgerMarket(pageMarket?: string): [string | null, (market: string) => void] {
+  const [market, setMarket] = useState<string | null>(pageMarket ?? null);
+  useEffect(() => {
+    if (pageMarket) return;
+    let saved: string | null = null;
+    try { saved = window.localStorage.getItem(AHLEDGER_MARKET_SLOT); } catch {}
+    setMarket(saved && isAhledgerMarket(saved) ? saved : DEFAULT_AHLEDGER_MARKET);
+  }, [pageMarket]);
+  const choose = useCallback((next: string) => {
+    setMarket(next);
+    try { window.localStorage.setItem(AHLEDGER_MARKET_SLOT, next); } catch {}
+  }, []);
+  return [market, choose];
+}
 
 /** AH Ledger has no Hardcore market; Taiwanese realms share KR. */
 export function AhledgerMarketPicker({ market, onChange }: { market: string; onChange: (market: string) => void }) {

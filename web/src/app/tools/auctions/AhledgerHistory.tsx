@@ -1,9 +1,9 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId } from "react";
 import Coins from "@/components/ui/Coins";
 import { type AhledgerHistory as History, type AhledgerPoint } from "@/lib/ahledger";
-import { AhledgerMarketPicker, AhledgerPanel, DEFAULT_AHLEDGER_MARKET, salesText, useAhledger } from "./AhledgerPanel";
+import { AhledgerMarketPicker, AhledgerPanel, salesText, useAhledger, useAhledgerMarket } from "./AhledgerPanel";
 
 function HistoryChart({ series }: { series: AhledgerPoint[] }) {
   const title = useId();
@@ -41,10 +41,10 @@ function HistoryChart({ series }: { series: AhledgerPoint[] }) {
   </figure>;
 }
 
-export default function AhledgerHistory({ itemId, defaultMarket = DEFAULT_AHLEDGER_MARKET }: { itemId: number; defaultMarket?: string }) {
-  const [market, setMarket] = useState(defaultMarket);
-  const read = useAhledger<History>(`/api/ahledger/${market}/history?item=${itemId}`, "history");
-  return <AhledgerPanel title="AH Ledger price history" state={read.state} credit={read.state === "ready" ? read.credit : undefined} controls={<AhledgerMarketPicker market={market} onChange={setMarket} />}>
+export default function AhledgerHistory({ itemId, defaultMarket }: { itemId: number; defaultMarket?: string }) {
+  const [market, setMarket] = useAhledgerMarket(defaultMarket);
+  const read = useAhledger<History>(market && `/api/ahledger/${market}/history?item=${itemId}`, "history");
+  return <AhledgerPanel title="AH Ledger price history" state={read.state} credit={read.state === "ready" ? read.credit : undefined} controls={market && <AhledgerMarketPicker market={market} onChange={setMarket} />}>
     {read.state === "ready" && <>
       <p className="text-meta text-fg-2">AH Ledger scans for this market, separate from player-reported prices. The chart shows up to 30 days of available scans.</p>
       <HistoryChart series={read.data.series} />

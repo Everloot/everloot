@@ -6,11 +6,13 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import AhledgerHistory from "./AhledgerHistory";
 import AhledgerCrafting from "./AhledgerCrafting";
 import { AhledgerDeals, AhledgerEconomySummary } from "./AhledgerMarket";
+import { AHLEDGER_MARKET_SLOT } from "./AhledgerPanel";
 
 let container: HTMLDivElement, root: Root;
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
+  localStorage.clear();
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
 const history = { median7d: 123456, median30d: 234567, salesPerDay: 3.5, windowDays: 7, series: [
@@ -112,4 +114,31 @@ test("an unreadable success body is a failed read", async () => {
   vi.stubGlobal("fetch", vi.fn(async () => Response.json({ notice: "unavailable" })));
   await act(async () => root.render(<AhledgerDeals />));
   expect(container.textContent).toContain("could not be read");
+});
+
+test("a market picked in one panel is the next panel's market; a realm page's own market comes first", async () => {
+  const fetchImpl = vi.fn(async () => Response.json({ ok: true, deals: [], recipes: [], history, credit })); vi.stubGlobal("fetch", fetchImpl);
+  await act(async () => root.render(<AhledgerDeals />));
+  expect((fetchImpl.mock.calls[0] as unknown[])[0]).toBe("/api/ahledger/forever.normal.alliance.us/deals");
+  await act(async () => { const el = container.querySelectorAll("select")[2]; el.value = "horde"; el.dispatchEvent(new Event("change", { bubbles: true })); });
+  expect(localStorage.getItem(AHLEDGER_MARKET_SLOT)).toBe("forever.normal.horde.us");
+  await act(async () => root.render(<AhledgerCrafting profession="Enchanting" />));
+  // Only the remembered market is read: no request for the default one first.
+  expect(fetchImpl.mock.calls.map((c) => (c as unknown[])[0]).filter((u) => String(u).includes("crafting"))).toEqual(["/api/ahledger/forever.normal.horde.us/crafting?profession=Enchanting"]);
+  expect((container.querySelectorAll("select")[2] as HTMLSelectElement).value).toBe("horde");
+  await act(async () => root.render(<AhledgerHistory itemId={42} defaultMarket="forever.pvp.alliance.eu" />));
+  expect((fetchImpl.mock.calls.at(-1) as unknown[])[0]).toBe("/api/ahledger/forever.pvp.alliance.eu/history?item=42");
+});
+
+test("a remembered value that is not a market, or storage the browser refuses, reads the default market", async () => {
+  const fetchImpl = vi.fn(async () => Response.json({ ok: true, deals: [], credit })); vi.stubGlobal("fetch", fetchImpl);
+  localStorage.setItem(AHLEDGER_MARKET_SLOT, "forever.hardcore.horde.us/../x");
+  await act(async () => root.render(<AhledgerDeals />));
+  expect((fetchImpl.mock.calls[0] as unknown[])[0]).toBe("/api/ahledger/forever.normal.alliance.us/deals");
+  await act(async () => root.unmount()); root = createRoot(container);
+  const blocked = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("SecurityError"); });
+  try {
+    await act(async () => root.render(<AhledgerDeals />));
+    expect((fetchImpl.mock.calls.at(-1) as unknown[])[0]).toBe("/api/ahledger/forever.normal.alliance.us/deals");
+  } finally { blocked.mockRestore(); }
 });
