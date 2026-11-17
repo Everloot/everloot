@@ -204,9 +204,18 @@ measured zeros under the three-install rule, relations (observed and game-file, 
 items of the build. One NDJSON file per dataset plus `index.json`, whose shape is `bulkIndex` in the
 protocol (`/schema/api/bulkIndex.json`).
 
-1. In `web/`, with the production R2 read variables in the environment (or `EVERLOOT_UPLOADS` for a
-   local store): `npm run export-bulk -- ../bulk-out`. It prints each file's rows, bytes and data class.
-   A file whose storage was unreachable is left out and `dataAsOf` is null; absent is not empty.
+1. In `web/`, run `npm run export-bulk -- ../bulk-out` with `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
+   `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in the environment.
+   The corpus needs all six; R2-only settings do not configure its upload index. Set
+   `EVERLOOT_PUBLIC_INSTALL_KEY` (at least 32 characters) for per-install pseudonyms; it falls back to
+   `EVERLOOT_CHARACTER_KEY`. Without either key, install ids are omitted. `EVERLOOT_GUILDS=1` also includes
+   the public guild files; leave it unset to omit them. The export reads the cloud store, not
+   `EVERLOOT_UPLOADS` or an implicit local uploads folder.
+   It prints each file's rows, bytes and data class. If corpus settings are missing, it prints
+   `corpus.ndjson omitted: missing` followed by their variable names (never their values); an unreadable
+   corpus prints `corpus.ndjson omitted: corpus storage unreachable`. The file is left out of the index
+   and `dataAsOf` is null; absent is not empty. A reachable corpus with zero public rows still produces
+   a zero-row `corpus.ndjson`.
 2. Upload it: `node scripts/upload-bulk.mjs ../bulk-out` with `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
    `R2_SECRET_ACCESS_KEY` and `BULK_BUCKET`. Every object is written create-only under a folder named
    by the export's `generatedAt`, data files first and the index last; then `latest.json` (the one

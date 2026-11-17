@@ -9,7 +9,7 @@ import { guildExportRows, guildsOn, loadGuildData } from "./guilds";
 import { CLIENT_TAXONOMY as T } from "./items";
 import { published, publicInstallSecret } from "./public-install";
 import { computeRollups } from "./rollup-compute";
-import { uploadStore } from "./upload-store";
+import { cloudConfig, uploadStore } from "./upload-store";
 
 /**
  * The bulk export: the published data as files, one newline-delimited JSON file per dataset plus an
@@ -29,7 +29,13 @@ interface Dataset {
 
 async function datasets(): Promise<{ sets: Dataset[]; dataAsOf: string | null }> {
   const sets: Dataset[] = [];
-  const corpus = await uploadStore.loadCorpus();
+  // The CLI runs outside production too: never mistake the loader's local fallback for cloud data.
+  const required = ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
+  const missing = required.filter((key) => !process.env[key]?.trim());
+  const corpus = cloudConfig() ? await uploadStore.loadCorpus() : { records: [], unreachable: true, dataAsOf: null };
+  if (corpus.unreachable) {
+    console.warn(`bulk export: corpus.ndjson omitted: ${missing.length ? `missing ${missing.join(", ")}` : "corpus storage unreachable"}`);
+  }
   const dataAsOf = corpus.unreachable ? null : (corpus.dataAsOf ?? null);
   if (!corpus.unreachable) {
     const wanted = new Set<string>(PUBLIC_RECORD_KINDS);
