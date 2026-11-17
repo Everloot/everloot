@@ -1,6 +1,6 @@
 {
   "source": "https://everloot.app/api/corpus/public?kinds=instance_entrance,encounter",
-  "asOf": "2026-11-10T22:50:15.399Z",
+  "asOf": "2026-11-17T22:30:16.820Z",
   "label": "Agreed by players, 3 installs; Data from Everloot (https://everloot.app), CC BY-SA 4.0",
   "entrances": [],
   "bosses": [
@@ -27,6 +27,22 @@
     {
       "instanceMapId": 48,
       "encounterId": 2916
+    },
+    {
+      "instanceMapId": 2998,
+      "encounterId": 3480
+    },
+    {
+      "instanceMapId": 2998,
+      "encounterId": 3481
+    },
+    {
+      "instanceMapId": 2998,
+      "encounterId": 3482
+    },
+    {
+      "instanceMapId": 189,
+      "encounterId": 444
     },
     {
       "instanceMapId": 389,
@@ -90,6 +106,10 @@
     },
     {
       "instanceMapId": 2999,
+      "encounterId": 3357
+    },
+    {
+      "instanceMapId": 2999,
       "encounterId": 3411
     },
     {
@@ -127,6 +147,34 @@
     {
       "instanceMapId": 33,
       "encounterId": 2755
+    },
+    {
+      "instanceMapId": 36,
+      "encounterId": 2741
+    },
+    {
+      "instanceMapId": 36,
+      "encounterId": 2742
+    },
+    {
+      "instanceMapId": 36,
+      "encounterId": 2743
+    },
+    {
+      "instanceMapId": 36,
+      "encounterId": 2744
+    },
+    {
+      "instanceMapId": 36,
+      "encounterId": 2745
+    },
+    {
+      "instanceMapId": 36,
+      "encounterId": 2746
+    },
+    {
+      "instanceMapId": 36,
+      "encounterId": 2747
     }
   ]
 }

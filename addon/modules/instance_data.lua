@@ -7,7 +7,7 @@ Everloot = Everloot or {}
 Everloot.InstanceData = {
   build = "1.60.1.70938",
   mapNamesBuild = "1.60.1.70634",
-  asOf = "2026-11-10T22:50:15.399Z",
+  asOf = "2026-11-17T22:30:16.820Z",
   instances = {
     { id = 33, name = "Shadowfang Keep", group = "Dungeons", unconfirmed = false, bosses = {
       { id = 2748, name = "Rethilgore" },
@@ -18,6 +18,15 @@ Everloot.InstanceData = {
       { id = 2753, name = "Fenrus the Devourer" },
       { id = 2754, name = "Wolf Master Nandos" },
       { id = 2755, name = "Archmage Arugal" },
+    } },
+    { id = 36, name = "Deadmines", group = "Dungeons", unconfirmed = false, bosses = {
+      { id = 2741, name = "Rhahk'Zor" },
+      { id = 2742, name = "Sneed" },
+      { id = 2743, name = "Gilnid" },
+      { id = 2744, name = "Captain Greenskin" },
+      { id = 2745, name = "Mr. Smite" },
+      { id = 2746, name = "Cookie" },
+      { id = 2747, name = "Edwin VanCleef" },
     } },
     { id = 43, name = "Wailing Caverns", group = "Dungeons", unconfirmed = false, bosses = {
       { id = 585, name = "Lady Anacondra" },
@@ -36,6 +45,9 @@ Everloot.InstanceData = {
       { id = 2914, name = "Geilhast" },
       { id = 2912, name = "Old Serra'kis" },
       { id = 2911, name = "Twilight Lord Kelris" },
+    } },
+    { id = 189, name = "Scarlet Monastery", group = "Dungeons", unconfirmed = false, bosses = {
+      { id = 444, name = "Interrogator Vishas" },
     } },
     { id = 389, name = "Ragefire Chasm", group = "Dungeons", unconfirmed = false, bosses = {
       { id = 2732, name = "Oggleflint" },
@@ -58,8 +70,14 @@ Everloot.InstanceData = {
       { id = 3113, name = "Taerar" },
       { id = 3114, name = "Ysondre" },
     } },
+    { id = 2998, name = "Excavation Site: Wetlands", group = "Dungeons", unconfirmed = false, bosses = {
+      { id = 3480, name = "Saltspine" },
+      { id = 3481, name = "Shadetooth" },
+      { id = 3482, name = "Relic Guardian" },
+    } },
     { id = 2999, name = "Ruins of Lordaeron", group = "Dungeons", unconfirmed = false, bosses = {
       { id = 3353, name = "Witherfang" },
+      { id = 3357, name = "The Abandoned" },
       { id = 3355, name = "The Butcher" },
       { id = 3411, name = "Viktor the Vile" },
       { id = 3412, name = "Bjork" },

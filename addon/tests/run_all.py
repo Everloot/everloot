@@ -18,7 +18,7 @@ TESTS = [
     "protocol_contract.py", "no_ads_contract.py", "minimap_contract.py", "secret_values_contract.py",
     "ui_window_contract.py", "answers_contract.py", "pulls_contract.py",
     "drawer_contract.py", "owned_contract.py", "guild_contract.py",
-    "inventory_contract.py", "roster_contract.py", "ledger_contract.py", "view_gold_contract.py", "view_collection_contract.py",
+    "inventory_contract.py", "roster_contract.py", "ledger_contract.py", "view_gold_contract.py", "view_collection_contract.py", "collection_tree_contract.py",
     "view_professions_contract.py", "event_isolation_contract.py", "repeat_events_contract.py",
     "instances_contract.py", "commands_contract.py", "retired_kinds_contract.py", "where_contract.py", "tooltip_history_contract.py", "shopping_contract.py",
 ]

@@ -7,7 +7,8 @@ test("the shipped Collection table matches the dated agreement snapshot and game
   const lua = readFileSync(new URL("../../addon/modules/instance_data.lua", import.meta.url), "utf8");
   expect(lua.replace(/\r\n/g, "\n")).toBe(renderInstanceData());
   expect(lua).not.toContain("id = 2720,");
-  expect(lua).not.toContain("id = 36, name =");
+  // Molten Core is in the game files but not yet agreed by 3 installs (snapshot 2026-11-17), so it stays out.
+  expect(lua).not.toContain("id = 409, name =");
   expect(lua).toContain("unconfirmed = true");
 });
 

@@ -77,7 +77,9 @@ click(c.scopes.account)
 assert(c.rows[3].detail.text:find('1 of 6', 1, true) and c.rows[3].detail.text:find('Velda', 1, true))
 assert(mark(c.rows[4]) == 'done' and c.rows[4].detail.text:find('Last killed 2026-11-10', 1, true) and not c.rows[4].detail.text:find('T12', 1, true) and c.rows[4].detail.text:find('Velda', 1, true))
 assert(c.rows[7].detail.text == 'No kill recorded', 'a key outside the roster does not count')
-assert(c.rows[8].detail.text == 'Found in game files, unconfirmed')
+assert(c.rows[8].detail.text == 'Found in game files, unconfirmed · 0 / 1 (0%)', c.rows[8].detail.text)
+-- Each heading counts the marks under it, as completionist lists do: Velda's kill is Blackfathom Deeps' one of one.
+assert(c.rows[1].detail.text == 'Agreed by players · 1 / 1 (100%)' and c.rows[2].detail.text == '1 / 1 (100%)', c.rows[2].detail.text)
 -- An instance nobody has agreed on gets no entry of its own, but a live lockout the game reports there is still
 -- this character's: it is listed under "Other lockouts this week", as the Raids section listed every lockout.
 local other, testwerk
@@ -88,7 +90,7 @@ for _, row in ipairs(c.rows) do
     assert(not row.detail.text:find('1970', 1, true), 'expired lockout is hidden')
   end
 end
-assert(other and testwerk and testwerk.name.text == '  Testwerk' and testwerk.detail.text:find('Velda', 1, true), 'a lockout off the list is kept, named')
+assert(other and testwerk and testwerk.name.text == 'Testwerk' and testwerk.detail.text:find('Velda', 1, true), 'a lockout off the list is kept, named')
 click(c.scopes.character)
 assert(c.rows[3].detail.text == 'No kill recorded')
 """)
