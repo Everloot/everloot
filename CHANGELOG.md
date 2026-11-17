@@ -231,6 +231,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: /database/recent and its RSS feed list the entities whose facts reached three installs in the last 30 days;
   dates from before the feed existed are marked estimated.
 - Site: /tools/bags shows the cheapest bag of each size on one realm's auction house and what each added slot costs over your smallest bag, and item tooltips print a bag's "14 Slot Bag" line; slot counts come from the game files, prices from players' scans.
+- Site: the world map shows zone or continent coordinates on hover and shares pins in the address; Shift-click or use Pin map centre, and Clear pin removes it.
 
 ### Fixed
 - Site: the armory no longer drops a character whose gear includes an item Blizzard sends without an item level (a common head item, seen 11/17); the item is kept with no level and counts as an empty slot in the item level and gear score.

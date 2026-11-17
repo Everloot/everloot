@@ -47,6 +47,15 @@ const renderContinent = async (slug: string, query: Record<string, string> = {})
   renderToStaticMarkup(await ContinentMapPage({ params: Promise.resolve({ continent: slug }), searchParams: Promise.resolve(query) }));
 const SLUGS: Record<string, string> = { "0": "eastern-kingdoms", "1": "kalimdor" };
 const render = async (continent?: string) => (continent ? renderContinent(SLUGS[continent]!) : renderWith({}));
+
+test("a coordinate pin in the URL renders with the game's continent bounds", async () => {
+  store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], dataAsOf: "2026-10-17T00:00:00.000Z" });
+  const html = await renderContinent("kalimdor", { pin: "25,40" });
+  expect(handed.props?.coordinatePin).toBe("25,40");
+  const bounds = WORLD_MAP.continents.find((c) => c.id === 1)!.bounds;
+  expect(handed.props?.coordinateBounds).toEqual({ x: -bounds.left, y: -bounds.top, width: bounds.left - bounds.right, height: bounds.top - bounds.bottom });
+  expect(html).toContain("Clear pin");
+});
 /** Where a page sent the request, or null when it rendered. */
 const sentTo = async (page: () => Promise<unknown>) => { try { await page(); return null; } catch (e) { return (e as Error).message; } };
 
