@@ -378,6 +378,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   syncs only Release files by default, so with every file a Beta, Everloot was missing for most app users. GitHub still
   marks an Alpha a pre-release, and the site still calls the addon an Alpha.
 - Site: the entity pages' pin tables (where an NPC, a vendor or an object stands, which NPCs an item was found on) are one table with the same columns everywhere, the vendor's now with the installs that agree, and the vendor page keeps its summary and open data in the same wide-screen column as the other entity pages.
+- Addon: new installs leave other addons' minimap buttons in place by default; existing players keep their drawer setting and can still use /everloot buttons on.
 - Site: the site shows no ads. About, the FAQ, the terms, the privacy policy, the privacy guide and the accessibility statement now say so and no longer describe Google AdSense.
 - Site: the Blizzard auction house page names each house by its ruleset and faction ("PvP, Alliance", "Roleplay PvP, Horde") instead of "Alliance, house 110", and lists them US first, then by ruleset. Blizzard's API does not say which ruleset a house serves; the mapping was matched by price in both regions.
 - Addon: auction scan messages name everloot.app/upload alongside the Desktop App as a way to send the saved file.

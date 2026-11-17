@@ -119,6 +119,7 @@ def test_hovering_the_button_explains_its_three_actions():
     hover(button)
     assert(GameTooltip.lines[2] == 'Left-click: open the plan workspace', 'window off')
     EverlootDB.toggles.window = nil
+    EverlootDB.toggles.buttons = true
     Everloot.Drawer = { collected = { {} } }
     hover(button)
     assert(#GameTooltip.lines == 4 and GameTooltip.lines[4] == "Hover: show other addons' buttons")
