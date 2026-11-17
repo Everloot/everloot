@@ -122,6 +122,9 @@ export declare const dropsResponse: z.ZodObject<{
         kills: z.ZodNumber;
         drops: z.ZodNumber;
         rate: z.ZodNumber;
+        rateLow: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+        rateHigh: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+        settled: z.ZodOptional<z.ZodBoolean>;
         reporters: z.ZodNumber;
         public: z.ZodLiteral<true>;
         sourceName: z.ZodOptional<z.ZodString>;
@@ -1447,6 +1450,9 @@ export declare const API_SCHEMAS: {
             kills: z.ZodNumber;
             drops: z.ZodNumber;
             rate: z.ZodNumber;
+            rateLow: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+            rateHigh: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+            settled: z.ZodOptional<z.ZodBoolean>;
             reporters: z.ZodNumber;
             public: z.ZodLiteral<true>;
             sourceName: z.ZodOptional<z.ZodString>;

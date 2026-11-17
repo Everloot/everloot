@@ -92,3 +92,31 @@ test("each rate names its source when the site knows the name, so the price file
   expect(dropsResponse.parse(body).rates[0]).toHaveProperty("sourceName", "Razormane Battleguard");
   vi.doUnmock("@/lib/names");
 });
+
+test("public rates carry likely ranges and settling without changing counts or leaking queued rows", async () => {
+  vi.resetModules();
+  const small = { sourceNpcId: 3114, itemId: 2589, kills: 3, drops: 3, rate: 1, reporters: 3, public: true };
+  const large = { sourceObjectId: 106318, itemId: 118, kills: 1000, drops: 400, rate: 0.4, reporters: 5, public: true };
+  vi.doMock("@/lib/rollup-compute", () => ({
+    computeRollups: async () => ({
+      rates: [small, large, { ...small, sourceNpcId: 999, reporters: 2, public: false }], measuredZeros: [],
+      stats: { uploads: 5, lootWindows: 1006, records: 1006, unreachable: false, dataAsOf: "2026-11-13T00:00:00.000Z" },
+    }),
+  }));
+  vi.doMock("@/lib/names", () => ({ loadNames: async () => ({ npcs: new Map([[3114, "Razormane Battleguard"]]), objects: new Map() }) }));
+  try {
+    const { GET: ranges } = await import("./route");
+    const body = await (await ranges(req())).json();
+    expect(body.rates).toHaveLength(2);
+    expect(body.rates[0]).toMatchObject({ ...small, sourceName: "Razormane Battleguard", settled: false });
+    expect(body.rates[0].rateLow).toBeCloseTo(0.438503, 5);
+    expect(body.rates[0].rateHigh).toBeCloseTo(1, 5);
+    expect(body.rates[1]).toMatchObject({ ...large, settled: true });
+    expect(body.rates[1].rateLow).toBeCloseTo(0.370075, 5);
+    expect(body.rates[1].rateHigh).toBeCloseTo(0.430691, 5);
+    expect(body.queued).toBe(1);
+    // Older bulk files share this row schema: the added metadata must stay additive.
+    expect(dropsResponse.shape.rates.element.parse(small)).toEqual(small);
+    expect(dropsResponse.parse(body).rates).toEqual(body.rates);
+  } finally { vi.doUnmock("@/lib/names"); }
+});

@@ -142,7 +142,7 @@ test("drop exports apply the same recheck cutoff as the site while preserving ot
   const expected = rollupDrops(lootWindowsFromRecords(recheckLootRecords(records, recheck)));
   const rate = rows(after.datasets, "observed", "drop-rates").find((r) => r.sourceNpcId === 300)!;
   const siteRate = expected.rates.find((r) => r.sourceNpcId === 300 && r.itemId === 7300)!;
-  expect(rate).toEqual({ sourceNpcId: 300, sourceObjectId: null, itemId: 7300, lootWindows: siteRate.kills, windowsWithItem: siteRate.drops, rate: siteRate.rate, installs: siteRate.reporters });
+  expect(rate).toMatchObject({ sourceNpcId: 300, sourceObjectId: null, itemId: 7300, lootWindows: siteRate.kills, windowsWithItem: siteRate.drops, rate: siteRate.rate, installs: siteRate.reporters });
   expect(rate.rate).toBe(0.5);
   expect(rows(before.datasets, "observed", "drop-rates").find((r) => r.sourceNpcId === 300)!.rate).toBeCloseTo(2 / 3);
   expect(rows(after.datasets, "observed", "drop-measured-zeros")).toEqual([]);
@@ -456,4 +456,24 @@ test("the exported loot-window schema describes the restart state", () => {
   const restarted = JSON.stringify(schemaFor([{ type: "drops", since: AT, source: "test" }]));
   expect(restarted).toContain("Empty loot windows are counted");
   expect(restarted).not.toContain("can read high");
+});
+
+test("drop export rows and schema carry fractional likely ranges and sample settling", () => {
+  const records = [
+    ...Array.from({ length: 3 }, (_, i) => ({ ...base(`small-${i}`), kind: "loot", sourceEvidence: "loot-api", sourceNpcId: 300, items: [{ itemId: 7300, count: 1 }] })),
+    ...Array.from({ length: 1000 }, (_, i) => ({ ...base(`large-${i % 5}`), eventId: `large-${i}`, kind: "loot", sourceEvidence: "loot-api", sourceObjectId: 903, items: i < 400 ? [{ itemId: 2447, count: 1 }] : [] })),
+  ];
+  const dataset = byName(buildOpenData(input(records)).datasets, "observed", "drop-rates");
+  const small = dataset.rows.find((r) => (r as { sourceNpcId: number }).sourceNpcId === 300) as Record<string, unknown>;
+  const large = dataset.rows.find((r) => (r as { sourceObjectId: number }).sourceObjectId === 903) as Record<string, unknown>;
+  expect(small).toMatchObject({ lootWindows: 3, windowsWithItem: 3, rate: 1, installs: 3, settled: false });
+  expect(small.rateLow).toBeCloseTo(0.438503, 5);
+  expect(small.rateHigh).toBeCloseTo(1, 5);
+  expect(large).toMatchObject({ lootWindows: 1000, windowsWithItem: 400, rate: 0.4, installs: 5, settled: true });
+  expect(large.rateLow).toBeCloseTo(0.370075, 5);
+  expect(large.rateHigh).toBeCloseTo(0.430691, 5);
+  expect(dataset.schema.parse(small)).toEqual(small);
+  const schema = z.toJSONSchema(dataset.schema) as { properties: Record<string, { description?: string }>; required: string[] };
+  expect(schema.required).toEqual(expect.arrayContaining(["rateLow", "rateHigh", "settled"]));
+  expect(schema.properties.rateLow.description).toContain("95%");
 });

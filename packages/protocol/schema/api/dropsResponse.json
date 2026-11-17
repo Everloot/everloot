@@ -101,7 +101,38 @@
           "rate": {
             "type": "number",
             "minimum": 0,
-            "maximum": 1
+            "maximum": 1,
+            "description": "drops / kills: the share of attributed loot windows holding the item, not a kill-based drop chance. Unobserved kills are unknown; older uploads can omit empty windows."
+          },
+          "rateLow": {
+            "description": "Lower end of the descriptive 95% Wilson range for the observed window share, as a fraction from 0 to 1; null without windows. Not a guaranteed kill chance.",
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rateHigh": {
+            "description": "Upper end of the descriptive 95% Wilson range for the observed window share, as a fraction from 0 to 1; null without windows.",
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "settled": {
+            "description": "True at 50 or more windows from at least 5 installs when the Wilson half-width is no more than the larger of 0.03 and 30% of the observed share. Describes sample precision, not a confirmed kill chance.",
+            "type": "boolean"
           },
           "reporters": {
             "type": "integer",
