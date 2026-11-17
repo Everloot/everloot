@@ -18,6 +18,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: Add daily auction reports with archived asking-price movers, house spreads, RSS and downloadable share cards.
 - Site: browse Blizzard auction house data by region and house, search item names, sort and page through current prices, and read 30 days of daily unit prices per house on the ad-free item pages.
 - Site: add AH Ledger 30-day item price history, profession crafting margins, auction deals and per-market listed-value comparisons, read in the browser with source credit and upstream cache lifetimes.
+- Site: explain addon directory rankings, approved listings and how to report wrong data in two linked guides.
 - Site: document Worker builds, release checks, MCP version files and dated desktop signing status in the package READMEs.
 - Addon: Optional local bag, bank and mail snapshots keep item counts and observation times; capture starts off and snapshots never upload.
 - Site: the market prices API accepts up to 100 item IDs to fetch public prices beyond the most-listed 2,000 items.

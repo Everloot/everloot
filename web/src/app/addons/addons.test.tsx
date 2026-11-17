@@ -207,3 +207,11 @@ test("the sitemap, header and footer reach the addons pages", async () => {
   expect(renderToStaticMarkup(<Header />)).toContain('href="/addons"');
   expect(renderToStaticMarkup(<Footer />)).toContain('href="/addons"');
 });
+
+
+test("links the directory rules and states the approval requirement", async () => {
+  const page = await addons();
+  expect(page).toContain('href="/docs/guides/addon-directory"');
+  expect(page).toContain("approved list");
+  expect(page).toContain("checked by hand");
+});

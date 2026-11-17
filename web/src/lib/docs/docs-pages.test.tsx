@@ -366,3 +366,20 @@ test("every docs page's BreadcrumbList starts at Home", () => {
   expect(lists.length).toBeGreaterThan(10);
   for (const list of lists) expect(list.itemListElement?.slice(0, 2).map((c) => c.name)).toEqual(["Home", "Docs"]);
 });
+
+
+test("directory and wrong-data guides are discoverable, rendered and have their own metadata", async () => {
+  for (const [slug, title] of [["addon-directory", "How the addon directory works"], ["report-wrong-data", "Report wrong data"]]) {
+    const href = `/docs/guides/${slug}`;
+    expect(allDocsPages().find((p) => p.href === href)).toMatchObject({ title, tab: { id: "guides" } });
+    const mod = modules[`../../app/docs/guides/${slug}/page.tsx`] as PageModule & { metadata: { title: string; alternates: { canonical: string } } };
+    expect(mod.metadata.title).toBe(title);
+    expect(mod.metadata.alternates.canonical).toBe(href);
+    const html = renderToStaticMarkup((await mod.default({ params: Promise.resolve({}) })) as ReactNode);
+    expect(html).toContain(title);
+    expect(html).not.toMatch(/tiers|partner levels|data packs/i);
+  }
+  expect(page).toContain("template=addon-listing.yml");
+  expect(page).toContain("template=ecosystem-project.yml");
+  expect(page).toContain("template=wrong-data.yml");
+});

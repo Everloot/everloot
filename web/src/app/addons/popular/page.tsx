@@ -184,33 +184,10 @@ export default async function PopularAddonsPage() {
         )}
 
         <Explainer summary="How addons are ranked, and how to add yours">
-          <p>
-            An addon is listed once three installs report it, so a rare setup cannot be picked out. Everloot itself is left
-            out. An install is one copy of the Everloot addon, not proof of one person.
-          </p>
-          <p>
-            This board counts what players run; it is not a directory. Everloot gives an addon its own page, title and
-            download links only after we have checked it by hand, so a listed addon with no link has not been checked yet.
-          </p>
-          <p>
-            Share is the installs that had the addon loaded, out of every install that reported its addons. The counts are
-            all-time. Week compares the rank with the board as it stood seven days earlier; New means the addon had no
-            published point then. The 8-week line is the share at the end of each week. A past week is shown only when
-            the change since then is three installs or more, both in installs reporting and in installs running the
-            addon, so no week can be subtracted from another to single out one or two installs. Early on, most weeks
-            stay blank.
-          </p>
-          <p>
-            Stars and the latest release come from GitHub, for addons whose repository has been checked by hand. Everloot
-            does not call CurseForge or Wago: their links open the author&apos;s page there, or a CurseForge search when we
-            have not checked which page is the right one.
-          </p>
-          <p>
-            To add yours, type <code className="font-mono text-fg">/everloot addons on</code> in the game, play, log out, then
-            send your save file from the <Link href="/upload" className={link}>upload page</Link>. The preview names every
-            addon before anything is sent.
-          </p>
-          <p>Addon lists are never published row by row, only these counts.</p>
+          <p>This board ranks addons by the share of reporting installs that run them, once three installs report them.</p>
+          <p>To share usage counts, type <code className="font-mono text-fg">/everloot addons on</code> in game, then log out and <Link href="/upload" className={link}>upload your save file</Link>.</p>
+          <p>A profile page, its title and download links appear only for a project checked by hand and added to the owner-approved list.</p>
+          <p><Link href="/docs/guides/addon-directory" className={link}>How to get listed and how the ranking works</Link>, including the full counting and privacy rules.</p>
         </Explainer>
       </article>
     </Container>
