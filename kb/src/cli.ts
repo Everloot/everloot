@@ -23,6 +23,7 @@ import { writeClientClassGear } from "./client-class-gear.js";
 import { writeClientClassSpells } from "./client-class-spells.js";
 import { writeClientRecipes } from "./client-recipes.js";
 import { writeClientBags } from "./client-bags.js";
+import { writeClientTerrain } from "./client-terrain.js";
 import { writeClientFactions } from "./client-factions.js";
 import { writeClientTitles } from "./client-titles.js";
 import { writeClientQuestLines } from "./client-quest-lines.js";
@@ -215,6 +216,10 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   client-bags <snapshot.sqlite> [--out ../web/src/data/game-data/client-bags.json]
     (every container with its slot count, quality and subclass, and the files' word for each subclass, one
     build-stamped file for the bag calculator and the tooltip's "N Slot Bag" line. Ids and numbers only, as above)
+  client-terrain <snapshot.sqlite> [--out ../web/src/data/game-data/client-terrain.json]
+    (the terrain types the spells' text names (Desert, Snowy, Strongholds and Cities ...) with the zones and
+    instances of each area group, and every item effect that needs a terrain or changes run, mount or swim
+    speed, one build-stamped file the zone, instance and terrain pages read. Ids, numbers and words only, as above)
   client-factions <snapshot.sqlite> [--out ../web/src/data/game-data/client-factions.json]
     (every faction with its parent and whether it shows in the reputation pane. Pages and search, as above)
   client-titles <snapshot.sqlite> [--out ../web/src/data/game-data/client-titles.json]
@@ -752,6 +757,14 @@ async function main(): Promise<number> {
       const path = flags.get("out") || "../web/src/data/game-data/client-bags.json";
       const table = writeClientBags(args[0], path);
       console.log(`${table.build.product} ${table.build.version}: ${Object.keys(table.bags).length} bags -> ${path}`);
+      return 0;
+    }
+    case "client-terrain": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-terrain.json";
+      const table = writeClientTerrain(args[0], path);
+      const named = Object.values(table.areaGroups).filter((g) => g.name).length;
+      console.log(`${table.build.product} ${table.build.version}: ${named} terrain types, ${table.items.length} item effects -> ${path}`);
       return 0;
     }
     case "client-factions": {

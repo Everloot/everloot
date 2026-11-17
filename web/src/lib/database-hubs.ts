@@ -23,6 +23,7 @@ export const DATABASE_HUBS: readonly DatabaseHub[] = [
   { href: "/database/download", label: "Download the data", source: "players" },
   { href: "/database/zones", label: "Zones", source: "files" },
   { href: "/database/instances", label: "Dungeons and raids", source: "files" },
+  { href: "/database/terrain", label: "Terrain and speed gear", source: "files" },
 ];
 
 /** The hub pages the sitemap lists whatever the data: the database landing page, the all-items list and each listed hub. */

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui";
 import { observedLine, reportedLine } from "@/lib/evidence";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
-import { loadItemTips, loadQuestNames, loadSiteAssets } from "@/lib/game-assets";
+import { loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
 import { computeRollups, loadItemFacts, loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
 import { zoneCoverageHref } from "@/lib/coverage-view";
@@ -35,6 +35,9 @@ import {
   type ZoneEntrance, type ZoneNpc, type ZoneQuest, type ZoneTreasure,
 } from "@/lib/zones";
 import { zoneLore } from "@/lib/zone-lore";
+import { gearFor, TERRAIN_BUILD, TERRAIN_PATH, zoneTerrain } from "@/lib/terrain";
+import TerrainGearTable from "@/components/TerrainGearTable";
+import { instanceRows } from "@/lib/instances";
 import { UNAVAILABLE } from "@/lib/lore";
 import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, FREQUENCY } from "../../entity";
 import { listQuery, PER_PAGE, type Search } from "../../list-parts";
@@ -110,7 +113,15 @@ export default async function ZonePage(props: Props) {
   const itemsHref = (page: number) => `${canonical}${page > 1 ? `?page=${page}` : ""}#items`;
   const itemFacts = shownItems.length ? await loadItemFacts() : null;
   const itemName = itemFacts && !itemFacts.unreachable ? itemNames(itemFacts) : new Map<number, string>();
-  const tips = await loadItemTips(assets, shownItems.map((i) => i.itemId));
+  // What the game files say of the ground here, and the gear whose effect works here (data/game-data/client-terrain.json).
+  const terrain = zoneTerrain(zone.mapId);
+  const gear = gearFor({ zone: zone.mapId });
+  const gearFacts = gear.length && !itemFacts ? await loadItemFacts() : itemFacts;
+  const gearName = gearFacts && !gearFacts.unreachable ? itemNames(gearFacts) : itemName;
+  const [spellNames, setNames] = gear.length
+    ? await Promise.all([loadSpellNames(CLIENT_LAYER.build.version), gear.some((g) => g.set) ? loadItemSetNames(CLIENT_LAYER.build.version) : null])
+    : [null, null];
+  const tips = await loadItemTips(assets, [...shownItems.map((i) => i.itemId), ...gear.flatMap((g) => g.set?.pieces ?? [g.itemId])]);
   const farmLinks = !gathering ? [] : zoneFarmLinks(zone, (here?.npcs ?? []).map((n) => n.npcId), rates, gatherRows);
   const wiki = zoneWikiPage(zone.mapId);
   const nameOf = (n: ZoneNpc) => n.name ?? `NPC ${n.npcId}`;
@@ -279,6 +290,36 @@ export default async function ZonePage(props: Props) {
                   <Link href={lore.href} className={link}>Read {lore.name} in the lore archive</Link>
                 </p>
               </Card>
+            </section>
+          )}
+
+          {(terrain.length > 0 || gear.length > 0) && (
+            <section aria-labelledby="terrain" data-zone-terrain>
+              <SectionHeading id="terrain" note={`Read from the game files, build ${TERRAIN_BUILD}: the kinds of ground some item effects need, and the gear whose effect works here. Found in game files, unconfirmed.`}>
+                Terrain
+              </SectionHeading>
+              {terrain.length > 0 && (
+                <p className="mb-3 flex flex-wrap items-center gap-2 text-meta text-fg-2">
+                  {terrain.map(({ type, parts }) => (
+                    <Link key={type.slug} href={`${TERRAIN_PATH}#${type.slug}`} className="inline-flex h-6 items-center rounded-full border border-line px-2.5 font-mono text-xs text-fg-2 hover:text-fg">
+                      {type.name}{parts ? ` · ${parts.join(", ")}` : ""}
+                    </Link>
+                  ))}
+                </p>
+              )}
+              {gear.length > 0 && (
+                <TerrainGearTable
+                  gear={gear}
+                  zone={zone.mapId}
+                  caption={`Gear whose effect works in ${zone.name}`}
+                  names={{
+                    item: (id) => ({ name: gearName.get(id) ?? tips.get(id)?.name, icon: tips.get(id)?.icon }),
+                    spell: (id) => spellNames?.names.get(id),
+                    set: (id) => setNames?.names.get(id),
+                    instances: new Map([...instanceRows()].map(([id, r]) => [id, r.name])),
+                  }}
+                />
+              )}
             </section>
           )}
 

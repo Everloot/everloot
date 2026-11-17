@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: zone and dungeon pages show their terrain types (Desert, Snowy, Swamp, Haunted, Strongholds and Cities and the rest) and the gear whose effect works there, and `/database/terrain` lists every terrain type's zones and instances and every item, enchant and set bonus that changes run, mount or swim speed, all read from the game files.
 - Site: Add daily auction reports with archived asking-price movers, house spreads, RSS and downloadable share cards.
 - Site: browse Blizzard auction house data by region and house, search item names, sort and page through current prices, and read 30 days of daily unit prices per house on the ad-free item pages.
 - Site: add AH Ledger 30-day item price history, profession crafting margins, auction deals and per-market listed-value comparisons, read in the browser with source credit and upstream cache lifetimes.

@@ -81,8 +81,9 @@ test("a zone page confirms the game files' entrance, lists its boss and the trea
   expect(page).toContain("Edwin VanCleef (3 kills)");
   expect(page).toContain('href="/database/objects/2843"');
   expect(page).toContain("Battered Chest");
-  // The game files place the Deadmines: the players' entrance confirms it, it adds no second row.
-  expect(page.match(/>Deadmines</g) ?? []).toHaveLength(1);
+  // The game files place the Deadmines: the players' entrance confirms it, it adds no second row. (The Terrain
+  // section above may link it too, as a place a zone-bound item works.)
+  expect(page.slice(page.indexOf('aria-labelledby="known"')).match(/>Deadmines</g) ?? []).toHaveLength(1);
 });
 
 test("two voters leave every one of these out", async () => {

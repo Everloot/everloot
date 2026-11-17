@@ -11,6 +11,7 @@ import { loadCatalog } from "@/lib/completion-lists";
 import { DATABASE_HUBS } from "@/lib/database-hubs";
 import { instanceRows } from "@/lib/instances";
 import { publicZones } from "@/lib/zones";
+import { terrainTypes } from "@/lib/terrain";
 import JsonLd from "@/components/JsonLd";
 import { AgreementMeter, Container, DataTitle, SearchBar } from "@/components/ui";
 import { asOfLine, EVIDENCE_KEY } from "@/lib/evidence";
@@ -78,6 +79,8 @@ export default async function DatabasePage() {
     "/database/zones": n(publicZones().length),
     // The instances the game files place in a released zone, like the zone count: it reads the files, not the uploads.
     "/database/instances": n(instanceRows().size),
+    // The terrain types the game files name, like the zone count: it reads the files, not the uploads.
+    "/database/terrain": n(terrainTypes().length),
   };
   const hubLinks = (source: "players" | "files") => DATABASE_HUBS.filter((h) => h.source === source).map((h) => ({ href: h.href, label: h.label, count: counts[h.href] }));
   const beforeLaunch = Date.now() < Date.parse(LAUNCH_AT);
