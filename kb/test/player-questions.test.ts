@@ -216,6 +216,32 @@ test("the city a player calls by its first word is the zone the files name in fu
 });
 
 
+test("MCP search keeps a common body word even when a nearby title spelling exists", async () => {
+  const db = openDb(":memory:");
+  try {
+    await replaceSourceRows(db, "warcraft-wiki-2023", ["lore_page"], [
+      row("gnome", "Gnome", "A gnome with engineering expertise."),
+      row("guide", "Engineering Guide", "Gnomes practice engineering."),
+      ...Array.from({ length: 15 }, (_, i) => row(`body-${i}`, `Village ${i}`, "Gnomes live here.")),
+    ]);
+    const result = await createToolHandlers(db).search({ query: "gnomes engineering" });
+    expect(JSON.parse(typeof result === "string" ? result : result.text).results[0].title).toBe("Engineering Guide");
+  } finally { db.close(); }
+});
+
+test("MCP search translates Spanish asking words before considering nearby English title spellings", async () => {
+  const db = openDb(":memory:");
+  try {
+    await replaceSourceRows(db, "warcraft-wiki-2023", ["lore_page"], [
+      row("data", "Data", "Data recorded by players."),
+      row("dates", "Dates", "Dates on the calendar."),
+    ]);
+    const result = await createToolHandlers(db).search({ query: "¿Dónde hay datos?" });
+    expect(JSON.parse(typeof result === "string" ? result : result.text).results[0].title).toBe("Data");
+    expect((await answerSources(db, { question: "¿Dónde hay datos?", limit: 3 }, null, null)).evidence[0]?.source.title).toBe("Data");
+  } finally { db.close(); }
+});
+
 test("a spelling repeated in bodies yields to the page title in all public search tools", async () => {
   const db = openDb(":memory:");
   try {

@@ -342,7 +342,7 @@ export async function respell(
       if (split !== -1) to = splits[split]!;
     }
     // Body-only spellings can recur in lists; a nearby title spelling names the subject directly.
-    if (!to && !inTitle) {
+    if (!to && !inTitle && onPages <= COMMON) {
       const titleCounts = await pageCounts(db, near.map((w) => `name : "${w}"`));
       const most = Math.max(0, ...titleCounts);
       const tied = near.filter((_, i) => titleCounts[i] === most);

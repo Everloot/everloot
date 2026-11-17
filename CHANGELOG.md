@@ -233,7 +233,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: news cards and bylines name Everloot, not everloot.app, as the source of a post that cites the site's own pages.
 - Site: the MCP methodology describes drop rates as a share of recorded loot windows, including its measured-zero example.
 - Site: loot-table notes and open-data descriptions warn that rates can read high before the drops restart, and switch to counted-empty-window wording when a drops recheck scope exists.
-- Site: find lore pages from nearby title spellings in public search and chat, including Leroy Jenkins.
+- Site: find lore pages from nearby title spellings in the MCP search tools and chat answers, including Leroy Jenkins.
 - Addon: Settings stays inside the Everloot window, counts every populated record kind and names item facts; a Full / Compact / Off selector controls tooltip detail without changing recording. Needs an in-game layout check before release.
 - Site: bag upgrade pickers offer publicly priced sizes and preserve bags selected in saved links, without suggesting unpriced test containers.
 - Docs: the project overview links current downloads and explains paired addon/Desktop App updates for community prices.
@@ -385,7 +385,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   marks an Alpha a pre-release, and the site still calls the addon an Alpha.
 - Site: the entity pages' pin tables (where an NPC, a vendor or an object stands, which NPCs an item was found on) are one table with the same columns everywhere, the vendor's now with the installs that agree, and the vendor page keeps its summary and open data in the same wide-screen column as the other entity pages.
 - Addon: new installs leave other addons' minimap buttons in place by default; existing players keep their drawer setting and can still use /everloot buttons on.
-- Site: cap each Worker request at 30 seconds of CPU after the CPU performance fixes.
+- Site: set the Worker CPU limit to 30 seconds.
 - Site: the site shows no ads. About, the FAQ, the terms, the privacy policy, the privacy guide and the accessibility statement now say so and no longer describe Google AdSense.
 - Site: the Blizzard auction house page names each house by its ruleset and faction ("PvP, Alliance", "Roleplay PvP, Horde") instead of "Alliance, house 110", and lists them US first, then by ruleset. Blizzard's API does not say which ruleset a house serves; the mapping was matched by price in both regions.
 - Addon: auction scan messages name everloot.app/upload alongside the Desktop App as a way to send the saved file.

@@ -49,6 +49,7 @@ import {
   npcPageUrl, npcUrl, objectPageUrl, professionsUrl, questPageUrl, vendorPageUrl, withMore,
 } from "./page-urls.js";
 import { allTerms, contentTerms, respell, getByName, getDocument, getEntity, search, searchSomeWords, SOME_WORDS, type SearchHit } from "./search.js";
+import { fromSpanish } from "./spanish.js";
 import { confirmedCatalog, confirmedLine, isConfirmable, type ConfirmedIds } from "./catalog-confirmed.js";
 import { bodyOf, gameplayIndex, mergeCatalogIndexes, catalogLabel, getCatalogByName, getCatalogEntity, isCatalogId, searchCatalog, CATALOG_ID_BASE, type CatalogIndex, type CatalogRecord } from "./catalog-index.js";
 import { cutArrays, MAX_ROWS, readField, type FieldRead } from "./json-pointer.js";
@@ -626,7 +627,8 @@ async function searchResult(db: ReleaseSource, args: SearchArgs, catalog: Catalo
   // Catalog names that match the asked words exactly or on every word join the normal answer; names that match only
   // some words wait for the release's own "some words" fallback, so they never hide it.
   const found = mergeHits(await search(db, args.query, args.limit, opts), catalogSearch(catalog, args, false), args);
-  const asked = contentTerms(args.query);
+  const translated = fromSpanish(args.query);
+  const asked = contentTerms(translated);
   const named = found.some((hit) => {
     const words = new Set(allTerms(hit.name).split(" "));
     return asked.every((word) => words.has(word));
@@ -634,7 +636,7 @@ async function searchResult(db: ReleaseSource, args: SearchArgs, catalog: Catalo
   if (!named) {
     // Preserve matching game-file names even when the archive does not have them.
     const keep = new Set(catalogSearch(catalog, args, false).flatMap((hit) => contentTerms(hit.name)));
-    const fixed = await respell(db, args.query, keep);
+    const fixed = await respell(db, translated, keep);
     if (fixed) {
       const retry = { ...args, query: fixed.text };
       const hits = mergeHits(await search(db, retry.query, retry.limit, opts), catalogSearch(catalog, retry, false), retry);
