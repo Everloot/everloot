@@ -6,13 +6,12 @@ const NOW = Date.parse("2026-10-19T08:00:00Z");
 
 const info: CharactersInfo = {
   characters: [{
-    id: "key:00000001", character: "Volvik", realm: "Nightslayer", gold: 1234_56_78, peakGold: 2000_00_00, gearSlots: 15, itemLevel: 61,
+    id: "key:00000001", character: "Volvik", realm: "Nightslayer", gold: 1234_56_78, peakGold: 2000_00_00,
     spent: { repairs: 50_00_00, auction: 100_00_00 }, earned: { loot: 300_00_00 },
-    history: [], week: { earned: 20_00_00, spent: 35_00_00 }, equipped: [], days: [], receipts: [],
+    history: [], week: { earned: 20_00_00, spent: 35_00_00 }, days: [], receipts: [],
   }],
-  progress: [{ key: "Volvik-Nightslayer", class: "Warrior", level: 60, achievements: 12, achievementsInProgress: 3, reputations: 20, exalted: 2, titles: 1, quests: 40, talentPoints: 51,
-    professions: [{ name: "Blacksmithing", rank: 300, maxRank: 300 }], lockouts: [{ instance: "Molten Core", difficulty: "40 Player", killed: 6, total: 10, resetAt: "2026-10-20T12:00:00Z" }] }],
-  talents: [],
+  progress: [{ key: "Volvik-Nightslayer", class: "Warrior", level: 60, titles: 1,
+    lockouts: [{ instance: "Molten Core", difficulty: "40 Player", killed: 6, total: 10, resetAt: "2026-10-20T12:00:00Z" }] }],
 };
 
 const ok = { state: "ok" as const, message: "3 records sent", at: "2026-10-19T07:00:00Z" };
@@ -36,17 +35,17 @@ test("gold reads as gold, silver and copper", () => {
   expect(gold(null)).toBe("unknown");
 });
 
-test("my_characters lists gold, the week, gear and progress with the local source", async () => {
+test("my_characters lists gold, the week and progress with the local source", async () => {
   const out = await run("my_characters");
-  expect(out).toContain("Volvik-Nightslayer: 1,234g 56s; peak 2,000g 0s; last 7 days earned 20g 0s, spent 35g 0s, net -15g 0s; item level 61 over 15 slots; spent by category all time: repairs 50g 0s, auction 100g 0s");
-  expect(out).toContain("Volvik-Nightslayer: level 60 Warrior, 12 achievements (3 in progress), 2 of 20 reputations exalted, 1 titles");
-  // Professions and raid lockouts never leave the computer, so the model provider never gets them either.
-  for (const text of ["Blacksmithing", "Molten Core", "lockout", "profession"]) expect(out).not.toContain(text);
+  expect(out).toContain("Volvik-Nightslayer: 1,234g 56s; peak 2,000g 0s; last 7 days earned 20g 0s, spent 35g 0s, net -15g 0s; spent by category all time: repairs 50g 0s, auction 100g 0s");
+  expect(out).toContain("Volvik-Nightslayer: level 60 Warrior, 1 titles");
+  // Raid lockouts never leave the computer, so the model provider never gets them either.
+  for (const text of ["Molten Core", "lockout", "item level"]) expect(out).not.toContain(text);
   expect(out.trim().split("\n").at(-1)).toBe(`Source: ${LOCAL_SOURCE}`);
 });
 
 test("with no characters the tool says so instead of an empty result", async () => {
-  const out = await run("my_characters", { characters: () => ({ characters: [], progress: [], talents: [] }) });
+  const out = await run("my_characters", { characters: () => ({ characters: [], progress: [] }) });
   expect(out).toMatch(/No characters in the account files yet/);
   expect(out).toContain(`Source: ${LOCAL_SOURCE}`);
 });

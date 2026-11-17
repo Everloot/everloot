@@ -74,7 +74,7 @@ test("a file the Characters page skips shows no character and suggests no realm,
   writeFileSync(noInstall, NO_INSTALL);
   writeFileSync(broken, BROKEN);
   expect(characterRealms([noInstall, broken, join(d, "missing.lua")])).toEqual([]);
-  expect(charactersFromFiles([noInstall, broken, join(d, "missing.lua")])).toEqual({ characters: [], progress: [], talents: [] });
+  expect(charactersFromFiles([noInstall, broken, join(d, "missing.lua")])).toEqual({ characters: [], progress: [] });
 });
 
 

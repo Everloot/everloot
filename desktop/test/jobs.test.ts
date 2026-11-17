@@ -267,7 +267,7 @@ describe("character link codes in the upload job", () => {
       if (url.includes("/api/coverage/settled")) return new Response(null, { status: 404 });
       calls.push({ url, auth: new Headers(init?.headers).get("authorization"), body: String(init?.body) });
       if (url.endsWith("/api/me/characters/sync")) {
-        return Response.json({ characters: [{ index: 0, result: "synced", categories: { professions: "stored" } }], skipped: 0 });
+        return Response.json({ characters: [{ index: 0, result: "synced", categories: { raids: "stored" } }], skipped: 0 });
       }
       const records = JSON.parse(String(init?.body)).records as { kind: string }[];
       if (url.endsWith("/api/me/characters/links")) {
@@ -298,7 +298,7 @@ describe("character link codes in the upload job", () => {
     }
   });
 
-  test("signed in, a linked character's professions go to the sync endpoint after the link, never with the upload", async () => {
+  test("signed in, a linked character's raid lockouts go to the sync endpoint after the link, never with the upload", async () => {
     const d = dir();
     const data = join(d, "data");
     const key = `evl_${"ab".repeat(32)}`;
@@ -306,17 +306,17 @@ describe("character link codes in the upload job", () => {
     writeFileSync(join(data, ACCOUNT_KEY_FILE), key);
     writeKeyOrigin(data, "https://everloot.app");
     const calls = site();
-    const professions = `
-["profession_owned"] = {
-{["capturedAt"] = "2026-11-05T10:00:00Z", ["characterKey"] = "0a1b2c3d", ["class"] = "SHAMAN", ["level"] = 24, ["profession"] = "Mining", ["rank"] = 75, ["maxRank"] = 150},
+    const lockouts = `
+["lockout_owned"] = {
+{["capturedAt"] = "2026-11-05T10:00:00Z", ["characterKey"] = "0a1b2c3d", ["class"] = "SHAMAN", ["level"] = 24, ["instance"] = "Molten Core", ["instanceId"] = 409, ["difficultyId"] = 9, ["bossesKilledCount"] = 3, ["bossesTotal"] = 10, ["resetAt"] = "2099-01-01T08:00:00Z"},
 },`;
     try {
-      const said = await companionJobs(data, () => ({ ...defaultSettings(), endpoint: "https://everloot.app" })).deps.upload(linkFile(d, professions));
+      const said = await companionJobs(data, () => ({ ...defaultSettings(), endpoint: "https://everloot.app" })).deps.upload(linkFile(d, lockouts));
       expect(said).toContain("linked Thrallina of Forever Pioneer; synced 1 character");
       expect(calls.map((c) => new URL(c.url).pathname)).toEqual(["/api/intake", "/api/me/characters/links", "/api/me/characters/sync"]);
-      expect(calls[0].body).not.toContain("profession_owned");
+      expect(calls[0].body).not.toContain("lockout_owned");
       expect(calls[2].auth).toBe(`Bearer ${key}`);
-      expect(JSON.parse(calls[2].body)).toEqual({ characters: [{ name: "Thrallina", realm: "Forever Pioneer", records: [expect.objectContaining({ kind: "profession_owned", profession: "Mining" })] }] });
+      expect(JSON.parse(calls[2].body)).toEqual({ characters: [{ name: "Thrallina", realm: "Forever Pioneer", records: [expect.objectContaining({ kind: "lockout_owned", instance: "Molten Core" })] }] });
     } finally {
       vi.unstubAllGlobals();
     }

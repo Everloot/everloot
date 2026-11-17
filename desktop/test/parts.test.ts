@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { JobState, JobStatus, LogLine } from "../src/shared/types";
-import { emptyCause, emptyState, ghostProfile, jobOfLine, ownedLockouts, ownedProfessions, statePill, threadLines, watchPill, workingStrip } from "../src/renderer/parts";
+import { emptyCause, emptyState, ghostProfile, jobOfLine, ownedLockouts, statePill, threadLines, watchPill, workingStrip } from "../src/renderer/parts";
 
 const j = (state: JobState): JobStatus => ({ state, message: "", at: null });
 
@@ -136,9 +136,7 @@ test("the rendered block escapes the cause and carries the action as a data attr
   expect(emptyState({ cause: "c", step: "s", action: { label: "Upload now", run: "upload" } }, "")).toContain('data-run="upload"');
 });
 
-test("a keyed character's professions and raid lockouts read as rank of max and killed of total; none is a dash, never a zero", () => {
-  expect(ownedProfessions([{ name: "Mining", rank: 280, maxRank: 300 }])).toBe('<div>Mining <span class="muted">280/300</span></div>');
-  expect(ownedProfessions([])).toBe('<span class="muted">–</span>');
+test("a keyed character's raid lockouts read as killed of total; none is a dash, never a zero", () => {
   const html = ownedLockouts([{ instance: "Zul'Gurub <b>", difficulty: "20 Player", killed: 3, total: 10, resetAt: "2026-11-11T12:00:00Z" }]);
   expect(html).toContain("Zul&#39;Gurub &lt;b&gt;");
   expect(html).toContain("20 Player · 3/10 · resets ");

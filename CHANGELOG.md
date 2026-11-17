@@ -384,6 +384,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Changed
 - Site: the AH Ledger panels (price history, crafting margins, deals) remember the market a visitor last picked, in their own browser, and open on it on every page; a realm page still opens on its realm. The crafting table no longer prefetches recipe pages, which sit behind the bot check and logged an error for each recipe in view.
+- Addon: gear, talent builds, professions, character sheet stats, PvP standing, achievements, reputation and completed quests are no longer recorded, since Blizzard's character API supplies them to everloot.app; the first load deletes any such rows from the saved file. Titles, raid lockouts, boss kills, the catalogs, gold, the census, player names and world data stay. The window's Collection and Home read achievements, reputation and quest chains from the game instead. Player names are on in a new install, said once in chat and in the feature chooser; an install from before keeps its choice. Needs an in-game check before release.
+- Desktop App: a new install starts with "Send the player pages with the uploads" on, and an install from before keeps its choice. Private sync stops sending gear, talents, professions, stats, PvP, reputations and achievements; raids, boss kills and titles still go. The Characters page no longer shows gear, achievements, reputations, quests, professions or talent builds.
 - CurseForge: every addon upload is a Release file; an Alpha is named "Everloot <version> Alpha". The CurseForge app
   syncs only Release files by default, so with every file a Beta, Everloot was missing for most app users. GitHub still
   marks an Alpha a pre-release, and the site still calls the addon an Alpha.

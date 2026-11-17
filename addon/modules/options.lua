@@ -39,18 +39,14 @@ O.ROWS = {
     text = "Name, realm, class, level, faction, gold and professions of each character you log in with, for the window's Home. Stays in this file; never uploaded." },
   { key = "inventoryCapture", group = "private", field = true, defaultOff = true, live = true, label = "Local inventory snapshots",
     text = "Counts of items in your bags, opened bank and opened mail, with a separate observation time for each. Stays in this file; never uploaded or synced. Off deletes these snapshots." },
-  { key = "gear", group = "private", label = "Your gear",
-    text = "Your equipped items and item levels, at most once an hour. Sent only if you share it on the upload page." },
-  { key = "talents", group = "private", label = "Your talents",
-    text = "Your own talent build, read only, for /everloot talents and plans." },
   { key = "guild", group = "private", label = "Guild",
     text = "Your guild's roster, lockouts and loot. Published only through an officer's upload." },
   { key = "completion", group = "private", command = "completion", label = "Completion tracker",
-    text = "Your achievements, reputation, titles and completed quests, read only; also your professions, dungeon and raid lockouts, active talent build, character sheet stats and PvP standing. Your boss kills stay on this computer. Collection rows leave from the upload page; achievements, reputation and titles also through the Desktop App's private sync, for a character you linked. Professions, lockouts, talents, stats and PvP never go in an upload, only through private sync. Off deletes its rows." },
+    text = "The game's achievement, reputation, title and quest chain lists, read only, and your titles, dungeon and raid lockouts and boss kills. Your achievements, reputation and quests are read from the game for the window, not recorded. The lists and titles leave from the upload page; titles and lockouts also through the Desktop App's private sync, for a character you linked. Lockouts never go in an upload. Your boss kills stay on this computer. Off deletes its rows." },
   { key = "addons", group = "shared", command = "addons", label = "Installed addon list",
     text = "Each installed addon's name and version. Sent only from the upload page. Off deletes its rows." },
   { key = "players", group = "shared", command = "players", label = "Player pages",
-    text = "Name, realm, race, class, level and guild of characters you see, for the site's player pages. Off deletes its rows." },
+    text = "Name, realm, race, class, level and guild of characters you see, for the site's player pages. On in a new install. Sent from the upload page, or by the Desktop App while its player pages setting is on. Off deletes its rows." },
 }
 -- Only in the builds that carry the pulls module (E.RUN_RECORDS in core.lua).
 if E.Pulls then
@@ -79,7 +75,7 @@ O.GROUPS = {
   { key = "shared", name = "Shared with Everloot",
     intro = "What the addon records for everloot.app. It stays in your saved file until the Everloot Desktop App or the upload page sends it, as each line says." },
   { key = "private", name = "Your characters",
-    intro = "Your own characters, gold, gear, talents, guild and completion. Each line says whether it can leave your saved file, and how." },
+    intro = "Your own characters, gold, guild and completion. Each line says whether it can leave your saved file, and how." },
 }
 O.INTRO = "What the addon records. Everything stays in your saved file until the Everloot Desktop App or the upload page sends it, as each line says."
 O.OVERVIEW = "The switches are on the pages under Everloot in this list: General, Auction house, Shared with Everloot and Your characters."
@@ -99,16 +95,13 @@ O.ADDED = {
   item_fact = "Item facts", auction_scan = "Auction scans", census_seen = "Players seen", map_bounds = "Zones mapped",
   npc = "NPCs", object_sighting = "Objects", instance_entrance = "Instance entrances", encounter = "Encounters",
   instance_run = "Instance runs", guild_snapshot = "Guild snapshots", raid_lockout = "Raid lockouts",
-  attendance = "Attendance", loot_award = "Loot awards", gear_snapshot = "Gear snapshots", vendor = "Vendors",
+  attendance = "Attendance", loot_award = "Loot awards", vendor = "Vendors",
   collection_catalog = "Collection catalogue", collection_owned = "Your collection", auction_snapshot = "Auction snapshots",
   recipe_seen = "Recipes", trainer_seen = "Trainer recipes", price_seen = "Prices seen", gold_snapshot = "Gold snapshots",
-  money_event = "Gold changes", addon_seen = "Addons", talent_snapshot = "Talent builds", guild_kill = "Guild kills",
+  money_event = "Gold changes", addon_seen = "Addons", guild_kill = "Guild kills",
   achievement_catalog = "Achievement catalogue", reputation_catalog = "Reputation catalogue", title_catalog = "Title catalogue",
-  quest_chain_catalog = "Quest chains", achievement_owned = "Your achievements", reputation_owned = "Your reputation",
-  title_owned = "Your titles", quest_owned = "Your quests", census_self = "Your census", player_seen = "Player pages",
-  character_link = "Character links", pull_summary = "Boss pulls", profession_owned = "Your professions",
-  lockout_owned = "Your lockouts", talent_owned = "Your active talents", stats_owned = "Your stats",
-  pvp_owned = "Your PvP standing", boss_kill_owned = "Your boss kills",
+  quest_chain_catalog = "Quest chains", title_owned = "Your titles", census_self = "Your census", player_seen = "Player pages",
+  character_link = "Character links", pull_summary = "Boss pulls", lockout_owned = "Your lockouts", boss_kill_owned = "Your boss kills",
 }
 
 function O.AddedRows()
@@ -162,8 +155,7 @@ O.DELETES = {
   players = { "player_seen", "guild_kill" },
   addons = { "addon_seen" },
   completion = { "achievement_catalog", "reputation_catalog", "title_catalog", "quest_chain_catalog",
-    "achievement_owned", "reputation_owned", "title_owned", "quest_owned",
-    "profession_owned", "lockout_owned", "talent_owned", "stats_owned", "pvp_owned", "boss_kill_owned" },
+    "title_owned", "lockout_owned", "boss_kill_owned" },
 }
 
 --- How many rows turning this row off would delete.
@@ -466,14 +458,16 @@ function O.Open()
   O.Refresh()
 end
 
--- Player names (the players module) stay off until the player turns them on, and each install is asked once.
+-- Player names (the players module) are on in a new install (core.lua), which says so once in chat and in the
+-- feature chooser. An install from before that release keeps its choice, and while the module is off it is asked once.
 -- The question comes a few seconds after the first loading screen of a session, never in combat. Either answer,
 -- or /everloot players on or off typed or clicked on this page, sets EverlootDB.playersAsked, and an install
 -- that already has the module on is never asked. The question has no close button: it goes away with an answer.
 O.PLAYERS_QUESTION = "Everloot can record player names for everloot.app. It is off until you choose.\n\n"
   .. "If you turn it on, it records the name, realm, race, class, level and guild of your own characters and of players "
   .. "you target, mouse over or group with, and the bosses your guild kills. Never where they are, their gear or what "
-  .. "they do. It stays in your saved file until you upload it; then these characters can appear on everloot.app.\n\n"
+  .. "they do. It stays in your saved file until the upload page or the Everloot Desktop App sends it; then these "
+  .. "characters can appear on everloot.app.\n\n"
   .. "/everloot players off turns it off and deletes the rows. Anyone can hide a character at everloot.app/players/opt-out. "
   .. "Everloot asks this once."
 O.ASK_DELAY = 8      -- seconds after the loading screen, so the question does not land on top of it
@@ -568,9 +562,12 @@ O.SETUP_INTRO = "Everloot does several jobs. Use all of them, or only the ones y
   .. "The census, player names, the addon list, the completion tracker and inventory snapshots keep their own switches."
 O.SETUP_UPLOAD = "The Everloot Desktop App sends what you collect after you log out or /reload, so you never upload "
   .. "files by hand. Download it at everloot.app/addon."
+O.SETUP_PLAYERS = "Player names are on in a new install: the name, realm, race, class, level and guild of characters you "
+  .. "see, for everloot.app's player pages. /everloot players off turns them off and deletes the rows; anyone can hide "
+  .. "a character at everloot.app/players/opt-out."
 O.SETUP_CHOICES = {
   { key = "everything", label = "Everything",
-    text = "Item tooltips with prices and sources, the auction house tab, the Everloot window and minimap button, and your characters' gold, gear and talents." },
+    text = "Item tooltips with prices and sources, the auction house tab, the Everloot window and minimap button, and your characters' gold." },
   { key = "collect", label = "Collect data only",
     text = "Records drops, vendors, recipes and the auction scans you start from its tab, for everloot.app. No tooltip lines, window, minimap button or helpers, so Auctionator and your other addons stay in charge." },
   { key = "choose", label = "Choose myself",
@@ -580,12 +577,12 @@ O.SETUP_CHOICES = {
 O.SETUP = {
   everything = {
     toggles = { openworld = true, professions = true, mapbounds = true, auctions = true, window = true,
-      gold = true, roster = true, gear = true, talents = true, guild = true },
+      gold = true, roster = true, guild = true },
     fields = { scanPrompt = true, minimapButton = true, tooltip = "full", tooltipMarket = true, tooltipHistory = true, tooltipSources = true },
   },
   collect = {
     toggles = { openworld = true, professions = true, mapbounds = true, auctions = true, window = false, buttons = false,
-      gold = false, roster = false, gear = false, talents = false, guild = false },
+      gold = false, roster = false, guild = false },
     fields = { scanPrompt = false, minimapButton = false, tooltip = "off", autoVendor = false, mailCollect = false },
   },
 }
@@ -684,7 +681,14 @@ local function buildSetup()
   upload:SetText(O.SETUP_UPLOAD)
   f.upload = upload
   f.choiceParts[#f.choiceParts + 1] = upload
-  local height = y + upload:GetStringHeight() + 16
+  y = y + upload:GetStringHeight() + 10
+  local players = words(f, "GameFontHighlightSmall", 11, "text")
+  players:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -y)
+  players:SetWidth(448)
+  players:SetText(O.SETUP_PLAYERS)
+  f.players = players
+  f.choiceParts[#f.choiceParts + 1] = players
+  local height = y + players:GetStringHeight() + 16
   f:SetHeight(height)
   -- After Everything or Collect data only: a reload applies what changed.
   local done = words(f, "GameFontHighlightSmall", 12, "text")
