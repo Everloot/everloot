@@ -234,7 +234,7 @@ export default async function AddonPage() {
                 <li>Where you stood when an NPC&apos;s window opened (a vendor, a quest giver, a trainer, a flight master), so that NPC can get a place on the map.</li>
                 <li>The census: the race, class, level and faction of your characters and of players near you, including the ones the game shows a nameplate for. Never a name. It is on in a new install and says so once in chat.</li>
                 <li>Gold in and out: shared only if you tick it on the upload page. The window&apos;s gold ledger, character roster and gold per hour sessions stay local and are never uploaded.</li>
-                <li>Gear: read from the game when needed, never recorded or uploaded by the addon.</li>
+                <li>Your equipped gear is not recorded or uploaded by the addon.</li>
                 <li>Your guild&apos;s roster, lockouts, attendance and loot: kept locally and published only through an officer&apos;s upload.</li>
                 <li>Completion, when enabled: game catalogs, your titles, raid lockouts and boss kills. Catalogs and titles can be uploaded; lockouts leave only through private sync, and boss kills stay local. Your achievements, reputation and completed quests are read live, never recorded.</li>
               </ul>
