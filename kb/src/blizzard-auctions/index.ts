@@ -16,7 +16,7 @@ export async function blizzardAuctions(flags: Map<string, string>): Promise<void
   };
   const api = new ForeverApi({ region, clientId: required("BNET_CLIENT_ID"), clientSecret: required("BNET_CLIENT_SECRET") });
   const store: JobStore = flags.has("dry-run")
-    ? { put: async (_region, _house, rows) => rows.length, purge: async () => 0 }
+    ? { put: async (_region, _house, rows) => rows.length, purge: async () => 0, stamps: async () => new Map() }
     : new AuctionStore({ url: required("SUPABASE_URL"), serviceKey: required("SUPABASE_SERVICE_ROLE_KEY") });
   await runAuctions({ region, budget, api, store, log: console.log });
 }

@@ -383,6 +383,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - CurseForge: every addon upload is a Release file; an Alpha is named "Everloot <version> Alpha". The CurseForge app
   syncs only Release files by default, so with every file a Beta, Everloot was missing for most app users. GitHub still
   marks an Alpha a pre-release, and the site still calls the addon an Alpha.
+- Site: the hourly Blizzard auction refresh asks Blizzard for each house document only when it is newer than the one stored (If-Modified-Since), so a document it already holds costs a 304 with no body instead of several MB.
 - Site: the entity pages' pin tables (where an NPC, a vendor or an object stands, which NPCs an item was found on) are one table with the same columns everywhere, the vendor's now with the installs that agree, and the vendor page keeps its summary and open data in the same wide-screen column as the other entity pages.
 - Addon: new installs leave other addons' minimap buttons in place by default; existing players keep their drawer setting and can still use /everloot buttons on.
 - Site: set the Worker CPU limit to 30 seconds.

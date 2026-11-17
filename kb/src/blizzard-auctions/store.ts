@@ -51,6 +51,14 @@ export class AuctionStore {
   purge() {
     return this.rpc<number>("blizzard_auctions_purge", {});
   }
+
+  /** The stored time of each house document in the region, by house id; none past 30 days. */
+  async stamps(region: Region): Promise<Map<number, Stamps>> {
+    const rows = await this.rpc<{ house_id: number; items_at: string | null; commodities_at: string | null }[]>(
+      "blizzard_auctions_stamps", { p_region: region });
+    return new Map(rows.map((r) => [r.house_id, { items: r.items_at, commodities: r.commodities_at }]));
+  }
 }
 
-export type JobStore = Pick<AuctionStore, "put" | "purge">;
+export type Stamps = Record<DocumentKind, string | null>;
+export type JobStore = Pick<AuctionStore, "put" | "purge" | "stamps">;
