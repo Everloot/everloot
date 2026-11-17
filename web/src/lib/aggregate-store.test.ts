@@ -7,7 +7,7 @@ vi.mock("./upload-store", () => ({ uploadStore: { loadCorpus: store.loadCorpus }
 
 import { buildAggregates, type AggregateSet } from "./aggregate-set";
 import {
-  AGGREGATES_KEY, anonymousAggregates, encodeAggregates, forgetStoredAggregates, loadStoredAggregates, parseAggregates, writeAggregates,
+  AGGREGATES_KEY, AGGREGATES_REVISION, anonymousAggregates, encodeAggregates, forgetStoredAggregates, loadStoredAggregates, parseAggregates, writeAggregates,
 } from "./aggregate-store";
 import { computeRollups, loadAddonLeaderboard, loadItemFacts } from "./rollup-compute";
 
@@ -176,7 +176,17 @@ test("named rows change no table: no grant, revoke or hide can change the stored
   expect(plain(anonymousAggregates(corpus([...anonymousRows(), ...namedRows()])))).toEqual(plain(without));
 });
 
-const head = (status: number) => vi.fn(async (req: Request) => new Response(null, { status: req.method === "HEAD" ? status : 200, headers: { "x-amz-meta-data-as-of": AS_OF } }));
+const head = (status: number, stamp = `${AS_OF};${AGGREGATES_REVISION}`) =>
+  vi.fn(async (req: Request) => new Response(null, { status: req.method === "HEAD" ? status : 200, headers: { "x-amz-meta-data-as-of": stamp } }));
+
+test("a file stamped before the current revision is rewritten by an idle run, and the new file carries the revision", async () => {
+  const set = buildAggregates(corpus(anonymousRows()));
+  const older = head(200, AS_OF);
+  expect(await writeAggregates({ added: 0, dataAsOf: AS_OF }, { cloud: CLOUD, fetch: older as unknown as typeof fetch, build: async () => set })).toMatchObject({ written: true });
+  const put = (older.mock.calls[1] as unknown as [Request])[0];
+  expect(put.method).toBe("PUT");
+  expect(put.headers.get("x-amz-meta-data-as-of")).toBe(`${AS_OF};${AGGREGATES_REVISION}`);
+});
 
 test("the cron writes the file when the run added uploads or rebuilt, or when there is none; an idle run with a file only asks", async () => {
   const set = buildAggregates(corpus(anonymousRows()));

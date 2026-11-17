@@ -39,6 +39,9 @@ test("a band disenchanted by 3 installs lists its materials; the answer matches 
   // Every band of the build is listed, the ones nobody disenchanted with nothing in them.
   expect(body.bands.filter((b) => b.state === "none").every((b) => b.materials.length === 0 && b.windows === 0)).toBe(true);
   expect(res.headers.get("x-everloot-credit")).toBe("Data from Everloot (https://everloot.app), CC BY-SA 4.0.");
+  // The bands are Blizzard's game data, labelled apart from the results.
+  expect(body.gameData).toMatchObject({ label: "Found in game files, unconfirmed", build: body.build });
+  expect(body.gameData.credit).toContain("Blizzard");
 });
 
 test("fewer than 3 installs: counts only, no materials", async () => {

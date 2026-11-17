@@ -59,6 +59,14 @@ export function disenchantBands(yields: readonly BandYield[]): DisenchantRespons
 
 export const DISENCHANT_BUILD = CLIENT_DISENCHANT.build.version;
 
+/** The bands are Blizzard's: the notice the API carries beside Everloot's own attribution. */
+export const disenchantGameData = () => ({
+  label: CLIENT_DISENCHANT.label,
+  build: CLIENT_DISENCHANT.build.version,
+  extractedAt: CLIENT_DISENCHANT.build.extractedAt,
+  credit: CLIENT_DISENCHANT.credit,
+});
+
 /**
  * A material's price on one house: its market value, else the newest public minimum buyout. Null when the house has
  * no public price for it: unrecorded, never zero.

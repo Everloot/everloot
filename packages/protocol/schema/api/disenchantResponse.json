@@ -217,7 +217,36 @@
         "source",
         "terms"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "For the disenchant results: Everloot's data under its licence."
+    },
+    "gameData": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "The evidence label pages show, such as \"found in game files, unconfirmed\"."
+        },
+        "build": {
+          "type": "string",
+          "description": "The game build the rows were read from."
+        },
+        "extractedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "credit": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "build"
+      ],
+      "additionalProperties": {},
+      "description": "For the bands (class, quality, item level range): Blizzard's, found in game files, unconfirmed, with the build."
     }
   },
   "required": [
@@ -227,7 +256,8 @@
     "build",
     "bands",
     "unplaced",
-    "attribution"
+    "attribution",
+    "gameData"
   ],
   "additionalProperties": false
 }

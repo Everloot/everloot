@@ -75,6 +75,18 @@ test("items the files give no level are placed by the level most installs report
   expect(t.playerBands).toEqual(new Map([[130, 5]]));
 });
 
+test("each install votes once, with its latest report of the item's level", () => {
+  const at = (installId: string, itemLevel: number, capturedAt: string) => ({ ...seen(installId, 130, "uncommon", itemLevel), capturedAt });
+  // A, B and C saw level 12; A and B saw level 18 later (a patch): 18 now has 2 installs, 12 has 1.
+  const records = [
+    at("a", 12, "2026-11-01T00:00:00Z"), at("b", 12, "2026-11-01T00:00:00Z"), at("c", 12, "2026-11-01T00:00:00Z"),
+    at("a", 18, "2026-11-10T00:00:00Z"), at("b", 18, "2026-11-10T00:00:00Z"),
+  ];
+  expect(reportedLevels(records).get(130)).toEqual({ quality: 2, itemLevel: 18 });
+  // An older report arriving later in the corpus does not move a newer vote back.
+  expect(reportedLevels([...records, at("a", 12, "2026-10-01T00:00:00Z")]).get(130)).toEqual({ quality: 2, itemLevel: 18 });
+});
+
 test("expected value counts zeros, keeps a missing price out and says so", () => {
   const t = disenchantTablesFromRecords([de("a", 100, [[DUST, 1]]), de("b", 100, [[DUST, 3]]), de("c", 100, [[ESSENCE, 1]]), de("c", 101, [[ESSENCE, 1]])], files);
   const rows = bandYield(t, placer(files).bands.find((b) => b.id === 4)!).rows;

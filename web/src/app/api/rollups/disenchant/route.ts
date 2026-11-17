@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { admit, attribution, attributionHeaders } from "@/lib/data-guard";
-import { DISENCHANT_BUILD, disenchantBands, loadDisenchant } from "@/lib/disenchant";
+import { DISENCHANT_BUILD, disenchantBands, disenchantGameData, loadDisenchant } from "@/lib/disenchant";
 import { recordUsage } from "@/lib/usage-metrics";
 
 /**
@@ -23,5 +23,6 @@ export async function GET(req: Request) {
     bands: disenchantBands(view.yields),
     unplaced: view.tables.unplaced,
     attribution: attribution("/tools/disenchanting"),
+    gameData: disenchantGameData(),
   }, { headers: attributionHeaders() });
 }

@@ -172,7 +172,8 @@ export const disenchantResponse = z.object({
   build: z.string().describe("The game build whose files give the bands."),
   bands: z.array(disenchantBand),
   unplaced: z.number().int().nonnegative().describe("Disenchants of items no band places yet: no item level in the files and no player report of one."),
-  attribution: attributionSchema,
+  attribution: attributionSchema.describe("For the disenchant results: Everloot's data under its licence."),
+  gameData: gameDataNoticeSchema.describe("For the bands (class, quality, item level range): Blizzard's, found in game files, unconfirmed, with the build."),
 });
 export type DisenchantResponse = z.infer<typeof disenchantResponse>;
 

@@ -195,6 +195,12 @@ export declare const disenchantResponse: z.ZodObject<{
         source: z.ZodString;
         terms: z.ZodString;
     }, z.core.$strip>;
+    gameData: z.ZodObject<{
+        label: z.ZodString;
+        build: z.ZodString;
+        extractedAt: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+        credit: z.ZodOptional<z.ZodString>;
+    }, z.core.$loose>;
 }, z.core.$strip>;
 export type DisenchantResponse = z.infer<typeof disenchantResponse>;
 declare const edge: z.ZodObject<{
@@ -1570,6 +1576,12 @@ export declare const API_SCHEMAS: {
             source: z.ZodString;
             terms: z.ZodString;
         }, z.core.$strip>;
+        gameData: z.ZodObject<{
+            label: z.ZodString;
+            build: z.ZodString;
+            extractedAt: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+            credit: z.ZodOptional<z.ZodString>;
+        }, z.core.$loose>;
     }, z.core.$strip>;
     readonly edgesResponse: z.ZodObject<{
         offset: z.ZodNumber;

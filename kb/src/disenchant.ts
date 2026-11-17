@@ -67,26 +67,34 @@ function captureDay(at: unknown, until: number): string | null {
 }
 
 /**
- * The quality and item level of each item, as most installs reported them in `item_seen`. A tie leaves the item out:
- * one install cannot move a band's windows by reporting another level.
+ * The quality and item level of each item, as most installs reported them in `item_seen`. Each install counts once,
+ * with its latest report: a patch that changes an item's level moves the install's vote, it does not add one. A tie
+ * leaves the item out: one install cannot move a band's windows by reporting another level.
  */
 export function reportedLevels(records: readonly unknown[]): Map<number, { quality: number; itemLevel: number }> {
-  const votes = new Map<number, Map<string, Set<string>>>();
+  const latest = new Map<number, Map<string, { at: string; key: string }>>();
   for (const raw of records) {
     if (!raw || typeof raw !== "object") continue;
     const row = raw as Record<string, unknown>;
     if (row.kind !== "item_seen" || !positive(row.itemId) || !positive(row.itemLevel) || typeof row.installId !== "string") continue;
     const quality = typeof row.quality === "string" ? QUALITY_ID[row.quality] : undefined;
     if (quality === undefined) continue;
-    const byValue = votes.get(row.itemId) ?? new Map<string, Set<string>>();
-    const key = `${quality}:${row.itemLevel}`;
-    byValue.set(key, (byValue.get(key) ?? new Set<string>()).add(row.installId));
-    votes.set(row.itemId, byValue);
+    const at = typeof row.capturedAt === "string" ? row.capturedAt : "";
+    const byInstall = latest.get(row.itemId) ?? new Map<string, { at: string; key: string }>();
+    const held = byInstall.get(row.installId);
+    if (!held || at >= held.at) byInstall.set(row.installId, { at, key: `${quality}:${row.itemLevel}` });
+    latest.set(row.itemId, byInstall);
+  }
+  const votes = new Map<number, Map<string, number>>();
+  for (const [itemId, byInstall] of latest) {
+    const byValue = new Map<string, number>();
+    for (const { key } of byInstall.values()) byValue.set(key, (byValue.get(key) ?? 0) + 1);
+    votes.set(itemId, byValue);
   }
   const out = new Map<number, { quality: number; itemLevel: number }>();
   for (const [itemId, byValue] of votes) {
-    const ranked = [...byValue].sort((a, b) => b[1].size - a[1].size);
-    if (ranked.length > 1 && ranked[0][1].size === ranked[1][1].size) continue;
+    const ranked = [...byValue].sort((a, b) => b[1] - a[1]);
+    if (ranked.length > 1 && ranked[0][1] === ranked[1][1]) continue;
     const [quality, itemLevel] = ranked[0][0].split(":").map(Number);
     out.set(itemId, { quality, itemLevel });
   }
