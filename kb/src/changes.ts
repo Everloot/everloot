@@ -68,7 +68,7 @@ export function sanitizePost(raw: unknown): BluePost | null {
   if (!id || !title || !postedAt) return null;
   if (raw.game !== "forever" && raw.game !== "classic") return null;
   const summary = clampText(raw.summary, 280);
-  const source = raw.source === "bluesky" ? "bluesky" : "forum";
+  const source = raw.source === "news" ? "news" : raw.source === "bluesky" ? "bluesky" : "forum";
   const positive = (v: unknown) => (Number.isInteger(v) && (v as number) > 0 && (v as number) < 2 ** 31 ? (v as number) : undefined);
   const topicId = source === "forum" ? positive(raw.topicId) : undefined;
   const postNumber = topicId === undefined ? undefined : positive(raw.postNumber);

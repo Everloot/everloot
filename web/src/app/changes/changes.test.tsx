@@ -388,3 +388,14 @@ test("with the game art, a spell a post names gets its icon, its tooltip and a l
   // Without the asset URL the same excerpt is plain text.
   expect(await page()).toContain(">Battle Shout now reaches the whole raid.</p>");
 });
+
+test("news announcements link to Blizzard and show the news source on desktop and mobile", async () => {
+  timeline.entries = [{ id: "news:24315281", source: "news", type: "hotfix", game: "forever",
+    at: "2026-11-17T02:17:13.000Z", title: "Synthetic Forever hotfix announcement", author: "Blizzard Entertainment",
+    url: "https://news.blizzard.com/en-us/article/24315281/wow-forever-hotfixes-november-16-2026" }];
+  const html = await page();
+  expect(html).toContain('href="https://news.blizzard.com/en-us/article/24315281/wow-forever-hotfixes-november-16-2026"');
+  expect(phoneLines(html)).toEqual(["2026-11-17 · Hotfix · Blizzard Entertainment · Blizzard News"]);
+  expect(html).toContain(">Blizzard News</span>");
+  expect(await page({ region: "us" })).not.toContain("Synthetic Forever hotfix announcement");
+});

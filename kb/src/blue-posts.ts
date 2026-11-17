@@ -2,8 +2,9 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { dirname } from "node:path";
 import {
   BLUE_REGIONS, REGIONS, bluePostsOf, emptyOverrides, isBlueGroup, isCandidate, nextTracked, parseAbout, parseOverrides, parsePostChunk, parseTopicList,
-  parseTopicView, staffIndex, type BlueOverrides, type ListedTopic, type StaffIndex, type StaffMember,
+  parseTopicView, staffIndex, type BlueOverrides, type StaffIndex, type StaffMember,
 } from "./blue-forum.js";
+import { NEWS_HOST, NEWS_INDEX, newsLinks, parseNewsArticle } from "./blue-news.js";
 import { sanitizePost } from "./changes.js";
 import { clampExcerpt, clampText, isoTime, plainText } from "./text-safety.js";
 
@@ -17,7 +18,8 @@ export { gameOf } from "./blue-forum.js";
  *  - the Blizzard WoW forums' public Discourse JSON, US and EU English, after checking each host's robots.txt:
  *    the staff list (`about.json`, at most once a day), the Forever and Classic topic lists sorted by last
  *    activity, and only the topics among them that changed and carry a staff post (see blue-forum.ts);
- *  - the official World of Warcraft account's public Bluesky feed.
+ *  - the official World of Warcraft account's public Bluesky feed;
+ *  - Blizzard News: current Forever/Classic announcement metadata, with no article body.
  * What it keeps per post: source, region, link, topic, title, author, role, times, category, game and an
  * excerpt of at most two sentences. Blizzard's post text is Blizzard's, so there is never a full copy here.
  * Players' posts are read with the topic but never kept. The research behind these choices is in the
@@ -26,7 +28,7 @@ export { gameOf } from "./blue-forum.js";
  * Budget: a scheduled run makes at most `maxRequests` requests (default 40) in all, 1.5 s apart per host.
  */
 
-export type BlueSource = "forum" | "bluesky";
+export type BlueSource = "forum" | "bluesky" | "news";
 export type BlueGame = "forever" | "classic";
 export type BlueRegion = "us" | "eu";
 
@@ -73,6 +75,8 @@ export interface FetchState extends Validators {
   notBefore?: string;
   /** Bluesky: newest post time seen. Topic lists: newest activity time fully handled. */
   newestSeen?: string;
+  /** An unfinished list scan. Only candidate topic ids/times are retained, never player records. */
+  scan?: { nextPage: number; newest: string | null; complete: boolean; pending: { id: number; bumpedAt: string }[] };
   /** Roster sources: the forum's staff list as last read. */
   staff?: StaffMember[];
 }
@@ -317,6 +321,8 @@ export interface IngestOptions {
   rosterMaxAgeMs?: number;
   /** Skip Bluesky (the backfill reads the forums only). */
   forumOnly?: boolean;
+  /** Omit the news source for a forum/Bluesky-only pass. */
+  skipNews?: boolean;
 }
 
 export interface IngestResult {
@@ -508,9 +514,8 @@ function session(opts: IngestOptions) {
  *     list by last activity, page by page (100 topics a page) until it reaches the activity time the last
  *     run handled, at most `maxListPages` pages; then each listed topic that changed since and carries a
  *     staff post is opened, oldest change first, and its staff posts are kept.
- * A list's handled time only moves past a topic once that topic was read, so a run cut short by the budget,
- * an error or a 429 picks up where it stopped. A list that needed more than `maxListPages` pages leaves a gap,
- * reported in `skipped`; `blue-backfill` fills it. Any 429 or server error ends the forum pass and records
+ * A list's handled time moves only after every listed page and candidate was read. A run cut short by
+ * the budget, an error, a 429 or `maxListPages` saves its page and pending topics for the next run. Any 429 or server error ends the forum pass and records
  * Retry-After; redirects are never followed.
  */
 export async function ingestBluePosts(opts: IngestOptions): Promise<IngestResult> {
@@ -518,6 +523,15 @@ export async function ingestBluePosts(opts: IngestOptions): Promise<IngestResult
   const maxPages = opts.maxListPages ?? 4;
   const x = session(opts);
   const { s } = x;
+
+  if (!opts.forumOnly && !opts.skipNews) {
+    try {
+      await readNews(x, opts, minInterval);
+    } catch (err) {
+      if (err instanceof BudgetSpent) s.skipped.push(`news: ${message(err)}`);
+      else s.errors.push({ source: "news", error: message(err) });
+    }
+  }
 
   if (!opts.forumOnly) {
     try {
@@ -567,44 +581,50 @@ type Session = ReturnType<typeof session>;
 async function readList(x: Session, now: Date, region: BlueRegion, key: string, path: string, state: FetchState | undefined, staff: StaffIndex, maxPages: number) {
   const { s } = x;
   const since = state?.newestSeen ?? null;
-  const listed: ListedTopic[] = [];
-  let reached = since === null;
-  let pages = 0;
-  for (let page = 0; page < maxPages; page++) {
-    const json = await x.forumJson("list", region, listPath(path, page));
-    if (json === null) throw new Error(`topic list ${path}: not found`);
-    const { topics, full } = parseTopicList(json);
-    listed.push(...topics);
-    pages++;
-    // Pinned topics sit on top whatever their age, so only the others say how far back a page reaches.
-    const oldest = topics.filter((t) => !t.pinned).map((t) => t.bumpedAt).sort()[0];
-    // A first run reads one page and starts from there; history is the backfill's job.
-    if (since === null || !full || (oldest !== undefined && oldest <= since)) { reached = true; break; }
-  }
-  const newest = listed.map((t) => t.bumpedAt).sort().at(-1) ?? since;
-  if (!reached) s.skipped.push(`${key}: more than ${pages} pages changed since ${since}; older changes were not listed (run blue-backfill to fill the gap)`);
-  const todo = listed
-    .filter((t) => (since === null || t.bumpedAt > since) && isCandidate(t, staff))
-    .sort((a, b) => a.bumpedAt.localeCompare(b.bumpedAt) || a.id - b.id);
-  const seen = new Set<number>();
-  let handled = since;
-  for (const topic of todo) {
-    if (seen.has(topic.id)) continue;
-    seen.add(topic.id);
-    try {
-      const posts = await x.openTopic(region, topic.id);
-      if (posts === null) s.skipped.push(`${key}: topic ${topic.id} is gone`);
-      else x.merge(posts);
-    } catch (err) {
-      // Stop here: the handled time stays before this topic, so the next run opens it again.
-      x.setState(key, { at: now.toISOString(), ...(handled ? { newestSeen: handled } : {}) });
-      if (err instanceof Backoff || err instanceof BudgetSpent) throw err;
-      s.errors.push({ source: `${key}: topic ${topic.id}`, error: message(err) });
-      return;
+  const scan = state?.scan ? { ...state.scan, pending: [...state.scan.pending] }
+    : { nextPage: 0, newest: since, complete: false, pending: [] as { id: number; bumpedAt: string }[] };
+  const save = () => x.setState(key, { at: now.toISOString(), ...(since ? { newestSeen: since } : {}), scan });
+  const drain = async () => {
+    while (scan.pending.length) {
+      const topic = scan.pending[0];
+      try {
+        const posts = await x.openTopic(region, topic.id);
+        if (posts === null) s.skipped.push(`${key}: topic ${topic.id} is gone`);
+        else x.merge(posts);
+      } catch (err) {
+        save();
+        throw err;
+      }
+      scan.pending.shift();
+      save();
     }
-    handled = topic.bumpedAt;
+  };
+  try {
+    await drain();
+    for (let pages = 0; !scan.complete && pages < maxPages; pages++) {
+      const json = await x.forumJson("list", region, listPath(path, scan.nextPage));
+      if (json === null) throw new Error(`topic list ${path}: not found`);
+      const { topics, full } = parseTopicList(json);
+      scan.newest = [...topics.map((t) => t.bumpedAt), ...(scan.newest ? [scan.newest] : [])].sort().at(-1) ?? null;
+      const oldest = topics.filter((t) => !t.pinned).map((t) => t.bumpedAt).sort()[0];
+      scan.complete = since === null || !full || (oldest !== undefined && oldest <= since);
+      scan.nextPage++;
+      scan.pending = topics.filter((t) => (since === null || t.bumpedAt > since) && isCandidate(t, staff))
+        .sort((a, b) => a.bumpedAt.localeCompare(b.bumpedAt) || a.id - b.id)
+        .map(({ id, bumpedAt }) => ({ id, bumpedAt }));
+      save();
+      await drain();
+    }
+  } catch (err) {
+    if (err instanceof Backoff || err instanceof BudgetSpent) throw err;
+    s.errors.push({ source: scan.pending.length ? `${key}: topic ${scan.pending[0].id}` : key, error: message(err) });
+    return;
   }
-  x.setState(key, { at: now.toISOString(), ...(newest ? { newestSeen: newest } : {}) });
+  if (!scan.complete) {
+    s.skipped.push(`${key}: more than ${maxPages} pages changed since ${since}; continuing from page ${scan.nextPage} next run`);
+    return;
+  }
+  x.setState(key, { at: now.toISOString(), ...(scan.newest ? { newestSeen: scan.newest } : {}) });
 }
 
 /** The Bluesky feed, page by page up to MAX_PAGES, stopping at what the last read already showed. */
@@ -709,4 +729,31 @@ export async function backfillBluePosts(opts: BackfillOptions): Promise<IngestRe
     else throw err;
   }
   return { store: s.store, added: s.added, skipped: s.skipped, errors: s.errors, requests: s.requests, topics: topicsOpened, pages: pagesRead };
+}
+
+/** Read a bounded set of current official announcements, checking robots and respecting backoff. */
+async function readNews(x: Session, opts: IngestOptions, minInterval: number) {
+  const key = "news";
+  const state = x.s.store.fetched[key];
+  if (state?.notBefore && Date.parse(state.notBefore) > opts.now.getTime()) return;
+  if (state && opts.now.getTime() - Date.parse(state.at) < minInterval) return;
+  const robots = await x.get("news", "news", `${NEWS_HOST}/robots.txt`, {}, key);
+  if (!robots.ok && robots.status !== 404) throw new Error(`robots.txt: HTTP ${robots.status}`);
+  const rules = robots.status === 404 ? "" : await robots.text();
+  const getHtml = async (url: string) => {
+    const path = new URL(url).pathname;
+    if (!robotsAllows(rules, path)) throw new Error(`robots.txt disallows ${path}`);
+    const res = await x.get("news", "news", url, { Accept: "text/html" }, key);
+    if (!res.ok) throw new Error(`HTTP ${res.status} for ${path}`);
+    return res.text();
+  };
+  const html = await getHtml(NEWS_INDEX);
+  if (!/\/en-us\/article\//.test(html)) throw new Error("news index has no article links");
+  // Re-read rolling hotfix articles: their article id stays the same when their title and date change.
+  for (const url of newsLinks(html).slice(0, 3)) {
+    const post = parseNewsArticle(await getHtml(url), url, opts.now);
+    if (!post) throw new Error(`news article has no valid announcement metadata: ${new URL(url).pathname}`);
+    x.merge([post]);
+  }
+  x.setState(key, { at: opts.now.toISOString() });
 }

@@ -29,7 +29,7 @@ export const REGIONS: Record<BlueRegion, RegionConfig> = {
   us: {
     host: "https://us.forums.blizzard.com",
     categories: new Map([
-      ...cats("forever", [[346, "WoW: Forever"], [347, "WoW: Forever General Discussion"], [348, "WoW: Forever Community Connections"], [349, "WoW: Forever Beta Discussion"]]),
+      ...cats("forever", [[346, "WoW: Forever"], [347, "WoW: Forever General Discussion"], [348, "WoW: Forever Community Connections"], [349, "WoW: Forever Beta Discussion"], [352, "WoW Forever Bug Report"]]),
       ...cats("classic", [
         [197, "WoW Classic"], [172, "WoW Classic General Discussion"], [335, "The Burning Crusade Classic"],
         [254, "Mists of Pandaria Classic Discussion"], [199, "WoW Classic Bug Report"], [201, "WoW Classic New Guild Listings"],

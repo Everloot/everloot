@@ -70,7 +70,7 @@ const href = (q: Partial<ChangesQuery>) => listHref("/changes", [
 const active = (q: ChangesQuery) => [q.q, q.show !== "all", q.game !== "forever", q.region, q.author, q.days].filter(Boolean).length;
 
 /** Every forum an announcement was posted on: "US forum", or "US · EU forum" for one posted on both. */
-const SOURCE_LABEL = (e: ChangeEntry) => e.type === "build" ? "" : e.source === "bluesky" ? "Bluesky" : e.source === "manual" ? e.category || "Everloot"
+const SOURCE_LABEL = (e: ChangeEntry) => e.type === "build" ? "" : e.source === "bluesky" ? "Bluesky" : e.source === "news" ? "Blizzard News" : e.source === "manual" ? e.category || "Everloot"
   : `${forumRegions(e).map((r) => r.toUpperCase()).join(" · ")} forum`;
 /** The announcement and its regional copies, for the filters that look inside them. */
 const copiesOf = (e: ChangeEntry) => [e, ...(e.copies ?? [])];
