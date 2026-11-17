@@ -35,7 +35,8 @@ const equipmentSchema = z
           slot: z.object({ type: z.string() }).passthrough(),
           item: z.object({ id: z.number().int() }).passthrough(),
           name: z.string(),
-          level: z.object({ value: z.number().nonnegative() }).passthrough(),
+          // Blizzard leaves the level out for some cosmetic items (a common head item, seen 2026-11-17).
+          level: z.object({ value: z.number().nonnegative() }).passthrough().nullish(),
           quality: z.object({ type: z.string() }).passthrough(),
           inventory_type: z.object({ type: z.string() }).passthrough(),
         })
@@ -142,7 +143,7 @@ export function parseCharacter(
       slot: i.slot.type,
       item_id: i.item.id,
       name: i.name,
-      level: i.level.value,
+      level: i.level?.value ?? null,
       quality: i.quality.type,
       inventory_type: i.inventory_type.type,
     })),
