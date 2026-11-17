@@ -3,14 +3,17 @@ import { buildLoreRelease } from "@/test/lore-release";
 
 const mocks = vi.hoisted(() => ({
   names: { items: new Map<number, string>(), npcs: new Map<number, string>(), objects: new Map<number, string>(), quests: new Map<number, string>() },
+  catalog: null as unknown,
   objects: { rates: [] as unknown[], measuredZeros: [] as unknown[], names: [] as unknown[], unreachable: false },
 }));
 vi.mock("@/lib/names", () => ({ loadNames: async () => mocks.names }));
 vi.mock("@/lib/objects", () => ({ loadObjectFacts: async () => mocks.objects }));
 
+vi.mock("./completion-lists", async (original) => ({ ...(await original<typeof import("./completion-lists")>()), loadCatalog: async () => mocks.catalog }));
 let release = "";
 beforeAll(async () => { release = await buildLoreRelease(); });
 afterEach(() => {
+  mocks.catalog = null;
   vi.unstubAllEnvs();
   vi.resetModules();
   mocks.names = { items: new Map(), npcs: new Map(), objects: new Map(), quests: new Map() };
@@ -240,4 +243,41 @@ test("suggestions: a dungeon's name, part of it or with the leading The, suggest
   expect((await suggest("deadmines"))[0]).toMatchObject({ type: "instance" });
   // A scoped box keeps to its database type.
   expect((await suggest("deadm", "item")).some((r) => r.type === "instance")).toBe(false);
+});
+
+
+test.each([
+  ["achievement", "achievements", "achievementId"], ["faction", "factions", "factionId"],
+  ["title", "titles", "titleId"], ["chain", "chains", "questLineId"],
+] as const)("nine %s matches keep exact order and scoped pages reach the ninth", async (type, collection, key) => {
+  mocks.catalog = { achievements: [], factions: [], titles: [], chains: [], [collection]: Array.from({ length: 9 }, (_, i) => ({ [key]: i + 1, name: i === 8 ? "Trial & Test" : `Trial & Test ${i}` })) };
+  const { siteSearch } = await import("./site-search");
+  const overview = (await siteSearch("Trial & Test")).find((g) => g.type === type)!;
+  expect(overview.total).toBe(9);
+  expect(overview.results).toHaveLength(8);
+  expect(overview.results[0].label).toBe("Trial & Test");
+  const first = await siteSearch("Trial & Test", { only: type, limit: 8, page: 1 });
+  const next = await siteSearch("Trial & Test", { only: type, limit: 8, page: 2 });
+  expect(first.map((g) => g.type)).toEqual([type]);
+  expect(next[0].results.map((r) => r.label)).toEqual(["Trial & Test 7"]);
+  expect((await siteSearch("Trial & Test", { only: type, limit: 8, page: 1e100 }))[0]).toMatchObject({ page: 2 });
+  expect((await siteSearch("Trial & Test", { only: type, limit: 0, page: -5 }))[0].results).toHaveLength(1);
+});
+
+test.each(["zone", "instance"] as const)("all %s matches remain reachable with the same search semantics", async (only) => {
+  const { siteSearch } = await import("./site-search");
+  const overview = (await siteSearch("a")).find((g) => g.type === only)!;
+  expect(overview.total).toBeGreaterThan(8);
+  expect(overview.results).toHaveLength(8);
+  const hits = [];
+  for (let page = 1; page <= Math.ceil(overview.total / 8); page++) {
+    const groups = await siteSearch("a", { only, page, limit: 8 });
+    expect(groups.map((g) => g.type)).toEqual([only]);
+    hits.push(...groups[0].results);
+  }
+  expect(hits).toHaveLength(overview.total);
+  expect(new Set(hits.map((r) => r.href)).size).toBe(overview.total);
+  expect(hits.slice(0, 8)).toEqual(overview.results);
+  const bounded = (await siteSearch("a", { only, limit: 1e9 }))[0];
+  expect(bounded.results.length).toBeLessThanOrEqual(50);
 });
