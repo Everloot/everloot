@@ -279,3 +279,26 @@ test("a repeated parameter answers with its first value, never a crash", async (
   expect(html).toContain('href="/search?q=grommash&amp;in=lore"');
   expect(html).not.toContain("page=3");
 });
+
+test.each([
+  ["achievement", "Achievements"], ["faction", "Factions"], ["title", "Titles"],
+  ["chain", "Quest chains"], ["zone", "Zones"], ["instance", "Dungeons and raids"],
+ ])("truncated %s groups preserve encoded queries and offer bounded continuation", async (type, heading) => {
+  const results = Array.from({ length: 8 }, (_, i) => ({ label: `Trial ${i}`, href: `/database/${type}/${i}`, exact: false }));
+  siteSearch.groups = [{ type, heading, total: 9, results }];
+  expect(await render({ q: "Trial & Test" })).toContain(`href="/search?q=Trial%20%26%20Test&amp;in=${type}"`);
+  siteSearch.groups = [{ type, heading, total: 51, results, page: 1 }];
+  const scoped = await render({ q: "Trial & Test", in: type });
+  expect(scoped).toContain(`href="/search?q=Trial%20%26%20Test&amp;in=${type}&amp;p=2"`);
+  siteSearch.groups = [{ type, heading, total: 9, results: [...results, { label: "Ninth", href: "/ninth", exact: false }], page: 1 }];
+  const complete = await render({ q: "Trial & Test", in: type });
+  expect(complete).toContain("Ninth");
+  expect(complete).not.toContain(`aria-label="${heading} pages"`);
+  expect(await render({ q: "Trial & Test" })).not.toContain(`All 9 ${heading.toLowerCase()}`);
+  siteSearch.groups = [{ type, heading, total: 51, results: [{ label: "Last match", href: "/last", exact: false }], page: 2 }];
+  const last = await render({ q: "Trial & Test", in: type, p: "2" });
+  expect(last).toContain(`href="/search?q=Trial%20%26%20Test&amp;in=${type}&amp;p=1"`);
+  expect(last).toContain("Last match");
+  expect(last).not.toContain(`&amp;p=3`);
+  siteSearch.groups = [];
+ });

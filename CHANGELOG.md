@@ -18,6 +18,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: Add daily auction reports with archived asking-price movers, house spreads, RSS and downloadable share cards.
 - Site: browse Blizzard auction house data by region and house, search item names, sort and page through current prices, and read 30 days of daily unit prices per house on the ad-free item pages.
 - Site: add AH Ledger 30-day item price history, profession crafting margins, auction deals and per-market listed-value comparisons, read in the browser with source credit and upstream cache lifetimes.
+- Site: explain addon directory rankings, approved listings and how to report wrong data in two linked guides.
 - Site: document Worker builds, release checks, MCP version files and dated desktop signing status in the package READMEs.
 - Addon: Optional local bag, bank and mail snapshots keep item counts and observation times; capture starts off and snapshots never upload.
 - Site: the market prices API accepts up to 100 item IDs to fetch public prices beyond the most-listed 2,000 items.
@@ -232,6 +233,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: news cards and bylines name Everloot, not everloot.app, as the source of a post that cites the site's own pages.
 - Site: the MCP methodology describes drop rates as a share of recorded loot windows, including its measured-zero example.
 - Site: loot-table notes and open-data descriptions warn that rates can read high before the drops restart, and switch to counted-empty-window wording when a drops recheck scope exists.
+- Site: find lore pages from nearby title spellings in the MCP search tools and chat answers, including Leroy Jenkins.
 - Addon: Settings stays inside the Everloot window, counts every populated record kind and names item facts; a Full / Compact / Off selector controls tooltip detail without changing recording. Needs an in-game layout check before release.
 - Site: bag upgrade pickers offer publicly priced sizes and preserve bags selected in saved links, without suggesting unpriced test containers.
 - Docs: the project overview links current downloads and explains paired addon/Desktop App updates for community prices.
@@ -375,6 +377,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the market rollup the Auction House pages read is read once at a time, with a time limit. Pages that arrived together each downloaded and parsed the whole file, which filled the isolate's memory and asked R2 for one object many times over; a read that never answered held its page until the platform cut it off. When the rollup cannot be read, the copy already held answers for up to an hour instead of the page saying the market is unrecorded. Every R2 call the upload store makes now has a time limit (25 seconds to read, 45 to write).
 - Site: the Auction House's background page refresh is tried twice, not six times, when it fails. Each try rendered the page again, and a page that outlasts the queue's 10-second limit failed every time (`NEXT_CACHE_DO_QUEUE_MAX_RETRIES`).
 - Site: the snapshot job holds less of the corpus in memory while it extends the snapshot. It drops the parsed old snapshot once its events are replayed, and the rollups that run after it (item view, aggregates, auction history, professions, map pins, database activity) read the state it just wrote instead of downloading and parsing the same file again. On a 20 MB synthetic snapshot the memory still held mid-run falls by about 28 MB (39 to 11 MB while the new uploads are read, 60 to 31 MB at the write), and a second read of the file is gone.
+- Site: search links every matching achievement, faction, title, quest chain, zone and instance through bounded result pages.
 
 ### Changed
 - CurseForge: every addon upload is a Release file; an Alpha is named "Everloot <version> Alpha". The CurseForge app
@@ -382,6 +385,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   marks an Alpha a pre-release, and the site still calls the addon an Alpha.
 - Site: the entity pages' pin tables (where an NPC, a vendor or an object stands, which NPCs an item was found on) are one table with the same columns everywhere, the vendor's now with the installs that agree, and the vendor page keeps its summary and open data in the same wide-screen column as the other entity pages.
 - Addon: new installs leave other addons' minimap buttons in place by default; existing players keep their drawer setting and can still use /everloot buttons on.
+- Site: set the Worker CPU limit to 30 seconds.
 - Site: the site shows no ads. About, the FAQ, the terms, the privacy policy, the privacy guide and the accessibility statement now say so and no longer describe Google AdSense.
 - Site: the Blizzard auction house page names each house by its ruleset and faction ("PvP, Alliance", "Roleplay PvP, Horde") instead of "Alliance, house 110", and lists them US first, then by ruleset. Blizzard's API does not say which ruleset a house serves; the mapping was matched by price in both regions.
 - Addon: auction scan messages name everloot.app/upload alongside the Desktop App as a way to send the saved file.

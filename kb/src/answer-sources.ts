@@ -4,6 +4,7 @@ import { itemPage, ITEM_AGREEMENT, type ItemFacts } from "./item-page.js";
 import { loreUrls, moreLine } from "./page-urls.js";
 import type { ReleaseSource } from "./release-db.js";
 import { allTerms, contentTerms, respell, search, searchSomeWords, SOME_WORDS, type Respelling, type SearchHit } from "./search.js";
+import { fromSpanish } from "./spanish.js";
 import { agreedNpcNames, npcPage, WORLD_AGREEMENT, worldFactsFromRecords, type WorldFacts } from "./world-pages.js";
 import type { RecheckScope } from "./coverage.js";
 import { claimAnswers, claimSubject, requestedPredicate, filesEvidence, filesNameWords, type FilesIndex } from "./files-evidence.js";
@@ -201,11 +202,12 @@ async function knowledgeHits(
   for (const hits of named) add(hits);
   // A hit whose title holds every asked word is the page asked about. Without one, the hits may have matched a typo
   // a page or two share ("scarlet monestary"), so the words are read again; a reading that changes nothing keeps them.
-  const asked = contentTerms(question);
+  const translated = fromSpanish(question);
+  const asked = contentTerms(translated);
   const onTopic = out.some((hit) => { const words = new Set(allTerms(hit.name).split(" ")); return asked.every((t) => words.has(t)); });
   if (onTopic) return { hits: out, some: false, text: question, respelled: [], trainers };
   // First the words as the pages spell them ("thunderbluff zeppeling"), then some of the words.
-  const fixed = await respell(db, question, keep);
+  const fixed = await respell(db, translated, keep);
   if (fixed) {
     const again = await search(db, fixed.text, limit + 5);
     if (again.length) {

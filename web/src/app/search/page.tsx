@@ -6,7 +6,7 @@ import GameIcon from "@/components/game/GameIcon";
 import { Container, DataTable, DataTitle, Entry, EntryList, filledColumns, LinkTabs, Pager, QUALITY_TEXT, SearchBar, qualityOf, type SparseColumn } from "@/components/ui";
 import { CC_BY_SA } from "@/lib/jsonld";
 import { BROWSE_HEADINGS, BROWSE_TYPES, hasTypes, loreSlug, MAX_QUERY, searchLore, UNAVAILABLE, UNAVAILABLE_COPY, type BrowseSlug, type LoreType } from "@/lib/lore";
-import { HEADINGS, isScope, siteSearch, type Scope, type SearchGroup, type SearchResult, type SearchType } from "@/lib/site-search";
+import { HEADINGS, isScope, isResultScope, isPagedScope, siteSearch, type ResultScope, type SearchGroup, type SearchResult, type SearchType } from "@/lib/site-search";
 import { loadShownSearchNames } from "@/lib/shown-search-names";
 import { loadShownNames } from "@/lib/shown-item-names";
 import { shownItemIcons } from "@/lib/item-icons";
@@ -43,7 +43,7 @@ const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 
-type Params = { q?: string | string[]; page?: string | string[]; type?: string | string[]; in?: string | string[] };
+type Params = { q?: string | string[]; page?: string | string[]; type?: string | string[]; in?: string | string[]; p?: string | string[] };
 
 /** Rows a scoped search (`in=item`) lists; the overview lists 8 per type. */
 const SCOPED_LIMIT = 50;
@@ -88,12 +88,12 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
   // `in=lore` is the full lore list (with its type chips and pages) behind the lore group of the overview;
   // the links this page gave out before it searched the whole site (`page=`, `type=`) still open it.
   if (first(params.in) === "lore" || params.page !== undefined || params.type !== undefined) return LoreResults({ q, params });
-  const scope = isScope(first(params.in)) ? (first(params.in) as Scope) : undefined;
+  const scope = isResultScope(first(params.in)) ? (first(params.in) as ResultScope) : undefined;
 
   // Reuse item facts only within this render; the next request rechecks publication.
   const shown = q ? loadShownNames() : undefined;
   // Matched on the names the database pages show, so a name a list prints is found here too.
-  const groups = q ? await siteSearch(q, { ...(scope ? { only: scope, limit: SCOPED_LIMIT } : {}), names: loadShownSearchNames(shown) }) : null;
+  const groups = q ? await siteSearch(q, { ...(scope ? { only: scope, limit: SCOPED_LIMIT, ...(isPagedScope(scope) ? { page: pageNumber(first(params.p)) } : {}) } : {}), names: loadShownSearchNames(shown) }) : null;
   // The game icon beside each item hit, where its page shows one.
   const { icons, unknown } = await shownItemIcons(groups?.find((g) => g.type === "item")?.results.flatMap((r) => (r.id === undefined ? [] : [r.id])) ?? [], shown);
   const base = `/search?q=${encodeURIComponent(q)}`;
@@ -102,7 +102,7 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
     ...groups.map((g) => ({
       label: g.heading,
       count: g.total,
-      href: isScope(g.type) ? `${base}&in=${g.type}` : g.type === "lore" ? `${base}&in=lore` : `${base}#results-${g.type}`,
+      href: isResultScope(g.type) ? `${base}&in=${g.type}` : g.type === "lore" ? `${base}&in=lore` : `${base}#results-${g.type}`,
       current: scope === g.type,
     })),
   ];
@@ -127,7 +127,7 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
         <div className="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2">
           <div className="[&>header]:mb-0"><DataTitle title="Search" /></div>
           <div className="w-full max-w-xl sm:flex-1">
-            <SearchBar action="/search" id="search-page" label="Search Everloot" placeholder={`A name or an id: ${EXAMPLES.slice(1).join(", ")}`} defaultValue={q} defaultScope={scope ?? ""} compact />
+            <SearchBar action="/search" id="search-page" label="Search Everloot" placeholder={`A name or an id: ${EXAMPLES.slice(1).join(", ")}`} defaultValue={q} defaultScope={isScope(scope) ? scope : ""} compact />
           </div>
           {tabs && <LinkTabs label="Result types" tabs={tabs} />}
         </div>
@@ -150,8 +150,16 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
 /** One type's results as a dense table; its heading is the first column's header. */
 function ResultTable({ group, q, scoped, icons, unknown }: { group: SearchGroup; q: string; scoped: boolean; icons: Map<number, string>; unknown: string | null }) {
   const more = group.total > group.results.length;
-  const all = isScope(group.type) ? `/search?q=${encodeURIComponent(q)}&in=${group.type}` : group.type === "lore" ? `/search?q=${encodeURIComponent(q)}&in=lore` : null;
+  const all = isResultScope(group.type) ? `/search?q=${encodeURIComponent(q)}&in=${group.type}` : group.type === "lore" ? `/search?q=${encodeURIComponent(q)}&in=lore` : null;
   const list = more && scoped && group.type in DATABASE_LIST ? `/database/${DATABASE_LIST[group.type as keyof typeof DATABASE_LIST]}?q=${encodeURIComponent(q)}` : null;
+  const current = group.page ?? 1;
+  const pages = Math.ceil(group.total / SCOPED_LIMIT);
+  const pager = scoped && isPagedScope(group.type) && pages > 1 ? <Pager
+    label={`${group.heading} pages`}
+    page={current}
+    prevHref={current > 1 ? `${all}&p=${current - 1}` : null}
+    nextHref={current < pages ? `${all}&p=${current + 1}` : null}
+  /> : null;
   const name = (r: SearchResult) => {
     // An item name takes its quality colour; any other hit is a plain link, never the accent an uncommon item resembles.
     const style = group.type === "item" && typeof r.quality === "number" && r.quality <= 5 ? `${QUALITY_TEXT[qualityOf(r.quality)]} hover:underline underline-offset-4` : "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
@@ -184,6 +192,7 @@ function ResultTable({ group, q, scoped, icons, unknown }: { group: SearchGroup;
         meta={(r) => (group.type === "item" ? [r.meta, r.id !== undefined && `ID ${r.id}`] : [r.id !== undefined ? `ID ${r.id}` : r.note]).filter(Boolean).join(" · ")}
         footer={
           more && all && !scoped ? <Link href={all} className={link}>All {group.total} {group.type === "lore" ? "lore results" : group.heading.toLowerCase()}</Link>
+          : pager ? pager
           : list ? <>{`Showing ${group.results.length} of ${group.total}. `}<Link href={list} className={link}>See every match in the database</Link></>
           : undefined
         }
