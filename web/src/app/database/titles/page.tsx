@@ -43,7 +43,7 @@ export default async function TitleListPage(props: { searchParams?: Promise<Sear
   const here = (over: Partial<ListQuery<Sort>>) => href({ ...q, page: 1, ...over });
 
   const columns: Column<Listed<TitleEntry>>[] = [
-    { key: "name", header: "Name", sortable: true, cell: (x) => <Link href={titleHref(x.titleId, x.name)} className={LINK}>{titleDisplayName(x.name)}</Link> },
+    { key: "name", header: "Name", sortable: true, cell: (x) => <Link prefetch={false} href={titleHref(x.titleId, x.name)} className={LINK}>{titleDisplayName(x.name)}</Link> },
     { key: "confirmed", header: "Confirmed", cell: (x) => confirmedCell(x, confirmations) },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.titleId },
   ];

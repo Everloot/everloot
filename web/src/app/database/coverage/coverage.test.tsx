@@ -2,12 +2,13 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
 
+const links = vi.hoisted(() => [] as { href: string; prefetch?: boolean }[]);
 const store = vi.hoisted(() => ({ loadCorpus: vi.fn() }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
   uploadStore: { loadCorpus: store.loadCorpus },
 }));
-vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
+vi.mock("next/link", () => ({ default: ({ href, children, prefetch }: { href: string; children: ReactNode; prefetch?: boolean }) => { links.push({ href, prefetch }); return <a href={href}>{children}</a>; } }));
 vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
   permanentRedirect: (to: string) => { throw new Error(`REDIRECT ${to}`); },
@@ -154,4 +155,17 @@ test("the plateau's shares round down, so 90% is never shown before it is met", 
   expect(plateauDetail({ type: "pins", denominator: 10, confirmed: 9, settled: 8, recheck: 1, newlyConfirmed: 0, shares: { confirmed: 0.9, settled: 0.8, newlyConfirmed: 0 }, atPlateau: true }))
     .toBe("9 confirmed, 8 settled, 0 newly confirmed in 28 days, 1 to recheck, of 10 expected");
   expect(plateauMeasured({ dataAsOf: null, windowStart: null, installs: 1, windowInstalls: 0 })).toBe("Data age unrecorded, from 1 install; the 28-day window is [?] without a data date.");
+});
+
+beforeEach(() => { links.length = 0; });
+
+test("coverage zone links navigate on click without prefetching", async () => {
+  store.loadCorpus.mockResolvedValue(corpus(westfall));
+  for (const q of [{}, { q: "100" }] as Record<string, string>[]) {
+    links.length = 0;
+    await html(CoveragePage(search(q)));
+    const zones = links.filter((link) => link.href.startsWith("/database/coverage/"));
+    expect(zones.length).toBeGreaterThan(0);
+    expect(zones.every((link) => link.prefetch === false)).toBe(true);
+  }
 });
