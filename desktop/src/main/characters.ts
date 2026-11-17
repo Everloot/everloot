@@ -4,8 +4,10 @@ import type { CharacterRow, CharactersInfo, ProgressRow } from "../shared/types"
 
 /**
  * What the addon knows about the player's own characters, read from the save file and shown only
- * here. This is the named data the upload never sends from the app (gold, gear, progress); it stays
- * on the machine unless the player shares it on the website with a verified grant.
+ * here. This is the named data the upload never sends from the app (gold, progress); it stays
+ * on the machine unless the player shares it on the website with a verified grant. Gear, talents, professions,
+ * achievements, reputations and quests are not read: the addon no longer records them, and a file an older addon
+ * wrote them into shows only what remains (docs/design/specs/2026-11-17-blizzard-api-first.md).
  */
 
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
@@ -98,7 +100,6 @@ export function collectCharacters(records: Array<Record<string, unknown>>, local
   const byName = keysByName(local.roster);
   const named = new Map<string, CharacterRow>();
   const keyed = new Map<string, ProgressRow>();
-  const gearAt = new Map<string, string>();
   const money = new Map<string, MoneyEvent[]>();
   const row = (r: Record<string, unknown>, key?: string): CharacterRow | null => {
     const character = str(r.character), realm = str(r.realm);
@@ -106,37 +107,25 @@ export function collectCharacters(records: Array<Record<string, unknown>>, local
     const keys = byName.get(`${character}\0${realm}`) ?? [];
     const id = key ? `key:${key}` : keys.length === 1 ? `key:${keys[0]}` : `install:${str(r.installId)}\0${character}\0${realm}`;
     let c = named.get(id);
-    if (!c) { c = { id, character, realm, gold: null, peakGold: null, gearSlots: 0, itemLevel: null, equipped: [], spent: {}, earned: {}, history: [], week: { earned: 0, spent: 0 }, days: [], receipts: [] }; named.set(id, c); }
+    if (!c) { c = { id, character, realm, gold: null, peakGold: null, spent: {}, earned: {}, history: [], week: { earned: 0, spent: 0 }, days: [], receipts: [] }; named.set(id, c); }
     return c;
   };
   const prog = (r: Record<string, unknown>): ProgressRow | null => {
     const key = str(r.characterKey);
     if (!key) return null;
     let p = keyed.get(key);
-    if (!p) { p = { key, class: str(r.class) || "?", level: num(r.level), achievements: 0, achievementsInProgress: 0, reputations: 0, exalted: 0, titles: 0, quests: 0, talentPoints: null, professions: [], lockouts: [] }; keyed.set(key, p); }
+    if (!p) { p = { key, class: str(r.class) || "?", level: num(r.level), titles: 0, lockouts: [] }; keyed.set(key, p); }
     if (num(r.level) > p.level) p.level = num(r.level);
     if (str(r.class)) p.class = str(r.class);
     return p;
   };
-  const titles = new Map<string, Set<number>>(), quests = new Map<string, Set<number>>(), achievements = new Map<string, Map<number, boolean>>(), reps = new Map<string, Map<number, number>>();
+  const titles = new Map<string, Set<number>>();
   for (const r of records) {
     switch (r.kind) {
       case "gold_snapshot": {
         const c = row(r); if (!c) break;
         c.gold = num(r.currentCopper); c.peakGold = Math.max(c.peakGold ?? 0, num(r.peakCopper));
         if (str(r.capturedAt)) c.history.push({ at: str(r.capturedAt), copper: num(r.currentCopper) });
-        break;
-      }
-      case "gear_snapshot": {
-        const c = row(r); if (!c) break;
-        const eq = Array.isArray(r.equipped) ? (r.equipped as Record<string, unknown>[]) : [];
-        if (!eq.length) break;
-        const id = c.id, at = str(r.capturedAt), seen = gearAt.get(id) ?? "";
-        if (c.equipped.length && !(at && at > seen)) break;
-        c.equipped = eq.map((e) => ({ slot: str(e.slot), itemLevel: num(e.itemLevel) })).filter((e) => e.slot && e.itemLevel > 0);
-        c.gearSlots = c.equipped.length;
-        c.itemLevel = c.gearSlots ? Math.round(c.equipped.reduce((s, e) => s + e.itemLevel, 0) / c.gearSlots) : null;
-        gearAt.set(id, at);
         break;
       }
       case "money_event": {
@@ -156,19 +145,9 @@ export function collectCharacters(records: Array<Record<string, unknown>>, local
         }
         break;
       }
-      case "achievement_owned": { const p = prog(r); if (!p) break; const m = achievements.get(p.key) ?? new Map<number, boolean>(); m.set(num(r.achievementId), r.completed === true); achievements.set(p.key, m); break; }
-      case "reputation_owned": { const p = prog(r); if (!p) break; const m = reps.get(p.key) ?? new Map<number, number>(); m.set(num(r.factionId), num(r.reaction)); reps.set(p.key, m); break; }
       case "title_owned": { const p = prog(r); if (!p) break; const s = titles.get(p.key) ?? new Set<number>(); for (const id of (Array.isArray(r.titleIds) ? r.titleIds : []) as unknown[]) s.add(num(id)); titles.set(p.key, s); break; }
-      case "quest_owned": { const p = prog(r); if (!p) break; const s = quests.get(p.key) ?? new Set<number>(); for (const id of (Array.isArray(r.questIds) ? r.questIds : []) as unknown[]) s.add(num(id)); quests.set(p.key, s); break; }
-      // The addon keeps only the latest state of these two (addon/modules/owned.lua); a row the game gave no numbers
+      // The addon keeps only the latest state of lockouts (addon/modules/owned.lua); a row the game gave no numbers
       // for is not written there, and one that arrives without them here is left out, never shown as zero.
-      case "profession_owned": {
-        const name = str(r.profession), rank = r.rank, max = r.maxRank;
-        if (!name || typeof rank !== "number" || typeof max !== "number" || max <= 0) break;
-        const p = prog(r); if (!p) break;
-        p.professions = [...p.professions.filter((x) => x.name !== name), { name, rank, maxRank: max }];
-        break;
-      }
       case "lockout_owned": {
         const instance = str(r.instance), killed = r.bossesKilledCount, total = r.bossesTotal, resetAt = str(r.resetAt);
         if (!instance || typeof killed !== "number" || typeof total !== "number" || total <= 0 || !Number.isFinite(Date.parse(resetAt))) break;
@@ -189,21 +168,11 @@ export function collectCharacters(records: Array<Record<string, unknown>>, local
     list.push({ at: e.at, ms: e.ms, category: e.category, copper: e.copper, direction: e.direction });
     money.set(id, list);
   }
-  for (const [key, p] of keyed) {
-    const a = achievements.get(key);
-    if (a) { p.achievements = [...a.values()].filter(Boolean).length; p.achievementsInProgress = [...a.values()].filter((v) => !v).length; }
-    const rp = reps.get(key);
-    if (rp) { p.reputations = rp.size; p.exalted = [...rp.values()].filter((v) => v >= 8).length; }
-    p.titles = titles.get(key)?.size ?? 0;
-    p.quests = quests.get(key)?.size ?? 0;
-  }
-  // Talent snapshots carry class and level but no key or name; count the active one per class as a hint.
-  const talents = records.filter((r) => r.kind === "talent_snapshot" && r.active === true).map((r) => ({ class: str(r.class), level: num(r.level), points: num(r.points) }));
+  for (const [key, p] of keyed) p.titles = titles.get(key)?.size ?? 0;
   for (const c of named.values()) c.history = thin(c.history.sort((a, b) => a.at.localeCompare(b.at)));
   return {
     characters: [...named.values()].sort((a, b) => (b.gold ?? 0) - (a.gold ?? 0)),
     progress: [...keyed.values()].sort((a, b) => b.level - a.level),
-    talents,
     money,
   };
 }
@@ -230,5 +199,5 @@ export function charactersAt(base: CharacterBase, now = Date.now()): CharactersI
   });
   // A lockout past its reset is over in the game too, whenever the addon last read the list.
   const progress = base.progress.map((p) => ({ ...p, lockouts: p.lockouts.filter((l) => Date.parse(l.resetAt) > now) }));
-  return { characters, progress, talents: base.talents };
+  return { characters, progress };
 }

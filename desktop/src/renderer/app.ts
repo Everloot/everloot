@@ -8,7 +8,7 @@ import { PROVIDER_PRESETS, assistantSource, keptModelPick, manualModelShown, pre
 import { inkOn } from "../../../web/src/lib/chat/catalogue";
 import { LOCAL_ONLY_CATEGORIES } from "../shared/ledger";
 import { WEBSITE_LINKS, websiteUrl } from "../shared/website";
-import { emptyCause, emptyState, ghostProfile, jobOfLine, ownedLockouts, ownedProfessions, statePill, threadLines, watchPill, workingStrip } from "./parts";
+import { emptyCause, emptyState, ghostProfile, jobOfLine, ownedLockouts, statePill, threadLines, watchPill, workingStrip } from "./parts";
 
 declare global { interface Window { everloot: EverlootApi } }
 const api = window.everloot;
@@ -34,6 +34,7 @@ let candidates: GameFolderCandidate[] = [];
 let chosenFolder: string | null = null;
 /** The census line on the welcome screen, ticked until the player unticks it. */
 let censusChoice = true;
+let playersChoice = true;
 /** The welcome screen's addon check for the picked folder: the installed version (null: not there) and what Install did ("!" starts an error). */
 let setupAddon: { folder: string; installed: string | null; note: string } | null = null;
 /** The welcome screen's "I agree to the Terms of Use and Privacy Policy" box. */
@@ -170,7 +171,8 @@ function welcome(): string {
       <ul class="plain fg2">
         <li>Anonymous observations from <code>Everloot.lua</code>: drops, vendors, recipes, spawns, auction scans. No character or account name.</li>
         <li><label class="switch"><input type="checkbox" id="censusConsent" ${censusChoice ? "checked" : ""}> Census: the race, class, level and faction of your characters and of players the addon sees. Never names, guilds, gear or places; the site shows only totals.</label></li>
-        <li>The uploader keeps guild, gear, gold, collection and installed-addon rows here. If you configure a model for Chat, it receives your questions and any local character details it uses to answer.</li>
+        <li><label class="switch"><input type="checkbox" id="playersConsent" ${playersChoice ? "checked" : ""}> Player pages, on in a new install: the name, realm, race, class, level and guild of the players the addon saw, so a page can be found by name. Anyone can hide a character at everloot.app/players/opt-out; <code>/everloot players off</code> in the game stops recording and deletes them.</label></li>
+        <li>The uploader keeps guild, gold, collection and installed-addon rows here. If you configure a model for Chat, it receives your questions and any local character details it uses to answer.</li>
       </ul>
       <p class="small fg2">Uploaded observations are published under CC BY-SA 4.0, credited to Everloot contributors. Source: ${ext("https://github.com/Everloot/everloot", "github.com/Everloot/everloot")} · Rules: ${ext("https://everloot.app/privacy", "everloot.app/privacy")}</p>
     </section>
@@ -490,8 +492,6 @@ function paintTiles(): void {
   for (const el of main.querySelectorAll<HTMLElement>("[data-tile]")) { el.style.background = el.dataset.tile!; el.style.color = inkOn(el.dataset.tile!); }
 }
 
-const SLOT_ORDER = ["HeadSlot", "NeckSlot", "ShoulderSlot", "BackSlot", "ChestSlot", "WristSlot", "HandsSlot", "WaistSlot", "LegsSlot", "FeetSlot", "Finger0Slot", "Finger1Slot", "Trinket0Slot", "Trinket1Slot", "MainHandSlot", "SecondaryHandSlot"];
-const SLOT_LABEL: Record<string, string> = { HeadSlot: "Head", NeckSlot: "Neck", ShoulderSlot: "Shoulders", BackSlot: "Back", ChestSlot: "Chest", WristSlot: "Wrist", HandsSlot: "Hands", WaistSlot: "Waist", LegsSlot: "Legs", FeetSlot: "Feet", Finger0Slot: "Finger 1", Finger1Slot: "Finger 2", Trinket0Slot: "Trinket 1", Trinket1Slot: "Trinket 2", MainHandSlot: "Main hand", SecondaryHandSlot: "Off hand" };
 const DAY_LETTERS = ["S", "M", "T", "W", "T", "F", "S"];
 
 /** The picked character (character\0realm) and the open drawer, kept across re-renders. */
@@ -540,7 +540,7 @@ function weekBars(days: MoneyDay[]): string {
 
 /** One keyed progress row set, listed apart from the named characters by design. */
 function keyedRows(c: CharactersInfo | undefined): string {
-  return (c?.progress ?? []).map((p) => `<tr><td><span class="mono">${esc(p.key)}</span></td><td>${esc(p.class.toLowerCase())} ${p.level}</td><td class="num">${p.achievements}${p.achievementsInProgress ? `<span class="muted"> +${p.achievementsInProgress} in progress</span>` : ""}</td><td class="num">${p.reputations}${p.exalted ? `<span class="muted"> · ${p.exalted} exalted</span>` : ""}</td><td class="num">${p.titles}</td><td class="num">${p.quests}</td><td>${ownedProfessions(p.professions)}</td><td>${ownedLockouts(p.lockouts)}</td></tr>`).join("");
+  return (c?.progress ?? []).map((p) => `<tr><td><span class="mono">${esc(p.key)}</span></td><td>${esc(p.class.toLowerCase())} ${p.level}</td><td class="num">${p.titles}</td><td>${ownedLockouts(p.lockouts)}</td></tr>`).join("");
 }
 
 function characters(): string {
@@ -555,7 +555,6 @@ function characters(): string {
       <td><b>${esc(r.character)}</b><div class="muted small">${esc(r.realm)}</div></td>
       <td class="num">${gold(r.gold)}${sparkline(r.history)}</td>
       <td class="num ${w >= 0 ? "ok" : "warn"}">${r.week.earned || r.week.spent ? signed(w) : "–"}</td>
-      <td class="num">${r.itemLevel ?? "–"}<div class="muted small">${r.gearSlots ? `${r.gearSlots} slots` : ""}</div></td>
       <td class="num muted small">${at ? ago(at) : "–"}</td>
     </tr>`;
   }).join("");
@@ -579,18 +578,17 @@ function characters(): string {
         <div class="mono muted small">${selected ? `${esc(selected.realm.toUpperCase())} · from the addon's save file` : "from the addon's save file"}</div>
         <h1 class="${selected ? "char-name" : ""}">${selected ? esc(selected.character) : "Characters"}</h1>
       </div>
-      <div class="row"><span class="sub">Stored locally. Asking the assistant may send character details to your selected model provider.</span>${named.length && data.chat?.mode !== "plain search" ? askChip(`How is ${selected?.character ?? "my main"} doing: gold this week, gear and progress?`, "Ask the assistant") : ""}</div>
+      <div class="row"><span class="sub">Stored locally. Asking the assistant may send character details to your selected model provider.</span>${named.length && data.chat?.mode !== "plain search" ? askChip(`How is ${selected?.character ?? "my main"} doing: gold this week and progress?`, "Ask the assistant") : ""}</div>
     </div>
-    <p class="fg2">What the addon recorded about your own characters. Gold and gear carry the name; progress rows carry an opaque key the addon derives per character, so they are listed apart. Sharing any of this with the site is a choice you make on the upload page with a verified grant, never here.</p>
+    <p class="fg2">What the addon recorded about your own characters. Gold carries the name; progress rows carry an opaque key the addon derives per character, so they are listed apart. Sharing any of this with the site is a choice you make on the upload page with a verified grant, never here. Gear, talents, professions, achievements and reputations are not recorded: everloot.app reads them from Blizzard's API.</p>
     ${named.length ? `${hero}
-    <section class="panel profile" aria-label="${esc(selected?.character ?? "")}: gold, gear and money by category">${selected ? drawerOverview(selected, true) : ""}</section>
+    <section class="panel profile" aria-label="${esc(selected?.character ?? "")}: gold and money by category">${selected ? drawerOverview(selected, true) : ""}</section>
     <section class="panel"><div class="row between"><h2>Roster</h2><span class="muted small">click a character, or press Enter, for history and sharing</span></div>
-      <div class="tablewrap"><table class="roster"><thead><tr><th>Character</th><th class="num">Gold</th><th class="num">7 days</th><th class="num">Item level</th><th class="num">Last seen</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="tablewrap"><table class="roster"><thead><tr><th>Character</th><th class="num">Gold</th><th class="num">7 days</th><th class="num">Last seen</th></tr></thead><tbody>${rows}</tbody></table></div>
     </section>` : c ? `${emptyState(emptyCause("characters", state!), icon("characters"))}${ghostProfile()}` : `<section class="panel"><p class="muted">Loading…</p></section>`}
     <section class="panel" id="keyed" tabindex="-1"><h2>Progress · keyed</h2>
-      ${prog ? `<div class="tablewrap"><table><thead><tr><th>Key</th><th>Class</th><th class="num">Achievements</th><th class="num">Reputations</th><th class="num">Titles</th><th class="num">Quests done</th><th>Professions</th><th>Raid lockouts</th></tr></thead><tbody>${prog}</tbody></table></div>
-        <p class="muted small">Professions and raid lockouts never go in an upload, and Chat does not read them. Private sync sends them only for a character you linked, and everloot.app keeps only the categories you switched on.</p>` : `<p class="muted">${c ? "Nothing yet. The completion tracker is off until <code>/everloot completion on</code> in game." : "Loading…"}</p>`}
-      ${c?.talents.length ? `<p class="muted small">Active talent builds: ${c.talents.map((x) => `${esc(x.class.toLowerCase())} ${x.level} (${x.points} points)`).join(", ")}. Not linked to a name.</p>` : ""}
+      ${prog ? `<div class="tablewrap"><table><thead><tr><th>Key</th><th>Class</th><th class="num">Titles</th><th>Raid lockouts</th></tr></thead><tbody>${prog}</tbody></table></div>
+        <p class="muted small">Raid lockouts never go in an upload, and Chat does not read them. Private sync sends them only for a character you linked, and everloot.app keeps only the categories you switched on.</p>` : `<p class="muted">${c ? "Nothing yet. The completion tracker is off until <code>/everloot completion on</code> in game." : "Loading…"}</p>`}
     </section>
   </div>
   <div class="drawer-layer" id="drawerLayer" hidden aria-hidden="true">
@@ -610,15 +608,9 @@ function characters(): string {
   </div>`;
 }
 
-/** The character's profile: gold now and at its peak, the week, every gear slot, money by category. On the page it skips the pointer to the keyed rows, which sit right under it there. */
+/** The character's profile: gold now and at its peak, the week, money by category. On the page it skips the pointer to the keyed rows, which sit right under it there. */
 function drawerOverview(c: CharacterRow, onPage = false): string {
   const week = netOf(c.week);
-  const slots = new Map(c.equipped.map((e) => [e.slot, e.itemLevel]));
-  const avg = c.equipped.length ? (c.equipped.reduce((s, e) => s + e.itemLevel, 0) / c.equipped.length).toFixed(1) : null;
-  const grid = SLOT_ORDER.map((s) => {
-    const v = slots.get(s);
-    return `<div class="slot${v ? "" : " empty"}"><span class="slot-k">${SLOT_LABEL[s] ?? esc(s)}</span><span class="slot-v">${v ?? "—"}</span></div>`;
-  }).join("");
   const catCol = (dir: "in" | "out") => {
     const rows = Object.entries(dir === "in" ? c.earned : c.spent).sort((a, b) => b[1] - a[1]).slice(0, 8);
     return rows.length ? rows.map(([k, v]) => `<div class="cat"><span>${esc(k.replace(/_/g, " "))}${LOCAL_ONLY_CATEGORIES.includes(k) ? ' <span class="muted small">local only</span>' : ""}</span><span class="num">${gold(v)}</span></div>`).join("") : '<p class="muted small">Nothing recorded.</p>';
@@ -629,16 +621,12 @@ function drawerOverview(c: CharacterRow, onPage = false): string {
       <div class="dw-stat"><span class="k">Peak</span><b>${gold(c.peakGold)}</b></div>
       <div class="dw-stat"><span class="k">7-day net</span><b class="${week >= 0 ? "ok" : "warn"}">${signed(week)}</b></div>
     </div>
-    <section class="dw-sec"><div class="row between"><h3>Gear</h3><span class="muted small">${c.equipped.length ? `${c.equipped.length} slots · average ${avg}` : "no snapshot yet"}</span></div>
-      <div class="slot-grid">${grid}</div>
-      <p class="muted small">Straight from the addon's last gear sample; empty slots show —.</p>
-    </section>
     <section class="dw-sec"><div class="row between"><h3>Money by category</h3><span class="muted small">all time in this file</span></div>
       <div class="cat-cols"><div><h4>Earned</h4>${catCol("in")}</div><div><h4>Spent</h4>${catCol("out")}</div></div>
       <p class="muted small">Repairs, trades and mail are read from the local ledger and are never uploaded.</p>
     </section>
     ${onPage ? "" : `<section class="dw-sec"><h3>Progress</h3>
-      <p class="muted small">Achievements, reputations, titles and quests are keyed by an opaque identifier, never a name, so they stay listed apart from this character. <button type="button" class="link" id="gotoKeyed">Show the keyed rows</button></p>
+      <p class="muted small">Titles and raid lockouts are keyed by an opaque identifier, never a name, so they stay listed apart from this character. <button type="button" class="link" id="gotoKeyed">Show the keyed rows</button></p>
     </section>`}`;
 }
 
@@ -662,12 +650,11 @@ function drawerShare(c: CharacterRow): string {
   const activeDays = c.days.filter((d) => d.earned || d.spent).length;
   return `
     <section class="dw-sec"><div class="row between"><h3>Sharing stays on the website</h3><span class="muted small">off by default</span></div>
-      <p class="fg2">The automatic uploader keeps <b>${esc(c.character)}</b>'s gold, gear and progress on this computer. On everloot.app/upload you choose, per character, to include gear or gold; a verified grant authorizes it, and the same page revokes the grant or opts the character out at any time.</p>
-      <p class="muted small">Progress rows carry an opaque key, never a name, so they cannot be included in that upload. Separately, Chat may send character names, gold, gear and progress to your selected model provider when it uses local tools to answer.</p>
+      <p class="fg2">The automatic uploader keeps <b>${esc(c.character)}</b>'s gold and progress on this computer. On everloot.app/upload you choose, per character, to include gold; a verified grant authorizes it, and the same page revokes the grant or opts the character out at any time.</p>
+      <p class="muted small">Progress rows carry an opaque key, never a name, so they cannot be included in that upload. Separately, Chat may send character names, gold and progress to your selected model provider when it uses local tools to answer.</p>
       <button type="button" class="btn btn-primary" data-open="https://everloot.app/upload">Open the upload page</button>
     </section>
     <section class="dw-sec"><h3>What is on this machine</h3>
-      <div class="cat"><span>Gear</span><span class="num">${c.gearSlots ? `${c.gearSlots} slots` : "none yet"}</span></div>
       <div class="cat"><span>Gold snapshots</span><span class="num">${c.history.length}</span></div>
       <div class="cat"><span>Days with money events, last 30</span><span class="num">${activeDays}</span></div>
     </section>`;
@@ -1016,7 +1003,7 @@ function settings(s: AppState): string {
       </div></section>
       <section class="panel set-sec"><div class="set-lead"><h2>Player pages</h2></div><div class="set-body">
         <label class="switch"><input type="checkbox" name="players" ${st.players ? "checked" : ""}> Send the player pages with the uploads</label>
-        <p class="muted small">The name, realm, race, class, level and guild of the players the addon saw, so a page can be found by name. Off keeps them in <code>Everloot.lua</code>; <code>/everloot players off</code> in the game stops recording and deletes them.</p>
+        <p class="muted small">The name, realm, race, class, level and guild of the players the addon saw, so a page can be found by name. On in a new install; an install from before keeps its choice. Off keeps them in <code>Everloot.lua</code>; <code>/everloot players off</code> in the game stops recording and deletes them, and anyone can hide a character at everloot.app/players/opt-out.</p>
       </div></section>
       ${s.runRecords ? `<section class="panel set-sec"><div class="set-lead"><h2>Boss pulls</h2></div><div class="set-body">
         <p class="muted small">After each boss pull, the names, realms, classes and roles of your group and the damage meter's totals. They go with the uploads; the site keeps them privately for a year, shows them nowhere and deletes any character someone hides. <code>/everloot pulls off</code> in the game stops recording and deletes them.</p>
@@ -1060,8 +1047,8 @@ function dataPanel(s: AppState): string {
       </ul>
       <h3>What stays here</h3>
       <ul class="plain fg2 small">
-        <li>Guild, gear, gold, collection and your installed addon list.</li>
-        <li>Your professions and raid lockouts. No upload sends them.</li>
+        <li>Guild, gold, collection and your installed addon list.</li>
+        <li>Your raid lockouts and boss kills. No upload sends them.</li>
         <li>Your settings, chat, upload history and backups, in the data folder.</li>
       </ul>
       <p class="small fg2">If you configure a model for Chat, it receives your questions and any local character details it uses to answer. Rules: ${ext("https://everloot.app/privacy", "everloot.app/privacy")}</p>
@@ -1638,7 +1625,7 @@ async function onClick(ev: MouseEvent): Promise<void> {
     t.closest(".callout")?.remove(); render(); return;
   }
   if (t.id === "keepFolder" && state?.settings.gameFolder) { state = await api.saveSettings({ keptGameFolder: state.settings.gameFolder }); t.closest(".callout")?.remove(); render(); return; }
-  if (t.id === "start" && chosenFolder) { state = await api.saveSettings({ gameFolder: chosenFolder, census: censusChoice, consentedAt: new Date().toISOString() }); void go("overview"); return; }
+  if (t.id === "start" && chosenFolder) { state = await api.saveSettings({ gameFolder: chosenFolder, census: censusChoice, players: playersChoice, consentedAt: new Date().toISOString() }); void go("overview"); return; }
   if (t.id === "openConfig") { void api.openConfig(); return; }
   if (t.id === "openData") { void api.openDataFolder(); return; }
   if (t.id === "openAddons") { void api.openAddonsFolder(); return; }
@@ -1734,6 +1721,7 @@ async function onChange(ev: Event): Promise<void> {
   }
   const el = ev.target as HTMLInputElement;
   if (el.id === "censusConsent") { censusChoice = el.checked; return; }
+  if (el.id === "playersConsent") { playersChoice = el.checked; return; }
   if (el.id === "agree") { agreed = el.checked; render(); return; }
   if (el.id === "providerModelPick") {
     syncManualModel();

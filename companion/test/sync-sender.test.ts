@@ -77,7 +77,7 @@ function site(answer: (characters: Sent[]) => Response) {
 const synced = (outcome = "stored") => (characters: Sent[]) => Response.json({
   characters: characters.map((c, index) => ({
     index, result: "synced",
-    categories: Object.fromEntries(c.records.map((r) => [{ gear_snapshot: "gear", profession_owned: "professions", reputation_owned: "reputations", lockout_owned: "raids", talent_owned: "talents" }[String(r.kind)] ?? "achievements", outcome])),
+    categories: Object.fromEntries(c.records.map((r) => [{ lockout_owned: "raids", boss_kill_owned: "boss_kills" }[String(r.kind)] ?? "achievements", outcome])),
   })),
   skipped: 0,
 });
@@ -96,67 +96,28 @@ describe("sending linked characters", () => {
     expect(call.characters).toHaveLength(1);
     expect(call.characters[0]).toMatchObject({ name: "Thrallina", realm: "Forever Pioneer" });
     const kinds = call.characters[0]!.records.map((x) => x.kind).sort();
-    // The keyed talent row goes; the anonymous talent_snapshot, link, loot and unlinked character's rows do not.
-    expect(kinds).toEqual(["achievement_owned", "gear_snapshot", "lockout_owned", "profession_owned", "reputation_owned", "talent_owned", "title_owned"]);
-    // The newest gear sample only.
-    expect(call.characters[0]!.records.find((x) => x.kind === "gear_snapshot")).toMatchObject({ equipped: [{ itemLevel: 22 }] });
+    // Raids and titles go. The kinds Blizzard's API supplies, which an older addon wrote into this file, do not;
+    // nor do the link, loot and unlinked character's rows.
+    expect(kinds).toEqual(["lockout_owned", "title_owned"]);
     expect(r).toMatchObject({ synced: ["Thrallina of Forever Pioneer"], waiting: 0, problem: null });
     expect(syncSummary(r)).toBe("synced 1 character");
   });
 
-  test("each linked character sends its own talent build; an unlinked one's is not sent", async () => {
+  // docs/design/specs/2026-11-17-blizzard-api-first.md: the gear, talents, professions, stats, pvp and reputations
+  // categories are retired, and the achievements category keeps only titles.
+  test("a file holding only the retired kinds sends nothing", async () => {
+    const stats = owned(THRALL, { installId: INSTALL, stats: { strength: 1, agility: 5, stamina: 6, intellect: 7, spirit: 8 } });
     const { file, state } = workspace({
-      character_link: [link("Thrallina", THRALL), link("Jainara", JAINA)],
-      talent_owned: [talentOwned(THRALL, 11), talentOwned(JAINA, 22), talentOwned("ffffffff", 33)],
+      character_link: [link("Thrallina", THRALL)],
+      gear_snapshot: [gear("Thrallina", "2026-11-05T11:00:00Z")],
+      talent_owned: [talentOwned(THRALL)], stats_owned: [stats], pvp_owned: [owned(THRALL, { installId: INSTALL, honorableKills: 150 })],
+      profession_owned: [profession(THRALL)], reputation_owned: [reputation(THRALL)], achievement_owned: [achievement(THRALL)],
+      talent_snapshot: [talent],
     });
     const api = site(synced());
     const r = await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send });
-    expect(api.calls).toHaveLength(1);
-    const sent = Object.fromEntries(api.calls[0]!.characters.map((c) => [c.name, c.records]));
-    expect(Object.keys(sent).sort()).toEqual(["Jainara", "Thrallina"]);
-    expect(sent.Thrallina).toMatchObject([{ kind: "talent_owned", nodes: [{ nodeId: 11 }] }]);
-    expect(sent.Jainara).toMatchObject([{ kind: "talent_owned", nodes: [{ nodeId: 22 }] }]);
-    expect(r.synced).toHaveLength(2);
-  });
-
-  test("each linked character sends its own newest stats row; an unlinked one's is not sent", async () => {
-    const stats = (key: string, strength: number, capturedAt: string) => owned(key, { installId: INSTALL, capturedAt, stats: { strength, agility: 5, stamina: 6, intellect: 7, spirit: 8 } });
-    const { file, state } = workspace({
-      character_link: [link("Thrallina", THRALL), link("Jainara", JAINA)],
-      stats_owned: [
-        stats(THRALL, 100, "2026-11-05T09:00:00Z"), stats(THRALL, 150, "2026-11-05T11:00:00Z"),
-        stats(JAINA, 200, "2026-11-05T10:00:00Z"), stats("ffffffff", 300, "2026-11-05T10:00:00Z"),
-      ],
-    });
-    const api = site((characters) => Response.json({
-      characters: characters.map((c, index) => ({ index, result: "synced", categories: { stats: "stored" } })), skipped: 0,
-    }));
-    const r = await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send });
-    const sent = Object.fromEntries(api.calls[0]!.characters.map((c) => [c.name, c.records]));
-    expect(Object.keys(sent).sort()).toEqual(["Jainara", "Thrallina"]);
-    expect(sent.Thrallina).toMatchObject([{ kind: "stats_owned", stats: { strength: 150 } }]);
-    expect(sent.Jainara).toMatchObject([{ kind: "stats_owned", stats: { strength: 200 } }]);
-    expect(r.synced).toHaveLength(2);
-  });
-
-  test("each linked character sends its own newest pvp row; an unlinked one's is not sent", async () => {
-    const pvp = (key: string, honorableKills: number, capturedAt: string) => owned(key, { installId: INSTALL, capturedAt, honorableKills });
-    const { file, state } = workspace({
-      character_link: [link("Thrallina", THRALL), link("Jainara", JAINA)],
-      pvp_owned: [
-        pvp(THRALL, 100, "2026-11-05T09:00:00Z"), pvp(THRALL, 150, "2026-11-05T11:00:00Z"),
-        pvp(JAINA, 200, "2026-11-05T10:00:00Z"), pvp("ffffffff", 300, "2026-11-05T10:00:00Z"),
-      ],
-    });
-    const api = site((characters) => Response.json({
-      characters: characters.map((c, index) => ({ index, result: "synced", categories: { pvp: "stored" } })), skipped: 0,
-    }));
-    const r = await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send });
-    const sent = Object.fromEntries(api.calls[0]!.characters.map((c) => [c.name, c.records]));
-    expect(Object.keys(sent).sort()).toEqual(["Jainara", "Thrallina"]);
-    expect(sent.Thrallina).toMatchObject([{ kind: "pvp_owned", honorableKills: 150 }]);
-    expect(sent.Jainara).toMatchObject([{ kind: "pvp_owned", honorableKills: 200 }]);
-    expect(r.synced).toHaveLength(2);
+    expect(api.calls).toHaveLength(0);
+    expect(syncSummary(r)).toBeNull();
   });
 
   test("an answered capture is not sent again; a changed one is, alone", async () => {
@@ -166,15 +127,15 @@ describe("sending linked characters", () => {
     const again = await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send });
     expect(api.calls).toHaveLength(1);
     expect(syncSummary(again)).toBeNull();
-    write({ ...full(), profession_owned: [profession(THRALL, 80)] });
+    write({ ...full(), lockout_owned: [{ ...lockout(THRALL), bossesKilledCount: 4 }] });
     await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send });
     expect(api.calls).toHaveLength(2);
-    expect(api.calls[1]!.characters[0]!.records.map((x) => x.kind)).toEqual(["profession_owned"]);
+    expect(api.calls[1]!.characters[0]!.records.map((x) => x.kind)).toEqual(["lockout_owned"]);
   });
 
   test("two files sharing an install id keep each other's answers", async () => {
-    const a = workspace({ character_link: [link("Thrallina", THRALL)], profession_owned: [profession(THRALL)] });
-    const b = workspace({ character_link: [link("Jainara", JAINA)], profession_owned: [profession(JAINA)] });
+    const a = workspace({ character_link: [link("Thrallina", THRALL)], lockout_owned: [lockout(THRALL)] });
+    const b = workspace({ character_link: [link("Jainara", JAINA)], lockout_owned: [lockout(JAINA)] });
     const api = site(synced());
     for (let i = 0; i < 2; i++) {
       await sendSync(a.file, { endpoint: SITE, key: KEY, state: a.state, fetch: api.send });
@@ -205,7 +166,7 @@ describe("sending linked characters", () => {
 
   // Linking (or settling a frozen link) can happen after a send; the character goes again until it is linked.
   test("not_linked and retry both go again next run", async () => {
-    const { file, state } = workspace({ ...full(), character_link: [link("Thrallina", THRALL), link("Jainara", JAINA)], profession_owned: [profession(THRALL), profession(JAINA)] });
+    const { file, state } = workspace({ ...full(), character_link: [link("Thrallina", THRALL), link("Jainara", JAINA)], lockout_owned: [lockout(THRALL), lockout(JAINA)] });
     const api = site(() => Response.json({ characters: [{ index: 0, result: "not_linked" }, { index: 1, result: "retry" }], skipped: 0 }));
     const r = await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send });
     expect(r).toMatchObject({ notLinked: ["Thrallina of Forever Pioneer"], waiting: 1 });
@@ -231,7 +192,8 @@ describe("sending linked characters", () => {
 
   test("404: the switch is off, nothing more goes and nothing is said", async () => {
     const characters = Array.from({ length: 11 }, (_, i) => `Char${String.fromCharCode(97 + i)}`);
-    const { file, state } = workspace({ character_link: characters.map((n) => link(n, THRALL)), gear_snapshot: characters.map((n) => gear(n, "2026-11-05T11:00:00Z")) });
+    const keys = characters.map((_, i) => (0x10000000 + i).toString(16));
+    const { file, state } = workspace({ character_link: characters.map((n, i) => link(n, keys[i]!)), lockout_owned: keys.map((k) => lockout(k)) });
     const api = site(() => Response.json({ error: "Not found" }, { status: 404 }));
     const r = await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send });
     expect(api.calls).toHaveLength(1);
@@ -286,10 +248,11 @@ describe("sending linked characters", () => {
     const keys = names.map((_, i) => (0x10000000 + i).toString(16));
     const { file, state } = workspace({
       character_link: names.map((n, i) => link(n, keys[i]!)),
-      gear_snapshot: names.map((n) => gear(n, "2026-11-05T11:00:00Z")),
-      achievement_owned: [
-        ...Array.from({ length: 6000 }, (_, i) => owned(keys[0]!, { achievementId: i + 1, completed: false, criteriaMet: 0, criteriaTotal: 1 })),
-        ...Array.from({ length: 5000 }, (_, i) => owned(keys[1]!, { achievementId: i + 1, completed: false, criteriaMet: 0, criteriaTotal: 1 })),
+      lockout_owned: keys.map((k) => lockout(k)),
+      title_owned: [
+        // Title ids stay inside the schema's range; each row is its own record.
+        ...Array.from({ length: 6000 }, (_, i) => owned(keys[0]!, { titleIds: [(i % 1000) + 1] })),
+        ...Array.from({ length: 5000 }, (_, i) => owned(keys[1]!, { titleIds: [(i % 1000) + 1] })),
       ],
     });
     const api = site(synced());
