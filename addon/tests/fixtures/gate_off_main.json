@@ -104,6 +104,7 @@
    "toggles": {
     "addons": false,
     "auctions": true,
+    "buttons": false,
     "census": true,
     "completion": false,
     "gear": true,
@@ -222,6 +223,7 @@
    "toggles": {
     "addons": false,
     "auctions": true,
+    "buttons": true,
     "census": false,
     "completion": false,
     "gear": true,

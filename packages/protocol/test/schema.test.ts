@@ -56,6 +56,28 @@ describe("schema files", () => {
     expect(item.additionalProperties).toBe(false);
   });
 
+  test("market route documentation exposes bounded item selection and invalid requests", () => {
+    const routes = JSON.parse(readFileSync(join(out, "api", "routes.json"), "utf8"));
+    const market = routes.find((route: { path: string }) => route.path === "/api/market/prices");
+    const items = market.query.find((param: { name: string }) => param.name === "items");
+    expect(items).toBeDefined();
+    expect(items.schema).toMatchObject({ type: "string", examples: ["2589,2592"] });
+    expect(items.description).toContain("100");
+    expect(items.description).toContain("realm");
+    expect(market.responses["400"].description).toContain("items");
+  });
+
+  test("the drops response schema emits range units and the window-share caveat", () => {
+    const file = JSON.parse(readFileSync(join(out, "api", "dropsResponse.json"), "utf8"));
+    const rate = file.properties.rates.items;
+    expect(Object.keys(rate.properties)).toEqual(expect.arrayContaining(["rateLow", "rateHigh", "settled"]));
+    expect(rate.properties.rate.description).toContain("loot windows");
+    expect(rate.properties.rate.description).toContain("not a kill-based drop chance");
+    expect(rate.properties.rateLow.description).toContain("95%");
+    expect(rate.properties.rateHigh.description).toContain("95%");
+    expect(rate.properties.settled.description).toContain("50");
+  });
+
   test("every MCP tool file has its input schema, and an output schema exactly where the tool declares one", () => {
     for (const name of MCP_TOOL_NAMES) {
       const file = JSON.parse(readFileSync(join(out, "mcp", `${name}.json`), "utf8")) as { inputSchema: { type: string }; outputSchema?: { properties: Record<string, unknown> } };

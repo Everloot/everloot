@@ -1,3 +1,4 @@
+import { measureDropRate } from "../../../../../../kb/src/drop-rate-settling";
 import { NextResponse } from "next/server";
 import { admit, attribution, attributionHeaders, badPage, pageOf, pageRequest } from "@/lib/data-guard";
 import { computeRollups } from "@/lib/rollup-compute";
@@ -25,7 +26,14 @@ export async function GET(req: Request) {
     r.sourceNpcId !== undefined ? names?.npcs.get(r.sourceNpcId) : r.sourceObjectId !== undefined ? names?.objects.get(r.sourceObjectId) : undefined;
   const publicRates = stats.unreachable ? [] : rates.filter((r) => r.public).map((r) => {
     const name = sourceName(r);
-    return name ? { ...r, sourceName: name } : r;
+    const measurement = measureDropRate(r, stats.dataAsOf ?? "");
+    return {
+      ...r,
+      rateLow: measurement.interval?.lower ?? null,
+      rateHigh: measurement.interval?.upper ?? null,
+      settled: measurement.settled,
+      ...(name ? { sourceName: name } : {}),
+    };
   });
   const publicZeros = stats.unreachable ? [] : measuredZeros.filter((z) => z.public);
   const both = [

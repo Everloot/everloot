@@ -112,6 +112,12 @@ test("a realm's rows are capped at MAX_PRICE_ROWS, the items with the most units
   // Most units first: the highest item ids were given the most units.
   expect(body.items[0][0]).toBe(total);
   expect(JSON.stringify(body).length).toBeLessThan(MAX_PRICE_ROWS * 60);
+  // Item 1 ranks below the default cutoff but can be fetched explicitly.
+  expect(body.items.some((row: number[]) => row[0] === 1)).toBe(false);
+  const selected = await (await GET(req("?realm=Forever&items=1,1,999999"))).json();
+  expect(selected.items).toEqual([[1, 1000, 1000, 1000, 10000, day, 3]]);
+  expect(selected.fields).toEqual(body.fields);
+  expect(() => marketPricesResponse.parse(selected)).not.toThrow();
 });
 
 test("every answer carries the licence and credit line, and stays cacheable for anonymous callers", async () => {
@@ -180,4 +186,33 @@ test("without a realm it also counts the players behind each realm that has scan
   expect(JSON.stringify(body)).not.toMatch(/12345|install-p/);
   expect(() => marketRealmsResponse.parse(body)).not.toThrow();
   expect(marketRealmsResponse.parse(body).pending).toEqual(body.pending);
+});
+
+
+test("item selection requires a realm and at most 100 positive safe integer ids", async () => {
+  for (const query of ["?items=2589", "?realm=Forever&items=", "?realm=Forever&items=0",
+    "?realm=Forever&items=-1", "?realm=Forever&items=1.5", "?realm=Forever&items=1e3",
+    "?realm=Forever&items=9007199254740992", "?realm=Forever&items=2589,",
+    "?realm=Forever&items=2589&items=42", `?realm=Forever&items=${Array.from({ length: 101 }, (_, i) => i + 1).join(",")}`]) {
+    const res = await GET(req(query));
+    expect(res.status, query).toBe(400);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+  }
+  expect(store.loadMarket).not.toHaveBeenCalled();
+  const selected = await (await GET(req(`?realm=Forever&items=${Array.from({ length: 100 }, (_, i) => i + 2589).join(",")}`))).json();
+  expect(selected.items).toEqual([[2589, 205, 200, 205, 40, day, 3]]);
+});
+
+test("item selection preserves house isolation and the public reporter threshold", async () => {
+  const rows = [
+    ...scans.map((s) => ({ ...s, house: "Horde", items: [[2589, 1, 10, 900, 900]] })),
+    ...scans.slice(0, 2).map((s) => ({ ...s, eventId: `private:${s.eventId}`, scanId: `private:${s.scanId}`, house: "Horde", items: [[42, 1, 10, 12345, 12345]] })),
+  ];
+  store.loadMarket.mockResolvedValue({ state: foldMarket(emptyMarket(), rows, NOW), dataAsOf: NOW.toISOString() });
+  const horde = await (await GET(req("?realm=Forever&house=Horde&items=2589,42"))).json();
+  expect(horde.items).toEqual([[2589, 900, 900, 900, 10, day, 3]]);
+  for (const query of ["?realm=Forever&house=Alliance&items=2589,42", "?realm=Forever&items=2589,42"]) {
+    expect((await (await GET(req(query))).json()).items).toEqual([]);
+  }
+  expect(JSON.stringify(horde)).not.toMatch(/install-secret|12345/);
 });

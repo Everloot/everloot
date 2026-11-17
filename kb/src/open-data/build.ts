@@ -1,5 +1,6 @@
 import { GATHER_KINDS, INSTANCE_TYPES, NPC_ROLES, RELS, ENTITY_KINDS } from "@everloot/protocol";
 import { z } from "zod";
+import { measureDropRate } from "../drop-rate-settling.js";
 import { lootWindowNote } from "../loot-tables.js";
 import type { RecheckScope } from "../coverage.js";
 import { rollupDrops, lootWindowsFromRecords, recheckLootRecords } from "../drop-rollup.js";
@@ -200,6 +201,9 @@ const dropRow = (recheck: readonly RecheckScope[]) => z.object({
   lootWindows: z.number().int().positive().describe(`Loot windows attributed to the source, from every install together. ${lootWindowNote(recheck)}`),
   windowsWithItem: z.number().int().positive().describe("Of those windows, how many held the item."),
   rate: z.number().min(0).max(1).describe("windowsWithItem / lootWindows. A share of loot windows, not a kill-based drop chance."),
+  rateLow: z.number().min(0).max(1).describe("Lower end of the descriptive 95% Wilson range for the observed window share, as a fraction from 0 to 1; not a guaranteed kill chance."),
+  rateHigh: z.number().min(0).max(1).describe("Upper end of the descriptive 95% Wilson range for the observed window share, as a fraction from 0 to 1."),
+  settled: z.boolean().describe("True at 50 or more windows from at least 5 installs when the Wilson half-width is no more than the larger of 0.03 and 30% of the observed share. Describes sample precision, not a confirmed kill chance."),
   installs: INSTALLS.describe(`Installs that opened a loot window on the source. At least ${WORLD_AGREEMENT}.`),
 }).strict().superRefine(oneSource);
 const zeroRow = z.object({
@@ -208,12 +212,16 @@ const zeroRow = z.object({
   installs: INSTALLS,
 }).strict().superRefine(oneSource);
 
-function drops(records: readonly unknown[], recheck: readonly RecheckScope[]): Dataset[] {
+function drops(records: readonly unknown[], recheck: readonly RecheckScope[], dataAsOf: string): Dataset[] {
   const rolled = rollupDrops(lootWindowsFromRecords(recheckLootRecords([...records], recheck)));
   const sources = (r: { sourceNpcId?: number; sourceObjectId?: number }) => ({ sourceNpcId: r.sourceNpcId ?? null, sourceObjectId: r.sourceObjectId ?? null });
-  const rates = rolled.rates.filter((r) => r.public && r.drops > 0).map((r) => ({
-    ...sources(r), itemId: r.itemId, lootWindows: r.kills, windowsWithItem: r.drops, rate: r.rate, installs: r.reporters,
-  }));
+  const rates = rolled.rates.filter((r) => r.public && r.drops > 0).map((r) => {
+    const measurement = measureDropRate(r, dataAsOf);
+    return {
+      ...sources(r), itemId: r.itemId, lootWindows: r.kills, windowsWithItem: r.drops, rate: r.rate, installs: r.reporters,
+      rateLow: measurement.interval!.lower, rateHigh: measurement.interval!.upper, settled: measurement.settled,
+    };
+  });
   const zeros = rolled.measuredZeros.filter((z) => z.public).map((z) => ({ ...sources(z), lootWindows: z.kills, installs: z.reporters }));
   return [
     {
@@ -572,7 +580,7 @@ export function buildOpenData(input: OpenDataInput): OpenData {
   const asOf = new Date(input.dataAsOf ?? input.generatedAt);
   const installs = new Set(records.map((r) => r.installId.trim()).filter(Boolean));
   const datasets = [
-    npcs(records), quests(records), vendorOffers(records), ...drops(records, input.recheck ?? []), relations(records, asOf), ...instances(records, asOf), ...objects(records, asOf), itemNames(records),
+    npcs(records), quests(records), vendorOffers(records), ...drops(records, input.recheck ?? [], asOf.toISOString()), relations(records, asOf), ...instances(records, asOf), ...objects(records, asOf), itemNames(records),
     ...gameFiles(input.gameFiles),
   ];
   return { datasets, source: { records: records.length, installs: installs.size, kinds: [...OPEN_DATA_KINDS] }, installIds: installs };
