@@ -50,8 +50,10 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
   if (!p) notFound();
   return {
     ...pageMetadata({
-      title: `WoW Forever ${p.name} Recipes`,
-      description: `All ${p.recipes.length} ${p.name} recipes in the WoW: Forever game files: what each makes, its reagents and where it turns yellow and grey, plus player paths.`,
+      title: p.slug === "herbalism" ? "WoW Forever Herbalism Gathering" : `WoW Forever ${p.name} Recipes`,
+      description: p.slug === "herbalism"
+        ? "Where to gather herbs in WoW: Forever from player uploads, followed by Herbalism crafts new in Forever."
+        : `All ${p.recipes.length} ${p.name} recipes in the WoW: Forever game files: what each makes, its reagents and where it turns yellow and grey, plus player paths.`,
       path: professionHref(p.slug),
     }),
     keywords: [`wow forever ${p.name.toLowerCase()}`, `wow forever ${p.name.toLowerCase()} recipes`, `wow forever ${p.name.toLowerCase()} leveling`],
@@ -191,15 +193,44 @@ export default async function ProfessionPage(props: Props) {
 
   const groups = recipeGroups(p.recipes);
   const trail = trailFor(path)!;
+  const gatheringSection = gather && (
+    <section id="gather" aria-labelledby="prof-gather" className="scroll-mt-24 space-y-3" data-gather={gather.source}>
+      <SectionHeading id="prof-gather" as="h2">{gather.source === "herb" || gather.source === "ore" ? `Where to gather ${gather.noun}` : `Where to farm ${gather.noun}`}</SectionHeading>
+      <p className="text-meta text-fg-2">{gather.how}</p>
+      {mobFarm && (
+        <FilterBar
+          label={`Where to farm ${gather.noun} filters`}
+          active={Number(Boolean(level))}
+          clearHref={levelHref(undefined)}
+          controls={[{
+            type: "menu", key: "mobs", label: "Mob level",
+            options: [{ label: "Any level", href: levelHref(undefined), on: !level, reset: true }, ...LEVEL_BRACKETS.map((b) => ({
+              label: `${b.min}–${b.max}`, href: levelHref(b), on: level?.min === b.min && level?.max === b.max,
+            }))],
+          }]}
+        />
+      )}
+      {gathered.down
+        ? <p className="text-cell text-fg-2" role="status">{STORAGE_UNREACHABLE}</p>
+        : gatherRows.length
+          ? <FarmAreaTable areas={gatherRows} backing={gather.source === "herb" || gather.source === "ore" ? "nodes" : "mobs"} caption={`Where to ${gather.source === "herb" || gather.source === "ore" ? "gather" : "farm"} ${gather.noun}: ${gatherRows.length}`} />
+          : level && gathered.all > 0 ? <p data-empty-state className="py-3 text-cell text-fg-2">{`Nothing here for levels ${rangeParam(level)}.`}</p>
+          : <EmptyState message={gather.source === "herb" || gather.source === "ore"
+            ? `No ${gather.noun} zones yet: a zone shows once 3 installs gather from the same spot there.`
+            : `No ${gather.noun} zones yet: a zone shows once 3 installs upload loot from the same mobs there.`} />}
+    </section>
+  );
 
   return (
     <Container width="data">
       <EdgeDegraded when={view.unreachable === true || gathered.down} />
       <PageHeader
         trail={trail}
-        title={`${p.name} recipes`}
+        title={p.slug === "herbalism" ? "Herbalism gathering" : `${p.name} recipes`}
         icon={icons.get(p.name.toLowerCase()) ? <GameIcon src={icons.get(p.name.toLowerCase())!} size={40} /> : undefined}
-        lede={`Every ${p.name} recipe in the WoW: Forever game files, with what players' uploads add.`}
+        lede={p.slug === "herbalism"
+          ? "Find herb gathering areas from player uploads. Herbalism crafts new in Forever are listed below."
+          : `Every ${p.name} recipe in the WoW: Forever game files, with what players' uploads add.`}
         meta={<>
           <span className="font-mono tabular-nums">{plural(p.recipes.length, "recipe")}</span>
           <span>Game files, build {RECIPES_BUILD}</span>
@@ -213,10 +244,11 @@ export default async function ProfessionPage(props: Props) {
 
       <div className="space-y-8">
         <ProfessionPicker professions={CLIENT_PROFESSIONS} icons={icons} current={p.slug} context={context} />
+        {p.slug === "herbalism" && gatheringSection}
         <AhledgerCrafting profession={p.name} />
 
         <section aria-labelledby="prof-recipes" className="space-y-4" data-recipes={p.slug}>
-          <SectionHeading id="prof-recipes" as="h2">Recipes from the game files</SectionHeading>
+          <SectionHeading id="prof-recipes" as="h2">{p.slug === "herbalism" ? "Herbalism crafts (new in Forever)" : "Recipes from the game files"}</SectionHeading>
           <p className="flex flex-wrap items-center gap-2 text-meta text-fg-2">
             <Badge tone="files" />
             Found in game files, unconfirmed, build {RECIPES_BUILD}. Grouped by the skill where a recipe turns yellow.
@@ -246,33 +278,7 @@ export default async function ProfessionPage(props: Props) {
           ))}
         </section>
 
-        {gather && (
-          <section id="gather" aria-labelledby="prof-gather" className="space-y-3" data-gather={gather.source}>
-            <SectionHeading id="prof-gather" as="h2">{gather.source === "herb" || gather.source === "ore" ? `Where to gather ${gather.noun}` : `Where to farm ${gather.noun}`}</SectionHeading>
-            <p className="text-meta text-fg-2">{gather.how}</p>
-            {mobFarm && (
-              <FilterBar
-                label={`Where to farm ${gather.noun} filters`}
-                active={Number(Boolean(level))}
-                clearHref={levelHref(undefined)}
-                controls={[{
-                  type: "menu", key: "mobs", label: "Mob level",
-                  options: [{ label: "Any level", href: levelHref(undefined), on: !level, reset: true }, ...LEVEL_BRACKETS.map((b) => ({
-                    label: `${b.min}–${b.max}`, href: levelHref(b), on: level?.min === b.min && level?.max === b.max,
-                  }))],
-                }]}
-              />
-            )}
-            {gathered.down
-              ? <p className="text-cell text-fg-2" role="status">{STORAGE_UNREACHABLE}</p>
-              : gatherRows.length
-                ? <FarmAreaTable areas={gatherRows} backing={gather.source === "herb" || gather.source === "ore" ? "nodes" : "mobs"} caption={`Where to ${gather.source === "herb" || gather.source === "ore" ? "gather" : "farm"} ${gather.noun}: ${gatherRows.length}`} />
-                : level && gathered.all > 0 ? <p data-empty-state className="py-3 text-cell text-fg-2">{`Nothing here for levels ${rangeParam(level)}.`}</p>
-                : <EmptyState message={gather.source === "herb" || gather.source === "ore"
-                  ? `No ${gather.noun} zones yet: a zone shows once 3 installs gather from the same spot there.`
-                  : `No ${gather.noun} zones yet: a zone shows once 3 installs upload loot from the same mobs there.`} />}
-          </section>
-        )}
+        {p.slug !== "herbalism" && gatheringSection}
 
         <RecipeSearch rows={catalog} />
         <section aria-labelledby="prof-path" className="space-y-4">
