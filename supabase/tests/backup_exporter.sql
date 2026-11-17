@@ -29,8 +29,18 @@ begin
       and (rolsuper or rolcreatedb or rolcreaterole or rolreplication)) then
     raise exception 'backup_exporter has administrative privileges';
   end if;
-  if exists (select 1 from pg_auth_members
-      where member = 'backup_exporter'::regrole or roleid = 'backup_exporter'::regrole) then
+  -- PostgreSQL 16+ gives a CREATEROLE creator an ADMIN-only membership.
+  -- It permits role management, not reading or SET ROLE. Keep every other
+  -- membership forbidden, including any role granted to the exporter.
+  -- JSON access keeps this assertion compatible with PostgreSQL 15, which
+  -- has no per-membership INHERIT/SET columns and gets no such exception.
+  if exists (select 1 from pg_auth_members membership
+      where member = 'backup_exporter'::regrole
+        or (roleid = 'backup_exporter'::regrole and not (
+          member = 'postgres'::regrole and admin_option
+          and coalesce((to_jsonb(membership)->>'inherit_option')::boolean, true) = false
+          and coalesce((to_jsonb(membership)->>'set_option')::boolean, true) = false
+        ))) then
     raise exception 'backup_exporter must be isolated from application and owner roles';
   end if;
   if has_schema_privilege('backup_exporter', 'public', 'CREATE')
