@@ -63,7 +63,7 @@ export default async function ZonesPage(props: { searchParams?: Promise<Search> 
   const columns: SparseColumn<Row>[] = filledColumns([
     { key: "name", header: "Zone", sortable: true, cell: (z) => {
       const src = pictures.get(z.mapId);
-      const name = <Link href={zoneHref(z.mapId, z.name)} className="text-fg hover:underline underline-offset-4">{z.name}</Link>;
+      const name = <Link prefetch={false} href={zoneHref(z.mapId, z.name)} className="text-fg hover:underline underline-offset-4">{z.name}</Link>;
       return src ? <span className="flex min-w-0 items-center gap-2"><ArtThumb src={src} width={42} height={28} />{name}</span> : name;
     } },
     { key: "continent", header: "Continent", sortable: true, cell: (z) => z.continentName },

@@ -52,14 +52,14 @@ export default async function DropsPage(props: { searchParams?: Promise<Search> 
     {
       key: "item", header: "Item", sortable: true, cell: (r) => (r.itemId === null ? <span className="text-muted">No items observed</span> : (
         <ItemTip tip={tips.get(r.itemId)}>
-          <EntityLink kind="item" id={r.itemId} name={names.items.get(r.itemId) ?? tips.get(r.itemId)?.name} />
+          <EntityLink prefetch={false} kind="item" id={r.itemId} name={names.items.get(r.itemId) ?? tips.get(r.itemId)?.name} />
         </ItemTip>
       )),
     },
     {
       key: "source", header: "Source", sortable: true, cell: (r) => (r.sourceNpcId !== undefined
-        ? <EntityLink kind="npc" id={r.sourceNpcId} name={names.npcs.get(r.sourceNpcId)} />
-        : <EntityLink kind="object" id={r.sourceObjectId!} name={names.objects.get(r.sourceObjectId!)} />),
+        ? <EntityLink prefetch={false} kind="npc" id={r.sourceNpcId} name={names.npcs.get(r.sourceNpcId)} />
+        : <EntityLink prefetch={false} kind="object" id={r.sourceObjectId!} name={names.objects.get(r.sourceObjectId!)} />),
     },
     { key: "windows", header: "Loot windows", numeric: true, sortable: true, cell: (r) => r.kills },
     { key: "drops", header: "Item observations", numeric: true, sortable: true, cell: (r) => r.drops },

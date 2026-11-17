@@ -62,7 +62,7 @@ export default async function ZoneCoveragePage(props: Props) {
     { key: "of", header: "Of", numeric: true, cell: (f) => f.denominator ?? f.observed },
   ];
   const needColumns: SparseColumn<CoverageNeed & { i: number }>[] = [
-    { key: "fact", header: "Fact", cell: (n) => (n.href ? <Link href={n.href} className={LINK}>{n.label}</Link> : n.label) },
+    { key: "fact", header: "Fact", cell: (n) => (n.href ? <Link prefetch={false} href={n.href} className={LINK}>{n.label}</Link> : n.label) },
     { key: "type", header: "Type", cell: (n) => TYPE_LABEL[n.type] },
     { key: "field", header: "Field", cell: (n) => n.field },
     { key: "installs", header: "Installs", numeric: true, cell: (n) => `${n.voters} of 3` },
@@ -75,7 +75,7 @@ export default async function ZoneCoveragePage(props: Props) {
         <DataTitle title={`${zone.name} coverage`} meta={here ? `${here.installs.toLocaleString("en-US")} installs` : undefined} />
         {!report || !here ? <Unreadable /> : (
           <>
-            <p className="mb-3 max-w-reading text-meta text-muted">{measuredLine(report)} {report.method} What is known of the zone itself is on <Link href={zoneHref(zone.mapId, zone.name)} className={LINK}>its zone page</Link>.</p>
+            <p className="mb-3 max-w-reading text-meta text-muted">{measuredLine(report)} {report.method} What is known of the zone itself is on <Link prefetch={false} href={zoneHref(zone.mapId, zone.name)} className={LINK}>its zone page</Link>.</p>
             <section aria-labelledby="fields" className="mb-6">
               <h2 id="fields" className="mb-2 text-h2-sm text-fg sm:text-h2">By field</h2>
               {here.fields.length === 0 ? <p className="py-4 text-cell text-fg-2">Nobody has reported anything in {zone.name} yet.</p> : (
