@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: `/tools/disenchanting` shows what disenchanting gives on WoW: Forever by the game files' own bands (armor or weapon, quality, item level range), from the disenchants players recorded once 3 installs disenchanted in a band: each material's chance and units, the value per disenchant on your realm's auction house before and after the cut, the materials' prices, and the listed items worth more as materials than their buyout. Item pages gain a Disenchant tab, and `GET /api/rollups/disenchant` serves the bands.
 - Site: armory character pages show completed achievements, faction standings and the number of completed quests from Blizzard's character API, each with the time of its read; the crawler keeps only those fields and deletes each part 30 days after its last read.
 - Site: zone and dungeon pages show their terrain types (Desert, Snowy, Swamp, Haunted, Strongholds and Cities and the rest) and the gear whose effect works there, and `/database/terrain` lists every terrain type's zones and instances and every item, enchant and set bonus that changes run, mount or swim speed, all read from the game files.
 - Site: Add daily auction reports with archived asking-price movers, house spreads, RSS and downloadable share cards.

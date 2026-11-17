@@ -154,6 +154,18 @@ export const tools: Tool[] = [
     keywords: [],
   },
   {
+    slug: "disenchanting",
+    group: "Look up",
+    line: "What disenchanting gives by item level band, from recorded disenchants, its value on your auction house, and the items worth buying to disenchant.",
+    href: "/tools/disenchanting",
+    title: "Disenchanting",
+    shortTitle: "Disenchanting",
+    tagline: "What disenchanting gives by item level band, and the items worth buying to disenchant on your auction house.",
+    description: "What disenchanting gives by item level band, from recorded disenchants, its value on your auction house, and the items worth buying to disenchant.",
+    status: "collecting",
+    keywords: [],
+  },
+  {
     slug: "census",
     group: "Look up",
     line: "Races, classes and levels, counted from players who turned the census on.",
