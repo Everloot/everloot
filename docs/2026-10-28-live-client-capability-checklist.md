@@ -188,7 +188,8 @@ An anonymous `recipe_observed` row never becomes a character's learned recipe; C
 
 ## 5. Inventory scope
 
-Gap IDs: ITEM-I01, PROBE-01. [`addon/modules/gear.lua`](../addon/modules/gear.lua) reads equipped items only.
+Gap IDs: ITEM-I01, PROBE-01. `addon/modules/gear.lua` read equipped items only; it was removed when Blizzard's
+character API took over gear ([spec](design/specs/2026-11-17-blizzard-api-first.md)).
 Forever's `ContainerDocumentation.lua` documents `C_Container`.
 
 | Probe | Steps | Expected | If not |

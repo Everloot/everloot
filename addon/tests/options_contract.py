@@ -133,12 +133,13 @@ assert(string.find(Everloot:Status(), 'options: ready (settings', 1, true), Ever
 SlashCmdList.EVERLOOT('options')
 assert(opened == 42, '/everloot options opens the category')
 
--- The boxes show the saved state: a new install has auctions and the census on, players off.
+-- The boxes show the saved state: a new install has auctions, the census and player names on.
 assert(not O.page.shown, 'built hidden; the game shows it when picked')
 O.page:Show()
 local byKey = {}
 for _, box in ipairs(O.page.boxes) do byKey[box.row.key] = box end
-assert(#O.page.boxes == #O.ROWS and byKey.auctions.checked and byKey.census.checked and byKey.scanPrompt.checked and not byKey.players.checked)
+assert(#O.page.boxes == #O.ROWS and byKey.auctions.checked and byKey.census.checked and byKey.scanPrompt.checked and byKey.players.checked)
+assert(byKey.gear == nil and byKey.talents == nil, 'no switch for gear or talents, which are no longer recorded')
 assert(string.find(O.page.note.text, 'Everloot ' .. Everloot.VERSION, 1, true))
 
 -- Every switch stays reachable in a bounded viewport, including small panels and long descriptions.
@@ -403,13 +404,15 @@ function runTimers() local due = timers; timers = {}; for _, t in ipairs(due) do
 function said(text) for _, line in ipairs(printed) do if string.find(line, text, 1, true) then return true end end return false end
 """
 
-lua = fresh(SETTINGS + TIMERS, window=True)
+# The one-time player names question is for an install from before player names were on by default, still off.
+OLD_OFF = "{ installId = 'abcd-1234', toggles = { players = false }, records = {} }"
+lua = fresh(SETTINGS + TIMERS, saved=OLD_OFF, window=True)
 lua.execute("""
 local O = Everloot.Options
 EverlootDB.setupAsked = true -- the feature chooser, asked first, is tested below
-assert(EverlootDB.toggles.players == false and EverlootDB.playersAsked == nil, 'player names start off and unasked')
+assert(EverlootDB.toggles.players == false and EverlootDB.playersAsked == nil, 'player names stay off and unasked')
 local listen = O.askFrame
-assert(listen and listen.events.PLAYER_ENTERING_WORLD, 'a new install waits for the loading screen to end')
+assert(listen and listen.events.PLAYER_ENTERING_WORLD, 'the install waits for the loading screen to end')
 assert(#timers == 0 and O.prompt == nil, 'nothing is asked at load')
 listen.onEvent(listen, 'PLAYER_ENTERING_WORLD')
 assert(#timers == 1 and timers[1].seconds == O.ASK_DELAY and O.ASK_DELAY >= 5, 'asked a few seconds after the loading screen')
@@ -441,7 +444,7 @@ assert(not p.shown and #timers == 0, 'never asked again after an answer')
 """)
 
 # Turn on: the same as /everloot players on, with its full chat line.
-lua = fresh(SETTINGS + TIMERS, window=True)
+lua = fresh(SETTINGS + TIMERS, saved=OLD_OFF, window=True)
 lua.execute("""
 local O = Everloot.Options
 EverlootDB.setupAsked = true
@@ -453,7 +456,7 @@ assert(said('players on. It records the name, realm') and said('/reload to apply
 """)
 
 # A choice made by hand, before the question, answers it: chat or the settings switch.
-lua = fresh(SETTINGS + TIMERS, window=True)
+lua = fresh(SETTINGS + TIMERS, saved=OLD_OFF, window=True)
 lua.execute("""
 local O = Everloot.Options
 EverlootDB.setupAsked = true
@@ -463,7 +466,7 @@ O.askFrame.onEvent(O.askFrame, 'PLAYER_ENTERING_WORLD')
 runTimers()
 assert(O.prompt == nil, 'not asked after a choice made by hand')
 """)
-lua = fresh(SETTINGS + TIMERS, window=True)
+lua = fresh(SETTINGS + TIMERS, saved=OLD_OFF, window=True)
 lua.execute("""
 local O = Everloot.Options
 local players
@@ -479,11 +482,22 @@ for saved in ("{ installId = 'abcd-1234', toggles = { players = false }, players
     lua = fresh(SETTINGS + TIMERS, saved=saved, window=True)
     lua.execute("assert(Everloot.Options.askFrame == nil, 'nothing waits to ask')")
 # An install from before the question, with players off, is asked once.
-lua = fresh(SETTINGS + TIMERS, saved="{ installId = 'abcd-1234', toggles = { players = false }, records = {} }", window=True)
+lua = fresh(SETTINGS + TIMERS, saved=OLD_OFF, window=True)
 lua.execute("assert(Everloot.Options.askFrame, 'an upgraded install with players off is asked')")
+# A new install already has player names on: after the chooser, the question is never asked.
+lua = fresh(SETTINGS + TIMERS, window=True)
+lua.execute("""
+local O = Everloot.Options
+assert(EverlootDB.toggles.players == true and not O.PlayersAskDue(), 'a new install is on, so the question is not owed')
+O.askFrame.onEvent(O.askFrame, 'PLAYER_ENTERING_WORLD')
+runTimers()
+O.AnswerSetup('everything')
+runTimers()
+assert(O.prompt == nil, 'the player names question is never shown to a new install')
+""")
 
 # Without the window's file: the game's dialog and a plain heading.
-lua = fresh(TIMERS)
+lua = fresh(TIMERS, saved=OLD_OFF)
 lua.execute("""
 local O = Everloot.Options
 EverlootDB.setupAsked = true
@@ -515,7 +529,12 @@ assert(string.find(f.upload.text, 'Desktop App', 1, true) and string.find(f.uplo
 for _, word in ipairs({ 'census', 'player names', 'addon list', 'completion tracker' }) do
   assert(string.find(f.intro.text, word, 1, true), 'the intro says the ' .. word .. ' keeps its own switch')
 end
-assert(f.height > 150 and f.intro.width <= f.width - 32 and f.upload.width <= f.width - 32, 'the text sits inside the window')
+for _, part in ipairs({ 'Player names are on', 'name, realm, race, class, level and guild', '/everloot players off',
+  'deletes the rows', 'everloot.app/players/opt-out' }) do
+  assert(string.find(f.players.text, part, 1, true), 'the chooser says about player names: ' .. part)
+end
+assert(f.height > 150 and f.intro.width <= f.width - 32 and f.upload.width <= f.width - 32 and f.players.width <= f.width - 32,
+  'the text sits inside the window')
 O.AskSetup()
 assert(#timers == 0, 'a chooser already on screen is not asked again')
 
@@ -524,11 +543,12 @@ EverlootDB.toggles.census, EverlootDB.toggles.completion, EverlootDB.toggles.add
 f.choices.collect.scripts.OnClick(f.choices.collect)
 local t = EverlootDB.toggles
 assert(t.openworld and t.professions and t.mapbounds and t.auctions, 'collection stays on, auction scans included')
-assert(t.window == false and t.buttons == false and t.gold == false and t.roster == false and t.gear == false
-  and t.talents == false and t.guild == false, 'the window, the button drawer and the your-characters switches go off')
+assert(t.window == false and t.buttons == false and t.gold == false and t.roster == false and t.guild == false,
+  'the window, the button drawer and the your-characters switches go off')
+assert(t.gear == nil and t.talents == nil, 'no gear or talents switch is written')
 assert(EverlootDB.minimapButton == false and EverlootDB.tooltip == 'off' and EverlootDB.scanPrompt == false
   and EverlootDB.autoVendor == false and EverlootDB.mailCollect == false, 'minimap button, tooltip lines, scan reminder and chores off')
-assert(t.census == true and t.completion == true and t.addons == true and t.players == false, 'consent switches keep their own state')
+assert(t.census == true and t.completion == true and t.addons == true and t.players == true, 'consent switches keep their own state')
 assert(EverlootDB.setupAsked == true and not O.SetupDue(), 'answered once')
 assert(said('collecting data only') and said('/everloot setup'), 'the answer is said in chat')
 assert(f.shown and f.done.shown and f.reload.shown and f.later.text == 'Later' and not f.choices.collect.shown,
@@ -537,11 +557,11 @@ assert(O.prompt == nil, 'player names wait for the reload or Later')
 f.reload.scripts.OnClick(f.reload)
 assert(reloads == 1, 'Reload now reloads')
 f.later.scripts.OnClick(f.later)
-assert(not f.shown and O.prompt and O.prompt.shown, 'Later closes it, and player names are asked next')
+assert(not f.shown and O.prompt == nil, 'Later closes it; a new install has player names on, so nothing more is asked')
 """)
 
 # Asked again only by /everloot setup; Everything after Collect data only turns the helpers back on.
-lua = fresh(SETTINGS + TIMERS, window=True)
+lua = fresh(SETTINGS + TIMERS, saved=OLD_OFF, window=True)
 lua.execute("""
 local O = Everloot.Options
 O.AnswerSetup('collect')
@@ -554,7 +574,7 @@ local f = O.setup
 assert(f and f.shown and f.choices.everything.shown and not f.done.shown, '/everloot setup asks again, from the answers')
 f.choices.everything.scripts.OnClick(f.choices.everything)
 local t = EverlootDB.toggles
-assert(t.window and t.gold and t.roster and t.gear and t.talents and t.guild and t.auctions, 'every feature back on')
+assert(t.window and t.gold and t.roster and t.guild and t.auctions, 'every feature back on')
 assert(EverlootDB.minimapButton == true and EverlootDB.tooltip == 'full' and EverlootDB.scanPrompt == true, 'tooltip, button and reminder back')
 assert(t.buttons == false, 'the button drawer stays its own choice')
 assert(f.done.shown and f.reload.shown, 'a reload is offered')
@@ -568,7 +588,7 @@ O.AskSetup()
 local f = O.setup
 f.choices.everything.scripts.OnClick(f.choices.everything)
 assert(not f.shown and reloads == 0 and said('every feature on'), 'nothing to reload; the chooser closes')
-assert(O.prompt and O.prompt.shown, 'player names are asked next')
+assert(O.prompt == nil, 'player names are already on, so they are not asked')
 """)
 
 # An upgraded install is asked too; Choose myself keeps every switch and opens the settings.
@@ -673,7 +693,7 @@ byKey.players.scripts.OnClick(byKey.players)
 assert(shown and shown[3] == 3, 'players counts player rows and guild kills')
 dialog.OnCancel()
 shown = nil
-EverlootDB.records.achievement_owned, EverlootDB.records.pvp_owned = { {} }, { {} }
+EverlootDB.records.title_owned, EverlootDB.records.lockout_owned = { {} }, { {} }
 EverlootDB.toggles.completion = true
 byKey.completion.checked = false
 byKey.completion.scripts.OnClick(byKey.completion)

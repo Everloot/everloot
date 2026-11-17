@@ -17,23 +17,19 @@ const SV = `EverlootDB = { ["version"] = "0.3.3", ["installId"] = "x", ["records
   ["talent_snapshot"] = { { ["class"] = "PALADIN", ["level"] = 60, ["group"] = 1, ["active"] = true, ["configId"] = 0, ["treeId"] = 1, ["exportStatus"] = "ok", ["points"] = 51, ["nodes"] = {} } },
 } }`;
 
-test("named characters get the latest gold, the peak, the latest gear snapshot and money by category", () => {
+// SV is a file an older addon wrote: it still holds gear, achievement, reputation, quest and talent rows. The addon no
+// longer records those (docs/design/specs/2026-11-17-blizzard-api-first.md), and this page does not read them.
+test("named characters get the latest gold, the peak and money by category; an older addon's gear rows are not read", () => {
   const info = summarizeCharacters(SV);
   expect(info.characters).toHaveLength(1);
-  expect(info.characters[0]).toMatchObject({ character: "Arthas", realm: "Nightslayer", gold: 1700000, peakGold: 2000000, gearSlots: 3, itemLevel: 70, spent: {}, earned: { loot: 1000, vendor: 500 } });
-  expect(info.characters[0].equipped).toEqual([
-    { slot: "HeadSlot", itemLevel: 70 },
-    { slot: "ChestSlot", itemLevel: 80 },
-    { slot: "LegsSlot", itemLevel: 60 },
-  ]);
+  expect(info.characters[0]).toMatchObject({ character: "Arthas", realm: "Nightslayer", gold: 1700000, peakGold: 2000000, spent: {}, earned: { loot: 1000, vendor: 500 } });
+  for (const field of ["gearSlots", "itemLevel", "equipped"]) expect(info.characters[0]).not.toHaveProperty(field);
 });
 
-test("progress rows are per opaque character key: unions for titles and quests, latest state for achievements and reputations", () => {
+test("progress rows are per opaque character key with a union of titles; achievement, reputation, quest and talent rows are not read", () => {
   const info = summarizeCharacters(SV);
-  expect(info.progress.map((p) => p.key)).toEqual(["0a1b2c3d", "ffffffff"]);
-  expect(info.progress[0]).toMatchObject({ class: "PALADIN", level: 60, achievements: 1, achievementsInProgress: 1, reputations: 2, exalted: 1, titles: 3, quests: 0 });
-  expect(info.progress[1]).toMatchObject({ class: "MAGE", level: 12, quests: 2 });
-  expect(info.talents).toEqual([{ class: "PALADIN", level: 60, points: 51 }]);
+  expect(info.progress).toEqual([{ key: "0a1b2c3d", class: "PALADIN", level: 60, titles: 3, lockouts: [] }]);
+  expect(info).not.toHaveProperty("talents");
 });
 
 test("gold history is the dated snapshots in order, and the week counts only money events from the last seven days", () => {
@@ -72,7 +68,7 @@ test("a long gold history is thinned to at most sixty points, keeping the first 
 });
 
 test("a file with no character data gives empty lists, not an error", () => {
-  expect(summarizeCharacters(`EverlootDB = { ["version"] = "0.3.3", ["installId"] = "x", ["records"] = {} }`)).toEqual({ characters: [], progress: [], talents: [] });
+  expect(summarizeCharacters(`EverlootDB = { ["version"] = "0.3.3", ["installId"] = "x", ["records"] = {} }`)).toEqual({ characters: [], progress: [] });
 });
 
 test("the Characters page reads the shared parse and still dates the week, the 30 days and the receipts at each call", () => {
@@ -89,7 +85,7 @@ test("the Characters page reads the shared parse and still dates the week, the 3
   } finally { rmSync(d, { recursive: true, force: true }); }
 });
 
-test("professions and this week's raid lockouts join their character's keyed row; a reset lockout and a row without numbers are left out", () => {
+test("this week's raid lockouts join their character's keyed row; a reset lockout, a row without numbers and an older addon's profession rows are left out", () => {
   const own = (kind: string, fields: string) => `{ ["characterKey"] = "0a1b2c3d", ["class"] = "PALADIN", ["level"] = 60, ["capturedAt"] = "2026-11-09T12:00:00Z", ${fields} }`;
   const sv = `EverlootDB = { ["version"] = "0.3.21", ["installId"] = "x", ["records"] = {
     ["achievement_owned"] = { ${own("achievement_owned", `["achievementId"] = 10, ["completed"] = true`)} },
@@ -101,16 +97,14 @@ test("professions and this week's raid lockouts join their character's keyed row
   } }`;
   const info = summarizeCharacters(sv, Date.parse("2026-11-09T12:00:00Z"));
   expect(info.characters).toEqual([]);
-  const [paladin, mage] = info.progress;
-  expect(paladin).toMatchObject({ key: "0a1b2c3d", achievements: 1 });
-  expect(paladin.professions).toEqual([{ name: "Blacksmithing", rank: 300, maxRank: 300 }, { name: "Mining", rank: 280, maxRank: 300 }]);
-  expect(paladin.lockouts).toEqual([{ instance: "Molten Core", difficulty: "40 Player", killed: 6, total: 10, resetAt: "2026-11-11T12:00:00Z" }]);
-  // A character known only from its professions still gets its own keyed row, with no lockouts and no zeros invented.
-  expect(mage).toMatchObject({ key: "ffffffff", class: "MAGE", level: 12, professions: [{ name: "Tailoring", rank: 40, maxRank: 75 }], lockouts: [] });
-  // The same file read after Molten Core resets: the lockout is gone, the professions stay.
+  // A character known only from its profession rows gets no keyed row.
+  expect(info.progress).toHaveLength(1);
+  const [paladin] = info.progress;
+  expect(paladin).toEqual({ key: "0a1b2c3d", class: "PALADIN", level: 60, titles: 0,
+    lockouts: [{ instance: "Molten Core", difficulty: "40 Player", killed: 6, total: 10, resetAt: "2026-11-11T12:00:00Z" }] });
+  // The same file read after Molten Core resets: the lockout is gone.
   const later = summarizeCharacters(sv, Date.parse("2026-11-11T12:00:01Z")).progress[0];
   expect(later.lockouts).toEqual([]);
-  expect(later.professions).toHaveLength(2);
 });
 
 test("with a ledger in the file, the week and the categories are the ledger's, uploaded rows count only from before it, and local-only categories are marked", () => {

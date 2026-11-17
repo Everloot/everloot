@@ -11,7 +11,8 @@ and, if you turn it on, answers `/ask` questions. Design:
 It follows the same rules ([`docs/DATA_POLICY.md`](../docs/DATA_POLICY.md)). It sends anonymous
 open-world events, and census rows if you allowed the census on its setup screen (the box starts ticked)
 or later in Settings; the command-line uploader never sends census rows. The automatic uploader keeps guild, gear, gold, collection and installed-addon rows on your computer.
-Player sightings are sent only if you enable player pages in Settings. Chat is separate: a configured
+Player sightings are sent while "Send the player pages with the uploads" is on in Settings; a new install from the
+release after 0.1.22 starts with it on, and an install from before keeps its choice. Chat is separate: a configured
 model provider receives your questions, conversation history and any local character details the model
 uses to answer, including names, gold, gear and progress.
 Nothing touches the game client. The window never shows an ad.

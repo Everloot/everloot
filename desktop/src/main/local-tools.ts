@@ -69,7 +69,7 @@ export function localTools(data: LocalData, now: () => number = Date.now): Local
   return [
     {
       name: "my_characters",
-      description: "The player's own characters from the save files on this computer: gold now and at its peak, gold earned and spent in the last seven days, item level and gear slots, level and class, achievements, exalted reputations and titles. Use for any question about the player's characters, gold or progress.",
+      description: "The player's own characters from the save files on this computer: gold now and at its peak, gold earned and spent in the last seven days, level and class, and titles. Gear, achievements and reputations are not in the save file; everloot.app reads them from Blizzard's API. Use for any question about the player's characters, gold or progress.",
       inputSchema: NO_ARGS,
       run: async () => {
         const info = await data.characters();
@@ -79,12 +79,11 @@ export function localTools(data: LocalData, now: () => number = Date.now): Local
           const parts = [`${c.character}-${c.realm}: ${gold(c.gold)}`];
           if (c.peakGold !== null && c.peakGold !== c.gold) parts.push(`peak ${gold(c.peakGold)}`);
           parts.push(`last 7 days earned ${gold(c.week.earned)}, spent ${gold(c.week.spent)}, net ${net < 0 ? "-" : "+"}${gold(Math.abs(net))}`);
-          if (c.itemLevel !== null) parts.push(`item level ${c.itemLevel} over ${c.gearSlots} slots`);
           if (sum(c.spent)) parts.push(`spent by category all time: ${Object.entries(c.spent).map(([k, v]) => `${k} ${gold(v)}`).join(", ")}`);
           return parts.join("; ");
         });
         for (const p of info.progress) {
-          lines.push(`${p.key}: level ${p.level} ${p.class}, ${p.achievements} achievements (${p.achievementsInProgress} in progress), ${p.exalted} of ${p.reputations} reputations exalted, ${p.titles} titles`);
+          lines.push(`${p.key}: level ${p.level} ${p.class}, ${p.titles} titles`);
         }
         return `${lines.join("\n")}\nSource: ${LOCAL_SOURCE}`;
       },

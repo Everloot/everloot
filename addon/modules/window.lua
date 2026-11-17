@@ -138,20 +138,12 @@ function U.Professions()
   return out
 end
 
--- This character's rows of one owned kind, by the catalog id in `field`, as the Collection view reads them.
-local function ownedById(kind, key, field)
-  local out = {}
-  for _, r in ipairs(E:Rows(kind)) do
-    if type(r) == "table" and r.characterKey == key and r[field] ~= nil then out[r[field]] = r end
-  end
-  return out
-end
-
---- What this character has not done yet, counted from the rows Collection and Professions already read: catalog
---- achievements not completed, catalog factions not exalted, catalog titles not held, professions in the book with
---- no recipe recorded, and this week's raid lockouts with bosses left. A count the file cannot give is nil: the
---- tracker counts while the completion tracker is off, a catalog with no rows yet, the recipes without a profession
---- book. Nil when the character cannot be identified. Nothing here estimates or records.
+--- What this character has not done yet, counted as Collection and Professions count it: catalog achievements the
+--- game says are not completed, catalog factions the reputation window does not show at exalted (both read from the
+--- game now), catalog titles not held, professions in the book with no recipe recorded, and this week's raid lockouts
+--- with bosses left. A count the file cannot give is nil: the tracker counts while the completion tracker is off, a
+--- catalog with no rows yet, the recipes without a profession book. Nil when the character cannot be identified.
+--- Nothing here estimates or records.
 function U.MissingData()
   local ok, key = pcall(E.CharacterKey)
   if not (ok and key) then return nil end
@@ -167,14 +159,14 @@ function U.MissingData()
   end
   if not E:IsEnabled("completion") then return d end
 
-  local done = ownedById("achievement_owned", key, "achievementId")
+  local C = E.Completion
   for _, a in ipairs(E:Rows("achievement_catalog")) do
     if type(a) == "table" then
-      local o = done[a.achievementId]
-      d.achievements = (d.achievements or 0) + ((o and o.completed == true) and 0 or 1)
+      local done = C and C.Achievement and C.Achievement(a.achievementId)
+      d.achievements = (d.achievements or 0) + (done == true and 0 or 1)
     end
   end
-  local standing = ownedById("reputation_owned", key, "factionId")
+  local standing = C and C.Standings and C.Standings() or {}
   for _, r in ipairs(E:Rows("reputation_catalog")) do
     if type(r) == "table" and not r.major then
       local o = standing[r.factionId]

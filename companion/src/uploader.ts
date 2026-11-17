@@ -13,7 +13,10 @@ export interface UploadOptions {
   state: SentState;
   /** The player allowed census counts in the Desktop App; without it the census waits for the upload page. */
   census?: boolean;
-  /** The player allowed the player pages in the Desktop App; without it they wait for the upload page. */
+  /**
+   * The Desktop App's "Send the player pages with the uploads" setting is on (on in a new Desktop App install); without
+   * it, player rows wait for the upload page. The command-line uploader never sets it.
+   */
   players?: boolean;
   /**
    * Send pull summaries. The Desktop App sets it: the addon's own switch (`/everloot pulls off`) is the player's choice,
@@ -57,7 +60,7 @@ const ADDON_LIST: RecordKind = "addon_seen";
  */
 const CENSUS = new Set<string>(["census_self", "census_seen"]);
 
-/** Named player rows go only from the upload page too, which says what they are first. */
+/** Named player rows go from the upload page, which says what they are first, or from here only with `players`. */
 const PLAYERS: RecordKind = "player_seen";
 
 /** Pull summaries name everyone in the group: they go from the upload page, or from here only with `pulls`. */
@@ -181,8 +184,8 @@ export interface UploadResult { sent: number; batches: number; skipped: number; 
 /**
  * Send one SavedVariables file's unsent events, the same way the upload page does: named categories
  * stay on this machine (no sharing choices, no grants), and progress advances only on a confirmed receipt.
- * The installed addon list and player rows stay here too: they are sent only from the upload page, after its preview.
- * The census stays here too unless `census` is set.
+ * The installed addon list stays here too: it is sent only from the upload page, after its preview. Player rows and
+ * the census stay here too unless `players` or `census` is set.
  */
 export async function uploadFile(file: string, options: UploadOptions): Promise<UploadResult> {
   const keys = new Map<string, string>();

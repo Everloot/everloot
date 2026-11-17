@@ -68,18 +68,27 @@ test("a missing file is the defaults and a damaged one is the defaults plus an e
   expect(loadSettings(path)).toEqual({ settings: defaultSettings(), error: null });
   writeFileSync(path, "{ not json");
   const loaded = loadSettings(path);
-  expect(loaded.settings).toEqual(defaultSettings());
+  // A damaged file was an existing install's: the player pages start off rather than at the new-install default.
+  expect(loaded.settings).toEqual({ ...defaultSettings(), players: false });
   expect(loaded.error).toMatch(/settings\.json could not be read/);
   writeFileSync(path, "[1,2]");
-  expect(loadSettings(path).settings).toEqual(defaultSettings());
+  expect(loadSettings(path).settings).toEqual({ ...defaultSettings(), players: false });
 });
 
-test("the player pages are off until the player turns them on", () => {
+// docs/design/specs/2026-11-17-blizzard-api-first.md: on for a new install; an existing install keeps its saved value.
+test("the player pages start on for a new install, and an install from before keeps its choice", () => {
   const path = join(dir(), "settings.json");
-  expect(defaultSettings().players).toBe(false);
-  writeFileSync(path, JSON.stringify({ gameFolder: "D:\\Games\\WoW" }));
+  expect(defaultSettings().players).toBe(true);
+  expect(loadSettings(path).settings.players).toBe(true);
+  // Saved before the switch existed: that install never sent them, and still does not.
+  writeFileSync(path, JSON.stringify({ gameFolder: "D:\\Games\\WoW", consentedAt: "2026-10-18T00:00:00Z" }));
+  expect(loadSettings(path).settings.players).toBe(false);
+  writeFileSync(path, JSON.stringify({ gameFolder: "D:\\Games\\WoW", players: false }));
   expect(loadSettings(path).settings.players).toBe(false);
   writeFileSync(path, JSON.stringify({ gameFolder: "D:\\Games\\WoW", players: true }));
+  expect(loadSettings(path).settings.players).toBe(true);
+  // A new install's saved file keeps the default it started with.
+  saveSettings(path, mergeSettings(defaultSettings(), { gameFolder: "D:/Games/WoW", consentedAt: "2026-11-17T00:00:00Z" }));
   expect(loadSettings(path).settings.players).toBe(true);
 });
 
@@ -98,7 +107,7 @@ test("a damaged settings file is kept under its own name, so the next Save does 
   const d = dir(), path = join(d, "settings.json");
   writeFileSync(path, '{ "gameFolder": "D:\\Games\\WoW", oops');
   const loaded = loadSettings(path);
-  expect(loaded.settings).toEqual(defaultSettings());
+  expect(loaded.settings).toEqual({ ...defaultSettings(), players: false });
   const kept = readdirSync(d).filter((n) => n.startsWith("settings.json.corrupt-"));
   expect(kept).toHaveLength(1);
   expect(loaded.error).toContain(kept[0]);
