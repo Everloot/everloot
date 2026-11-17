@@ -205,6 +205,11 @@ complete market snapshot or listing distribution. The fallback records no seller
 The addon's gold-per-hour sessions (`/everloot gph`) are personal: they stay in your SavedVariables
 file, outside the records an upload reads, and are never sent to the site.
 
+`EverlootDB.inventory` is also local-only: explicit consent, off by default, stores item counts and observation
+times for bags, opened bank and opened mail under an opaque character key. It never enters upload records or
+private sync. Turning capture off deletes all inventory; forgetting a character deletes its stock. Partial or
+unreadable observations retain the prior dated snapshot, while a complete empty observation replaces it.
+
 The addon's window keeps two more tables that are local in the same way. `EverlootDB.ledger` holds your money events,
 your auction sales and each character's closing gold per day, and
 `EverlootDB.roster` holds one row per character you log in with. Neither is a record, neither is read by an

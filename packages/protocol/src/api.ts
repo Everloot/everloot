@@ -79,7 +79,7 @@ export const marketRealmsResponse = z.object({
 
 export const MARKET_PRICE_FIELDS = ["itemId", "market", "min", "historical", "quantity", "day", "reporters"] as const;
 
-/** GET /api/market/prices?realm=: the items with the most units listed, as tuples in `fields` order. */
+/** GET /api/market/prices?realm=: most-listed or explicitly selected public items, in `fields` order. */
 export const marketPricesResponse = z.object({
   ok: z.literal(true),
   dataAsOf: ISO_TIME.nullable(),
@@ -101,7 +101,10 @@ const dropRate = z.object({
   itemId: z.number().int().positive(),
   kills: z.number().int().nonnegative().describe("Loot windows players opened on this source, not kills counted by the game."),
   drops: z.number().int().nonnegative(),
-  rate: z.number().min(0).max(1),
+  rate: z.number().min(0).max(1).describe("drops / kills: the share of attributed loot windows holding the item, not a kill-based drop chance. Unobserved kills are unknown; older uploads can omit empty windows."),
+  rateLow: z.number().min(0).max(1).nullable().optional().describe("Lower end of the descriptive 95% Wilson range for the observed window share, as a fraction from 0 to 1; null without windows. Not a guaranteed kill chance."),
+  rateHigh: z.number().min(0).max(1).nullable().optional().describe("Upper end of the descriptive 95% Wilson range for the observed window share, as a fraction from 0 to 1; null without windows."),
+  settled: z.boolean().optional().describe("True at 50 or more windows from at least 5 installs when the Wilson half-width is no more than the larger of 0.03 and 30% of the observed share. Describes sample precision, not a confirmed kill chance."),
   reporters: z.number().int().nonnegative().describe("Distinct installs that looted the source."),
   public: z.literal(true),
   sourceName: z.string().min(1).optional().describe("The NPC's or object's name, once 3 installs agree on it; absent until then."),
@@ -547,15 +550,17 @@ export const API_ROUTES: readonly ApiRoute[] = [
   {
     method: "GET", path: "/api/market/prices",
     summary: "Forever market values from full auction scans players started",
-    description: "Without `realm`, the realms that have public values (and, in `houses`, which auction houses have values of their own). With it, the items with the most units listed on that realm as tuples in `fields` order, copper per unit. Each scan counts for one house: the house it read, else its scanner's faction. Ask once per house (`house`) for current prices. Without `house` the answer reads only scans that recorded no house: older addons, plus days stored before houses were kept apart, which may mix them. That list is often empty and never stands in for a house. A day is public when three reporters scanned the item in that house.",
+    description: "Without `realm`, the realms that have public values (and, in `houses`, which auction houses have values of their own). With it, public prices as tuples in `fields` order, copper per unit. Without `items`, the most-listed 2,000 items are returned; `items` selects up to 100 IDs before that cap. Each scan counts for one house: the house it read, else its scanner's faction. Ask once per house (`house`) for current prices. Without `house` the answer reads only scans that recorded no house: older addons, plus days stored before houses were kept apart, which may mix them. That list is often empty and never stands in for a house. A day is public when three reporters scanned the item in that house.",
     access: "rate-limited", data: "observed",
     query: [
       { name: "realm", description: "Realm name. Omit it to list realms.", schema: { type: "string", minLength: 2, maxLength: 40 } },
       { name: "house", description: "Alliance, Horde or Neutral (any case). Needs realm. Without it, only scans that recorded no house are read.", schema: { type: "string", enum: ["alliance", "horde", "neutral"] } },
+      { name: "items", description: "Comma-separated positive item IDs, at most 100 entries, with a realm. Selected before the row cap; unknown and non-public items are omitted. Repeated IDs are deduplicated; repeated items parameters are rejected.", schema: { type: "string", minLength: 1, maxLength: 1700, pattern: "^[1-9][0-9]*(,[1-9][0-9]*)*$", examples: ["2589,2592"] } },
     ],
     responses: {
       "200": { description: "Realms when `realm` is absent (marketRealmsResponse), prices when present.", schema: "marketPricesResponse" },
       ...ERROR_RESPONSES,
+      "400": { description: "Invalid realm, house or items. items requires a realm and one list of at most 100 positive safe-integer IDs.", schema: "apiError" },
     },
   },
   {

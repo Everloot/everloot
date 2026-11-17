@@ -37,6 +37,8 @@ O.ROWS = {
     text = "Your own gold in and out, for gold per hour. Sent only if you share it on the upload page." },
   { key = "roster", group = "private", label = "Your characters",
     text = "Name, realm, class, level, faction, gold and professions of each character you log in with, for the window's Home. Stays in this file; never uploaded." },
+  { key = "inventoryCapture", group = "private", field = true, defaultOff = true, live = true, label = "Local inventory snapshots",
+    text = "Counts of items in your bags, opened bank and opened mail, with a separate observation time for each. Stays in this file; never uploaded or synced. Off deletes these snapshots." },
   { key = "gear", group = "private", label = "Your gear",
     text = "Your equipped items and item levels, at most once an hour. Sent only if you share it on the upload page." },
   { key = "talents", group = "private", label = "Your talents",
@@ -145,6 +147,7 @@ function O.Set(row, on)
     SlashCmdList.EVERLOOT(row.command .. (on and " on" or " off"))
   elseif row.field then
     EverlootDB[row.key] = on
+    if row.key == "inventoryCapture" and not on and E.Inventory then E.Inventory.Withdraw() end
   else
     EverlootDB.toggles[row.key] = on
   end

@@ -150,7 +150,7 @@ elsewhere = CreateFrame('Button', 'LibDBIcon10_Elsewhere', UIParent)
 """
 
 
-def fresh(api: str = MINIMAP + TIMER + LIBDBICON + CHILDREN, saved: str = "nil", login: bool = True, window: str = ""):
+def fresh(api: str = MINIMAP + TIMER + LIBDBICON + CHILDREN, saved: str = "{ installId = 'abcd-1234', toggles = {}, records = {} }", login: bool = True, window: str = ""):
     lua = LuaRuntime()
     lua.execute(WORLD)
     lua.execute(api)
@@ -168,6 +168,31 @@ def fresh(api: str = MINIMAP + TIMER + LIBDBICON + CHILDREN, saved: str = "nil",
 
 def notices(lua) -> int:
     return lua.eval("(function() local n = 0; for _, l in ipairs(printed) do if l:find('/everloot buttons off', 1, true) and l:find('hover', 1, true) then n = n + 1 end end; return n end)()")
+
+
+def test_new_installs_leave_buttons_on_the_minimap():
+    lua = fresh(saved="nil")
+    lua.execute("""
+    assert(EverlootDB.toggles.buttons == false, 'new installs start with the drawer off')
+    assert(alpha.parent == Minimap and beta.parent == Minimap, 'other addons keep their minimap buttons')
+    assert(Everloot:Status():find('buttons: off', 1, true), 'status reports the drawer off')
+    local row
+    for _, r in ipairs(Everloot.Options.ROWS) do if r.key == 'buttons' then row = r end end
+    assert(row and not Everloot.Options.IsOn(row), 'settings report off too')
+    SlashCmdList.EVERLOOT('buttons on')
+    assert(EverlootDB.toggles.buttons == true, 'new players can opt in with the command')
+    Everloot.Options.Set(row, false)
+    assert(EverlootDB.toggles.buttons == false, 'the settings switch still works')
+    """)
+    assert notices(lua) == 0
+
+
+def test_existing_installs_keep_their_drawer_choice():
+    for choice, on in (("nil", True), ("true", True), ("false", False)):
+        lua = fresh(saved="{ installId = 'abcd-1234', toggles = { buttons = " + choice + " }, records = {} }")
+        assert lua.eval("Everloot:IsEnabled('buttons')") == on
+        assert lua.eval("alpha.parent == Minimap and beta.parent == Minimap") == (not on)
+        assert ("buttons: off" in lua.eval("Everloot:Status()")) == (not on)
 
 
 def test_the_toc_loads_the_drawer_after_the_minimap_button():
@@ -335,11 +360,8 @@ def test_off_collects_nothing_and_the_switch_and_command_work():
     """)
     assert "buttons: off by toggle" in lua.eval("Everloot:Status()")
     assert notices(lua) == 0
-    # On by default, for a new install and an upgrade alike, without writing a new key into the file.
-    for saved in ("nil", "{ installId = 'abcd-1234', toggles = { openworld = true }, records = {} }"):
-        lua = fresh(saved=saved)
-        assert lua.eval("Everloot:IsEnabled('buttons')") is True
-        assert lua.eval("alpha.parent == Everloot.Drawer.frame") is True
+    # Exercise switches on an existing install with its drawer enabled.
+    lua = fresh()
     lua.execute("""
     SlashCmdList.EVERLOOT('buttons off')
     assert(EverlootDB.toggles.buttons == false)
@@ -442,6 +464,8 @@ def test_the_one_time_notice_is_printed_once():
 
 
 if __name__ == "__main__":
+    test_new_installs_leave_buttons_on_the_minimap()
+    test_existing_installs_keep_their_drawer_choice()
     test_the_toc_loads_the_drawer_after_the_minimap_button()
     test_libdbicon_buttons_are_collected_and_laid_out_and_nothing_else_is()
     test_the_drawer_borrows_the_window_panel_when_the_window_is_loaded()

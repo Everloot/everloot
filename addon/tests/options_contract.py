@@ -295,6 +295,8 @@ OWN_SWITCH_OK = {
     "ask", "conveniences", "gph", "minimap", "plan", "planner", "prices", "raid", "options",
     # Stores item facts, but its init returns "off" when the openworld switch is off, so that row is its switch.
     "itemfacts",
+    # Local capture uses the default-off inventoryCapture field, verified in inventory_contract.py.
+    "inventory",
 }
 sources = sorted((root / "modules").glob("*.lua")) + [root / "core.lua"]
 wanted = {}

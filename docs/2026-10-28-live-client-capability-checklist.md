@@ -346,3 +346,27 @@ Fill one record per probe; keep raw evidence private.
 - Whether the PvP rank renown faction belongs in reputation completion or a PvP view.
 - Combat log format stability across builds, and whether logging is allowed on every realm type.
 - Everything that depends on the identity ADR: which character a probe result belongs to beyond this file.
+
+
+## Release gate — optional local inventory and new-install drawer (November 16)
+
+These checks are UNVERIFIED. Source tests and a rebuilt zip do not satisfy them. Do not tag or publish an
+addon release carrying these changes until the operator records the client build, candidate zip hash,
+observed results and any failures. Preserve the original SavedVariables file before testing.
+
+- [ ] Fresh install leaves other addons' minimap buttons in place. An existing install preserves explicit
+  on/off settings; an older save without a drawer setting preserves its prior enabled behavior.
+- [ ] Inventory capture starts off and writes no stock. Enabling **Local inventory snapshots** begins capture;
+  disabling it deletes all stored inventory, and forgetting a character deletes only that character's stock.
+- [ ] With populated bags, log in and `/reload`: a pending/uncached read must not replace prior stock with an
+  empty snapshot. After bag events settle, recorded counts match visible items. A truly emptied bag records empty.
+- [ ] Open the bank with populated main/bank bags, then close it: counts match the visible slots; unavailable or
+  unreadable bags retain their prior observation time and contents rather than recording zero.
+- [ ] Open mail containing item stacks of 1, 2 and 20, multiple attachments, empty letters and uncached links.
+  Confirm header attachment counts agree with the actual attachments and each successful snapshot matches the
+  visible items. Boolean/stack-count header returns or an unreadable attachment must not create partial stock.
+- [ ] Preview an upload with consent on and off: neither public records nor prepared upload batches include
+  inventory. No private inventory transport is introduced by these changes.
+- [ ] Observe capture while looting with consent on; record any frame-time impact before approving release.
+
+Result: UNVERIFIED. Release owner/date/evidence: pending.

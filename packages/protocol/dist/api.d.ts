@@ -77,7 +77,7 @@ export declare const marketRealmsResponse: z.ZodObject<{
     }, z.core.$strip>;
 }, z.core.$strip>;
 export declare const MARKET_PRICE_FIELDS: readonly ["itemId", "market", "min", "historical", "quantity", "day", "reporters"];
-/** GET /api/market/prices?realm=: the items with the most units listed, as tuples in `fields` order. */
+/** GET /api/market/prices?realm=: most-listed or explicitly selected public items, in `fields` order. */
 export declare const marketPricesResponse: z.ZodObject<{
     ok: z.ZodLiteral<true>;
     dataAsOf: z.ZodNullable<z.ZodString>;
@@ -122,6 +122,9 @@ export declare const dropsResponse: z.ZodObject<{
         kills: z.ZodNumber;
         drops: z.ZodNumber;
         rate: z.ZodNumber;
+        rateLow: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+        rateHigh: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+        settled: z.ZodOptional<z.ZodBoolean>;
         reporters: z.ZodNumber;
         public: z.ZodLiteral<true>;
         sourceName: z.ZodOptional<z.ZodString>;
@@ -1447,6 +1450,9 @@ export declare const API_SCHEMAS: {
             kills: z.ZodNumber;
             drops: z.ZodNumber;
             rate: z.ZodNumber;
+            rateLow: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+            rateHigh: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+            settled: z.ZodOptional<z.ZodBoolean>;
             reporters: z.ZodNumber;
             public: z.ZodLiteral<true>;
             sourceName: z.ZodOptional<z.ZodString>;
