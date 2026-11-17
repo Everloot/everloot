@@ -12,10 +12,14 @@ import { privateSyncOn, SYNC_CATEGORIES, type SyncCategory } from "@/lib/private
 import { ownCharacterFacts, ownSyncedLink, type OwnCategory, type OwnSyncedLink } from "@/lib/private-sync-store";
 import { validId } from "@/lib/saved-builds";
 import { getUser } from "@/lib/supabase/server";
+import { ownCharacterArmory } from "@/lib/character-armory";
+import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
+import { ArmoryPart } from "@/app/characters/armory-part";
 
 /**
  * /me/characters/links/<id>: the signed-in preview of one of the account's linked characters, with everything it
- * synced, switched on for the public page or not (showcase plan S5). Only the account that holds the link sees it;
+ * synced, switched on for the public page or not (showcase plan S5), and Blizzard's data for the armory character
+ * it is associated with. Only the account that holds the link sees it;
  * any other id is a 404. Read on every request, never cached and never indexed. 404 until EVERLOOT_PRIVATE_SYNC=1.
  */
 export const dynamic = "force-dynamic";
@@ -23,9 +27,7 @@ export const metadata: Metadata = { title: "Character preview", robots: { index:
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 /** The section each category fills on the page. */
-const SECTION: Record<SyncCategory, SectionKey> = {
-  gear: "gear", stats: "stats", talents: "talents", pvp: "pvp", professions: "professions", reputations: "reputations", raids: "raids", achievements: "collections",
-};
+const SECTION: Record<SyncCategory, SectionKey> = { raids: "raids", achievements: "collections" };
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -43,7 +45,7 @@ function Settings({ link: l, categories }: { link: OwnSyncedLink; categories: Ow
             return (
               <li key={category} data-category={category} data-sync={sync ? "on" : "off"} data-public={shown ? "on" : "off"}
                 className="flex flex-wrap items-baseline justify-between gap-x-3 border-b border-line py-1">
-                <span className="text-fg">{SECTION_TITLES[SECTION[category]]}{category === "achievements" ? " (achievements and titles)" : ""}</span>
+                <span className="text-fg">{SECTION_TITLES[SECTION[category]]}{category === "achievements" ? " (titles)" : ""}</span>
                 <span className="text-fg-2">
                   Sync {sync ? "on" : "off"} · Public {shown && l.pagePublic ? "on" : shown ? "on once the page is public" : "off"}
                   {c?.fact ? <> · Captured <span className="font-mono">{c.fact.capturedAt.slice(0, 10)}</span></> : null}
@@ -86,7 +88,12 @@ export default async function LinkPreviewPage({ params }: Params) {
     lastUpload: new Date(c.lastUploadAt).toISOString().slice(0, 10),
     gear: { state: "empty" }, stats: { state: "unsupported" }, talents: { state: "empty" }, pvp: { state: "empty" }, professions: { state: "empty" }, reputations: { state: "empty" },
     raids: { state: "empty" }, collections: { state: "empty" },
-  }, facts.length ? factSections(facts, await loadFactNames(facts, c.class), now) : {}), now);
+  }, facts.length ? factSections(facts, await loadFactNames(facts), now) : {}), now);
+  // Blizzard's data for the associated armory character: every part here; the public page shows a part only while its switch is on.
+  const armory = c.status === "linked" ? await ownCharacterArmory(user.id, id) : null;
+  const tips = armory
+    ? await loadSiteAssets().then((assets) => loadItemTips(assets, armory.character.equipment.map((item) => item.itemId))).catch(() => new Map())
+    : new Map();
   return (
     <Container width="reading">
       <article className="space-y-8">
@@ -104,9 +111,19 @@ export default async function LinkPreviewPage({ params }: Params) {
         </Card>
         <Settings link={c} categories={categories} />
         <div className="space-y-8" data-part="preview">
-          {c.status === "linked" && <ShowcaseSections showcase={showcase} preview />}
+          {/* Only the sections sync still fills: the rest come from Blizzard's API, below. */}
+          {c.status === "linked" && <ShowcaseSections showcase={{ ...showcase, sections: showcase.sections.filter((x) => x.key === "raids" || x.key === "collections") }} preview />}
           <p className="text-sm text-fg-2">{FOOTER_LINE}</p>
         </div>
+        {armory && (
+          <div className="space-y-2">
+            <p className="text-sm text-fg-2">
+              The public page shows each part below only while its section switch is on: Gear, Stats, Talents, PvP,
+              Professions, Reputations, and Collections for achievements and completed quests.
+            </p>
+            <ArmoryPart armory={armory} tips={tips} />
+          </div>
+        )}
       </article>
     </Container>
   );

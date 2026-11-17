@@ -109,13 +109,14 @@ describe("the switch", () => {
   });
 });
 
-describe("the section switches, with private sync on", () => {
-  const SECTIONS = ["show_gear", "show_stats", "show_talents", "show_pvp", "show_professions", "show_reputations", "show_raids", "show_collections"];
+describe("the section switches", () => {
+  const SYNCED = ["show_raids", "show_collections"];
+  const BLIZZARD = ["show_gear", "show_stats", "show_talents", "show_pvp", "show_professions", "show_reputations", "show_collections"];
 
-  test("each section switch goes to set_visibility as sent, and clears the page and both cards", async () => {
+  test("with private sync on, the synced sections' switches go to set_visibility as sent, and clear the page and both cards", async () => {
     vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1");
     owned();
-    const flags = Object.fromEntries(SECTIONS.map((s, i) => [s, i % 2 === 0]));
+    const flags = Object.fromEntries(SYNCED.map((s, i) => [s, i % 2 === 0]));
     const res = await send(flags);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ id: LINK_ID, ...flags });
@@ -123,29 +124,24 @@ describe("the section switches, with private sync on", () => {
     expect(cache.revalidatePath.mock.calls.map((c) => c[0])).toEqual([PATH, `${PATH}/card.png`, `${PATH}/card-square.png`]);
   });
 
-  test("with private sync off they are refused as before; gold, guild and the rankings stay refused either way", async () => {
-    for (const s of SECTIONS) expect((await send({ [s]: true })).status, s).toBe(400);
-    vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1");
-    for (const bad of [{ show_gold: true }, { show_guild: true }, { ranked_gear: false }, { show_talents: "on" }]) {
-      expect((await send(bad)).status, JSON.stringify(bad)).toBe(400);
-    }
-    expect(auth.authQuery).not.toHaveBeenCalled();
-  });
-});
-
-describe("the gear ranking switch, with the leaderboards on", () => {
-  test("ranked_gear goes to set_visibility only with EVERLOOT_LEADERBOARDS=1 and private sync on; the other rankings stay refused", async () => {
-    vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1");
-    expect((await send({ ranked_gear: true })).status).toBe(400);
-    vi.stubEnv("EVERLOOT_LEADERBOARDS", "1");
-    for (const bad of [{ ranked_achievements: true }, { ranked_gold: true }, { ranked_gear: "on" }]) {
-      expect((await send(bad)).status, JSON.stringify(bad)).toBe(400);
-    }
-    expect(auth.authQuery).not.toHaveBeenCalled();
+  test("with the armory on, the switches of Blizzard's parts are taken, sync or not", async () => {
+    vi.stubEnv("EVERLOOT_ARMORY", "1");
     owned();
-    const res = await send({ ranked_gear: true });
+    const flags = Object.fromEntries(BLIZZARD.map((s, i) => [s, i % 2 === 0]));
+    const res = await send(flags);
     expect(res.status).toBe(200);
-    expect(JSON.parse(auth.authQuery.mock.calls[1][1].body).p_flags).toEqual({ ranked_gear: true });
+    expect(JSON.parse(auth.authQuery.mock.calls[1][1].body).p_flags).toEqual(flags);
+  });
+
+  test("off, they are refused as before; gold, guild and every ranking switch stay refused either way", async () => {
+    for (const s of new Set([...SYNCED, ...BLIZZARD])) expect((await send({ [s]: true })).status, s).toBe(400);
+    vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1");
+    vi.stubEnv("EVERLOOT_ARMORY", "1");
+    vi.stubEnv("EVERLOOT_LEADERBOARDS", "1");
+    for (const bad of [{ show_gold: true }, { show_guild: true }, { ranked_gear: false }, { ranked_achievements: true }, { show_talents: "on" }]) {
+      expect((await send(bad)).status, JSON.stringify(bad)).toBe(400);
+    }
+    expect(auth.authQuery).not.toHaveBeenCalled();
   });
 });
 

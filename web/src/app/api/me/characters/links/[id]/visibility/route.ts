@@ -2,7 +2,8 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { fail, linkAccount, NO_STORE, ownLinkPath, setVisibility, unavailable, type VisibilityFlags } from "@/lib/character-links-store";
 import { showcaseOn } from "@/lib/character-showcase";
-import { leaderboardsOn } from "@/lib/leaderboard-switch";
+import { armoryOn } from "@/lib/armory";
+import { BLIZZARD_SWITCH } from "@/lib/character-armory";
 import { privateSyncOn, SHOW_SWITCH } from "@/lib/private-sync";
 import { validId } from "@/lib/saved-builds";
 
@@ -14,22 +15,21 @@ import { validId } from "@/lib/saved-builds";
  * exactly as an unknown one, 404. Any change clears the page and both cards from the Next cache. 404 unless both
  * EVERLOOT_CHARACTER_LINKS=1 and EVERLOOT_SHOWCASE=1.
  *
- * With EVERLOOT_PRIVATE_SYNC=1 the owner's section switches are taken too (showcase plan S6): show_gear, show_stats, show_talents,
- * show_pvp, show_professions, show_reputations, show_raids and show_collections. Each publishes only that section's synced facts,
- * and only while sync for it stays on. Gold, guild and the achievement and gold rankings stay refused.
- *
- * With EVERLOOT_LEADERBOARDS=1, `ranked_gear` ("Rank my gear") is taken too: the character is on the gear boards while
- * it is on, its page is public and gear sync is on (`ranked_gear_board`).
+ * With EVERLOOT_PRIVATE_SYNC=1 the synced sections' switches are taken too (showcase plan S6): show_raids and
+ * show_collections. Each publishes only that section's synced facts, and only while sync for it stays on.
+ * With EVERLOOT_ARMORY=1 the switches of Blizzard's parts are taken too: show_gear, show_stats, show_talents, show_pvp,
+ * show_professions, show_reputations and show_collections (character-armory.ts). Gold, guild and every ranking switch
+ * stay refused.
  */
 export const dynamic = "force-dynamic";
 
 const NONE = "No linked character with that id on this account.";
 const SWITCHES = ["page_public", "indexable"] as const;
-/** The section switches, only while private sync is on; the gear ranking switch only while the boards are on. */
-const sections = (): readonly string[] => [
-  ...(privateSyncOn() ? new Set(Object.values(SHOW_SWITCH)) : []),
-  ...(leaderboardsOn() ? ["ranked_gear"] : []),
-];
+/** The synced sections' switches while private sync is on; Blizzard's parts' switches while the armory is on. */
+const sections = (): readonly string[] => [...new Set([
+  ...(privateSyncOn() ? Object.values(SHOW_SWITCH) : []),
+  ...(armoryOn() ? Object.values(BLIZZARD_SWITCH) : []),
+])];
 
 /** The flags to set, or null for a body that is not booleans under those names. */
 function flags(body: unknown): VisibilityFlags | null {

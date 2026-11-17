@@ -265,6 +265,7 @@ describe("the owner's list", () => {
   test("with private sync on, each link lists its sync per category and, with the pages on, its section switches; never the facts", async () => {
     vi.stubEnv("EVERLOOT_SHOWCASE", "1");
     vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1");
+    // The database may still list the retired categories until the migration runs; the list keeps only raids and achievements.
     const consent = (on: string[], captured: Record<string, string> = {}) => ["gear", "stats", "talents", "pvp", "professions", "reputations", "raids", "achievements"]
       .map((category) => ({ category, consented: on.includes(category), captured_at: captured[category] ?? null, data: captured[category] ? { secret: "fact-data" } : null }));
     auth.authQuery.mockImplementation(async (path: string, init?: { body: string }) => {
@@ -276,7 +277,7 @@ describe("the owner's list", () => {
       }
       if (path === "rpc/own_character_facts") {
         const { p_link_id } = JSON.parse(init!.body);
-        return p_link_id === LINK_ID ? consent(["gear", "achievements"], { gear: "2026-11-05T10:00:00+00:00" }) : consent(["raids"]);
+        return p_link_id === LINK_ID ? consent(["gear", "achievements"], { gear: "2026-11-05T10:00:00+00:00", achievements: "2026-11-04T10:00:00+00:00" }) : consent(["raids"]);
       }
       throw new Error(`unexpected ${path}`);
     });
@@ -284,20 +285,15 @@ describe("the owner's list", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     const [path] = auth.authQuery.mock.calls[0];
-    expect(path).toContain("character_visibility(page_public,show_gear,show_stats,show_talents,show_pvp,show_professions,show_reputations,show_raids,show_collections)");
-    expect(body.links[0].page.sections).toEqual({ gear: true, stats: false, talents: false, pvp: true, professions: false, reputations: false, raids: false, achievements: true });
+    expect(path).toContain("character_visibility(page_public,show_raids,show_collections)");
+    expect(body.links[0].page.sections).toEqual({ raids: false, achievements: true });
+    expect(body.links[0].page.blizzard).toBeUndefined();
     expect(body.links[0].sync).toEqual([
-      { category: "gear", on: true, capturedAt: "2026-11-05T10:00:00.000Z" },
-      { category: "stats", on: false, capturedAt: null },
-      { category: "talents", on: false, capturedAt: null },
-      { category: "pvp", on: false, capturedAt: null },
-      { category: "professions", on: false, capturedAt: null },
-      { category: "reputations", on: false, capturedAt: null },
       { category: "raids", on: false, capturedAt: null },
-      { category: "achievements", on: true, capturedAt: null },
+      { category: "achievements", on: true, capturedAt: "2026-11-04T10:00:00.000Z" },
     ]);
     // A link with no visibility row has every switch off.
-    expect(Object.values(body.links[1].page.sections)).toEqual([false, false, false, false, false, false, false, false]);
+    expect(Object.values(body.links[1].page.sections)).toEqual([false, false]);
     expect(body.links[1].sync.find((c: { category: string }) => c.category === "raids").on).toBe(true);
     // Each read is the session's own account.
     for (const [p, init] of auth.authQuery.mock.calls.slice(1)) {
@@ -310,11 +306,33 @@ describe("the owner's list", () => {
   test("with private sync on but the pages off, sync is listed with no page and no section switches", async () => {
     vi.stubEnv("EVERLOOT_SHOWCASE", "");
     vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1");
-    auth.authQuery.mockResolvedValueOnce([own]).mockResolvedValueOnce([{ category: "gear", consented: true, captured_at: null, data: null }]);
+    auth.authQuery.mockResolvedValueOnce([own]).mockResolvedValueOnce([{ category: "raids", consented: true, captured_at: null, data: null }]);
     const body = await (await list()).json();
     expect(body.links[0].page).toBeUndefined();
-    expect(body.links[0].sync[0]).toEqual({ category: "gear", on: true, capturedAt: null });
+    expect(body.links[0].sync[0]).toEqual({ category: "raids", on: true, capturedAt: null });
     expect(auth.authQuery.mock.calls[0][0]).not.toContain("show_");
+  });
+
+  test("with the armory on, a connected link lists the switches of Blizzard's parts; a link with no visibility row has them off", async () => {
+    vi.stubEnv("EVERLOOT_SHOWCASE", "1");
+    vi.stubEnv("EVERLOOT_ARMORY", "1");
+    auth.authQuery.mockImplementation(async (path: string) => {
+      if (path.startsWith("character_links?")) {
+        return [
+          { ...own, ruleset: "forever", character_visibility: { page_public: true, show_gear: true, show_stats: false, show_talents: true, show_pvp: false, show_professions: false, show_reputations: false, show_collections: true } },
+          { ...own, id: OTHER_ID, name: "Jainara", ruleset: "forever", character_visibility: null },
+        ];
+      }
+      if (path === "rpc/armory_own_links") return [{ link_id: LINK_ID, region: "eu", slug: "thrallina-vale" }];
+      throw new Error(`unexpected ${path}`);
+    });
+    const body = await (await list()).json();
+    expect(auth.authQuery.mock.calls[0][0]).toContain("character_visibility(page_public,show_gear,show_stats,show_talents,show_pvp,show_professions,show_reputations,show_collections)");
+    expect(body.links[0].armory).toEqual({ path: "/armory/eu/thrallina-vale" });
+    expect(body.links[0].page.blizzard).toEqual({ gear: true, stats: false, talents: true, pvp: false, professions: false, reputations: false, collections: true });
+    expect(body.links[1].armory).toEqual({ path: null });
+    expect(Object.values(body.links[1].page.blizzard).every((v) => v === false)).toBe(true);
+    expect(body.links[0].sync).toBeUndefined();
   });
 
   test("with private sync on, a sync read failing is a 503, never a list that says sync is off", async () => {

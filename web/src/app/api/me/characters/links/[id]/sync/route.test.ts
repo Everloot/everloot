@@ -37,7 +37,7 @@ afterEach(() => { vi.unstubAllEnvs(); });
 
 test("with the switch off both methods are 404 and nothing is read", async () => {
   vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "");
-  expect((await send({ gear: true })).status).toBe(404);
+  expect((await send({ raids: true })).status).toBe(404);
   expect((await read()).status).toBe(404);
   expect(auth.getUser).not.toHaveBeenCalled();
   expect(auth.authQuery).not.toHaveBeenCalled();
@@ -45,19 +45,19 @@ test("with the switch off both methods are 404 and nothing is read", async () =>
 
 describe("who may change it", () => {
   test("only a session from this site: no Origin, another site or an API key alone is 403, signed out 401", async () => {
-    expect((await send({ gear: true }, { headers: {} })).status).toBe(403);
-    expect((await send({ gear: true }, { headers: { origin: "https://evil.example" } })).status).toBe(403);
+    expect((await send({ raids: true }, { headers: {} })).status).toBe(403);
+    expect((await send({ raids: true }, { headers: { origin: "https://evil.example" } })).status).toBe(403);
     // A sync:own key sends facts; it never grants consent.
-    expect((await send({ gear: true }, { headers: { authorization: `Bearer ${KEY}` } })).status).toBe(403);
+    expect((await send({ raids: true }, { headers: { authorization: `Bearer ${KEY}` } })).status).toBe(403);
     auth.getUser.mockResolvedValue(null);
-    expect((await send({ gear: true })).status).toBe(401);
+    expect((await send({ raids: true })).status).toBe(401);
     expect(auth.authQuery).not.toHaveBeenCalled();
   });
 
   test("another account's link answers exactly as an unknown one, 404, and no consent is touched", async () => {
     auth.authQuery.mockResolvedValueOnce([]);
-    const foreign = await send({ gear: true });
-    const notAnId = await send({ gear: true }, { id: "not-an-id" });
+    const foreign = await send({ raids: true });
+    const notAnId = await send({ raids: true }, { id: "not-an-id" });
     expect(foreign.status).toBe(404);
     expect(await foreign.json()).toEqual(await notAnId.json());
     expect(auth.authQuery.mock.calls[0][0]).toContain(`user_id=eq.${USER.id}`);
@@ -78,14 +78,12 @@ describe("who may change it", () => {
 describe("consent", () => {
   test("grants and revokes per category through set_sync_consent, for the session's account, and clears the page", async () => {
     owned(null, null, null, null);
-    const res = await send({ gear: true, stats: true, pvp: false, raids: false });
+    const res = await send({ achievements: true, raids: false });
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toBe("private, no-store");
-    expect(await res.json()).toEqual({ id: LINK_ID, gear: true, stats: true, pvp: false, raids: false });
+    expect(await res.json()).toEqual({ id: LINK_ID, achievements: true, raids: false });
     expect(consentCalls()).toEqual([
-      { p_user_id: USER.id, p_link_id: LINK_ID, p_category: "gear", p_granted: true },
-      { p_user_id: USER.id, p_link_id: LINK_ID, p_category: "stats", p_granted: true },
-      { p_user_id: USER.id, p_link_id: LINK_ID, p_category: "pvp", p_granted: false },
+      { p_user_id: USER.id, p_link_id: LINK_ID, p_category: "achievements", p_granted: true },
       { p_user_id: USER.id, p_link_id: LINK_ID, p_category: "raids", p_granted: false },
     ]);
     expect(cache.revalidatePath.mock.calls.map((c) => c[0])).toEqual([PATH, `${PATH}/card.png`, `${PATH}/card-square.png`]);
@@ -93,11 +91,11 @@ describe("consent", () => {
 
   test("a frozen link cannot be granted: 409", async () => {
     owned("frozen");
-    expect((await send({ talents: true })).status).toBe(409);
+    expect((await send({ achievements: true })).status).toBe(409);
   });
 
-  test("anything but category names with booleans is a 400 before anything is read", async () => {
-    for (const bad of [{}, { gold: true }, { gear: "yes" }, [], null]) expect((await send(bad)).status).toBe(400);
+  test("anything but kept category names with booleans is a 400 before anything is read; a retired category is refused", async () => {
+    for (const bad of [{}, { gold: true }, { raids: "yes" }, { gear: true }, { stats: false }, { reputations: true }, [], null]) expect((await send(bad)).status).toBe(400);
     expect(auth.authQuery).not.toHaveBeenCalled();
   });
 
@@ -120,13 +118,8 @@ describe("consent", () => {
     const body = await res.json();
     expect(body).toEqual({
       id: LINK_ID, status: "linked", pagePublic: true,
+      // The retired categories the database still lists until the migration runs are left out.
       categories: [
-        { category: "gear", sync: true, shown: true, capturedAt: "2026-11-05T10:00:00.000Z" },
-        { category: "stats", sync: true, shown: true, capturedAt: null },
-        { category: "talents", sync: false, shown: false, capturedAt: null },
-        { category: "pvp", sync: false, shown: false, capturedAt: null },
-        { category: "professions", sync: false, shown: false, capturedAt: null },
-        { category: "reputations", sync: false, shown: false, capturedAt: null },
         { category: "raids", sync: false, shown: false, capturedAt: null },
         { category: "achievements", sync: true, shown: true, capturedAt: null },
       ],

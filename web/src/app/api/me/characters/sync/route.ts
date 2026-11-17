@@ -14,9 +14,10 @@ import { syncAccount, syncCharacterFacts, unavailable, type CharacterOutcome } f
 /**
  * POST /api/me/characters/sync: `{ characters: [{ name, realm, records: [...] }] }`, from the Desktop App with a key
  * that has sync:own (`Authorization: Bearer evl_...`). Never a session: consent and switches are set signed in, and
- * sending facts is the key's only power. Each character's rows (gear_snapshot, talent_owned, stats_owned, pvp_owned,
- * profession_owned, reputation_owned, lockout_owned, achievement_owned, title_owned; every other kind is skipped) become at most one fact
- * per category, and each is kept only when the key's account holds that character's live link with sync on for the
+ * sending facts is the key's only power. Each character's lockout_owned and title_owned rows become at most one fact
+ * per category (raids, and achievements, which keeps only titles). The retired kinds an older Desktop App still sends
+ * (gear_snapshot, talent_owned, stats_owned, pvp_owned, profession_owned, reputation_owned, achievement_owned) and every
+ * other kind are dropped and counted in `skipped`, never refused. Each fact is kept only when the key's account holds that character's live link with sync on for the
  * category, and only when it is newer than the stored one. A character the account has no live link for is
  * `not_linked` in the receipt, whoever else may hold it. The install id becomes a keyed hash here and goes no further.
  * Own boss_kill_owned rows use a separate, always-private consent and table, only with EVERLOOT_BOSS_KILL_SYNC=1.
@@ -85,7 +86,7 @@ export async function POST(req: Request) {
         keys.set(r.installId, r.characterKey);
       }
       if (mixed) { characters.push({ index, result: "invalid" }); continue; }
-      const built = buildCharacterFacts(name, realm, rows, now);
+      const built = buildCharacterFacts(rows, now);
       if (!built) { characters.push({ index, result: "invalid" }); continue; }
       skipped += built.skipped;
       try {

@@ -137,8 +137,9 @@ export function reputationGroups(rows: readonly ReputationRow[]): { standing: st
 
 /** The progress the completion rows hold: achievements, titles and quests. */
 export interface CollectionsData {
-  achievements: number;
-  points: number;
+  /** Null when not recorded here: a page with only synced titles has no achievement count. */
+  achievements: number | null;
+  points: number | null;
   /** The newest achievements first, with the day each was earned. */
   recent: { name: string; date: string }[];
   /** Achievements earned out of those the catalog lists, per category. */
@@ -269,7 +270,7 @@ function headlines(input: ShowcaseInput): Headline[] {
   const out: Headline[] = [];
   const avg = input.gear.state === "shown" ? averageItemLevel(input.gear.data) : null;
   if (avg !== null) out.push({ label: "Item level", value: avg });
-  if (input.collections.state === "shown") out.push({ label: "Achievement points", value: input.collections.data.points });
+  if (input.collections.state === "shown" && input.collections.data.points !== null) out.push({ label: "Achievement points", value: input.collections.data.points });
   return out;
 }
 

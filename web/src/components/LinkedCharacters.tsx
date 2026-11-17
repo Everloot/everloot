@@ -12,21 +12,26 @@ export interface ListedLink {
   /**
    * Listed only while the character pages are on (EVERLOOT_SHOWCASE=1). `label` only while planned builds are on too
    * (EVERLOOT_SHOWCASE_BUILDS=1): the build label whose shared builds the page lists, or null. `sections` only while
-   * private sync is on too (EVERLOOT_PRIVATE_SYNC=1): each category's section switch. `ranked` only while the gear
-   * rankings are on (EVERLOOT_LEADERBOARDS=1): the "Rank my gear" switch.
+   * private sync is on too (EVERLOOT_PRIVATE_SYNC=1): each category's section switch. `blizzard` only while the armory
+   * is on (EVERLOOT_ARMORY=1): the switch behind each part of Blizzard's data on the page.
    */
-  page?: { public: boolean; path: string; label?: { id: string; name: string } | null; sections?: Record<SyncCategory, boolean>; ranked?: boolean };
+  page?: { public: boolean; path: string; label?: { id: string; name: string } | null; sections?: Record<SyncCategory, boolean>; blizzard?: Record<BlizzardPart, boolean> };
   /** Listed only while private sync is on: each category's sync, in page order. */
   sync?: { category: SyncCategory; on: boolean; capturedAt: string | null }[];
 }
 /** SYNC_CATEGORIES in web/src/lib/private-sync.ts, which is server code and cannot be imported here. */
-type SyncCategory = "gear" | "stats" | "talents" | "pvp" | "professions" | "reputations" | "raids" | "achievements";
+type SyncCategory = "raids" | "achievements";
 /** Each category's name here, and the visibility switch that shows it (SHOW_SWITCH in private-sync.ts). */
 const CATEGORY: Record<SyncCategory, { name: string; show: string }> = {
+  raids: { name: "Raids", show: "show_raids" }, achievements: { name: "Titles", show: "show_collections" },
+};
+/** BLIZZARD_SWITCH in web/src/lib/character-armory.ts, which is server code and cannot be imported here. */
+type BlizzardPart = "gear" | "stats" | "talents" | "pvp" | "professions" | "reputations" | "collections";
+const BLIZZARD: Record<BlizzardPart, { name: string; show: string }> = {
   gear: { name: "Gear", show: "show_gear" }, stats: { name: "Stats", show: "show_stats" },
   talents: { name: "Talents", show: "show_talents" }, pvp: { name: "PvP", show: "show_pvp" },
   professions: { name: "Professions", show: "show_professions" }, reputations: { name: "Reputations", show: "show_reputations" },
-  raids: { name: "Raids", show: "show_raids" }, achievements: { name: "Achievements and titles", show: "show_collections" },
+  collections: { name: "Achievements and quests", show: "show_collections" },
 };
 /** A build label as GET /api/me/builds lists it. */
 interface Label { id: string; name: string; classSlug: string }
@@ -51,16 +56,8 @@ export const LABEL_TEXT = "Planned builds: the page can list the shared builds y
 /** What private sync does, said above a character's sync switches. */
 export const SYNC_TEXT = "Sync: the Everloot Desktop App sends what you turn on here, with a key made with \"Sync my linked characters\". Every part starts off, and only you see what is synced. Turning a part's sync off deletes what was synced for it.";
 
-/** What ranking a character's gear does, said next to its switch. */
-export const RANK_TEXT = "Rank my gear: the character's name, realm, level, race and class, with its item level and Gear Score from the synced gear, show on the item level and Gear Score rankings. Never the items themselves unless you show gear on the page. Off by default; turning it off takes the character off the rankings at once.";
-
-/** Why a character's gear is not ranked yet, or null when it can be. */
-function notRankedBecause(pagePublic: boolean, gearSync: boolean): string | null {
-  if (!pagePublic && !gearSync) return "Ranks only once the page is public and gear sync is on.";
-  if (!pagePublic) return "Ranks only once the page is public.";
-  if (!gearSync) return "Ranks only once gear sync is on.";
-  return null;
-}
+/** What showing Blizzard's data does, said above its switches. */
+export const BLIZZARD_TEXT = "From Blizzard's API: the public page can show what Blizzard's character API returns for the armory character this link is connected to, labelled with the time of the read and credited to Blizzard Entertainment. Each part starts off and shows only while the page is public and you show it. Titles and achievements share one switch.";
 
 /** Why a section switch does nothing yet, or null when its section can show. */
 function notShownBecause(pagePublic: boolean, syncOn: boolean): string | null {
@@ -256,33 +253,34 @@ export default function LinkedCharacters() {
                       </>
                     )}
                   </div>
-                  {link.page.ranked !== undefined && (() => {
-                    const ranked = link.page!.ranked!;
-                    const gearSync = link.sync?.find((s) => s.category === "gear")?.on === true;
-                    const why = notRankedBecause(link.page!.public, gearSync);
-                    const whyId = `rank-why-${link.id}`;
-                    return (
-                      <div className="space-y-1">
-                        <p className="text-fg-2">{RANK_TEXT}</p>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-fg">Rank my gear: {ranked && !why ? "on" : ranked ? "on, not ranked yet" : "off"}</span>
-                          <button
-                            type="button"
-                            className={button}
-                            aria-label={ranked ? `Take ${link.name} off the gear rankings` : `Rank ${link.name}'s gear`}
-                            aria-describedby={why ? whyId : undefined}
-                            onClick={() => void setSwitch(link, `${link.id}:rank`, "visibility", { ranked_gear: !ranked },
-                              ranked ? `${link.name} is off the gear rankings.` : `${link.name}'s gear is ranked.`)}
-                            // On can always be turned off; off turns on only when the character would rank.
-                            disabled={busy !== null || (!ranked && why !== null)}
-                          >
-                            {busy === `${link.id}:rank` ? "Saving…" : ranked ? "Stop ranking" : "Rank it"}
-                          </button>
-                          {why && <span id={whyId} className="text-fg-2">{why}</span>}
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  {link.page.blizzard && link.armory?.path && (
+                    <div className="space-y-1" data-blizzard-switches>
+                      <p className="text-fg-2">{BLIZZARD_TEXT}</p>
+                      <ul className="space-y-2">
+                        {(Object.keys(BLIZZARD) as BlizzardPart[]).map((part) => {
+                          const { name, show } = BLIZZARD[part];
+                          const shown = link.page!.blizzard![part];
+                          const key = `${link.id}:blizzard:${part}`;
+                          return (
+                            <li key={part} className="flex flex-wrap items-center gap-2">
+                              <span className="min-w-44 text-fg">{name}</span>
+                              <span className="text-fg-2">Page: {shown && link.page!.public ? "shown" : shown ? "shown once the page is public" : "not shown"}</span>
+                              <button
+                                type="button"
+                                className={button}
+                                aria-label={shown ? `Hide Blizzard's ${name.toLowerCase()} from ${link.name}'s page` : `Show Blizzard's ${name.toLowerCase()} on ${link.name}'s page`}
+                                onClick={() => void setSwitch(link, key, "visibility", { [show]: !shown },
+                                  shown ? `${name} from Blizzard's API is off ${link.name}'s page.` : `${name} from Blizzard's API shows on ${link.name}'s page.`)}
+                                disabled={busy !== null}
+                              >
+                                {busy === key ? "Saving…" : shown ? "Hide" : "Show"}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
                   {link.page.label !== undefined && (
                     <div className="space-y-1">
                       <p className="text-fg-2">{LABEL_TEXT}</p>
