@@ -40,7 +40,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/components/EmailCapture", () => ({ default: () => null }));
 
-import ProfessionPage from "./page";
+import ProfessionPage, { generateMetadata } from "./page";
 
 const obs = (installId: string, rank: number, difficulty: string, recipe = "Lesser Healing Potion") => ({
   kind: "recipe_observed", eventId: `${installId}:${rank}`, installId, capturedAt: "2026-10-10T00:00:00.000Z",
@@ -326,4 +326,21 @@ test.each(["alchemy", "herbalism", "mining", "tailoring", "skinning"])("stored %
   const served = vi.mocked(fetch).mock.calls.map(([input]) => (input as Request).url);
   expect(served.some((url) => url.endsWith("snapshots/item-view.json"))).toBe(true);
   expect(store.loadCorpus).not.toHaveBeenCalled();
+});
+
+test("Herbs lands on gathering before the new Forever crafts, including when no spots are confirmed", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  const html = await render("herbalism");
+  expect(html).toMatch(/<h1[^>]*>Herbalism gathering<\/h1>/);
+  const gathering = html.indexOf('id="gather"');
+  const crafts = html.indexOf('data-recipes="herbalism"');
+  expect(gathering).toBeGreaterThan(-1);
+  expect(crafts).toBeGreaterThan(gathering);
+  expect(html).toContain("Herbalism crafts (new in Forever)");
+  expect(html.slice(gathering, crafts)).toContain("No herb zones yet");
+  expect(html.slice(crafts)).toContain("Found in game files, unconfirmed");
+  expect(html.slice(crafts)).toContain("/database/spells/");
+  const metadata = await generateMetadata({ params: Promise.resolve({ profession: "herbalism" }) });
+  expect(metadata.title).toContain("Herbalism Gathering");
+  expect(metadata.description).toContain("gather herbs");
 });

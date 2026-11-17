@@ -275,3 +275,38 @@ test("a realm held only by house-less scans is never an alias, an ambiguity or a
     expect(answer.text, tool).not.toContain(EU);
   }
 });
+
+test("price answers expose the selected house and keep their existing item links", async () => {
+  for (const faction of ["Alliance", "Horde", "Neutral"] as const) {
+    const h = handlers(houseMarket(houseScans(US, faction, 300)));
+    for (const tool of ["market_value", "auction_history"] as const) {
+      const answer = await answerOf(h, tool, "US1 Realm 4 PvP");
+      expect(answer.structured).toMatchObject({ page: { realm: US, house: { realm: US, faction } } });
+      const schema = tool === "market_value" ? MARKET_OUT : HISTORY_OUT;
+      expect(schema.parse(answer.structured)).toMatchObject({ page: { house: { realm: US, faction } } });
+      expect(answer.text).toContain(`More: https://everloot.app/tools/auctions?realm=${encodeURIComponent(US)}&item=${LINEN}`);
+    }
+  }
+});
+
+test("realm-only price answers explicitly leave the faction unknown", async () => {
+  const h = handlers(houseMarket(houseScans(US, null, 900)), {
+    auctionHistory: async () => ({ points: [{ day: dayAgo(3).slice(0, 10), copper: 25, reporters: 3 }], dataAsOf: null }),
+  });
+  for (const tool of ["market_value", "auction_history"] as const) {
+    const answer = await answerOf(h, tool, US);
+    expect(answer.structured).toMatchObject({ page: { house: { realm: US, faction: null } } });
+    const schema = tool === "market_value" ? MARKET_OUT : HISTORY_OUT;
+    expect(schema.parse(answer.structured)).toMatchObject({ page: { house: { realm: US, faction: null } } });
+  }
+});
+
+test("ambiguous and invalid history answers never invent a faction", async () => {
+  const h = handlers(market(US, EU));
+  for (const realm of ["Realm 4 PvP", "", "Unknown Realm"]) {
+    for (const tool of ["market_value", "auction_history"] as const) {
+      const answer = await answerOf(h, tool, realm);
+      expect(answer.structured).toMatchObject({ page: { house: { realm, faction: null } } });
+    }
+  }
+});
