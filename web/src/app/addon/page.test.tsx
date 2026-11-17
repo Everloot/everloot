@@ -59,9 +59,9 @@ test("the addon choices lead with the app, then website, then zip; desktop start
   expect(visible(html)).toContain("Choose your download");
 });
 
-test("the download is clearly labelled Alpha, without the pending note once checked in the live client", async () => {
+test("the download is a regular release, not labelled Alpha, without the pending note once checked in the live client", async () => {
   const html = await render(() => Promise.resolve(Response.json(releases)));
-  expect(visible(html)).toContain("Alpha");
+  expect(visible(html)).not.toContain("Alpha");
   expect(visible(html)).not.toContain("Live-client verification is pending");
 });
 
@@ -89,7 +89,7 @@ test("the addon and every desktop build are offered with version, date, size and
   expect(html).toContain('href="https://www.curseforge.com/wow/addons/everloot"');
   expect(text).toContain("CurseForge website");
   expect(text).toContain("Opens the CurseForge page. Press Install there to add it in the app.");
-  expect(text).toContain(`Version ${addon.version}, Alpha, released 2026-10-18`);
+  expect(text).toContain(`Version ${addon.version}, released 2026-10-18`);
   expect(text).toContain("Version 0.1.0, released 2026-10-19");
   for (const [label, size] of [["Windows installer", "108 MB"], ["Windows portable", "108 MB"], ["macOS disk image", "125 MB"], ["Linux AppImage", "122 MB"]]) {
     expect(text).toContain(`${label} (${size})`);
