@@ -28,7 +28,26 @@ test("a page cap resumes the missing older forum pages on the next run", async (
     }] } });
   };
   const first = await ingestBluePosts({ store, fetcher, now, forumOnly: true, regions: ["us"], maxListPages: 1, sleep: async () => {} });
-  const second = await ingestBluePosts({ store: first.store, fetcher, now: new Date(now.getTime() + 30 * 60_000), forumOnly: true, regions: ["us"], maxListPages: 1, sleep: async () => {} });
+  const second = await ingestBluePosts({ store: JSON.parse(JSON.stringify(first.store)), fetcher, now: new Date(now.getTime() + 30 * 60_000), forumOnly: true, regions: ["us"], maxListPages: 1, sleep: async () => {} });
   expect(second.errors).toEqual([]);
   expect(second.store.posts.map((p) => p.title)).toContain("Player-Level Dungeon XP Adjustment - November 14");
+});
+
+
+test("the recorded refund category belongs to the Forever list and its staff post is ingested", async () => {
+  const categories = JSON.parse(fixture("november-categories.json")).categories;
+  expect(categories.find((c: { id: number }) => c.id === 352).parent_category_id).toBe(346);
+  const refund = JSON.parse(fixture("november-refund.json"));
+  const fetcher = async (url: string) => {
+    if (url.endsWith("robots.txt")) return new Response("");
+    if (url.endsWith("about.json")) return Response.json({ users: [] });
+    if (url.includes("/t/2415068")) return Response.json(refund);
+    return Response.json({ topic_list: { topics: url.includes("/346/") ? [{ id: refund.id,
+      category_id: refund.category_id, bumped_at: "2026-11-14T01:36:48.839Z",
+      first_tracked_post: { group: "community-manager", post_number: 1 } }] : [] } });
+  };
+  const result = await ingestBluePosts({ store: emptyStore(), fetcher, now, forumOnly: true, regions: ["us"], sleep: async () => {} });
+  expect(result.errors).toEqual([]);
+  expect(result.store.posts).toHaveLength(1);
+  expect(result.store.posts[0]).toMatchObject({ title: refund.title, game: "forever", topicId: 2415068 });
 });

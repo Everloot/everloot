@@ -1,1 +1,2 @@
 November regression fixtures: recorded 2026-11-17 from the public US forum topics 2415068 and 2416343, and Blizzard News article 24315281 and its World of Warcraft feed. Topic metadata and NewsArticle structured metadata retain their wire shape; player replies and article bodies are omitted, and forum excerpts are synthetic. The index keeps only relevant links. Tests never fetch live sources.
+Category fixture: trimmed public US site.json, recorded 2026-11-17, shows category 352 is a child of 346. The EU site.json had no Forever bug-report category at that time.

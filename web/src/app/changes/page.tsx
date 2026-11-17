@@ -114,6 +114,7 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
     const page = postPath(e);
     const title = page
       ? <Link href={page} className={`${BLUE} font-medium`}>{e.title}</Link>
+      : e.source === "news" && e.url ? <a href={e.url} className={`${BLUE} font-medium`}>{e.title}</a>
       : <span className="font-medium">{e.title}</span>;
     return e.source === "manual" ? <>{title}<span className="block text-cell-2 text-muted">Summary by Everloot. {e.url && <a href={e.url} className={LINK}>Original source</a>}</span></> : title;
   };

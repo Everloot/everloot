@@ -35,6 +35,7 @@ timeline.entries = entries;
 const page = async (params: Record<string, string> = {}) =>
   renderToStaticMarkup(await ChangesPage({ searchParams: Promise.resolve(params) }));
 const rows = (html: string) => (html.match(/data-change-row/g) ?? []).length;
+const phoneLines = (html: string) => [...html.matchAll(/<div class="text-cell-2 text-muted sm:hidden">(.*?)<\/div>/g)].map((m) => m[1]);
 
 const manualRow: ChangeEntry = { id: "manual:fixture", source: "manual", type: "post", game: "retail", at: "2026-10-23T00:00:00.000Z", title: "Retail source fixture", summary: "Everloot summary fixture.", url: "https://us.forums.blizzard.com/en/wow/t/example/123/4" };
 test("compact ChangeList manual rows show Everloot summary and clickable original with a plain Post label", () => {
@@ -150,7 +151,6 @@ test("sorted by date, a day's date shows on its first row only; the rows under i
 test("the once-a-day date holds at a page break and a filtered start, either way round, and only for the date sort", async () => {
   const SHOWN = "hidden font-mono tabular-nums text-fg-2 sm:inline";
   const dateClasses = (html: string) => [...html.matchAll(/<time dateTime="[^"]+"[^>]*class="([^"]+)">/g)].map((m) => m[1]);
-  const phoneLines = (html: string) => [...html.matchAll(/<div class="text-cell-2 text-muted sm:hidden">(.*?)<\/div>/g)].map((m) => m[1]);
   const firstTitle = (html: string) => /<div data-phone-title[^>]*><a [^>]*>([^<]+)<\/a>/.exec(html)![1];
   // 120 posts on one day: every page after the first starts in the middle of that day.
   timeline.entries = Array.from({ length: 120 }, (_, i) => ({ ...entries[1], id: `forum:${5000 + i}`, title: `Post ${i}`, at: new Date(Date.UTC(2026, 9, 1, 0, i)).toISOString() }));

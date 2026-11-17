@@ -12,9 +12,10 @@ export function newsLinks(html: string): string[] {
   for (const match of html.matchAll(/\bhref\s*=\s*["']([^"']+)["']/gi)) {
     let url: URL;
     try { url = new URL(match[1], NEWS_HOST); } catch { continue; }
-    const path = /^\/en-us\/article\/(\d{1,15})\/([a-z0-9-]+)$/.exec(url.pathname);
+    const pathname = url.pathname.replace(/\/$/, "");
+    const path = /^\/en-us\/article\/(\d{1,15})\/([a-z0-9-]+)$/.exec(pathname);
     if (url.origin !== NEWS_HOST || url.username || url.password || !path || !gameOf(path[2])) continue;
-    links.set(path[1], `${NEWS_HOST}${url.pathname}`);
+    links.set(path[1], `${NEWS_HOST}${pathname}`);
   }
   return [...links.values()];
 }

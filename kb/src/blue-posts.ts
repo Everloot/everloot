@@ -75,6 +75,8 @@ export interface FetchState extends Validators {
   notBefore?: string;
   /** Bluesky: newest post time seen. Topic lists: newest activity time fully handled. */
   newestSeen?: string;
+  /** Last news article visited, so one hourly read rotates through the whole feed. */
+  newsCursor?: string;
   /** An unfinished list scan. Only candidate topic ids/times are retained, never player records. */
   scan?: { nextPage: number; newest: string | null; complete: boolean; pending: { id: number; bumpedAt: string }[] };
   /** Roster sources: the forum's staff list as last read. */
@@ -736,7 +738,7 @@ async function readNews(x: Session, opts: IngestOptions, minInterval: number) {
   const key = "news";
   const state = x.s.store.fetched[key];
   if (state?.notBefore && Date.parse(state.notBefore) > opts.now.getTime()) return;
-  if (state && opts.now.getTime() - Date.parse(state.at) < minInterval) return;
+  if (state && opts.now.getTime() - Date.parse(state.at) < Math.max(minInterval, HOUR)) return;
   const robots = await x.get("news", "news", `${NEWS_HOST}/robots.txt`, {}, key);
   if (!robots.ok && robots.status !== 404) throw new Error(`robots.txt: HTTP ${robots.status}`);
   const rules = robots.status === 404 ? "" : await robots.text();
@@ -748,12 +750,13 @@ async function readNews(x: Session, opts: IngestOptions, minInterval: number) {
     return res.text();
   };
   const html = await getHtml(NEWS_INDEX);
-  if (!/\/en-us\/article\//.test(html)) throw new Error("news index has no article links");
-  // Re-read rolling hotfix articles: their article id stays the same when their title and date change.
-  for (const url of newsLinks(html).slice(0, 3)) {
-    const post = parseNewsArticle(await getHtml(url), url, opts.now);
-    if (!post) throw new Error(`news article has no valid announcement metadata: ${new URL(url).pathname}`);
-    x.merge([post]);
-  }
-  x.setState(key, { at: opts.now.toISOString() });
+  const links = newsLinks(html);
+  if (!links.length) throw new Error("news index has no relevant article links");
+  // One article per hour leaves the forums most of their deadline. Rotate instead of permanently
+  // excluding older cards; rolling hotfix articles keep the same id across title/date changes.
+  const url = links[(links.indexOf(state?.newsCursor ?? "") + 1) % links.length];
+  const post = parseNewsArticle(await getHtml(url), url, opts.now);
+  if (post) x.merge([post]);
+  else x.s.skipped.push(`news: unsupported announcement metadata: ${new URL(url).pathname}`);
+  x.setState(key, { at: opts.now.toISOString(), newsCursor: url });
 }

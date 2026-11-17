@@ -24,7 +24,7 @@ export interface RegionConfig {
 
 const cats = (game: BlueGame, rows: [number, string][]) => rows.map(([id, name]) => [id, { game, name }] as const);
 
-/** Category ids and slugs from each forum's /en/wow/site.json, read 2026-10-19. */
+/** Category ids and slugs from each forum's /en/wow/site.json, read 2026-10-19; US bug-report category 352 rechecked 2026-11-17 (parent 346). */
 export const REGIONS: Record<BlueRegion, RegionConfig> = {
   us: {
     host: "https://us.forums.blizzard.com",

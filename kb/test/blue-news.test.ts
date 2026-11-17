@@ -62,3 +62,40 @@ test.each(["disallowed", "redirect", "rate-limit", "bad-layout"])("reports a new
     expect(calls.some((address) => address.startsWith("https://news."))).toBe(false);
   }
 });
+
+test("hourly news rotates past unsupported articles and leaves the next cron pass for forums", async () => {
+  const second = "https://news.blizzard.com/en-us/article/2/wow-forever-hotfixes-november-13-2026";
+  const calls: string[] = [];
+  const fetcher = async (address: string) => {
+    calls.push(address);
+    if (address.endsWith("robots.txt")) return new Response("");
+    if (address.endsWith("/feed/world-of-warcraft")) return new Response(`<a href="${url}/">One</a><a href="${second}">Two</a>`);
+    if (address === url) return new Response("<html>Unsupported metadata</html>");
+    if (address === second) return new Response(fixture("news-article.html"));
+    if (address.includes("bsky")) return Response.json({ feed: [] });
+    if (address.endsWith("about.json")) return Response.json({ users: [] });
+    return Response.json({ topic_list: { topics: [] } });
+  };
+  let elapsed = 0;
+  const first = await ingestBluePosts({ store: emptyStore(), fetcher, now, regions: ["us"], minIntervalMs: 8 * 60_000,
+    deadlineMs: 15_000, clock: () => elapsed, sleep: async (ms) => { elapsed += ms; } });
+  expect(first.errors).toEqual([]);
+  expect(first.skipped).toContainEqual(expect.stringContaining("unsupported announcement metadata"));
+  expect(calls.some((address) => address.includes("/346/"))).toBe(true);
+  expect(elapsed).toBeLessThan(15_000);
+  calls.length = 0;
+  const next = await ingestBluePosts({ store: JSON.parse(JSON.stringify(first.store)), fetcher,
+    now: new Date(now.getTime() + 10 * 60_000), regions: ["us"], minIntervalMs: 8 * 60_000, sleep: async () => {} });
+  expect(calls.some((address) => address.startsWith("https://news."))).toBe(false);
+  calls.length = 0;
+  const rotated = await ingestBluePosts({ store: next.store, fetcher, now: new Date(now.getTime() + 60 * 60_000), regions: [], sleep: async () => {} });
+  expect(calls).toContain(second);
+  expect(rotated.store.posts).toHaveLength(1);
+  expect(rotated.store.posts[0]).toMatchObject({ id: "news:2", url: second });
+});
+
+test("an index with article markup but no relevant links reports a source failure", async () => {
+  const fetcher = async (address: string) => new Response(address.endsWith("robots.txt") ? "" : '<a href="/en-us/article/1/retail-update">Retail</a>');
+  const result = await ingestBluePosts({ store: emptyStore(), fetcher, now, regions: [], sleep: async () => {} });
+  expect(result.errors).toContainEqual({ source: "news", error: "news index has no relevant article links" });
+});
