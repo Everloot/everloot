@@ -117,3 +117,80 @@ test("writeClientTerrain writes one group and one item effect per line, and the 
   expect(text).toContain('\n  [1,1000,"equip",900,"mount",7]');
   expect(text).not.toMatch(/Increases|spell power/);
 });
+
+// A second snapshot for the reach rules: a speed on a triggered spell, an enchant that gives speed, a chance-on-hit
+// proc, a set bonus bound to a zone list, and a QA test item.
+const reach = (() => {
+  const path = join(mkdtempSync(join(tmpdir(), "kb-terrain-reach-")), "client.sqlite");
+  writeClientSnapshot(path, meta, [
+    table("Map", [{ ID: 1, InstanceType: 0 }]),
+    table("UiMap", [{ ID: 11, Type: 3 }]),
+    table("UiMapAssignment", [{ ID: 1, UiMapID: 11, MapID: 1, AreaID: 100, OrderIndex: 0, UiMin: [0, 0], UiMax: [1, 1], Region: [0, 0, 0, 10, 10, 0] }]),
+    table("AreaTable", [{ ID: 100, ContinentID: 1, ParentAreaID: 0, AreaName_lang: "Plague Zone" }]),
+    table("AreaGroupMember", [{ ID: 1, AreaGroupID: 950, AreaID: 100 }]),
+    table("Item", [{ ID: 1 }, { ID: 2 }, { ID: 3 }, { ID: 4 }, { ID: 5 }, { ID: 6 }]),
+    table("ItemSparse", [{ ID: 4, Display_lang: "Sprint Ring" }]),
+    table("ItemEffect", [
+      { ID: 10, SpellID: 1000, TriggerType: 0 }, { ID: 20, SpellID: 2000, TriggerType: 0 },
+      { ID: 30, SpellID: 3000, TriggerType: 2 }, { ID: 40, SpellID: 4000, TriggerType: 0 },
+    ]),
+    table("ItemXItemEffect", [
+      { ID: 1, ItemID: 1, ItemEffectID: 10 }, { ID: 2, ItemID: 2, ItemEffectID: 20 },
+      { ID: 3, ItemID: 3, ItemEffectID: 30 }, { ID: 4, ItemID: 6, ItemEffectID: 40 },
+    ]),
+    table("SpellEffect", [
+      // Item 1: a cocoon that triggers a +60% sprint.
+      { ID: 1, SpellID: 1000, DifficultyID: 0, EffectIndex: 0, Effect: 64, EffectAura: 0, EffectBasePointsF: 0, EffectTriggerSpell: 1001, EffectMiscValue: [0, 0] },
+      { ID: 2, SpellID: 1001, DifficultyID: 0, EffectIndex: 0, Effect: 6, EffectAura: 31, EffectBasePointsF: 60, EffectTriggerSpell: 0, EffectMiscValue: [0, 0] },
+      // Item 2: spurs that enchant boots with enchantment 70, whose equip spell gives +4% mount speed.
+      { ID: 3, SpellID: 2000, DifficultyID: 0, EffectIndex: 0, Effect: 53, EffectAura: 0, EffectBasePointsF: 0, EffectTriggerSpell: 0, EffectMiscValue: [70, 0] },
+      { ID: 4, SpellID: 2001, DifficultyID: 0, EffectIndex: 0, Effect: 6, EffectAura: 32, EffectBasePointsF: 4, EffectTriggerSpell: 0, EffectMiscValue: [0, 0] },
+      // Item 3: a chance-on-hit +40% run speed proc.
+      { ID: 5, SpellID: 3000, DifficultyID: 0, EffectIndex: 0, Effect: 6, EffectAura: 31, EffectBasePointsF: 40, EffectTriggerSpell: 0, EffectMiscValue: [0, 0] },
+      // Set 500: +5% mount speed in a zone list.
+      { ID: 6, SpellID: 5000, DifficultyID: 0, EffectIndex: 0, Effect: 6, EffectAura: 32, EffectBasePointsF: 5, EffectTriggerSpell: 0, EffectMiscValue: [0, 0] },
+      // Item 6: a QA test enchant, left out.
+      { ID: 7, SpellID: 4000, DifficultyID: 0, EffectIndex: 0, Effect: 6, EffectAura: 31, EffectBasePointsF: 8, EffectTriggerSpell: 0, EffectMiscValue: [0, 0] },
+    ]),
+    table("SpellItemEnchantment", [{ ID: 70, Effect: [3, 0, 0], EffectArg: [2001, 0, 0] }]),
+    table("SpellCastingRequirements", [{ ID: 1, SpellID: 5000, RequiredAreasID: 950 }]),
+    table("SpellName", [{ ID: 4000, Name_lang: "QAEnchant Boots +8% Speed" }]),
+    table("ItemSet", [{ ID: 500, Name_lang: "Rider Set", ItemID: [4, 5, 0, 0] }]),
+    table("ItemSetSpell", [{ ID: 1, ItemSetID: 500, SpellID: 5000, Threshold: 2 }]),
+  ]);
+  return path;
+})();
+
+test("buildClientTerrain follows triggered spells and enchantments, reads chance-on-hit procs and set bonuses, and skips QA rows", () => {
+  const out = buildClientTerrain(reach);
+  expect(out.items).toEqual([
+    [1, 1000, "use", null, "run", 60],
+    [2, 2000, "use", null, "mount", 4],
+    [3, 3000, "hit", null, "run", 40],
+  ]);
+  expect(out.sets).toEqual([[500, 5000, 2, 950, "mount", 5, [4, 5]]]);
+  expect(out.areaGroups).toEqual({ 950: { name: null, zones: [11], parts: {}, instances: [] } });
+});
+
+test("the speed is the percent the spell's text prints; mount summons and other kinds of speed are left out", () => {
+  const path = join(mkdtempSync(join(tmpdir(), "kb-terrain-text-")), "client.sqlite");
+  const fx = (ID: number, SpellID: number, EffectIndex: number, EffectAura: number, EffectBasePointsF: number) =>
+    ({ ID, SpellID, DifficultyID: 0, EffectIndex, Effect: 6, EffectAura, EffectBasePointsF, EffectTriggerSpell: 0, EffectMiscValue: [0, 0] });
+  writeClientSnapshot(path, meta, [
+    table("Item", [{ ID: 1 }, { ID: 2 }, { ID: 3 }, { ID: 4 }]),
+    table("ItemEffect", [1, 2, 3, 4].map((i) => ({ ID: i, SpellID: i * 100, TriggerType: 1 }))),
+    table("ItemXItemEffect", [1, 2, 3, 4].map((i) => ({ ID: i, ItemID: i, ItemEffectID: i }))),
+    table("SpellEffect", [
+      fx(1, 100, 0, 4, 33), fx(2, 100, 1, 58, 78), // a cloak: the text prints the dummy's 33
+      fx(3, 200, 0, 78, 0), fx(4, 200, 1, 58, 500), // a mount summon
+      fx(5, 300, 0, 527, 140), fx(6, 300, 1, 31, 100), // backwards walking speed
+      fx(7, 400, 0, 87, 14), fx(8, 400, 1, 129, 14), // fire damage taken and movement speed
+    ]),
+    table("Spell", [
+      { ID: 100, Description_lang: "Swim speed increased by $s1%." },
+      { ID: 300, Description_lang: "Increases movement speed while walking backwards by $s1% for $d1." },
+      { ID: 400, Description_lang: "Increases Fire damage taken by $s1% and movement speed by $s2% for $d." },
+    ]),
+  ]);
+  expect(buildClientTerrain(path).items).toEqual([[1, 100, "equip", null, "swim", 33], [4, 400, "equip", null, "run", 14]]);
+});

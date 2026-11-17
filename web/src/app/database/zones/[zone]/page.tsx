@@ -13,7 +13,7 @@ import {
 } from "@/components/ui";
 import { observedLine, reportedLine } from "@/lib/evidence";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
-import { loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
+import { loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
 import { computeRollups, loadItemFacts, loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
 import { zoneCoverageHref } from "@/lib/coverage-view";
@@ -118,8 +118,10 @@ export default async function ZonePage(props: Props) {
   const gear = gearFor({ zone: zone.mapId });
   const gearFacts = gear.length && !itemFacts ? await loadItemFacts() : itemFacts;
   const gearName = gearFacts && !gearFacts.unreachable ? itemNames(gearFacts) : itemName;
-  const spellNames = gear.length ? await loadSpellNames(CLIENT_LAYER.build.version) : null;
-  const tips = await loadItemTips(assets, [...shownItems.map((i) => i.itemId), ...gear.map((g) => g.itemId)]);
+  const [spellNames, setNames] = gear.length
+    ? await Promise.all([loadSpellNames(CLIENT_LAYER.build.version), gear.some((g) => g.set) ? loadItemSetNames(CLIENT_LAYER.build.version) : null])
+    : [null, null];
+  const tips = await loadItemTips(assets, [...shownItems.map((i) => i.itemId), ...gear.flatMap((g) => g.set?.pieces ?? [g.itemId])]);
   const farmLinks = !gathering ? [] : zoneFarmLinks(zone, (here?.npcs ?? []).map((n) => n.npcId), rates, gatherRows);
   const wiki = zoneWikiPage(zone.mapId);
   const nameOf = (n: ZoneNpc) => n.name ?? `NPC ${n.npcId}`;
@@ -313,6 +315,7 @@ export default async function ZonePage(props: Props) {
                   names={{
                     item: (id) => ({ name: gearName.get(id) ?? tips.get(id)?.name, icon: tips.get(id)?.icon }),
                     spell: (id) => spellNames?.names.get(id),
+                    set: (id) => setNames?.names.get(id),
                     instances: new Map([...instanceRows()].map(([id, r]) => [id, r.name])),
                   }}
                 />

@@ -25,6 +25,12 @@ test("the terrain page has a section per terrain type with its zones, then the s
   expect(cities).toContain("Booty Bay in <a href=\"/database/zones/1434-stranglethorn-vale\"");
   const speed = page.slice(page.indexOf('data-terrain="speed"'));
   expect(speed).toContain("+40% run speed");
-  expect(speed).toContain("Anywhere");
+  expect(speed).toContain("No area limit in the files");
+  // Gaps the speed list closed: an enchant applied by an item (Mithril Spurs), a triggered sprint (Transformative
+  // Cocoon), and a set bonus bound to the Plaguelands (Rider of the Plaguelands' pieces).
+  expect(speed).toContain('href="/database/items/7969"');
+  expect(speed).toContain('href="/database/items/276895"');
+  expect(speed).toContain('href="/database/items/284102"');
+  expect(speed).toContain("Set bonus (2 pieces)");
   expect(metadata.alternates?.canonical).toBe("/database/terrain");
 });

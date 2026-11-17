@@ -5,8 +5,9 @@
  * group the spells' own text names (the terrain types), with the zones it lists whole (UiMap ids), the zones it lists
  * only parts of (with those parts' area names, through `AreaTable.ParentAreaID` to the area a zone shows) and the
  * instances (map ids) of its areas, and every item effect that needs a terrain type or
- * changes speed: its spell, how it fires, the group it needs, and which speed it changes by how much (`SpellEffect`
- * aura and base points). A speed effect bound to a group the text does not name (a zone list, as on the Staff of
+ * changes speed: its spell, how it fires (use, equip, chance on hit), the group it needs, and which speed it changes
+ * by how much (`SpellEffect` aura and base points), following the spells it triggers and the enchantment it applies
+ * (Mithril Spurs, the boot speed enchants); and the item set bonuses that do the same (`ItemSetSpell`, `ItemSet`). A speed effect bound to a group the text does not name (a zone list, as on the Staff of
  * Westfall) keeps that group too.
  *
  * Ids, numbers, area names and the terrain words only: item names, spell names and spell text stay in private storage
@@ -18,17 +19,28 @@ import { dirname } from "node:path";
 import { z } from "zod";
 import { GAME_DATA_CREDIT } from "@everloot/protocol";
 import { readClientMeta, readClientRows, readClientTables } from "./client-snapshot.js";
+import { isDevelopmentItemName } from "./dev-item-names.js";
 import { CLIENT_LABEL } from "./edges.js";
 import { placeUiMaps, zoneOfAreaChain } from "./world-map-data.js";
 
 export const TERRAIN_SCHEMA = "everloot.client-terrain/1";
 
-/** `ItemEffect.TriggerType`: 0 on use, 1 on equip. Chance on hit (2) and the recipe learn trigger (6) are not read. */
-const TRIGGERS: Record<number, "use" | "equip"> = { 0: "use", 1: "equip" };
+/** `ItemEffect.TriggerType`: 0 on use, 1 on equip, 2 chance on hit. The recipe learn trigger (6) is not read. */
+const TRIGGERS: Record<number, "use" | "equip" | "hit"> = { 0: "use", 1: "equip", 2: "hit" };
+/** `SpellEffect.Effect` 53 and 54 enchant an item (permanent, temporary) with the enchantment in `EffectMiscValue[0]`. */
+const ENCHANT_ITEM = new Set([53, 54]);
+/** `SpellItemEnchantment.Effect`: 1 a spell on hit, 3 a spell while equipped, 7 a spell on use. */
+const ENCHANT_SPELL = new Set([1, 3, 7]);
+/** How deep a spell's triggers and enchantments are followed: item spell, then two more steps. */
+const REACH = 2;
 /** `SpellEffect.EffectAura` of the speed auras: run speed, mounted speed and swim speed. */
 export const SPEED_AURAS: Record<number, "run" | "mount" | "swim"> = { 31: "run", 129: "run", 32: "mount", 130: "mount", 58: "swim" };
 /** `SpellEffect.Effect` 6 applies an aura. */
 const APPLY_AURA = 6;
+/** `SpellEffect.EffectAura` 78 mounts the caster: the spell summons a mount. */
+const MOUNTED = 78;
+/** `SpellEffect.EffectAura` 4 is a dummy: a number the text prints, worked by the server. */
+const DUMMY = 4;
 const UI_MAP_ZONE = 3;
 
 const AreaGroup = z.object({
@@ -44,8 +56,14 @@ const AreaGroup = z.object({
 
 /** One effect of one item: `[itemId, spellId, trigger, areaGroupId | null, speed kind | null, percent | null]`. */
 const TerrainItem = z.tuple([
-  z.number().int(), z.number().int(), z.enum(["use", "equip"]), z.number().int().nullable(),
+  z.number().int(), z.number().int(), z.enum(["use", "equip", "hit"]), z.number().int().nullable(),
   z.enum(["run", "mount", "swim"]).nullable(), z.number().nullable(),
+]);
+
+/** One set bonus: `[setId, spellId, pieces needed, areaGroupId | null, speed kind | null, percent | null, [piece item ids]]`. */
+const TerrainSet = z.tuple([
+  z.number().int(), z.number().int(), z.number().int(), z.number().int().nullable(),
+  z.enum(["run", "mount", "swim"]).nullable(), z.number().nullable(), z.array(z.number().int()),
 ]);
 
 export const ClientTerrain = z.object({
@@ -60,10 +78,13 @@ export const ClientTerrain = z.object({
   areaGroups: z.record(z.string(), AreaGroup),
   /** Item effects that need a terrain type or change speed, by item and spell id. */
   items: z.array(TerrainItem),
+  /** Item set bonuses that need a terrain type or change speed (`ItemSetSpell`), by set and spell id. */
+  sets: z.array(TerrainSet),
   note: z.literal("ids, numbers, area names and the terrain words are the game files'; item and spell names follow the site's name rules"),
 });
 export type ClientTerrain = z.infer<typeof ClientTerrain>;
 export type TerrainItem = z.infer<typeof TerrainItem>;
+export type TerrainSet = z.infer<typeof TerrainSet>;
 
 type Rows = Map<number, Record<string, unknown>>;
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -83,10 +104,11 @@ export function terrainWord(text: unknown): string | null {
 
 /** One group per line and one item effect per line, so a new build's file reads as a line diff in review. */
 export function serializeClientTerrain(table: ClientTerrain): string {
-  const { areaGroups, items, ...head } = table;
+  const { areaGroups, items, sets, ...head } = table;
   const top = JSON.stringify(head, null, 1).replace(/\n}$/, "");
   const groups = Object.keys(areaGroups).sort((a, b) => Number(a) - Number(b)).map((id) => `  ${JSON.stringify(id)}: ${JSON.stringify(areaGroups[id])}`);
-  return `${top},\n "areaGroups": {\n${groups.join(",\n")}\n },\n "items": [\n${items.map((r) => `  ${JSON.stringify(r)}`).join(",\n")}\n ]\n}\n`;
+  const list = (rows: unknown[]) => rows.map((r) => `  ${JSON.stringify(r)}`).join(",\n");
+  return `${top},\n "areaGroups": {\n${groups.join(",\n")}\n },\n "items": [\n${list(items)}\n ],\n "sets": [\n${list(sets)}\n ]\n}\n`;
 }
 
 export function buildClientTerrain(snapshotPath: string): ClientTerrain {
@@ -95,7 +117,11 @@ export function buildClientTerrain(snapshotPath: string): ClientTerrain {
   const get = (t: string): Rows => (present.has(t) ? readClientRows(snapshotPath, t) : new Map());
   const itemRows = get("Item"), itemEffects = get("ItemEffect"), spellEffects = get("SpellEffect");
   const requirements = get("SpellCastingRequirements"), spellText = get("Spell"), areas = get("AreaTable");
-  const maps = get("Map"), uiMaps = get("UiMap");
+  const maps = get("Map"), uiMaps = get("UiMap"), enchantments = get("SpellItemEnchantment");
+  const sparse = get("ItemSparse"), spellNames = get("SpellName");
+  // Test and placeholder rows stay out: an item the dev-name rule marks, or a QA spell ("QAEnchant Boots +8% Speed").
+  const development = (itemId: number, spell: number) =>
+    isDevelopmentItemName(sparse.get(itemId)?.Display_lang as string | undefined) || /^QA/.test(String(spellNames.get(spell)?.Name_lang ?? ""));
 
   const effectsOf = new Map<number, Record<string, unknown>[]>();
   for (const e of spellEffects.values()) {
@@ -120,20 +146,55 @@ export function buildClientTerrain(snapshotPath: string): ClientTerrain {
     for (const m of String(row.Description_lang).matchAll(/\$(\d+)[a-z]/g)) if (Number(m[1]) !== id) add(Number(m[1]), word);
   }
 
-  // The group an item's spell needs: its own, or that of a spell it triggers (Mirage Mirror's desert bonus).
-  const neededGroup = (spell: number): { group: number; spell: number } | null => {
-    if (groupOf.has(spell)) return { group: groupOf.get(spell)!, spell };
-    for (const e of effectsOf.get(spell) ?? []) {
-      const t = num(e.EffectTriggerSpell);
-      if (t && groupOf.has(t)) return { group: groupOf.get(t)!, spell: t };
+  const byIndex = (spell: number) => [...(effectsOf.get(spell) ?? [])].sort((a, b) => Number(a.EffectIndex) - Number(b.EffectIndex));
+  // The spells an item's spell reaches, in order: itself, the spells it triggers (Mirage Mirror's desert bonus,
+  // Transformative Cocoon's sprint) and the spells of the enchantment it puts on an item (Mithril Spurs, the boot
+  // speed enchants), up to REACH steps.
+  const reached = (spell: number): number[] => {
+    const out = [spell];
+    const depth = new Map([[spell, 0]]);
+    for (let i = 0; i < out.length; i++) {
+      const at = out[i]!, d = depth.get(at)!;
+      if (d >= REACH) continue;
+      const next: number[] = [];
+      for (const e of byIndex(at)) {
+        const t = num(e.EffectTriggerSpell);
+        if (t) next.push(t);
+        const misc = Array.isArray(e.EffectMiscValue) ? num(e.EffectMiscValue[0]) : null;
+        const enchant = ENCHANT_ITEM.has(Number(e.Effect)) && misc ? enchantments.get(misc) : undefined;
+        if (!enchant) continue;
+        const kinds = Array.isArray(enchant.Effect) ? enchant.Effect : [], args = Array.isArray(enchant.EffectArg) ? enchant.EffectArg : [];
+        args.forEach((a, k) => { if (ENCHANT_SPELL.has(Number(kinds[k])) && num(a)) next.push(Number(a)); });
+      }
+      for (const n of next) if (!depth.has(n)) { depth.set(n, d + 1); out.push(n); }
     }
-    return null;
+    return out;
   };
+  // The group an item's spell needs: the first spell it reaches that names one.
+  const neededGroup = (spell: number): { group: number; spell: number } | null => {
+    const s = reached(spell).find((r) => groupOf.has(r));
+    return s === undefined ? null : { group: groupOf.get(s)!, spell: s };
+  };
+  // The speed an item's spell gives: the first speed aura among the spells it reaches. A mount summon (aura 78) is a
+  // mount, not speed gear. The percent is the one the spell's own text prints ("Swim speed increased by $s1%"), which
+  // can sit on another effect of the spell than the aura (the Cloak of Hermitic Bliss's 33%, not its aura's 78).
   const speedOf = (spell: number): { kind: "run" | "mount" | "swim"; percent: number } | null => {
-    for (const e of [...(effectsOf.get(spell) ?? [])].sort((a, b) => Number(a.EffectIndex) - Number(b.EffectIndex))) {
-      const kind = SPEED_AURAS[Number(e.EffectAura)];
-      const percent = num(e.EffectBasePointsF);
-      if (num(e.Effect) === APPLY_AURA && kind && percent !== null && percent > 0) return { kind, percent };
+    for (const s of reached(spell)) {
+      const effects = byIndex(s);
+      if (effects.some((e) => num(e.EffectAura) === MOUNTED)) continue;
+      // The effects the text prints as a percent ("$s1%", "$s2%"); of those, the first speed aura or dummy is the speed.
+      const quoted = [...String(spellText.get(s)?.Description_lang ?? "").matchAll(/\$s(\d)%/g)]
+        .map((m) => effects.find((e) => num(e.EffectIndex) === Number(m[1]) - 1))
+        .filter((e): e is Record<string, unknown> => e !== undefined);
+      const quotedSpeed = quoted.find((e) => num(e.EffectAura) === DUMMY || SPEED_AURAS[Number(e.EffectAura)]);
+      // Text that prints only another kind of effect ("speed while walking backwards", aura 527) is not this speed.
+      if (quoted.length && !quotedSpeed) continue;
+      const shown = num(quotedSpeed?.EffectBasePointsF);
+      for (const e of effects) {
+        const kind = SPEED_AURAS[Number(e.EffectAura)];
+        const percent = shown !== null && shown > 0 ? shown : num(e.EffectBasePointsF);
+        if (num(e.Effect) === APPLY_AURA && kind && percent !== null && percent > 0) return { kind, percent };
+      }
     }
     return null;
   };
@@ -146,7 +207,7 @@ export function buildClientTerrain(snapshotPath: string): ClientTerrain {
     // An item the build lists (`Item`); many Forever items have no readable ItemSparse row, so no name is required.
     if (itemId === null || !effect || !itemRows.has(itemId)) continue;
     const trigger = TRIGGERS[Number(effect.TriggerType)], spell = num(effect.SpellID);
-    if (!trigger || !spell) continue;
+    if (!trigger || !spell || development(itemId, spell)) continue;
     const need = neededGroup(spell), speed = speedOf(spell);
     if (!need && !speed) continue;
     const key = `${itemId}:${spell}`;
@@ -173,8 +234,29 @@ export function buildClientTerrain(snapshotPath: string): ClientTerrain {
   }
   const nameOf = (group: number) => [...(counts.get(group) ?? [])]
     .sort((a, b) => b[1] - a[1] || a[0].length - b[0].length || a[0].localeCompare(b[0]))[0]?.[0] ?? null;
+  // Set bonuses, by the same rules: the bonus spell, the pieces it needs and the set's pieces.
+  const setCandidates: { row: TerrainSet; words: string[] }[] = [];
+  const itemSets = get("ItemSet");
+  for (const b of [...get("ItemSetSpell").values()].sort((p, q) => Number(p.ItemSetID) - Number(q.ItemSetID) || Number(p.SpellID) - Number(q.SpellID))) {
+    const setId = num(b.ItemSetID), spell = num(b.SpellID), set = setId === null ? undefined : itemSets.get(setId);
+    if (setId === null || !spell || !set) continue;
+    const need = neededGroup(spell), speed = speedOf(spell);
+    if (!need && !speed) continue;
+    const pieces = (Array.isArray(set.ItemID) ? set.ItemID : []).map(Number).filter((id) => id > 0 && itemRows.has(id));
+    if (!pieces.length) continue;
+    const words = need ? [...new Set([spell, need.spell])].flatMap((s) => wordsOf.get(s) ?? []) : [];
+    setCandidates.push({ row: [setId, spell, num(b.Threshold) ?? 0, need?.group ?? null, speed?.kind ?? null, speed?.percent ?? null, pieces], words });
+  }
+  for (const { row, words } of setCandidates) {
+    if (row[3] === null) continue;
+    const c = counts.get(row[3]) ?? new Map<string, number>();
+    for (const w of words) c.set(w, (c.get(w) ?? 0) + 1);
+    counts.set(row[3], c);
+  }
   // Kept: an effect bound to a named terrain, and a speed effect (with its zone list when it has one).
-  const items = candidates.map((c) => c.row).filter((r) => (r[3] !== null && nameOf(r[3]) !== null) || r[4] !== null);
+  const keep = (group: number | null, kind: string | null) => (group !== null && nameOf(group) !== null) || kind !== null;
+  const items = candidates.map((c) => c.row).filter((r) => keep(r[3], r[4]));
+  const sets = setCandidates.map((c) => c.row).filter((r) => keep(r[3], r[4]));
 
   // Which zone shows each area: zone-type UiMaps placed on a map, by the area their assignment shows.
   const zoneOfArea = new Map<number, number>();
@@ -190,7 +272,7 @@ export function buildClientTerrain(snapshotPath: string): ClientTerrain {
   }
 
   const areaGroups: ClientTerrain["areaGroups"] = {};
-  for (const group of [...new Set(items.map((r) => r[3]).filter((g): g is number => g !== null))].sort((a, b) => a - b)) {
+  for (const group of [...new Set([...items, ...sets].map((r) => r[3]).filter((g): g is number => g !== null))].sort((a, b) => a - b)) {
     const zones = new Set<number>(), instances = new Set<number>(), parts = new Map<number, Set<string>>();
     for (const area of members.get(group) ?? []) {
       const continent = num(areas.get(area)?.ContinentID);
@@ -214,6 +296,7 @@ export function buildClientTerrain(snapshotPath: string): ClientTerrain {
     build: { product: meta.product, buildId: meta.buildId, version: meta.version, buildConfig: meta.buildConfig, definitions: meta.definitions, extractedAt: meta.extractedAt },
     areaGroups,
     items,
+    sets,
     note: "ids, numbers, area names and the terrain words are the game files'; item and spell names follow the site's name rules",
   });
 }

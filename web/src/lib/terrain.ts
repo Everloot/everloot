@@ -28,10 +28,14 @@ export interface TerrainType {
 }
 
 export interface TerrainGear {
+  /** The item, or for a set bonus its first piece. */
   itemId: number;
   spellId: number;
-  trigger: "use" | "equip";
-  /** The terrain the effect needs, or null when it works anywhere. */
+  /** How it fires: on use, while equipped, by chance on hit, or as a set bonus. */
+  trigger: "use" | "equip" | "hit" | "set";
+  /** A set bonus: the set, how many pieces it needs and its pieces. */
+  set: { setId: number; threshold: number; pieces: number[] } | null;
+  /** The terrain the effect needs, or null when the files tie it to none. */
   terrain: TerrainType | null;
   /** For an effect bound to a zone list rather than a terrain type: the released zones and instances of the list. */
   places: { zones: number[]; instances: number[] } | null;
@@ -57,18 +61,23 @@ function releasedZones(): Set<number> {
   return new Set(publicZones().map((z) => z.mapId));
 }
 
-/** Every item effect of a terrain file that needs a terrain type or changes speed, in item order. */
+/** Every item effect and set bonus of a terrain file that needs a terrain type or changes speed: items in item order, then sets. */
 export function terrainGear(data: ClientTerrain = CLIENT_TERRAIN, released: ReadonlySet<number> = releasedZones()): TerrainGear[] {
   const types = new Map(terrainTypes(data, released).map((t) => [t.groupId, t]));
-  return data.items.map(([itemId, spellId, trigger, group, kind, percent]) => {
+  const where = (group: number | null) => {
     const list = group === null ? undefined : data.areaGroups[String(group)];
     return {
-      itemId, spellId, trigger,
       terrain: group === null ? null : types.get(group) ?? null,
       places: list && list.name === null ? { zones: list.zones.filter((z) => released.has(z)), instances: list.instances } : null,
-      speed: kind && percent !== null ? { kind, percent } : null,
     };
-  });
+  };
+  const speedOf = (kind: SpeedKind | null, percent: number | null) => (kind && percent !== null ? { kind, percent } : null);
+  return [
+    ...data.items.map(([itemId, spellId, trigger, group, kind, percent]): TerrainGear => ({ itemId, spellId, trigger, set: null, ...where(group), speed: speedOf(kind, percent) })),
+    ...data.sets.map(([setId, spellId, threshold, group, kind, percent, pieces]): TerrainGear => ({
+      itemId: pieces[0]!, spellId, trigger: "set", set: { setId, threshold, pieces }, ...where(group), speed: speedOf(kind, percent),
+    })),
+  ];
 }
 
 /** What the files say of a zone's ground: each terrain type that covers it, whole or in part (with the parts). */
@@ -91,7 +100,7 @@ export function gearFor(place: { zone: number } | { instance: number }, gear: re
 /** The gear that changes speed anywhere or somewhere, fastest first within each kind (run, mount, swim). */
 export function speedGear(gear: readonly TerrainGear[] = terrainGear()): TerrainGear[] {
   const order: SpeedKind[] = ["run", "mount", "swim"];
-  return gear.filter((g) => g.speed).sort((a, b) => order.indexOf(a.speed!.kind) - order.indexOf(b.speed!.kind) || b.speed!.percent - a.speed!.percent || a.itemId - b.itemId);
+  return gear.filter((g) => g.speed).sort((a, b) => order.indexOf(a.speed!.kind) - order.indexOf(b.speed!.kind) || b.speed!.percent - a.speed!.percent || a.itemId - b.itemId || a.spellId - b.spellId);
 }
 
 const SPEED_WORD: Record<SpeedKind, string> = { run: "run speed", mount: "mount speed", swim: "swim speed" };
@@ -99,4 +108,10 @@ const SPEED_WORD: Record<SpeedKind, string> = { run: "run speed", mount: "mount 
 /** "+7% mount speed", or null for an effect that changes no speed. */
 export const speedLabel = (speed: TerrainGear["speed"]): string | null => (speed ? `+${speed.percent}% ${SPEED_WORD[speed.kind]}` : null);
 
-export const triggerLabel = (trigger: TerrainGear["trigger"]): string => (trigger === "use" ? "Use" : "Equip");
+const TRIGGER_WORD: Record<TerrainGear["trigger"], string> = { use: "Use", equip: "Equip", hit: "Chance on hit", set: "Set bonus" };
+
+export const triggerLabel = (gear: Pick<TerrainGear, "trigger" | "set">): string =>
+  (gear.set ? `Set bonus (${gear.set.threshold} pieces)` : TRIGGER_WORD[gear.trigger]);
+
+/** What a row says when the files tie an effect to no area. The game may still limit it (Westfall Stew's speed). */
+export const NO_AREA = "No area limit in the files";

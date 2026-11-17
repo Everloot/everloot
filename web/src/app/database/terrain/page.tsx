@@ -3,13 +3,13 @@ import Link from "next/link";
 import TerrainGearTable, { type GearNames } from "@/components/TerrainGearTable";
 import { Container, DataTitle, SectionHeading } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
-import { loadItemTips, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
+import { loadItemSetNames, loadItemTips, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
 import { instanceHref, instanceRows } from "@/lib/instances";
 import { CLIENT_LAYER } from "@/lib/items";
 import { itemNames } from "@/lib/names";
 import { loadItemFacts } from "@/lib/rollup-compute";
 import { pageMetadata } from "@/lib/seo";
-import { speedGear, TERRAIN_BUILD, TERRAIN_PATH, terrainGear, terrainTypes } from "@/lib/terrain";
+import { NO_AREA, speedGear, TERRAIN_BUILD, TERRAIN_PATH, terrainGear, terrainTypes } from "@/lib/terrain";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
 import { LINK } from "../entity";
 
@@ -29,13 +29,16 @@ export default async function TerrainPage() {
   const gear = terrainGear();
   const speed = speedGear(gear);
   const instances = new Map([...instanceRows()].map(([id, r]) => [id, r.name]));
-  const ids = [...new Set(gear.map((g) => g.itemId))];
-  const [facts, spells, assets] = await Promise.all([loadItemFacts(), loadSpellNames(CLIENT_LAYER.build.version), loadSiteAssets()]);
+  const ids = [...new Set(gear.flatMap((g) => g.set?.pieces ?? [g.itemId]))];
+  const [facts, spells, sets, assets] = await Promise.all([
+    loadItemFacts(), loadSpellNames(CLIENT_LAYER.build.version), loadItemSetNames(CLIENT_LAYER.build.version), loadSiteAssets(),
+  ]);
   const tips = await loadItemTips(assets, ids);
   const named = facts.unreachable ? new Map<number, string>() : itemNames(facts);
   const names: GearNames = {
     item: (id) => ({ name: named.get(id) ?? tips.get(id)?.name, icon: tips.get(id)?.icon }),
     spell: (id) => spells?.names.get(id),
+    set: (id) => sets?.names.get(id),
     instances,
   };
   const zoneLink = (id: number) => {
@@ -50,8 +53,9 @@ export default async function TerrainPage() {
         <p className="mb-6 max-w-[70ch] text-fg-2">
           Some item effects in WoW: Forever work only on one kind of ground, such as Desert or Snowy areas. The game files
           list the areas each kind covers. Below are the zones and instances of each terrain type, the gear bound to it, and
-          every item that changes run, mount or swim speed. Read from the game files, build {TERRAIN_BUILD}: found in game
-          files, unconfirmed.
+          every item, enchant and set bonus that changes run, mount or swim speed. Read from the game files, build{" "}
+          {TERRAIN_BUILD}: found in game files, unconfirmed. Where a row says &ldquo;{NO_AREA}&rdquo;, the game may still
+          limit it (Westfall Stew&apos;s speed works only in Westfall); the spell&apos;s own page has its text.
         </p>
 
         <nav aria-label="Terrain types" className="mb-8 flex flex-wrap gap-2">
@@ -87,7 +91,7 @@ export default async function TerrainPage() {
           })}
 
           <section aria-labelledby="speed" data-terrain="speed">
-            <SectionHeading id="speed" note="Every item effect the game files give a run, mount or swim speed bonus, fastest first. A Use effect lasts a short time; an Equip effect lasts while it is worn.">
+            <SectionHeading id="speed" note="Every item effect, enchant and set bonus the game files give a run, mount or swim speed bonus, fastest first. A Use effect lasts a short time; an Equip effect or set bonus lasts while it is worn.">
               Speed gear
             </SectionHeading>
             <TerrainGearTable gear={speed} names={names} caption="Items that change run, mount or swim speed" />

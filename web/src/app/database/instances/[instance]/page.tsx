@@ -21,7 +21,7 @@ import { wikiHref } from "@/lib/wiki";
 import { prepPage } from "@/lib/wiki-dungeon";
 import { npcLootTable } from "../../../../../../kb/src/loot-tables";
 import EntityLink from "@/components/EntityLink";
-import { loadItemTips, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
+import { loadItemSetNames, loadItemTips, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
 import { gearFor, instanceTerrain, TERRAIN_BUILD, TERRAIN_PATH } from "@/lib/terrain";
 import TerrainGearTable from "@/components/TerrainGearTable";
@@ -129,10 +129,12 @@ export default async function InstancePage(props: Props) {
   // What the game files say of the ground here, and the gear whose effect works here (data/game-data/client-terrain.json).
   const terrain = instanceTerrain(row.instanceMapId);
   const gear = gearFor({ instance: row.instanceMapId });
-  const gearIds = gear.map((g) => g.itemId);
+  const gearIds = gear.flatMap((g) => g.set?.pieces ?? [g.itemId]);
   const gearFacts = gear.length && !itemFacts ? await loadItemFacts() : itemFacts;
   const gearName = gearFacts && !gearFacts.unreachable ? itemNames(gearFacts) : names;
-  const spellNames = gear.length ? await loadSpellNames(CLIENT_LAYER.build.version) : null;
+  const [spellNames, setNames] = gear.length
+    ? await Promise.all([loadSpellNames(CLIENT_LAYER.build.version), gear.some((g) => g.set) ? loadItemSetNames(CLIENT_LAYER.build.version) : null])
+    : [null, null];
   const tips = await loadItemTips(droppedIds.length || gearIds.length ? await loadSiteAssets() : null, [...droppedIds, ...gearIds]);
 
   // Quests: the ones 3 installs file under this instance's name in the quest log, from the stored world facts.
@@ -241,6 +243,7 @@ export default async function InstancePage(props: Props) {
                   names={{
                     item: (id) => ({ name: gearName.get(id) ?? tips.get(id)?.name, icon: tips.get(id)?.icon }),
                     spell: (id) => spellNames?.names.get(id),
+                    set: (id) => setNames?.names.get(id),
                     instances: new Map([...instanceRows()].map(([id, r]) => [id, r.name])),
                   }}
                 />
