@@ -91,7 +91,7 @@ export default async function AddonPage() {
           <Card as="section" aria-labelledby="addon" className="space-y-6">
             <SectionHeading
               id="addon"
-              note={addon ? `Version ${addon.version}, Alpha${addonRelease ? `, released ${addonRelease.date}` : ""}. For the WoW: Forever client.` : undefined}
+              note={addon ? `Version ${addon.version}${addonRelease ? `, released ${addonRelease.date}` : ""}. For the WoW: Forever client.` : undefined}
             >
               The addon
             </SectionHeading>
@@ -110,7 +110,7 @@ export default async function AddonPage() {
                   </TrackedDownload>
                   <p className="text-sm text-fg-2">Addon {addon.version}{served ? ` (.zip, ${fileSize(served.size)})` : ""}</p>
                 </div>
-                <p className="text-sm text-fg-2">{ADDON_LIVE_VERIFIED ? "" : "Live-client verification is pending. "}This Alpha includes website talent and raid plan imports; use <code className="font-mono">/everloot</code> to open the planners.</p>
+                <p className="text-sm text-fg-2">{ADDON_LIVE_VERIFIED ? "" : "Live-client verification is pending. "}This release includes website talent and raid plan imports; use <code className="font-mono">/everloot</code> to open the planners.</p>
                 <div>
                   <SectionHeading as="h3">Install</SectionHeading>
                   <ol className="list-decimal space-y-1 pl-5 text-sm text-fg-2">

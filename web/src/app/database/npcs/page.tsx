@@ -89,7 +89,7 @@ export default async function NpcListPage(props: { searchParams?: Promise<Search
 
   const dash = <span className="text-muted">—</span>;
   const columns: SparseColumn<NpcRow>[] = [
-    { key: "name", header: "Name", sortable: true, cell: (n) => <Link href={`/database/npcs/${n.npcId}`} className={LINK}>{n.name ?? `NPC ${n.npcId}`}</Link> },
+    { key: "name", header: "Name", sortable: true, cell: (n) => <Link prefetch={false} href={`/database/npcs/${n.npcId}`} className={LINK}>{n.name ?? `NPC ${n.npcId}`}</Link> },
     { key: "level", header: "Level", numeric: true, sortable: true, cell: (n) => n.level ?? dash, blank: (n) => n.level === null },
     { key: "type", header: "Type", sortable: true, cell: (n) => n.creatureType ?? dash, blank: (n) => !n.creatureType },
     { key: "rank", header: "Rank", sortable: true, cell: (n) => (n.rank ? RANK_LABEL[n.rank] : dash), blank: (n) => !n.rank },
@@ -147,7 +147,7 @@ export default async function NpcListPage(props: { searchParams?: Promise<Search
   const empty = facts.unreachable ? <Unreadable />
     : filters(q) > 0 ? <>
         <NoMatches noun="NPCs" chips={chips} clearHref="/database/npcs" />
-        {id !== null && <p className="pb-4 text-cell"><Link href={`/database/npcs/${id}`} className={LINK}>Open NPC {id}</Link></p>}
+        {id !== null && <p className="pb-4 text-cell"><Link prefetch={false} href={`/database/npcs/${id}`} className={LINK}>Open NPC {id}</Link></p>}
       </>
     : <NoObservations>{`NPCs are listed once players report them. ${Date.now() < Date.parse(LAUNCH_AT) ? `The addon starts recording when the game launches on ${longDate(LAUNCH.date)}, and an` : "An"} NPC shows here once 3 installs agree on it.`}</NoObservations>;
 

@@ -57,6 +57,36 @@
           "realm": {
             "type": "string"
           },
+          "house": {
+            "description": "The house of value and history; null faction means no known house. Older servers may omit it.",
+            "type": "object",
+            "properties": {
+              "realm": {
+                "type": "string"
+              },
+              "faction": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "Alliance",
+                      "Horde",
+                      "Neutral"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The selected full-scan auction house; null when unknown. Browsing points are realm-only and are not assigned to this house."
+              }
+            },
+            "required": [
+              "realm",
+              "faction"
+            ],
+            "additionalProperties": false
+          },
           "itemId": {
             "type": "integer",
             "minimum": -9007199254740991,
