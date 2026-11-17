@@ -51,3 +51,35 @@ test("the recorded refund category belongs to the Forever list and its staff pos
   expect(result.store.posts).toHaveLength(1);
   expect(result.store.posts[0]).toMatchObject({ title: refund.title, game: "forever", topicId: 2415068 });
 });
+
+
+test("a resumed list catches a topic shifted onto the previous page without reopening handled topics", async () => {
+  const store = emptyStore();
+  store.fetched["list:us:forever"] = { at: "2026-11-13T00:00:00Z", newestSeen: "2026-11-13T00:00:00.000Z" };
+  let resumed = false;
+  const opened: number[] = [];
+  const topic = (id: number) => ({ id, bumped_at: "2026-11-15T01:18:00Z", first_tracked_post: { group: "community-manager", post_number: 1 } });
+  const fetcher = async (url: string) => {
+    if (url.endsWith("robots.txt")) return new Response("");
+    if (url.endsWith("about.json")) return Response.json({ users: [] });
+    if (url.includes("/t/")) {
+      const id = Number(/\/t\/(\d+)/.exec(url)![1]);
+      opened.push(id);
+      const recorded = JSON.parse(fixture("november-xp.json"));
+      return Response.json({ ...recorded, id });
+    }
+    if (!url.includes("/346/")) return Response.json({ topic_list: { topics: [] } });
+    const page = Number(new URL(url).searchParams.get("page") ?? 0);
+    // A topic was removed between runs; the unread XP announcement moves onto page zero.
+    const topics = page === 0 ? (resumed ? [topic(999), topic(2416343)] : [topic(999), { id: 998, bumped_at: "2026-11-16T01:00:00Z" }]) : [];
+    return Response.json({ topic_list: { per_page: 2, topics, ...(page === 0 ? { more_topics_url: "/next" } : {}) } });
+  };
+  const first = await ingestBluePosts({ store, fetcher, now, forumOnly: true, regions: ["us"], maxListPages: 1, sleep: async () => {} });
+  resumed = true;
+  const second = await ingestBluePosts({ store: JSON.parse(JSON.stringify(first.store)), fetcher,
+    now: new Date(now.getTime() + 30 * 60_000), forumOnly: true, regions: ["us"], maxListPages: 1, sleep: async () => {} });
+  expect(second.errors).toEqual([]);
+  expect(opened).toEqual([999, 2416343]);
+  expect(second.store.posts).toContainEqual(expect.objectContaining({ topicId: 2416343 }));
+  expect(second.store.fetched["list:us:forever"].scan).toBeUndefined();
+});

@@ -79,8 +79,7 @@ test("hourly news rotates past unsupported articles and leaves the next cron pas
   let elapsed = 0;
   const first = await ingestBluePosts({ store: emptyStore(), fetcher, now, regions: ["us"], minIntervalMs: 8 * 60_000,
     deadlineMs: 15_000, clock: () => elapsed, sleep: async (ms) => { elapsed += ms; } });
-  expect(first.errors).toEqual([]);
-  expect(first.skipped).toContainEqual(expect.stringContaining("unsupported announcement metadata"));
+  expect(first.errors).toContainEqual({ source: "news", error: expect.stringContaining("unsupported announcement metadata") });
   expect(calls.some((address) => address.includes("/346/"))).toBe(true);
   expect(elapsed).toBeLessThan(15_000);
   calls.length = 0;
@@ -98,4 +97,50 @@ test("an index with article markup but no relevant links reports a source failur
   const fetcher = async (address: string) => new Response(address.endsWith("robots.txt") ? "" : '<a href="/en-us/article/1/retail-update">Retail</a>');
   const result = await ingestBluePosts({ store: emptyStore(), fetcher, now, regions: [], sleep: async () => {} });
   expect(result.errors).toContainEqual({ source: "news", error: "news index has no relevant article links" });
+});
+
+
+test.each([404, 302, "robots"])("an unreadable article (%s) consumes its hourly turn and does not starve later cards", async (status) => {
+  const second = "https://news.blizzard.com/en-us/article/2/wow-forever-update";
+  const calls: string[] = [];
+  const fetcher = async (address: string) => {
+    calls.push(address);
+    if (address.endsWith("robots.txt")) return new Response(status === "robots" ? `User-agent: *\nDisallow: ${new URL(url).pathname}` : "");
+    if (address.endsWith("/feed/world-of-warcraft")) return new Response(`<a href="${url}">One</a><a href="${second}">Two</a>`);
+    if (address === url) return new Response(null, { status: typeof status === "number" ? status : 404 });
+    if (address === second) return new Response(fixture("news-article.html"));
+    return Response.json({ feed: [] });
+  };
+  const first = await ingestBluePosts({ store: emptyStore(), fetcher, now, regions: [], sleep: async () => {} });
+  expect(first.errors).toContainEqual({ source: "news", error: expect.any(String) });
+  calls.length = 0;
+  await ingestBluePosts({ store: first.store, fetcher, now: new Date(now.getTime() + 10 * 60_000), regions: [], sleep: async () => {} });
+  expect(calls.some((address) => address.startsWith("https://news."))).toBe(false);
+  calls.length = 0;
+  const next = await ingestBluePosts({ store: JSON.parse(JSON.stringify(first.store)), fetcher,
+    now: new Date(now.getTime() + 60 * 60_000), regions: [], sleep: async () => {} });
+  expect(calls).toContain(second);
+  expect(next.store.posts).toContainEqual(expect.objectContaining({ id: "news:2" }));
+});
+
+test("new announcements take priority over rotating stored articles, which still refresh later", async () => {
+  const second = "https://news.blizzard.com/en-us/article/2/wow-forever-update";
+  const newest = "https://news.blizzard.com/en-us/article/3/wow-forever-new-hotfix";
+  const store = emptyStore();
+  store.posts = [parseNewsArticle(fixture("news-article.html"), url, now)!, parseNewsArticle(fixture("news-article.html"), second, now)!];
+  store.fetched.news = { at: "2026-11-17T08:00:00Z", newsCursor: url };
+  const calls: string[] = [];
+  const fetcher = async (address: string) => {
+    calls.push(address);
+    if (address.endsWith("robots.txt")) return new Response("");
+    if (address.endsWith("/feed/world-of-warcraft")) return new Response([newest, url, second].map((link) => `<a href="${link}">Card</a>`).join(""));
+    if (address.includes("/article/")) return new Response(fixture("news-article.html"));
+    return Response.json({ feed: [] });
+  };
+  const first = await ingestBluePosts({ store, fetcher, now, regions: [], sleep: async () => {} });
+  expect(calls).toContain(newest);
+  expect(calls).not.toContain(second);
+  calls.length = 0;
+  await ingestBluePosts({ store: first.store, fetcher, now: new Date(now.getTime() + 60 * 60_000), regions: [], sleep: async () => {} });
+  expect(calls).toContain(url);
 });

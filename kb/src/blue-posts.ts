@@ -77,8 +77,10 @@ export interface FetchState extends Validators {
   newestSeen?: string;
   /** Last news article visited, so one hourly read rotates through the whole feed. */
   newsCursor?: string;
+  /** Unreadable cards in the current index, so new announcements can pass them. Retried by rotation. */
+  newsFailed?: string[];
   /** An unfinished list scan. Only candidate topic ids/times are retained, never player records. */
-  scan?: { nextPage: number; newest: string | null; complete: boolean; pending: { id: number; bumpedAt: string }[] };
+  scan?: { nextPage: number; newest: string | null; complete: boolean; pending: { id: number; bumpedAt: string }[]; opened?: { id: number; bumpedAt: string }[] };
   /** Roster sources: the forum's staff list as last read. */
   staff?: StaffMember[];
 }
@@ -583,8 +585,12 @@ type Session = ReturnType<typeof session>;
 async function readList(x: Session, now: Date, region: BlueRegion, key: string, path: string, state: FetchState | undefined, staff: StaffIndex, maxPages: number) {
   const { s } = x;
   const since = state?.newestSeen ?? null;
-  const scan = state?.scan ? { ...state.scan, pending: [...state.scan.pending] }
-    : { nextPage: 0, newest: since, complete: false, pending: [] as { id: number; bumpedAt: string }[] };
+  const scan = state?.scan ? { ...state.scan, pending: [...state.scan.pending], opened: [...(state.scan.opened ?? [])] }
+    : { nextPage: 0, newest: since, complete: false, pending: [] as { id: number; bumpedAt: string }[], opened: [] as { id: number; bumpedAt: string }[] };
+  // Lists can shrink between runs. Re-read the last page before continuing, retaining only candidate
+  // ids/activity times to avoid opening an unchanged topic again. The overlap is one extra list page.
+  const overlap = !scan.complete && scan.nextPage > 0;
+  if (overlap) scan.nextPage--;
   const save = () => x.setState(key, { at: now.toISOString(), ...(since ? { newestSeen: since } : {}), scan });
   const drain = async () => {
     while (scan.pending.length) {
@@ -597,13 +603,14 @@ async function readList(x: Session, now: Date, region: BlueRegion, key: string, 
         save();
         throw err;
       }
+      scan.opened.push(topic);
       scan.pending.shift();
       save();
     }
   };
   try {
     await drain();
-    for (let pages = 0; !scan.complete && pages < maxPages; pages++) {
+    for (let pages = 0; !scan.complete && pages < maxPages + Number(overlap); pages++) {
       const json = await x.forumJson("list", region, listPath(path, scan.nextPage));
       if (json === null) throw new Error(`topic list ${path}: not found`);
       const { topics, full } = parseTopicList(json);
@@ -611,7 +618,8 @@ async function readList(x: Session, now: Date, region: BlueRegion, key: string, 
       const oldest = topics.filter((t) => !t.pinned).map((t) => t.bumpedAt).sort()[0];
       scan.complete = since === null || !full || (oldest !== undefined && oldest <= since);
       scan.nextPage++;
-      scan.pending = topics.filter((t) => (since === null || t.bumpedAt > since) && isCandidate(t, staff))
+      scan.pending = topics.filter((t) => (since === null || t.bumpedAt > since) && isCandidate(t, staff)
+        && !scan.opened.some((opened) => opened.id === t.id && opened.bumpedAt === t.bumpedAt))
         .sort((a, b) => a.bumpedAt.localeCompare(b.bumpedAt) || a.id - b.id)
         .map(({ id, bumpedAt }) => ({ id, bumpedAt }));
       save();
@@ -752,11 +760,23 @@ async function readNews(x: Session, opts: IngestOptions, minInterval: number) {
   const html = await getHtml(NEWS_INDEX);
   const links = newsLinks(html);
   if (!links.length) throw new Error("news index has no relevant article links");
-  // One article per hour leaves the forums most of their deadline. Rotate instead of permanently
-  // excluding older cards; rolling hotfix articles keep the same id across title/date changes.
-  const url = links[(links.indexOf(state?.newsCursor ?? "") + 1) % links.length];
-  const post = parseNewsArticle(await getHtml(url), url, opts.now);
-  if (post) x.merge([post]);
-  else x.s.skipped.push(`news: unsupported announcement metadata: ${new URL(url).pathname}`);
-  x.setState(key, { at: opts.now.toISOString(), newsCursor: url });
+  // Prioritize newly listed announcements. Failed cards are remembered until they leave the index
+  // and retried during rotation, so one broken article cannot starve the rest of the feed.
+  const failed = new Set((state?.newsFailed ?? []).filter((link) => links.includes(link)));
+  const known = new Set(x.s.store.posts.map((post) => post.id));
+  const url = links.find((link) => !known.has(`news:${new URL(link).pathname.split("/")[3]}`) && !failed.has(link))
+    ?? links[(links.indexOf(state?.newsCursor ?? "") + 1) % links.length];
+  try {
+    const post = parseNewsArticle(await getHtml(url), url, opts.now);
+    if (!post) throw new Error(`unsupported announcement metadata: ${new URL(url).pathname}`);
+    x.merge([post]);
+    failed.delete(url);
+  } catch (err) {
+    // Preserve Retry-After and the cursor on slow-down; a spent budget has not visited this card.
+    if (err instanceof Backoff || err instanceof BudgetSpent) throw err;
+    failed.add(url);
+    x.setState(key, { at: opts.now.toISOString(), newsCursor: url, newsFailed: [...failed] });
+    throw err;
+  }
+  x.setState(key, { at: opts.now.toISOString(), newsCursor: url, newsFailed: [...failed] });
 }
