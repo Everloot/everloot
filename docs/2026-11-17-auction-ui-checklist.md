@@ -1,0 +1,16 @@
+# Auction house cleanup: in-game acceptance
+
+Status: implementation and automated contracts only; no live-client acceptance or release claimed.
+
+Use a test build containing this change. Back up the installed Everloot folder before replacing it; preserve SavedVariables.
+
+1. Open an auction house. Expect **Everloot** after Buy / Sell / Auctions, no floating prompt and no separate scan button when the tab works.
+2. Select Everloot. Expect native fonts and a gold heading, one **Scan prices** action, price lookup and the existing Shopping list switch.
+3. Click Scan prices once. Expect **Scanning...**, disabled while busy; keep the house open until completion. Then expect **Ready in M:SS**, last-scan age and saved-file status. Reopening the house must not scan or show another popup.
+4. Look up an item by name/id and shift-click an item into the focused lookup. Check long warnings and values remain inside the scrolling area. Open Shopping list and search one item; no purchase is made.
+5. Select Buy, Sell and Auctions in turn. Each must hide the Everloot panel and work normally. Close/reopen the AH and repeat.
+6. Open Esc > Options > AddOns > Everloot (or `/everloot options`). Expect General, Tooltips, Auction House, Helpers and Data Sharing under Everloot. Check each page and scroll to its last control. Expect merchant/mail controls in Helpers and all four tooltip controls in Tooltips.
+7. Change a tooltip preference and a non-destructive display preference, reload, and confirm the choices persist. Do not turn off data-recording switches merely for this check: some intentionally delete their recorded rows after confirmation.
+8. If the tab cannot build, expect exactly one fallback Scan prices action. The failure is available through `/dump Everloot.AuctionTab.failureReason`; record it with the client build and installed addon version.
+
+After these checks pass, include the changes in the next addon release. Do not mark the release as verified from automated tests alone.

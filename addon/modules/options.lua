@@ -1,5 +1,5 @@
 -- Everloot settings page: Esc > Options > AddOns > Everloot, or /everloot options. One switch per module and
--- the auction scan prompt, each with what it records and where it goes. A switch with a /everloot command
+-- the first-visit auction introduction, each with what it records and where it goes. A switch with a /everloot command
 -- runs that command, so the page and chat behave the same (turning the census, players, completion or addon
 -- list off deletes their rows); the others set the toggle. Every change applies after a /reload, which the
 -- Reload button does. Settings API (modern clients), then the older interface options, then a plain window.
@@ -19,66 +19,68 @@ O.ROWS = {
     text = "Other addons' minimap buttons gather into the Everloot minimap button; hover it to use them. Records nothing; off puts them back after a reload." },
   { key = "auctions", group = "auction", command = "auctions", label = "Auction scans",
     text = "Scan this house from the Everloot tab at the auction house, one click at a time. Item prices and quantities, never sellers." },
-  { key = "scanPrompt", group = "auction", command = "scanprompt", field = true, label = "Scan prompt at the auction house",
-    text = "A small reminder beside the house when a scan can run. The tab and /everloot scan work either way." },
-  { key = "autoVendor", group = "auction", command = "vendor", field = true, defaultOff = true, label = "Sell greys and repair at merchants",
+  { key = "scanPrompt", group = "auction", command = "scanprompt", field = true, label = "First-visit auction introduction",
+    text = "Explain scanning once in chat when you first visit an auction house. No floating popup. Scanning works either way." },
+  { key = "autoVendor", group = "helpers", command = "vendor", field = true, defaultOff = true, label = "Sell greys and repair at merchants",
     text = "When a merchant window opens: sells grey items and repairs with your own gold, never the guild bank. Records nothing itself." },
-  { key = "mailCollect", group = "auction", command = "mail", field = true, defaultOff = true, label = "Collect all at the mailbox",
+  { key = "mailCollect", group = "helpers", command = "mail", field = true, defaultOff = true, label = "Collect all at the mailbox",
     text = "A button that takes money and items from auction letters only, one at a time. Skips cash on delivery and other letters." },
-  { key = "census", group = "shared", command = "census", label = "Census",
+  { key = "census", group = "data", command = "census", label = "Census",
     text = "Race, class, level and faction of your characters and of players near you, nameplates included. Never names, guilds, gear or places. Off deletes its rows." },
-  { key = "openworld", group = "shared", label = "World",
+  { key = "openworld", group = "data", label = "World",
     text = "NPCs, loot, quests, vendors and items you see, and where you stood at NPC windows and herbs, ore and chests, and the stats on the item tooltips you see. Anonymous: no character or guild names." },
-  { key = "professions", group = "shared", label = "Recipes and trainers",
+  { key = "professions", group = "data", label = "Recipes and trainers",
     text = "At profession and trainer windows you open: each recipe you know with its colour at your rank, product and reagents, and each trainer recipe's required rank and cost. Never crafts or trains. Stays in this file until it is sent." },
-  { key = "mapbounds", group = "shared", label = "Zone map corners",
+  { key = "mapbounds", group = "data", label = "Zone map corners",
     text = "Each zone's corners in world coordinates, once per zone per game build, so the site can place zone coordinates on one map. Nothing about you. Stays in this file until it is sent." },
-  { key = "gold", group = "private", label = "Your gold",
+  { key = "gold", group = "data", label = "Your gold",
     text = "Your own gold in and out, for gold per hour. Sent only if you share it on the upload page." },
-  { key = "roster", group = "private", label = "Your characters",
+  { key = "roster", group = "data", label = "Your characters",
     text = "Name, realm, class, level, faction, gold and professions of each character you log in with, for the window's Home. Stays in this file; never uploaded." },
-  { key = "inventoryCapture", group = "private", field = true, defaultOff = true, live = true, label = "Local inventory snapshots",
+  { key = "inventoryCapture", group = "data", field = true, defaultOff = true, live = true, label = "Local inventory snapshots",
     text = "Counts of items in your bags, opened bank and opened mail, with a separate observation time for each. Stays in this file; never uploaded or synced. Off deletes these snapshots." },
-  { key = "guild", group = "private", label = "Guild",
+  { key = "guild", group = "data", label = "Guild",
     text = "Your guild's roster, lockouts and loot. Published only through an officer's upload." },
-  { key = "completion", group = "private", command = "completion", label = "Completion tracker",
+  { key = "completion", group = "data", command = "completion", label = "Completion tracker",
     text = "The game's achievement, reputation, title and quest chain lists, read only, and your titles, dungeon and raid lockouts and boss kills. Your achievements, reputation and quests are read from the game for the window, not recorded. The lists and titles leave from the upload page; titles and lockouts also through the Desktop App's private sync, for a character you linked. Lockouts never go in an upload. Your boss kills stay on this computer. Off deletes its rows." },
-  { key = "addons", group = "shared", command = "addons", label = "Installed addon list",
+  { key = "addons", group = "data", command = "addons", label = "Installed addon list",
     text = "Each installed addon's name and version. Sent only from the upload page. Off deletes its rows." },
-  { key = "players", group = "shared", command = "players", label = "Player pages",
+  { key = "players", group = "data", command = "players", label = "Player pages",
     text = "Name, realm, race, class, level and guild of characters you see, for the site's player pages. On in a new install. Sent from the upload page, or by the Desktop App while its player pages setting is on. Off deletes its rows." },
 }
 -- Only in the builds that carry the pulls module (E.RUN_RECORDS in core.lua).
 if E.Pulls then
-  O.ROWS[#O.ROWS + 1] = { key = "pulls", group = "shared", command = "pulls", label = "Boss pulls",
+  O.ROWS[#O.ROWS + 1] = { key = "pulls", group = "data", command = "pulls", label = "Boss pulls",
     text = "After each boss pull: your group's names, classes, roles and the game's damage meter totals. Sent from the upload page or the Desktop App. Off deletes its rows." }
 end
 -- What the item tooltip shows (prices.lua reads them through E.TooltipShows on every hover). They record nothing.
-O.ROWS[#O.ROWS + 1] = { key = "tooltipMarket", group = "general", field = true, live = true, label = "Item tooltip: prices",
+O.ROWS[#O.ROWS + 1] = { key = "tooltipMarket", group = "tooltips", field = true, live = true, label = "Prices",
   text = "Community market value, min buyout and historical price, your own last scan and the vendor price. Records nothing; applies at once." }
-O.ROWS[#O.ROWS + 1] = { key = "tooltipHistory", group = "general", field = true, live = true, label = "Item tooltip: your history",
+O.ROWS[#O.ROWS + 1] = { key = "tooltipHistory", group = "tooltips", field = true, live = true, label = "Your sale and purchase history",
   text = "Your last sale, average sale and units sold, and what you paid where your gold ledger knows it, over the ledger's last 90 days, from your characters on this realm. Read from this file. Records nothing; applies at once." }
-O.ROWS[#O.ROWS + 1] = { key = "tooltipSources", group = "general", field = true, live = true, label = "Item tooltip: sources",
+O.ROWS[#O.ROWS + 1] = { key = "tooltipSources", group = "tooltips", field = true, live = true, label = "Item sources",
   text = "Who drops it, who sells it, the recipes it is a reagent for and the zones you met its sources in. Records nothing; applies at once." }
 
 -- The settings pages, in the game's list under Everloot. Everloot itself is the overview: what this file holds and
 -- where the switches are. A client without sub-pages keeps every switch on one page, in O.ROWS order.
-O.ROWS[#O.ROWS + 1] = { key = "tooltip", group = "general", field = true, live = true,
-  choices = { "full", "compact", "off" }, label = "Item tooltip: detail",
+O.ROWS[#O.ROWS + 1] = { key = "tooltip", group = "tooltips", field = true, live = true,
+  choices = { "full", "compact", "off" }, label = "Detail",
   text = "Click to choose Full, Compact (market value and your scan) or Off. Compact keeps price-age warnings. Records nothing; applies at once." }
 
 O.GROUPS = {
   { key = "general", name = "General",
-    intro = "The Everloot window, the minimap button and what the item tooltip shows. Nothing on this page records anything." },
-  { key = "auction", name = "Auction house",
-    intro = "Scans at the auction house, and the helpers at merchants and the mailbox." },
-  { key = "shared", name = "Shared with Everloot",
-    intro = "What the addon records for everloot.app. It stays in your saved file until the Everloot Desktop App or the upload page sends it, as each line says." },
-  { key = "private", name = "Your characters",
-    intro = "Your own characters, gold, guild and completion. Each line says whether it can leave your saved file, and how." },
+    intro = "The Everloot window and minimap controls." },
+  { key = "tooltips", name = "Tooltips",
+    intro = "Choose what appears when you hover an item. These settings record nothing and apply immediately." },
+  { key = "auction", name = "Auction House",
+    intro = "Scan prices from the Everloot tab at the auction house. Scans only start when you click." },
+  { key = "helpers", name = "Helpers",
+    intro = "Optional helpers at merchants and the mailbox." },
+  { key = "data", name = "Data Sharing",
+    intro = "Recording and sharing controls. Each setting explains what is recorded, what stays local and how it can be sent." },
 }
 O.INTRO = "What the addon records. Everything stays in your saved file until the Everloot Desktop App or the upload page sends it, as each line says."
-O.OVERVIEW = "The switches are on the pages under Everloot in this list: General, Auction house, Shared with Everloot and Your characters."
+O.OVERVIEW = "The switches are on the pages under Everloot in this list: General, Tooltips, Auction House, Helpers and Data Sharing."
 
 --- The rows of one page, in O.ROWS order.
 function O.RowsOf(group)
@@ -211,7 +213,7 @@ function O.Refresh()
     if page.added then
       page.addedRows = O.AddedRows()
       for i, text in ipairs(page.addedRows) do
-        if not page.added[i] then page.added[i] = words(page.content, "GameFontHighlightSmall", 11, "muted") end
+        if not page.added[i] then page.added[i] = words(page.content, "GameFontHighlightSmall") end
         page.added[i]:SetText(text)
         page.added[i]:Show()
       end
@@ -233,11 +235,11 @@ function O.Boxes()
   return all
 end
 
--- Text in the Everloot window's fonts and colours (modules/window.lua loads after this file, before the page is
--- built), else in the game's own template.
+-- Native font objects match the surrounding game options.
 words = function(parent, template, size, tone)
+  -- Settings use native font objects; the standalone onboarding dialogs retain their styling.
   local W = E.Window
-  if W and W.Text then return W.Text(parent, size, nil, W.COLORS[tone]) end
+  if size and W and W.Text then return W.Text(parent, size, nil, W.COLORS[tone]) end
   local s = parent:CreateFontString(nil, "ARTWORK", template)
   s:SetJustifyH("LEFT")
   return s
@@ -247,21 +249,15 @@ local PAD = 8 -- inside the list of switches
 
 --- One settings page: a heading, its introduction, its switches (and, with `added`, what the file holds) in a
 --- scrolling list, and Reload now in the footer.
-local function build(frameName, name, subtitle, introText, rows, added)
+local function build(frameName, name, introText, rows, added)
   -- A frame that can take a backdrop, for when the page is shown as a window of its own.
   local made, page = pcall(CreateFrame, "Frame", frameName, nil, "BackdropTemplate")
   if not made or not page then page = CreateFrame("Frame", frameName) end
   page.name = name
-  local W = E.Window
-  if W and W.Heading then
-    page.crest, page.title = W.Heading(page, subtitle)
-    page.crest:SetPoint("TOPLEFT", page, "TOPLEFT", 12, -10)
-  else
-    page.title = words(page, "GameFontNormalLarge")
-    page.title:SetPoint("TOPLEFT", 16, -16)
-    page.title:SetText("Everloot")
-  end
-  local intro = words(page, "GameFontHighlightSmall", 11, "muted")
+  page.title = words(page, "GameFontNormalLarge")
+  page.title:SetPoint("TOPLEFT", 16, -16)
+  page.title:SetText(name)
+  local intro = words(page, "GameFontHighlightSmall")
   intro:SetPoint("TOPLEFT", page, "TOPLEFT", 16, -46)
   intro:SetPoint("TOPRIGHT", page, "TOPRIGHT", -32, -46)
   intro:SetText(introText)
@@ -272,7 +268,6 @@ local function build(frameName, name, subtitle, introText, rows, added)
   local content = CreateFrame("Frame", nil, scroll)
   content:SetSize(1, 1)
   scroll:SetScrollChild(content)
-  if W and W.Surface then W.Surface(scroll) end
   page.scroll = scroll
   page.content = content
   page.boxes = {}
@@ -281,10 +276,10 @@ local function build(frameName, name, subtitle, introText, rows, added)
       row.choices and "UIPanelButtonTemplate" or "UICheckButtonTemplate")
     if row.choices then box:SetSize(70, 24) end
     box.row = row
-    local label = words(box, "GameFontNormal", 13, "text")
+    local label = words(box, "GameFontHighlight")
     label:SetPoint("TOPLEFT", box, "TOPRIGHT", 4, -4)
     label:SetText(row.label)
-    local text = words(box, "GameFontHighlightSmall", 11, "muted")
+    local text = words(box, "GameFontHighlightSmall")
     text:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -2)
     text:SetText(row.text)
     box.label, box.description = label, text
@@ -302,7 +297,7 @@ local function build(frameName, name, subtitle, introText, rows, added)
   -- False, not nil, on the pages without it: a frame's methods would answer for a missing field.
   page.addedHeading, page.added = false, false
   if added then
-    page.addedHeading = words(content, "GameFontNormal", 13, "text")
+    page.addedHeading = words(content, "GameFontNormal")
     page.addedHeading:SetText("What you've added")
     page.added = {}
     page.addedRows = {}
@@ -343,7 +338,7 @@ local function build(frameName, name, subtitle, introText, rows, added)
   reload:SetText("Reload now")
   reload:SetScript("OnClick", function() if ReloadUI then ReloadUI() end end)
   page.reload = reload
-  local note = words(page, "GameFontDisableSmall", 11, "muted")
+  local note = words(page, "GameFontDisableSmall")
   note:SetPoint("TOPLEFT", reload, "TOPRIGHT", 10, -2)
   note:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -32, 16)
   note:SetJustifyV("TOP")
@@ -357,15 +352,15 @@ end
 
 --- Puts the page in the game's options: the Settings API, else the older interface options, else nothing
 --- (/everloot options then shows it as a window). Returns how it was registered.
---- The one page with every switch: older clients, /everloot options as a window, and the fallback below.
+--- The one page with every switch: clients without categories and the standalone fallback.
 local function single()
-  return build("EverlootOptionsPage", "Everloot", "Settings", O.INTRO, O.ROWS, true)
+  return build("EverlootOptionsPage", "Everloot", O.INTRO, O.ROWS, true)
 end
 
 --- A separate instance uses the same rows and command handlers without moving the game's settings panels.
 function O.BuildWindow(parent)
   O.Register()
-  local page = build(nil, "Everloot", "Settings", O.INTRO, O.ROWS, true)
+  local page = build(nil, "Everloot", O.INTRO, O.ROWS, true)
   page:SetParent(parent)
   page:SetAllPoints(parent)
   O.pages[#O.pages + 1] = page
@@ -380,7 +375,7 @@ function O.Register()
     local split = Settings.RegisterCanvasLayoutSubcategory ~= nil
     local page
     if split then
-      page = build("EverlootOptionsPage", "Everloot", "Settings", O.INTRO .. "\n\n" .. O.OVERVIEW, {}, true)
+      page = build("EverlootOptionsPage", "Everloot", O.INTRO .. "\n\n" .. O.OVERVIEW, {}, true)
     else
       page = single()
     end
@@ -392,7 +387,7 @@ function O.Register()
       if split then
         O.groupPages = {}
         for _, group in ipairs(O.GROUPS) do
-          local sub = build("EverlootOptionsPage_" .. group.key, group.name, group.name, group.intro, O.RowsOf(group.key), false)
+          local sub = build("EverlootOptionsPage_" .. group.key, group.name, group.intro, O.RowsOf(group.key), false)
           local made, subcategory = pcall(Settings.RegisterCanvasLayoutSubcategory, category, sub, group.name)
           if made and subcategory then
             O.pages[#O.pages + 1] = sub
@@ -407,12 +402,25 @@ function O.Register()
       return O.how
     end
   end
+  if InterfaceOptions_AddCategory then
+    local page = build("EverlootOptionsPage", "Everloot", O.INTRO .. "\n\n" .. O.OVERVIEW, {}, true)
+    if pcall(InterfaceOptions_AddCategory, page) then
+      O.page, O.pages, O.groupPages, O.how = page, { page }, {}, "interface"
+      for _, group in ipairs(O.GROUPS) do
+        local sub = build("EverlootOptionsPage_" .. group.key, group.name, group.intro, O.RowsOf(group.key), false)
+        sub.parent = "Everloot"
+        if pcall(InterfaceOptions_AddCategory, sub) then
+          O.pages[#O.pages + 1] = sub
+          O.groupPages[group.key] = sub
+        else
+          O.splitFailed = true
+        end
+      end
+      return O.how
+    end
+  end
   O.page = single()
   O.pages = { O.page }
-  if InterfaceOptions_AddCategory and pcall(InterfaceOptions_AddCategory, O.page) then
-    O.how = "interface"
-    return O.how
-  end
   O.how = "window"
   return O.how
 end
@@ -424,7 +432,7 @@ function O.Open()
     local id = O.category.GetID and O.category:GetID() or O.category.ID
     -- The call returns nothing either way: the panel being on screen afterwards is the proof it opened.
     if pcall(Settings.OpenToCategory, id) and not (SettingsPanel and SettingsPanel.IsShown and not SettingsPanel:IsShown()) then return end
-  elseif O.how == "interface" and InterfaceOptionsFrame_OpenToCategory then
+  elseif O.how == "interface" and not O.splitFailed and InterfaceOptionsFrame_OpenToCategory then
     -- The older frame needs two calls when it has not been opened yet this session.
     InterfaceOptionsFrame_OpenToCategory(O.page)
     InterfaceOptionsFrame_OpenToCategory(O.page)
