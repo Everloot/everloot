@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { AUCTION_AGREEMENT } from "../../../../../../kb/src/auction-history";
-import { MARKET_RULE, MAX_PRICE_ROWS, marketHouses, marketPrices, marketRealms, parseHouse, validRealm } from "../../../../../../kb/src/market";
+import { MARKET_RULE, MAX_PRICE_ITEMS, MAX_PRICE_ROWS, marketHouses, marketPrices, marketRealms, parseHouse, validRealm } from "../../../../../../kb/src/market";
 import { admit, attribution, attributionHeaders } from "@/lib/data-guard";
 import { pendingRealms } from "@/lib/auction-house";
 import { uploadStore } from "@/lib/upload-store";
@@ -22,6 +22,8 @@ const NO_STORE = { "Cache-Control": "no-store" };
  * companion asks for each house it writes. Without it the answer holds only scans that named neither a house nor a
  * faction, and days folded before houses were kept apart: an older companion's request. Those may mix houses, so no
  * house's price ever comes from them, and every scan that names its house is left out of them.
+ * `items=2589,2592` selects up to 100 positive item ids before the row cap, with a realm; unknown or
+ * non-public items are omitted. Without it the most-listed items are returned as before.
  * Install ids and upload addresses stay on the site. Requests the CDN does not answer count against a
  * per-IP quota, or against the caller's key (lib/data-guard.ts).
  */
@@ -37,6 +39,17 @@ export async function GET(req: Request) {
   if (houseParam !== null && (!house || !realm)) {
     return NextResponse.json({ ok: false, error: "house is Alliance, Horde or Neutral, with a realm." }, { status: 400, headers: NO_STORE });
   }
+  const itemParams = new URL(req.url).searchParams.getAll("items");
+  let itemIds: number[] | undefined;
+  if (itemParams.length) {
+    const raw = itemParams[0];
+    const parts = raw.split(",");
+    if (!realm || itemParams.length !== 1 || raw.length > MAX_PRICE_ITEMS * 17 ||
+      parts.length > MAX_PRICE_ITEMS || parts.some((id) => !/^[1-9]\d*$/.test(id) || !Number.isSafeInteger(Number(id)))) {
+      return NextResponse.json({ ok: false, error: `items is a comma-separated list of at most ${MAX_PRICE_ITEMS} positive integer ids, with a realm.` }, { status: 400, headers: NO_STORE });
+    }
+    itemIds = parts.map(Number);
+  }
   const market = await uploadStore.loadMarket();
   if (!market.state) {
     return NextResponse.json({ ok: false, error: "Market values unavailable. They are unrecorded, not zero." },
@@ -48,7 +61,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, dataAsOf: market.dataAsOf, realms: marketRealms(market.state), houses: marketHouses(market.state), pending, attribution: credit }, { headers: cache });
   }
   return NextResponse.json(
-    { ok: true, dataAsOf: market.dataAsOf, rule: MARKET_RULE, fields: FIELDS, ...marketPrices(market.state, realm, new Date(), MAX_PRICE_ROWS, house), attribution: credit },
+    { ok: true, dataAsOf: market.dataAsOf, rule: MARKET_RULE, fields: FIELDS, ...marketPrices(market.state, realm, new Date(), MAX_PRICE_ROWS, house, itemIds), attribution: credit },
     { headers: cache },
   );
 }
