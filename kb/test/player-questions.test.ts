@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import { answerSources, formatAnswerSources } from "../src/answer-sources.js";
+import { createToolHandlers } from "../src/mcp-server.js";
 import { openDb } from "../src/db.js";
 import { replaceSourceRows, type EntityInput } from "../src/entities.js";
 import { buildFilesIndex } from "../src/files-evidence.js";
@@ -212,4 +213,25 @@ test("the player questions read the same through D1's statement limits", async (
 test("the city a player calls by its first word is the zone the files name in full", async () => {
   const { result } = await ask("where is stormwind");
   expect(result.evidence[0]!.claim).toBe("Stormwind City: a zone, in the game files.");
+});
+
+
+test("a spelling repeated in bodies yields to the page title in all public search tools", async () => {
+  const db = openDb(":memory:");
+  try {
+    await replaceSourceRows(db, "warcraft-wiki-2023", ["lore_page"], [
+      row("leeroy", "Leeroy Jenkins", "Leeroy Jenkins is a paladin."),
+      ...Array.from({ length: 4 }, (_, i) => row(`culture-${i}`, `Pop culture ${i}`, "Leroy Jenkins appears in this list.")),
+    ]);
+    const h = createToolHandlers(db);
+    const query = "who's Leroy Jenkins";
+    const knowledge = await h.search_knowledge({ query, limit: 3 });
+    expect(typeof knowledge === "string" ? null : knowledge.structured).toMatchObject({ hits: [{ name: "Leeroy Jenkins" }] });
+    const found = await h.search({ query });
+    expect(JSON.parse(typeof found === "string" ? found : found.text).results[0].title).toBe("Leeroy Jenkins");
+    expect((await answerSources(db, { question: query, limit: 3 }, null, null)).evidence[0]?.source.title).toBe("Leeroy Jenkins");
+    expect(await respell(db, "Leroy Jenkins", new Set(["leroy"]))).toBeNull();
+    await replaceSourceRows(db, "curated", ["lore_page"], [row("leroy", "Leroy", "Leroy is a different person.")]);
+    expect(await respell(db, query)).toBeNull();
+  } finally { db.close(); }
 });

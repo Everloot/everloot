@@ -232,6 +232,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: news cards and bylines name Everloot, not everloot.app, as the source of a post that cites the site's own pages.
 - Site: the MCP methodology describes drop rates as a share of recorded loot windows, including its measured-zero example.
 - Site: loot-table notes and open-data descriptions warn that rates can read high before the drops restart, and switch to counted-empty-window wording when a drops recheck scope exists.
+- Site: find lore pages from nearby title spellings in public search and chat, including Leroy Jenkins.
 - Addon: Settings stays inside the Everloot window, counts every populated record kind and names item facts; a Full / Compact / Off selector controls tooltip detail without changing recording. Needs an in-game layout check before release.
 - Site: bag upgrade pickers offer publicly priced sizes and preserve bags selected in saved links, without suggesting unpriced test containers.
 - Docs: the project overview links current downloads and explains paired addon/Desktop App updates for community prices.
