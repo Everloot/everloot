@@ -45,7 +45,7 @@ export default async function QuestChainListPage(props: { searchParams?: Promise
   // A chain cut at 80 quests has more than it lists.
   const count = (x: ChainEntry) => (x.truncated ? `${x.questIds.length}+` : x.questIds.length);
   const columns: Column<Listed<ChainEntry>>[] = [
-    { key: "name", header: "Name", sortable: true, cell: (x) => <Link href={chainHref(x.questLineId, x.name)} className={LINK}>{x.name}</Link> },
+    { key: "name", header: "Name", sortable: true, cell: (x) => <Link prefetch={false} href={chainHref(x.questLineId, x.name)} className={LINK}>{x.name}</Link> },
     { key: "quests", header: "Quests", numeric: true, sortable: true, cell: count },
     { key: "confirmed", header: "Confirmed", cell: (x) => confirmedCell(x, confirmations) },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.questLineId },
