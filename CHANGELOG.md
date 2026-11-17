@@ -230,6 +230,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: /tools/bags shows the cheapest bag of each size on one realm's auction house and what each added slot costs over your smallest bag, and item tooltips print a bag's "14 Slot Bag" line; slot counts come from the game files, prices from players' scans.
 
 ### Fixed
+- Site: the armory no longer drops a character whose gear includes an item Blizzard sends without an item level (a common head item, seen 11/17); the item is kept with no level and counts as an empty slot in the item level and gear score.
 - Site: news cards and bylines name Everloot, not everloot.app, as the source of a post that cites the site's own pages.
 - Site: the MCP methodology describes drop rates as a share of recorded loot windows, including its measured-zero example.
 - Site: loot-table notes and open-data descriptions warn that rates can read high before the drops restart, and switch to counted-empty-window wording when a drops recheck scope exists.

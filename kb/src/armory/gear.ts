@@ -4,7 +4,7 @@ export interface EquipmentItem {
   slot: { type: string };
   item: { id: number };
   name: string;
-  level: { value: number };
+  level?: { value: number } | null;
   quality: { type: string };
   inventory_type: { type: string };
 }
@@ -52,10 +52,12 @@ const slotInventory: Record<RankedSlot, number> = {
   SecondaryHandSlot: 22,
   RangedSlot: 28,
 };
-export function gearNumbers(equipped: EquipmentItem[]): {
+export function gearNumbers(all: EquipmentItem[]): {
   item_level: number | null;
   gear_score: number | null;
 } {
+  // An item Blizzard gives no level counts as an empty slot in both numbers.
+  const equipped = all.filter((e): e is EquipmentItem & { level: { value: number } } => e.level != null);
   const result = score(
     equipped.map((e, index) => ({
       slot: slots[e.slot.type] ?? e.slot.type,

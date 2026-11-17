@@ -135,6 +135,17 @@ it("uses the 17 slot weights", () => {
     gear_score: 5,
   });
 });
+it("an equipped item Blizzard gives no level is kept with none and counts as an empty slot", () => {
+  // Seen 2026-11-17: a common head item (4491) came without `level`, and the whole character failed validation.
+  const items = equipment.equipped_items.map((i) => (i.slot.type === "HEAD" ? { ...i, level: undefined } : i));
+  const row = parseCharacter(profile, { ...equipment, equipped_items: items }, pvp, "date", "ember-vale");
+  expect(row.equipment.find((e) => e.slot === "HEAD")?.level).toBeNull();
+  expect(row.equipment.filter((e) => e.level === null)).toHaveLength(1);
+  // Ranked levels without the head's 51 sum to 924 (the two-hander's 63 fills the off hand): floor(924 / 17) = 54.
+  expect(row.item_level).toBe(54);
+  expect(parseCharacter(profile, equipment, pvp, "date", "ember-vale").item_level).toBe(57);
+  expect(row.gear_score).toBe(gearNumbers(items.filter((i) => i.slot.type !== "HEAD")).gear_score);
+});
 it("two hands, ignored shirt, empty set", () => {
   expect(
     gearNumbers([
