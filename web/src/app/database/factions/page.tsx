@@ -57,7 +57,7 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
 
   const dash = <span className="text-muted">—</span>;
   const columns: Column<Listed<FactionEntry>>[] = [
-    { key: "name", header: "Name", sortable: true, cell: (x) => <Link href={factionHref(x.factionId, x.name)} className={LINK}>{x.name}</Link> },
+    { key: "name", header: "Name", sortable: true, cell: (x) => <Link prefetch={false} href={factionHref(x.factionId, x.name)} className={LINK}>{x.name}</Link> },
     { key: "header", header: "Header", sortable: true, cell: (x) => x.header ?? dash },
     { key: "confirmed", header: "Confirmed", cell: (x) => confirmedCell(x, confirmations) },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (x) => x.factionId },
