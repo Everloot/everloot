@@ -10,7 +10,7 @@
 local E = Everloot
 if not (E.Window and E.Window.Views) then return end
 local U = E.Window
-local COLORS, NARROW, text, surface = U.COLORS, U.NARROW, U.Text, U.Surface
+local COLORS, text, surface = U.COLORS, U.Text, U.Surface
 
 local W = 604          -- the view frame window.lua gives every view (W - MAIN - 12 wide)
 local ROWS, ROW_H = 12, 18
@@ -28,6 +28,9 @@ local NO_CHAINS = "No quest chains read yet. They are read at login and each tim
 local NOTHING_MISSING = "Nothing missing here."
 local NO_KEY = "This character cannot be identified yet."
 local DETAIL_W, DETAIL_WIDE = 210, 306   -- the detail column, narrower beside a bar
+-- The game's ready-check marks, as completionist lists draw them: a green check for done, a red cross for missing.
+local DONE_MARK, MISSING_MARK = "Interface\RaidFrame\ReadyCheck-Ready", "Interface\RaidFrame\ReadyCheck-NotReady"
+local GOLD = { 1, 0.82, 0, 1 } -- the game's heading yellow (GameFontNormal)
 
 local refresh
 
@@ -59,6 +62,8 @@ end
 local function number(v) return type(v) == "number" end
 local function name(v) return type(v) == "string" and v ~= "" and v or "-" end
 local function byName(a, b) return a.name < b.name end
+-- " (75%)" after a count, as completionist lists write it; nothing when there is nothing to count.
+local function percent(n, total) return total > 0 and (" (" .. math.floor(n * 100 / total) .. "%)") or "" end
 
 -- What a scope covers: `keys`, this character first, then in the account scope every other character in the
 -- roster; and, in the account scope only, `holder(key)`, the roster name a detail line ends with. Names come from
@@ -101,7 +106,8 @@ local function known(kind, s, field)
   return out
 end
 
--- Each section returns its items ({ name, detail, done, bar = { floor, ceiling, standing } }) and its summary line.
+-- Each section returns its items ({ name, detail, done, heading, bar = { floor, ceiling, standing } }) and its summary
+-- line. `done` true draws a check and false a cross; a heading or an information line leaves it nil and draws neither.
 -- In the account scope an item is done when any key holds it; the first key in scope order that does is named.
 -- Achievements, reputation and quests are read from the game, so they are this character's (s.keys[1]) in either scope.
 local function achievements(s)
@@ -128,7 +134,7 @@ local function achievements(s)
     if a.done and a.when ~= b.when then return (a.when or "") > (b.when or "") end
     return byName(a, b)
   end)
-  return items, live("Achievements: " .. done .. " of " .. #items .. " · " .. points .. " points", s)
+  return items, live("Achievements: " .. done .. " of " .. #items .. percent(done, #items) .. " · " .. points .. " points", s)
 end
 
 -- A faction the reputation window does not list now (under a collapsed header) shows "-".
@@ -166,7 +172,7 @@ local function titles(s)
     end
   end
   table.sort(items, byName)
-  return items, "Titles: " .. n .. " of " .. #items
+  return items, "Titles: " .. n .. " of " .. #items .. percent(n, #items)
 end
 
 -- The shipped player agreement gates instances; personal kills never change that public catalog.
@@ -177,21 +183,21 @@ local function raids(s)
   for _, key in ipairs(s.keys) do keys[key] = true end
   local items, listed = {}, {}
   for _, group in ipairs({ "Dungeons", "Raids", "World bosses" }) do
-    items[#items + 1] = { name = group, detail = group == "World bosses" and "Found in game files, unconfirmed" or "Agreed by players", done = false }
+    items[#items + 1] = { name = group, detail = group == "World bosses" and "Found in game files, unconfirmed" or "Agreed by players", heading = true }
     local instances = {}
     for _, instance in ipairs(data.instances) do
       if instance.group == group then instances[#instances + 1] = instance end
     end
     table.sort(instances, byName)
     for _, instance in ipairs(instances) do
-      items[#items + 1] = { name = instance.name, detail = instance.unconfirmed and "Unconfirmed" or "", done = false }
+      items[#items + 1] = { name = instance.name, detail = instance.unconfirmed and "Unconfirmed" or "", heading = true }
       for _, r in ipairs(E:Rows("lockout_owned")) do
         if keys[r.characterKey] and (r.instanceId == instance.id or r.instance == instance.name)
           and type(r.resetAt) == "string" and r.resetAt > now then
           listed[r] = true
           local day, hour = r.resetAt:match("^(%d+%-%d+%-%d+)T(%d+:%d+)")
           items[#items + 1] = { name = "  This week's lockout", detail = held((r.bossesKilledCount or "-") .. " of " .. (r.bossesTotal or "-")
-            .. " / resets " .. (day and (day .. " " .. hour .. " UTC") or r.resetAt), s, r.characterKey), done = false }
+            .. " / resets " .. (day and (day .. " " .. hour .. " UTC") or r.resetAt), s, r.characterKey) }
         end
       end
       for _, boss in ipairs(instance.bosses) do
@@ -205,7 +211,7 @@ local function raids(s)
           detail = kill and held("Last killed " .. kill.lastKillAt:sub(1, 10), s, kill.characterKey) or "No kill recorded" }
       end
     end
-    if #instances == 0 then items[#items + 1] = { name = "No agreed instances yet", detail = "", done = false } end
+    if #instances == 0 then items[#items + 1] = { name = "No agreed instances yet", detail = "" } end
   end
   -- A lockout the game reports for an instance players have not agreed on yet is still this character's: it is
   -- listed on its own, as the Raids section did before, rather than dropped.
@@ -221,7 +227,7 @@ local function raids(s)
   end
   if #other > 0 then
     table.sort(other, byName)
-    items[#items + 1] = { name = "Other lockouts this week", detail = "Not on the agreed list yet", done = false }
+    items[#items + 1] = { name = "Other lockouts this week", detail = "Not on the agreed list yet", heading = true }
     for _, item in ipairs(other) do items[#items + 1] = item end
   end
   return items, "Dungeons & raids / as of " .. data.asOf:sub(1, 10)
@@ -261,7 +267,8 @@ local function quests(s)
     items[#items + 1] = item
   end
   table.sort(items, byName)
-  return items, live("Quests: " .. complete .. " of " .. #items .. (#items == 1 and " chain" or " chains") .. " complete", s)
+  return items, live("Quests: " .. complete .. " of " .. #items .. (#items == 1 and " chain" or " chains") .. " complete"
+    .. percent(complete, #items), s)
 end
 
 local READ = { achievements = achievements, reputation = reputation, titles = titles, raids = raids, quests = quests }
@@ -269,8 +276,10 @@ local EMPTY = { quests = NO_CHAINS }
 
 local function draw(row, item)
   row.name:SetText(item.name)
+  row.name:SetTextColor(unpack(item.heading and GOLD or COLORS.text))
   row.detail:SetText(item.detail)
-  row.done:SetText(item.done and "done" or "")
+  if item.done == nil then row.done:Hide()
+  else row.done:SetTexture(item.done and DONE_MARK or MISSING_MARK); row.done:Show() end
   if item.bar then
     row.detail:SetWidth(DETAIL_W)
     row.bar:SetMinMaxValues(item.bar[1], item.bar[2])
@@ -370,15 +379,16 @@ local function build(f, parent)
     local row = CreateFrame("Frame", nil, list)
     row:SetPoint("TOPLEFT", 4, -8 - (i - 1) * ROW_H)
     row:SetSize(W - 8, ROW_H)
-    for _, col in ipairs({ { "name", 4, 220 }, { "detail", 228, DETAIL_W }, { "done", 540, 50 } }) do
-      local s = text(row, 12, col[1] == "done" and NARROW or nil) -- the count in the narrow figures, words in Friz
+    for _, col in ipairs({ { "name", 4, 220 }, { "detail", 228, DETAIL_W } }) do
+      local s = text(row, 12)
       s:SetPoint("LEFT", col[2], 0)
       s:SetWidth(col[3])
       if s.SetWordWrap then s:SetWordWrap(false) end
       row[col[1]] = s
     end
-    row.done:SetJustifyH("RIGHT")
-    row.done:SetTextColor(unpack(COLORS.accent))
+    row.done = row:CreateTexture(nil, "ARTWORK")
+    row.done:SetSize(14, 14)
+    row.done:SetPoint("RIGHT", -6, 0)
     local bar = CreateFrame("StatusBar", nil, row)
     bar:SetPoint("LEFT", 444, 0)
     bar:SetSize(90, 6)

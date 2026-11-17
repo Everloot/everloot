@@ -80,6 +80,7 @@ HELPERS = """
 local U = Everloot.Window
 local function shown(rows) local n = 0; for _, r in ipairs(rows) do if r.shown then n = n + 1 end end; return n end
 local function click(b) b.scripts.OnClick(b) end
+local function mark(row) if not row.done.shown then return '' end; return row.done.path:find('NotReady', 1, true) and 'missing' or (row.done.path:find('Ready', 1, true) and 'done') end
 """
 
 # --- Off: what the tracker reads, and the button that runs /everloot completion on ---
@@ -116,12 +117,12 @@ assert(#rows == 12 and c.sections.achievements and c.sections.reputation and c.s
 assert(c.scopes.character.text == 'This character' and c.scopes.account.text == 'Account', 'the scope buttons of the Gold tab')
 
 -- Achievements: earned newest first, then the rest by name; the other character's do not count.
-assert(c.summary.text == 'Achievements: 2 of 4 · 20 points', c.summary.text)
+assert(c.summary.text == 'Achievements: 2 of 4 (50%) · 20 points', c.summary.text)
 assert(shown(rows) == 4)
-assert(rows[1].name.text == 'Explore Durotar' and rows[1].detail.text == '10 pts · Exploration · 2026-11-02' and rows[1].done.text == 'done', rows[1].detail.text)
-assert(rows[2].name.text == 'Level 10' and rows[2].done.text == 'done')
-assert(rows[3].name.text == 'Journeyman Fisherman' and rows[3].detail.text == '25 pts · Professions' and rows[3].done.text == '', rows[3].detail.text)
-assert(rows[4].name.text == 'Zul Farrak' and rows[4].done.text == '')
+assert(rows[1].name.text == 'Explore Durotar' and rows[1].detail.text == '10 pts · Exploration · 2026-11-02' and mark(rows[1]) == 'done', rows[1].detail.text)
+assert(rows[2].name.text == 'Level 10' and mark(rows[2]) == 'done')
+assert(rows[3].name.text == 'Journeyman Fisherman' and rows[3].detail.text == '25 pts · Professions' and mark(rows[3]) == 'missing', rows[3].detail.text)
+assert(rows[4].name.text == 'Zul Farrak' and mark(rows[4]) == 'missing')
 assert(not rows[1].bar.shown, 'bars are for reputation')
 assert(c.missingOnly.text == 'Missing only')
 click(c.missingOnly)
@@ -136,15 +137,15 @@ assert(c.section == 'reputation' and c.summary.text == 'Reputation: 2 factions �
 assert(shown(rows) == 2 and rows[1].name.text == 'Darkspear Trolls' and rows[2].name.text == 'Orgrimmar')
 local bar = rows[1].bar
 assert(bar.shown and bar.lo == 3000 and bar.hi == 9000 and bar.value == 4500, 'the bar runs floor to ceiling')
-assert(rows[1].detail.text == '4500 / 9000' and rows[1].done.text == '' and rows[2].done.text == 'done', rows[1].detail.text)
+assert(rows[1].detail.text == '4500 / 9000' and mark(rows[1]) == 'missing' and mark(rows[2]) == 'done', rows[1].detail.text)
 click(c.missingOnly)
 assert(shown(rows) == 1 and rows[1].name.text == 'Darkspear Trolls', 'exalted is done')
 click(c.missingOnly)
 
 -- Titles: known of total, the missing ones listed.
 click(c.sections.titles)
-assert(c.summary.text == 'Titles: 1 of 3', c.summary.text)
-assert(shown(rows) == 3 and rows[1].name.text == 'Corporal' and rows[1].done.text == 'done' and rows[2].done.text == '')
+assert(c.summary.text == 'Titles: 1 of 3 (33%)', c.summary.text)
+assert(shown(rows) == 3 and rows[1].name.text == 'Corporal' and mark(rows[1]) == 'done' and mark(rows[2]) == 'missing')
 click(c.missingOnly)
 assert(shown(rows) == 2 and rows[1].name.text == 'Private' and rows[2].name.text == 'Scout', 'the missing titles')
 click(c.missingOnly)
@@ -155,21 +156,21 @@ assert(c.sections.raids.text == 'Dungeons & raids')
 
 -- Quests: one row per chain, this character's quests done of its total; a chain cut at the tracker's limit is never complete.
 click(c.sections.quests)
-assert(c.section == 'quests' and c.summary.text == 'Quests: 1 of 4 chains complete', c.summary.text)
+assert(c.section == 'quests' and c.summary.text == 'Quests: 1 of 4 chains complete (25%)', c.summary.text)
 assert(shown(rows) == 4)
-assert(rows[4].name.text == 'Wayward Trail' and rows[4].detail.text == '2 of 4' and rows[4].done.text == '', rows[4].detail.text)
-assert(rows[1].name.text == 'Kolkar Raiders' and rows[1].detail.text == '1 of 2' and rows[1].done.text == '', rows[1].detail.text)
+assert(rows[4].name.text == 'Wayward Trail' and rows[4].detail.text == '2 of 4' and mark(rows[4]) == 'missing', rows[4].detail.text)
+assert(rows[1].name.text == 'Kolkar Raiders' and rows[1].detail.text == '1 of 2' and mark(rows[1]) == 'missing', rows[1].detail.text)
 assert(rows[1].bar.shown and rows[1].bar.lo == 0 and rows[1].bar.hi == 2 and rows[1].bar.value == 1, 'the bar runs to the chain total')
 assert(rows[1].detail.width == 210 and 228 + rows[1].detail.width <= 444, 'the detail stops before the bar at 444')
-assert(rows[2].name.text == 'The Defias Brotherhood' and rows[2].detail.text == '4 of 4' and rows[2].done.text == 'done', 'quests from two rows count')
-assert(rows[3].name.text == 'The Long Road' and rows[3].detail.text == '0 of 2+' and rows[3].done.text == '', rows[3].detail.text)
+assert(rows[2].name.text == 'The Defias Brotherhood' and rows[2].detail.text == '4 of 4' and mark(rows[2]) == 'done', 'quests from two rows count')
+assert(rows[3].name.text == 'The Long Road' and rows[3].detail.text == '0 of 2+' and mark(rows[3]) == 'missing', rows[3].detail.text)
 click(c.missingOnly)
 assert(shown(rows) == 3 and rows[1].name.text == 'Kolkar Raiders' and rows[2].name.text == 'The Long Road', 'missing only hides complete chains')
 click(c.missingOnly)
 
 -- Account with no roster: this character alone, named as such.
 click(c.scopes.account)
-assert(c.scope == 'account' and c.summary.text == 'Quests: 1 of 4 chains complete · this character', c.summary.text)
+assert(c.scope == 'account' and c.summary.text == 'Quests: 1 of 4 chains complete (25%) · this character', c.summary.text)
 assert(rows[2].detail.text == '4 of 4 · This character', rows[2].detail.text)
 click(c.scopes.character)
 assert(c.scope == 'character' and rows[2].detail.text == '4 of 4', rows[2].detail.text)
@@ -220,41 +221,41 @@ lua.execute(HELPERS + """
 assert(U.Open('collection') == true)
 local c = EverlootWindow.collection
 local rows = c.rows
-assert(c.summary.text == 'Achievements: 2 of 4 · 20 points', 'This character is the default: ' .. c.summary.text)
+assert(c.summary.text == 'Achievements: 2 of 4 (50%) · 20 points', 'This character is the default: ' .. c.summary.text)
 click(c.scopes.account)
 assert(c.scope == 'account')
 
 -- Achievements are read from the game: this character's, named, and the summary says so.
-assert(c.summary.text == 'Achievements: 2 of 4 · 20 points · this character', c.summary.text)
+assert(c.summary.text == 'Achievements: 2 of 4 (50%) · 20 points · this character', c.summary.text)
 assert(rows[1].name.text == 'Explore Durotar' and rows[1].detail.text == '10 pts · Exploration · 2026-11-02 · Brakka', rows[1].detail.text)
-assert(rows[3].name.text == 'Journeyman Fisherman' and rows[3].detail.text == '25 pts · Professions' and rows[3].done.text == '', rows[3].detail.text)
-assert(rows[4].name.text == 'Zul Farrak' and rows[4].done.text == '', 'an old row of the alt does not count')
+assert(rows[3].name.text == 'Journeyman Fisherman' and rows[3].detail.text == '25 pts · Professions' and mark(rows[3]) == 'missing', rows[3].detail.text)
+assert(rows[4].name.text == 'Zul Farrak' and mark(rows[4]) == 'missing', 'an old row of the alt does not count')
 
 -- Reputation: this character's standing, named.
 click(c.sections.reputation)
 assert(c.summary.text == 'Reputation: 2 factions · 1 exalted · this character', c.summary.text)
-assert(rows[1].name.text == 'Darkspear Trolls' and rows[1].detail.text == '4500 / 9000 · Brakka' and rows[1].done.text == '', rows[1].detail.text)
+assert(rows[1].name.text == 'Darkspear Trolls' and rows[1].detail.text == '4500 / 9000 · Brakka' and mark(rows[1]) == 'missing', rows[1].detail.text)
 assert(rows[2].name.text == 'Orgrimmar' and rows[2].detail.text == '42500 / 42999 · Brakka', rows[2].detail.text)
 
 -- Titles: known on any character, named.
 click(c.sections.titles)
-assert(c.summary.text == 'Titles: 3 of 3', c.summary.text)
+assert(c.summary.text == 'Titles: 3 of 3 (100%)', c.summary.text)
 assert(rows[1].name.text == 'Corporal' and rows[1].detail.text == 'Brakka' and rows[2].name.text == 'Private' and rows[2].detail.text == 'Velda')
 
 -- Quests: this character's, from the game.
 click(c.sections.quests)
-assert(c.summary.text == 'Quests: 1 of 4 chains complete · this character', c.summary.text)
-assert(rows[4].name.text == 'Wayward Trail' and rows[4].detail.text == '2 of 4 · Brakka' and rows[4].done.text == '', rows[4].detail.text)
+assert(c.summary.text == 'Quests: 1 of 4 chains complete (25%) · this character', c.summary.text)
+assert(rows[4].name.text == 'Wayward Trail' and rows[4].detail.text == '2 of 4 · Brakka' and mark(rows[4]) == 'missing', rows[4].detail.text)
 assert(rows[1].name.text == 'Kolkar Raiders' and rows[1].detail.text == '1 of 2 · Brakka', rows[1].detail.text)
-assert(rows[2].name.text == 'The Defias Brotherhood' and rows[2].detail.text == '4 of 4 · Brakka' and rows[2].done.text == 'done', rows[2].detail.text)
-assert(rows[3].name.text == 'The Long Road' and rows[3].detail.text == '0 of 2+' and rows[3].done.text == '', rows[3].detail.text)
+assert(rows[2].name.text == 'The Defias Brotherhood' and rows[2].detail.text == '4 of 4 · Brakka' and mark(rows[2]) == 'done', rows[2].detail.text)
+assert(rows[3].name.text == 'The Long Road' and rows[3].detail.text == '0 of 2+' and mark(rows[3]) == 'missing', rows[3].detail.text)
 click(c.missingOnly)
 assert(shown(rows) == 3 and rows[1].name.text == 'Kolkar Raiders', 'missing only')
 click(c.missingOnly)
 
 -- Back to this character: the same progress, without the names.
 click(c.scopes.character)
-assert(c.summary.text == 'Quests: 1 of 4 chains complete' and rows[1].detail.text == '1 of 2', c.summary.text)
+assert(c.summary.text == 'Quests: 1 of 4 chains complete (25%)' and rows[1].detail.text == '1 of 2', c.summary.text)
 assert(rows[4].detail.text == '2 of 4', rows[4].detail.text)
 assert(EverlootWindow.shown and not U.failed)
 """)
