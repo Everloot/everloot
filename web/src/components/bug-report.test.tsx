@@ -90,3 +90,15 @@ test("a page change closes the dialog and the next report uses the new page", as
   await open();
   expect(report().searchParams.get("page")).toBe("https://everloot.app/map");
 });
+
+test("chat moves the mobile report control above the composer and restores it on other pages", async () => {
+  path = "/chat";
+  await act(async () => root.render(<BugReport />));
+  expect(trigger().className).toContain("top-header");
+  expect(trigger().className).toContain("sm:top-auto");
+  expect(trigger().className).toContain("bottom-auto");
+  path = "/map";
+  await act(async () => root.render(<BugReport />));
+  expect(trigger().className).not.toContain("top-header");
+  expect(trigger().className).toContain("bottom-[");
+});

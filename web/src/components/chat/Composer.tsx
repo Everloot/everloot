@@ -62,15 +62,6 @@ export default function Composer(p: {
     <form className="mx-auto w-full max-w-reading px-4 pb-3" aria-label="Ask Everloot"
       onSubmit={(e) => { e.preventDefault(); p.onSend(); }}>
       <div className="rounded-card border border-edge bg-panel focus-within:border-accent">
-        {!ready && (mode === "free" ? (
-          <p className="border-b border-line px-4 py-2 text-sm text-fg-2">
-            Everloot (free) answers with a free AI model on {free}, from Everloot&apos;s data, a limited number a day. Your question and this chat go to {names.length > 1 ? `whichever of ${free} answers` : free}, and each answer names it; no key, and no account details unless you attach a character or note. At the limit, Send shows Everloot search. {setup} adds your own model.
-          </p>
-        ) : (
-          <p className="border-b border-line px-4 py-2 text-sm text-fg-2">
-            Everloot search is ready. {setup} adds an optional AI model on your own provider account.
-          </p>
-        ))}
         <textarea ref={p.box} rows={1} value={p.value} aria-label="Your question" aria-keyshortcuts="Enter Shift+Enter"
           placeholder="Ask about WoW: Forever" maxLength={2000}
           className="block max-h-60 w-full resize-none border-0 bg-transparent px-4 pt-3 text-base text-fg placeholder:text-muted focus:outline-none"
@@ -80,34 +71,53 @@ export default function Composer(p: {
             if (e.key === "Escape" && p.busy) { e.preventDefault(); p.onStop(); }
           }} />
         <div className="flex flex-wrap items-center gap-2 px-3 pb-3 pt-1">
-          {ready && (
-            <select aria-label="Model" className={menu} disabled={p.busy} value={`${active!.kind}|${active!.model}`}
-              onChange={(e) => {
-                if (e.target.value === "manage") { window.location.assign(p.keysHref); return; }
-                const [kind, ...rest] = e.target.value.split("|");
-                p.onPickModel(kind as SavedProvider["kind"], rest.join("|"));
-              }}>
-              {modelOptions(p.providers).map((g) => (
-                <optgroup key={g.kind} label={g.label}>
-                  {g.models.map((m) => <option key={m.id} value={`${g.kind}|${m.id}`}>{m.label}</option>)}
-                </optgroup>
+          <details className="min-w-0 max-w-full">
+            <summary className={`${chip} cursor-pointer hover:border-edge focus-visible:outline-accent`}>
+              {active?.model ?? (mode === "free" ? "Everloot (free)" : "Everloot search")}
+            </summary>
+            <div className="mt-2 space-y-2 rounded-control border border-line p-3">
+              {!ready && (mode === "free" ? (
+                <p className="text-sm text-fg-2">
+                  Everloot (free) answers with a free AI model on {free}, from Everloot&apos;s data, a limited number a day. Your question and this chat go to {names.length > 1 ? `whichever of ${free} answers` : free}, and each answer names it; no key, and no account details unless you attach a character or note. At the limit, Send shows Everloot search. {setup} adds your own model.
+                </p>
+              ) : (
+                <p className="text-sm text-fg-2">
+                  Everloot search is ready. {setup} adds an optional AI model on your own provider account.
+                </p>
               ))}
-              <option value="manage">Assistant setup…</option>
-            </select>
-          )}
-          {/* With the workspace or the free model on, the model menu shows without a key too: the free model when it is
-              on, Everloot search, and a model of your own after setup. */}
-          {!ready && (free || p.sessionKey !== undefined) && (
-            <select aria-label="Model" className={menu} disabled={p.busy} value={mode}
-              onChange={(e) => {
-                if (e.target.value === "setup") window.location.assign(p.keysHref);
-                else p.onMode?.(e.target.value as "free" | "search");
-              }}>
-              {free && <option value="free">Everloot (free)</option>}
-              <option value="search">Everloot search</option>
-              <option value="setup">Assistant setup…</option>
-            </select>
-          )}
+              {ready && (
+                <select aria-label="Model" className={menu} disabled={p.busy} value={`${active!.kind}|${active!.model}`}
+                  onChange={(e) => {
+                    if (e.target.value === "manage") { window.location.assign(p.keysHref); return; }
+                    const [kind, ...rest] = e.target.value.split("|");
+                    p.onPickModel(kind as SavedProvider["kind"], rest.join("|"));
+                  }}>
+                  {modelOptions(p.providers).map((g) => (
+                    <optgroup key={g.kind} label={g.label}>
+                      {g.models.map((m) => <option key={m.id} value={`${g.kind}|${m.id}`}>{m.label}</option>)}
+                    </optgroup>
+                  ))}
+                  <option value="manage">Assistant setup…</option>
+                </select>
+              )}
+              {/* With the workspace or the free model on, the model menu shows without a key too: the free model when it is
+                  on, Everloot search, and a model of your own after setup. */}
+              {!ready && (free || p.sessionKey !== undefined) && (
+                <select aria-label="Model" className={menu} disabled={p.busy} value={mode}
+                  onChange={(e) => {
+                    if (e.target.value === "setup") window.location.assign(p.keysHref);
+                    else p.onMode?.(e.target.value as "free" | "search");
+                  }}>
+                  {free && <option value="free">Everloot (free)</option>}
+                  <option value="search">Everloot search</option>
+                  <option value="setup">Assistant setup…</option>
+                </select>
+              )}
+              {p.signed !== null && (
+                <span className="text-xs text-muted">{p.signed ? "Game data through your Everloot account" : "Signed out: lookups use the public limits"}</span>
+              )}
+            </div>
+          </details>
           {p.note && (
             <span className={chip}>
               Note: {p.note.title}
@@ -125,9 +135,6 @@ export default function Composer(p: {
               <option value="">Add a character</option>
               {p.characters.map((c) => <option key={c.id} value={c.id}>{c.name} · {className(c.classSlug)}</option>)}
             </select>
-          )}
-          {p.signed !== null && (
-            <span className="text-xs text-muted">{p.signed ? "Game data through your Everloot account" : "Signed out: lookups use the public limits"}</span>
           )}
           {p.sessionKey !== undefined && <DictationButton value={p.value} onChange={p.onValue} disabled={p.busy} sessionKey={p.sessionKey} />}
           {p.busy
