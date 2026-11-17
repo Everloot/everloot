@@ -43,7 +43,7 @@ export default async function VendorListPage(props: { searchParams?: Promise<Sea
 
   const dash = <span className="text-muted">—</span>;
   const columns: Column<VendorRow>[] = [
-    { key: "name", header: "Vendor", sortable: true, cell: (v) => <Link href={`/database/vendors/${v.id}`} className={LINK}>{v.name ?? `Vendor NPC ${v.id}`}</Link> },
+    { key: "name", header: "Vendor", sortable: true, cell: (v) => <Link prefetch={false} href={`/database/vendors/${v.id}`} className={LINK}>{v.name ?? `Vendor NPC ${v.id}`}</Link> },
     { key: "zone", header: "Zone", sortable: true, cell: (v) => v.zone ?? dash },
     { key: "items", header: "Items", numeric: true, sortable: true, cell: (v) => v.items },
     { key: "id", header: "ID", numeric: true, sortable: true, cell: (v) => v.id },

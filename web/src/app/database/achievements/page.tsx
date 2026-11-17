@@ -57,7 +57,7 @@ export default async function AchievementListPage(props: { searchParams?: Promis
   const here = (over: Partial<AchievementQuery>) => href({ ...q, page: 1, ...over });
 
   const columns: Column<Listed<AchievementEntry>>[] = [
-    { key: "name", header: "Name", sortable: true, cell: (x) => <Link href={achievementHref(x.achievementId, x.name)} className={LINK}>{x.name}</Link> },
+    { key: "name", header: "Name", sortable: true, cell: (x) => <Link prefetch={false} href={achievementHref(x.achievementId, x.name)} className={LINK}>{x.name}</Link> },
     { key: "category", header: "Category", sortable: true, cell: (x) => x.category },
     { key: "points", header: "Points", numeric: true, sortable: true, cell: (x) => x.points },
     { key: "criteria", header: "Criteria", numeric: true, sortable: true, cell: (x) => x.criteriaCount },

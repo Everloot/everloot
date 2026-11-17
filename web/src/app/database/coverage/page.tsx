@@ -53,7 +53,7 @@ export default async function CoveragePage(props: { searchParams?: Promise<Searc
   const sort = q.sort ?? DEFAULT_SORT;
   const rows = sortRows(zones, (z) => (sort.key === "zone" ? z.name : cellRank(z.types[sort.key as CoverageType])), sort.desc, (z) => z.mapId);
   const columns: SparseColumn<ZoneCoverage>[] = [
-    { key: "zone", header: "Zone", sortable: true, cell: (z) => <Link href={zoneCoverageHref(z)} className={LINK}>{z.name}</Link> },
+    { key: "zone", header: "Zone", sortable: true, cell: (z) => <Link prefetch={false} href={zoneCoverageHref(z)} className={LINK}>{z.name}</Link> },
     ...COVERAGE_TYPES.map((t): SparseColumn<ZoneCoverage> => ({
       key: t, header: TYPE_LABEL[t], numeric: true, sortable: true,
       cell: (z) => <span title={cellDetail(z.types[t])} className="tabular-nums">{shareText(z.types[t])}<span className="sr-only">: {cellDetail(z.types[t])}</span></span>,
@@ -96,7 +96,7 @@ export default async function CoveragePage(props: { searchParams?: Promise<Searc
               <p className="mb-3 text-cell text-fg-2">
                 {found.length === 0 ? `No quest or NPC ${id} has been reported yet.` : found.map((f, i) => {
                   const z = zoneName(f.zone);
-                  return <span key={i} className="mr-3">{f.what}: {z ? <>counted in <Link href={zoneCoverageHref(z)} className={LINK}>{z.name}</Link></> : "in no released zone yet"}.</span>;
+                  return <span key={i} className="mr-3">{f.what}: {z ? <>counted in <Link prefetch={false} href={zoneCoverageHref(z)} className={LINK}>{z.name}</Link></> : "in no released zone yet"}.</span>;
                 })}
               </p>
             )}
