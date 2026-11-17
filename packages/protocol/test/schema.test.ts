@@ -56,6 +56,17 @@ describe("schema files", () => {
     expect(item.additionalProperties).toBe(false);
   });
 
+  test("market route documentation exposes bounded item selection and invalid requests", () => {
+    const routes = JSON.parse(readFileSync(join(out, "api", "routes.json"), "utf8"));
+    const market = routes.find((route: { path: string }) => route.path === "/api/market/prices");
+    const items = market.query.find((param: { name: string }) => param.name === "items");
+    expect(items).toBeDefined();
+    expect(items.schema).toMatchObject({ type: "string", examples: ["2589,2592"] });
+    expect(items.description).toContain("100");
+    expect(items.description).toContain("realm");
+    expect(market.responses["400"].description).toContain("items");
+  });
+
   test("the drops response schema emits range units and the window-share caveat", () => {
     const file = JSON.parse(readFileSync(join(out, "api", "dropsResponse.json"), "utf8"));
     const rate = file.properties.rates.items;

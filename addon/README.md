@@ -350,7 +350,9 @@ settings page turns it off; the minimap button then opens the plan workspace as 
 Hovering the minimap button shows what its clicks do. The Minimap button switch on the settings page hides it after a `/reload`; `/everloot window` still opens the window.
 
 The minimap button also holds other addons' minimap buttons. Buttons made with LibDBIcon (most addons' round
-minimap buttons) move into it at login; hover the crest and they show in a small panel beside it, which closes
+minimap buttons) move into it at login when the drawer is enabled. It starts off for new installs; existing
+players keep their saved setting, and upgrades without a saved toggle keep it on. Use `/everloot buttons on`
+to enable it. Hover the crest and they show in a small panel beside it, which closes
 when the mouse leaves. Its clicks stay the same. Blizzard's own minimap buttons and any other button are left
 where they are. The first time it gathers a button, chat says how many. `/everloot buttons off`, or the **Addon
 buttons in the Everloot button** switch on the settings page, turns it off; the buttons go back around the

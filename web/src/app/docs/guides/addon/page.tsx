@@ -79,7 +79,7 @@ export default function Page() {
           [<C key="window">/everloot window</C>, "Opens or closes the Everloot window, the same as a left-click on the minimap button."],
           [<C key="a2">/everloot options</C>, "Opens the addon's settings page, with a switch for each part and what it records. A right-click on the minimap button does the same."],
           [<C key="planner">/everloot planner [talents|raid]</C>, "Opens the matching planner tab. Copy a plan on the website with Copy for addon, paste it here and choose Import."],
-          [<C key="a3">/everloot buttons off</C>, <>Stops gathering other addons&apos; minimap buttons into the Everloot button (hover the crest to open them). They return to the minimap after <C>/reload</C>; <C>buttons on</C> gathers them again.</>],
+          [<C key="a3">/everloot buttons off</C>, <>The drawer starts off for new installs; existing players keep their setting. Stops gathering other addons&apos; minimap buttons into the Everloot button (hover the crest to open them). They return to the minimap after <C>/reload</C>; <C>buttons on</C> gathers them again.</>],
           [<C key="a">/everloot status</C>, "Prints the version and your install id, each part of the addon and how many rows it holds."],
           [<C key="b">/everloot version</C>, "Prints the addon version."],
           [<C key="c">/everloot auctions off</C>, <>Turns off auction capture, which is on in a new install. <C>auctions on</C> turns it back on. Type <C>/reload</C> to apply either.</>],

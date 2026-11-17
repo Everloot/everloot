@@ -77,7 +77,7 @@ export declare const marketRealmsResponse: z.ZodObject<{
     }, z.core.$strip>;
 }, z.core.$strip>;
 export declare const MARKET_PRICE_FIELDS: readonly ["itemId", "market", "min", "historical", "quantity", "day", "reporters"];
-/** GET /api/market/prices?realm=: the items with the most units listed, as tuples in `fields` order. */
+/** GET /api/market/prices?realm=: most-listed or explicitly selected public items, in `fields` order. */
 export declare const marketPricesResponse: z.ZodObject<{
     ok: z.ZodLiteral<true>;
     dataAsOf: z.ZodNullable<z.ZodString>;

@@ -7,6 +7,9 @@ required, or tightening a limit is a major release.
 ## [Unreleased]
 
 ### Added
+- Pending next minor package release: optional API drop-rate bounds (`rateLow`, `rateHigh`) and `settled`, plus
+  documented `items` selection for market prices. Public record kinds and record protocol are unchanged.
+
 - 2.3.0 (record protocol 1.15.0): `loot.sourceEvidence` may be `empty-window`, a loot window with nothing in it. The
   loot API names no source for an empty window, so the addon takes the one dead creature the player could loot. Such a
   row is a `kill` window on an NPC with no items and no coin; anything else is refused. It adds a window to the

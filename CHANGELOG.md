@@ -21,7 +21,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: document Worker builds, release checks, MCP version files and dated desktop signing status in the package READMEs.
 - Addon: Optional local bag, bank and mail snapshots keep item counts and observation times; capture starts off and snapshots never upload.
 - Site: the market prices API accepts up to 100 item IDs to fetch public prices beyond the most-listed 2,000 items.
-- Site: drop API and open data rows include likely rate ranges and sample precision.
+- Site: drop API and open data rows include descriptive 95% Wilson ranges and sample precision, not guaranteed drop chances.
 - Site: auction item pages show AH Ledger's latest price for the item on each Forever market, both factions, US and EU on the all-realms page and the realm's own ruleset on a realm's page, read live from AH Ledger's API with its credit link and never stored.
 - Site: auction item pages show the one-day and seven-day price changes when solid public days support them.
 - Addon: recipe and trainer observations keep optional profession skill-line IDs; trainer links also retain spell or product IDs when available, alongside localized names.

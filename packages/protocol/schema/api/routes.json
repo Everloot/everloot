@@ -387,7 +387,7 @@
     "method": "GET",
     "path": "/api/market/prices",
     "summary": "Forever market values from full auction scans players started",
-    "description": "Without `realm`, the realms that have public values (and, in `houses`, which auction houses have values of their own). With it, the items with the most units listed on that realm as tuples in `fields` order, copper per unit. Each scan counts for one house: the house it read, else its scanner's faction. Ask once per house (`house`) for current prices. Without `house` the answer reads only scans that recorded no house: older addons, plus days stored before houses were kept apart, which may mix them. That list is often empty and never stands in for a house. A day is public when three reporters scanned the item in that house.",
+    "description": "Without `realm`, the realms that have public values (and, in `houses`, which auction houses have values of their own). With it, public prices as tuples in `fields` order, copper per unit. Without `items`, the most-listed 2,000 items are returned; `items` selects up to 100 IDs before that cap. Each scan counts for one house: the house it read, else its scanner's faction. Ask once per house (`house`) for current prices. Without `house` the answer reads only scans that recorded no house: older addons, plus days stored before houses were kept apart, which may mix them. That list is often empty and never stands in for a house. A day is public when three reporters scanned the item in that house.",
     "access": "rate-limited",
     "data": "observed",
     "query": [
@@ -411,6 +411,19 @@
             "neutral"
           ]
         }
+      },
+      {
+        "name": "items",
+        "description": "Comma-separated positive item IDs, at most 100 entries, with a realm. Selected before the row cap; unknown and non-public items are omitted. Repeated IDs are deduplicated; repeated items parameters are rejected.",
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1700,
+          "pattern": "^[1-9][0-9]*(,[1-9][0-9]*)*$",
+          "examples": [
+            "2589,2592"
+          ]
+        }
       }
     ],
     "responses": {
@@ -419,7 +432,7 @@
         "schema": "marketPricesResponse"
       },
       "400": {
-        "description": "A parameter is wrong; `error` says which.",
+        "description": "Invalid realm, house or items. items requires a realm and one list of at most 100 positive safe-integer IDs.",
         "schema": "apiError"
       },
       "429": {
