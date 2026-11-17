@@ -191,6 +191,9 @@ export const CLIENT_TABLES = {
   SpellLearnSpell: 1001907, SpellLabel: 1347275, SpellProcsPerMinute: 1133526,
   SpellProceduralEffect: 1140477,
   RandPropPoints: 1310245, ArmorLocation: 1284818,
+  // Terrain: the AreaGroup a spell needs to work (RequiredAreasID), which gives the Desert, Snowy, Swamp and the
+  // other terrain types their zones, and the items whose effects work only there (client-terrain.json).
+  SpellCastingRequirements: 1002166,
   // E (text-bearing, pages-only; docs/2026-10-18-client-data-placement.md): what an NPC's gossip window
   // and the scripted conversations declare on the client. GossipNPCOption names the option ids an NPC
   // offers and GossipNPCOptionDisplayInfo their icons; the option-to-text binding is server-side, so

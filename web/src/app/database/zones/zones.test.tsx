@@ -299,3 +299,17 @@ test("when only the loot tables cannot be read the Items tab says so, the page i
   store.lootDown = false;
   expect(edgeDegraded(await html(ZonePage(props("1436-westfall"))))).toBe(false);
 });
+
+test("a zone page shows the terrain types the game files give it and the gear whose effect works there", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([]));
+  const page = await html(ZonePage(props("1436-westfall")));
+  const section = page.slice(page.indexOf("data-zone-terrain"), page.indexOf('aria-labelledby="known"'));
+  expect(section).toContain('href="/database/terrain#forest-and-grassland"');
+  expect(section).toContain('href="/database/terrain#wasteland"');
+  expect(section).not.toContain("#desert");
+  // The Staff of Westfall's run speed works in the zone list its spell names (Elwynn, Westfall, Redridge, the Deadmines).
+  expect(section).toContain('href="/database/items/2042"');
+  expect(section).toContain('href="/database/spells/1292011"');
+  expect(section).toContain("+2% run speed");
+  expect(section).toContain('href="/database/zones/1429-elwynn-forest"');
+});

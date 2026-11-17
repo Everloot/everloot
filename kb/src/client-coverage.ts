@@ -50,6 +50,7 @@ export const NEEDED_FIELDS: Partial<Record<keyof typeof CLIENT_TABLES, readonly 
   MapDifficulty: ["MapID", "DifficultyID", "MaxPlayers", "ContentTuningID"],
   ContentTuning: ["MinLevelSquish", "MaxLevelSquish"],
   AreaGroupMember: ["AreaID", "AreaGroupID"],
+  SpellCastingRequirements: ["SpellID", "RequiredAreasID"],
   ItemExtendedCost: ["Money", "ItemID", "ItemCount", "CurrencyID", "CurrencyCount"],
   ItemLimitCategory: ["Name_lang", "Quantity"],
   ItemBagFamily: ["Name_lang"],

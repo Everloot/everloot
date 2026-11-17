@@ -21,7 +21,10 @@ import { wikiHref } from "@/lib/wiki";
 import { prepPage } from "@/lib/wiki-dungeon";
 import { npcLootTable } from "../../../../../../kb/src/loot-tables";
 import EntityLink from "@/components/EntityLink";
-import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
+import { loadItemTips, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
+import { CLIENT_LAYER } from "@/lib/items";
+import { gearFor, instanceTerrain, TERRAIN_BUILD, TERRAIN_PATH } from "@/lib/terrain";
+import TerrainGearTable from "@/components/TerrainGearTable";
 import { itemNames, npcNames } from "@/lib/names";
 import { loadItemFacts, loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
 import { EntityHeader, EntityTop, Unreachable } from "../../entity";
@@ -123,7 +126,14 @@ export default async function InstancePage(props: Props) {
   const droppedIds = [...lootTables.values()].flatMap((t) => t.rows.map((r) => r.itemId));
   const itemFacts = droppedIds.length ? await loadItemFacts() : null;
   const names = itemFacts && !itemFacts.unreachable ? itemNames(itemFacts) : new Map<number, string>();
-  const tips = await loadItemTips(droppedIds.length ? await loadSiteAssets() : null, droppedIds);
+  // What the game files say of the ground here, and the gear whose effect works here (data/game-data/client-terrain.json).
+  const terrain = instanceTerrain(row.instanceMapId);
+  const gear = gearFor({ instance: row.instanceMapId });
+  const gearIds = gear.map((g) => g.itemId);
+  const gearFacts = gear.length && !itemFacts ? await loadItemFacts() : itemFacts;
+  const gearName = gearFacts && !gearFacts.unreachable ? itemNames(gearFacts) : names;
+  const spellNames = gear.length ? await loadSpellNames(CLIENT_LAYER.build.version) : null;
+  const tips = await loadItemTips(droppedIds.length || gearIds.length ? await loadSiteAssets() : null, [...droppedIds, ...gearIds]);
 
   // Quests: the ones 3 installs file under this instance's name in the quest log, from the stored world facts.
   const world = unreachable || row.name === null ? null : await loadWorldFacts();
@@ -211,6 +221,32 @@ export default async function InstancePage(props: Props) {
             <p>Loot: each boss's loot is the loot table of the creature 3 installs tie to its encounter, the same rows its NPC page shows. A rate needs loot windows from 3 installs; short of that, the count so far shows and no rate.</p>
             <p>Quests: a quest is listed once 3 installs file it under this instance's name in the quest log, where the game files a dungeon's quests. This matches the quest log's header, not the quest's giver or turn-in, so a quest filed under another header is not here. Installs counts the installs that agreed on the header.</p>
           </Disclosure>
+
+          {(terrain.length > 0 || gear.length > 0) && (
+            <section aria-labelledby="terrain" data-instance-terrain>
+              <SectionHeading id="terrain" note={`Read from the game files, build ${TERRAIN_BUILD}: the kinds of ground some item effects need, and the gear whose effect works here. Found in game files, unconfirmed.`}>
+                Terrain
+              </SectionHeading>
+              {terrain.length > 0 && (
+                <p className="mb-3 flex flex-wrap items-center gap-2 text-meta text-fg-2">
+                  {terrain.map((type) => (
+                    <Link key={type.slug} href={`${TERRAIN_PATH}#${type.slug}`} className="inline-flex h-6 items-center rounded-full border border-line px-2.5 font-mono text-xs text-fg-2 hover:text-fg">{type.name}</Link>
+                  ))}
+                </p>
+              )}
+              {gear.length > 0 && (
+                <TerrainGearTable
+                  gear={gear}
+                  caption={`Gear whose effect works in ${title}`}
+                  names={{
+                    item: (id) => ({ name: gearName.get(id) ?? tips.get(id)?.name, icon: tips.get(id)?.icon }),
+                    spell: (id) => spellNames?.names.get(id),
+                    instances: new Map([...instanceRows()].map(([id, r]) => [id, r.name])),
+                  }}
+                />
+              )}
+            </section>
+          )}
 
           <section aria-labelledby="entrance">
             <SectionHeading id="entrance">Entrance</SectionHeading>

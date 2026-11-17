@@ -242,6 +242,11 @@ test("the W6 tables are read by the file data ids the WoWDBDefs manifest lists f
   });
 });
 
+test("the terrain table is read by the file data id the WoWDBDefs manifest lists for it", () => {
+  // manifest.json at WoWDBDefs master, 2026-11-17, field db2FileDataID; a 1.60.1 layout covers 69876 to 70938.
+  expect(CLIENT_TABLES).toMatchObject({ SpellCastingRequirements: 1002166 });
+});
+
 test("the E tables (text-bearing, pages-only) are read by the file data ids the WoWDBDefs manifest lists for them", () => {
   // manifest.json at WoWDBDefs 05e242b6acdc (verified against the live wowf 70630 scan: GossipNPCOption 1577,
   // GossipNPCOptionDisplayInfo 50, BroadcastText 12 rows; GossipXGarrTalentTrees is garrison plumbing and stays never).
