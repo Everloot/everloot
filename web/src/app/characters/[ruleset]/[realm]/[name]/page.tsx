@@ -9,17 +9,16 @@ import { buildShowcase, FOOTER_LINE, showcaseOn, type Showcase } from "@/lib/cha
 import { classLabel, contextLinks, MAX_LEVEL, type ClassSlug } from "@/lib/class-context";
 import { dataAgeLabel } from "@/lib/data-age";
 import { guildPath, guildsOn } from "@/lib/guilds";
-import { leaderboardsOn } from "@/lib/leaderboard-switch";
-import { GEAR_BOARDS, gearBoardPath, loadGearBoard, ranksOf, type GearMetric, type RankedEntry } from "@/lib/leaderboards";
+import { publicCharacterArmory } from "@/lib/character-armory";
+import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
 import { characterPath, optOutPath, playerPagesOn, type Player } from "@/lib/player-pages";
-import { loadTrack } from "@/lib/profile-pipeline";
 import { pageMetadata } from "@/lib/seo";
 import { withGearArt } from "@/lib/showcase-gear-art";
 import { className, classText, describePlayer, PLAYER_SIGHTING_LINE, PLAYER_STORAGE_UNAVAILABLE, raceName } from "@/app/players/player-view";
 import { InstanceCard } from "@/app/guilds/parts";
 import { characterGuild, GUILD_LINE, PLAN_LINE, raceFaction, type CharacterGuild } from "./character-guild";
 import { characterParts, characterShowcase, plannedBuilds, publishedFacts, type Params } from "./character-view";
-import { TrackChart } from "@/app/characters/track-chart";
+import { ArmoryPart, armoryHeading } from "@/app/characters/armory-part";
 
 /**
  * Read on every request and never cached, so a page switched off, or a character hidden, is gone at once. The
@@ -188,25 +187,9 @@ function PlanPart({ classSlug, level }: { classSlug: ClassSlug; level: number })
 const Unavailable = ({ text }: { text: string }) => <Card><p className="text-fg-2" role="status">{text}</p></Card>;
 
 /**
- * The character's places on the gear rankings, when its owner ranks its gear (EVERLOOT_LEADERBOARDS=1): the same
- * numbers and ranks the boards print, read with them, so the page and the boards never disagree.
- */
-function GearRanks({ ranks }: { ranks: Record<GearMetric, RankedEntry> }) {
-  return (
-    <Card as="section" aria-label="Rankings" className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
-      {(["item-level", "gear-score"] as const).map((m) => (
-        <p key={m} className="text-fg-2">
-          {GEAR_BOARDS[m].column} <span className="font-mono tabular-nums text-fg">{ranks[m].entry[m === "item-level" ? "itemLevel" : "gearScore"]}</span>{" "}
-          <Link href={gearBoardPath(m)} className={link}>#{ranks[m].rank}</Link>
-        </p>
-      ))}
-    </Card>
-  );
-}
-
-/**
  * A character's one page. The owner's showcase first, when the owner linked the character and made its page
- * public; then what the addon last saw of it, when the player pages are on and a row exists; then the guild it was
+ * public; then Blizzard's data for it, when the link is associated with an armory character and the page's switch
+ * for each part is on; then what the addon last saw of it, when the player pages are on and a row exists; then the guild it was
  * seen in, as the guild's page shows it; then the site's pages for its class. Each part is drawn from its own source
  * and says so; none is mixed into another. The rail lists the parts and each source's date. Neither the showcase nor
  * a sighting found is a 404.
@@ -235,10 +218,10 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
   const guildRead = sighted ? await characterGuild(sighted) : null;
   const guild = guildRead === "unreachable" ? null : guildRead;
   const c = showcase?.input;
-  const board = c && leaderboardsOn() ? await loadGearBoard() : null;
-  const ranks = c && board?.state === "ready" ? ranksOf(board.entries, c.path) : null;
-  // Only a ranked character's history, read from what the profile cron stored: nothing is scored here.
-  const track = ranks ? await loadTrack(ranks["item-level"].entry.linkId) : null;
+  const armory = found(owner) ? await publicCharacterArmory(owner.ruleset, owner.character.realm, owner.character.name) : null;
+  const tips = armory?.shown.gear
+    ? await loadSiteAssets().then((assets) => loadItemTips(assets, armory.character.equipment.map((item) => item.itemId))).catch(() => new Map())
+    : new Map();
   const name = c?.name ?? sighted!.name;
   const realm = c?.realm ?? sighted!.realm;
   const path = c?.path ?? characterPath(sighted!.ruleset, sighted!.realm, sighted!.name);
@@ -250,12 +233,14 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
     ...(showcase
       ? showcaseContents(showcase, false)
       : []),
+    ...(armory ? [{ id: "character-armory", label: "From Blizzard's API" }] : []),
     ...(sighted ? [{ id: "character-sighting", label: "Seen in game" }] : []),
     ...(guild ? [{ id: "character-guild", label: "Guild" }] : []),
     ...(classSlug ? [{ id: "character-plan", label: "Plan this class" }] : []),
   ];
   const sources = [
     ...(c ? [{ label: "Linked player's upload", value: <span className="font-mono">{c.lastUpload}</span> }] : []),
+    ...(armory ? [{ label: "Blizzard's API", value: armoryHeading(armory.character.fetchedAt).replace("From Blizzard's API, ", "") }] : []),
     ...(sighted ? [{ label: "Last seen by the addon", value: <span className="font-mono">{sighted.lastSeen}</span> }] : []),
     ...(guild ? [{ label: "Guild data", value: dataAgeLabel(guild.dataAsOf) }] : []),
   ];
@@ -270,9 +255,8 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
           {showcase
             ? <ShowcaseHeader showcase={showcase} trail={trail(name, path)} />
             : <PageHeader trail={trail(name, path)} title={<span className={classText(sighted!.class)}>{name}</span>} lede={`${describePlayer(sighted!)} · ${realm}`} />}
-          {ranks && <GearRanks ranks={ranks} />}
-          {track && <TrackChart days={track} name={name} />}
           {showcase ? <OwnerPart showcase={showcase} /> : owner === "unavailable" && <Unavailable text={UNAVAILABLE} />}
+          {armory && <ArmoryPart armory={armory} tips={tips} />}
           {sighted ? <SightingPart seen={sighted} /> : seen === "unavailable" && <Unavailable text={PLAYER_STORAGE_UNAVAILABLE} />}
           {guild ? <GuildPart guild={guild} /> : guildRead === "unreachable" && <Unavailable text={GUILD_UNAVAILABLE} />}
           {classSlug && <PlanPart classSlug={classSlug} level={level} />}

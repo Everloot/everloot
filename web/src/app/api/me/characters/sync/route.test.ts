@@ -21,6 +21,8 @@ const gear = {
 };
 const profession = { kind: "profession_owned", ...owned, capturedAt: "2026-11-05T11:00:00Z", profession: "Mining", rank: 280, maxRank: 300 };
 const reputation = { kind: "reputation_owned", ...owned, capturedAt: "2026-11-05T09:00:00Z", factionId: 76, reaction: 7, standing: 30_000, floor: 21_000, ceiling: 42_000 };
+const lockout = { kind: "lockout_owned", ...owned, capturedAt: "2026-11-05T11:00:00Z", instance: "Molten Core", instanceId: 409, bossesKilledCount: 6, bossesTotal: 10, resetAt: "2099-01-01T00:00:00Z" };
+const title = { kind: "title_owned", ...owned, capturedAt: "2026-11-05T12:00:00Z", titleIds: [3, 1] };
 
 const send = (body: unknown, headers: Record<string, string> = { authorization: `Bearer ${KEY}` }) =>
   POST(new Request("https://everloot.app/api/me/characters/sync", {
@@ -78,13 +80,13 @@ describe("who may sync", () => {
 
 describe("what is stored", () => {
   test("one fact per category, keyed by an install hash; no install id, character key or name of a row reaches storage", async () => {
-    answers([{ category: "gear", outcome: "stored" }, { category: "professions", outcome: "stored" }, { category: "reputations", outcome: "stored" }]);
-    const res = await send(thrallina([gear, profession, reputation, { kind: "loot", nonsense: true }]));
+    answers([{ category: "raids", outcome: "stored" }, { category: "achievements", outcome: "stored" }]);
+    const res = await send(thrallina([lockout, title, { kind: "loot", nonsense: true }]));
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toBe("private, no-store");
     const body = await res.json();
     expect(body).toEqual({
-      characters: [{ index: 0, result: "synced", categories: { gear: "stored", professions: "stored", reputations: "stored" } }],
+      characters: [{ index: 0, result: "synced", categories: { raids: "stored", achievements: "stored" } }],
       skipped: 1,
     });
     const [call] = syncCalls();
@@ -92,8 +94,10 @@ describe("what is stored", () => {
       p_user_id: ACCOUNT, p_ruleset: "forever", p_realm: "Forever Pioneer", p_name: "Thrallina", p_class: "SHAMAN",
       p_source_ref: createHmac("sha256", SECRET).update(`source:${INSTALL}`).digest("hex"),
     });
-    expect(call.p_facts.map((f: { category: string }) => f.category)).toEqual(["gear", "professions", "reputations"]);
-    expect(call.p_facts[1]).toEqual({ category: "professions", captured_at: "2026-11-05T11:00:00.000Z", data: { professions: [{ name: "Mining", skillLine: null, rank: 280, maxRank: 300 }] } });
+    expect(call.p_facts).toEqual([
+      { category: "raids", captured_at: "2026-11-05T11:00:00.000Z", data: { lockouts: [{ instance: "Molten Core", instanceId: 409, difficulty: null, difficultyId: null, killed: 6, total: 10, resetAt: "2099-01-01T00:00:00.000Z" }] } },
+      { category: "achievements", captured_at: "2026-11-05T12:00:00.000Z", data: { titleIds: [1, 3] } },
+    ]);
     const stored = JSON.stringify(call.p_facts);
     expect(stored).not.toContain(INSTALL);
     expect(stored).not.toContain(CHARACTER_KEY);
@@ -103,46 +107,61 @@ describe("what is stored", () => {
     for (const secret of [ACCOUNT, KEY, INSTALL, CHARACTER_KEY, call.p_source_ref]) expect(text).not.toContain(secret);
   });
 
+  test("an older Desktop App's retired rows get a success answer that drops them; its kept rows still sync", async () => {
+    answers([{ category: "raids", outcome: "stored" }]);
+    const achievement = { kind: "achievement_owned", ...owned, capturedAt: "2026-11-05T12:00:00Z", achievementId: 6, completed: true, earnedByMe: true, criteriaMet: 1, criteriaTotal: 1 };
+    const talent = { kind: "talent_owned", ...owned, capturedAt: "2026-11-05T10:00:00Z", treeId: 1, points: 1, nodes: [{ nodeId: 10, ranks: 1 }] };
+    const stats = { kind: "stats_owned", ...owned, capturedAt: "2026-11-05T10:00:00Z", stats: { strength: 10 } };
+    const pvp = { kind: "pvp_owned", ...owned, capturedAt: "2026-11-05T10:00:00Z", rank: 3 };
+    const res = await send(thrallina([gear, profession, reputation, achievement, talent, stats, pvp, lockout]));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({ characters: [{ index: 0, result: "synced", categories: { raids: "stored" } }], skipped: 7 });
+    expect(syncCalls()[0].p_facts.map((f: { category: string }) => f.category)).toEqual(["raids"]);
+    expect(JSON.stringify(syncCalls())).not.toMatch(/16842|Mining|equipped|achievements"/);
+  });
+
+  test("only retired rows: a success answer with no fact sent", async () => {
+    answers([]);
+    const res = await send(thrallina([gear, profession]));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ characters: [{ index: 0, result: "synced", categories: {} }], skipped: 2 });
+    expect(syncCalls()[0].p_facts).toEqual([]);
+  });
+
   test("a character the account holds no live link for is counted, never an error, and says nothing more", async () => {
-    answers([{ category: null, outcome: "not_linked" }], [{ category: "gear", outcome: "duplicate" }]);
+    answers([{ category: null, outcome: "not_linked" }], [{ category: "raids", outcome: "duplicate" }]);
     const res = await send({ characters: [
-      { name: "Jainy", realm: "Forever Pioneer", records: [{ ...gear, character: "Jainy" }] },
-      { name: "Thrallina", realm: "Forever Pioneer", records: [gear] },
+      { name: "Jainy", realm: "Forever Pioneer", records: [lockout] },
+      { name: "Thrallina", realm: "Forever Pioneer", records: [lockout] },
     ] });
     expect(res.status).toBe(200);
     expect((await res.json()).characters).toEqual([
       { index: 0, result: "not_linked" },
-      { index: 1, result: "synced", categories: { gear: "duplicate" } },
+      { index: 1, result: "synced", categories: { raids: "duplicate" } },
     ]);
   });
 
   test("older captures and categories without consent pass the database's answer through", async () => {
-    answers([{ category: "gear", outcome: "older" }, { category: "professions", outcome: "no_consent" }]);
-    const body = await (await send(thrallina([gear, profession]))).json();
-    expect(body.characters[0].categories).toEqual({ gear: "older", professions: "no_consent" });
+    answers([{ category: "raids", outcome: "older" }, { category: "achievements", outcome: "no_consent" }]);
+    const body = await (await send(thrallina([lockout, title]))).json();
+    expect(body.characters[0].categories).toEqual({ raids: "older", achievements: "no_consent" });
   });
 
   test("rows of one install under two character keys are not one character: nothing is sent for it", async () => {
     answers();
-    const body = await (await send(thrallina([profession, { ...reputation, characterKey: "ffffffff" }]))).json();
+    const body = await (await send(thrallina([lockout, { ...title, characterKey: "ffffffff" }]))).json();
     expect(body.characters).toEqual([{ index: 0, result: "invalid" }]);
     expect(syncCalls()).toEqual([]);
   });
 
-  test("a gear row of another character is skipped, not stored under this one", async () => {
-    answers([{ category: null, outcome: "not_linked" }]);
-    const body = await (await send(thrallina([{ ...gear, character: "Jainy" }]))).json();
-    expect(body.skipped).toBe(1);
-    expect(syncCalls()[0].p_facts).toEqual([]);
-  });
-
   test("after a storage failure the remaining characters are marked to send again", async () => {
-    answers([{ category: "gear", outcome: "stored" }]);
+    answers([{ category: "raids", outcome: "stored" }]);
     auth.authQuery.mockRejectedValueOnce(new Error("down"));
     const body = await (await send({ characters: [
-      { name: "Thrallina", realm: "Forever Pioneer", records: [gear] },
-      { name: "Rokhan", realm: "Forever Pioneer", records: [{ ...gear, character: "Rokhan" }] },
-      { name: "Zul", realm: "Forever Pioneer", records: [{ ...gear, character: "Zul" }] },
+      { name: "Thrallina", realm: "Forever Pioneer", records: [lockout] },
+      { name: "Rokhan", realm: "Forever Pioneer", records: [lockout] },
+      { name: "Zul", realm: "Forever Pioneer", records: [lockout] },
     ] })).json();
     expect(body.characters.map((c: { result: string }) => c.result)).toEqual(["synced", "retry", "retry"]);
   });
@@ -155,132 +174,12 @@ describe("what is stored", () => {
     }
     expect(syncCalls()).toEqual([]);
   });
-
-  test("achievements count only what this character earned: complete on the account alone, or unsaid, is left out", async () => {
-    const achievement = { kind: "achievement_owned", ...owned, capturedAt: "2026-11-05T12:00:00Z", criteriaMet: 1, criteriaTotal: 1 };
-    answers([{ category: "achievements", outcome: "stored" }]);
-    await send(thrallina([
-      { ...achievement, achievementId: 6, completed: true, earnedByMe: true, earnedOn: "2026-11-01" },
-      { ...achievement, achievementId: 7, completed: true, earnedByMe: false },
-      { ...achievement, achievementId: 8, completed: true },
-      { ...achievement, achievementId: 9, completed: false, criteriaMet: 0 },
-    ]));
-    expect(syncCalls()[0].p_facts).toEqual([
-      { category: "achievements", captured_at: "2026-11-05T12:00:00.000Z", data: { achievements: [{ id: 6, on: "2026-11-01" }], titleIds: [] } },
-    ]);
-  });
-});
-
-describe("talents", () => {
-  const talentOwned = {
-    kind: "talent_owned", ...owned, capturedAt: "2026-11-05T13:00:00Z", treeId: 790, specId: 262, points: 4,
-    nodes: [{ nodeId: 30, ranks: 2 }, { nodeId: 10, ranks: 1, choice: 0 }, { nodeId: 20, ranks: 1, choice: 1 }],
-  };
-  const talentSnapshot = {
-    kind: "talent_snapshot", installId: INSTALL, capturedAt: "2026-11-05T14:00:00Z", class: "SHAMAN", level: 60, group: 1, active: true,
-    configId: 1, treeId: 790, specId: 262, exportStatus: "empty", points: 1, nodes: [{ nodeId: 5, ranks: 1 }],
-  };
-
-  test("a keyed talent_owned row becomes the talents fact, nodes sorted, in the shape the page reads", async () => {
-    answers([{ category: "talents", outcome: "stored" }]);
-    const body = await (await send(thrallina([talentOwned]))).json();
-    expect(body.characters[0].categories).toEqual({ talents: "stored" });
-    expect(syncCalls()[0].p_facts).toEqual([{
-      category: "talents", captured_at: "2026-11-05T13:00:00.000Z",
-      data: { class: "SHAMAN", treeId: 790, specId: 262, points: 4, nodes: [{ nodeId: 10, ranks: 1, choice: 0 }, { nodeId: 20, ranks: 1, choice: 1 }, { nodeId: 30, ranks: 2 }] },
-    }]);
-    expect(sentToDatabase()).not.toContain(CHARACTER_KEY);
-  });
-
-  test("an anonymous talent_snapshot row is skipped: it can never become a character's talents", async () => {
-    answers([{ category: "gear", outcome: "stored" }]);
-    const body = await (await send(thrallina([gear, talentSnapshot]))).json();
-    expect(body.skipped).toBe(1);
-    expect(syncCalls()[0].p_facts.map((f: { category: string }) => f.category)).toEqual(["gear"]);
-    answers([{ category: null, outcome: "not_linked" }]);
-    await send(thrallina([talentSnapshot]));
-    expect(syncCalls()[1].p_facts).toEqual([]);
-  });
-
-  test("limits match the protocol's talent row: ranks above 10 and a build above 100 points are accepted", async () => {
-    answers([{ category: "talents", outcome: "stored" }]);
-    await send(thrallina([{ ...talentOwned, points: 11, nodes: [{ nodeId: 1, ranks: 11 }] }]));
-    expect(syncCalls()[0].p_facts[0].data).toMatchObject({ points: 11, nodes: [{ nodeId: 1, ranks: 11 }] });
-    const nodes = Array.from({ length: 150 }, (_, i) => ({ nodeId: i + 1, ranks: 1 }));
-    answers([{ category: "talents", outcome: "stored" }]);
-    await send(thrallina([{ ...talentOwned, points: 150, nodes }]));
-    expect(syncCalls()[1].p_facts[0].data).toMatchObject({ points: 150 });
-  });
-
-  test("a talent_owned row whose points do not match its ranks, or repeats a node, is skipped", async () => {
-    answers([{ category: null, outcome: "not_linked" }]);
-    const body = await (await send(thrallina([
-      { ...talentOwned, points: 9 },
-      { ...talentOwned, nodes: [{ nodeId: 1, ranks: 1 }, { nodeId: 1, ranks: 1 }], points: 2 },
-    ]))).json();
-    expect(body.skipped).toBe(2);
-    expect(syncCalls()[0].p_facts).toEqual([]);
-  });
-});
-
-describe("stats", () => {
-  const statsOwned = {
-    kind: "stats_owned", ...owned, capturedAt: "2026-11-05T13:00:00Z",
-    stats: { block: 4.5, strength: 100, agility: 0, stamina: 200, intellect: 5, spirit: 6, meleeHit: 0, armor: 3000, made_up: 9 },
-  };
-
-  test("a keyed stats_owned row becomes the stats fact: known keys in page order, zeros outside the attributes left out", async () => {
-    answers([{ category: "stats", outcome: "stored" }]);
-    const body = await (await send(thrallina([statsOwned]))).json();
-    expect(body.characters[0].categories).toEqual({ stats: "stored" });
-    const data = syncCalls()[0].p_facts[0].data;
-    expect(syncCalls()[0].p_facts[0].category).toBe("stats");
-    expect(Object.keys(data.stats)).toEqual(["strength", "agility", "stamina", "intellect", "spirit", "armor", "block"]);
-    expect(data.stats).toMatchObject({ agility: 0, block: 4.5 });
-    expect(sentToDatabase()).not.toContain(CHARACTER_KEY);
-  });
-
-  test("a row with no known key, or a non-finite or non-numeric value, is skipped", async () => {
-    answers([{ category: null, outcome: "not_linked" }]);
-    const body = await (await send(thrallina([
-      { ...statsOwned, stats: { made_up: 1 } },
-      { ...statsOwned, stats: {} },
-      { ...statsOwned, stats: { strength: "12" } },
-      { ...statsOwned, stats: { strength: null } },
-    ]))).json();
-    expect(body.skipped).toBe(4);
-    expect(syncCalls()[0].p_facts).toEqual([]);
-  });
-});
-
-describe("pvp", () => {
-  const pvpOwned = { kind: "pvp_owned", ...owned, capturedAt: "2026-11-05T13:00:00Z", rank: 9, rankPoints: 12_500, rankThreshold: 15_000, rankMax: 14, season: 2, honorableKills: 1234, made_up: 1 };
-
-  test("a keyed pvp_owned row becomes the pvp fact with the six numbers, null where absent", async () => {
-    answers([{ category: "pvp", outcome: "stored" }]);
-    const later = { ...pvpOwned, capturedAt: "2026-11-05T14:00:00Z", rank: undefined, rankPoints: undefined, rankThreshold: undefined, rankMax: undefined, season: undefined, honorableKills: 5 };
-    const body = await (await send(thrallina([pvpOwned, later]))).json();
-    expect(body.characters[0].categories).toEqual({ pvp: "stored" });
-    const fact = syncCalls()[0].p_facts[0];
-    expect(fact.category).toBe("pvp");
-    expect(fact.data).toEqual({ rank: null, rankPoints: null, rankThreshold: null, rankMax: null, season: null, honorableKills: 5 });
-    expect(sentToDatabase()).not.toContain(CHARACTER_KEY);
-  });
-
-  test("a row with neither rank nor honorable kills, or a bad number, is skipped", async () => {
-    answers([{ category: null, outcome: "not_linked" }]);
-    const body = await (await send(thrallina([
-      { ...pvpOwned, rank: undefined, honorableKills: undefined }, { ...pvpOwned, rank: -1 }, { ...pvpOwned, honorableKills: 1.5 }, { ...pvpOwned, season: 3e9 },
-    ]))).json();
-    expect(body.skipped).toBe(4);
-    expect(syncCalls()[0].p_facts).toEqual([]);
-  });
 });
 
 describe("how often a key may sync", () => {
   test("each request counts against the key's own hourly bucket, after the key is checked; never the raw key", async () => {
-    answers([{ category: "gear", outcome: "stored" }]);
-    expect((await send(thrallina([gear]))).status).toBe(200);
+    answers([{ category: "raids", outcome: "stored" }]);
+    expect((await send(thrallina([lockout]))).status).toBe(200);
     expect(quota.syncKey.mock.calls).toEqual([[hashKey(KEY)]]);
     expect(JSON.stringify(quota.syncKey.mock.calls)).not.toContain(KEY);
   });
@@ -362,7 +261,7 @@ test("boss kills do not write when the account has no live link, or when a group
   expect((await response.json()).characters[0].result).toBe("not_linked");
   expect(auth.authQuery.mock.calls.some((c) => c[0] === "rpc/sync_boss_kills")).toBe(false);
   answers();
-  const mixed = await send(thrallina([profession, { ...bossKill, characterKey: "ffffffff" }]));
+  const mixed = await send(thrallina([lockout, { ...bossKill, characterKey: "ffffffff" }]));
   expect((await mixed.json()).characters[0].result).toBe("invalid");
   expect(auth.authQuery.mock.calls.some((c) => c[0] === "rpc/sync_boss_kills")).toBe(false);
 });

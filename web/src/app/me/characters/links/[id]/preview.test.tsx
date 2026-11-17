@@ -13,7 +13,11 @@ vi.mock("next/navigation", () => ({
 }));
 const factNames = vi.hoisted(() => ({ load: vi.fn() }));
 vi.mock("@/lib/character-facts-names", () => ({ loadFactNames: factNames.load }));
+const armory = vi.hoisted(() => ({ character: vi.fn() }));
+vi.mock("@/lib/armory-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/armory-store")>()), armoryStore: () => ({ character: armory.character }) }));
+vi.mock("@/lib/game-assets", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/game-assets")>()), loadSiteAssets: async () => null, loadItemTips: async () => new Map() }));
 
+import { armoryCharacter } from "@/lib/armory.fixture";
 import Page, { dynamic, metadata } from "./page";
 
 const USER = { id: "11111111-2222-4333-8444-555555555555", name: "Thrall#1" };
@@ -24,8 +28,8 @@ const render = async (id = LINK_ID) => renderToStaticMarkup(await Page(props(id)
 const LINK = {
   id: LINK_ID, ruleset: "forever", name: "Thrallina", realm: "Forever Pioneer", race: "Orc", class: "SHAMAN", faction: "Horde", level: 60,
   status: "linked", last_upload_at: "2026-10-30T18:00:00+00:00", link_key: "a".repeat(64), completion_ref: "b".repeat(64),
-  // Only gear is switched on for the public page.
-  character_visibility: { page_public: true, show_gear: true, show_stats: false, show_talents: false, show_pvp: false, show_professions: false, show_reputations: false, show_raids: false, show_collections: false },
+  // Only raids is switched on for the public page.
+  character_visibility: { page_public: true, show_gear: true, show_stats: false, show_talents: false, show_pvp: false, show_professions: false, show_reputations: false, show_raids: true, show_collections: false },
 };
 const OWN = [
   { category: "gear", consented: true, captured_at: "2026-10-31T09:00:00+00:00", data: { equipped: [{ slot: "HeadSlot", itemId: 16842, itemLevel: 66 }] } },
@@ -34,12 +38,13 @@ const OWN = [
   { category: "pvp", consented: false, captured_at: null, data: null },
   { category: "professions", consented: true, captured_at: "2026-10-30T09:00:00+00:00", data: { professions: [{ name: "Mining", skillLine: null, rank: 280, maxRank: 300 }] } },
   { category: "reputations", consented: false, captured_at: null, data: null },
-  { category: "raids", consented: true, captured_at: null, data: null },
+  { category: "raids", consented: true, captured_at: "2026-10-31T09:00:00+00:00", data: { lockouts: [{ instance: "Molten Core", difficulty: "40 Player", killed: 6, total: 10, resetAt: "2026-11-03T15:00:00.000Z" }] } },
   { category: "achievements", consented: false, captured_at: null, data: null },
 ];
-const answer = (link: unknown[], own: unknown[] = OWN) => auth.authQuery.mockImplementation(async (path: string) => {
+const answer = (link: unknown[], own: unknown[] = OWN, armoryLinks: unknown[] = []) => auth.authQuery.mockImplementation(async (path: string) => {
   if (path.startsWith("character_links?")) return link;
   if (path === "rpc/own_character_facts") return own;
+  if (path === "rpc/armory_own_links") return armoryLinks;
   throw new Error(`unexpected ${path}`);
 });
 
@@ -48,7 +53,8 @@ beforeEach(() => {
   vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1");
   auth.getUser.mockReset().mockResolvedValue(USER);
   auth.authQuery.mockReset();
-  factNames.load.mockReset().mockResolvedValue({ item: () => null, catalog: null, talentTrees: null });
+  factNames.load.mockReset().mockResolvedValue({ catalog: null });
+  armory.character.mockReset();
   vi.useFakeTimers({ now: new Date("2026-11-01T12:00:00Z"), toFake: ["Date"] });
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.useRealTimers(); });
@@ -79,23 +85,24 @@ test("another account's link is a 404, exactly as an unknown id, and its facts a
   expect(auth.authQuery.mock.calls.some(([path]) => path === "rpc/own_character_facts")).toBe(false);
 });
 
-test("the owner sees every synced section, switched on or not, each category's sync and public state, and nothing secret", async () => {
+test("the owner sees every synced section, switched on or not, each kept category's sync and public state, and nothing secret", async () => {
   answer([LINK]);
   const html = await render();
   expect(html).toContain("Thrallina");
   expect(html).toContain("Only you see this preview");
-  // Switched off publicly, still in the preview.
-  expect(html).toContain('data-section="gear"');
-  expect(html).toContain('data-section="professions"');
-  expect(html).toContain("280 / 300");
+  expect(html).toContain('data-section="raids"');
+  expect(html).toContain("Molten Core");
   // Nothing synced yet: said so, never a zero.
   expect(html).toContain("Nothing synced for this yet.");
-  // The settings list: sync, public and capture per category.
-  expect(html).toContain('data-category="gear" data-sync="on" data-public="on"');
-  expect(html).toContain('data-category="professions" data-sync="on" data-public="off"');
-  expect(html).toContain('data-category="talents" data-sync="off" data-public="off"');
-  expect(html).toContain('data-category="stats" data-sync="on" data-public="off"');
-  expect(html).toContain('data-category="pvp" data-sync="off" data-public="off"');
+  // The settings list: sync, public and capture per kept category. Retired categories, stored until the migration, never show.
+  expect(html).toContain('data-category="raids" data-sync="on" data-public="on"');
+  expect(html).toContain('data-category="achievements" data-sync="off" data-public="off"');
+  for (const retired of ["gear", "stats", "talents", "pvp", "professions", "reputations"]) {
+    expect(html).not.toContain(`data-category="${retired}"`);
+    expect(html).not.toContain(`data-section="${retired}"`);
+  }
+  expect(html).not.toContain("280 / 300");
+  expect(html).not.toContain('data-part="armory"');
   expect(html).toContain('href="/characters/forever/forever-pioneer/thrallina"');
   expect(html).not.toMatch(/verified|owner|proven|✓/i);
   for (const secret of [USER.id, "a".repeat(64), "b".repeat(64), "Thrall#1"]) expect(html).not.toContain(secret);
@@ -105,8 +112,32 @@ test("a frozen link shows no synced section and says why", async () => {
   answer([{ ...LINK, status: "frozen" }], OWN.map((r) => ({ ...r, captured_at: null, data: null })));
   const html = await render();
   expect(html).toContain("frozen");
-  expect(html).not.toContain('data-section="gear"');
-  expect(html).not.toContain("280 / 300");
+  expect(html).not.toContain('data-section="raids"');
+  expect(html).not.toContain("Molten Core");
+});
+
+test("with the armory on, a connected character shows every part of Blizzard's data, labelled and credited", async () => {
+  vi.stubEnv("EVERLOOT_ARMORY", "1");
+  const at = "2026-10-31T08:00:00.000Z";
+  armory.character.mockResolvedValue(armoryCharacter({
+    fetchedAt: at,
+    details: { revision: 1, statistics: { asOf: at, rows: [{ label: "Intellect", value: 69, percent: false }] }, quests: { asOf: at, completed: [1, 2, 3] } },
+  }));
+  answer([LINK], OWN, [{ link_id: "another-link", region: "us", slug: "someone-else" }, { link_id: LINK_ID, region: "eu", slug: "thrallina-vale" }]);
+  const html = await render();
+  expect(armory.character).toHaveBeenCalledWith("eu", "thrallina-vale");
+  expect(html).toContain('data-part="armory"');
+  expect(html).toContain("From Blizzard&#x27;s API, 2026-10-31");
+  expect(html).toContain("Data from Blizzard Entertainment");
+  // Switched off publicly, still in the owner's preview.
+  expect(html).toContain("Intellect");
+  expect(html).toContain("Giantstalker");
+  expect(html).toContain("completed quests");
+
+  answer([LINK], OWN, [{ link_id: "another-link", region: "us", slug: "someone-else" }]);
+  armory.character.mockClear();
+  expect(await render()).not.toContain('data-part="armory"');
+  expect(armory.character).not.toHaveBeenCalled();
 });
 
 test("storage failing says so on the page", async () => {

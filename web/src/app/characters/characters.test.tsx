@@ -13,13 +13,15 @@ vi.mock("@/lib/player-store", async (importOriginal) => ({ ...(await importOrigi
 // The names synced facts are drawn with: fixed here, so a published-sections test reads no item or catalog store.
 const factNames = vi.hoisted(() => ({ load: vi.fn() }));
 vi.mock("@/lib/character-facts-names", () => ({ loadFactNames: factNames.load }));
-// The gear boards, fed in whole: their own reads are tested in app/rankings/gear-board.test.tsx.
-const gearBoard = vi.hoisted(() => ({ load: vi.fn() }));
-vi.mock("@/lib/leaderboards", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/leaderboards")>()), loadGearBoard: gearBoard.load }));
+// The armory character, fed in whole: the armory store's own reads are tested in lib/armory-store.test.ts.
+const armory = vi.hoisted(() => ({ character: vi.fn() }));
+vi.mock("@/lib/armory-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/armory-store")>()), armoryStore: () => ({ character: armory.character }) }));
+vi.mock("@/lib/game-assets", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/game-assets")>()), loadSiteAssets: async () => null, loadItemTips: async () => new Map() }));
 
 import { createMemoryPlayerStore, type PlayerStore } from "@/lib/player-store";
 import { FOOTER_LINE, NOT_RECORDED_LINE } from "@/lib/character-showcase";
 import { PLAYER_SIGHTING_LINE } from "@/app/players/player-view";
+import { armoryCharacter } from "@/lib/armory.fixture";
 import * as pageModule from "./[ruleset]/[realm]/[name]/page";
 import Page, { dynamic, generateMetadata } from "./[ruleset]/[realm]/[name]/page";
 import { GET as wideCard } from "./[ruleset]/[realm]/[name]/card.png/route";
@@ -245,11 +247,12 @@ describe("planned builds (S4)", () => {
 describe("published sections (private sync, S6)", () => {
   const FACTS_RPC = "rpc/public_character_facts";
   /** What public_character_facts returns for the switched-on sections, plus fields it never sends. */
-  const GEAR = {
-    category: "gear", captured_at: "2026-10-31T09:00:00+00:00", data: { equipped: [{ slot: "HeadSlot", itemId: 16842, itemLevel: 66 }] },
+  const RAIDS = {
+    category: "raids", captured_at: "2026-10-31T09:00:00+00:00",
+    data: { lockouts: [{ instance: "Molten Core", instanceId: 409, difficulty: "40 Player", difficultyId: 9, killed: 6, total: 10, resetAt: "2026-11-03T15:00:00.000Z" }] },
     source_ref: "d".repeat(64), install_id: "install-1234", user_id: USER_ID,
   };
-  const PROFESSIONS = { category: "professions", captured_at: "2026-10-30T09:00:00+00:00", data: { professions: [{ name: "Mining", skillLine: 186, rank: 280, maxRank: 300 }] } };
+  const TITLES = { category: "achievements", captured_at: "2026-10-30T09:00:00+00:00", data: { titleIds: [1] } };
   const answer = (facts: unknown) => auth.authQuery.mockImplementation(async (path: string) => {
     if (path === "rpc/public_character") return [ROW];
     if (path === FACTS_RPC) {
@@ -262,84 +265,67 @@ describe("published sections (private sync, S6)", () => {
   const on = () => { vi.stubEnv("EVERLOOT_CHARACTER_LINKS", "1"); vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1"); };
 
   beforeEach(() => {
-    factNames.load.mockReset().mockResolvedValue({ item: (id: number) => (id === 16842 ? "Earthfury Helmet" : null), catalog: null, talentTrees: null });
+    factNames.load.mockReset().mockResolvedValue({ catalog: { titles: new Map([[1, { name: "Private" }]]) } });
   });
 
   test("with the switch off nothing asks for facts, and the page and cards are as before", async () => {
-    answer([GEAR]);
+    answer([RAIDS]);
     for (const [links, sync] of [["1", ""], ["1", "true"], ["", "1"]]) {
       vi.stubEnv("EVERLOOT_CHARACTER_LINKS", links);
       vi.stubEnv("EVERLOOT_PRIVATE_SYNC", sync);
       const html = await render();
       expect(html).toContain("Thrallina");
-      expect(html).not.toContain('data-section="gear"');
+      expect(html).not.toContain("Molten Core");
       expect((await card(wideCard)).status).toBe(200);
     }
     expect(askedForFacts()).toBe(false);
     expect(factNames.load).not.toHaveBeenCalled();
   });
 
-  test("on, the page shows exactly the sections the owner switched on, dated, with names only where installs agree", async () => {
+  test("on, the page shows exactly the sections the owner switched on, dated", async () => {
     on();
-    answer([GEAR, PROFESSIONS]);
+    answer([RAIDS, TITLES]);
     const html = await render();
     expect(JSON.parse(auth.authQuery.mock.calls.find(([path]) => path === FACTS_RPC)![1].body))
       .toEqual({ p_ruleset: "forever", p_realm_slug: "Forever Pioneer", p_name: "Thrallina" });
-    expect(html).toContain('data-section="gear"');
-    expect(html).toContain("Earthfury Helmet");
-    expect(html).toContain('href="/database/items/16842"');
-    expect(html).toContain('data-section="professions"');
-    expect(html).toContain("280 / 300");
-    for (const key of ["talents", "reputations", "raids", "collections"]) expect(html).not.toContain(`data-section="${key}"`);
+    expect(html).toContain('data-section="raids"');
+    expect(html).toContain("Molten Core");
+    expect(html).toContain('data-section="collections"');
+    expect(html).toContain("Private");
     // The header's date is the newest published capture.
     expect(html).toContain("From the player&#x27;s own addon upload, 2026-10-31 (1 day ago)");
     expect(html).not.toMatch(/verified|owner|proven|✓/i);
     for (const secret of [USER_ID, "d".repeat(64), "install-1234", "Thrall#1234", "source_ref"]) expect(html).not.toContain(secret);
   });
 
-  test("a published stats fact is drawn; without one the stats keep the not-recorded line", async () => {
+  test("retired categories still stored before the migration are never drawn", async () => {
     on();
-    answer([PROFESSIONS]);
-    const without = await render();
-    expect(without).toContain('data-section="stats" data-state="unsupported"');
-    expect(without).toContain(NOT_RECORDED_LINE);
-    answer([{ category: "stats", captured_at: "2026-10-31T09:00:00+00:00", data: { stats: { strength: 1234, meleeCrit: 12.34, agility: 0, meleeHit: 0 } } }]);
+    answer([
+      { category: "gear", captured_at: "2026-10-31T09:00:00+00:00", data: { equipped: [{ slot: "HeadSlot", itemId: 16842, itemLevel: 66 }] } },
+      { category: "stats", captured_at: "2026-10-31T09:00:00+00:00", data: { stats: { strength: 1234 } } },
+      { category: "pvp", captured_at: "2026-10-31T09:00:00+00:00", data: { rank: 7, honorableKills: 12_345 } },
+    ]);
     const html = await render();
-    expect(html).toContain('data-section="stats"');
-    expect(html).not.toContain('data-section="stats" data-state="unsupported"');
-    expect(html).not.toContain(NOT_RECORDED_LINE);
-    expect(html).toContain("1,234");
-    expect(html).toContain("12.34%");
-    expect(html).not.toContain("0.00%");
-  });
-
-  test("a published pvp fact is drawn; without one the section is left out", async () => {
-    on();
-    answer([PROFESSIONS]);
-    expect(await render()).not.toContain('data-section="pvp"');
-    answer([{ category: "pvp", captured_at: "2026-10-31T09:00:00+00:00", data: { rank: 7, rankPoints: null, rankThreshold: null, rankMax: 14, season: null, honorableKills: 12_345 } }]);
-    const html = await render();
-    expect(html).toContain('data-section="pvp"');
-    expect(html).toContain("Rank 7 of 14");
-    expect(html).toContain("Honorable kills 12,345");
-    expect(html).not.toContain("Season");
+    expect(html).toContain("Thrallina");
+    expect(html).not.toContain("16842");
+    expect(html).not.toContain("1,234");
+    expect(html).not.toContain("12,345");
   });
 
   test("a section switched off is gone on the next request", async () => {
     on();
-    answer([GEAR, PROFESSIONS]);
-    expect(await render()).toContain('data-section="gear"');
-    // The owner switched gear off: public_character_facts no longer returns it (supabase/tests/private_sync.sql).
-    answer([PROFESSIONS]);
+    answer([RAIDS, TITLES]);
+    expect(await render()).toContain("Molten Core");
+    // The owner switched raids off: public_character_facts no longer returns it (supabase/tests/private_sync.sql).
+    answer([TITLES]);
     const html = await render();
-    expect(html).not.toContain('data-section="gear"');
-    expect(html).not.toContain("Earthfury Helmet");
-    expect(html).toContain('data-section="professions"');
+    expect(html).not.toContain("Molten Core");
+    expect(html).toContain('data-section="collections"');
   });
 
   test("a hidden, frozen or private character is a 404 and its facts are never asked for", async () => {
     on();
-    auth.authQuery.mockImplementation(async (path: string) => (path === FACTS_RPC ? [GEAR] : []));
+    auth.authQuery.mockImplementation(async (path: string) => (path === FACTS_RPC ? [RAIDS] : []));
     await expect(Page(props())).rejects.toThrow("NEXT_NOT_FOUND");
     expect((await card(wideCard)).status).toBe(404);
     expect(askedForFacts()).toBe(false);
@@ -347,74 +333,82 @@ describe("published sections (private sync, S6)", () => {
 
   test("a failed or malformed read leaves the sections out and keeps the page", async () => {
     on();
-    for (const facts of [new Error("down"), [{ category: "gear", captured_at: "not a date", data: {} }, { category: "gold", captured_at: "2026-10-31T09:00:00Z", data: {} }]]) {
+    for (const facts of [new Error("down"), [{ category: "raids", captured_at: "not a date", data: {} }, { category: "gold", captured_at: "2026-10-31T09:00:00Z", data: {} }]]) {
       answer(facts);
       const html = await render();
       expect(html).toContain("Thrallina");
-      expect(html).not.toContain('data-section="gear"');
+      expect(html).not.toContain("Molten Core");
     }
   });
 
   test("the cards draw from the published sections too", async () => {
     on();
-    answer([GEAR]);
+    answer([RAIDS]);
     expect((await card(wideCard)).status).toBe(200);
     expect(askedForFacts()).toBe(true);
   });
 });
 
-describe("gear ranks (EVERLOOT_LEADERBOARDS)", () => {
-  const entry = (name: string, itemLevel: number, gearScore: number) => ({
-    name, realm: "Forever Pioneer", realmBase: "Forever Pioneer", ruleset: null, region: null, race: "Orc", class: "SHAMAN", faction: "Horde",
-    level: 24, path: `/characters/forever/forever-pioneer/${name.toLowerCase()}`, capturedAt: "2026-10-31T09:00:00Z", itemLevel, gearScore,
-    linkId: `link-${name}`,
+describe("Blizzard's API part (armory association)", () => {
+  const ARMORY_RPC = "rpc/public_character_armory";
+  const SWITCHES = { show_gear: true, show_stats: false, show_talents: false, show_pvp: true, show_professions: false, show_reputations: false, show_collections: true };
+  const OFF = Object.fromEntries(Object.keys(SWITCHES).map((k) => [k, false]));
+  const at = "2026-10-31T08:00:00.000Z";
+  const character = armoryCharacter({
+    fetchedAt: at, honorableKills: 321, pvpRank: 4,
+    details: {
+      revision: 1,
+      statistics: { asOf: at, rows: [{ label: "Intellect", value: 69, percent: false }] },
+      reputations: { asOf: at, rows: [{ id: 530, name: "Darkspear Trolls", standing: "Friendly", tier: 4 }] },
+      achievements: { asOf: at, rows: [{ id: 6, name: "Level 10", completedAt: "2026-10-01T12:00:00.000Z" }] },
+      quests: { asOf: at, completed: [788, 789] },
+    },
   });
-  const on = () => { for (const k of ["EVERLOOT_LEADERBOARDS", "EVERLOOT_CHARACTER_LINKS", "EVERLOOT_PRIVATE_SYNC"]) vi.stubEnv(k, "1"); };
+  const answer = (row: unknown) => auth.authQuery.mockImplementation(async (path: string) => {
+    if (path === "rpc/public_character") return [ROW];
+    if (path === ARMORY_RPC) {
+      if (row instanceof Error) throw row;
+      return row;
+    }
+    return [];
+  });
   beforeEach(() => {
-    gearBoard.load.mockReset().mockResolvedValue({ state: "ready", generatedAt: "2026-11-01T12:00:00Z", notCounted: 0, entries: [entry("Thrallina", 40, 41), entry("Other", 45, 39)] });
-    auth.authQuery.mockImplementation(async (path: string) => (path === "rpc/public_character" ? [ROW] : []));
+    vi.stubEnv("EVERLOOT_ARMORY", "1");
+    armory.character.mockReset().mockResolvedValue(character);
   });
 
-  test("a ranked character's page shows its number and place on both boards, linked to them", async () => {
-    on();
+  test("an associated character shows the parts whose switches are on, labelled and credited, and no other", async () => {
+    answer([{ region: "eu", slug: "ember-vale", ...SWITCHES }]);
     const html = await render();
-    expect(html).toContain('aria-label="Rankings"');
-    expect(html).toMatch(/Item level <span[^>]*>40<\/span> <a href="\/rankings\/item-level"[^>]*>#2<\/a>/);
-    expect(html).toMatch(/Gear Score <span[^>]*>41<\/span> <a href="\/rankings\/gear-score"[^>]*>#1<\/a>/);
+    expect(JSON.parse(auth.authQuery.mock.calls.find(([path]) => path === ARMORY_RPC)![1].body))
+      .toEqual({ p_ruleset: "forever", p_realm_slug: "Forever Pioneer", p_name: "Thrallina" });
+    expect(armory.character).toHaveBeenCalledWith("eu", "ember-vale");
+    expect(html).toContain('data-part="armory"');
+    expect(html).toContain("From Blizzard&#x27;s API, 2026-10-31");
+    expect(html).toContain("Data from Blizzard Entertainment");
+    expect(html).toContain("Giantstalker");
+    expect(html).toContain("321");
+    expect(html).toContain('href="/database/achievements/6"');
+    expect(html).toContain("completed quests");
+    // Stats and reputations are switched off: they never reach the markup.
+    expect(html).not.toContain("Intellect");
+    expect(html).not.toContain("Darkspear Trolls");
   });
 
-  test("off the boards, or with them off, the page has no ranks and the boards are not read", async () => {
-    on();
-    gearBoard.load.mockResolvedValue({ state: "ready", generatedAt: "2026-11-01T12:00:00Z", notCounted: 0, entries: [entry("Other", 45, 39)] });
-    expect(await render()).not.toContain('aria-label="Rankings"');
-    gearBoard.load.mockClear();
-    vi.stubEnv("EVERLOOT_LEADERBOARDS", "");
-    expect(await render()).not.toContain('aria-label="Rankings"');
-    expect(gearBoard.load).not.toHaveBeenCalled();
-  });
-
-  test("a ranked character with two tracked days or more gets its chart, read for its own link only", async () => {
-    on();
-    const points = [
-      { day: "2026-11-04", metric: "item_level", value: 38 }, { day: "2026-11-04", metric: "gear_score", value: 39 },
-      { day: "2026-11-06", metric: "item_level", value: 40 }, { day: "2026-11-06", metric: "gear_score", value: 41 },
-    ];
-    const track = vi.fn((_body: unknown) => points);
-    auth.authQuery.mockImplementation(async (path: string, init?: RequestInit) =>
-      path === "rpc/public_character" ? [ROW] : path === "rpc/character_track_points" ? track(JSON.parse(String(init?.body))) : []);
-    const html = await render();
-    expect(track).toHaveBeenCalledWith({ p_link_id: "link-Thrallina" });
-    expect(html).toContain("data-track-chart");
-    expect(html).toContain('aria-label="Thrallina: item level and Gear Score by day"');
-    expect(html).toContain("<th scope=\"row\">2026-11-06</th><td>40</td><td>41</td>");
-    // One day is not a line yet.
-    track.mockReturnValue(points.slice(0, 2));
-    expect(await render()).not.toContain("data-track-chart");
-    // Off the boards: no chart, and its points are not read.
-    track.mockClear();
-    gearBoard.load.mockResolvedValue({ state: "ready", generatedAt: "2026-11-01T12:00:00Z", notCounted: 0, entries: [entry("Other", 45, 39)] });
-    expect(await render()).not.toContain("data-track-chart");
-    expect(track).not.toHaveBeenCalled();
+  test("no association, every switch off, no armory row, the armory off or a failed read leave the part out", async () => {
+    for (const row of [[], [{ region: "eu", slug: "ember-vale", ...OFF }], new Error("down")]) {
+      answer(row);
+      const html = await render();
+      expect(html).toContain("Thrallina");
+      expect(html).not.toContain('data-part="armory"');
+    }
+    answer([{ region: "eu", slug: "ember-vale", ...SWITCHES }]);
+    armory.character.mockResolvedValue(null);
+    expect(await render()).not.toContain('data-part="armory"');
+    vi.stubEnv("EVERLOOT_ARMORY", "");
+    armory.character.mockResolvedValue(character);
+    expect(await render()).not.toContain('data-part="armory"');
+    expect(auth.authQuery.mock.calls.filter(([path]) => path === ARMORY_RPC)).toHaveLength(4);
   });
 });
 
