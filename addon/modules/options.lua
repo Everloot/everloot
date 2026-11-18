@@ -213,7 +213,7 @@ function O.Refresh()
     if page.added then
       page.addedRows = O.AddedRows()
       for i, text in ipairs(page.addedRows) do
-        if not page.added[i] then page.added[i] = words(page.content, "GameFontHighlightSmall", page.branded and 11 or nil, "muted") end
+        if not page.added[i] then page.added[i] = words(page.content, "GameFontHighlight", page.branded and 12 or nil, "muted") end
         page.added[i]:SetText(text)
         page.added[i]:Show()
       end
@@ -266,7 +266,7 @@ local function build(frameName, name, introText, rows, added, branded)
     page.title:SetPoint("TOPLEFT", 16, -16)
     page.title:SetText(name)
   end
-  local intro = pageWords(page, "GameFontHighlightSmall", 11, "muted")
+  local intro = pageWords(page, "GameFontHighlight", 12, "muted")
   intro:SetPoint("TOPLEFT", page, "TOPLEFT", 16, -46)
   intro:SetPoint("TOPRIGHT", page, "TOPRIGHT", -32, -46)
   intro:SetText(introText)
@@ -289,7 +289,7 @@ local function build(frameName, name, introText, rows, added, branded)
     local label = pageWords(box, "GameFontHighlight", 13, "text")
     label:SetPoint("TOPLEFT", box, "TOPRIGHT", 4, -4)
     label:SetText(row.label)
-    local text = pageWords(box, "GameFontHighlightSmall", 11, "muted")
+    local text = pageWords(box, "GameFontHighlight", 12, "muted")
     text:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -2)
     text:SetText(row.text)
     box.label, box.description = label, text
@@ -348,7 +348,7 @@ local function build(frameName, name, introText, rows, added, branded)
   reload:SetText("Reload now")
   reload:SetScript("OnClick", function() if ReloadUI then ReloadUI() end end)
   page.reload = reload
-  local note = pageWords(page, "GameFontDisableSmall", 11, "muted")
+  local note = pageWords(page, "GameFontDisable", 12, "muted")
   note:SetPoint("TOPLEFT", reload, "TOPRIGHT", 10, -2)
   note:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -32, 16)
   note:SetJustifyV("TOP")
@@ -536,7 +536,7 @@ end
 
 local function buildPrompt()
   local f, top = dialog("EverlootPlayersPrompt", 440, "Player names")
-  local body = words(f, "GameFontHighlightSmall", 12, "text")
+  local body = words(f, "GameFontHighlight", 12, "text")
   body:SetPoint("TOPLEFT", top, "BOTTOMLEFT", 4, -10)
   body:SetWidth(400)
   body:SetText(O.PLAYERS_QUESTION)
@@ -670,7 +670,7 @@ end
 
 local function buildSetup()
   local f = dialog("EverlootSetupPrompt", 480, "Features")
-  local intro = words(f, "GameFontHighlightSmall", 12, "text")
+  local intro = words(f, "GameFontHighlight", 12, "text")
   intro:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -48)
   intro:SetWidth(448)
   intro:SetText(O.SETUP_INTRO)
@@ -683,7 +683,7 @@ local function buildSetup()
     button:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -y)
     button:SetText(choice.label)
     button:SetScript("OnClick", function() O.AnswerSetup(choice.key) end)
-    local text = words(f, "GameFontHighlightSmall", 11, "muted")
+    local text = words(f, "GameFontHighlight", 12, "muted")
     text:SetPoint("TOPLEFT", f, "TOPLEFT", 176, -y - 2)
     text:SetWidth(288)
     text:SetText(choice.text)
@@ -693,14 +693,14 @@ local function buildSetup()
     f.choiceParts[#f.choiceParts + 1] = text
     y = y + math.max(24, text:GetStringHeight() + 2) + 12
   end
-  local upload = words(f, "GameFontHighlightSmall", 11, "text")
+  local upload = words(f, "GameFontHighlight", 12, "text")
   upload:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -y)
   upload:SetWidth(448)
   upload:SetText(O.SETUP_UPLOAD)
   f.upload = upload
   f.choiceParts[#f.choiceParts + 1] = upload
   y = y + upload:GetStringHeight() + 10
-  local players = words(f, "GameFontHighlightSmall", 11, "text")
+  local players = words(f, "GameFontHighlight", 12, "text")
   players:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -y)
   players:SetWidth(448)
   players:SetText(O.SETUP_PLAYERS)
@@ -709,7 +709,7 @@ local function buildSetup()
   local height = y + players:GetStringHeight() + 16
   f:SetHeight(height)
   -- After Everything or Collect data only: a reload applies what changed.
-  local done = words(f, "GameFontHighlightSmall", 12, "text")
+  local done = words(f, "GameFontHighlight", 12, "text")
   done:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -48)
   done:SetWidth(448)
   local reload = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")

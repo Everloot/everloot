@@ -383,7 +383,7 @@ sameAsLines(STUB)
 checkLayout()
 for i = 1, p.used do
   local row = p.rows[i]
-  if row.value.shown then assert(row.label.template == 'GameFontHighlightSmall' and row.value.template == 'GameFontHighlight', 'native label and value fonts') end
+  if row.value.shown then assert(row.label.template == 'GameFontHighlight' and row.value.template == 'GameFontHighlight', 'native label and value fonts, nothing below 12 px') end
 end
 assert(p.rows[5].label:GetStringHeight() > 12 and p.rows[5].value:GetStringHeight() == 12, 'a long label wraps beside its value, which stays on one line')
 assert(p.rows[4].note:GetStringHeight() > 12, 'a long warning wraps inside the column')

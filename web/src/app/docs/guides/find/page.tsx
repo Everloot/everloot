@@ -69,6 +69,7 @@ export default function Page() {
         <li><strong>List.</strong> The List tab has everything the map shows, as lists, with a Show on map button on each row. It follows the same category switches.</li>
         <li><strong>On a phone.</strong> The bar along the bottom opens Categories, Search and the List as sheets. Drag a sheet up for the whole screen, or down to close it.</li>
         <li><strong>Coordinates.</strong> Select a pin or zone and use Copy /way on its card. Paste the line into the game chat to set a waypoint, in the form <C>/way 42.5 61 Name</C>.</li>
+        <li><strong>Share a spot.</strong> Shift-click the map or use Pin map centre, then share the address. The <C>pin=x,y</C> coordinates use the continent&apos;s 0–100 scale. Keyboard users can pan with the arrow keys before pressing Pin map centre. Clear pin removes the marker and its coordinates from the address.</li>
         <li><strong>Links.</strong> Each continent has its own page, <Link href="/map/eastern-kingdoms" className={docLink}>Eastern Kingdoms</Link> and <Link href="/map/kalimdor" className={docLink}>Kalimdor</Link>. The address keeps your view, the categories shown, an open search and the List tab, so a link opens the same place; Copy link on a card links that one pin. Back returns from a zone to the continent.</li>
       </List>
       <Callout kind="warning">

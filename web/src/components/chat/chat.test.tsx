@@ -102,6 +102,60 @@ function setValue(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
 }
 
 describe("the chat page", () => {
+  test("setup and limits are collapsed behind the current mode", async () => {
+    api({ signed: false });
+    await render(<ChatClient profiles />);
+    const details = container.querySelector("details");
+    expect(details).not.toBeNull();
+    expect(details!.open).toBe(false);
+    expect(details!.querySelector("summary")?.textContent).toBe("Everloot search");
+    expect(details!.textContent).toContain("Signed out: lookups use the public limits");
+    await click(details!.querySelector("summary")!);
+    expect(details!.open).toBe(true);
+    expect(details!.textContent).toContain("Everloot search is ready");
+    expect(details!.textContent).toContain("(sign in first)");
+    expect(details!.querySelector("a")?.getAttribute("href")).toBe("/sign-in?returnTo=%2Faccount%23chat-keys");
+  });
+
+  test("the mode chip follows the free/search choice and keeps provider disclosure reachable", async () => {
+    api({ signed: false });
+    await render(<ChatClient freeChat={["Groq"]} />);
+    const details = container.querySelector("details")!;
+    expect(details.open).toBe(false);
+    expect(details.querySelector("summary")?.textContent).toBe("Everloot (free)");
+    await click(details.querySelector("summary")!);
+    expect(details.textContent).toContain("Your question and this chat go to Groq");
+    await act(async () => setValue(details.querySelector("select")!, "search"));
+    expect(details.querySelector("summary")?.textContent).toBe("Everloot search");
+    expect(details.textContent).toContain("Everloot search is ready");
+  });
+
+  test("a configured model is named by the collapsed chip", async () => {
+    api();
+    saveKey();
+    await render(<ChatClient />);
+    const details = container.querySelector("details")!;
+    expect(details.open).toBe(false);
+    expect(details.querySelector("summary")?.textContent).toBe("deepseek/deepseek-v4.1-flash");
+    await click(details.querySelector("summary")!);
+    expect(details.querySelector('select[aria-label="Model"]')).not.toBeNull();
+    expect(details.textContent).toContain("Assistant setup");
+  });
+
+  test.each([false, true])("desktop rail defaults to history presence: %s", async (history) => {
+    api();
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true })));
+    if (history) localStorage.setItem("everloot.chat.conversations.v1", JSON.stringify([{
+      id: "saved-chat", title: "Saved question", updatedAt: new Date().toISOString(),
+      messages: [{ role: "user", text: "Saved question", at: new Date().toISOString(), model: null, sources: [], steps: [] }],
+    }]));
+    await render(<ChatClient />);
+    expect(button("Chats")?.getAttribute("aria-expanded")).toBe(String(history));
+    expect(container.querySelector('nav[aria-label="Conversations"]') !== null).toBe(history);
+    await click(button("Chats"));
+    expect(button("Chats")?.getAttribute("aria-expanded")).toBe(String(!history));
+  });
+
   test("moves old browser-wide credentials into this tab before using them", async () => {
     api();
     saveKey();

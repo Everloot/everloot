@@ -39,6 +39,7 @@ export interface LeafletMapProps {
   onSelect: (id: string | null) => void;
   onZone: (mapId: number) => void;
   onPoint: (x: number, y: number) => void;
+  onPin: (x: number, y: number) => void;
   onHover: (point: { x: number; y: number } | null) => void;
   onView: (view: MapViewChange) => void;
 }
@@ -239,6 +240,7 @@ export default function LeafletMap(props: LeafletMapProps) {
     m.on("mouseout", () => { cancelAnimationFrame(hoverFrame); hoverFrame = 0; live.current.onHover(null); });
     m.on("click", (e: L.LeafletMouseEvent) => {
       const now = live.current, x = e.latlng.lng, y = -e.latlng.lat;
+      if (e.originalEvent.shiftKey) { now.onPin(x, y); return; }
       // The smallest zone under the click: zoom to it from afar, drop a point once already close.
       let zone: MapZone | null = null;
       for (const z of now.zones) if (x >= z.x && x <= z.x + z.width && y >= z.y && y <= z.y + z.height && (!zone || z.width * z.height < zone.width * zone.height)) zone = z;

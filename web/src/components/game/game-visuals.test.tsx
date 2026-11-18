@@ -5,6 +5,7 @@ import { emptyMarket, foldMarket } from "../../../../kb/src/market";
 import { itemIndex, shard0, siteManifest } from "@/lib/game-assets.fixture";
 import { forgetPrivateReads, forgetSiteAssets } from "@/lib/game-assets";
 import { CREDIT } from "@/lib/talents/assets";
+import { buildLoreRelease } from "@/test/lore-release";
 
 const store = vi.hoisted(() => ({ loadCorpus: vi.fn(), loadMarket: vi.fn() }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
@@ -40,11 +41,6 @@ import ZonesPage from "@/app/database/zones/page";
 
 // The home page's ask box uses the app router; these renders have none mounted.
 vi.mock("next/navigation", async (importOriginal) => ({ ...(await importOriginal<typeof import("next/navigation")>()), useRouter: () => ({ push: () => {} }) }));
-
-/** The wide-screen banner's markup: from its start to the end of its caption. */
-const onBanner = (html: string) => html.slice(html.indexOf("data-banner"), html.indexOf("</p>", html.indexOf("data-banner-credit")));
-/** The banner's one-line caption, tiny and quiet in the corner; the full credit with the build is at the foot of the page. */
-const CAPTION = /data-banner-credit(?:="true")? class="absolute bottom-1 right-0 text-\[10px\] leading-none text-muted[^"]*">Art © Blizzard Entertainment$/;
 
 const BASE = "https://assets.example.test/wow_classic_beta-70450-84bea423";
 const PRIVATE = "https://r2.example.test/everloot-game-data/wow_classic_beta-70450-84bea423";
@@ -332,13 +328,15 @@ test("map: the continent picture and zone pictures; held-back zones only with sp
   expect(kalimdor).not.toMatch(/Map pictures/);
 });
 
-test("lore archive: the same wide-screen banner, Scarlet Monastery's loading screen with the title on it", async () => {
+test("lore archive: Scarlet Monastery's loading screen stays uncropped beside the categories", async () => {
+  vi.stubEnv("KB_SNAPSHOT_PATH", await buildLoreRelease());
   vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", BASE);
   vi.stubGlobal("fetch", bucket());
   const html = await render(() => LorePage());
-  expect(onBanner(html)).toMatch(/<img[^>]*loading\/9189\.webp[^>]*data-page-banner/);
-  expect(onBanner(html)).toMatch(/<h1[^>]*>Lore archive<\/h1>/);
-  expect(onBanner(html)).toMatch(CAPTION);
+  expect(html).toMatch(/<img[^>]*loading\/9189\.webp[^>]*class="h-auto w-full rounded-card"/);
+  expect(html).toMatch(/<h1[^>]*>Lore archive<\/h1>/);
+  expect(html).not.toContain("data-page-banner");
+  expect(html).toContain('aria-labelledby="browse-categories"');
   // No credit block: the credit is site-wide; the lore page keeps only its one source line.
   expect(html).not.toMatch(/data-game-credit|data-source-line/);
   expect(html.match(/data-lore-source/g)).toHaveLength(1);

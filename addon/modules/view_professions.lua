@@ -520,10 +520,10 @@ buildCrafting = function(parent)
   c.sortButton:SetPoint("TOPLEFT", 0, -6)
   c.filterButton = button(c.page, PROFITABLE, 150, function() c.profitable = not c.profitable; c.rows.offset = 0 end)
   c.filterButton:SetPoint("TOPLEFT", 154, -6)
-  c.age = text(c.page, 11, NARROW, COLORS.muted)
+  c.age = text(c.page, 12, nil, COLORS.muted)
   c.age:SetPoint("TOPLEFT", 4, -32)
   c.age:SetWidth(W - 8)
-  c.note = text(c.page, 11, NARROW, COLORS.muted)
+  c.note = text(c.page, 12, nil, COLORS.muted)
   c.note:SetPoint("TOPLEFT", 4, -45)
   c.note:SetWidth(W - 8)
   c.note:SetText(PER_ITEM)
@@ -531,7 +531,7 @@ buildCrafting = function(parent)
   local list = box(c.page, 0, -60, W, 186)
   c.head = {}
   for _, col in ipairs(CRAFT_COLUMNS) do
-    local s = text(list, 11, NARROW, COLORS.muted)
+    local s = text(list, 12, nil, COLORS.muted)
     s:SetPoint("TOPLEFT", col[2] + 4, -6)
     s:SetWidth(col[3])
     if col[1] ~= "name" then s:SetJustifyH("RIGHT") end
@@ -547,7 +547,7 @@ buildCrafting = function(parent)
     line:SetPoint("TOPLEFT", 4, -22 - (i - 1) * CRAFT_ROW_H)
     line:SetSize(W - 8, CRAFT_ROW_H)
     for _, col in ipairs(CRAFT_COLUMNS) do
-      local s = text(line, 11, NARROW)
+      local s = text(line, 12, col[1] ~= "name" and NARROW or nil) -- numbers in the narrow figures, words in Friz
       s:SetPoint("LEFT", col[2], 0)
       s:SetWidth(col[3])
       if s.SetWordWrap then s:SetWordWrap(false) end
@@ -559,7 +559,7 @@ buildCrafting = function(parent)
     end)
     rows[i] = line
   end
-  rows.empty = text(list, 11, nil, COLORS.muted)
+  rows.empty = text(list, 12, nil, COLORS.muted)
   rows.empty:SetPoint("TOPLEFT", 8, -24)
   rows.empty:SetWidth(W - 16)
   rows.up = button(list, "Up", 48, function() rows.offset = math.max(0, rows.offset - CRAFT_ROWS) end)
@@ -584,7 +584,7 @@ buildCrafting = function(parent)
   end
   -- The lines and the total leave the bottom right to Up and Down (106 wide).
   for i = 1, BUY_LINES do
-    local line = text(buy, 11, NARROW, COLORS.muted)
+    local line = text(buy, 12, nil, COLORS.muted)
     line:SetPoint("TOPLEFT", 8, -30 - (i - 1) * LINE_H)
     line:SetWidth(W - 16 - 110)
     if line.SetWordWrap then line:SetWordWrap(false) end
@@ -634,16 +634,16 @@ local function build(f, parent)
     b.rank = text(b, 12, NARROW)
     b.rank:SetPoint("TOPRIGHT", -10, -10)
     b.rank:SetJustifyH("RIGHT")
-    b.recipes = text(b, 11, NARROW, COLORS.muted)
+    b.recipes = text(b, 12, nil, COLORS.muted)
     b.recipes:SetPoint("TOPLEFT", 46, -28)
     b.recipes:SetWidth(W - 236)
-    b.last = text(b, 11, NARROW, COLORS.muted)
+    b.last = text(b, 12, nil, COLORS.muted)
     b.last:SetPoint("TOPRIGHT", -10, -28)
     b.last:SetWidth(170)
     b.last:SetJustifyH("RIGHT")
     b.trainer = {}
     for j = 1, TRAINER_LINES do
-      local line = text(b, 11, NARROW, COLORS.muted)
+      local line = text(b, 12, nil, COLORS.muted)
       line:SetPoint("TOPLEFT", 46, -(HEAD_H + (j - 1) * LINE_H))
       line:SetWidth(W - 56)
       b.trainer[j] = line
@@ -659,12 +659,12 @@ local function build(f, parent)
   p.others:SetText(OTHERS)
   p.other = {}
   for i = 1, OTHER_ROWS do
-    local line = text(parent, 11, NARROW, COLORS.muted)
+    local line = text(parent, 12, nil, COLORS.muted)
     line:SetPoint("TOPLEFT", p.others, "BOTTOMLEFT", 0, -(i - 1) * LINE_H - 2)
     line:SetWidth(W - 16)
     p.other[i] = line
   end
-  p.footer = text(parent, 11, NARROW, COLORS.muted)
+  p.footer = text(parent, 12, nil, COLORS.muted)
   -- At the bottom of the view, under the blocks and the other characters.
   p.footer:SetPoint("BOTTOMLEFT", 8, 8)
   p.footer:SetWidth(W - 160)  -- the button beside it is 140 wide

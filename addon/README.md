@@ -304,7 +304,9 @@ and everloot.app/players/opt-out to hide a character.
 
 ## The Everloot window
 
-Left-click the minimap button, or `/everloot window`, for the Everloot window. Its sidebar has five items.
+Left-click the minimap button, or `/everloot window`, for the Everloot window. Its sidebar has five items. Drag the
+grip in its bottom-right corner to make the whole window bigger or smaller (from three quarters to one and a half times,
+never larger than the screen); right-click the grip for the normal size. The size is kept for the next session.
 
 - **Home** lists every character this install has seen: gold, level, professions, raid lockouts (shown only while the completion tracker is on) and when it was last
   seen, with totals for each realm and for the account and a "This week" line (gold in and out for this character over
@@ -316,7 +318,20 @@ Left-click the minimap button, or `/everloot window`, for the Everloot window. I
 - **Collection** shows achievements, reputation, titles, raid lockouts and quest chains (quests done of each chain's
   total) from the rows the completion tracker wrote, so it needs `/everloot completion on`; with it off the tab says so
   and has a button that runs that command. It shows this character, or the account: every character in the roster, each
-  item done when any of them has it, with the name of the character that does.
+  item done when any of them has it, with the name of the character that does. It is drawn as completionist addons
+  draw their lists: headings in the game's gold that open and close with a click, each with how many of the marked
+  items under it are done ("3 / 8 (37%)"), an icon on each row, a green check for done and a red cross for missing,
+  and the game's tooltip on hover. The mouse wheel scrolls the list.
+  - **Dungeons & raids** lists the instances players agreed on, their bosses with your kills and this week's
+    lockouts. A boss opens on its drops: the public drop rates (three installs) the Desktop App wrote into the price
+    file, from the creatures this install saw in that fight or, failing that, from the NPCs the file names as the
+    boss is named (the boss's tooltip says which). Each drop shows its rate and loot windows; a drop that is a mount,
+    battle pet, toy or appearance is marked with whether this character has it, read from the game. Without the
+    price file's drops block the bosses stay plain rows and the summary says why.
+  - **Mounts** lists every mount the game lists for this character (the other faction's only once collected), with
+    its source. **Pets** (one row per species) and **Toys** list what the Pet Journal and the Toy Box list under their
+    own filters; clear those filters in the Collections window to see everything. These three are read from the game
+    and never recorded.
 - **Professions** shows each profession in the profession book with its rank and the recipes recorded for it by
   difficulty colour. **Crafting costs**, the button at its bottom, lists the recipes this install recorded under this
   character's profession names (recipe rows carry no character, so an alt's recipes in the same profession show too)
@@ -358,12 +373,12 @@ inside it closes it until `/reload` and `/everloot status` names the error. The 
 settings page turns it off; the minimap button then opens the plan workspace as before. The crest it uses is
 `media/crest.tga`, which the release zip carries beside the code.
 
-Hovering the minimap button shows what its clicks do. The Minimap button switch on the settings page hides it after a `/reload`; `/everloot window` still opens the window.
+The minimap button sits on the minimap's edge like other addons' buttons, at the top-left at first; drag it around the edge to move it, and it stays there. Hovering it shows what its clicks do. The Minimap button switch on the settings page hides it after a `/reload`; `/everloot window` still opens the window.
 
 The minimap button also holds other addons' minimap buttons. Buttons made with LibDBIcon (most addons' round
 minimap buttons) move into it at login when the drawer is enabled. It starts off for new installs; existing
 players keep their saved setting, and upgrades without a saved toggle keep it on. Use `/everloot buttons on`
-to enable it. Hover the crest and they show in a small panel beside it, which closes
+to enable it. Hover the button and they show in a small panel beside it, on the side away from the map, which closes
 when the mouse leaves. Its clicks stay the same. Blizzard's own minimap buttons and any other button are left
 where they are. The first time it gathers a button, chat says how many. `/everloot buttons off`, or the **Addon
 buttons in the Everloot button** switch on the settings page, turns it off; the buttons go back around the

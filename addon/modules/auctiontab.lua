@@ -120,9 +120,9 @@ end
 -- One result row: a label and its value, or one line of text.
 local function newRow(content)
   local row = {
-    label = words(content, "GameFontHighlightSmall"),
+    label = words(content, "GameFontHighlight"),
     value = words(content, "GameFontHighlight"),
-    note = words(content, "GameFontHighlightSmall"),
+    note = words(content, "GameFontHighlight"),
   }
   row.value:SetJustifyH("RIGHT")
   return row
@@ -376,16 +376,16 @@ local function buildShop(panel)
   shop.maxBox = shopBox(page, 90, 276, -30)
   shop.addButton = shopButton(page, "Add or update", 120, function() addFromBoxes(shop) end)
   shop.addButton:SetPoint("TOPLEFT", page, "TOPLEFT", 374, -30)
-  shop.help = words(page, "GameFontDisableSmall")
+  shop.help = words(page, "GameFontDisable")
   shop.help:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -56)
   shop.help:SetText(SHOP_HELP)
-  shop.file = words(page, "GameFontDisableSmall")
+  shop.file = words(page, "GameFontDisable")
   shop.file:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -70)
 
   shop.head = {}
   local heads = { name = "Item", want = "Want", max = "Max each", market = "Market · age", found = "Lowest found" }
   for _, col in ipairs(SHOP_COLUMNS) do
-    local s = words(page, "GameFontDisableSmall")
+    local s = words(page, "GameFontDisable")
     s:SetPoint("TOPLEFT", page, "TOPLEFT", col[2], -90)
     s:SetWidth(col[3])
     if col[1] ~= "name" then s:SetJustifyH("RIGHT") end
@@ -397,7 +397,7 @@ local function buildShop(panel)
     line:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -106 - (i - 1) * SHOP_ROW_H)
     line:SetSize(686, SHOP_ROW_H)
     for _, col in ipairs(SHOP_COLUMNS) do
-      local s = words(line, "GameFontHighlightSmall", 12, "text", col[1] ~= "name")
+      local s = words(line, "GameFontHighlight", 12, "text", col[1] ~= "name")
       s:SetPoint("LEFT", line, "LEFT", col[2], 0)
       s:SetWidth(col[3])
       if s.SetWordWrap then s:SetWordWrap(false) end
@@ -423,13 +423,13 @@ local function buildShop(panel)
     line.remove:SetPoint("LEFT", line, "LEFT", 664, 0)
     shop.rows[i] = line
   end
-  shop.empty = words(page, "GameFontHighlightSmall")
+  shop.empty = words(page, "GameFontHighlight")
   shop.empty:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -108)
   shop.empty:SetWidth(560)
-  shop.caps = words(page, "GameFontDisableSmall")
+  shop.caps = words(page, "GameFontDisable")
   shop.caps:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", 0, 0)
   shop.caps:SetText(S.CAPS .. " Nothing is uploaded, bought or posted for you.")
-  shop.message = words(page, "GameFontHighlightSmall")
+  shop.message = words(page, "GameFontHighlight")
   shop.message:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", 0, 16)
   shop.message:SetWidth(560)
   shop.up = shopButton(page, "Up", 48, function() shop.offset = math.max(0, shop.offset - SHOP_ROWS) end)
@@ -515,7 +515,7 @@ local function buildPanel(house)
   panel.title = words(panel, "GameFontNormalLarge")
   panel.title:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -14)
   panel.title:SetText("Everloot")
-  local intro = words(panel, "GameFontHighlightSmall")
+  local intro = words(panel, "GameFontHighlight")
   intro:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -46)
   intro:SetWidth(COLUMN)
   intro:SetText("Scan this house's item prices and quantities, never sellers. Prices appear in your tooltips immediately. "
@@ -556,7 +556,7 @@ local function buildPanel(house)
   box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
   panel.lookup = box
 
-  local footer = words(panel, "GameFontDisableSmall")
+  local footer = words(panel, "GameFontDisable")
   footer:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 16, 12)
   footer:SetWidth(COLUMN)
   footer:SetText("Full history and other realms: " .. T.SITE)
@@ -583,10 +583,10 @@ local function buildPanel(house)
   -- it holds every alphabet the client shows, where a font file named here may not.
   panel.item = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   panel.item:SetJustifyH("LEFT")
-  panel.unit = words(content, "GameFontDisableSmall")
+  panel.unit = words(content, "GameFontDisable")
   panel.unit:SetJustifyH("RIGHT")
   panel.unit:SetText("per unit")
-  panel.message = words(content, "GameFontHighlightSmall")
+  panel.message = words(content, "GameFontHighlight")
   render(panel, { message = HINT })
   -- The shopping lists, behind a button at the top right, when their file is loaded.
   if E.Shopping then

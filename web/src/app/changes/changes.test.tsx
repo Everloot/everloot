@@ -35,6 +35,7 @@ timeline.entries = entries;
 const page = async (params: Record<string, string> = {}) =>
   renderToStaticMarkup(await ChangesPage({ searchParams: Promise.resolve(params) }));
 const rows = (html: string) => (html.match(/data-change-row/g) ?? []).length;
+const phoneLines = (html: string) => [...html.matchAll(/<div class="text-cell-2 text-muted sm:hidden">(.*?)<\/div>/g)].map((m) => m[1]);
 
 const manualRow: ChangeEntry = { id: "manual:fixture", source: "manual", type: "post", game: "retail", at: "2026-10-23T00:00:00.000Z", title: "Retail source fixture", summary: "Everloot summary fixture.", url: "https://us.forums.blizzard.com/en/wow/t/example/123/4" };
 test("compact ChangeList manual rows show Everloot summary and clickable original with a plain Post label", () => {
@@ -101,7 +102,7 @@ test("dense rows: date, type, title linked to the post's page on Everloot, autho
   // The type is plain mono text, as on the home page: no pill on every row.
   expect(html).toContain('<span data-type="true" class="font-mono text-xs text-muted">Blue post</span>');
   expect(html).toContain('<span data-type="true" class="font-mono text-xs text-muted">Hotfix</span>');
-  expect(html.split("<tr").slice(1).some((r) => r.includes("data-badge"))).toBe(false);
+  expect(html).toContain("data-blue-card");
   expect(html).toMatch(/<a href="\/changes\/us-1-synthetic-beta-notice-b"[^>]*>Synthetic beta notice &lt;b&gt;<\/a>/);
   expect(html).toContain('href="/changes/eu-2-wow-forever-hotfixes"');
   // The original is one click further, on the post's page.
@@ -150,8 +151,7 @@ test("sorted by date, a day's date shows on its first row only; the rows under i
 test("the once-a-day date holds at a page break and a filtered start, either way round, and only for the date sort", async () => {
   const SHOWN = "hidden font-mono tabular-nums text-fg-2 sm:inline";
   const dateClasses = (html: string) => [...html.matchAll(/<time dateTime="[^"]+"[^>]*class="([^"]+)">/g)].map((m) => m[1]);
-  const phoneLines = (html: string) => [...html.matchAll(/<div class="text-cell-2 text-muted sm:hidden">(.*?)<\/div>/g)].map((m) => m[1]);
-  const firstTitle = (html: string) => /<div data-phone-title[^>]*><a [^>]*>([^<]+)<\/a>/.exec(html)![1];
+  const firstTitle = (html: string) => /<div data-phone-title[^>]*>.*?<a href="\/changes\/[^\"]+"[^>]*>([^<]+)<\/a>/.exec(html)![1];
   // 120 posts on one day: every page after the first starts in the middle of that day.
   timeline.entries = Array.from({ length: 120 }, (_, i) => ({ ...entries[1], id: `forum:${5000 + i}`, title: `Post ${i}`, at: new Date(Date.UTC(2026, 9, 1, 0, i)).toISOString() }));
   for (const [params, first] of [[{}, "Post 119"], [{ page: "2" }, "Post 69"], [{ sort: "-date", page: "2" }, "Post 69"], [{ sort: "date" }, "Post 0"], [{ sort: "date", page: "2" }, "Post 50"]] as const) {
@@ -387,4 +387,60 @@ test("with the game art, a spell a post names gets its icon, its tooltip and a l
   vi.unstubAllGlobals();
   // Without the asset URL the same excerpt is plain text.
   expect(await page()).toContain(">Battle Shout now reaches the whole raid.</p>");
+});
+
+test("news announcements link to Blizzard and show the news source on desktop and mobile", async () => {
+  timeline.entries = [{ id: "news:24315281", source: "news", type: "hotfix", game: "forever",
+    at: "2026-11-17T02:17:13.000Z", title: "Synthetic Forever hotfix announcement", author: "Blizzard Entertainment",
+    url: "https://news.blizzard.com/en-us/article/24315281/wow-forever-hotfixes-november-16-2026" }];
+  const html = await page();
+  expect(html).toContain('href="https://news.blizzard.com/en-us/article/24315281/wow-forever-hotfixes-november-16-2026"');
+  expect(phoneLines(html)).toEqual(["2026-11-17 · Hotfix · Blizzard Entertainment · Blizzard News"]);
+  expect(html).toContain(">Blizzard News</span>");
+  expect(await page({ region: "us" })).not.toContain("Synthetic Forever hotfix announcement");
+});
+
+const blueCards = (html: string) => [...html.matchAll(/<blockquote data-blue-card[^>]*>[\s\S]*?<\/blockquote>/g)].map((m) => m[0]);
+
+test("forum cards show the blue poster and body, Blizzard role badge and source chip on desktop and mobile", async () => {
+  timeline.entries = [entries[1]];
+  const cards = blueCards(await page());
+  expect(cards).toHaveLength(2);
+  for (const card of cards) {
+    expect(card).toContain("border-l-blue-post");
+    expect(card).toContain("bg-panel");
+    expect(card).toMatch(/<a [^>]*class="[^"]*text-blue-post[^"]*"[^>]*>Linxy<\/a>/);
+    expect(card).toContain(">Blizzard</span>");
+    expect(card).toContain(">Community Manager</span>");
+    expect(card).toMatch(/data-source-chip[^>]*>US forum<\/span>/);
+    expect(card).toMatch(/<p class="[^"]*text-blue-post[^"]*">A short excerpt\. Second sentence\.<\/p>/);
+    expect(card).not.toContain("line-clamp");
+  }
+});
+
+test("news cards link the original, show the source chip and omit an unknown role and body", async () => {
+  timeline.entries = [{ id: "news:fixture", source: "news", type: "hotfix", game: "forever",
+    at: "2026-11-17T02:17:13.000Z", title: "Synthetic news notice", author: "Blizzard Entertainment",
+    url: "https://news.blizzard.com/en-us/article/123/fixture" }];
+  const cards = blueCards(await page());
+  expect(cards).toHaveLength(2);
+  for (const card of cards) {
+    expect(card).toContain('href="https://news.blizzard.com/en-us/article/123/fixture"');
+    expect(card).toContain(">Blizzard Entertainment</a>");
+    expect(card).toContain(">Blizzard</span>");
+    expect(card).toMatch(/data-source-chip[^>]*>Blizzard News<\/span>/);
+    expect(card).not.toContain("Community Manager");
+    expect(card).not.toContain("<p");
+  }
+});
+
+test("builds remain compact rows without Blizzard card styling", async () => {
+  timeline.entries = [entries[0]];
+  const html = await page();
+  expect(rows(html)).toBe(1);
+  expect(html).toContain('data-change-row="true" class="min-w-0 py-1"');
+  expect(html).toContain("First seen by Everloot.");
+  expect(blueCards(html)).toHaveLength(0);
+  expect(html).not.toContain("data-source-chip");
+  expect(html).not.toContain("border-l-blue-post");
 });

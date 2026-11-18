@@ -26,6 +26,7 @@ export default function BugReport() {
     return () => { document.body.style.overflow = before; };
   }, [open]);
 
+  const clearance = "calc(max(1rem, var(--cookie-clearance, 0px)) + env(safe-area-inset-bottom, 0px))";
   const query = new URLSearchParams({ template: "bug-report.yml", labels: "bug", page });
 
   return (
@@ -36,8 +37,8 @@ export default function BugReport() {
         aria-label="Report a bug"
         aria-haspopup="dialog"
         title="Report a bug"
-        className="fixed left-4 z-40 inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-edge bg-panel px-3 text-sm text-accent transition-colors hover:border-accent hover:bg-canvas"
-        style={{ bottom: "calc(max(1rem, var(--cookie-clearance, 0px)) + env(safe-area-inset-bottom, 0px))" }}
+        className={`fixed ${pathname === "/chat" ? "right-4 top-header mt-1 bottom-auto sm:left-4 sm:right-auto sm:top-auto sm:mt-0 sm:bottom-[var(--report-bottom)]" : "left-4 bottom-[var(--report-bottom)]"} z-40 inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-edge bg-panel px-3 text-sm text-accent transition-colors hover:border-accent hover:bg-canvas`}
+        style={{ "--report-bottom": clearance } as React.CSSProperties}
         onClick={() => {
           setPage(reportPage(window.location.pathname));
           dialog.current?.showModal();
