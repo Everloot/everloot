@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ARMORY_RECHECK_DAYS, namesFromSlug, SEARCH_RULE, type ArmoryMetricKey } from "./armory";
+import { ARMORY_RECHECK_DAYS, armoryNameQuery, namesFromSlug, SEARCH_RULE, type ArmoryMetricKey } from "./armory";
 import { authQuery } from "./supabase/server";
 import { ArmoryDetails, type ProfileDetails } from "../../../kb/src/armory/details";
 
@@ -52,7 +52,7 @@ export interface ArmoryStore {
   guild(region: string, slug: string): Promise<ArmoryGuild | null>;
   /** The guild's members, with item level and Gear Score for those stored; hidden characters left out. */
   roster(region: string, slug: string): Promise<ArmoryMember[]>;
-  /** Characters whose name starts with `prefix` (2 letters or more), name then surname order. */
+  /** Characters whose first name, surname or "first surname" starts with `prefix` (2 letters or more), name then surname order. */
   search(prefix: string, limit: number): Promise<ArmoryHit[]>;
   searchGuilds(prefix: string, limit: number): Promise<ArmoryGuildHit[]>;
   /** One board, highest first; a null region or ruleset means all of them. */
@@ -227,9 +227,10 @@ export function createMemoryArmoryStore(now: () => Date = () => new Date()): Mem
       });
     },
     async search(prefix, limit) {
-      const p = prefixOf(prefix);
+      const p = armoryNameQuery(prefix);
       if (!p) return [];
-      return [...characters.values()].filter((c) => c.name.toLowerCase().startsWith(p))
+      const starts = (c: ArmoryCharacter) => [c.name, c.surname, `${c.name} ${c.surname}`].some((s) => s.toLowerCase().startsWith(p));
+      return [...characters.values()].filter(starts)
         .sort((a, b) => a.name.localeCompare(b.name) || a.surname.localeCompare(b.surname)).slice(0, limit)
         .map((c) => ({ region: c.region, slug: c.slug, name: c.name, surname: c.surname, level: c.level, class: c.class, race: c.race, ruleset: c.ruleset, guildName: c.guildName }));
     },

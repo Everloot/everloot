@@ -94,6 +94,15 @@ export function namesFromSlug(slug: string): { name: string; surname: string } {
 /** A search prefix: 2 to 24 letters of any script. */
 export const SEARCH_RULE = /^\p{L}{2,24}$/u;
 
+/**
+ * A character search as armory_search reads it: lower case, trimmed, any run of spaces as one. One word (the start
+ * of a first name or a surname) or a full first name and the start of a surname; null for anything else.
+ */
+export function armoryNameQuery(raw: string): string | null {
+  const q = raw.normalize("NFC").trim().replace(/\s+/g, " ").toLowerCase();
+  return /^\p{L}{2,24}( \p{L}{1,24})?$/u.test(q) ? q : null;
+}
+
 export const ARMORY_PATH = "/armory";
 export const ARMORY_HIDE_PATH = "/armory/hide";
 export const ARMORY_SUBMIT_PATH = "/armory/submit";
