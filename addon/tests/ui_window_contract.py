@@ -20,7 +20,7 @@ from window_world import AFTER, BEFORE, WORLD, fresh  # noqa: F401
 root = Path(__file__).parents[1]
 repo = root.parent
 
-# --- The file itself: no events, no hooks on the recording frame, the game's own fonts and the bronze edge ---
+# --- The file itself: no events, no hooks on the recording frame, the game's own fonts and the edges ---
 toc = (root / "Everloot.toc").read_text(encoding="utf-8")
 assert "modules\\window.lua" in toc, "the window is in the TOC"
 assert toc.index("modules\\window.lua") < toc.index("modules\\minimap.lua"), "the window loads before the minimap button"
@@ -34,7 +34,8 @@ for path in [root / "modules" / "window.lua", *sorted((root / "modules").glob("v
         assert word not in lines, f"{path.name} reads and displays only: {word} found"
     assert "Coming soon" not in text, f"no stubs in {path.name}"
 assert "Fonts\\\\FRIZQT__.TTF" in code and "Fonts\\\\ARIALN.TTF" in code, "Friz Quadrata headings, Arial Narrow numbers"
-assert "UI-Tooltip-Border" in code and "SetBackdropBorderColor" in code, "the stock tooltip edge, tinted"
+assert "UI-Tooltip-Border" in code and "SetBackdropBorderColor" in code, "the stock tooltip edge, tinted, for the borrowed look"
+assert "UI-DialogBox-Gold-Border" in code, "the open window's gold dialog edge"
 assert "Coming soon" not in source, "no stubs in the window"
 prices = (root / "modules" / "prices.lua").read_text(encoding="utf-8")
 for word in ["CreateTexture", "CreateFontString", "SetFont"]:
@@ -104,7 +105,12 @@ table.insert(Everloot.Window.NAV, { key = 'ghost', label = 'Ghost', icon = 'INV_
 assert(U.Open() == true, 'the window opens')
 local f = EverlootWindow
 assert(f == U.frame and f.shown and f.template == 'BackdropTemplate', 'one named window, shown')
-assert(f.backdrop.edgeFile == 'Interface\\\\Tooltips\\\\UI-Tooltip-Border' and f.border[1] > f.border[3], 'bronze-tinted tooltip edge')
+-- The open window wears the game's gold dialog edge, untinted, with Blizzard's own size and insets for it.
+local b = f.backdrop
+assert(b.edgeFile == 'Interface\\\\DialogFrame\\\\UI-DialogBox-Gold-Border' and b.edgeSize == 32, 'the gold dialog edge')
+assert(b.insets.left == 11 and b.insets.right == 12 and b.insets.top == 12 and b.insets.bottom == 11, "Blizzard's gold dialog insets")
+assert(f.border[1] == 1 and f.border[2] == 1 and f.border[3] == 1, 'untinted, so the edge stays gold')
+assert(f.grip.point[1] == 'BOTTOMRIGHT' and f.grip.point[2] <= -12 and f.grip.point[3] >= 12, 'the grip sits inside the gold edge')
 assert(f.crest.path == 'Interface\\\\AddOns\\\\Everloot\\\\media\\\\crest', 'the crest')
 
 -- The corner grip, as on the game's chat windows: dragging right by a quarter of the window's width makes it a quarter

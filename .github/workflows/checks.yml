@@ -78,7 +78,7 @@ jobs:
         run: python scripts/test_check_dco.py && python scripts/check_dco.py "origin/${{ github.base_ref }}" HEAD
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

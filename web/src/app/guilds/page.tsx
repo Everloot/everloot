@@ -5,6 +5,7 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, DataTable, EmptyState, FilterBar, Input, PageHeader, ResultStrip, SectionHeading, type Column, type FilterControl } from "@/components/ui";
 import { FAMILIES } from "@/data/families";
 import { armoryOn } from "@/lib/armory";
+import { directoryPrefix, guildDirectoryHref } from "@/lib/armory-guilds";
 import { dataAgeLabel } from "@/lib/data-age";
 import {
   factionLabel, guildPath, guildSearchPrefix, guildsOn, ladderHref, loadGuildData, loadGuildRealms, loadGuildSearch, loadLadder, parseLadderQuery, raidsOpen, realmPath,
@@ -140,7 +141,7 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
           meta={!data.unreachable && <span>{dataAgeLabel(data.dataAsOf)}</span>}
         />
         <div className="space-y-6">
-          {armoryOn() && <p className="text-sm text-fg-2">Guild rosters as Blizzard&apos;s API lists them are in the <Link href="/armory" className={link}>armory</Link>.</p>}
+          {armoryOn() && <ArmoryDirectoryLine q={q} />}
           <form action="/guilds" method="get" role="search" className="flex max-w-xl flex-col gap-2 sm:flex-row">
             <label htmlFor="guild-q" className="sr-only">Guild name</label>
             <Input id="guild-q" name="q" type="search" defaultValue={q} maxLength={40} autoComplete="off" placeholder="Start of a guild name, 2 letters or more" className="flex-1" />
@@ -230,6 +231,22 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
         </div>
       </article>
     </Container>
+  );
+}
+
+/**
+ * The armory's guild directory, linked rather than shown here: it is Blizzard's API data, which may only appear on
+ * an ad-free page, and /guilds is not one. A search typed here carries over when the armory's search rule takes it.
+ */
+function ArmoryDirectoryLine({ q }: { q: string }) {
+  const prefix = directoryPrefix(q);
+  const searched = typeof prefix === "string" && prefix !== "invalid" ? prefix : null;
+  return (
+    <p className="text-sm text-fg-2">
+      Every guild read from Blizzard&apos;s API, with its members, class mix and item level, is in the{" "}
+      <Link href={guildDirectoryHref({})} className={link}>guild directory</Link>.
+      {searched && <> <Link href={guildDirectoryHref({ prefix: searched })} className={link}>Search it for &ldquo;{searched}&rdquo;</Link>.</>}
+    </p>
   );
 }
 

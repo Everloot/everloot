@@ -19,7 +19,9 @@ function bodyFor(path: string): unknown {
 function setup(count = 1) {
   const store = {
     seedFromPlayers: vi.fn().mockResolvedValue(2),
-    take: vi.fn(async (_r: string, k: string) =>
+    spiderGuilds: vi.fn().mockResolvedValue(0),
+    recordRun: vi.fn().mockResolvedValue(0),
+    take: vi.fn(async (_r: string, k: string, _limit?: number) =>
       k === "guild"
         ? []
         : Array.from({ length: count }, (_, i) => ({
@@ -189,6 +191,7 @@ it("guild summary", async () => {
     touch_failed: { character: 0, guild: 0 },
     enqueued: 4,
     purged: 3,
+    zero_runs: 0,
   });
 });
 it("batches 100 and caps rate/concurrency", async () => {
@@ -237,6 +240,8 @@ it("dry run writes nothing", async () => {
   await runCrawl({ region: "eu", budget: 3, store, api, dryRun: true });
   for (const k of [
     "seedFromPlayers",
+    "spiderGuilds",
+    "recordRun",
     "upsertCharacters",
     "upsertGuild",
     "touch",
@@ -674,4 +679,67 @@ it("reserves each bad-row count before awaiting slow retry storage", async () =>
   } finally {
     vi.useRealTimers();
   }
+});
+
+it("spiders guilds, then reads each roster and queues its members", async () => {
+  const { store, api } = setup(0);
+  store.spiderGuilds.mockResolvedValue(3);
+  store.take.mockImplementation(async (_r, k) =>
+    k === "guild" ? [{ slug: "copper-owls", tries: 0, stored: false }] : [],
+  );
+  api.get.mockImplementation(async (path) => ({
+    status: 200,
+    body: path.endsWith("roster") ? roster : guild,
+    lastModified: "date",
+  }));
+  const s = await runCrawl({ region: "eu", budget: 80, store, api });
+  expect(store.spiderGuilds).toHaveBeenCalledWith("eu", 10);
+  expect(store.take).toHaveBeenCalledWith("eu", "guild", 10);
+  const [, , members] = store.upsertGuild.mock.calls[0]!;
+  expect(members.map((m: { character_slug: string }) => m.character_slug)).toEqual(["ember-vale", "willow-stone"]);
+  // 2 from the players table, 3 spidered guilds, 2 roster members.
+  expect(s.enqueued).toBe(7);
+});
+it("guild rosters get at most a quarter of the budget, characters the rest", async () => {
+  const { store, api } = setup(100);
+  store.take.mockImplementation(async (_r, k, limit = 0) =>
+    k === "guild"
+      ? Array.from({ length: limit }, (_, i) => ({ slug: `guild-${i}`, tries: 0, stored: false }))
+      : Array.from({ length: limit }, (_, i) => ({ slug: `ember-vale-${i}`, tries: 0, stored: false })),
+  );
+  api.get.mockImplementation(async (path) => ({
+    status: 200,
+    body: path.endsWith("roster") ? roster : path.includes("/data/wow/guild/") ? { ...guild, name: decodeURIComponent(path.split("/").at(-1)!) } : bodyFor(path),
+    lastModified: "date",
+  }));
+  const s = await runCrawl({ region: "eu", budget: 40, store, api });
+  const guildCalls = api.get.mock.calls.filter((c) => c[0].startsWith("/data/wow/guild/")).length;
+  expect(store.take).toHaveBeenCalledWith("eu", "guild", 5);
+  expect(guildCalls).toBe(10);
+  expect(store.take).toHaveBeenCalledWith("eu", "character", 30);
+  expect(s.calls).toBeLessThanOrEqual(40);
+  expect(s.characters.fetched).toBe(10);
+});
+it("counts zero-call runs and fails on the sixth in a row", async () => {
+  for (const [streak, fails] of [[5, false], [6, true]] as const) {
+    const { store, api } = setup(0);
+    store.recordRun.mockResolvedValue(streak);
+    const run = runCrawl({ region: "us", budget: 12_000, store, api });
+    if (fails) await expect(run).rejects.toThrow(/no Blizzard calls for 6 runs in a row/);
+    else expect((await run).zero_runs).toBe(5);
+    expect(store.recordRun).toHaveBeenCalledWith("us", 0);
+  }
+});
+it("records the call count of a run that read something", async () => {
+  const { store, api } = setup(1);
+  const s = await runCrawl({ region: "eu", budget: 3, store, api });
+  expect(store.recordRun).toHaveBeenCalledWith("eu", 3);
+  expect(s.zero_runs).toBe(0);
+});
+it("still crawls without the discovery migration, then fails naming it", async () => {
+  const { store, api } = setup(1);
+  store.spiderGuilds.mockRejectedValue(new StoreError(404));
+  await expect(runCrawl({ region: "eu", budget: 3, store, api })).rejects.toThrow(/20261117160000_armory_discovery\.sql/);
+  expect(store.upsertCharacters).toHaveBeenCalledTimes(1);
+  expect(store.recordRun).not.toHaveBeenCalled();
 });
