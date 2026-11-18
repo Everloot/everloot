@@ -81,8 +81,8 @@ one is not recorded here.
 | `R2_BUCKET` | `web/src/lib/upload-store.ts` and the other bucket stores | The uploads bucket | Yes |
 | `BLUE_BUCKET` | `web/src/lib/blue-store.ts` | A separate bucket for the blue-post archive; falls back to `R2_BUCKET` | No |
 | `CRON_SECRET` | `web/src/app/api/cron/*/route.ts`, `web/scripts/cf-entry.mjs` | The scheduled jobs call their routes with it | Yes |
-| `BNET_CLIENT_ID` | `web/src/lib/auth/battlenet.ts`, `web/src/app/api/auth/bnet/route.ts` | Battle.net sign-in | For sign-in |
-| `BNET_CLIENT_SECRET` | `web/src/lib/auth/battlenet.ts`, `web/src/app/api/auth/bnet/route.ts` | Battle.net sign-in | For sign-in |
+| `BNET_CLIENT_ID` | `web/src/lib/auth/battlenet.ts`, `web/src/app/api/auth/bnet/route.ts`, `web/src/lib/armory-lookup.ts` | Battle.net sign-in; the on-demand armory lookup's Profile API client | For sign-in and the lookup |
+| `BNET_CLIENT_SECRET` | `web/src/lib/auth/battlenet.ts`, `web/src/app/api/auth/bnet/route.ts`, `web/src/lib/armory-lookup.ts` | Battle.net sign-in; the on-demand armory lookup's Profile API client | For sign-in and the lookup |
 | `BNET_REDIRECT_URI` | `web/src/app/api/auth/bnet/route.ts` | The old sign-in's callback address; the new sign-in derives it | No |
 | `EVERLOOT_AUTH_V2` | `web/src/lib/auth/auth.ts`, `web/src/middleware.ts`, `web/src/lib/auth/social.ts` | The Better Auth sign-in instead of the old one | Switch |
 | `BETTER_AUTH_SECRET` | `web/src/lib/auth/auth.ts` | Signs the new sign-in's sessions | With `EVERLOOT_AUTH_V2` |
@@ -98,6 +98,7 @@ one is not recorded here.
 | `ALLOWED_ORIGINS` | `web/src/lib/mcp-mount.ts` | Comma-separated browser origins the MCP accepts; defaults to the site's | No |
 | `EVERLOOT_USAGE_METRICS` | `web/src/lib/usage-metrics.ts`, `web/src/lib/mcp-mount.ts` | Counts MCP and API use in storage | Switch |
 | `EVERLOOT_ARMORY` | `web/src/lib/armory.ts` | The armory pages from Blizzard data | Switch |
+| `EVERLOOT_ARMORY_LOOKUP` | `web/src/lib/armory-lookup.ts` | `1` lets /search look up a full name nobody stored in Blizzard's character API (needs `EVERLOOT_ARMORY=1`, the BNET client and `20261117150000_armory_lookup.sql` applied) | Switch, off by default |
 | `EVERLOOT_GUIDE_SUBMISSIONS` | `web/src/lib/guide-submissions.ts` | Guide submissions from signed-in players; needs `EVERLOOT_PROFILES` | Switch |
 | `EVERLOOT_PLAYER_PAGES_INDEX` | `web/src/lib/player-pages.ts` | Character pages drop `noindex` | Switch |
 | `EVERLOOT_GUILDS_INDEX` | `web/src/lib/guild-switch.ts` | Guild pages drop `noindex` | Switch |
