@@ -171,6 +171,7 @@ test("missing corpus configuration omits the file and prints the missing variabl
   expect(index.dataAsOf).toBeNull();
   expect(index.files.some((f) => f.name === "corpus.ndjson")).toBe(false);
   expect(existsSync(join(dir, "corpus.ndjson"))).toBe(false);
+  expect(index.files.some((f) => f.dataset === "drops")).toBe(false);
   expect(warning).toHaveBeenCalledWith(expect.stringMatching(/corpus.ndjson.*SUPABASE_URL.*SUPABASE_SERVICE_ROLE_KEY/));
 });
 
@@ -194,7 +195,9 @@ test("R2-readable drop aggregates survive missing corpus index settings", async 
   vi.stubEnv("SUPABASE_URL", "");
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
   vi.spyOn(console, "warn").mockImplementation(() => {});
-  aggregates.loadStoredAggregates.mockResolvedValue(buildAggregates({ uploads: 3, records: parseRecords(records).records, dataAsOf: AS_OF }));
+  const parsed = parseRecords(records.map((r) => ({ ...r, installId: `install-${r.installId}` })));
+  expect(parsed.receipt.rejected).toEqual([]);
+  aggregates.loadStoredAggregates.mockResolvedValue(buildAggregates({ uploads: 3, records: parsed.records, dataAsOf: AS_OF }));
   const index = await exportBulk(dir);
   expect(index.dataAsOf).toBeNull();
   expect(index.files.some((f) => f.name === "corpus.ndjson")).toBe(false);

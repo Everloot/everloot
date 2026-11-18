@@ -215,7 +215,7 @@ protocol (`/schema/api/bulkIndex.json`).
    `corpus.ndjson omitted: missing` followed by their variable names (never their values); an unreadable
    corpus prints `corpus.ndjson omitted: corpus storage unreachable`. The file is left out of the index
    and `dataAsOf` is null; absent is not empty. A reachable corpus with zero public rows still produces
-   a zero-row `corpus.ndjson`.
+   a zero-row `corpus.ndjson`. Readable drop aggregates in R2 still export when the corpus index is unavailable.
 2. Upload it: `node scripts/upload-bulk.mjs ../bulk-out` with `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
    `R2_SECRET_ACCESS_KEY` and `BULK_BUCKET`. Every object is written create-only under a folder named
    by the export's `generatedAt`, data files first and the index last; then `latest.json` (the one
