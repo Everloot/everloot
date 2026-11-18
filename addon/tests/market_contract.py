@@ -25,6 +25,7 @@ local function newFrame(kind, name, parent)
     HookScript = function(self, _, f) self.hooks = self.hooks or {}; table.insert(self.hooks, f) end,
     SetSize = function() end, SetPoint = function() end,
     SetText = function(self, t) self.text = t end,
+    SetEnabled = function(self, enabled) self.enabled = enabled end,
   }
 end
 CreateFrame = newFrame
@@ -112,7 +113,7 @@ AuctionHouseFrame = CreateFrame('Frame', 'AuctionHouseFrame')
 fire('ADDON_LOADED', 'Blizzard_AuctionHouseUI')
 fire('AUCTION_HOUSE_SHOW')
 local button = Everloot.scanButton
-assert(button and button.parent == AuctionHouseFrame and button.text == 'Everloot scan', 'scan button on the auction house frame')
+assert(button and button.parent == AuctionHouseFrame and button.text == 'Scan prices' and button.enabled, 'scan button on the auction house frame')
 
 button.scripts.OnClick()
 assert(replicateCalls == 1, 'a click starts one full scan')

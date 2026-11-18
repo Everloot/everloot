@@ -1,7 +1,6 @@
 -- Everloot auction collector. On in a new install; /everloot auctions off turns it off.
 -- Forever (C_AuctionHouse): a full scan the player starts from the Everloot tab at the auction house
--- (modules/auctiontab.lua; an "Everloot scan" button if the tab cannot be added), the
--- "Scan prices for Everloot" prompt (shown once per visit when a scan can run) or /everloot scan while
+-- (modules/auctiontab.lua; an "Everloot scan" button if the tab cannot be added) or /everloot scan while
 -- the auction house is open. Each scan records the player's faction and, when the auctioneer can be
 -- read, which house it was (Alliance, Horde or a neutral goblin house). Clients with the older API: buyouts from the
 -- list the player already opened. No external price feed. Nothing here posts, bids or buys.
@@ -426,7 +425,6 @@ function E:StartScan()
   if wait > 0 then return say(string.format("next full scan in %d min.", math.ceil(wait / 60))) end
   local realm = GetRealmName and GetRealmName()
   if type(realm) ~= "string" or #realm < 2 then return say("no realm name.") end
-  if E.scanPrompt then E.scanPrompt:Hide() end
   local started = {
     realm = realm, startedAt = time(), at = date("!%Y-%m-%dT%H:%M:%SZ"), waiting = true,
     faction = playerFaction(), house = E.auctionHouseKind,
@@ -453,14 +451,26 @@ function E:Scanning()
 end
 
 local function addButton()
-  if E.scanButton or not AuctionHouseFrame then return end
+  if E.scanButton then E.scanButton.refresh(); return end
+  if not AuctionHouseFrame then return end
   if E.AuctionTab and E.AuctionTab.Attach(AuctionHouseFrame) then return end
   local button = CreateFrame("Button", "EverlootScanButton", AuctionHouseFrame, "UIPanelButtonTemplate")
   button:SetSize(120, 22)
   -- Keep the fallback below the window, away from the house's Search and Filter controls.
   button:SetPoint("TOPRIGHT", AuctionHouseFrame, "BOTTOMRIGHT", -12, -4)
-  button:SetText("Everloot scan")
-  button:SetScript("OnClick", function() E:StartScan() end)
+  local function refresh()
+    local label, enabled = E:ScanAction()
+    button:SetText(label)
+    button:SetEnabled(enabled)
+  end
+  button.refresh = refresh
+  button:SetScript("OnClick", function() E:StartScan(); refresh() end)
+  local elapsed = 0
+  button:SetScript("OnUpdate", function(_, dt)
+    elapsed = elapsed + dt
+    if elapsed >= 1 then elapsed = 0; refresh() end
+  end)
+  refresh()
   E.scanButton = button
 end
 
@@ -470,42 +480,12 @@ function E:ScanReady()
     and (EverlootDB.lastScanAt or 0) + E.SCAN_COOLDOWN <= time()
 end
 
---- A small "Scan prices for Everloot" prompt beside the auction house, at most once per visit, only when
---- a scan can run. It never scans by itself: the scan starts from the player's click.
-local function showPrompt()
-  if EverlootDB.scanPrompt == false or E.promptShown or not AuctionHouseFrame or not E:ScanReady() then return end
-  if not E.scanPrompt then
-    local ok, frame = pcall(CreateFrame, "Frame", "EverlootScanPrompt", AuctionHouseFrame, "BackdropTemplate")
-    if not ok or not frame then return end
-    local built = pcall(function()
-      frame:SetWidth(280)
-      frame:SetPoint("TOPLEFT", AuctionHouseFrame, "TOPRIGHT", 4, 0)
-      frame:SetClampedToScreen(true)
-      if frame.SetBackdrop then
-        frame:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-          tile = true, tileSize = 16, edgeSize = 16, insets = { left = 4, right = 4, top = 4, bottom = 4 } })
-      end
-      local text = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-      text:SetPoint("TOPLEFT", 12, -12)
-      text:SetWidth(232)
-      text:SetJustifyH("LEFT")
-      text:SetText("Share this house's prices with Everloot? One scan, every 15 min at most. /everloot scanprompt off hides this.")
-      local button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-      button:SetSize(220, 22)
-      button:SetPoint("TOPLEFT", text, "BOTTOMLEFT", 0, -12)
-      button:SetText("Scan prices for Everloot")
-      button:SetScript("OnClick", function() frame:Hide(); E:StartScan() end)
-      frame.button = button
-      frame:SetHeight(12 + text:GetStringHeight() + 12 + 22 + 12)
-      local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-      close:SetPoint("TOPRIGHT", -2, -2)
-      close:SetScript("OnClick", function() frame:Hide() end)
-    end)
-    if not built then return end
-    E.scanPrompt = frame
-  end
-  E.promptShown = true
-  E.scanPrompt:Show()
+--- One label and readiness for the tab and the fallback button; never starts a scan.
+function E:ScanAction()
+  if self:Scanning() then return "Scanning...", false end
+  local wait = (EverlootDB.lastScanAt or 0) + self.SCAN_COOLDOWN - time()
+  if wait > 0 then return string.format("Ready in %d:%02d", math.floor(wait / 60), wait % 60), false end
+  return "Scan prices", self:ScanReady() and true or false
 end
 
 local function onFullScanEvent(event, arg1)
@@ -516,21 +496,16 @@ local function onFullScanEvent(event, arg1)
     E.auctionHouseOpen = true
     E.auctionHouseKind = auctioneerHouse()
     addButton()
-    showPrompt()
   elseif event == "AUCTION_HOUSE_CLOSED" then
     if E.AuctionTab then E.AuctionTab.Hide() end
     E.auctionHouseOpen = false
     E.auctionHouseKind = nil
-    E.promptShown = false
-    if E.scanPrompt then E.scanPrompt:Hide() end
     if scan then
       if scan.fallback then finishFallback(scan) elseif scan.waiting then refundWaitingScan() else scan = nil end
       say("scan stopped: the auction house closed.")
     end
   elseif event == "ADDON_LOADED" and arg1 == "Blizzard_AuctionHouseUI" then
     addButton()
-    -- The house's window loads on the first visit, possibly after AUCTION_HOUSE_SHOW reached us.
-    if E.auctionHouseOpen then showPrompt() end
   elseif scan and scan.fallback then
     local s = scan
     local ok = pcall(fallbackResult, s, event, arg1)
@@ -554,18 +529,17 @@ local hint = CreateFrame("Frame")
 E.auctionHintFrame = hint
 pcall(hint.RegisterEvent, hint, "AUCTION_HOUSE_SHOW")
 hint:SetScript("OnEvent", function()
-  if not EverlootDB then return end
+  if not EverlootDB or EverlootDB.scanPrompt == false then return end
+  if EverlootDB.auctionNoticeShown or EverlootDB.auctionHintShown then return end
   if E:IsEnabled("auctions") then
-    if EverlootDB.auctionNoticeShown then return end
     EverlootDB.auctionNoticeShown = true
-    say("the Everloot tab at the bottom of the auction house scans this house's prices when you click Scan. "
+    say("the Everloot tab (or scan button) at the bottom of the auction house scans this house's prices when you click Scan. "
       .. "It reads item prices and quantities, never sellers, and never posts, bids or buys. /everloot auctions off turns scans off.")
     return
   end
-  if EverlootDB.auctionHintShown or EverlootDB.scanPrompt == false then return end
   EverlootDB.auctionHintShown = true
   say("you can share this auction house's prices with Everloot: /everloot auctions on, then /reload. "
-    .. "A scan only runs when you click it. /everloot scanprompt off hides this.")
+    .. "A scan only runs when you click it. /everloot scanprompt off hides this introduction.")
 end)
 
 E:RegisterModule("auctions", function()

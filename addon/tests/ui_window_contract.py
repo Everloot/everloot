@@ -91,8 +91,7 @@ local U = Everloot.Window
 assert(U.frame == nil and EverlootWindow == nil, 'nothing is built at load')
 assert(Everloot:Status():find('window: ready'), 'the module reports in /everloot status')
 local page = Everloot.Options.page
-assert(page.crest and page.crest.path == 'Interface\\\\AddOns\\\\Everloot\\\\media\\\\crest' and page.title.color[2] > 0.9,
-  'the settings page, built at load, already wears the crest and fel green title')
+assert(rawget(page, 'crest') == nil and page.title.text == 'Everloot', 'settings use a native heading independently of the main window')
 
 -- Gold the gold module records: a vendor sale, a quest reward and a flight.
 fire('PLAYER_ENTERING_WORLD')
@@ -143,7 +142,7 @@ UIParent.GetHeight = function() return 1080 end
 EverlootDB.windowScale = nil
 U.Toggle(); assert(U.Open() == true and scale == 1, 'normal size until the grip is used')
 assert(f.title.text == 'Everloot' and f.title.color[2] > 0.9 and f.title.color[1] < 0.7 and f.title.color[3] < 0.3,
-  'Everloot in fel green, as in the tooltip, the settings page and the auction house tab')
+  'Everloot in fel green, as in the tooltip')
 assert(f.subtitle.text == 'Home' and f.home.shown ~= false and f.nav.home.on.shown, 'Home is open, its nav item lit')
 assert(f.name.text == 'Samplechar' and f.realm.text == 'Forever', f.name.text)
 assert(f.class.text:find('^Level 24 Orc |cff0070dd') and f.class.text:find('Shaman'), f.class.text)
@@ -260,6 +259,10 @@ assert(f.views.settings and f.views.settings.shown and not f.home.shown, 'Settin
 assert(f.subtitle.text == 'Settings' and f.nav.settings.on.shown, 'Settings is the selected view')
 local embedded = f.views.settings.page
 assert(embedded and embedded.parentSet == f.views.settings, 'the settings page belongs to this view')
+assert(rawget(embedded, 'crest') and embedded.title.color[2] > 0.9,
+  'embedded Settings keeps the main window crest and green heading')
+assert(embedded.scroll.textures and embedded.boxes[1].label.font,
+  'embedded Settings keeps the branded surface and fonts')
 assert(#embedded.boxes == #Everloot.Options.ROWS, 'every settings row is available inside the window')
 local seen = {}
 for _, box in ipairs(embedded.boxes) do seen[box.row.key] = true end
