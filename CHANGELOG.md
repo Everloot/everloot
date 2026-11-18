@@ -534,6 +534,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - MCP: `coverage` and `everloot_plan` answer with a summary first and page the rest, so a broad question stays under 12 KB (the audit measured 82 KB for every zone's quests and 38 KB for the plan). `coverage` without a zone gives the totals, each type and one line per zone, 20 zones at a time, now with structured totals and denominators; `everloot_plan` with any argument names each row, 40 at a time, and states the tracker's revision (it records no date). `detail`, `offset` and `limit` read the rest, every page stays under 12,000 bytes even at the largest `limit`, and says how many it shows of how many and gives `nextOffset`. One zone answers as before, and `everloot_plan` with no arguments still returns the whole tracker. A zone filter that matches no released zone is unmeasured, not zeros.
 - MCP: rank answering claims before subject matches, state unavailable requested facts,
   and report separate answerability rates.
+- Site: describe the in-game Everloot window, feature chooser, local data and how to reopen it or report a window error.
 
 ## [desktop-v0.1.23] - 2026-11-17
 
