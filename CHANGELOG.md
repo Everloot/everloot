@@ -226,10 +226,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: /database/recent and its RSS feed list the entities whose facts reached three installs in the last 30 days;
   dates from before the feed existed are marked estimated.
 - Site: /tools/bags shows the cheapest bag of each size on one realm's auction house and what each added slot costs over your smallest bag, and item tooltips print a bag's "14 Slot Bag" line; slot counts come from the game files, prices from players' scans.
+- Site: the world map shows zone or continent coordinates on hover and shares pins in the address; Shift-click or use Pin map centre, and Clear pin removes it.
 
 ### Fixed
 - Site: Database list links load on click instead of prefetching into the edge rate limit.
 - Site: Herbs opens with gathering areas, with new Forever Herbalism crafts below them.
+- Site: recover interrupted blue-post scans, include Forever bug-report announcements, and read linked Blizzard News announcement metadata.
 - Site: the armory no longer drops a character whose gear includes an item Blizzard sends without an item level (a common head item, seen 11/17); the item is kept with no level and counts as an empty slot in the item level and gear score.
 - Site: news cards and bylines name Everloot, not everloot.app, as the source of a post that cites the site's own pages.
 - Site: the MCP methodology describes drop rates as a share of recorded loot windows, including its measured-zero example.
@@ -381,7 +383,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Addon: easier reading in the Everloot window, settings, auction house tab and plan workspace: words use the game's own Friz Quadrata and nothing is smaller than 12 px (was 10 to 11 px, mostly in Arial Narrow); Arial Narrow stays only for figures, dates and the tight Home lists, also at 12 px. Home's character columns and the Collection list were re-spaced so the larger text still fits. Home's Missing list now sits under the realm line, so a long class or realm name ("CAMWOW US1 Realm 4 PvP") no longer runs into it. Needs an in-game check before release.
 - Addon: the minimap button is built like every other addon's (LibDBIcon's gold ring, dark background and the crest's diamond) and sits on the minimap's edge at the top-left instead of off its corner; drag it around the edge to move it, and the spot is kept. The button drawer is a slimmer panel with a one-pixel edge, evens its rows (eight buttons are two rows of four) and opens on the side away from the map. Needs an in-game check before release.
 - Addon: the Everloot window has a grip in its bottom-right corner, as the game's chat windows do: drag it to make the whole window bigger or smaller (three quarters to one and a half times, never larger than the screen), right-click it for the normal size; the size is kept. Collection draws its lists as completionist addons do: a green check for done, a red cross for missing, headings in the game's gold and a percentage in each summary ("Titles: 1 of 3 (33%)"). Needs an in-game check before release.
+- Site: drop rates restart from addon 0.3.24 (2026-11-17): only loot windows recorded after the release count, now that empty corpses are recorded too, so sources show fewer public rates until new windows build up.
 - Site: the addon is offered as a regular release from 0.3.24: the home, addon and upload pages no longer call it an Alpha.
+- Site: Lore now pairs stories behind Forever’s world with illustrated category links, keeps search above both columns, and shows the full hero art.
 - Site: a linked character connected to its armory profile shows Blizzard's gear, stats, talents, professions, PvP, achievements, reputations and completed quests on its page and the owner's preview, each part behind the page's existing switch, labelled "From Blizzard's API" with the read time; private sync keeps only raid lockouts and titles and drops the retired categories older Desktop Apps still send; `/rankings/item-level` and `/rankings/gear-score` redirect to the armory boards.
 - Site: the AH Ledger panels (price history, crafting margins, deals) remember the market a visitor last picked, in their own browser, and open on it on every page; a realm page still opens on its realm. The crafting table no longer prefetches recipe pages, which sit behind the bot check and logged an error for each recipe in view.
 - CurseForge: every addon upload is a Release file; an Alpha is named "Everloot <version> Alpha". The CurseForge app
@@ -534,6 +538,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - MCP: `coverage` and `everloot_plan` answer with a summary first and page the rest, so a broad question stays under 12 KB (the audit measured 82 KB for every zone's quests and 38 KB for the plan). `coverage` without a zone gives the totals, each type and one line per zone, 20 zones at a time, now with structured totals and denominators; `everloot_plan` with any argument names each row, 40 at a time, and states the tracker's revision (it records no date). `detail`, `offset` and `limit` read the rest, every page stays under 12,000 bytes even at the largest `limit`, and says how many it shows of how many and gives `nextOffset`. One zone answers as before, and `everloot_plan` with no arguments still returns the whole tracker. A zone filter that matches no released zone is unmeasured, not zeros.
 - MCP: rank answering claims before subject matches, state unavailable requested facts,
   and report separate answerability rates.
+- Site: describe the in-game Everloot window, feature chooser, local data and how to reopen it or report a window error.
 
 ## [desktop-v0.1.23] - 2026-11-17
 
