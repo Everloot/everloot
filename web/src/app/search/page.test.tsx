@@ -81,6 +81,13 @@ test("without a query it says what a search finds, with each list and four queri
   expect(await render({ q: "zzzz" })).not.toContain("What you can search");
 });
 
+test("when the search read a typo, one line says what it searched for instead", async () => {
+  siteSearch.groups = [{ type: "item", heading: "Items", total: 1, respelled: "linen cloth", results: [{ label: "Linen Cloth", href: "/database/items/2589", exact: false, id: 2589 }] }];
+  expect(await render({ q: "lnen clth" })).toContain("Showing results for linen cloth");
+  siteSearch.groups = [{ type: "item", heading: "Items", total: 1, results: [{ label: "Linen Cloth", href: "/database/items/2589", exact: true, id: 2589 }] }];
+  expect(await render({ q: "linen cloth" })).not.toContain("Showing results for");
+});
+
 test("a query shows the groups the site search found, each under its heading, and a link to every lore result", async () => {
   siteSearch.groups = [
     { type: "npc", heading: "NPCs", results: [{ label: "Thrall", href: "/database/npcs/1", note: "id 1", exact: true }] },
