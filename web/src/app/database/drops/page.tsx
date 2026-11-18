@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { measureDropRate } from "../../../../../kb/src/drop-rate-settling";
 import { computeRollups } from "@/lib/rollup-compute";
 import { dataAgeLabel } from "@/lib/data-age";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
@@ -40,7 +41,7 @@ export default async function DropsPage(props: { searchParams?: Promise<Search> 
   const sourceName = (r: Row) => (r.sourceNpcId !== undefined ? names.npcs.get(r.sourceNpcId)?.toLowerCase() ?? `~npc ${String(r.sourceNpcId).padStart(9, "0")}` : names.objects.get(r.sourceObjectId!)?.toLowerCase() ?? `~object ${String(r.sourceObjectId).padStart(9, "0")}`);
   const sort = q.sort;
   const rows = !sort ? all : sortRows(all, (r) => sort.key === "item" ? (r.itemId === null ? null : names.items.get(r.itemId)?.toLowerCase() ?? `~${String(r.itemId).padStart(9, "0")}`)
-    : sort.key === "source" ? sourceName(r) : sort.key === "windows" ? r.kills : sort.key === "drops" ? r.drops : sort.key === "rate" ? r.rate : r.reporters, sort.desc, (r) => r.itemId ?? 0);
+    : sort.key === "source" ? sourceName(r) : sort.key === "windows" ? r.kills : sort.key === "drops" ? r.drops : sort.key === "rate" ? (r.rate === null ? null : measureDropRate(r, stats.dataAsOf ?? "").interval?.lower ?? null) : r.reporters, sort.desc, (r) => r.itemId ?? 0);
   const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
   if (q.page > pages) notFound();
   const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
