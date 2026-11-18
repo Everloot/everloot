@@ -296,6 +296,10 @@ local function priceLines(realm, itemId)
     local sell = vendorPrice(itemId)
     if sell and sell > 0 then
       add("Vendor " .. E.Coins(sell) .. " · per unit", LABEL, "Vendor", coinIcons(sell))
+      -- The sell check's verdict (modules/sellcheck.lua): this house's current value after its cut is no more than this.
+      if E.SellCheck and E.SellCheck.VendorBeats and E.SellCheck.VendorBeats(realm, itemId) then
+        add("A vendor pays more than this house, after its cut", WARN, nil, nil, true)
+      end
     elseif sell == 0 then
       add("Vendor: no sell price", LABEL, "Vendor", quiet("no sell price"))
     end

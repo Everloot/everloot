@@ -149,6 +149,16 @@ function S.On()
   return not (type(EverlootDB) == "table" and EverlootDB.sellCheck == false)
 end
 
+--- For the item tooltip: true when this house's current, not-thin market value after its cut is no more than the vendor
+--- price, so selling to a vendor is the better deal. Follows the vendor check's switch.
+function S.VendorBeats(realm, itemId)
+  if not S.On() then return false end
+  local sell = vendorUnit(itemId)
+  local market = sell and marketUnit(realm, itemId)
+  if not market then return false end
+  return math.floor(market * (1 - S.Cut(E:MarketHouse()))) <= sell
+end
+
 --- The suggested price and the merchant button: each on unless turned off.
 function S.PriceOn() return not (type(EverlootDB) == "table" and EverlootDB.sellPrice == false) end
 function S.MerchantOn() return not (type(EverlootDB) == "table" and EverlootDB.merchantSell == false) end

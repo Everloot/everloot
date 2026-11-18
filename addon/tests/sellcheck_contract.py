@@ -443,6 +443,28 @@ S.frame.onEvent(S.frame, 'MERCHANT_CLOSED')
 assert(not button.shown)
 """)
 
+# The item tooltip says when a vendor pays more than this house, after its cut.
+lua.execute(r"""
+local E, S = Everloot, Everloot.SellCheck
+E:InitModules()
+local function hover(id)
+  local tip = { lines = {} }
+  tip.AddLine = function(self, t) self.lines[#self.lines + 1] = t end
+  tip.AddDoubleLine = function(self, l, r) self.lines[#self.lines + 1] = l .. ': ' .. r end
+  for _, f in ipairs(tooltipCalls) do f(tip, { id = id }) end
+  return table.concat(tip.lines, '\n')
+end
+assert(S.VendorBeats('Forever', 300) and not S.VendorBeats('Forever', 302) and not S.VendorBeats('Forever', 303))
+assert(hover(300):find('A vendor pays more than this house, after its cut', 1, true))
+assert(not hover(302):find('A vendor pays more', 1, true), 'sells well here')
+EverlootDB.tooltip = 'compact'
+assert(hover(300):find('A vendor pays more', 1, true), 'compact tooltips keep it, as a warning')
+EverlootDB.tooltip = 'full'
+EverlootDB.sellCheck = false
+assert(not hover(300):find('A vendor pays more', 1, true), 'the vendor check switch turns it off')
+EverlootDB.sellCheck = nil
+""")
+
 source = (root / "modules/sellcheck.lua").read_text(encoding="utf-8")
 code = "\n".join(line.split("--")[0] for line in source.splitlines())
 for call in ("PostItem", "PostCommodity", "CancelAuction", "PlaceBid", "SetQuantity", "ConfirmPost", "PickupContainerItem",
