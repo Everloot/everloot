@@ -10,7 +10,7 @@ const info: CharactersInfo = {
     spent: { repairs: 50_00_00, auction: 100_00_00 }, earned: { loot: 300_00_00 },
     history: [], week: { earned: 20_00_00, spent: 35_00_00 }, days: [], receipts: [],
   }],
-  progress: [{ key: "Volvik-Nightslayer", class: "Warrior", level: 60, titles: 1,
+  progress: [{ key: "Volvik-Nightslayer", class: "Warrior", level: 60, titles: 1, missingTitles: null, linkedAs: null,
     lockouts: [{ instance: "Molten Core", difficulty: "40 Player", killed: 6, total: 10, resetAt: "2026-10-20T12:00:00Z" }] }],
 };
 

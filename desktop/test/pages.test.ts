@@ -3,7 +3,7 @@ import type { AppState, ChatInfo, FileSummary, JobStatus, MarketInfo } from "../
 import { summarizeCharacters } from "../src/main/characters";
 import { addon, ask, assistantSetup, changes, characters, chat, log, market, overview, restartDialog, settings, updatePopover, upload, welcome, wipeDialog, type View } from "../src/renderer/pages";
 import { PROVIDER_PRESETS, type ModelChoice } from "../src/shared/providers";
-import { CHARACTERS } from "./save-fixtures";
+import { CHARACTERS, PROGRESS } from "./save-fixtures";
 
 // The pages print times in the machine's locale and zone; a snapshot needs the same text everywhere.
 vi.mock("../src/renderer/format", async (real) => ({
@@ -268,12 +268,61 @@ describe("characters", () => {
     expect(characters(view({ state: appState(), data }))).toContain("/everloot completion on");
   });
 
-  test("populated, from the save fixture", () => {
-    const info = summarizeCharacters(CHARACTERS, Date.parse(NOW));
+  test("populated, from the save fixture, with missing titles and the site's links per keyed row", () => {
+    const info = { ...summarizeCharacters(CHARACTERS, Date.parse(NOW)), progress: summarizeCharacters(PROGRESS, Date.parse(NOW)).progress };
     const html = characters(view({ state: appState(), data: { characters: info } }));
     expect(h1(html)).toBe(info.characters[0].character);
     expect(html).toContain("roster-row sel");
+    const keyed = /<section class="panel" id="keyed"[\s\S]*?<\/section>/.exec(html)?.[0] ?? "";
+    const cells = (re: RegExp) => [...keyed.matchAll(re)].map((m) => [...m[1].matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/g)].map((c) => text(c[1])));
+    expect(cells(/<thead>([\s\S]*?)<\/thead>/g)).toEqual([["Key", "Class", "Titles", "Missing", "Raid lockouts", "On everloot.app"]]);
+    expect(cells(/<tr>([\s\S]*?)<\/tr>/g).slice(1)).toEqual([
+      ["0a1b2c3dlinked as Uther of Forever Pioneer", "paladin 60", "3", "3 titles", "–", "Collections ↗ · Character page ↗"],
+      ["1a2b3c4d", "mage 60", "1", "4 titles", "–", "Collections ↗"],
+    ]);
+    expect(html).toContain('data-open="https://everloot.app/tools/collections?utm_source=desktop-app&amp;utm_medium=app"');
+    expect(html).toContain('data-open="https://everloot.app/characters/forever/forever-pioneer/uther?utm_source=desktop-app&amp;utm_medium=app"');
     expect(html).toMatchSnapshot();
+  });
+
+  describe("Linked characters", () => {
+    const linked = (html: string) => text(/<section class="panel" id="linked">[\s\S]*?<\/section>/.exec(html)?.[0] ?? "");
+    const status = (patch: Partial<NonNullable<AppState["links"]>[number]> = {}) => ({
+      file: FILE, linked: [], frozen: [], linkedAt: null, linkError: null, syncedAt: null, synced: [], categories: [], syncError: null, ...patch,
+    });
+    const data = { characters: { characters: [], progress: [] } };
+
+    test("empty: how to link one", () => {
+      for (const links of [undefined, []]) {
+        const html = characters(view({ state: appState({ links }), data }));
+        expect(statusLines(html)).toEqual(["Nothing linked yet. Type /everloot link &lt;code&gt; in game."]);
+        expect(linked(html)).toContain("Linked characters");
+      }
+    });
+
+    test("populated: the linked characters, a frozen one and the last sync", () => {
+      const links = [status({ linked: ["Thrallina of Forever Pioneer"], frozen: ["Jainara of Forever Pioneer"], linkedAt: "2026-10-20T11:00:00Z", syncedAt: "2026-10-20T11:30:00Z", synced: ["Thrallina of Forever Pioneer"], categories: ["raids", "boss_kills"] })];
+      const html = characters(view({ state: appState({ links }), data }));
+      expect(statusLines(html)).toEqual([]);
+      expect(linked(html)).toContain("Thrallina of Forever Pioneer");
+      expect(linked(html)).toContain("Jainara of Forever Pioneer frozen: another account linked it too.");
+      expect(linked(html)).toContain("Last synced 2026-10-20T11:30:00Z: Thrallina of Forever Pioneer (raid lockouts, boss kills)");
+      expect(/<section class="panel" id="linked">[\s\S]*?<\/section>/.exec(html)?.[0]).toMatchSnapshot();
+    });
+
+    test("a refused sync says why", () => {
+      const links = [status({ linked: ["Thrallina of Forever Pioneer"], syncError: "Thrallina of Forever Pioneer not synced: the site did not match it to the link" })];
+      const html = characters(view({ state: appState({ links }), data }));
+      expect(statusLines(html)).toEqual(["Thrallina of Forever Pioneer not synced: the site did not match it to the link"]);
+      expect(html).toContain('<p class="error small" role="status">');
+    });
+
+    test("with two account files, each problem names its account", () => {
+      const other = FILE.replace("\\ACC\\", "\\ALT\\");
+      const links = [status({ linkError: "1 link code refused (expired)" }), status({ file: other, syncError: "sync: could not reach everloot.app. Your characters sync next time." })];
+      const html = characters(view({ state: appState({ links }), data }));
+      expect(statusLines(html)).toContain("ACC: 1 link code refused (expired); ALT: sync: could not reach everloot.app. Your characters sync next time.");
+    });
   });
 });
 

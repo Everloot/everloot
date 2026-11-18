@@ -86,6 +86,8 @@ const NAMES: Record<string, string> = {
   "/tools/disenchanting": "Disenchanting",
   "/tools/gold-ledger": "Gold ledger",
   "/tools/professions": "Profession hubs",
+  "/tools/professions/herbalism": "Herbalism",
+  "/tools/professions/herbalism/gathering": "Gathering",
   "/tools/farming-routes": "Farming",
   "/docs": "Docs",
 };
@@ -95,6 +97,8 @@ const PARENT: Record<string, string> = {
   // The lists kept in this browser are part of Profile, beside the account pages.
   "/tools/builds": "/account",
   "/tools/alts": "/account",
+  "/tools/professions/herbalism": "/tools/professions",
+  "/tools/professions/herbalism/gathering": "/tools/professions/herbalism",
   "/database/objects": "/database",
   "/database/items": "/database",
   "/classes/choose": "/classes",
