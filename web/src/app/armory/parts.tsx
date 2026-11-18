@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Card } from "@/components/ui";
-import { BLIZZARD_CREDIT, NAME_PATTERN, readLine, SURNAME_PATTERN } from "@/lib/armory";
+import { BLIZZARD_CREDIT, NAME_PATTERN, readLine, regionLabel, SURNAME_PATTERN } from "@/lib/armory";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 
@@ -25,6 +25,22 @@ export function ArmoryCredit({ at }: { at: string | null | undefined }) {
       {BLIZZARD_CREDIT}. {at ? <time dateTime={at}>{readLine(at)}</time> : readLine(null)}.
     </p>
   );
+}
+
+const REGION_CHIP: Record<string, string> = { us: "border-region-us text-region-us", eu: "border-region-eu text-region-eu" };
+
+/** A region as a small coloured chip, "US" in blue and "EU" in gold, so a lopsided list shows at a glance. */
+export function RegionChip({ region }: { region: string }) {
+  return (
+    <span data-region={region} className={`inline-flex h-5 shrink-0 items-center rounded-full border px-1.5 font-mono text-xs ${REGION_CHIP[region] ?? "border-line text-fg-2"}`}>
+      {regionLabel(region)}
+    </span>
+  );
+}
+
+/** The chip, then the ruleset: where a character or guild plays. */
+export function RegionRuleset({ region, ruleset }: { region: string; ruleset: string }) {
+  return <span className="inline-flex items-center gap-1.5 text-fg-2"><RegionChip region={region} />{ruleset}</span>;
 }
 
 export const Unreachable = () => <Card><p className="text-fg-2" role="status">{STORAGE_UNREACHABLE}</p></Card>;

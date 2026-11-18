@@ -9,7 +9,7 @@ import {
 } from "@/lib/armory";
 import { armoryStore, type ArmoryBoardRow } from "@/lib/armory-store";
 import { classText } from "@/app/players/player-view";
-import { ArmoryCredit, armoryMetadata, link, newest, NOT_FOUND_METADATA, Unreachable } from "../../parts";
+import { ArmoryCredit, armoryMetadata, link, newest, NOT_FOUND_METADATA, RegionRuleset, Unreachable } from "../../parts";
 
 export const revalidate = 1800;
 
@@ -57,7 +57,7 @@ function columns(metric: ArmoryMetric): Column<ArmoryBoardRow>[] {
     { key: "class", header: "Class", nowrap: true, cell: (r) => <span className={classText(classTokenOfName(r.class))}>{r.class}</span> },
     { key: "race", header: "Race", nowrap: true, cell: (r) => r.race },
     { key: "guild", header: "Guild", cell: (r) => r.guildName ?? <span className="text-muted">None</span> },
-    { key: "where", header: "Realm", nowrap: true, cell: (r) => <span className="text-fg-2">{regionLabel(r.region)} {r.ruleset}</span> },
+    { key: "where", header: "Realm", nowrap: true, cell: (r) => <RegionRuleset region={r.region} ruleset={r.ruleset} /> },
     { key: "value", header: ARMORY_BOARDS[metric].column, numeric: true, cell: (r) => <span className="font-medium text-fg">{metricValue(metric, r.value)}</span> },
   ];
 }

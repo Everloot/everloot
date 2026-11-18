@@ -4,7 +4,7 @@ begin;
 do $$
 declare t text; f regprocedure; r text; n integer := 0;
 begin
-  foreach t in array array['armory_characters','armory_guilds','armory_members','armory_queue','armory_hides'] loop
+  foreach t in array array['armory_characters','armory_guilds','armory_members','armory_queue','armory_hides','armory_runs'] loop
     if not (select relrowsecurity from pg_class where oid = ('public.' || t)::regclass) then raise exception 'RLS disabled: %', t; end if;
     foreach r in array array['anon','authenticated','service_role'] loop
       if has_table_privilege(r, 'public.' || t, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') then raise exception 'direct table access: % %', r,t; end if;
@@ -23,7 +23,7 @@ begin
     if not has_function_privilege('service_role',f,'EXECUTE') then raise exception 'server cannot execute %',f; end if;
     if not (select prosecdef and proconfig @> array['search_path=""','lock_timeout=3s'] from pg_proc where oid=f) then raise exception 'unsafe function %',f; end if;
   end loop;
-  if n <> 22 then raise exception 'expected 22 functions, got %', n; end if;
+  if n <> 24 then raise exception 'expected 24 functions, got %', n; end if;
 end $$;
 
 -- Invented fixtures. Keep the original batch for the hide regression.

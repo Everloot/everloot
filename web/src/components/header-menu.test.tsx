@@ -41,11 +41,14 @@ test("the menu keeps both build links reachable below the desktop build chip bre
   expect(nav.querySelector('a[title^="The newest WoW"]')).not.toBeNull();
 });
 
-test("Tools opens its grouped menu and says so", async () => {
+test("Tools opens its menu and says so; opening another menu closes it", async () => {
   await act(async () => toolsButton().click());
   expect(toolsButton().getAttribute("aria-expanded")).toBe("true");
-  expect(Array.from(menu()!.querySelectorAll("p")).map((p) => p.textContent)).toEqual(["Plan", "Look up", "Track"]);
-  expect(menu()!.querySelector('a[href="/tools/talents"]')).not.toBeNull();
+  expect(Array.from(menu()!.querySelectorAll("a")).map((a) => a.getAttribute("href"))).toEqual(["/tools/raid", "/tools/talents", "/tools/professions", "/tools"]);
+  const profile = Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "Profile")!;
+  await act(async () => profile.click());
+  expect(menu()).toBeNull();
+  expect(container.querySelector("#profile-menu:not([hidden]) a[href=\"/tools/builds\"]")).not.toBeNull();
 });
 
 test("Tools is marked current on a tool page, and the tool is current in the menu", async () => {
@@ -79,8 +82,9 @@ test("the phone menu lists the same places", async () => {
   const toggle = Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "Menu")!;
   await act(async () => toggle.click());
   const panel = container.querySelector("#site-navigation")!;
-  for (const href of ["/database", "/map", "/changes", "/lore", "/docs", "/tools/talents", "/census", "/upload", "/about"])
+  for (const href of ["/database", "/map", "/changes", "/lore", "/guides", "/chat", "/docs", "/tools/talents", "/census", "/account", "/tools/builds", "/tools/alts", "/about"])
     expect(panel.querySelector(`a[href="${href}"]`), href).not.toBeNull();
+  for (const href of ["/upload", "/tools/farming-routes", "/tools/collections"]) expect(panel.querySelector(`a[href="${href}"]`), href).toBeNull();
   expect(panel.querySelector('form[action="/search"]')).not.toBeNull();
 });
 

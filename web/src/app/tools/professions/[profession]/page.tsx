@@ -7,13 +7,14 @@ import AdSlot from "@/components/AdSlot";
 import EmailCapture from "@/components/EmailCapture";
 import ClassContextChip from "@/components/classes/ClassContextChip";
 import GameIcon from "@/components/game/GameIcon";
-import { Badge, Card, Container, Contribute, DataTable, Disclosure, EmptyState, Field, FilterBar, PageHeader, QUALITY_TEXT, SectionHeading, qualityOf, type Column } from "@/components/ui";
+import { Badge, Card, Container, Contribute, DataTable, Disclosure, EmptyState, Field, FilterBar, PageHeader, QUALITY_TEXT, ResultStrip, SectionHeading, qualityOf, type Column } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { classContextParams, parseClassContext, withoutClassContext } from "@/lib/class-context";
 import { dataAgeLabel } from "@/lib/data-age";
 import { loadItemTips, loadSiteAssets, loadSpellNames, type ItemTip } from "@/lib/game-assets";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, shownItemName, type ShownItemName } from "@/lib/items";
-import { CLIENT_PROFESSIONS, professionBySegment, professionHref, RECIPES_BUILD, recipeGroups, recipeItemIds, type RecipeView } from "@/lib/professions";
+import { CLIENT_PROFESSIONS, professionBySegment, professionHref, RECIPES_BUILD, recipeGroups, recipeItemIds, SKILL_BRACKETS, type RecipeView } from "@/lib/professions";
+import { filterRecipeViews, RECIPE_PAGE_SIZES, recipeListHref, recipeListQuery, recipePage, recipeSearchKeep } from "@/lib/recipe-list";
 import { pageMetadata } from "@/lib/seo";
 import { loadListNames } from "@/lib/item-view";
 import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT } from "@/lib/upload-store";
@@ -29,7 +30,6 @@ import { LINK } from "../../../database/entity";
 import { LEVEL_BRACKETS, listHref, range, rangeParam } from "../../../database/list-parts";
 import FarmAreaTable from "../../farming-routes/area-table";
 import ProfessionPicker from "../picker";
-import RecipeSearch from "../recipe-search";
 import { buildRecipeCatalog, teachingItemIds } from "@/lib/recipe-catalog";
 import ShoppingList from "../shopping-list";
 
@@ -130,6 +130,14 @@ export default async function ProfessionPage(props: Props) {
   const spellName = (id: number) => spellNames?.names.get(id);
   const catalog = buildRecipeCatalog(p, id => names.get(id)?.name ?? `Item ${id}`, spellName, id => names.get(id)?.source === "files");
   const players = (r: RecipeView) => { const n = spellName(r.spellId); return n ? byRecipe.get(n.trim().toLowerCase()) : undefined; };
+  // The recipe table, filtered and paged here: the page carries only the rows it shows (`?page=&size=&q=&min=&max=`).
+  const listQuery = recipeListQuery(searchParams);
+  const listed = recipePage(filterRecipeViews(recipeGroups(p.recipes).flatMap((g) => g.recipes), catalog, listQuery), listQuery);
+  const listHere = (change: Parameters<typeof recipeListHref>[3]) => recipeListHref(path, searchParams, listQuery, change);
+  const teaching = new Map(catalog.map((r) => [r.spellId, r.recipeItems]));
+  // The shopping list only looks up the recipes on the agreed path and their reagents, so it gets those, not the catalog.
+  const pathNames = new Set(plannerRecipes.map((r) => r.recipe.trim().toLowerCase()));
+  const shoppingCatalog = catalog.filter((r) => pathNames.has(r.name.trim().toLowerCase()));
   const icons = new Map([...(assets?.professions ?? new Map<string, { icon: string }>())].map(([k, v]) => [k, v.icon]));
 
   const ItemLink = ({ id, size = 24, count }: { id: number; size?: number; count?: number }) => {
@@ -158,11 +166,16 @@ export default async function ProfessionPage(props: Props) {
     {
       key: "recipe", header: "Recipe", cell: (r) => {
         const icon = assets?.spellIcons.get(r.spellId);
+        const taught = teaching.get(r.spellId) ?? [];
         return (
-          <span className="inline-flex min-w-0 items-center gap-2">
-            {icon ? <GameIcon src={icon} size={24} /> : <span aria-hidden="true" className="h-6 w-6 shrink-0 rounded-sm border border-line" />}
-            <Link href={`/database/spells/${r.spellId}`} className={`min-w-0 ${LINK}`}>{spellName(r.spellId) ?? `Spell ${r.spellId}`}</Link>
-            <Badge tone="files" />
+          <span className="flex min-w-0 flex-col gap-1">
+            <span className="inline-flex min-w-0 items-center gap-2">
+              {icon ? <GameIcon src={icon} size={24} /> : <span aria-hidden="true" className="h-6 w-6 shrink-0 rounded-sm border border-line" />}
+              <Link href={`/database/spells/${r.spellId}`} className={`min-w-0 ${LINK}`}>{spellName(r.spellId) ?? `Spell ${r.spellId}`}</Link>
+              <Badge tone="files" />
+            </span>
+            {/* The recipe item the files link to this spell (client-recipe-items.json): unconfirmed, like the rest of the row. */}
+            {taught.length > 0 && <span className="inline-flex flex-wrap items-center gap-x-2 text-cell-2 text-fg-2">Recipe item: {taught.map((x) => <ItemLink key={x.itemId} id={x.itemId} size={16} />)}</span>}
           </span>
         );
       },
@@ -192,6 +205,9 @@ export default async function ProfessionPage(props: Props) {
   ];
 
   const groups = recipeGroups(p.recipes);
+  const shownGroups = recipeGroups(listed.rows);
+  const listFilters = Number(Boolean(listQuery.q)) + Number(listQuery.min !== null || listQuery.max !== null);
+  const strip = <ResultStrip total={listed.total} noun={listed.total === 1 ? "recipe" : "recipes"} page={listed.page} perPage={listQuery.size} href={(page) => listHere({ page })} label={`${p.name} recipe pages`} />;
   const trail = trailFor(path)!;
   const gatheringSection = gather && (
     <section id="gather" aria-labelledby="prof-gather" className="scroll-mt-24 space-y-3" data-gather={gather.source}>
@@ -247,24 +263,45 @@ export default async function ProfessionPage(props: Props) {
         {p.slug === "herbalism" && gatheringSection}
         <AhledgerCrafting profession={p.name} />
 
-        <section aria-labelledby="prof-recipes" className="space-y-4" data-recipes={p.slug}>
-          <SectionHeading id="prof-recipes" as="h2">{p.slug === "herbalism" ? "Herbalism crafts (new in Forever)" : "Recipes from the game files"}</SectionHeading>
+        <section id="prof-recipes" aria-labelledby="prof-recipes-heading" className="scroll-mt-24 space-y-4" data-recipes={p.slug}>
+          <SectionHeading id="prof-recipes-heading" as="h2">{p.slug === "herbalism" ? "Herbalism crafts (new in Forever)" : "Recipes from the game files"}</SectionHeading>
           <p className="flex flex-wrap items-center gap-2 text-meta text-fg-2">
             <Badge tone="files" />
             Found in game files, unconfirmed, build {RECIPES_BUILD}. Grouped by the skill where a recipe turns yellow.
             {p.otherSpells > 0 && ` ${plural(p.otherSpells, "other spell")} on the ${p.name} line make and cost nothing and are not listed.`}
           </p>
-          {groups.length > 1 && (
-            <nav aria-label={`${p.name} skill brackets`} className="flex flex-wrap gap-2 text-sm">
-              {groups.map((g) => (
-                <a key={g.key} href={`#skill-${g.key}`} className="inline-flex min-h-9 items-center gap-1.5 rounded-control border border-line px-3 text-fg-2 hover:border-accent hover:text-fg">
-                  {g.label} <span className="font-mono tabular-nums text-muted">{g.recipes.length}</span>
-                </a>
-              ))}
-            </nav>
+          {groups.length > 0 && (
+            <FilterBar
+              label={`${p.name} recipe filters`}
+              search={{ action: `${path}#prof-recipes`, value: listQuery.q, placeholder: "Recipe, item or reagent", label: "Filter recipes by recipe, item or reagent", keep: recipeSearchKeep(searchParams, listQuery) }}
+              active={listFilters}
+              clearHref={listHere({ q: "", min: null, max: null })}
+              controls={[
+                {
+                  type: "menu", key: "skill", label: "Turns yellow",
+                  options: [
+                    { label: "Any skill", href: listHere({ min: null, max: null }), on: listQuery.min === null && listQuery.max === null, reset: true },
+                    ...SKILL_BRACKETS.map((b) => {
+                      const max = b.max >= 999 ? null : b.max;
+                      return {
+                        label: max === null ? `${b.min}+` : `${b.min}–${b.max}`, href: listHere({ min: b.min, max }),
+                        on: listQuery.min === b.min && listQuery.max === max,
+                        count: p.recipes.filter((r) => r.yellow !== null && r.yellow >= b.min && r.yellow <= b.max).length,
+                      };
+                    }),
+                  ],
+                },
+                {
+                  type: "menu", key: "size", label: "Rows",
+                  options: RECIPE_PAGE_SIZES.map((size) => ({ label: String(size), href: listHere({ size }), on: listQuery.size === size })),
+                },
+              ]}
+              aside={strip}
+            />
           )}
           {groups.length === 0 && <EmptyState message={`The game files list no ${p.name} recipes that make an item or cost a reagent.`} />}
-          {groups.map((g) => (
+          {groups.length > 0 && listed.total === 0 && <p data-empty-state className="py-3 text-cell text-fg-2">No {p.name} recipes match these filters.</p>}
+          {shownGroups.map((g) => (
             <section key={g.key} aria-labelledby={`skill-${g.key}`} data-skill-group={g.key} className="space-y-2">
               <SectionHeading id={`skill-${g.key}`} as="h3">{g.label}</SectionHeading>
               <DataTable
@@ -276,11 +313,11 @@ export default async function ProfessionPage(props: Props) {
               />
             </section>
           ))}
+          {listed.pages > 1 && strip}
         </section>
 
         {p.slug !== "herbalism" && gatheringSection}
 
-        <RecipeSearch rows={catalog} />
         <section aria-labelledby="prof-path" className="space-y-4">
           <SectionHeading id="prof-path" as="h2">Leveling path from player uploads</SectionHeading>
           <Card>
@@ -295,7 +332,7 @@ export default async function ProfessionPage(props: Props) {
           </Card>
         </section>
         {pending && <EmptyState message={`No recipe ranges for ${p.name} yet: paths and ranges appear once 3 installs report the same recipes.`} />}
-        {view.unreachable ? <Card><p>{STORAGE_UNREACHABLE}</p></Card> : <ShoppingList catalog={catalog} profession={p.name} recipes={plannerRecipes} from={fromSkill} to={toSkill} />}
+        {view.unreachable ? <Card><p>{STORAGE_UNREACHABLE}</p></Card> : <ShoppingList catalog={shoppingCatalog}profession={p.name} recipes={plannerRecipes} from={fromSkill} to={toSkill} />}
 
         {!pending && (
           <section aria-labelledby="prof-ranges">

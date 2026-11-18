@@ -10,7 +10,10 @@ export async function armoryCrawl(flags: Map<string, string>): Promise<void> {
     throw Error("--region must be us or eu");
   if (flags.has("budget") && !flags.get("budget")?.trim())
     throw Error("--budget requires a value");
-  const budget = Number(flags.get("budget") ?? 6000);
+  // Blizzard allows 36,000 requests an hour per client. One client serves, each hour: this crawl for us and eu
+  // (12,000 each, 24,000), the auction refresh (at most 100 per region, 200) and Battle.net sign-in. That leaves
+  // about 11,800 (a third) for sign-ins and on-demand lookups. At 50 calls a second a full run takes 4 minutes.
+  const budget = Number(flags.get("budget") ?? 12_000);
   if (!Number.isSafeInteger(budget) || budget < 0)
     throw Error("--budget must be a nonnegative integer");
   const required = (key: string) => {
@@ -39,6 +42,8 @@ export async function armoryCrawl(flags: Map<string, string>): Promise<void> {
       character: async () => [],
       guild: async () => [],
       seedFromPlayers: noWrite,
+      spiderGuilds: noWrite,
+      recordRun: noWrite,
       upsertCharacters: noWrite,
       upsertGuild: noWrite,
       touch: noWrite,

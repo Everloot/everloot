@@ -17,7 +17,8 @@ describe("working feature discovery", () => {
     const urls = (await sitemap())!.map((entry) => new URL(entry.url).pathname);
     expect(new Set(urls).size).toBe(urls.length);
     expect(urls).toContain("/database");
-    expect(urls).toContain("/upload");
+    // Upload is hidden until polished: the route answers, the sitemap leaves it out.
+    expect(urls).not.toContain("/upload");
     expect(urls).not.toContain("/tools/database");
     expect(urls).not.toContain("/tools/guild-tracker");
     expect(urls).not.toContain("/tools/completionist");

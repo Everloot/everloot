@@ -42,7 +42,7 @@ test("the groups are asked for uncached and list each row with its link and meta
     guilds: { results: [{ type: "guild", label: "Thrall Fans", href: "/guilds/pioneer/thrall-fans", meta: "Pioneer · 4 members seen", exact: false }], total: 1 },
   };
   await show("thrall");
-  expect(asked).toEqual([{ url: "/search/people?q=thrall", cache: "no-store" }]);
+  expect(asked).toEqual([{ url: "/search/people?q=thrall&lookup=1", cache: "no-store" }]);
   expect(container.querySelector("#results-character")!.textContent).toContain("Characters (1)");
   expect(container.querySelector('#results-character a[href="/players/forever/pioneer/thrallina"]')!.textContent).toBe("Thrallina");
   expect(container.querySelector("#results-character")!.textContent).toContain("Level 24 Shaman · Pioneer");

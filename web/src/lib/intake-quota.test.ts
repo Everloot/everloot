@@ -80,6 +80,17 @@ test("in development the form scope allows 30 an hour per IP and leaves the uplo
   expect((await quota.request(local)).allowed).toBe(true);
 });
 
+test("the armory lookup has its own scope: 20 an hour per IP in development, sent as 'lookup' to the RPC", async () => {
+  const quota = createIntakeQuota({ env: { NODE_ENV: "test" }, now: () => 0 });
+  const local = new Request("http://localhost/search/people");
+  for (let i = 0; i < 20; i++) expect((await quota.lookup(local)).allowed).toBe(true);
+  expect((await quota.lookup(local)).allowed).toBe(false);
+  expect((await quota.request(local)).allowed).toBe(true);
+  const fetch = vi.fn(async (_url: string, _init: RequestInit) => Response.json([{ allowed: true, retry_after: 0 }]));
+  await createIntakeQuota({ env, fetch: fetch as unknown as typeof globalThis.fetch }).lookup(request());
+  expect(JSON.parse(fetch.mock.calls[0]![1].body as string).p_scope).toBe("lookup");
+});
+
 test("refuses missing, list or invalid platform IPs and does not trust a proxy header", async () => {
   const fetch = vi.fn();
   const quota = createIntakeQuota({ env, fetch });

@@ -107,17 +107,24 @@ test("is compact: two rows, no four-column block", () => {
   expect(markup).toMatch(/aria-label="Discord"[\s\S]*aria-label="GitHub"/);
 });
 
-test("keeps every link the four-column footer had", () => {
+test("keeps every link the four-column footer had, less Upload, hidden until polished", () => {
   const markup = html();
   const before = [
     "/database", "/map", "/changes", "/news", "/lore", "/addons",
-    "/addon", "/upload", "/docs", "/methodology", "https://github.com/Everloot/everloot/blob/main/docs/DATA_POLICY.md", "/changes/feed.xml", "/news/feed.xml",
+    "/addon", "/docs", "/methodology", "https://github.com/Everloot/everloot/blob/main/docs/DATA_POLICY.md", "/changes/feed.xml", "/news/feed.xml",
     "/about", "/contact", "https://discord.gg/9CKsbHTRu3", "https://github.com/Everloot/everloot",
     "https://github.com/Everloot/everloot/blob/main/CONTRIBUTING.md", "/security",
     "/privacy", "/terms", "/privacy#choices", "/terms#takedown", "/terms#trademarks", "/accessibility",
     "/methodology#credits", "mailto:hello@everloot.app", "/",
   ];
   for (const href of before) expect(markup, href).toContain(`href="${href}"`);
+});
+
+test("Browse links the guides, and the guides feed sits beside the other feeds; Upload is not linked", () => {
+  const markup = html();
+  expect(markup).toMatch(/<a href="\/classes"[^>]*>Classes<\/a><\/li><li><a href="\/guides"[^>]*>Guides<\/a>/);
+  expect(markup).toMatch(/>Changes feed \(RSS\)<\/a><\/li><li><a href="\/guides\/feed.xml"[^>]*>Guides feed \(RSS\)<\/a>/);
+  expect(markup).not.toContain('href="/upload"');
 });
 
 test("Glint perches on the footer's edge as a labelled button, his drawing hidden from screen readers", () => {

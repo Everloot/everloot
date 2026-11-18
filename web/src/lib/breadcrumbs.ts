@@ -26,6 +26,7 @@ const NAMES: Record<string, string> = {
   "/armory": "Armory",
   "/armory/hide": "Hide a character",
   "/armory/submit": "Add a character",
+  "/armory/guilds": "Guild directory",
   "/showcase/character": "Sample character",
   "/about": "About",
   "/tools": "Tools",
@@ -91,6 +92,9 @@ const NAMES: Record<string, string> = {
 
 /** The parent of a page, when it is not Home. */
 const PARENT: Record<string, string> = {
+  // The lists kept in this browser are part of Profile, beside the account pages.
+  "/tools/builds": "/account",
+  "/tools/alts": "/account",
   "/database/objects": "/database",
   "/database/items": "/database",
   "/classes/choose": "/classes",
@@ -99,6 +103,7 @@ const PARENT: Record<string, string> = {
   "/guilds/hide": "/guilds",
   "/armory/hide": "/armory",
   "/armory/submit": "/armory",
+  "/armory/guilds": "/armory",
   "/lore/coverage": "/lore",
   "/lore/npcs": "/lore",
   "/lore/items": "/lore",

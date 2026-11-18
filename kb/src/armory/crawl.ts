@@ -38,7 +38,14 @@ export interface Summary {
   touch_failed: Record<Kind, number>;
   enqueued: number;
   purged: number;
+  /** Runs in a row, this one included, that made no Blizzard call; null when the run was not recorded. */
+  zero_runs: number | null;
 }
+/** The job fails when this many runs in a row made no call: the queue has starved. */
+export const ZERO_RUN_LIMIT = 6;
+const MIGRATION = "supabase/migrations/20261117160000_armory_discovery.sql";
+/** PostgREST answers 404 for a function that does not exist yet. */
+const missingFunction = (error: unknown) => error instanceof StoreError && error.status === 404;
 /** Each stored details section and the endpoint that fills it. */
 const SECTIONS = [
   ["statistics", "statistics"], ["talents", "specializations"], ["professions", "professions"], ["avatar", "media"],
@@ -75,8 +82,10 @@ export async function runCrawl(cfg: {
     touch_failed: { character: 0, guild: 0 },
     enqueued: 0,
     purged: 0,
+    zero_runs: null,
   };
   let fatal: Error | undefined;
+  let unmigrated = false;
   let nonTransientFailures = 0;
   const logged = new Set<string>();
   function reason(error: unknown): string {
@@ -362,12 +371,20 @@ export async function runCrawl(cfg: {
       }),
     );
   }
+  // Guild rosters (2 calls each) get at most a quarter of the budget, so a long guild queue cannot starve
+  // character reads and refreshes. The spider queues no more guilds per run than a run can read.
+  const guildRows = Math.floor(cfg.budget / 8);
   try {
-    if (!dryRun) summary.enqueued = await store.seedFromPlayers();
-    await process(
-      "guild",
-      await store.take(region, "guild", Math.floor(cfg.budget / 2)),
-    );
+    if (!dryRun) {
+      summary.enqueued = await store.seedFromPlayers();
+      try {
+        summary.enqueued += await store.spiderGuilds(region, guildRows);
+      } catch (error) {
+        if (!missingFunction(error)) throw error;
+        unmigrated = true;
+      }
+    }
+    await process("guild", await store.take(region, "guild", guildRows));
     if (!fatal)
       await process(
         "character",
@@ -393,8 +410,18 @@ export async function runCrawl(cfg: {
       fail(error);
     }
   }
+  if (!fatal && !dryRun && !unmigrated) {
+    try {
+      summary.zero_runs = await store.recordRun(region, summary.calls);
+    } catch (error) {
+      if (missingFunction(error)) unmigrated = true;
+      else fail(error);
+    }
+  }
   cfg.log?.(JSON.stringify(summary));
   if (fatal) throw fatal;
+  if (unmigrated)
+    throw Error(`Armory discovery functions are missing: apply ${MIGRATION}`);
   if (summary.invalid + summary.rejected)
     throw Error(
       `${summary.invalid + summary.rejected} armory row failures deferred for 7 days`,
@@ -403,5 +430,9 @@ export async function runCrawl(cfg: {
     summary.touch_failed.character + summary.touch_failed.guild;
   if (failedTouches)
     throw Error(`${failedTouches} armory touch updates failed`);
+  if (summary.zero_runs !== null && summary.zero_runs >= ZERO_RUN_LIMIT)
+    throw Error(
+      `Armory ${region} made no Blizzard calls for ${summary.zero_runs} runs in a row: the queue is empty and nothing is due. Check the discovery seeds.`,
+    );
   return summary;
 }
