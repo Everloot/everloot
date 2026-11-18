@@ -55,7 +55,7 @@ import { bodyOf, gameplayIndex, mergeCatalogIndexes, catalogLabel, getCatalogByN
 import { cutArrays, MAX_ROWS, readField, type FieldRead } from "./json-pointer.js";
 
 export const SERVER_NAME = "everloot-knowledge";
-export const SERVER_VERSION = "0.9.1";
+export const SERVER_VERSION = "0.10.0";
 /** The source this server runs, offered to every client (AGPL section 13). */
 export const SOURCE_URL = "https://github.com/Everloot/everloot";
 /** One line a client shows beside the server's name in its list of servers. */
@@ -274,7 +274,8 @@ export async function marketValueAnswer(args: { realm: string; itemId: number },
   const value = busiest?.value ?? null;
   const points = busiest?.points ?? [];
   const url = realm && (value || points.length) ? marketItemUrl(realm, args.itemId) : undefined;
-  const page = { realm: shownRealm(args.realm, lookup), itemId: args.itemId, value, history: points, ...realmLookupFields(lookup) };
+  const pageRealm = shownRealm(args.realm, lookup);
+  const page = { realm: pageRealm, house: { realm: pageRealm, faction: busiest?.house ?? null }, itemId: args.itemId, value, history: points, ...realmLookupFields(lookup) };
   const body = handleMarketValue(args, market.state, now);
   const pageHouse = busiest ? `\nThe structured page carries the ${busiest.house} auction house (most units listed; ties: Alliance, then Horde, then Neutral).` : "";
   return {
@@ -309,19 +310,20 @@ export function auctionHistoryPage(
   scanHouse: AuctionHouse | null = null,
 ): { text: string; page: object; url?: string } {
   const realm = shownRealm(args.realm, lookup);
+  const house = { realm, faction: scanHouse };
   const head = `${realm} item ${args.itemId}`;
   const lookupFields = lookup ? realmLookupFields(lookup) : {};
-  if (!args.realm.trim()) return { text: "Name a realm.", page: { realm, itemId: args.itemId, points: [] } };
-  if (!Number.isInteger(args.itemId) || args.itemId < 1) return { text: "Name an item id.", page: { realm, itemId: args.itemId, points: [] } };
+  if (!args.realm.trim()) return { text: "Name a realm.", page: { realm, house, itemId: args.itemId, points: [] } };
+  if (!Number.isInteger(args.itemId) || args.itemId < 1) return { text: "Name an item id.", page: { realm, house, itemId: args.itemId, points: [] } };
   // Several realms' names end that way and they are separate markets: no price, scanned or browsed, answers it, whatever
   // was stored under the name as typed.
   if (lookup?.status === "ambiguous") {
     return { text: `${head}
-${realmLookupText(lookup)}`, page: { realm, itemId: args.itemId, points: [], ...(scanDays ? { scanDays: [] } : {}), ...lookupFields } };
+${realmLookupText(lookup)}`, page: { realm, house, itemId: args.itemId, points: [], ...(scanDays ? { scanDays: [] } : {}), ...lookupFields } };
   }
   // A name no realm answers to, with nothing browsed under it either: say so, never an empty history.
   if (lookup && !lookupRealm(lookup) && !points?.length) {
-    return { text: `${head}\n${realmLookupText(lookup)}`, page: { realm, itemId: args.itemId, points: [], ...lookupFields } };
+    return { text: `${head}\n${realmLookupText(lookup)}`, page: { realm, house, itemId: args.itemId, points: [], ...lookupFields } };
   }
   const note = lookup && lookupRealm(lookup) ? realmLookupText(lookup) : null;
   const browse = points ? auctionPointLines(points) : ["Browsing scans unavailable. They are unrecorded, not zero."];
@@ -340,7 +342,7 @@ ${realmLookupText(lookup)}`, page: { realm, itemId: args.itemId, points: [], ...
   const url = scanDays?.length || points?.length ? marketItemUrl(lookup ? lookupRealm(lookup) ?? realm : realm, args.itemId) : undefined;
   return {
     text: lines.join("\n"),
-    page: { realm, itemId: args.itemId, points: points ?? [], ...(scanDays ? { scanDays } : {}), ...lookupFields },
+    page: { realm, house, itemId: args.itemId, points: points ?? [], ...(scanDays ? { scanDays } : {}), ...lookupFields },
     url,
   };
 }

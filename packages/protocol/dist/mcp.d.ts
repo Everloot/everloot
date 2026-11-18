@@ -338,6 +338,14 @@ export declare const auctionHistory: z.ZodObject<{
     askedRealm: z.ZodOptional<z.ZodString>;
     candidates: z.ZodOptional<z.ZodArray<z.ZodString>>;
     realm: z.ZodString;
+    house: z.ZodOptional<z.ZodObject<{
+        realm: z.ZodString;
+        faction: z.ZodNullable<z.ZodEnum<{
+            Alliance: "Alliance";
+            Horde: "Horde";
+            Neutral: "Neutral";
+        }>>;
+    }, z.core.$strip>>;
     itemId: z.ZodNumber;
     points: z.ZodArray<z.ZodObject<{
         day: z.ZodString;
@@ -741,6 +749,14 @@ export declare const marketPage: z.ZodObject<{
     askedRealm: z.ZodOptional<z.ZodString>;
     candidates: z.ZodOptional<z.ZodArray<z.ZodString>>;
     realm: z.ZodString;
+    house: z.ZodOptional<z.ZodObject<{
+        realm: z.ZodString;
+        faction: z.ZodNullable<z.ZodEnum<{
+            Alliance: "Alliance";
+            Horde: "Horde";
+            Neutral: "Neutral";
+        }>>;
+    }, z.core.$strip>>;
     itemId: z.ZodNumber;
     value: z.ZodNullable<z.ZodObject<{
         itemId: z.ZodNumber;
@@ -2838,6 +2854,14 @@ export declare const MCP_TOOLS: {
                 askedRealm: z.ZodOptional<z.ZodString>;
                 candidates: z.ZodOptional<z.ZodArray<z.ZodString>>;
                 realm: z.ZodString;
+                house: z.ZodOptional<z.ZodObject<{
+                    realm: z.ZodString;
+                    faction: z.ZodNullable<z.ZodEnum<{
+                        Alliance: "Alliance";
+                        Horde: "Horde";
+                        Neutral: "Neutral";
+                    }>>;
+                }, z.core.$strip>>;
                 itemId: z.ZodNumber;
                 points: z.ZodArray<z.ZodObject<{
                     day: z.ZodString;
@@ -2883,6 +2907,14 @@ export declare const MCP_TOOLS: {
                 askedRealm: z.ZodOptional<z.ZodString>;
                 candidates: z.ZodOptional<z.ZodArray<z.ZodString>>;
                 realm: z.ZodString;
+                house: z.ZodOptional<z.ZodObject<{
+                    realm: z.ZodString;
+                    faction: z.ZodNullable<z.ZodEnum<{
+                        Alliance: "Alliance";
+                        Horde: "Horde";
+                        Neutral: "Neutral";
+                    }>>;
+                }, z.core.$strip>>;
                 itemId: z.ZodNumber;
                 value: z.ZodNullable<z.ZodObject<{
                     itemId: z.ZodNumber;
@@ -4865,6 +4897,14 @@ export declare const MCP_TOOL_LIST: ({
             askedRealm: z.ZodOptional<z.ZodString>;
             candidates: z.ZodOptional<z.ZodArray<z.ZodString>>;
             realm: z.ZodString;
+            house: z.ZodOptional<z.ZodObject<{
+                realm: z.ZodString;
+                faction: z.ZodNullable<z.ZodEnum<{
+                    Alliance: "Alliance";
+                    Horde: "Horde";
+                    Neutral: "Neutral";
+                }>>;
+            }, z.core.$strip>>;
             itemId: z.ZodNumber;
             points: z.ZodArray<z.ZodObject<{
                 day: z.ZodString;
@@ -4910,6 +4950,14 @@ export declare const MCP_TOOL_LIST: ({
             askedRealm: z.ZodOptional<z.ZodString>;
             candidates: z.ZodOptional<z.ZodArray<z.ZodString>>;
             realm: z.ZodString;
+            house: z.ZodOptional<z.ZodObject<{
+                realm: z.ZodString;
+                faction: z.ZodNullable<z.ZodEnum<{
+                    Alliance: "Alliance";
+                    Horde: "Horde";
+                    Neutral: "Neutral";
+                }>>;
+            }, z.core.$strip>>;
             itemId: z.ZodNumber;
             value: z.ZodNullable<z.ZodObject<{
                 itemId: z.ZodNumber;
