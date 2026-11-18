@@ -339,6 +339,7 @@ test("Herbs lands on gathering before the new Forever crafts, including when no 
   expect(crafts).toBeGreaterThan(gathering);
   expect(html).toContain("Herbalism crafts (new in Forever)");
   expect(html.slice(gathering, crafts)).toContain("No herb zones yet");
+  expect(html.slice(gathering, crafts)).toContain('href="/tools/professions/herbalism/gathering"');
   expect(html.slice(crafts)).toContain("Found in game files, unconfirmed");
   expect(html.slice(crafts)).toContain("/database/spells/");
   const metadata = await generateMetadata({ params: Promise.resolve({ profession: "herbalism" }) });
