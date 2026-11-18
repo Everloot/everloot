@@ -20,6 +20,8 @@ import { writeClientClassSpells } from "../client-class-spells.js";
 import { writeClientRecipes } from "../client-recipes.js";
 import { writeClientBags } from "../client-bags.js";
 import { writeClientTerrain } from "../client-terrain.js";
+import { writeClientDisenchant } from "../client-disenchant.js";
+import { disenchantLua } from "../disenchant-lua.js";
 import { writeClientFactions } from "../client-factions.js";
 import { writeClientTitles } from "../client-titles.js";
 import { writeClientQuestLines } from "../client-quest-lines.js";
@@ -32,7 +34,7 @@ import { readTerrainAreas } from "../terrain-area.js";
 import { ClassCatalog } from "../talents/catalog.js";
 import { writeWorldMapData } from "../world-map-data.js";
 import { clientDigestsOf } from "./client-digests.js";
-import { GAME_DATA_DIR, spellValuesOf } from "./site-data.js";
+import { DISENCHANT_LUA, GAME_DATA_DIR, spellValuesOf } from "./site-data.js";
 import type { Extracted } from "./watch.js";
 
 export async function extractFromCdn(product: string, region: string, curatedPath: string, webDir: string, definitions: string | null): Promise<Extracted> {
@@ -88,6 +90,8 @@ export async function extractFromCdn(product: string, region: string, curatedPat
         writeClientRecipes(snapshot, join(root, GAME_DATA_DIR, "client-recipes.json"));
         writeClientBags(snapshot, join(root, GAME_DATA_DIR, "client-bags.json"));
         writeClientTerrain(snapshot, join(root, GAME_DATA_DIR, "client-terrain.json"));
+        const disenchant = writeClientDisenchant(snapshot, join(root, GAME_DATA_DIR, "client-disenchant.json"));
+        writeFileSync(join(root, DISENCHANT_LUA), disenchantLua(disenchant));
         writeClientFactions(snapshot, join(root, GAME_DATA_DIR, "client-factions.json"));
         writeClientTitles(snapshot, join(root, GAME_DATA_DIR, "client-titles.json"));
         writeClientQuestLines(snapshot, join(root, GAME_DATA_DIR, "client-quest-lines.json"));

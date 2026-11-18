@@ -60,6 +60,8 @@ O.ROWS[#O.ROWS + 1] = { key = "tooltipHistory", group = "tooltips", field = true
   text = "Your last sale, average sale and units sold, and what you paid where your gold ledger knows it, over the ledger's last 90 days, from your characters on this realm. Read from this file. Records nothing; applies at once." }
 O.ROWS[#O.ROWS + 1] = { key = "tooltipSources", group = "tooltips", field = true, live = true, label = "Item sources",
   text = "Who drops it, who sells it, the recipes it is a reagent for and the zones you met its sources in. Records nothing; applies at once." }
+O.ROWS[#O.ROWS + 1] = { key = "tooltipDisenchant", group = "tooltips", field = true, live = true, label = "Disenchant estimate",
+  text = "Observed material yields and estimated value at this character's house prices. Records nothing; applies at once." }
 
 -- The settings pages, in the game's list under Everloot. Everloot itself is the overview: what this file holds and
 -- where the switches are. A client without sub-pages keeps every switch on one page, in O.ROWS order.
@@ -596,7 +598,7 @@ O.SETUP = {
   everything = {
     toggles = { openworld = true, professions = true, mapbounds = true, auctions = true, window = true,
       gold = true, roster = true, guild = true },
-    fields = { scanPrompt = true, minimapButton = true, tooltip = "full", tooltipMarket = true, tooltipHistory = true, tooltipSources = true },
+    fields = { scanPrompt = true, minimapButton = true, tooltip = "full", tooltipMarket = true, tooltipHistory = true, tooltipSources = true, tooltipDisenchant = true },
   },
   collect = {
     toggles = { openworld = true, professions = true, mapbounds = true, auctions = true, window = false, buttons = false,

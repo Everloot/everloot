@@ -358,3 +358,33 @@ test("every tool declares an output schema; coverage says it is not connected in
 
   await client.close();
 });
+
+test("MCP drop answers keep exactly the existing public keys", async () => {
+  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+  const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
+  const records = ["a", "b", "c"].flatMap((installId) => [
+    { kind: "loot", sourceEvidence: "loot-api", installId, sourceNpcId: 7, copper: 123, items: [{ itemId: 2589, count: 2 }] },
+    { kind: "loot", sourceEvidence: "loot-api", installId, sourceObjectId: 9, copper: 60, items: [{ itemId: 2589, count: 3 }] },
+    { kind: "loot", sourceEvidence: "loot-api", installId, sourceObjectId: 10, copper: 40, items: [] },
+  ]);
+  const db = await seed();
+  const server = createKnowledgeServer(db, { corpus: async () => ({ records, uploads: 3, dataAsOf: "2026-11-17T00:00:00Z" }) });
+  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverSide);
+  const client = new Client({ name: "test", version: "0" });
+  await client.connect(clientSide);
+  try {
+    const item = await client.callTool({ name: "item_page", arguments: { itemId: 2589 } });
+    const object = await client.callTool({ name: "object_page", arguments: { objectId: 9 } });
+    const zero = await client.callTool({ name: "object_page", arguments: { objectId: 10 } });
+    const page = (answer: typeof item) => (answer.structuredContent as { page: { drops: Record<string, unknown>[]; zero?: Record<string, unknown> } }).page;
+    expect(item.isError).not.toBe(true);
+    expect(Object.keys(page(item)).sort()).toEqual(["drops", "itemId", "name", "pins", "reported"]);
+    for (const answer of [object, zero]) expect(Object.keys(page(answer)).sort()).toEqual(["drops", "name", "objectId", "queued", "zero"]);
+    expect(Object.keys(page(item).drops[0]).sort()).toEqual(["drops", "kills", "rate", "reporters", "source", "sourceNpcId", "sourceObjectId"]);
+    expect(Object.keys(page(item).drops[1]).sort()).toEqual(["drops", "kills", "rate", "reporters", "source", "sourceNpcId", "sourceObjectId"]);
+    expect(Object.keys(page(object).drops[0]).sort()).toEqual(["drops", "itemId", "itemName", "kills", "rate", "reporters"]);
+    expect(Object.keys(page(zero).zero!).sort()).toEqual(["kills", "reporters"]);
+    for (const answer of [item, object, zero]) expect(JSON.stringify(answer)).not.toMatch(/units|copper/i);
+  } finally { await client.close(); db.close(); }
+});
