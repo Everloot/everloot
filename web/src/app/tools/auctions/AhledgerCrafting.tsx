@@ -1,39 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Coins from "@/components/ui/Coins";
 import { DataTable, type Column } from "@/components/ui";
-import { isAhledgerMarket, isAhledgerProfession, type AhledgerCraft } from "@/lib/ahledger";
-import { AhledgerMarketPicker, AhledgerPanel, AHLEDGER_MARKET_SLOT, DEFAULT_AHLEDGER_MARKET, salesText, useAhledger } from "./AhledgerPanel";
-
-// This table's shareable URL takes precedence over the browser's remembered market.
-function useCraftingMarket(): [string | null, (next: string) => void] {
-  const [market, setMarket] = useState<string | null>(null);
-  useEffect(() => {
-    const read = () => {
-      const shared = new URL(window.location.href).searchParams.get("market");
-      let saved: string | null = null;
-      try { saved = window.localStorage.getItem(AHLEDGER_MARKET_SLOT); } catch {}
-      const next = shared && isAhledgerMarket(shared) ? shared : saved && isAhledgerMarket(saved) ? saved : DEFAULT_AHLEDGER_MARKET;
-      const url = new URL(window.location.href);
-      url.searchParams.set("market", next);
-      window.history.replaceState(window.history.state, "", url);
-      setMarket(next);
-    };
-    read();
-    window.addEventListener("popstate", read);
-    return () => window.removeEventListener("popstate", read);
-  }, []);
-  return [market, (next) => {
-    if (!isAhledgerMarket(next)) return;
-    const url = new URL(window.location.href);
-    url.searchParams.set("market", next);
-    window.history.replaceState(window.history.state, "", url);
-    try { window.localStorage.setItem(AHLEDGER_MARKET_SLOT, next); } catch {}
-    setMarket(next);
-  }];
-}
+import { ahledgerMarketLabel, isAhledgerMarket, isAhledgerProfession, type AhledgerCraft } from "@/lib/ahledger";
+import { AhledgerPanel, salesText, useAhledger } from "./AhledgerPanel";
 
 // The sortable columns: the column key (also the `?sort=` value, `-` first for high to low) and the field it orders by.
 const CRAFT_SORTS = { cost: "cost", net: "netValue", margin: "margin", sales: "salesPerDay", profit: "profitPerDay" } as const;
@@ -67,11 +39,10 @@ function useCraftingSort(): [CraftOrder, (next: CraftOrder) => void] {
   }];
 }
 
-function Crafting({ profession }: { profession: string }) {
-  const [market, setMarket] = useCraftingMarket();
+function Crafting({ profession, market, picker, none }: CraftingProps) {
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useCraftingSort();
-  const read = useAhledger<AhledgerCraft[]>(market && `/api/ahledger/${market}/crafting?profession=${encodeURIComponent(profession)}`, "recipes");
+  const read = useAhledger<AhledgerCraft[]>(market && isAhledgerMarket(market) ? `/api/ahledger/${market}/crafting?profession=${encodeURIComponent(profession)}` : null, "recipes");
   const query = filter.trim().toLowerCase();
   const field = CRAFT_SORTS[sort.key];
   const rows = read.state === "ready" ? read.data.filter((r) => r.name.toLowerCase().includes(query)).sort((a, b) => {
@@ -90,7 +61,9 @@ function Crafting({ profession }: { profession: string }) {
     { key: "sales", header: "Sales per day", numeric: true, cell: (r) => salesText(r.salesPerDay) },
     { key: "profit", header: "Profit per day", numeric: true, cell: (r) => <Coins copper={r.profitPerDay} /> },
   ];
-  return <AhledgerPanel title="AH Ledger crafting margins" state={read.state} credit={read.state === "ready" ? read.credit : undefined} controls={market && <AhledgerMarketPicker market={market} onChange={setMarket} />}>
+  const controls = <>{picker}<p data-ahledger-market className="text-meta text-fg-2">{market ? `AH Ledger market: ${ahledgerMarketLabel(market)}` : none}</p></>;
+  if (!market) return <section data-ahledger="none" className="space-y-3"><h2 className="text-control font-medium text-fg">AH Ledger crafting margins</h2>{controls}</section>;
+  return <AhledgerPanel title="AH Ledger crafting margins" state={read.state} credit={read.state === "ready" ? read.credit : undefined} controls={controls}>
     <p className="text-meta text-fg-2">AH Ledger reagent and result prices, separate from player uploads. Net value uses average yield less the 5% auction house cut. A missing reagent price makes the cost unpriced. Estimated profit per day is an upper bound assuming you supply the whole market, not guaranteed earnings. Estimated sales lean low and are unrecorded when too few scans support them.</p>
     <div className="flex flex-wrap gap-3 text-meta text-fg-2">
       <label className="flex items-center gap-2">Filter recipes <input type="search" value={filter} onChange={(e) => setFilter(e.target.value)} className="min-h-10 rounded-control border border-line bg-canvas px-2 text-sm text-fg" /></label>
@@ -104,6 +77,16 @@ function Crafting({ profession }: { profession: string }) {
   </AhledgerPanel>;
 }
 
-export default function AhledgerCrafting({ profession }: { profession: string }) {
-  return isAhledgerProfession(profession) ? <Crafting profession={profession} /> : null;
+interface CraftingProps {
+  profession: string;
+  /** The AH Ledger market the page chose from its realm and house; null where AH Ledger has none. */
+  market: string | null;
+  /** The page's realm and house picker (RealmHousePicker), rendered on the server. */
+  picker?: ReactNode;
+  /** What to say when `market` is null. */
+  none?: string;
+}
+
+export default function AhledgerCrafting(props: CraftingProps) {
+  return isAhledgerProfession(props.profession) ? <Crafting {...props} /> : null;
 }

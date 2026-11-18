@@ -122,3 +122,18 @@ test("saved bags remain selectable when market prices are unavailable", async ()
   expect(document.querySelector<HTMLSelectElement>('select[name="b2"]')!.value).toBe("40");
   expect(document.querySelector<HTMLSelectElement>('select[name="b3"]')!.value).toBe("0");
 });
+
+test("the realm and house picker reads ?realm= and ?house= as the old form did, and its links keep the bags", async () => {
+  const bags = { b1: String(small), b2: String(small), b3: String(small), b4: String(small) };
+  // A link saved from the old form (realm and house as select values) shows the same house.
+  const html = await page({ realm: "forever", house: "horde", ...bags });
+  expect(text(html)).toContain("Horde auction house on Forever");
+  expect(html).toContain("data-realm-house-picker");
+  expect(html).not.toMatch(/<select[^>]*name="(?:realm|house)"/);
+  // The bag form keeps the picked realm and house; the picker keeps the bags.
+  expect(html).toContain('<input type="hidden" name="realm" value="forever"/>');
+  expect(html).toContain('<input type="hidden" name="house" value="horde"/>');
+  expect(html).toContain(`href="/tools/bags?b1=${small}&amp;b2=${small}&amp;b3=${small}&amp;b4=${small}&amp;realm=forever&amp;house=alliance"`);
+  // A house that is not one reads as none asked: the realm's busiest house.
+  expect(text(await page({ realm: "forever", house: "Horde!" }))).toContain("Horde auction house on Forever");
+});

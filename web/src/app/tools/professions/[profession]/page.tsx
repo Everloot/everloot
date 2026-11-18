@@ -1,5 +1,10 @@
 import { CoinText } from "@/components/ui/Coins";
 import AhledgerCrafting from "../../auctions/AhledgerCrafting";
+import { RealmHousePicker, realmHouseHref, realmHouseParams } from "../../auctions/RealmHousePicker";
+import type { AuctionHouse } from "@everloot/protocol";
+import { ahledgerMarket, isAhledgerMarket, isAhledgerProfession } from "@/lib/ahledger";
+import { busiestHouse, findBoard, realmBoards } from "@/lib/auction-house";
+import { realmRegion, realmRuleset } from "@/lib/realms";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
@@ -17,7 +22,7 @@ import { CLIENT_PROFESSIONS, professionBySegment, professionHref, RECIPES_BUILD,
 import { filterRecipeViews, RECIPE_PAGE_SIZES, recipeListHref, recipeListQuery, recipePage, recipeSearchKeep } from "@/lib/recipe-list";
 import { pageMetadata } from "@/lib/seo";
 import { loadListNames } from "@/lib/item-view";
-import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT } from "@/lib/upload-store";
+import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT, uploadStore } from "@/lib/upload-store";
 import { loadProfessions } from "@/lib/profession-store";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { formatCopper, agreeRecipes } from "../../../../../../kb/src/profession-path";
@@ -64,6 +69,47 @@ const dash = <span className="text-muted">—</span>;
 const plural = (n: number, word: string) => `${n.toLocaleString("en-US")} ${word}${n === 1 ? "" : "s"}`;
 const rangeText = (r: Range) => (r.min === null && r.max === null ? "?" : r.min === null ? `≤${r.max}` : r.max === null ? `${r.min}+` : r.min === r.max ? `${r.min}` : `${r.min}–${r.max}`);
 
+/** AH Ledger has a market per faction: the Alliance and Horde houses, never the neutral one. */
+const LEDGER_HOUSES: readonly AuctionHouse[] = ["Alliance", "Horde"];
+
+/**
+ * The AH Ledger margins under the realm and house picker: the realm's region and ruleset and the house's faction name
+ * AH Ledger's market. A realm is offered only where AH Ledger has a market for it. With no house asked, the realm's
+ * busier faction house. A link with no realm keeps working as before: `?market=` (the old Region, Ruleset and Faction
+ * selects' parameter) names the market, else the AH Ledger panels' default, PvE Alliance in the US.
+ */
+function ledgerPanel(profession: string, search: Search, path: string, state: Parameters<typeof realmBoards>[0] | null) {
+  const { realm, house: asked } = realmHouseParams(search);
+  const legacy = realm ? null : one(search.market);
+  const shared = legacy && isAhledgerMarket(legacy) ? legacy : null;
+  const realms = state ? realmBoards(state, new Date()).filter((b) => {
+    const region = realmRegion(b.realm.name);
+    return region !== null && ahledgerMarket(realmRuleset(b.realm.name), "alliance", region) !== null;
+  }) : [];
+  const board = realm ? findBoard(realms, realm) : null;
+  const sharedHouse = shared ? LEDGER_HOUSES.find((h) => shared.split(".")[2] === h.toLowerCase()) ?? null : null;
+  const house = asked ?? (board ? busiestHouse(board.rows.filter((r) => r.house !== "Neutral"))?.house ?? "Alliance" : sharedHouse);
+  const region = board ? realmRegion(board.realm.name) : null;
+  const faction = house === "Alliance" ? "alliance" : house === "Horde" ? "horde" : null;
+  const market = realm
+    ? (board && region && faction ? ahledgerMarket(realmRuleset(board.realm.name), faction, region) : null)
+    : shared ?? ahledgerMarket("normal", "alliance", "us");
+  const none = !board ? "AH Ledger has no market for this realm." : "AH Ledger has no market for the neutral auction house: pick Alliance or Horde.";
+  // A realm replaces the old market parameter, and the links land back on the margins.
+  const rest = Object.fromEntries(Object.entries(search).filter(([k]) => k !== "market"));
+  const picker = (
+    <RealmHousePicker
+      realms={realms.map((b) => ({ slug: b.realm.slug, name: b.realm.name }))}
+      realm={realm}
+      house={house}
+      houses={LEDGER_HOUSES}
+      href={(r, h) => realmHouseHref(path, rest, r, h, "#ahledger-margins")}
+      remember={shared ? "save" : "redirect"}
+    />
+  );
+  return <AhledgerCrafting profession={profession} market={market} picker={picker} none={none} />;
+}
+
 /**
  * One profession: every recipe the game files list for it, grouped by the skill where it turns yellow, with the
  * item it makes and its reagents; then what players' uploads add (agreed colour ranges, the path, cost per craft).
@@ -93,8 +139,10 @@ export default async function ProfessionPage(props: Props) {
   const level = mobFarm ? range(searchParams, "mobs") : undefined;
   if (level === null) notFound();
 
-  const [view, assets, shown, spellNames] = await Promise.all([
+  const ledger = isAhledgerProfession(p.name);
+  const [view, assets, shown, spellNames, market] = await Promise.all([
     loadProfessions(), loadSiteAssets(), loadListNames(), loadSpellNames(CLIENT_LAYER.build.version),
+    ledger ? uploadStore.loadMarket() : Promise.resolve(null),
   ]);
   // Names, icons and qualities of the items the recipes make and use, under the item name rule (shown-item-names.ts).
   const ids = [...new Set([...recipeItemIds(p.recipes), ...teachingItemIds(p.recipes.map(r => r.spellId))])].filter(shown.showsTip);
@@ -267,7 +315,7 @@ export default async function ProfessionPage(props: Props) {
       <div className="space-y-8">
         <ProfessionPicker professions={CLIENT_PROFESSIONS} icons={icons} current={p.slug} context={context} />
         {p.slug === "herbalism" && gatheringSection}
-        <AhledgerCrafting profession={p.name} />
+        {ledger && <div id="ahledger-margins" className="scroll-mt-24">{ledgerPanel(p.name, searchParams, path, market?.state ?? null)}</div>}
 
         <section id="prof-recipes" aria-labelledby="prof-recipes-heading" className="scroll-mt-24 space-y-4" data-recipes={p.slug}>
           <SectionHeading id="prof-recipes-heading" as="h2">{p.slug === "herbalism" ? "Herbalism crafts (new in Forever)" : "Recipes from the game files"}</SectionHeading>

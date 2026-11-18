@@ -44,7 +44,7 @@ vi.mock("@/lib/talents/catalogs", async (importOriginal) => {
 });
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
-  uploadStore: { loadCorpus: async () => ({ records: [], unreachable: false, dataAsOf: "2026-10-26T00:00:00.000Z" }) },
+  uploadStore: { loadCorpus: async () => ({ records: [], unreachable: false, dataAsOf: "2026-10-26T00:00:00.000Z" }), loadMarket: async () => ({ state: null, dataAsOf: null }) },
 }));
 vi.mock("@/components/EmailCapture", () => ({ default: () => null }));
 

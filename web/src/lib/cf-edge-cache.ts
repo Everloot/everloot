@@ -51,10 +51,27 @@ export function isPrivatePath(pathname: string): boolean {
  */
 const CREDENTIAL_FREE_PATH = /^\/database\/card\/(?:item|npc|quest|object|spell|vendor)\/[1-9]\d{0,9}$/;
 
+/**
+ * The public Auction House pages read only the market rollup, its stored history and item names: no cookie, no
+ * header and no install id. The browse page (`/tools/auctions`), a realm's page and an item's price page (on one
+ * realm, or `item/<id>` across realms) drop credentials like the hover cards. The realm must already be the
+ * lower-case slug the page serves, so a spelling the page redirects keeps its credentials. The market report
+ * (`report`, a static folder beside the realms) is left out, as is every other tool: the collections page shows one
+ * install's progress, and the Blizzard auction page is private.
+ */
+function credentialFreeAuctionPath(pathname: string): boolean {
+  if (pathname === "/tools/auctions") return true;
+  const item = AUCTION_ITEM_PATH.exec(pathname);
+  if (item) return plainRealm(item[1]);
+  const list = AUCTION_LIST_PATH.exec(pathname);
+  return list?.[1] !== undefined && plainRealm(list[1]);
+}
+
 /** The request without its Cookie and Authorization headers on a route that reads neither; any other request as it is. */
 export function withoutCredentials(req: Request): Request {
   if (req.method !== "GET" || !(req.headers.has("cookie") || req.headers.has("authorization"))) return req;
-  if (!CREDENTIAL_FREE_PATH.test(new URL(req.url).pathname)) return req;
+  const pathname = new URL(req.url).pathname;
+  if (!CREDENTIAL_FREE_PATH.test(pathname) && !credentialFreeAuctionPath(pathname)) return req;
   const headers = new Headers(req.headers);
   headers.delete("cookie");
   headers.delete("authorization");
