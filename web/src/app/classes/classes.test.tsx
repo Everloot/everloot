@@ -21,8 +21,7 @@ vi.mock("next/navigation", () => ({
 import ClassesPage, * as indexRoute from "./page";
 import ClassPage, * as hubRoute from "./[class]/page";
 import UseClassButton, { RememberedClass } from "@/components/classes/UseClassButton";
-import { PRIMARY } from "@/components/Header";
-import { toolGroups } from "@/data/tools";
+import { navItems, phoneGroups } from "@/components/Header";
 import { classesIndexable, classRaces, hubIndexable } from "@/lib/class-hub";
 import { CLASS_CONTEXT_SLOT, contextLinks } from "@/lib/class-context";
 import { RACE_TABLE, RACIAL_NOTES } from "@/lib/race-traits";
@@ -273,7 +272,7 @@ describe("class hubs", () => {
   });
 
   test("no header or Tools menu link points at the class pages yet", () => {
-    const hrefs = [...PRIMARY.map((l) => l.href), ...[false, true].flatMap((guilds) => toolGroups(guilds).flatMap((g) => g.links.map((l) => l.href)))];
+    const hrefs = [false, true].flatMap((on) => phoneGroups(navItems({ guilds: on, players: on, profiles: on, savedBuilds: on })).flatMap((g) => g.links.map((l) => l.href)));
     expect(hrefs.filter((h) => h === "/classes" || h.startsWith("/classes/"))).toEqual([]);
   });
 });

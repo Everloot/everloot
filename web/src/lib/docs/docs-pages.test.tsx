@@ -24,7 +24,7 @@ import { createIntakeQuota } from "@/lib/intake-quota";
 import { ANON_PAGE, ANON_PER_HOUR, attribution, KEY_PAGE, KEY_PER_HOUR } from "@/lib/data-guard";
 import sitemap from "@/lib/site-sitemap";
 import Footer from "@/components/Footer";
-import Header from "@/components/Header";
+import { navItems, phoneGroups } from "@/components/Header";
 import { allDocsPages, endpointSlug } from "./nav";
 import corsPrerenderedPaths from "@/data/cors-prerendered-paths.json";
 import { FILE_SCHEMAS, PAGE_INTERNAL_ROUTES } from "./file-schemas";
@@ -220,7 +220,8 @@ test("every docs page is in the sitemap, the docs are in the header and the foot
   const paths = (await sitemap())!.map((entry) => new URL(entry.url).pathname);
   for (const { href } of allDocsPages()) expect(paths, href).toContain(href);
   expect(paths).not.toContain("/connect");
-  expect(renderToStaticMarkup(<Header />)).toContain('href="/docs"');
+  // The header's phone menu lists Docs under More; the wide bar leaves it to the footer.
+  expect(phoneGroups(navItems()).flatMap((g) => g.links.map((l) => l.href))).toContain("/docs");
   expect(renderToStaticMarkup(<Footer />)).toContain('href="/docs"');
   const config = readFileSync(new URL("../../../next.config.js", import.meta.url), "utf8");
   expect(config).toContain('{ source: "/connect", destination: "/docs", permanent: true }');

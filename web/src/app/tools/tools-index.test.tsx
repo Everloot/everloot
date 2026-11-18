@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, test, vi } from "vitest";
-import { TOOL_GROUPS, TOOL_LINES, getTool, toolHref, tools } from "@/data/tools";
+import { TOOL_GROUPS, TOOL_LINES, getTool } from "@/data/tools";
 import sitemap from "@/lib/site-sitemap";
 
 vi.mock("next/link", () => ({
@@ -23,38 +23,31 @@ test("the catalogue keeps the old slugs with the current names and destinations"
   expect(getTool("guild-tracker")).toMatchObject({ title: "Guild board", shortTitle: "Guild board", href: "/tools/guild-board" });
 });
 
-test("every catalogue tool with a group is listed under it on /tools", async () => {
+test("/tools is one card per planner, most used first: Raid builder, Talent calculator, Professions", async () => {
   const { default: ToolsPage } = await import("./page");
   const html = renderToStaticMarkup(await ToolsPage());
-  for (const tool of tools.filter((t) => t.group)) {
-    const group = TOOL_GROUPS.find((g) => g.title === tool.group)!;
-    expect(group.links).toContainEqual({ label: tool.shortTitle, href: toolHref(tool) });
-    expect(html).toContain(`>${tool.shortTitle}</a>`);
-  }
+  expect(hrefs(html)).toEqual(["/tools/raid", "/tools/talents", "/tools/professions"]);
+  expect(TOOL_GROUPS.find((g) => g.title === "Tools")!.links.map((l) => l.label)).toEqual(["Raid builder", "Talent calculator", "Professions"]);
+  for (const link of TOOL_GROUPS.find((g) => g.title === "Tools")!.links) expect(html, link.label).toContain(`>${link.label}</a>`);
+  // One grid, no group headings.
+  expect(html).not.toMatch(/<h2/);
 });
 
-test("/tools lists the menu's names and links, with the guild board while the guild switch is off", async () => {
+test("/tools leaves out Farming, hidden until polished, and the pages that moved to Lookup, Guides and Profile", async () => {
   const { default: ToolsPage } = await import("./page");
   const html = renderToStaticMarkup(await ToolsPage());
-  for (const link of TOOL_GROUPS.flatMap((g) => g.links)) {
-    expect(html, link.href).toContain(`href="${link.href}"`);
-    expect(html, link.label).toContain(`>${link.label}</a>`);
+  expect(getTool("farming-routes")).toMatchObject({ group: "Tools", hidden: true });
+  for (const href of ["/tools/farming-routes", "/tools/auctions", "/census", "/tools/legacy", "/tools/builds", "/tools/alts", "/tools/collections", "/upload", "/chat"]) {
+    expect(html, href).not.toContain(`href="${href}"`);
   }
-  expect(html).not.toContain('href="/guilds"');
-});
-
-test("/tools offers Guilds in place of the guild board with EVERLOOT_GUILDS on, as the header does", async () => {
-  vi.stubEnv("EVERLOOT_GUILDS", "1");
-  const { default: ToolsPage } = await import("./page");
-  const html = renderToStaticMarkup(await ToolsPage());
-  expect(hrefs(html)).toContain("/guilds");
-  expect(html).not.toContain('href="/tools/guild-board"');
 });
 
 test("/about names the tools as the menu does and no longer uses the old names", async () => {
   const { default: About } = await import("../about/page");
   const html = renderToStaticMarkup(<About />);
-  for (const name of ["Collections", "Guild board", "Professions"]) expect(html).toContain(`>${name}</a>`);
+  for (const name of ["Guild board", "Professions"]) expect(html).toContain(`>${name}</a>`);
+  // Hidden until polished.
+  expect(hrefs(html)).not.toContain("/tools/collections");
   for (const old of ["Completionist Tracker", "Forever Guild Tracker", "Profession Hubs", "Thottbot"]) expect(html).not.toContain(old);
   expect(hrefs(html)).toContain("/tools");
   expect(hrefs(html)).not.toContain("/guilds");
@@ -64,34 +57,27 @@ test("the sitemap lists /tools", async () => {
   expect((await sitemap())!.map((e) => new URL(e.url).pathname)).toContain("/tools");
 });
 
-test("Alts on this device is listed on /tools with its line, and the sitemap leaves it out too", async () => {
-  const { default: ToolsPage } = await import("./page");
-  const html = renderToStaticMarkup(await ToolsPage());
-  expect(html).toContain('href="/tools/alts"');
-  expect(html).toContain(TOOL_LINES["/tools/alts"]);
-  expect((await sitemap())!.map((e) => new URL(e.url).pathname)).not.toContain("/tools/alts");
-});
-
-test("Plans on this device is listed on /tools, and the sitemap leaves the private list out", async () => {
-  const { default: ToolsPage } = await import("./page");
-  const html = renderToStaticMarkup(await ToolsPage());
-  expect(html).toContain('href="/tools/builds"');
-  expect(html).toContain(TOOL_LINES["/tools/builds"]);
-  expect((await sitemap())!.map((e) => new URL(e.url).pathname)).not.toContain("/tools/builds");
+test("Plans and Alts on this device are in Profile, keep their lines, and the sitemap leaves the private lists out", async () => {
+  const profile = TOOL_GROUPS.find((g) => g.title === "Profile")!.links.map((l) => l.href);
+  const paths = (await sitemap())!.map((e) => new URL(e.url).pathname);
+  for (const href of ["/tools/alts", "/tools/builds"]) {
+    expect(profile, href).toContain(href);
+    expect(TOOL_LINES[href], href).toBeTruthy();
+    expect(paths, href).not.toContain(href);
+  }
 });
 
 test("/tools gives each tool the game icon the asset upload has, and its initial when the upload has none", async () => {
   const { siteManifest } = await import("@/lib/game-assets.fixture");
   vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", "https://assets.example.test/wow_classic_beta-70450-84bea423");
-  vi.stubGlobal("fetch", vi.fn(async () => Response.json(siteManifest)));
+  // The fixture plus a paladin icon, which the raid builder falls back to when the upload has no raid legend icon.
+  const manifest = { ...siteManifest, classes: { ...siteManifest.classes, paladin: { classId: 2, name: "Paladin", icon: "6201.webp", trees: [] } } };
+  vi.stubGlobal("fetch", vi.fn(async () => Response.json(manifest)));
   const { default: ToolsPage } = await import("./page");
   const html = renderToStaticMarkup(await ToolsPage());
   vi.unstubAllGlobals();
   const card = (href: string) => html.slice(html.lastIndexOf("<li", html.indexOf(`href="${href}"`)), html.indexOf("</li>", html.indexOf(`href="${href}"`)));
-  // The warrior's class icon for Plans on this device; the flight legend icon for uploads; a faction crest for the census.
-  expect(card("/tools/builds")).toContain("icons/6001.webp");
-  expect(card("/upload")).toContain("poi/TaxiNode_Neutral.webp");
-  expect(card("/census")).toMatch(/<img[^>]*src="[^"]+"/);
+  expect(card("/tools/raid")).toContain("icons/6201.webp");
   // The fixture has no mage icon: the talent calculator shows its initial instead of an image.
   expect(card("/tools/talents")).not.toContain("<img");
   expect(card("/tools/talents")).toContain(">T</span>");

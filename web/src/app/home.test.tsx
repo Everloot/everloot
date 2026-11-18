@@ -23,9 +23,8 @@ test("tool status keeps its meaning: a tool still collecting shows the 0-of-3 me
   const list = html.slice(html.indexOf('id="tools-title"'), html.indexOf('id="agree"'));
   const row = (href: string) => list.slice(list.indexOf(`href="${href}"`), list.indexOf("</a>", list.indexOf(`href="${href}"`)));
   expect(row("/tools/guild-board")).toContain('aria-label="0 of 3 installs agree"');
-  // Farming is live and collecting (#826): it carries the meter, not the Planned label; the sitemap keys on the same status.
-  expect(row("/tools/farming-routes")).toContain('aria-label="0 of 3 installs agree"');
-  expect(row("/tools/farming-routes")).not.toContain("Planned");
+  // Farming is hidden until polished: the home page does not list it.
+  expect(list).not.toContain('href="/tools/farming-routes"');
   expect(row("/tools/raid")).not.toMatch(/installs agree|Planned/);
   const planned = tools.filter((t) => t.status === "coming-soon").map(toolHref);
   for (const href of planned) expect(row(href), href).toMatch(/text-muted[^"]*"[^>]*>Planned</);
