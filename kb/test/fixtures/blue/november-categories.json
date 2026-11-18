@@ -1,0 +1,15 @@
+{
+  "categories": [
+    {
+      "id": 346,
+      "name": "WoW: Forever",
+      "slug": "wow-forever"
+    },
+    {
+      "id": 352,
+      "name": "WoW Forever Bug Report",
+      "slug": "wow-forever-bug-report",
+      "parent_category_id": 346
+    }
+  ]
+}

@@ -226,10 +226,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: /database/recent and its RSS feed list the entities whose facts reached three installs in the last 30 days;
   dates from before the feed existed are marked estimated.
 - Site: /tools/bags shows the cheapest bag of each size on one realm's auction house and what each added slot costs over your smallest bag, and item tooltips print a bag's "14 Slot Bag" line; slot counts come from the game files, prices from players' scans.
+- Site: the world map shows zone or continent coordinates on hover and shares pins in the address; Shift-click or use Pin map centre, and Clear pin removes it.
 
 ### Fixed
 - Site: Database list links load on click instead of prefetching into the edge rate limit.
 - Site: Herbs opens with gathering areas, with new Forever Herbalism crafts below them.
+- Site: recover interrupted blue-post scans, include Forever bug-report announcements, and read linked Blizzard News announcement metadata.
 - Site: the armory no longer drops a character whose gear includes an item Blizzard sends without an item level (a common head item, seen 11/17); the item is kept with no level and counts as an empty slot in the item level and gear score.
 - Site: news cards and bylines name Everloot, not everloot.app, as the source of a post that cites the site's own pages.
 - Site: the MCP methodology describes drop rates as a share of recorded loot windows, including its measured-zero example.
@@ -243,7 +245,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: auction prices keep updating when the market rollup is full: the oldest open scan day closes early (its public prices kept) instead of new scans being refused, one uploader cannot take more than a third of the room, and dropped scans no longer leave empty days behind.
 - Site: avoid compiling game-file name matchers for absent ASCII names when answering sourced questions, reducing cold-start CPU work.
 - Site: the header shows the build whose files the site reads and the newest build seen, each linked to what it means.
-- Companion: retry failed watch uploads with bounded backoff, honor Retry-After across accounts, and queue saves without overlapping sends.
 - Site: /api/suggest spends the per-IP quota and shares one edge cache entry for `Thunder` and `thunder `, the coverage 400 and waitlist 503 are `no-store` (the 503 adds `Retry-After`), and the docs list every route that sends CORS from one file.
 - Site: when a database or tools page can't be read, you now get a "Database unavailable" or "Tool unavailable" page that says it could not be read, not that it is empty, with a Try again button and a link back to the section, instead of the generic error page.
 - Site: item list pagination is crawlable while filter URLs stay blocked.
@@ -369,8 +370,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the local gold ledger keeps two characters with the same name and realm from different installs apart.
 - Site: the home page banner no longer makes the page a few pixels wider than the window on a computer with a
   scrollbar, so the page has nothing to scroll sideways at any width.
-- Desktop App: restoring the oldest backup keeps the selected save and an undo copy, even within the same second.
-- Companion: watch mode waits for the first account save and finds new accounts without a restart, refreshing prices for every discovered account.
 - Knowledge base: open data drop rates and measured zeros follow the same recheck cutoffs as the site, leaving other exported facts and corpus counts unchanged.
 - Site: the blue-post tracker's scheduled run stops starting requests after 15 seconds and saves where it got to, and every storage call has a time limit. A busy pass of up to 40 polite requests could outlast the platform's limit and be cut off before it saved anything, so it repeated the same work every run and never advanced.
 - Site: a HEAD request for an Auction House page that has no stored copy is answered from the URL, without rendering the page. Crawlers ask HEAD of thousands of realm and item addresses, and each one rendered the whole page (seconds of CPU) to send back no body. A URL the page would redirect or answer 404, or a list page with filters, still goes to the page.
@@ -381,11 +380,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - MCP: Price answers identify their auction house, with an unknown faction when only the realm is recorded.
 
 ### Changed
+- Site: drop rates restart from addon 0.3.24 (2026-11-17): only loot windows recorded after the release count, now that empty corpses are recorded too, so sources show fewer public rates until new windows build up.
 - Site: the addon is offered as a regular release from 0.3.24: the home, addon and upload pages no longer call it an Alpha.
+- Site: Lore now pairs stories behind Forever’s world with illustrated category links, keeps search above both columns, and shows the full hero art.
 - Site: chat setup and limits fold into the current mode control, the desktop rail starts closed without browser history, and the mobile report button stays above the composer.
 - Site: a linked character connected to its armory profile shows Blizzard's gear, stats, talents, professions, PvP, achievements, reputations and completed quests on its page and the owner's preview, each part behind the page's existing switch, labelled "From Blizzard's API" with the read time; private sync keeps only raid lockouts and titles and drops the retired categories older Desktop Apps still send; `/rankings/item-level` and `/rankings/gear-score` redirect to the armory boards.
 - Site: the AH Ledger panels (price history, crafting margins, deals) remember the market a visitor last picked, in their own browser, and open on it on every page; a realm page still opens on its realm. The crafting table no longer prefetches recipe pages, which sit behind the bot check and logged an error for each recipe in view.
-- Desktop App: a new install starts with "Send the player pages with the uploads" on, and an install from before keeps its choice. Private sync stops sending gear, talents, professions, stats, PvP, reputations and achievements; raids, boss kills and titles still go. The Characters page no longer shows gear, achievements, reputations, quests, professions or talent builds.
 - CurseForge: every addon upload is a Release file; an Alpha is named "Everloot <version> Alpha". The CurseForge app
   syncs only Release files by default, so with every file a Beta, Everloot was missing for most app users. GitHub still
   marks an Alpha a pre-release, and the site still calls the addon an Alpha.
@@ -536,6 +536,22 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - MCP: `coverage` and `everloot_plan` answer with a summary first and page the rest, so a broad question stays under 12 KB (the audit measured 82 KB for every zone's quests and 38 KB for the plan). `coverage` without a zone gives the totals, each type and one line per zone, 20 zones at a time, now with structured totals and denominators; `everloot_plan` with any argument names each row, 40 at a time, and states the tracker's revision (it records no date). `detail`, `offset` and `limit` read the rest, every page stays under 12,000 bytes even at the largest `limit`, and says how many it shows of how many and gives `nextOffset`. One zone answers as before, and `everloot_plan` with no arguments still returns the whole tracker. A zone filter that matches no released zone is unmeasured, not zeros.
 - MCP: rank answering claims before subject matches, state unavailable requested facts,
   and report separate answerability rates.
+- Site: describe the in-game Everloot window, feature chooser, local data and how to reopen it or report a window error.
+
+## [desktop-v0.1.23] - 2026-11-17
+
+Goes with addon 0.3.24. Private sync now sends only raid lockouts, boss kills and titles: Blizzard's character API gives
+everloot.app gear, talents, professions, stats, PvP, achievements and reputation. A new install sends the player pages
+with the uploads, which helps the armory find more characters; an install from before keeps its choice, and Settings
+turns it off.
+
+### Changed
+- A new install starts with "Send the player pages with the uploads" on, and an install from before keeps its choice. Private sync stops sending gear, talents, professions, stats, PvP, reputations and achievements; raids, boss kills and titles still go. The Characters page no longer shows gear, achievements, reputations, quests, professions or talent builds.
+
+### Fixed
+- The command-line uploader: retry failed watch uploads with bounded backoff, honor Retry-After across accounts, and queue saves without overlapping sends.
+- Restoring the oldest backup keeps the selected save and an undo copy, even within the same second.
+- The command-line uploader: watch mode waits for the first account save and finds new accounts without a restart, refreshing prices for every discovered account.
 
 ## [0.3.24] - 2026-11-17
 
