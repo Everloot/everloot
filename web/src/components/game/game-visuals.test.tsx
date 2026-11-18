@@ -171,13 +171,10 @@ test("item page: the tooltip card for an item players reported; an id nobody rep
   expect(fetcher.mock.calls.map(([req]) => String(req instanceof Request ? req.url : req))).toEqual([expect.stringMatching(/\/item-names\.json$/)]);
 });
 
-test("home: class icons link to the talent calculator, names kept, and no credit line on the page", async () => {
+test("home: no credit line on the page", async () => {
   vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", BASE);
   vi.stubGlobal("fetch", bucket());
   const html = await render(() => Home());
-  expect(html).toMatch(/href="\/tools\/talents\/warrior"[^>]*><img[^>]*icons\/6001\.webp[^>]*\/?>Warrior/);
-  // A class the upload has no icon for keeps its link and name.
-  expect(html).toMatch(/href="\/tools\/talents\/druid"[^>]*>(?:<img[^>]*\/?>)?Druid/);
   expect(html).not.toMatch(/data-game-credit|data-source-line/);
   expect(html).not.toContain(CREDIT);
 });

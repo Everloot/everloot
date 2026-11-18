@@ -83,7 +83,7 @@ test("the phone menu lists the same places", async () => {
   const toggle = Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "Menu")!;
   await act(async () => toggle.click());
   const panel = container.querySelector("#site-navigation")!;
-  for (const href of ["/database", "/map", "/changes", "/lore", "/guides", "/chat", "/docs", "/tools/talents", "/census", "/account", "/tools/builds", "/tools/alts", "/about"])
+  for (const href of ["/database", "/map", "/changes", "/lore", "/database/instances", "/chat", "/docs", "/tools/talents", "/census", "/account", "/tools/builds", "/tools/alts", "/about"])
     expect(panel.querySelector(`a[href="${href}"]`), href).not.toBeNull();
   for (const href of ["/upload", "/tools/farming-routes", "/tools/collections"]) expect(panel.querySelector(`a[href="${href}"]`), href).toBeNull();
   expect(panel.querySelector('form[action="/search"]')).not.toBeNull();
