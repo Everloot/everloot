@@ -53,11 +53,14 @@ function Frame.SetEnabled(self, enabled) self.enabled = enabled end
 function Frame.IsEnabled(self) return rawget(self, 'enabled') ~= false end
 function Frame.Enable(self) self.enabled = true end
 function Frame.Disable(self) self.enabled = false end
+function PanelTemplates_SelectTab(tab) tab.selected = true; tab:Disable() end
+function PanelTemplates_DeselectTab(tab) tab.selected = false; tab:Enable() end
 function Frame.GetText(self) return self.text end
 function Frame.Show(self) self.shown = true end
 function Frame.Hide(self) self.shown = false end
 function Frame.IsShown(self) return self.shown end
 function Frame.HasFocus(self) return self.focus end
+function Frame.ClearAllPoints(self) self.points = {} end
 function Frame.SetPoint(self, point, ...) assert(select(1, ...) ~= self, 'cannot anchor a frame to itself'); self.points = rawget(self, 'points') or {}; self.points[point] = { ... } end
 function Frame.SetWidth(self, w) self.width = w end
 function Frame.SetHeight(self, h) self.height = h end
@@ -130,6 +133,7 @@ function openHouse()
   blizzardTabs = { CreateFrame('Button', 'Buy'), CreateFrame('Button', 'Sell'), CreateFrame('Button', 'Auctions') }
   AuctionHouseFrame = CreateFrame('Frame', 'AuctionHouseFrame')
   AuctionHouseFrame.Tabs = blizzardTabs
+  blizzardTabs[3]:SetHeight(32)
   fire('AUCTION_HOUSE_SHOW')
 end
 function showPanel()
@@ -246,8 +250,8 @@ end
 
 -- Price lines as the tooltip may give them: aligned pairs, plain lines, a long warning, a long localised label,
 -- native coin textures and a line with a label but no value.
-LONG = 'Precio de mercado de la comunidad en todas las casas de subastas del reino, por unidad'
-STALE = '  STALE: newest public day 2026-10-01 is 19 days old; the Everloot Desktop App refreshes it, then /reload'
+LONG = 'Precio de mercado de la comunidad en todas las casas de subastas del reino, por unidad, para esta casa de subastas y todos los objetos de esta categoria'
+STALE = '  STALE: newest public day 2026-10-01 is 19 days old; the Everloot Desktop App refreshes it, then /reload. Check current prices before choosing a buyout.'
 STUB = {
   { text = 'Everloot market 2s 5c · per unit · Alliance house', left = 'Everloot market · per unit · Alliance house',
     right = '2|TInterface\\\\MoneyFrame\\\\UI-SilverIcon:0:0:2:0|t 5|TInterface\\\\MoneyFrame\\\\UI-CopperIcon:0:0:2:0|t', r = 0.9, g = 0.8, b = 0.5 },
@@ -276,6 +280,31 @@ def fresh(files, api: str = ""):
 
 lua = fresh(STYLED)
 lua.execute("""
+openHouse()
+showPanel()
+local p, tab = Everloot.AuctionTab.panel, Everloot.AuctionTab.tab
+assert(rawget(p, 'intro') == nil, 'scan instructions must not crowd the main page')
+assert(p.searchButton and p.helpButton, 'lookup has a visible Search action and optional scan help')
+assert(p.shareButton.text == 'Save scan' and not p.shareButton.enabled, 'saving is explicit and unavailable without an unsaved scan')
+assert(p.status.text == 'No scan on this realm yet.', 'readiness is not repeated below Scan prices')
+assert(tab.points.BOTTOMLEFT and tab.points.BOTTOMLEFT[2] == 'BOTTOMRIGHT' and tab:GetHeight() == blizzardTabs[3]:GetHeight(), 'tab shares the native tabs bottom edge and height')
+assert(tab.selected, 'Everloot is styled as the active tab')
+""")
+
+lua = fresh(STYLED, """
+PanelTemplates_SelectTab = function() error('tab textures unavailable') end
+PanelTemplates_DeselectTab = function() error('tab textures unavailable') end
+""")
+lua.execute("""
+openHouse()
+showPanel()
+assert(Everloot.AuctionTab.panel.shown, 'unsupported tab styling does not break the page')
+Everloot.AuctionTab.Hide()
+assert(not Everloot.AuctionTab.panel.shown, 'unsupported tab styling does not trap the player in Everloot')
+""")
+
+lua = fresh(STYLED)
+lua.execute("""
 -- A new install: scans on, and the first visit says once what they read.
 Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')
 assert(EverlootDB.toggles.auctions == true, 'a new install starts with auction scans on')
@@ -298,9 +327,9 @@ assert(replicateCalls == 0, 'opening the house never scans')
 
 -- Native fonts and a gold heading, even when the main Everloot window is available.
 local p = T.panel
-assert(string.find(p.intro.text, 'Desktop App', 1, true) and string.find(p.intro.text, 'everloot.app/upload', 1, true), 'scan introduction names both upload routes')
+assert(p.helpButton.scripts.OnEnter and p.helpButton.scripts.OnLeave, 'scan instructions are available on hover')
 assert(p.title.text == 'Everloot' and p.title.template == 'GameFontNormalLarge', 'native gold heading')
-assert(rawget(p, 'crest') == nil and rawget(p.intro, 'font') == nil, 'native fonts rather than the main window style')
+assert(rawget(p, 'crest') == nil and rawget(p.status, 'font') == nil, 'native fonts rather than the main window style')
 assert(Everloot.Window.frame == nil, 'opening the auction house does not build the main window')
 assert(Everloot.scanPrompt == nil, 'no floating reminder alongside the tab')
 
@@ -308,22 +337,22 @@ assert(Everloot.scanPrompt == nil, 'no floating reminder alongside the tab')
 showPanel()
 assert(T.panel.shown, 'the tab shows the panel')
 assert(p.scanButton.text == 'Scan prices' and p.scanButton.enabled, 'one available scan action')
-assert(string.find(T.panel.status.text, 'Ready to scan.', 1, true) and string.find(T.panel.status.text, 'No scan on this realm yet.', 1, true), T.panel.status.text)
+assert(T.panel.status.text == 'No scan on this realm yet.', T.panel.status.text)
 assert(p.message.shown and p.message.text == "Type an item's name or id, or shift-click an item here." and p.used == 0, 'the lookup starts with how to use it')
 T.panel.scanButton.scripts.OnClick()
 assert(replicateCalls == 1, 'Scan prices starts one scan')
 assert(p.scanButton.text == 'Scanning...' and not p.scanButton.enabled, 'busy scan action disabled')
-assert(string.find(T.panel.status.text, 'Scanning', 1, true), T.panel.status.text)
+assert(not string.find(T.panel.status.text, 'Scanning', 1, true), 'scan state belongs on its button only')
 fire('REPLICATE_ITEM_LIST_UPDATE')
 drain()
 now = now + 125
 T.Refresh()
 assert(p.scanButton.text == 'Ready in 12:55' and not p.scanButton.enabled, 'cooldown shown on disabled action')
 local status = T.panel.status.text
-assert(string.find(status, 'Next scan in 12:55.', 1, true), status)
+assert(not string.find(status, '12:55', 1, true), 'the cooldown is not repeated')
 assert(string.find(status, 'Last scan on this realm: 2 items, 2 min ago.', 1, true), status)
-assert(string.find(status, 'Not saved yet', 1, true), 'a scan from this session is not in the saved file yet')
-assert(string.find(status, 'Desktop App', 1, true) and string.find(status, 'everloot.app/upload', 1, true), 'unsaved scan names both upload routes')
+assert(string.find(p.footer.text, 'Not saved yet', 1, true), 'a scan from this session is not in the saved file yet')
+assert(p.shareButton.enabled and p.shareButton.text == 'Save scan', 'an unsaved scan can be saved explicitly')
 T.panel.scanButton.scripts.OnClick()
 assert(replicateCalls == 1, 'no second scan inside the cooldown')
 
@@ -378,7 +407,8 @@ checkLayout()
 -- Aligned rows from the shared lines: label left, value right, the fallback text, each line's colour, the window's fonts.
 local real = Everloot.PriceLines
 Everloot.PriceLines = function() return STUB, { status = 'ready' } end
-lookup('2589')
+p.lookup:SetText('2589')
+p.searchButton.scripts.OnClick()
 sameAsLines(STUB)
 checkLayout()
 for i = 1, p.used do
@@ -391,9 +421,8 @@ assert(p.rows[4].note:GetStringHeight() > 12, 'a long warning wraps inside the c
 -- A narrow panel: the column narrows, labels wrap, values keep their edge, nothing collides.
 p.hooked.OnSizeChanged(p, 280, 450)
 assert(p.results.width <= 280 - 32, 'the results fit a narrow panel: ' .. p.results.width)
-assert(p.scanButton.width + 8 + p.shareButton.width <= p.results.width,
-  'both scan controls fit the same narrow column as the price rows')
-assert(p.status.width == p.results.width and p.intro.width == p.results.width, 'status and introduction wrap to the same column')
+assert(p.scanButton.width <= p.results.width and p.status.width <= p.results.width, 'scan controls fit a narrow page')
+assert(p.shareButton.points.BOTTOMRIGHT[1] == p, 'saving is a footer action')
 sameAsLines(STUB)
 checkLayout()
 p.hooked.OnSizeChanged(p, 784, 450)
@@ -402,7 +431,7 @@ checkLayout()
 -- Long results scroll inside their area above the footer; a new lookup starts at the top.
 local bottom = p.results.points.BOTTOMLEFT
 assert(bottom[1] == p.footer and bottom[2] == 'TOPLEFT' and bottom[4] >= 4, 'the results end above the footer, however many lines it wraps to')
-assert(p.footer.points.BOTTOMLEFT[1] == p and p.footer.width == p.width - 32, 'the footer spans the panel')
+assert(p.footer.points.BOTTOMLEFT[1] == p and p.footer.width + p.shareButton.width <= p.width - 32, 'the footer leaves room for Save scan')
 p.results.height = 60
 checkScroll()
 p.results.scripts.OnMouseWheel(p.results, -1000)
@@ -463,7 +492,7 @@ Everloot.PriceLines = real
 SECRET.Forever = true
 lookup('2589')
 assert(p.message.text == 'No Everloot price for that item on this realm yet.', p.message.text)
-assert(T.StatusLines()[2] == 'No scan on this realm yet.')
+assert(T.StatusLines()[1] == 'No scan on this realm yet.')
 SECRET.Forever = nil
 SECRET[LINEN] = true
 lookup('2589')
@@ -486,8 +515,8 @@ assert(#frames == before, 'reopening the house builds nothing new')
 EverlootDB.lastScans.Forever.at = 999000
 Everloot.ownScanCache = nil
 T.Refresh()
-assert(string.find(T.panel.status.text, 'Saved in your file', 1, true), T.panel.status.text)
-assert(string.find(T.panel.status.text, 'Desktop App', 1, true) and string.find(T.panel.status.text, 'everloot.app/upload', 1, true), 'saved scan names both upload routes')
+assert(string.find(T.panel.footer.text, 'Saved in your file', 1, true), T.panel.footer.text)
+assert(not T.panel.shareButton.enabled, 'an already-saved scan does not offer another reload')
 """)
 
 # Cooldown completion and module changes redraw the action without ever scanning automatically.
@@ -525,6 +554,7 @@ local function click(tab)
 end
 T.Show()
 assert(blizzardTabs[1]:IsEnabled() and house.selectedTab == 1, 'Buy can be clicked without changing native selection')
+assert(not blizzardTabs[1].selected and T.tab.selected, 'only Everloot looks selected while its page is open')
 click(blizzardTabs[1])
 assert(not T.panel.shown and not blizzardTabs[1]:IsEnabled(), 'a real Buy click returns to native Buy')
 T.Show()
@@ -548,7 +578,7 @@ openHouse()
 local T = Everloot.AuctionTab
 assert(T.tab and T.panel and not T.failed, 'the native tab template must build')
 assert(#AuctionHouseFrame.Tabs == 3, 'Everloot stays outside Blizzard display-mode tabs')
-assert(T.tab.points.LEFT[1] == blizzardTabs[3] and T.tab.points.LEFT[1] ~= T.tab,
+assert(T.tab.points.BOTTOMLEFT[1] == blizzardTabs[3] and T.tab.points.BOTTOMLEFT[1] ~= T.tab,
   'Everloot follows the last native tab, never itself')
 assert(not T.tab.hooked.OnClick, 'the Everloot click must not also hide its own panel')
 T.tab.scripts.OnClick()
@@ -618,4 +648,4 @@ checkLayout()
 checkScroll()
 """)
 
-print("Lua 5.1 auction tab: scans on for a new install with a one-time notice, tab after Blizzard's tabs with a template fallback, click-only scan, cooldown and saved state, Share now reload; native fonts and gold heading; price lookup rows from the tooltip's lines aligned label to value, fallback text, scope and stale words, missing, checking and checksum states, narrow and long results scrolled above the footer; shift-click; hidden by Blizzard tabs and on close")
+print("Lua 5.1 auction tab: scans on for a new install with a one-time notice, tab after Blizzard's tabs with a template fallback, click-only scan, cooldown and saved state, Save scan reload; native fonts and gold heading; price lookup rows from the tooltip's lines aligned label to value, fallback text, scope and stale words, missing, checking and checksum states, narrow and long results scrolled above the footer; shift-click; hidden by Blizzard tabs and on close")

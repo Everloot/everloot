@@ -14,3 +14,5 @@ Use a test build containing this change. Back up the installed Everloot folder b
 8. If the tab cannot build, expect exactly one fallback Scan prices action. The failure is available through `/dump Everloot.AuctionTab.failureReason`; record it with the client build and installed addon version.
 
 After these checks pass, include the changes in the next addon release. Do not mark the release as verified from automated tests alone.
+
+Retest after the live feedback correction: Everloot shares the native tab baseline/height, and only the active tab looks selected. Expect one compact scan toolbar, one last-scan summary without a repeated cooldown, Search beside item lookup, and optional scan explanation on the question-mark hover. Save scan is in the footer, disabled for a scan already saved; it reloads rather than uploading. Check narrow layouts, Shopping list/back navigation and native Buy/Sell/Auctions return. Previous screenshots do not accept this corrected build.

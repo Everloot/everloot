@@ -565,6 +565,7 @@ Release candidate: live Forever acceptance is pending for the combined UI, disen
 - Addon: Collection works like a completionist addon: headings open and close with a count of what is done under them, rows carry icons, item quality colours and the game's tooltip, and the mouse wheel scrolls. Each boss in Dungeons & raids opens on its drops from the Desktop App's price file (public rates, three installs), found by the creatures this install saw in the fight or else by the boss's name, with whether each mount, pet, toy or appearance is collected. New Mounts, Pets and Toys sections read the game's journals. The Collection's instance list is refreshed to the 2026-11-17 player agreement (Deadmines, Scarlet Monastery and Excavation Site: Wetlands join). Needs an in-game check before release.
 
 ### Changed
+- Addon: the auction page has one scan toolbar, a Search button beside item lookup and a separate Save scan footer action; scanning help moves to a hover, cooldown text is shown once, and the Everloot tab matches the native tabs' bottom edge and height with one selected page.
 - Addon: auction scans live in one Everloot tab with price lookup and shopping lists. The scan button shows when it is scanning or cooling down, and the recurring floating scan prompt is replaced by a one-time chat introduction.
 - Addon: settings are grouped into General, Tooltips, Auction House, Helpers and Data Sharing in both modern and older game Options. Settings inside the Everloot window keep that window's appearance.
 
