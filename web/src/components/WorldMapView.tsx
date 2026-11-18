@@ -10,6 +10,7 @@ import {
   type Box, type Candidate, type CategoryId, type CategoryState, type MapArtLayer, type MapItems, type MapPinSet, type MapUrlState, type SearchHit,
 } from "@/lib/map-view";
 import type { PoiIcons } from "@/lib/map-marks";
+import { mapCoordinates, mapPoint, parseCoordinatePin, serialiseCoordinatePin } from "@/lib/map-coordinate-pin";
 import { confirmedLine } from "@/lib/report-labels";
 import MapList, { HELD_LABEL } from "./map/MapList";
 import type { FitRequest, MapMarker, MapViewChange } from "./map/LeafletMap";
@@ -29,12 +30,13 @@ export const SIDEBAR_KEY = "everloot.map.sidebar";
 const EMPTY_ICONS: PoiIcons = {};
 type HoverPoint = { x: number; y: number } | null;
 type CoordinatesHandle = { setPoint: (point: HoverPoint) => void };
-const Coordinates = forwardRef<CoordinatesHandle, { zones: MapItems["zones"] }>(function Coordinates({ zones }, ref) {
+const Coordinates = forwardRef<CoordinatesHandle, { zones: MapItems["zones"]; bounds: Box; name: string }>(function Coordinates({ zones, bounds, name }, ref) {
   const [point, setPoint] = useState<HoverPoint>(null);
   useImperativeHandle(ref, () => ({ setPoint }), []);
   const hovered = point ? zoneSpot(zones, point.x, point.y) : null;
+  const continent = point ? mapCoordinates(bounds, point) : null;
   return <p data-coordinates className="pointer-events-none absolute bottom-2 right-2 z-[1100] hidden rounded-control border border-line bg-panel px-3 py-1 font-mono text-xs text-fg-2 md:block">
-    {hovered ? `${hovered.zone.name} ${hovered.x}, ${hovered.y}` : "Move over the map for coordinates"}
+    {hovered ? `${hovered.zone.name} ${hovered.x}, ${hovered.y}` : continent ? `${name} ${continent.x.toFixed(1)}, ${continent.y.toFixed(1)}` : "Move over the map for coordinates"}
   </p>;
 });
 
@@ -111,6 +113,9 @@ export interface WorldMapViewProps {
   continents: { id: number; name: string }[];
   /** The continent's box in yards. */
   base: Box;
+  /** The game's full continent bounds for 0–100 shareable coordinates. */
+  coordinateBounds?: Box;
+  coordinatePin?: string;
   /**
    * What the page carries for its List tab: the zones, entrances and flight masters, and the first player points.
    * Held-back zones and their items are in only with spoilers on. The rest comes from `pinsUrl`.
@@ -156,6 +161,12 @@ export interface WorldMapViewProps {
  */
 export default function WorldMapView(props: WorldMapViewProps) {
   const { base, marker, spoilers, art } = props;
+  const coordinateBounds = props.coordinateBounds ?? base;
+  const [sharedPoint, setSharedPoint] = useState(() => {
+    const pin = parseCoordinatePin(props.coordinatePin);
+    return pin ? mapPoint(coordinateBounds, pin) : null;
+  });
+  const sharedPin = useRef(props.coordinatePin && parseCoordinatePin(props.coordinatePin) ? props.coordinatePin : null);
   const icons: PoiIcons = props.poi ?? EMPTY_ICONS;
   const [show, setShow] = useState<CategoryState>(props.url.show);
   const [showArt, setShowArt] = useState(true);
@@ -165,7 +176,7 @@ export default function WorldMapView(props: WorldMapViewProps) {
   const [pinsFailed, setPinsFailed] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(props.view.pin);
   const [focusZone, setFocusZone] = useState<number | null>(props.marker?.mapId ?? props.zoneId);
-  const [spot, setSpot] = useState<{ x: number; y: number } | null>(null);
+  const [spot, setSpot] = useState<{ x: number; y: number } | null>(sharedPoint);
   const coordinates = useRef<CoordinatesHandle>(null);
   const onHover = useCallback((point: HoverPoint) => coordinates.current?.setPoint(point), []);
   const [copied, setCopied] = useState("");
@@ -283,6 +294,8 @@ export default function WorldMapView(props: WorldMapViewProps) {
   const moveZone = useCallback((mapId: number) => {
     const z = props.items.zones.find((s) => s.mapId === mapId);
     if (!z) return false;
+    sharedPin.current = null;
+    setSharedPoint(null);
     setFocusZone(mapId);
     setSelectedId(null);
     setSpot(null);
@@ -290,6 +303,8 @@ export default function WorldMapView(props: WorldMapViewProps) {
     return true;
   }, [props.items.zones, fit]);
   const moveHome = useCallback(() => {
+    sharedPin.current = null;
+    setSharedPoint(null);
     setFocusZone(null);
     setSelectedId(null);
     setSpot(null);
@@ -335,10 +350,16 @@ export default function WorldMapView(props: WorldMapViewProps) {
       const link = { zone: q.get("zone") ?? undefined, x: q.get("x") ?? undefined, y: q.get("y") ?? undefined };
       const mapId = parseDeepLink(link)?.mapId ?? parseZoneLink(link);
       if (mapId === null || !moveZone(mapId)) moveHome();
+      const pin = parseCoordinatePin(q.get("pin"));
+      sharedPin.current = pin ? serialiseCoordinatePin(pin) : null;
+      const point = pin ? mapPoint(coordinateBounds, pin) : null;
+      setSharedPoint(point);
+      setSpot(point);
+      if (point) fit(spotBox(point.x, point.y));
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [moveZone, moveHome]);
+  }, [moveZone, moveHome, coordinateBounds, fit]);
   const closeCard = () => {
     setSelectedId(null);
     setSpot(null);
@@ -357,17 +378,37 @@ export default function WorldMapView(props: WorldMapViewProps) {
     timer.current = setTimeout(() => {
       const c = camera.current;
       const withState = mapUrlSearch(new URLSearchParams(window.location.search), urlState.current);
-      const search = c ? viewSearch(withState, { x: c.x, y: c.y, zoom: c.zoom, pin: selectedRef.current }) : withState.toString();
+      const search = c ? viewSearch(withState, { x: c.x, y: c.y, zoom: c.zoom, pin: sharedPin.current ?? selectedRef.current }) : withState.toString();
       window.history.replaceState(window.history.state, "", `${window.location.pathname}${search ? `?${search}` : ""}`);
     }, 250);
   }, []);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
   useEffect(() => { sync(); }, [selectedId, show, query, view, sync]);
   const onView = useCallback((v: MapViewChange) => { camera.current = v; sync(); }, [sync]);
+  const placePin = (x: number, y: number) => {
+    const pin = mapCoordinates(coordinateBounds, { x, y });
+    if (!pin) return;
+    sharedPin.current = serialiseCoordinatePin(pin);
+    setSharedPoint({ x, y });
+    setSpot({ x, y });
+    setSelectedId(null);
+    const q = new URLSearchParams(window.location.search);
+    q.set("pin", sharedPin.current);
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}?${q}${window.location.hash}`);
+  };
+  const clearPin = () => {
+    sharedPin.current = null;
+    setSharedPoint(null);
+    setSpot(null);
+    const q = new URLSearchParams(window.location.search);
+    q.delete("pin");
+    const search = q.toString();
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`);
+  };
 
   // Read once, when the map opens.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const initial = useMemo(() => initialView({ base, items, view: props.view, marker, zoneId: props.zoneId }), []);
+  const initial = useMemo(() => initialView({ base, items, view: props.view, marker: sharedPoint ?? marker, zoneId: props.zoneId }), []);
   // A `pin=` for a player point past the first the page carried: the map moves to it once the pins load.
   const pinWaiting = useRef(Boolean(props.view.pin && !(props.view.at && props.view.zoom !== null) && !marker && !subjects.has(props.view.pin)));
   useEffect(() => {
@@ -581,10 +622,11 @@ export default function WorldMapView(props: WorldMapViewProps) {
       <div className="relative isolate min-h-0 min-w-0 flex-1 bg-panel">
         <LeafletMap
           name={props.name} base={base} items={shown} zones={zones} art={art ?? null} showArt={showArt} icons={icons}
-          selectedId={selectedId} marker={marker} initial={initial} request={request}
+          selectedId={selectedId} marker={sharedPoint ? { ...sharedPoint, label: "Shared pin" } : marker} initial={initial} request={request}
           onSelect={(id) => { setSelectedId(id); if (id) { setSpot(null); setSheet(null); returnFocus.current = null; } }}
           onZone={goZone}
           onPoint={(x, y) => { setSpot({ x, y }); setSheet(null); returnFocus.current = null; }}
+          onPin={placePin}
           onHover={onHover}
           onView={onView}
         />
@@ -595,7 +637,11 @@ export default function WorldMapView(props: WorldMapViewProps) {
           </div>
         )}
         {/* Where the pointer is, on the game's 0 to 100 scale. A phone has no pointer: it reads the card instead. */}
-        <Coordinates ref={coordinates} zones={zones} />
+        <Coordinates ref={coordinates} zones={zones} bounds={coordinateBounds} name={props.name} />
+        <div className="absolute right-2 top-2 z-[1100] flex gap-2 rounded-control border border-line bg-panel p-1">
+          <button type="button" className="btn min-h-11 px-3 text-sm" title="Pan with arrow keys, then pin the map centre. Shift-click also places a pin." onClick={() => placePin(camera.current?.x ?? base.x + base.width / 2, camera.current?.y ?? base.y + base.height / 2)}>Pin map centre</button>
+          {sharedPoint && <button type="button" className="btn min-h-11 px-3 text-sm" onClick={clearPin}>Clear pin</button>}
+        </div>
         {/* The card for what was chosen: a sheet along the bottom on a phone, the map's corner on a desk. */}
         {(selected || (spot && here)) && (
           <div

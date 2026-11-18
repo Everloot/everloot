@@ -67,6 +67,37 @@ export default function Page() {
         addon switches off only that part and says so there.
       </P>
 
+      <H2 id="window">The Everloot window</H2>
+      <P>
+        Left-click the minimap button or type <C>/everloot window</C> to open it. If you close it, use either again to
+        reopen it. Hover the minimap button to see what its clicks do; right-click it or type <C>/everloot options</C> for settings.
+        Typing <C>/everloot</C> on its own opens the planner workspace instead.
+      </P>
+      <List>
+        <li><strong>Home</strong>: your characters, their gold, level, professions, last seen time and raid lockouts while the completion tracker is on, with realm and account totals, this week&apos;s gold in and out and the gold per hour session.</li>
+        <li><strong>Gold</strong>: Overview shows gold by character and realm and the last 30 days; Ledger lists money events; Sales lists auction sales; Session shows gold per hour.</li>
+        <li><strong>Collection</strong>: achievements, reputation, titles, dungeon and raid progress and quest chains. Enable it with <C>/everloot completion on</C>, then <C>/reload</C>. Achievements, reputation and completed quests are read from the game, never recorded.</li>
+        <li><strong>Professions</strong>: profession ranks and recorded recipes by difficulty colour, with Crafting costs and a reagent list you can add to your shopping list.</li>
+        <li><strong>Settings</strong>: opens the addon&apos;s settings, including the switches and the row counts under What you&apos;ve added.</li>
+      </List>
+      <P>
+        The character roster (<C>EverlootDB.roster</C>) and gold ledger (<C>EverlootDB.ledger</C>) live only in your
+        SavedVariables file and are never uploaded. The roster holds characters you log in with; the ledger holds money
+        events, auction sales and daily closing gold. Nothing in the window uploads anything, and recording continues when it is closed.
+      </P>
+      <P>
+        The <strong>Everloot window</strong> switch in settings turns the window off; the minimap button then opens the
+        planner workspace. Turn the switch back on to use the window again. The <strong>Minimap button</strong> switch
+        hides the button after <C>/reload</C>; <C>/everloot window</C> still works while the window is enabled.
+      </P>
+      <P>
+        Every install is asked which features to use. <C>/everloot setup</C> asks again: <strong>Everything</strong> enables
+        the window and other features; <strong>Collect data only</strong> keeps recording and auction scans but turns off
+        the window, minimap button and helpers; <strong>Choose myself</strong> opens settings without changing your switches.
+        Apply changes with <C>/reload</C>. The census, player names, addon list, completion tracker and inventory snapshots
+        keep their own switches.
+      </P>
+
       <H2 id="commands">Slash commands</H2>
       <P>
         Most commands start with <C>/everloot</C>. Typing it on its own opens the planner workspace, the Talents and

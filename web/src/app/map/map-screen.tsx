@@ -99,6 +99,8 @@ export async function renderMapScreen(query: MapQuery, pageContinent: number | n
   // Each instance's page, for an entrance card's Open instance page.
   const instancePages = Object.fromEntries([...instanceRows(seen).values()].map((r) => [r.instanceMapId, instanceHref(r.instanceMapId, r.name)]));
   const vb = map.viewBox;
+  const continentBounds = WORLD_MAP.continents.find((c) => c.id === continentId)!.bounds;
+  const coordinateBounds = { x: -continentBounds.left, y: -continentBounds.top, width: continentBounds.left - continentBounds.right, height: continentBounds.top - continentBounds.bottom };
   // The game's own map pictures under the outlines, only when the asset URL is set and the upload has them.
   // A held-back zone's picture follows its outline: none unless spoilers are on.
   const assets = vb ? await loadSiteAssets() : null;
@@ -174,6 +176,8 @@ export async function renderMapScreen(query: MapQuery, pageContinent: number | n
           continentId={continentId}
           continents={CONTINENTS.map((c) => ({ id: c.id, name: c.name }))}
           base={vb}
+          coordinateBounds={coordinateBounds}
+          coordinatePin={one(query.pin)}
           items={items}
           pinsUrl={`/api/map/pins?continent=${continentId}${spoilers ? "&spoilers=1" : ""}`}
           seed={{

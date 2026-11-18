@@ -1,4 +1,11 @@
 {
   "schema": "everloot.recheck/1",
-  "scopes": []
+  "scopes": [
+    {
+      "since": "2026-11-17T23:32:27Z",
+      "source": "addon-v0.3.24 empty loot windows",
+      "type": "drops",
+      "note": "Windows before this left out empty corpses; rates restart from the release."
+    }
+  ]
 }

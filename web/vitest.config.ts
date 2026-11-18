@@ -8,7 +8,7 @@ export default defineConfig({
   // The first test in a file pays its cold imports (the MCP SDK, the social-card renderer), over a
   // second even when warm. On a busy machine, e.g. during `next build`, that can pass the 5 s default.
   // better-auth loads next/headers itself (nextCookies); inlining it lets a test mock that module.
-  test: { testTimeout: 15_000, server: { deps: { inline: ["better-auth"] } } },
+  test: { testTimeout: 15_000, setupFiles: ["./vitest.setup.ts"], server: { deps: { inline: ["better-auth"] } } },
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
