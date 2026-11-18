@@ -125,6 +125,12 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 120
+    },
+    "gatherSkill": {
+      "description": "With a gather or skinning window: the player's own rank in the skill the cast used (Herbalism, Mining or Skinning), as the game's profession book shows it, without bonuses from gear or race. Absent when the client could not read it, for other windows and from older addons.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 500
     }
   },
   "required": [

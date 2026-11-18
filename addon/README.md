@@ -174,7 +174,9 @@ innkeeper) records where you stand as that NPC's place (`positionKind = "interac
 service, once per NPC, role and zone. Targeting still records `positionKind = "player"`, which never becomes a
 pin. Looting an object adds where you stand (`mapId`, `x`, `y`), a `gatherKind` (herb, ore, chest, fishing,
 other) from the spell you cast just before (`UNIT_SPELLCAST_SENT`) and the object's name from that cast's
-target (`sourceObjectName`). A kill's loot window with nothing in it is recorded too, so drop rates count the
+target (`sourceObjectName`). A herb, ore or skinning window also carries your own rank in that skill
+(`gatherSkill`), from the game's profession book, without bonuses from gear or race; when the client cannot give it,
+the row has none. A kill's loot window with nothing in it is recorded too, so drop rates count the
 corpses that dropped nothing: the game names no source for an empty window, so the addon takes the one dead
 creature you could loot among the units you interacted with, pointed at or targeted, and writes a loot row with no
 items and no coin (`sourceEvidence = "empty-window"`), once per corpse. Two different dead creatures there, a

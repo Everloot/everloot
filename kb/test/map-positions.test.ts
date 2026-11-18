@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { observedEdges } from "../src/edges.js";
-import { agreedGatherKinds, agreedObjectNames, objectSpawnRowsFromRecords, objectSpawns, parseSpawnKey, spawnKey, type ObjectSpawnRow } from "../src/object-spawns.js";
+import { agreedGatherKinds, agreedObjectNames, gatherSkillRanges, objectSpawnRowsFromRecords, objectSpawns, parseSpawnKey, skillRange, spawnKey, type ObjectSpawnRow } from "../src/object-spawns.js";
 import { npcPage, npcRoles, worldFactsFromRecords } from "../src/world-pages.js";
 
 const sighting = (installId: string, positionKind: unknown, extra: Record<string, unknown> = {}) => ({
@@ -167,5 +167,29 @@ describe("object spawn points", () => {
       { installId: "a", objectId: 1618 },
       { installId: "a", objectId: 1618 },
     ]);
+  });
+
+  test("upload rows keep the player's gathering skill only when it is a whole rank from 1 to 500", () => {
+    const loot = (gatherSkill: unknown) => ({ kind: "loot", sourceEvidence: "loot-api", installId: "a", items: [], sourceObjectId: 1618, gatherKind: "herb", gatherSkill });
+    const rows = objectSpawnRowsFromRecords([loot(75), loot(0), loot(501), loot(12.5), loot("75"), loot(undefined)]);
+    expect(rows.map((r) => r.gatherSkill)).toEqual([75, undefined, undefined, undefined, undefined, undefined]);
+    expect(rows[1]).not.toHaveProperty("gatherSkill");
+  });
+
+  test("the skill players had: each install's lowest rank, then the lowest and the median, from 3 installs", () => {
+    const at = (installId: string, gatherSkill?: number, extra: Partial<ObjectSpawnRow> = {}) => herb(installId, 40, 40, { ...(gatherSkill === undefined ? {} : { gatherSkill }), ...extra });
+    expect(skillRange([at("a", 70), at("b", 90)])).toBeNull();
+    // One install's many rows count once, at its lowest rank; rows with no rank do not count.
+    expect(skillRange([at("a", 70), at("a", 120), at("a", 5, { installId: " a " }), at("b", 90), at("c", 110), at("d")])).toEqual({ min: 5, median: 90, installs: 3 });
+    // An even count takes the lower middle rank, so the median is always one an install had.
+    expect(skillRange([at("a", 10), at("b", 20), at("c", 30), at("d", 40)])).toEqual({ min: 10, median: 20, installs: 4 });
+    // By object: only objects 3 installs agree are herbs, only rows opened as herbs, only with 3 installs reporting.
+    const ranges = gatherSkillRanges([
+      at("a", 1), at("b", 15), at("c", 30), at("d", 300, { gatherKind: "other" }),
+      ...["a", "b", "c"].map((i) => at(i, 65, { objectId: 1731, gatherKind: "ore" })),
+      at("a", 50, { objectId: 1617 }), at("b", 60, { objectId: 1617 }),
+    ], "herb");
+    expect(ranges).toEqual(new Map([[1618, { min: 1, median: 15, installs: 3 }]]));
+    expect(gatherSkillRanges(["a", "b", "c"].map((i) => at(i, 65, { objectId: 1731, gatherKind: "ore" })), "ore")).toEqual(new Map([[1731, { min: 65, median: 65, installs: 3 }]]));
   });
 });

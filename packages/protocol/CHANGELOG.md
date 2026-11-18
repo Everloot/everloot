@@ -12,6 +12,11 @@ required, or tightening a limit is a major release.
   disenchant band of the game files yields, from the disenchants players recorded, public per band once three
   installs disenchanted in it. Public record kinds and record protocol are unchanged.
 
+- 2.4.0 (record protocol 1.17.0): optional `loot.gatherSkill`, 1 to 500: on a gather or skinning window, the player's
+  own rank in Herbalism, Mining or Skinning (the skill the cast used), without bonuses from gear or race. The site can
+  then say what skill players had where they gathered a herb or ore. Absent from older addons, so earlier rows and
+  readers are unaffected.
+
 - 2.3.0 (record protocol 1.15.0): `loot.sourceEvidence` may be `empty-window`, a loot window with nothing in it. The
   loot API names no source for an empty window, so the addon takes the one dead creature the player could loot. Such a
   row is a `kill` window on an NPC with no items and no coin; anything else is refused. It adds a window to the
