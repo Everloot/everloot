@@ -10,8 +10,8 @@ import { uploadStore, type Corpus, type R2Config } from "./upload-store";
  * scan on each request, which cost seconds of CPU on every new server instance; they now read one file. The cron writes
  * it after the corpus snapshot (`writeAuctionHistory`), only when that run added uploads or rebuilt, or when the file is
  * missing. Every value comes from the same functions the corpus path uses (kb/src/auction-history.ts), so the page and
- * the tool answer the same either way; with no file yet (the first minutes after a deploy, or storage out of reach) they
- * read the corpus as before. The file holds each pair's public days only: no install id and no single scan.
+ * the tool answer the same either way; with no file yet (the first minutes after a deploy, or storage out of reach) the
+ * tool reads the corpus as before and the page says the history is unrecorded. The file holds each pair's public days only: no install id and no single scan.
  */
 
 export const AUCTION_HISTORY_KEY = "snapshots/auction-history.json";
@@ -86,7 +86,7 @@ let kept: { at: number; read: { dataAsOf: string | null; byKey: Map<string, Auct
 
 /**
  * One realm and item's public days from the stored file, kept KEEP_MS per server instance. Null when there is no file
- * or it cannot be read, and the caller reads the corpus instead. Never throws.
+ * or it cannot be read: the tool then reads the corpus, the page says unrecorded. Never throws.
  */
 export async function storedAuctionHistory(realm: string, itemId: number, deps: {
   cloud?: R2Config | null; fetch?: typeof fetch; now?: () => number;
