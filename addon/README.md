@@ -318,9 +318,20 @@ never larger than the screen); right-click the grip for the normal size. The siz
 - **Collection** shows achievements, reputation, titles, raid lockouts and quest chains (quests done of each chain's
   total) from the rows the completion tracker wrote, so it needs `/everloot completion on`; with it off the tab says so
   and has a button that runs that command. It shows this character, or the account: every character in the roster, each
-  item done when any of them has it, with the name of the character that does. As completionist addons draw them, a
-  green check marks what is done and a red cross what is missing, headings are in the game's gold, and each summary
-  gives the share done as a percentage.
+  item done when any of them has it, with the name of the character that does. It is drawn as completionist addons
+  draw their lists: headings in the game's gold that open and close with a click, each with how many of the marked
+  items under it are done ("3 / 8 (37%)"), an icon on each row, a green check for done and a red cross for missing,
+  and the game's tooltip on hover. The mouse wheel scrolls the list.
+  - **Dungeons & raids** lists the instances players agreed on, their bosses with your kills and this week's
+    lockouts. A boss opens on its drops: the public drop rates (three installs) the Desktop App wrote into the price
+    file, from the creatures this install saw in that fight or, failing that, from the NPCs the file names as the
+    boss is named (the boss's tooltip says which). Each drop shows its rate and loot windows; a drop that is a mount,
+    battle pet, toy or appearance is marked with whether this character has it, read from the game. Without the
+    price file's drops block the bosses stay plain rows and the summary says why.
+  - **Mounts** lists every mount the game lists for this character (the other faction's only once collected), with
+    its source. **Pets** (one row per species) and **Toys** list what the Pet Journal and the Toy Box list under their
+    own filters; clear those filters in the Collections window to see everything. These three are read from the game
+    and never recorded.
 - **Professions** shows each profession in the profession book with its rank and the recipes recorded for it by
   difficulty colour. **Crafting costs**, the button at its bottom, lists the recipes this install recorded under this
   character's profession names (recipe rows carry no character, so an alt's recipes in the same profession show too)
