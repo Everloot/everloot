@@ -14,7 +14,7 @@ test("armory profile migration and behavior on a disposable PostgreSQL database"
       create function public.create_api_key(uuid,text,text,text,text[]) returns text language sql as 'select null::text';`);
     const links = read("migrations/20261021190000_character_links.sql");
     await db.exec(links.slice(0, links.indexOf("alter table public.api_keys")));
-    for (const migration of ["20261021130000_players", "20261109120000_armory", "20261109130000_armory_touch_members", "20261112190000_armory_profiles", "20261112190000_armory_profiles"]) {
+    for (const migration of ["20261021130000_players", "20261109120000_armory", "20261109130000_armory_touch_members", "20261112190000_armory_profiles", "20261112190000_armory_profiles", "20261117140000_armory_discovery"]) {
       await db.exec(read(`migrations/${migration}.sql`));
     }
     await db.exec(read("tests/armory.sql"));
@@ -24,6 +24,8 @@ test("armory profile migration and behavior on a disposable PostgreSQL database"
     await db.exec(read("migrations/20261117120000_armory_progress.sql"));
     await db.exec(read("tests/armory_profiles.sql"));
     await db.exec(read("tests/armory_progress.sql"));
+    await db.exec(read("migrations/20261117140000_armory_discovery.sql"));
+    await db.exec(read("tests/armory_discovery.sql"));
     expect((await db.query("select count(*)::int as n from public.armory_characters")).rows).toEqual([{ n: 0 }]);
   } finally { await db.close(); }
 }, 30_000);
