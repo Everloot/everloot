@@ -21,6 +21,8 @@ O.ROWS = {
     text = "Scan this house from the Everloot tab at the auction house, one click at a time. Item prices and quantities, never sellers." },
   { key = "scanPrompt", group = "auction", command = "scanprompt", field = true, label = "First-visit auction introduction",
     text = "Explain scanning once in chat when you first visit an auction house. No floating popup. Scanning works either way." },
+  { key = "sellCheck", group = "auction", field = true, live = true, label = "Vendor check when you sell",
+    text = "In the Sell tab, a line under Post when a vendor pays more than your price brings in after the house's cut, when the gain is smaller than the deposit you lose if it does not sell, or when disenchanting looks better. Never changes a price or posts. Records nothing; applies at once." },
   { key = "autoVendor", group = "helpers", command = "vendor", field = true, defaultOff = true, label = "Sell greys and repair at merchants",
     text = "When a merchant window opens: sells grey items and repairs with your own gold, never the guild bank. Records nothing itself." },
   { key = "mailCollect", group = "helpers", command = "mail", field = true, defaultOff = true, label = "Collect all at the mailbox",
@@ -598,12 +600,12 @@ O.SETUP = {
   everything = {
     toggles = { openworld = true, professions = true, mapbounds = true, auctions = true, window = true,
       gold = true, roster = true, guild = true },
-    fields = { scanPrompt = true, minimapButton = true, tooltip = "full", tooltipMarket = true, tooltipHistory = true, tooltipSources = true, tooltipDisenchant = true },
+    fields = { scanPrompt = true, sellCheck = true, minimapButton = true, tooltip = "full", tooltipMarket = true, tooltipHistory = true, tooltipSources = true, tooltipDisenchant = true },
   },
   collect = {
     toggles = { openworld = true, professions = true, mapbounds = true, auctions = true, window = false, buttons = false,
       gold = false, roster = false, guild = false },
-    fields = { scanPrompt = false, minimapButton = false, tooltip = "off", autoVendor = false, mailCollect = false },
+    fields = { scanPrompt = false, sellCheck = false, minimapButton = false, tooltip = "off", autoVendor = false, mailCollect = false },
   },
 }
 
