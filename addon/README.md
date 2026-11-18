@@ -7,7 +7,7 @@ Everloot Desktop App, and adds auction prices to item tooltips. It uses only the
 plays the character. Records match the upload contract (`packages/protocol`, see its `schema/records/`) field for
 field.
 
-**Status:** 0.3.25 release candidate. Automated verification covers the combined auction house, minimap, window resizing and Collection changes. Live Forever acceptance for this candidate is pending; the live check of 0.3.24 does not cover these changes. The published release remains 0.3.24 until this candidate passes its in-game checklist and is released. Use `docs/2026-11-17-auction-ui-checklist.md` plus the minimap, resizing and Collection checks before publication.
+**Status:** 0.3.25 release candidate. Automated verification covers the combined auction house, minimap, window resizing, Collection, disenchanting and loot item-level changes. Live Forever acceptance for this candidate is pending; the live check of 0.3.24 does not cover these changes. The published release remains 0.3.24 until this candidate passes its in-game checklist and is released. Use `docs/2026-11-17-auction-ui-checklist.md` plus the minimap, resizing and Collection checks before publication.
 
 ## Run it
 
