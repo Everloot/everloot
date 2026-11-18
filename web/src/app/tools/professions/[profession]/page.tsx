@@ -152,7 +152,7 @@ export default async function ProfessionPage(props: Props) {
           ? <GameIcon src={tip.icon} size={size} />
           : <span aria-hidden="true" className="shrink-0 rounded-sm border border-line" style={{ width: size, height: size }} />}
         {count !== undefined && <span className="font-mono tabular-nums text-fg-2">{count}×</span>}
-        <Link href={`/database/items/${id}`} className={`min-w-0 ${colour} hover:underline underline-offset-4`} style={name?.color ? { color: name.color } : undefined}>
+        <Link prefetch={false} href={`/database/items/${id}`} className={`min-w-0 ${colour} hover:underline underline-offset-4`} style={name?.color ? { color: name.color } : undefined}>
           {name?.name ?? `Item ${id}`}
         </Link>
         {name?.source === "files" && <Badge tone="files" />}
@@ -171,7 +171,7 @@ export default async function ProfessionPage(props: Props) {
           <span className="flex min-w-0 flex-col gap-1">
             <span className="inline-flex min-w-0 items-center gap-2">
               {icon ? <GameIcon src={icon} size={24} /> : <span aria-hidden="true" className="h-6 w-6 shrink-0 rounded-sm border border-line" />}
-              <Link href={`/database/spells/${r.spellId}`} className={`min-w-0 ${LINK}`}>{spellName(r.spellId) ?? `Spell ${r.spellId}`}</Link>
+              <Link prefetch={false} href={`/database/spells/${r.spellId}`} className={`min-w-0 ${LINK}`}>{spellName(r.spellId) ?? `Spell ${r.spellId}`}</Link>
               <Badge tone="files" />
             </span>
             {/* The recipe item the files link to this spell (client-recipe-items.json): unconfirmed, like the rest of the row. */}

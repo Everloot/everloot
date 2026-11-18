@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vitest";
 import ChatWelcome, { WELCOME } from "./ChatWelcome";
 import { AssistantMessage, pageKind } from "./Message";
+import { itemQuery } from "@/lib/chat/items";
 
 const ICON = "https://assets.everloot.app/b/icons/warrior.webp";
 
@@ -17,6 +18,14 @@ test("the empty chat welcomes with a heading, a decorative Glint and four questi
     for (let prev = ""; prev !== name;) { prev = name; name = name.replace(/<[^>]*>/g, ""); }
     expect(name).toBe(WELCOME[i].text);
   }
+});
+
+test("no starting question asks where an item drops, which the public data cannot answer yet, or opens an item card", () => {
+  for (const { text } of WELCOME) {
+    expect(text).not.toMatch(/drops?/i);
+    expect(itemQuery(text), text).toBeNull();
+  }
+  expect(WELCOME.map((s) => s.text)).toContain("Where is Hogger?");
 });
 
 test("a card shows the game icon when the page has one, and the drawn glyph without it", () => {

@@ -22,12 +22,11 @@ const allowed = (url: string | undefined) => (url && /^https:\/\/assets\.everloo
 export default async function ChatPage() {
   const icons = classAndProfessionIcons(await loadSiteAssets());
   const warrior = allowed(icons.classes.find((c) => c.key === "warrior")?.icon);
-  const tailoring = allowed(icons.professions.find((p) => p.key === "Tailoring")?.icon);
   return (
     <>
       <JsonLd data={{ "@context": "https://schema.org", "@type": "WebPage", name: "Ask Everloot", url: absoluteUrl("/chat") }} />
       <h1 className="sr-only">{TITLE}</h1>
-      <ChatClient savedBuilds={savedBuildsOn()} profiles={profilesOn()} workspace={chatWorkspaceOn()} freeChat={freeChatNames()} icons={{ warrior, tailoring }} />
+      <ChatClient savedBuilds={savedBuildsOn()} profiles={profilesOn()} workspace={chatWorkspaceOn()} freeChat={freeChatNames()} icons={{ warrior }} />
     </>
   );
 }

@@ -240,6 +240,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
 
 ### Fixed
+- Site: profession recipe tables, the item page's Sold by, Created by and Used in tabs, database links in tables and the Auction House result rows load on click instead of prefetching every link as the page opens, which ran into the edge rate limit and could refuse the first click.
+- Site: Chat's first suggested question is "Where is Hogger?", which Everloot's data answers, in place of a drop question that only said drop data was unavailable.
+- Site: on phones the "Report a bug" pill no longer covers the map's Categories tab and the first table row: it shows from the md width up, and the phone menu's More group has Report a bug.
 - Site: character search finds a Forever character by first name, surname or full name (“Volvik Morningstar”), and the header and /search list armory characters with their region. Surnames and full names need the 20261117140000 migration.
 - Site: terrain page and zone and dungeon Terrain links load on click instead of prefetching into the edge rate limit.
 - Site: disenchant bands read build 1.60.1.70959 like the rest of the game data (they still named 70938 after the build refresh).
@@ -397,6 +400,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the loot observations table sorts frequency by its 95% Wilson lower bound while still showing the observed share.
 
 ### Changed
+- Site: /tools lists every tool the header offers as cards under the header's groups (Lookup, Tools, Guides, Profile), not only the three planners; hidden tools stay off it, and Guilds stands in for the guild board when guild pages are on.
 - Addon: the Everloot window opens inside the game's gold dialog frame, the gold of the minimap button's ring, in place of the thin bronze edge; the resize grip moves inside the frame. The settings page and the raid panel keep the bronze edge.
 - Site: the signed-in home puts your characters first: the main character's card, then alts, then builds. With no characters it shows one card to get the addon or connect Battle.net, and empty build lists hide instead of saying "None yet".
 - Addon: easier reading in the Everloot window, settings, auction house tab and plan workspace: words use the game's own Friz Quadrata and nothing is smaller than 12 px (was 10 to 11 px, mostly in Arial Narrow); Arial Narrow stays only for figures, dates and the tight Home lists, also at 12 px. Home's character columns and the Collection list were re-spaced so the larger text still fits. Home's Missing list now sits under the realm line, so a long class or realm name ("CAMWOW US1 Realm 4 PvP") no longer runs into it. Needs an in-game check before release.
