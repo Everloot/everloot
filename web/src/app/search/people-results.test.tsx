@@ -7,7 +7,7 @@ vi.mock("next/link", () => ({
   default: ({ children, onNavigate: _onNavigate, prefetch: _prefetch, ...props }: { children: React.ReactNode; onNavigate?: () => void; prefetch?: boolean; href: string }) => <a {...props}>{children}</a>,
 }));
 
-import PeopleResults from "./PeopleResults";
+import PeopleResults, { PEOPLE_PAGE_TIMEOUT_MS } from "./PeopleResults";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -66,14 +66,14 @@ test("no rows, or a failed request, leaves the fallback", async () => {
   expect(container.textContent).toBe("Nothing matches that.");
 });
 
-test("the slot stays empty until the answer settles, and a slow answer counts as none after 3 seconds", async () => {
+test("the slot stays empty until the answer settles, and a slow answer counts as none after the page timeout", async () => {
   vi.useFakeTimers();
   try {
     reply.never = true;
     await show("slow");
     // Never "Nothing matches" first and then replaced.
     expect(container.textContent).toBe("");
-    await act(async () => { await vi.advanceTimersByTimeAsync(2999); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(PEOPLE_PAGE_TIMEOUT_MS - 1); });
     expect(container.textContent).toBe("");
     await act(async () => { await vi.advanceTimersByTimeAsync(1); });
     expect(container.textContent).toBe("Nothing matches that.");
