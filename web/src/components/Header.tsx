@@ -7,32 +7,87 @@ import { track } from "@/lib/analytics/track";
 import AccountControls from "./AccountControls";
 import GameVersionLabel from "./GameVersionLabel";
 import { SuggestField } from "./ui/SearchBar";
-import { TOOL_GROUPS, toolGroups } from "@/data/tools";
+import { TOOL_GROUPS, toolGroups, type ToolGroup } from "@/data/tools";
 
 type NavLink = { label: string; href: string };
+/** A top bar item: a menu of links, or one link (Chat). */
+export type NavItem = { label: string; href: string; links?: undefined } | { label: string; href?: undefined; links: NavLink[] };
 
-/** The top bar: seven items, Tools opening the grouped menu below. Ask is the chat, also listed in the menu. */
-export const PRIMARY: NavLink[] = [
-  { label: "Database", href: "/database" },
-  { label: "Ask", href: "/chat" },
-  { label: "Map", href: "/map" },
-  { label: "Changes", href: "/changes" },
-  { label: "Lore", href: "/lore" },
-  { label: "Docs", href: "/docs" },
-];
+/** The switches the layout passes in; each one adds the pages it turns on. */
+type NavSwitches = { guilds?: boolean; players?: boolean; profiles?: boolean; savedBuilds?: boolean };
 
-// The Tools menu lives in data/tools.ts so the home page lists the same groups.
+// The catalogue's groups live in data/tools.ts so the home page lists the same tools.
 export { TOOL_GROUPS };
 
-// A menu entry that is also in the bar (Ask) marks the bar item current, not Tools.
-const TOOL_HREFS = [...TOOL_GROUPS.flatMap((g) => g.links.map((l) => l.href)), "/guilds"].filter((href) => !PRIMARY.some((l) => l.href === href));
+/**
+ * The top bar, in order: Lookup (live data), Database (reference from the game files and uploads), Tools (planners),
+ * Guides (static reference), Chat, and Profile (the player's own pages, and the lists kept in this browser). The
+ * phone menu shows the same items as groups. Only existing pages are linked; hidden tools are left out.
+ */
+export function navItems({ guilds = false, players = false, profiles = false, savedBuilds = false }: NavSwitches = {}): NavItem[] {
+  const groups = toolGroups(guilds);
+  const catalogue = (title: ToolGroup) => groups.find((g) => g.title === title)?.links ?? [];
+  return [
+    { label: "Lookup", links: [...(players ? [{ label: "Characters", href: "/players" }] : []), ...catalogue("Lookup")] },
+    {
+      label: "Database",
+      links: [
+        { label: "Overview", href: "/database" },
+        { label: "Items", href: "/database/items" },
+        { label: "NPCs", href: "/database/npcs" },
+        { label: "Quests", href: "/database/quests" },
+        { label: "Zones", href: "/database/zones" },
+        { label: "Spells", href: "/database/spells" },
+        { label: "World map", href: "/map" },
+      ],
+    },
+    { label: "Tools", links: [...catalogue("Tools"), { label: "All tools", href: "/tools" }] },
+    { label: "Guides", links: [{ label: "All guides", href: "/guides" }, ...catalogue("Guides"), { label: "Lore archive", href: "/lore" }, { label: "Changes", href: "/changes" }] },
+    { label: "Chat", href: "/chat" },
+    {
+      label: "Profile",
+      links: [
+        { label: "Account", href: "/account" },
+        ...(profiles ? [{ label: "Settings", href: "/settings" }] : []),
+        ...(savedBuilds ? [{ label: "My builds", href: "/me" }] : []),
+        ...catalogue("Profile"),
+      ],
+    },
+  ];
+}
 
 const isCurrent = (path: string, href: string) => path === href || path.startsWith(`${href}/`);
+
+/** Where the page sits in the bar: the longest matching link and its item, so /tools/gold-ledger is Profile's Gold
+ *  ledger, not the Tools menu's "All tools". Every switch counts as on, so a page behind one still marks its item. */
+function currentPlace(path: string): { label: string; href: string } | undefined {
+  let best: { label: string; href: string } | undefined;
+  for (const item of navItems({ guilds: true, players: true, profiles: true, savedBuilds: true })) {
+    for (const href of item.links ? item.links.map((l) => l.href) : [item.href]) {
+      if (isCurrent(path, href) && (!best || href.length > best.href.length)) best = { label: item.label, href };
+    }
+  }
+  return best;
+}
+
+/** The top bar item that holds the page. */
+export const currentItem = (path: string): string | undefined => currentPlace(path)?.label;
+
+const menuId = (label: string) => `${label.toLowerCase()}-menu`;
 
 // The ring sits inside the box: these items start at the top edge of the window, where a ring offset outward is cut off.
 const navItem = "inline-flex min-h-11 items-center whitespace-nowrap border-b-2 px-2 transition-colors focus-visible:outline-offset-[-2px]";
 const navState = (on: boolean) => (on ? "border-accent text-fg" : "border-transparent text-fg-2 hover:text-accent");
 const menuLink = "flex min-h-11 items-center rounded-control px-3 text-sm text-fg-2 hover:bg-canvas hover:text-accent";
+
+/** The phone menu: each top bar menu as a group, then More with the single links (Chat), Docs and About. */
+export function phoneGroups(items: NavItem[]): { label: string; links: NavLink[] }[] {
+  const singles = items.flatMap((item) => (item.links ? [] : [{ label: item.label, href: item.href }]));
+  return [
+    ...items.flatMap((item) => (item.links ? [{ label: item.label, links: item.links }] : [])),
+    { label: "More", links: [...singles, { label: "Docs", href: "/docs" }, { label: "About", href: "/about" }] },
+  ];
+}
 
 function SearchIcon() {
   return (
@@ -46,24 +101,28 @@ function SearchIcon() {
  * The compact bar (docs/design/specs/2026-10-20-account-shell-design.md). From the layout: `savedBuilds` adds Your
  * builds to the avatar menu (EVERLOOT_SAVED_BUILDS); `accountSwitching` is true with Better Auth (EVERLOOT_AUTH_V2),
  * which can hold several accounts on one browser; `profiles` is EVERLOOT_PROFILES, without which the avatar menu
- * never asks for the player's shell. With it, the menu fetches the player from /api/me/shell itself. `guilds` is
- * EVERLOOT_GUILDS: the Tools menu then offers Guilds in place of the guild board.
+ * never asks for the player's shell. With it, the menu fetches the player from /api/me/shell itself, and Profile lists
+ * Settings. `guilds` is EVERLOOT_GUILDS: Lookup then offers Guilds in place of the guild board. `players` is
+ * EVERLOOT_PLAYER_PAGES: Lookup then starts with the character search.
  */
-export default function Header({ savedBuilds = false, profiles = false, accountSwitching = false, guilds = false }: {
+export default function Header({ savedBuilds = false, profiles = false, accountSwitching = false, guilds = false, players = false }: {
   savedBuilds?: boolean;
   profiles?: boolean;
   accountSwitching?: boolean;
   guilds?: boolean;
+  players?: boolean;
 }) {
-  const groups = toolGroups(guilds);
+  const items = navItems({ guilds, players, profiles, savedBuilds });
   const path = usePathname() ?? "/";
+  const place = currentPlace(path);
+  const current = place?.label;
   const [open, setOpen] = useState(false);
-  const [toolsOpen, setToolsOpen] = useState(false);
+  // The top bar menu that is open, by its label; one at a time.
+  const [menu, setMenu] = useState<string | null>(null);
   // Below 1280 px the bar has no room for the field: the search icon opens it full width under the bar.
   const [searchOpen, setSearchOpen] = useState(false);
   const toggle = useRef<HTMLButtonElement>(null);
-  const toolsButton = useRef<HTMLButtonElement>(null);
-  const tools = useRef<HTMLDivElement>(null);
+  const bar = useRef<HTMLElement>(null);
   const search = useRef<HTMLInputElement>(null);
   const searchButton = useRef<HTMLButtonElement>(null);
   const searchRow = useRef<HTMLInputElement>(null);
@@ -72,13 +131,13 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
   // A new page closes the opened field.
   useEffect(() => setSearchOpen(false), [path]);
 
-  // A click outside the Tools menu closes it.
+  // A click outside the bar's menus closes the open one.
   useEffect(() => {
-    if (!toolsOpen) return;
-    const close = (event: PointerEvent) => { if (!tools.current?.contains(event.target as Node)) setToolsOpen(false); };
+    if (!menu) return;
+    const close = (event: PointerEvent) => { if (!bar.current?.contains(event.target as Node)) setMenu(null); };
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
-  }, [toolsOpen]);
+  }, [menu]);
 
   // "/" focuses the search field, as on GitHub, unless the visitor is typing somewhere already.
   useEffect(() => {
@@ -95,13 +154,12 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
     return () => document.removeEventListener("keydown", focusSearch);
   }, []);
 
-  const closeAll = () => { setOpen(false); setToolsOpen(false); };
-  const toolsCurrent = TOOL_HREFS.some((href) => isCurrent(path, href));
+  const closeAll = () => { setOpen(false); setMenu(null); };
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-canvas" onKeyDown={(event) => {
       if (event.key !== "Escape") return;
-      if (toolsOpen) { setToolsOpen(false); toolsButton.current?.focus(); }
+      if (menu) { document.getElementById(`${menuId(menu)}-button`)?.focus(); setMenu(null); }
       if (open) { setOpen(false); toggle.current?.focus(); }
       if (searchOpen) { setSearchOpen(false); searchButton.current?.focus(); }
     }}>
@@ -115,39 +173,37 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
           everloot
         </Link>
 
-        <nav aria-label="Primary" className="hidden shrink-0 items-center text-sm font-medium lg:flex">
-          <Link href={PRIMARY[0].href} aria-current={isCurrent(path, PRIMARY[0].href) ? "page" : undefined} className={`${navItem} ${navState(isCurrent(path, PRIMARY[0].href))}`}>{PRIMARY[0].label}</Link>
-          <div ref={tools} className="relative">
-            <button
-              ref={toolsButton}
-              type="button"
-              aria-expanded={toolsOpen}
-              aria-controls="tools-menu"
-              onClick={() => setToolsOpen(!toolsOpen)}
-              className={`${navItem} gap-1.5 ${navState(toolsCurrent || toolsOpen)}`}
-            >
-              Tools
-              <svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" className={toolsOpen ? "rotate-180" : undefined}><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
-            </button>
-            {/* Always in the page, so the tools are in the HTML for crawlers; hidden until opened. */}
-            <div id="tools-menu" hidden={!toolsOpen} className={`pop absolute left-0 top-full mt-2 w-[36rem] grid-cols-3 gap-6 rounded-card border border-edge bg-panel p-6 ${toolsOpen ? "grid" : "hidden"}`}>
-              {groups.map((group) => (
-                <div key={group.title}>
-                  <p className="mb-2 px-3 font-mono text-xs text-muted">{group.title}</p>
+        <nav ref={bar} aria-label="Primary" className="hidden shrink-0 items-center text-sm font-medium lg:flex">
+          {items.map((item) => {
+            const on = current === item.label;
+            if (!item.links) return <Link key={item.label} href={item.href} aria-current={isCurrent(path, item.href) ? "page" : undefined} className={`${navItem} ${navState(on)}`}>{item.label}</Link>;
+            const id = menuId(item.label);
+            const expanded = menu === item.label;
+            return (
+              <div key={item.label} className="relative">
+                <button
+                  id={`${id}-button`}
+                  type="button"
+                  aria-expanded={expanded}
+                  aria-controls={id}
+                  onClick={() => setMenu(expanded ? null : item.label)}
+                  className={`${navItem} gap-1.5 ${navState(on || expanded)}`}
+                >
+                  {item.label}
+                  <svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" className={expanded ? "rotate-180" : undefined}><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
+                </button>
+                {/* Always in the page, so the links are in the HTML for crawlers; hidden until opened. */}
+                <div id={id} hidden={!expanded} className={`pop absolute left-0 top-full mt-2 w-60 rounded-card border border-edge bg-panel p-2 ${expanded ? "block" : "hidden"}`}>
                   <ul>
-                    {group.links.map((link) => (
+                    {item.links.map((link) => (
                       <li key={link.href}>
-                        <Link href={link.href} onClick={closeAll} aria-current={isCurrent(path, link.href) ? "page" : undefined} className={menuLink}>{link.label}</Link>
+                        <Link href={link.href} onClick={closeAll} aria-current={place?.href === link.href ? "page" : undefined} className={menuLink}>{link.label}</Link>
                       </li>
                     ))}
                   </ul>
                 </div>
-              ))}
-            </div>
-          </div>
-          {PRIMARY.slice(1).map((link) => {
-            const on = isCurrent(path, link.href);
-            return <Link key={link.href} href={link.href} aria-current={on ? "page" : undefined} className={`${navItem} ${navState(on)}`}>{link.label}</Link>;
+              </div>
+            );
           })}
         </nav>
 
@@ -208,22 +264,14 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
               <label htmlFor="menu-search" className="sr-only">Search Everloot</label>
               <input id="menu-search" name="q" type="search" maxLength={200} placeholder="Search Everloot" className="w-full min-w-0 bg-transparent text-fg placeholder:text-muted focus:outline-none" />
             </form>
+            {/* The top bar's menus as groups, in the same order; More holds Chat and the pages outside the bar. */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-6">
-              <div>
-                <p className="mb-1 px-3 font-mono text-xs text-muted">Browse</p>
-                <ul>
-                  {PRIMARY.map((link) => (
-                    <li key={link.href}><Link href={link.href} onClick={closeAll} aria-current={isCurrent(path, link.href) ? "page" : undefined} className={menuLink}>{link.label}</Link></li>
-                  ))}
-                  <li><Link href="/about" onClick={closeAll} className={menuLink}>About</Link></li>
-                </ul>
-              </div>
-              {groups.map((group) => (
-                <div key={group.title}>
-                  <p className="mb-1 px-3 font-mono text-xs text-muted">{group.title}</p>
+              {phoneGroups(items).map((group) => (
+                <div key={group.label}>
+                  <p className="mb-1 px-3 font-mono text-xs text-muted">{group.label}</p>
                   <ul>
                     {group.links.map((link) => (
-                      <li key={link.href}><Link href={link.href} onClick={closeAll} aria-current={isCurrent(path, link.href) ? "page" : undefined} className={menuLink}>{link.label}</Link></li>
+                      <li key={link.href}><Link href={link.href} onClick={closeAll} aria-current={place?.href === link.href ? "page" : undefined} className={menuLink}>{link.label}</Link></li>
                     ))}
                   </ul>
                 </div>

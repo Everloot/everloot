@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: profession pages list the game-file recipes 50 at a time (25 to 200), with search and skill range filters in the URL, instead of sending every recipe; AH Ledger crafting margins also sort by net value and sales per day, and the sort is kept in the URL.
 - Desktop: refreshes the disenchant results once a day into the game's price file and keeps the last good copy when a fetch fails.
 - Site: `/tools/disenchanting` shows what disenchanting gives on WoW: Forever by the game files' own bands (armor or weapon, quality, item level range), from the disenchants players recorded once 3 installs disenchanted in a band: each material's chance and units, the value per disenchant on your realm's auction house before and after the cut, the materials' prices, and the listed items worth more as materials than their buyout. Item pages gain a Disenchant tab, and `GET /api/rollups/disenchant` serves the bands.
 - Site: AH Ledger crafting margins can be sorted and filtered, with shareable market URLs.
@@ -391,6 +392,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Changed
 - Site: the signed-in home puts your characters first: the main character's card, then alts, then builds. With no characters it shows one card to get the addon or connect Battle.net, and empty build lists hide instead of saying "None yet".
+- Site: the header is Lookup, Database, Tools, Guides, Chat and Profile, the phone menu follows it, and /tools shows the planners as cards; Plans and Alts on this device move to Profile, Farming, Collections and Upload are unlinked until polished (their pages still load), and the footer links Guides and the guides feed.
 - Site: drop rates restart from addon 0.3.24 (2026-11-17): only loot windows recorded after the release count, now that empty corpses are recorded too, so sources show fewer public rates until new windows build up.
 - Site: the addon is offered as a regular release from 0.3.24: the home, addon and upload pages no longer call it an Alpha.
 - Site: Lore now pairs stories behind Forever’s world with illustrated category links, keeps search above both columns, and shows the full hero art.

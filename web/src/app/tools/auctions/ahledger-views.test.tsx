@@ -157,15 +157,23 @@ test("crafting sorts profit, margin and cost in both directions with unknown val
   const select = container.querySelector('select[aria-label="Sort crafting margins"]') as HTMLSelectElement;
   expect(select).not.toBeNull();
   for (const [value, order] of [
-    ["profitPerDay:asc", ["Test alpha", "Test beta", "Test gamma"]],
-    ["margin:desc", ["Test beta", "Test alpha", "Test gamma"]],
-    ["margin:asc", ["Test alpha", "Test beta", "Test gamma"]],
-    ["cost:asc", ["Test beta", "Test alpha", "Test gamma"]],
-    ["cost:desc", ["Test alpha", "Test beta", "Test gamma"]],
+    ["profit", ["Test alpha", "Test beta", "Test gamma"]],
+    ["-margin", ["Test beta", "Test alpha", "Test gamma"]],
+    ["margin", ["Test alpha", "Test beta", "Test gamma"]],
+    ["cost", ["Test beta", "Test alpha", "Test gamma"]],
+    ["-cost", ["Test alpha", "Test beta", "Test gamma"]],
+    ["-net", ["Test beta", "Test gamma", "Test alpha"]],
+    ["net", ["Test alpha", "Test beta", "Test gamma"]],
+    ["-sales", ["Test alpha", "Test beta", "Test gamma"]],
+    ["sales", ["Test beta", "Test alpha", "Test gamma"]],
   ] as const) {
     await act(async () => { select.value = value; select.dispatchEvent(new Event("change", { bubbles: true })); });
-    expect(recipeOrder()).toEqual(order);
+    expect(recipeOrder(), value).toEqual(order);
+    expect(new URL(window.location.href).searchParams.get("sort"), value).toBe(value);
   }
+  // The default order leaves no parameter behind.
+  await act(async () => { select.value = "-profit"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+  expect(new URL(window.location.href).searchParams.has("sort")).toBe(false);
   const input = container.querySelector('input[type="search"]') as HTMLInputElement;
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, " BETA ");
@@ -203,4 +211,20 @@ test("crafting makes a remembered market shareable immediately and rejects inval
   expect(new URL(window.location.href).searchParams.get("market")).toBe("forever.rp.horde.eu");
   expect(window.location.search).toContain("other=keep");
   expect(fetchImpl.mock.calls.map((c) => (c as unknown[])[0])).toEqual(["/api/ahledger/forever.rp.horde.eu/crafting?profession=Enchanting"]);
+});
+
+test("crafting reads its sort from a shared URL, marks the sorted column, follows browser navigation and ignores an unknown sort", async () => {
+  window.history.replaceState(null, "", "/tools/professions/enchanting?market=forever.pvp.horde.eu&sort=-net");
+  vi.stubGlobal("fetch", vi.fn(async () => Response.json({ ok: true, recipes, credit })));
+  await act(async () => root.render(<AhledgerCrafting profession="Enchanting" />));
+  const select = () => container.querySelector('select[aria-label="Sort crafting margins"]') as HTMLSelectElement;
+  expect(recipeOrder()).toEqual(["Test beta", "Test gamma", "Test alpha"]);
+  expect(select().value).toBe("-net");
+  expect(container.querySelector('th[aria-sort="descending"]')?.textContent).toContain("Net value");
+  await act(async () => { window.history.replaceState(null, "", "?market=forever.pvp.horde.eu&sort=sales"); window.dispatchEvent(new PopStateEvent("popstate")); });
+  expect(recipeOrder()).toEqual(["Test beta", "Test alpha", "Test gamma"]);
+  expect(container.querySelector('th[aria-sort="ascending"]')?.textContent).toContain("Sales per day");
+  await act(async () => { window.history.replaceState(null, "", "?market=forever.pvp.horde.eu&sort=-name"); window.dispatchEvent(new PopStateEvent("popstate")); });
+  expect(recipeOrder()).toEqual(["Test beta", "Test alpha", "Test gamma"]);
+  expect(select().value).toBe("-profit");
 });

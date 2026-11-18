@@ -12,10 +12,9 @@ vi.mock("next/link", () => ({
 }));
 
 import GroupPage, * as route from "./page";
-import { PRIMARY } from "@/components/Header";
+import { navItems, phoneGroups } from "@/components/Header";
 import { CLASSES } from "@/design/tokens";
 import { CURRENT_BUILD, TABLES } from "@/data/game-data/raid";
-import { toolGroups } from "@/data/tools";
 import { classLabel } from "@/lib/class-context";
 import { decodeRaid } from "@/lib/raid";
 import { DESCRIPTION_MAX, DESCRIPTION_MIN } from "@/lib/seo";
@@ -124,7 +123,7 @@ describe("the group page", () => {
     expect(String(m.title)).toMatch(/^WoW Forever /);
     expect(String(m.description).length, String(m.description)).toBeGreaterThanOrEqual(DESCRIPTION_MIN);
     expect(String(m.description).length, String(m.description)).toBeLessThanOrEqual(DESCRIPTION_MAX);
-    const hrefs = [...PRIMARY.map((l) => l.href), ...[false, true].flatMap((guilds) => toolGroups(guilds).flatMap((g) => g.links.map((l) => l.href)))];
+    const hrefs = [false, true].flatMap((on) => phoneGroups(navItems({ guilds: on, players: on, profiles: on, savedBuilds: on })).flatMap((g) => g.links.map((l) => l.href)));
     expect(hrefs.filter((h) => h.startsWith("/classes"))).toEqual([]);
   });
 

@@ -18,8 +18,7 @@ vi.mock("next/navigation", () => ({
 import ChooserPage, * as route from "./page";
 import ClassesPage from "../page";
 import ClassHubPage, * as hubRoute from "../[class]/page";
-import { PRIMARY } from "@/components/Header";
-import { toolGroups } from "@/data/tools";
+import { navItems, phoneGroups } from "@/components/Header";
 import { scrubEvent, stripFragment } from "@/lib/analytics/load";
 import { guidesDir } from "@/lib/guides";
 import { DESCRIPTION_MAX, DESCRIPTION_MIN } from "@/lib/seo";
@@ -152,7 +151,7 @@ describe("the chooser page", () => {
   });
 
   test("is linked from no header, Tools menu, class index or hub while it is a draft", async () => {
-    const hrefs = [...PRIMARY.map((l) => l.href), ...[false, true].flatMap((guilds) => toolGroups(guilds).flatMap((g) => g.links.map((l) => l.href)))];
+    const hrefs = [false, true].flatMap((on) => phoneGroups(navItems({ guilds: on, players: on, profiles: on, savedBuilds: on })).flatMap((g) => g.links.map((l) => l.href)));
     expect(hrefs.filter((h) => h.startsWith("/classes"))).toEqual([]);
     const pages = [renderToStaticMarkup(<ClassesPage />), renderToStaticMarkup(await ClassHubPage({ params: Promise.resolve({ class: "mage" }) }))];
     for (const html of pages) expect(html).not.toContain("/classes/choose");
