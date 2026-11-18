@@ -301,7 +301,7 @@ export default async function ZonePage(props: Props) {
               {terrain.length > 0 && (
                 <p className="mb-3 flex flex-wrap items-center gap-2 text-meta text-fg-2">
                   {terrain.map(({ type, parts }) => (
-                    <Link key={type.slug} href={`${TERRAIN_PATH}#${type.slug}`} className="inline-flex h-6 items-center rounded-full border border-line px-2.5 font-mono text-xs text-fg-2 hover:text-fg">
+                    <Link prefetch={false} key={type.slug} href={`${TERRAIN_PATH}#${type.slug}`} className="inline-flex h-6 items-center rounded-full border border-line px-2.5 font-mono text-xs text-fg-2 hover:text-fg">
                       {type.name}{parts ? ` · ${parts.join(", ")}` : ""}
                     </Link>
                   ))}

@@ -232,6 +232,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the world map shows zone or continent coordinates on hover and shares pins in the address; Shift-click or use Pin map centre, and Clear pin removes it.
 
 ### Fixed
+- Site: terrain page and zone and dungeon Terrain links load on click instead of prefetching into the edge rate limit.
 - Site: disenchant bands read build 1.60.1.70959 like the rest of the game data (they still named 70938 after the build refresh).
 - Site: Database list links load on click instead of prefetching into the edge rate limit.
 - Site: Herbs opens with gathering areas, with new Forever Herbalism crafts below them.
