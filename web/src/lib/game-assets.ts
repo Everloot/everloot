@@ -308,17 +308,22 @@ export async function loadItemTips(assets: SiteAssets | null, ids: readonly numb
  * keep a partial answer, such as the edge-cached hover card, can tell a failure from an item with no tooltip.
  * `degraded` is a broken folder rather than a failed read: a shard the index lists that is not there or is not a
  * shard, or a record for an asked-for item that is not a record. An item its shard does not hold is neither.
+ * `unread` holds the asked-for items whose tooltip could not be looked up at all (no store, no usable index, or a
+ * shard that failed or was broken), so a count of them can say a list built from these tooltips is incomplete.
  */
-export async function readItemTips(assets: SiteAssets | null, ids: readonly number[], store: PrivateStore | null = privateStoreFromEnv()): Promise<{ tips: Map<number, ItemTip>; unreachable: boolean; degraded: boolean }> {
+export async function readItemTips(assets: SiteAssets | null, ids: readonly number[], store: PrivateStore | null = privateStoreFromEnv()): Promise<{ tips: Map<number, ItemTip>; unreachable: boolean; degraded: boolean; unread: Set<number> }> {
   const out = new Map<number, ItemTip>();
-  const result = { tips: out, unreachable: false, degraded: false };
+  const unread = new Set<number>();
+  const result = { tips: out, unreachable: false, degraded: false, unread };
   const wanted = [...new Set(ids)].filter((id) => Number.isInteger(id) && id > 0);
   const folder = assets ? buildFolder(assets.base) : null;
-  if (!assets || !store || !folder || !wanted.length) return result;
+  const none = () => { for (const id of wanted) unread.add(id); return result; };
+  if (!wanted.length) return result;
+  if (!assets || !store || !folder) return none();
   const read = await store.read(`${folder}/items.json`);
-  if (read === PRIVATE_UNREACHABLE) return { ...result, unreachable: true };
+  if (read === PRIVATE_UNREACHABLE) { result.unreachable = true; return none(); }
   const index = ItemIndexSchema.safeParse(read);
-  if (!index.success || index.data.build.version !== assets.version) return result;
+  if (!index.success || index.data.build.version !== assets.version) return none();
   const byShard = new Map<number, number[]>();
   for (const id of wanted) {
     const s = itemShard(id, index.data.shardSize);
@@ -328,15 +333,15 @@ export async function readItemTips(assets: SiteAssets | null, ids: readonly numb
     const file = index.data.shards[String(shard)]?.file;
     if (!file) return;
     const shardRead = await store.read(`${folder}/${file}`);
-    if (shardRead === PRIVATE_UNREACHABLE) { result.unreachable = true; return; }
+    if (shardRead === PRIVATE_UNREACHABLE) { result.unreachable = true; for (const id of ids) unread.add(id); return; }
     const body = z.record(z.string(), z.unknown()).safeParse(shardRead);
-    if (!body.success) { result.degraded = true; return; }
+    if (!body.success) { result.degraded = true; for (const id of ids) unread.add(id); return; }
     for (const id of ids) {
       const raw = body.data[String(id)];
       if (raw === undefined) continue;
       const r = ItemRecordSchema.safeParse(raw);
       if (r.success) out.set(id, itemTip(r.data, assets, id));
-      else result.degraded = true;
+      else { result.degraded = true; unread.add(id); }
     }
   }));
   return result;

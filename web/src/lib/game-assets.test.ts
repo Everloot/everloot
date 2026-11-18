@@ -134,6 +134,16 @@ test("a private read that failed is told apart from an item with no tooltip: the
   expect((await readItemTips(a, [9], memoryStore({}))).unreachable).toBe(false);
 });
 
+test("the items whose tooltip could not be looked up are named, apart from an item its shard does not hold", async () => {
+  const a = parseSiteManifest(siteManifest, BASE)!;
+  // 4000's shard is not in the index: no tooltip, but nothing failed.
+  expect([...(await readItemTips(a, [9, 4000], memoryStore(privateFiles))).unread]).toEqual([]);
+  const failing = (path: string) => ({ read: async (p: string) => (p === path ? PRIVATE_UNREACHABLE : (privateFiles as Record<string, unknown>)[p] ?? null) });
+  expect([...(await readItemTips(a, [9, 25, 4000], failing(`${FOLDER}/items/0.json`))).unread].sort((x, y) => x - y)).toEqual([9, 25]);
+  expect([...(await readItemTips(a, [9, 4000], failing(`${FOLDER}/items.json`))).unread].sort((x, y) => x - y)).toEqual([9, 4000]);
+  expect([...(await readItemTips(a, [9], null)).unread]).toEqual([9]);
+});
+
 test("a broken item folder is told apart from an item with no tooltip: a listed shard missing or not a shard, or a bad record", async () => {
   const a = parseSiteManifest(siteManifest, BASE)!;
   const withShard = (shard?: unknown) => memoryStore({ [`${FOLDER}/items.json`]: itemIndex, ...(shard === undefined ? {} : { [`${FOLDER}/items/0.json`]: shard }) });

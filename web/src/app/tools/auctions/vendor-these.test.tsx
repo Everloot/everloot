@@ -3,24 +3,20 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
 import { emptyMarket, foldMarket } from "../../../../../kb/src/market";
-import type { ItemTip } from "./art";
+import type { StoredVendorHouse, StoredVendorRealm } from "@/lib/vendor-these-store";
 
 const store = vi.hoisted(() => ({ loadMarket: vi.fn(), loadCorpus: vi.fn() }));
-const sell = vi.hoisted(() => new Map<number, number>());
+const stored = vi.hoisted(() => ({ read: vi.fn() }));
+const art = vi.hoisted(() => ({ asked: [] as number[][] }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
   uploadStore: { loadMarket: store.loadMarket, loadCorpus: store.loadCorpus },
 }));
-// The game files' sell prices come with the tooltips, which live in private storage: stand in for them here.
+// The list is the cron's stored object: the page reads it and no tooltip for its rows.
+vi.mock("@/lib/vendor-these-store", () => ({ storedVendorThese: stored.read }));
 vi.mock("./art", () => ({
-  itemArt: async (ids: readonly number[]) => ({
-    assets: null,
-    tips: new Map(ids.filter((id) => sell.has(id)).map((id) => [id, {
-      name: `Thing ${id}`, color: "#fff", quality: "common", icon: null, lines: [], partial: false, why: [], label: "", level: 1, required: 0, binding: 0,
-      sellPrice: sell.get(id)!,
-    } satisfies ItemTip])),
-  }),
-  auctionNames: async (ids: readonly number[]) => new Map(ids.map((id) => [id, `Thing ${id}`])),
+  itemArt: async (ids: readonly number[]) => { art.asked.push([...ids]); return { assets: null, tips: new Map() }; },
+  auctionNames: async () => new Map(),
 }));
 vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a>,
@@ -36,18 +32,21 @@ vi.mock("next/navigation", () => ({
 import RealmPage from "./[realm]/page";
 
 const today = new Date();
-const dayAgo = (n: number) => new Date(today.getTime() - n * 86_400_000).toISOString();
-// [item id, market value]; 40 units each, so no market is thin unless asked.
-const scans = (capturedAt: string, house: string, items: [number, number, number?][]) => ["install-a", "install-b", "install-c"].map((installId) => ({
-  kind: "auction_snapshot", installId, eventId: `${installId}:${house}:${capturedAt}`, capturedAt, realm: "Forever", house,
-  scanId: `${installId}-${house}-${capturedAt}`, part: 1, parts: 1, items: items.map(([id, market, units = 40]) => [id, 2, units, market, market]),
+const day = today.toISOString().slice(0, 10);
+const scans = (house: string, items: number[]) => ["install-a", "install-b", "install-c"].map((installId) => ({
+  kind: "auction_snapshot", installId, eventId: `${installId}:${house}`, capturedAt: today.toISOString(), realm: "Forever", house,
+  scanId: `${installId}-${house}`, part: 1, parts: 1, items: items.map((id) => [id, 2, 40, 205, 205]),
 }));
-const VENDOR = 2589, KEEP = 765, THIN = 1366, STALE = 25, NEUTRAL_ONLY = 2770;
-const market = foldMarket(emptyMarket(), [
-  ...scans(dayAgo(0), "Horde", [[VENDOR, 205], [KEEP, 33], [THIN, 10, 5], [NEUTRAL_ONLY, 100]]),
-  ...scans(dayAgo(4), "Horde", [[STALE, 10]]),
-  ...scans(dayAgo(0), "Neutral", [[NEUTRAL_ONLY, 100]]),
-], today);
+const VENDOR = 2589;
+const market = foldMarket(emptyMarket(), [...scans("Horde", [VENDOR, 765]), ...scans("Neutral", [VENDOR])], today);
+
+const house = (over: Partial<StoredVendorHouse> = {}): StoredVendorHouse => ({
+  house: "Horde", candidates: 2, unread: 0, total: 1,
+  rows: [{ itemId: VENDOR, name: "Thing 2589", vendor: 250, market: 205, afterCut: 194, more: 56, quantity: 40, day }],
+  ...over,
+});
+const realm = (houses: StoredVendorHouse[], dataAsOf: string | null = new Date(today.getTime() - 20 * 60_000).toISOString()): StoredVendorRealm =>
+  ({ version: 1, dataAsOf, builtAt: today.toISOString(), realm: "Forever", houses });
 
 const { JSDOM } = createRequire(import.meta.url)("jsdom") as { JSDOM: new (html: string) => { window: { document: Document } } };
 const doc = (html: string) => new JSDOM(html).window.document;
@@ -64,76 +63,76 @@ const links = (section: Element) => [...section.querySelectorAll("tbody tr td:fi
 beforeEach(() => {
   store.loadMarket.mockReset().mockResolvedValue({ state: market, dataAsOf: today.toISOString() });
   store.loadCorpus.mockReset().mockResolvedValue({ uploads: 0, records: [], dataAsOf: null });
-  sell.clear();
-  // 205 less 5% is 194: a vendor's 250 is 56 more. 33 less 5% is 31: a vendor's 10 is less. 100 less 5% is 95; less 15%, 85.
-  for (const [id, price] of [[VENDOR, 250], [KEEP, 10], [THIN, 500], [STALE, 500], [NEUTRAL_ONLY, 90]]) sell.set(id, price);
+  stored.read.mockReset().mockResolvedValue({ realm: realm([house(), house({ house: "Neutral", candidates: 1, total: 0, rows: [] })]), missing: false });
+  art.asked = [];
 });
 
-test("a house's list shows each item a vendor pays more for, with its prices, units and market day", async () => {
-  const section = vendorSection(await realmPage({ house: "horde", vendor: "1" }));
+test("a picked house shows its stored list, linking each item to the realm's own price page, with the data's age", async () => {
+  const section = vendorSection(await realmPage({ house: "horde" }));
   expect(section, "the Vendor these section").not.toBeNull();
+  expect(stored.read).toHaveBeenCalledWith("forever");
   expect(section!.querySelector("h2")?.textContent).toBe("Vendor these");
   expect(section!.textContent).toContain("the Horde auction house on Forever after its 5% cut");
-  // Thin, stale and kept items are not on it, nor what only the neutral house would lose.
-  expect(links(section!)).toEqual([`/database/items/${VENDOR}`]);
+  // The realm's item price page, as the rest of the auction tool links; never /database.
+  expect(links(section!)).toEqual([`/tools/auctions/forever/${VENDOR}`]);
   const row = section!.querySelector("tbody tr")!;
   expect(row.querySelector("a")?.textContent).toBe("Thing 2589");
-  // Vendor, market, after cut, difference, units, day.
-  expect(cells(row).slice(1)).toEqual(["2 silver 50 copper", "2 silver 5 copper", "1 silver 94 copper", "56 copper", "40", today.toISOString().slice(0, 10)]);
+  expect(cells(row).slice(1)).toEqual(["2 silver 50 copper", "2 silver 5 copper", "1 silver 94 copper", "56 copper", "40", day]);
+  expect(section!.querySelector("[data-vendor-age] time")?.textContent).toBe("20 min ago");
+  expect(section!.querySelector("[data-vendor-incomplete]")).toBeNull();
 });
 
-test("the neutral house uses its 15% cut", async () => {
-  const section = vendorSection(await realmPage({ house: "neutral", vendor: "1" }));
+test("the list reads no tooltip: an item only on the list is never asked for", async () => {
+  const ONLY_LISTED = 4321;
+  const rows = [...house().rows, { itemId: ONLY_LISTED, name: null, vendor: 90, market: 50, afterCut: 47, more: 43, quantity: 30, day }];
+  stored.read.mockResolvedValue({ realm: realm([house({ total: 2, rows })]), missing: false });
+  const section = vendorSection(await realmPage({ house: "horde" }));
+  expect(links(section!)).toEqual([`/tools/auctions/forever/${VENDOR}`, `/tools/auctions/forever/${ONLY_LISTED}`]);
+  expect(section!.querySelectorAll("tbody tr")[1]?.querySelector("a")?.textContent).toBe(`Item ${ONLY_LISTED}`);
+  expect(art.asked.flat()).not.toContain(ONLY_LISTED);
+});
+
+test("the neutral house reads its own list and cut, and an empty one says so", async () => {
+  const section = vendorSection(await realmPage({ house: "neutral" }));
   expect(section!.textContent).toContain("after its 15% cut");
-  expect(links(section!)).toEqual([`/database/items/${NEUTRAL_ONLY}`]);
-  // 100 less 15% is 85, 5 under the vendor's 90; the Horde house's 95 is not.
-  expect(cells(section!.querySelector("tbody tr")!).slice(1, 5)).toEqual(["90 copper", "1 silver 0 copper", "85 copper", "5 copper"]);
+  expect(section!.querySelector("[data-empty-state]")?.textContent).toContain("No item with a current market here sells for less than a vendor pays");
 });
 
-test("with every house shown the list asks for a house, and a filter or later page leaves it out", async () => {
-  const all = await realmPage({});
-  expect(vendorSection(all)).toBeNull();
-  expect(doc(all).querySelector("[data-vendor-hint]")?.innerHTML).toContain("house=horde&amp;vendor=1#vendor-these");
-  expect(vendorSection(await realmPage({ house: "horde", quality: "common", vendor: "1" }))).toBeNull();
+test("a list that is not built yet says so", async () => {
+  stored.read.mockResolvedValue({ realm: null, missing: true });
+  const section = vendorSection(await realmPage({ house: "horde" }));
+  expect(section!.querySelector("[data-vendor-missing]")?.textContent).toContain("isn't built yet");
+  expect(section!.querySelector("table")).toBeNull();
+  // A realm object from before this house had a market is not built for it either.
+  stored.read.mockResolvedValue({ realm: realm([house({ house: "Neutral" })]), missing: false });
+  expect(vendorSection(await realmPage({ house: "horde" }))!.querySelector("[data-vendor-missing]")).not.toBeNull();
 });
 
-test("a plain house view only offers the list: it is built when asked for", async () => {
-  const html = await realmPage({ house: "horde" });
-  expect(vendorSection(html)).toBeNull();
-  const offer = doc(html).querySelector("[data-vendor-offer] a");
-  expect(offer?.getAttribute("href")).toContain("vendor=1#vendor-these");
-  expect(offer?.getAttribute("href")).toContain("house=horde");
+test("a list built while some vendor prices could not be read says it is incomplete, with counts", async () => {
+  stored.read.mockResolvedValue({ realm: realm([house({ candidates: 2, unread: 1 })]), missing: false });
+  const section = vendorSection(await realmPage({ house: "horde" }));
+  expect(links(section!)).toEqual([`/tools/auctions/forever/${VENDOR}`]);
+  expect(section!.querySelector("[data-vendor-incomplete]")?.textContent).toBe("Incomplete: 1 of 2 items with a current market here had no vendor price available when this was built and is left out.");
 });
 
-test("a later page leaves the list and the offer out", async () => {
-  // 60 current items on the Horde house: more than one page of results.
-  const many = foldMarket(emptyMarket(), scans(dayAgo(0), "Horde", Array.from({ length: 60 }, (_, i) => [20000 + i, 100] as [number, number])), today);
-  store.loadMarket.mockResolvedValue({ state: many, dataAsOf: today.toISOString() });
-  const first = await realmPage({ house: "horde" });
-  expect(doc(first).querySelector("[data-vendor-offer]"), "page 1 offers it").not.toBeNull();
-  const second = await realmPage({ house: "horde", vendor: "1", page: "2" });
-  // A page past the last would be notFound(), which throws: page 2 rendered, with items on it.
-  expect(doc(second).body.textContent).toContain("Thing 200");
-  expect(vendorSection(second)).toBeNull();
-  expect(doc(second).querySelector("[data-vendor-offer]")).toBeNull();
-});
-
-test("vendor prices that cannot be read are said, not reported as nothing to sell", async () => {
-  sell.clear();
-  const section = vendorSection(await realmPage({ house: "horde", vendor: "1" }));
+test("no vendor price at all, or a store that cannot be read, is unavailable, not an empty list", async () => {
+  stored.read.mockResolvedValue({ realm: realm([house({ candidates: 2, unread: 2, total: 0, rows: [] })]), missing: false });
+  let section = vendorSection(await realmPage({ house: "horde" }));
   expect(section!.querySelector("[data-vendor-unavailable]")?.textContent).toContain("Vendor prices are unavailable right now");
   expect(section!.querySelector("[data-empty-state]")).toBeNull();
+  stored.read.mockResolvedValue({ realm: null, missing: false });
+  section = vendorSection(await realmPage({ house: "horde" }));
+  expect(section!.querySelector("[data-vendor-unavailable]")).not.toBeNull();
 });
 
-test("a candidate with no vendor price is counted as left out", async () => {
-  sell.delete(KEEP);
-  const section = vendorSection(await realmPage({ house: "horde", vendor: "1" }));
-  expect(links(section!)).toEqual([`/database/items/${VENDOR}`]);
-  expect(section!.querySelector("[data-vendor-incomplete]")?.textContent).toBe("1 item has no vendor price available right now and is left out.");
+test("every house shown asks for a house; a filter or later page leaves the list out and reads nothing", async () => {
+  const all = await realmPage({});
+  expect(vendorSection(all)).toBeNull();
+  expect(doc(all).querySelector("[data-vendor-hint]")?.innerHTML).toContain("house=horde#vendor-these");
+  expect(vendorSection(await realmPage({ house: "horde", quality: "common" }))).toBeNull();
+  expect(stored.read).not.toHaveBeenCalled();
 });
 
-test("a house with nothing a vendor pays more for says so", async () => {
-  sell.set(VENDOR, 1);
-  const section = vendorSection(await realmPage({ house: "horde", vendor: "1" }));
-  expect(section!.querySelector("[data-empty-state]")?.textContent).toContain("No item with a current market here sells for less than a vendor pays");
+test("the old vendor=1 link still shows the list", async () => {
+  expect(vendorSection(await realmPage({ house: "horde", vendor: "1" }))).not.toBeNull();
 });

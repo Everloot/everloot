@@ -17,6 +17,7 @@ import { buildDatabaseActivity } from "@/lib/database-activity";
 import { writeDatabaseActivity } from "@/lib/database-activity-store";
 import { buildMapPins, writeMapPins } from "@/lib/map-pins-store";
 import { writeGuildLadder } from "@/lib/guild-ladder-store";
+import { writeVendorThese } from "@/lib/vendor-these-store";
 
 /**
  * GET /api/cron/snapshot — the Worker's Cron Trigger (src/lib/cf-crons.ts, every 10 minutes) extends the corpus snapshot with new uploads,
@@ -181,13 +182,18 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("guild ladder failed", err);
     }
+    // Each realm's "Vendor these" lists (lib/vendor-these-store.ts), from the market and the game files' sell prices, which
+    // are read here rather than on a page view. Like the auction reports it waits while the market is still catching up.
+    // It writes each realm apart and records an incomplete run, so the next run tries again; a failure is logged.
+    let vendorThese: { written: boolean; realms?: number; failed?: number; unread?: number } | null = null;
+    try { if (!(market.remaining ?? 0)) vendorThese = await writeVendorThese(); } catch (err) { console.error("vendor lists failed", err); }
     // A rollup with uploads left over is pending: the next run folds them even when no new upload arrived.
     await uploadStore.writeCronRun(
       completion.remaining > 0 || completion.rebuilding || (market.remaining ?? 0) > 0 || (census?.remaining ?? 0) > 0,
       result.dataAsOf,
       settled?.written ? week : work.settledWeek ?? null,
     );
-    return NextResponse.json({ ok: true, rebuild, ...result, market, completion, coverage, settled, census, itemView, aggregates, auctionHistory, auctionReports, professions, mapPins, databaseActivity, guildLadder });
+    return NextResponse.json({ ok: true, rebuild, ...result, market, completion, coverage, settled, census, itemView, aggregates, auctionHistory, auctionReports, professions, mapPins, databaseActivity, guildLadder, vendorThese });
   } catch (err) {
     console.error("snapshot failed", err);
     return NextResponse.json({ ok: false, error: "snapshot failed" }, { status: 500 });

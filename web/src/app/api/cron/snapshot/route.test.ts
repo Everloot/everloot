@@ -30,10 +30,13 @@ vi.mock("@/lib/database-activity-store", () => ({ writeDatabaseActivity: activit
 vi.mock("@/lib/database-activity", () => ({ buildDatabaseActivity: activity.buildDatabaseActivity }));
 const guilds = vi.hoisted(() => ({ writeGuildLadder: vi.fn() }));
 vi.mock("@/lib/guild-ladder-store", () => guilds);
+const vendor = vi.hoisted(() => ({ writeVendorThese: vi.fn() }));
+vi.mock("@/lib/vendor-these-store", () => vendor);
 import { GET } from "./route";
 beforeEach(() => {
   store.loadCorpus.mockReset();
   guilds.writeGuildLadder.mockReset().mockResolvedValue({ written: false });
+  vendor.writeVendorThese.mockReset().mockResolvedValue({ written: false });
   activity.writeDatabaseActivity.mockReset().mockResolvedValue({ written: false });
   professions.writeProfessions.mockReset().mockResolvedValue({ written: false });
   mapPins.writeMapPins.mockReset().mockResolvedValue({ written: false });
@@ -386,4 +389,26 @@ test("the snapshot refreshes the guild ladder even when no new uploads arrive an
   expect(guilds.writeGuildLadder).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-11-12" });
   guilds.writeGuildLadder.mockRejectedValueOnce(new Error("publication unavailable"));
   expect((await GET(req())).status).toBe(200);
+});
+
+test("the vendor lists are built after the other views, wait for a market still catching up, and a failure breaks nothing", async () => {
+  vendor.writeVendorThese.mockResolvedValue({ written: true, realms: 2, failed: 0, unread: 0 });
+  let res = await GET(req());
+  expect(res.status).toBe(200);
+  expect((await res.json()).vendorThese).toEqual({ written: true, realms: 2, failed: 0, unread: 0 });
+  vendor.writeVendorThese.mockClear();
+  store.writeMarket.mockResolvedValue({ added: 5, scans: 5, remaining: 3 });
+  expect((await GET(req())).status).toBe(200);
+  expect(vendor.writeVendorThese).not.toHaveBeenCalled();
+  store.writeMarket.mockResolvedValue({ added: 0, scans: 0 });
+  const error = vi.spyOn(console, "error").mockImplementation(() => {});
+  vendor.writeVendorThese.mockRejectedValue(new Error("shards"));
+  res = await GET(req());
+  expect(res.status).toBe(200);
+  const body = await res.json();
+  expect(body.vendorThese).toBeNull();
+  expect(guilds.writeGuildLadder).toHaveBeenCalled();
+  expect(store.writeCronRun).toHaveBeenCalled();
+  expect(error).toHaveBeenCalledWith("vendor lists failed", expect.any(Error));
+  error.mockRestore();
 });

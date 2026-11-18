@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: a realm's Auction House page, with one house picked, shows "Vendor these" again: the items a vendor pays more for than that house after its cut, worked out with each market update and stored, with the list's age, an "incomplete" note when some vendor prices could not be read, and links to the realm's own item price pages.
 - Site: profession pages list the game-file recipes 50 at a time (25 to 200), with search and skill range filters in the URL, instead of sending every recipe; AH Ledger crafting margins also sort by net value and sales per day, and the sort is kept in the URL.
 - Addon: the auction house's Sell tab says, under Post, when a vendor pays more than your price brings in after the house's cut (5% at faction houses, 15% at goblin ones), when the gain over a vendor is smaller than the deposit you lose if it does not sell, when this house's current market value after the cut is below the vendor price, and when disenchanting looks better. It never changes a price or posts; Auction House settings turn it off.
 - Addon: armor and weapons you see or disenchant are recorded with their item level, so the site can place a disenchant in its band when the game files give the item no level (about one in five disenchants so far).
