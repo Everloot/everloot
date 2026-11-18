@@ -149,7 +149,7 @@ let root: Root;
 
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  // A desktop window: the sidebar starts open.
+  // A desktop window.
   vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("min-width"), addEventListener() {}, removeEventListener() {} }));
   localStorage.clear();
   sessionStorage.clear();
@@ -174,7 +174,12 @@ afterEach(async () => {
 });
 
 const settle = async () => { for (let i = 0; i < 12; i++) await act(async () => { await new Promise((r) => setTimeout(r, 0)); }); };
-const render = async (props: { workspace?: boolean; savedBuilds?: boolean } = { workspace: true }) => { await act(async () => root.render(<ChatClient {...props} />)); await settle(); };
+const render = async (props: { workspace?: boolean; savedBuilds?: boolean } = { workspace: true }, openRail = true) => {
+  await act(async () => root.render(<ChatClient {...props} />));
+  await settle();
+  // Workspace actions below are exercised with the rail open, including on a fresh browser.
+  if (openRail && props.workspace && window.matchMedia("(min-width: 1024px)").matches && button("Chats")?.getAttribute("aria-expanded") === "false") await click("Chats");
+};
 const text = () => container.textContent ?? "";
 const button = (label: string) => Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.trim() === label || b.getAttribute("aria-label") === label);
 const field = (label: string) => container.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(`[aria-label="${label}"]`)!;
@@ -210,6 +215,21 @@ function seedChat(owner: string, title: string, extra: Partial<WorkspaceConversa
   s.conversations.set(c.id, c);
   return c;
 }
+
+test.each(["empty", "shared", "own", "other"])("workspace rail defaults to visible browser history: %s", async (history) => {
+  if (history !== "empty") {
+    const key = history === "shared" ? "everloot.chat.conversations.v1" : `everloot.chat.conversations.v1@${history === "own" ? ME : "another-account"}`;
+    localStorage.setItem(key, JSON.stringify([{ id: "saved-chat", title: "Saved question", updatedAt: now(), messages: [msg("user", "Saved question")] }]));
+  }
+  await render({ workspace: true }, false);
+  expect(button("Chats")?.getAttribute("aria-expanded")).toBe(String(history === "shared" || history === "own"));
+});
+
+test("workspace account history also opens the desktop rail", async () => {
+  seedChat(ME, "Saved route");
+  await render({ workspace: true }, false);
+  expect(button("Chats")?.getAttribute("aria-expanded")).toBe("true");
+});
 
 test("flag off: Chat stays in the browser and never calls the private workspace", async () => {
   await render({});
