@@ -611,6 +611,14 @@ function refresh(f)
       count(all)
       cache = { section = c.section, scope = c.scope, key = key, items = all, summary = said }
       c.cache = cache
+      -- A price file still being checked is read again each second until the check ends, while Dungeons & raids is open.
+      if c.section == "raids" and said:find(DROPS_STATUS.verifying, 1, true) and not c.recheck and C_Timer and C_Timer.After then
+        c.recheck = true
+        C_Timer.After(1, function()
+          c.recheck = false
+          if U.frame and U.frame:IsShown() and U.view == "collection" and c.section == "raids" then redraw() end
+        end)
+      end
     end
     items, summary = cache.items, cache.summary
     empty = EMPTY[c.section] or NOTHING_READ

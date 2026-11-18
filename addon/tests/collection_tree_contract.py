@@ -186,6 +186,23 @@ assert(shown(rows) == 0 and rows.empty.text:find('Pet Journal lists no pets', 1,
 assert(EverlootWindow.shown and not U.failed)
 """)
 
+# --- A large price file is checked a slice per frame: the page says so, then draws the drops once the check ends ---
+BIG = DROPS + "".join(f";{9000 + i},n,9999,1,10,3" for i in range(1500))
+assert len(BIG) > 20000, "more than one checksum slice"
+lua = fresh("{ installId = 'abcd-1234', toggles = { completion = true }, records = {} }",
+            API.replace(DROPS, BIG).replace(str(SUM), str(zlib.adler32(BIG.encode()))),
+            extra=("modules/completion.lua", "modules/owned.lua"))
+lua.execute(HELPERS + r"""
+assert(U.Open('collection') == true)
+local c = EverlootWindow.collection
+click(c.sections.raids)
+assert(c.summary.text:find('drops: checking the price file', 1, true) and not c.rows[3].toggle.shown, c.summary.text)
+drain()
+assert(not c.summary.text:find('drops:', 1, true) and c.rows[3].toggle.shown and c.rows[3].name.text == 'Ghamoo-ra',
+  'redrawn with the drops once the check ended: ' .. c.summary.text)
+assert(EverlootWindow.shown and not U.failed)
+""")
+
 # --- No drops block in the price file: the bosses stay plain rows and the summary says why ---
 lua = fresh("{ installId = 'abcd-1234', toggles = { completion = true }, records = {} }",
             "date = os.date\nUnitGUID = function() return 'Player-1-0001' end\n", extra=("modules/completion.lua", "modules/owned.lua"))
