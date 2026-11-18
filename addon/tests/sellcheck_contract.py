@@ -37,6 +37,14 @@ function sellFrame()
   f.GetTotalPrice = function(self) return (rawget(self, 'quantity') or 1) * (rawget(self, 'unit') or 0) end
   f.UpdatePostState = function(self) self.updated = (rawget(self, 'updated') or 0) + 1 end
   f.PostItem = function() posted = posted + 1 end
+  -- The price box, Blizzard's default (a multiple of the vendor price) and the price of a matched listing.
+  f.PriceInput = {
+    GetAmount = function() return rawget(f, 'unit') or 0 end,
+    SetAmount = function(_, v) f.unit = v; f:UpdatePostState() end,
+  }
+  f.GetDefaultPrice = function(self) return rawget(self, 'default') or 100 end
+  f.GetSearchResultPrice = function(self) return rawget(self, 'searchPrice') end
+  f.UpdatePriceSelection = function(self) end
   return f
 end
 function setSell(f, id, unit, quantity, deposit)
@@ -100,7 +108,7 @@ local S = Everloot.SellCheck
 AuctionHouseFrame = { ItemSellFrame = sellFrame(), CommoditiesSellFrame = sellFrame() }
 local items, goods = AuctionHouseFrame.ItemSellFrame, AuctionHouseFrame.CommoditiesSellFrame
 assert(S.Attach() and S.Attach(), 'attaching twice is harmless')
-assert(#hooks == 2, 'one hook per sell frame, not one per attach')
+assert(#hooks == 4, 'the post state and the price selection of each sell frame, hooked once')
 local note = S.notes[goods]
 assert(note and not note:IsShown())
 local own = {}
@@ -296,8 +304,136 @@ click(p.vendorButton); click(p.vendorButton)
 assert(p.mode == 'lookup' and p.lookup.shown and not v.page.shown)
 """)
 
+# The suggested price: only when nothing is listed and the box still holds Blizzard's default; never below the vendor.
+lua.execute(r"""
+local E, S = Everloot, Everloot.SellCheck
+local goods = AuctionHouseFrame.CommoditiesSellFrame
+S.hooked, S.notes, S.priced = {}, {}, {}
+AuctionHouseFrame = { ItemSellFrame = sellFrame(), CommoditiesSellFrame = sellFrame() }
+goods = AuctionHouseFrame.CommoditiesSellFrame
+assert(S.Attach())
+local note = S.notes[goods]
+C_AuctionHouse.SupportsCopperValues = function() return false end
+-- Item 302: vendor 1s, market 3s here. Nothing listed, Blizzard's default 1s 50c in the box: Everloot puts 3s there.
+setSell(goods, 302, 150, 5, 25)
+goods.default = 150
+goods:UpdatePriceSelection()
+assert(goods.unit == 300, goods.unit)
+assert(note:IsShown() and note.text:find('Everloot set this price from this house') and note.text:find('community 2026%-11%-17'))
+-- A price the player types afterwards is theirs; the line goes.
+goods.PriceInput:SetAmount(275)
+assert(goods.unit == 275 and not (note.text or ''):find('Everloot set this price'))
+goods:UpdatePriceSelection()
+assert(goods.unit == 275, 'a typed price is never replaced')
+-- A matched listing is Blizzard's: left alone.
+setSell(goods, 302, 150, 5, 25)
+goods.searchPrice = 140
+goods:UpdatePriceSelection()
+assert(goods.unit == 150)
+goods.searchPrice = nil
+-- Item 300's market (1s 4c) after the cut is under its 1s vendor price: Blizzard's default stays and the warning says why.
+setSell(goods, 300, 150, 5, 25)
+goods:UpdatePriceSelection()
+assert(goods.unit == 150 and note.text:find('vendor'))
+-- Where the house takes no copper, rounded down to whole silver: item 301's 1s 10c becomes 1s, under the vendor after
+-- the cut, so Blizzard's default stays.
+setSell(goods, 301, 150, 5, 5)
+goods:UpdatePriceSelection()
+assert(goods.unit == 150, goods.unit)
+-- With copper prices allowed, the market value itself: 5 x 1s 10c after the cut is 5s 22c, 22c over the vendor, more
+-- than the 5c deposit: set.
+C_AuctionHouse.SupportsCopperValues = function() return true end
+setSell(goods, 301, 150, 5, 5)
+goods:UpdatePriceSelection()
+assert(goods.unit == 110, goods.unit)
+-- The same with a 25c deposit is barely worth posting: left alone.
+setSell(goods, 301, 150, 5, 25)
+goods:UpdatePriceSelection()
+assert(goods.unit == 150, goods.unit)
+-- Switched off: Blizzard's default stays.
+EverlootDB.sellPrice = false
+setSell(goods, 302, 150, 5, 25)
+goods:UpdatePriceSelection()
+assert(goods.unit == 150)
+EverlootDB.sellPrice = nil
+assert(posted == 0, 'still never posts')
+""")
+
+# The merchant button: what a vendor pays more for, minus shopping-list items, 12 stacks a press, only at a merchant.
+lua.execute(r"""
+local E, S = Everloot, Everloot.SellCheck
+local function stacks(id, n) local t = {}; for i = 1, n do t[i] = { itemID = id, stackCount = 1, quality = 1 } end; return t end
+-- 14 single stacks of 300 (vendor pays more), 2 of 301 (gain under deposit: kept), 1 of 302 (sells well here).
+bag = {}
+for _, part in ipairs({ stacks(300, 14), stacks(301, 2), stacks(302, 1) }) do
+  for _, info in ipairs(part) do bag[#bag + 1] = info end
+end
+-- The earlier bag was a local of its own block; this one is read from here on.
+C_Container.GetContainerNumSlots = function(b) return b == 0 and 20 or 0 end
+C_Container.GetContainerItemInfo = function(b, slot) return bag[slot] end
+used = {}
+C_Container.UseContainerItem = function(b, slot) used[#used + 1] = slot; bag[slot] = nil end
+E.auctionHouseOpen = false
+GameTooltip = CreateFrame('GameTooltip', 'GameTooltip')
+MerchantFrame = CreateFrame('Frame', 'MerchantFrame')
+MerchantFrame.shown = false
+
+-- Away from a merchant nothing is sold.
+assert(S.SellToMerchant() == 0 and #used == 0)
+MerchantFrame.shown = true
+S.frame.onEvent(S.frame, 'MERCHANT_SHOW')
+local button = S.merchantButton
+assert(button and button.shown and button.text == 'Everloot: sell 12 low-value stacks', button and button.text)
+assert(button.point[2] == MerchantFrame and button.point[3] == 'BOTTOMLEFT', 'below the merchant window')
+button.scripts.OnEnter(button)
+local list = S.MerchantList()
+assert(#list.rows == 1 and list.rows[1].itemId == 300 and list.stacks == 14)
+-- A press sells 12, the buyback tab's worth; the next sells the other 2.
+button.scripts.OnClick(button)
+assert(#used == 12 and said('sold 12 stacks a vendor pays more for'))
+S.frame.onEvent(S.frame, 'BAG_UPDATE_DELAYED')
+assert(button.shown and button.text == 'Everloot: sell 2 low-value stacks')
+button.scripts.OnClick(button)
+assert(#used == 14)
+S.frame.onEvent(S.frame, 'BAG_UPDATE_DELAYED')
+assert(not button.shown, 'nothing left to sell')
+
+-- Items on a shopping list are kept.
+bag = stacks(300, 3)
+EverlootDB.shopping = nil
+local list, why = E.Shopping.Create('Crafting')
+assert(E.Shopping.Set(300, 10, nil, 'Item 300'))
+assert(#S.MerchantList().rows == 0)
+E.Shopping.Remove(300)
+assert(#S.MerchantList().rows == 1)
+-- A slot that changed since the list was read is not sold.
+local real = C_Container.GetContainerItemInfo
+local reads = 0
+C_Container.GetContainerItemInfo = function(b, slot)
+  reads = reads + 1
+  if reads > 3 and slot == 1 then return { itemID = 999, stackCount = 1, quality = 1 } end
+  return real(b, slot)
+end
+used = {}
+S.SellToMerchant()
+assert(#used == 2 and used[1] == 2, 'the changed slot was skipped')
+C_Container.GetContainerItemInfo = real
+-- Switched off: no button, nothing sold.
+bag = stacks(300, 2)
+EverlootDB.merchantSell = false
+S.frame.onEvent(S.frame, 'MERCHANT_SHOW')
+assert(not button.shown and S.SellToMerchant() == 0)
+EverlootDB.merchantSell = nil
+S.frame.onEvent(S.frame, 'MERCHANT_CLOSED')
+assert(not button.shown)
+""")
+
 source = (root / "modules/sellcheck.lua").read_text(encoding="utf-8")
-for call in ("PostItem", "PostCommodity", "CancelAuction", "PlaceBid", "SetAmount", "SetQuantity", "ConfirmPost", "UseContainerItem", "PickupContainerItem"):
-    assert call not in source, f"the check must never call {call}"
+code = "\n".join(line.split("--")[0] for line in source.splitlines())
+for call in ("PostItem", "PostCommodity", "CancelAuction", "PlaceBid", "SetQuantity", "ConfirmPost", "PickupContainerItem",
+             "StartCommoditiesPurchase", "ConfirmCommoditiesPurchase", "SellAllJunkItems"):
+    assert call not in code, f"the check must never call {call}"
+# One place sets a price (S.Suggest) and one place sells (S.SellToMerchant).
+assert code.count("SetAmount") == 1 and code.count("UseContainerItem") == 1
 assert "modules\\sellcheck.lua" in (root / "Everloot.toc").read_text(encoding="utf-8")
 print("Sell check contract: PASS")

@@ -195,7 +195,10 @@ for case in main:
             assert actual.count("tooltipDisenchant") == 1
             # So is the vendor check in the auction house's Sell tab.
             assert actual.count("sellCheck") == 1
-            actual = [key for key in actual if key not in {"tooltip", "inventoryCapture", "tooltipDisenchant", "sellCheck"}]
+            # And the suggested price and the merchant button beside it.
+            assert actual.count("sellPrice") == 1 and actual.count("merchantSell") == 1
+            actual = [key for key in actual if key not in {"tooltip", "inventoryCapture", "tooltipDisenchant", "sellCheck",
+                                                           "sellPrice", "merchantSell"}]
         if part == "printed":
             # The feature chooser adds /everloot setup to the command list for every install, independently of pull
             # recording. Keep the historical fixture and compare every other word.
