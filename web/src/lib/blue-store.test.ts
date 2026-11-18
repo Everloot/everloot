@@ -5,7 +5,7 @@ vi.mock("./upload-store", () => ({
   r2Config: () => ({ r2AccountId: "test", r2Bucket: "test" }),
   r2Client: () => ({ sign: async (url: string, init: RequestInit) => new Request(url, init) }),
 }));
-import { readBlueStore, writeBlueStore } from "./blue-store";
+import { readBlueStore, STORE_TIMEOUT_MS, writeBlueStore } from "./blue-store";
 
 afterEach(() => { vi.unstubAllGlobals(); });
 
@@ -39,6 +39,24 @@ it("saves posts before advancing the fetch state", async () => {
   ]);
   expect(await requests[0][0].json()).toEqual({ posts: [] });
   expect(await requests[1][0].json()).toEqual({ fetched: {} });
+});
+
+it("bounds both writes together by the caller's deadline", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  const timeout = vi.spyOn(AbortSignal, "timeout");
+  try {
+    // Each write takes 4 s: the second one only gets what the first left of the 6 s.
+    vi.stubGlobal("fetch", vi.fn(async () => { vi.advanceTimersByTime(4_000); return new Response(null, { status: 200 }); }));
+    await writeBlueStore({ posts: [], fetched: {} }, Date.now() + 6_000);
+    expect(timeout.mock.calls).toEqual([[6_000], [2_000]]);
+    timeout.mockClear();
+    // Without a deadline each write keeps its own cap.
+    await writeBlueStore({ posts: [], fetched: {} });
+    expect(timeout.mock.calls).toEqual([[STORE_TIMEOUT_MS], [STORE_TIMEOUT_MS]]);
+  } finally {
+    timeout.mockRestore();
+    vi.useRealTimers();
+  }
 });
 
 it("does not advance fetch state when the posts write fails", async () => {
