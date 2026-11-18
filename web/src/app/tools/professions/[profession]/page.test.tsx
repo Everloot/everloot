@@ -41,6 +41,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/components/EmailCapture", () => ({ default: () => null }));
 
 import ProfessionPage, { generateMetadata } from "./page";
+import { professionBySegment } from "@/lib/professions";
 
 const obs = (installId: string, rank: number, difficulty: string, recipe = "Lesser Healing Potion") => ({
   kind: "recipe_observed", eventId: `${installId}:${rank}`, installId, capturedAt: "2026-10-10T00:00:00.000Z",
@@ -343,4 +344,43 @@ test("Herbs lands on gathering before the new Forever crafts, including when no 
   const metadata = await generateMetadata({ params: Promise.resolve({ profession: "herbalism" }) });
   expect(metadata.title).toContain("Herbalism Gathering");
   expect(metadata.description).toContain("gather herbs");
+});
+
+const spellLinks = (html: string) => html.match(/href="\/database\/spells\/\d+"/g)?.length ?? 0;
+
+test("the recipe table is paged on the server: 50 rows by default, the size clamped to 25..200, a page past the end shows the last", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  const all = professionBySegment("alchemy")!.recipes.length;
+  expect(all).toBeGreaterThan(100);
+  const first = await render();
+  expect(spellLinks(first)).toBe(50);
+  expect(first).toContain(`${all.toLocaleString("en-US")}</span> recipes`);
+  expect(first).toContain('href="/tools/professions/alchemy?page=2#prof-recipes"');
+  // The duplicated client-side list and its search box are gone; the table's own search is a GET form.
+  expect(first).not.toContain("Search recipes");
+  expect(first).toContain('action="/tools/professions/alchemy#prof-recipes"');
+  expect(spellLinks(await render("alchemy", { size: "1" }))).toBe(25);
+  expect(spellLinks(await render("alchemy", { size: "100" }))).toBe(100);
+  const most = await render("alchemy", { size: "5000" });
+  expect(spellLinks(most)).toBe(Math.min(all, 200));
+  expect(first.length).toBeLessThan(most.length / 2);
+  const last = Math.ceil(all / 50);
+  const past = await render("alchemy", { page: "999" });
+  expect(spellLinks(past)).toBe(all - (last - 1) * 50);
+  expect(past).toContain('aria-current="page"');
+});
+
+test("search and skill range filter on the server and keep the page's other parameters in their links", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  const named = await render("alchemy", { q: "minor strength" });
+  expect(spellLinks(named)).toBe(1);
+  expect(named).toContain('href="/database/spells/2329"');
+  expect(named).toContain("1</span> recipe");
+  const ranged = await render("alchemy", { min: "76", max: "150", from: "1", to: "11" });
+  expect([...ranged.matchAll(/data-skill-group="([^"]+)"/g)].map((m) => m[1])).toEqual(["76"]);
+  expect(ranged).toContain('href="/tools/professions/alchemy?from=1&amp;to=11&amp;min=76&amp;max=150&amp;size=100#prof-recipes"');
+  expect(ranged).toContain('type="hidden" name="min" value="76"');
+  const none = await render("alchemy", { q: "no recipe is called this" });
+  expect(spellLinks(none)).toBe(0);
+  expect(none).toContain("No Alchemy recipes match these filters.");
 });

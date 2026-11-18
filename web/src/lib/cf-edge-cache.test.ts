@@ -592,3 +592,28 @@ test("the light HEAD says 200 only for URLs the pages' own validators accept wit
     expect(light !== null, path).toBe(pageAnswers200);
   }
 });
+
+test("a profession page keeps one copy per recipe page and filter: order and tracking tags do not split it, a cookie bypasses it", async () => {
+  const store = fakeStore();
+  const ctx = fakeContext();
+  let rendered = 0;
+  const handler = async (req: Request) => { rendered++; return cachedPage(`<html>${new URL(req.url).search}</html>`); };
+  const get = async (url: string, headers: Record<string, string> = {}) => {
+    const res = await cachedResponse(new Request(`https://everloot.app${url}`, { headers }), VERSIONS, handler, store, ctx);
+    await Promise.all(ctx.waits);
+    return res;
+  };
+  await get("/tools/professions/alchemy?page=2&size=100&q=potion&min=1&max=75");
+  expect(rendered).toBe(1);
+  expect((await get("/tools/professions/alchemy?max=75&min=1&q=potion&size=100&page=2&utm_source=x")).headers.get("x-everloot-edge-cache")).toBe("HIT");
+  expect(rendered).toBe(1);
+  // Another page, size or range is another page of rows, so another copy.
+  for (const url of ["/tools/professions/alchemy?page=3&size=100&q=potion&min=1&max=75", "/tools/professions/alchemy?page=2&size=50&q=potion&min=1&max=75", "/tools/professions/alchemy?page=2&size=100&q=potion&min=76&max=150"]) {
+    expect((await get(url)).headers.get("x-everloot-edge-cache"), url).toBeNull();
+  }
+  expect(rendered).toBe(4);
+  const entries = store.entries.size;
+  await get("/tools/professions/alchemy?page=2&size=100&q=potion&min=1&max=75", { cookie: "everloot.session_token=abc" });
+  expect(rendered).toBe(5);
+  expect(store.entries.size).toBe(entries);
+});

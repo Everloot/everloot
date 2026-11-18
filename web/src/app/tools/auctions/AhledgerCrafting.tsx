@@ -35,15 +35,47 @@ function useCraftingMarket(): [string | null, (next: string) => void] {
   }];
 }
 
-type CraftSort = "profitPerDay" | "margin" | "cost";
+// The sortable columns: the column key (also the `?sort=` value, `-` first for high to low) and the field it orders by.
+const CRAFT_SORTS = { cost: "cost", net: "netValue", margin: "margin", sales: "salesPerDay", profit: "profitPerDay" } as const;
+type CraftSort = keyof typeof CRAFT_SORTS;
+type CraftOrder = { key: CraftSort; desc: boolean };
+const DEFAULT_CRAFT_SORT: CraftOrder = { key: "profit", desc: true };
+const SORT_LABELS: Record<CraftSort, string> = { cost: "Cost", net: "Net value", margin: "Margin", sales: "Sales per day", profit: "Profit per day" };
+
+/** `?sort=-profit` (high to low) or `?sort=cost` (low to high); anything else is the default, profit per day high to low. */
+function parseCraftSort(raw: string | null): CraftOrder {
+  const m = raw ? /^(-?)([a-z]+)$/.exec(raw) : null;
+  return m && m[2] in CRAFT_SORTS ? { key: m[2] as CraftSort, desc: m[1] === "-" } : DEFAULT_CRAFT_SORT;
+}
+const craftSortParam = (s: CraftOrder) => `${s.desc ? "-" : ""}${s.key}`;
+
+// The order lives in the URL beside the market, so a sorted table can be shared; the default leaves no parameter.
+function useCraftingSort(): [CraftOrder, (next: CraftOrder) => void] {
+  const [sort, setSort] = useState<CraftOrder>(DEFAULT_CRAFT_SORT);
+  useEffect(() => {
+    const read = () => setSort(parseCraftSort(new URL(window.location.href).searchParams.get("sort")));
+    read();
+    window.addEventListener("popstate", read);
+    return () => window.removeEventListener("popstate", read);
+  }, []);
+  return [sort, (next) => {
+    const url = new URL(window.location.href);
+    if (next.key === DEFAULT_CRAFT_SORT.key && next.desc === DEFAULT_CRAFT_SORT.desc) url.searchParams.delete("sort");
+    else url.searchParams.set("sort", craftSortParam(next));
+    window.history.replaceState(window.history.state, "", url);
+    setSort(next);
+  }];
+}
+
 function Crafting({ profession }: { profession: string }) {
   const [market, setMarket] = useCraftingMarket();
   const [filter, setFilter] = useState("");
-  const [sort, setSort] = useState<{ key: CraftSort; desc: boolean }>({ key: "profitPerDay", desc: true });
+  const [sort, setSort] = useCraftingSort();
   const read = useAhledger<AhledgerCraft[]>(market && `/api/ahledger/${market}/crafting?profession=${encodeURIComponent(profession)}`, "recipes");
   const query = filter.trim().toLowerCase();
+  const field = CRAFT_SORTS[sort.key];
   const rows = read.state === "ready" ? read.data.filter((r) => r.name.toLowerCase().includes(query)).sort((a, b) => {
-    const left = a[sort.key], right = b[sort.key];
+    const left = a[field], right = b[field];
     if (left === null) return right === null ? a.spellId - b.spellId : 1;
     if (right === null) return -1;
     return (sort.desc ? right - left : left - right) || a.spellId - b.spellId;
@@ -62,16 +94,13 @@ function Crafting({ profession }: { profession: string }) {
     <p className="text-meta text-fg-2">AH Ledger reagent and result prices, separate from player uploads. Net value uses average yield less the 5% auction house cut. A missing reagent price makes the cost unpriced. Estimated profit per day is an upper bound assuming you supply the whole market, not guaranteed earnings. Estimated sales lean low and are unrecorded when too few scans support them.</p>
     <div className="flex flex-wrap gap-3 text-meta text-fg-2">
       <label className="flex items-center gap-2">Filter recipes <input type="search" value={filter} onChange={(e) => setFilter(e.target.value)} className="min-h-10 rounded-control border border-line bg-canvas px-2 text-sm text-fg" /></label>
-      <label className="flex items-center gap-2">Sort by <select aria-label="Sort crafting margins" value={`${sort.key}:${sort.desc ? "desc" : "asc"}`} onChange={(e) => {
-        const [key, direction] = e.target.value.split(":");
-        setSort({ key: key as CraftSort, desc: direction === "desc" });
-      }} className="min-h-10 rounded-control border border-line bg-canvas px-2 text-sm text-fg">
-        <option value="profitPerDay:desc">Profit per day: high to low</option><option value="profitPerDay:asc">Profit per day: low to high</option>
-        <option value="margin:desc">Margin: high to low</option><option value="margin:asc">Margin: low to high</option>
-        <option value="cost:asc">Cost: low to high</option><option value="cost:desc">Cost: high to low</option>
+      <label className="flex items-center gap-2">Sort by <select aria-label="Sort crafting margins" value={craftSortParam(sort)} onChange={(e) => setSort(parseCraftSort(e.target.value))} className="min-h-10 rounded-control border border-line bg-canvas px-2 text-sm text-fg">
+        {(Object.keys(CRAFT_SORTS) as CraftSort[]).map((key) => [true, false].map((desc) => (
+          <option key={`${key}:${desc}`} value={craftSortParam({ key, desc })}>{SORT_LABELS[key]}: {desc ? "high to low" : "low to high"}</option>
+        )))}
       </select></label>
     </div>
-    {read.state === "ready" && (read.data.length ? <DataTable dense caption={`${profession} crafting margins from AH Ledger`} columns={columns} rows={rows} empty={<p className="py-3 text-meta text-fg-2">No recipes match this filter.</p>} rowKey={(r) => String(r.spellId)} meta={(r) => <>Cost: {r.cost === null ? "unpriced" : <Coins copper={r.cost} />} · Net: <Coins copper={r.netValue} /> · Margin: <Coins copper={r.margin} /> · Sales/day: {salesText(r.salesPerDay)} · Profit/day: <Coins copper={r.profitPerDay} /></>} /> : <p className="text-meta text-fg-2">No crafting margins on this market yet.</p>)}
+    {read.state === "ready" && (read.data.length ? <DataTable dense caption={`${profession} crafting margins from AH Ledger`} columns={columns} rows={rows} sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}empty={<p className="py-3 text-meta text-fg-2">No recipes match this filter.</p>} rowKey={(r) => String(r.spellId)} meta={(r) => <>Cost: {r.cost === null ? "unpriced" : <Coins copper={r.cost} />} · Net: <Coins copper={r.netValue} /> · Margin: <Coins copper={r.margin} /> · Sales/day: {salesText(r.salesPerDay)} · Profit/day: <Coins copper={r.profitPerDay} /></>} /> : <p className="text-meta text-fg-2">No crafting margins on this market yet.</p>)}
   </AhledgerPanel>;
 }
 
