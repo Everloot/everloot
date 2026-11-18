@@ -27,6 +27,7 @@ export { default as SearchBar, type SearchBarProps } from "./SearchBar";
 export { default as SectionHeading } from "./SectionHeading";
 export { default as Segmented, type SegmentedOption } from "./Segmented";
 export { default as Tabs, tabFromHash, type TabItem } from "./Tabs";
+export { filledTabs } from "./tab-style";
 export { default as ReadingLayout, RailFacts, type TocItem } from "./ReadingLayout";
 export { default as TooltipFrame, type TooltipFrameProps } from "./TooltipFrame";
 export { default as TooltipLines } from "./TooltipLines";

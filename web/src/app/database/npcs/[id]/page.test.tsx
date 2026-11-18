@@ -41,12 +41,14 @@ beforeEach(() => {
   mocks.items.mockResolvedValue({ rates: [], names: [], npcs: [], unreachable: false });
 });
 
-test("four tabs link agreed goods and giver/turn-in quests with their evidence", async () => {
+test("the tabs with rows link agreed goods and giver/turn-in quests with their evidence; the empty ones are left out", async () => {
   facts.vendors = goods();
   facts.quests = [...quest(10, "giverNpcId"), ...quest(11, "turnInNpcId"), ...quest(12, "giverNpcId").map((r) => ({ ...r, turnInNpcId: 1125 }))];
   const out = await html();
-  expect(out.match(/role="tab"/g)).toHaveLength(4);
-  for (const id of ["drops", "map", "goods", "quests"]) expect(out).toContain(`data-tab-panel="${id}"`);
+  expect(out.match(/role="tab"/g)).toHaveLength(2);
+  for (const id of ["goods", "quests"]) expect(out).toContain(`data-tab-panel="${id}"`);
+  // No drop and no agreed position: no "Drops (0)" or "Map (0)" before the tabs with rows.
+  for (const id of ["drops", "map"]) expect(out).not.toContain(`data-tab-panel="${id}"`);
   expect(panel(out, "goods")).toContain('href="/database/vendors/1125"');
   expect(panel(out, "goods")).toContain('href="/database/items/117"');
   expect(panel(out, "goods")).toContain("1 gold 23 silver 45 copper");
@@ -69,12 +71,18 @@ test("empty and below-threshold tabs explain the three-install rule without publ
     facts.vendors = goods(count);
     facts.quests = quest(10, "giverNpcId", count);
     const out = await html();
+    expect(out).not.toContain("12345");
+    expect(out).not.toContain('href="/database/quests/10"');
+    if (count === 0) {
+      // Nothing reported anywhere: no strip, the one line of the first tab.
+      expect(out).not.toContain('role="tab"');
+      continue;
+    }
+    // Short of 3 installs the tab stays, with its meter and the rule.
     expect(panel(out, "goods")).toContain("No agreed goods yet. A price needs 3 installs.");
     expect(panel(out, "quests")).toContain("No agreed quest yet. A quest needs its giver or turn-in from 3 installs.");
     expect(panel(out, "goods")).toContain(`data-agreement="${count}"`);
     expect(panel(out, "quests")).toContain(`data-agreement="${count}"`);
-    expect(panel(out, "goods")).not.toContain("12345");
-    expect(panel(out, "quests")).not.toContain('href="/database/quests/10"');
   }
 });
 
@@ -123,15 +131,17 @@ test("named NPC uses only agreed quest names and counts each install once per re
 test("a recheck on a quest reward item also resets its NPC relation", async () => {
   facts.quests = quest(10, "giverNpcId").map((r) => ({ ...r, rewardItemIds: [117] }));
   facts.recheck = [{ source: "test", type: "quests", ids: [117], since: "2026-11-09T00:00:00Z" }];
-  expect(panel(await html(), "quests")).toContain("No agreed quest yet.");
+  const out = await html();
+  expect(out).not.toContain('href="/database/quests/10"');
+  expect(out).not.toContain('data-tab-panel="quests"');
 });
 
 test("rechecks hide old agreements until three fresh installs agree", async () => {
   facts.vendors = goods();
   facts.quests = quest(10, "giverNpcId");
   facts.recheck = [{ source: "test", since: "2026-11-09T00:00:00Z", ids: [1125, 10] }];
-  expect(panel(await html(), "goods")).toContain("No agreed goods yet.");
-  expect(panel(await html(), "quests")).toContain("No agreed quest yet.");
+  const old = await html();
+  for (const id of ["goods", "quests"]) expect(old).not.toContain(`data-tab-panel="${id}"`);
   const fresh = "2026-11-10T00:00:00Z";
   facts.vendors.push(...goods().map((r) => ({ ...r, capturedAt: fresh })));
   facts.quests.push(...quest(10, "giverNpcId").map((r) => ({ ...r, capturedAt: fresh })));
@@ -169,8 +179,8 @@ test("zone rechecks reset goods and quest relations at the NPC's reported zone",
   facts.quests = quest(10, "giverNpcId");
   facts.recheck = [{ source: "test", zones: [1426], since: "2026-11-09T00:00:00Z" }];
   const out = await html();
-  expect(panel(out, "goods")).toContain('data-agreement="0"');
-  expect(panel(out, "quests")).toContain('data-agreement="0"');
+  expect(out).not.toContain("1 gold 23 silver 45 copper");
+  for (const id of ["goods", "quests"]) expect(out).not.toContain(`data-tab-panel="${id}"`);
 });
 
 test.each([1, 2])("%i agreeing reports plus a wiki match name all page surfaces without identities", async (count) => {

@@ -172,8 +172,8 @@ test("an item page shows its category path, slot and quality, with no source lin
   expect(page).not.toContain('aria-label="Breadcrumb"');
   expect(page).toContain('"@type":"BreadcrumbList"');
   expect(page).toContain('"item":"https://everloot.app/database/items/armor/cloth"');
-  // Every empty relation tab is the shared one-line empty state, never a bare zero.
-  expect(page).toContain("data-empty-state");
+  // Empty relation tabs are left out, never a bare "(0)" tab before the ones with rows.
+  expect(page).not.toMatch(/role="tab"[^>]*>[^<]*<span[^>]*> \(0\)/);
 });
 
 test("the Source column and filter: reported items show where they come from, the filter keeps its place in pager, menus and name box", async () => {

@@ -49,10 +49,22 @@ test("three installs: the NPC and item tables give the rate with its denominator
   expect(npc).toContain("50.0%");
   expect(npc).toContain("Out of 4 loot windows from 3 installs, dated 2026-10-10 to 2026-10-14.");
   expect(npc).toContain("Data as of 2026-10-21.");
-  const item = text(await html(Item(props("750"))));
+  const markup = await html(Item(props("750")));
+  const item = text(markup);
   expect(item).toContain("50.0%");
   expect(item).toContain("2026-10-10 to 2026-10-14");
   expect(item).toContain("out of the loot windows opened on the source");
+  // Where to get it is in the quick facts, above the tabs: the NPC it drops from, linked.
+  const getFrom = markup.split(">Get it from</dt>")[1]?.split("</dd>")[0] ?? "";
+  expect(getFrom).toContain('href="/database/npcs/40"');
+});
+
+test("no source: the quick facts have no Get it from row, and In short says nobody reported one", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([]));
+  const { Item } = await pages();
+  const markup = await html(Item(props("750")));
+  expect(markup).not.toContain("Get it from");
+  expect(text(markup)).toContain("No player has reported a drop source");
 });
 
 test("short of 3 installs, the quick facts count the installs that reported so far, and show no name or rate", async () => {
