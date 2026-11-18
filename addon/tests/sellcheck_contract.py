@@ -356,6 +356,21 @@ setSell(goods, 302, 150, 5, 25)
 goods:UpdatePriceSelection()
 assert(goods.unit == 150)
 EverlootDB.sellPrice = nil
+-- The safety net: a block that blames Everloot while its price is in the box switches the fill off, once.
+setSell(goods, 302, 150, 5, 25)
+goods:UpdatePriceSelection()
+assert(goods.unit == 300 and next(S.priced))
+assert(S.frame.events.ADDON_ACTION_BLOCKED and S.frame.events.ADDON_ACTION_FORBIDDEN)
+S.frame.onEvent(S.frame, 'ADDON_ACTION_BLOCKED', 'SomeOtherAddon', 'PostItem()')
+assert(EverlootDB.sellPrice ~= false, 'another addon blamed: nothing changes')
+S.frame.onEvent(S.frame, 'ADDON_ACTION_FORBIDDEN', 'Everloot', 'C_AuctionHouse.PostCommodity()')
+assert(EverlootDB.sellPrice == false and next(S.priced) == nil and said('no longer fills in prices'))
+assert(goods.unit == 300, 'the price stays for the player')
+setSell(goods, 302, 150, 5, 25)
+goods:UpdatePriceSelection()
+assert(goods.unit == 150, 'off now')
+assert(not S.Blocked('Everloot', 'x'), 'nothing of Everloot in the box: not blamed again')
+EverlootDB.sellPrice = nil
 assert(posted == 0, 'still never posts')
 """)
 

@@ -10,7 +10,8 @@
 -- Two helpers need no setup and are on in a new install, each with its own switch:
 -- * Suggested price: when the house lists none of the item, Blizzard fills the price with a multiple of the vendor price.
 --   Everloot puts this house's current market value there instead, only when that beats a vendor by more than the
---   deposit. A matched listing and anything the player typed are left alone. The player still presses Post.
+--   deposit. A matched listing and anything the player typed are left alone. The player still presses Post. Should the
+--   game ever block an action and blame Everloot while such a price is in the box, the fill switches itself off.
 -- * At a merchant, a button under the window sells, one press at a time, up to 12 stacks a vendor pays more for than
 --   this house (what the buyback tab can undo). Greys are Blizzard's own Sell All Junk button's. Items on a shopping
 --   list are kept.
@@ -284,6 +285,21 @@ function S.Suggest(frame)
   return unit
 end
 
+--- The game names the addon it blames when it blocks a protected action. If that is Everloot while a price Everloot
+--- filled in is still in a sell window, the fill is the likely cause: the suggested price switches off for good (the
+--- settings switch shows it off), the player is told once in chat, and the price stays in the box for them to post.
+--- Returns true when it switched the fill off.
+function S.Blocked(addon, action)
+  addon = E.Readable(addon)
+  if addon ~= "Everloot" or next(S.priced) == nil then return false end
+  if type(EverlootDB) == "table" then EverlootDB.sellPrice = false end
+  S.priced = {}
+  print("Everloot: the game blocked " .. tostring(E.Readable(action) or "an action") .. " after Everloot filled in a price, "
+    .. "so Everloot no longer fills in prices (Esc > Options > AddOns > Everloot > Auction House turns it back on). "
+    .. "Retype the price and press Post again.")
+  return true
+end
+
 --- Reads the sell frame and shows or hides its note. Called after each of Blizzard's own updates.
 function S.Update(frame)
   local note = frame and S.notes[frame]
@@ -467,11 +483,13 @@ end
 -- The merchant button follows the merchant window and the bags while it is open.
 local listener = CreateFrame("Frame")
 S.frame = listener
-for _, event in ipairs({ "ADDON_LOADED", "AUCTION_HOUSE_SHOW", "MERCHANT_SHOW", "MERCHANT_CLOSED", "BAG_UPDATE_DELAYED" }) do
+for _, event in ipairs({ "ADDON_LOADED", "AUCTION_HOUSE_SHOW", "MERCHANT_SHOW", "MERCHANT_CLOSED", "BAG_UPDATE_DELAYED",
+  "ADDON_ACTION_BLOCKED", "ADDON_ACTION_FORBIDDEN" }) do
   pcall(listener.RegisterEvent, listener, event)
 end
-listener:SetScript("OnEvent", function(_, event, name)
-  if event == "AUCTION_HOUSE_SHOW" or name == "Blizzard_AuctionHouseUI" then pcall(S.Attach)
+listener:SetScript("OnEvent", function(_, event, name, action)
+  if event == "ADDON_ACTION_BLOCKED" or event == "ADDON_ACTION_FORBIDDEN" then pcall(S.Blocked, name, action)
+  elseif event == "AUCTION_HOUSE_SHOW" or name == "Blizzard_AuctionHouseUI" then pcall(S.Attach)
   elseif event == "MERCHANT_SHOW" then
     if S.MerchantOn() then pcall(merchantButton) end
     pcall(S.RefreshMerchant)

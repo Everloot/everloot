@@ -65,7 +65,9 @@ grouped across stacks, with what vendoring and posting them would bring. It is a
 Two helpers are on in a new install, each with its own switch. In the Sell tab, when the house lists none of the item,
 Everloot replaces Blizzard's default (a multiple of the vendor price) with this house's current market value, rounded
 down to whole silver where the house takes no copper, and only when posting at it beats a vendor by more than the
-deposit; a matched listing and a price you typed are never changed, and posting is always your own press of Post. At a
+deposit; a matched listing and a price you typed are never changed, and posting is always your own press of Post. If
+the game ever blocks an action and blames Everloot while such a price is in the box, the fill turns itself off and says
+so in chat. At a
 merchant, a button under the window sells up to 12 stacks per press (what the buyback tab can undo) of items a vendor
 pays more for than your auction house after its cut; items on a shopping list are kept, and greys stay with Blizzard's
 Sell All Junk button.
