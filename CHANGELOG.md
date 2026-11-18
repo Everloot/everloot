@@ -238,7 +238,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: /tools/bags shows the cheapest bag of each size on one realm's auction house and what each added slot costs over your smallest bag, and item tooltips print a bag's "14 Slot Bag" line; slot counts come from the game files, prices from players' scans.
 - Site: the world map shows zone or continent coordinates on hover and shares pins in the address; Shift-click or use Pin map centre, and Clear pin removes it.
 - Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
-- Site: a realm's Auction House page, with one house picked, lists "Vendor these": items a vendor pays more for than that house after its cut, biggest difference first, so you know what not to post.
 
 ### Fixed
 - Site: character search finds a Forever character by first name, surname or full name (“Volvik Morningstar”), and the header and /search list armory characters with their region. Surnames and full names need the 20261117140000 migration.
@@ -398,6 +397,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the loot observations table sorts frequency by its 95% Wilson lower bound while still showing the observed share.
 
 ### Changed
+- Addon: the Everloot window opens inside the game's gold dialog frame, the gold of the minimap button's ring, in place of the thin bronze edge; the resize grip moves inside the frame. The settings page and the raid panel keep the bronze edge.
 - Site: the signed-in home puts your characters first: the main character's card, then alts, then builds. With no characters it shows one card to get the addon or connect Battle.net, and empty build lists hide instead of saying "None yet".
 - Addon: easier reading in the Everloot window, settings, auction house tab and plan workspace: words use the game's own Friz Quadrata and nothing is smaller than 12 px (was 10 to 11 px, mostly in Arial Narrow); Arial Narrow stays only for figures, dates and the tight Home lists, also at 12 px. Home's character columns and the Collection list were re-spaced so the larger text still fits. Home's Missing list now sits under the realm line, so a long class or realm name ("CAMWOW US1 Realm 4 PvP") no longer runs into it. Needs an in-game check before release.
 - Site: the header is Lookup, Database, Tools, Guides, Chat and Profile, the phone menu follows it, and /tools shows the planners as cards; Plans and Alts on this device move to Profile, Farming, Collections and Upload are unlinked until polished (their pages still load), and the footer links Guides and the guides feed.
