@@ -65,6 +65,23 @@ beforeAll(async () => {
   text = decode(stripTags(page));
 });
 
+test("the addon and troubleshooting guides explain opening the window and recovering from an error", async () => {
+  const renderGuide = async (slug: string) => renderToStaticMarkup((await modules[`../../app/docs/guides/${slug}/page.tsx`]!.default({ params: Promise.resolve({}) })) as ReactNode);
+  const addon = await renderGuide("addon");
+  expect(addon).toContain('<h2 id="window"');
+  const words = decode(stripTags(addon));
+  for (const term of ["Home", "Gold", "Collection", "Professions", "Settings", "/everloot window", "/everloot setup", "Collect data only", "EverlootDB.roster", "EverlootDB.ledger", "never uploaded"]) {
+    expect(words).toContain(term);
+  }
+  const troubleshooting = await renderGuide("troubleshooting");
+  expect(troubleshooting).toContain('<h2 id="window-closed"');
+  expect(troubleshooting).toContain("template=bug-report.yml");
+  const help = decode(stripTags(troubleshooting));
+  for (const term of ["/everloot status", "/reload", "/everloot window", "Recording was not affected", "This part of Everloot did not load"]) {
+    expect(help).toContain(term);
+  }
+});
+
 test("the tool list is exactly the tools the protocol declares, in order", () => {
   expect(MCP_TOOL_NAMES.length).toBeGreaterThan(0);
   expect(MCP_TOOLS.map((tool) => tool.name)).toEqual(MCP_TOOL_NAMES);
