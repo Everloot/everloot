@@ -15,6 +15,8 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: Herbalism has a gathering guide at /tools/professions/herbalism/gathering: herb zones with the herbs looted in each, every herb's zones and the Herbalism trainers players saw, all at 3 installs.
+- Desktop: the Characters page shows how many titles each keyed character is missing, with links to the site's collections tool and, for a linked character, its page, and a Linked characters panel with the characters you linked, the last private sync and the last link or sync problem.
 - Site: profession pages list the game-file recipes 50 at a time (25 to 200), with search and skill range filters in the URL, instead of sending every recipe; AH Ledger crafting margins also sort by net value and sales per day, and the sort is kept in the URL.
 - Addon: the auction house's Sell tab says, under Post, when a vendor pays more than your price brings in after the house's cut (5% at faction houses, 15% at goblin ones), when the gain over a vendor is smaller than the deposit you lose if it does not sell, when this house's current market value after the cut is below the vendor price, and when disenchanting looks better. It never changes a price or posts; Auction House settings turn it off.
 - Addon: armor and weapons you see or disenchant are recorded with their item level, so the site can place a disenchant in its band when the game files give the item no level (about one in five disenchants so far).
@@ -240,6 +242,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Fixed
 - Site: lore pages drop the doubled spaces the wiki's source had but never showed, leave no gap where footnotes or race icons sat side by side, show `{{-}}` as its dash and `{{Race|…|notext}}` as only its icon, so far fewer pages are marked damaged.
+- Site: the Blizzard character lookup on /search finds real characters: it waits up to 4 s instead of 1.8 s (every live hit ran out of time), and a character Blizzard finds after that is still stored, so searching again lists it.
 - Site: character search finds a Forever character by first name, surname or full name (“Volvik Morningstar”), and the header and /search list armory characters with their region. Surnames and full names need the 20261117140000 migration.
 - Site: terrain page and zone and dungeon Terrain links load on click instead of prefetching into the edge rate limit.
 - Site: disenchant bands read build 1.60.1.70959 like the rest of the game data (they still named 70938 after the build refresh).
@@ -397,6 +400,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the loot observations table sorts frequency by its 95% Wilson lower bound while still showing the observed share.
 
 ### Changed
+- Site: the Blizzard character lookup on /search is switched on: a full "First Surname" nobody has stored is looked up in the US, then the EU, within its per-address and site-wide limits.
+- Addon: the Everloot window opens inside the game's gold dialog frame, the gold of the minimap button's ring, in place of the thin bronze edge; the resize grip moves inside the frame. The settings page and the raid panel keep the bronze edge.
 - Site: the signed-in home puts your characters first: the main character's card, then alts, then builds. With no characters it shows one card to get the addon or connect Battle.net, and empty build lists hide instead of saying "None yet".
 - Addon: easier reading in the Everloot window, settings, auction house tab and plan workspace: words use the game's own Friz Quadrata and nothing is smaller than 12 px (was 10 to 11 px, mostly in Arial Narrow); Arial Narrow stays only for figures, dates and the tight Home lists, also at 12 px. Home's character columns and the Collection list were re-spaced so the larger text still fits. Home's Missing list now sits under the realm line, so a long class or realm name ("CAMWOW US1 Realm 4 PvP") no longer runs into it. Needs an in-game check before release.
 - Site: the header is Lookup, Database, Tools, Guides, Chat and Profile, the phone menu follows it, and /tools shows the planners as cards; Plans and Alts on this device move to Profile, Farming, Collections and Upload are unlinked until polished (their pages still load), and the footer links Guides and the guides feed.

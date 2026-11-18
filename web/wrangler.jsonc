@@ -90,6 +90,9 @@
     "EVERLOOT_SHOWCASE": "1",
     // Armory: a page for every Forever character and guild from the Blizzard API; unset means /armory answers 404 (owner, 2026-11-09).
     "EVERLOOT_ARMORY": "1",
+    // /search looks up a full "First Surname" nobody stored in Blizzard's character API, US then EU, on the site's
+    // Battle.net client (BNET_CLIENT_ID/SECRET, shared with sign-in); 20/h per address, 300/h site-wide (owner, 2026-11-18).
+    "EVERLOOT_ARMORY_LOOKUP": "1",
     "EVERLOOT_PRIVATE_SYNC": "1",
     // Item level and Gear Score boards for linked characters whose owner chose "Rank my gear" (owner, 2026-11-06).
     "EVERLOOT_LEADERBOARDS": "1",

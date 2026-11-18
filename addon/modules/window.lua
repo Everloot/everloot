@@ -257,6 +257,22 @@ local function backdrop(f)
   end
 end
 
+-- The open window's frame: the game's gold dialog edge around Everloot's dark panel, the gold of the minimap button's
+-- ring. Edge size and insets are Blizzard's BACKDROP_GOLD_DIALOG_32_32 (Blizzard_SharedXML/Backdrop.lua, build
+-- 70959). Untinted, so it stays gold. The settings page and the raid panel keep the bronze edge above: the settings
+-- page also sits inside this window, where a second gold frame would double the border.
+local GOLD_EDGE, GOLD_INSET = "Interface\\DialogFrame\\UI-DialogBox-Gold-Border", 12
+local function goldFrame(f)
+  if f.SetBackdrop then
+    f:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = GOLD_EDGE, tile = false, tileEdge = true,
+      edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } })
+    f:SetBackdropColor(unpack(COLORS.canvas))
+    f:SetBackdropBorderColor(1, 1, 1, 1)
+  else
+    fill(f, COLORS.canvas)
+  end
+end
+
 -- The heading of the settings page and the auction house tab: a small crest, Everloot in fel green as in the
 -- tooltip, and the page's name in muted text. The caller places the crest; the words follow it.
 local function heading(parent, subtitle)
@@ -496,7 +512,7 @@ local function build()
   f:RegisterForDrag("LeftButton")
   f:SetScript("OnDragStart", function(self) self:StartMoving() end)
   f:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
-  backdrop(f)
+  goldFrame(f)
 
   -- The crest breaks out of the top-left corner.
   local crest = f:CreateTexture(nil, "OVERLAY")
@@ -519,9 +535,9 @@ local function build()
   -- The corner grip the game's chat windows have: drag it to make the whole window bigger or smaller, right-click it
   -- for the normal size. The top-left corner stays put, and the size is kept for the next session.
   local grip = CreateFrame("Button", nil, f)
-  -- Inside the corner's edge, drawn above the views.
+  -- Inside the gold edge, drawn above the views.
   grip:SetSize(14, 14)
-  grip:SetPoint("BOTTOMRIGHT", -3, 3)
+  grip:SetPoint("BOTTOMRIGHT", -GOLD_INSET, GOLD_INSET)
   local level = tonumber((f:GetFrameLevel()))
   if level then grip:SetFrameLevel(level + 10) end
   grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
