@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: /search can find a character nobody has stored yet: a full "First Surname" with no match is looked up in Blizzard's character API (US, then EU) and the character is stored and listed. Off until `EVERLOOT_ARMORY_LOOKUP=1`; limited per address and site-wide, never for crawlers or the header's type-ahead.
 - Addon: armor and weapons you see or disenchant are recorded with their item level, so the site can place a disenchant in its band when the game files give the item no level (about one in five disenchants so far).
 - Addon: item tooltips show a disenchant estimate for armor and weapons: the value of the materials their band gives at your house's prices ("at least" when a material has no price), each material's chance and units, and whether the materials, the auction or a vendor pays more, from the disenchants players recorded; an Options checkbox turns it off. A Disenchanting view in the Everloot window keeps your own disenchants on this computer (never uploaded): materials received, their value now and, where the ledger knows it, what you paid.
 - Desktop: refreshes the disenchant results once a day into the game's price file and keeps the last good copy when a fetch fails.

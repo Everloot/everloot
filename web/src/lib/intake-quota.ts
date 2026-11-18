@@ -37,7 +37,7 @@ export function createIntakeQuota(opts: {
   const secret = env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   const production = env.NODE_ENV === "production";
 
-  async function consume(scope: "request" | "install" | "mcp" | "api" | "form" | "market", value: string): Promise<QuotaResult> {
+  async function consume(scope: "request" | "install" | "mcp" | "api" | "form" | "market" | "lookup", value: string): Promise<QuotaResult> {
     if (url && secret) {
       const key = createHmac("sha256", secret).update(`${scope}:${value}`).digest("hex");
       const response = await doFetch(`${url.replace(/\/$/, "")}/rest/v1/rpc/consume_intake_quota`, {
@@ -61,6 +61,7 @@ export function createIntakeQuota(opts: {
       : scope === "api" ? [["api_global", 3000], [`api:${value}`, 30]]
       : scope === "form" ? [["form_global", 2000], [`form:${value}`, 30]]
       : scope === "market" ? [["market_global", 5000], [`market:${value}`, 200]]
+      : scope === "lookup" ? [["lookup_global", 300], [`lookup:${value}`, 20]]
       : [[`install:${value}`, 20]];
     const retryAfter = Math.max(0, ...limits.map(([key, limit]) => {
       const bucket = local.get(key);
@@ -147,6 +148,13 @@ export function createIntakeQuota(opts: {
      */
     async api(req: Request) {
       return consume("api", clientIp(req));
+    },
+    /**
+     * The on-demand armory lookup (armory-lookup.ts), which calls Blizzard: 300 an hour site-wide and 20 per address,
+     * after 20261117150000_armory_lookup.sql is applied. Before that the scope is refused and no lookup runs.
+     */
+    async lookup(req: Request) {
+      return consume("lookup", clientIp(req));
     },
     install(installId: string) { return consume("install", installId); },
     /**

@@ -1,14 +1,16 @@
 import { isIP } from "node:net";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { ipv6Subscriber } from "@/lib/intake-quota";
+import { armoryLookupOn, browserLookup, findCharacter } from "@/lib/armory-lookup";
+import { intakeQuota, ipv6Subscriber } from "@/lib/intake-quota";
 import { MAX_QUERY } from "@/lib/lore";
 import { peopleSearch } from "@/lib/people-search";
 import { edgeClientIp } from "@/lib/platform";
 
 /**
  * GET /search/people?q=<text>: the characters and guilds whose name starts with the text, for the header
- * type-ahead and the /search page. Apart from /search/suggest on purpose: that answer is kept by browsers and
- * the CDN for minutes, and the hide forms promise a hidden name leaves search as soon as it is sent. This one is
+ * type-ahead and the /search page. `lookup=1` (the /search page only) also asks Blizzard for a full name nobody
+ * stored, when EVERLOOT_ARMORY_LOOKUP=1 and the request is a browser's own fetch (armory-lookup.ts). Apart from
+ * /search/suggest on purpose: that answer is kept by browsers and the CDN for minutes, and the hide forms promise a hidden name leaves search as soon as it is sent. This one is
  * never stored outside the server, whose caches a hide clears. Never indexed.
  */
 export const dynamic = "force-dynamic";
@@ -34,13 +36,25 @@ async function overLimit(req: Request): Promise<boolean> {
   }
 }
 
+/**
+ * One lookup admitted by the 'lookup' quota. Unlike the per-minute limit above, a quota that cannot be read refuses:
+ * the lookup spends a third party's quota, and refusing it only means "not found" as before.
+ */
+async function lookupAdmitted(req: Request): Promise<boolean> {
+  try { return (await intakeQuota.lookup(req)).allowed; } catch { return false; }
+}
+
 export async function GET(req: Request) {
-  const q = (new URL(req.url).searchParams.get("q") ?? "").trim();
+  const url = new URL(req.url);
+  const q = (url.searchParams.get("q") ?? "").trim();
   if (q.length > MAX_QUERY) return Response.json({ ok: false, error: `q is at most ${MAX_QUERY} characters.` }, { status: 400, headers: HEADERS });
   if (await overLimit(req)) {
     return Response.json({ ok: false, error: "Too many name lookups from this address. Try again in a minute." },
       { status: 429, headers: { ...HEADERS, "Retry-After": "60" } });
   }
   // Empty text reads nothing: peopleSearch validates both prefixes before any lookup.
-  return Response.json({ q, ...(await peopleSearch(q)) }, { headers: HEADERS });
+  const lookup = url.searchParams.get("lookup") === "1" && armoryLookupOn() && browserLookup(req)
+    ? (text: string) => findCharacter(text, () => lookupAdmitted(req))
+    : undefined;
+  return Response.json({ q, ...(await peopleSearch(q, undefined, lookup)) }, { headers: HEADERS });
 }
