@@ -1,0 +1,218 @@
+"""The vendor check in the auction house's Sell tab: the verdict from plain numbers, the reading of Blizzard's sell
+frames through hooksecurefunc, the switch, and that it never posts or changes what Blizzard's frame holds."""
+from pathlib import Path
+import zlib
+import json
+from window_world import fresh
+
+root = Path(__file__).parents[1]
+api = """
+now = 1794873600 + 3600
+-- Today is the test's own day, not the machine's, so the price ages below never go stale.
+date = function(format, t) return os.date(format, t or now) end
+-- Item 100: uncommon armor, item level 10 (a disenchant band), sells to a vendor for 20c each.
+-- Item 300: a reagent that sells to a vendor for 1s each. Item 400: no vendor price.
+GetItemInfo = function(id)
+  if id == 100 then return 'Item 100', 'item:100', 2, 10, 1, '', '', 1, '', 123, 20, 4 end
+  if id == 300 then return 'Item 300', 'item:300', 1, 10, 1, '', '', 20, '', 123, 100, 7 end
+  if id == 400 then return 'Item 400', 'item:400', 1, 10, 1, '', '', 20, '', 123, 0, 7 end
+  return 'Item ' .. id, 'item:' .. id, 1, 10, 1, '', '', 1, '', 123, 5, 7
+end
+C_Item = { GetItemID = function(location) return location.id end }
+hooks = {}
+hooksecurefunc = function(target, method, f)
+  local original = target[method]
+  target[method] = function(...) local r = original(...); f(...); return r end
+  hooks[#hooks + 1] = method
+end
+posted = 0
+-- Blizzard's sell frame as the client builds it: the methods the check reads, and a Post that counts.
+function sellFrame()
+  local f = CreateFrame('Frame')
+  f.PostButton = CreateFrame('Button')
+  -- The stub frame answers any unknown key with a function, so its own fields are read with rawget.
+  f.Deposit = { GetAmount = function() return rawget(f, 'deposit') or 0 end }
+  f.GetItem = function(self) return rawget(self, 'item') end
+  f.GetQuantity = function(self) return rawget(self, 'quantity') or 1 end
+  f.GetTotalPrice = function(self) return (rawget(self, 'quantity') or 1) * (rawget(self, 'unit') or 0) end
+  f.UpdatePostState = function(self) self.updated = (rawget(self, 'updated') or 0) + 1 end
+  f.PostItem = function() posted = posted + 1 end
+  return f
+end
+function setSell(f, id, unit, quantity, deposit)
+  f.item = id and { id = id } or nil
+  f.unit, f.quantity, f.deposit = unit, quantity, deposit
+  f:UpdatePostState()
+end
+"""
+lua = fresh(api=api, extra=("modules/disenchant_data.lua", "modules/disenchant.lua", "modules/sellcheck.lua"))
+
+# The verdict alone, from plain numbers.
+lua.execute(r"""
+local S = Everloot.SellCheck
+local function text(v) local t = {}; for _, l in ipairs(v.lines) do t[#t + 1] = l.text end; return table.concat(t, '\n') end
+assert(S.Cut('Alliance') == 0.05 and S.Cut('Horde') == 0.05 and S.Cut('Neutral') == 0.15 and S.Cut(nil) == 0.05)
+
+-- 1s posted, 5% cut: 95c in hand; a vendor pays 1s now. Red, and the deposit is named.
+local v = S.Verdict({ quantity = 1, total = 100, deposit = 15, house = 'Alliance', vendorUnit = 100 })
+assert(v.level == 'vendor', v.level)
+assert(text(v):find('a vendor pays more') and text(v):find('95') and text(v):find('5%% cut') and text(v):find('deposit'))
+assert(v.lines[1].color[1] == 1 and v.lines[1].color[2] == 0.4, 'the heading is the tooltip warning red')
+
+-- Exactly the vendor price after the cut is still not worth posting.
+assert(S.Verdict({ quantity = 1, total = 106, house = 'Alliance', vendorUnit = 100 }).level == 'vendor', 'floor(106 * 0.95) = 100')
+
+-- The neutral house's 15% turns a sale that beats the vendor at a faction house into a loss.
+assert(S.Verdict({ quantity = 1, total = 115, deposit = 0, house = 'Alliance', vendorUnit = 100 }).level == nil)
+assert(S.Verdict({ quantity = 1, total = 115, deposit = 0, house = 'Neutral', vendorUnit = 100 }).level == 'vendor')
+
+-- 20 for 30s: 28s 50c after the cut, 8s 50c above the 20s a vendor pays, but the deposit is 10s: amber.
+v = S.Verdict({ quantity = 20, total = 3000, deposit = 1000, house = 'Horde', vendorUnit = 100 })
+assert(v.level == 'thin', v.level)
+assert(text(v):find('barely beats a vendor') and text(v):find('for all 20'))
+-- With a deposit smaller than the gain, nothing is said.
+assert(#S.Verdict({ quantity = 20, total = 3000, deposit = 500, house = 'Horde', vendorUnit = 100 }).lines == 0)
+
+-- The player's price beats the vendor, but this house's current value after the cut does not.
+v = S.Verdict({ quantity = 1, total = 500, deposit = 10, house = 'Alliance', vendorUnit = 100, marketUnit = 104,
+  marketSource = 'your scan 2026-11-17' })
+assert(v.level == 'market' and text(v):find('your scan 2026%-11%-17') and text(v):find('may not sell'))
+assert(#S.Verdict({ quantity = 1, total = 500, deposit = 10, house = 'Alliance', vendorUnit = 100, marketUnit = 300 }).lines == 0)
+
+-- Disenchanting: said when its materials after the cut beat both the sale and the vendor.
+v = S.Verdict({ quantity = 1, total = 200, deposit = 5, house = 'Alliance', vendorUnit = 20, disenchantUnit = 400 })
+assert(v.level == 'disenchant' and text(v):find('disenchanting looks better') and text(v):find('needs an enchanter'))
+v = S.Verdict({ quantity = 1, total = 30, deposit = 5, house = 'Alliance', vendorUnit = 100, disenchantUnit = 400 })
+assert(v.level == 'vendor' and text(v):find('Disenchanted, its materials'), 'both said, the vendor first')
+assert(#S.Verdict({ quantity = 1, total = 900, deposit = 5, house = 'Alliance', vendorUnit = 20, disenchantUnit = 400 }).lines == 0)
+
+-- Nothing it cannot back: no vendor price, no price typed, no quantity, a secret or odd number.
+assert(#S.Verdict({ quantity = 1, total = 50, deposit = 5, house = 'Alliance' }).lines == 0)
+assert(#S.Verdict({ quantity = 1, total = 50, deposit = 5, house = 'Alliance', vendorUnit = 0 }).lines == 0)
+assert(#S.Verdict({ quantity = 1, total = 0, house = 'Alliance', vendorUnit = 100 }).lines == 0)
+assert(#S.Verdict({ quantity = 0, total = 50, house = 'Alliance', vendorUnit = 100 }).lines == 0)
+assert(#S.Verdict({ quantity = 1, total = 50.5, house = 'Alliance', vendorUnit = 100 }).lines == 0)
+""")
+
+# Blizzard's sell frames: hooked once, read after each of Blizzard's updates, never posted or changed.
+lua.execute(r"""
+local S = Everloot.SellCheck
+AuctionHouseFrame = { ItemSellFrame = sellFrame(), CommoditiesSellFrame = sellFrame() }
+local items, goods = AuctionHouseFrame.ItemSellFrame, AuctionHouseFrame.CommoditiesSellFrame
+assert(S.Attach() and S.Attach(), 'attaching twice is harmless')
+assert(#hooks == 2, 'one hook per sell frame, not one per attach')
+local note = S.notes[goods]
+assert(note and not note:IsShown())
+local own = {}
+for key in pairs(goods) do own[key] = true end
+for _, key in ipairs({ 'everlootSellNote', 'everlootSellHooked' }) do assert(not own[key], 'nothing written into Blizzard frames') end
+
+-- 20 of the reagent at 1s each: 95c each after the cut, under the 1s a vendor pays.
+setSell(goods, 300, 100, 20, 300)
+assert(goods.updated == 1, "Blizzard's own update still runs")
+assert(note:IsShown() and note.text:find('a vendor pays more') and S.last.level == 'vendor')
+assert(goods.unit == 100 and goods.quantity == 20 and goods.deposit == 300, 'the check never changes the price, quantity or deposit')
+
+-- Raised to 5s each: the warning goes away.
+setSell(goods, 300, 500, 20, 300)
+assert(not note:IsShown() and S.last == nil)
+
+-- An item with no vendor price: nothing to compare.
+setSell(goods, 400, 1, 1, 0)
+assert(not note:IsShown())
+
+-- The item taken out of the slot clears the note.
+setSell(goods, 300, 50, 1, 15)
+assert(note:IsShown())
+setSell(goods, nil)
+assert(not note:IsShown())
+
+-- The switch: off hides it at once, back on shows it again.
+setSell(goods, 300, 50, 1, 15)
+EverlootDB.sellCheck = false
+goods:UpdatePostState()
+assert(not note:IsShown())
+EverlootDB.sellCheck = nil
+goods:UpdatePostState()
+assert(note:IsShown())
+
+-- A secret value reads as missing: no note, no error.
+local secretTotal = {}
+SECRET[secretTotal] = true
+goods.GetTotalPrice = function() return secretTotal end
+goods:UpdatePostState()
+assert(not note:IsShown())
+
+-- A sell frame that errors while being read leaves Blizzard's update intact.
+items.GetQuantity = function() error('boom') end
+setSell(items, 300, 50, 1, 15)
+assert(items.updated == 1 and not S.notes[items]:IsShown())
+assert(posted == 0, 'never posts')
+""")
+
+# The settings switch: in the auction group, live, on by default, off in the collect-only setup.
+lua.execute(r"""
+local O = Everloot.Options
+local row
+for _, r in ipairs(O.ROWS) do if r.key == 'sellCheck' then row = r end end
+assert(row and row.group == 'auction' and row.field and row.live and not row.defaultOff)
+assert(O.SETUP.everything.fields.sellCheck == true and O.SETUP.collect.fields.sellCheck == false)
+""")
+
+# House prices and the disenchant estimate come from the same file the tooltip reads, for this house only.
+def block(data):
+    lua.execute(f"EverlootPricesDB = {{ disenchant = {{ data = {json.dumps(data)}, sum = {zlib.adler32(data.encode())}, dataAsOf = '2026-11-17T00:00:00Z' }} }}; Everloot:ResetPrices()")
+
+block("4,200,8,10,1600,1,3")
+lua.execute(r"""
+local E, S = Everloot, Everloot.SellCheck
+local function prices(data)
+  EverlootPricesDB.realms = { ['forever|alliance'] = { data = data, sum = E.Adler32(data), dataAsOf = '2026-11-17' } }
+  E:ResetPrices()
+end
+local goods = AuctionHouseFrame.CommoditiesSellFrame
+local note = S.notes[goods]
+goods.GetTotalPrice = function(self) return (rawget(self, 'quantity') or 1) * (rawget(self, 'unit') or 0) end
+
+-- The reagent's market value here is 1s 4c: after the cut, under the vendor's 1s. A 5s price draws the market line.
+prices('300,104,100,100,100,2026-11-17,3')
+setSell(goods, 300, 500, 1, 15)
+assert(note:IsShown() and S.last.level == 'market' and note.text:find('community 2026%-11%-17'))
+-- A thin market (5 units or fewer) says nothing.
+prices('300,104,100,100,5,2026-11-17,3')
+setSell(goods, 300, 500, 1, 15)
+assert(not note:IsShown())
+-- Another house's prices are never read.
+prices('300,104,100,100,100,2026-11-17,3')
+UnitFactionGroup = function() return 'Horde', 'Horde' end
+setSell(goods, 300, 500, 1, 15)
+assert(not note:IsShown())
+UnitFactionGroup = function() return 'Alliance', 'Alliance' end
+
+-- Item 100 disenchants into 1.6 of item 200; at 1g each that beats a 2s sale and the 20c vendor price.
+prices('200,10000,100,100,100,2026-11-17,3')
+setSell(goods, 100, 200, 1, 5)
+assert(note:IsShown() and S.last.level == 'disenchant', S.last and S.last.level)
+-- A material without a price makes the estimate incomplete: nothing said.
+prices('201,10000,100,100,100,2026-11-17,3')
+setSell(goods, 100, 200, 1, 5)
+assert(not note:IsShown())
+""")
+
+# Hooked when Blizzard's auction house UI loads, through the listener's events.
+lua.execute(r"""
+local S = Everloot.SellCheck
+S.hooked, S.notes = {}, {}
+AuctionHouseFrame = { ItemSellFrame = sellFrame(), CommoditiesSellFrame = sellFrame() }
+assert(S.frame.events.ADDON_LOADED and S.frame.events.AUCTION_HOUSE_SHOW)
+S.frame.onEvent(S.frame, 'ADDON_LOADED', 'SomeOtherAddon')
+assert(next(S.hooked) == nil)
+S.frame.onEvent(S.frame, 'ADDON_LOADED', 'Blizzard_AuctionHouseUI')
+assert(S.hooked[AuctionHouseFrame.ItemSellFrame] and S.hooked[AuctionHouseFrame.CommoditiesSellFrame])
+""")
+
+source = (root / "modules/sellcheck.lua").read_text(encoding="utf-8")
+for call in ("PostItem", "PostCommodity", "CancelAuction", "PlaceBid", "SetAmount", "SetQuantity", "ConfirmPost"):
+    assert call not in source, f"the check must never call {call}"
+assert "modules\\sellcheck.lua" in (root / "Everloot.toc").read_text(encoding="utf-8")
+print("Sell check contract: PASS")

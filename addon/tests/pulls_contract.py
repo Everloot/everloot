@@ -193,7 +193,9 @@ for case in main:
             assert actual.count("inventoryCapture") == 1
             # The disenchant display switch is independent of pull recording too.
             assert actual.count("tooltipDisenchant") == 1
-            actual = [key for key in actual if key not in {"tooltip", "inventoryCapture", "tooltipDisenchant"}]
+            # So is the vendor check in the auction house's Sell tab.
+            assert actual.count("sellCheck") == 1
+            actual = [key for key in actual if key not in {"tooltip", "inventoryCapture", "tooltipDisenchant", "sellCheck"}]
         if part == "printed":
             # The feature chooser adds /everloot setup to the command list for every install, independently of pull
             # recording. Keep the historical fixture and compare every other word.

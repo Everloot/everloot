@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import DataTable, { type Column } from "@/components/ui/DataTable";
-import type { PeopleSearch, PersonGroup, PersonResult } from "@/lib/people-search";
+import type { PeopleSearch, PersonGroup, PersonResult } from "@/lib/people-search-types";
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 export const PEOPLE_PAGE_TIMEOUT_MS = 3000;

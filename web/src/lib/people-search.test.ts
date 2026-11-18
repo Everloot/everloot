@@ -1,12 +1,14 @@
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { GuildSummary } from "../../../kb/src/guilds";
+import { createMemoryArmoryStore, type MemoryArmoryStore } from "./armory-store";
 import { createMemoryPlayerStore, type PlayerStore } from "./player-store";
 
-const held = vi.hoisted(() => ({ store: null as PlayerStore | null, guilds: [] as unknown[] | Error, partial: false, guildAsked: [] as string[], kept: [] as { key: string[]; tags: string[] }[] }));
+const held = vi.hoisted(() => ({ store: null as PlayerStore | null, armory: null as MemoryArmoryStore | null, guilds: [] as unknown[] | Error, partial: false, guildAsked: [] as string[], kept: [] as { key: string[]; tags: string[] }[] }));
 vi.mock("next/cache", () => ({
   unstable_cache: <T extends (...args: never[]) => unknown>(fn: T, key: string[], options: { tags: string[] }) => { held.kept.push({ key, tags: options.tags }); return fn; },
 }));
 vi.mock("./player-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("./player-store")>()), playerStore: () => held.store }));
+vi.mock("./armory-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("./armory-store")>()), armoryStore: () => held.armory }));
 vi.mock("./guilds", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./guilds")>()),
   loadGuildSearch: async (prefix: string) => {
@@ -16,6 +18,8 @@ vi.mock("./guilds", async (importOriginal) => ({
   },
 }));
 
+import { armoryCharacterPath } from "./armory";
+import { armoryCharacter } from "./armory.fixture";
 import { guildPath } from "./guilds";
 import { peopleSearch } from "./people-search";
 import { playerPath } from "./player-pages";
@@ -31,6 +35,12 @@ beforeEach(async () => {
     { name: "Thrall", realm: "Forever Pioneer", race: "Orc", class: "WARRIOR", level: 60, seen: "2026-10-21" },
   ]);
   held.guilds = [guild("Thrall Fans", 4), guild("Thrall", null)];
+  // Invented characters: one name in both regions, one whose surname starts with that name, one hidden below.
+  held.armory = createMemoryArmoryStore();
+  held.armory.putCharacter(armoryCharacter({ region: "us", slug: "volvik-morningstar", name: "Volvik", surname: "Morningstar", level: 31, class: "Warrior", ruleset: "PvP" }));
+  held.armory.putCharacter(armoryCharacter({ region: "eu", slug: "volvik-morningstar", name: "Volvik", surname: "Morningstar", level: 60, class: "Warrior", ruleset: "Normal" }));
+  held.armory.putCharacter(armoryCharacter({ region: "us", slug: "orla-volvikson", name: "Orla", surname: "Volvikson", level: 20, class: "Mage", ruleset: "PvP" }));
+  held.armory.putCharacter(armoryCharacter({ region: "us", slug: "volvik-hushwood", name: "Volvik", surname: "Hushwood", level: 12, class: "Rogue", ruleset: "Normal" }));
   held.partial = false;
   held.guildAsked = [];
 });
@@ -128,4 +138,56 @@ test("a hidden character is gone from the next search, and the server caches car
   // Other modules' caches (lib/guilds.ts keeps the realm list) are not this search's, so only its two are checked.
   const ours = held.kept.filter((c) => ["player-search", "site-guild-search"].includes(c.key[0]));
   expect(ours).toEqual([{ key: ["player-search"], tags: ["players"] }, { key: ["site-guild-search"], tags: ["guilds", "players"] }]);
+});
+
+describe("armory characters", () => {
+  const armoryOn = () => { on(); vi.stubEnv("EVERLOOT_ARMORY", "1"); };
+  const us = { type: "character", label: "Volvik Morningstar", href: armoryCharacterPath("us", "volvik-morningstar"), meta: "Level 31 Warrior · US PvP" };
+
+  test.each(["Morningstar", "morning", "Volvik Morningstar", "Volvik", "  volvik   morningSTAR "])("%j finds Volvik Morningstar in both regions", async (text) => {
+    armoryOn();
+    const labels = (await peopleSearch(text, 25)).characters.results;
+    expect(labels).toContainEqual(expect.objectContaining(us));
+    expect(labels).toContainEqual(expect.objectContaining({ href: armoryCharacterPath("eu", "volvik-morningstar"), meta: "Level 60 Warrior · EU Normal" }));
+  });
+
+  test("the full name is an exact match and comes first; a surname that only starts with the name does not", async () => {
+    armoryOn();
+    const found = await peopleSearch("Volvik Morningstar");
+    expect(found.characters.results[0]).toEqual({ ...us, exact: true });
+    expect(found.characters.results.map((r) => r.label)).not.toContain("Orla Volvikson");
+    expect((await peopleSearch("volvik")).characters.results.map((r) => r.label)).toContain("Orla Volvikson");
+  });
+
+  test("a hidden character is not returned", async () => {
+    armoryOn();
+    expect((await peopleSearch("hushwood")).characters.total).toBe(1);
+    await held.armory!.hide("us", "volvik-hushwood");
+    expect((await peopleSearch("hushwood")).characters.total).toBe(0);
+    expect((await peopleSearch("volvik")).characters.results.map((r) => r.href)).not.toContain(armoryCharacterPath("us", "volvik-hushwood"));
+  });
+
+  test("addon and armory rows share the characters group, one row per page, and keep the limit", async () => {
+    armoryOn();
+    await held.store!.upsert([{ name: "Volvik", realm: "Forever Pioneer", race: "Human", class: "WARRIOR", level: 30, seen: "2026-11-16" }]);
+    const found = await peopleSearch("volvik", 3);
+    expect(found.characters.total).toBe(5);
+    expect(found.characters.results).toHaveLength(3);
+    expect(found.characters.capped).toBe(false);
+    // The addon row has no surname, so a full name reads the armory only.
+    expect((await peopleSearch("volvik morningstar", 25)).characters.results.map((r) => r.label)).toEqual(["Volvik Morningstar", "Volvik Morningstar"]);
+    const rows = [...(await peopleSearch("volvik", 25)).characters.results];
+    expect(new Set(rows.map((r) => r.href)).size).toBe(rows.length);
+  });
+
+  test("an armory that fails leaves the addon rows, and the switch off asks it nothing", async () => {
+    on();
+    const search = vi.spyOn(held.armory!, "search");
+    expect((await peopleSearch("thrall")).characters.total).toBe(2);
+    expect(search).not.toHaveBeenCalled();
+    vi.stubEnv("EVERLOOT_ARMORY", "1");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    search.mockRejectedValue(new Error("down"));
+    expect((await peopleSearch("thrall")).characters.total).toBe(2);
+  });
 });
