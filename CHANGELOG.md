@@ -229,6 +229,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the world map shows zone or continent coordinates on hover and shares pins in the address; Shift-click or use Pin map centre, and Clear pin removes it.
 
 ### Fixed
+- Site: character search finds a Forever character by first name, surname or full name (“Volvik Morningstar”), and the header and /search list armory characters with their region. Surnames and full names need the 20261117140000 migration.
 - Site: Database list links load on click instead of prefetching into the edge rate limit.
 - Site: Herbs opens with gathering areas, with new Forever Herbalism crafts below them.
 - Site: recover interrupted blue-post scans, include Forever bug-report announcements, and read linked Blizzard News announcement metadata.
