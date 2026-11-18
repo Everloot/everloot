@@ -15,6 +15,10 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Addon: armor and weapons you see or disenchant are recorded with their item level, so the site can place a disenchant in its band when the game files give the item no level (about one in five disenchants so far).
+- Addon: item tooltips show a disenchant estimate for armor and weapons: the value of the materials their band gives at your house's prices ("at least" when a material has no price), each material's chance and units, and whether the materials, the auction or a vendor pays more, from the disenchants players recorded; an Options checkbox turns it off. A Disenchanting view in the Everloot window keeps your own disenchants on this computer (never uploaded): materials received, their value now and, where the ledger knows it, what you paid.
+- Desktop: refreshes the disenchant results once a day into the game's price file and keeps the last good copy when a fetch fails.
+- Site: `/tools/disenchanting` shows what disenchanting gives on WoW: Forever by the game files' own bands (armor or weapon, quality, item level range), from the disenchants players recorded once 3 installs disenchanted in a band: each material's chance and units, the value per disenchant on your realm's auction house before and after the cut, the materials' prices, and the listed items worth more as materials than their buyout. Item pages gain a Disenchant tab, and `GET /api/rollups/disenchant` serves the bands.
 - Site: AH Ledger crafting margins can be sorted and filtered, with shareable market URLs.
 - Site: armory character pages show completed achievements, faction standings and the number of completed quests from Blizzard's character API, each with the time of its read; the crawler keeps only those fields and deletes each part 30 days after its last read.
 - Site: zone and dungeon pages show their terrain types (Desert, Snowy, Swamp, Haunted, Strongholds and Cities and the rest) and the gear whose effect works there, and `/database/terrain` lists every terrain type's zones and instances and every item, enchant and set bonus that changes run, mount or swim speed, all read from the game files.
@@ -227,11 +231,15 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   dates from before the feed existed are marked estimated.
 - Site: /tools/bags shows the cheapest bag of each size on one realm's auction house and what each added slot costs over your smallest bag, and item tooltips print a bag's "14 Slot Bag" line; slot counts come from the game files, prices from players' scans.
 - Site: the world map shows zone or continent coordinates on hover and shares pins in the address; Shift-click or use Pin map centre, and Clear pin removes it.
+- Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
 
 ### Fixed
+- Site: terrain page and zone and dungeon Terrain links load on click instead of prefetching into the edge rate limit.
+- Site: disenchant bands read build 1.60.1.70959 like the rest of the game data (they still named 70938 after the build refresh).
 - Site: Database list links load on click instead of prefetching into the edge rate limit.
 - Site: Herbs opens with gathering areas, with new Forever Herbalism crafts below them.
 - Site: recover interrupted blue-post scans, include Forever bug-report announcements, and read linked Blizzard News announcement metadata.
+- Site: bulk exports omit an unconfigured or unreachable corpus with a diagnostic instead of presenting it as an empty dataset.
 - Site: the armory no longer drops a character whose gear includes an item Blizzard sends without an item level (a common head item, seen 11/17); the item is kept with no level and counts as an empty slot in the item level and gear score.
 - Site: news cards and bylines name Everloot, not everloot.app, as the source of a post that cites the site's own pages.
 - Site: the MCP methodology describes drop rates as a share of recorded loot windows, including its measured-zero example.
@@ -378,6 +386,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the snapshot job holds less of the corpus in memory while it extends the snapshot. It drops the parsed old snapshot once its events are replayed, and the rollups that run after it (item view, aggregates, auction history, professions, map pins, database activity) read the state it just wrote instead of downloading and parsing the same file again. On a 20 MB synthetic snapshot the memory still held mid-run falls by about 28 MB (39 to 11 MB while the new uploads are read, 60 to 31 MB at the write), and a second read of the file is gone.
 - Site: search links every matching achievement, faction, title, quest chain, zone and instance through bounded result pages.
 - MCP: Price answers identify their auction house, with an unknown faction when only the realm is recorded.
+- Site: the loot observations table sorts frequency by its 95% Wilson lower bound while still showing the observed share.
 
 ### Changed
 - Site: drop rates restart from addon 0.3.24 (2026-11-17): only loot windows recorded after the release count, now that empty corpses are recorded too, so sources show fewer public rates until new windows build up.

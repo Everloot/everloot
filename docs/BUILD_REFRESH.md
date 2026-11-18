@@ -71,6 +71,18 @@ not touch tests, the starter builds, the asset URL or any bucket.
    encrypted block in a table it reads refuses the build rather than leave a perk out. Verify: the file's
    `build` is the new version; commit it with the build in the message.
 
+   Three more committed files carry the build and the watch leaves them on the old one (the 70959 refresh
+   found the first two still on 70938):
+
+   - `web/src/data/game-data/build-version.json`: in `web/`, `node scripts/build-version.mjs` (it reads the
+     client layer's stamp).
+   - `web/src/data/game-data/client-recipe-items.json`: in `kb/`, `npx tsx scripts/export-recipe-items.mts`
+     (it reads the build from the CDN and refuses one that differs from `client-recipes.json`). The recipe
+     catalog test fails until it is redone.
+   - `addon/modules/instance_data.lua`: in `web/`, `npx tsx scripts/build-instance-data.ts`.
+
+   Verify: `git grep -l <old version> -- web/src/data addon/modules kb/curated` lists nothing.
+
 5. **Re-encode the starter builds.** By hand. Each entry in `kb/curated/builds.yaml` carries a `share_code` and a
    `build`, made in `/tools/talents` for that build; `kb/test/curated-builds.test.ts` requires every entry to
    decode and resolve whole on the current build, and the import refuses a code whose class or tree does not

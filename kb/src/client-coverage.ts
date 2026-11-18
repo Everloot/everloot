@@ -9,7 +9,8 @@ import { CLIENT_TABLES, readClientManifest, readClientMeta, readClientRows, type
 /** The columns later steps read, per table (relation edges, item taxonomy, objects, the icon manifest). */
 export const NEEDED_FIELDS: Partial<Record<keyof typeof CLIENT_TABLES, readonly string[]>> = {
   // The bag calculator and the tooltip's slot line (client-bags) read ContainerSlots.
-  ItemSparse: ["Display_lang", "OverallQualityID", "AllowableClass", "ContainerSlots"],
+  // The disenchant bands (client-disenchant) read ItemLevel and the not-disenchantable flag.
+  ItemSparse: ["Display_lang", "OverallQualityID", "AllowableClass", "ContainerSlots", "ItemLevel", "Flags"],
   Item: ["ClassID", "SubclassID", "InventoryType", "IconFileDataID"],
   SpellName: ["Name_lang"],
   SpellMisc: ["SpellID", "SpellIconFileDataID"],
@@ -70,7 +71,8 @@ export const NEEDED_FIELDS: Partial<Record<keyof typeof CLIENT_TABLES, readonly 
   ItemXBonusTree: ["ItemID", "ItemBonusTreeID"],
   ItemBonus: ["Value", "ParentItemBonusListID", "Type"],
   ItemBonusTreeNode: ["ParentItemBonusTreeID", "ChildItemBonusTreeID", "ChildItemBonusListID", "ItemContext"],
-  ItemDisenchantLoot: ["Class", "Subclass", "Quality"],
+  // The disenchant bands (client-disenchant) read the level range too.
+  ItemDisenchantLoot: ["Class", "Subclass", "Quality", "MinLevel", "MaxLevel"],
   ItemSearchName: ["Display_lang", "OverallQualityID", "RequiredLevel", "ItemLevel"],
   ItemSetSpell: ["ItemSetID", "SpellID", "Threshold"],
   TransmogSet: ["Name_lang"],

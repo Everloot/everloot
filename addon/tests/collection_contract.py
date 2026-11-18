@@ -191,6 +191,16 @@ assert(#EverlootDB.records.item_seen == items + 1, 'one looted item seen three t
 GetItemInfo = function() return 'Linen Cloth', nil, 2 end
 for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'LOOT_OPENED') end
 assert(#EverlootDB.records.item_seen == items + 2 and EverlootDB.records.item_seen[items + 2].quality == 'uncommon', 'a new quality is a new row')
+assert(EverlootDB.records.item_seen[items + 2].itemLevel == nil, 'an item that is not gear carries no item level')
+-- Armor and weapons carry their item level (the 4th value; class is the 12th), and a new level is a new row.
+GetItemInfo = function() return 'Linen Cloth', nil, 2, 12, 1, '', '', 1, '', 1, 5, 4 end
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'LOOT_OPENED') end
+assert(#EverlootDB.records.item_seen == items + 3 and EverlootDB.records.item_seen[items + 3].itemLevel == 12, 'gear carries its item level')
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'LOOT_OPENED') end
+assert(#EverlootDB.records.item_seen == items + 3, 'the same level again adds no row')
+GetItemInfo = function() return 'Linen Cloth', nil, 2, 'x', 1, '', '', 1, '', 1, 5, 2 end
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'LOOT_OPENED') end
+assert(EverlootDB.records.item_seen[#EverlootDB.records.item_seen].itemLevel == nil, 'a level that is not a whole number is left out')
 GetItemInfo, GetLootSourceInfo = nil, nil
 GetNumLootItems = function() return 0 end
 date = function() return '2026-10-08T00:00:00Z' end

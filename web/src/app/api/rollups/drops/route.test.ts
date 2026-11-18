@@ -44,7 +44,7 @@ test("guard on: the drop list is paged for anonymous callers and limited per IP"
   vi.doMock("@/lib/rollup-compute", () => ({
     computeRollups: async () => ({
       rates: Array.from({ length: 400 }, (_, i) => rate(i)),
-      measuredZeros: Array.from({ length: 400 }, (_, i) => ({ itemId: 1000 + i, public: true })),
+      measuredZeros: Array.from({ length: 400 }, (_, i) => ({ sourceNpcId: 1000 + i, kills: 3, reporters: 3, public: true })),
       stats: { unreachable: false, dataAsOf: null },
     }),
   }));
@@ -58,7 +58,7 @@ test("guard on: the drop list is paged for anonymous callers and limited per IP"
   const rest = await (await paged(req(`?offset=${ANON_PAGE}`))).json();
   expect(rest.rates).toHaveLength(0);
   expect(rest.measuredZeros).toHaveLength(800 - ANON_PAGE);
-  expect(rest.measuredZeros[0].itemId).toBe(1000 + ANON_PAGE - 400);
+  expect(rest.measuredZeros[0].sourceNpcId).toBe(1000 + ANON_PAGE - 400);
   expect(rest.next).toBeNull();
   store.api.mockResolvedValue({ allowed: false, retryAfter: 60 });
   expect((await paged(req())).status).toBe(429);
@@ -118,5 +118,27 @@ test("public rates carry likely ranges and settling without changing counts or l
     // Older bulk files share this row schema: the added metadata must stay additive.
     expect(dropsResponse.shape.rates.element.parse(small)).toEqual(small);
     expect(dropsResponse.parse(body).rates).toEqual(body.rates);
+  } finally { vi.doUnmock("@/lib/names"); }
+});
+
+test("public drop responses keep exactly the existing keys", async () => {
+  vi.resetModules();
+  const internal = { units: 99, averageCopper: 123, futureInternal: true };
+  const rate = { sourceNpcId: 7, itemId: 2589, kills: 3, drops: 3, rate: 1, reporters: 3, public: true, ...internal };
+  vi.doMock("@/lib/rollup-compute", () => ({ computeRollups: async () => ({
+    rates: [rate, { ...rate, sourceNpcId: undefined, sourceObjectId: 9 }],
+    measuredZeros: [{ sourceNpcId: 8, kills: 3, reporters: 3, public: true, ...internal }],
+    sources: [{ sourceNpcId: 7, averageCopper: 123 }],
+    stats: { uploads: 3, lootWindows: 9, records: 9, unreachable: false, dataAsOf: null },
+  }) }));
+  vi.doMock("@/lib/names", () => ({ loadNames: async () => ({ npcs: new Map([[7, "Wolf"]]), objects: new Map() }) }));
+  try {
+    const { GET: projected } = await import("./route");
+    const body = await (await projected(req())).json();
+    expect(Object.keys(body).sort()).toEqual(["attribution", "dataAsOf", "generatedAt", "limit", "measuredZeros", "next", "offset", "queued", "rates", "stats", "total", "totalMeasuredZeros", "totalRates", "unreachable"]);
+    expect(Object.keys(body.rates[0]).sort()).toEqual(["drops", "itemId", "kills", "public", "rate", "rateHigh", "rateLow", "reporters", "settled", "sourceName", "sourceNpcId"]);
+    expect(Object.keys(body.rates[1]).sort()).toEqual(["drops", "itemId", "kills", "public", "rate", "rateHigh", "rateLow", "reporters", "settled", "sourceObjectId"]);
+    expect(Object.keys(body.measuredZeros[0]).sort()).toEqual(["kills", "public", "reporters", "sourceNpcId"]);
+    expect(JSON.stringify(body)).not.toMatch(/units|copper|futureInternal/i);
   } finally { vi.doUnmock("@/lib/names"); }
 });

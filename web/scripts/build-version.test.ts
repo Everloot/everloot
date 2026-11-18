@@ -27,7 +27,9 @@ for (const hook of ["pretest", "predev"]) {
       writeFileSync(output, JSON.stringify({ product: "old", version: "old" }));
       for (const version of ["1.60.1.99998", "1.60.1.99999"]) {
         writeFileSync(source, JSON.stringify({ build: { product: "wowf", version }, items: [1, 2, 3] }));
-        execFileSync("npm", ["run", hook, "--", source, output], { cwd: fileURLToPath(new URL("..", import.meta.url)) });
+        // npm is npm.cmd on Windows, and Node runs .cmd files only through a shell.
+        const windows = process.platform === "win32";
+        execFileSync(windows ? "npm.cmd" : "npm", ["run", hook, "--", source, output], { cwd: fileURLToPath(new URL("..", import.meta.url)), shell: windows });
         expect(JSON.parse(readFileSync(output, "utf8"))).toEqual({ product: "wowf", version });
       }
     } finally {

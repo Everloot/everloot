@@ -23,6 +23,8 @@ import { uploadStore, type Corpus, type R2Config } from "./upload-store";
  */
 
 export const AGGREGATES_KEY = "snapshots/aggregates.json";
+/** The set's shape in the file's stamp. Change it when the set gains a table, so the next cron rewrites the file. */
+export const AGGREGATES_REVISION = "disenchant-1";
 /** How long one server instance keeps the file before asking for it again: the cron rewrites it at most every 10 minutes. */
 const KEEP_MS = 5 * 60_000;
 /** A missing or unreadable file is asked for again after a minute, not after the full KEEP_MS. */
@@ -48,7 +50,7 @@ export function anonymousAggregates(corpus: Pick<Corpus, "uploads" | "records" |
  */
 export function encodeAggregates(set: AggregateSet, generatedAt: string): string {
   const { addonTrends, ...rest } = set;
-  return JSON.stringify({ version: 1, generatedAt, set: { ...rest, addonTrends: addonTrends() } }, (_, value: unknown) =>
+  return JSON.stringify({ version: 1, revision: AGGREGATES_REVISION, generatedAt, set: { ...rest, addonTrends: addonTrends() } }, (_, value: unknown) =>
     value instanceof Map ? { $map: [...value] } : value instanceof Set ? { $set: [...value] } : value);
 }
 
@@ -71,7 +73,12 @@ export function parseAggregates(text: string): { generatedAt: string; set: Aggre
   }
   if (!isObject(raw) || raw.version !== 1 || typeof raw.generatedAt !== "string" || !isObject(raw.set)) return null;
   const s = raw.set;
-  const ok = typeof s.key === "string" && [s.uploads, s.records, s.windows].every(Number.isFinite) &&
+  // A file written before the disenchant tables existed reads as no disenchants yet, not as an unreadable file: the
+  // pages would otherwise rebuild the whole set until the cron's next write.
+  if (s.disenchant === undefined) s.disenchant = { bands: new Map(), items: new Map(), unplaced: 0, playerBands: new Map() };
+  const dis = s.disenchant;
+  const ok = isObject(dis) && dis.bands instanceof Map && dis.items instanceof Map && dis.playerBands instanceof Map && Number.isFinite(dis.unplaced) &&
+    typeof s.key === "string" && [s.uploads, s.records, s.windows].every(Number.isFinite) &&
     (s.dataAsOf === null || typeof s.dataAsOf === "string") &&
     arrays(s.drops, "rates", "measuredZeros", "rejected") && arrays(s.items, "rates", "names", "npcs") &&
     arrays(s.world, "npcs", "quests", "vendors") && arrays(s.instances, "entrances", "encounters") &&
@@ -101,9 +108,9 @@ export async function writeAggregates(opts: { added: number; rebuild?: boolean; 
   const cloud = deps.cloud === undefined ? r2FromEnv() : deps.cloud;
   if (!cloud) throw new Error("the stored aggregates need the cloud store");
   const doFetch = deps.fetch ?? fetch;
-  if (opts.added <= 0 && !opts.rebuild && !await storedViewNeedsWrite(r2(cloud), r2Url(cloud), opts.dataAsOf, doFetch)) return { written: false };
+  if (opts.added <= 0 && !opts.rebuild && !await storedViewNeedsWrite(r2(cloud), r2Url(cloud), opts.dataAsOf, doFetch, AGGREGATES_REVISION)) return { written: false };
   const body = encodeAggregates(await (deps.build ?? currentSet)(), (deps.now?.() ?? new Date()).toISOString());
-  const put = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "PUT", body, headers: { "content-type": "application/json", [STAMP]: stampOf(opts.dataAsOf) } }));
+  const put = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "PUT", body, headers: { "content-type": "application/json", [STAMP]: stampOf(opts.dataAsOf, AGGREGATES_REVISION) } }));
   if (!put.ok) throw new Error(`aggregates write failed (${put.status})`);
   return { written: true, bytes: new TextEncoder().encode(body).length };
 }

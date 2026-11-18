@@ -1,3 +1,4 @@
+import { publicDropRate, publicMeasuredZero } from "../../../../../../kb/src/drop-rollup";
 import { measureDropRate } from "../../../../../../kb/src/drop-rate-settling";
 import { NextResponse } from "next/server";
 import { admit, attribution, attributionHeaders, badPage, pageOf, pageRequest } from "@/lib/data-guard";
@@ -28,14 +29,14 @@ export async function GET(req: Request) {
     const name = sourceName(r);
     const measurement = measureDropRate(r, stats.dataAsOf ?? "");
     return {
-      ...r,
+      ...publicDropRate(r),
       rateLow: measurement.interval?.lower ?? null,
       rateHigh: measurement.interval?.upper ?? null,
       settled: measurement.settled,
       ...(name ? { sourceName: name } : {}),
     };
   });
-  const publicZeros = stats.unreachable ? [] : measuredZeros.filter((z) => z.public);
+  const publicZeros = stats.unreachable ? [] : measuredZeros.filter((z) => z.public).map(publicMeasuredZero);
   const both = [
     ...publicRates.map((rate) => ({ rate })),
     ...publicZeros.map((zero) => ({ zero })),

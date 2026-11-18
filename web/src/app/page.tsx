@@ -40,6 +40,7 @@ const TOOL_NOTES: Record<string, string> = {
   "/tools/farming-routes": "Gold and reputation areas from uploads",
   "/tools/auctions": "Prices by realm, from scans",
   "/tools/bags": "Cheapest bag space per house",
+  "/tools/disenchanting": "What disenchanting is worth",
   "/census": "Who plays what",
   "/rankings": "Classes and races by week",
   "/addons": "What players run",
