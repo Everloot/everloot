@@ -12,7 +12,7 @@ import { sendSync, syncSummary } from "../../../companion/src/sync-sender";
 import { uploadFile } from "../../../companion/src/uploader";
 import { watchFile } from "../../../companion/src/watch-file";
 import { appSettledList } from "../../../web/src/lib/settled-cache";
-import type { RealmSummary, Settings } from "../shared/types";
+import type { CharacterLinkStatus, RealmSummary, Settings } from "../shared/types";
 import { accountKeyForSite } from "./account";
 import { backupSavedVariables } from "./backups";
 import { pruneSettledLists } from "./data-folder";
@@ -26,7 +26,7 @@ import { readForUpload } from "./save-reader";
  * what the command line does. `current` is read on every run, so a settings change takes effect
  * at the next job without rebuilding anything.
  */
-export function companionJobs(dataFolder: string, current: () => Settings): { deps: EngineDeps; lastMarket(): RealmSummary[]; answerStore: ReturnType<typeof createAnswerStore>; notices: string[] } {
+export function companionJobs(dataFolder: string, current: () => Settings): { deps: EngineDeps; lastMarket(): RealmSummary[]; links(): CharacterLinkStatus[]; answerStore: ReturnType<typeof createAnswerStore>; notices: string[] } {
   const notices: string[] = [];
   const recovered = (message: string) => { notices.push(message); };
   const state = createSentState(join(dataFolder, "sent.json"), recovered);
@@ -35,6 +35,11 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
   const answerStore = createAnswerStore(join(dataFolder, "answers.json"), recovered);
   const addonsDir = () => join(current().gameFolder ?? "", "Interface", "AddOns");
   let lastMarket: RealmSummary[] = [];
+  // The last link and sync results per account file, for the Characters page. Kept while the app runs.
+  const links = new Map<string, CharacterLinkStatus>();
+  const linkStatus = (file: string): CharacterLinkStatus =>
+    links.get(file) ?? { file, linked: [], frozen: [], linkedAt: null, linkError: null, syncedAt: null, synced: [], categories: [], syncError: null };
+  const union = (a: string[], b: string[]) => [...new Set([...a, ...b])];
   const deps: EngineDeps = {
     findFiles: findEverlootFiles,
     async upload(file) {
@@ -60,19 +65,40 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
       const rejected = r.rejected ? `; the site turned away ${r.rejected} ${r.rejected === 1 ? "row, which stays unsent and goes" : "rows, which stay unsent and go"} again next run` : "";
       // Codes typed with /everloot link go to the account's own link endpoint with the account key, never with the
       // upload. A link that fails never fails the upload; its rows go again next run.
-      let links = "";
+      let linked = "";
       try {
-        const said = linkSummary(await sendLinks(file, { endpoint, key: accountKeyForSite(dataFolder, endpoint), state }));
-        if (said) links = `; ${said}`;
-      } catch (err) { links = `; character links not sent: ${err instanceof Error ? err.message : String(err)}`; }
+        const r = await sendLinks(file, { endpoint, key: accountKeyForSite(dataFolder, endpoint), state });
+        const said = linkSummary(r);
+        if (said) {
+          linked = `; ${said}`;
+          const was = linkStatus(file);
+          // What is left of the summary once the linked and frozen characters are taken out: refused codes, or why codes wait.
+          links.set(file, { ...was, linked: union(was.linked, r.linked).filter((x) => !r.frozen.includes(x)), frozen: union(was.frozen, r.frozen), linkedAt: new Date().toISOString(), linkError: linkSummary({ ...r, linked: [], frozen: [] }) });
+        }
+      } catch (err) {
+        const why = err instanceof Error ? err.message : String(err);
+        linked = `; character links not sent: ${why}`;
+        links.set(file, { ...linkStatus(file), linkedAt: new Date().toISOString(), linkError: `character links not sent: ${why}` });
+      }
       // Linked characters' own rows go to the account's sync endpoint with the same key, after the links so a code
       // typed this session is linked first. Each category is kept only where the player turned its sync on.
       let sync = "";
       try {
-        const said = syncSummary(await sendSync(file, { endpoint, key: accountKeyForSite(dataFolder, endpoint), state }));
-        if (said) sync = `; ${said}`;
-      } catch (err) { sync = `; characters not synced: ${err instanceof Error ? err.message : String(err)}`; }
-      return `sent ${r.sent} new events in ${r.batches} batch(es)${rejected}; skipped ${r.skipped} already settled; kept ${r.heldNamed} named, ${r.heldAddons} installed-addon, ${r.heldCensus} census and ${r.heldLegacy} legacy rows here${runs}${links}${sync}${backup}`;
+        const r = await sendSync(file, { endpoint, key: accountKeyForSite(dataFolder, endpoint), state });
+        const said = syncSummary(r);
+        if (said) {
+          sync = `; ${said}`;
+          const was = linkStatus(file);
+          // A character the site synced, or holds with its sync off, is linked to the account.
+          const kept = r.synced.length ? { syncedAt: new Date().toISOString(), synced: r.synced, categories: r.categories } : {};
+          links.set(file, { ...was, ...kept, linked: union(was.linked, [...r.synced, ...r.syncOff]), syncError: syncSummary({ ...r, synced: [] }) });
+        }
+      } catch (err) {
+        const why = err instanceof Error ? err.message : String(err);
+        sync = `; characters not synced: ${why}`;
+        links.set(file, { ...linkStatus(file), syncError: `characters not synced: ${why}` });
+      }
+      return `sent ${r.sent} new events in ${r.batches} batch(es)${rejected}; skipped ${r.skipped} already settled; kept ${r.heldNamed} named, ${r.heldAddons} installed-addon, ${r.heldCensus} census and ${r.heldLegacy} legacy rows here${runs}${linked}${sync}${backup}`;
     },
     async prices(files) {
       const s = current();
@@ -112,5 +138,5 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
     // usually ready before they run.
     watch: (file, onChange) => watchFile(file, () => { void readyFacts([file]); onChange(); }),
   };
-  return { deps, lastMarket: () => lastMarket, answerStore, notices };
+  return { deps, lastMarket: () => lastMarket, links: () => [...links.values()], answerStore, notices };
 }

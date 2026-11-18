@@ -235,6 +235,16 @@ export interface ProgressRow {
   class: string;
   level: number;
   titles: number;
+  /**
+   * Titles in the file's title_catalog rows this key does not hold; null when the file has no catalog rows. Achievements,
+   * reputations and quest chains have no owned rows any more, so nothing is missing from them here.
+   */
+  missingTitles: number | null;
+  /**
+   * The character a `/everloot link` row in this file ties to this key (its completionKey), with the path of its page on
+   * the site; null when no link row names the key. Read on this computer only.
+   */
+  linkedAs: { name: string; realm: string; path: string } | null;
   /** The addon's lockout_owned rows for this key that have not reset yet; never in an upload, not given to Chat, sent only by private sync for a linked character. */
   lockouts: LockoutRow[];
 }
@@ -266,6 +276,29 @@ export interface BuildsStatus {
   builds: number | null;
 }
 
+/**
+ * One account file's last character link and private sync results, kept while the app runs from what the upload job's
+ * link and sync steps returned. A run with nothing to answer leaves them as they were.
+ */
+export interface CharacterLinkStatus {
+  file: string;
+  /** "Name of Realm" the site linked from this file's codes, or synced as linked, since the app started. */
+  linked: string[];
+  /** Characters another account linked too, so neither link counts. */
+  frozen: string[];
+  /** When a link step last had codes to answer, or failed. */
+  linkedAt: string | null;
+  /** The last link step's refused codes or why codes wait; null when it went through. */
+  linkError: string | null;
+  /** When the site last kept a sync of this file's characters. */
+  syncedAt: string | null;
+  /** The characters and categories that sync kept. */
+  synced: string[];
+  categories: string[];
+  /** The last sync step's refusal or problem; null when it went through. */
+  syncError: string | null;
+}
+
 /** Signed in to everloot.app with one of the account's API keys; the page sees only its last four characters. */
 export interface Account { signedIn: boolean; hint: string | null }
 
@@ -287,6 +320,8 @@ export interface AppState {
   staleScans: ScanAge[];
   account: Account;
   builds: BuildsStatus;
+  /** The last character link and sync results per account file; missing or empty before an upload had any. */
+  links?: CharacterLinkStatus[];
   /** The site's last receipt for runs and boss pulls said it reads them; the settings page describes them only then. */
   runRecords?: boolean;
   /** A newer addon release the app did not install itself (the switch is off, or the install failed); shown in the tray. */

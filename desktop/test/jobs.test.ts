@@ -384,3 +384,59 @@ test("runs and boss pulls stay unsent across runs, never resent, until a receipt
     expect(sent).toHaveLength(6);
   } finally { vi.useRealTimers(); vi.unstubAllGlobals(); }
 });
+
+describe("the upload's character links and sync", () => {
+  const KEY = `evl_${"ab".repeat(32)}`;
+  const linkedFile = (d: string) => {
+    const file = join(d, "Everloot.lua");
+    writeFileSync(file, `EverlootDB = { ["version"] = "0.3.14", ["installId"] = "abcd-1234-ef56-7890", ["records"] = {
+  ["character_link"] = { { ["eventId"] = "character_link:1", ["capturedAt"] = "2026-11-01T18:00:00Z", ["code"] = "EL-AAAA-01", ["name"] = "Thrallina", ["realm"] = "Forever Pioneer", ["race"] = "Orc", ["class"] = "SHAMAN", ["level"] = 24, ["faction"] = "Horde", ["guid"] = "Player-4395-0A1B2C3D", ["completionKey"] = "0a1b2c3d" } },
+  ["title_owned"] = { { ["capturedAt"] = "2026-11-05T10:00:00Z", ["characterKey"] = "0a1b2c3d", ["class"] = "SHAMAN", ["level"] = 24, ["titleIds"] = { 1, 2 } } },
+} }\n`);
+    return file;
+  };
+  const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+
+  test("keep the link result and a refused sync's message for the Characters page", async () => {
+    const d = dir();
+    writeFileSync(join(d, ACCOUNT_KEY_FILE), KEY);
+    writeKeyOrigin(d, "https://everloot.app");
+    const file = linkedFile(d);
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.endsWith("/api/me/characters/links")) return json({ results: [{ index: 0, status: "linked", name: "Thrallina", realm: "Forever Pioneer" }] });
+      if (url.endsWith("/api/me/characters/sync")) return json({ characters: [{ index: 0, result: "mismatch" }] });
+      return json({ error: "not here" }, 404);
+    }));
+    try {
+      const jobs = companionJobs(d, () => ({ ...defaultSettings(), endpoint: "https://everloot.app", gameFolder: d }));
+      expect(jobs.links()).toEqual([]);
+      await jobs.deps.upload(file).catch(() => undefined);
+      const [status] = jobs.links();
+      expect(status).toMatchObject({ file, linked: ["Thrallina of Forever Pioneer"], frozen: [], linkError: null, syncedAt: null, synced: [] });
+      expect(status.linkedAt).not.toBeNull();
+      expect(status.syncError).toBe("Thrallina of Forever Pioneer not synced: the site did not match it to the link");
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+  test("a sync the site kept gives its time and categories, and a later run with nothing to answer keeps them", async () => {
+    const d = dir();
+    writeFileSync(join(d, ACCOUNT_KEY_FILE), KEY);
+    writeKeyOrigin(d, "https://everloot.app");
+    const file = linkedFile(d);
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.endsWith("/api/me/characters/links")) return json({ results: [{ index: 0, status: "linked", name: "Thrallina", realm: "Forever Pioneer" }] });
+      if (url.endsWith("/api/me/characters/sync")) return json({ characters: [{ index: 0, result: "synced", categories: { achievements: "stored" } }] });
+      return json({ error: "not here" }, 404);
+    }));
+    try {
+      const jobs = companionJobs(d, () => ({ ...defaultSettings(), endpoint: "https://everloot.app", gameFolder: d }));
+      await jobs.deps.upload(file).catch(() => undefined);
+      const first = jobs.links()[0];
+      expect(first).toMatchObject({ linked: ["Thrallina of Forever Pioneer"], synced: ["Thrallina of Forever Pioneer"], categories: ["achievements"], syncError: null });
+      expect(first.syncedAt).not.toBeNull();
+      // Both steps are answered now: the next run sends nothing and the results stay.
+      await jobs.deps.upload(file).catch(() => undefined);
+      expect(jobs.links()[0]).toEqual(first);
+    } finally { vi.unstubAllGlobals(); }
+  });
+});

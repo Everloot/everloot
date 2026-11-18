@@ -78,7 +78,14 @@ exports[`changes > populated 1`] = `
   </div>"
 `;
 
-exports[`characters > populated, from the save fixture 1`] = `
+exports[`characters > Linked characters > populated: the linked characters, a frozen one and the last sync 1`] = `
+"<section class="panel" id="linked"><h2>Linked characters</h2>
+      <p class="fg2">Characters you linked to your everloot.app account with a code from the site. After each upload their titles, raid lockouts and boss kills go to your account's private sync, only for the categories you switched on there.</p>
+      <ul class="plain"><li><b>Thrallina of Forever Pioneer</b></li></ul><p class="warn small">Jainara of Forever Pioneer frozen: another account linked it too.</p><p class="fg2">Last synced 2026-10-20T11:30:00Z: Thrallina of Forever Pioneer (raid lockouts, boss kills)</p>
+    </section>"
+`;
+
+exports[`characters > populated, from the save fixture, with missing titles and the site's links per keyed row 1`] = `
 "<div class="page char-page">
     <div class="head">
       <div>
@@ -131,7 +138,12 @@ exports[`characters > populated, from the save fixture 1`] = `
     </tr></tbody></table></div>
     </section>
     <section class="panel" id="keyed" tabindex="-1"><h2>Progress · keyed</h2>
-      <p class="muted">Nothing yet. The completion tracker is off until <code>/everloot completion on</code> in game.</p>
+      <div class="tablewrap"><table><thead><tr><th>Key</th><th>Class</th><th class="num">Titles</th><th class="num">Missing</th><th>Raid lockouts</th><th>On everloot.app</th></tr></thead><tbody><tr><td><span class="mono">0a1b2c3d</span><div class="muted small">linked as Uther of Forever Pioneer</div></td><td>paladin 60</td><td class="num">3</td><td class="num">3 titles</td><td><span class="muted">–</span></td><td><button type="button" class="link" data-open="https://everloot.app/tools/collections?utm_source=desktop-app&amp;utm_medium=app">Collections ↗</button> · <button type="button" class="link" data-open="https://everloot.app/characters/forever/forever-pioneer/uther?utm_source=desktop-app&amp;utm_medium=app">Character page ↗</button></td></tr><tr><td><span class="mono">1a2b3c4d</span></td><td>mage 60</td><td class="num">1</td><td class="num">4 titles</td><td><span class="muted">–</span></td><td><button type="button" class="link" data-open="https://everloot.app/tools/collections?utm_source=desktop-app&amp;utm_medium=app">Collections ↗</button></td></tr></tbody></table></div>
+        <p class="muted small">Raid lockouts never go in an upload, and Chat does not read them. Private sync sends them only for a character you linked, and everloot.app keeps only the categories you switched on.</p>
+    </section>
+    <section class="panel" id="linked"><h2>Linked characters</h2>
+      <p class="fg2">Characters you linked to your everloot.app account with a code from the site. After each upload their titles, raid lockouts and boss kills go to your account's private sync, only for the categories you switched on there.</p>
+      <p class="muted small" role="status">Nothing linked yet. Type <code>/everloot link &lt;code&gt;</code> in game.</p>
     </section>
   </div>
   <div class="drawer-layer" id="drawerLayer" hidden aria-hidden="true">
