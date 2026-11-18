@@ -1,13 +1,14 @@
 import { z } from "zod";
-import { ARMORY_RECHECK_DAYS, namesFromSlug, SEARCH_RULE, type ArmoryMetricKey } from "./armory";
+import { ARMORY_RECHECK_DAYS, armoryNameQuery, namesFromSlug, SEARCH_RULE, type ArmoryMetricKey } from "./armory";
 import { authQuery } from "./supabase/server";
 import { ArmoryDetails, type ProfileDetails } from "../../../kb/src/armory/details";
+import type { CharacterRow } from "../../../kb/src/armory/parse";
 
 /**
  * Where the armory rows live: Supabase in production (the functions of 20261109120000_armory.sql, called with the
  * service key through authQuery), and maps in memory in development, which follow the same rules and forget
  * everything on restart. The pages are the only readers: nothing here feeds an API answer, an export or the MCP tools.
- * Only two writes: a hide, and a character put in the crawler's queue. Every answer is checked against the shape the
+ * Writes: a hide, a character put in the crawler's queue, and the on-demand lookup's hit and misses (armory-lookup.ts). Every answer is checked against the shape the
  * contract gives; one that does not match is an error, as storage out of reach is, never a page of "undefined".
  */
 
@@ -52,7 +53,7 @@ export interface ArmoryStore {
   guild(region: string, slug: string): Promise<ArmoryGuild | null>;
   /** The guild's members, with item level and Gear Score for those stored; hidden characters left out. */
   roster(region: string, slug: string): Promise<ArmoryMember[]>;
-  /** Characters whose name starts with `prefix` (2 letters or more), name then surname order. */
+  /** Characters whose first name, surname or "first surname" starts with `prefix` (2 letters or more), name then surname order. */
   search(prefix: string, limit: number): Promise<ArmoryHit[]>;
   searchGuilds(prefix: string, limit: number): Promise<ArmoryGuildHit[]>;
   /** One board, highest first; a null region or ruleset means all of them. */
@@ -63,6 +64,12 @@ export interface ArmoryStore {
   hide(region: string, slug: string): Promise<void>;
   /** Put a character or guild in the crawler's queue; false when it is queued already, read recently, or hidden. */
   enqueue(region: string, kind: "character" | "guild", slug: string, source: string): Promise<boolean>;
+  /** The regions an on-demand lookup may ask Blizzard about, US first: not hidden, not stored; none while a miss is kept. */
+  lookupRegions(slug: string): Promise<string[]>;
+  /** Keep a slug no region knows for six hours, so it is not asked for again. */
+  lookupMiss(slug: string): Promise<void>;
+  /** Store a lookup's hit as the crawler does (armory_upsert_characters); false when its hide guard refused it. */
+  storeLookup(region: string, row: CharacterRow): Promise<boolean>;
 }
 
 type Query = <T>(path: string, init?: RequestInit) => Promise<T>;
@@ -164,6 +171,9 @@ export function createCloudArmoryStore(query: Query = authQuery): ArmoryStore {
     async enqueue(region, kind, slug, source) {
       return rpc("armory_enqueue", { p_region: region, p_kind: kind, p_slug: slug, p_source: source }, z.boolean());
     },
+    async lookupRegions(slug) { return rpc("armory_lookup_regions", { p_slug: slug }, z.array(z.enum(["us", "eu"]))); },
+    async lookupMiss(slug) { await query("rpc/armory_lookup_miss", { method: "POST", body: JSON.stringify({ p_slug: slug }) }); },
+    async storeLookup(region, row) { return (await rpc("armory_upsert_characters", { p_region: region, p_rows: [row] }, num)) > 0; },
   };
 }
 
@@ -173,7 +183,7 @@ const unavailableReason = new WeakMap<ArmoryStore, string>();
 /** A store with nothing behind it: every call fails, so each page shows storage as out of reach. */
 export function createUnavailableArmoryStore(reason: string): ArmoryStore {
   const fail = async (): Promise<never> => { throw new Error(reason); };
-  const store = { character: fail, guild: fail, roster: fail, search: fail, searchGuilds: fail, board: fail, rank: fail, counts: fail, hide: fail, enqueue: fail, refresh: fail };
+  const store = { character: fail, guild: fail, roster: fail, search: fail, searchGuilds: fail, board: fail, rank: fail, counts: fail, hide: fail, enqueue: fail, refresh: fail, lookupRegions: fail, lookupMiss: fail, storeLookup: fail };
   unavailableReason.set(store, reason);
   return store;
 }
@@ -194,6 +204,7 @@ export function createMemoryArmoryStore(now: () => Date = () => new Date()): Mem
   const members = new Map<string, Omit<ArmoryMember, "itemLevel" | "gearScore" | "stored">[]>();
   const hides = new Set<string>();
   const queue = new Map<string, { region: string; kind: string; slug: string; source: string }>();
+  const misses = new Map<string, number>();
   const key = (region: string, slug: string) => `${region}/${slug}`;
   const valueOf = (c: ArmoryCharacter, metric: ArmoryMetricKey) => (metric === "item_level" ? c.itemLevel : metric === "gear_score" ? c.gearScore : c.honorableKills);
   const login = (c: ArmoryCharacter) => (c.lastLogin ? Date.parse(c.lastLogin) : -Infinity);
@@ -227,9 +238,10 @@ export function createMemoryArmoryStore(now: () => Date = () => new Date()): Mem
       });
     },
     async search(prefix, limit) {
-      const p = prefixOf(prefix);
+      const p = armoryNameQuery(prefix);
       if (!p) return [];
-      return [...characters.values()].filter((c) => c.name.toLowerCase().startsWith(p))
+      const starts = (c: ArmoryCharacter) => [c.name, c.surname, `${c.name} ${c.surname}`].some((s) => s.toLowerCase().startsWith(p));
+      return [...characters.values()].filter(starts)
         .sort((a, b) => a.name.localeCompare(b.name) || a.surname.localeCompare(b.surname)).slice(0, limit)
         .map((c) => ({ region: c.region, slug: c.slug, name: c.name, surname: c.surname, level: c.level, class: c.class, race: c.race, ruleset: c.ruleset, guildName: c.guildName }));
     },
@@ -280,6 +292,27 @@ export function createMemoryArmoryStore(now: () => Date = () => new Date()): Mem
       const stored = kind === "character" ? characters.get(key(region, slug)) : guilds.get(key(region, slug));
       if (stored && now().getTime() - Date.parse(stored.checkedAt) < ARMORY_RECHECK_DAYS * 86_400_000) return false;
       queue.set(qk, { region, kind, slug, source });
+      return true;
+    },
+    async lookupRegions(slug) {
+      if ((misses.get(slug) ?? 0) > now().getTime()) return [];
+      return ["us", "eu"].filter((r) => !hides.has(key(r, slug)) && !characters.has(key(r, slug)));
+    },
+    async lookupMiss(slug) { misses.set(slug, now().getTime() + 6 * 3_600_000); },
+    async storeLookup(region, row) {
+      if (hides.has(key(region, row.slug))) return false;
+      const at = now().toISOString();
+      characters.set(key(region, row.slug), {
+        region, slug: row.slug, characterId: row.character_id, name: row.name, surname: row.surname, level: row.level,
+        rulesetId: row.ruleset_id, ruleset: row.ruleset, raceId: row.race_id, race: row.race, classId: row.class_id, class: row.class,
+        faction: row.faction, gender: row.gender, guildSlug: row.guild_slug, guildName: row.guild_name, lastLogin: row.last_login,
+        equippedItemLevel: row.equipped_item_level, averageItemLevel: row.average_item_level, itemLevel: row.item_level, gearScore: row.gear_score,
+        honorableKills: row.honorable_kills, pvpRank: row.pvp_rank,
+        equipment: row.equipment.map((e) => ({ slot: e.slot, itemId: e.item_id, name: e.name, level: e.level, quality: e.quality, inventoryType: e.inventory_type })),
+        fetchedAt: at, checkedAt: at,
+      });
+      // armory_upsert_characters puts the character's guild in the crawler's queue; so does this.
+      if (row.guild_slug && !guilds.has(key(region, row.guild_slug))) queue.set(`${region}/guild/${row.guild_slug}`, { region, kind: "guild", slug: row.guild_slug, source: "character" });
       return true;
     },
     async refresh(region, slug) {

@@ -18,6 +18,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Desktop: refreshes the disenchant results once a day into the game's price file and keeps the last good copy when a fetch fails.
 - Site: `/tools/disenchanting` shows what disenchanting gives on WoW: Forever by the game files' own bands (armor or weapon, quality, item level range), from the disenchants players recorded once 3 installs disenchanted in a band: each material's chance and units, the value per disenchant on your realm's auction house before and after the cut, the materials' prices, and the listed items worth more as materials than their buyout. Item pages gain a Disenchant tab, and `GET /api/rollups/disenchant` serves the bands.
 - Site: AH Ledger crafting margins can be sorted and filtered, with shareable market URLs.
+- Site: /search can find a character nobody has stored yet: a full "First Surname" with no match is looked up in Blizzard's character API (US, then EU) and the character is stored and listed. Off until `EVERLOOT_ARMORY_LOOKUP=1`; limited per address and site-wide, never for crawlers or the header's type-ahead.
 - Site: armory character pages show completed achievements, faction standings and the number of completed quests from Blizzard's character API, each with the time of its read; the crawler keeps only those fields and deletes each part 30 days after its last read.
 - Site: zone and dungeon pages show their terrain types (Desert, Snowy, Swamp, Haunted, Strongholds and Cities and the rest) and the gear whose effect works there, and `/database/terrain` lists every terrain type's zones and instances and every item, enchant and set bonus that changes run, mount or swim speed, all read from the game files.
 - Site: Add daily auction reports with archived asking-price movers, house spreads, RSS and downloadable share cards.
@@ -232,6 +233,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
 
 ### Fixed
+- Site: character search finds a Forever character by first name, surname or full name (“Volvik Morningstar”), and the header and /search list armory characters with their region. Surnames and full names need the 20261117140000 migration.
 - Site: terrain page and zone and dungeon Terrain links load on click instead of prefetching into the edge rate limit.
 - Site: disenchant bands read build 1.60.1.70959 like the rest of the game data (they still named 70938 after the build refresh).
 - Site: Database list links load on click instead of prefetching into the edge rate limit.
@@ -388,6 +390,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the loot observations table sorts frequency by its 95% Wilson lower bound while still showing the observed share.
 
 ### Changed
+- Site: the signed-in home puts your characters first: the main character's card, then alts, then builds. With no characters it shows one card to get the addon or connect Battle.net, and empty build lists hide instead of saying "None yet".
 - Site: drop rates restart from addon 0.3.24 (2026-11-17): only loot windows recorded after the release count, now that empty corpses are recorded too, so sources show fewer public rates until new windows build up.
 - Site: the addon is offered as a regular release from 0.3.24: the home, addon and upload pages no longer call it an Alpha.
 - Site: Lore now pairs stories behind Forever’s world with illustrated category links, keeps search above both columns, and shows the full hero art.

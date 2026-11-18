@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import GameIcon from "@/components/game/GameIcon";
-import type { PeopleSearch } from "@/lib/people-search";
+import type { PeopleSearch } from "@/lib/people-search-types";
 import { QUALITY_TEXT, qualityOf } from "./quality";
 
 /**
@@ -40,14 +40,15 @@ export function withPeople(database: Suggestion[], people: Suggestion[]): Sugges
 }
 
 /**
- * Whether the text could start a character name (2 to 12 letters) or a guild name (2 to 24 letters, digits, spaces,
- * apostrophes and hyphens, starting with a letter or digit): the same rules as validPlayerName and validGuildName in
- * the protocol package, copied so the browser bundle does not load it. Text with no letter at all is an id ("6948"),
- * the box's most common lookup, so it never asks either. Only otherwise is /search/people asked.
+ * Whether the text could start a character name (2 to 12 letters), a Forever surname or full name ("First Surname",
+ * as armoryNameQuery in lib/armory reads it) or a guild name (2 to 24 letters, digits, spaces, apostrophes and
+ * hyphens, starting with a letter or digit): the same rules as validPlayerName and validGuildName in the protocol
+ * package, copied so the browser bundle does not load it. Text with no letter at all is an id ("6948"), the box's
+ * most common lookup, so it never asks either. Only otherwise is /search/people asked.
  */
 export function couldBeName(text: string): boolean {
   if (!/\p{L}/u.test(text)) return false;
-  return /^\p{L}{2,12}$/u.test(text) || (text.length >= 2 && text.length <= 24 && /^[\p{L}\p{N}][\p{L}\p{N} '’-]*$/u.test(text));
+  return /^\p{L}{2,24}(\s+\p{L}{1,24})?$/u.test(text) || (text.length >= 2 && text.length <= 24 && /^[\p{L}\p{N}][\p{L}\p{N} '’-]*$/u.test(text));
 }
 
 /** Database rows wait 120 ms after the last key; characters and guilds wait longer, as they reach storage. */
