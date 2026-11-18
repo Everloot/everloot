@@ -30,12 +30,13 @@ test("an empty query finds nothing", async () => {
   expect(await search("   ")).toEqual([]);
 });
 
-test("tools use their current names and leave device-only lists out of search", async () => {
-  for (const [q, href] of [["Collections", "/tools/collections"], ["Guild board", "/tools/guild-board"], ["Legacy perks", "/tools/legacy"]]) {
+test("tools use their current names and leave device-only lists and hidden tools out of search", async () => {
+  for (const [q, href] of [["Guild board", "/tools/guild-board"], ["Legacy perks", "/tools/legacy"]]) {
     const results = (await search(q)).find((g) => g.type === "tool")!.results;
     expect(results).toContainEqual(expect.objectContaining({ label: q, href }));
   }
-  for (const q of ["Plans on this device", "Alts on this device"]) {
+  // Hidden until polished: Farming, Collections and Upload.
+  for (const q of ["Plans on this device", "Alts on this device", "Collections", "Forever Farming", "Upload Addon Data"]) {
     expect((await search(q)).find((g) => g.type === "tool")).toBeUndefined();
   }
 });

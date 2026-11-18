@@ -15,9 +15,11 @@ import Header from "./Header";
 const html = renderToStaticMarkup(<Header />);
 const primary = html.match(/<nav aria-label="Primary"[^>]*>([\s\S]*?)<\/nav>/)?.[1] ?? "";
 
-test("on /chat the bar marks Ask current, not Tools, though the Tools menu still lists Chat", () => {
-  expect(primary).toMatch(/<a href="\/chat" aria-current="page" class="[^"]*border-accent[^"]*">Ask<\/a>/);
-  const tools = primary.match(/<button [^>]*aria-controls="tools-menu"[^>]*class="([^"]*)"/)?.[1] ?? "";
-  expect(tools).toContain("border-transparent");
-  expect(html.match(/id="tools-menu"[\s\S]*?<\/div><\/div>/)?.[0]).toContain('href="/chat"');
+test("on /chat the bar marks Chat current, and no menu", () => {
+  expect(primary).toMatch(/<a href="\/chat" aria-current="page" class="[^"]*border-accent[^"]*">Chat<\/a>/);
+  const buttons = [...primary.matchAll(/<button [^>]*class="([^"]*)"/g)].map((m) => m[1]);
+  expect(buttons).toHaveLength(5);
+  for (const cls of buttons) expect(cls).toContain("border-transparent");
+  // Chat is its own item, in no menu.
+  expect(html.match(/id="tools-menu"[\s\S]*?<\/div><\/div>/)?.[0]).not.toContain('href="/chat"');
 });

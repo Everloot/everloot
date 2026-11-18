@@ -57,8 +57,9 @@ test("breadcrumbs go from Home to the page and never through /tools", () => {
   expect(trailFor("/database/coverage")?.map((c) => c.path)).toEqual(["/", "/database", "/database/coverage"]);
   expect(trailFor("/database/download")?.map((c) => c.path)).toEqual(["/", "/database", "/database/download"]);
   expect(trailFor("/docs")).toEqual([{ name: "Home", path: "/" }, { name: "Docs", path: "/docs" }]);
-  expect(trailFor("/tools/builds")).toEqual([{ name: "Home", path: "/" }, { name: "Plans on this device", path: "/tools/builds" }]);
-  expect(trailFor("/tools/alts")).toEqual([{ name: "Home", path: "/" }, { name: "Alts on this device", path: "/tools/alts" }]);
+  // The lists kept in this browser sit in Profile, under the account page.
+  expect(trailFor("/tools/builds")).toEqual([{ name: "Home", path: "/" }, { name: "Account", path: "/account" }, { name: "Plans on this device", path: "/tools/builds" }]);
+  expect(trailFor("/tools/alts")).toEqual([{ name: "Home", path: "/" }, { name: "Account", path: "/account" }, { name: "Alts on this device", path: "/tools/alts" }]);
   for (const path of ["/tools/talents", "/tools/raid", "/lore/npcs", "/database/drops", "/map", "/changes"]) {
     expect(trailFor(path)!.some((c) => c.path === "/tools"), path).toBe(false);
   }

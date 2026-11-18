@@ -49,10 +49,11 @@ vi.mock("@/lib/game-assets", async (importOriginal) => {
 const entries = (await sitemap())!;
 const byPath = new Map(entries.map((e) => [new URL(e.url).pathname, e]));
 
-test("public catalogue tools that are not coming-soon are in the sitemap, with rankings subject to its row count", () => {
-  expect(byPath.has("/tools/farming-routes")).toBe(true);
+test("public catalogue tools that are not coming-soon or hidden are in the sitemap, with rankings subject to its row count", () => {
+  // Hidden until polished: the routes answer, but the sitemap leaves them out.
+  for (const path of ["/tools/farming-routes", "/tools/collections", "/upload"]) expect(byPath.has(path), path).toBe(false);
   for (const tool of tools.filter((t) => toolHref(t) !== "/rankings")) {
-    expect(byPath.has(toolHref(tool)), tool.slug).toBe(!tool.private && tool.status !== "coming-soon");
+    expect(byPath.has(toolHref(tool)), tool.slug).toBe(!tool.private && !tool.hidden && tool.status !== "coming-soon");
   }
   expect(byPath.has("/rankings")).toBe(false);
   // Device-only lists never reach the sitemap.
