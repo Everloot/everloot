@@ -48,6 +48,24 @@ export default function Page() {
         </li>
       </List>
 
+      <H2 id="window-closed">The Everloot window closed</H2>
+      <P>
+        If you closed it yourself, type <C>/everloot window</C> or left-click the minimap button to reopen it. If the
+        window is off, turn on <strong>Everloot window</strong> in <C>/everloot options</C>. You can also run{" "}
+        <C>/everloot setup</C> to choose your features again.
+      </P>
+      <P>
+        If chat says &ldquo;the window hit an error and closed until /reload&rdquo;, <C>/everloot status</C> names the error.
+        Recording was not affected. Save that output, type <C>/reload</C>, then open the window again with{" "}
+        <C>/everloot window</C>. Report it with the{" "}
+        <a className={docLink} href="https://github.com/Everloot/everloot/issues/new?template=bug-report.yml">Bug report form</a>,
+        including the status output and what you were doing when it closed.
+      </P>
+      <P>
+        &ldquo;This part of Everloot did not load&rdquo; means that view is unavailable; <C>/everloot status</C> says why.
+        Include that line in a bug report too.
+      </P>
+
       <H2 id="paused">Chat says a collection is paused at capacity</H2>
       <P>
         Most kinds of record hold at most 2,000 rows in your file. When one is full, the addon stops recording that kind and
