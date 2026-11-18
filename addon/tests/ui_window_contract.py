@@ -219,6 +219,10 @@ assert(f.views.settings and f.views.settings.shown and not f.home.shown, 'Settin
 assert(f.subtitle.text == 'Settings' and f.nav.settings.on.shown, 'Settings is the selected view')
 local embedded = f.views.settings.page
 assert(embedded and embedded.parentSet == f.views.settings, 'the settings page belongs to this view')
+assert(rawget(embedded, 'crest') and embedded.title.color[2] > 0.9,
+  'embedded Settings keeps the main window crest and green heading')
+assert(embedded.scroll.textures and embedded.boxes[1].label.font,
+  'embedded Settings keeps the branded surface and fonts')
 assert(#embedded.boxes == #Everloot.Options.ROWS, 'every settings row is available inside the window')
 local seen = {}
 for _, box in ipairs(embedded.boxes) do seen[box.row.key] = true end

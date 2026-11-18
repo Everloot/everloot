@@ -213,7 +213,7 @@ function O.Refresh()
     if page.added then
       page.addedRows = O.AddedRows()
       for i, text in ipairs(page.addedRows) do
-        if not page.added[i] then page.added[i] = words(page.content, "GameFontHighlightSmall") end
+        if not page.added[i] then page.added[i] = words(page.content, "GameFontHighlightSmall", page.branded and 11 or nil, "muted") end
         page.added[i]:SetText(text)
         page.added[i]:Show()
       end
@@ -249,15 +249,24 @@ local PAD = 8 -- inside the list of switches
 
 --- One settings page: a heading, its introduction, its switches (and, with `added`, what the file holds) in a
 --- scrolling list, and Reload now in the footer.
-local function build(frameName, name, introText, rows, added)
+local function build(frameName, name, introText, rows, added, branded)
   -- A frame that can take a backdrop, for when the page is shown as a window of its own.
   local made, page = pcall(CreateFrame, "Frame", frameName, nil, "BackdropTemplate")
   if not made or not page then page = CreateFrame("Frame", frameName) end
-  page.name = name
-  page.title = words(page, "GameFontNormalLarge")
-  page.title:SetPoint("TOPLEFT", 16, -16)
-  page.title:SetText(name)
-  local intro = words(page, "GameFontHighlightSmall")
+  page.name, page.branded = name, branded and true or false
+  local W = E.Window
+  local function pageWords(parent, template, size, tone)
+    return words(parent, template, branded and size or nil, tone)
+  end
+  if branded and W and W.Heading then
+    page.crest, page.title = W.Heading(page, "Settings")
+    page.crest:SetPoint("TOPLEFT", page, "TOPLEFT", 12, -10)
+  else
+    page.title = words(page, "GameFontNormalLarge")
+    page.title:SetPoint("TOPLEFT", 16, -16)
+    page.title:SetText(name)
+  end
+  local intro = pageWords(page, "GameFontHighlightSmall", 11, "muted")
   intro:SetPoint("TOPLEFT", page, "TOPLEFT", 16, -46)
   intro:SetPoint("TOPRIGHT", page, "TOPRIGHT", -32, -46)
   intro:SetText(introText)
@@ -268,6 +277,7 @@ local function build(frameName, name, introText, rows, added)
   local content = CreateFrame("Frame", nil, scroll)
   content:SetSize(1, 1)
   scroll:SetScrollChild(content)
+  if branded and W and W.Surface then W.Surface(scroll) end
   page.scroll = scroll
   page.content = content
   page.boxes = {}
@@ -276,10 +286,10 @@ local function build(frameName, name, introText, rows, added)
       row.choices and "UIPanelButtonTemplate" or "UICheckButtonTemplate")
     if row.choices then box:SetSize(70, 24) end
     box.row = row
-    local label = words(box, "GameFontHighlight")
+    local label = pageWords(box, "GameFontHighlight", 13, "text")
     label:SetPoint("TOPLEFT", box, "TOPRIGHT", 4, -4)
     label:SetText(row.label)
-    local text = words(box, "GameFontHighlightSmall")
+    local text = pageWords(box, "GameFontHighlightSmall", 11, "muted")
     text:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -2)
     text:SetText(row.text)
     box.label, box.description = label, text
@@ -297,7 +307,7 @@ local function build(frameName, name, introText, rows, added)
   -- False, not nil, on the pages without it: a frame's methods would answer for a missing field.
   page.addedHeading, page.added = false, false
   if added then
-    page.addedHeading = words(content, "GameFontNormal")
+    page.addedHeading = pageWords(content, "GameFontNormal", 13, "text")
     page.addedHeading:SetText("What you've added")
     page.added = {}
     page.addedRows = {}
@@ -338,7 +348,7 @@ local function build(frameName, name, introText, rows, added)
   reload:SetText("Reload now")
   reload:SetScript("OnClick", function() if ReloadUI then ReloadUI() end end)
   page.reload = reload
-  local note = words(page, "GameFontDisableSmall")
+  local note = pageWords(page, "GameFontDisableSmall", 11, "muted")
   note:SetPoint("TOPLEFT", reload, "TOPRIGHT", 10, -2)
   note:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -32, 16)
   note:SetJustifyV("TOP")
@@ -360,7 +370,7 @@ end
 --- A separate instance uses the same rows and command handlers without moving the game's settings panels.
 function O.BuildWindow(parent)
   O.Register()
-  local page = build(nil, "Everloot", O.INTRO, O.ROWS, true)
+  local page = build(nil, "Everloot", O.INTRO, O.ROWS, true, true)
   page:SetParent(parent)
   page:SetAllPoints(parent)
   O.pages[#O.pages + 1] = page

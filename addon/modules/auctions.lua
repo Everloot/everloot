@@ -530,14 +530,13 @@ E.auctionHintFrame = hint
 pcall(hint.RegisterEvent, hint, "AUCTION_HOUSE_SHOW")
 hint:SetScript("OnEvent", function()
   if not EverlootDB or EverlootDB.scanPrompt == false then return end
+  if EverlootDB.auctionNoticeShown or EverlootDB.auctionHintShown then return end
   if E:IsEnabled("auctions") then
-    if EverlootDB.auctionNoticeShown then return end
     EverlootDB.auctionNoticeShown = true
     say("the Everloot tab (or scan button) at the bottom of the auction house scans this house's prices when you click Scan. "
       .. "It reads item prices and quantities, never sellers, and never posts, bids or buys. /everloot auctions off turns scans off.")
     return
   end
-  if EverlootDB.auctionHintShown then return end
   EverlootDB.auctionHintShown = true
   say("you can share this auction house's prices with Everloot: /everloot auctions on, then /reload. "
     .. "A scan only runs when you click it. /everloot scanprompt off hides this introduction.")

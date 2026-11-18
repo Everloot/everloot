@@ -50,6 +50,9 @@ function Frame.SetScript(self, script, f) self.scripts[script] = f; if script ==
 function Frame.HookScript(self, script, f) self.hooks[#self.hooks + 1] = f; self.hooked[script] = f end
 function Frame.SetText(self, t) self.text = t end
 function Frame.SetEnabled(self, enabled) self.enabled = enabled end
+function Frame.IsEnabled(self) return rawget(self, 'enabled') ~= false end
+function Frame.Enable(self) self.enabled = true end
+function Frame.Disable(self) self.enabled = false end
 function Frame.GetText(self) return self.text end
 function Frame.Show(self) self.shown = true end
 function Frame.Hide(self) self.shown = false end
@@ -498,6 +501,43 @@ assert(replicateCalls == calls, 'cooldown completion never starts a scan')
 EverlootDB.toggles.auctions = false
 T.Refresh()
 assert(not T.panel.scanButton.enabled, 'disabled recording cannot be started from the tab')
+""")
+
+# Blizzard disables its selected tab. The overlay must still let a real click return directly to it,
+# while restoring Blizzard's selection state when closed or a different native tab is selected.
+lua = fresh(STYLED)
+lua.execute("""
+openHouse()
+local T, house = Everloot.AuctionTab, AuctionHouseFrame
+house.selectedTab = 1
+for i, tab in ipairs(blizzardTabs) do
+  tab.isDisabled = false
+  tab:SetEnabled(i ~= house.selectedTab)
+  tab.scripts.OnClick = function()
+    house.selectedTab = i
+    for n, native in ipairs(blizzardTabs) do native:SetEnabled(n ~= i and not native.isDisabled) end
+  end
+end
+local function click(tab)
+  if not tab:IsEnabled() then return end
+  tab.scripts.OnClick()
+  tab.hooked.OnClick()
+end
+T.Show()
+assert(blizzardTabs[1]:IsEnabled() and house.selectedTab == 1, 'Buy can be clicked without changing native selection')
+click(blizzardTabs[1])
+assert(not T.panel.shown and not blizzardTabs[1]:IsEnabled(), 'a real Buy click returns to native Buy')
+T.Show()
+click(blizzardTabs[2])
+assert(not T.panel.shown and blizzardTabs[1]:IsEnabled() and not blizzardTabs[2]:IsEnabled(),
+  'selecting Sell restores Buy and keeps Sell selected')
+T.Show()
+T.Hide()
+assert(not blizzardTabs[2]:IsEnabled(), 'toggling Everloot closed restores the selected tab')
+blizzardTabs[2].isDisabled = true
+T.Show()
+assert(not blizzardTabs[2]:IsEnabled(), 'an independently disabled native tab stays disabled')
+T.Hide()
 """)
 
 # The supported native template registers itself in Tabs. Never anchor it to itself or leave it

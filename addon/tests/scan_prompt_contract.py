@@ -99,7 +99,7 @@ Everloot:InitModules()
 AuctionHouseFrame = CreateFrame('Frame', 'AuctionHouseFrame')
 printed = {}
 Everloot.auctionHintFrame.onEvent(nil, 'AUCTION_HOUSE_SHOW')
-assert(#printed == 1 and said('Everloot tab') and said('never sellers') and said('auctions off'), 'with scans on, the first visit says once what a scan reads: ' .. table.concat(printed, ' | '))
+assert(#printed == 0, 'an install already introduced with scans off stays quiet when scans are enabled')
 assert(not said('/everloot auctions on'), 'with scans on there is no opt-in hint')
 printed = {}
 Everloot.auctionHintFrame.onEvent(nil, 'AUCTION_HOUSE_SHOW')
@@ -168,6 +168,7 @@ assert(EverlootDB.scanPrompt == true)
 lua.execute("""
 EverlootDB.scanPrompt = false
 EverlootDB.auctionNoticeShown = nil
+EverlootDB.auctionHintShown = nil
 printed = {}
 Everloot.auctionHintFrame.onEvent(nil, 'AUCTION_HOUSE_SHOW')
 assert(#printed == 0 and EverlootDB.auctionNoticeShown == nil, 'existing off preference is respected')
@@ -176,6 +177,9 @@ Everloot.auctionHintFrame.onEvent(nil, 'AUCTION_HOUSE_SHOW')
 assert(#printed == 1 and EverlootDB.auctionNoticeShown, 'one introduction after opting in')
 Everloot.auctionHintFrame.onEvent(nil, 'AUCTION_HOUSE_SHOW')
 assert(#printed == 1, 'later visits remain quiet')
+EverlootDB.toggles.auctions = false
+Everloot.auctionHintFrame.onEvent(nil, 'AUCTION_HOUSE_SHOW')
+assert(#printed == 1, 'turning scans off does not introduce the addon a second time')
 """)
 
 from protocol_schema import check_all  # noqa: E402

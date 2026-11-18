@@ -42,3 +42,10 @@
 ## Verification
 
 50 addon contract suites and both connected-planner contracts pass on Lua 5.1. Native template auto-registration was reproduced as a failing regression before the fix. Live acceptance remains open; use docs/2026-11-17-auction-ui-checklist.md. No game install or release was performed.
+
+## Merge review fixes
+
+- Preserve branded typography, crest and surface for Settings embedded in the main window; native Options pages use native styling. A separate embedded-settings contract covers the boundary.
+- Permit a real click on the currently selected native AH tab while the Everloot overlay is open. Restore its disabled state only if it is still selected; independently disabled tabs remain disabled.
+- Treat either saved introduction flag as an already-introduced install, including when auction recording changes later.
+- All three findings have regression coverage; full addon suite rerun before publication.

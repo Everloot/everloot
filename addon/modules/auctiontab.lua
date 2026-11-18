@@ -479,6 +479,14 @@ end
 
 function T.Show()
   if not T.panel then return end
+  -- Blizzard disables the selected tab. Let a click on it dismiss our overlay without
+  -- changing its selected display mode or enabling a tab disabled for another reason.
+  local tabs = T.house and T.house.Tabs
+  local native = type(tabs) == "table" and tabs[T.house.selectedTab]
+  if native and not native.isDisabled and native:IsEnabled() == false then
+    T.returnTab = native
+    native:Enable()
+  end
   T.panel:Show()
   layout(T.panel)
   T.Refresh()
@@ -486,6 +494,9 @@ end
 
 function T.Hide()
   if T.panel then T.panel:Hide() end
+  local native = T.returnTab
+  T.returnTab = nil
+  if native and T.house.Tabs[T.house.selectedTab] == native and not native.isDisabled then native:Disable() end
 end
 
 local function buildPanel(house)
@@ -652,6 +663,6 @@ function T.Attach(house)
     if T.panel then T.panel:Hide() end
     return false
   end
-  T.tab = tab
+  T.tab, T.house = tab, house
   return true
 end
