@@ -274,3 +274,37 @@ test("{{Race}} shows its label, or only an icon with notext, and icons in a row 
   expect(repairTemplates("Fought by {{Race|Orc|orcs}} and {{Race|High elf}}.")).toBe("Fought by orcs and High elf.");
   expect(repairTemplates("Led by Genn Greymane and {{RaceIcon|Worgen|Male}}{{RaceIcon|Human|Male}} [[Darius Crowley]].")).toBe("Led by Genn Greymane and [[Darius Crowley]].");
 });
+
+test("spaces inside code, pre, nowiki, poem and syntaxhighlight are kept as written", () => {
+  expect(wtf(repairTemplates('<code>ignored  pad; local key = "a  b"</code>')).text()).toContain('local key = "a  b"');
+  for (const src of [
+    "<pre>\nlocal  x = 1\nlocal  y\n</pre>",
+    "a <nowiki>x  y</nowiki> b",
+    "<poem>\nRoses  are\nred</poem>",
+    '<syntaxhighlight lang="lua">\nlocal  s = "a  b"\n</syntaxhighlight>',
+    "<SOURCE>a  b</SOURCE> and <!-- a  b -->",
+  ]) expect(repairTemplates(src)).toBe(src);
+  // Outside them the run still collapses.
+  expect(repairTemplates("a  <nowiki>x  y</nowiki>  b")).toBe("a <nowiki>x  y</nowiki> b");
+});
+
+test("a <ref> inside a comment or a quoted attribute does not swallow prose", () => {
+  expect(wtf(repairTemplates("Intro <!-- <ref> --> KEEP <ref>source</ref> tail.")).text()).toBe("Intro KEEP tail.");
+  expect(wtf(repairTemplates('A<ref name="a>b" />KEEP<ref>citation</ref>C')).text()).toBe("AKEEPC");
+  expect(repairTemplates("Name<ref name=Kael'thas/> is here")).toBe("Name is here");
+  // A quote that never closes before the next tag ends at the first ">", as on the wiki (Hakkar the Soulflayer).
+  expect(repairTemplates("into the world.<ref name=\"Chronicle SunkenTemple>''[[World of Warcraft: Chronicle Volume 3]]'', pg. 122</ref> The Atal'ai's spiritual leader, [[Jammal'an]], had a prophecy.\"")).toBe("into the world. The Atal'ai's spiritual leader, [[Jammal'an]], had a prophecy.\"");
+  expect(repairTemplates("t<ref>a</references>b</ref>c")).toBe("tc");
+  expect(repairTemplates("x<ref>a</ref> y\n<references/>")).toBe("x y\n<references/>");
+  // A ref that never closes is left for the converter, as before.
+  expect(repairTemplates("x<ref>never closed")).toBe("x<ref>never closed");
+});
+
+test("long space runs and unclosed tags convert in linear time", () => {
+  for (const src of ["a" + " ".repeat(40_000) + "b", "<ref>".repeat(40_000), "<ref ".repeat(40_000), "<pre>".repeat(40_000), "<!--".repeat(40_000)]) {
+    repairTemplates(src.slice(0, 1000)); // warm up
+    const start = performance.now();
+    repairTemplates(src);
+    expect(performance.now() - start).toBeLessThan(100);
+  }
+});

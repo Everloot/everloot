@@ -187,45 +187,134 @@ function render(inner: string): string | null {
   return null;
 }
 
+/** Tags whose content is shown as written (or, for a comment, not at all): their spaces are never collapsed. */
+const VERBATIM_TAGS = new Set(["code", "pre", "nowiki", "poem", "syntaxhighlight", "source"]);
+
+/** The closing tag of `ref` and each verbatim tag, matched exactly (`</references>` is not `</ref>`). */
+const CLOSERS = new Map([...VERBATIM_TAGS, "ref"].map((name) => [name, new RegExp(`^</${name}\\s*>`)]));
+
+/** Longest opening tag read; real ones are a few dozen characters, and the cap keeps a tag that never ends linear. */
+const MAX_TAG = 2000;
+
+/** Holds a verbatim span's place while the spaces around it are collapsed; never appears in wikitext. */
+const HELD = (n: number) => `\u0002${n}\u0003`;
+
 /**
- * The converter drops everything inside `<code>`, which loses lore lines like `<code>{{api|C_Map}}</code>`.
- * Unwraps the tag and any `<nowiki>` inside it, keeping the text as written.
+ * Finds `needle` (lower-case) at or after `from` in `lower`, remembering the last answer so that repeated
+ * searches for a missing close tag (`<ref><ref><ref>…`) do not each rescan the rest of the page.
  */
-function keepCodeText(wikitext: string): string {
-  return wikitext
-    .replace(/<code\b[^>]*>([\s\S]*?)<\/code\s*>/gi, (_, body: string) => body.replace(/<\/?nowiki\s*>/gi, ""))
-    .replace(/<code\b[^>]*\/>/gi, "");
+function forwardFinder(lower: string) {
+  const memo = new Map<string, { from: number; at: number }>();
+  return (needle: string, from: number): number => {
+    const m = memo.get(needle);
+    if (m && from >= m.from && (m.at === -1 || from <= m.at)) return m.at;
+    const at = lower.indexOf(needle, from);
+    memo.set(needle, { from, at });
+    return at;
+  };
 }
 
 /**
- * The converter drops `<ref>` footnotes but leaves a space for each one, so a name with three sources
- * (`'''Helhounds'''<ref>…</ref><ref>…</ref><ref>…</ref> are`) read "Helhounds  are". Removed here instead.
+ * Reads the tag that opens at `start` (`<name …>`, `<name …/>`), honouring quoted attribute values, so
+ * `<ref name="a>b" />` ends at its real `/>`. Returns where it ends and whether it closes itself, or null
+ * when the tag never ends.
  */
-function dropRefs(wikitext: string): string {
-  return wikitext.replace(/<ref\b[^>]*\/>/gi, "").replace(/<ref\b[^>]*>[\s\S]*?<\/ref\s*>/gi, "");
+function readTag(text: string, start: number, nameLength: number, find: (needle: string, from: number) => number): { end: number; selfClosing: boolean } | null {
+  const gt = find(">", start);
+  if (gt === -1 || gt > start + MAX_TAG) return null; // no ">" within reach: not a tag
+  let i = start + 1 + nameLength;
+  const limit = Math.min(text.length, start + MAX_TAG);
+  while (i < limit) {
+    const ch = text[i];
+    if (ch === ">") return { end: i + 1, selfClosing: text[i - 1] === "/" };
+    if (ch === "=") {
+      i++;
+      while (text[i] === " " || text[i] === "\t" || text[i] === "\n") i++;
+      const quote = text[i];
+      if (quote === '"' || quote === "'") {
+        // A quote counts only when it closes before the next "<" or line break: the wiki has many
+        // `<ref name="Source>…</ref>` with the closing quote missing, and those end at the first ">".
+        const value = /^[^<\n]*/.exec(text.slice(i + 1, limit))![0];
+        const close = value.indexOf(quote);
+        if (close !== -1) i += close + 2;
+        else i++;
+        continue;
+      }
+      continue;
+    }
+    i++;
+  }
+  return null;
 }
 
 /**
- * A browser shows a run of spaces as one, so the wiki never shows the doubled spaces its source often has:
- * `after  completing`, `'''Garn Cloudsong ''' is`, `In ''[[World of Warcraft: Classic| Classic]]''`. The
- * converter keeps them, and they would read as a dropped template. They are collapsed before any template
- * is rendered, so a doubled space in the output still means a template was lost. A line that starts with
- * a space is preformatted on the wiki and shows its spaces, so it is left as written.
+ * The pass before templates render, in one forward scan:
+ *
+ * - `<ref>` footnotes go. The converter drops them too but leaves a space for each, so a name with three
+ *   sources (`'''Helhounds'''<ref>…</ref><ref>…</ref><ref>…</ref> are`) read "Helhounds  are".
+ * - `<code>` is unwrapped (with any `<nowiki>` inside it): the converter drops everything inside `<code>`,
+ *   which lost lore lines like `<code>{{api|C_Map}}</code>`.
+ * - Comments and the verbatim tags (code, pre, nowiki, poem, syntaxhighlight, source) are kept as written:
+ *   a `<ref>` inside a comment is not a footnote, and the spaces in code are content.
+ * - Everywhere else, runs of spaces collapse. A browser shows a run as one space, so the wiki never shows
+ *   the doubled spaces its source often has (`after  completing`, `'''Garn Cloudsong ''' is`,
+ *   `In ''[[World of Warcraft: Classic| Classic]]''`); kept, they would read as a dropped template. A
+ *   doubled space left in the output therefore still means a template was lost. A line that starts with a
+ *   space is preformatted on the wiki and shows its spaces, so it is left as written.
  */
-function collapseSourceSpaces(wikitext: string): string {
-  return wikitext
+function prepare(wikitext: string): string {
+  const lower = wikitext.toLowerCase();
+  const find = forwardFinder(lower);
+  const held: string[] = [];
+  let out = "";
+  let i = 0;
+  while (i < wikitext.length) {
+    const lt = wikitext.indexOf("<", i);
+    if (lt === -1) { out += wikitext.slice(i); break; }
+    out += wikitext.slice(i, lt);
+    i = lt;
+    if (lower.startsWith("<!--", lt)) {
+      const close = find("-->", lt + 4);
+      const end = close === -1 ? wikitext.length : close + 3; // an unclosed comment runs to the end of the page
+      out += HELD(held.push(wikitext.slice(lt, end)) - 1);
+      i = end;
+      continue;
+    }
+    const name = /^[a-z]+/.exec(lower.slice(lt + 1, lt + 17))?.[0] ?? "";
+    const boundary = lower[lt + 1 + name.length];
+    if (!name || !(boundary === undefined || boundary === ">" || boundary === "/" || /\s/.test(boundary))) { out += "<"; i = lt + 1; continue; }
+    if (name !== "ref" && !VERBATIM_TAGS.has(name)) { out += "<"; i = lt + 1; continue; }
+    const tag = readTag(wikitext, lt, name.length, find);
+    if (!tag) { out += "<"; i = lt + 1; continue; }
+    if (tag.selfClosing) {
+      if (name !== "ref" && name !== "code") out += HELD(held.push(wikitext.slice(lt, tag.end)) - 1);
+      i = tag.end;
+      continue;
+    }
+    // The first `</name>` after the tag closes it; `</references>` is not `</ref>`.
+    const closer = CLOSERS.get(name)!;
+    let close = find(`</${name}`, tag.end);
+    while (close !== -1 && !closer.test(lower.slice(close, close + name.length + 20))) close = find(`</${name}`, close + 1);
+    if (close === -1) { out += "<"; i = lt + 1; continue; }
+    const closeEnd = wikitext.indexOf(">", close);
+    if (name === "code") out += HELD(held.push(wikitext.slice(tag.end, close).replace(/<\/?nowiki\s*>/gi, "")) - 1);
+    else if (name !== "ref") out += HELD(held.push(wikitext.slice(lt, closeEnd + 1)) - 1);
+    i = closeEnd + 1;
+  }
+  return out
     .split("\n")
     .map((line) => (line.startsWith(" ") ? line : line
       .replace(/( '{0,5}\[\[[^[\]|\n]*\|) +/g, "$1") // a link label that starts with a space, after a space
-      .replace(/ +\]\](?= )/g, "]]") // a link label that ends with a space, before a space
+      .replace(/(?<! ) +\]\](?= )/g, "]]") // a link label that ends with a space, before a space
       .replace(/(\S) +('{2,5}) +/g, "$1$2 ") // bold or italic quotes with a space on each side
       .replace(/(\S) {2,}(?=\S)/g, "$1 ")))
-    .join("\n");
+    .join("\n")
+    .replace(/\u0002(\d+)\u0003/g, (_, n: string) => held[Number(n)]);
 }
 
 /** Renders the handled templates to text in one pass, leaving unknown templates and all line structure untouched. */
 export function repairTemplates(rawWikitext: string): string {
-  const wikitext = collapseSourceSpaces(dropRefs(keepCodeText(rawWikitext)));
+  const wikitext = prepare(rawWikitext);
   const stack: string[] = [];
   let cur = "";
   let literal = 0; // opens past MAX_DEPTH, kept as text along with their closes
@@ -251,7 +340,7 @@ export function repairTemplates(rawWikitext: string): string {
   return cur
     .split("\n")
     .filter((line) => !(line.includes(REMOVED) && line.replace(new RegExp(REMOVED, "g"), "").trim() === ""))
-    .map((line) => (line.includes(REMOVED) ? line.replace(new RegExp(`^(${REMOVED} *)+`), "").replace(new RegExp(` *(?:${REMOVED} *)+`, "g"), " ").replace(/ +$/, "") : line))
+    .map((line) => (line.includes(REMOVED) ? line.replace(new RegExp(`^(${REMOVED} *)+`), "").replace(new RegExp(`(?<! ) *(?:${REMOVED} *)+`, "g"), " ").replace(/(?<! ) +$/, "") : line))
     .join("\n")
     .replace(/^\n+/, "")
     .replace(/\n+$/, "");
