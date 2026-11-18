@@ -1,3 +1,4 @@
+import { publicDropRate, publicMeasuredZero } from "../../../kb/src/drop-rollup";
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -53,11 +54,11 @@ async function datasets(): Promise<{ sets: Dataset[]; dataAsOf: string | null }>
     const { rates, measuredZeros } = drops;
     sets.push({
       file: { name: "drops.ndjson", dataset: "drops", format: "ndjson", rowsOf: "dropsResponse", field: "rates", data: "observed", attribution: attribution("/database/drops"), gameData: null },
-      rows: rates.filter((r) => r.public) as unknown as Row[],
+      rows: rates.filter((r) => r.public).map(publicDropRate) as unknown as Row[],
     });
     sets.push({
       file: { name: "drops-measured-zeros.ndjson", dataset: "drops", format: "ndjson", rowsOf: "dropsResponse", field: "measuredZeros", data: "observed", attribution: attribution("/database/drops"), gameData: null },
-      rows: measuredZeros.filter((z) => z.public) as unknown as Row[],
+      rows: measuredZeros.filter((z) => z.public).map(publicMeasuredZero) as unknown as Row[],
     });
   }
   if (guildsOn()) {

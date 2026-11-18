@@ -18,10 +18,11 @@ export interface LootRow {
   installId: string;
   sourceNpcId?: number;
   sourceObjectId?: number;
+  copper?: number;
   items: Array<{ itemId: number; count: number }>;
 }
 
-export interface DropRate {
+export interface PublicDropRate {
   sourceNpcId?: number;
   sourceObjectId?: number;
   itemId: number;
@@ -30,6 +31,35 @@ export interface DropRate {
   rate: number;
   reporters: number;
   public: boolean;
+}
+
+/** Internal stack total; never serialized into a public rate. */
+export interface DropRate extends PublicDropRate {
+  units: number;
+}
+
+/** Explicit allow-list shared by public answers and bulk exports. */
+export function publicDropRate(r: PublicDropRate): PublicDropRate {
+  return {
+    ...(r.sourceNpcId !== undefined ? { sourceNpcId: r.sourceNpcId } : {}),
+    ...(r.sourceObjectId !== undefined ? { sourceObjectId: r.sourceObjectId } : {}),
+    itemId: r.itemId, kills: r.kills, drops: r.drops, rate: r.rate, reporters: r.reporters, public: r.public,
+  };
+}
+
+export function publicMeasuredZero(r: MeasuredZero): MeasuredZero {
+  return {
+    ...(r.sourceNpcId !== undefined ? { sourceNpcId: r.sourceNpcId } : {}),
+    ...(r.sourceObjectId !== undefined ? { sourceObjectId: r.sourceObjectId } : {}),
+    kills: r.kills, reporters: r.reporters, public: r.public,
+  };
+}
+
+export interface DropSource {
+  sourceNpcId?: number;
+  sourceObjectId?: number;
+  kills: number;
+  averageCopper: number;
 }
 
 /** Kills of one source, and no valid item in any of those windows. */
@@ -43,6 +73,7 @@ export interface MeasuredZero {
 
 export interface RollupResult {
   rates: DropRate[];
+  sources: DropSource[];
   measuredZeros: MeasuredZero[];
   rejected: string[];
 }
@@ -55,8 +86,8 @@ export type ItemFactRows = { rates: DropRate[]; names: ItemNameRow[]; npcs: NpcP
 /** Frequency among source-attributed observations; missing kills are not inferred. */
 export function rollupDrops(windows: LootRow[]): RollupResult {
   const rejected: string[] = [];
-  const kills = new Map<string, { n: number; reporters: Set<string> }>();
-  const drops = new Map<string, { n: number; reporters: Set<string> }>();
+  const kills = new Map<string, { n: number; copper: number; reporters: Set<string> }>();
+  const drops = new Map<string, { n: number; units: number; reporters: Set<string> }>();
   const sourcesWithDrops = new Set<string>();
   const meta = new Map<string, { sourceNpcId?: number; sourceObjectId?: number; itemId: number }>();
 
@@ -77,8 +108,9 @@ export function rollupDrops(windows: LootRow[]): RollupResult {
       rejected.push("implausible source id");
       continue;
     }
-    const k = kills.get(s) ?? { n: 0, reporters: new Set<string>() };
+    const k = kills.get(s) ?? { n: 0, copper: 0, reporters: new Set<string>() };
     k.n += 1;
+    k.copper += Number.isInteger(w.copper) && w.copper! >= 0 ? w.copper! : 0;
     k.reporters.add(w.installId);
     kills.set(s, k);
     const seen = new Set<number>();
@@ -88,7 +120,8 @@ export function rollupDrops(windows: LootRow[]): RollupResult {
         continue;
       }
       const key = `${s}|item:${it.itemId}`;
-      const d = drops.get(key) ?? { n: 0, reporters: new Set<string>() };
+      const d = drops.get(key) ?? { n: 0, units: 0, reporters: new Set<string>() };
+      d.units += it.count;
       if (!seen.has(it.itemId)) {
         seen.add(it.itemId);
         d.n += 1;
@@ -114,6 +147,7 @@ export function rollupDrops(windows: LootRow[]): RollupResult {
       ...meta.get(key)!,
       kills: k.n,
       drops: d.n,
+      units: d.units,
       rate: k.n > 0 ? d.n / k.n : 0,
       reporters,
       public: reporters >= INDEPENDENT_INSTALLS,
@@ -134,7 +168,14 @@ export function rollupDrops(windows: LootRow[]): RollupResult {
     });
   }
   measuredZeros.sort((a, b) => b.kills - a.kills || (a.sourceNpcId ?? a.sourceObjectId ?? 0) - (b.sourceNpcId ?? b.sourceObjectId ?? 0));
-  return { rates, measuredZeros, rejected };
+  const sources = [...kills].map(([src, k]) => {
+    const [kind, id] = src.split(":");
+    return {
+      ...(kind === "npc" ? { sourceNpcId: Number(id) } : { sourceObjectId: Number(id) }),
+      kills: k.n, averageCopper: k.copper / k.n,
+    };
+  });
+  return { rates, sources, measuredZeros, rejected };
 }
 
 /**
@@ -167,6 +208,7 @@ export function lootWindowsFromRecords(records: unknown[]): LootRow[] {
     if (!countsAsKillOrGather(row.lootType)) continue;
     windows.push({
       installId: row.installId,
+      ...(typeof row.copper === "number" ? { copper: row.copper } : {}),
       ...(typeof row.sourceNpcId === "number" ? { sourceNpcId: row.sourceNpcId } : {}),
       ...(typeof row.sourceObjectId === "number" ? { sourceObjectId: row.sourceObjectId } : {}),
       items: (row.items as Array<{ itemId?: unknown; count?: unknown }>)

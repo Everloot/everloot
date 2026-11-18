@@ -231,6 +231,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   dates from before the feed existed are marked estimated.
 - Site: /tools/bags shows the cheapest bag of each size on one realm's auction house and what each added slot costs over your smallest bag, and item tooltips print a bag's "14 Slot Bag" line; slot counts come from the game files, prices from players' scans.
 - Site: the world map shows zone or continent coordinates on hover and shares pins in the address; Shift-click or use Pin map centre, and Clear pin removes it.
+- Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
 
 ### Fixed
 - Site: terrain page and zone and dungeon Terrain links load on click instead of prefetching into the edge rate limit.

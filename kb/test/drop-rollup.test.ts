@@ -90,3 +90,23 @@ test("typed windows: pick-pocket, skinning, disenchant and container windows sta
   const facts = itemFactsFromRecords(records);
   expect(facts.rates.find((r) => r.sourceNpcId === 5)).toMatchObject({ kills: 2, drops: 2 });
 });
+
+test("stack units and source copper use the existing counted windows", () => {
+  const result = rollupDrops(lootWindowsFromRecords([
+    { kind: "loot", sourceEvidence: "loot-api", installId: "a", sourceNpcId: 7, copper: 90, items: [{ itemId: 2589, count: 2 }] },
+    { kind: "loot", sourceEvidence: "empty-window", lootType: "kill", installId: "b", sourceNpcId: 7, items: [] },
+    { kind: "loot", sourceEvidence: "loot-api", lootType: "skinning", installId: "c", sourceNpcId: 7, copper: 999, items: [{ itemId: 2589, count: 9 }] },
+    { kind: "loot", sourceEvidence: "loot-api", installId: "c", sourceObjectId: 9, copper: 12, items: [] },
+  ]));
+  expect(result.rates).toEqual([{ sourceNpcId: 7, itemId: 2589, kills: 2, drops: 1, units: 2, rate: 0.5, reporters: 2, public: false }]);
+  expect(result.sources).toEqual([
+    { sourceNpcId: 7, kills: 2, averageCopper: 45 },
+    { sourceObjectId: 9, kills: 1, averageCopper: 12 },
+  ]);
+});
+
+test("duplicate stacks add units but still count only one window with the item", () => {
+  const result = rollupDrops([{ installId: "a", sourceNpcId: 7, items: [{ itemId: 2589, count: 2 }, { itemId: 2589, count: 3 }, { itemId: 2589, count: -1 }] }]);
+  expect(result.rates[0]).toMatchObject({ units: 5, drops: 1, kills: 1, rate: 1 });
+  expect(result.sources[0]).toMatchObject({ averageCopper: 0 });
+});
