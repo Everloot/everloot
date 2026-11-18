@@ -140,6 +140,7 @@ the Worker. The browser bundle keeps the `NEXT_PUBLIC_*` values.
 | `GITHUB_TOKEN` | `web/src/lib/addon-github.ts`, `web/src/lib/polestar-github.ts`, `web/src/lib/everloot-releases.ts`, `kb/src/cli.ts` | Signed-in release reads from GitHub, past the anonymous rate limit | The workflow's own token | No |
 | `EVERLOOT_COMMIT_SHA` | `web/src/lib/platform.ts` | The deployed commit, for the footer and the source link | `web/scripts/cf-deploy.mjs` | No |
 | `EVERLOOT_DOWNLOADS` | `web/src/lib/addon-release.ts` | The addon zips' sizes and hashes, worked out at build time | `web/next.config.js` | Build only |
+| `EVERLOOT_REVIEWED_GUIDES` | `web/src/app/layout.tsx` | "1" when kb/guides holds a reviewed guide, so the header's Guides menu lists the guides index; empty otherwise | `web/next.config.js` | Build only |
 | `NEXT_PHASE` | `web/src/app/addon/page.tsx`, `web/src/app/addons/polestar/page.tsx` | Tells a build from a request, so a build without GitHub does not fail | Next.js | Framework |
 
 ## Actions secrets (repository settings, Secrets)
