@@ -183,11 +183,14 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
     if (crossesDocumentBoundary(window.location.pathname)) return;
     try { setProviders(loadProviders(providerStorage())); }
     catch { setError("Chat keys could not move to this tab. Allow browser storage and reload before saving a key."); }
-    if (!workspace) setConversations(loadConversations(localStorage));
+    if (!workspace) {
+      const history = loadConversations(localStorage);
+      setConversations(history);
+      setRailOpen(history.length > 0 && typeof window.matchMedia === "function" && !narrow());
+    }
     const id = newConversationId();
     latest.current.currentId = id;
     setCurrentId(id);
-    setRailOpen(typeof window.matchMedia === "function" && window.matchMedia("(min-width: 1024px)").matches);
     setReady(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the switch is fixed for the page's life
   }, []);
@@ -203,10 +206,11 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
   useEffect(() => {
     if (!workspace || ws.account === undefined || !ready) return;
     setSigned(ws.account !== null);
-    refreshLocal();
+    const history = refreshLocal();
+    setRailOpen((history.mine.length > 0 || history.unbound.length > 0 || ws.recent.length > 0) && typeof window.matchMedia === "function" && !narrow());
     if (messagesRef.current.length === 0 && metaRef.current.revision === 0) setMeta(freshMeta(null, "account"));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when the account is known or changes
-  }, [workspace, ws.account, ready]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialize for each account, including when its history finishes loading
+  }, [workspace, ws.account, ready, ws.loaded]);
 
   // The screen named in the URL, and Back and Forward between them.
   useEffect(() => {
@@ -281,7 +285,9 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
   /** The browser lists the current account may see: its own, and the old shared ones nobody imported. */
   function refreshLocal(id: string | null = accountIdNow()) {
     const old = browserChats(localStorage, id);
-    setLocal({ mine: id ? loadConversations(scoped(localStorage, id)) : [], ...old });
+    const history = { mine: id ? loadConversations(scoped(localStorage, id)) : [], ...old };
+    setLocal(history);
+    return history;
   }
   function accountIdNow() { return ws.opts()?.accountId ?? null; }
 
@@ -714,7 +720,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
       {railOpen && rail}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center gap-2 px-3 py-2">
+        <div className="flex items-center gap-2 py-2 pl-3 pr-16 sm:pr-3">
           <button ref={railToggle} type="button" className="btn min-h-9 px-3 text-sm" aria-expanded={railOpen} aria-controls="chat-rail" onClick={() => setRailOpen(!railOpen)}>
             Chats
           </button>
