@@ -8,6 +8,8 @@ import {
   armoryGuildPath, armoryOn, classTokenOfName, regionLabel, SEARCH_RULE,
 } from "@/lib/armory";
 import { armoryStore, type ArmoryCount, type ArmoryGuildHit, type ArmoryHit } from "@/lib/armory-store";
+import { armoryGuildHidden, GUILD_DIRECTORY_PATH } from "@/lib/armory-guilds";
+import { playerStore } from "@/lib/player-store";
 import { classText } from "@/app/players/player-view";
 import { ArmoryCredit, armoryMetadata, first, link, newest, NOT_FOUND_METADATA, Unreachable } from "./parts";
 
@@ -78,7 +80,11 @@ export default async function ArmoryPage(props: { searchParams: Promise<{ q?: st
   const [counts, characters, guilds] = await Promise.all([
     store.counts().catch(() => null),
     results(q, (p) => store.search(p, SEARCH_LIMIT)),
-    results(g, (p) => store.searchGuilds(p, SEARCH_LIMIT)),
+    // A guild hidden through /guilds/hide is left out; without the hide list no guild is listed.
+    results(g, async (p) => {
+      const [hits, hidden] = await Promise.all([store.searchGuilds(p, SEARCH_LIMIT), playerStore().hiddenGuilds()]);
+      return hits.filter((h) => !armoryGuildHidden(hidden, h.region, h.name));
+    }),
   ]);
 
   return (
@@ -112,6 +118,7 @@ export default async function ArmoryPage(props: { searchParams: Promise<{ q?: st
           <SectionHeading id="armory-boards">Rankings</SectionHeading>
           <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
             {ARMORY_METRICS.map((m) => <li key={m}><Link href={armoryBoardPath(m)} className={link}>{ARMORY_BOARDS[m].title}</Link></li>)}
+            <li><Link href={GUILD_DIRECTORY_PATH} className={link}>Guild directory</Link></li>
           </ul>
         </section>
 

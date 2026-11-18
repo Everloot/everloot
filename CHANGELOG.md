@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: the armory has a guild directory at /armory/guilds: search by name, filter by region and ruleset, sort by members read, average item level or level 60 count. Guild pages show the class mix, levels and average item level, a guild hidden through /guilds/hide leaves the armory too, and ranking rows show the region as a coloured chip. Counts start once the new database migration is applied.
 - Addon: armor and weapons you see or disenchant are recorded with their item level, so the site can place a disenchant in its band when the game files give the item no level (about one in five disenchants so far).
 - Addon: item tooltips show a disenchant estimate for armor and weapons: the value of the materials their band gives at your house's prices ("at least" when a material has no price), each material's chance and units, and whether the materials, the auction or a vendor pays more, from the disenchants players recorded; an Options checkbox turns it off. A Disenchanting view in the Everloot window keeps your own disenchants on this computer (never uploaded): materials received, their value now and, where the ledger knows it, what you paid.
 - Desktop: refreshes the disenchant results once a day into the game's price file and keeps the last good copy when a fetch fails.
