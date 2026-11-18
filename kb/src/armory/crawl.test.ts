@@ -739,7 +739,7 @@ it("records the call count of a run that read something", async () => {
 it("still crawls without the discovery migration, then fails naming it", async () => {
   const { store, api } = setup(1);
   store.spiderGuilds.mockRejectedValue(new StoreError(404));
-  await expect(runCrawl({ region: "eu", budget: 3, store, api })).rejects.toThrow(/20261117140000_armory_discovery\.sql/);
+  await expect(runCrawl({ region: "eu", budget: 3, store, api })).rejects.toThrow(/20261117160000_armory_discovery\.sql/);
   expect(store.upsertCharacters).toHaveBeenCalledTimes(1);
   expect(store.recordRun).not.toHaveBeenCalled();
 });

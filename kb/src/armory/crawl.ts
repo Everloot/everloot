@@ -43,7 +43,7 @@ export interface Summary {
 }
 /** The job fails when this many runs in a row made no call: the queue has starved. */
 export const ZERO_RUN_LIMIT = 6;
-const MIGRATION = "supabase/migrations/20261117140000_armory_discovery.sql";
+const MIGRATION = "supabase/migrations/20261117160000_armory_discovery.sql";
 /** PostgREST answers 404 for a function that does not exist yet. */
 const missingFunction = (error: unknown) => error instanceof StoreError && error.status === 404;
 /** Each stored details section and the endpoint that fills it. */
