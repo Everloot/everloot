@@ -67,7 +67,7 @@ export interface ArmoryStore {
   search(prefix: string, limit: number): Promise<ArmoryHit[]>;
   searchGuilds(prefix: string, limit: number): Promise<ArmoryGuildHit[]>;
   /**
-   * One page of the guild directory (20261117140000_armory_guild_directory.sql), hidden characters out of every count.
+   * One page of the guild directory (20261117170000_armory_guild_directory.sql), hidden characters out of every count.
    * Null while that migration is not applied, so the page can say the directory is not ready rather than down.
    */
   guildDirectory(filter: ArmoryGuildFilter): Promise<ArmoryGuildPage | null>;

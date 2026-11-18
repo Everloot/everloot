@@ -19,7 +19,7 @@ test("the guild directory migration counts read members, honours both hides, and
       "20261021130000_players", "20261022160000_players_realm_key", "20261025120000_guilds",
       "20261109120000_armory", "20261109130000_armory_touch_members", "20261112190000_armory_profiles",
     ]) await db.exec(read(`migrations/${migration}.sql`));
-    for (let i = 0; i < 2; i++) await db.exec(read("migrations/20261117140000_armory_guild_directory.sql"));
+    for (let i = 0; i < 2; i++) await db.exec(read("migrations/20261117170000_armory_guild_directory.sql"));
     await db.exec(read("tests/armory_guild_directory.sql"));
     expect((await db.query("select count(*)::int as n from public.armory_guilds")).rows).toEqual([{ n: 0 }]);
   } finally { await db.close(); }
