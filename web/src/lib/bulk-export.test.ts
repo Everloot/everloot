@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -7,10 +7,14 @@ import { API_SCHEMAS, bulkIndex, corpusPublicResponse, dropsResponse, edgesRespo
 import { z } from "zod";
 
 const store = vi.hoisted(() => ({ loadCorpus: vi.fn(), loadMarket: vi.fn(), loadCompletion: vi.fn() }));
-vi.mock("@/lib/upload-store", () => ({ uploadStore: store }));
+vi.mock("@/lib/upload-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/upload-store")>()), uploadStore: store }));
 const hide = vi.hoisted(() => ({ hiddenGuilds: vi.fn() }));
 vi.mock("@/lib/player-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/player-store")>()), playerStore: () => hide }));
 
+const aggregates = vi.hoisted(() => ({ loadStoredAggregates: vi.fn() }));
+vi.mock("@/lib/aggregate-store", () => aggregates);
+
+import { buildAggregates } from "./aggregate-set";
 import { exportBulk } from "./bulk-export";
 
 const AS_OF = "2026-10-18T10:00:00.000Z";
@@ -23,13 +27,15 @@ for (const [i, installId] of ["a", "b", "c"].entries()) {
 
 let dir: string;
 beforeEach(() => {
+  for (const key of ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]) vi.stubEnv(key, "configured");
   dir = mkdtempSync(join(tmpdir(), "everloot-bulk-"));
   store.loadCorpus.mockReset().mockResolvedValue({ uploads: 3, records, dataAsOf: AS_OF, unreachable: false });
+  aggregates.loadStoredAggregates.mockReset().mockResolvedValue(null);
   store.loadMarket.mockReset().mockResolvedValue({ state: null, dataAsOf: null });
   store.loadCompletion.mockReset().mockResolvedValue(null);
   hide.hiddenGuilds.mockReset().mockResolvedValue(new Set());
 });
-afterEach(() => { rmSync(dir, { recursive: true, force: true }); vi.unstubAllEnvs(); });
+afterEach(() => { rmSync(dir, { recursive: true, force: true }); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 function lines(name: string): Record<string, unknown>[] {
   return readFileSync(join(dir, name), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as Record<string, unknown>);
@@ -154,4 +160,48 @@ describe("guild kills", () => {
     expect(lines("guild-kills.ndjson").map((r) => [r.guildName, r.name])).toEqual([["Night Watch", "Lucifron"]]);
     expect(lines("guilds.ndjson").map((r) => [r.guildName, r.kills])).toEqual([["Night Watch", 1]]);
   });
+});
+
+test("missing corpus configuration omits the file and prints the missing variable names", async () => {
+  vi.stubEnv("SUPABASE_URL", "");
+  vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+  const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+  store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], dataAsOf: null });
+  const index = await exportBulk(dir);
+  expect(index.dataAsOf).toBeNull();
+  expect(index.files.some((f) => f.name === "corpus.ndjson")).toBe(false);
+  expect(existsSync(join(dir, "corpus.ndjson"))).toBe(false);
+  expect(index.files.some((f) => f.dataset === "drops")).toBe(false);
+  expect(warning).toHaveBeenCalledWith(expect.stringMatching(/corpus.ndjson.*SUPABASE_URL.*SUPABASE_SERVICE_ROLE_KEY/));
+});
+
+test("reachable empty corpus remains an empty file in the index", async () => {
+  store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], dataAsOf: null });
+  const index = await exportBulk(dir);
+  expect(index.files.find((f) => f.name === "corpus.ndjson")).toMatchObject({ rows: 0, bytes: 0 });
+  expect(readFileSync(join(dir, "corpus.ndjson"), "utf8")).toBe("");
+});
+
+test("unreachable corpus prints a reason and is omitted", async () => {
+  const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+  store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], unreachable: true });
+  const index = await exportBulk(dir);
+  expect(index.files.some((f) => f.name === "corpus.ndjson")).toBe(false);
+  expect(index.dataAsOf).toBeNull();
+  expect(warning).toHaveBeenCalledWith(expect.stringMatching(/corpus.ndjson.*unreachable/));
+});
+
+test("R2-readable drop aggregates survive missing corpus index settings", async () => {
+  vi.stubEnv("SUPABASE_URL", "");
+  vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+  vi.spyOn(console, "warn").mockImplementation(() => {});
+  const parsed = parseRecords(records.map((r) => ({ ...r, installId: `install-${r.installId}` })));
+  expect(parsed.receipt.rejected).toEqual([]);
+  aggregates.loadStoredAggregates.mockResolvedValue(buildAggregates({ uploads: 3, records: parsed.records, dataAsOf: AS_OF }));
+  const index = await exportBulk(dir);
+  expect(index.dataAsOf).toBeNull();
+  expect(index.files.some((f) => f.name === "corpus.ndjson")).toBe(false);
+  expect(index.files.find((f) => f.name === "drops.ndjson")).toMatchObject({ rows: 1 });
+  expect(index.files.some((f) => f.name === "drops-measured-zeros.ndjson")).toBe(true);
+  expect(lines("drops.ndjson")[0]).toMatchObject({ itemId: 1234, public: true });
 });
