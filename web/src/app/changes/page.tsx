@@ -118,6 +118,20 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
       : <span className="font-medium">{e.title}</span>;
     return e.source === "manual" ? <>{title}<span className="block text-cell-2 text-muted">Summary by Everloot. {e.url && <a href={e.url} className={LINK}>Original source</a>}</span></> : title;
   };
+  const isBluePost = (e: ChangeEntry) => e.type !== "build" && (e.source === "forum" || e.source === "news" || e.source === "bluesky");
+  const blueCard = (e: ChangeEntry) => (
+    <blockquote data-blue-card className="min-w-0 rounded-control border border-line border-l-4 border-l-blue-post bg-panel p-3 whitespace-normal">
+      {titleLink(e)}
+      {q.game === "all" && <span className="ml-2 text-cell-2 text-muted">{GAME_LABEL[e.game]}</span>}
+      <header className="my-2 flex flex-wrap items-center gap-2 text-cell-2">
+        {e.author && <Link href={here({ author: e.author })} title={e.role || undefined} className={BLUE}>{e.author}</Link>}
+        <span className="rounded-full border border-blue-post px-2 text-blue-post">Blizzard</span>
+        {e.role && <span className="text-fg-2">{e.role}</span>}
+        <span data-source-chip title={e.category || undefined} className="rounded-full border border-edge px-2 text-fg-2">{SOURCE_LABEL(e)}</span>
+      </header>
+      {(e.summary ?? e.excerpt) && <p className="text-cell text-blue-post [&_a]:text-blue-post"><WithSpells text={(e.summary ?? e.excerpt)!} index={index} /></p>}
+    </blockquote>
+  );
   const columns: Column<ChangeEntry>[] = [
     {
       // On a phone this is the only column shown, so it carries the title and the muted line holds the date.
@@ -130,7 +144,7 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
           >
             {e.at.slice(0, 10)}
           </time>
-          <div data-phone-title className="whitespace-normal py-1 sm:hidden">{titleLink(e)}{e.source === "manual" && e.summary && <span className="block text-cell-2 text-muted">{e.summary}</span>}</div>
+          <div data-phone-title className="whitespace-normal py-1 sm:hidden">{isBluePost(e) ? blueCard(e) : titleLink(e)}{e.source === "manual" && e.summary && <span className="block text-cell-2 text-muted">{e.summary}</span>}</div>
         </>
       ),
     },
@@ -138,6 +152,7 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
     { key: "type", header: "Type", sortable: true, nowrap: true, cell: (e) => <span data-type className="font-mono text-xs text-muted">{e.source === "manual" && e.type === "post" ? "Post" : TYPE_LABEL[e.type]}</span> },
     {
       key: "title", header: "Title", sortable: true, cell: (e) => {
+        if (isBluePost(e)) return <div data-change-row data-blue-post="" className="min-w-0 py-1">{blueCard(e)}</div>;
         const line = e.type === "build"
           ? <>First seen by Everloot.{e.diffUrl && <> <a href={e.diffUrl} className={LINK}>See what changed</a></>}</>
           : (e.summary ?? e.excerpt) && <WithSpells text={(e.summary ?? e.excerpt)!} index={index} />;

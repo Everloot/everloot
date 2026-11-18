@@ -579,6 +579,7 @@ windows are now recorded, so drop rates restart counting from this release. Play
 
 ### Fixed
 - Settings stays inside the Everloot window, counts every populated record kind and names item facts; a Full / Compact / Off selector controls tooltip detail without changing recording.
+- Site: Blizzard posts in Changes show blue quote cards with the poster, role badge and source chip; builds stay compact.
 
 ## [desktop-v0.1.22] - 2026-11-11
 
