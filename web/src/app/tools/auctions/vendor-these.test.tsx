@@ -70,7 +70,7 @@ beforeEach(() => {
 });
 
 test("a house's list shows each item a vendor pays more for, with its prices, units and market day", async () => {
-  const section = vendorSection(await realmPage({ house: "horde" }));
+  const section = vendorSection(await realmPage({ house: "horde", vendor: "1" }));
   expect(section, "the Vendor these section").not.toBeNull();
   expect(section!.querySelector("h2")?.textContent).toBe("Vendor these");
   expect(section!.textContent).toContain("the Horde auction house on Forever after its 5% cut");
@@ -83,7 +83,7 @@ test("a house's list shows each item a vendor pays more for, with its prices, un
 });
 
 test("the neutral house uses its 15% cut", async () => {
-  const section = vendorSection(await realmPage({ house: "neutral" }));
+  const section = vendorSection(await realmPage({ house: "neutral", vendor: "1" }));
   expect(section!.textContent).toContain("after its 15% cut");
   expect(links(section!)).toEqual([`/database/items/${NEUTRAL_ONLY}`]);
   // 100 less 15% is 85, 5 under the vendor's 90; the Horde house's 95 is not.
@@ -93,12 +93,47 @@ test("the neutral house uses its 15% cut", async () => {
 test("with every house shown the list asks for a house, and a filter or later page leaves it out", async () => {
   const all = await realmPage({});
   expect(vendorSection(all)).toBeNull();
-  expect(doc(all).querySelector("[data-vendor-hint]")?.innerHTML).toContain("house=horde#vendor-these");
-  expect(vendorSection(await realmPage({ house: "horde", quality: "common" }))).toBeNull();
+  expect(doc(all).querySelector("[data-vendor-hint]")?.innerHTML).toContain("house=horde&amp;vendor=1#vendor-these");
+  expect(vendorSection(await realmPage({ house: "horde", quality: "common", vendor: "1" }))).toBeNull();
+});
+
+test("a plain house view only offers the list: it is built when asked for", async () => {
+  const html = await realmPage({ house: "horde" });
+  expect(vendorSection(html)).toBeNull();
+  const offer = doc(html).querySelector("[data-vendor-offer] a");
+  expect(offer?.getAttribute("href")).toContain("vendor=1#vendor-these");
+  expect(offer?.getAttribute("href")).toContain("house=horde");
+});
+
+test("a later page leaves the list and the offer out", async () => {
+  // 60 current items on the Horde house: more than one page of results.
+  const many = foldMarket(emptyMarket(), scans(dayAgo(0), "Horde", Array.from({ length: 60 }, (_, i) => [20000 + i, 100] as [number, number])), today);
+  store.loadMarket.mockResolvedValue({ state: many, dataAsOf: today.toISOString() });
+  const first = await realmPage({ house: "horde" });
+  expect(doc(first).querySelector("[data-vendor-offer]"), "page 1 offers it").not.toBeNull();
+  const second = await realmPage({ house: "horde", vendor: "1", page: "2" });
+  // A page past the last would be notFound(), which throws: page 2 rendered, with items on it.
+  expect(doc(second).body.textContent).toContain("Thing 200");
+  expect(vendorSection(second)).toBeNull();
+  expect(doc(second).querySelector("[data-vendor-offer]")).toBeNull();
+});
+
+test("vendor prices that cannot be read are said, not reported as nothing to sell", async () => {
+  sell.clear();
+  const section = vendorSection(await realmPage({ house: "horde", vendor: "1" }));
+  expect(section!.querySelector("[data-vendor-unavailable]")?.textContent).toContain("Vendor prices are unavailable right now");
+  expect(section!.querySelector("[data-empty-state]")).toBeNull();
+});
+
+test("a candidate with no vendor price is counted as left out", async () => {
+  sell.delete(KEEP);
+  const section = vendorSection(await realmPage({ house: "horde", vendor: "1" }));
+  expect(links(section!)).toEqual([`/database/items/${VENDOR}`]);
+  expect(section!.querySelector("[data-vendor-incomplete]")?.textContent).toBe("1 item has no vendor price available right now and is left out.");
 });
 
 test("a house with nothing a vendor pays more for says so", async () => {
   sell.set(VENDOR, 1);
-  const section = vendorSection(await realmPage({ house: "horde" }));
+  const section = vendorSection(await realmPage({ house: "horde", vendor: "1" }));
   expect(section!.querySelector("[data-empty-state]")?.textContent).toContain("No item with a current market here sells for less than a vendor pays");
 });

@@ -41,6 +41,12 @@ export const isPlainView = (q: AhQuery) => activeFilters(q) === 0 && !q.house &&
 /** The vendor list shows on a realm's unfiltered first page; a sort only orders the results above it. */
 const isVendorView = (q: AhQuery) => activeFilters(q) === 0 && q.page === 1;
 
+/**
+ * The vendor list reads a tooltip for every item with a current market on the house (up to the market cap), so it is
+ * built only when asked for with `vendor=1`; a plain house view offers it with a link and reads nothing extra.
+ */
+const vendorAsked = (search: Search) => (Array.isArray(search.vendor) ? search.vendor[0] : search.vendor) === "1";
+
 /** A house tab's item count: read out everywhere, drawn from 640 px up so the four tabs fit a phone. */
 function HouseCount({ n }: { n: number }) {
   return <span data-house-count className="sr-only tabular-nums text-muted sm:not-sr-only sm:ml-1">{` (${n.toLocaleString("en-US")})`}</span>;
@@ -101,7 +107,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
   // The summary's movers are named in the same read as the results, so the page reads the corpus once.
   const moveIds = summaryRows.flatMap((r) => r.moves.map((m) => m.row.value.itemId));
   // "Vendor these" is a realm's one-house list, on its plain first page; its items are read with the page's.
-  const vendorBoard = slug && q.house && isVendorView(q) ? mine[0] ?? null : null;
+  const vendorBoard = slug && q.house && isVendorView(q) && vendorAsked(search) ? mine[0] ?? null : null;
   const vendorIds = vendorBoard ? vendorCandidates(vendorBoard.rows) : [];
   const withMoves = (ids: number[]) => [...new Set([...ids, ...moveIds, ...vendorIds])];
 
@@ -123,6 +129,12 @@ export async function browseView({ slug, search }: { slug: string | null; search
   }
 
   const here = (over: Partial<AhQuery>) => ahHref(path, { ...q, page: 1, ...over });
+  const vendorHref = (over: Partial<AhQuery>) => {
+    const href = here(over);
+    return `${href}${href.includes("?") ? "&" : "?"}vendor=1#vendor-these`;
+  };
+  // A candidate with no tooltip at all had no vendor price to compare: say so instead of reporting nothing to sell.
+  const vendorMissing = vendorIds.filter((id) => !tips.has(id)).length;
   const pageHref = (page: number) => ahHref(path, { ...q, page });
   const strip = <ResultStrip total={results.length} noun={results.length === 1 ? "item" : "items"} page={q.page} perPage={AH_PER_PAGE} href={pageHref} label="Result pages" />;
   const board = slug ? findBoard(realmWide, slug) : null;
@@ -337,6 +349,8 @@ export async function browseView({ slug, search }: { slug: string | null; search
           <div className="mt-8">
             <VendorThese
               rows={vendorThese(vendorBoard.rows, q.house, (id) => tips.get(id)?.sellPrice)}
+              candidates={vendorIds.length}
+              missing={vendorMissing}
               house={q.house}
               realmName={vendorBoard.realm.name}
               tips={tips}
@@ -344,10 +358,17 @@ export async function browseView({ slug, search }: { slug: string | null; search
             />
           </div>
         )}
+        {!vendorBoard && slug && q.house && isVendorView(q) && mine[0] && (
+          <p data-vendor-offer className="mt-4 text-sm text-fg-2">
+            {"Which items does a vendor pay more for than this house? "}
+            <Link href={vendorHref({})} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Show Vendor these</Link>
+            .
+          </p>
+        )}
         {slug && state && !q.house && isVendorView(q) && rows.length > 0 && (
           <p data-vendor-hint className="mt-4 text-sm text-fg-2">
             {"Which items does a vendor pay more for? Pick a house: "}
-            {HOUSES.map((h, i) => <span key={h}>{i > 0 && ", "}<Link href={`${here({ house: h })}#vendor-these`} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{h}</Link></span>)}
+            {HOUSES.map((h, i) => <span key={h}>{i > 0 && ", "}<Link href={vendorHref({ house: h })} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{h}</Link></span>)}
             .
           </p>
         )}

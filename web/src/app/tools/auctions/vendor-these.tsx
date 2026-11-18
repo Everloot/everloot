@@ -15,7 +15,16 @@ const coins = (copper: number) => <CoinText text={formatCopper(copper)} />;
  * "Vendor these" on a realm's house: the items a vendor pays more for than this house after its cut, as the addon's
  * Sell tab warns. `rows` come from lib/vendor-these.ts, sorted; the list shows the first VENDOR_SHOWN.
  */
-export function VendorThese({ rows, house, realmName, tips, names }: { rows: VendorRow[]; house: AuctionHouse; realmName: string; tips: ReadonlyMap<number, ItemTip>; names: ItemNames }) {
+export function VendorThese({ rows, candidates, missing, house, realmName, tips, names }: {
+  rows: VendorRow[];
+  /** Items with a current market here, and how many of them came back with no vendor price to compare. */
+  candidates: number;
+  missing: number;
+  house: AuctionHouse;
+  realmName: string;
+  tips: ReadonlyMap<number, ItemTip>;
+  names: ItemNames;
+}) {
   const where = `the ${house} auction house on ${realmName}`;
   const cut = `${Math.round(auctionCut(house) * 100)}%`;
   const shown = rows.slice(0, VENDOR_SHOWN);
@@ -28,6 +37,16 @@ export function VendorThese({ rows, house, realmName, tips, names }: { rows: Ven
     { key: "units", header: "Units", numeric: true, cell: (v) => v.row.value.quantity.toLocaleString("en-US") },
     { key: "day", header: "Market day", numeric: true, nowrap: true, cell: (v) => v.row.value.day },
   ];
+  if (candidates > 0 && missing >= candidates) {
+    return (
+      <section aria-labelledby="vendor-these" data-vendor-these>
+        <SectionHeading id="vendor-these">Vendor these</SectionHeading>
+        <p data-vendor-unavailable className="text-sm text-fg-2">
+          {"Vendor prices are unavailable right now, so this list can't be worked out. Try again later."}
+        </p>
+      </section>
+    );
+  }
   return (
     <section aria-labelledby="vendor-these" data-vendor-these>
       <SectionHeading
@@ -48,6 +67,11 @@ export function VendorThese({ rows, house, realmName, tips, names }: { rows: Ven
         </>}
         empty={<EmptyState framed={false} message="No item with a current market here sells for less than a vendor pays, after the cut." />}
       />
+      {missing > 0 && (
+        <p data-vendor-incomplete className="mt-2 text-meta text-fg-2">
+          {`${missing.toLocaleString("en-US")} ${missing === 1 ? "item has" : "items have"} no vendor price available right now and ${missing === 1 ? "is" : "are"} left out.`}
+        </p>
+      )}
       <p className="mt-2 text-meta text-fg-2">{`Vendor prices: the sell prices in the game files, unconfirmed. Only a current market counts: a market value whose newest day lists more than ${THIN_UNITS} units and is at most ${STALE_DAYS} days old.`}</p>
     </section>
   );
