@@ -21,7 +21,7 @@ test("no armory file places an ad", () => {
 // Not placing a slot is not enough: AdSense Auto ads fills any page its script loads on. The armory is on the ad-free
 // list, so the script never loads there (components/OptionalScripts.tsx) and a move to it loads a new document.
 test("the armory is an ad-free path, so the ad script never loads on it", () => {
-  for (const path of ["/armory", "/armory/us/a-character", "/armory/eu/guilds/a-guild", "/armory/rankings/item-level", "/armory/submit"]) {
+  for (const path of ["/armory", "/armory/us/a-character", "/armory/eu/guilds/a-guild", "/armory/guilds", "/armory/rankings/item-level", "/armory/submit"]) {
     expect(isAdFreePath(path), path).toBe(true);
   }
   expect(isAdFreePath("/armoryx")).toBe(false);

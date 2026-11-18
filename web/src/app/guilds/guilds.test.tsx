@@ -227,6 +227,19 @@ test("the hub's search finds guilds by the start of the name", async () => {
   expect(await hub({ q: "x" })).toContain("Type 2 to 24 letters");
 });
 
+test("with the armory on, the hub links the armory's guild directory and carries a search over that its rule takes", async () => {
+  on();
+  expect(await hub()).not.toContain("/armory/guilds");
+  vi.stubEnv("EVERLOOT_ARMORY", "1");
+  const plain = await hub();
+  expect(plain).toContain('href="/armory/guilds"');
+  expect(plain).not.toContain("Search it for");
+  const searched = await hub({ q: "Nig" });
+  expect(searched).toContain('href="/armory/guilds?q=nig"');
+  expect(searched).toContain("1 guild starting with");
+  expect(await hub({ q: "Night Watch" })).not.toContain("Search it for");
+});
+
 test("a players table that cannot be read leaves the hub's search as it was, and marks the answer partial", async () => {
   on();
   vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");

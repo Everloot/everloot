@@ -166,7 +166,7 @@ export type TokenName =
   | "canvas" | "panel" | "line" | "edge" | "fg" | "fg-2" | "muted" | "accent" | "danger" | "warning"
   | "tooltip" | "tooltip-border" | "tooltip-inner" | "accent-hover" | "blue-post"
   | `q-${(typeof QUALITIES)[number]}` | `class-${(typeof CLASSES)[number]}` | "chat-whisper" | "chat-guild"
-  | `realm-${(typeof REALM_RULESETS)[number]}` | "tip-yellow" | "coin-gold" | "coin-silver" | "coin-copper";
+  | `realm-${(typeof REALM_RULESETS)[number]}` | "region-us" | "region-eu" | "tip-yellow" | "coin-gold" | "coin-silver" | "coin-copper";
 
 // Tooltip frames stay dark in both modes, as in the game.
 const tooltip = { tooltip: "#080C18", "tooltip-border": "#5B6B8C", "tooltip-inner": "#26324F" } as const;
@@ -212,6 +212,9 @@ export const tokens: Record<Mode, Record<TokenName, string>> = {
     "realm-rp": "#73B3FF",
     "realm-rp-pvp": "#FF8040",
     "realm-hardcore": "#FFD100",
+    // An armory region's chip (app/armory/parts.tsx RegionChip): blue Americas, gold Europe.
+    "region-us": "#5CB8FF",
+    "region-eu": "#F2C230",
     // Item tooltip lines (components/ui/TooltipLines.tsx): the game's yellow for the item level, a set and the
     // flavour text, and the three coin metals of a sell price.
     "tip-yellow": "#FFD100",
@@ -255,6 +258,8 @@ export const tokens: Record<Mode, Record<TokenName, string>> = {
     "realm-rp": "#0057AD",
     "realm-rp-pvp": "#A84B00",
     "realm-hardcore": "#746500",
+    "region-us": "#0057AD",
+    "region-eu": "#7A5C00",
     "tip-yellow": "#746500",
     "coin-gold": "#7A5C00",
     "coin-silver": "#5E5E66",
@@ -268,6 +273,7 @@ export const TEXT_TOKENS: TokenName[] = [
   ...CLASSES.map((c) => `class-${c}` as const),
   "chat-whisper", "chat-guild",
   ...REALM_RULESETS.map((r) => `realm-${r}` as const),
+  "region-us", "region-eu",
   "tip-yellow", "coin-gold", "coin-silver", "coin-copper",
 ];
 
