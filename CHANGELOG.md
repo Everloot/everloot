@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Desktop: the Characters page shows how many titles each keyed character is missing, with links to the site's collections tool and, for a linked character, its page, and a Linked characters panel with the characters you linked, the last private sync and the last link or sync problem.
 - Site: profession pages list the game-file recipes 50 at a time (25 to 200), with search and skill range filters in the URL, instead of sending every recipe; AH Ledger crafting margins also sort by net value and sales per day, and the sort is kept in the URL.
 - Addon: the auction house's Sell tab says, under Post, when a vendor pays more than your price brings in after the house's cut (5% at faction houses, 15% at goblin ones), when the gain over a vendor is smaller than the deposit you lose if it does not sell, when this house's current market value after the cut is below the vendor price, and when disenchanting looks better. It never changes a price or posts; Auction House settings turn it off.
 - Addon: armor and weapons you see or disenchant are recorded with their item level, so the site can place a disenchant in its band when the game files give the item no level (about one in five disenchants so far).

@@ -1,3 +1,4 @@
+import { characterPath, rulesetOf } from "../../../web/src/lib/player-pages";
 import { parseEverlootLua, parseEverlootTable } from "../../../web/src/lib/sv-parse";
 import { DAY_MS, directionOf, periodStart } from "../shared/ledger";
 import type { CharacterRow, CharactersInfo, ProgressRow } from "../shared/types";
@@ -114,12 +115,15 @@ export function collectCharacters(records: Array<Record<string, unknown>>, local
     const key = str(r.characterKey);
     if (!key) return null;
     let p = keyed.get(key);
-    if (!p) { p = { key, class: str(r.class) || "?", level: num(r.level), titles: 0, lockouts: [] }; keyed.set(key, p); }
+    if (!p) { p = { key, class: str(r.class) || "?", level: num(r.level), titles: 0, missingTitles: null, linkedAs: null, lockouts: [] }; keyed.set(key, p); }
     if (num(r.level) > p.level) p.level = num(r.level);
     if (str(r.class)) p.class = str(r.class);
     return p;
   };
   const titles = new Map<string, Set<number>>();
+  // Every title the file's catalog rows list, and the newest link row for each completion key.
+  const catalog = new Set<number>();
+  const links = new Map<string, { name: string; realm: string; at: string }>();
   for (const r of records) {
     switch (r.kind) {
       case "gold_snapshot": {
@@ -145,6 +149,14 @@ export function collectCharacters(records: Array<Record<string, unknown>>, local
         }
         break;
       }
+      case "title_catalog": if (num(r.titleId) > 0) catalog.add(num(r.titleId)); break;
+      case "character_link": {
+        const key = str(r.completionKey), name = str(r.name), realm = str(r.realm).trim(), at = str(r.capturedAt);
+        if (!key || !name || !realm) break;
+        const had = links.get(key);
+        if (!had || at >= had.at) links.set(key, { name, realm, at });
+        break;
+      }
       case "title_owned": { const p = prog(r); if (!p) break; const s = titles.get(p.key) ?? new Set<number>(); for (const id of (Array.isArray(r.titleIds) ? r.titleIds : []) as unknown[]) s.add(num(id)); titles.set(p.key, s); break; }
       // The addon keeps only the latest state of lockouts (addon/modules/owned.lua); a row the game gave no numbers
       // for is not written there, and one that arrives without them here is left out, never shown as zero.
@@ -168,7 +180,13 @@ export function collectCharacters(records: Array<Record<string, unknown>>, local
     list.push({ at: e.at, ms: e.ms, category: e.category, copper: e.copper, direction: e.direction });
     money.set(id, list);
   }
-  for (const [key, p] of keyed) p.titles = titles.get(key)?.size ?? 0;
+  for (const [key, p] of keyed) {
+    const owned = titles.get(key) ?? new Set<number>();
+    p.titles = owned.size;
+    p.missingTitles = catalog.size ? [...catalog].filter((id) => !owned.has(id)).length : null;
+    const link = links.get(key);
+    p.linkedAs = link ? { name: link.name, realm: link.realm, path: characterPath(rulesetOf(link.realm), link.realm, link.name) } : null;
+  }
   for (const c of named.values()) c.history = thin(c.history.sort((a, b) => a.at.localeCompare(b.at)));
   return {
     characters: [...named.values()].sort((a, b) => (b.gold ?? 0) - (a.gold ?? 0)),

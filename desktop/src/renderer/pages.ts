@@ -388,9 +388,40 @@ function weekBars(days: MoneyDay[]): string {
   return `<div class="week-bars" role="img" aria-label="Money earned above the line and spent below, one column a day">${cols}</div>`;
 }
 
-/** One keyed progress row set, listed apart from the named characters by design. */
-function keyedRows(c: CharactersInfo | undefined): string {
-  return (c?.progress ?? []).map((p) => `<tr><td><span class="mono">${esc(p.key)}</span></td><td>${esc(p.class.toLowerCase())} ${p.level}</td><td class="num">${p.titles}</td><td>${ownedLockouts(p.lockouts)}</td></tr>`).join("");
+/**
+ * One keyed progress row set, listed apart from the named characters by design. A key a `/everloot link` row in the file
+ * names gets that character's name and its page on the site; every row links the site's collections tool.
+ */
+function keyedRows(c: CharactersInfo | undefined, endpoint: string): string {
+  const collections = websiteUrl(endpoint, "/tools/collections");
+  return (c?.progress ?? []).map((p) => {
+    const who = p.linkedAs ? `<div class="muted small">linked as ${esc(p.linkedAs.name)} of ${esc(p.linkedAs.realm)}</div>` : "";
+    const page = p.linkedAs ? ` · ${ext(websiteUrl(endpoint, p.linkedAs.path), "Character page ↗")}` : "";
+    const missing = p.missingTitles === null ? "–" : `${p.missingTitles} title${p.missingTitles === 1 ? "" : "s"}`;
+    return `<tr><td><span class="mono">${esc(p.key)}</span>${who}</td><td>${esc(p.class.toLowerCase())} ${p.level}</td><td class="num">${p.titles}</td><td class="num">${missing}</td><td>${ownedLockouts(p.lockouts)}</td><td>${ext(collections, "Collections ↗")}${page}</td></tr>`;
+  }).join("");
+}
+
+/** The private sync's categories as the page names them: the achievements category carries titles only now. */
+const SYNC_CATEGORY: Record<string, string> = { raids: "raid lockouts", achievements: "titles", boss_kills: "boss kills" };
+
+/** The character links and private sync the upload job runs: which characters are linked, the last sync and the last problem. */
+function linkedCharacters(s: AppState): string {
+  const all = s.links ?? [];
+  const linked = [...new Set(all.flatMap((l) => l.linked))];
+  const frozen = [...new Set(all.flatMap((l) => l.frozen))];
+  const last = all.filter((l) => l.syncedAt).sort((a, b) => (b.syncedAt ?? "").localeCompare(a.syncedAt ?? ""))[0];
+  const errors = all.flatMap((l) => [l.linkError, l.syncError].filter((e): e is string => !!e).map((e) => (all.length > 1 ? `${account(l.file)}: ${e}` : e)));
+  const names = linked.length
+    ? `<ul class="plain">${linked.map((n) => `<li><b>${esc(n)}</b></li>`).join("")}</ul>`
+    : `<p class="muted small" role="status">Nothing linked yet. Type <code>/everloot link &lt;code&gt;</code> in game.</p>`;
+  const froze = frozen.length ? `<p class="warn small">${esc(frozen.join(", "))} frozen: another account linked ${frozen.length === 1 ? "it" : "them"} too.</p>` : "";
+  const synced = last ? `<p class="fg2">Last synced ${esc(when(last.syncedAt))}: ${esc(last.synced.join(", "))}${last.categories.length ? ` (${esc(last.categories.map((x) => SYNC_CATEGORY[x] ?? x).join(", "))})` : ""}</p>` : "";
+  const line = errors.length ? `<p class="error small" role="status">${esc(errors.join("; "))}</p>` : "";
+  return `<section class="panel" id="linked"><h2>Linked characters</h2>
+      <p class="fg2">Characters you linked to your everloot.app account with a code from the site. After each upload their titles, raid lockouts and boss kills go to your account's private sync, only for the categories you switched on there.</p>
+      ${names}${froze}${synced}${line}
+    </section>`;
 }
 
 export function characters(v: View): string {
@@ -422,7 +453,7 @@ export function characters(v: View): string {
         <div class="week-foot"><span class="muted small">+${gold(selected.week.earned)}</span><span class="${week >= 0 ? "ok" : "warn"}"><b>${signed(week)}</b> net</span><span class="muted small">−${gold(selected.week.spent)}</span></div>
       </section>
     </div>` : "";
-  const prog = keyedRows(c);
+  const prog = keyedRows(c, state?.settings.endpoint ?? "https://everloot.app");
   return `<div class="page char-page">
     <div class="head">
       <div>
@@ -438,9 +469,10 @@ export function characters(v: View): string {
       <div class="tablewrap"><table class="roster"><thead><tr><th>Character</th><th class="num">Gold</th><th class="num">7 days</th><th class="num">Last seen</th></tr></thead><tbody>${rows}</tbody></table></div>
     </section>` : c ? `${emptyState(emptyCause("characters", state!), icon("characters"))}${ghostProfile()}` : `<section class="panel"><p class="muted">Loading…</p></section>`}
     <section class="panel" id="keyed" tabindex="-1"><h2>Progress · keyed</h2>
-      ${prog ? `<div class="tablewrap"><table><thead><tr><th>Key</th><th>Class</th><th class="num">Titles</th><th>Raid lockouts</th></tr></thead><tbody>${prog}</tbody></table></div>
+      ${prog ? `<div class="tablewrap"><table><thead><tr><th>Key</th><th>Class</th><th class="num">Titles</th><th class="num">Missing</th><th>Raid lockouts</th><th>On everloot.app</th></tr></thead><tbody>${prog}</tbody></table></div>
         <p class="muted small">Raid lockouts never go in an upload, and Chat does not read them. Private sync sends them only for a character you linked, and everloot.app keeps only the categories you switched on.</p>` : `<p class="muted">${c ? "Nothing yet. The completion tracker is off until <code>/everloot completion on</code> in game." : "Loading…"}</p>`}
     </section>
+    ${state ? linkedCharacters(state) : ""}
   </div>
   <div class="drawer-layer" id="drawerLayer" hidden aria-hidden="true">
     <div class="drawer-scrim" data-dwclose></div>

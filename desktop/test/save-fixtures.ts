@@ -13,6 +13,17 @@ export const CHARACTERS = `EverlootDB = { ["version"] = "0.3.14", ["installId"] 
     ["money_event"] = { { ["character"] = "Thrall", ["realm"] = "Skull Rock", ["capturedAt"] = "2026-10-18T10:00:00Z", ["category"] = "loot", ["copper"] = 5 } } },
     ["lastScans"] = { ["Nightslayer"] = { ["at"] = "2026-10-18T00:00:00Z" } } }`;
 
+const own = (key: string, cls: string, ids: number[]) => `{ ["characterKey"] = "${key}", ["class"] = "${cls}", ["level"] = 60, ["titleIds"] = { ${ids.join(", ")} } }`;
+const titleRow = (id: number) => `{ ["titleId"] = ${id}, ["name"] = "Title ${id}" }`;
+const linkRow = (name: string, key: string, at: string) =>
+  `{ ["eventId"] = "character_link:${name}", ["capturedAt"] = "${at}", ["code"] = "EL-AAAA-01", ["name"] = "${name}", ["realm"] = "Forever Pioneer", ["completionKey"] = "${key}" }`;
+
+/** Two keyed characters with titles against a five-title catalog; one of them linked twice, the newer row naming it. */
+export const PROGRESS = `EverlootDB = { ["version"] = "0.3.14", ["installId"] = "x", ["records"] = {
+    ["title_catalog"] = { ${[1, 2, 3, 4, 5].map(titleRow).join(", ")} },
+    ["title_owned"] = { ${own("0a1b2c3d", "PALADIN", [1, 2])}, ${own("0a1b2c3d", "PALADIN", [2, 9])}, ${own("1a2b3c4d", "MAGE", [5])} },
+    ["character_link"] = { ${linkRow("Lightbringer", "0a1b2c3d", "2026-10-01T10:00:00Z")}, ${linkRow("Uther", "0a1b2c3d", "2026-10-02T10:00:00Z")} } } }`;
+
 export const NO_INSTALL = `EverlootDB = { ["version"] = "0.3.14", ["records"] = { ["gold_snapshot"] = { ${gold("Arthas", "Doomhowl", 10)} } } }`;
 
 export const BROKEN = `EverlootDB = { ["version"] = `;

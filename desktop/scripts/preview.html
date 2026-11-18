@@ -43,6 +43,7 @@
         consentedAt: "2026-11-01T00:00:00Z", launchAtLogin: false, startInTray: true, dataNoticeDismissed: false },
       foreverFolder: null, engine, update: null, updateProgress: { stage: "idle", percent: 0, error: null }, staleScans: [],
       account: { signedIn: true, hint: "5f65" }, builds: { state: "off", message: "", syncedAt: null, builds: null },
+      links: live ? [{ file: engine.files[0], linked: ["Hakoovak of Moon Guard"], frozen: [], linkedAt: t(240), linkError: null, syncedAt: t(4), synced: ["Hakoovak of Moon Guard"], categories: ["raids", "achievements"], syncError: null }] : [],
     };
     const fixtures = {
       state, uploadInfo: live ? [{ file: engine.files[0], ok: true, error: null, writtenAt: t(30), bytes: 418000, addonVersion: "0.3.15", clientBuild: "1.60.1.70707", records: 2410, confirmed: 1880, kinds: [{ kind: "loot", count: 1200 }, { kind: "vendor", count: 640 }, { kind: "quest", count: 300 }, { kind: "spawn", count: 270 }] }] : [],
@@ -56,7 +57,10 @@
         { title: "Blue post: Forever launches November 4 at 3 PM PT", link: "https://everloot.app/changes", date: t(3000), summary: "Raids open December 9." },
         { title: "Blue post: Beta realm maintenance", link: "https://everloot.app/changes", date: t(5000), summary: "" },
       ],
-      charactersInfo: { characters: live ? [character] : [], progress: [], talents: [] },
+      charactersInfo: { characters: live ? [character] : [], talents: [], progress: live ? [
+        { key: "0a1b2c3d", class: "WARRIOR", level: 41, titles: 2, missingTitles: 9, linkedAs: { name: "Hakoovak", realm: "Moon Guard", path: "/characters/forever/moon-guard/hakoovak" }, lockouts: [] },
+        { key: "7e8f9a0b", class: "MAGE", level: 22, titles: 0, missingTitles: 11, linkedAs: null, lockouts: [] },
+      ] : [] },
       chatInfo: { messages: [], mode: "plain search", mcpUrl: "https://everloot.app/mcp", withToken: false, withAccountKey: true, provider: null, providers: [], busy: false, error: null },
       chatModels: [], dataUsage: { total: 2048000, parts: { backups: 1024000, updates: 0, chat: 1000, uploads: 20000, settings: 1000, other: 0 }, notice: false },
       detectGameFolders: [], saveSettings: state,

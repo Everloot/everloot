@@ -38,6 +38,8 @@ export interface SyncSendOptions {
 export interface SyncSendResult {
   /** Characters the site kept (or already had) at least one category of. */
   synced: string[];
+  /** The categories the site kept (or already had) of any character this run. */
+  categories: SendCategory[];
   /** Characters whose every category sent has its sync off on the site. */
   syncOff: string[];
   /** Characters the account holds no live link for. */
@@ -59,7 +61,7 @@ export interface SyncSendResult {
  */
 export const syncReceiptKey = (installId: string, endpoint: string, character: string) => `sync|${receiptKeyForSite(installId, endpoint)}|${character}`;
 
-type SendCategory = SyncCategory | "boss_kills";
+export type SendCategory = SyncCategory | "boss_kills";
 type SendRow = SyncRow | BossKillRow;
 /** The kinds sync sends, each keyed by the completion module's characterKey. */
 const CATEGORY_OF: Record<string, SendCategory> = { boss_kill_owned: "boss_kills", lockout_owned: "raids", title_owned: "achievements" };
@@ -158,7 +160,7 @@ function problemOf(status: number): string {
 type Answer = { index?: unknown; result?: unknown; categories?: unknown };
 
 export async function sendSync(file: string, options: SyncSendOptions): Promise<SyncSendResult> {
-  const result: SyncSendResult = { synced: [], syncOff: [], notLinked: [], refused: [], waiting: 0, tooLarge: 0, problem: null };
+  const result: SyncSendResult = { synced: [], categories: [], syncOff: [], notLinked: [], refused: [], waiting: 0, tooLarge: 0, problem: null };
   // No key for this site, no sync: making a key with "Sync my linked characters" is the player's opt-in.
   if (!options.key) return result;
   const origin = new URL(options.endpoint).origin;
@@ -179,6 +181,7 @@ export async function sendSync(file: string, options: SyncSendOptions): Promise<
 
   const url = new URL("/api/me/characters/sync", origin).href;
   const send = options.fetch ?? fetch;
+  const keptCategories = new Set<SendCategory>();
   const kept = new Set<string>(), off = new Set<string>(), notLinked = new Set<string>(), refused = new Set<string>(), waiting = new Set<string>();
   const requests = requestsOf(pending, result);
   for (let n = 0; n < requests.length; n++) {
@@ -216,7 +219,7 @@ export async function sendSync(file: string, options: SyncSendOptions): Promise<
         const outcomes = (answer.categories && typeof answer.categories === "object" ? answer.categories : {}) as Record<string, unknown>;
         for (const capture of group.captures) {
           const outcome = outcomes[capture.category];
-          if (outcome === "stored" || outcome === "duplicate" || outcome === "older") kept.add(label);
+          if (outcome === "stored" || outcome === "duplicate" || outcome === "older") { kept.add(label); keptCategories.add(capture.category); }
           // Sync off is not remembered: the player may turn it on later, and the same capture must go then.
           else if (outcome === "no_consent") { off.add(label); continue; }
           else { waiting.add(label); continue; }
@@ -233,6 +236,7 @@ export async function sendSync(file: string, options: SyncSendOptions): Promise<
     });
   }
   result.synced = [...kept];
+  result.categories = [...keptCategories];
   result.syncOff = [...off].filter((l) => !kept.has(l));
   result.notLinked = [...notLinked];
   result.refused = [...refused];
