@@ -12,7 +12,8 @@ import StartHere from "@/components/start/StartHere";
 import Greeting from "@/components/home/Greeting";
 import LaunchCountdown from "@/components/LaunchCountdown";
 import { CLASS_TEXT } from "@/components/talents/TalentTreeView";
-import type { AccountShell } from "@/lib/account-shell-types";
+import { Badge, Card, GET_THE_ADDON } from "@/components/ui";
+import type { AccountShell, ShellCharacter } from "@/lib/account-shell-types";
 import { loadAccountShell } from "@/lib/account-shell";
 import { ADD_FROM_COOKIE } from "@/lib/auth/device-accounts";
 import { filterTimeline, loadTimeline, TYPE_LABEL } from "@/lib/changes";
@@ -34,6 +35,75 @@ const QUICK_ACTIONS = [
 ];
 const rail = "text-meta font-semibold text-muted";
 const railLink = "block truncate rounded-control px-2 py-1 text-cell text-fg-2 hover:bg-panel hover:text-fg";
+const textLink = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
+
+const savedCount = (n: number) => n === 0 ? "No saved builds" : n === 1 ? "1 saved build" : `${n} saved builds`;
+const placeLine = (c: ShellCharacter) => [className(c.classSlug), c.realm].filter(Boolean).join(" · ");
+
+/**
+ * Characters first: the main character's card, then the alts, from what the account shell already read. With no
+ * character, one card with the ways in that exist today. Builds per character come from the saved builds the page
+ * already loaded; gold and completion wait for the addon sync (#1275).
+ */
+function YourCharacters({ shell, builds }: { shell: AccountShell; builds: AccountBuilds["builds"] }) {
+  if (shell.characters.length === 0) {
+    return (
+      <Card as="section" aria-labelledby="your-characters" className="space-y-4">
+        <div className="space-y-1">
+          <h2 id="your-characters" className="text-base font-semibold text-fg">Bring in your characters</h2>
+          <p className="text-cell text-fg-2">Get the Everloot addon to record your characters as you play, and connect the Battle.net account they are on.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link href={GET_THE_ADDON.href} className="btn btn-primary min-h-11 px-4 text-sm">{GET_THE_ADDON.label}</Link>
+          <Link href="/account#integrations" className="btn min-h-11 px-4 text-sm">Connect Battle.net</Link>
+        </div>
+        <p className="text-meta text-muted">
+          Or <Link href="/me" className={textLink}>add a character by name</Link>, or <Link href="/upload" className={textLink}>upload a save file</Link>.
+        </p>
+      </Card>
+    );
+  }
+  const main = shell.characters.find((c) => c.id === shell.mainCharacterId) ?? null;
+  const first = main ?? shell.characters[0];
+  const alts = shell.characters.filter((c) => c.id !== first.id);
+  const count = (id: string) => builds.filter((b) => b.characterId === id).length;
+  return (
+    <section aria-labelledby="your-characters" className="space-y-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 id="your-characters" className="text-cell font-semibold text-fg">Your characters</h2>
+        <Link href="/me" className={`text-meta ${textLink}`}>Manage</Link>
+      </div>
+      <Card href={`/me/characters/${first.id}`} padding="none">
+        <div className="flex min-w-0 items-center gap-4 p-4">
+          <Avatar name={first.name} classSlug={first.classSlug} size={48} />
+          <div className="min-w-0 flex-1">
+            <p className="flex min-w-0 items-center gap-2">
+              <span className={`truncate text-base font-semibold ${CLASS_TEXT[first.classSlug] ?? "text-fg"}`}>{first.name}</span>
+              {main && <Badge tone="neutral">Main</Badge>}
+            </p>
+            <p className="truncate text-meta text-fg-2">{placeLine(first)}</p>
+            <p className="text-meta text-muted">{savedCount(count(first.id))}</p>
+          </div>
+        </div>
+      </Card>
+      {alts.length > 0 && (
+        <ul aria-label="Alts" className="grid gap-2 sm:grid-cols-2">
+          {alts.map((c) => (
+            <li key={c.id} className="min-w-0">
+              <Link href={`/me/characters/${c.id}`} className="flex min-h-11 min-w-0 items-center gap-3 rounded-control border border-line px-3 py-2 hover:border-accent">
+                <Avatar name={c.name} classSlug={c.classSlug} size={28} />
+                <span className="min-w-0 flex-1">
+                  <span className={`block truncate text-cell font-semibold ${CLASS_TEXT[c.classSlug] ?? "text-fg"}`}>{c.name}</span>
+                  <span className="block truncate text-meta text-muted">{placeLine(c)}</span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
 
 /**
  * The signed-in home. Visitors never see this route: the middleware rewrites `/` here only when a session cookie
@@ -92,34 +162,13 @@ export default async function SignedInHome({ searchParams }: { searchParams?: Pr
           <Link href="/" aria-current="page" className={`${railLink} text-fg`}>Home</Link>
           <Link href="/changes" className={railLink}>Feed</Link>
         </nav>
-        {buildsEnabled && <section aria-labelledby="your-characters" className="space-y-1">
-          <h2 id="your-characters" className={rail}>Your characters</h2>
-          {shell.characters.length === 0
-            ? <p className="text-cell text-muted">None yet. <Link href="/me" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Add one</Link></p>
-            : (
-              <ul>
-                {shell.characters.map((c) => (
-                  <li key={c.id}>
-                    <Link href={`/me/characters/${c.id}`} className={`${railLink} flex items-center justify-between gap-2`}>
-                      <span className={`truncate ${CLASS_TEXT[c.classSlug] ?? "text-fg"}`}>{c.name}</span>
-                      {c.id === shell.mainCharacterId && <span className="text-meta text-muted">Main</span>}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-        </section>}
-        {buildsEnabled && <section aria-labelledby="recent-builds" className="space-y-1">
+        {buildsEnabled && saved.builds.length > 0 && <section aria-labelledby="recent-builds" className="space-y-1">
           <h2 id="recent-builds" className={rail}>Recent builds</h2>
-          {saved.builds.length === 0
-            ? <p className="text-cell text-muted">None yet. <Link href="/tools/talents" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Plan one</Link></p>
-            : (
-              <ul>
-                {saved.builds.slice(0, 5).map((b) => (
-                  <li key={b.id}><a href={editPath(b)} className={railLink}>{b.name}</a></li>
-                ))}
-              </ul>
-            )}
+          <ul>
+            {saved.builds.slice(0, 5).map((b) => (
+              <li key={b.id}><a href={editPath(b)} className={railLink}>{b.name}</a></li>
+            ))}
+          </ul>
         </section>}
       </aside>
 
@@ -138,25 +187,21 @@ export default async function SignedInHome({ searchParams }: { searchParams?: Pr
           {active && <input type="hidden" name="character" value={active.id} />}
           <button type="submit" className="btn btn-primary min-h-11 shrink-0 px-4 text-sm">Ask</button>
         </form>
+        {buildsEnabled && <YourCharacters shell={shell} builds={saved.builds} />}
         <ul aria-label="Quick actions" className="flex flex-wrap gap-2">
           {QUICK_ACTIONS.map((a) => <li key={a.href}><Link href={a.href} className="btn min-h-9 px-3 text-sm">{a.label}</Link></li>)}
         </ul>
         <StartHere compact />
-        {buildsEnabled && <section aria-labelledby="active-builds" className="space-y-2">
-          <h2 id="active-builds" className="text-cell font-semibold text-fg">
-            {active ? <>Builds for <span className={CLASS_TEXT[active.classSlug] ?? ""}>{active.name}</span></> : "Your builds"}
-          </h2>
-          {!active ? (
-            <p className="text-cell text-muted">Add a character on <Link href="/me" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">My builds</Link> to see its builds here.</p>
-          ) : activeBuilds.length === 0 ? (
-            <p className="text-cell text-muted">
-              No builds for this {className(active.classSlug).toLowerCase()} yet.{" "}
-              <Link href={`/tools/talents/${active.classSlug}`} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Plan one</Link>
-            </p>
-          ) : (
+        {active && (activeBuilds.length > 0 ? (
+          <section aria-labelledby="active-builds" className="space-y-2">
+            <h2 id="active-builds" className="text-cell font-semibold text-fg">
+              Builds for <span className={CLASS_TEXT[active.classSlug] ?? ""}>{active.name}</span>
+            </h2>
             <BuildsTable builds={activeBuilds} facts={facts} caption={`Builds for ${active.name}`} onCharacterPage />
-          )}
-        </section>}
+          </section>
+        ) : (
+          <p><Link href={`/tools/talents/${active.classSlug}`} className="btn min-h-11 px-4 text-sm">Plan a build for {active.name}</Link></p>
+        ))}
       </section>
 
       <aside aria-label="Latest from Forever" className="space-y-5">
