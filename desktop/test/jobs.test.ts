@@ -1,3 +1,4 @@
+import type { CharacterLinkStatus } from "../src/shared/types";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,7 +8,7 @@ import * as bridge from "../../companion/src/bridge/engine";
 import { createSentState, receiptKeyForSite } from "../../companion/src/sent-state";
 import { FIXTURE_STRUCTURED, FIXTURE_URL } from "../../web/src/lib/chat/market-fixture";
 import { ACCOUNT_KEY_FILE, writeKeyOrigin } from "../src/main/account";
-import { companionJobs } from "../src/main/jobs";
+import { afterLinks, afterSync, companionJobs } from "../src/main/jobs";
 import { defaultSettings } from "../src/main/settings";
 
 const dirs: string[] = [];
@@ -438,5 +439,62 @@ describe("the upload's character links and sync", () => {
       await jobs.deps.upload(file).catch(() => undefined);
       expect(jobs.links()[0]).toEqual(first);
     } finally { vi.unstubAllGlobals(); }
+  });
+
+  test("results belong to the site and account they were sent with, and to the files the app watches now", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.endsWith("/api/me/characters/links")) return json({ results: [{ index: 0, status: "linked", name: "Thrallina", realm: "Forever Pioneer" }] });
+      if (url.endsWith("/api/me/characters/sync")) return json({ characters: [{ index: 0, result: "mismatch" }] });
+      return json({ error: "not here" }, 404);
+    }));
+    // A fresh data folder, signed in, with one upload's results kept.
+    const sent = async () => {
+      const d = dir();
+      writeFileSync(join(d, ACCOUNT_KEY_FILE), KEY);
+      writeKeyOrigin(d, "https://everloot.app");
+      const file = linkedFile(d);
+      const settings = { endpoint: "https://everloot.app" };
+      const jobs = companionJobs(d, () => ({ ...defaultSettings(), endpoint: settings.endpoint, gameFolder: d }));
+      await jobs.deps.upload(file).catch(() => undefined);
+      expect(jobs.links([file])).toHaveLength(1);
+      return { d, file, settings, jobs };
+    };
+    try {
+      // Another site: this site's results are not shown, and are dropped.
+      const site = await sent();
+      site.settings.endpoint = "https://other.test";
+      expect(site.jobs.links()).toEqual([]);
+      site.settings.endpoint = "https://everloot.app";
+      expect(site.jobs.links()).toEqual([]);
+      // Signed in to another account: the first account's results are gone, not shown as this one's.
+      const account = await sent();
+      writeFileSync(join(account.d, ACCOUNT_KEY_FILE), `evl_${"cd".repeat(32)}`);
+      expect(account.jobs.links()).toEqual([]);
+      // A file the app no longer watches: its results go; the watched one's stay.
+      const files = await sent();
+      expect(files.jobs.links([files.file])).toHaveLength(1);
+      expect(files.jobs.links([join(files.d, "Other.lua")])).toEqual([]);
+    } finally { vi.unstubAllGlobals(); }
+  });
+});
+
+describe("link and sync answers applied to the page's state", () => {
+  const blank: CharacterLinkStatus = { file: "f", linked: [], frozen: [], linkedAt: null, linkError: null, syncedAt: null, synced: [], categories: [], syncError: null };
+  const AT = "2026-11-18T08:00:00Z";
+
+  test("a character linked after being frozen is no longer frozen, and one frozen after linking is no longer linked", () => {
+    const frozen = afterLinks(blank, { linked: [], frozen: ["A of R"] }, AT, null);
+    expect(frozen).toMatchObject({ linked: [], frozen: ["A of R"] });
+    const recovered = afterLinks(frozen, { linked: ["A of R"], frozen: [] }, AT, null);
+    expect(recovered).toMatchObject({ linked: ["A of R"], frozen: [] });
+    expect(afterLinks(recovered, { linked: [], frozen: ["A of R"] }, AT, null)).toMatchObject({ linked: [], frozen: ["A of R"] });
+  });
+
+  test("a sync that finds no live link takes the character off the linked list; one it synced clears a freeze", () => {
+    const linked = afterLinks(blank, { linked: ["A of R", "B of R"], frozen: [] }, AT, null);
+    const lost = afterSync(linked, { synced: ["A of R"], syncOff: [], notLinked: ["B of R"], categories: ["raids"] }, AT, null);
+    expect(lost).toMatchObject({ linked: ["A of R"], synced: ["A of R"], categories: ["raids"], syncedAt: AT });
+    const frozen = { ...blank, frozen: ["C of R"] };
+    expect(afterSync(frozen, { synced: [], syncOff: ["C of R"], notLinked: [], categories: [] }, AT, null)).toMatchObject({ linked: ["C of R"], frozen: [], syncedAt: null });
   });
 });
