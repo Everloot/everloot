@@ -15,6 +15,7 @@ import {
   AH_PATH, HOUSES, agreementSoFar, crossRealmHref, findBoard, houseCounts, itemHref, itemIdParam, money, onRuleset, pendingRealms, percent, realmBoards,
   realmHref, rulesetSummaries, slugWords,
 } from "@/lib/auction-house";
+import { vendorCandidates, vendorThese } from "@/lib/vendor-these";
 import { AFTER_LAUNCH, REGION_LABEL, RULESET_LABEL, inRegion, isRulesetSlug, mappedRulesets, realmRegion, realmRuleset, type RegionFilter } from "@/lib/realms";
 import { auctionNames, itemArt, type ItemTip } from "./art";
 import {
@@ -23,6 +24,7 @@ import {
 } from "./browse";
 import { Contribute, Facts, ItemLink, PendingRealms, RealmName, RulesetSummaryTable, Sparkline, count } from "./parts";
 import TimeAgo from "./TimeAgo";
+import { VendorThese } from "./vendor-these";
 
 type Search = Record<string, string | string[] | undefined>;
 
@@ -35,6 +37,9 @@ const WIDE_SORTS: AhSort[] = ["name", "ilvl", "req"];
 
 /** Only the plain view is indexed; a filter, a house, a ruleset, a sort or a later page points its canonical at it. */
 export const isPlainView = (q: AhQuery) => activeFilters(q) === 0 && !q.house && !q.region && !q.ruleset && !q.sort && q.page === 1;
+
+/** The vendor list shows on a realm's unfiltered first page; a sort only orders the results above it. */
+const isVendorView = (q: AhQuery) => activeFilters(q) === 0 && q.page === 1;
 
 /** A house tab's item count: read out everywhere, drawn from 640 px up so the four tabs fit a phone. */
 function HouseCount({ n }: { n: number }) {
@@ -95,7 +100,10 @@ export async function browseView({ slug, search }: { slug: string | null; search
   const summaryRows = activeFilters(q) || q.page > 1 ? [] : ruleset ? summaries.filter((r) => r.ruleset === ruleset) : summaries;
   // The summary's movers are named in the same read as the results, so the page reads the corpus once.
   const moveIds = summaryRows.flatMap((r) => r.moves.map((m) => m.row.value.itemId));
-  const withMoves = (ids: number[]) => [...new Set([...ids, ...moveIds])];
+  // "Vendor these" is a realm's one-house list, on its plain first page; its items are read with the page's.
+  const vendorBoard = slug && q.house && isVendorView(q) ? mine[0] ?? null : null;
+  const vendorIds = vendorBoard ? vendorCandidates(vendorBoard.rows) : [];
+  const withMoves = (ids: number[]) => [...new Set([...ids, ...moveIds, ...vendorIds])];
 
   let tips = new Map<number, ItemTip>();
   let names = new Map<number, string>();
@@ -325,6 +333,24 @@ export async function browseView({ slug, search }: { slug: string | null; search
             {pages > 1 && <div className="mt-2">{strip}</div>}
           </div>
         </div>
+        {vendorBoard && q.house && (
+          <div className="mt-8">
+            <VendorThese
+              rows={vendorThese(vendorBoard.rows, q.house, (id) => tips.get(id)?.sellPrice)}
+              house={q.house}
+              realmName={vendorBoard.realm.name}
+              tips={tips}
+              names={names}
+            />
+          </div>
+        )}
+        {slug && state && !q.house && isVendorView(q) && rows.length > 0 && (
+          <p data-vendor-hint className="mt-4 text-sm text-fg-2">
+            {"Which items does a vendor pay more for? Pick a house: "}
+            {HOUSES.map((h, i) => <span key={h}>{i > 0 && ", "}<Link href={`${here({ house: h })}#vendor-these`} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{h}</Link></span>)}
+            .
+          </p>
+        )}
         <div className="mt-8 space-y-4">
           <Contribute />
           <div>

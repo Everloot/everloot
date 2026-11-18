@@ -237,6 +237,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: /tools/bags shows the cheapest bag of each size on one realm's auction house and what each added slot costs over your smallest bag, and item tooltips print a bag's "14 Slot Bag" line; slot counts come from the game files, prices from players' scans.
 - Site: the world map shows zone or continent coordinates on hover and shares pins in the address; Shift-click or use Pin map centre, and Clear pin removes it.
 - Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
+- Site: a realm's Auction House page, with one house picked, lists "Vendor these": items a vendor pays more for than that house after its cut, biggest difference first, so you know what not to post.
 
 ### Fixed
 - Site: character search finds a Forever character by first name, surname or full name (“Volvik Morningstar”), and the header and /search list armory characters with their region. Surnames and full names need the 20261117140000 migration.
