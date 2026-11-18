@@ -10,9 +10,9 @@ import { QUALITY_TEXT, qualityOf } from "./quality";
  * One row under the field: a database page from GET /search/suggest, or (unscoped only) a character or guild from
  * GET /search/people. Characters and guilds have no id; their `note` says who and where.
  */
-export interface Suggestion { type: "item" | "npc" | "quest" | "object" | "instance" | "character" | "guild"; id?: number; label: string; href: string; quality?: number | null; icon?: string; note?: string }
+export interface Suggestion { type: "item" | "npc" | "quest" | "object" | "zone" | "instance" | "character" | "guild" | "all"; id?: number; label: string; href: string; quality?: number | null; icon?: string; note?: string }
 
-const TYPE_LABEL: Record<Suggestion["type"], string> = { item: "Item", npc: "NPC", quest: "Quest", object: "Object", instance: "Instance", character: "Character", guild: "Guild" };
+const TYPE_LABEL: Record<Suggestion["type"], string> = { item: "Item", npc: "NPC", quest: "Quest", object: "Object", zone: "Zone", instance: "Instance", character: "Character", guild: "Guild", all: "Search" };
 /** The row's right-hand note: a dungeon or raid says which and its level, a character or guild who and where; the rest their type and id. */
 const typeNote = (row: Suggestion) => row.note ?? `${TYPE_LABEL[row.type]}${row.id === undefined || row.label.endsWith(String(row.id)) ? "" : ` ${row.id}`}`;
 export const SEARCH_SCOPES = [
@@ -39,6 +39,12 @@ export function withPeople(database: Suggestion[], people: Suggestion[]): Sugges
   return [...database.slice(0, LIMIT - kept.length), ...kept];
 }
 
+/** The last row under any suggestions: the search page for the text, in the box's scope. */
+export function allResultsRow(text: string, scope: string): Suggestion {
+  const q = text.trim();
+  return { type: "all", label: `All results for “${q}”`, href: `/search?q=${encodeURIComponent(q)}${scope ? `&in=${scope}` : ""}` };
+}
+
 /**
  * Whether the text could start a character name (2 to 12 letters), a Forever surname or full name ("First Surname",
  * as armoryNameQuery in lib/armory reads it) or a guild name (2 to 24 letters, digits, spaces, apostrophes and
@@ -50,6 +56,12 @@ export function couldBeName(text: string): boolean {
   if (!/\p{L}/u.test(text)) return false;
   return /^\p{L}{2,24}(\s+\p{L}{1,24})?$/u.test(text) || (text.length >= 2 && text.length <= 24 && /^[\p{L}\p{N}][\p{L}\p{N} '’-]*$/u.test(text));
 }
+
+/**
+ * The type-ahead's request, lower case like this page's cache key and the edge's, so `Thrall` and `thrall` are
+ * one request the edge can answer for every visitor (matching ignores case).
+ */
+export const suggestUrl = (text: string, scope: string) => `/search/suggest?q=${encodeURIComponent(text.trim().toLowerCase())}${scope ? `&in=${scope}` : ""}`;
 
 /** Database rows wait 120 ms after the last key; characters and guilds wait longer, as they reach storage. */
 const PEOPLE_PAUSE_MS = 280;
@@ -78,7 +90,7 @@ function useSuggestions(text: string, scope: string): Suggestion[] {
     if (!hit) {
       timers.push(setTimeout(() => {
         // The site's own route, matched on the names the pages show (/api/suggest keeps the agreed names only).
-        fetch(`/search/suggest?q=${encodeURIComponent(q)}${scope ? `&in=${scope}` : ""}`, { signal: ctrl.signal })
+        fetch(suggestUrl(q, scope), { signal: ctrl.signal })
           .then((r) => (r.ok ? r.json() : { results: [] }))
           .then((body: { results?: Suggestion[] }) => { database = body.results ?? []; cache.set(key, database); show(); })
           .catch(() => {});
@@ -102,7 +114,8 @@ function useSuggestions(text: string, scope: string): Suggestion[] {
 }
 
 /**
- * A search field with instant suggestions (items, NPCs, quests, objects, dungeons and raids, characters and guilds), as a combobox:
+ * A search field with instant suggestions (items, NPCs, quests, objects, zones, dungeons and raids, characters and guilds,
+ * then a row for every result on the search page), as a combobox:
  * arrow keys move through the list, Enter opens the one picked, or searches when none is, Escape closes. Inside
  * a GET form, so without JavaScript it is a plain search.
  */
@@ -114,7 +127,8 @@ export function SuggestField({ id, name = "q", label, placeholder, defaultValue 
   const [open, setOpen] = useState(false);
   // The picked row is held by its link, so rows added under it (characters, guilds) leave the pick where it is.
   const [picked, setPicked] = useState<string | null>(null);
-  const rows = useSuggestions(text, scope);
+  const found = useSuggestions(text, scope);
+  const rows = found.length ? [...found, allResultsRow(text, scope)] : found;
   const active = picked === null ? -1 : rows.findIndex((r) => r.href === picked);
   const list = useRef<HTMLUListElement>(null);
   const listId = `${id}-suggestions`;

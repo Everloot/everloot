@@ -31,8 +31,8 @@ export const objectNames = (facts: Pick<ItemFacts, "objects">) => once(facts.obj
 export const questTitles = (facts: Pick<WorldFacts, "quests">) => once(facts.quests, () => agreedQuestTitles(facts));
 
 /** All four name sets; empty when the store cannot be read (callers then print ids, never guesses). */
-export async function loadNames(itemsRead: ReturnType<typeof loadItemFacts> = loadItemFacts()): Promise<Names> {
-  const [items, world] = await Promise.all([itemsRead, loadWorldFacts()]);
+export async function loadNames(itemsRead: ReturnType<typeof loadItemFacts> = loadItemFacts(), worldRead: ReturnType<typeof loadWorldFacts> = loadWorldFacts()): Promise<Names> {
+  const [items, world] = await Promise.all([itemsRead, worldRead]);
   return {
     items: items.unreachable ? new Map() : itemNames(items),
     npcs: world.unreachable ? new Map() : npcNames(world),

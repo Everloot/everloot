@@ -1,7 +1,10 @@
+import { npcReportedName, type WorldFacts } from "../../../kb/src/world-pages";
 import { loadQuestNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
 import { loadNames, type Names } from "@/lib/names";
+import { loadWorldFacts } from "@/lib/rollup-compute";
 import { loadShownNames, type ShownNames } from "@/lib/shown-item-names";
+import { loadWikiEntityNames, type WikiEntityNames } from "@/lib/wiki-entity-names";
 
 // The names the database pages show, for the site's own search: /search and the type-ahead under the
 // header and hub search boxes (/search/suggest). Server only, and pages only: /api/suggest, the MCP server
@@ -28,15 +31,42 @@ function mergedOnce<T extends { name: string }>(agreed: Map<number, string>, rul
   return out;
 }
 
+// The NPC page's rule (shownNpcName): one or two installs' unanimous name, where it matches a Warcraft Wiki NPC name.
+// One pass over the sightings per corpus and wiki file version.
+const wikiNpcMemo = new WeakMap<object, WeakMap<object, Map<number, { name: string }>>>();
+function wikiNpcNames(facts: WorldFacts & { unreachable?: boolean }, wiki: WikiEntityNames | null): Map<number, { name: string }> | null {
+  if (facts.unreachable || !wiki?.names.size) return null;
+  let inner = wikiNpcMemo.get(facts.npcs);
+  if (!inner) { inner = new WeakMap(); wikiNpcMemo.set(facts.npcs, inner); }
+  let out = inner.get(wiki);
+  if (!out) {
+    const byNpc = new Map<number, WorldFacts["npcs"]>();
+    for (const row of facts.npcs) { const rows = byNpc.get(row.npcId); if (rows) rows.push(row); else byNpc.set(row.npcId, [row]); }
+    out = new Map();
+    for (const [id, npcs] of byNpc) {
+      const candidate = npcReportedName(id, { ...facts, npcs });
+      const hit = candidate ? wiki.names.get(candidate) : undefined;
+      if (hit) out.set(id, { name: hit.name });
+    }
+    inner.set(wiki, out);
+  }
+  return out;
+}
+
 /**
  * Item names, NPC names, object names and quest titles as the pages print them: the name 3 installs agree on, else the
- * game files and Warcraft Wiki match for items, and the wiki title for quests. NPCs and objects have agreed names only.
+ * game files and Warcraft Wiki match for items, the Warcraft Wiki name a unanimous report matches for NPCs, and the
+ * wiki title for quests. Objects have agreed names only, as their pages do.
  */
 export async function loadShownSearchNames(shownRead: Promise<ShownNames> = loadShownNames()): Promise<Names> {
-  const [agreed, shown, quests] = await Promise.all([loadNames(shownRead.then((shown) => shown.facts)), shownRead, loadQuestNames(CLIENT_LAYER.build.version)]);
+  // One world read serves the agreed names and the wiki match.
+  const worldRead = loadWorldFacts();
+  const [agreed, shown, quests, world, npcWiki] = await Promise.all([
+    loadNames(shownRead.then((shown) => shown.facts), worldRead), shownRead, loadQuestNames(CLIENT_LAYER.build.version), worldRead, loadWikiEntityNames("npc"),
+  ]);
   return {
     items: mergedOnce(agreed.items, shown.matched?.names),
-    npcs: agreed.npcs,
+    npcs: mergedOnce(agreed.npcs, wikiNpcNames(world, npcWiki)),
     objects: agreed.objects,
     quests: mergedOnce(agreed.quests, quests?.names),
   };

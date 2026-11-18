@@ -8,7 +8,7 @@ import AdSlot from "@/components/AdSlot";
 import EntityLink from "@/components/EntityLink";
 import ZonePreview from "@/components/ZonePreview";
 import {
-  AgreementMeter, Badge, Card, Container, DataTable, EmptyState, InShort, OpenData, ResultStrip, SectionHeading, Tabs,
+  AgreementMeter, Badge, Card, Container, DataTable, Disclosure, EmptyState, InShort, OpenData, ResultStrip, SectionHeading, Tabs,
   type Column, type TabItem,
 } from "@/components/ui";
 import { observedLine, reportedLine } from "@/lib/evidence";
@@ -280,6 +280,27 @@ export default async function ZonePage(props: Props) {
         </EntitySidebar>
 
         <div className="space-y-6">
+          <section aria-labelledby="known">
+            <SectionHeading id="known" note="Positions, quests, bosses and treasures are public once 3 installs agree. Entrances are read from the game files and confirmed once 3 installs zoned in.">
+              What we know here
+            </SectionHeading>
+            {/* Confirmed items and gathering spots are things players confirmed too (a herb spot is no treasure, NPC or quest). */}
+            {!facts.unreachable && !hasConfirmed(here) && items.length === 0 && gathered.length === 0 && (
+              <div className="mb-4">
+                <EmptyState
+                  message={`Players have not confirmed anything in ${zone.name} yet.${entrances.length ? " The dungeon and raid entrances here are read from the game files." : ""} A fact appears when 3 installs agree on it, and until then the lists below stay empty on purpose.`}
+                />
+              </div>
+            )}
+            <Tabs label={`Known in ${zone.name}`} tabs={tabs} empty={empty(noEntrance)} />
+            {farmLinks.length > 0 && (
+              <p data-farm-links className="mt-3 text-meta text-fg-2">
+                Farming and gathering:{" "}
+                {farmLinks.map((l, i) => <span key={l.href}>{i > 0 && " · "}<Link href={l.href} className={link}>{l.label}</Link></span>)}
+              </p>
+            )}
+          </section>
+
           {lore && lore !== UNAVAILABLE && (
             <section aria-labelledby="lore">
               <SectionHeading id="lore">Lore</SectionHeading>
@@ -294,55 +315,35 @@ export default async function ZonePage(props: Props) {
           )}
 
           {(terrain.length > 0 || gear.length > 0) && (
-            <section aria-labelledby="terrain" data-zone-terrain>
-              <SectionHeading id="terrain" note={`Read from the game files, build ${TERRAIN_BUILD}: the kinds of ground some item effects need, and the gear whose effect works here. Found in game files, unconfirmed.`}>
-                Terrain
-              </SectionHeading>
-              {terrain.length > 0 && (
-                <p className="mb-3 flex flex-wrap items-center gap-2 text-meta text-fg-2">
-                  {terrain.map(({ type, parts }) => (
-                    <Link prefetch={false} key={type.slug} href={`${TERRAIN_PATH}#${type.slug}`} className="inline-flex h-6 items-center rounded-full border border-line px-2.5 font-mono text-xs text-fg-2 hover:text-fg">
-                      {type.name}{parts ? ` · ${parts.join(", ")}` : ""}
-                    </Link>
-                  ))}
-                </p>
-              )}
-              {gear.length > 0 && (
-                <TerrainGearTable
-                  gear={gear}
-                  zone={zone.mapId}
-                  caption={`Gear whose effect works in ${zone.name}`}
-                  names={{
-                    item: (id) => ({ name: gearName.get(id) ?? tips.get(id)?.name, icon: tips.get(id)?.icon }),
-                    spell: (id) => spellNames?.names.get(id),
-                    set: (id) => setNames?.names.get(id),
-                    instances: new Map([...instanceRows()].map(([id, r]) => [id, r.name])),
-                  }}
-                />
-              )}
+            <section aria-label="Terrain" data-zone-terrain>
+              {/* Closed until asked for: what players confirmed here comes first, the game files' gear list after. */}
+              <Disclosure as="h2" id="terrain" wide summary={gear.length ? `Terrain: ${gear.length} ${gear.length === 1 ? "item whose effect works" : "items whose effect works"} here` : "Terrain"}>
+                <p className="text-meta text-fg-2">Read from the game files, build {TERRAIN_BUILD}: the kinds of ground some item effects need, and the gear whose effect works here. Found in game files, unconfirmed.</p>
+                {terrain.length > 0 && (
+                  <p className="flex flex-wrap items-center gap-2 text-meta text-fg-2">
+                    {terrain.map(({ type, parts }) => (
+                      <Link prefetch={false} key={type.slug} href={`${TERRAIN_PATH}#${type.slug}`} className="inline-flex h-6 items-center rounded-full border border-line px-2.5 font-mono text-xs text-fg-2 hover:text-fg">
+                        {type.name}{parts ? ` · ${parts.join(", ")}` : ""}
+                      </Link>
+                    ))}
+                  </p>
+                )}
+                {gear.length > 0 && (
+                  <TerrainGearTable
+                    gear={gear}
+                    zone={zone.mapId}
+                    caption={`Gear whose effect works in ${zone.name}`}
+                    names={{
+                      item: (id) => ({ name: gearName.get(id) ?? tips.get(id)?.name, icon: tips.get(id)?.icon }),
+                      spell: (id) => spellNames?.names.get(id),
+                      set: (id) => setNames?.names.get(id),
+                      instances: new Map([...instanceRows()].map(([id, r]) => [id, r.name])),
+                    }}
+                  />
+                )}
+              </Disclosure>
             </section>
           )}
-
-          <section aria-labelledby="known">
-            <SectionHeading id="known" note="Positions, quests, bosses and treasures are public once 3 installs agree. Entrances are read from the game files and confirmed once 3 installs zoned in.">
-              What we know here
-            </SectionHeading>
-            {/* Confirmed items and gathering spots are things players confirmed too (a herb spot is no treasure, NPC or quest). */}
-            {!facts.unreachable && !hasConfirmed(here) && items.length === 0 && gathered.length === 0 && (
-              <div className="mb-4">
-                <EmptyState
-                  message={`Players have not confirmed anything in ${zone.name} yet.${entrances.length ? " The dungeon and raid entrances here are read from the game files." : ""} A fact appears when 3 installs agree on it, and until then the lists below stay empty on purpose.`}
-                />
-              </div>
-            )}
-            <Tabs label={`Known in ${zone.name}`} tabs={tabs} />
-            {farmLinks.length > 0 && (
-              <p data-farm-links className="mt-3 text-meta text-fg-2">
-                Farming and gathering:{" "}
-                {farmLinks.map((l, i) => <span key={l.href}>{i > 0 && " · "}<Link href={l.href} className={link}>{l.label}</Link></span>)}
-              </p>
-            )}
-          </section>
         </div>
         {!facts.unreachable && hasContent(here) && <AdSlot slot="inContent" />}
       </EntityLayout>

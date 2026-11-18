@@ -79,12 +79,38 @@ function itemFacts(id: number): Pick<SearchResult, "quality" | "meta"> {
 
 const WORD = { item: "Item", npc: "NPC", quest: "Quest" } as const;
 
+/** One name of a name map, with its lowercase form for matching. */
+export interface NamedRow { id: number; name: string; n: string }
+const sortedRows = new WeakMap<Map<number, string>, NamedRow[]>();
+/**
+ * A name map's rows in name order, built once per map: the maps are replaced when the corpus or a names file
+ * reloads, so each keystroke matches against the same array instead of copying and sorting the whole map.
+ */
+export function sortedNames(names: Map<number, string>): NamedRow[] {
+  let rows = sortedRows.get(names);
+  if (!rows) {
+    rows = [...names].map(([id, name]) => ({ id, name, n: name.toLowerCase() })).sort((a, b) => a.n.localeCompare(b.n));
+    sortedRows.set(names, rows);
+  }
+  return rows;
+}
+
+/** `byName` over rows already in name order: a stable sort by rank keeps the name order within a rank. */
+function bySortedName(rows: readonly NamedRow[], q: string): { entry: NamedRow; exact: boolean; r: number }[] {
+  const hits: { entry: NamedRow; exact: boolean; r: number }[] = [];
+  for (const entry of rows) {
+    const r = rank(entry.n, q);
+    if (r !== null) hits.push({ entry, exact: r === 0, r });
+  }
+  return hits.sort((a, b) => a.r - b.r);
+}
+
 /** Exact id first (any id opens its page), then the agreed names that match, best first. */
 function agreed(kind: "item" | "npc" | "quest", names: Map<number, string>, q: string, id: number | null): { results: (SearchResult & { r: number })[]; total: number } {
   const out: (SearchResult & { r: number })[] = [];
   const extra = (n: number) => (kind === "item" ? itemFacts(n) : {});
   if (id !== null) out.push({ label: names.get(id) ?? `${WORD[kind]} ${id}`, href: entityHref(kind, id), note: `id ${id}`, exact: true, id, r: -1, ...extra(id) });
-  const rows = byName([...names].map(([n, name]) => ({ id: n, name })), q).filter(({ entry }) => entry.id !== id);
+  const rows = bySortedName(sortedNames(names), q).filter(({ entry }) => entry.id !== id);
   for (const { entry, exact, r } of rows) out.push({ label: entry.name, href: entityHref(kind, entry.id), note: `id ${entry.id}`, exact, id: entry.id, r, ...extra(entry.id) });
   return { results: out, total: out.length };
 }
@@ -106,16 +132,49 @@ function instanceHits(q: string): (SearchResult & { id: number; r: number })[] {
   }).sort((a, b) => a.r - b.r || a.label.localeCompare(b.label));
 }
 
+/** Released zones on the map by name, best first, as the zone group of /search lists them. */
+function zoneHits(q: string): { id: number; label: string; href: string; exact: boolean; r: number }[] {
+  return byName(WORLD_MAP.zones.map((z) => ({ id: z.uiMapId, name: z.name })), q)
+    .map(({ entry, exact, r }) => ({ id: entry.id, label: entry.name, href: zoneHref(entry.id, entry.name), exact, r }));
+}
+
+type ObjectFacts = Awaited<ReturnType<typeof loadObjectFacts>>;
+const publicObjects = new WeakMap<object, WeakMap<object, Set<number>>>();
+const namedObjects = new WeakMap<Map<number, string>, WeakMap<Set<number>, NamedRow[]>>();
+/**
+ * The ids /database/objects lists, and the named ones in name order. The rate arrays stay the same object while the
+ * rollup does, so the list and the rows are built once per rollup and names version, not per keystroke.
+ */
+function objectRows(facts: ObjectFacts, names: Map<number, string>): { ids: Set<number>; rows: NamedRow[] } {
+  let byZeros = publicObjects.get(facts.rates);
+  if (!byZeros) { byZeros = new WeakMap(); publicObjects.set(facts.rates, byZeros); }
+  let ids = byZeros.get(facts.measuredZeros);
+  if (!ids) { ids = new Set(objectList(facts).map((o) => o.objectId)); byZeros.set(facts.measuredZeros, ids); }
+  let byIds = namedObjects.get(names);
+  if (!byIds) { byIds = new WeakMap(); namedObjects.set(names, byIds); }
+  let rows = byIds.get(ids);
+  if (!rows) { const kept = ids; rows = sortedNames(names).filter((row) => kept.has(row.id)); byIds.set(ids, rows); }
+  return { ids, rows };
+}
+
 /** Names and ids from the same public object list as /database/objects; unavailable facts yield no hits. */
-async function objectHits(q: string, id: number | null, names: Map<number, string>): Promise<(SearchResult & { r: number })[]> {
-  const facts = await loadObjectFacts();
+async function objectHits(q: string, id: number | null, names: Map<number, string>, read: Promise<ObjectFacts> = loadObjectFacts()): Promise<(SearchResult & { r: number })[]> {
+  const facts = await read;
   if (facts.unreachable) return [];
-  const publicIds = new Set(objectList(facts).map((o) => o.objectId));
+  const { ids, rows } = objectRows(facts, names);
   const out: (SearchResult & { r: number })[] = [];
-  if (id !== null && publicIds.has(id)) out.push({ label: names.get(id) ?? `Object ${id}`, href: entityHref("object", id), note: `id ${id}`, exact: true, id, r: -1 });
-  const named = [...names].filter(([n]) => publicIds.has(n) && n !== id).map(([n, name]) => ({ id: n, name }));
-  for (const { entry, exact, r } of byName(named, q)) out.push({ label: entry.name, href: entityHref("object", entry.id), note: `id ${entry.id}`, exact, id: entry.id, r });
+  if (id !== null && ids.has(id)) out.push({ label: names.get(id) ?? `Object ${id}`, href: entityHref("object", id), note: `id ${id}`, exact: true, id, r: -1 });
+  for (const { entry, exact, r } of bySortedName(rows, q)) if (entry.id !== id) out.push({ label: entry.name, href: entityHref("object", entry.id), note: `id ${entry.id}`, exact, id: entry.id, r });
   return out;
+}
+
+/** The lore archive's hits, and its some-words hits when no page has every word; null when the archive is out of reach. */
+async function loreHits(text: string): Promise<{ hits: SearchHit[]; some: SearchHit[] | null } | null> {
+  const lore = await searchLore(text, 1);
+  if (lore === UNAVAILABLE) return null;
+  if (lore.hits.length) return { hits: lore.hits, some: null };
+  const some = await searchLoreSomeWords(text, LORE_LIMIT);
+  return { hits: lore.hits, some: some === UNAVAILABLE ? null : some };
 }
 
 /**
@@ -134,10 +193,16 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
 
   const paged = isPagedScope(only);
   if (paged) limit = Number.isFinite(limit) ? Math.max(1, Math.min(50, Math.floor(limit))) : 50;
-  // Neither read depends on the other. Item, NPC, quest and object scopes do not need the completion catalogue.
+  // No read depends on another, so they all start now. Item, NPC, quest and object scopes do not need the completion
+  // catalogue; only the unscoped page asks the lore archive.
+  const objectsRead = want("object") ? loadObjectFacts() : null;
+  const loreRead = only ? null : loreHits(text);
+  // A failed name read rejects the search before these are awaited; their own failure must not go unhandled then.
+  objectsRead?.catch(() => {});
+  loreRead?.catch(() => {});
   const [names, catalog] = await Promise.all([given ?? loadNames(), only && !paged ? null : loadCatalog()]);
   for (const kind of ["item", "npc", "quest"] as const) if (want(kind)) found.set(kind, agreed(kind, names[`${kind}s`], q, id));
-  if (want("object")) { const objects = await objectHits(q, id, names.objects); found.set("object", { results: objects, total: objects.length }); }
+  if (objectsRead) { const objects = await objectHits(q, id, names.objects, objectsRead); found.set("object", { results: objects, total: objects.length }); }
 
   if (!only || paged) {
     // Achievements, factions, titles and quest chains three players reported, by name or id; none when the rollup cannot be read.
@@ -163,8 +228,7 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
       found.set("chain", { results: chains, total: chains.length });
     }
 
-    const zones = byName(WORLD_MAP.zones.map((z) => ({ id: z.uiMapId, name: z.name })), q)
-      .map(({ entry, exact }) => ({ label: entry.name, href: zoneHref(entry.id, entry.name), note: "zone", exact }));
+    const zones = zoneHits(q).map(({ label, href, exact }) => ({ label, href, note: "zone", exact }));
     found.set("zone", { results: zones, total: zones.length });
 
     const instances = instanceHits(q).map(({ r: _r, ...hit }) => hit);
@@ -189,15 +253,14 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
     }).sort((a, b) => a.r - b.r).map(({ r: _r, ...hit }) => hit);
     found.set("guide", { results: guides, total: guides.length });
 
-    const lore = await searchLore(text, 1);
-    if (lore !== UNAVAILABLE) {
+    const lore = await loreRead;
+    if (lore) {
       const loreHit = (h: SearchHit) => ({ label: h.name, href: `/lore/${loreSlug(h)}`, note: h.snippet, exact: h.name.toLowerCase() === q });
-      const some = lore.hits.length ? [] : await searchLoreSomeWords(text, LORE_LIMIT);
-      if (lore.hits.length || some === UNAVAILABLE) {
+      if (lore.hits.length || !lore.some) {
         const hits = lore.hits.map(loreHit);
         found.set("lore", { results: hits.slice(0, LORE_LIMIT), total: hits.length });
       } else {
-        found.set("lore", { results: some.map(loreHit), total: some.length, heading: LORE_SOME_WORDS });
+        found.set("lore", { results: lore.some.map(loreHit), total: lore.some.length, heading: LORE_SOME_WORDS });
       }
     }
 
@@ -253,16 +316,16 @@ function strip(result: SearchResult & { r?: number }): SearchResult {
 }
 
 /**
- * One instant suggestion under a search box: an item, NPC, quest or object page, or (unscoped only) a dungeon or
- * raid page, whose `note` says which and its level ("Dungeon, level 16").
+ * One instant suggestion under a search box: an item, NPC, quest or object page, or (unscoped only) a zone page, or
+ * a dungeon or raid page whose `note` says which and its level ("Dungeon, level 16").
  */
-export interface Suggestion { type: Scope | "instance"; id: number; label: string; href: string; quality?: number | null; note?: string }
+export interface Suggestion { type: Scope | "zone" | "instance"; id: number; label: string; href: string; quality?: number | null; note?: string }
 export const SUGGEST_LIMIT = 8;
 
 /**
  * Up to 8 pages for a search box as the visitor types: an exact id first, then exact names, then names that
- * start with the text, then names that contain it, across items, NPCs, quests, objects and, unscoped, dungeons and
- * raids (or one of the first four). Names only where players agree on them, as on /search; instances from the
+ * start with the text, then names that contain it, across items, NPCs, quests, objects and, unscoped, zones, dungeons
+ * and raids (or one of the first four). Names only where players agree on them, as on /search; instances from the
  * same rows as /search; no lore or tools, so it stays cheap per keystroke.
  */
 export async function suggest(raw: string, scope?: Scope, names?: Names): Promise<Suggestion[]> {
@@ -282,8 +345,11 @@ export async function suggest(raw: string, scope?: Scope, names?: Names): Promis
     }
   }
   if (!scope) {
+    for (const x of zoneHits(q).slice(0, SUGGEST_LIMIT)) {
+      ranked.push({ s: { type: "zone", id: x.id, label: x.label, href: x.href, note: "Zone" }, r: x.r, t: order.length });
+    }
     for (const x of instanceHits(q).slice(0, SUGGEST_LIMIT)) {
-      ranked.push({ s: { type: "instance", id: x.id, label: x.label, href: x.href, note: x.note }, r: x.r, t: order.length });
+      ranked.push({ s: { type: "instance", id: x.id, label: x.label, href: x.href, note: x.note }, r: x.r, t: order.length + 1 });
     }
   }
   return ranked.sort((a, b) => a.r - b.r || a.t - b.t).slice(0, SUGGEST_LIMIT).map((x) => x.s);

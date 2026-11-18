@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { CONTACT_EMAIL, DISCORD_INVITE } from "@/lib/jsonld";
 import { isProtectedPath } from "@/lib/document-boundary";
@@ -10,6 +10,10 @@ function reportPage(path: string): string {
   return `https://everloot.app${path}`;
 }
 
+/** Sent on the window to open the report dialog from elsewhere: the phone menu's More group, which stands in for the
+ *  pill below the md breakpoint, where the pill would cover the map's tabs and the first table row. */
+export const REPORT_BUG_EVENT = "everloot:report-bug";
+
 /** A report is only sent when the player finishes the existing form on GitHub, or contacts us themselves. */
 export default function BugReport() {
   const pathname = usePathname();
@@ -17,8 +21,21 @@ export default function BugReport() {
   const dialog = useRef<HTMLDialogElement>(null);
   const [page, setPage] = useState("");
   const [open, setOpen] = useState(false);
+  // What had focus when the dialog opened, to return to on close: the pill, or the phone menu's button.
+  const opener = useRef<HTMLElement | null>(null);
+
+  const show = useCallback(() => {
+    opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setPage(reportPage(window.location.pathname));
+    dialog.current?.showModal();
+    setOpen(true);
+  }, []);
 
   useEffect(() => { dialog.current?.close(); }, [pathname]);
+  useEffect(() => {
+    window.addEventListener(REPORT_BUG_EVENT, show);
+    return () => window.removeEventListener(REPORT_BUG_EVENT, show);
+  }, [show]);
   useEffect(() => {
     if (!open) return;
     const before = document.body.style.overflow;
@@ -37,25 +54,21 @@ export default function BugReport() {
         aria-label="Report a bug"
         aria-haspopup="dialog"
         title="Report a bug"
-        className={`fixed ${pathname === "/chat" ? "right-4 top-header mt-1 bottom-auto sm:left-4 sm:right-auto sm:top-auto sm:mt-0 sm:bottom-[var(--report-bottom)]" : "left-4 bottom-[var(--report-bottom)]"} z-40 inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-edge bg-panel px-3 text-sm text-accent transition-colors hover:border-accent hover:bg-canvas`}
+        className="fixed bottom-[var(--report-bottom)] left-4 z-40 hidden min-h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-edge bg-panel px-3 text-sm text-accent transition-colors hover:border-accent hover:bg-canvas md:inline-flex"
         style={{ "--report-bottom": clearance } as React.CSSProperties}
-        onClick={() => {
-          setPage(reportPage(window.location.pathname));
-          dialog.current?.showModal();
-          setOpen(true);
-        }}
+        onClick={show}
       >
         <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
           <path d="m9 3 1 2m5-2-1 2M8 9a4 4 0 0 1 8 0v6a4 4 0 0 1-8 0V9Zm0 3h8m-4 0v7M4 7l4 3m12-3-4 3M3 13h5m8 0h5M4 19l4-3m12 3-4-3" />
         </svg>
-        <span className="hidden sm:inline">Report a bug</span>
+        <span>Report a bug</span>
       </button>
       <dialog
         ref={dialog}
         aria-labelledby="bug-report-heading"
         aria-describedby="bug-report-description"
         className="m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-md overflow-y-auto rounded-card border border-edge bg-panel p-6 text-fg backdrop:bg-canvas/80"
-        onClose={() => { setOpen(false); trigger.current?.focus(); }}
+        onClose={() => { setOpen(false); (opener.current?.isConnected ? opener.current : trigger.current)?.focus(); }}
         onKeyDown={(event) => {
           if (event.key !== "Tab") return;
           const controls = event.currentTarget.querySelectorAll<HTMLElement>("button, a[href]");
