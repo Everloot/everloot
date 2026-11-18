@@ -124,7 +124,7 @@ companion's modules and the site's parser (`web/src/lib/sv-parse.ts`), so `web` 
 must be installed too.
 
 ```
-npm test            # vitest: every module under src/main and the renderer's text helpers
+npm test            # vitest: every module under src/main, the renderer's text helpers, and each page's markup (pages.test.ts, with snapshots)
 npm run typecheck
 npm run pack        # installers into release/ (electron-builder)
 npm run icons       # remake build/*.png from web/src/app/icon.svg

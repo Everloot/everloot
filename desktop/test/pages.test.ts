@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import type { AppState, ChatInfo, FileSummary, JobStatus, MarketInfo } from "../src/shared/types";
 import { summarizeCharacters } from "../src/main/characters";
-import { addon, ask, changes, characters, chat, log, market, overview, restartDialog, settings, updatePopover, upload, welcome, wipeDialog, type View } from "../src/renderer/pages";
+import { addon, ask, assistantSetup, changes, characters, chat, log, market, overview, restartDialog, settings, updatePopover, upload, welcome, wipeDialog, type View } from "../src/renderer/pages";
+import { PROVIDER_PRESETS, type ModelChoice } from "../src/shared/providers";
 import { CHARACTERS } from "./save-fixtures";
 
 // The pages print times in the machine's locale and zone; a snapshot needs the same text everywhere.
@@ -211,6 +212,33 @@ describe("chat", () => {
     const html = chat(view({ data: { chat: chatInfo({ messages: MESSAGES }) }, copied: { index: 1, label: "Copied" } }));
     expect(html).not.toContain("chat-empty");
     expect(html).toMatchSnapshot();
+  });
+
+  // A saved provider: the model menu keeps the saved pick selected and lists the models fetched from the provider.
+  const KIND = PROVIDER_PRESETS[0].kind;
+  const LIVE = { [KIND]: [{ id: "m-first", label: "First model" } as ModelChoice, { id: "m-live", label: "Live model" } as ModelChoice] };
+  const SAVED = { kind: KIND, model: "m-saved", baseUrl: null };
+
+  test("a saved provider keeps its model selected, beside the fetched models", () => {
+    const html = chat(view({ data: { chat: chatInfo({ provider: SAVED, providers: [SAVED] }) }, liveModels: LIVE }));
+    expect(html).toContain(`<option value="${KIND}|m-saved" selected>`);
+    expect(html).toContain(`<option value="${KIND}|m-live" >Live model</option>`);
+    expect(html).toContain("Assistant setup: saved providers");
+    expect(html).not.toContain("Search only, no model");
+  });
+
+  test("the open setup form shows the saved providers and keeps a draft's model through a redraw", () => {
+    const c = chatInfo({ provider: SAVED, providers: [SAVED] });
+    const draft = { kind: KIND, key: "", baseUrl: "", model: "m-live", modelText: "" };
+    const s = appState();
+    const html = assistantSetup(c, "settings", view({ state: s, data: { chat: c }, pickOpen: true, pickKind: KIND, providerDraft: draft, liveModels: LIVE }));
+    expect(html).toContain('id="providerForm"');
+    expect(html).toContain("Saved here:");
+    expect(html).toContain('data-removekind="' + KIND + '"');
+    expect(html).toMatch(/<option value="m-live"[^>]*selected/);
+    expect(html).not.toMatch(/<option value="m-first"[^>]*selected/);
+    // Closed, the same panel offers the button instead of the form.
+    expect(assistantSetup(c, "settings", view({ state: s, data: { chat: c }, pickOpen: false }))).toContain('id="assistantOpen"');
   });
 });
 
