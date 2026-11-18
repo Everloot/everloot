@@ -89,6 +89,47 @@ const button = (label: string, scope: ParentNode = container) =>
 const click = (el: Element) => act(async () => (el as HTMLElement).click());
 const shell = () => $("[data-map-shell]");
 const panel = () => $("#map-panel");
+
+test("a coordinate pin from the URL renders a marker and survives camera changes", async () => {
+  window.history.replaceState(null, "", "/map?pin=25,40&keep=yes");
+  await mount({ coordinatePin: new URLSearchParams(window.location.search).get("pin")! });
+  expect(leaflet.props.marker).toMatchObject({ x: 500, y: 800 });
+  expect(leaflet.props.initial).toEqual({ fit: spotBox(500, 800) });
+  vi.useFakeTimers();
+  await act(async () => leaflet.props.onView({ x: 600, y: 900, zoom: 1 }));
+  await act(async () => vi.advanceTimersByTime(300));
+  expect(new URLSearchParams(window.location.search).get("pin")).toBe("25,40");
+  expect(new URLSearchParams(window.location.search).get("keep")).toBe("yes");
+  await click(button("Clear pin"));
+  expect(leaflet.props.marker).toBeNull();
+  expect(new URLSearchParams(window.location.search).has("pin")).toBe(false);
+});
+
+test("keyboard button and direct placement write a pin without losing other parameters", async () => {
+  window.history.replaceState(null, "", "/map?keep=yes&spoilers=1");
+  await mount();
+  await act(async () => leaflet.props.onView({ x: 500, y: 800, zoom: 1 }));
+  button("Pin map centre").focus();
+  await click(button("Pin map centre"));
+  expect(leaflet.props.marker).toMatchObject({ x: 500, y: 800 });
+  expect(new URLSearchParams(window.location.search).get("pin")).toBe("25,40");
+  await act(async () => leaflet.props.onPin(100, 200));
+  expect(new URLSearchParams(window.location.search).get("pin")).toBe("5,10");
+  expect(new URLSearchParams(window.location.search).get("keep")).toBe("yes");
+  expect(new URLSearchParams(window.location.search).get("spoilers")).toBe("1");
+});
+
+test.each(["bad", "101,20"])("invalid coordinate pin %s renders safely", async (coordinatePin) => {
+  await mount({ coordinatePin });
+  expect(leaflet.props.marker).toBeNull();
+  expect(button("Clear pin")).toBeUndefined();
+});
+
+test("hover outside a zone uses the game's continent bounds", async () => {
+  await mount({ coordinateBounds: { x: -1000, y: -1000, width: 4000, height: 4000 } });
+  await act(async () => leaflet.props.onHover({ x: -500, y: -500 }));
+  expect($("[data-coordinates]").textContent).toBe("Kalimdor 12.5, 12.5");
+});
 test("pointer coordinates update without rendering the surrounding map view", async () => {
   await mount();
   const before = leaflet.props;

@@ -226,6 +226,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: /database/recent and its RSS feed list the entities whose facts reached three installs in the last 30 days;
   dates from before the feed existed are marked estimated.
 - Site: /tools/bags shows the cheapest bag of each size on one realm's auction house and what each added slot costs over your smallest bag, and item tooltips print a bag's "14 Slot Bag" line; slot counts come from the game files, prices from players' scans.
+- Site: the world map shows zone or continent coordinates on hover and shares pins in the address; Shift-click or use Pin map centre, and Clear pin removes it.
 
 ### Fixed
 - Site: Database list links load on click instead of prefetching into the edge rate limit.
