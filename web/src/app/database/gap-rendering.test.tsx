@@ -25,6 +25,23 @@ const html = async (page: () => Promise<ReactNode>) => renderToStaticMarkup(awai
 
 beforeEach(() => store.loadCorpus.mockReset());
 
+test.each([
+  ["-rate", [77, 42]],
+  ["rate", [42, 77]],
+] as const)("the drops list sorts %s by the Wilson lower bound and shows observed shares", async (sort, expected) => {
+  const installs = ["install-aaa", "install-bbb", "install-ccc"];
+  store.loadCorpus.mockResolvedValue({ uploads: 3, dataAsOf: "2026-10-09T00:00:00.000Z", records: [
+    ...installs.map((install) => loot(install, 42, [{ itemId: 9, count: 1 }], 1)),
+    ...Array.from({ length: 1000 }, (_, n) => loot(installs[n % 3], 77, n < 600 ? [{ itemId: 9, count: 1 }] : [], n)),
+  ] });
+  const drops = await html(() => DropsPage({ searchParams: Promise.resolve({ sort }) }));
+  const rows = [...drops.matchAll(/<tr\b[^>]*>[\s\S]*?<\/tr>/g)].map(([row]) => row).filter((row) => row.includes("/database/npcs/"));
+  expect(rows).toHaveLength(2);
+  expect(rows.map((row) => Number(/\/database\/npcs\/(\d+)/.exec(row)![1]))).toEqual(expected);
+  expect(rows.find((row) => row.includes("/database/npcs/42"))).toContain("100.0% (43.9%");
+  expect(rows.find((row) => row.includes("/database/npcs/77"))).toContain("60.0% (56.9%");
+});
+
 test("unreadable storage reads unrecorded, never zero", async () => {
   store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], unreachable: true });
   const drops = await html(() => DropsPage({}));
