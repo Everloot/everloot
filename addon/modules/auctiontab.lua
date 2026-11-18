@@ -503,14 +503,17 @@ local function buildPanel(house)
   local panel = CreateFrame("Frame", "EverlootAuctionPanel", house, "BackdropTemplate")
   -- If a later control is unavailable, a partial panel must not cover the native house.
   panel:Hide()
-  panel:SetPoint("TOPLEFT", house, "TOPLEFT", 8, -60)
+  panel:SetPoint("TOPLEFT", house, "TOPLEFT", 8, -32)
   panel:SetPoint("BOTTOMRIGHT", house, "BOTTOMRIGHT", -8, 28)
   local level = house.GetFrameLevel and house:GetFrameLevel()
   if type(level) == "number" then panel:SetFrameLevel(level + 20) end
   if panel.EnableMouse then panel:EnableMouse(true) end
   if panel.SetBackdrop then
-    panel:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    -- The dialog texture has transparent pixels: it cannot hide Blizzard's categories,
+    -- search and results underneath this page. Use a solid surface below the house title.
+    panel:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
       tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+    panel:SetBackdropColor(0.08, 0.075, 0.065, 1)
   end
   panel.title = words(panel, "GameFontNormalLarge")
   panel.title:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -14)

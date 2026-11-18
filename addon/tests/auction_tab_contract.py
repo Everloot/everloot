@@ -590,7 +590,10 @@ openHouse()
 local T = Everloot.AuctionTab
 assert(T.tab and T.panel and not T.failed, 'the tab builds without the window file')
 local p = T.panel
-assert(p.backdrop.bgFile == 'Interface\\\\DialogFrame\\\\UI-DialogBox-Background', 'the game\\'s own dialog background')
+assert(p.backdrop.bgFile == 'Interface\\\\Buttons\\\\WHITE8X8' and p.bg[4] == 1,
+  'the active Everloot page must be opaque: native categories and results cannot bleed through')
+assert(p.points.TOPLEFT[4] == -32,
+  'the page covers the native search bar as well as the category/results area, below the house title')
 assert(p.title.text == 'Everloot' and rawget(p, 'crest') == nil, "the game's own heading")
 showPanel()
 Everloot.PriceLines = function() return STUB, { status = 'ready' } end

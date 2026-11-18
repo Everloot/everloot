@@ -569,6 +569,7 @@ Release candidate: live Forever acceptance is pending for the combined UI, disen
 - Addon: settings are grouped into General, Tooltips, Auction House, Helpers and Data Sharing in both modern and older game Options. Settings inside the Everloot window keep that window's appearance.
 
 ### Fixed
+- Addon: the Everloot auction page has an opaque background and covers the native search bar, so Blizzard's categories, search controls and auction rows cannot show through its text.
 - Addon: the native auction tab no longer anchors to itself or joins Blizzard's display-mode tab list. Clicking the selected Buy, Sell or Auctions tab can return directly from Everloot. A failed panel stays hidden and leaves one fallback scan action.
 
 ## [desktop-v0.1.23] - 2026-11-17
