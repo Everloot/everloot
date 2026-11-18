@@ -116,7 +116,7 @@ if (!app.requestSingleInstanceLock()) {
     onChange: () => broadcast(),
     log: (level, text) => engine.log(level, text),
   });
-  const appState = (): AppState => ({ version: app.getVersion(), platform: process.platform, dataFolder: data, notice: loaded.error, settings, foreverFolder: foreverSuggestion(settings.gameFolder, settings.keptGameFolder, realFs), engine: engine.snapshot(), update, updateProgress, staleScans: staleScans(knownScans()), account: accountInfo(data), builds: builds.status(), runRecords: siteReadsRuns(join(data, "site-collects.json"), settings.endpoint), addonUpdate });
+  const appState = (): AppState => ({ version: app.getVersion(), platform: process.platform, dataFolder: data, notice: loaded.error, settings, foreverFolder: foreverSuggestion(settings.gameFolder, settings.keptGameFolder, realFs), engine: engine.snapshot(), update, updateProgress, staleScans: staleScans(knownScans()), account: accountInfo(data), builds: builds.status(), links: jobs.links(engine.snapshot().files), runRecords: siteReadsRuns(join(data, "site-collects.json"), settings.endpoint), addonUpdate });
   const broadcast = () => {
     const s = appState();
     win?.webContents.send("state", s);
