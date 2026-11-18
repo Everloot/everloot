@@ -82,7 +82,10 @@ export default async function ArmoryPage(props: { searchParams: Promise<{ q?: st
     results(q, (p) => store.search(p, SEARCH_LIMIT)),
     // A guild hidden through /guilds/hide is left out; without the hide list no guild is listed.
     results(g, async (p) => {
-      const [hits, hidden] = await Promise.all([store.searchGuilds(p, SEARCH_LIMIT), playerStore().hiddenGuilds()]);
+      // Both reads settle before either failure is raised, so neither rejection is left unhandled.
+      const reads = [store.searchGuilds(p, SEARCH_LIMIT), (async () => playerStore().hiddenGuilds())()] as const;
+      await Promise.allSettled(reads);
+      const [hits, hidden] = await Promise.all(reads);
       return hits.filter((h) => !armoryGuildHidden(hidden, h.region, h.name));
     }),
   ]);

@@ -25,7 +25,11 @@ const load = cache(async (region: string, segment: string): Promise<{ guild: Arm
   try {
     const store = armoryStore();
     // The guild hide list (/guilds/hide) is read too; without it the page is withheld, never shown unchecked.
-    const [guild, roster, hidden] = await Promise.all([store.guild(region, slug), store.roster(region, slug), playerStore().hiddenGuilds()]);
+    // playerStore() can throw before returning a promise, so it runs inside an async function.
+    const reads = [store.guild(region, slug), store.roster(region, slug), (async () => playerStore().hiddenGuilds())()] as const;
+    // Let every read settle first: Promise.all alone would leave the later failures unhandled.
+    await Promise.allSettled(reads);
+    const [guild, roster, hidden] = await Promise.all(reads);
     return guild && !armoryGuildHidden(hidden, guild.region, guild.name) ? { guild, roster } : null;
   } catch {
     return "unreachable";
