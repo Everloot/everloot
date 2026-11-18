@@ -107,3 +107,13 @@ test("fewer than three trainer prices leave the training cost unrecorded", () =>
   expect(handleProfessionPath({ profession: "Alchemy", fromSkill: 1, toSkill: 5 }, facts.sightings, facts.prices, facts.derived))
     .toContain("Training for Minor Healing Potion unrecorded.");
 });
+
+test("trainer rows keep the trainer's NPC id and skill line when the addon sent them, and stay as before when it did not", () => {
+  const { trainers } = pathFactsFromRecords([
+    { kind: "trainer_seen", installId: "install-a", profession: "Herbalism", recipe: "Herbalism", requiredRank: 1, trainerNpcId: 1218, skillLineId: 182 },
+    { kind: "trainer_seen", installId: "install-b", profession: "Herbalism", recipe: "Herbalism", requiredRank: 1, trainerNpcId: 0, skillLineId: 1.5 },
+  ]);
+  expect(trainers[0]).toMatchObject({ trainerNpcId: 1218, skillLineId: 182 });
+  expect(trainers[1]).not.toHaveProperty("trainerNpcId");
+  expect(trainers[1]).not.toHaveProperty("skillLineId");
+});

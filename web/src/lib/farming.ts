@@ -1,5 +1,6 @@
 import { CLIENT_TAXONOMY } from "./items";
 import { agreedGatherKinds, objectSpawns, type ObjectSpawnRow } from "../../../kb/src/object-spawns";
+import { INDEPENDENT_INSTALLS } from "../../../kb/src/drop-rollup";
 import type { NpcRow } from "./world-lists";
 import type { ZoneSummary } from "./zones";
 
@@ -155,3 +156,71 @@ export const GATHERING: Record<string, { source: "herb" | "ore" | "leather" | "c
   tailoring: { source: "cloth", noun: "cloth", how: "Zones whose mobs dropped cloth in players' loot, once 3 installs agree on the drop." },
   "first-aid": { source: "cloth", noun: "cloth", how: "Zones whose mobs dropped cloth in players' loot, once 3 installs agree on the drop." },
 };
+
+/** Herbs: Trade Goods (class 7), subclass 9, as the committed taxonomy lists them. Ids only; names come at runtime. */
+export const HERB_IDS: readonly number[] = CLIENT_TAXONOMY.items.filter((r) => r[1] === TRADE_GOODS && r[2] === 9).map((r) => r[0]).sort((a, b) => a - b);
+
+/** The Herbalism skill line, as the addon's `trainer_seen` rows send it. */
+export const HERBALISM_SKILL_LINE = 182;
+
+/** One herb zone of the gathering guide: the `gatherAreas` row, the installs behind its spots, and the herbs looted from them. */
+export interface HerbZone extends FarmArea {
+  /** Distinct installs that opened an agreed herb object at one of this zone's spots. */
+  installs: number;
+  /** Herb item ids with a public loot frequency from the herb objects placed here, ascending. */
+  herbs: number[];
+}
+
+/**
+ * The herb zones of `gatherAreas`, each with the herbs players looted there: the items with a public loot frequency
+ * (3 installs, the drop rollup's rule) from the herb objects that have a spot in the zone, kept to `HERB_IDS`. A
+ * node's loot is the object's, not the zone's, so an object gathered in two zones gives both its herbs.
+ */
+export function herbZones(
+  rows: readonly ObjectSpawnRow[],
+  rates: readonly { sourceObjectId?: number; itemId: number; drops: number; public: boolean }[],
+  zones: readonly ZoneSummary[],
+): HerbZone[] {
+  const kinds = agreedGatherKinds([...rows]);
+  const herbSet = new Set(HERB_IDS);
+  const loot = new Map<number, Set<number>>();
+  for (const r of rates) {
+    if (!r.public || r.drops <= 0 || r.sourceObjectId === undefined || !herbSet.has(r.itemId)) continue;
+    loot.set(r.sourceObjectId, (loot.get(r.sourceObjectId) ?? new Set()).add(r.itemId));
+  }
+  const objects = new Map<number, Set<number>>();
+  for (const pin of objectSpawns([...rows]).pins) {
+    if (kinds.get(pin.objectId) === "herb") objects.set(pin.mapId, (objects.get(pin.mapId) ?? new Set()).add(pin.objectId));
+  }
+  return gatherAreas(rows, "herb", zones).map((area) => {
+    const here = objects.get(area.zone.mapId) ?? new Set<number>();
+    const installs = new Set(rows.filter((r) => r.mapId === area.zone.mapId && here.has(r.objectId)).map((r) => r.installId.trim()));
+    const herbs = [...new Set([...here].flatMap((id) => [...(loot.get(id) ?? [])]))].sort((a, b) => a - b);
+    return { ...area, installs: installs.size, herbs };
+  });
+}
+
+/** Each herb of `HERB_IDS` with the herb zones it was looted in, zones in the order `herbZones` gives them. */
+export function herbIndex(zones: readonly HerbZone[]): { itemId: number; zones: ZoneSummary[] }[] {
+  return HERB_IDS.map((itemId) => ({ itemId, zones: zones.filter((z) => z.herbs.includes(itemId)).map((z) => z.zone) }));
+}
+
+/**
+ * The trainers players saw teach a profession: `trainer_seen` rows that name their trainer (`trainerNpcId`, newer
+ * addons) on the skill line, or under the profession's English name when a row has no skill line. A trainer counts
+ * at 3 installs. Most installs first, then by id.
+ */
+export function professionTrainers(
+  rows: readonly { installId: string; profession: string; trainerNpcId?: number; skillLineId?: number }[],
+  skillLineId: number,
+  profession: string,
+): { npcId: number; installs: number }[] {
+  const byNpc = new Map<number, Set<string>>();
+  for (const r of rows) {
+    if (r.trainerNpcId === undefined || !r.installId.trim()) continue;
+    const onLine = r.skillLineId !== undefined ? r.skillLineId === skillLineId : r.profession.trim().toLowerCase() === profession.toLowerCase();
+    if (onLine) byNpc.set(r.trainerNpcId, (byNpc.get(r.trainerNpcId) ?? new Set()).add(r.installId.trim()));
+  }
+  return [...byNpc].filter(([, s]) => s.size >= INDEPENDENT_INSTALLS).map(([npcId, s]) => ({ npcId, installs: s.size }))
+    .sort((a, b) => b.installs - a.installs || a.npcId - b.npcId);
+}
