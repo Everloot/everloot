@@ -164,7 +164,7 @@ export default function AddonAuthorsPage() {
           [<C key="e">eventId</C>, <>The record&apos;s id within its install. With <C>installId</C> it names one window once.</>],
           [<C key="f">installId</C>, <>A pseudonym for the install: <C>pub-</C> and 32 hex. Stable for one install, never the addon&apos;s own id. It is absent when the server has no key to make one.</>],
           [<C key="g">sourceEvidence</C>, <><C>loot-api</C> when the game&apos;s loot API named the source. <C>empty-window</C> for a kill window with nothing in it, which the loot API cannot name: the addon took the one dead creature the player could loot, and the row has no items and no coin. The site counts only those two.</>],
-          [<C key="h">gatherSkill</C>, <>Optional, newer addons only: the player&apos;s own rank in the skill the cast used (Skinning here; Herbalism or Mining for a herb or ore), 1 to 500, without bonuses from gear or race. Absent when the client could not read it.</>],
+          [<C key="h">gatherSkill</C>, <>Optional, newer addons only: the player&apos;s own rank in the skill the cast used (Skinning here; Herbalism or Mining for a herb or ore), 1 to 500, with the rank bonus from race and gear added. Absent when the client could not read it.</>],
         ]}
       />
       <Callout kind="note">

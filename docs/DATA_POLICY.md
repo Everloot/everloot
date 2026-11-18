@@ -161,7 +161,7 @@ on), once per NPC, service and zone. When the player opens a herb, ore vein, che
 loot row carries the player's position, how it was opened (from the spell cast on it) and the object's
 name as the game showed it, taken only from a herb, ore or chest cast, so the target of any other spell (a
 player you healed, say) never becomes a name. A herb, ore or skinning window also carries the player's own rank in
-the skill the cast used (`gatherSkill`), as the game's profession book shows it, without bonuses from gear or race: a
+the skill the cast used (`gatherSkill`), as the game's profession book shows it, rank plus the bonus from race and gear: a
 number about the character, never a name, that goes wherever its loot row goes (the public corpus included). The
 gathering lists read it only as the lowest and middle rank among 3 or more installs. Where you stand when you only target or mouse over an NPC
 (`positionKind: "player"`) is never used as the NPC's place. A Polestar Recorder file's NPC windows become

@@ -339,13 +339,13 @@ GetProfessions = function() return 3, 5, nil, nil, nil end
 GetProfessionInfo = function(index) local p = book[index]; if p then return unpack(p) end end
 event('UNIT_SPELLCAST_SENT', 'player', 'Peacebloom', 'Cast-40', 2366)
 window('GameObject-0-1-2-3-1618-0000000060', { { 2447, 1 } })
-assert(last().lootType == 'gather' and last().gatherKind == 'herb' and last().gatherSkill == 75, 'the trained rank, not rank plus bonus')
+assert(last().lootType == 'gather' and last().gatherKind == 'herb' and last().gatherSkill == 90, 'rank plus bonus (75 + 15), what the node is checked against')
 event('UNIT_SPELLCAST_SENT', 'player', 'Copper Vein', 'Cast-41', 2575)
 window('GameObject-0-1-2-3-1731-0000000060', { { 2770, 1 } })
 assert(last().gatherKind == 'ore' and last().gatherSkill == 120)
 event('UNIT_SPELLCAST_SENT', 'player', 'Bloom', 'Cast-42', 2366)
 window('Creature-0-1-2-3-320-0000000001', { { 2447, 1 } })
-assert(last().lootType == 'skinning' and last().gatherSkill == 75, 'herb gathering on a creature is Herbalism')
+assert(last().lootType == 'skinning' and last().gatherSkill == 90, 'herb gathering on a creature is Herbalism, bonus included')
 event('UNIT_SPELLCAST_SENT', 'player', 'Wolf', 'Cast-43', 8613)
 event('UNIT_SPELLCAST_SUCCEEDED', 'player', 'Cast-43', 8613)
 window('Creature-0-1-2-3-321-0000000001', { { 783, 1 } })
@@ -374,6 +374,13 @@ GetProfessionInfo = function() error('unavailable') end
 assert(herbWindow(1) == nil)
 GetProfessionInfo = function() return 'Herbalism', 'icon', 501, 525, 2, 0, 182, 0 end
 assert(herbWindow(2) == nil)
+-- A bonus the client cannot give (missing or secret) counts as none: the rank alone is still a true lower bound.
+GetProfessionInfo = function() return 'Herbalism', 'icon', 75, 150, 2, 0, 182, nil end
+assert(herbWindow(6) == 75, 'no bonus value: the rank alone')
+issecretvalue = function(v) return v == 15 end
+GetProfessionInfo = function(index) local p = book[index]; if p then return unpack(p) end end
+assert(herbWindow(7) == 75, 'a secret bonus: the rank alone')
+issecretvalue = nil
 issecretvalue = function(v) return v == 75 end
 GetProfessionInfo = function(index) local p = book[index]; if p then return unpack(p) end end
 assert(herbWindow(3) == nil)
@@ -382,8 +389,8 @@ GetProfessions = function() error('unavailable') end
 assert(herbWindow(4) == nil)
 GetProfessions, GetProfessionInfo = nil, nil
 assert(herbWindow(5) == nil)
-assert(#rows() == count + 13)
+assert(#rows() == count + 15)
 """)
 counts = check_all(lua)
 # The two item_seen rows: the disenchanted bracers (with their level) and the dust it gave.
-assert counts == {"loot": 51, "item_seen": 2}, counts
+assert counts == {"loot": 53, "item_seen": 2}, counts

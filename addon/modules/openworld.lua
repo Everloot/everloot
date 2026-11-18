@@ -419,8 +419,9 @@ local function lootTypeOf(group, cast)
 end
 
 -- The player's own rank in the gathering skill the cast used, read the way the game's profession book reads it:
--- GetProfessions, then the rank and skill line GetProfessionInfo gives. The rank is the trained one, without the
--- bonus from gear or race. Nil when the cast was no gathering cast or the client cannot say; never guessed.
+-- GetProfessions, then the rank, skill line and rank bonus GetProfessionInfo gives. The value is rank plus bonus
+-- (race, gear), what a node's requirement is checked against and what the book shows as "rank (+bonus)". Nil when the
+-- cast was no gathering cast or the client cannot say; never guessed.
 local function gatherSkill(cast)
   local skillLine = cast and (cast.lootKind == "skinning" and GATHER_SKILL_LINES.skinning or GATHER_SKILL_LINES[cast.gatherKind])
   if not skillLine or type(GetProfessions) ~= "function" or type(GetProfessionInfo) ~= "function" then return nil end
@@ -430,8 +431,13 @@ local function gatherSkill(cast)
   for slot = 2, 6 do
     local index = E.Readable(got[slot])
     if type(index) == "number" then
-      local ok, _, _, rank, _, _, _, line = pcall(GetProfessionInfo, index)
-      if ok and E.Readable(line) == skillLine then return whole(E.Readable(rank), 1, 500) end
+      local ok, _, _, rank, _, _, _, line, bonus = pcall(GetProfessionInfo, index)
+      if ok and E.Readable(line) == skillLine then
+        rank, bonus = E.Readable(rank), E.Readable(bonus)
+        if type(rank) ~= "number" then return nil end
+        -- A bonus the client cannot read counts as none: the trained rank is still a true lower bound.
+        return whole(rank + (type(bonus) == "number" and bonus > 0 and bonus or 0), 1, 500)
+      end
     end
   end
   return nil

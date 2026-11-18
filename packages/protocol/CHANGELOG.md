@@ -13,7 +13,7 @@ required, or tightening a limit is a major release.
   installs disenchanted in it. Public record kinds and record protocol are unchanged.
 
 - 2.4.0 (record protocol 1.17.0): optional `loot.gatherSkill`, 1 to 500: on a gather or skinning window, the player's
-  own rank in Herbalism, Mining or Skinning (the skill the cast used), without bonuses from gear or race. The site can
+  own rank in Herbalism, Mining or Skinning (the skill the cast used), plus the rank bonus from race and gear. The site can
   then say what skill players had where they gathered a herb or ore. Absent from older addons, so earlier rows and
   readers are unaffected.
 
