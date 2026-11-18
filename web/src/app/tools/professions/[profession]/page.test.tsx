@@ -2,11 +2,12 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
 import { edgeDegraded } from "@/lib/cf-edge-cache";
+import { emptyMarket, foldMarket } from "../../../../../../kb/src/market";
 
-const store = vi.hoisted(() => ({ loadCorpus: vi.fn() }));
+const store = vi.hoisted(() => ({ loadCorpus: vi.fn(), loadMarket: vi.fn() }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
-  uploadStore: { loadCorpus: store.loadCorpus },
+  uploadStore: { loadCorpus: store.loadCorpus, loadMarket: store.loadMarket },
 }));
 // The rollup readers run for real unless a test makes one of them fail, so a page can see one read fail and another work.
 const fail = vi.hoisted(() => ({ world: false, rollups: false }));
@@ -51,7 +52,10 @@ const render = async (profession = "alchemy", search: Record<string, string> = {
   renderToStaticMarkup(await ProfessionPage({ params: Promise.resolve({ profession }), searchParams: Promise.resolve(search) }));
 const empty = { uploads: 0, records: [], dataAsOf: "2026-10-10T00:00:00.000Z" };
 
-beforeEach(() => { store.loadCorpus.mockReset(); fail.world = false; fail.rollups = false; });
+beforeEach(() => {
+  store.loadCorpus.mockReset(); fail.world = false; fail.rollups = false;
+  store.loadMarket.mockReset().mockResolvedValue({ state: null, dataAsOf: null });
+});
 
 test("the game file recipes show in skill brackets, labelled, with the item and its reagents", async () => {
   store.loadCorpus.mockResolvedValue(empty);
@@ -392,4 +396,45 @@ test("the recipe tables' spell and item links load on click, not all at once as 
   const links = [...html.matchAll(/<a href="\/database\/(?:spells|items)\/\d+"([^>]*)>/g)];
   expect(links.length).toBeGreaterThan(2);
   for (const [a, attrs] of links) expect(attrs, a).toContain('data-prefetch="false"');
+});
+
+const ledgerScans = (realm: string, house: string, installs = ["install-a", "install-b", "install-c"]) => installs.map((installId) => ({
+  kind: "auction_snapshot", installId, eventId: `${installId}:${realm}:${house}`, capturedAt: new Date().toISOString(), realm,
+  scanId: `${installId}-${realm}-${house}`, part: 1, parts: 1, items: [[2589, 1, 3, 100, 100]], house,
+}));
+const ledgerMarketText = (html: string) => /data-ahledger-market[^>]*>([^<]*)</.exec(html)?.[1];
+
+test("the AH Ledger margins follow the realm and house picker: the realm's region and ruleset, the house's faction", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  const state = foldMarket(emptyMarket(), [...ledgerScans("CAMWOW EU1 Realm 4 PvP", "Horde"), ...ledgerScans("CAMWOW EU1 Realm 4 PvP", "Alliance", ["install-d", "install-e", "install-f"]).slice(0, 2)], new Date());
+  store.loadMarket.mockResolvedValue({ state, dataAsOf: null });
+  // No house asked: the realm's busier faction house, Horde here.
+  const html = await render("alchemy", { realm: "camwow-eu1-realm-4-pvp", sort: "-net" });
+  expect(html).toContain("data-realm-house-picker");
+  expect(ledgerMarketText(html)).toBe("AH Ledger market: PvP Horde");
+  // The picker's links keep the page's other parameters and land back on the margins.
+  expect(html).toContain('href="/tools/professions/alchemy?sort=-net&amp;realm=camwow-eu1-realm-4-pvp&amp;house=alliance#ahledger-margins"');
+  expect(ledgerMarketText(await render("alchemy", { realm: "camwow-eu1-realm-4-pvp", house: "alliance" }))).toBe("AH Ledger market: PvP Alliance");
+  // The neutral house and a realm AH Ledger has no market for say so instead of reading a market.
+  expect(ledgerMarketText(await render("alchemy", { realm: "camwow-eu1-realm-4-pvp", house: "neutral" }))).toContain("no market for the neutral auction house");
+  expect(ledgerMarketText(await render("alchemy", { realm: "nowhere" }))).toBe("AH Ledger has no market for this realm.");
+  // A profession AH Ledger has no margins for neither shows the picker nor reads the market.
+  store.loadMarket.mockClear();
+  expect(await render("fishing")).not.toContain("data-realm-house-picker");
+  expect(store.loadMarket).not.toHaveBeenCalled();
+});
+
+test("an old margins link with ?market= still shows that market; with no realm or market the default", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  expect(ledgerMarketText(await render("alchemy", { market: "forever.rp.horde.eu" }))).toBe("AH Ledger market: RP Horde");
+  expect(ledgerMarketText(await render("alchemy", { market: "forever.hardcore.horde.us" }))).toBe("AH Ledger market: PvE Alliance");
+  expect(ledgerMarketText(await render("alchemy"))).toBe("AH Ledger market: PvE Alliance");
+  // A realm in the link wins over the old parameter, and the picker's links drop it.
+  const state = foldMarket(emptyMarket(), ledgerScans("CAMWOW US1 Realm 2 PvP", "Alliance"), new Date());
+  store.loadMarket.mockResolvedValue({ state, dataAsOf: null });
+  const html = await render("alchemy", { market: "forever.rp.horde.eu", realm: "camwow-us1-realm-2-pvp" });
+  expect(ledgerMarketText(html)).toBe("AH Ledger market: PvP Alliance");
+  const pickerLinks = [...html.matchAll(/href="([^"]*#ahledger-margins)"/g)].map((m) => m[1]);
+  expect(pickerLinks.length).toBeGreaterThan(0);
+  for (const link of pickerLinks) expect(link).not.toContain("market=");
 });

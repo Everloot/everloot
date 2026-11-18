@@ -8,13 +8,14 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { webApplicationJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import { uploadStore } from "@/lib/upload-store";
-import { AH_PATH, HOUSES, busiestHouse, findBoard, houseParam, houseSlug, itemHref, itemLabel, realmBoards, slugParam, type ItemNames } from "@/lib/auction-house";
+import { AH_PATH, busiestHouse, findBoard, itemHref, itemLabel, realmBoards, type ItemNames } from "@/lib/auction-house";
 import { DISENCHANT_BUILD, bandValues, chanceText, disenchantDeals, loadDisenchant, materialRows, type BandValue, type Deal, type MaterialRow } from "@/lib/disenchant";
 import { bandLabel, unitsRange, type BandYield } from "../../../../../kb/src/disenchant";
 import { INDEPENDENT_INSTALLS } from "../../../../../kb/src/drop-rollup";
 import { MARKET_RULE, formatCopper } from "../../../../../kb/src/market";
 import { auctionNames, itemArt, type ItemTip } from "../auctions/art";
 import { Contribute, ItemLink, RealmName } from "../auctions/parts";
+import { RealmHousePicker, realmHouseHref, realmHouseParams } from "../auctions/RealmHousePicker";
 
 // The choices live in the query string, so the page is rendered for each request (the rollups are cached by the store).
 export const dynamic = "force-dynamic";
@@ -33,8 +34,6 @@ export const metadata: Metadata = {
 
 type Search = Record<string, string | string[] | undefined>;
 
-const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] ?? "" : value ?? "");
-const field = "ctl w-full min-w-0 border border-edge bg-panel px-3 text-fg focus:border-accent";
 const plural = (n: number, word: string) => `${n.toLocaleString("en-US")} ${word}${n === 1 ? "" : "s"}`;
 const itemPage = (id: number) => `/database/items/${id}`;
 
@@ -45,8 +44,7 @@ function Value({ value, complete }: { value: number; complete: boolean }) {
 
 export default async function DisenchantingPage(props: { searchParams: Promise<Search> }) {
   const search = await props.searchParams;
-  const slug = slugParam(one(search.realm)) ?? null;
-  const asked = houseParam(one(search.house) || undefined);
+  const { realm: slug, house: asked } = realmHouseParams(search);
   const now = new Date();
   const [view, market] = await Promise.all([loadDisenchant(), uploadStore.loadMarket()]);
   const state = market.state;
@@ -175,24 +173,13 @@ export default async function DisenchantingPage(props: { searchParams: Promise<S
         actions={<Link href={AH_PATH} className="btn">Auction House</Link>}
       />
       <div className="space-y-8">
-        <Card>
-          <form action={PATH} method="get" className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-            <label className="block min-w-0 space-y-1 text-sm">
-              <span className="block text-muted">Realm</span>
-              <select name="realm" defaultValue={realm?.realm.slug ?? ""} className={field}>
-                <option value="">Choose a realm</option>
-                {realms.map((b) => <option key={b.realm.slug} value={b.realm.slug}>{b.realm.name}</option>)}
-              </select>
-            </label>
-            <label className="block min-w-0 space-y-1 text-sm">
-              <span className="block text-muted">Auction house</span>
-              <select name="house" defaultValue={house ? houseSlug(house) : houseSlug(HOUSES[0]!)} className={field}>
-                {HOUSES.map((h) => <option key={h} value={houseSlug(h)}>{h}</option>)}
-              </select>
-            </label>
-            <div><button type="submit" className="btn">Show values</button></div>
-          </form>
-        </Card>
+        <RealmHousePicker
+          realms={realms.map((b) => ({ slug: b.realm.slug, name: b.realm.name }))}
+          realm={slug}
+          house={house}
+          href={(r, h) => realmHouseHref(PATH, search, r, h)}
+          remember="redirect"
+        />
         <p data-disenchant-sources className="text-meta text-fg-2">
           {`Bands: found in game files, unconfirmed (build ${DISENCHANT_BUILD}). Results: disenchants recorded by the Everloot addon, shown once ${INDEPENDENT_INSTALLS} installs disenchanted in a band. Prices: players' auction scans, one auction house at a time.`}
         </p>
