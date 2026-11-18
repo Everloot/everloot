@@ -6,6 +6,7 @@ import { formatCopper } from "../../../../../kb/src/profession-path";
 import { cheapestPrices, planShopping, type ListedPrice, type PlannerRecipe, type SearchRecipe } from "@/lib/profession-planner";
 import { SELECT_CLASS } from "./controls";
 import { realmRuleset, RULESET_LABEL } from "@/lib/realms";
+import { auctionatorImportString, tsmImportString } from "@/lib/shopping-export";
 
 const KEY = "everloot.profession-shopping.market";
 const HOUSES = ["Alliance","Horde","Neutral"];
@@ -93,6 +94,14 @@ export default function ShoppingList({ profession, recipes, catalog = [], from =
   const pricedMaterials=plan?.reagents.filter(r=>byName[r.item.trim().toLowerCase()]!==undefined).length ?? 0;
   const subtotalText=pricedMaterials ? `${formatCopper(subtotal)} for ${pricedMaterials} of ${plan?.reagents.length ?? 0} materials` : "no prices yet";
   const total=!incompleteHouses && plan && plan.steps.length>0 && plan.gaps.length===0 && plan.copper!==null ? formatCopper(plan.copper) : "no price yet (list incomplete)";
+  const exportItems=plan?.reagents.map(r=>({itemId:ids.get(r.item.trim().toLowerCase()) ?? null,name:r.item,count:r.count})) ?? [];
+  const tsm=tsmImportString(exportItems);
+  const auctionator=auctionatorImportString(`${profession} ${start}-${end}`,exportItems);
+  const items=(n:number)=>`${n} ${n===1 ? "item" : "items"}`;
+  const left=(names:string[],why:string)=>names.length ? ` Left out (${why}): ${names.join(", ")}.` : "";
+  async function copyExport(text:string,done:string) {
+    try {await navigator.clipboard.writeText(text);setCopied(done);} catch {setCopied("Copy unavailable. Select the text below.");}
+  }
   const copy=[`${profession} shopping list, skill ${start}–${end}`,pricing,"Listed minima are medians of reporters' latest public scan day, not guaranteed live offers. Limited to the market API's most-listed items; absent prices stay unknown.",...materialLines,`Grand total: ${total}`,`Known material subtotal: ${subtotalText}`,"Counts use the agreed path's whole crafts; training and recipe item purchase costs are excluded.",...(plan?.steps.map(s=>`${s.fromSkill}–${s.toSkill}: ${s.recipe}, ${s.crafts} crafts. ${sourceText(s.recipe)}`) ?? []),...(plan?.gaps.map(g=>`No alternative agreed recipe for ${g.fromSkill}–${g.toSkill}.`) ?? [])].join("\n");
   return <section aria-labelledby="shopping-list" className="space-y-4">
     <SectionHeading id="shopping-list">Shopping list</SectionHeading>
@@ -128,8 +137,16 @@ export default function ShoppingList({ profession, recipes, catalog = [], from =
         {plan.gaps.map(g=><p key={g.fromSkill}>No alternative agreed recipe for {g.fromSkill}–{g.toSkill}. This range is not included in the materials.</p>)}
         {skipped.length>0 && <button type="button" className="btn" onClick={()=>setSkipped([])}>Restore skipped recipes ({skipped.length})</button>}
         <button type="button" className="btn" onClick={async()=>{try {await navigator.clipboard.writeText(copy);setCopied("Shopping list copied.");} catch {setCopied("Copy unavailable. Select the text below.");}}}>Copy shopping list</button>
+        <fieldset className="space-y-2"><legend>Export to an auction addon</legend>
+          <div className="flex flex-wrap gap-4">
+            <button type="button" className="btn" disabled={!tsm.text} onClick={()=>copyExport(tsm.text,`Copied for TradeSkillMaster: ${items(tsm.included)}, no quantities.${left(tsm.omitted,"no known item id")}`)}>Copy for TradeSkillMaster</button>
+            <button type="button" className="btn" disabled={!auctionator.text} onClick={()=>copyExport(auctionator.text,`Copied for Auctionator: ${items(auctionator.included)} with quantities.${left(auctionator.omitted,"name Auctionator cannot import")}`)}>Copy for Auctionator</button>
+          </div>
+          <p className="text-sm text-muted">TradeSkillMaster: open its Groups page, choose Import Group, paste and confirm. It makes a group of these items; groups hold no quantities. Auctionator: on the auction house&apos;s Shopping tab choose Import, paste and import. It makes the list &quot;{profession} {start}-{end}&quot; with an exact-name search and quantity per material. Nothing is uploaded.</p>
+        </fieldset>
         <p role="status" className="text-sm text-muted">{copied}</p>
         <details><summary className="cursor-pointer">Shopping list as text</summary><pre className="mt-2 whitespace-pre-wrap text-sm">{copy}</pre></details>
+        <details><summary className="cursor-pointer">Addon import strings as text</summary><p className="mt-2 text-sm">TradeSkillMaster</p><pre className="whitespace-pre-wrap break-all text-sm">{tsm.text || "No items with a known item id."}</pre><p className="mt-2 text-sm">Auctionator</p><pre className="whitespace-pre-wrap break-all text-sm">{auctionator.text || "No items to export."}</pre></details>
       </>}
     </Card>
   </section>;

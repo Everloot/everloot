@@ -84,3 +84,34 @@ test("ruleset choices show only matching realms including explicitly unconfirmed
  expect(realm.textContent).toContain("Unmapped Realm");
  expect(realm.textContent).not.toContain("CAMWOW US1 Realm 4 PvP");
 });
+test("export copies TradeSkillMaster and Auctionator import strings and says so in a status line",async()=>{
+ vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);
+ vi.stubGlobal("fetch",vi.fn());
+ const writeText=vi.fn().mockResolvedValue(undefined);Object.defineProperty(navigator,"clipboard",{value:{writeText},configurable:true});
+ const host=document.createElement("div");root=createRoot(host);
+ await act(async()=>root!.render(<ShoppingList catalog={catalog} profession="Alchemy" recipes={recipes} from={1} to={4} />));
+ const button=(text:string)=>[...host.querySelectorAll("button")].find(b=>b.textContent===text)!;
+ expect([...host.querySelectorAll("legend")].map(l=>l.textContent)).toContain("Export to an auction addon");
+ expect(host.textContent).toContain("choose Import Group, paste and confirm");
+ expect(host.textContent).toContain("Shopping tab choose Import");
+ await act(async()=>button("Copy for TradeSkillMaster").click());
+ expect(writeText).toHaveBeenLastCalledWith("i:1");
+ const status=[...host.querySelectorAll('[role="status"]')].map(s=>s.textContent).join(" ");
+ expect(status).toContain("Copied for TradeSkillMaster: 1 item, no quantities.");
+ await act(async()=>button("Copy for Auctionator").click());
+ expect(writeText).toHaveBeenLastCalledWith('Alchemy 1-4^"Iron Ore";;;;;;;;;;;#;;6');
+ expect([...host.querySelectorAll('[role="status"]')].map(s=>s.textContent).join(" ")).toContain("Copied for Auctionator: 1 item with quantities.");
+});
+test("export leaves out a material with no known item id from the TradeSkillMaster string and names it",async()=>{
+ vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);
+ vi.stubGlobal("fetch",vi.fn());
+ const writeText=vi.fn().mockResolvedValue(undefined);Object.defineProperty(navigator,"clipboard",{value:{writeText},configurable:true});
+ const host=document.createElement("div");root=createRoot(host);
+ await act(async()=>root!.render(<ShoppingList catalog={[]} profession="Alchemy" recipes={recipes} from={1} to={4} />));
+ const tsm=[...host.querySelectorAll("button")].find(b=>b.textContent==="Copy for TradeSkillMaster")!;
+ expect(tsm.disabled).toBe(true);
+ const auc=[...host.querySelectorAll("button")].find(b=>b.textContent==="Copy for Auctionator")!;
+ await act(async()=>auc.click());
+ expect(writeText).toHaveBeenLastCalledWith('Alchemy 1-4^"Iron Ore";;;;;;;;;;;#;;6');
+ expect(host.textContent).toContain("No items with a known item id.");
+});
