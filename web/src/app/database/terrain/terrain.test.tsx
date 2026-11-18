@@ -6,7 +6,8 @@ vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
   uploadStore: { loadCorpus: async () => ({ uploads: 0, records: [], dataAsOf: null }) },
 }));
-vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
+const links = vi.hoisted(() => [] as { href: string; prefetch?: boolean }[]);
+vi.mock("next/link", () => ({ default: ({ href, children, prefetch }: { href: string; children: ReactNode; prefetch?: boolean }) => { links.push({ href, prefetch }); return <a href={href}>{children}</a>; } }));
 
 import TerrainPage, { metadata } from "./page";
 import { terrainTypes } from "@/lib/terrain";
@@ -33,4 +34,12 @@ test("the terrain page has a section per terrain type with its zones, then the s
   expect(speed).toContain('href="/database/items/284102"');
   expect(speed).toContain("Set bonus (2 pieces)");
   expect(metadata.alternates?.canonical).toBe("/database/terrain");
+});
+
+test("the terrain page's hundreds of links navigate on click without prefetching", async () => {
+  // Prefetching every visible row sent a burst of RSC requests that the edge answered with 429s and a challenge.
+  links.length = 0;
+  renderToStaticMarkup(await TerrainPage());
+  expect(links.length).toBeGreaterThan(100);
+  expect(links.filter((l) => l.prefetch !== false).map((l) => l.href)).toEqual([]);
 });

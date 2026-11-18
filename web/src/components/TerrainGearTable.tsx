@@ -22,14 +22,14 @@ export interface GearNames {
 function Where({ gear, names, zone }: { gear: TerrainGear; names: GearNames; zone?: number }) {
   if (gear.terrain) {
     const parts = zone !== undefined && !gear.terrain.zones.includes(zone) ? gear.terrain.parts.get(zone) : undefined;
-    return <><Link href={`${TERRAIN_PATH}#${gear.terrain.slug}`} className={link}>{gear.terrain.name}</Link>{parts ? <span className="text-fg-2">{` · here: ${parts.join(", ")}`}</span> : null}</>;
+    return <><Link prefetch={false} href={`${TERRAIN_PATH}#${gear.terrain.slug}`} className={link}>{gear.terrain.name}</Link>{parts ? <span className="text-fg-2">{` · here: ${parts.join(", ")}`}</span> : null}</>;
   }
   if (gear.places) {
     const places = [
       ...gear.places.zones.flatMap((id) => { const z = zoneByMapId(id); return z ? [{ key: `z${id}`, href: zoneHref(id, z.name), name: z.name }] : []; }),
       ...gear.places.instances.flatMap((id) => (names.instances.has(id) ? [{ key: `i${id}`, href: instanceHref(id, names.instances.get(id) ?? null), name: names.instances.get(id) ?? `Instance ${id}` }] : [])),
     ];
-    return places.length ? <>{places.map((p, i) => <span key={p.key}>{i > 0 && ", "}<Link href={p.href} className={link}>{p.name}</Link></span>)}</> : <span className="text-fg-2">Unreleased places</span>;
+    return places.length ? <>{places.map((p, i) => <span key={p.key}>{i > 0 && ", "}<Link prefetch={false} href={p.href} className={link}>{p.name}</Link></span>)}</> : <span className="text-fg-2">Unreleased places</span>;
   }
   return <span className="text-fg-2">{NO_AREA}</span>;
 }
@@ -42,13 +42,13 @@ function Where({ gear, names, zone }: { gear: TerrainGear; names: GearNames; zon
 export default function TerrainGearTable({ gear, names, caption, zone, empty }: { gear: readonly TerrainGear[]; names: GearNames; caption: string; zone?: number; empty?: string }) {
   const columns: Column<TerrainGear>[] = [
     { key: "item", header: "Item", cell: (g) => {
-      if (!g.set) return <EntityLink kind="item" id={g.itemId} {...names.item(g.itemId)} />;
+      if (!g.set) return <EntityLink prefetch={false} kind="item" id={g.itemId} {...names.item(g.itemId)} />;
       // A set bonus: the set's name, then each piece, as the item pages list a set.
       const name = names.set(g.set.setId);
       return (
         <span className="inline-flex flex-col gap-1">
           <span className="inline-flex items-center gap-x-2" title={name ? GAME_NAME_TITLE.files : undefined}>{name ?? `Item set ${g.set.setId}`}{name ? <Badge tone="files" /> : null}</span>
-          <span className="inline-flex flex-wrap gap-x-3 gap-y-1">{g.set.pieces.map((id) => <EntityLink key={id} kind="item" id={id} {...names.item(id)} />)}</span>
+          <span className="inline-flex flex-wrap gap-x-3 gap-y-1">{g.set.pieces.map((id) => <EntityLink key={id} prefetch={false} kind="item" id={id} {...names.item(id)} />)}</span>
         </span>
       );
     } },
@@ -57,7 +57,7 @@ export default function TerrainGearTable({ gear, names, caption, zone, empty }: 
       const speed = speedLabel(g.speed);
       return (
         <span className="inline-flex flex-wrap items-center gap-x-2">
-          <Link href={`/database/spells/${g.spellId}`} title={spell ? GAME_NAME_TITLE.files : undefined} className={link}>{spell ?? `Spell ${g.spellId}`}</Link>
+          <Link prefetch={false} href={`/database/spells/${g.spellId}`} title={spell ? GAME_NAME_TITLE.files : undefined} className={link}>{spell ?? `Spell ${g.spellId}`}</Link>
           {spell ? <Badge tone="files" /> : null}
           {speed ? <span className="font-mono text-meta tabular-nums text-fg-2">{speed}</span> : null}
         </span>
