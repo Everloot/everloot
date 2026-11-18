@@ -211,8 +211,93 @@ S.frame.onEvent(S.frame, 'ADDON_LOADED', 'Blizzard_AuctionHouseUI')
 assert(S.hooked[AuctionHouseFrame.ItemSellFrame] and S.hooked[AuctionHouseFrame.CommoditiesSellFrame])
 """)
 
+# The bag list: which stacks this house pays less for than a vendor, and the page that shows them.
+for file in ("modules/shopping.lua", "modules/auctiontab.lua"):
+    lua.execute((root / file).read_text(encoding="utf-8"))
+lua.execute(r"""
+local E, S, T = Everloot, Everloot.SellCheck, Everloot.AuctionTab
+local function prices(data)
+  EverlootPricesDB.realms = { ['forever|alliance'] = { data = data, sum = E.Adler32(data), dataAsOf = '2026-11-17' } }
+  E:ResetPrices()
+end
+-- 300 vendor pays more (market 1s 4c, 95% of it under the 1s vendor price); 301 beats the vendor by less than the
+-- deposit; 302 sells well here; 303 has no price here; 304 is soulbound; 305 is grey; 306 the house will not take;
+-- 400 a vendor will not buy.
+prices('300,104,100,100,100,2026-11-17,3;301,110,100,100,100,2026-11-17,3;302,300,100,100,100,2026-11-17,3;'
+  .. '304,1,1,1,100,2026-11-17,3;305,1,1,1,100,2026-11-17,3;306,1,1,1,100,2026-11-17,3;400,1,1,1,100,2026-11-17,3')
+GetItemInfo = function(id)
+  local sell = id == 400 and 0 or 100
+  return 'Item ' .. id, 'item:' .. id, 1, 10, 1, '', '', 20, '', 123, sell, 7
+end
+local bag = {
+  { itemID = 300, stackCount = 20, quality = 1 }, { itemID = 301, stackCount = 10, quality = 1 },
+  { itemID = 302, stackCount = 5, quality = 1 }, { itemID = 303, stackCount = 5, quality = 1 },
+  { itemID = 304, stackCount = 1, quality = 2, isBound = true }, { itemID = 305, stackCount = 3, quality = 0 },
+  { itemID = 306, stackCount = 2, quality = 1 }, { itemID = 400, stackCount = 2, quality = 1 },
+  { itemID = 300, stackCount = 5, quality = 1 }, nil,
+}
+NUM_BAG_SLOTS = 0
+C_Container = {
+  GetContainerNumSlots = function(b) return b == 0 and 10 or 0 end,
+  GetContainerItemInfo = function(b, slot) return bag[slot] end,
+}
+ItemLocation = { CreateFromBagAndSlot = function(_, b, slot) return { bag = b, slot = slot } end }
+C_AuctionHouse = {
+  -- 5c a unit for the shortest auction.
+  CalculateItemDeposit = function(location, duration, count) assert(duration == 1); return 5 * count end,
+  IsSellItemValid = function(location) return bag[location.slot].itemID ~= 306 end,
+}
+E.auctionHouseOpen = true
+
+local found = S.BagCandidates()
+assert(#found.rows == 2, #found.rows)
+local first, second = found.rows[1], found.rows[2]
+assert(first.itemId == 300 and first.count == 25 and first.vendor == 2500 and first.auction == 2470 and first.reason == 'vendor',
+  'both stacks of 300 in one row, 95% of 25 x 104c against 25 x 1s')
+assert(second.itemId == 301 and second.vendor == 1000 and second.auction == 1045 and second.deposit == 50 and second.reason == 'deposit',
+  '45c over the vendor, 50c deposit')
+assert(found.vendor == 3500 and found.auction == 3515 and found.unpriced == 1)
+-- At the neutral house the 15% cut puts 301 under the vendor price too.
+E.auctionHouseKind = 'Neutral'
+EverlootPricesDB.realms['forever|neutral'] = EverlootPricesDB.realms['forever|alliance']
+E:ResetPrices()
+found = S.BagCandidates()
+assert(#found.rows == 2 and found.rows[1].itemId == 300 and found.rows[2].itemId == 301 and found.rows[2].reason == 'vendor')
+E.auctionHouseKind = nil
+-- Without the house's deposit the "barely" case is not guessed.
+C_AuctionHouse.CalculateItemDeposit = nil
+found = S.BagCandidates()
+assert(#found.rows == 1 and found.rows[1].itemId == 300)
+C_AuctionHouse.CalculateItemDeposit = function(location, duration, count) return 5 * count end
+
+-- The page in the Everloot auction house tab.
+AuctionHouseFrame = CreateFrame('Frame', 'AuctionHouseFrame')
+AuctionHouseFrame.Tabs = { CreateFrame('Button', 'Buy') }
+assert(T.Attach(AuctionHouseFrame))
+T.Show()
+local p = T.panel
+local function click(b) b.scripts.OnClick(b) end
+assert(p.vendorButton.text == 'Vendor these' and not p.vendor.page.shown and p.lookup.shown)
+click(p.vendorButton)
+local v = p.vendor
+assert(p.mode == 'vendor' and v.page.shown and not p.lookup.shown and not p.scanButton.shown and not p.shop.page.shown)
+assert(p.vendorButton.text == 'Price lookup' and p.modeButton.text == 'Shopping list')
+assert(v.rows[1].shown and v.rows[1].name.text == 'item:300' and v.rows[1].count.text == '25')
+assert(v.rows[1].why.text == 'vendor pays more' and v.rows[2].why.text == 'gain under deposit' and not v.rows[3].shown)
+assert(v.total.text:find('Vendoring these brings') and v.unpriced.text == '1 other item has no current price here.')
+assert(not v.empty.shown and v.caps.text:find('nothing is sold or posted'))
+-- Selling the stacks empties the list.
+for i = 1, 9 do if bag[i] and (bag[i].itemID == 300 or bag[i].itemID == 301) then bag[i] = nil end end
+T.Refresh()
+assert(v.empty.shown and not v.rows[1].shown and v.total.text == '')
+click(p.modeButton)
+assert(p.mode == 'shop' and p.shop.page.shown and not v.page.shown and p.vendorButton.text == 'Vendor these')
+click(p.vendorButton); click(p.vendorButton)
+assert(p.mode == 'lookup' and p.lookup.shown and not v.page.shown)
+""")
+
 source = (root / "modules/sellcheck.lua").read_text(encoding="utf-8")
-for call in ("PostItem", "PostCommodity", "CancelAuction", "PlaceBid", "SetAmount", "SetQuantity", "ConfirmPost"):
+for call in ("PostItem", "PostCommodity", "CancelAuction", "PlaceBid", "SetAmount", "SetQuantity", "ConfirmPost", "UseContainerItem", "PickupContainerItem"):
     assert call not in source, f"the check must never call {call}"
 assert "modules\\sellcheck.lua" in (root / "Everloot.toc").read_text(encoding="utf-8")
 print("Sell check contract: PASS")

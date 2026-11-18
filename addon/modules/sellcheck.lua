@@ -5,6 +5,8 @@
 -- deposit) after Blizzard updates it, through hooksecurefunc. Display only: it never changes a price and never posts,
 -- cancels or blocks Post. Everything Everloot is unsure of (no vendor price, a stale or thin market, an incomplete
 -- disenchant estimate) stays unsaid.
+-- S.BagCandidates applies the same comparison to the bags, at this house's market values, for the Everloot auction
+-- house tab's Vendor these page (modules/auctiontab.lua).
 
 local E = Everloot
 local S = {}
@@ -137,6 +139,89 @@ end
 --- The check is on unless the player turned it off (Esc > Options > AddOns > Everloot > Auction House).
 function S.On()
   return not (type(EverlootDB) == "table" and EverlootDB.sellCheck == false)
+end
+
+local function bagSlots(bag)
+  local ok, n = pcall(C_Container.GetContainerNumSlots, bag)
+  n = ok and E.Readable(n)
+  return whole(n) and n or 0
+end
+
+--- One bag slot's ItemLocation, or nil on a client without the mixin.
+local function slotLocation(bag, slot)
+  if not (ItemLocation and ItemLocation.CreateFromBagAndSlot) then return nil end
+  local ok, location = pcall(ItemLocation.CreateFromBagAndSlot, ItemLocation, bag, slot)
+  return ok and location or nil
+end
+
+--- What the shortest auction of this stack would cost to post, or nil when the house cannot say.
+local function stackDeposit(location, count)
+  if not (location and C_AuctionHouse and C_AuctionHouse.CalculateItemDeposit) then return nil end
+  local ok, deposit = pcall(C_AuctionHouse.CalculateItemDeposit, location, 1, count)
+  deposit = ok and E.Readable(deposit)
+  return whole(deposit) and deposit or nil
+end
+
+--- The bag items this house pays less for than a vendor: the stacks of each item whose current market value here,
+--- after the cut, is at or below the vendor price ("vendor"), or beats it by no more than the deposit of its shortest
+--- auction ("deposit"). Greys, items a vendor will not buy, items the house will not take (soulbound, quest) and items
+--- without a current, not-thin price at this house are left out; `unpriced` counts the last. Returns
+--- { rows = { { itemId, count, vendor, auction, deposit, reason } }, vendor, auction, unpriced }, the rows sorted by what
+--- vendoring gains over posting, and the totals of both. Reads only; sells and posts nothing.
+function S.BagCandidates()
+  local out = { rows = {}, vendor = 0, auction = 0, unpriced = 0 }
+  if not (C_Container and C_Container.GetContainerItemInfo and C_Container.GetContainerNumSlots) then return out end
+  local realm = realmName()
+  local cut = S.Cut(E:MarketHouse())
+  local canCheck = E.auctionHouseOpen and C_AuctionHouse and C_AuctionHouse.IsSellItemValid
+  local byItem, unpriced = {}, {}
+  for bag = 0, type(NUM_BAG_SLOTS) == "number" and NUM_BAG_SLOTS or 4 do
+    for slot = 1, bagSlots(bag) do
+      local ok, info = pcall(C_Container.GetContainerItemInfo, bag, slot)
+      local id = ok and type(info) == "table" and E.Readable(info.itemID)
+      local count = id and E.Readable(info.stackCount)
+      local quality = id and E.Readable(info.quality)
+      if whole(id) and whole(count) and count >= 1 and quality ~= 0 and not E.Readable(info.hasNoValue)
+        and not E.Readable(info.isBound) then
+        local location = slotLocation(bag, slot)
+        local postable = true
+        if canCheck and location then
+          local okValid, valid = pcall(C_AuctionHouse.IsSellItemValid, location, false)
+          postable = not okValid or E.Readable(valid) ~= false
+        end
+        local sell = postable and vendorUnit(id)
+        if sell then
+          local market = marketUnit(realm, id)
+          if market then
+            local row = byItem[id] or { itemId = id, count = 0, vendor = 0, auction = 0, deposit = 0, market = market }
+            byItem[id] = row
+            row.count = row.count + count
+            row.vendor = row.vendor + sell * count
+            row.auction = row.auction + math.floor(market * count * (1 - cut))
+            local deposit = stackDeposit(location, count)
+            if deposit then row.deposit = row.deposit + deposit else row.depositUnknown = true end
+          else
+            unpriced[id] = true
+          end
+        end
+      end
+    end
+  end
+  for _, row in pairs(byItem) do
+    if row.auction <= row.vendor then row.reason = "vendor"
+    elseif not row.depositUnknown and row.auction - row.vendor <= row.deposit then row.reason = "deposit" end
+    if row.reason then
+      out.rows[#out.rows + 1] = row
+      out.vendor, out.auction = out.vendor + row.vendor, out.auction + row.auction
+    end
+  end
+  for _ in pairs(unpriced) do out.unpriced = out.unpriced + 1 end
+  table.sort(out.rows, function(a, b)
+    local ga, gb = a.vendor - a.auction, b.vendor - b.auction
+    if ga ~= gb then return ga > gb end
+    return a.itemId < b.itemId
+  end)
+  return out
 end
 
 -- One text block per sell frame, in the empty space Blizzard leaves under its Post button.
