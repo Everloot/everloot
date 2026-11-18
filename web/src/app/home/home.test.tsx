@@ -84,7 +84,7 @@ test("the three columns: the player, the Ask box and the active character's buil
   expect(html).toMatch(/Playing<\/span><span class="[^"]*text-class-mage[^"]*">Jaina</);
   expect(html).toContain('aria-label="Switch character"');
   expect(html).toContain('bg-class-warrior');
-  expect(html).toMatch(/Thrall<\/span><span class="text-meta text-muted">Main</);
+  expect(html).toMatch(/>Thrall<\/span><span data-badge="neutral"[^>]*>Main</);
   expect(html).toContain('href="/changes"');
   expect(html).toContain("Loose fire");
   // Centre: the greeting the server can say, quick actions, the active character's builds only.
@@ -189,6 +189,67 @@ test("a new player: no handle, no character, the active character follows the ma
   expect(renderToStaticMarkup(await SignedInHome({}))).toContain(`name="character" value="${THRALL}"`);
 });
 
+test("characters first: the main character's card, then the alts, then builds; Latest from Forever after them", async () => {
+  const html = renderToStaticMarkup(await SignedInHome({}));
+  const centre = html.slice(html.indexOf('aria-label="Start"'), html.indexOf('aria-label="Latest from Forever"'));
+  const section = centre.slice(centre.indexOf('aria-labelledby="your-characters"'), centre.indexOf('aria-label="Builds for Jaina"'));
+  // The main character leads, as a card that opens its page, with its class, realm and saved-build count.
+  expect(section.indexOf(`href="/me/characters/${THRALL}"`)).toBeLessThan(section.indexOf(`href="/me/characters/${JAINA}"`));
+  expect(section).toContain("Warrior");
+  expect(section).toContain("No saved builds");
+  // Jaina is the alt, with her realm.
+  const alts = section.slice(section.indexOf('aria-label="Alts"'));
+  expect(alts).toContain("Jaina");
+  expect(alts).toContain("Mage · Pioneer");
+  expect(alts).not.toContain("Thrall");
+  // The characters sit above the builds, and the left rail no longer repeats them.
+  expect(centre.indexOf('id="your-characters"')).toBeLessThan(centre.indexOf('id="active-builds"'));
+  expect(html.indexOf('id="your-characters"')).toBe(html.lastIndexOf('id="your-characters"'));
+  expect(html).not.toContain("None yet");
+});
+
+test("with no main character the first character leads, unmarked", async () => {
+  profileRow = { ...profileRow!, main_character_id: null, active_character_id: null };
+  const html = renderToStaticMarkup(await SignedInHome({}));
+  const section = html.slice(html.indexOf('aria-labelledby="your-characters"'));
+  expect(section.indexOf(`href="/me/characters/${JAINA}"`)).toBeLessThan(section.indexOf(`href="/me/characters/${THRALL}"`));
+  expect(html).not.toContain('data-badge="neutral"');
+});
+
+test("no characters and no builds: one card with the ways in, no empty rails and never None yet", async () => {
+  auth.authQuery.mockImplementation(async (path: string) => (path.startsWith("user_profiles") ? [profileRow] : []));
+  const html = renderToStaticMarkup(await SignedInHome({}));
+  expect(html).not.toContain("None yet");
+  expect(html).not.toContain("Recent builds");
+  expect(html).not.toContain('id="active-builds"');
+  expect(html).not.toContain('aria-label="Alts"');
+  const card = html.slice(html.indexOf('aria-labelledby="your-characters"'), html.indexOf("</section>", html.indexOf('aria-labelledby="your-characters"')));
+  expect(card).toContain("Bring in your characters");
+  // The addon is the filled action; Battle.net goes to the account's existing integrations; the rest are links.
+  expect(card).toMatch(/<a href="\/addon" class="btn btn-primary[^"]*">Get the addon</);
+  expect(card).toMatch(/<a href="\/account#integrations" class="btn [^"]*">Connect Battle.net</);
+  expect(card).toContain('href="/me"');
+  expect(card).toContain('href="/upload"');
+  expect(card.match(/btn-primary/g)).toHaveLength(1);
+  // Latest from Forever still shows.
+  expect(html).toContain("Latest from Forever");
+  expect(html).toContain("Entry 0");
+});
+
+test("characters but no builds for the one being played: one link to plan a build, no empty builds section", async () => {
+  auth.authQuery.mockImplementation(async (path: string) => {
+    if (path.startsWith("user_profiles")) return [profileRow];
+    if (path.startsWith("build_characters")) return [{ id: JAINA, name: "Jaina", class_slug: "mage", realm: null, note: null }];
+    return [];
+  });
+  const html = renderToStaticMarkup(await SignedInHome({}));
+  expect(html).not.toContain("None yet");
+  expect(html).not.toContain('id="active-builds"');
+  expect(html).not.toContain("Recent builds");
+  expect(html).toMatch(/<a href="\/tools\/talents\/mage" class="btn [^"]*">Plan a build for Jaina</);
+  expect(html).not.toContain("Bring in your characters");
+  expect(html).not.toContain('aria-label="Alts"');
+});
 
 test("signed-in home exposes the same start jobs", async () => {
   const html = renderToStaticMarkup(await SignedInHome({}));
