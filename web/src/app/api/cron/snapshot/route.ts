@@ -184,7 +184,8 @@ export async function GET(req: Request) {
     }
     // Each realm's "Vendor these" lists (lib/vendor-these-store.ts), from the market and the game files' sell prices, which
     // are read here rather than on a page view. Like the auction reports it waits while the market is still catching up.
-    // It writes each realm apart and records an incomplete run, so the next run tries again; a failure is logged.
+    // It rebuilds at most hourly for a changed market (at once on a new UTC day or after an incomplete run, which the
+    // next run retries), writes each realm apart, and a failure is logged.
     let vendorThese: { written: boolean; realms?: number; failed?: number; unread?: number } | null = null;
     try { if (!(market.remaining ?? 0)) vendorThese = await writeVendorThese(); } catch (err) { console.error("vendor lists failed", err); }
     // A rollup with uploads left over is pending: the next run folds them even when no new upload arrived.

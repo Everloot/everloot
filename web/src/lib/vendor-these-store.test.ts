@@ -19,9 +19,8 @@ const market = async () => ({ state, dataAsOf: "2026-11-18T11:50:00.000Z" });
 const sell = (over: Partial<SellPrices> = {}) => async (): Promise<SellPrices> => ({ prices: new Map([[1, 120], [2, 10]]), names: new Map([[1, "Linen Cloth"]]), unread: new Set(), ...over });
 
 /** A bucket in memory: HEAD and GET answer from what was PUT; `failPut` paths answer a PUT with a 500. */
-function bucket(failPut: string[] = [], index?: { stamp: string }) {
+function bucket(failPut: string[] = []) {
   const files = new Map<string, { body: string; stamp: string | null }>();
-  if (index) files.set("/bucket/snapshots/vendor-these/index.json", { body: "{}", stamp: index.stamp });
   const fetch = vi.fn(async (input: RequestInfo | URL) => {
     const req = input as Request;
     const path = new URL(req.url).pathname;
@@ -63,32 +62,60 @@ test("only the first 40 rows are kept, with the full count", async () => {
   expect(horde.rows[0]!.itemId).toBe(144);
 });
 
-test("a complete run writes every realm and an index stamped with the market's snapshot", async () => {
+const INDEX = "/bucket/snapshots/vendor-these/index.json";
+const indexOf = (b: ReturnType<typeof bucket>) => JSON.parse(b.files.get(INDEX)!.body) as { builtAt: string; complete: boolean; dataAsOf: string | null; failed: number; unread: number };
+const marketAt = (dataAsOf: string) => async () => ({ state, dataAsOf });
+const minutes = (n: number) => new Date(now.getTime() + n * 60_000);
+
+test("a complete run writes every realm and an index with the market's snapshot and the build time", async () => {
   const b = bucket();
   expect(await writeVendorThese(now, { cloud, fetch: b.fetch, market, read: sell() })).toEqual({ written: true, realms: 2, failed: 0, unread: 0 });
   expect(b.read("forever").houses).toHaveLength(2);
   expect(b.read("elsewhere").houses[0]).toMatchObject({ house: "Alliance", candidates: 2, unread: 0 });
-  const stamp = b.files.get("/bucket/snapshots/vendor-these/index.json")!.stamp;
-  expect(stamp).toBe("2026-11-18T11:50:00.000Z;vendor-these-1;2026-11-18");
-  // The next run, with the same market on the same day, builds nothing.
+  expect(indexOf(b)).toMatchObject({ dataAsOf: "2026-11-18T11:50:00.000Z", builtAt: now.toISOString(), complete: true });
+  // The next run, with the same market, builds nothing.
   const read = vi.fn(sell());
-  expect(await writeVendorThese(now, { cloud, fetch: b.fetch, market, read })).toEqual({ written: false });
+  expect(await writeVendorThese(minutes(10), { cloud, fetch: b.fetch, market, read })).toEqual({ written: false });
   expect(read).not.toHaveBeenCalled();
-  // A new day rebuilds: a market goes stale by the calendar.
-  expect((await writeVendorThese(new Date("2026-11-19T00:10:00Z"), { cloud, fetch: b.fetch, market, read })).written).toBe(true);
 });
 
-test("sell prices that could not be read are counted, and the run is marked incomplete so the next one tries again", async () => {
+test("a changed market rebuilds at most once an hour", async () => {
+  const b = bucket();
+  await writeVendorThese(now, { cloud, fetch: b.fetch, market, read: sell() });
+  const read = vi.fn(sell());
+  // The market changes 10 and 59 minutes after the build: both wait.
+  expect(await writeVendorThese(minutes(10), { cloud, fetch: b.fetch, market: marketAt("2026-11-18T12:05:00.000Z"), read })).toEqual({ written: false });
+  expect(await writeVendorThese(minutes(59), { cloud, fetch: b.fetch, market: marketAt("2026-11-18T12:55:00.000Z"), read })).toEqual({ written: false });
+  expect(read).not.toHaveBeenCalled();
+  // An hour after the build, the newest market is built.
+  expect((await writeVendorThese(minutes(60), { cloud, fetch: b.fetch, market: marketAt("2026-11-18T12:55:00.000Z"), read })).written).toBe(true);
+  expect(read).toHaveBeenCalledOnce();
+  expect(indexOf(b)).toMatchObject({ dataAsOf: "2026-11-18T12:55:00.000Z", builtAt: minutes(60).toISOString() });
+});
+
+test("a new UTC day rebuilds right away, even within the hour: a market goes stale by the calendar", async () => {
+  const b = bucket();
+  const late = new Date("2026-11-18T23:55:00Z");
+  await writeVendorThese(late, { cloud, fetch: b.fetch, market, read: sell() });
+  const read = vi.fn(sell());
+  expect((await writeVendorThese(new Date("2026-11-19T00:05:00Z"), { cloud, fetch: b.fetch, market, read })).written).toBe(true);
+  expect(read).toHaveBeenCalledOnce();
+});
+
+test("sell prices that could not be read are counted, and the next run retries without waiting the hour", async () => {
   const b = bucket();
   const result = await writeVendorThese(now, { cloud, fetch: b.fetch, market, read: sell({ prices: new Map([[2, 10]]), unread: new Set([1]) }) });
   expect(result).toEqual({ written: true, realms: 2, failed: 0, unread: 3 });
   const horde = b.read("forever").houses.find((h) => h.house === "Horde")!;
   // Item 1 is left out and counted, never shown as a complete empty list.
   expect(horde).toMatchObject({ candidates: 2, unread: 1, total: 0, rows: [] });
-  expect(b.files.get("/bucket/snapshots/vendor-these/index.json")!.stamp).toContain(";incomplete");
+  expect(indexOf(b)).toMatchObject({ complete: false, unread: 3 });
+  // Ten minutes later, same market: the retry runs, and a complete build ends the retries.
   const read = vi.fn(sell());
-  expect((await writeVendorThese(now, { cloud, fetch: b.fetch, market, read })).written).toBe(true);
+  expect((await writeVendorThese(minutes(10), { cloud, fetch: b.fetch, market, read })).written).toBe(true);
   expect(read).toHaveBeenCalledOnce();
+  expect(indexOf(b).complete).toBe(true);
+  expect((await writeVendorThese(minutes(20), { cloud, fetch: b.fetch, market, read })).written).toBe(false);
 });
 
 test("one realm that fails to write leaves the others written, and the next run tries again", async () => {
@@ -97,8 +124,17 @@ test("one realm that fails to write leaves the others written, and the next run 
   expect(await writeVendorThese(now, { cloud, fetch: b.fetch, market, read: sell() })).toEqual({ written: true, realms: 2, failed: 1, unread: 0 });
   expect(b.read("elsewhere").houses).toHaveLength(1);
   expect(b.files.has("/bucket/snapshots/vendor-these/forever.json")).toBe(false);
-  expect(b.files.get("/bucket/snapshots/vendor-these/index.json")!.stamp).toContain(";incomplete");
+  expect(indexOf(b)).toMatchObject({ complete: false, failed: 1 });
   error.mockRestore();
+});
+
+test("an index that cannot be read waits for the next run instead of rebuilding", async () => {
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  const read = vi.fn(sell());
+  const fetch = vi.fn(async () => new Response(null, { status: 503 })) as unknown as typeof globalThis.fetch;
+  expect(await writeVendorThese(now, { cloud, fetch, market, read })).toEqual({ written: false });
+  expect(read).not.toHaveBeenCalled();
+  warn.mockRestore();
 });
 
 test("no market, or no store, writes nothing", async () => {

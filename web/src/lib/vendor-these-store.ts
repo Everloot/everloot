@@ -3,7 +3,7 @@ import { AwsClient } from "aws4fetch";
 import type { AuctionHouse } from "@everloot/protocol";
 import type { MarketState } from "../../../kb/src/market";
 import { HOUSES, realmBoards } from "./auction-house";
-import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
+import { STAMP, stampOf } from "./stored-view-freshness";
 import type { R2Config } from "./upload-store";
 import { VENDOR_SHOWN, vendorCandidates, vendorThese } from "./vendor-these";
 
@@ -15,7 +15,7 @@ import { VENDOR_SHOWN, vendorCandidates, vendorThese } from "./vendor-these";
  */
 const ROOT = "snapshots/vendor-these";
 const INDEX = `${ROOT}/index.json`;
-/** Names the stored shape; a file of another revision is rewritten by the next run. */
+/** Names the stored shape; an index of another revision makes the next run rebuild. */
 const REVISION = "vendor-these-1";
 
 export interface StoredVendorRow {
@@ -119,19 +119,49 @@ async function readSellPrices(ids: number[]): Promise<SellPrices> {
   return { prices, names, unread: read.unread };
 }
 
+/** At most one rebuild an hour for a changed market: each one reads every candidate's tooltip shard and writes every realm. */
+export const VENDOR_REBUILD_MS = 60 * 60_000;
+
+interface VendorIndex { version: 1; revision: string; dataAsOf: string | null; builtAt: string; complete: boolean }
+
 /**
- * Rebuild every realm's lists when the market rollup has changed, on a new UTC day (a market goes stale by the
- * calendar), or after a run that was incomplete. Each realm is written in its own try; the index is written last and,
- * when a realm failed or a sell price could not be read, stamped so the next run tries again. A realm that failed keeps
- * its last object, which carries its own snapshot time.
+ * Whether this run rebuilds, from the index the last build wrote: always when there is none, it is of another revision,
+ * or the last build was incomplete (the retry); at a new UTC day, since a market goes stale by the calendar; and for a
+ * changed market only once VENDOR_REBUILD_MS has passed since the last build. An index that cannot be read waits for
+ * the next run rather than rebuilding, as the other stored views do.
+ */
+async function rebuildDue(s: NonNullable<ReturnType<typeof storage>>, dataAsOf: string | null, now: Date): Promise<boolean> {
+  let res: Response;
+  try {
+    res = await s.request(INDEX, { method: "GET", headers: { "accept-encoding": "identity" } });
+  } catch (err) {
+    console.warn("vendor list index unreadable; skipping this run", err);
+    return false;
+  }
+  if (res.status === 404) return true;
+  if (!res.ok) {
+    console.warn(`vendor list index unreadable (${res.status}); skipping this run`);
+    return false;
+  }
+  let index: Partial<VendorIndex>;
+  try { index = await res.json() as Partial<VendorIndex>; } catch { return true; }
+  const builtAt = typeof index.builtAt === "string" ? Date.parse(index.builtAt) : NaN;
+  if (index.version !== 1 || index.revision !== REVISION || index.complete !== true || !Number.isFinite(builtAt)) return true;
+  if (new Date(builtAt).toISOString().slice(0, 10) !== now.toISOString().slice(0, 10)) return true;
+  return index.dataAsOf !== dataAsOf && now.getTime() - builtAt >= VENDOR_REBUILD_MS;
+}
+
+/**
+ * Rebuild every realm's lists when `rebuildDue` says so. Each realm is written in its own try; the index is written
+ * last, with the build time, and marked incomplete when a realm failed or a sell price could not be read, so the next
+ * run tries again. A realm that failed keeps its last object, which carries its own snapshot time.
  */
 export async function writeVendorThese(now = new Date(), deps: Deps & { market?: () => Promise<{ state: MarketState | null; dataAsOf: string | null }>; read?: (ids: number[]) => Promise<SellPrices> } = {}): Promise<{ written: boolean; realms?: number; failed?: number; unread?: number }> {
   const s = storage(deps);
   if (!s) throw new Error("the vendor lists need the cloud store");
   const market = await (deps.market ?? (async () => (await import("./upload-store")).uploadStore.loadMarket()))();
   if (!market.state) throw new Error("market unavailable");
-  const revision = `${REVISION};${now.toISOString().slice(0, 10)}`;
-  if (!await storedViewNeedsWrite(s.client, s.url(INDEX), market.dataAsOf, deps.fetch ?? fetch, revision)) return { written: false };
+  if (!await rebuildDue(s, market.dataAsOf, now)) return { written: false };
   const realms = await buildVendorLists(market.state, now, market.dataAsOf, deps.read ?? readSellPrices);
   let failed = 0;
   let unread = 0;
@@ -139,7 +169,7 @@ export async function writeVendorThese(now = new Date(), deps: Deps & { market?:
     unread += realm.houses.reduce((n, h) => n + h.unread, 0);
     try {
       if (!validSlug(slug)) throw new Error(`unusable realm slug ${JSON.stringify(slug)}`);
-      const put = await s.request(realmKey(slug), { method: "PUT", body: JSON.stringify(realm), headers: { "content-type": "application/json", [STAMP]: stampOf(market.dataAsOf, revision) } });
+      const put = await s.request(realmKey(slug), { method: "PUT", body: JSON.stringify(realm), headers: { "content-type": "application/json", [STAMP]: stampOf(market.dataAsOf, REVISION) } });
       if (!put.ok) throw new Error(`write failed (${put.status})`);
     } catch (err) {
       failed++;
@@ -147,10 +177,12 @@ export async function writeVendorThese(now = new Date(), deps: Deps & { market?:
     }
   }
   const complete = failed === 0 && unread === 0;
-  const index = { version: 1, dataAsOf: market.dataAsOf, builtAt: now.toISOString(), realms: realms.size, failed, unread };
+  const index: VendorIndex & { realms: number; failed: number; unread: number } = {
+    version: 1, revision: REVISION, dataAsOf: market.dataAsOf, builtAt: now.toISOString(), complete, realms: realms.size, failed, unread,
+  };
   const put = await s.request(INDEX, {
     method: "PUT", body: JSON.stringify(index),
-    headers: { "content-type": "application/json", [STAMP]: stampOf(market.dataAsOf, complete ? revision : `${revision};incomplete`) },
+    headers: { "content-type": "application/json", [STAMP]: stampOf(market.dataAsOf, REVISION) },
   });
   if (!put.ok) throw new Error(`vendor list index write failed (${put.status})`);
   return { written: true, realms: realms.size, failed, unread };

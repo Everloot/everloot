@@ -41,7 +41,6 @@ export const isPlainView = (q: AhQuery) => activeFilters(q) === 0 && !q.house &&
 /** The vendor list shows on a realm's unfiltered first page; a sort only orders the results above it. */
 const isVendorView = (q: AhQuery) => activeFilters(q) === 0 && q.page === 1;
 
-
 /** A house tab's item count: read out everywhere, drawn from 640 px up so the four tabs fit a phone. */
 function HouseCount({ n }: { n: number }) {
   return <span data-house-count className="sr-only tabular-nums text-muted sm:not-sr-only sm:ml-1">{` (${n.toLocaleString("en-US")})`}</span>;
