@@ -7,7 +7,7 @@ local E = Everloot
 -- The game passes the folder name as the first argument of each file; a folder extracted as Everloot-0.3.20 is still this addon.
 local addonName = ... or "Everloot"
 
-E.VERSION = "0.3.23"
+E.VERSION = "0.3.24"
 E.MAX_ROWS_PER_KIND = 2000
 -- Boss pull timing, dungeon and raid runs, and pull summaries (docs/design/specs/2026-11-02-pull-and-run-records-design.md).
 -- Off in every build made from this file, nightlies included: openworld.lua then writes encounter rows as before,
@@ -553,7 +553,7 @@ SlashCmdList["EVERLOOT"] = function(msg)
     print(E.Pulls.StatusLine())
   elseif msg == "scanprompt on" or msg == "scanprompt off" then
     EverlootDB.scanPrompt = (msg == "scanprompt on")
-    print("Everloot: the scan prompt at the auction house is " .. (EverlootDB.scanPrompt and "on" or "off")
+    print("Everloot: the first-visit auction introduction is " .. (EverlootDB.scanPrompt and "on" or "off")
       .. ". The Everloot scan button and /everloot scan still work.")
   elseif msg == "vendor on" or msg == "vendor off" then
     EverlootDB.autoVendor = (msg == "vendor on")

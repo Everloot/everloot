@@ -62,7 +62,7 @@ export default async function ObjectsPage(props: { searchParams?: Promise<Search
   const columns: Column<Row>[] = [
     { key: "name", header: "Object", sortable: true, cell: (o) => {
       const name = names.get(o.objectId);
-      const link = <Link href={`/database/objects/${o.objectId}`} className={LINK}>{name ?? `Object ${o.objectId}`}</Link>;
+      const link = <Link prefetch={false} href={`/database/objects/${o.objectId}`} className={LINK}>{name ?? `Object ${o.objectId}`}</Link>;
       // An object with no agreed name is listed by its id, with a line saying why.
       return name ? link : <span className="inline-flex flex-wrap items-baseline gap-x-2" title={NO_NAME}>{link}<span className="text-meta text-muted">no agreed name yet</span></span>;
     } },
@@ -75,7 +75,7 @@ export default async function ObjectsPage(props: { searchParams?: Promise<Search
   const empty = facts.unreachable ? <Unreadable />
     : q.q ? <>
         <NoMatches noun="objects" chips={[{ label: `${id !== null ? "Id" : "Name"}: ${q.q}`, href: here({ q: undefined }) }]} clearHref="/database/objects" />
-        {id !== null && <p className="pb-4 text-cell"><Link href={`/database/objects/${id}`} className={LINK}>Open object {id}</Link></p>}
+        {id !== null && <p className="pb-4 text-cell"><Link prefetch={false} href={`/database/objects/${id}`} className={LINK}>Open object {id}</Link></p>}
       </>
     : <NoObservations>No object has public loot observations yet; each needs loot windows from 3 installs.</NoObservations>;
 

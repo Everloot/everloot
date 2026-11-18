@@ -33,7 +33,7 @@ local function button(parent, text, x, y, width, action)
   b:SetHighlightTexture("Interface\\Buttons\\WHITE8X8")
   local highlight = b:GetHighlightTexture()
   if highlight then highlight:SetVertexColor(0.612, 0.941, 0.227, 0.12) end
-  b.text = label(b, text, 12, -8, "GameFontHighlightSmall")
+  b.text = label(b, text, 12, -8, "GameFontHighlight")
   b:SetScript("OnClick", action)
   return b
 end
@@ -155,7 +155,7 @@ local function build()
   header:SetScript("OnDragStart", function() f:StartMoving() end)
   header:SetScript("OnDragStop", function() f:StopMovingOrSizing() end)
   label(f, "EVERLOOT", 24, -20, "GameFontNormalLarge", COLORS.accent)
-  label(f, "Your plan. In your game.", 180, -23, "GameFontHighlightSmall", COLORS.muted)
+  label(f, "Your plan. In your game.", 180, -23, "GameFontHighlight", COLORS.muted)
   button(f, "Close", 638, -14, 64, function() f:Hide() end)
 
   f.tabs = {}
@@ -174,9 +174,9 @@ local function build()
   divider:SetSize(672, 1)
   divider:SetColorTexture(unpack(COLORS.line))
   f.heading = label(f, "", 24, -116, "GameFontNormalLarge")
-  f.hint = label(f, "", 24, -141, "GameFontHighlightSmall", COLORS.muted)
+  f.hint = label(f, "", 24, -141, "GameFontHighlight", COLORS.muted)
   f.hint:SetWidth(660)
-  label(f, "WEBSITE CODE OR LINK", 24, -178, "GameFontHighlightSmall", COLORS.muted)
+  label(f, "WEBSITE CODE OR LINK", 24, -178, "GameFontHighlight", COLORS.muted)
   local box = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
   box:SetPoint("TOPLEFT", 30, -200)
   box:SetSize(552, 30)
@@ -186,7 +186,7 @@ local function build()
   box:SetScript("OnEscapePressed", function(self) self:ClearFocus(); f:Hide() end)
   f.box = box
   f.import = button(f, "Import", 600, -200, 96, W.Import)
-  f.notice = label(f, "", 24, -242, "GameFontHighlightSmall", COLORS.accent)
+  f.notice = label(f, "", 24, -242, "GameFontHighlight", COLORS.accent)
   f.notice:SetWidth(660)
 
   local scroll = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")

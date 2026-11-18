@@ -1,5 +1,5 @@
 """
-The minimap button and the ask box: a button at the top-left of the minimap that opens the panel, and
+The minimap button and the ask box: a button on the minimap's edge, built and placed like other addons' buttons, that opens the panel, and
 a box in the panel that sends a question the way /ask does. A client with no minimap gets no button and
 no error, and the panel still opens from the command.
 """
@@ -98,6 +98,60 @@ def test_the_button_sits_on_the_minimap_and_opens_the_panel():
     assert lua.eval("Everloot.Options.page ~= nil") is True
 
 
+# A minimap with a size and a centre, frames that record their points and sizes, and a cursor to drag with.
+SIZED = """
+local F = getmetatable(CreateFrame('Frame'))
+function F.SetPoint(self, ...) local p = rawget(self, 'pts') or {}; p[#p + 1] = { ... }; self.pts = p end
+function F.ClearAllPoints(self) self.pts = {} end
+function F.SetSize(self, w, h) self.w, self.h = w, h end
+function F.SetTexCoord(self, ...) self.coords = { ... } end
+function F.SetFrameLevel(self, l) self.level = l end
+function F.RegisterForDrag(self, b) self.drag = b end
+width = 140
+Minimap = { IsObjectType = function() return true end, GetWidth = function() return width end,
+  GetHeight = function() return width end, GetCenter = function() return 500, 400 end, GetEffectiveScale = function() return 1 end }
+cursor = { 0, 0 }
+GetCursorPosition = function() return cursor[1], cursor[2] end
+function near(a, b) return math.abs(a - b) < 1e-6 end
+"""
+
+
+def test_the_button_is_built_and_placed_like_other_addons_buttons():
+    # LibDBIcon's button on this UI: 31 pixels at level 8, the gold tracking ring, the dark round background, an
+    # 18-pixel face; and its sums: on the ring 5 pixels past the minimap's edge.
+    lua = fresh(SIZED)
+    lua.execute("""
+    local b = Everloot.Minimap.Button()
+    assert(b.w == 31 and b.h == 31 and b.level == 8)
+    assert(b.ring.path == 'Interface\\\\Minimap\\\\MiniMap-TrackingBorder' and b.ring.w == 50 and b.ring.pts[1][1] == 'TOPLEFT')
+    -- The face is the crest's diamond alone, cut as the tooltip header cuts it, so no second ring sits inside the gold one.
+    assert(b.icon.w == 18 and near(b.icon.coords[1], 36 / 128) and near(b.icon.coords[2], 92 / 128))
+    -- At the top-left of the ring by default: 135 degrees, 75 pixels from the centre of a 140-pixel minimap.
+    local p = b.pts
+    assert(#p == 1 and p[1][1] == 'CENTER' and p[1][2] == Minimap and p[1][3] == 'CENTER')
+    assert(near(p[1][4], -75 * math.sqrt(0.5)) and near(p[1][5], 75 * math.sqrt(0.5)), p[1][4] .. ',' .. p[1][5])
+    -- Dragged around the ring like any other addon's button, and the angle is kept.
+    assert(b.drag == 'LeftButton')
+    b.scripts.OnDragStart(b)
+    cursor = { 600, 400 }
+    b.scripts.OnUpdate(b)
+    assert(near(EverlootDB.minimapAngle, 0) and near(b.pts[1][4], 75) and near(b.pts[1][5], 0) and #b.pts == 1)
+    b.scripts.OnDragStop(b)
+    assert(b.scripts.OnUpdate == nil, 'dropping it stops following the cursor')
+    -- Placed again at login, so a minimap resized by then still has the button on its edge.
+    width = 200
+    for _, hook in ipairs(Everloot.frame.hooks.OnEvent) do hook(Everloot.frame, 'PLAYER_LOGIN') end
+    assert(near(b.pts[1][4], 105) and #b.pts == 1)
+    """)
+    # A saved angle is where the next session puts it; a square minimap has it along the edge, not on a circle.
+    lua = fresh(SIZED + "GetMinimapShape = function() return 'SQUARE' end", "{ installId = 'abcd-1234', toggles = {}, records = {}, minimapAngle = 30 }")
+    lua.execute("""
+    local p = Everloot.Minimap.Button().pts[1]
+    local diagonal = math.sqrt(2 * 75 ^ 2) - 10
+    assert(near(p[4], 75) and near(p[5], 0.5 * diagonal), p[4] .. ',' .. p[5])
+    """)
+
+
 def test_hovering_the_button_explains_its_three_actions():
     lua = fresh(MINIMAP + TOOLTIP)
     lua.execute("""
@@ -162,7 +216,8 @@ def test_ask_left_the_settings_page_and_the_command_still_queues():
 if __name__ == "__main__":
     test_without_a_minimap_the_module_says_so_and_does_not_error()
     test_the_button_sits_on_the_minimap_and_opens_the_panel()
+    test_the_button_is_built_and_placed_like_other_addons_buttons()
     test_hovering_the_button_explains_its_three_actions()
     test_the_minimap_button_can_be_switched_off()
     test_ask_left_the_settings_page_and_the_command_still_queues()
-    print("Lua 5.1 minimap: absent-client fallback, one button, options and ask box")
+    print("Lua 5.1 minimap: absent-client fallback, one button built and placed like LibDBIcon's, dragged and kept, options and ask box")

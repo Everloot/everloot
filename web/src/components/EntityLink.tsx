@@ -12,11 +12,11 @@ export const entityHref = (kind: EntityKind, id: number) => `/database/${PAGE[ki
  * A link to a database page: the agreed name (and icon, when the page has one) in place of
  * "Item 1234". Only an entity with no agreed name falls back to its id.
  */
-export default function EntityLink({ kind, id, name, icon, ...aria }: { kind: EntityKind; id: number; name?: string | null; icon?: string | null; "aria-describedby"?: string }) {
+export default function EntityLink({ kind, id, name, icon, prefetch, ...aria }: { kind: EntityKind; id: number; name?: string | null; icon?: string | null; prefetch?: boolean; "aria-describedby"?: string }) {
   return (
     <span className="inline-flex items-center gap-2">
       {icon ? <GameIcon src={icon} size={18} /> : null}
-      <Link href={entityHref(kind, id)} {...aria} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{name || `${WORD[kind]} ${id}`}</Link>
+      <Link href={entityHref(kind, id)} prefetch={prefetch} {...aria} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{name || `${WORD[kind]} ${id}`}</Link>
     </span>
   );
 }

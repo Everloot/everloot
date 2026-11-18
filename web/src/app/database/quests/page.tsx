@@ -89,14 +89,14 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
   const itemName = (rid: number) => (shownNames ? shownItemName(rid, shownNames.agreed, shownNames.matched?.names, tips.get(rid))?.name : undefined) ?? `Item ${rid}`;
 
   const dash = <span className="text-muted">—</span>;
-  const npc = (n: number | null) => (n === null ? dash : <Link href={`/database/npcs/${n}`} className={LINK}>{npcs.get(n) ?? `NPC ${n}`}</Link>);
+  const npc = (n: number | null) => (n === null ? dash : <Link prefetch={false} href={`/database/npcs/${n}`} className={LINK}>{npcs.get(n) ?? `NPC ${n}`}</Link>);
   const columns: SparseColumn<QuestRow>[] = [
     { key: "name", header: "Name", sortable: true, cell: (x) => {
       const wiki = !x.title && titleOf(x);
       // Where a title comes from is in the link's hover card (and words for a screen reader), never a printed label.
       // The screen reader words follow the link, so its text is the title alone.
       return <>
-        <Link href={`/database/quests/${x.questId}`} className={LINK}>{titleOf(x) ?? `Quest ${x.questId}`}</Link>
+        <Link prefetch={false} href={`/database/quests/${x.questId}`} className={LINK}>{titleOf(x) ?? `Quest ${x.questId}`}</Link>
         {wiki && <span className="sr-only"> ({GAME_NAME_TITLE.wiki.toLowerCase()})</span>}
       </>;
     } },
@@ -112,8 +112,8 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
           {x.rewards.map((rid) => {
             const icon = tips.get(rid)?.icon;
             return icon
-              ? <Link key={rid} href={`/database/items/${rid}`} aria-label={itemName(rid)}><GameIcon src={icon} size={24} /></Link>
-              : <Link key={rid} href={`/database/items/${rid}`} className={`${LINK} mr-2`}>{itemName(rid)}</Link>;
+              ? <Link prefetch={false} key={rid} href={`/database/items/${rid}`} aria-label={itemName(rid)}><GameIcon src={icon} size={24} /></Link>
+              : <Link prefetch={false} key={rid} href={`/database/items/${rid}`} className={`${LINK} mr-2`}>{itemName(rid)}</Link>;
           })}
         </span>
       ),
@@ -155,7 +155,7 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
   const empty = facts.unreachable ? <Unreadable />
     : filters(q) > 0 ? <>
         <NoMatches noun="quests" chips={chips} clearHref="/database/quests" />
-        {id !== null && <p className="pb-4 text-cell"><Link href={`/database/quests/${id}`} className={LINK}>Open quest {id}</Link></p>}
+        {id !== null && <p className="pb-4 text-cell"><Link prefetch={false} href={`/database/quests/${id}`} className={LINK}>Open quest {id}</Link></p>}
       </>
     : <NoObservations>No quest has agreed facts yet; each shows here once 3 installs report it.</NoObservations>;
 

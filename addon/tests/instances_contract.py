@@ -63,12 +63,19 @@ local U = Everloot.Window
 assert(U.Open('collection'))
 local c = EverlootWindow.collection
 local function click(b) b.scripts.OnClick(b) end
+local function mark(row) if not row.done.shown then return '' end; return row.done.path:find('NotReady', 1, true) and 'missing' or (row.done.path:find('Ready', 1, true) and 'done') end
 click(c.sections.raids)
 assert(c.sections.raids.text == 'Dungeons & raids')
 assert(c.rows[3].detail.text == 'No kill recorded')
+-- As completionist lists draw them: the group and the instance in the game's heading gold without a mark, a boss
+-- with no kill a red cross.
+for i = 1, 2 do
+  assert(mark(c.rows[i]) == '' and c.rows[i].name.color[1] == 1 and c.rows[i].name.color[2] == 0.82, 'heading ' .. i)
+end
+assert(mark(c.rows[3]) == 'missing' and c.rows[3].name.color[2] ~= 0.82, 'a boss with no kill')
 click(c.scopes.account)
 assert(c.rows[3].detail.text:find('1 of 6', 1, true) and c.rows[3].detail.text:find('Velda', 1, true))
-assert(c.rows[4].done.text == 'done' and c.rows[4].detail.text:find('Last killed 2026-11-10', 1, true) and not c.rows[4].detail.text:find('T12', 1, true) and c.rows[4].detail.text:find('Velda', 1, true))
+assert(mark(c.rows[4]) == 'done' and c.rows[4].detail.text:find('Last killed 2026-11-10', 1, true) and not c.rows[4].detail.text:find('T12', 1, true) and c.rows[4].detail.text:find('Velda', 1, true))
 assert(c.rows[7].detail.text == 'No kill recorded', 'a key outside the roster does not count')
 assert(c.rows[8].detail.text == 'Found in game files, unconfirmed')
 -- An instance nobody has agreed on gets no entry of its own, but a live lockout the game reports there is still

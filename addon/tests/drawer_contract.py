@@ -54,6 +54,9 @@ function Frame.SetFixedFrameLevel(self, v) self.fixedLevel = v end
 function Frame.SetFixedFrameStrata(self, v) self.fixedStrata = v end
 function Frame.GetFrameLevel(self) return rawget(self, 'level') or 1 end
 function Frame.SetBackdrop(self, b) self.backdrop = b end
+function Frame.SetBackdropColor(self, ...) self.bg = { ... } end
+function Frame.SetBackdropBorderColor(self, ...) self.border = { ... } end
+function Frame.GetCenter(self) return rawget(self, 'cx'), rawget(self, 'cy') end
 function Frame.SetColorTexture(self, r, g, b, a) self.color = { r, g, b, a } end
 function Frame.SetWidth(self, w) self.width = w end
 function Frame.SetSize(self, w, h) self.width, self.height = w, h end
@@ -95,7 +98,7 @@ function hover(frame) for _, hook in ipairs(frame.hooks.OnEnter or {}) do hook(f
 MINIMAP = """
 Minimap = CreateFrame('Frame', 'Minimap', UIParent)
 GameTooltip = { lines = {}, shown = false }
-function GameTooltip:SetOwner(owner) self.owner, self.lines = owner, {} end
+function GameTooltip:SetOwner(owner, anchor) self.owner, self.anchor, self.lines = owner, anchor, {} end
 function GameTooltip:AddLine(text) self.lines[#self.lines + 1] = text end
 function GameTooltip:Show() self.shown = true end
 function GameTooltip:Hide() self.shown = false end
@@ -239,17 +242,55 @@ def test_libdbicon_buttons_are_collected_and_laid_out_and_nothing_else_is():
     assert "buttons: ready (2 addon buttons" in lua.eval("Everloot:Status()")
 
 
-def test_the_drawer_borrows_the_window_panel_when_the_window_is_loaded():
-    # window.lua loads before drawer.lua and exposes its backdrop; the drawer then looks like the rest of Everloot.
-    lua = fresh(window="styled = {}; Everloot.Window = { Backdrop = function(f) styled[#styled + 1] = f end, COLORS = { accent = { 0.1, 0.95, 0.2, 1 } } }")
+def test_the_drawer_is_a_slim_panel_in_the_window_colours():
+    # window.lua loads before drawer.lua and lends its colours; the panel is its canvas inside a one-pixel line, not
+    # the window's thick tooltip edge, which looked bulky around the rings.
+    lua = fresh(window="Everloot.Window = { COLORS = { accent = { 0.1, 0.95, 0.2, 1 }, canvas = { 0.01, 0.02, 0.03, 0.9 }, bronze = { 0.4, 0.3, 0.2, 1 } } }")
     lua.execute("""
     local D = Everloot.Drawer
-    assert(#styled == 1 and styled[1] == D.frame, 'the window styles the drawer panel')
-    assert(rawget(D.frame, 'backdrop') == nil, 'and the drawer sets no panel of its own')
+    local b = rawget(D.frame, 'backdrop')
+    assert(b and b.edgeSize == 1 and b.edgeFile == 'Interface\\\\Buttons\\\\WHITE8X8', 'a one-pixel edge')
+    assert(D.frame.bg[1] == 0.01 and D.frame.border[1] == 0.4, 'the window canvas and bronze')
     assert(D.frame.accent.color[1] == 0.1 and D.frame.accent.color[2] == 0.95, 'the bar takes the window accent')
     """)
     toc = (root / "Everloot.toc").read_text(encoding="utf-8")
     assert toc.index("modules\\window.lua") < toc.index("modules\\drawer.lua")
+
+
+def test_rows_are_evened_out():
+    # Eight buttons are two rows of four, not a row of six over a row of two.
+    lua = fresh(MINIMAP + TIMER + LIBDBICON + CHILDREN + "for i = 1, 6 do libdbicon.CreateIcon('More' .. i) end")
+    lua.execute("""
+    local D, crest = Everloot.Drawer, Everloot.Minimap.button
+    crest.mouse = true
+    hover(crest)
+    assert(#D.collected == 8)
+    local fifth = D.collected[5].points[1]
+    assert(fifth[4] == 5 and fifth[5] == -(5 + 38), 'the fifth starts the second row')
+    assert(D.frame.width == 5 * 2 + 4 * 38 and D.frame.height == 5 * 2 + 2 * 38, 'four columns, two rows')
+    """)
+
+
+def test_the_drawer_opens_away_from_the_minimap():
+    lua = fresh()
+    lua.execute("""
+    local D, crest = Everloot.Drawer, Everloot.Minimap.button
+    crest.mouse = true
+    -- Left of the minimap's centre: the drawer opens to the crest's left, the bar down its right edge.
+    Minimap.cx, crest.cx = 500, 420
+    hover(crest)
+    local p = D.frame.points
+    assert(#p == 1 and p[1][1] == 'TOPRIGHT' and p[1][2] == crest and p[1][3] == 'TOPLEFT')
+    assert(D.frame.accent.points[1][1] == 'TOPRIGHT' and #D.frame.accent.points == 2)
+    assert(GameTooltip.anchor == 'ANCHOR_BOTTOMRIGHT')
+    -- Dragged to the right of it: the drawer opens to the right, the bar down its left edge, the tooltip to the left.
+    crest.cx = 580
+    hover(crest)
+    p = D.frame.points
+    assert(#p == 1 and p[1][1] == 'TOPLEFT' and p[1][3] == 'TOPRIGHT', 'one anchor, the other side')
+    assert(D.frame.accent.points[1][1] == 'TOPLEFT' and #D.frame.accent.points == 2)
+    assert(GameTooltip.anchor == 'ANCHOR_BOTTOMLEFT')
+    """)
 
 
 def test_a_late_libdbicon_button_is_collected():
@@ -407,7 +448,7 @@ def test_another_button_collector_keeps_the_buttons():
     hover(crest)
     assert(#D.collected == 1 and D.collected[1] == beta, 'alpha is theirs now')
     assert(#alpha.points == before and alpha.parent == container, 'and is not moved into the drawer')
-    assert(D.frame.shown and #beta.points == 1 and D.frame.width == 8 * 2 + 38, 'the drawer holds the one it still has')
+    assert(D.frame.shown and #beta.points == 1 and D.frame.width == 5 * 2 + 38, 'the drawer holds the one it still has')
     """)
 
 
@@ -468,7 +509,9 @@ if __name__ == "__main__":
     test_existing_installs_keep_their_drawer_choice()
     test_the_toc_loads_the_drawer_after_the_minimap_button()
     test_libdbicon_buttons_are_collected_and_laid_out_and_nothing_else_is()
-    test_the_drawer_borrows_the_window_panel_when_the_window_is_loaded()
+    test_the_drawer_is_a_slim_panel_in_the_window_colours()
+    test_rows_are_evened_out()
+    test_the_drawer_opens_away_from_the_minimap()
     test_a_late_libdbicon_button_is_collected()
     test_hover_shows_the_drawer_until_the_mouse_leaves_and_clicks_are_unchanged()
     test_with_the_minimap_button_off_the_addon_buttons_stay_on_the_minimap()
@@ -477,4 +520,4 @@ if __name__ == "__main__":
     test_another_button_collector_keeps_the_buttons()
     test_a_client_without_libstub_minimap_or_timers_gets_no_error()
     test_the_one_time_notice_is_printed_once()
-    print("Lua 5.1 drawer: LibDBIcon buttons only, window panel, late buttons, hover and leave, clicks unchanged, off, another collector, missing APIs, one notice")
+    print("Lua 5.1 drawer: LibDBIcon buttons only, slim panel, even rows, opens away from the map, late buttons, hover and leave, clicks unchanged, off, another collector, missing APIs, one notice")
