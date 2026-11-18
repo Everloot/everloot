@@ -47,8 +47,10 @@ test("Tools holds the planners, most used first, then the card page", () => {
   expect(menuHrefs("Tools")).toEqual(["/tools/raid", "/tools/talents", "/tools/professions", "/tools"]);
 });
 
-test("Guides holds the guides, Legacy perks, lore and changes", () => {
-  expect(menuHrefs("Guides")).toEqual(["/guides", "/tools/legacy", "/lore", "/changes"]);
+test("Guides holds the guides that exist: dungeons and raids, Herbalism gathering, two docs guides, Legacy perks, lore and changes; the guides list only once one is reviewed", () => {
+  const today = ["/database/instances", "/tools/professions/herbalism/gathering", "/docs/guides/addon-directory", "/docs/guides/wiki", "/tools/legacy", "/lore", "/changes"];
+  expect(menuHrefs("Guides")).toEqual(today);
+  expect(menuHrefs("Guides", navItems({ reviewedGuides: true }))).toEqual(["/guides", ...today]);
 });
 
 test("Profile holds the account pages and the lists kept on this device; Settings and My builds follow their switches", () => {
