@@ -72,10 +72,20 @@ const text = () => container.textContent ?? "";
 const button = (label: string) => Array.from(container.querySelectorAll("button")).find((b) => b.textContent === label);
 const click = async (el: Element | undefined) => { expect(el).toBeTruthy(); await act(async () => (el as HTMLElement).click()); await settle(); };
 const stored = () => localStorage.getItem(CONVERSATIONS) ?? "";
+/** Types a question and sends it, without waiting for the answer. */
+const send = async (question: string) => {
+  const box = container.querySelector<HTMLTextAreaElement>("textarea")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(box, question);
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => box.form!.requestSubmit());
+};
 
 test("no key: Linen Cloth opens its own card and drop state, not a similar item's lore", async () => {
   await render(<ChatClient />);
-  await click(button("Where does Linen Cloth drop?"));
+  await send("Where does Linen Cloth drop?");
+  await settle();
   expect(calls.map((c) => c.url)).toContain("/search/suggest?q=Linen+Cloth&in=item");
   expect(calls.some((c) => c.url.startsWith("/api/tools/answer_sources"))).toBe(false);
   expect(text()).not.toContain("Red Linen Robe");
@@ -91,7 +101,8 @@ test("no key: Linen Cloth opens its own card and drop state, not a similar item'
 test("with a key: the model answers as before and the card sits beside it, its facts kept from the model", async () => {
   sessionStorage.setItem("everloot.chat.providers.v1", JSON.stringify([{ kind: "openrouter", model: "deepseek/deepseek-v4.1-flash", key: KEY }]));
   await render(<ChatClient />);
-  await click(button("Where does Linen Cloth drop?"));
+  await send("Where does Linen Cloth drop?");
+  await settle();
   expect(text()).toContain("Humanoids drop it.");
   expect(text()).toContain("Sell Price 13c");
   const sent = calls.filter((c) => c.url.startsWith("https://openrouter.ai/api/v1/chat/completions")).map((c) => String(c.init?.body));
@@ -149,7 +160,7 @@ test("stopping while the item is looked up writes no answer", async () => {
     ? new Promise((_, reject) => init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))))
     : base(input, init)));
   await render(<ChatClient />);
-  await act(async () => { button("Where does Linen Cloth drop?")!.click(); });
+  await send("Where does Linen Cloth drop?");
   await act(async () => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); });
   await settle();
   expect(text()).toContain("Stopped.");

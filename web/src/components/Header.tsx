@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { track } from "@/lib/analytics/track";
 import AccountControls from "./AccountControls";
+import { REPORT_BUG_EVENT } from "./BugReport";
 import GameVersionLabel from "./GameVersionLabel";
 import { SuggestField } from "./ui/SearchBar";
 import { TOOL_GROUPS, toolGroups, type ToolGroup } from "@/data/tools";
@@ -264,7 +265,8 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
               <label htmlFor="menu-search" className="sr-only">Search Everloot</label>
               <input id="menu-search" name="q" type="search" maxLength={200} placeholder="Search Everloot" className="w-full min-w-0 bg-transparent text-fg placeholder:text-muted focus:outline-none" />
             </form>
-            {/* The top bar's menus as groups, in the same order; More holds Chat and the pages outside the bar. */}
+            {/* The top bar's menus as groups, in the same order; More holds Chat, the pages outside the bar, and the bug
+                report, whose floating pill is hidden below md. Focus moves to Menu first, so closing the dialog returns there. */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-6">
               {phoneGroups(items).map((group) => (
                 <div key={group.label}>
@@ -273,6 +275,15 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
                     {group.links.map((link) => (
                       <li key={link.href}><Link href={link.href} onClick={closeAll} aria-current={place?.href === link.href ? "page" : undefined} className={menuLink}>{link.label}</Link></li>
                     ))}
+                    {group.label === "More" && (
+                      <li>
+                        <button type="button" aria-haspopup="dialog" className={`${menuLink} w-full text-left`} onClick={() => {
+                          closeAll();
+                          toggle.current?.focus();
+                          window.dispatchEvent(new Event(REPORT_BUG_EVENT));
+                        }}>Report a bug</button>
+                      </li>
+                    )}
                   </ul>
                 </div>
               ))}

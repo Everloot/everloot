@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import BugReport from "./BugReport";
+import BugReport, { REPORT_BUG_EVENT } from "./BugReport";
 
 let path = "/database/items/19019";
 vi.mock("next/navigation", () => ({ usePathname: () => path }));
@@ -91,14 +91,27 @@ test("a page change closes the dialog and the next report uses the new page", as
   expect(report().searchParams.get("page")).toBe("https://everloot.app/map");
 });
 
-test("chat moves the mobile report control above the composer and restores it on other pages", async () => {
-  path = "/chat";
-  await act(async () => root.render(<BugReport />));
-  expect(trigger().className).toContain("top-header");
-  expect(trigger().className).toContain("sm:top-auto");
-  expect(trigger().className).toContain("bottom-auto");
-  path = "/map";
-  await act(async () => root.render(<BugReport />));
-  expect(trigger().className).not.toContain("top-header");
-  expect(trigger().className).toContain("bottom-[");
+test("the pill is hidden below md on every page, chat included, and sits bottom-left from md", async () => {
+  for (const route of ["/chat", "/map", "/database/items/19019"]) {
+    path = route;
+    await act(async () => root.render(<BugReport />));
+    const classes = trigger().className.split(" ");
+    expect(classes, route).toContain("hidden");
+    expect(classes, route).toContain("md:inline-flex");
+    expect(classes, route).not.toContain("inline-flex");
+    expect(classes, route).toContain("left-4");
+    expect(trigger().className, route).not.toContain("top-header");
+  }
+});
+
+test("the phone menu's report event opens the same dialog, and closing it returns focus to what opened it", async () => {
+  const menuButton = document.createElement("button");
+  document.body.append(menuButton);
+  menuButton.focus();
+  await act(async () => { window.dispatchEvent(new Event(REPORT_BUG_EVENT)); });
+  expect(dialog().open).toBe(true);
+  expect(report().searchParams.get("page")).toBe("https://everloot.app/database/items/19019");
+  await act(async () => dialog().close());
+  expect(document.activeElement).toBe(menuButton);
+  menuButton.remove();
 });

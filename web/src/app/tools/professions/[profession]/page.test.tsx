@@ -32,7 +32,7 @@ vi.mock("@/lib/game-assets", async (importOriginal) => ({
   loadSpellNames: async () => ({ version: "1.60.1.70707", names: new Map([[2329, "Elixir of Minor Strength"]]) }),
 }));
 vi.mock("next/link", () => ({
-  default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a>,
+  default: ({ href, children, prefetch }: { href: string; children: ReactNode; prefetch?: boolean }) => <a href={href} data-prefetch={prefetch === undefined ? undefined : String(prefetch)}>{children}</a>,
 }));
 vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
@@ -384,4 +384,12 @@ test("search and skill range filter on the server and keep the page's other para
   const none = await render("alchemy", { q: "no recipe is called this" });
   expect(spellLinks(none)).toBe(0);
   expect(none).toContain("No Alchemy recipes match these filters.");
+});
+
+test("the recipe tables' spell and item links load on click, not all at once as the page opens", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  const html = await render();
+  const links = [...html.matchAll(/<a href="\/database\/(?:spells|items)\/\d+"([^>]*)>/g)];
+  expect(links.length).toBeGreaterThan(2);
+  for (const [a, attrs] of links) expect(attrs, a).toContain('data-prefetch="false"');
 });

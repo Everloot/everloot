@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import GameIcon from "@/components/game/GameIcon";
-import { Container, PageHeader } from "@/components/ui";
-import { TOOL_GROUPS, TOOL_LINES } from "@/data/tools";
+import { Container, PageHeader, SectionHeading } from "@/components/ui";
+import { TOOL_LINES, toolGroups } from "@/data/tools";
 import { classAndProfessionIcons, emblems, loadSiteAssets, poiIcons, type SiteAssets } from "@/lib/game-assets";
 import { trailFor } from "@/lib/breadcrumbs";
+import { guildsOn } from "@/lib/guild-switch";
 import type { PoiIcons } from "@/lib/map-marks";
 import { pageMetadata } from "@/lib/seo";
 
-const description = "Everloot's planners for WoW: Forever: fill a raid, plan a talent build, and work out a profession.";
+const description = "Every Everloot tool for WoW: Forever: auction prices and guild boards, the raid, talent and profession planners, guides, and the lists kept on your device.";
 
 export const metadata: Metadata = pageMetadata({ title: "WoW Forever Tools", description, path: "/tools" });
 
@@ -39,31 +40,40 @@ function toolIcons(assets: SiteAssets | null): Map<string, string> {
   return out;
 }
 
-/** The Tools menu as cards, in the menu's order (most used first). Lookup, Guides and Profile pages have their own
- *  menus; a tool hidden until polished has no card. */
+/** One tool as a card: its game icon (or initial), its name and its one line. */
+function ToolCard({ label, href, icon }: { label: string; href: string; icon: string | undefined }) {
+  return (
+    // The link's area covers the card, so the whole card opens the tool; the name is the link's text.
+    <li className="relative flex items-start gap-3 rounded-card border border-line bg-panel p-4 transition-colors focus-within:border-accent hover:border-accent">
+      {icon
+        ? <GameIcon src={icon} size={36} />
+        : <span aria-hidden="true" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-line bg-canvas font-semibold text-muted">{label.charAt(0)}</span>}
+      <div className="min-w-0 space-y-1">
+        <Link href={href} className="font-semibold text-fg after:absolute after:inset-0 after:content-['']">{label}</Link>
+        <p className="text-sm text-muted">{TOOL_LINES[href]}</p>
+      </div>
+    </li>
+  );
+}
+
+/** Every tool the header offers, as cards under the header's group names (Lookup, Tools, Guides, Profile), in the
+ *  menus' order. A tool hidden until polished has no card; with the guild switch on, Guilds replaces the guild board. */
 export default async function ToolsPage() {
   const icons = toolIcons(await loadSiteAssets());
-  const links = TOOL_GROUPS.find((g) => g.title === "Tools")!.links;
+  const groups = toolGroups(guildsOn()).filter((g) => g.links.length > 0);
   return (
     <Container>
       <PageHeader title="Tools" lede={description} trail={trailFor("/tools")!} />
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {links.map((l) => {
-          const icon = icons.get(l.href);
-          return (
-            // The link's area covers the card, so the whole card opens the tool; the name is the link's text.
-            <li key={l.href} className="relative flex items-start gap-3 rounded-card border border-line bg-panel p-4 transition-colors focus-within:border-accent hover:border-accent">
-              {icon
-                ? <GameIcon src={icon} size={36} />
-                : <span aria-hidden="true" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-line bg-canvas font-semibold text-muted">{l.label.charAt(0)}</span>}
-              <div className="min-w-0 space-y-1">
-                <Link href={l.href} className="font-semibold text-fg after:absolute after:inset-0 after:content-['']">{l.label}</Link>
-                <p className="text-sm text-muted">{TOOL_LINES[l.href]}</p>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="space-y-10">
+        {groups.map((group) => (
+          <section key={group.title} aria-labelledby={`tools-${group.title.toLowerCase()}`}>
+            <SectionHeading id={`tools-${group.title.toLowerCase()}`}>{group.title}</SectionHeading>
+            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {group.links.map((l) => <ToolCard key={l.href} label={l.label} href={l.href} icon={icons.get(l.href)} />)}
+            </ul>
+          </section>
+        ))}
+      </div>
     </Container>
   );
 }

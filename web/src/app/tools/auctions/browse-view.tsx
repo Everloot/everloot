@@ -192,7 +192,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
       key: "name", header: "Item", sortable: true,
       cell: ({ row }) => <ItemLink id={row.value.itemId} href={itemHref(row.realm, row.value.itemId)} tip={tips.get(row.value.itemId)} names={names} />,
     },
-    ...(showRealm ? [{ key: "realm", header: "Realm", nowrap: true, cell: ({ row }: BrowseRow) => <Link href={ahHref(realmHref(row.realm), { house: q.house, region: q.region })} className="text-fg-2 hover:text-fg hover:underline underline-offset-4"><RealmName name={row.realm.name} /></Link> }] : []),
+    ...(showRealm ? [{ key: "realm", header: "Realm", nowrap: true, cell: ({ row }: BrowseRow) => <Link prefetch={false} href={ahHref(realmHref(row.realm), { house: q.house, region: q.region })} className="text-fg-2 hover:text-fg hover:underline underline-offset-4"><RealmName name={row.realm.name} /></Link> }] : []),
     ...(showRealm ? [{ key: "region", header: "Region", nowrap: true, cell: ({ row }: BrowseRow) => REGION_LABEL[realmRegion(row.realm.name) ?? "unknown"] }] : []),
     // Every row is one house's price; with every house shown, the row says which.
     ...(!q.house ? [{ key: "house", header: "House", nowrap: true, cell: ({ row }: BrowseRow) => row.house }] : []),
