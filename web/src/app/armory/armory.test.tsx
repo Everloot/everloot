@@ -11,6 +11,7 @@ vi.mock("next/link", () => ({
 }));
 vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
+  permanentRedirect: (to: string) => { throw new Error(`NEXT_REDIRECT 308 ${to}`); },
   usePathname: () => "/armory", useRouter: () => ({ push: () => {} }), useSearchParams: () => new URLSearchParams(),
 }));
 
@@ -171,10 +172,9 @@ describe("the guild page", () => {
     expect(out).toContain(">Velkara Duskmantle<");
   });
 
-  test("a single-word guild slug has a page, and the hub finds it", async () => {
+  test("a single-word guild slug has a page", async () => {
     mem.putGuild(armoryGuild({ slug: "wardens", name: "Wardens" }), []);
     expect(await html(pages.guild("eu", "wardens"))).toContain("Wardens");
-    expect(await html(pages.hub({ guild: "war" }))).toContain('href="/armory/eu/guilds/wardens"');
   });
 });
 
@@ -196,23 +196,25 @@ describe("the boards", () => {
 });
 
 describe("the hub", () => {
-  test("counts by region and ruleset, links the boards, the forms and searches characters and guilds", async () => {
-    const out = await html(pages.hub({ q: "vel", guild: "emb" }));
+  test("counts by region and ruleset, links the boards and the forms, and sends searches to Players and Guilds", async () => {
+    const out = await html(pages.hub());
     expect(out).toContain('href="/armory/rankings/item-level"');
     expect(out).toContain('href="/armory/rankings/gear-score"');
     expect(out).toContain('href="/armory/rankings/honorable-kills"');
     expect(out).toContain('href="/armory/hide"');
     expect(out).toContain('href="/armory/submit"');
-    expect(out).toContain('href="/armory/eu/velkara-duskmantle"');
-    expect(out).toContain('href="/armory/eu/guilds/ember-wardens"');
+    expect(out).toContain('href="/players"');
+    expect(out).toContain('href="/guilds"');
+    expect(out).not.toContain('role="search"');
     expect(out).toContain("Read 2026-11-09 11:30 UTC");
-    expect(await html(pages.hub({ q: "v1" }))).toContain("Type 2 to 24 letters");
-    // A surname, or the full "First Surname", finds the character too.
-    for (const q of ["dusk", "Velkara Duskmantle", " velkara  dusk "]) expect(await html(pages.hub({ q }))).toContain('href="/armory/eu/velkara-duskmantle"');
-    mem.putCharacter(armoryCharacter({ slug: "élodie-brún", name: "Élodie", surname: "Brún" }));
-    expect(await html(pages.hub({ q: "Élo" }))).toContain('href="/armory/eu/%C3%A9lodie-br%C3%BAn"');
     holder.store = broken();
     expect(await html(pages.hub())).toContain(STORAGE_UNREACHABLE);
+  });
+
+  test("an old search address redirects to the one search box: characters to /players, guilds to /guilds", async () => {
+    await expect(pages.hub({ q: " Velkara Dusk " })).rejects.toThrow("NEXT_REDIRECT 308 /players?q=Velkara%20Dusk");
+    await expect(pages.hub({ guild: "emb" })).rejects.toThrow("NEXT_REDIRECT 308 /guilds?q=emb");
+    await expect(pages.hub({ q: "Élo" })).rejects.toThrow("NEXT_REDIRECT 308 /players?q=%C3%89lo");
   });
 });
 

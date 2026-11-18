@@ -29,7 +29,7 @@ export function navItems({ guilds = false, players = false, profiles = false, sa
   const groups = toolGroups(guilds);
   const catalogue = (title: ToolGroup) => groups.find((g) => g.title === title)?.links ?? [];
   return [
-    { label: "Lookup", links: [...(players ? [{ label: "Characters", href: "/players" }] : []), ...catalogue("Lookup")] },
+    { label: "Lookup", links: [...(players ? [{ label: "Players", href: "/players" }] : []), ...catalogue("Lookup")] },
     {
       label: "Database",
       links: [
@@ -103,8 +103,8 @@ function SearchIcon() {
  * builds to the avatar menu (EVERLOOT_SAVED_BUILDS); `accountSwitching` is true with Better Auth (EVERLOOT_AUTH_V2),
  * which can hold several accounts on one browser; `profiles` is EVERLOOT_PROFILES, without which the avatar menu
  * never asks for the player's shell. With it, the menu fetches the player from /api/me/shell itself, and Profile lists
- * Settings. `guilds` is EVERLOOT_GUILDS: Lookup then offers Guilds in place of the guild board. `players` is
- * EVERLOOT_PLAYER_PAGES: Lookup then starts with the character search.
+ * Settings. `guilds` is EVERLOOT_GUILDS or the armory: Lookup then offers Guilds in place of the guild board. `players`
+ * is EVERLOOT_PLAYER_PAGES or the armory: Lookup then starts with Players, the one character search.
  */
 export default function Header({ savedBuilds = false, profiles = false, accountSwitching = false, guilds = false, players = false }: {
   savedBuilds?: boolean;

@@ -24,6 +24,8 @@ test("the armory is an ad-free path, so the ad script never loads on it", () => 
   for (const path of ["/armory", "/armory/us/a-character", "/armory/eu/guilds/a-guild", "/armory/guilds", "/armory/rankings/item-level", "/armory/submit"]) {
     expect(isAdFreePath(path), path).toBe(true);
   }
+  // Players and Guilds show armory rows next to the addon's, so they are ad-free too.
+  for (const path of ["/players", "/players/opt-out", "/guilds", "/guilds/forever-pioneer/night-watch"]) expect(isAdFreePath(path), path).toBe(true);
   expect(isAdFreePath("/armoryx")).toBe(false);
   expect(isAdFreePath("/database/items/954")).toBe(false);
 });
