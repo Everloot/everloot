@@ -380,6 +380,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - MCP: Price answers identify their auction house, with an unknown faction when only the realm is recorded.
 
 ### Changed
+- Addon: easier reading in the Everloot window, settings, auction house tab and plan workspace: words use the game's own Friz Quadrata and nothing is smaller than 12 px (was 10 to 11 px, mostly in Arial Narrow); Arial Narrow stays only for figures, dates and the tight Home lists, also at 12 px. Home's character columns and the Collection list were re-spaced so the larger text still fits. Home's Missing list now sits under the realm line, so a long class or realm name ("CAMWOW US1 Realm 4 PvP") no longer runs into it. Needs an in-game check before release.
+- Addon: the minimap button is built like every other addon's (LibDBIcon's gold ring, dark background and the crest's diamond) and sits on the minimap's edge at the top-left instead of off its corner; drag it around the edge to move it, and the spot is kept. The button drawer is a slimmer panel with a one-pixel edge, evens its rows (eight buttons are two rows of four) and opens on the side away from the map. Needs an in-game check before release.
 - Site: drop rates restart from addon 0.3.24 (2026-11-17): only loot windows recorded after the release count, now that empty corpses are recorded too, so sources show fewer public rates until new windows build up.
 - Site: the addon is offered as a regular release from 0.3.24: the home, addon and upload pages no longer call it an Alpha.
 - Site: Lore now pairs stories behind Forever’s world with illustrated category links, keeps search above both columns, and shows the full hero art.
