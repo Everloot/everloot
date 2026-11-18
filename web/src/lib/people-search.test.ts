@@ -190,4 +190,31 @@ describe("armory characters", () => {
     search.mockRejectedValue(new Error("down"));
     expect((await peopleSearch("thrall")).characters.total).toBe(2);
   });
+
+  describe("the on-demand lookup", () => {
+    const found = { region: "us", slug: "nera-ashcombe", name: "Nera", surname: "Ashcombe", level: 22, class: "Mage", race: "Human", ruleset: "PvP", guildName: null };
+
+    test("a full name nobody stored is looked up once, and its hit is the one row", async () => {
+      on();
+      vi.stubEnv("EVERLOOT_ARMORY", "1");
+      const lookup = vi.fn(async () => found);
+      const { characters } = await peopleSearch("  Nera   Ashcombe ", undefined, lookup);
+      expect(lookup).toHaveBeenCalledExactlyOnceWith("Nera   Ashcombe");
+      expect(characters.results).toEqual([{ type: "character", label: "Nera Ashcombe", href: armoryCharacterPath("us", "nera-ashcombe"), meta: "Level 22 Mage · US PvP", exact: true }]);
+    });
+
+    test("no lookup when the armory has the name, failed, or is switched off; a miss lists nothing", async () => {
+      on();
+      const lookup = vi.fn(async () => null);
+      await peopleSearch("Nera Ashcombe", undefined, lookup);
+      vi.stubEnv("EVERLOOT_ARMORY", "1");
+      expect((await peopleSearch("Volvik Morningstar", undefined, lookup)).characters.total).toBe(2);
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.spyOn(held.armory!, "search").mockRejectedValueOnce(new Error("down"));
+      await peopleSearch("Nera Ashcombe", undefined, lookup);
+      expect(lookup).not.toHaveBeenCalled();
+      expect((await peopleSearch("Nera Ashcombe", undefined, lookup)).characters.results).toEqual([]);
+      expect(lookup).toHaveBeenCalledOnce();
+    });
+  });
 });

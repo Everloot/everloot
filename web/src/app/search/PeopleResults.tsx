@@ -23,7 +23,8 @@ export default function PeopleResults({ q, empty }: { q: string; empty?: ReactNo
     // A slow answer counts as none, so the empty line is not held back for long.
     const limit = setTimeout(() => ctrl.abort(), PEOPLE_PAGE_TIMEOUT_MS);
     setFound(null);
-    fetch(`/search/people?q=${encodeURIComponent(q)}`, { signal: ctrl.signal, cache: "no-store" })
+    // lookup=1: a full name nobody stored may be read from Blizzard now (search/people/route.ts); never asked as one types.
+    fetch(`/search/people?q=${encodeURIComponent(q)}&lookup=1`, { signal: ctrl.signal, cache: "no-store" })
       .then((r) => (r.ok ? r.json() : {}))
       .then(settle, () => settle({}))
       .finally(() => clearTimeout(limit));
