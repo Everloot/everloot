@@ -553,7 +553,7 @@ SlashCmdList["EVERLOOT"] = function(msg)
     print(E.Pulls.StatusLine())
   elseif msg == "scanprompt on" or msg == "scanprompt off" then
     EverlootDB.scanPrompt = (msg == "scanprompt on")
-    print("Everloot: the scan prompt at the auction house is " .. (EverlootDB.scanPrompt and "on" or "off")
+    print("Everloot: the first-visit auction introduction is " .. (EverlootDB.scanPrompt and "on" or "off")
       .. ". The Everloot scan button and /everloot scan still work.")
   elseif msg == "vendor on" or msg == "vendor off" then
     EverlootDB.autoVendor = (msg == "vendor on")

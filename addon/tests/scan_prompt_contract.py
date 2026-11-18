@@ -1,9 +1,8 @@
 """Run with: uv run --with lupa --with jsonschema python addon/tests/scan_prompt_contract.py
 
 The auction house side of a scan: each scan records the player's faction and the house it read
-(Alliance, Horde, or Neutral for a goblin house, from the auctioneer's faction); a one-click prompt
-appears once per visit when a scan can run, never scans by itself and can be turned off; with scans
-off, one hint says how to opt in.
+(Alliance, Horde, or Neutral for a goblin house, from the auctioneer's faction). There is no floating
+prompt. Scans need a click, and the first visit prints one introduction, controlled by scanprompt.
 """
 from pathlib import Path
 from lupa.lua51 import LuaRuntime
@@ -100,26 +99,20 @@ Everloot:InitModules()
 AuctionHouseFrame = CreateFrame('Frame', 'AuctionHouseFrame')
 printed = {}
 Everloot.auctionHintFrame.onEvent(nil, 'AUCTION_HOUSE_SHOW')
-assert(#printed == 1 and said('Everloot tab') and said('never sellers') and said('auctions off'), 'with scans on, the first visit says once what a scan reads: ' .. table.concat(printed, ' | '))
+assert(#printed == 0, 'an install already introduced with scans off stays quiet when scans are enabled')
 assert(not said('/everloot auctions on'), 'with scans on there is no opt-in hint')
 printed = {}
 Everloot.auctionHintFrame.onEvent(nil, 'AUCTION_HOUSE_SHOW')
 assert(#printed == 0, 'the notice is said once per install')
 
--- Opening the house: a prompt with one button, and nothing scanned until it is clicked.
+-- Opening the house never adds a second floating scan action.
 fire('AUCTION_HOUSE_SHOW')
-local prompt = Everloot.scanPrompt
-assert(prompt and prompt.shown and prompt.parent == AuctionHouseFrame, 'the prompt shows beside the auction house')
-assert(prompt.button and prompt.button.text == 'Scan prices for Everloot', 'one button says what it does')
-local description = prompt.fonts[1]
-assert(prompt.height >= description:GetStringHeight() + prompt.button.height + 36,
-  'the prompt must fit its wrapped text, button and spacing without clipping or overlap')
+assert(Everloot.scanPrompt == nil, 'no floating scan prompt')
 assert(Everloot.scanButton.points.TOPRIGHT[2] == 'BOTTOMRIGHT',
-  'the fallback scan action must stay below the house, away from Search and Filter')
-assert(replicateCalls == 0, 'the prompt never scans by itself')
-
-prompt.button.scripts.OnClick()
-assert(replicateCalls == 1 and not prompt.shown, 'one click starts one scan and closes the prompt')
+  'the fallback scan action stays below the house')
+assert(replicateCalls == 0, 'opening the house never scans')
+Everloot.scanButton.scripts.OnClick()
+assert(replicateCalls == 1, 'one fallback click starts one scan')
 fire('REPLICATE_ITEM_LIST_UPDATE')
 drain()
 local part = EverlootDB.records.auction_snapshot[1]
@@ -127,21 +120,17 @@ assert(part.faction == 'Horde' and part.house == 'Horde', 'a scan records the fa
 
 -- The same visit, or a new one inside the cooldown: no prompt.
 fire('AUCTION_HOUSE_SHOW')
-assert(not prompt.shown, 'no prompt while the cooldown runs')
+assert(Everloot.scanPrompt == nil, 'no prompt while the cooldown runs')
 fire('AUCTION_HOUSE_CLOSED')
 fire('AUCTION_HOUSE_SHOW')
-assert(not prompt.shown, 'no prompt on a new visit inside the cooldown')
+assert(Everloot.scanPrompt == nil, 'no prompt on a new visit inside the cooldown')
 fire('AUCTION_HOUSE_CLOSED')
 
 -- A goblin house, after the cooldown: the auctioneer has no faction, so the house is Neutral.
 now = now + 901
 npc.faction = nil
 fire('AUCTION_HOUSE_SHOW')
-assert(prompt.shown, 'once the cooldown is over the prompt is back')
-fire('AUCTION_HOUSE_SHOW')
-prompt:Hide()
-fire('AUCTION_HOUSE_SHOW')
-assert(not prompt.shown, 'closed by the player, it stays closed for the rest of the visit')
+assert(Everloot.scanPrompt == nil, 'no recurring prompt after cooldown or later visits')
 SlashCmdList.EVERLOOT('scan')
 fire('REPLICATE_ITEM_LIST_UPDATE')
 drain()
@@ -166,7 +155,7 @@ now = now + 901
 SlashCmdList.EVERLOOT('scanprompt off')
 assert(EverlootDB.scanPrompt == false)
 fire('AUCTION_HOUSE_SHOW')
-assert(not prompt.shown, 'scanprompt off: no prompt')
+assert(Everloot.scanPrompt == nil, 'scanprompt off: no prompt')
 local calls = replicateCalls
 Everloot.scanButton.scripts.OnClick()
 assert(replicateCalls == calls + 1, 'the Everloot scan button still scans on click')
@@ -175,7 +164,25 @@ SlashCmdList.EVERLOOT('scanprompt on')
 assert(EverlootDB.scanPrompt == true)
 """)
 
+# The saved preference silences the introduction without marking it as already delivered.
+lua.execute("""
+EverlootDB.scanPrompt = false
+EverlootDB.auctionNoticeShown = nil
+EverlootDB.auctionHintShown = nil
+printed = {}
+Everloot.auctionHintFrame.onEvent(nil, 'AUCTION_HOUSE_SHOW')
+assert(#printed == 0 and EverlootDB.auctionNoticeShown == nil, 'existing off preference is respected')
+EverlootDB.scanPrompt = true
+Everloot.auctionHintFrame.onEvent(nil, 'AUCTION_HOUSE_SHOW')
+assert(#printed == 1 and EverlootDB.auctionNoticeShown, 'one introduction after opting in')
+Everloot.auctionHintFrame.onEvent(nil, 'AUCTION_HOUSE_SHOW')
+assert(#printed == 1, 'later visits remain quiet')
+EverlootDB.toggles.auctions = false
+Everloot.auctionHintFrame.onEvent(nil, 'AUCTION_HOUSE_SHOW')
+assert(#printed == 1, 'turning scans off does not introduce the addon a second time')
+""")
+
 from protocol_schema import check_all  # noqa: E402
 counts = check_all(lua)
 assert counts.get("auction_snapshot") == 3, counts  # four scans, the newest three kept
-print("Lua 5.1 scan prompt: faction and house on every scan (Neutral for a goblin house, omitted when unreadable), one prompt per visit only when a scan can run, click to scan, scanprompt off, one opt-in hint")
+print("Lua 5.1 scan prompt: faction and house on every scan (Neutral for a goblin house, omitted when unreadable), no floating prompt on repeated visits, click to scan, scanprompt off, one opt-in hint")

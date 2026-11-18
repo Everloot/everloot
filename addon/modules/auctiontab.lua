@@ -3,7 +3,7 @@
 -- price lookup with the same lines as the tooltip. The tab sits beside Blizzard's tabs without joining
 -- their tab system, so their code is never changed: it shows a panel over the house, and clicking any of
 -- their tabs hides it. Nothing here posts, bids or buys, and a scan starts only from the player's click.
--- With the Everloot window's file loaded (modules/window.lua) the panel wears that window's look.
+-- The panel uses the game's fonts, gold headings and standard controls.
 -- A button at its top right swaps the panel for the shopping lists (modules/shopping.lua): the active list with each
 -- item's wanted count, max price, market value and what a search found, and a Search button per item that sends one
 -- search per press.
@@ -101,11 +101,8 @@ function T.Lookup(text)
   return table.concat(out, "\n")
 end
 
--- Text in the Everloot window's fonts and colours (modules/window.lua loads after this file, before the house
--- opens), else in the game's own template.
-local function words(parent, template, size, tone, narrow)
-  local W = E.Window
-  if W and W.Text then return W.Text(parent, size, narrow and W.NARROW or nil, W.COLORS[tone]) end
+-- Native font objects preserve the client's fonts and gold/white hierarchy.
+local function words(parent, template)
   local s = parent:CreateFontString(nil, "OVERLAY", template)
   s:SetJustifyH("LEFT")
   return s
@@ -123,9 +120,9 @@ end
 -- One result row: a label and its value, or one line of text.
 local function newRow(content)
   local row = {
-    label = words(content, "GameFontHighlightSmall", 12, "text"),
-    value = words(content, "GameFontHighlight", 13, "text", true),
-    note = words(content, "GameFontHighlightSmall", 11, "muted"),
+    label = words(content, "GameFontHighlightSmall"),
+    value = words(content, "GameFontHighlight"),
+    note = words(content, "GameFontHighlightSmall"),
   }
   row.value:SetJustifyH("RIGHT")
   return row
@@ -340,7 +337,7 @@ local function buildShop(panel)
 
   local prev = shopButton(page, "<", 24, function() S.Select(select(2, S.Active()) - 1) end)
   prev:SetPoint("TOPLEFT", page, "TOPLEFT", 0, 0)
-  shop.listName = words(page, "GameFontNormal", 13, "text")
+  shop.listName = words(page, "GameFontNormal")
   shop.listName:SetPoint("TOPLEFT", page, "TOPLEFT", 30, -4)
   shop.listName:SetWidth(176)
   if shop.listName.SetWordWrap then shop.listName:SetWordWrap(false) end
@@ -379,16 +376,16 @@ local function buildShop(panel)
   shop.maxBox = shopBox(page, 90, 276, -30)
   shop.addButton = shopButton(page, "Add or update", 120, function() addFromBoxes(shop) end)
   shop.addButton:SetPoint("TOPLEFT", page, "TOPLEFT", 374, -30)
-  shop.help = words(page, "GameFontDisableSmall", 11, "muted")
+  shop.help = words(page, "GameFontDisableSmall")
   shop.help:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -56)
   shop.help:SetText(SHOP_HELP)
-  shop.file = words(page, "GameFontDisableSmall", 11, "muted")
+  shop.file = words(page, "GameFontDisableSmall")
   shop.file:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -70)
 
   shop.head = {}
   local heads = { name = "Item", want = "Want", max = "Max each", market = "Market · age", found = "Lowest found" }
   for _, col in ipairs(SHOP_COLUMNS) do
-    local s = words(page, "GameFontDisableSmall", 11, "muted")
+    local s = words(page, "GameFontDisableSmall")
     s:SetPoint("TOPLEFT", page, "TOPLEFT", col[2], -90)
     s:SetWidth(col[3])
     if col[1] ~= "name" then s:SetJustifyH("RIGHT") end
@@ -426,13 +423,13 @@ local function buildShop(panel)
     line.remove:SetPoint("LEFT", line, "LEFT", 664, 0)
     shop.rows[i] = line
   end
-  shop.empty = words(page, "GameFontHighlightSmall", 12, "muted")
+  shop.empty = words(page, "GameFontHighlightSmall")
   shop.empty:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -108)
   shop.empty:SetWidth(560)
-  shop.caps = words(page, "GameFontDisableSmall", 10, "muted")
+  shop.caps = words(page, "GameFontDisableSmall")
   shop.caps:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", 0, 0)
   shop.caps:SetText(S.CAPS .. " Nothing is uploaded, bought or posted for you.")
-  shop.message = words(page, "GameFontHighlightSmall", 12, "text")
+  shop.message = words(page, "GameFontHighlightSmall")
   shop.message:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", 0, 16)
   shop.message:SetWidth(560)
   shop.up = shopButton(page, "Up", 48, function() shop.offset = math.max(0, shop.offset - SHOP_ROWS) end)
@@ -469,7 +466,12 @@ function T.ShowResult(text)
 end
 
 function T.Refresh()
-  if T.panel and T.panel.status then T.panel.status:SetText(table.concat(T.StatusLines(), "\n")) end
+  if T.panel and T.panel.status then
+    T.panel.status:SetText(table.concat(T.StatusLines(), "\n"))
+    local label, enabled = E:ScanAction()
+    T.panel.scanButton:SetText(label)
+    T.panel.scanButton:SetEnabled(enabled)
+  end
   -- A search the house never answered is let go after a while; the shopping page redraws its ages and results.
   if E.Shopping then E.Shopping.Tick() end
   if T.panel and T.panel.mode == "shop" then T.RefreshShop() end
@@ -477,6 +479,14 @@ end
 
 function T.Show()
   if not T.panel then return end
+  -- Blizzard disables the selected tab. Let a click on it dismiss our overlay without
+  -- changing its selected display mode or enabling a tab disabled for another reason.
+  local tabs = T.house and T.house.Tabs
+  local native = type(tabs) == "table" and tabs[T.house.selectedTab]
+  if native and not native.isDisabled and native:IsEnabled() == false then
+    T.returnTab = native
+    native:Enable()
+  end
   T.panel:Show()
   layout(T.panel)
   T.Refresh()
@@ -484,41 +494,38 @@ end
 
 function T.Hide()
   if T.panel then T.panel:Hide() end
+  local native = T.returnTab
+  T.returnTab = nil
+  if native and T.house.Tabs[T.house.selectedTab] == native and not native.isDisabled then native:Disable() end
 end
 
 local function buildPanel(house)
   local panel = CreateFrame("Frame", "EverlootAuctionPanel", house, "BackdropTemplate")
+  -- If a later control is unavailable, a partial panel must not cover the native house.
+  panel:Hide()
   panel:SetPoint("TOPLEFT", house, "TOPLEFT", 8, -60)
   panel:SetPoint("BOTTOMRIGHT", house, "BOTTOMRIGHT", -8, 28)
   local level = house.GetFrameLevel and house:GetFrameLevel()
   if type(level) == "number" then panel:SetFrameLevel(level + 20) end
   if panel.EnableMouse then panel:EnableMouse(true) end
-  -- The Everloot window's dark panel under a small crest heading; the game's dialog without the window file.
-  local W = E.Window
-  if W and W.Backdrop and W.Heading then
-    W.Backdrop(panel)
-    panel.crest, panel.title = W.Heading(panel, "Auction house")
-    panel.crest:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, -10)
-  else
-    if panel.SetBackdrop then
-      panel:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-    end
-    panel.title = words(panel, "GameFontNormalLarge")
-    panel.title:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -14)
-    panel.title:SetText("Everloot")
+  if panel.SetBackdrop then
+    panel:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+      tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
   end
-  local intro = words(panel, "GameFontHighlightSmall", 11, "muted")
+  panel.title = words(panel, "GameFontNormalLarge")
+  panel.title:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -14)
+  panel.title:SetText("Everloot")
+  local intro = words(panel, "GameFontHighlightSmall")
   intro:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -46)
   intro:SetWidth(COLUMN)
-  intro:SetText("One click reads this house's prices. They show in your tooltips at once and reach everloot.app when "
-    .. "your file is saved: Share now or log out, and the Desktop App, or everloot.app/upload, sends it. A price counts on the site once three players agree.")
+  intro:SetText("Scan this house's item prices and quantities, never sellers. Prices appear in your tooltips immediately. "
+    .. "Reload or log out to save; the Desktop App or everloot.app/upload sends the file.")
   panel.intro = intro
 
   local scanButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
   scanButton:SetSize(160, 24)
   scanButton:SetPoint("TOPLEFT", intro, "BOTTOMLEFT", 0, -12)
-  scanButton:SetText("Scan this house")
+  scanButton:SetText("Scan prices")
   scanButton:SetScript("OnClick", function() E:StartScan(); T.Refresh() end)
   panel.scanButton = scanButton
 
@@ -529,12 +536,12 @@ local function buildPanel(house)
   shareButton:SetScript("OnClick", function() if ReloadUI then ReloadUI() end end)
   panel.shareButton = shareButton
 
-  local status = words(panel, "GameFontHighlight", 12, "text")
+  local status = words(panel, "GameFontHighlight")
   status:SetPoint("TOPLEFT", scanButton, "BOTTOMLEFT", 0, -10)
   status:SetWidth(COLUMN)
   panel.status = status
 
-  local label = words(panel, "GameFontNormal", 13, "text")
+  local label = words(panel, "GameFontNormal")
   label:SetPoint("TOPLEFT", status, "BOTTOMLEFT", 0, -16)
   label:SetText("Look up a price")
   panel.lookupLabel = label
@@ -549,7 +556,7 @@ local function buildPanel(house)
   box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
   panel.lookup = box
 
-  local footer = words(panel, "GameFontDisableSmall", 10, "muted")
+  local footer = words(panel, "GameFontDisableSmall")
   footer:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 16, 12)
   footer:SetWidth(COLUMN)
   footer:SetText("Full history and other realms: " .. T.SITE)
@@ -565,7 +572,6 @@ local function buildPanel(house)
   local content = CreateFrame("Frame", nil, scroll)
   content:SetSize(COLUMN, 1)
   scroll:SetScrollChild(content)
-  if W and W.Surface then W.Surface(scroll) end
   scroll:EnableMouseWheel(true)
   scroll:SetScript("OnMouseWheel", function(self, delta)
     local limit = math.max(0, (tonumber(content:GetHeight()) or 0) - (tonumber(self:GetHeight()) or 0))
@@ -577,11 +583,10 @@ local function buildPanel(house)
   -- it holds every alphabet the client shows, where a font file named here may not.
   panel.item = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   panel.item:SetJustifyH("LEFT")
-  if W and W.COLORS then panel.item:SetTextColor(unpack(W.COLORS.text)) end
-  panel.unit = words(content, "GameFontDisableSmall", 11, "muted")
+  panel.unit = words(content, "GameFontDisableSmall")
   panel.unit:SetJustifyH("RIGHT")
   panel.unit:SetText("per unit")
-  panel.message = words(content, "GameFontHighlightSmall", 12, "muted")
+  panel.message = words(content, "GameFontHighlightSmall")
   render(panel, { message = HINT })
   -- The shopping lists, behind a button at the top right, when their file is loaded.
   if E.Shopping then
@@ -629,7 +634,14 @@ function T.Attach(house)
     if ok and frame then tab = frame; break end
   end
   if not tab then return false end
-  local built = pcall(function()
+  -- PanelTabButtonTemplate adds itself to the parent's Tabs array during CreateFrame.
+  -- Keep it out of Blizzard's display-mode system, and never use it as its own anchor.
+  if type(house.Tabs) == "table" then
+    for i = #house.Tabs, 1, -1 do
+      if house.Tabs[i] == tab then table.remove(house.Tabs, i) end
+    end
+  end
+  local built, why = pcall(function()
     local tabs = type(house.Tabs) == "table" and house.Tabs or {}
     local last = tabs[#tabs]
     if last then tab:SetPoint("LEFT", last, "RIGHT", -15, 0)
@@ -647,9 +659,10 @@ function T.Attach(house)
   end)
   if not built then
     tab:Hide()
-    T.failed = true
+    T.failed, T.failureReason = true, tostring(why)
+    if T.panel then T.panel:Hide() end
     return false
   end
-  T.tab = tab
+  T.tab, T.house = tab, house
   return true
 end

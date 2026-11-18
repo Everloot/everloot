@@ -23,11 +23,11 @@ client's `Interface/AddOns/`, `/reload`, then run `/everloot status`. Login and 
 version, how many modules are on and off, any that could not start and any paused collection); `/everloot status`
 lists every module and row count. Auction capture is on in a new
 install (`/everloot auctions off` turns it off). At the auction house, open the **Everloot** tab after
-Blizzard's tabs and click **Scan this house** (or type `/everloot scan`) for a full scan: at most one every 15 minutes, read in chunks, summarised per item,
+Blizzard's tabs and click **Scan prices** (or type `/everloot scan`) for a full scan: at most one every 15 minutes, read in chunks, summarised per item,
 and the last three scans per realm kept. Nothing scans without that click. The tab shows the cooldown,
 whether the last scan is in your saved file yet, a **Share now** button (a `/reload`, which writes the
 file so the Desktop App can send it) and a price lookup with the tooltip's lines. If the tab cannot be
-added, an **Everloot scan** button takes its place. The list of your
+added, a **Scan prices** button takes its place. The list of your
 installed addons is off until `/everloot addons on`; it is sent only from the upload page, after
 its preview. `/everloot addons off` stops it and deletes every recorded addon row.
 
@@ -101,10 +101,11 @@ auctioneer's faction, Neutral for a goblin house whose auctioneer has none, and 
 gives no auctioneer to read. The game files list separate Alliance, Horde and Blackwater (neutral) houses
 with different cuts, so the site keeps a market per house next to the realm-wide one.
 
-When scans are on, the cooldown is over and no scan is running, opening the auction house shows a small
-**Scan prices for Everloot** prompt beside it, once per visit. One click scans; closing it hides it until
-the next visit. It never scans by itself. `/everloot scanprompt off` turns it off (the **Everloot scan**
-button and `/everloot scan` still work). With scans off, the first visit prints one line saying how to opt in.
+The first visit prints one introduction in chat explaining scanning; there is no floating popup or recurring
+reminder. `/everloot scanprompt off` hides that introduction (the tab and `/everloot scan` still work).
+With scans off, the first visit instead explains how to opt in. The scan action shows **Scan prices**,
+**Scanning...** or **Ready in M:SS**, and is disabled while busy or cooling down. Last-scan age and saved-file
+status remain in the tab. The tab and settings use native WoW fonts, gold headings and standard controls.
 
 ### Shopping lists
 
@@ -130,15 +131,15 @@ guide at everloot.app/docs/guides/addon; `addon/tests/commands_contract.py` fail
 | Command | What it does |
 |---|---|
 | `/everloot window` | Opens or closes the Everloot window (left-click on the minimap button does the same). |
-| `/everloot options` | Opens the settings (right-click on the minimap button does the same): an Everloot overview with four pages under it in the game's AddOns list, General, Auction house, Shared with Everloot and Your characters, one switch per module. |
+| `/everloot options` | Opens the settings (right-click on the minimap button does the same): an Everloot overview with five pages under it in the game's AddOns list: General, Tooltips, Auction House, Helpers and Data Sharing, one switch per module. |
 | `/everloot setup` | Asks again which features to use: Everything, Collect data only or Choose myself (see Choosing features). |
 | `/everloot planner [talents\|raid]` | Opens the planner workspace on the named tab, where a website plan is pasted and imported. |
 | `/everloot buttons on\|off` | Gathers other addons' minimap buttons into the Everloot button, or leaves them on the minimap; `/reload` to apply. |
 | `/everloot status` | Prints the version, each module and how many rows it holds, and any paused collection. |
 | `/everloot version` | Prints the addon version. |
 | `/everloot auctions on\|off` | Auction scans, on in a new install; `/reload` to apply. |
-| `/everloot scan` | At the auction house, starts a full scan, like the **Scan this house** button; at most one every 15 minutes. |
-| `/everloot scanprompt on\|off` | The scan prompt shown when the auction house opens; the button and `/everloot scan` still work with it off. |
+| `/everloot scan` | At the auction house, starts a full scan, like the **Scan prices** button; at most one every 15 minutes. |
+| `/everloot scanprompt on\|off` | The once-per-install chat introduction at the auction house; the button and `/everloot scan` still work with it off. |
 | `/everloot vendor on\|off` | At a merchant, sell grey items and repair with your own gold; never the guild bank. |
 | `/everloot mail on\|off` | The **Collect all** button at the mailbox, for auction letters only. |
 | `/everloot where [item link\|item id\|NPC name]` | Lists drops, vendors and NPC locations from your own saved sightings only. Shift-click an item link, give its id, or an exact NPC name (case-insensitive). Counts are recorded loot windows, not item quantities or drop rates. |
@@ -287,11 +288,11 @@ at once, without a reload.
 A few seconds after the first loading screen, every install (new or updated) is asked once which parts of Everloot
 to use, before the player-names question. `/everloot setup` asks again at any time. There are three answers:
 
-- **Everything** turns on the item tooltip lines, the auction house tab and its scan reminder, the Everloot window
-  and minimap button, and the Your characters switches (gold, characters, guild).
+- **Everything** turns on the item tooltip lines, the auction house tab and its first-visit introduction, the Everloot window
+  and minimap button, and the character switches in Data Sharing (gold, characters, guild).
 - **Collect data only** keeps World, Recipes and trainers, Zone map corners and Auction scans on, so the Everloot
-  tab at the auction house still sends the scans you start. It turns off the tooltip lines, the scan reminder, the
-  window, the minimap button and its button drawer, the merchant and mailbox helpers and the Your characters
+  tab at the auction house still sends the scans you start. It turns off the tooltip lines, the first-visit introduction, the
+  window, the minimap button and its button drawer, the merchant and mailbox helpers and the character
   switches. For players who keep Auctionator or other addons for those jobs.
 - **Choose myself** changes nothing and opens the settings.
 
