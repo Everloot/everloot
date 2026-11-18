@@ -155,3 +155,15 @@ describe("guild kills", () => {
     expect(lines("guilds.ndjson").map((r) => [r.guildName, r.kills])).toEqual([["Night Watch", 1]]);
   });
 });
+
+test("bulk drop files keep exactly the existing public keys", async () => {
+  const loot = ["a", "b", "c"].flatMap((installId) => [
+    { kind: "loot", sourceEvidence: "loot-api", installId, sourceNpcId: 7, copper: 120, items: [{ itemId: 2589, count: 2 }] },
+    { kind: "loot", sourceEvidence: "loot-api", installId, sourceObjectId: 9, copper: 60, items: [] },
+  ]);
+  store.loadCorpus.mockResolvedValue({ uploads: 3, records: loot, dataAsOf: AS_OF, unreachable: false });
+  await exportBulk(dir);
+  expect(Object.keys(lines("drops.ndjson")[0]).sort()).toEqual(["drops", "itemId", "kills", "public", "rate", "reporters", "sourceNpcId"]);
+  expect(Object.keys(lines("drops-measured-zeros.ndjson")[0]).sort()).toEqual(["kills", "public", "reporters", "sourceObjectId"]);
+  for (const file of ["drops.ndjson", "drops-measured-zeros.ndjson"]) expect(readFileSync(join(dir, file), "utf8")).not.toMatch(/units|averageCopper/);
+});

@@ -6,14 +6,14 @@
  * on the minimap is a pin at 3 installs (object-spawns.ts), and loot windows the rates leave out are only counted
  * (pending-loot.ts).
  */
-import { itemFactsFromRecords, lootWindowsFromRecords, recheckLootRecords, rollupDrops, type DropRate, type ItemNameRow, type MeasuredZero } from "./drop-rollup.js";
+import { itemFactsFromRecords, lootWindowsFromRecords, recheckLootRecords, rollupDrops, type PublicDropRate, type ItemNameRow, type MeasuredZero } from "./drop-rollup.js";
 import type { RecheckScope } from "./coverage.js";
 import { formatMeasuredZero, itemPage } from "./item-page.js";
 import { agreedObjectNames, objectSightingRowsFromRecords, objectSpawns, type ObjectSpawnRow } from "./object-spawns.js";
 import { pendingForObject, pendingLine, pendingLootFromRecords, type PendingCount, type PendingLoot } from "./pending-loot.js";
 
 /** `sightings`: where players saw objects on the minimap; `pending`: loot windows not yet in the rates. */
-export interface ObjectFacts { rates: DropRate[]; measuredZeros: MeasuredZero[]; names: ItemNameRow[]; objects?: ObjectSpawnRow[]; sightings?: ObjectSpawnRow[]; pending?: PendingLoot; recheck?: readonly RecheckScope[] }
+export interface ObjectFacts { rates: PublicDropRate[]; measuredZeros: MeasuredZero[]; names: ItemNameRow[]; objects?: ObjectSpawnRow[]; sightings?: ObjectSpawnRow[]; pending?: PendingLoot; recheck?: readonly RecheckScope[] }
 
 export interface ObjectDrop { itemId: number; itemName: string | null; kills: number; drops: number; rate: number; reporters: number }
 export interface ObjectPage {

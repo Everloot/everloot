@@ -477,3 +477,17 @@ test("drop export rows and schema carry fractional likely ranges and sample sett
   expect(schema.required).toEqual(expect.arrayContaining(["rateLow", "rateHigh", "settled"]));
   expect(schema.properties.rateLow.description).toContain("95%");
 });
+
+test("open data drop files keep exactly the existing public keys", () => {
+  const records = ["a", "b", "c"].flatMap((installId) => [
+    { kind: "loot", sourceEvidence: "loot-api", installId, sourceNpcId: 7, copper: 120, items: [{ itemId: 2589, count: 2 }] },
+    { kind: "loot", sourceEvidence: "loot-api", installId, sourceObjectId: 9, copper: 60, items: [] },
+  ]);
+  const { datasets } = buildOpenData(input(records));
+  expect(Object.keys(rows(datasets, "observed", "drop-rates")[0]).sort()).toEqual(["installs", "itemId", "lootWindows", "rate", "rateHigh", "rateLow", "settled", "sourceNpcId", "sourceObjectId", "windowsWithItem"]);
+  expect(Object.keys(rows(datasets, "observed", "drop-measured-zeros")[0]).sort()).toEqual(["installs", "lootWindows", "sourceNpcId", "sourceObjectId"]);
+  writeOpenData(dir, input(records));
+  for (const name of ["drop-rates", "drop-measured-zeros"]) {
+    expect(readFileSync(join(dir, "observed", `${name}.ndjson`), "utf8")).not.toMatch(/units|copper/i);
+  }
+});

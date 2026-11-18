@@ -51,7 +51,7 @@ async function loadAggregates(read?: Corpus): Promise<AggregateSet | null> {
 }
 
 /** Every stored upload, loot windows pulled out, rolled up. */
-export async function computeRollups(read?: Corpus): Promise<RollupResult & { stats: CorpusStats }> {
+export async function computeRollups(read?: Corpus): Promise<Omit<RollupResult, "sources"> & { stats: CorpusStats }> {
   const agg = await loadAggregates(read);
   if (!agg) return { rates: [], measuredZeros: [], rejected: [], stats: UNREAD };
   return {

@@ -15,7 +15,7 @@ import { completionProgress, handleCompletionProgress, type CompletionFacts } fr
 import { goldFactsFromRecords, goldLedger, handleGoldLedger } from "./gold-ledger.js";
 import { guildBoard, guildFactsFromRecords, handleGuildBoard } from "./guild-board.js";
 import { formatGuildPage, formatGuildSearch, formatLadder, guildLadder, guildPageOut, ladderOut, summaryOut, type GuildReader } from "./guilds.js";
-import { itemFactsFromRecords } from "./drop-rollup.js";
+import { publicDropRate, publicMeasuredZero, itemFactsFromRecords } from "./drop-rollup.js";
 import { formatItemPage, itemPage } from "./item-page.js";
 import { formatItemNumbers, itemToolFactsFromRecords } from "./item-page-tool.js";
 import { reportedItemFacts } from "./item-facts.js";
@@ -1034,7 +1034,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
     item_page: async (args) => {
       const answer = await readPageIn("item_page", (facts: ReturnType<typeof itemToolFactsFromRecords>, dataAsOf) => {
         const reported = reportedItemFacts(facts.numbers.get(args.itemId), new Date(dataAsOf ?? NaN));
-        const page = { ...itemPage(args.itemId, facts), reported };
+        const page = { ...itemPage(args.itemId, { ...facts, rates: facts.rates.map(publicDropRate) }), reported };
         return { text: `${formatItemPage(page)}\n${formatItemNumbers(reported, CLIENT_TAXONOMY.items.find((r) => r[0] === args.itemId))}\nItem-number data as of ${dataAsOf ?? "[?]"}.`, page, url: itemPageUrl(page, inGameFiles(page.itemId)) };
       });
       if ("connected" in answer.structured && !answer.structured.connected) answer.text += "\nItem numbers: [?]; no corpus read. Agreeing installs [?], last seen [?], build [?], data as of [?].";
@@ -1045,7 +1045,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
       return { text: formatNpcPage(page), page, url: npcPageUrl(page) };
     }),
     object_page: (args) => readPageIn("object_page", (facts: ObjectFacts) => {
-      const page = objectPage(args.objectId, facts);
+      const page = objectPage(args.objectId, { ...facts, rates: facts.rates.map(publicDropRate), measuredZeros: facts.measuredZeros.map(publicMeasuredZero) });
       return { text: formatObjectPage(page), page, url: objectPageUrl(page) };
     }),
     quest_page: (args) => readPageIn("quest_page", (facts: ReturnType<typeof worldFactsFromRecords>) => {
