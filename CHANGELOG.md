@@ -380,10 +380,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - MCP: Price answers identify their auction house, with an unknown faction when only the realm is recorded.
 
 ### Changed
-- Addon: easier reading in the Everloot window, settings, auction house tab and plan workspace: words use the game's own Friz Quadrata and nothing is smaller than 12 px (was 10 to 11 px, mostly in Arial Narrow); Arial Narrow stays only for figures, dates and the tight Home lists, also at 12 px. Home's character columns and the Collection list were re-spaced so the larger text still fits. Home's Missing list now sits under the realm line, so a long class or realm name ("CAMWOW US1 Realm 4 PvP") no longer runs into it. Needs an in-game check before release.
-- Addon: the minimap button is built like every other addon's (LibDBIcon's gold ring, dark background and the crest's diamond) and sits on the minimap's edge at the top-left instead of off its corner; drag it around the edge to move it, and the spot is kept. The button drawer is a slimmer panel with a one-pixel edge, evens its rows (eight buttons are two rows of four) and opens on the side away from the map. Needs an in-game check before release.
-- Addon: the Everloot window has a grip in its bottom-right corner, as the game's chat windows do: drag it to make the whole window bigger or smaller (three quarters to one and a half times, never larger than the screen), right-click it for the normal size; the size is kept. Collection draws its lists as completionist addons do: a green check for done, a red cross for missing, headings in the game's gold and a percentage in each summary ("Titles: 1 of 3 (33%)"). Needs an in-game check before release.
-- Addon: Collection works like a completionist addon: headings open and close with a count of what is done under them, rows carry icons, item quality colours and the game's tooltip, and the mouse wheel scrolls. Each boss in Dungeons & raids opens on its drops from the Desktop App's price file (public rates, three installs), found by the creatures this install saw in the fight or else by the boss's name, with whether each mount, pet, toy or appearance is collected. New Mounts, Pets and Toys sections read the game's journals. The Collection's instance list is refreshed to the 2026-11-17 player agreement (Deadmines, Scarlet Monastery and Excavation Site: Wetlands join). Needs an in-game check before release.
 - Site: drop rates restart from addon 0.3.24 (2026-11-17): only loot windows recorded after the release count, now that empty corpses are recorded too, so sources show fewer public rates until new windows build up.
 - Site: the addon is offered as a regular release from 0.3.24: the home, addon and upload pages no longer call it an Alpha.
 - Site: Lore now pairs stories behind Forever’s world with illustrated category links, keeps search above both columns, and shows the full hero art.
@@ -541,6 +537,23 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - MCP: rank answering claims before subject matches, state unavailable requested facts,
   and report separate answerability rates.
 - Site: describe the in-game Everloot window, feature chooser, local data and how to reopen it or report a window error.
+
+## [0.3.25] - 2026-11-17
+
+Release candidate: live Forever acceptance is pending. Do not publish this version until the combined UI checks pass.
+
+### Added
+- Addon: easier reading in the Everloot window, settings, auction house tab and plan workspace: words use the game's own Friz Quadrata and nothing is smaller than 12 px (was 10 to 11 px, mostly in Arial Narrow); Arial Narrow stays only for figures, dates and the tight Home lists, also at 12 px. Home's character columns and the Collection list were re-spaced so the larger text still fits. Home's Missing list now sits under the realm line, so a long class or realm name ("CAMWOW US1 Realm 4 PvP") no longer runs into it. Needs an in-game check before release.
+- Addon: the minimap button is built like every other addon's (LibDBIcon's gold ring, dark background and the crest's diamond) and sits on the minimap's edge at the top-left instead of off its corner; drag it around the edge to move it, and the spot is kept. The button drawer is a slimmer panel with a one-pixel edge, evens its rows (eight buttons are two rows of four) and opens on the side away from the map. Needs an in-game check before release.
+- Addon: the Everloot window has a grip in its bottom-right corner, as the game's chat windows do: drag it to make the whole window bigger or smaller (three quarters to one and a half times, never larger than the screen), right-click it for the normal size; the size is kept. Collection draws its lists as completionist addons do: a green check for done, a red cross for missing, headings in the game's gold and a percentage in each summary ("Titles: 1 of 3 (33%)"). Needs an in-game check before release.
+- Addon: Collection works like a completionist addon: headings open and close with a count of what is done under them, rows carry icons, item quality colours and the game's tooltip, and the mouse wheel scrolls. Each boss in Dungeons & raids opens on its drops from the Desktop App's price file (public rates, three installs), found by the creatures this install saw in the fight or else by the boss's name, with whether each mount, pet, toy or appearance is collected. New Mounts, Pets and Toys sections read the game's journals. The Collection's instance list is refreshed to the 2026-11-17 player agreement (Deadmines, Scarlet Monastery and Excavation Site: Wetlands join). Needs an in-game check before release.
+
+### Changed
+- Addon: auction scans live in one Everloot tab with price lookup and shopping lists. The scan button shows when it is scanning or cooling down, and the recurring floating scan prompt is replaced by a one-time chat introduction.
+- Addon: settings are grouped into General, Tooltips, Auction House, Helpers and Data Sharing in both modern and older game Options. Settings inside the Everloot window keep that window's appearance.
+
+### Fixed
+- Addon: the native auction tab no longer anchors to itself or joins Blizzard's display-mode tab list. Clicking the selected Buy, Sell or Auctions tab can return directly from Everloot. A failed panel stays hidden and leaves one fallback scan action.
 
 ## [desktop-v0.1.23] - 2026-11-17
 
