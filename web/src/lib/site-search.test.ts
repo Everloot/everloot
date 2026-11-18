@@ -105,6 +105,29 @@ test("objects match agreed names in exact, prefix and substring order in search 
   expect(await suggest("copper", "object")).toEqual([]);
 });
 
+test("the unscoped type-ahead suggests a zone by its name, says it is one, and a scoped box does not", async () => {
+  vi.stubEnv("KB_SNAPSHOT_PATH", release);
+  const { suggest } = await import("./site-search");
+  mocks.names.items = new Map([[7, "Westfall Stew"]]);
+  mocks.names.quests = new Map([[8, "The Westfall Brigade"]]);
+  const rows = await suggest("westfall");
+  // The exact zone name leads; prefix and contains names follow.
+  expect(rows[0]).toEqual({ type: "zone", id: expect.any(Number), label: "Westfall", href: expect.stringMatching(/^\/database\/zones\/\d+-westfall$/), note: "Zone" });
+  expect(rows.map((r) => r.label)).toEqual(["Westfall", "Westfall Stew", "The Westfall Brigade"]);
+  expect((await suggest("westfall", "item")).some((r) => r.type === "zone")).toBe(false);
+  // The same zone page /search lists.
+  expect((await search("westfall")).find((g) => g.type === "zone")!.results[0].href).toBe(rows[0].href);
+});
+
+test("a name map's sorted rows are built once per map, and a new map gets new rows", async () => {
+  const { sortedNames } = await import("./site-search");
+  const names = new Map([[2, "beta"], [1, "Alpha"]]);
+  const rows = sortedNames(names);
+  expect(rows.map((r) => r.id)).toEqual([1, 2]);
+  expect(sortedNames(names)).toBe(rows);
+  expect(sortedNames(new Map(names))).not.toBe(rows);
+});
+
 test("zones are the released ones, linking to the map", async () => {
   const zones = (await search("elwynn")).find((g) => g.type === "zone")!.results;
   expect(zones[0]).toMatchObject({ label: "Elwynn Forest", href: "/database/zones/1429-elwynn-forest", exact: false });

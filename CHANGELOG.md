@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: the header and database search find NPCs by the Warcraft Wiki name their pages print and suggest zones as you type; each suggestion says what it is, the list ends with "All results", and search answers every casing of a query from one cached page.
 - Site: Herbalism has a gathering guide at /tools/professions/herbalism/gathering: herb zones with the herbs looted in each, every herb's zones and the Herbalism trainers players saw, all at 3 installs.
 - Desktop: the Characters page shows how many titles each keyed character is missing, with links to the site's collections tool and, for a linked character, its page, and a Linked characters panel with the characters you linked, the last private sync and the last link or sync problem.
 - Site: profession pages list the game-file recipes 50 at a time (25 to 200), with search and skill range filters in the URL, instead of sending every recipe; AH Ledger crafting margins also sort by net value and sales per day, and the sort is kept in the URL.
