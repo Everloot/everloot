@@ -51,6 +51,8 @@ assert 'Interface\\\\AddOns\\\\Everloot\\\\media\\\\crest' in code and 'Interfac
 # The key core.lua's E.CharacterKey gives this install and player GUID.
 ME = "%08x" % zlib.adler32(b"abcd-1234:Player-1-0001")
 API = ("UnitGUID = function() return 'Player-1-0001' end\n"
+       "cursor = { 500, 300 }\n"
+       "GetCursorPosition = function() return cursor[1], cursor[2] end\n"
        "date = os.date\n"
        "RAID_CLASS_COLORS.MAGE = { r = 0.25, g = 0.78, b = 0.92 }\n"
        "RAID_CLASS_COLORS.ROGUE = { r = 1, g = 0.96, b = 0.41 }\n"
@@ -104,6 +106,41 @@ local f = EverlootWindow
 assert(f == U.frame and f.shown and f.template == 'BackdropTemplate', 'one named window, shown')
 assert(f.backdrop.edgeFile == 'Interface\\\\Tooltips\\\\UI-Tooltip-Border' and f.border[1] > f.border[3], 'bronze-tinted tooltip edge')
 assert(f.crest.path == 'Interface\\\\AddOns\\\\Everloot\\\\media\\\\crest', 'the crest')
+
+-- The corner grip, as on the game's chat windows: dragging right by a quarter of the window's width makes it a quarter
+-- bigger with the top-left corner held; the size is kept, held to the limits and to the screen, and a right-click
+-- puts it back. The next open uses the kept size.
+local grip, scale = f.grip, 1
+f.SetScale = function(_, s) scale = s end
+f.GetScale = function() return scale end
+f.GetLeft = function() return 100 end
+f.GetTop = function() return 700 end
+UIParent.GetEffectiveScale = function() return 1 end
+assert(grip and grip.scripts.OnMouseDown and grip.width == 14, 'a grip in the corner')
+grip.scripts.OnMouseDown(grip, 'LeftButton')
+assert(grip.scripts.OnUpdate, 'a drag follows the cursor')
+cursor[1] = 700
+grip.scripts.OnUpdate(grip)
+assert(scale == 1.25 and EverlootDB.windowScale == 1.25, 'a quarter wider is a quarter bigger: ' .. scale)
+assert(f.point[1] == 'TOPLEFT' and f.point[2] == UIParent and f.point[4] == 100 / 1.25 and f.point[5] == 700 / 1.25,
+  'the top-left corner stays where it was on screen')
+cursor[1] = 9000
+grip.scripts.OnUpdate(grip)
+assert(scale == 1.5, 'no bigger than one and a half times: ' .. scale)
+cursor[1], cursor[2] = 0, 9000
+grip.scripts.OnUpdate(grip)
+assert(scale == 0.75, 'no smaller than three quarters: ' .. scale)
+grip.scripts.OnMouseUp(grip)
+assert(grip.scripts.OnUpdate == nil, 'letting go stops the drag')
+grip.scripts.OnMouseDown(grip, 'RightButton')
+assert(scale == 1 and EverlootDB.windowScale == 1 and grip.scripts.OnUpdate == nil, 'a right-click is the normal size')
+EverlootDB.windowScale = 1.4
+U.Toggle(); assert(U.Open() == true and scale == 1.4, 'the kept size at the next open: ' .. scale)
+UIParent.GetHeight = function() return 600 end
+U.Toggle(); assert(U.Open() == true and scale == (600 - 32) / 450, 'never larger than the screen holds: ' .. scale)
+UIParent.GetHeight = function() return 1080 end
+EverlootDB.windowScale = nil
+U.Toggle(); assert(U.Open() == true and scale == 1, 'normal size until the grip is used')
 assert(f.title.text == 'Everloot' and f.title.color[2] > 0.9 and f.title.color[1] < 0.7 and f.title.color[3] < 0.3,
   'Everloot in fel green, as in the tooltip')
 assert(f.subtitle.text == 'Home' and f.home.shown ~= false and f.nav.home.on.shown, 'Home is open, its nav item lit')

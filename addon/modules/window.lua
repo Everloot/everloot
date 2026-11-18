@@ -288,6 +288,21 @@ local function stat(parent, x, path, caption)
 end
 
 local W, H, SIDE, MAIN = 800, 450, 160, 184
+local MIN_SCALE, MAX_SCALE = 0.75, 1.5 -- how small and how large the corner grip makes the window
+
+-- The largest scale at which the whole window fits on the screen, with a margin; nil when the screen has no size.
+local function fit()
+  local width = UIParent and UIParent.GetWidth and tonumber((UIParent:GetWidth()))
+  local height = UIParent and UIParent.GetHeight and tonumber((UIParent:GetHeight()))
+  if width and height then return math.min((width - 32) / W, (height - 32) / H) end
+end
+
+-- The scale the player chose with the grip (1 until they drag it), held between the limits and to the screen.
+local function scaleFor(chosen)
+  local s = math.max(MIN_SCALE, math.min(MAX_SCALE, tonumber(chosen) or 1))
+  local limit = fit()
+  return limit and math.min(s, limit) or s
+end
 
 -- The Missing strip on Home: { key in U.MissingData, the line's label, the sidebar item a click opens }, in order.
 -- The recipes line comes from the professions module and shows with the tracker off; the rest need it on.
@@ -499,6 +514,50 @@ local function build()
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", -2, -2)
   f.close = close
+
+  -- The corner grip the game's chat windows have: drag it to make the whole window bigger or smaller, right-click it
+  -- for the normal size. The top-left corner stays put, and the size is kept for the next session.
+  local grip = CreateFrame("Button", nil, f)
+  -- Inside the corner's edge, drawn above the views.
+  grip:SetSize(14, 14)
+  grip:SetPoint("BOTTOMRIGHT", -3, 3)
+  local level = tonumber((f:GetFrameLevel()))
+  if level then grip:SetFrameLevel(level + 10) end
+  grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+  grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+  grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+  local function setScale(scale)
+    local left, top, old = f:GetLeft(), f:GetTop(), f:GetScale()
+    f:SetScale(scale)
+    if EverlootDB then EverlootDB.windowScale = scale end
+    if not (left and top and old) then return end
+    f:ClearAllPoints()
+    f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left * old / scale, top * old / scale)
+  end
+  local function follow(self)
+    local s, x, y = self.start, GetCursorPosition()
+    -- The cursor's travel in the screen's units: dragging right or down by the window's own size doubles it.
+    local dx, dy = (x - s.x) / s.ui, (s.y - y) / s.ui
+    setScale(scaleFor(s.scale + math.max(dx / W, dy / H)))
+  end
+  grip:SetScript("OnMouseDown", function(self, mouseButton)
+    if mouseButton == "RightButton" then return setScale(scaleFor(1)) end
+    local x, y = GetCursorPosition()
+    local ui = UIParent.GetEffectiveScale and tonumber((UIParent:GetEffectiveScale()))
+    if not (x and y and ui and ui > 0) then return end
+    self.start = { x = x, y = y, ui = ui, scale = tonumber((f:GetScale())) or 1 }
+    self:SetScript("OnUpdate", follow)
+  end)
+  grip:SetScript("OnMouseUp", function(self) self:SetScript("OnUpdate", nil) end)
+  grip:SetScript("OnEnter", function(self)
+    if type(GameTooltip) ~= "table" then return end
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:AddLine("Drag to make the window bigger or smaller")
+    GameTooltip:AddLine("Right-click: normal size", 1, 1, 1)
+    GameTooltip:Show()
+  end)
+  grip:SetScript("OnLeave", function() if type(GameTooltip) == "table" then GameTooltip:Hide() end end)
+  f.grip = grip
 
   -- The sidebar: game icons, fel green only on the item that is open.
   f.nav = {}
@@ -830,9 +889,7 @@ function U.Open(key)
     U.Fail(err or "the window could not be built")
     return false
   end
-  local width = UIParent and UIParent.GetWidth and tonumber(UIParent:GetWidth())
-  local height = UIParent and UIParent.GetHeight and tonumber(UIParent:GetHeight())
-  if width and height then pcall(U.frame.SetScale, U.frame, math.min(1, (width - 32) / W, (height - 32) / H)) end
+  pcall(U.frame.SetScale, U.frame, scaleFor(EverlootDB and EverlootDB.windowScale))
   U.frame:Show()
   local shown, why = pcall(U.Select, key or U.view or "home")
   if not shown then U.Fail(why); return false end

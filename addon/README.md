@@ -304,7 +304,9 @@ and everloot.app/players/opt-out to hide a character.
 
 ## The Everloot window
 
-Left-click the minimap button, or `/everloot window`, for the Everloot window. Its sidebar has five items.
+Left-click the minimap button, or `/everloot window`, for the Everloot window. Its sidebar has five items. Drag the
+grip in its bottom-right corner to make the whole window bigger or smaller (from three quarters to one and a half times,
+never larger than the screen); right-click the grip for the normal size. The size is kept for the next session.
 
 - **Home** lists every character this install has seen: gold, level, professions, raid lockouts (shown only while the completion tracker is on) and when it was last
   seen, with totals for each realm and for the account and a "This week" line (gold in and out for this character over
@@ -316,7 +318,9 @@ Left-click the minimap button, or `/everloot window`, for the Everloot window. I
 - **Collection** shows achievements, reputation, titles, raid lockouts and quest chains (quests done of each chain's
   total) from the rows the completion tracker wrote, so it needs `/everloot completion on`; with it off the tab says so
   and has a button that runs that command. It shows this character, or the account: every character in the roster, each
-  item done when any of them has it, with the name of the character that does.
+  item done when any of them has it, with the name of the character that does. As completionist addons draw them, a
+  green check marks what is done and a red cross what is missing, headings are in the game's gold, and each summary
+  gives the share done as a percentage.
 - **Professions** shows each profession in the profession book with its rank and the recipes recorded for it by
   difficulty colour. **Crafting costs**, the button at its bottom, lists the recipes this install recorded under this
   character's profession names (recipe rows carry no character, so an alt's recipes in the same profession show too)
