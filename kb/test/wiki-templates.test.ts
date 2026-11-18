@@ -298,10 +298,36 @@ test("a <ref> inside a comment or a quoted attribute does not swallow prose", ()
   expect(repairTemplates("x<ref>a</ref> y\n<references/>")).toBe("x y\n<references/>");
   // A ref that never closes is left for the converter, as before.
   expect(repairTemplates("x<ref>never closed")).toBe("x<ref>never closed");
+  // A malformed tag ends at the first ">", as on the wiki (Nightbane pack).
+  expect(repairTemplates('when captured,<ref name="Bane" /<ref name="Yorgen" /> as well as [[Manor Mistmantle]].')).toBe("when captured, as well as [[Manor Mistmantle]].");
+  // A comment inside a ref does not end it.
+  expect(wtf(repairTemplates("A<ref><!-- </ref> -->citation</ref>KEEP")).text()).toBe("AKEEP");
 });
 
-test("long space runs and unclosed tags convert in linear time", () => {
-  for (const src of ["a" + " ".repeat(40_000) + "b", "<ref>".repeat(40_000), "<ref ".repeat(40_000), "<pre>".repeat(40_000), "<!--".repeat(40_000)]) {
+test("letters that grow when lower-cased do not shift where tags are found", () => {
+  // "İ".toLowerCase() is two characters; reading tags from a fully lower-cased copy cut text in the wrong place.
+  expect(wtf(repairTemplates("A<ref>İİİİİİİİ</ref>KEEP <b>tail</b>")).text()).toBe("AKEEP tail");
+  expect(wtf(repairTemplates("<code>İ</code>KEEP")).text()).toBe("İKEEP");
+});
+
+test("verbatim tags stay as written even when unclosed, long, or holding a close tag in <nowiki>", () => {
+  // An unclosed <pre> runs to the end of the page.
+  expect(repairTemplates('<pre>local key = "a  b"; <ref>LITERAL</ref>')).toBe('<pre>local key = "a  b"; <ref>LITERAL</ref>');
+  // A </code> inside <nowiki> does not close the <code>, and the ref after it is code, not a footnote.
+  expect(repairTemplates("<code><nowiki></code>KEEP  <ref>LITERAL</ref></nowiki></code>")).toBe("</code>KEEP  <ref>LITERAL</ref>");
+  // An opening tag of any length is read.
+  expect(repairTemplates("<code " + " ".repeat(2000) + '>local key = "a  b"</code>')).toBe('local key = "a  b"');
+  // The characters that mark held text are themselves held when the page has them.
+  expect(repairTemplates("a\u0002 0\u0003  b")).toBe("a\u0002 0\u0003 b");
+});
+
+test("long space runs, unclosed tags and near-miss close tags convert in linear time", () => {
+  const n = 8_000;
+  for (const src of [
+    "a" + " ".repeat(40_000) + "b", "<ref>".repeat(40_000), "<ref ".repeat(40_000), "<pre>".repeat(40_000), "<!--".repeat(40_000),
+    "<ref>".repeat(n) + "</references>".repeat(n), "<ref>".repeat(n) + "<!-- </ref> -->".repeat(n), "<code>".repeat(n) + "<!-- </code> -->".repeat(n),
+    '<ref a="'.repeat(20_000), '<ref a="x\n'.repeat(20_000), "<nowiki>".repeat(20_000) + "<code>".repeat(20_000),
+  ]) {
     repairTemplates(src.slice(0, 1000)); // warm up
     const start = performance.now();
     repairTemplates(src);
