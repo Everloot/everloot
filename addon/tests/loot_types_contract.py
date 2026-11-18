@@ -104,6 +104,10 @@ UnitGUID = function() return 'Player-1-0001' end
 UnitClass = function() return 'Mage', 'MAGE' end
 UnitLevel = function() return 60 end
 GetItemInfoInstant = function(name) if name == 'Green Iron Bracers' then return 3835 end end
+GetItemInfo = function(id)
+  if id == 3835 then return 'Green Iron Bracers', 'item:3835', 2, 36, 31, '', '', 1, '', 1, 500, 4 end
+  if id == 10940 then return 'Strange Dust', 'item:10940', 1, 1, 0, '', '', 20, '', 1, 10, 7 end
+end
 local before = #rows()
 event('UNIT_SPELLCAST_SENT', 'player', 'Green Iron Bracers', 'Cast-7', 13262)
 event('UNIT_SPELLCAST_SUCCEEDED', 'player', 'Cast-7', 13262)
@@ -112,6 +116,16 @@ assert(#rows() == before + 1 and last().lootType == 'disenchant' and last().sour
 assert(last().sourceNpcId == nil and last().sourceObjectId == nil and last().items[1].itemId == 10940)
 assert(#Everloot.Disenchant.History() == 1 and Everloot.Disenchant.History()[1].item == 3835)
 assert(Everloot.Disenchant.History()[1].mats[10940] == 2 and EverlootDB.records.disenchantLog == nil)
+-- The destroyed item is remembered with its level, so the site can place it in its band; the dust carries none.
+local seenRows = EverlootDB.records.item_seen or {}
+local bracers, dust
+for _, r in ipairs(seenRows) do
+  if r.itemId == 3835 then bracers = r end
+  if r.itemId == 10940 then dust = r end
+end
+assert(bracers and bracers.itemLevel == 36 and bracers.quality == 'uncommon', 'the disenchanted item is an item_seen row with its level')
+assert(dust and dust.itemLevel == nil, 'a material is not gear')
+GetItemInfo = nil
 -- Reopening an already attributed window cannot append another local entry.
 event('UNIT_SPELLCAST_SENT', 'player', 'Green Iron Bracers', 'Cast-7b', 13262)
 event('UNIT_SPELLCAST_SUCCEEDED', 'player', 'Cast-7b', 13262)
@@ -317,4 +331,5 @@ assert(#rows() == count, 'an unreadable interact unit: no guess')
 UnitGUID, UnitIsDead, UnitIsTapDenied, IsFishingLoot = function() end, nil, nil, nil
 """)
 counts = check_all(lua)
-assert counts == {"loot": 38}, counts
+# The two item_seen rows: the disenchanted bracers (with their level) and the dust it gave.
+assert counts == {"loot": 38, "item_seen": 2}, counts
