@@ -53,6 +53,12 @@ file. Update the addon and the Desktop App together, let the app refresh prices,
 keep working throughout. They are recorded asking-price
 estimates, not live listings or guaranteed sale prices. Your own latest scan of each house is kept per realm and house
 (`EverlootDB.houseScans`); a scan whose auctioneer could not be read says its house was not recorded.
+In the auction house's Sell tab, a line under Post compares what the listing brings in after the house's cut with
+what a vendor pays now: red when the vendor pays as much or more, amber when the gain is no larger than the deposit
+lost on an unsold auction, or when this house's current market value after the cut is below the vendor price, and a
+note when the disenchant estimate's materials beat both. Stale, thin or incomplete prices say nothing. It reads
+Blizzard's own sell window and never changes a price or posts; Esc > Options > AddOns > Everloot > Auction House
+turns it off.
 Below the prices, the tooltip shows where the item drops when three installs looted the source: each rate as
 drops of loot windows, with its installs and the date of the uploads behind it, from the drop rates the Desktop
 App writes into the same `EverlootPrices` file. Once that file is in the game, a missing price or drop source is

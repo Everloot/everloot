@@ -7,8 +7,9 @@ from window_world import fresh
 root = Path(__file__).parents[1]
 api = """
 UnitGUID = function() return 'Player-1-0001' end
-date = os.date
 now = 1794873600 + 3600
+-- Today is the test's own day (2026-11-17), not the machine's, so the 2026-11-17 prices below never go stale.
+date = function(format, t) return os.date(format, t or now) end
 GetItemInfo = function(id)
   if id == 999 then return nil end
   return 'Item ' .. id, 'item:' .. id, id == 100 and 2 or 1, 10, 1, '', '', 1, '', 123, 20, id == 100 and 4 or 7

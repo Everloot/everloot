@@ -7,7 +7,7 @@ vi.mock("next/link", () => ({
   default: ({ children, onNavigate: _onNavigate, ...props }: { children: React.ReactNode; onNavigate?: () => void; href: string }) => <a {...props}>{children}</a>,
 }));
 
-import SearchBar from "./SearchBar";
+import SearchBar, { couldBeName } from "./SearchBar";
 
 // Each test types its own text: the suggestion cache outlives a render.
 // The suggestions arrive 120 ms after the last key. Until they do, the list still shows the rows for what was
@@ -239,4 +239,9 @@ test("a failed character lookup leaves the database rows; a scoped box never ask
   await answer("wool", [suggestion(3, "Wool Cloth")]);
   expect(texts()).toEqual(["Wool ClothItem 3"]);
   expect(peopleAsked).toEqual([]);
+});
+
+test("a surname or a full Forever name could be a name, so the box asks /search/people for it", () => {
+  for (const text of ["Volvik", "Morningstar", "Volvik Morningstar", "Volvik  Morn", "Aeriwen Thistlewhisperingvale"]) expect(couldBeName(text)).toBe(true);
+  for (const text of ["6948", "V", "Volvik Morningstar Third2"]) expect(couldBeName(text)).toBe(false);
 });

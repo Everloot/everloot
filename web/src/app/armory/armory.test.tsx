@@ -207,6 +207,8 @@ describe("the hub", () => {
     expect(out).toContain('href="/armory/eu/guilds/ember-wardens"');
     expect(out).toContain("Read 2026-11-09 11:30 UTC");
     expect(await html(pages.hub({ q: "v1" }))).toContain("Type 2 to 24 letters");
+    // A surname, or the full "First Surname", finds the character too.
+    for (const q of ["dusk", "Velkara Duskmantle", " velkara  dusk "]) expect(await html(pages.hub({ q }))).toContain('href="/armory/eu/velkara-duskmantle"');
     mem.putCharacter(armoryCharacter({ slug: "élodie-brún", name: "Élodie", surname: "Brún" }));
     expect(await html(pages.hub({ q: "Élo" }))).toContain('href="/armory/eu/%C3%A9lodie-br%C3%BAn"');
     holder.store = broken();
