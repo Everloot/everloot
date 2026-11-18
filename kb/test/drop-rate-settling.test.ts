@@ -75,7 +75,7 @@ test("source-attributed windows count once per item, with empty windows and sour
     drops: 25, windows: 50, voters: 5, rate: 0.5, settled: true,
   });
   expect(rates[0]).toEqual({
-    sourceObjectId: 900, itemId: 77, kills: 50, drops: 25, rate: 0.5, reporters: 5, public: true,
+    sourceObjectId: 900, itemId: 77, kills: 50, drops: 25, units: 125, rate: 0.5, reporters: 5, public: true,
   });
 });
 

@@ -1,11 +1,16 @@
 import type { AwsClient } from "aws4fetch";
 
 export const STAMP = "x-amz-meta-data-as-of";
-export const stampOf = (dataAsOf: string | null) => dataAsOf ?? "none";
+/** The stamp of a view built from data current at `dataAsOf`; `revision` names the view's shape when it can change. */
+export const stampOf = (dataAsOf: string | null, revision?: string) => `${dataAsOf ?? "none"}${revision ? `;${revision}` : ""}`;
 
-/** Missing/unstamped/stale files need a write. Unknown freshness waits for the next cron instead of rebuilding. */
-export async function storedViewNeedsWrite(client: AwsClient, url: string, dataAsOf: string | null | undefined, doFetch: typeof fetch): Promise<boolean> {
-  const differs = (stamp: string | null) => dataAsOf !== undefined && stamp !== stampOf(dataAsOf);
+/**
+ * Missing/unstamped/stale files need a write. Unknown freshness waits for the next cron instead of rebuilding. With
+ * `revision`, a file stamped by code of another revision is stale too, so a view that gains a table is rewritten by
+ * the next cron run even when no upload arrived.
+ */
+export async function storedViewNeedsWrite(client: AwsClient, url: string, dataAsOf: string | null | undefined, doFetch: typeof fetch, revision?: string): Promise<boolean> {
+  const differs = (stamp: string | null) => dataAsOf !== undefined && stamp !== stampOf(dataAsOf, revision);
   try {
     const head = await doFetch(await client.sign(url, { method: "HEAD" }));
     if (head.status === 404) return true;
@@ -21,9 +26,9 @@ export async function storedViewNeedsWrite(client: AwsClient, url: string, dataA
     if (stamp !== null) return differs(stamp);
     const raw: unknown = await res.json();
     if (typeof raw === "object" && raw !== null) {
-      const body = raw as { dataAsOf?: unknown; set?: { dataAsOf?: unknown } | null };
+      const body = raw as { dataAsOf?: unknown; revision?: unknown; set?: { dataAsOf?: unknown } | null };
       const at = "dataAsOf" in body ? body.dataAsOf : body.set?.dataAsOf;
-      if (at === null || typeof at === "string") return differs(stampOf(at));
+      if (at === null || typeof at === "string") return differs(stampOf(at, typeof body.revision === "string" ? body.revision : undefined));
     }
     throw new Error("GET has no snapshot time");
   } catch (error) {

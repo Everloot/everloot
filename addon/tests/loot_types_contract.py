@@ -37,7 +37,7 @@ GetLootSourceInfo = function(i) return unpack(slots[i].sources) end
 root = Path(__file__).parents[1]
 lua = LuaRuntime()
 lua.execute(STUBS)
-for file in ["core.lua", "modules/openworld.lua"]:
+for file in ["core.lua", "modules/disenchant_data.lua", "modules/disenchant.lua", "modules/openworld.lua"]:
     lua.execute((root / file).read_text(encoding="utf-8"))
 lua.execute("""
 Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')
@@ -100,13 +100,37 @@ window('GameObject-0-1-2-3-2843-0000000001', { { 2589, 1 } })
 assert(last().lootType == 'gather', 'an object window with no cast is a gather window')
 
 -- Disenchanting: the item's id is read from the cast target while the item is in the bags.
+UnitGUID = function() return 'Player-1-0001' end
+UnitClass = function() return 'Mage', 'MAGE' end
+UnitLevel = function() return 60 end
 GetItemInfoInstant = function(name) if name == 'Green Iron Bracers' then return 3835 end end
+GetItemInfo = function(id)
+  if id == 3835 then return 'Green Iron Bracers', 'item:3835', 2, 36, 31, '', '', 1, '', 1, 500, 4 end
+  if id == 10940 then return 'Strange Dust', 'item:10940', 1, 1, 0, '', '', 20, '', 1, 10, 7 end
+end
 local before = #rows()
 event('UNIT_SPELLCAST_SENT', 'player', 'Green Iron Bracers', 'Cast-7', 13262)
 event('UNIT_SPELLCAST_SUCCEEDED', 'player', 'Cast-7', 13262)
 window('Item-4372-0-4000000000000001', { { 10940, 2 } })
 assert(#rows() == before + 1 and last().lootType == 'disenchant' and last().sourceItemId == 3835)
 assert(last().sourceNpcId == nil and last().sourceObjectId == nil and last().items[1].itemId == 10940)
+assert(#Everloot.Disenchant.History() == 1 and Everloot.Disenchant.History()[1].item == 3835)
+assert(Everloot.Disenchant.History()[1].mats[10940] == 2 and EverlootDB.records.disenchantLog == nil)
+-- The destroyed item is remembered with its level, so the site can place it in its band; the dust carries none.
+local seenRows = EverlootDB.records.item_seen or {}
+local bracers, dust
+for _, r in ipairs(seenRows) do
+  if r.itemId == 3835 then bracers = r end
+  if r.itemId == 10940 then dust = r end
+end
+assert(bracers and bracers.itemLevel == 36 and bracers.quality == 'uncommon', 'the disenchanted item is an item_seen row with its level')
+assert(dust and dust.itemLevel == nil, 'a material is not gear')
+GetItemInfo = nil
+-- Reopening an already attributed window cannot append another local entry.
+event('UNIT_SPELLCAST_SENT', 'player', 'Green Iron Bracers', 'Cast-7b', 13262)
+event('UNIT_SPELLCAST_SUCCEEDED', 'player', 'Cast-7b', 13262)
+window('Item-4372-0-4000000000000001', { { 10940, 2 } })
+assert(#Everloot.Disenchant.History() == 1)
 -- An item the addon cannot name records nothing.
 event('UNIT_SPELLCAST_SENT', 'player', 'Gone Item', 'Cast-8', 13262)
 window('Item-4372-0-4000000000000002', { { 10940, 1 } })
@@ -307,4 +331,5 @@ assert(#rows() == count, 'an unreadable interact unit: no guess')
 UnitGUID, UnitIsDead, UnitIsTapDenied, IsFishingLoot = function() end, nil, nil, nil
 """)
 counts = check_all(lua)
-assert counts == {"loot": 38}, counts
+# The two item_seen rows: the disenchanted bracers (with their level) and the dust it gave.
+assert counts == {"loot": 38, "item_seen": 2}, counts

@@ -101,6 +101,32 @@
   },
   {
     "method": "GET",
+    "path": "/api/rollups/disenchant",
+    "summary": "What each disenchant band yields, from disenchants players recorded",
+    "description": "The game files sort a disenchanted item into a band by class, quality and item level; the server draws its materials from that band's table. A band's materials are public once three installs disenchanted items in it, each with its chance and its mean units per disenchant. Never another addon's tables: WoW: Forever's bands are its own.",
+    "access": "key-or-rate-limited",
+    "data": "mixed",
+    "responses": {
+      "200": {
+        "description": "Every band of the current build.",
+        "schema": "disenchantResponse"
+      },
+      "400": {
+        "description": "A parameter is wrong; `error` says which.",
+        "schema": "apiError"
+      },
+      "429": {
+        "description": "Rate limited. `Retry-After` says when to try again.",
+        "schema": "apiError"
+      },
+      "503": {
+        "description": "A dependency is unavailable. The answer is unrecorded, not zero.",
+        "schema": "apiError"
+      }
+    }
+  },
+  {
+    "method": "GET",
     "path": "/api/edges",
     "summary": "Typed relations between items, NPCs, spells, quests, zones and sets",
     "description": "Observed edges (dropped by, sold by, reward from, located in) come first and carry install counts; game-file edges (created by, reagent for, part of set, same icon) follow and carry the build. With no filter the whole table pages like the corpus.",

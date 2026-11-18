@@ -4,11 +4,13 @@ import { observedEdges, type Edge } from "../../../kb/src/edges";
 import { itemFactRowsFromRecords } from "../../../kb/src/item-facts";
 import type { ItemFacts } from "../../../kb/src/item-page";
 import { craftedItemsFromRecords } from "../../../kb/src/item-source";
+import { disenchantTablesFromRecords, type DisenchantTables } from "../../../kb/src/disenchant";
 import { instanceFactsFromRecords, type InstanceFacts } from "../../../kb/src/instances";
 import { lootTablesFromRecords, type LootTables } from "../../../kb/src/loot-tables";
 import { objectSightingRowsFromRecords, type ObjectSpawnRow } from "../../../kb/src/object-spawns";
 import { worldFactsFromRecords, type WorldFacts } from "../../../kb/src/world-pages";
 import { RECHECK_SCOPES } from "./recheck-scopes";
+import { CLIENT_DISENCHANT } from "../data/game-data/client-disenchant";
 import { lootWindowsFromRecords, rollupDrops, type RollupResult } from "./rollups";
 import type { Corpus } from "./upload-store";
 
@@ -43,6 +45,8 @@ export interface AggregateSet {
   edges: Edge[];
   /** The NPC loot and item-source tables, with each source's windows, installs and dates. */
   loot: LootTables;
+  /** Disenchants by band and by item (kb/src/disenchant.ts), each band public once 3 installs disenchanted in it. */
+  disenchant: DisenchantTables;
 }
 
 /**
@@ -90,5 +94,6 @@ export function buildAggregates(corpus: Pick<Corpus, "uploads" | "records" | "da
     addonTrends: once(() => addonTrends(addonRowsFromRecords(records), asOf)),
     edges: observedEdges(corpus.records, corpus.dataAsOf ?? new Date(), RECHECK_SCOPES),
     loot: lootTablesFromRecords(lootRecords, corpus.dataAsOf ?? null),
+    disenchant: disenchantTablesFromRecords(corpus.records, CLIENT_DISENCHANT, corpus.dataAsOf ?? null),
   };
 }

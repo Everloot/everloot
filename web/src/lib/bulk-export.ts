@@ -1,15 +1,17 @@
+import { publicDropRate, publicMeasuredZero } from "../../../kb/src/drop-rollup";
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { bulkIndex, CREDIT_LINE, LICENCE, LICENCE_URL, PROTOCOL_VERSION, PUBLIC_RECORD_KINDS, SITE, type BulkFile, type BulkIndex } from "@everloot/protocol";
 import { filterItems, describe } from "../../../kb/src/item-taxonomy";
+import { loadStoredAggregates } from "./aggregate-store";
 import { attribution } from "./data-guard";
 import { gameDataNotice, loadEdges } from "./edges";
 import { guildExportRows, guildsOn, loadGuildData } from "./guilds";
 import { CLIENT_TAXONOMY as T } from "./items";
 import { published, publicInstallSecret } from "./public-install";
 import { computeRollups } from "./rollup-compute";
-import { uploadStore } from "./upload-store";
+import { cloudConfig, uploadStore } from "./upload-store";
 
 /**
  * The bulk export: the published data as files, one newline-delimited JSON file per dataset plus an
@@ -29,7 +31,13 @@ interface Dataset {
 
 async function datasets(): Promise<{ sets: Dataset[]; dataAsOf: string | null }> {
   const sets: Dataset[] = [];
-  const corpus = await uploadStore.loadCorpus();
+  // The CLI runs outside production too: never mistake the loader's local fallback for cloud data.
+  const required = ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
+  const missing = required.filter((key) => !process.env[key]?.trim());
+  const corpus = cloudConfig() ? await uploadStore.loadCorpus() : { uploads: 0, records: [], unreachable: true, dataAsOf: null };
+  if (corpus.unreachable) {
+    console.warn(`bulk export: corpus.ndjson omitted: ${missing.length ? `missing ${missing.join(", ")}` : "corpus storage unreachable"}`);
+  }
   const dataAsOf = corpus.unreachable ? null : (corpus.dataAsOf ?? null);
   if (!corpus.unreachable) {
     const wanted = new Set<string>(PUBLIC_RECORD_KINDS);
@@ -38,17 +46,20 @@ async function datasets(): Promise<{ sets: Dataset[]; dataAsOf: string | null }>
       file: { name: "corpus.ndjson", dataset: "corpus", format: "ndjson", rowsOf: "corpusPublicResponse", field: "records", data: "observed", attribution: attribution("/database"), gameData: null },
       rows: corpus.records.filter((r) => wanted.has(r.kind)).map((r) => published(r, secret) as Row),
     });
-    const { rates, measuredZeros, stats } = await computeRollups();
-    if (!stats.unreachable) {
-      sets.push({
-        file: { name: "drops.ndjson", dataset: "drops", format: "ndjson", rowsOf: "dropsResponse", field: "rates", data: "observed", attribution: attribution("/database/drops"), gameData: null },
-        rows: rates.filter((r) => r.public) as unknown as Row[],
-      });
-      sets.push({
-        file: { name: "drops-measured-zeros.ndjson", dataset: "drops", format: "ndjson", rowsOf: "dropsResponse", field: "measuredZeros", data: "observed", attribution: attribution("/database/drops"), gameData: null },
-        rows: measuredZeros.filter((z) => z.public) as unknown as Row[],
-      });
-    }
+  }
+  // Stored drops need only R2; never fall back to local uploads when the cloud corpus is unavailable.
+  const stored = await loadStoredAggregates();
+  const drops = stored?.drops ?? (!corpus.unreachable ? await computeRollups(corpus) : null);
+  if (drops) {
+    const { rates, measuredZeros } = drops;
+    sets.push({
+      file: { name: "drops.ndjson", dataset: "drops", format: "ndjson", rowsOf: "dropsResponse", field: "rates", data: "observed", attribution: attribution("/database/drops"), gameData: null },
+      rows: rates.filter((r) => r.public).map(publicDropRate) as unknown as Row[],
+    });
+    sets.push({
+      file: { name: "drops-measured-zeros.ndjson", dataset: "drops", format: "ndjson", rowsOf: "dropsResponse", field: "measuredZeros", data: "observed", attribution: attribution("/database/drops"), gameData: null },
+      rows: measuredZeros.filter((z) => z.public).map(publicMeasuredZero) as unknown as Row[],
+    });
   }
   if (guildsOn()) {
     const guilds = await loadGuildData();

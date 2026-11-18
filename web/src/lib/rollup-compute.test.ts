@@ -24,7 +24,10 @@ vi.mock("../../../kb/src/addon-rollup", async (importOriginal) => ({
   popularAddonsFromRecords: fns.addons,
   addonTrends: fns.trends,
 }));
-vi.mock("../../../kb/src/edges", () => ({ observedEdges: fns.edges }));
+vi.mock("../../../kb/src/edges", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../kb/src/edges")>()),
+  observedEdges: fns.edges,
+}));
 vi.mock("./rollups", () => ({ lootWindowsFromRecords: fns.windows, rollupDrops: fns.rollup }));
 
 import { RECHECK_SCOPES } from "./recheck-scopes";

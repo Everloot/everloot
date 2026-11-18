@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { writeItemView, buildItemView } from "./item-view-store";
-import { writeAggregates, anonymousAggregates } from "./aggregate-store";
+import { writeAggregates, anonymousAggregates, AGGREGATES_REVISION } from "./aggregate-store";
 import { writeProfessions, buildProfessions } from "./profession-store";
 import { writeMapPins, buildMapPins } from "./map-pins-store";
 import { writeAuctionHistory, buildAuctionHistory } from "./auction-history-store";
@@ -10,15 +10,16 @@ const dataAsOf = "2026-11-10T00:00:00.000Z";
 const corpus = { uploads: 0, records: [], dataAsOf };
 const stamp = "x-amz-meta-data-as-of";
 const writers = [
-  { name: "items", write: (added: number, fetch: typeof globalThis.fetch) => writeItemView({ added, dataAsOf }, { cloud, fetch, build: () => buildItemView(dataAsOf, new Date(), corpus) }) },
-  { name: "aggregates", write: (added: number, fetch: typeof globalThis.fetch) => writeAggregates({ added, dataAsOf }, { cloud, fetch, build: async () => anonymousAggregates(corpus) }) },
-  { name: "professions", write: (added: number, fetch: typeof globalThis.fetch) => writeProfessions({ added, dataAsOf }, { cloud, fetch, build: async () => buildProfessions(corpus) }) },
-  { name: "map pins", write: (added: number, fetch: typeof globalThis.fetch) => writeMapPins({ added, dataAsOf }, { cloud, fetch, build: async () => buildMapPins(corpus) }) },
-  { name: "auction history", write: (added: number, fetch: typeof globalThis.fetch) => writeAuctionHistory({ added, dataAsOf }, { cloud, fetch, build: async () => buildAuctionHistory(corpus) }) },
+  { name: "items", current: dataAsOf, write: (added: number, fetch: typeof globalThis.fetch) => writeItemView({ added, dataAsOf }, { cloud, fetch, build: () => buildItemView(dataAsOf, new Date(), corpus) }) },
+  // The aggregates' stamp carries the set's revision, so a file from before a new table is rewritten once.
+  { name: "aggregates", current: `${dataAsOf};${AGGREGATES_REVISION}`, revision: AGGREGATES_REVISION, write: (added: number, fetch: typeof globalThis.fetch) => writeAggregates({ added, dataAsOf }, { cloud, fetch, build: async () => anonymousAggregates(corpus) }) },
+  { name: "professions", current: dataAsOf, write: (added: number, fetch: typeof globalThis.fetch) => writeProfessions({ added, dataAsOf }, { cloud, fetch, build: async () => buildProfessions(corpus) }) },
+  { name: "map pins", current: dataAsOf, write: (added: number, fetch: typeof globalThis.fetch) => writeMapPins({ added, dataAsOf }, { cloud, fetch, build: async () => buildMapPins(corpus) }) },
+  { name: "auction history", current: dataAsOf, write: (added: number, fetch: typeof globalThis.fetch) => writeAuctionHistory({ added, dataAsOf }, { cloud, fetch, build: async () => buildAuctionHistory(corpus) }) },
 ];
 afterEach(() => vi.restoreAllMocks());
 
-for (const { name, write } of writers) {
+for (const { name, write, current, revision } of writers) {
   test(`${name}: an idle run retries a failed PUT, then skips the current object`, async () => {
     let stored = "older";
     let fail = true;
@@ -31,7 +32,7 @@ for (const { name, write } of writers) {
     });
     await expect(write(1, fetch)).rejects.toThrow("write failed");
     expect(await write(0, fetch)).toMatchObject({ written: true });
-    expect(stored).toBe(dataAsOf);
+    expect(stored).toBe(current);
     expect(await write(0, fetch)).toEqual({ written: false });
     expect(fetch.mock.calls.map(([req]) => (req as Request).method)).toEqual(["PUT", "HEAD", "PUT", "HEAD"]);
   });
@@ -45,7 +46,7 @@ for (const { name, write } of writers) {
       return new Response(null);
     });
     expect(await write(0, fetch)).toMatchObject({ written: true });
-    expect(stored).toBe(dataAsOf);
+    expect(stored).toBe(current);
     expect(await write(0, fetch)).toEqual({ written: false });
   });
 
@@ -66,7 +67,7 @@ for (const { name, write } of writers) {
 
   test.each(["matching", "stale", "missing"])(`${name}: HEAD %s`, async (mode) => {
     const fetch = vi.fn(async (input: RequestInfo | URL) => (input as Request).method === "HEAD"
-      ? new Response(null, { status: mode === "missing" ? 404 : 200, headers: { [stamp]: mode === "matching" ? dataAsOf : "older" } })
+      ? new Response(null, { status: mode === "missing" ? 404 : 200, headers: { [stamp]: mode === "matching" ? current : "older" } })
       : new Response(null));
     expect(await write(0, fetch)).toMatchObject({ written: mode !== "matching" });
     expect(fetch.mock.calls.map(([req]) => (req as Request).method)).toEqual(mode === "matching" ? ["HEAD"] : ["HEAD", "PUT"]);
@@ -84,10 +85,10 @@ for (const { name, write } of writers) {
         if (req.method === "PUT") return new Response(null);
         if (mode === "network") throw new Error("offline");
         if (mode === "503" || mode === "missing") return new Response(null, { status: mode === "503" ? 503 : 404 });
-        if (mode.endsWith("metadata")) return new Response("invalid", { headers: { [stamp]: mode.startsWith("matching") ? dataAsOf : "older" } });
+        if (mode.endsWith("metadata")) return new Response("invalid", { headers: { [stamp]: mode.startsWith("matching") ? current : "older" } });
         // Exercise the actual on-disk envelope for each writer.
         const value = { dataAsOf: mode.startsWith("matching") ? dataAsOf : "older" };
-        return new Response(mode === "invalid" ? "{}" : JSON.stringify(name === "items" || name === "auction history" ? value : { set: value }));
+        return new Response(mode === "invalid" ? "{}" : JSON.stringify(name === "items" || name === "auction history" ? value : { ...(revision ? { revision } : {}), set: value }));
       });
       const written = mode.startsWith("stale") || mode === "missing";
       for (let run = 0; run < 2; run++) expect(await write(0, fetch)).toMatchObject({ written });
