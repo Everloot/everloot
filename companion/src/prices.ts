@@ -113,6 +113,10 @@ export type DropRow = [number, "n" | "o", number, number, number, number];
  */
 export interface DropSources { dataAsOf: string | null; fetchedAt: string; rows: DropRow[]; names?: Record<string, string> }
 
+/** [bandId, materialId, withMaterial, windows, mean units * 1000, min, max]. Rated bands only. */
+export type DisenchantRow = [number, number, number, number, number, number, number];
+export interface DisenchantSources { dataAsOf: string | null; fetchedAt: string; rows: DisenchantRow[] }
+
 /** A source's name as one line of the names block: control characters become spaces, at most 100 characters. */
 function nameLine(name: string): string {
   return name.replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, 100);
@@ -173,10 +177,11 @@ function block(key: string, data: string, dates: { dataAsOf: string | null; fetc
  * "id,market,min,historical,quantity,day,reporters;..." string and its Adler-32. An addon from before houses finds no
  * realm-only key and shows no community price rather than another house's. With `drops`, one
  * "itemId,kind,sourceId,drops,windows,installs;..." string and its Adler-32 beside them;
- * with `sources`, one "itemId,npcId/npcId,reagentOf;..." string and its Adler-32 after the drops. Each block is
- * optional: an addon reading a file without one shows what it showed before the block existed.
+ * with `sources`, one "itemId,npcId/npcId,reagentOf;..." string and its Adler-32 after the drops. `disenchant` carries
+ * rated yields as "bandId,materialId,withMaterial,windows,milliUnits,min,max". Each block is optional: an addon
+ * reading a file without one shows what it showed before the block existed.
  */
-export function renderPricesAddon(realms: RealmPrices[], drops?: DropSources, sources?: ItemSources): { toc: string; lua: string } {
+export function renderPricesAddon(realms: RealmPrices[], drops?: DropSources, sources?: ItemSources, disenchant?: DisenchantSources): { toc: string; lua: string } {
   const toc = [
     `## Interface: ${INTERFACE}`,
     "## Title: Everloot Prices",
@@ -192,6 +197,10 @@ export function renderPricesAddon(realms: RealmPrices[], drops?: DropSources, so
       `["data"] = ${luaString(data)}, ["sum"] = ${adler32(data)} },`;
   });
   const blocks: string[] = [];
+  if (disenchant) {
+    const rows = [...disenchant.rows].sort((a, b) => a[0] - b[0] || b[2] / b[3] - a[2] / a[3] || a[1] - b[1]);
+    blocks.push(block("disenchant", rows.map((r) => r.join(",")).join(";"), disenchant, ""));
+  }
   if (drops) blocks.push(block("drops", sortDropRows(drops.rows).map((r) => r.join(",")).join(";"), drops, dropNames(drops)));
   if (sources) {
     const data = sortSourceRows(sources.rows).map((r) => `${r[0]},${r[1].join("/")},${r[2]}`).join(";");
@@ -208,10 +217,10 @@ export function renderPricesAddon(realms: RealmPrices[], drops?: DropSources, so
   return { toc, lua };
 }
 
-export function writePricesAddon(addonsDir: string, realms: RealmPrices[], drops?: DropSources, sources?: ItemSources): void {
+export function writePricesAddon(addonsDir: string, realms: RealmPrices[], drops?: DropSources, sources?: ItemSources, disenchant?: DisenchantSources): void {
   const dir = join(addonsDir, PRICES_ADDON);
   mkdirSync(dir, { recursive: true });
-  const { toc, lua } = renderPricesAddon(realms, drops, sources);
+  const { toc, lua } = renderPricesAddon(realms, drops, sources, disenchant);
   for (const [name, text] of [[`${PRICES_ADDON}.toc`, toc], [`${PRICES_ADDON}.lua`, lua]] as const) {
     writeFileSync(join(dir, `${name}.tmp`), text);
     renameSync(join(dir, `${name}.tmp`), join(dir, name));

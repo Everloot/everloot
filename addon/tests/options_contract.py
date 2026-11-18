@@ -2,14 +2,12 @@
 
 The settings page: registered with the Settings API when the client has it, else the older interface
 options, else shown as a window by /everloot options. With sub-pages, Everloot is an overview and the switches
-sit on four short pages under it (General, Auction house, Shared with Everloot, Your characters), each switch
+sit on five pages under it (General, Tooltips, Auction House, Helpers, Data Sharing), each switch
 on exactly one; a sub-page the game refuses sends /everloot options to the one page with every switch. The
-Ask box is not on the settings page (/ask still works). One switch per module and the scan prompt; a switch
+Ask box is not on the settings page (/ask still works). One switch per module and the first-visit introduction; a switch
 with a /everloot command runs it (so off deletes rows exactly as in chat), the others set the toggle; the
 boxes show the saved state; Reload now reloads. Every switch stays reachable in a scrolling list above the
-footer at any width. With the window's file loaded the page wears that window's look (a small crest heading,
-its fonts, the switches on a surface panel, its dark window when shown on its own) without building the
-window; without that file it keeps the game's own fonts and dialog.
+footer at any width. Settings use native fonts and gold headings; the standalone fallback keeps a dark backdrop.
 """
 from pathlib import Path
 from lupa.lua51 import LuaRuntime
@@ -92,7 +90,7 @@ function checkRows(page)
     end
     assert(child.height >= previousBottom, 'the last description must be inside scrollable content')
     scroll.scripts.OnMouseWheel(scroll, -1000)
-    assert(scroll.offset == child.height - scroll.height, 'scrolling down reaches the last settings')
+    assert(scroll.offset == math.max(0, child.height - scroll.height), 'scrolling down reaches the last settings')
     scroll.scripts.OnMouseWheel(scroll, 1000)
     assert(scroll.offset == 0, 'scrolling back reaches the first settings')
   end
@@ -156,7 +154,7 @@ for _, line in ipairs(printed) do if string.find(line, 'census off', 1, true) th
 assert(said, 'the page says what changed, like the command')
 assert(string.find(O.page.note.text, 'Changes apply after a reload.', 1, true))
 
--- The scan prompt is a top-level setting; a module without a command sets its toggle.
+-- The first-visit introduction is a top-level setting; a module without a command sets its toggle.
 byKey.scanPrompt.checked = false
 byKey.scanPrompt.scripts.OnClick(byKey.scanPrompt)
 assert(EverlootDB.scanPrompt == false and not byKey.scanPrompt.checked)
@@ -171,7 +169,7 @@ O.page.reload.scripts.OnClick()
 assert(reloads == 1, 'Reload now reloads')
 """)
 
-# --- With sub-pages: an overview, and four short pages that hold every switch once ---
+# --- With sub-pages: an overview, and five pages that hold every switch once ---
 SPLIT = SETTINGS + """
 subs = {}
 refuse = nil
@@ -187,16 +185,16 @@ for window in (False, True):
     lua.execute("""
 local O = Everloot.Options
 assert(O.how == 'settings' and #registered == 1 and registered[1].frame == O.page, 'Everloot is still the AddOns category')
-assert(#subs == 4, 'four pages under it')
+assert(#subs == 5, 'five pages under it')
 local names = {}
 for i, c in ipairs(subs) do
   names[i] = c.name
   assert(c.parent == registered[1], 'each page sits under Everloot')
 end
-assert(table.concat(names, '|') == 'General|Auction house|Shared with Everloot|Your characters', table.concat(names, '|'))
+assert(table.concat(names, '|') == 'General|Tooltips|Auction House|Helpers|Data Sharing', table.concat(names, '|'))
 -- The overview: no switches, what the file holds, where the switches went, Reload now.
 assert(#O.page.boxes == 0 and #O.page.added == #O.AddedRows(), 'the overview holds no switches, only what you have added')
-assert(string.find(O.page.intro.text, 'General, Auction house, Shared with Everloot and Your characters', 1, true), 'the overview says where the switches are')
+assert(string.find(O.page.intro.text, 'General, Tooltips, Auction House, Helpers and Data Sharing', 1, true), 'the overview says where the switches are')
 assert(O.page.reload and O.page.note)
 assert(rawget(O.page, 'ask') == nil, 'no ask box')
 -- Every row on exactly one page, in O.ROWS order within it; each page short enough to read without scrolling.
@@ -209,7 +207,7 @@ for i, c in ipairs(subs) do
   assert(page == O.groupPages[O.GROUPS[i].key] and page.name == O.GROUPS[i].name)
   assert(page.intro.text == O.GROUPS[i].intro and page.title.text ~= nil)
   assert(rawget(page, 'added') == false, 'what you have added stays on the overview')
-  assert(#page.boxes >= 3 and #page.boxes <= 7, O.GROUPS[i].name .. ' has ' .. #page.boxes .. ' switches')
+  assert(#page.boxes >= 2 and #page.boxes <= 12, O.GROUPS[i].name .. ' has ' .. #page.boxes .. ' switches')
   local last = 0
   for _, box in ipairs(page.boxes) do
     assert(box.row.group == O.GROUPS[i].key, box.row.key .. ' is on its own page')
@@ -227,7 +225,7 @@ for i, c in ipairs(subs) do
   checkRows(page)
 end
 local censusBox
-for _, box in ipairs(O.groupPages.shared.boxes) do if box.row.key == 'census' then censusBox = box end end
+for _, box in ipairs(O.groupPages.data.boxes) do if box.row.key == 'census' then censusBox = box end end
 assert(censusBox and not censusBox.checked, 'census off by command shows unticked on the first visit')
 for _, row in ipairs(O.ROWS) do assert(seen[row.key], row.key .. ' has a page') end
 assert(#O.Boxes() == #O.ROWS, 'every switch once across the pages')
@@ -238,7 +236,7 @@ for _, row in ipairs(O.ROWS) do
   assert(known, row.key .. ' names a known page')
 end
 local census
-for _, box in ipairs(O.groupPages.shared.boxes) do if box.row.key == 'census' then census = box end end
+for _, box in ipairs(O.groupPages.data.boxes) do if box.row.key == 'census' then census = box end end
 census.checked = false
 census.scripts.OnClick(census)
 assert(EverlootDB.toggles.census == false and not census.checked, 'a switch on a page sets its module')
@@ -248,10 +246,10 @@ assert(opened == 42, '/everloot options opens Everloot, the overview')
 """)
 
 # A page the game refuses: its switches stay reachable, /everloot options opens the one page with all of them.
-lua = fresh(SPLIT.replace("refuse = nil", "refuse = 'Auction house'"))
+lua = fresh(SPLIT.replace("refuse = nil", "refuse = 'Auction House'"))
 lua.execute("""
 local O = Everloot.Options
-assert(O.splitFailed and #subs == 3 and O.groupPages.auction == nil, 'the refused page is not listed')
+assert(O.splitFailed and #subs == 4 and O.groupPages.auction == nil, 'the refused page is not listed')
 SlashCmdList.EVERLOOT('options')
 assert(opened == nil, 'not sent to a list that lacks switches')
 assert(O.whole and O.whole.shown and #O.whole.boxes == #O.ROWS and O.close, 'a window with every switch')
@@ -324,15 +322,42 @@ assert 'key = "pulls"' in (root / "modules" / "options.lua").read_text(encoding=
 
 # --- Older client: interface options ---
 lua = fresh("""
-added = nil; openCalls = 0
-InterfaceOptions_AddCategory = function(frame) added = frame end
+added = {}; openCalls = 0
+InterfaceOptions_AddCategory = function(frame) added[#added + 1] = frame end
 InterfaceOptionsFrame_OpenToCategory = function(frame) openCalls = openCalls + 1 end
 """)
 lua.execute("""
 local O = Everloot.Options
-assert(O.how == 'interface' and added == O.page and O.page.name == 'Everloot')
+assert(O.how == 'interface' and added[1] == O.page and O.page.name == 'Everloot')
 SlashCmdList.EVERLOOT('options')
 assert(openCalls == 2, 'the older frame is asked twice, as it needs on a first open')
+assert(#added == 6 and #O.page.boxes == 0, 'older Options has an overview and five child pages')
+local seen = {}
+for i, group in ipairs(O.GROUPS) do
+  local page = added[i + 1]
+  assert(page.parent == 'Everloot' and page.name == group.name, 'native child category')
+  for _, box in ipairs(page.boxes) do
+    assert(not seen[box.row.key] and box.row.group == group.key, 'each setting has one home')
+    seen[box.row.key] = true
+  end
+  checkRows(page)
+end
+for _, row in ipairs(O.ROWS) do assert(seen[row.key], row.key .. ' is reachable') end
+""")
+
+# Older Options can refuse a child too; no switch may become unreachable.
+lua = fresh("""
+InterfaceOptions_AddCategory = function(frame)
+  if frame.name == 'Helpers' then error('child unavailable') end
+end
+InterfaceOptionsFrame_OpenToCategory = function() error('should use complete fallback') end
+""")
+lua.execute("""
+local O = Everloot.Options
+assert(O.splitFailed and O.groupPages.helpers == nil, 'refused legacy child is recorded')
+SlashCmdList.EVERLOOT('options')
+assert(O.whole and O.whole.shown and #O.whole.boxes == #O.ROWS, 'fallback keeps every switch')
+checkRows(O.whole)
 """)
 
 # --- Neither: /everloot options shows the page as a window ---
@@ -353,15 +378,11 @@ lua.execute("""
 local O = Everloot.Options
 local page = O.page
 assert(O.how == 'settings' and registered[1].frame == page, 'still an AddOns category')
-assert(page.crest and page.crest.path == 'Interface\\\\AddOns\\\\Everloot\\\\media\\\\crest' and page.crest.width <= 32, 'a modest crest heads the page')
-assert(page.title.text == 'Everloot' and page.title.color[2] > 0.9 and page.title.color[1] < 0.7 and page.title.color[3] < 0.3, 'Everloot in fel green')
-assert(Everloot.Window.frame == nil and EverlootWindow == nil, 'the page borrows the look without building the window')
-assert(page.scroll.textures and page.scroll.textures[1].colorTexture[1] < 0.1, 'the switches sit on a surface panel')
+assert(rawget(page, 'crest') == nil and rawget(page.title, 'font') == nil, 'settings keep native headings and fonts')
+assert(Everloot.Window.frame == nil and EverlootWindow == nil, 'settings do not build the main window')
 for _, box in ipairs(page.boxes) do
-  assert(box.label.font:find('FRIZQT', 1, true) and box.description.font:find('FRIZQT', 1, true), "the window's fonts")
-  assert(box.label.size > box.description.size and box.label.color[1] > box.description.color[1], 'a label reads above its description')
+  assert(rawget(box.label, 'font') == nil and rawget(box.description, 'font') == nil, 'native control fonts')
 end
-assert(page.intro.font:find('FRIZQT', 1, true) and page.note.font:find('FRIZQT', 1, true), 'the introduction and the footer note too')
 page:Show()
 checkRows(page)
 
@@ -742,4 +763,4 @@ assert(EverlootDB.tooltip == 'full' and mode.text == 'Full', 'next click selects
 assert(EverlootDB.tooltipMarket == nil and EverlootDB.tooltipSources == nil, 'the individual switches keep their values')
 """)
 
-print("Lua 5.1 options: Settings API, interface options or a window; one switch per module; command rows run their command; every switch inside a scrolling list at any width; the window's crest heading, fonts, surface and dark window, or the game's own without its file; Reload now; the feature chooser (Everything, Collect data only, Choose myself) asked once per install before player names, and again by /everloot setup; player names asked once, after the loading screen and out of combat")
+print("Lua 5.1 options: Settings API, interface options or a window; one switch per module; command rows run their command; every switch inside a scrolling list at any width; native headings/fonts on both Options APIs, complete fallback on a refused child; Reload now; the feature chooser (Everything, Collect data only, Choose myself) asked once per install before player names, and again by /everloot setup; player names asked once, after the loading screen and out of combat")

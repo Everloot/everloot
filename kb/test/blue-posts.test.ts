@@ -323,7 +323,7 @@ function fakeServer(routes: Record<string, Route> = {}) {
 }
 
 const run = (server: ReturnType<typeof fakeServer>, extra: Partial<IngestOptions> = {}) =>
-  ingestBluePosts({ store: emptyStore(), fetcher: server.fetcher, now, sleep: async () => {}, ...extra });
+  ingestBluePosts({ store: emptyStore(), fetcher: server.fetcher, now, skipNews: true, sleep: async () => {}, ...extra });
 const forumIds = (store: BlueStore) => store.posts.filter((p) => p.source === "forum").map((p) => p.id).sort();
 
 test("ingest: Bluesky, then per forum robots.txt first, the staff list, each topic list, and only topics with staff posts", async () => {
@@ -440,7 +440,7 @@ test("ingest: a run stops at its request budget, and the next run opens the topi
   expect(forumIds(cut.store)).toEqual(["forum:502002"]);
   expect(cut.skipped.some((s) => s.startsWith("stopped: request budget of 5 spent"))).toBe(true);
   expect(cut.errors).toEqual([]);
-  expect(cut.store.fetched["list:us:forever"].newestSeen).toBe("2026-10-17T09:00:00.000Z");
+  expect(cut.store.fetched["list:us:forever"].scan?.pending).toEqual([{ id: 500, bumpedAt: "2026-10-17T11:00:00.000Z" }]);
   const next = fakeServer({ "list:us:wow-forever": many });
   const done = await run(next, { store: cut.store, now: minutes(30) });
   expect(next.of("topic").map((c) => new URL(c.url).pathname)).toEqual(["/en/wow/t/500.json"]);

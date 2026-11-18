@@ -7,10 +7,7 @@ Everloot Desktop App, and adds auction prices to item tooltips. It uses only the
 plays the character. Records match the upload contract (`packages/protocol`, see its `schema/records/`) field for
 field.
 
-**Status:** 0.3.23 Alpha. The automated contract tests pass. 0.3.22 was checked in the live Forever client on
-2026-11-10: the Everloot window, the minimap button and its button drawer, and the auction house shopping list. The
-settings pages and Collection's Dungeons & raids section are new in 0.3.23 and were checked on its nightly on
-2026-11-11; whether the game reports open-world boss kills is not yet known. The in-client checks in
+**Status:** 0.3.24, a regular release. The automated contract tests pass. 0.3.24 was checked in the live Forever client on 2026-11-17: the feature chooser, the removal of the kinds Blizzard's API now supplies, the one-time player names notice and an empty loot window. The in-client checks in
 `docs/2026-10-08-beta-client-checklist.md`, `docs/2026-10-18-addon-0.3.2-beta-checklist.md`,
 `docs/2026-10-19-addon-0.3.3-beta-checklist.md` and `docs/2026-10-21-addon-0.3.10-launch-checklist.md` are still open, and the full scan
 (`docs/design/specs/2026-10-16-forever-market-design.md`) has not run in the Forever client.
@@ -26,11 +23,11 @@ client's `Interface/AddOns/`, `/reload`, then run `/everloot status`. Login and 
 version, how many modules are on and off, any that could not start and any paused collection); `/everloot status`
 lists every module and row count. Auction capture is on in a new
 install (`/everloot auctions off` turns it off). At the auction house, open the **Everloot** tab after
-Blizzard's tabs and click **Scan this house** (or type `/everloot scan`) for a full scan: at most one every 15 minutes, read in chunks, summarised per item,
+Blizzard's tabs and click **Scan prices** (or type `/everloot scan`) for a full scan: at most one every 15 minutes, read in chunks, summarised per item,
 and the last three scans per realm kept. Nothing scans without that click. The tab shows the cooldown,
 whether the last scan is in your saved file yet, a **Share now** button (a `/reload`, which writes the
 file so the Desktop App can send it) and a price lookup with the tooltip's lines. If the tab cannot be
-added, an **Everloot scan** button takes its place. The list of your
+added, a **Scan prices** button takes its place. The list of your
 installed addons is off until `/everloot addons on`; it is sent only from the upload page, after
 its preview. `/everloot addons off` stops it and deletes every recorded addon row.
 
@@ -70,8 +67,8 @@ The amounts are per unit. The header names your realm with its ruleset (PvP, PvE
 the name in its own colour, as the realm list shows it; drop rates sit in the value column too, their loot windows
 and installs beneath. A source you have met is named as your client showed it ("Drops from Defias Bandit"), read
 from your own sightings and loot in the saved file; one you have not met keeps its id ("NPC 116"). Dates, units listed, reporters, all-house scope and stale-data warnings remain visible.
-`/everloot price` prints the same amounts as plain text. Disenchant outcomes and values are not yet available;
-the addon does not guess them from an item's color or type.
+`/everloot price` prints the same amounts as plain text. Disenchant estimates come only from disenchants players
+recorded (see the disenchant row below); the addon never guesses them from an item's color or type.
 
 Between the prices and the sources, the tooltip shows your own history with the item, read from the gold ledger
 in your saved file for your characters on this realm: the day and price per unit of your last sale, the average
@@ -104,10 +101,11 @@ auctioneer's faction, Neutral for a goblin house whose auctioneer has none, and 
 gives no auctioneer to read. The game files list separate Alliance, Horde and Blackwater (neutral) houses
 with different cuts, so the site keeps a market per house next to the realm-wide one.
 
-When scans are on, the cooldown is over and no scan is running, opening the auction house shows a small
-**Scan prices for Everloot** prompt beside it, once per visit. One click scans; closing it hides it until
-the next visit. It never scans by itself. `/everloot scanprompt off` turns it off (the **Everloot scan**
-button and `/everloot scan` still work). With scans off, the first visit prints one line saying how to opt in.
+The first visit prints one introduction in chat explaining scanning; there is no floating popup or recurring
+reminder. `/everloot scanprompt off` hides that introduction (the tab and `/everloot scan` still work).
+With scans off, the first visit instead explains how to opt in. The scan action shows **Scan prices**,
+**Scanning...** or **Ready in M:SS**, and is disabled while busy or cooling down. Last-scan age and saved-file
+status remain in the tab. The tab and settings use native WoW fonts, gold headings and standard controls.
 
 ### Shopping lists
 
@@ -133,15 +131,15 @@ guide at everloot.app/docs/guides/addon; `addon/tests/commands_contract.py` fail
 | Command | What it does |
 |---|---|
 | `/everloot window` | Opens or closes the Everloot window (left-click on the minimap button does the same). |
-| `/everloot options` | Opens the settings (right-click on the minimap button does the same): an Everloot overview with four pages under it in the game's AddOns list, General, Auction house, Shared with Everloot and Your characters, one switch per module. |
+| `/everloot options` | Opens the settings (right-click on the minimap button does the same): an Everloot overview with five pages under it in the game's AddOns list: General, Tooltips, Auction House, Helpers and Data Sharing, one switch per module. |
 | `/everloot setup` | Asks again which features to use: Everything, Collect data only or Choose myself (see Choosing features). |
 | `/everloot planner [talents\|raid]` | Opens the planner workspace on the named tab, where a website plan is pasted and imported. |
 | `/everloot buttons on\|off` | Gathers other addons' minimap buttons into the Everloot button, or leaves them on the minimap; `/reload` to apply. |
 | `/everloot status` | Prints the version, each module and how many rows it holds, and any paused collection. |
 | `/everloot version` | Prints the addon version. |
 | `/everloot auctions on\|off` | Auction scans, on in a new install; `/reload` to apply. |
-| `/everloot scan` | At the auction house, starts a full scan, like the **Scan this house** button; at most one every 15 minutes. |
-| `/everloot scanprompt on\|off` | The scan prompt shown when the auction house opens; the button and `/everloot scan` still work with it off. |
+| `/everloot scan` | At the auction house, starts a full scan, like the **Scan prices** button; at most one every 15 minutes. |
+| `/everloot scanprompt on\|off` | The once-per-install chat introduction at the auction house; the button and `/everloot scan` still work with it off. |
 | `/everloot vendor on\|off` | At a merchant, sell grey items and repair with your own gold; never the guild bank. |
 | `/everloot mail on\|off` | The **Collect all** button at the mailbox, for auction letters only. |
 | `/everloot where [item link\|item id\|NPC name]` | Lists drops, vendors and NPC locations from your own saved sightings only. Shift-click an item link, give its id, or an exact NPC name (case-insensitive). Counts are recorded loot windows, not item quantities or drop rates. |
@@ -280,21 +278,37 @@ records and where it goes. A switch that has a `/everloot` command runs that com
 always agree. Changes apply after a reload; the page has a **Reload now** button. A client without the
 game's options API shows the page as a window instead.
 
-Three switches at the end of the list choose what item tooltips show: **prices** (community market, your scan,
-vendor), **your history** (your sales and purchases from the gold ledger) and **sources** (drops, vendors,
-reagents, zones). All three are on for a new install, are saved in your SavedVariables, record nothing and apply
-at once, without a reload.
+Four switches on the Tooltips page choose what item tooltips show: **prices** (community market, your scan,
+vendor), **your history** (your sales and purchases from the gold ledger), **sources** (drops, vendors,
+reagents, zones) and **disenchant estimate** (observed yields and their estimated value). All four are on for a new
+install, are saved in your SavedVariables, record nothing and apply at once, without a reload.
+
+The disenchant row applies to eligible armor and weapons in Forever's game-file bands, excluding items the files
+flag as not disenchantable. Observed yields need three contributing installs. The Desktop App writes them into
+EverlootPrices, refreshed daily; reload to read an update. A band the file holds no results for shows a quiet "not enough data yet" line; a file without the block (no Desktop App, or an older one) adds nothing to the tooltip.
+The tooltip shows each material's icon, runtime name, observed chance and units range, plus an expected gross
+value using mean units across all disenchants and prices for your current realm and auction house. Missing prices
+make it "at least"; missing, stale or thin prices prevent a comparison. Estimates are before auction fees and do
+not promise a sale, profit, eligibility of an individual bound copy, or the character's enchanting skill.
+
+Open **Disenchanting** in the main Everloot window for today's (UTC) and the last seven days' disenchants,
+materials, estimated gross value, known cost and estimated difference, followed by recent entries. Up and Down
+page through the list. Disenchant with Everloot's open-world collection on to start. The last 500 entries per
+character stay only in `EverlootDB.disenchantLog`, outside uploaded records. When the local ledger knows a purchase,
+the entry saves that item's average paid per unit on this realm at capture time; this is a cost estimate, not proof
+of what that particular copy cost. Unknown costs stay unknown, and a period with any unknown cost shows no total
+difference. Materials are valued at current house prices when viewed, so their estimates can change after a reload.
 
 ### Choosing features
 
 A few seconds after the first loading screen, every install (new or updated) is asked once which parts of Everloot
 to use, before the player-names question. `/everloot setup` asks again at any time. There are three answers:
 
-- **Everything** turns on the item tooltip lines, the auction house tab and its scan reminder, the Everloot window
-  and minimap button, and the Your characters switches (gold, characters, guild).
+- **Everything** turns on the item tooltip lines, the auction house tab and its first-visit introduction, the Everloot window
+  and minimap button, and the character switches in Data Sharing (gold, characters, guild).
 - **Collect data only** keeps World, Recipes and trainers, Zone map corners and Auction scans on, so the Everloot
-  tab at the auction house still sends the scans you start. It turns off the tooltip lines, the scan reminder, the
-  window, the minimap button and its button drawer, the merchant and mailbox helpers and the Your characters
+  tab at the auction house still sends the scans you start. It turns off the tooltip lines, the first-visit introduction, the
+  window, the minimap button and its button drawer, the merchant and mailbox helpers and the character
   switches. For players who keep Auctionator or other addons for those jobs.
 - **Choose myself** changes nothing and opens the settings.
 
@@ -306,7 +320,9 @@ and everloot.app/players/opt-out to hide a character.
 
 ## The Everloot window
 
-Left-click the minimap button, or `/everloot window`, for the Everloot window. Its sidebar has five items.
+Left-click the minimap button, or `/everloot window`, for the Everloot window. Its sidebar has five items. Drag the
+grip in its bottom-right corner to make the whole window bigger or smaller (from three quarters to one and a half times,
+never larger than the screen); right-click the grip for the normal size. The size is kept for the next session.
 
 - **Home** lists every character this install has seen: gold, level, professions, raid lockouts (shown only while the completion tracker is on) and when it was last
   seen, with totals for each realm and for the account and a "This week" line (gold in and out for this character over
@@ -318,7 +334,20 @@ Left-click the minimap button, or `/everloot window`, for the Everloot window. I
 - **Collection** shows achievements, reputation, titles, raid lockouts and quest chains (quests done of each chain's
   total) from the rows the completion tracker wrote, so it needs `/everloot completion on`; with it off the tab says so
   and has a button that runs that command. It shows this character, or the account: every character in the roster, each
-  item done when any of them has it, with the name of the character that does.
+  item done when any of them has it, with the name of the character that does. It is drawn as completionist addons
+  draw their lists: headings in the game's gold that open and close with a click, each with how many of the marked
+  items under it are done ("3 / 8 (37%)"), an icon on each row, a green check for done and a red cross for missing,
+  and the game's tooltip on hover. The mouse wheel scrolls the list.
+  - **Dungeons & raids** lists the instances players agreed on, their bosses with your kills and this week's
+    lockouts. A boss opens on its drops: the public drop rates (three installs) the Desktop App wrote into the price
+    file, from the creatures this install saw in that fight or, failing that, from the NPCs the file names as the
+    boss is named (the boss's tooltip says which). Each drop shows its rate and loot windows; a drop that is a mount,
+    battle pet, toy or appearance is marked with whether this character has it, read from the game. Without the
+    price file's drops block the bosses stay plain rows and the summary says why.
+  - **Mounts** lists every mount the game lists for this character (the other faction's only once collected), with
+    its source. **Pets** (one row per species) and **Toys** list what the Pet Journal and the Toy Box list under their
+    own filters; clear those filters in the Collections window to see everything. These three are read from the game
+    and never recorded.
 - **Professions** shows each profession in the profession book with its rank and the recipes recorded for it by
   difficulty colour. **Crafting costs**, the button at its bottom, lists the recipes this install recorded under this
   character's profession names (recipe rows carry no character, so an alt's recipes in the same profession show too)
@@ -360,12 +389,12 @@ inside it closes it until `/reload` and `/everloot status` names the error. The 
 settings page turns it off; the minimap button then opens the plan workspace as before. The crest it uses is
 `media/crest.tga`, which the release zip carries beside the code.
 
-Hovering the minimap button shows what its clicks do. The Minimap button switch on the settings page hides it after a `/reload`; `/everloot window` still opens the window.
+The minimap button sits on the minimap's edge like other addons' buttons, at the top-left at first; drag it around the edge to move it, and it stays there. Hovering it shows what its clicks do. The Minimap button switch on the settings page hides it after a `/reload`; `/everloot window` still opens the window.
 
 The minimap button also holds other addons' minimap buttons. Buttons made with LibDBIcon (most addons' round
 minimap buttons) move into it at login when the drawer is enabled. It starts off for new installs; existing
 players keep their saved setting, and upgrades without a saved toggle keep it on. Use `/everloot buttons on`
-to enable it. Hover the crest and they show in a small panel beside it, which closes
+to enable it. Hover the button and they show in a small panel beside it, on the side away from the map, which closes
 when the mouse leaves. Its clicks stay the same. Blizzard's own minimap buttons and any other button are left
 where they are. The first time it gathers a button, chat says how many. `/everloot buttons off`, or the **Addon
 buttons in the Everloot button** switch on the settings page, turns it off; the buttons go back around the

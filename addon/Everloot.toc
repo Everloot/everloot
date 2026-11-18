@@ -6,7 +6,7 @@
 ## Category: Auction & Economy
 ## X-Website: https://everloot.app
 ## X-Curse-Project-ID: 1762765
-## Version: 0.3.23
+## Version: 0.3.24
 ## X-License: AGPL-3.0
 ## SavedVariables: EverlootDB
 ## OptionalDeps: EverlootAnswers, EverlootPrices, EverlootBuilds
@@ -41,6 +41,8 @@ modules\raid_data.lua
 modules\raid.lua
 modules\prices.lua
 modules\drops.lua
+modules\disenchant_data.lua
+modules\disenchant.lua
 modules\shopping.lua
 modules\auctiontab.lua
 modules\gph.lua
@@ -51,5 +53,6 @@ modules\window.lua
 modules\view_gold.lua
 modules\view_collection.lua
 modules\view_professions.lua
+modules\view_disenchanting.lua
 modules\minimap.lua
 modules\drawer.lua

@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fetchRealmPrices, housesFor, writePricesAddon, type DropRow, type DropSources, type RealmPrices } from "../../../companion/src/prices";
+import { fetchRealmPrices, housesFor, writePricesAddon, type DisenchantRow, type DisenchantSources, type DropRow, type DropSources, type RealmPrices } from "../../../companion/src/prices";
 import { validRealm } from "../../../packages/protocol/src/realm";
 import type { RealmSummary } from "../shared/types";
 import { saveFacts } from "./save-facts";
+import { adler32 } from "../../../companion/src/bridge/lua";
 
 /** The companion's cap on realms in one prices file. */
 export const MAX_REALMS = 20;
@@ -135,6 +136,45 @@ export const DROPS_EVERY_MS = 24 * 3600_000;
 const count = (n: unknown): n is number => Number.isSafeInteger(n) && (n as number) >= 0;
 const ISO = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/;
 
+function validDisenchantRow(row: number[]): row is DisenchantRow {
+  const [band, item, withMaterial, windows, milli, min, max] = row;
+  return row.length === 7 && row.every(count) && band > 0 && item > 0 && windows > 0
+    && withMaterial > 0 && withMaterial <= windows && min > 0 && max >= min
+    && milli <= max * 1000 && milli >= 0;
+}
+
+/** Public observed yields only; a failed read never replaces a good block with empty data. */
+export async function fetchDisenchant(endpoint: string, send: typeof fetch = fetch, now = new Date()): Promise<DisenchantSources> {
+  const res = await send(`${new URL(endpoint).origin}/api/rollups/disenchant`, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(15_000) });
+  if (!res.ok) throw new Error(`disenchant: ${res.status}`);
+  const body = await res.json() as { unreachable?: unknown; bands?: unknown; dataAsOf?: unknown };
+  if (!body || body.unreachable !== false || !Array.isArray(body.bands)) throw new Error("disenchant: unexpected or unreachable answer");
+  const rows: DisenchantRow[] = [];
+  const seen = new Set<number>();
+  for (const band of body.bands) {
+    if (!band || band.state !== "rated" || !count(band.bandId) || band.bandId < 1 || seen.has(band.bandId)
+      || !count(band.installs) || band.installs < 3 || !count(band.windows) || band.windows < 1 || !Array.isArray(band.materials)) continue;
+    seen.add(band.bandId);
+    const materials = new Set<number>();
+    for (const m of band.materials) {
+      if (!m || typeof m.perDisenchant !== "number" || !Number.isFinite(m.perDisenchant) || m.perDisenchant < 0) continue;
+      const row = [band.bandId, m.itemId, m.withMaterial, band.windows, Math.round(m.perDisenchant * 1000), m.min, m.max];
+      if (validDisenchantRow(row) && !materials.has(row[1])) { rows.push(row); materials.add(row[1]); }
+    }
+  }
+  return { dataAsOf: typeof body.dataAsOf === "string" && ISO.test(body.dataAsOf) ? body.dataAsOf : null, fetchedAt: now.toISOString(), rows };
+}
+
+export function readDisenchantBlock(addonsDir: string): DisenchantSources | null {
+  let text: string;
+  try { text = readFileSync(join(addonsDir, "EverlootPrices", "EverlootPrices.lua"), "utf8"); } catch { return null; }
+  const m = /\["disenchant"\] = \{ \["data"\] = "([\d,;]*)", \["sum"\] = (\d+), \["dataAsOf"\] = "([^"\\]*)", \["fetchedAt"\] = "([^"\\]*)" \}/.exec(text);
+  if (!m || adler32(m[1]) !== Number(m[2]) || !ISO.test(m[4]) || !Number.isFinite(Date.parse(m[4]))) return null;
+  const rows = m[1] ? m[1].split(";").map((r) => r.split(",").map(Number)) : [];
+  if (!rows.every(validDisenchantRow)) return null;
+  return { dataAsOf: m[3] || null, fetchedAt: m[4], rows };
+}
+
 /**
  * The public drop rates from `GET /api/rollups/drops`, following `next` on the same site. Only rates three installs
  * looted (the site sends no others; a row under 3 is dropped here too) with one NPC or object source and at least
@@ -213,6 +253,11 @@ export async function refreshMarket(options: {
   if (!(age >= 0 && age < DROPS_EVERY_MS)) {
     try { drops = await fetchDropSources(options.endpoint, options.send, now); } catch { /* keep the last good block, or none */ }
   }
-  writePricesAddon(options.addonsDir, fetched, drops ?? undefined);
+  let disenchant = readDisenchantBlock(options.addonsDir);
+  const disenchantAge = disenchant ? now.getTime() - Date.parse(disenchant.fetchedAt) : Infinity;
+  if (!(disenchantAge >= 0 && disenchantAge < DROPS_EVERY_MS)) {
+    try { disenchant = await fetchDisenchant(options.endpoint, options.send, now); } catch { /* keep the last good block, or none */ }
+  }
+  writePricesAddon(options.addonsDir, fetched, drops ?? undefined, undefined, disenchant ?? undefined);
   return { realms: summaries, items: summaries.reduce((n, r) => n + r.items, 0), drops: drops?.rows.length ?? 0 };
 }

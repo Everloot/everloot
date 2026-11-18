@@ -49,7 +49,7 @@ test("auction_history, collection_gap and guild_board answer with their result u
 
   const auctions = await c.callTool({ name: "auction_history", arguments: { realm: "Forever", itemId: 5 } });
   const auctionsOut = OUT.auction_history.parse(auctions.structuredContent);
-  expect(auctionsOut).toEqual({ connected: true, dataAsOf: AS_OF, url: "https://everloot.app/tools/auctions?realm=Forever&item=5", page: auctionHistory("Forever", 5, auctionSightingsFromRecords(records)) });
+  expect(auctionsOut).toEqual({ connected: true, dataAsOf: AS_OF, url: "https://everloot.app/tools/auctions?realm=Forever&item=5", page: { ...auctionHistory("Forever", 5, auctionSightingsFromRecords(records)), house: { realm: "Forever", faction: null } } });
   expect(auctionsOut.page!.points).toEqual([{ day: "2026-10-12", copper: 200, reporters: 3 }]);
   expect(JSON.stringify(auctions.content)).toContain("2026-10-12  2s 0c  3 reporters");
 

@@ -14,8 +14,11 @@ local COLUMNS = 6
 -- A LibDBIcon button is 31 pixels square, but its ring and shadow are drawn larger from its top-left corner, so a
 -- 32-pixel cell put every ring over the icon beside it and every shadow over the icon below.
 local CELL = 38
-local PAD = 8
-local ACCENT = { 0.612, 0.941, 0.227, 1 } -- the window's accent green, when the window is not there to lend it
+local PAD = 5
+-- The window's colours, when the window is not there to lend them.
+local ACCENT = { 0.612, 0.941, 0.227, 1 }
+local CANVAS = { 0.055, 0.059, 0.051, 0.97 }
+local BRONZE = { 0.478, 0.416, 0.298, 1 }
 local POLL_SECONDS = 0.25 -- how often an open drawer checks whether the mouse has left
 local NOTICE_SECONDS = 5 -- the notice waits for the other addons' buttons to settle, so the count is right
 local RESCANS = { 3, 10 } -- seconds after entering the world: buttons some addons make late
@@ -77,27 +80,22 @@ local function drawer()
   local template = BackdropTemplateMixin and "BackdropTemplate" or nil
   local f = CreateFrame("Frame", "EverlootButtonDrawer", UIParent or D.crest, template)
   f:SetFrameStrata("DIALOG")
-  -- Opens to the left of the crest, which sits at the minimap's top-left corner.
-  f:SetPoint("TOPRIGHT", D.crest, "TOPLEFT", -2, 0)
-  -- A minimap moved to the left edge would otherwise open the drawer off the screen.
+  -- A minimap moved to the screen's edge would otherwise open the drawer off the screen.
   if f.SetClampedToScreen then f:SetClampedToScreen(true) end
-  -- The window's own panel (its canvas inside the bronze edge), so the drawer looks like the rest of Everloot.
-  if E.Window and E.Window.Backdrop then
-    E.Window.Backdrop(f)
-  elseif f.SetBackdrop then
-    f:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-      tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-    if f.SetBackdropColor then f:SetBackdropColor(0.05, 0.05, 0.07, 0.95) end
+  -- The window's canvas inside a one-pixel bronze line: the window's thick tooltip edge made a panel this small
+  -- look bulky around the rings.
+  local colors = E.Window and E.Window.COLORS or {}
+  if f.SetBackdrop then
+    f:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
+    if f.SetBackdropColor then f:SetBackdropColor(unpack(colors.canvas or CANVAS)) end
+    if f.SetBackdropBorderColor then f:SetBackdropBorderColor(unpack(colors.bronze or BRONZE)) end
   end
   -- A two-pixel bar in the window's accent green on the edge facing the crest: the drawer is the crest's tab, and
-  -- the green is the window title's, not a frame of its own around the other addons' rings.
+  -- the green is the window title's, not a frame of its own around the other addons' rings. Placed on open.
   local bar = f.CreateTexture and f:CreateTexture(nil, "OVERLAY")
   if bar then
-    local accent = E.Window and E.Window.COLORS and E.Window.COLORS.accent or ACCENT
-    bar:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -4)
-    bar:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -4, 4)
     bar:SetWidth(2)
-    if bar.SetColorTexture then bar:SetColorTexture(unpack(accent)) end
+    if bar.SetColorTexture then bar:SetColorTexture(unpack(colors.accent or ACCENT)) end
     f.accent = bar
   end
   f:Hide()
@@ -105,7 +103,23 @@ local function drawer()
   return f
 end
 
---- Places the shown buttons in rows of COLUMNS and sizes the drawer to fit. Returns how many are shown.
+--- Opens beside the crest on the side away from the minimap, the accent bar on the edge that faces the crest.
+local function place()
+  local f, bar = D.frame, D.frame.accent
+  local right = E.Minimap and E.Minimap.Side and E.Minimap.Side() == "RIGHT"
+  local near, far = right and "LEFT" or "RIGHT", right and "RIGHT" or "LEFT"
+  f:ClearAllPoints()
+  f:SetPoint("TOP" .. near, D.crest, "TOP" .. far, right and 2 or -2, 0)
+  if bar then
+    if bar.ClearAllPoints then bar:ClearAllPoints() end
+    local x = right and 2 or -2
+    bar:SetPoint("TOP" .. near, f, "TOP" .. near, x, -2)
+    bar:SetPoint("BOTTOM" .. near, f, "BOTTOM" .. near, x, 2)
+  end
+end
+
+--- Places the shown buttons in as few rows of at most COLUMNS as they need, the rows evened out (eight buttons are two
+--- rows of four, not six and two), and sizes the drawer to fit. Returns how many are shown.
 --- Each button sits one frame level above the one before it: a ring's shadow falls to the right and below, so the
 --- button it would fall on draws over it and no icon is dimmed by its neighbour.
 local function layout()
@@ -117,18 +131,21 @@ local function layout()
     local b = D.collected[i]
     if b:GetParent() ~= f then table.remove(D.collected, i) end
   end
+  local visible = 0
+  for _, b in ipairs(D.collected) do if b:IsShown() then visible = visible + 1 end end
+  local rows = math.max(1, math.ceil(visible / COLUMNS))
+  local columns = math.max(1, math.ceil(visible / rows))
   for _, b in ipairs(D.collected) do
     local own = original[b]
     own.ClearAllPoints(b)
     if b:IsShown() then
-      local column, row = shown % COLUMNS, math.floor(shown / COLUMNS)
+      local column, row = shown % columns, math.floor(shown / columns)
       own.SetPoint(b, "TOPLEFT", f, "TOPLEFT", PAD + column * CELL, -(PAD + row * CELL))
       raise(b, base + shown)
       b:SetAlpha(1)
       shown = shown + 1
     end
   end
-  local columns, rows = math.min(math.max(shown, 1), COLUMNS), math.max(1, math.ceil(shown / COLUMNS))
   f:SetSize(PAD * 2 + columns * CELL, PAD * 2 + rows * CELL)
   return shown
 end
@@ -197,6 +214,7 @@ end
 --- Hovering the crest: the drawer, when there is at least one shown button to put in it.
 local function open()
   if not D.frame or #D.collected == 0 or layout() == 0 then return end
+  place()
   D.frame:Show()
   if not polling then
     polling = true

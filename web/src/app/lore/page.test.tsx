@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeAll, expect, test, vi } from "vitest";
 import { buildLoreRelease } from "@/test/lore-release";
+import type { LorePage } from "@/lib/lore";
 
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => (
@@ -45,6 +46,43 @@ test("the landing page is indexed with its canonical", async () => {
   expect(metadata.openGraph).toMatchObject({ title: "Lore archive · Everloot", url: "/lore" });
   expect(metadata.twitter).toMatchObject({ card: "summary_large_image", title: "Lore archive · Everloot" });
   expect(metadata.robots ?? { index: true }).toMatchObject({ index: true });
+});
+
+test("search precedes the featured story and category columns", async () => {
+  vi.stubEnv("KB_SNAPSHOT_PATH", release);
+  const lore = await import("@/lib/lore");
+  const lookup = lore.loreByExtId;
+  vi.spyOn(lore, "loreByExtId").mockImplementation(async (id) => id === "321633" ? {
+    ...await lookup("forever-launch-date") as LorePage,
+    extId: "321633", name: "Mount Hyjal", body: "An opening sentence from the snapshot. Another sentence.",
+  } : lookup(id));
+  const html = await render();
+  expect(html).toContain('aria-labelledby="featured-story"');
+  expect(html).toContain('aria-labelledby="browse-categories"');
+  expect(html).toContain('href="/lore/321633-mount-hyjal"');
+  expect(html).toContain("An opening sentence from the snapshot.");
+  expect(html.indexOf('name="q"')).toBeLessThan(html.indexOf('id="featured-story"'));
+  expect(html).toContain("grid-cols-1");
+  expect(html).toContain("lg:grid-cols-2");
+  for (const [name, href] of [
+    ["Factions", "/lore/254870-faction"], ["Races", "/lore/394728-race"],
+    ["Places", "/lore/zones"], ["Characters", "/lore/npcs"], ["Events", "/lore/10897-timeline"],
+  ]) {
+    expect(html).toContain(`href="${href}"`);
+    expect(html).toContain(`>${name}</`);
+  }
+});
+
+test("the existing hero art is rendered at its full proportions", async () => {
+  const assets = await import("@/lib/game-assets");
+  vi.spyOn(assets, "loadingArt").mockReturnValue({
+    mapId: assets.BANNER_MAP.lore, name: "Archive art", kind: "dungeon", heldBack: false,
+    url: "https://assets.example.test/lore.webp", width: 1024, small: null,
+  });
+  const html = await render();
+  expect(html).toMatch(/<img[^>]*src="https:\/\/assets.example.test\/lore.webp"[^>]*class="h-auto w-full rounded-card"/);
+  expect(html).not.toContain("data-page-banner");
+  expect(html).not.toContain("object-cover");
 });
 
 test("an unavailable release renders the unavailable copy, not a zero", async () => {

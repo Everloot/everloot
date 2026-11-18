@@ -534,6 +534,9 @@ local function lootCapture(_, isFromItem)
       group.installId = EverlootDB.installId
       group.capturedAt = date("!%Y-%m-%dT%H:%M:%SZ")
       group.sourceEvidence = "loot-api"
+      if lootType == "disenchant" and E.Disenchant then
+        E.Disenchant.Record(group.sourceItemId, group.items, guid)
+      end
       if E:Store("loot", group, nil, group.sourceItemId and ITEMS or group.sourceObjectId and OBJECTS or CREATURES) then
         -- Local-only corpse identity, by GUID and loot type so a kill and a skinning window on one corpse are both
         -- kept: retained across reloads, never exported as a row.

@@ -37,7 +37,7 @@ GetLootSourceInfo = function(i) return unpack(slots[i].sources) end
 root = Path(__file__).parents[1]
 lua = LuaRuntime()
 lua.execute(STUBS)
-for file in ["core.lua", "modules/openworld.lua"]:
+for file in ["core.lua", "modules/disenchant_data.lua", "modules/disenchant.lua", "modules/openworld.lua"]:
     lua.execute((root / file).read_text(encoding="utf-8"))
 lua.execute("""
 Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')
@@ -100,6 +100,9 @@ window('GameObject-0-1-2-3-2843-0000000001', { { 2589, 1 } })
 assert(last().lootType == 'gather', 'an object window with no cast is a gather window')
 
 -- Disenchanting: the item's id is read from the cast target while the item is in the bags.
+UnitGUID = function() return 'Player-1-0001' end
+UnitClass = function() return 'Mage', 'MAGE' end
+UnitLevel = function() return 60 end
 GetItemInfoInstant = function(name) if name == 'Green Iron Bracers' then return 3835 end end
 local before = #rows()
 event('UNIT_SPELLCAST_SENT', 'player', 'Green Iron Bracers', 'Cast-7', 13262)
@@ -107,6 +110,13 @@ event('UNIT_SPELLCAST_SUCCEEDED', 'player', 'Cast-7', 13262)
 window('Item-4372-0-4000000000000001', { { 10940, 2 } })
 assert(#rows() == before + 1 and last().lootType == 'disenchant' and last().sourceItemId == 3835)
 assert(last().sourceNpcId == nil and last().sourceObjectId == nil and last().items[1].itemId == 10940)
+assert(#Everloot.Disenchant.History() == 1 and Everloot.Disenchant.History()[1].item == 3835)
+assert(Everloot.Disenchant.History()[1].mats[10940] == 2 and EverlootDB.records.disenchantLog == nil)
+-- Reopening an already attributed window cannot append another local entry.
+event('UNIT_SPELLCAST_SENT', 'player', 'Green Iron Bracers', 'Cast-7b', 13262)
+event('UNIT_SPELLCAST_SUCCEEDED', 'player', 'Cast-7b', 13262)
+window('Item-4372-0-4000000000000001', { { 10940, 2 } })
+assert(#Everloot.Disenchant.History() == 1)
 -- An item the addon cannot name records nothing.
 event('UNIT_SPELLCAST_SENT', 'player', 'Gone Item', 'Cast-8', 13262)
 window('Item-4372-0-4000000000000002', { { 10940, 1 } })

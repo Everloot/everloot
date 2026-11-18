@@ -103,6 +103,54 @@ function E:DropSources(itemId)
   return out
 end
 
+--- The items one source drops at the file's public rates (three installs looted it), best rate first:
+--- { { itemId, drops, windows, installs } }. `kind` is "npc" or "object". Nil and the block's status ("absent",
+--- "verifying" or "bad") while the block cannot be read. The block is indexed by source once, the first time it is asked.
+function E:DropsFrom(kind, id)
+  local entry = dropFile()
+  if entry.status ~= "ready" then return nil, entry.status end
+  if not entry.bySource then
+    local index = {}
+    for item, k, source, dropped, windows, installs in entry.data:gmatch("(%d+),([no]),(%d+),(%d+),(%d+),(%d+)") do
+      windows, installs = tonumber(windows), tonumber(installs)
+      if windows > 0 and installs >= E.DROP_INSTALLS then
+        local list = index[k .. source] or {}
+        list[#list + 1] = { itemId = tonumber(item), drops = tonumber(dropped), windows = windows, installs = installs }
+        index[k .. source] = list
+      end
+    end
+    for _, list in pairs(index) do
+      table.sort(list, function(a, b)
+        local ra, rb = a.drops / a.windows, b.drops / b.windows
+        if ra ~= rb then return ra > rb end
+        return a.itemId < b.itemId
+      end)
+    end
+    entry.bySource = index
+  end
+  return entry.bySource[(kind == "npc" and "n" or "o") .. id] or {}, "ready"
+end
+
+--- The NPCs the drops block names `name`, case aside, as a list of ids: the block's names are the site's. Empty while
+--- the block cannot be read or names no such NPC.
+function E:NpcsNamed(name)
+  local entry = dropFile()
+  if entry.status ~= "ready" or type(name) ~= "string" then return {} end
+  if not entry.byName then
+    entry.byName = {}
+    for key, n in pairs(entry.names) do
+      local id = key:match("^n(%d+)$")
+      if id then
+        local list = entry.byName[n:lower()] or {}
+        list[#list + 1] = tonumber(id)
+        entry.byName[n:lower()] = list
+      end
+    end
+    for _, list in pairs(entry.byName) do table.sort(list) end
+  end
+  return entry.byName[name:lower()] or {}
+end
+
 --- The drop lines for one item as { text, r, g, b }, and a note when there is nothing to show: no source with three
 --- installs, no drops block in the file, or a failed checksum. Nil and nil while the block is still being checked.
 --- A rate always carries its denominator (loot windows), its installs and the date of the uploads behind it.
