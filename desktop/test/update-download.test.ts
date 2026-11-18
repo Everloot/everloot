@@ -13,7 +13,7 @@ vi.mock("electron", () => ({
   dialog: { showMessageBox: vi.fn(async () => ({ response: 0 })) },
   ipcMain: { handle: (name: string, handler: (...args: unknown[]) => unknown) => h.handlers.set(name, handler) },
 }));
-vi.mock("../src/main/jobs", () => ({ companionJobs: () => ({ deps: {}, notices: [] }) }));
+vi.mock("../src/main/jobs", () => ({ companionJobs: () => ({ deps: {}, links: () => [], notices: [] }) }));
 vi.mock("../src/main/engine", () => ({ createEngine: () => ({ onChange: vi.fn(), snapshot: () => ({ files: [], jobs: { upload: { state: "idle" }, prices: { state: "idle" }, ask: { state: "idle" } }, log: [] }) }) }));
 vi.mock("../src/main/chat", () => ({ createChat: () => ({}) }));
 vi.mock("../src/main/builds", () => ({ createBuildsSync: () => ({ status: () => ({}) }) }));

@@ -99,7 +99,7 @@ describe("sending linked characters", () => {
     // Raids and titles go. The kinds Blizzard's API supplies, which an older addon wrote into this file, do not;
     // nor do the link, loot and unlinked character's rows.
     expect(kinds).toEqual(["lockout_owned", "title_owned"]);
-    expect(r).toMatchObject({ synced: ["Thrallina of Forever Pioneer"], waiting: 0, problem: null });
+    expect(r).toMatchObject({ synced: ["Thrallina of Forever Pioneer"], categories: ["raids", "achievements"], waiting: 0, problem: null });
     expect(syncSummary(r)).toBe("synced 1 character");
   });
 

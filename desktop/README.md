@@ -124,7 +124,7 @@ companion's modules and the site's parser (`web/src/lib/sv-parse.ts`), so `web` 
 must be installed too.
 
 ```
-npm test            # vitest: every module under src/main and the renderer's text helpers
+npm test            # vitest: every module under src/main, the renderer's text helpers, and each page's markup (pages.test.ts, with snapshots)
 npm run typecheck
 npm run pack        # installers into release/ (electron-builder)
 npm run icons       # remake build/*.png from web/src/app/icon.svg
@@ -151,7 +151,7 @@ Set `EVERLOOT_DATA_DIR` to a scratch folder to keep a development run away from 
 | `src/shared/website.ts` | The site pages the sidebar links to, and their address with the source tag |
 | `src/main/settings.ts`, `game-folder.ts`, `updates.ts`, `external.ts`, `login-item.ts` | Settings file, where the game is, the release check, the browser allow-list, the start-at-sign-in entry (the portable exe names itself, not its temporary folder) |
 | `src/preload.ts` | The only bridge the page can call (`window.everloot`) |
-| `src/renderer/` | The window: one page, no framework, the site's colours; `format.ts` holds the text helpers, tested without the DOM |
+| `src/renderer/` | The window: one page, no framework, the site's colours; `pages.ts` builds each page's markup and `format.ts` holds the text helpers, both tested without the DOM |
 | `src/shared/types.ts` | Shapes both sides use |
 | `build/` | App and tray icons |
 | `scripts/` | The esbuild bundle, the icon maker, the screenshot helper |

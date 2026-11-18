@@ -5,6 +5,7 @@ import { expect, test } from "vitest";
 import { summarizeCharacters } from "../src/main/characters";
 import { LOCAL_ONLY_CATEGORIES } from "../src/shared/ledger";
 import { charactersFromFiles } from "../src/main/save-facts";
+import { PROGRESS } from "./save-fixtures";
 
 const SV = `EverlootDB = { ["version"] = "0.3.3", ["installId"] = "x", ["records"] = {
   ["gold_snapshot"] = { { ["character"] = "Arthas", ["realm"] = "Nightslayer", ["capturedAt"] = "2026-10-17T10:00:00Z", ["currentCopper"] = 1500000, ["peakCopper"] = 2000000 }, { ["character"] = "Arthas", ["realm"] = "Nightslayer", ["capturedAt"] = "2026-10-18T10:00:00Z", ["currentCopper"] = 1700000, ["peakCopper"] = 2000000 } },
@@ -28,8 +29,21 @@ test("named characters get the latest gold, the peak and money by category; an o
 
 test("progress rows are per opaque character key with a union of titles; achievement, reputation, quest and talent rows are not read", () => {
   const info = summarizeCharacters(SV);
-  expect(info.progress).toEqual([{ key: "0a1b2c3d", class: "PALADIN", level: 60, titles: 3, lockouts: [] }]);
+  expect(info.progress).toEqual([{ key: "0a1b2c3d", class: "PALADIN", level: 60, titles: 3, missingTitles: null, linkedAs: null, lockouts: [] }]);
   expect(info).not.toHaveProperty("talents");
+});
+
+test("missing titles are the catalog's titles a key does not hold, and a link row names its key with the character page", () => {
+  const info = summarizeCharacters(PROGRESS);
+  const byKey = Object.fromEntries(info.progress.map((p) => [p.key, p]));
+  // The catalog lists titles 1 to 5; the paladin holds 1, 2 and 9 (one the catalog does not list), the mage holds 5.
+  expect(byKey["0a1b2c3d"]).toMatchObject({ titles: 3, missingTitles: 3 });
+  expect(byKey["1a2b3c4d"]).toMatchObject({ titles: 1, missingTitles: 4 });
+  // The newest link row for the paladin's key names it; the mage has none.
+  expect(byKey["0a1b2c3d"].linkedAs).toEqual({ name: "Uther", realm: "Forever Pioneer", path: "/characters/forever/forever-pioneer/uther" });
+  expect(byKey["1a2b3c4d"].linkedAs).toBeNull();
+  // Without catalog rows nothing is counted as missing.
+  expect(summarizeCharacters(SV).progress[0].missingTitles).toBeNull();
 });
 
 test("gold history is the dated snapshots in order, and the week counts only money events from the last seven days", () => {
@@ -100,7 +114,7 @@ test("this week's raid lockouts join their character's keyed row; a reset lockou
   // A character known only from its profession rows gets no keyed row.
   expect(info.progress).toHaveLength(1);
   const [paladin] = info.progress;
-  expect(paladin).toEqual({ key: "0a1b2c3d", class: "PALADIN", level: 60, titles: 0,
+  expect(paladin).toEqual({ key: "0a1b2c3d", class: "PALADIN", level: 60, titles: 0, missingTitles: null, linkedAs: null,
     lockouts: [{ instance: "Molten Core", difficulty: "40 Player", killed: 6, total: 10, resetAt: "2026-11-11T12:00:00Z" }] });
   // The same file read after Molten Core resets: the lockout is gone.
   const later = summarizeCharacters(sv, Date.parse("2026-11-11T12:00:01Z")).progress[0];

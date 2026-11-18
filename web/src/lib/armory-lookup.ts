@@ -1,3 +1,4 @@
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { ApiError, ForeverApi, type Region } from "../../../kb/src/armory/api";
 import { parseCharacter } from "../../../kb/src/armory/parse";
 import { armoryOn, characterSlugOf } from "./armory";
@@ -16,12 +17,17 @@ import { armoryStore, type ArmoryHit, type ArmoryStore } from "./armory-store";
  *   asked for, and armory_upsert_characters refuses to write one hidden while the lookup ran;
  * - a slug no region knows is kept six hours (armory_lookup_miss) and not asked for again;
  * - each lookup that reaches Blizzard counts against the 'lookup' quota, 20 an hour per address and 300 site-wide;
- * - the whole lookup has LOOKUP_BUDGET_MS. A slow, failed or refused lookup answers null, and the page says "not
- *   found" as before; a failure is not kept as a miss.
+ * - the answer waits at most LOOKUP_BUDGET_MS. A slow, failed or refused lookup answers null, and the page says "not
+ *   found" as before; a failure is not kept as a miss. Once Blizzard has found the character, a late lookup still
+ *   reads and stores it after the answer (`background`, the Worker's waitUntil), so the next search lists it.
  */
 
-/** The whole lookup, storage included; the /search page waits 3 s for its answer. */
-export const LOOKUP_BUDGET_MS = 1800;
+/**
+ * The answer's wait, storage included. A found character costs two store calls, a token, the profile, then the
+ * equipment and PvP summary and the write: 1.8 s timed out on every live hit (2026-11-18). The /search page waits
+ * PEOPLE_PAGE_TIMEOUT_MS (6 s) for the answer.
+ */
+export const LOOKUP_BUDGET_MS = 4000;
 
 export function armoryLookupOn(env: Record<string, string | undefined> = process.env): boolean {
   return armoryOn(env) && env.EVERLOOT_ARMORY_LOOKUP === "1";
@@ -58,6 +64,8 @@ export interface LookupDeps {
   /** Called when Blizzard refused the client's token, so the next lookup builds a fresh client. */
   forgetApi?: () => void;
   budgetMs?: number;
+  /** Keeps the lookup running after its answer (the Worker's waitUntil), so a found character is still stored. */
+  background?: (work: Promise<unknown>) => void;
 }
 
 /** A stored character for the full name, read from Blizzard now, or null (see the notes at the top). Never throws. */
@@ -75,11 +83,12 @@ export async function lookupCharacter(text: string, deps: LookupDeps): Promise<A
     for (const region of regions) {
       const api = deps.api(region);
       const profile = await api.get(path, "profile");
-      if (late) return null;
+      // Past the deadline, only a found character is worth finishing: no other region is asked and no miss is kept.
+      if (late && profile.status !== 200) return null;
       if (profile.status === 404) continue;
       if (profile.status !== 200) return null;
       const [equipment, pvp] = await Promise.all([api.get(`${path}/equipment`, "profile"), api.get(`${path}/pvp-summary`, "profile")]);
-      if (late || equipment.status !== 200 || pvp.status !== 200) return null;
+      if (equipment.status !== 200 || pvp.status !== 200) return null;
       const row = parseCharacter(profile.body, equipment.body, pvp.body, profile.lastModified, slug);
       if (row.slug !== slug || !(await deps.store.storeLookup(region, row))) return null;
       return { region, slug, name: row.name, surname: row.surname, level: row.level, class: row.class, race: row.race, ruleset: row.ruleset, guildName: row.guild_name };
@@ -87,16 +96,27 @@ export async function lookupCharacter(text: string, deps: LookupDeps): Promise<A
     if (!late) await deps.store.lookupMiss(slug);
     return null;
   };
-  try {
-    return await Promise.race([run(), deadline]);
-  } catch (err) {
+  const failed = (err: unknown) => {
     if (err instanceof ApiError && err.phase === "oauth") deps.forgetApi?.();
     // The reason only: the name someone searched for is not logged.
     console.error(`armory lookup failed: ${err instanceof Error ? err.message.slice(0, 120) : "unknown error"}`);
     return null;
+  };
+  const work = run();
+  // After the answer, a failure is logged here; before it, the race below logs it.
+  deps.background?.(work.catch((err) => (late ? failed(err) : null)));
+  try {
+    return await Promise.race([work, deadline]);
+  } catch (err) {
+    return failed(err);
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** The Worker's waitUntil for this request; outside Workers (tests, next dev) the promise simply runs on. */
+function waitUntil(work: Promise<unknown>): void {
+  try { getCloudflareContext().ctx.waitUntil(work); } catch { /* not on a Worker */ }
 }
 
 const held = globalThis as typeof globalThis & { __everlootLookupApi?: Partial<Record<Region, ForeverApi>>; __everlootLookupLogged?: boolean };
@@ -120,5 +140,6 @@ export function findCharacter(text: string, admit: () => Promise<boolean>, env: 
     admit,
     api: (region) => (apis[region] ??= new ForeverApi({ clientId, clientSecret, region, fetchImpl })),
     forgetApi: () => { held.__everlootLookupApi = {}; },
+    background: waitUntil,
   });
 }

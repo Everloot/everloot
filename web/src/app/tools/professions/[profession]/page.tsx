@@ -213,6 +213,12 @@ export default async function ProfessionPage(props: Props) {
     <section id="gather" aria-labelledby="prof-gather" className="scroll-mt-24 space-y-3" data-gather={gather.source}>
       <SectionHeading id="prof-gather" as="h2">{gather.source === "herb" || gather.source === "ore" ? `Where to gather ${gather.noun}` : `Where to farm ${gather.noun}`}</SectionHeading>
       <p className="text-meta text-fg-2">{gather.how}</p>
+      {p.slug === "herbalism" && (
+        <p className="text-cell">
+          <Link href={`${path}/gathering`} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Herbalism gathering guide</Link>
+          <span className="text-fg-2">: herb zones with the herbs looted there, every herb&apos;s zones and the trainers players saw.</span>
+        </p>
+      )}
       {mobFarm && (
         <FilterBar
           label={`Where to farm ${gather.noun} filters`}
