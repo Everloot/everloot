@@ -237,3 +237,40 @@ test("sentences that broke on {{RaceIcon}} and {{mob}} convert without damage", 
     expect(countDamage(wtf(repairTemplates(src)).text())).toBe(0);
   }
 });
+
+test("{{-}} renders as the em dash the wiki shows", () => {
+  // Into the Basin's criteria: the dash was dropped, "The Wolvar after completing Just Following Orders".
+  expect(repairTemplates("*2. ''The Wolvar'' {{-}} after completing [[Just Following Orders]].")).toBe("*2. ''The Wolvar'' — after completing [[Just Following Orders]].");
+  expect(repairTemplates("A {{–}} B")).toBe("A — B");
+});
+
+test("doubled spaces the wiki source has are collapsed, as the wiki shows them", () => {
+  for (const [src, before, after] of [
+    ["*2. ''The Wolvar'' {{-}} after  completing [[Just Following Orders]].", "The Wolvar after  completing Just Following Orders.", "The Wolvar — after completing Just Following Orders."],
+    ["'''Garn Cloudsong ''' is a [[tauren]] [[shaman trainer]].", "Garn Cloudsong  is a tauren shaman trainer.", "Garn Cloudsong is a tauren shaman trainer."],
+    ["* In ''[[World of Warcraft: Classic| Classic]]'', mechanical mobs are immune.", "In  Classic, mechanical mobs are immune.", "In Classic, mechanical mobs are immune."],
+  ]) {
+    expect(wtf(src).text().trim().replace(/^\* (\d\. )?/, "")).toBe(before);
+    expect(wtf(repairTemplates(src)).text().trim().replace(/^\* (\d\. )?/, "")).toBe(after);
+    expect(countDamage(before)).toBeGreaterThan(0);
+    expect(countDamage(after)).toBe(0);
+  }
+  // A line that starts with a space is preformatted on the wiki, which shows its spaces.
+  expect(repairTemplates(" for i=1,2 do  print(i) end")).toBe(" for i=1,2 do  print(i) end");
+});
+
+test("footnotes in a row leave no gap", () => {
+  const src = "'''Helhounds'''<ref>[[Feral Helhound]]</ref><ref>[[Helhound Hair Bracers]]</ref><ref>[[Frothing Helhound's Fury]]</ref> are gigantic, three-headed [[hound]]s.";
+  expect(wtf(src).text()).toBe("Helhounds  are gigantic, three-headed hounds.");
+  expect(repairTemplates(src)).toBe("'''Helhounds''' are gigantic, three-headed [[hound]]s.");
+  expect(repairTemplates("the Third War,<ref name=\"encyclopedia508\"/> the night elf")).toBe("the Third War, the night elf");
+  expect(repairTemplates("See below.\n<references/>")).toBe("See below.\n<references/>");
+});
+
+test("{{Race}} shows its label, or only an icon with notext, and icons in a row leave one space", () => {
+  // The Horde page's list of allies read "Gilgoblin  Unshackled - A faction of former naga slaves."
+  expect(repairTemplates("{{Race|Gilgoblin|notext}}{{RaceIcon|Skrog}}{{RaceIcon|Makrura}} [[Unshackled]] - A faction of former [[naga]] slaves."))
+    .toBe("[[Unshackled]] - A faction of former [[naga]] slaves.");
+  expect(repairTemplates("Fought by {{Race|Orc|orcs}} and {{Race|High elf}}.")).toBe("Fought by orcs and High elf.");
+  expect(repairTemplates("Led by Genn Greymane and {{RaceIcon|Worgen|Male}}{{RaceIcon|Human|Male}} [[Darius Crowley]].")).toBe("Led by Genn Greymane and [[Darius Crowley]].");
+});

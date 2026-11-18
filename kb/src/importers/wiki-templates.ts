@@ -18,7 +18,7 @@ export const REPAIRED_TEMPLATES = [
   "wp", "wplink", "au", "alternate universe", "loot", "coppercost", "cv-ah",
   "co", "coords", "reputation", "quality", "costitem",
   "api", "raceicon", "classicon", "socket icon", "mob", "fu", "expac", "achievement", "title", "school", "gossip", "keypress",
-  "starcraft", "sc", "overwatch", "diablo", "dash", "queststart", "queststartfinish",
+  "starcraft", "sc", "overwatch", "diablo", "dash", "-", "–", "queststart", "queststartfinish",
   "wow-inline", "bc-inline", "wotlk-inline", "legion-inline", "wod-inline", "bfa-inline", "sl-inline", "df-inline",
   "ss", "for", "stub", "removed",
 ];
@@ -120,7 +120,8 @@ function render(inner: string): string | null {
   if (name === "cost") return cost(positional, named);
   if (name === "money") return money(positional);
   if (name === "rep" || name === "faction standing") return capitalise(positional[0] ?? "");
-  if (name === "race") return positional[0] ?? "";
+  // {{Race|Gilgoblin}} shows the race's name, {{Race|Orc|orcs}} the label, {{Race|Skrog|notext}} only its icon.
+  if (name === "race") return positional[1] === "notext" ? REMOVED : positional[1] || positional[0] || "";
   if (/^patch \d/.test(name)) return `${capitalise(args[0].trim())}${named.note ? `: ${named.note}` : ""}`;
   if (["npc", "item", "quest", "spell", "zone", "ability"].includes(name)) {
     if (positional.length === 0) return "";
@@ -176,6 +177,8 @@ function render(inner: string): string | null {
   // {{StarCraft|Page|label}} and friends link another wiki: the label, else the page.
   if (["starcraft", "sc", "overwatch", "diablo"].includes(name)) return positional[1] || positional[0] || "";
   if (name === "dash") return "–";
+  // {{-}} redirects to {{–}}, which the wiki renders as an em dash: "''The Wolvar'' {{-}} after completing".
+  if (name === "-" || name === "–") return "—";
   // Icon-only templates: a race, class or socket icon, a quest marker or an expansion logo.
   if (["raceicon", "classicon", "socket icon", "queststart", "queststartfinish"].includes(name) || /^(wow|bc|wotlk|legion|wod|bfa|sl|df)-inline$/.test(name)) return REMOVED;
   // {{Alliance}}, {{Horde}}, {{Neutral}} are the small faction icon alone.
@@ -194,9 +197,35 @@ function keepCodeText(wikitext: string): string {
     .replace(/<code\b[^>]*\/>/gi, "");
 }
 
+/**
+ * The converter drops `<ref>` footnotes but leaves a space for each one, so a name with three sources
+ * (`'''Helhounds'''<ref>…</ref><ref>…</ref><ref>…</ref> are`) read "Helhounds  are". Removed here instead.
+ */
+function dropRefs(wikitext: string): string {
+  return wikitext.replace(/<ref\b[^>]*\/>/gi, "").replace(/<ref\b[^>]*>[\s\S]*?<\/ref\s*>/gi, "");
+}
+
+/**
+ * A browser shows a run of spaces as one, so the wiki never shows the doubled spaces its source often has:
+ * `after  completing`, `'''Garn Cloudsong ''' is`, `In ''[[World of Warcraft: Classic| Classic]]''`. The
+ * converter keeps them, and they would read as a dropped template. They are collapsed before any template
+ * is rendered, so a doubled space in the output still means a template was lost. A line that starts with
+ * a space is preformatted on the wiki and shows its spaces, so it is left as written.
+ */
+function collapseSourceSpaces(wikitext: string): string {
+  return wikitext
+    .split("\n")
+    .map((line) => (line.startsWith(" ") ? line : line
+      .replace(/( '{0,5}\[\[[^[\]|\n]*\|) +/g, "$1") // a link label that starts with a space, after a space
+      .replace(/ +\]\](?= )/g, "]]") // a link label that ends with a space, before a space
+      .replace(/(\S) +('{2,5}) +/g, "$1$2 ") // bold or italic quotes with a space on each side
+      .replace(/(\S) {2,}(?=\S)/g, "$1 ")))
+    .join("\n");
+}
+
 /** Renders the handled templates to text in one pass, leaving unknown templates and all line structure untouched. */
 export function repairTemplates(rawWikitext: string): string {
-  const wikitext = keepCodeText(rawWikitext);
+  const wikitext = collapseSourceSpaces(dropRefs(keepCodeText(rawWikitext)));
   const stack: string[] = [];
   let cur = "";
   let literal = 0; // opens past MAX_DEPTH, kept as text along with their closes
@@ -222,7 +251,7 @@ export function repairTemplates(rawWikitext: string): string {
   return cur
     .split("\n")
     .filter((line) => !(line.includes(REMOVED) && line.replace(new RegExp(REMOVED, "g"), "").trim() === ""))
-    .map((line) => (line.includes(REMOVED) ? line.replace(new RegExp(`^(${REMOVED} *)+`), "").replace(new RegExp(` *${REMOVED} *`, "g"), " ").replace(/ +$/, "") : line))
+    .map((line) => (line.includes(REMOVED) ? line.replace(new RegExp(`^(${REMOVED} *)+`), "").replace(new RegExp(` *(?:${REMOVED} *)+`, "g"), " ").replace(/ +$/, "") : line))
     .join("\n")
     .replace(/^\n+/, "")
     .replace(/\n+$/, "");

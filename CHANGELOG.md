@@ -239,6 +239,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
 
 ### Fixed
+- Site: lore pages drop the doubled spaces the wiki's source had but never showed, leave no gap where footnotes or race icons sat side by side, show `{{-}}` as its dash and `{{Race|…|notext}}` as only its icon, so far fewer pages are marked damaged.
 - Site: character search finds a Forever character by first name, surname or full name (“Volvik Morningstar”), and the header and /search list armory characters with their region. Surnames and full names need the 20261117140000 migration.
 - Site: terrain page and zone and dungeon Terrain links load on click instead of prefetching into the edge rate limit.
 - Site: disenchant bands read build 1.60.1.70959 like the rest of the game data (they still named 70938 after the build refresh).
