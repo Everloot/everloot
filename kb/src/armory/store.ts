@@ -60,6 +60,20 @@ export class ArmoryStore {
   seedFromPlayers() {
     return this.rpc<number>("armory_seed_from_players");
   }
+  /** Queue up to `limit` never-read guilds that stored characters name; returns how many were queued. */
+  spiderGuilds(region: Region, limit: number) {
+    return this.rpc<number>("armory_spider_guilds", {
+      p_region: region,
+      p_limit: limit,
+    });
+  }
+  /** Record a finished run; returns how many runs in a row, this one included, made no Blizzard call. */
+  recordRun(region: Region, calls: number) {
+    return this.rpc<number>("armory_record_run", {
+      p_region: region,
+      p_calls: calls,
+    });
+  }
   take(region: Region, kind: Kind, limit: number) {
     return this.rpc<QueueRow[]>("armory_take", {
       p_region: region,
@@ -121,6 +135,8 @@ export class ArmoryStore {
 export type CrawlStore = Pick<
   ArmoryStore,
   | "seedFromPlayers"
+  | "spiderGuilds"
+  | "recordRun"
   | "take"
   | "character"
   | "guild"
