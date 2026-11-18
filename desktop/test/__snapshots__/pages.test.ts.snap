@@ -1,0 +1,397 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`addon > populated: up to date, with a reinstall link and synced builds 1`] = `
+"<div class="page">
+    <div class="head"><h1>Addon</h1><span class="sub"><span class="mono">D:\\Games\\World of Warcraft\\_forever_\\Interface\\AddOns</span></span></div>
+    <div class="stats">
+      <div class="stat"><div class="k">Installed</div><div class="v">0.3.14</div></div>
+      <div class="stat"><div class="k">Latest release</div><div class="v">0.3.14</div><div class="s"><button type="button" class="link" data-open="https://github.com/Everloot/everloot/releases/tag/addon-v0.3.14">release notes</button></div></div>
+      <div class="stat"><div class="k">Prices file</div><div class="v"><span class="ok">present</span></div><div class="s">EverlootPrices</div></div>
+      <div class="stat"><div class="k">Answers file</div><div class="v"><span class="ok">present</span></div><div class="s">EverlootAnswers</div></div>
+      <div class="stat"><div class="k">Builds file</div><div class="v"><span class="ok">present</span></div><div class="s">EverlootBuilds</div></div>
+    </div>
+    <section class="panel">
+      
+      <h2>Up to date</h2><p class="fg2">You have the newest Everloot addon, 0.3.14. Nothing to do.</p>
+      <div class="row">
+        
+        <button type="button" class="link" data-open="https://everloot.app/upload">manual install steps</button>
+        <button type="button" class="link" id="openAddons">open the AddOns folder</button>
+        <span class="ok small" role="status"></span>
+      </div>
+      <p class="muted small">Addon acting up? <button type="button" class="link" id="installAddon" >Reinstall 0.3.14</button> puts a clean copy of the release back. Only needed when files are broken or missing.</p>
+    </section>
+    <section class="panel"><h2>Saved builds</h2>
+      <p class="fg2">The talent builds you saved on everloot.app, written into <code>EverlootBuilds</code> so <code>/everloot plan</code> lists them in game. Synced after you sign in and every 15 minutes; nothing goes back.</p>
+      <p class="fg2">Last synced 2026-10-20T11:00:00Z (2 builds) · <code>/reload</code> in game to see them</p>
+      <div class="row"><button type="button" class="btn" id="buildsSync" >Sync builds</button></div>
+    </section>
+    <section class="panel"><h2>In game</h2>
+      <ul class="plain fg2">
+        <li><code>/everloot status</code> shows what the addon is recording; <code>/everloot addons on</code> shares your addon list on the upload page only.</li>
+        <li><code>/everloot plan</code> lists your saved builds after a sync; <code>/everloot plan 2</code> loads the second one.</li>
+        <li><code>/ask &lt;question&gt;</code> queues a question; this app answers it after the game writes the file.</li>
+        <li>The addon only reads the game's own API and writes its own save file. It never acts for you.</li>
+      </ul>
+    </section>
+  </div>"
+`;
+
+exports[`ask > populated 1`] = `
+"<div class="page">
+    <div class="head"><h1>Ask</h1><div class="row"><label class="switch"><input type="checkbox" data-toggle="ask" checked><span>On</span></label><button type="button" class="btn" data-run="ask" >Answer now</button></div></div>
+    <section class="strip strip-waiting" aria-live="polite"><span class="pill-s pill-waiting">Waiting</span><div class="strip-main"><p class="strip-head">Waiting for the next write</p><p class="strip-last"><time>11:52</time>ask ACC: the token file is missing</p></div></section>
+    
+    <p class="fg2">Ask in game with <code>/ask</code>, then <code>/reload</code> to save your question. Keep this app running while it answers, then <code>/reload</code> again to read the answer. Answers arrive through saved files, not live.</p>
+    <p class="fg2 small">Item prices come from recorded scans, not live listings. Price and search results include their source. The time beside an answer is when it was written; price answers also show the observation day.</p>
+    <section class="panel assistant" id="assistant" aria-labelledby="assistantTitle"><div class="row between"><h2 id="assistantTitle">Assistant</h2><button type="button" class="btn" id="assistantOpen" data-addmodel >Assistant setup</button></div><p><code>/ask</code> answers recorded item-price questions and shows the top <b>Everloot search</b> result: no model or key needed. If an item or realm is unclear, it asks you to specify it.</p><p class="fg2 small">Waiting for the next write</p>
+    
+    
+    <p class="muted small">Everloot search is free. A model you add uses your own provider account, so that provider's pricing and limits apply; some have a limited free tier. A ChatGPT or Claude subscription is not an API key. The website keeps its own keys in your browser tab; setting one up there does not set up this app.</p>
+    <p id="assistantNote" role="status" class="ok small"></p></section>
+    <details id="askAdvanced" class="panel adv" >
+      <summary>Advanced: private MCP server</summary>
+      <form id="askForm" autocomplete="off">
+        <div class="grid2">
+          <div class="field"><label for="mcpUrl">Private MCP server <span class="hint">used only with a token file</span></label><input type="url" id="mcpUrl" name="mcpUrl" value="https://everloot.app/mcp"></div>
+          <div class="field"><label for="tokenFile">Token file <span class="hint">for a private Everloot server; leave empty to use the public one. The token is never typed here</span></label>
+            <div class="row"><input class="grow" type="text" id="tokenFile" name="tokenFile" value=""><button type="button" class="btn" id="pickToken">Choose…</button></div></div>
+        </div>
+        
+        <div class="row"><button type="submit" class="btn btn-primary">Save</button><span class="muted" id="saved"></span></div>
+      </form>
+      <p class="muted small">Models are in Assistant setup above; <code>config.json</code> in the data folder is only for what that form cannot say (any OpenAI-compatible server, keys from a file). <button type="button" class="link" id="openConfig">Open config.json</button></p>
+    </details>
+    <section class="panel"><h2>Pending in game</h2>
+      <div class="list"><div class="item"><div class="t">price Linen Cloth on Doomhowl</div><div class="muted small">ACC · 2026-10-20T11:30:00Z</div></div></div>
+    </section>
+    <section class="panel"><h2>Recent answers</h2>
+      <div class="list"><div class="item"><div>Linen Cloth on Doomhowl: 12s.</div><div class="muted small">Everloot market · answered 2026-10-20T10:00:00Z</div></div></div>
+    </section>
+  </div>"
+`;
+
+exports[`changes > populated 1`] = `
+"<div class="page">
+    <div class="head"><h1>Changes</h1><span class="sub">Blizzard posts, hotfixes and builds, newest first · <button type="button" class="link" data-open="https://everloot.app/changes">everloot.app/changes</button></span></div>
+    <section class="panel"><div class="list"><div class="item"><div class="t"><button type="button" class="link" data-open="https://everloot.app/changes/1">Hotfixes: October 19</button></div><div class="fg2 small">Molten Core respawn timers.</div><div class="muted small">2026-10-19T20:00:00Z</div></div><div class="item"><div class="t">Build 1.60.1.70450</div><div class="muted small">2026-10-18T08:00:00Z</div></div></div></section>
+  </div>"
+`;
+
+exports[`characters > populated, from the save fixture 1`] = `
+"<div class="page char-page">
+    <div class="head">
+      <div>
+        <div class="mono muted small">NIGHTSLAYER · from the addon's save file</div>
+        <h1 class="char-name">Jaina</h1>
+      </div>
+      <div class="row"><span class="sub">Stored locally. Asking the assistant may send character details to your selected model provider.</span><button type="button" class="chip ask" data-ask="How is Jaina doing: gold this week and progress?">Ask the assistant</button></div>
+    </div>
+    <p class="fg2">What the addon recorded about your own characters. Gold carries the name; progress rows carry an opaque key the addon derives per character, so they are listed apart. Sharing any of this with the site is a choice you make on the upload page with a verified grant, never here. Gear, talents, professions, achievements and reputations are not recorded: everloot.app reads them from Blizzard's API.</p>
+    
+    <div class="char-hero">
+      <section class="panel river-card">
+        <div class="row between"><h2>30-day money river</h2><span class="muted small">+0c in · −0c out · <b class="ok">+0c</b> net</span></div>
+        <svg class="river" viewBox="0 0 560 96" preserveAspectRatio="none" role="img" aria-label="Cumulative net gold over the last thirty days"><path class="river-area" d="M0.0,90.0 L18.7,90.0 L37.3,90.0 L56.0,90.0 L74.7,90.0 L93.3,90.0 L112.0,90.0 L130.7,90.0 L149.3,90.0 L168.0,90.0 L186.7,90.0 L205.3,90.0 L224.0,90.0 L242.7,90.0 L261.3,90.0 L280.0,90.0 L298.7,90.0 L317.3,90.0 L336.0,90.0 L354.7,90.0 L373.3,90.0 L392.0,90.0 L410.7,90.0 L429.3,90.0 L448.0,90.0 L466.7,90.0 L485.3,90.0 L504.0,90.0 L522.7,90.0 L541.3,90.0 L560.0,90.0 L560,90.0 L0,90.0 Z"/><line class="river-zero" x1="0" y1="90.0" x2="560" y2="90.0"/><path class="river-line" d="M0.0,90.0 L18.7,90.0 L37.3,90.0 L56.0,90.0 L74.7,90.0 L93.3,90.0 L112.0,90.0 L130.7,90.0 L149.3,90.0 L168.0,90.0 L186.7,90.0 L205.3,90.0 L224.0,90.0 L242.7,90.0 L261.3,90.0 L280.0,90.0 L298.7,90.0 L317.3,90.0 L336.0,90.0 L354.7,90.0 L373.3,90.0 L392.0,90.0 L410.7,90.0 L429.3,90.0 L448.0,90.0 L466.7,90.0 L485.3,90.0 L504.0,90.0 L522.7,90.0 L541.3,90.0 L560.0,90.0"/></svg>
+        <div class="row between muted small"><span>2026-09-21</span><span>2026-10-20</span></div>
+      </section>
+      <section class="panel week-card">
+        <div class="row between"><h2>This week</h2><span class="muted small">earned above · spent below</span></div>
+        <div class="week-bars" role="img" aria-label="Money earned above the line and spent below, one column a day"><div class="wk-col" title="2026-10-14: +0c in, −0c out"><div class="wk-up"><i data-h="0"></i></div><div class="wk-down"><i data-h="0"></i></div><span class="wk-d">W</span></div><div class="wk-col" title="2026-10-15: +0c in, −0c out"><div class="wk-up"><i data-h="0"></i></div><div class="wk-down"><i data-h="0"></i></div><span class="wk-d">T</span></div><div class="wk-col" title="2026-10-16: +0c in, −0c out"><div class="wk-up"><i data-h="0"></i></div><div class="wk-down"><i data-h="0"></i></div><span class="wk-d">F</span></div><div class="wk-col" title="2026-10-17: +0c in, −0c out"><div class="wk-up"><i data-h="0"></i></div><div class="wk-down"><i data-h="0"></i></div><span class="wk-d">S</span></div><div class="wk-col" title="2026-10-18: +0c in, −0c out"><div class="wk-up"><i data-h="0"></i></div><div class="wk-down"><i data-h="0"></i></div><span class="wk-d">S</span></div><div class="wk-col" title="2026-10-19: +0c in, −0c out"><div class="wk-up"><i data-h="0"></i></div><div class="wk-down"><i data-h="0"></i></div><span class="wk-d">M</span></div><div class="wk-col" title="2026-10-20: +0c in, −0c out"><div class="wk-up"><i data-h="0"></i></div><div class="wk-down"><i data-h="0"></i></div><span class="wk-d">T</span></div></div>
+        <div class="week-foot"><span class="muted small">+0c</span><span class="ok"><b>+0c</b> net</span><span class="muted small">−0c</span></div>
+      </section>
+    </div>
+    <section class="panel profile" aria-label="Jaina: gold and money by category">
+    <div class="dw-stats">
+      <div class="dw-stat"><span class="k">Gold now</span><b>9s 0c</b></div>
+      <div class="dw-stat"><span class="k">Peak</span><b>9s 0c</b></div>
+      <div class="dw-stat"><span class="k">7-day net</span><b class="ok">+0c</b></div>
+    </div>
+    <section class="dw-sec"><div class="row between"><h3>Money by category</h3><span class="muted small">all time in this file</span></div>
+      <div class="cat-cols"><div><h4>Earned</h4><p class="muted small">Nothing recorded.</p></div><div><h4>Spent</h4><p class="muted small">Nothing recorded.</p></div></div>
+      <p class="muted small">Repairs, trades and mail are read from the local ledger and are never uploaded.</p>
+    </section>
+    </section>
+    <section class="panel"><div class="row between"><h2>Roster</h2><span class="muted small">click a character, or press Enter, for history and sharing</span></div>
+      <div class="tablewrap"><table class="roster"><thead><tr><th>Character</th><th class="num">Gold</th><th class="num">7 days</th><th class="num">Last seen</th></tr></thead><tbody><tr class="roster-row sel" data-char="0" tabindex="0" aria-haspopup="dialog">
+      <td><b>Jaina</b><div class="muted small">Nightslayer</div></td>
+      <td class="num">9s 0c</td>
+      <td class="num ok">–</td>
+      <td class="num muted small">2 d ago</td>
+    </tr><tr class="roster-row" data-char="1" tabindex="0" aria-haspopup="dialog">
+      <td><b>Arthas</b><div class="muted small">Doomhowl</div></td>
+      <td class="num">50c<svg class="spark" width="96" height="24" viewBox="0 0 96 24" role="img" aria-label="gold from 2026-10-18 to 2026-10-18"><title>2 snapshots, 2026-10-18 to 2026-10-18</title><path d="M0.0,23.0 L95.0,1.0" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></td>
+      <td class="num ok">–</td>
+      <td class="num muted small">2 d ago</td>
+    </tr><tr class="roster-row" data-char="2" tabindex="0" aria-haspopup="dialog">
+      <td><b>Thrall</b><div class="muted small">Skull Rock</div></td>
+      <td class="num">–</td>
+      <td class="num ok">+5c</td>
+      <td class="num muted small">–</td>
+    </tr></tbody></table></div>
+    </section>
+    <section class="panel" id="keyed" tabindex="-1"><h2>Progress · keyed</h2>
+      <p class="muted">Nothing yet. The completion tracker is off until <code>/everloot completion on</code> in game.</p>
+    </section>
+  </div>
+  <div class="drawer-layer" id="drawerLayer" hidden aria-hidden="true">
+    <div class="drawer-scrim" data-dwclose></div>
+    <div class="drawer" role="dialog" aria-modal="true" aria-labelledby="dwTitle">
+      <div class="drawer-head">
+        <div class="grow"><div class="mono muted small" id="dwRealm"></div><h2 class="dw-name" id="dwTitle"></h2></div>
+        <button type="button" class="drawer-close" data-dwclose aria-label="Close details">×</button>
+      </div>
+      <div class="drawer-tabs" role="tablist" aria-label="Character details">
+        <button type="button" role="tab" data-dwtab="overview" aria-selected="true">Overview</button>
+        <button type="button" role="tab" data-dwtab="history" aria-selected="false">History</button>
+        <button type="button" role="tab" data-dwtab="share" aria-selected="false">Sharing</button>
+      </div>
+      <div class="drawer-body" id="dwBody"></div>
+    </div>
+  </div>"
+`;
+
+exports[`chat > populated 1`] = `
+"<div class="page chat"><div class="chat-top">
+    <div class="head"><h1>Chat</h1><span class="sub">plain search · public MCP, rate limited <button type="button" class="link" id="chatClear" >clear</button></span></div>
+    <p class="muted small">Ask anything about the game. The model looks it up in Everloot's own MCP tools first and names the sources; when they have nothing it says the answer is its own knowledge. The transcript is saved in your data folder. Your selected model provider receives your questions, conversation history and any local character details the model uses, including names, gold, gear and progress.</p>
+    <section class="panel assistant" id="assistant" aria-labelledby="assistantTitle"><div class="row between"><h2 id="assistantTitle">Assistant</h2><button type="button" class="btn" id="assistantOpen" data-addmodel >Assistant setup</button></div><p>Chat answers recorded item-price questions and shows <b>Everloot search</b> results: no AI key or token file needed. A model is optional and uses your own provider account, so its pricing applies.</p>
+    
+    
+    
+    <p id="assistantNote" role="status" class="ok small"></p></section>
+    
+    </div>
+    <div class="thread" id="thread"><div class="msg msg-user">What drops the Bindings of the Windseeker?<div class="meta">11:00</div></div><div class="msg msg-assistant">Baron Geddon and Garr, in Molten Core.<div class="meta"><button type="button" class="link copy" data-copy="1">Copied</button><b>search only</b><br>Sources: everloot.app/items/18563</div></div></div>
+    <form id="chatForm" class="composer"><textarea id="chatText" rows="2" aria-label="Your question" placeholder="Ask about Forever. Enter sends, Shift+Enter is a new line." ></textarea>
+      <div class="composer-bar"><select id="modelPick" class="model-pick" aria-label="Model" ><option value="" selected>Search only, no model</option><option value="add">Assistant setup…</option></select><button type="submit" class="btn btn-primary" >Send</button></div></form>
+  </div>"
+`;
+
+exports[`log > populated 1`] = `
+"<div class="page">
+    <div class="head"><h1>Log</h1><div class="row"><button type="button" class="btn" id="copyDiag">Copy diagnostics</button><button type="button" class="btn" id="pause">Pause</button></div></div>
+    <p class="ok small">Copied. Paste it into the bug report.</p>
+    <section class="panel"><div class="log"><div><time>11:52</time><span class="error">ask ACC: the token file is missing</span></div><div><time>11:51</time><span class="info">prices: wrote 2 realms into the game</span></div><div><time>11:50</time><span class="info">upload ACC: sent 12 new events</span></div></div></section>
+    <p class="muted small">Copy diagnostics puts the version, your settings (where the token file is, never the token), the files watched, each job's last state and the last hundred lines on the clipboard, with your user folder hidden, for a bug report.</p>
+  </div>"
+`;
+
+exports[`market > populated 1`] = `
+"<div class="page">
+    <div class="head"><h1>Market</h1><div class="row"><label class="switch"><input type="checkbox" data-toggle="prices" checked><span>On</span></label><button type="button" class="btn" data-run="prices" >Refresh now</button></div></div>
+    <section class="strip strip-waiting" aria-live="polite"><span class="pill-s pill-waiting">Waiting</span><div class="strip-main"><p class="strip-head">Waiting for the next write</p></div></section>
+    <section class="panel"><div class="row between"><h2>Look up a price</h2><button type="button" class="link" data-open="https://everloot.app/tools/auctions?utm_source=desktop-app&amp;utm_medium=app">Auction prices on everloot.app ↗</button></div>
+      <form id="priceForm" class="row" autocomplete="off"><input type="text" id="priceItem" name="priceItem" class="grow" aria-label="Item id or link" placeholder="Item id, or an item link pasted from game chat" maxlength="500"><button type="submit" class="btn">Look up</button></form>
+      <div class="tablewrap"><table><thead><tr><th>Realm</th><th>House</th><th class="num">Market</th><th class="num">Min</th><th class="num">Historical</th><th class="num">Up</th><th class="num">Reporters</th><th>Day</th><th></th></tr></thead><tbody><tr><td>Doomhowl</td><td>Alliance</td><td class="num">12s 50c</td><td class="num">11s 0c</td><td class="num">13s 0c</td><td class="num">400</td><td class="num">3</td><td>2026-10-19</td><td><button type="button" class="link" data-open="https://everloot.app/tools/auctions?realm=Doomhowl&amp;item=2589&amp;utm_source=desktop-app&amp;utm_medium=app">history ↗</button></td></tr></tbody></table></div>
+    <p class="muted small">Item 2589. Market weighs the last 14 public days, historical is the 60-day median, min is the lowest buyout per unit. Each auction house is its own market; the game shows the one your character uses.</p>
+      <p class="muted small">From the prices file in your game, the same numbers your tooltips show. In game, <code>/everloot price [item]</code> prints them in chat, anywhere in the world. Charts, every realm and item names are on the site.</p>
+    </section>
+    <p class="fg2">Community market values written into <code>EverlootPrices</code> so item tooltips show them after <code>/reload</code>. Realms from your own auction scans are always included; pick more below, the way TSM lets you pick realms, except the values are Everloot's own: a day counts once three reporters scanned it. Refreshed after each upload and every hour.</p>
+    <p class="callout fg2"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10m8 10V4m8 16v-7M2 21h20"/></svg><span>Follow your characters' realms: <b>Skull Rock</b>. Their community prices then go into your tooltips like any realm you follow; nothing is asked of everloot.app for them until you press Follow. <button type="button" class="btn btn-primary" data-suggestion="follow">Follow</button> <button type="button" class="link" data-suggestion="dismiss">No thanks</button></span></p>
+    <section class="panel"><div class="row between"><h2>Realms to carry into the game</h2><span class="muted small">site data as of 2026-10-20T06:00:00Z</span></div>
+      <div class="checks"><label class="check"><input type="checkbox" data-realm="Doomhowl"  disabled checked> Doomhowl <span class="muted small">(your scans)</span></label><label class="check"><input type="checkbox" data-realm="Nightslayer" checked > Nightslayer</label></div>
+      <div class="row"><input type="text" id="realmAdd" class="grow" placeholder="Add a realm by name" maxlength="60"><button type="button" class="btn" id="realmAddBtn">Follow</button></div>
+      
+      <p class="muted small">At most 20 realms in one prices file; your scans come first. The full tables and 60-day charts are on the Auction prices tool in the sidebar.</p>
+    </section>
+    <section class="panel"><h2>Your scans</h2>
+      <div class="tablewrap"><table><thead><tr><th>Realm</th><th>Last full scan</th><th>Status</th></tr></thead><tbody><tr><td>Doomhowl</td><td>3 h ago</td><td class="ok">fresh</td></tr><tr><td>Nightslayer</td><td>5 d ago</td><td class="warn">scan again next time you are at the auction house</td></tr></tbody></table></div>
+      <p class="muted small">Every scan you upload is one of the three reporters a day needs before a price is published. A realm is only as fresh as its last scans.</p>
+    </section>
+    <section class="panel"><div class="row between"><h2>Written into the game</h2><span class="muted small"></span></div>
+      
+      <div class="tablewrap"><table><thead><tr><th>Realm</th><th>House</th><th class="num">Items</th><th>Data as of</th><th>Why</th></tr></thead><tbody><tr><td>Doomhowl</td><td>Alliance</td><td class="num">1200</td><td>2026-10-20T06:00:00Z</td><td class="muted">your scans</td></tr></tbody></table></div>
+    </section>
+  </div>"
+`;
+
+exports[`overview > populated 1`] = `
+"<div class="page">
+    <div class="head"><h1>Overview</h1></div>
+    
+    
+    
+    
+    <section class="status-line" data-state="idle" aria-labelledby="heroTitle">
+      <span class="pill-s pill-waiting">Waiting</span>
+      <div class="status-text"><b id="heroTitle">Watching 1 account file</b><span class="muted">The next upload starts after you log out of the game or /reload.</span></div>
+      <div class="status-actions"><button type="button" class="btn btn-primary" data-run="upload" >Upload now</button><button type="button" class="btn" data-run="prices" >Refresh prices</button></div>
+      
+    </section>
+    <div class="stats">
+      <div class="stat"><div class="k"><svg class="ico ico-k" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3m-5 5 5-5 5 5M4 15v6h16v-6"/></svg>Upload</div><div class="v"><span class="dot dot-ok" aria-hidden="true"></span><span>OK</span></div><div class="s">last run 10 min ago</div></div>
+      <div class="stat"><div class="k"><svg class="ico ico-k" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10m8 10V4m8 16v-7M2 21h20"/></svg>Market prices</div><div class="v"><span class="dot dot-ok" aria-hidden="true"></span><span>1 realm(s)</span></div><div class="s">your last scan 3 h ago</div></div>
+      <div class="stat"><div class="k"><svg class="ico ico-k" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 8 3 4-3 4m6 0h4"/></svg>/ask</div><div class="v"><span class="dot dot-idle" aria-hidden="true"></span><span>On</span></div><div class="s">waiting</div></div>
+      <div class="stat"><div class="k"><svg class="ico ico-k" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5v9l-9 5-9-5V8l9-5Zm0 10L3 8m9 5 9-5m-9 5v9"/></svg>Addon</div><div class="v"><span>0.3.13 <span class="warn">→ 0.3.14 available</span></span></div><div class="s">prices file in game · <button type="button" class="link" data-page="addon">update</button></div></div>
+    </div>
+    <div class="overview-grid">
+      <div>
+        <div class="sec-head"><h2>What Everloot did</h2><button type="button" class="link" data-page="log">open the log</button></div>
+        <div class="thread-steps"><div class="step step-info" data-job="upload"><time>11:50</time><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3m-5 5 5-5 5 5M4 15v6h16v-6"/></svg><span class="step-text">upload ACC: sent 12 new events</span></div><div class="step step-info" data-job="prices"><time>11:51</time><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10m8 10V4m8 16v-7M2 21h20"/></svg><span class="step-text">prices: wrote 2 realms into the game</span></div><div class="step step-error step-last" data-job="ask"><time>11:52</time><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 8 3 4-3 4m6 0h4"/></svg><span class="step-text">ask ACC: the token file is missing</span></div></div>
+      </div>
+      <div>
+        <div class="sec-head"><h2>Latest changes</h2><button type="button" class="link" data-page="changes">all</button></div>
+        <div class="list"><div class="item"><div class="t"><button type="button" class="link" data-open="https://everloot.app/changes/1">Hotfixes: October 19</button></div><div class="muted small">2026-10-19T20:00:00Z</div></div><div class="item"><div class="t">Build 1.60.1.70450</div><div class="muted small">2026-10-18T08:00:00Z</div></div></div>
+      </div>
+    </div>
+  </div>"
+`;
+
+exports[`settings > populated 1`] = `
+"<div class="page settings">
+    <div class="head"><h1>Settings</h1></div>
+    
+    <section class="panel set-sec" id="account" tabindex="-1"><div class="set-lead"><h2>Account</h2></div><div class="set-body">
+      <p class="fg2">Signed in to everloot.app with the key ending <b class="mono">…9f3c</b>.</p>
+      <p class="muted small">Chat and the in-game /ask send it to everloot.app's public server, which then counts their requests against your account instead of this internet address, with a higher limit. A key with the "Read my saved builds" permission also brings your saved talent builds into the game. Uploads never carry it.</p>
+      <div class="row"><button type="button" class="btn" data-open="https://everloot.app/docs/api/keys?utm_source=desktop-app&amp;utm_medium=app#your-keys">Manage keys on everloot.app ↗</button><button type="button" class="btn" id="accountSignOut">Sign out</button></div>
+    </div></section>
+    <section class="panel set-sec"><div class="set-lead"><h2>What runs</h2></div><div class="set-body"><div class="set-row"><div class="grow"><b>Upload</b><div class="muted small">Send what the addon recorded after every logout or /reload · <button type="button" class="link" data-page="upload">details</button></div></div><label class="switch"><input type="checkbox" data-toggle="upload" checked><span>On</span></label></div><div class="set-row"><div class="grow"><b>Market prices</b><div class="muted small">Keep community prices in your item tooltips, refreshed hourly · <button type="button" class="link" data-page="prices">details</button></div></div><label class="switch"><input type="checkbox" data-toggle="prices" checked><span>On</span></label></div><div class="set-row"><div class="grow"><b>In-game /ask</b><div class="muted small">Answer /ask questions from the game with the model below · <button type="button" class="link" data-page="ask">details</button></div></div><label class="switch"><input type="checkbox" data-toggle="ask" checked><span>On</span></label></div></div></section>
+    <section class="panel set-sec" id="assistant" aria-labelledby="assistantTitle"><div class="set-lead"><h2 id="assistantTitle">Assistant</h2><button type="button" class="btn" id="assistantOpen" data-addmodel >Assistant setup</button></div><div class="set-body"><p>Chat answers recorded item-price questions and shows <b>Everloot search</b> results: no AI key or token file needed. A model is optional and uses your own provider account, so its pricing applies.</p>
+    
+    <p class="muted small">Chat uses the first model only; the in-game <code>/ask</code> goes down the list. The private server and token file are under <button type="button" class="link" data-advanced>Advanced on the Ask page</button>.</p>
+    <p class="muted small">Everloot search is free. A model you add uses your own provider account, so that provider's pricing and limits apply; some have a limited free tier. A ChatGPT or Claude subscription is not an API key. The website keeps its own keys in your browser tab; setting one up there does not set up this app.</p>
+    <p id="assistantNote" role="status" class="ok small"></p></div></section>
+    <form id="settings" autocomplete="off">
+      <section class="panel set-sec"><div class="set-lead"><h2>Game</h2></div><div class="set-body">
+        <div class="field"><label for="gameFolder">Game folder <span class="hint">the product folder that holds <code>WTF</code>: for WoW: Forever, <code>World of Warcraft\\_forever_</code></span></label>
+          <p class="callout fg2"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4m0 3.5v.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg><span>Everloot is built for WoW: Forever, and it is installed at <span class="mono">D:\\Games\\World of Warcraft\\_forever_</span>. The app reads <span class="mono">D:\\Games\\World of Warcraft\\_classic_era_</span> now. <button type="button" class="btn btn-primary" id="useForever">Use Forever</button> <button type="button" class="link" id="keepFolder">Keep this folder</button></span></p>
+          <div class="row"><input class="grow" type="text" id="gameFolder" name="gameFolder" value="D:\\Games\\World of Warcraft\\_classic_era_"><button type="button" class="btn" id="browse">Browse…</button></div></div>
+        <label class="switch"><input type="checkbox" name="autoUpdateAddon" checked> Keep the addon up to date</label>
+        <p class="muted small">New versions of the Everloot addon install on their own and load at the next <code>/reload</code> or login.</p>
+      </div></section>
+      <section class="panel set-sec"><div class="set-lead"><h2>Startup</h2></div><div class="set-body">
+        <label class="switch"><input type="checkbox" name="launchAtLogin" > Start when I sign in</label>
+        <label class="switch"><input type="checkbox" name="startInTray" > Start in the tray without a window</label>
+      </div></section>
+      <section class="panel set-sec"><div class="set-lead"><h2>Census</h2></div><div class="set-body">
+        <label class="switch"><input type="checkbox" name="census" checked> Send census counts with the uploads</label>
+        <p class="muted small">The race, class, level and faction of your characters and of players the addon sees. Never names, guilds, gear or places; the site shows only totals. Off keeps them in <code>Everloot.lua</code>; <code>/everloot census off</code> in the game stops recording and deletes them.</p>
+      </div></section>
+      <section class="panel set-sec"><div class="set-lead"><h2>Player pages</h2></div><div class="set-body">
+        <label class="switch"><input type="checkbox" name="players" checked> Send the player pages with the uploads</label>
+        <p class="muted small">The name, realm, race, class, level and guild of the players the addon saw, so a page can be found by name. On in a new install; an install from before keeps its choice. Off keeps them in <code>Everloot.lua</code>; <code>/everloot players off</code> in the game stops recording and deletes them, and anyone can hide a character at everloot.app/players/opt-out.</p>
+      </div></section>
+      <section class="panel set-sec"><div class="set-lead"><h2>Boss pulls</h2></div><div class="set-body">
+        <p class="muted small">After each boss pull, the names, realms, classes and roles of your group and the damage meter's totals. They go with the uploads; the site keeps them privately for a year, shows them nowhere and deletes any character someone hides. <code>/everloot pulls off</code> in the game stops recording and deletes them.</p>
+      </div></section>
+      <details class="panel set-sec"><summary><h2>Advanced</h2></summary>
+        <div class="field"><label for="endpoint">Site <span class="hint">change only to test against another deployment</span></label><input type="url" id="endpoint" name="endpoint" value="https://everloot.app"></div>
+      </details>
+      <div class="row set-save"><button type="submit" class="btn btn-primary">Save</button><span class="muted" id="saved"></span></div>
+    </form>
+    <section class="panel set-sec"><div class="set-lead"><h2>This app</h2></div><div class="set-body">
+      <p class="fg2">Everloot 0.1.23 · AGPL-3.0-only · <button type="button" class="link" data-open="https://github.com/Everloot/everloot/tree/main/desktop">source</button> · <button type="button" class="link" data-open="https://discord.gg/9CKsbHTRu3">Discord</button></p>
+      <div class="row"><button type="button" class="btn" id="updates">Check for updates</button></div>
+    </div></section>
+    <section class="panel set-sec" id="data" tabindex="-1"><div class="set-lead"><h2>Data on this computer</h2></div><div class="set-body">
+      <p class="fg2">The data folder holds <b>3.2 MB</b>: <span class="mono">C:\\Users\\player\\AppData\\Roaming\\Everloot</span> <button type="button" class="link" id="openData">Open data folder</button></p>
+      <div class="tablewrap"><table><tbody><tr><td><b>Backups</b><div class="muted small">a copy of each account&#39;s Everloot.lua before an upload; the oldest go first</div></td><td class="num">2.8 MB</td></tr><tr><td><b>Update downloads</b><div class="muted small">deleted once the update is installed</div></td><td class="num">0 B</td></tr><tr><td><b>Chat history</b><div class="muted small">Chat&#39;s conversation and the in-game /ask answers; older messages are dropped</div></td><td class="num">195 KB</td></tr><tr><td><b>Upload history</b><div class="muted small">which events the site has confirmed, for the rows still in Everloot.lua</div></td><td class="num">244 KB</td></tr><tr><td><b>Settings and keys</b><div class="muted small">these settings, your everloot.app key and the model keys you added</div></td><td class="num">4 KB</td></tr><tr><td><b>Other</b><div class="muted small">files from an interrupted write, or kept from a damaged one</div></td><td class="num">45 KB</td></tr></tbody></table></div>
+      <h3>What goes to everloot.app</h3>
+      <ul class="plain fg2 small">
+        <li>Anonymous observations from <code>Everloot.lua</code>: drops, vendors, recipes, spawns, auction scans. No character or account name.</li>
+        <li>Census counts: the race, class, level and faction of your characters and of players the addon sees. Never names, guilds, gear or places; the site shows only totals.</li>
+        <li>Player pages: the name, realm, race, class, level and guild of the players the addon saw.</li>
+        <li>Your everloot.app key, when you are signed in, goes with Chat and the in-game <code>/ask</code>. Uploads never carry it.</li>
+      </ul>
+      <h3>What stays here</h3>
+      <ul class="plain fg2 small">
+        <li>Guild, gold, collection and your installed addon list.</li>
+        <li>Your raid lockouts and boss kills. No upload sends them.</li>
+        <li>Your settings, chat, upload history and backups, in the data folder.</li>
+      </ul>
+      <p class="small fg2">If you configure a model for Chat, it receives your questions and any local character details it uses to answer. Rules: <button type="button" class="link" data-open="https://everloot.app/privacy">everloot.app/privacy</button></p>
+      <p class="muted small">Uninstalling keeps this folder, with your keys, chat and save backups in it. Delete my local data empties it; the command-line tool uses the same folder.</p>
+      <div class="row"><button type="button" class="btn btn-danger" id="wipeOpen">Delete my local data…</button></div>
+    </div></section>
+  </div>"
+`;
+
+exports[`update > the popover offers the download, then its progress, then the restart 1`] = `
+"<div class="pop-head"><h2 id="updTitle">Update ready to install</h2><div class="muted small">0.1.24 · you run 0.1.23 · released 2026-10-19T00:00:00Z</div></div>
+    <div class="pop-body"><h3>What's changed</h3><ul><li><span class="note" title="Desktop: the Market page remembers the lookup">Desktop: the Market page remembers the lookup</span></li></ul><button type="button" class="link" data-open="https://github.com/Everloot/everloot/releases/tag/desktop-v0.1.24">Release notes on GitHub ↗</button></div>
+    
+    <div class="pop-foot"><button type="button" class="btn btn-primary" id="updateRestartPop">Restart to update</button><button type="button" class="btn" id="updateLater">Later</button></div>
+    <p class="muted small">The update is checked against the release's published checksum before it installs. Your settings and data folder stay.</p>"
+`;
+
+exports[`update > the restart dialog turns its buttons off once restarting 1`] = `
+"<div class="confirm-head brand-head"><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" class="mark-bg"/><path d="M32 12 52 32 32 52 12 32Z" fill="none" stroke="currentColor" stroke-width="5" stroke-linejoin="round"/></svg><div><h2 id="rsTitle">Restart to update?</h2><div class="muted small">Everloot 0.1.24 · you run 0.1.23</div></div></div>
+    <div class="confirm-body"><p>The app closes, installs the update and opens again in a few seconds.</p><p class="fg2">Your settings, characters, chat and backups stay in the data folder. The game and its save files are not touched.</p></div>
+    <div class="confirm-foot"><span class="muted small">Nothing is running right now.</span><div class="row"><button type="button" class="btn" id="restartCancel">Not now</button><button type="button" class="btn btn-primary btn-icon" id="restartGo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4.6h-4.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Restart and update</button></div></div>"
+`;
+
+exports[`upload > populated 1`] = `
+"<div class="page">
+    <div class="head"><h1>Upload</h1><div class="row"><label class="switch"><input type="checkbox" data-toggle="upload" checked><span>On</span></label><button type="button" class="btn" data-run="upload" >Run now</button></div></div>
+    <p class="fg2">After every logout or <code>/reload</code> the game rewrites <code>Everloot.lua</code>; once the write settles, the events the site has not confirmed are sent. Named data (guild, gear, gold, collection) and your installed addon list stay here.</p>
+    <section class="strip strip-waiting" aria-live="polite"><span class="pill-s pill-waiting">Waiting</span><div class="strip-main"><p class="strip-head">Waiting for the next write</p><p class="strip-last"><time>11:50</time>upload ACC: sent 12 new events</p></div></section>
+    <section class="panel"><h2>Account files</h2>
+      <div class="tablewrap"><table><thead><tr><th>Account</th><th>Written</th><th>Addon</th><th class="num">Records</th><th class="num">Confirmed</th><th>What it holds</th></tr></thead><tbody><tr>
+      <td><span class="mono">ACC</span></td>
+      <td>2026-10-20T11:40:00Z<div class="muted small">47 KB</div></td>
+      <td>0.3.14<div class="muted small">1.60.1.70450</div></td>
+      <td class="num">52</td><td class="num">50</td>
+      <td><div class="chips"><span class="chip"><b>40</b> loot</span><span class="chip"><b>12</b> npc_sighting</span></div></td>
+    </tr></tbody></table></div>
+      <p class="muted small">Records are what the addon has on disk; confirmed is how many of them the site has accepted from this install. The site states a fact once three installs agree.</p>
+    </section>
+    <section class="panel"><div class="row between"><h2>Backups</h2><button type="button" class="btn" id="openBackups" >Open folder</button></div>
+      <div class="tablewrap"><table><thead><tr><th>Account</th><th>Taken</th><th class="num">Size</th><th></th></tr></thead><tbody><tr><td><span class="mono">ACC</span></td><td>2026-10-20T11:40:00Z</td><td class="num">47 KB</td><td><button type="button" class="btn small" data-restore="ACC-2026-10-20.lua" >Restore</button></td></tr></tbody></table></div>
+      <p class="muted small">A copy of <code>Everloot.lua</code> as it was uploaded, the newest ten per account. Restore with the game closed; the file you replace is backed up first.</p>
+      <p class="ok small">Restored ACC. Log in to see it.</p>
+    </section>
+  </div>"
+`;
+
+exports[`welcome > populated 1`] = `
+"<div class="welcome">
+    <div class="brand"><img src="logo.png" alt=""><h1>Set up Everloot</h1></div>
+    <section class="panel signin" aria-label="Your everloot.app account">
+      <p class="ok">Signed in to everloot.app <span class="muted small">key …9f3c</span></p>
+      
+      <div class="or">or</div>
+      <p class="muted small">Continue without an account below: uploads and prices work either way. Signing in raises the Chat and <code>/ask</code> limits and brings your saved talent builds into the game.</p>
+    </section>
+    <div>
+      <p class="lead">It runs in the tray beside the game: uploads what the addon recorded after every logout, keeps market prices in your tooltips, installs addon updates, carries the site's tools and a chat over Everloot's data, and, if you turn it on, answers <code>/ask</code>.</p></div>
+    <section class="panel">
+      <h2>What leaves this computer</h2>
+      <ul class="plain fg2">
+        <li>Anonymous observations from <code>Everloot.lua</code>: drops, vendors, recipes, spawns, auction scans. No character or account name.</li>
+        <li><label class="switch"><input type="checkbox" id="censusConsent" checked> Census: the race, class, level and faction of your characters and of players the addon sees. Never names, guilds, gear or places; the site shows only totals.</label></li>
+        <li><label class="switch"><input type="checkbox" id="playersConsent" checked> Player pages, on in a new install: the name, realm, race, class, level and guild of the players the addon saw, so a page can be found by name. Anyone can hide a character at everloot.app/players/opt-out; <code>/everloot players off</code> in the game stops recording and deletes them.</label></li>
+        <li>The uploader keeps guild, gold, collection and installed-addon rows here. If you configure a model for Chat, it receives your questions and any local character details it uses to answer.</li>
+      </ul>
+      <p class="small fg2">Uploaded observations are published under CC BY-SA 4.0, credited to Everloot contributors. Source: <button type="button" class="link" data-open="https://github.com/Everloot/everloot">github.com/Everloot/everloot</button> · Rules: <button type="button" class="link" data-open="https://everloot.app/privacy">everloot.app/privacy</button></p>
+    </section>
+    <section class="panel">
+      <h2>Which game folder?</h2>
+      <div class="choices">
+        <label class="choice"><input type="radio" name="folder" value="D:\\Games\\World of Warcraft\\_forever_" checked>
+          <span class="grow"><span class="mono">_forever_</span> <span class="muted">1 account file(s) with Everloot data</span><br><span class="muted mono small">D:\\Games\\World of Warcraft\\_forever_</span></span></label>
+        <label class="choice"><input type="radio" name="folder" value="D:\\Games\\World of Warcraft\\_classic_era_" >
+          <span class="grow"><span class="mono">_classic_era_</span> <span class="muted">never played here yet</span><br><span class="muted mono small">D:\\Games\\World of Warcraft\\_classic_era_</span></span></label></div><p role="status" class="ok small">Installed the Everloot addon 0.3.14. If the game is open, restart it.</p>
+      <div class="row"><button type="button" class="btn" id="browse">Browse…</button><button type="button" class="btn" id="redetect">Look again</button></div>
+    </section>
+    <label class="agree"><input type="checkbox" id="agree" checked> I agree to the <button type="button" class="link" data-open="https://everloot.app/terms">Terms of Use</button> and <button type="button" class="link" data-open="https://everloot.app/privacy">Privacy Policy</button>.</label>
+    <div class="row"><button type="button" class="btn btn-primary btn-lg" id="start" >Start</button><span class="muted">Nothing runs before you press Start.</span></div>
+  </div>"
+`;
+
+exports[`wipe > populated 1`] = `
+"<div class="confirm-head"><h2 id="wpTitle">Delete your local data?</h2><div class="muted small mono">C:\\Users\\player\\AppData\\Roaming\\Everloot · 3.2 MB</div></div>
+    <div class="confirm-body"><p>The app empties its data folder and starts over on the setup screen. This goes:</p>
+      <ul class="plain fg2">
+        <li>Your settings, and the model keys you added for Chat</li>
+        <li>Your everloot.app key on this computer (…9f3c). It still works until you revoke it on everloot.app: <button type="button" class="link" data-open="https://everloot.app/docs/api/keys?utm_source=desktop-app&amp;utm_medium=app#your-keys">manage keys</button>.</li>
+        <li>Upload history: the next upload sends what is in <code>Everloot.lua</code> again, and the site skips what it already has</li>
+        <li>Backups of <code>Everloot.lua</code></li>
+        <li>Chat history and <code>/ask</code> answers</li>
+        <li>Downloaded updates</li>
+      </ul>
+      <p class="fg2">The command-line tool uses the same folder, so it loses its upload history and settings too. The game folder, the addon and your <code>Everloot.lua</code> files are not touched.</p>
+      </div>
+    <div class="confirm-foot"><span class="muted small"></span><div class="row"><button type="button" class="btn" id="wipeCancel">Cancel</button><button type="button" class="btn btn-danger-fill" id="wipeGo">Delete and start over</button></div></div>"
+`;
