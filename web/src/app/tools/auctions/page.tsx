@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import JsonLd from "@/components/JsonLd";
 import { webApplicationJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
-import { crossRealmHref, itemIdParam, realmHref, realmSlug, slugParam } from "@/lib/auction-house";
+import { crossRealmHref, houseParam, houseSlug, itemIdParam, realmHref, realmSlug, slugParam } from "@/lib/auction-house";
 import { browseView } from "./browse-view";
 import { AhledgerDeals, AhledgerEconomySummary } from "./AhledgerMarket";
 import { Container } from "@/components/ui";
@@ -28,11 +28,13 @@ function one(value: string | string[] | undefined): string {
 
 export default async function AuctionHousePage(props: Props) {
   const searchParams = await props.searchParams;
-  // The old page's form: `realm` (and `item`) land on the realm and item pages.
+  // The old page's form: `realm` (and `item`) land on the realm and item pages. `?realm=&house=`, the market tools'
+  // realm and house picker's link, keeps its house on the realm's page.
   const realmText = one(searchParams.realm).trim().slice(0, 60);
   const legacyItem = itemIdParam(one(searchParams.item) || (realmText ? one(searchParams.q) : ""));
   const slug = realmText ? slugParam(realmSlug(realmText)) : null;
-  if (slug) redirect(legacyItem ? `${realmHref({ slug })}/${legacyItem}` : realmHref({ slug }));
+  const house = houseParam(one(searchParams.house) || undefined);
+  if (slug) redirect(legacyItem ? `${realmHref({ slug })}/${legacyItem}` : `${realmHref({ slug })}${house ? `?house=${houseSlug(house)}` : ""}`);
   if (legacyItem) redirect(crossRealmHref(legacyItem));
   const view = await browseView({ slug: null, search: Object.fromEntries(Object.entries(searchParams).filter(([k]) => k !== "realm" && k !== "item")) });
   // The page has no lead line, so the application is described by the meta description. Its name is the H1.

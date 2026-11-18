@@ -2,20 +2,20 @@ import { CoinText } from "@/components/ui/Coins";
 import Link from "next/link";
 import { DataTable, type Column } from "@/components/ui";
 import { uploadStore } from "@/lib/upload-store";
-import { crossRealmHref, itemAcrossRealms, itemHref, money, realmBoards, type MarketRow } from "@/lib/auction-house";
+import { crossRealmHref, itemHref, itemRows, money, type MarketRow } from "@/lib/auction-house";
 import { formatCopper } from "../../../../../kb/src/market";
 import { RealmName } from "./RealmName";
 
 /**
  * An item's public auction prices for its database page: each house of each realm with its own price, never a
- * blend of houses. Empty when nothing is public (3 players' scans) or the rollup cannot be read: the page then
- * shows no box at all. Never throws.
+ * blend of houses. It reads this one item from the rollup without building every realm's board. Empty when nothing
+ * is public (3 players' scans) or the rollup cannot be read: the page then shows no box at all. Never throws.
  */
 export async function loadMarketBox(itemId: number, now: Date = new Date()): Promise<MarketRow[]> {
   try {
     const { state } = await uploadStore.loadMarket();
     if (!state) return [];
-    return itemAcrossRealms(realmBoards(state, now), itemId);
+    return itemRows(state, now, itemId);
   } catch {
     return [];
   }

@@ -29,12 +29,12 @@ function fill() {
 }
 
 describe("the directory's address", () => {
-  test("reads q, region, ruleset, sort and page, and drops what it does not know", () => {
-    expect(guildDirectoryQuery({ q: "Emb", region: "EU", ruleset: "roleplay-pvp", sort: "item-level", page: "3" }))
+  test("reads q, region, rules, sort and p, and drops what it does not know", () => {
+    expect(guildDirectoryQuery({ q: "Emb", region: "EU", rules: "roleplay-pvp", sort: "item-level", p: "3" }))
       .toEqual({ prefix: "emb", region: "eu", ruleset: 15, sort: "item-level", page: 3 });
-    expect(guildDirectoryQuery({ q: "e", region: "kr", ruleset: "4", sort: "dps", page: "-2" }))
+    expect(guildDirectoryQuery({ q: "e", region: "kr", rules: "4", sort: "dps", p: "-2" }))
       .toEqual({ prefix: null, region: null, ruleset: null, sort: "members", page: 1 });
-    expect(guildDirectoryQuery({ page: "1.5" }).page).toBe(1);
+    expect(guildDirectoryQuery({ p: "1.5" }).page).toBe(1);
   });
 
   test("the search follows the armory's character search rule", () => {
@@ -44,10 +44,10 @@ describe("the directory's address", () => {
   });
 
   test("writes only what differs from the defaults, and round-trips", () => {
-    expect(guildDirectoryHref({})).toBe("/armory/guilds");
+    expect(guildDirectoryHref({})).toBe("/guilds");
     const q = { prefix: "emb", region: "us" as const, ruleset: 1, sort: "level-60" as const, page: 2 };
     const href = guildDirectoryHref(q);
-    expect(href).toBe("/armory/guilds?q=emb&region=us&ruleset=pvp&sort=level-60&page=2");
+    expect(href).toBe("/guilds?q=emb&region=us&rules=pvp&sort=level-60&p=2");
     expect(guildDirectoryQuery(Object.fromEntries(new URL(href, "https://everloot.app").searchParams))).toEqual(q);
   });
 });
@@ -86,11 +86,11 @@ describe("the directory", () => {
     expect(search.state === "ready" && search.rows.map((r) => r.slug)).toEqual(["ember-wardens", "empty-hall"]);
     const us = await loadGuildDirectory(guildDirectoryQuery({ region: "us" }), new Set());
     expect(us.state === "ready" && us.rows.map((r) => r.slug)).toEqual(["ash-pact"]);
-    const pvp = await loadGuildDirectory(guildDirectoryQuery({ ruleset: "normal" }), new Set());
+    const pvp = await loadGuildDirectory(guildDirectoryQuery({ rules: "normal" }), new Set());
     expect(pvp.state === "ready" && pvp.rows.map((r) => r.slug)).toEqual(["ember-wardens", "empty-hall"]);
 
     for (let i = 0; i < GUILD_DIRECTORY_PAGE + 2; i++) mem.putGuild(armoryGuild({ slug: `zz-${i}`, name: `Zz ${i}` }), []);
-    const second = await loadGuildDirectory(guildDirectoryQuery({ page: "2" }), new Set());
+    const second = await loadGuildDirectory(guildDirectoryQuery({ p: "2" }), new Set());
     expect(second.state === "ready" && second.rows.length).toBe(5);
     expect(second.state === "ready" && second.total).toBe(GUILD_DIRECTORY_PAGE + 5);
   });

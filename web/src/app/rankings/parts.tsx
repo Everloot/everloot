@@ -35,8 +35,9 @@ const CLASS_FILL: Record<string, string> = {
 
 /**
  * The list of rankings: a rail on wide screens, a bar of links that scrolls sideways on a phone. Plain links,
- * so it works without JavaScript. `row` keeps it a bar at every width (the hub puts it under the title). With
- * EVERLOOT_GUILDS on, Population ends with the guild ladder; with the armory on, its character boards lead.
+ * so it works without JavaScript. `row` makes it the hub's grouped list under the title, every ranking once, each
+ * group named on its line. With EVERLOOT_GUILDS on, Population ends with the guild ladder; with the armory on, its
+ * character boards lead.
  */
 export function RankingRail({ current, row = false }: { current?: string; row?: boolean }) {
   const col = row ? "" : "lg:block";
@@ -47,6 +48,26 @@ export function RankingRail({ current, row = false }: { current?: string; row?: 
   const groups = armoryOn()
     ? [{ title: "Characters", links: ARMORY_METRICS.map((m) => ({ label: ARMORY_BOARDS[m].title, href: armoryBoardPath(m) })) }, ...withGuilds]
     : withGuilds;
+  if (row) {
+    return (
+      <nav aria-label="Rankings" data-rankings-rail className="min-w-0">
+        <ul className="space-y-1">
+          {groups.map((group) => (
+            <li key={group.title} className="flex flex-col gap-x-3 sm:flex-row sm:items-baseline">
+              <h2 className="shrink-0 text-th text-muted sm:w-28">{group.title}</h2>
+              <ul className="-mx-2 flex flex-wrap gap-x-1">
+                {group.links.map((l) => (
+                  <li key={l.href}>
+                    <Link href={l.href} className="flex min-h-8 items-center rounded-control px-2 text-control text-fg-2 hover:text-fg">{l.label}</Link>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    );
+  }
   return (
     <nav aria-label="Rankings" data-rankings-rail className="min-w-0">
       <div className={`-mx-4 overflow-x-auto px-4 ${row ? "" : "lg:mx-0 lg:overflow-visible lg:px-0"}`}>

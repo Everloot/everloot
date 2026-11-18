@@ -451,6 +451,33 @@ test("only the card route drops credentials: a page, a card spelled another way 
   expect(edgeCacheable(card)).toBe(true);
 });
 
+test.each([
+  "/tools/auctions",
+  "/tools/auctions/camwow-us1-realm-4-pvp",
+  "/tools/auctions/camwow-us1-realm-4-pvp/2589",
+  "/tools/auctions/item/2589",
+])("the public auction page %s drops credentials: a signed-in visitor reads the shared copy", (path) => {
+  const req = new Request(`https://everloot.app${path}?house=horde`, { headers: { cookie: "__Secure-everloot.session_token=abc; cf_clearance=x", authorization: "Bearer t" } });
+  const prepared = withoutCredentials(req);
+  expect(prepared.headers.has("cookie")).toBe(false);
+  expect(prepared.headers.has("authorization")).toBe(false);
+  expect(prepared.url).toBe(req.url);
+  expect(edgeCacheable(prepared)).toBe(true);
+});
+
+test.each([
+  // Pages that read a cookie, a session or one install's data, or are private.
+  "/tools/collections", "/tools/gold-ledger", "/tools/alts", "/blizzard-auctions", "/me",
+  // The market report is not a browse, realm or item page.
+  "/tools/auctions/report", "/tools/auctions/report/2026-11-17",
+  // Spellings the auction pages redirect or refuse: they keep their credentials and bypass the cache.
+  "/tools/auctions/", "/tools/auctions/CamWow-US1", "/tools/auctions/realm/02589", "/tools/auctions/realm/2589/extra", "/tools/auctionsx",
+])("%s keeps its credentials and bypasses the shared cache", (path) => {
+  const req = new Request(`https://everloot.app${path}`, { headers: { cookie: "session=private" } });
+  expect(withoutCredentials(req)).toBe(req);
+  expect(edgeCacheable(withoutCredentials(req))).toBe(false);
+});
+
 test("the edge-check header the deploy warm-up and audits send changes neither whether a page is cached nor its key", () => {
   const plain = new Request("https://everloot.app/database/card/item/2589");
   const checked = new Request("https://everloot.app/database/card/item/2589", { headers: { "x-everloot-check": "s3cret", "user-agent": "everloot-deploy-warm" } });

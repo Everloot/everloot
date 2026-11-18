@@ -97,6 +97,15 @@ function Controls({ search, controls, active, clearHref, phone }: FilterBarProps
   );
 }
 
+/** One dropdown on its own, outside a bar (the realm picker's realm menu): the same button and list as a bar's. */
+export function FilterMenu({ label, control }: { label: string; control: Extract<FilterControl, { type: "menu" }> }) {
+  return (
+    <FilterMenus label={label} className="flex flex-wrap items-center gap-2">
+      <Menu key={control.options.map((o) => Number(o.on)).join("")} c={control} phone={false} />
+    </FilterMenus>
+  );
+}
+
 /**
  * The filter row above a database list: one wrapping row of 32 px dropdown buttons and toggles, every choice a
  * link (the filters live in the URL, so a view can be shared and works without JavaScript). Below 640 px the
