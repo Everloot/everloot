@@ -1,9 +1,16 @@
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
+import * as market from "../../../kb/src/market";
 import { emptyMarket, foldMarket } from "../../../kb/src/market";
 import {
-  SPARK_BOX, agreementSoFar, houseCounts, pendingRealms, houseParam, itemAcrossRealms, itemByHouse, itemIdParam, itemLabel, percent, priceMove, realmBoards,
-  realmSlug, sitemapPaths, slugParam, sparkline, timeAgo,
+  SPARK_BOX, agreementSoFar, findBoard, houseCounts, pendingRealms, houseParam, itemAcrossRealms, itemByHouse, itemIdParam, itemLabel, itemRows, percent, priceMove,
+  realmBoards, realmForSlug, realmSlug, sitemapPaths, slugParam, sparkline, timeAgo,
 } from "./auction-house";
+
+// Counts the per-item reads, so a test can tell one item's read from a whole board's.
+vi.mock("../../../kb/src/market", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../../../kb/src/market")>();
+  return { ...real, itemMarket: vi.fn(real.itemMarket) };
+});
 
 const now = new Date("2026-10-20T12:00:00.000Z");
 const at = (daysAgo: number) => new Date(now.getTime() - daysAgo * 86_400_000).toISOString();
@@ -167,4 +174,29 @@ test("realm boards reuse each state, house and UTC day without changing their va
     expect(next).not.toBe(first);
     expect(next).toEqual(realmBoards(structuredClone(state), tomorrow, house));
   }
+});
+
+test("one item's rows and a slug's realm read from the rollup match the boards, and touch only that item", () => {
+  const houses = foldMarket(emptyMarket(), [
+    ...scans("Forever", 0, [[2589, 100], [765, 30]]).map((r) => ({ ...r, faction: "Alliance" })),
+    ...scans("Forever", 1, [[2589, 900]], ["install-d", "install-e", "install-f"]),
+    ...scans("Mal'Ganis", 0, [[2589, 300]]),
+    ...scans("Nightfall", 0, [[2589, 999]], ["install-x", "install-y"]),
+  ], now);
+  for (const rollup of [state, houses]) {
+    const boards = realmBoards(structuredClone(rollup), now);
+    for (const itemId of [765, 2589, 2592, 4306, 9999]) expect(itemRows(rollup, now, itemId), String(itemId)).toEqual(itemAcrossRealms(boards, itemId));
+    for (const slug of ["forever", "malganis", "nightfall", "unknown"]) expect(realmForSlug(rollup, now, slug), slug).toEqual(findBoard(boards, slug)?.realm ?? null);
+  }
+  // A board reads every item in every house; one item's page reads that item, and one probe per house to name the realm.
+  const reads = vi.mocked(market.itemMarket);
+  reads.mockClear();
+  itemRows(houses, now, 2589);
+  expect(new Set(reads.mock.calls.map((c) => c[2]))).toEqual(new Set([2589]));
+  reads.mockClear();
+  realmForSlug(houses, now, "forever");
+  expect(reads.mock.calls.length).toBeLessThanOrEqual(2);
+  reads.mockClear();
+  realmBoards(structuredClone(houses), now);
+  expect(new Set(reads.mock.calls.map((c) => c[2]))).toEqual(new Set([765, 2589]));
 });

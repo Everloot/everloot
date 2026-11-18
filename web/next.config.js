@@ -198,6 +198,10 @@ const nextConfig = {
       // The profession hub and pages read no cookies; a page renders every recipe with the corpus's gathering areas on each request
       // (2 to 5 s). Five minutes, so a page drawn while storage was unreachable does not stay long.
       { source: "/tools/professions/:path*", headers: briefCdnHeaders },
+      // The bags, disenchanting and farming route tools read no cookies either and draw from the market rollup or the corpus
+      // on each request (2 to 4 s live). Five minutes, like the auction pages they price from. Collections is left out:
+      // it shows one install's progress, so it never joins the shared cache.
+      ...["/tools/bags", "/tools/disenchanting", "/tools/farming-routes"].map((source) => ({ source, headers: briefCdnHeaders })),
       // The database index, the other list and detail pages (a type's source matches its list too), the census and the
       // rankings read no cookies either, and each renders from the whole corpus on every request. Five minutes for the
       // same reason: zones, instances and the index were kept an hour, which kept a page drawn while storage was unreachable.

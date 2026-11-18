@@ -397,6 +397,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Changed
 - Site: the Blizzard character lookup on /search is switched on: a full "First Surname" nobody has stored is looked up in the US, then the EU, within its per-address and site-wide limits.
+- Site: an item's auction price pages read that one item from the market rollup instead of building every realm's board, and the realm item page no longer reads the whole upload corpus when the stored history file is missing (the history then says unrecorded). `/tools/bags`, `/tools/disenchanting` and `/tools/farming-routes` are kept at the CDN for five minutes like the auction pages.
 - Site: the signed-in home puts your characters first: the main character's card, then alts, then builds. With no characters it shows one card to get the addon or connect Battle.net, and empty build lists hide instead of saying "None yet".
 - Site: the header is Lookup, Database, Tools, Guides, Chat and Profile, the phone menu follows it, and /tools shows the planners as cards; Plans and Alts on this device move to Profile, Farming, Collections and Upload are unlinked until polished (their pages still load), and the footer links Guides and the guides feed.
 - Site: drop rates restart from addon 0.3.24 (2026-11-17): only loot windows recorded after the release count, now that empty corpses are recorded too, so sources show fewer public rates until new windows build up.
