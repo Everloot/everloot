@@ -191,7 +191,9 @@ for case in main:
             assert actual.count("tooltip") == 1
             # #1128 adds local inventory consent independently of pull recording.
             assert actual.count("inventoryCapture") == 1
-            actual = [key for key in actual if key not in {"tooltip", "inventoryCapture"}]
+            # The disenchant display switch is independent of pull recording too.
+            assert actual.count("tooltipDisenchant") == 1
+            actual = [key for key in actual if key not in {"tooltip", "inventoryCapture", "tooltipDisenchant"}]
         if part == "printed":
             # The feature chooser adds /everloot setup to the command list for every install, independently of pull
             # recording. Keep the historical fixture and compare every other word.

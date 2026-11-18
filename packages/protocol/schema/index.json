@@ -79,6 +79,7 @@
     "marketRealmsResponse",
     "marketPricesResponse",
     "dropsResponse",
+    "disenchantResponse",
     "edgesResponse",
     "itemsResponse",
     "itemCategoriesResponse",
@@ -96,6 +97,7 @@
   "routes": [
     "GET /api/corpus/public",
     "GET /api/rollups/drops",
+    "GET /api/rollups/disenchant",
     "GET /api/edges",
     "GET /api/edges/client-layer",
     "GET /api/items",

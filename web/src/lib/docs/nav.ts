@@ -58,7 +58,7 @@ export function routeFromSlug(slug: string): ApiRoute | undefined {
 
 /** Endpoints by what they are for, in the protocol's order inside each group. */
 const ENDPOINT_GROUPS: { title: string; icon: DocsIcon; paths: string[] }[] = [
-  { title: "Player data", icon: "database", paths: ["/api/corpus/public", "/api/rollups/drops", "/api/coverage/settled", "/api/market/prices"] },
+  { title: "Player data", icon: "database", paths: ["/api/corpus/public", "/api/rollups/drops", "/api/rollups/disenchant", "/api/coverage/settled", "/api/market/prices"] },
   { title: "Game data", icon: "box", paths: ["/api/items", "/api/items/categories", "/api/edges", "/api/edges/client-layer"] },
   { title: "Tools and cards", icon: "spark", paths: ["/api/tools/{tool}", "/api/tooltip/{type}/{id}"] },
   { title: "Uploads and status", icon: "upload", paths: ["/api/intake", "/api/health"] },

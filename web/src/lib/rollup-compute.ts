@@ -5,6 +5,7 @@ import { itemFactProgress, siteItemFacts, type ItemFactProgress, type ItemFactSt
 import type { ItemFacts } from "../../../kb/src/item-page";
 import type { InstanceFacts } from "../../../kb/src/instances";
 import type { LootTables } from "../../../kb/src/loot-tables";
+import type { DisenchantTables } from "../../../kb/src/disenchant";
 import type { ObjectSpawnRow } from "../../../kb/src/object-spawns";
 import type { WorldFacts } from "../../../kb/src/world-pages";
 import { buildAggregates, corpusKey, type AggregateSet } from "./aggregate-set";
@@ -126,6 +127,13 @@ export async function loadLootTables(): Promise<{ tables: LootTables; unreachabl
   const agg = await loadAggregates();
   if (!agg) return { tables: { sources: new Map(), leftOut: 0 }, unreachable: true, dataAsOf: null };
   return { tables: agg.loot, unreachable: false, dataAsOf: agg.dataAsOf };
+}
+
+/** Disenchants by band and by item, and the items players' reports placed in a band. Empty and unreachable when the store cannot be read. */
+export async function loadDisenchantTables(): Promise<{ tables: DisenchantTables; unreachable: boolean; dataAsOf: string | null }> {
+  const agg = await loadAggregates();
+  if (!agg) return { tables: { bands: new Map(), items: new Map(), unplaced: 0, playerBands: new Map() }, unreachable: true, dataAsOf: null };
+  return { tables: agg.disenchant, unreachable: false, dataAsOf: agg.dataAsOf };
 }
 
 /** The addon leaderboard: only addons three installs report, as counts with no install ids. */

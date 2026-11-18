@@ -4,10 +4,27 @@ import { join } from "node:path";
 import { expect, test, vi } from "vitest";
 import { adler32 } from "../src/bridge/lua";
 import { fetchRealmPrices, housesFor, neutralRealmsIn, readRealms, refreshPrices, renderPricesAddon, PRICES_ADDON } from "../src/prices";
-import { parseEverlootTable } from "../../web/src/lib/sv-parse";
+import { parseEverlootLua, parseEverlootTable } from "../../web/src/lib/sv-parse";
 import { FIXTURE_DROPS, FIXTURE_REALMS, FIXTURE_SOURCES } from "../scripts/write-prices-fixture";
 
 const FIXTURE = new URL("../../addon/tests/fixtures/EverlootPrices.lua", import.meta.url);
+
+test("optional disenchant block sorts bands then chance and checksums integer rows", () => {
+  const data = "1,10,8,10,1600,1,3;1,11,2,10,200,1,1;2,12,1,3,333,1,1";
+  const file = renderPricesAddon([], undefined, undefined, {
+    dataAsOf: null, fetchedAt: "2026-11-17T00:00:00Z",
+    rows: [[2,12,1,3,333,1,1], [1,11,2,10,200,1,1], [1,10,8,10,1600,1,3]],
+  }).lua;
+  expect(file).toContain(`["disenchant"] = { ["data"] = "${data}", ["sum"] = ${adler32(data)}`);
+  expect(renderPricesAddon([]).lua).not.toContain('"disenchant"');
+});
+
+test("upload parsing excludes the complete personal disenchant log and cost basis", () => {
+  const file = 'EverlootDB = { version = "0.3.23", installId = "test-install", disenchantLog = { character = { { t = 123, item = 100, mats = { [200] = 3 }, cost = 42, source = "private-guid" } } }, records = { loot = { { sourceItemId = 100, lootType = "disenchant", items = { { itemId = 200, count = 3 } } } } } }';
+  const uploaded = parseEverlootLua(file);
+  expect(uploaded.records).toEqual([{ installId: "test-install", kind: "loot", sourceItemId: 100, lootType: "disenchant", items: [{ itemId: 200, count: 3 }] }]);
+  expect(JSON.stringify(uploaded)).not.toMatch(/private-guid|disenchantLog|cost/);
+});
 
 test("price discovery and output keep region and ruleset endings in separate realm blocks", () => {
   const names = ["PVE", "PVP", "RP", "RPPVP", "Hardcore"].map((s) => `CAMWOW US1 Realm 4 ${s}`);

@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 TESTS = [
+    "disenchant_contract.py",
     "event_identity.py", "collection_contract.py", "map_positions_contract.py", "loot_types_contract.py",
     "item_facts_contract.py", "auction_contract.py", "auction_fallback_contract.py", "gold_contract.py",
     "ask_contract.py", "recipes_contract.py", "addons_contract.py", "mapbounds_contract.py", "market_contract.py",

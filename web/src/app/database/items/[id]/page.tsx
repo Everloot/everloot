@@ -13,6 +13,9 @@ import { loadShownNames } from "@/lib/shown-item-names";
 import { loadEdges } from "@/lib/edges";
 import { loadItemSeen } from "@/lib/item-seen";
 import { itemSourceValue } from "./item-source";
+import { DisenchantPanel, showsDisenchant } from "./disenchant";
+import { loadDisenchant } from "@/lib/disenchant";
+import { bandYield } from "../../../../../../kb/src/disenchant";
 import { RelationTarget, SameIcon } from "@/components/EntityRelations";
 import { gameNameFor, loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames, unknownItemIcon } from "@/lib/game-assets";
 import { Badge, Container, DataTable, EvidenceLine, Facts, InShort, OpenData, QUALITY_TEXT, Tabs, TooltipFrame, TooltipLines, qualityOf, reportedLabel, type Column, type Fact, type TabItem } from "@/components/ui";
@@ -166,6 +169,12 @@ export default async function ItemPage(props: Props) {
   const iconNamed = [...new Set(sameIcon)].filter((id) => shownItemName(id, agreed, matched?.names)).slice(0, 12);
   const iconTips = iconNamed.length ? await loadItemTips(assets ?? await loadSiteAssets(), iconNamed.filter(showsTip)) : new Map<number, { icon: string | null }>();
   const itemName = (id: number) => shownItemName(id, agreed, matched?.names)?.name;
+  // What disenchanting it gives: the band the game files (or players' reported item level) place it in.
+  const disenchant = await loadDisenchant();
+  const placement = disenchant.placer.place(itemId);
+  const band = placement.kind === "band" ? bandYield(disenchant.tables, placement.band) : null;
+  const materialIds = (band?.rows ?? []).map((r) => r.materialId).filter((id) => itemName(id));
+  const materialTips = materialIds.length ? await loadItemTips(assets ?? await loadSiteAssets(), materialIds.filter(showsTip)) : new Map<number, { icon: string | null }>();
   const tabs: TabItem[] = [
     {
       id: "dropped-by", label: "Dropped by", count: facts.unreachable ? undefined : page.drops.length,
@@ -184,6 +193,11 @@ export default async function ItemPage(props: Props) {
         </>,
     },
     relationTab("sold-by", "Sold by", "sold_by", "Vendor", "No vendor seen selling this yet. A vendor shows once 3 installs report it."),
+    ...(!disenchant.unreachable && showsDisenchant(placement) ? [{
+      id: "disenchant", label: "Disenchant", count: band?.state === "rated" ? band.rows.length : undefined,
+      panel: <DisenchantPanel placement={placement} band={band} own={disenchant.tables.items.get(itemId)} title={title}
+        item={(id) => <EntityLink kind="item" id={id} name={itemName(id)} icon={materialTips.get(id)?.icon} />} />,
+    }] : []),
     relationTab("created-by", "Created by", "created_by", "Recipe", "No recipe makes this.", PROFESSIONS),
     relationTab("used-in", "Used in", "reagent_for", "Recipe", "No recipe uses this.", PROFESSIONS),
     ...(rel("reward_from").length ? [relationTab("reward-from", "Reward from", "reward_from", "Quest", "")] : []),
