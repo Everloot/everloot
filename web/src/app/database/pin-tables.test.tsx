@@ -44,9 +44,12 @@ test("an NPC with no agreed position and a quest with no agreed level draw no na
     expect(markup).not.toContain("data-tooltip-frame");
     expect(markup).not.toContain("<div data-empty-state");
   }
-  // The Map tab says it once, with the rule.
+  // No agreed position: no "Map (0)" tab; the Map positions meter in the quick facts says it. The goods and quests
+  // one install reported keep their tabs and meters.
   const npc = await html(NpcPage(props("1")));
-  expect(npc.match(/No agreed position yet\. A pin needs 3 installs at the same spot\./g)).toHaveLength(1);
+  expect(npc).not.toContain('data-tab-panel="map"');
+  expect(npc).not.toContain("No agreed position yet.");
+  expect(npc).toContain('data-tab-panel="goods"');
 });
 
 test("an NPC's pin table names the zone, keeps the map id in a tooltip, and names its link and its link column", async () => {

@@ -32,7 +32,7 @@ export function ItemLink({ id, href, tip, names }: { id: number; href: string; t
   const q = itemQuality(id, tip, names.has(id));
   return (
     <ItemTip tip={tip}>
-      <Link href={href} className={`underline-offset-4 hover:underline ${q ? QUALITY_TEXT[q] : "text-fg"}`}>{itemLabel(id, names)}</Link>
+      <Link prefetch={false} href={href} className={`underline-offset-4 hover:underline ${q ? QUALITY_TEXT[q] : "text-fg"}`}>{itemLabel(id, names)}</Link>
     </ItemTip>
   );
 }

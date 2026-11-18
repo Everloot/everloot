@@ -5,8 +5,7 @@ import { cache } from "react";
 import { notFound, permanentRedirect } from "next/navigation";
 import { pageMetadata } from "@/lib/seo";
 import { formatCopper, MARKET_RULE, reportersText } from "../../../../../../../kb/src/market";
-import { auctionSightingsFromRecords, handleAuctionHistory, handleStoredAuctionHistory } from "../../../../../../../kb/src/auction-history";
-import { trustedInstalls } from "../../../../../../../kb/src/trusted-source";
+import { handleStoredAuctionHistory } from "../../../../../../../kb/src/auction-history";
 import { STORAGE_UNREACHABLE, uploadStore } from "@/lib/upload-store";
 import { storedAuctionHistory } from "@/lib/auction-history-store";
 import { marketDatasetJsonLd } from "@/lib/jsonld";
@@ -15,8 +14,8 @@ import GameIcon from "@/components/game/GameIcon";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, Disclosure, EmptyState, PageHeader, SectionHeading, Tabs } from "@/components/ui";
 import {
-  AH_PATH, HOUSES, agreementSoFar, busiestHouse, crossRealmHref, findBoard, houseSlug, indexable, itemAcrossRealms, itemByHouse, itemHref, itemIdParam,
-  itemLabel, money, percent, priceMove, realmBoards, realmHref, slugParam, slugWords,
+  AH_PATH, HOUSES, agreementSoFar, busiestHouse, crossRealmHref, houseSlug, indexable, itemHref, itemIdParam,
+  itemLabel, itemRows, money, percent, priceMove, realmForSlug, realmHref, slugParam, slugWords,
 } from "@/lib/auction-house";
 import { auctionNames, itemArt } from "../../art";
 import { Contribute, DayTable, Facts, HousePrices, PriceChart, PriceFacts, RealmPrices, UnnamedReason, itemQuality } from "../../parts";
@@ -47,16 +46,17 @@ const loadFor = cache(async (rawRealm: string, rawItemId: string) => {
   if (!slug || !itemId || String(itemId) !== raw.itemId) notFound();
   const now = new Date();
   const market = await uploadStore.loadMarket();
-  const boards = market.state ? realmBoards(market.state, now) : [];
-  const board = findBoard(boards, slug);
-  const houses = market.state ? itemByHouse(market.state, now, slug, itemId) : [];
+  // This item's rows alone, read from the rollup: no realm's whole board is built for one item's page.
+  const place = market.state ? realmForSlug(market.state, now, slug) : null;
+  const rows = market.state ? itemRows(market.state, now, itemId) : [];
+  const houses = place ? rows.filter((r) => r.realm.key === place.key) : [];
   // The page leads with one house's price, the house with the most units listed; the Houses tab lists every house.
   const row = busiestHouse(houses);
-  const others = itemAcrossRealms(boards, itemId).filter((r) => r.realm.key !== board?.realm.key);
+  const others = rows.filter((r) => r.realm.key !== place?.key);
   // Art only for an item with a public price somewhere: an id typed into the URL may be unreleased.
   const { tips } = await itemArt(row || others.length ? [itemId] : []);
   const names = await auctionNames([itemId], tips);
-  return { raw, slug, itemId, now, market, board, row, others, houses, tip: tips.get(itemId), names, realm: board?.realm.name ?? slugWords(slug), label: itemLabel(itemId, names) };
+  return { raw, slug, itemId, now, market, row, others, houses, tip: tips.get(itemId), names, realm: place?.name ?? slugWords(slug), label: itemLabel(itemId, names) };
 });
 
 export async function generateMetadata(props: Props): Promise<Metadata> {
@@ -75,12 +75,9 @@ export default async function RealmItemPage(props: Props) {
   if (decodeURIComponent(raw.realm) !== slug) permanentRedirect(itemHref({ slug }, itemId));
   const state = market.state;
   const quality = itemQuality(itemId, tip, names.has(itemId)) ?? undefined;
-  // The cron's stored days; the corpus only when there is no stored file to read.
+  // The cron's stored days. With no stored file to read the history is unrecorded: the page never reads the whole corpus.
   const stored = row ? await storedAuctionHistory(realm, itemId) : null;
-  const corpus = row && !stored ? await uploadStore.loadCorpus() : null;
-  const browse = stored ? handleStoredAuctionHistory({ realm, itemId }, stored.points) : corpus && (corpus.unreachable
-    ? STORAGE_UNREACHABLE
-    : handleAuctionHistory({ realm, itemId }, auctionSightingsFromRecords(corpus.records), trustedInstalls(process.env.EVERLOOT_TRUSTED_INSTALLS)));
+  const browse = stored ? handleStoredAuctionHistory({ realm, itemId }, stored.points) : row ? STORAGE_UNREACHABLE : null;
   const path = itemHref({ slug }, itemId);
   const trail = [...trailFor(AH_PATH)!, { name: realm, path: realmHref({ slug }) }, { name: label, path }];
   const v = row?.value;

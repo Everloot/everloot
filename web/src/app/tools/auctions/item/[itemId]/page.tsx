@@ -11,7 +11,7 @@ import GameIcon from "@/components/game/GameIcon";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, Disclosure, EmptyState, PageHeader, SectionHeading } from "@/components/ui";
 import {
-  AH_PATH, crossRealmHref, indexable, itemAcrossRealms, itemIdParam, itemLabel, realmBoards, type MarketRow,
+  AH_PATH, crossRealmHref, indexable, itemIdParam, itemLabel, itemRows, type MarketRow,
 } from "@/lib/auction-house";
 import { auctionNames, itemArt } from "../../art";
 import { Contribute, Facts, PriceFacts, RealmPrices, UnnamedReason, count, itemQuality } from "../../parts";
@@ -32,7 +32,7 @@ async function load(params: Props["params"]) {
   if (!itemId || String(itemId) !== raw) notFound();
   const now = new Date();
   const market = await uploadStore.loadMarket();
-  const rows = market.state ? itemAcrossRealms(realmBoards(market.state, now), itemId) : [];
+  const rows = market.state ? itemRows(market.state, now, itemId) : [];
   const { tips } = await itemArt(rows.length ? [itemId] : []);
   const names = await auctionNames([itemId], tips);
   return { itemId, market, rows, tip: tips.get(itemId), names, label: itemLabel(itemId, names) };

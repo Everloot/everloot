@@ -1,5 +1,10 @@
 import { CoinText } from "@/components/ui/Coins";
 import AhledgerCrafting from "../../auctions/AhledgerCrafting";
+import { RealmHousePicker, realmHouseHref, realmHouseParams } from "../../auctions/RealmHousePicker";
+import type { AuctionHouse } from "@everloot/protocol";
+import { ahledgerMarket, isAhledgerMarket, isAhledgerProfession } from "@/lib/ahledger";
+import { busiestHouse, findBoard, realmBoards } from "@/lib/auction-house";
+import { realmRegion, realmRuleset } from "@/lib/realms";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
@@ -17,7 +22,7 @@ import { CLIENT_PROFESSIONS, professionBySegment, professionHref, RECIPES_BUILD,
 import { filterRecipeViews, RECIPE_PAGE_SIZES, recipeListHref, recipeListQuery, recipePage, recipeSearchKeep } from "@/lib/recipe-list";
 import { pageMetadata } from "@/lib/seo";
 import { loadListNames } from "@/lib/item-view";
-import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT } from "@/lib/upload-store";
+import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT, uploadStore } from "@/lib/upload-store";
 import { loadProfessions } from "@/lib/profession-store";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { formatCopper, agreeRecipes } from "../../../../../../kb/src/profession-path";
@@ -64,6 +69,47 @@ const dash = <span className="text-muted">—</span>;
 const plural = (n: number, word: string) => `${n.toLocaleString("en-US")} ${word}${n === 1 ? "" : "s"}`;
 const rangeText = (r: Range) => (r.min === null && r.max === null ? "?" : r.min === null ? `≤${r.max}` : r.max === null ? `${r.min}+` : r.min === r.max ? `${r.min}` : `${r.min}–${r.max}`);
 
+/** AH Ledger has a market per faction: the Alliance and Horde houses, never the neutral one. */
+const LEDGER_HOUSES: readonly AuctionHouse[] = ["Alliance", "Horde"];
+
+/**
+ * The AH Ledger margins under the realm and house picker: the realm's region and ruleset and the house's faction name
+ * AH Ledger's market. A realm is offered only where AH Ledger has a market for it. With no house asked, the realm's
+ * busier faction house. A link with no realm keeps working as before: `?market=` (the old Region, Ruleset and Faction
+ * selects' parameter) names the market, else the AH Ledger panels' default, PvE Alliance in the US.
+ */
+function ledgerPanel(profession: string, search: Search, path: string, state: Parameters<typeof realmBoards>[0] | null) {
+  const { realm, house: asked } = realmHouseParams(search);
+  const legacy = realm ? null : one(search.market);
+  const shared = legacy && isAhledgerMarket(legacy) ? legacy : null;
+  const realms = state ? realmBoards(state, new Date()).filter((b) => {
+    const region = realmRegion(b.realm.name);
+    return region !== null && ahledgerMarket(realmRuleset(b.realm.name), "alliance", region) !== null;
+  }) : [];
+  const board = realm ? findBoard(realms, realm) : null;
+  const sharedHouse = shared ? LEDGER_HOUSES.find((h) => shared.split(".")[2] === h.toLowerCase()) ?? null : null;
+  const house = asked ?? (board ? busiestHouse(board.rows.filter((r) => r.house !== "Neutral"))?.house ?? "Alliance" : sharedHouse);
+  const region = board ? realmRegion(board.realm.name) : null;
+  const faction = house === "Alliance" ? "alliance" : house === "Horde" ? "horde" : null;
+  const market = realm
+    ? (board && region && faction ? ahledgerMarket(realmRuleset(board.realm.name), faction, region) : null)
+    : shared ?? ahledgerMarket("normal", "alliance", "us");
+  const none = !board ? "AH Ledger has no market for this realm." : "AH Ledger has no market for the neutral auction house: pick Alliance or Horde.";
+  // A realm replaces the old market parameter, and the links land back on the margins.
+  const rest = Object.fromEntries(Object.entries(search).filter(([k]) => k !== "market"));
+  const picker = (
+    <RealmHousePicker
+      realms={realms.map((b) => ({ slug: b.realm.slug, name: b.realm.name }))}
+      realm={realm}
+      house={house}
+      houses={LEDGER_HOUSES}
+      href={(r, h) => realmHouseHref(path, rest, r, h, "#ahledger-margins")}
+      remember={shared ? "save" : "redirect"}
+    />
+  );
+  return <AhledgerCrafting profession={profession} market={market} picker={picker} none={none} />;
+}
+
 /**
  * One profession: every recipe the game files list for it, grouped by the skill where it turns yellow, with the
  * item it makes and its reagents; then what players' uploads add (agreed colour ranges, the path, cost per craft).
@@ -93,8 +139,10 @@ export default async function ProfessionPage(props: Props) {
   const level = mobFarm ? range(searchParams, "mobs") : undefined;
   if (level === null) notFound();
 
-  const [view, assets, shown, spellNames] = await Promise.all([
+  const ledger = isAhledgerProfession(p.name);
+  const [view, assets, shown, spellNames, market] = await Promise.all([
     loadProfessions(), loadSiteAssets(), loadListNames(), loadSpellNames(CLIENT_LAYER.build.version),
+    ledger ? uploadStore.loadMarket() : Promise.resolve(null),
   ]);
   // Names, icons and qualities of the items the recipes make and use, under the item name rule (shown-item-names.ts).
   const ids = [...new Set([...recipeItemIds(p.recipes), ...teachingItemIds(p.recipes.map(r => r.spellId))])].filter(shown.showsTip);
@@ -152,7 +200,7 @@ export default async function ProfessionPage(props: Props) {
           ? <GameIcon src={tip.icon} size={size} />
           : <span aria-hidden="true" className="shrink-0 rounded-sm border border-line" style={{ width: size, height: size }} />}
         {count !== undefined && <span className="font-mono tabular-nums text-fg-2">{count}×</span>}
-        <Link href={`/database/items/${id}`} className={`min-w-0 ${colour} hover:underline underline-offset-4`} style={name?.color ? { color: name.color } : undefined}>
+        <Link prefetch={false} href={`/database/items/${id}`} className={`min-w-0 ${colour} hover:underline underline-offset-4`} style={name?.color ? { color: name.color } : undefined}>
           {name?.name ?? `Item ${id}`}
         </Link>
         {name?.source === "files" && <Badge tone="files" />}
@@ -171,7 +219,7 @@ export default async function ProfessionPage(props: Props) {
           <span className="flex min-w-0 flex-col gap-1">
             <span className="inline-flex min-w-0 items-center gap-2">
               {icon ? <GameIcon src={icon} size={24} /> : <span aria-hidden="true" className="h-6 w-6 shrink-0 rounded-sm border border-line" />}
-              <Link href={`/database/spells/${r.spellId}`} className={`min-w-0 ${LINK}`}>{spellName(r.spellId) ?? `Spell ${r.spellId}`}</Link>
+              <Link prefetch={false} href={`/database/spells/${r.spellId}`} className={`min-w-0 ${LINK}`}>{spellName(r.spellId) ?? `Spell ${r.spellId}`}</Link>
               <Badge tone="files" />
             </span>
             {/* The recipe item the files link to this spell (client-recipe-items.json): unconfirmed, like the rest of the row. */}
@@ -213,6 +261,12 @@ export default async function ProfessionPage(props: Props) {
     <section id="gather" aria-labelledby="prof-gather" className="scroll-mt-24 space-y-3" data-gather={gather.source}>
       <SectionHeading id="prof-gather" as="h2">{gather.source === "herb" || gather.source === "ore" ? `Where to gather ${gather.noun}` : `Where to farm ${gather.noun}`}</SectionHeading>
       <p className="text-meta text-fg-2">{gather.how}</p>
+      {p.slug === "herbalism" && (
+        <p className="text-cell">
+          <Link href={`${path}/gathering`} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Herbalism gathering guide</Link>
+          <span className="text-fg-2">: herb zones with the herbs looted there, every herb&apos;s zones and the trainers players saw.</span>
+        </p>
+      )}
       {mobFarm && (
         <FilterBar
           label={`Where to farm ${gather.noun} filters`}
@@ -261,7 +315,7 @@ export default async function ProfessionPage(props: Props) {
       <div className="space-y-8">
         <ProfessionPicker professions={CLIENT_PROFESSIONS} icons={icons} current={p.slug} context={context} />
         {p.slug === "herbalism" && gatheringSection}
-        <AhledgerCrafting profession={p.name} />
+        {ledger && <div id="ahledger-margins" className="scroll-mt-24">{ledgerPanel(p.name, searchParams, path, market?.state ?? null)}</div>}
 
         <section id="prof-recipes" aria-labelledby="prof-recipes-heading" className="scroll-mt-24 space-y-4" data-recipes={p.slug}>
           <SectionHeading id="prof-recipes-heading" as="h2">{p.slug === "herbalism" ? "Herbalism crafts (new in Forever)" : "Recipes from the game files"}</SectionHeading>

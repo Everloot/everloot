@@ -105,6 +105,29 @@ test("objects match agreed names in exact, prefix and substring order in search 
   expect(await suggest("copper", "object")).toEqual([]);
 });
 
+test("the unscoped type-ahead suggests a zone by its name, says it is one, and a scoped box does not", async () => {
+  vi.stubEnv("KB_SNAPSHOT_PATH", release);
+  const { suggest } = await import("./site-search");
+  mocks.names.items = new Map([[7, "Westfall Stew"]]);
+  mocks.names.quests = new Map([[8, "The Westfall Brigade"]]);
+  const rows = await suggest("westfall");
+  // The exact zone name leads; prefix and contains names follow.
+  expect(rows[0]).toEqual({ type: "zone", id: expect.any(Number), label: "Westfall", href: expect.stringMatching(/^\/database\/zones\/\d+-westfall$/), note: "Zone" });
+  expect(rows.map((r) => r.label)).toEqual(["Westfall", "Westfall Stew", "The Westfall Brigade"]);
+  expect((await suggest("westfall", "item")).some((r) => r.type === "zone")).toBe(false);
+  // The same zone page /search lists.
+  expect((await search("westfall")).find((g) => g.type === "zone")!.results[0].href).toBe(rows[0].href);
+});
+
+test("a name map's sorted rows are built once per map, and a new map gets new rows", async () => {
+  const { sortedNames } = await import("./site-search");
+  const names = new Map([[2, "beta"], [1, "Alpha"]]);
+  const rows = sortedNames(names);
+  expect(rows.map((r) => r.id)).toEqual([1, 2]);
+  expect(sortedNames(names)).toBe(rows);
+  expect(sortedNames(new Map(names))).not.toBe(rows);
+});
+
 test("zones are the released ones, linking to the map", async () => {
   const zones = (await search("elwynn")).find((g) => g.type === "zone")!.results;
   expect(zones[0]).toMatchObject({ label: "Elwynn Forest", href: "/database/zones/1429-elwynn-forest", exact: false });
@@ -168,6 +191,93 @@ test("without a lore release the other groups still answer", async () => {
   mocks.names.npcs = new Map([[77, "Thrall"]]);
   const groups = await search("thrall", "C:/missing/release.sqlite");
   expect(groups.map((g) => g.type)).toEqual(["npc"]);
+});
+
+test("words match in any order: the whole name, then every word at a word start, then every word anywhere", async () => {
+  mocks.names.items = new Map([[1, "Linen Cloth"], [2, "Bolt of Linen Cloth"], [3, "Clothlinen Scrap"], [4, "Linen Cap"]]);
+  const items = (q: string) => search(q).then((g) => g.find((x) => x.type === "item")?.results.map((r) => r.label));
+  // Same rank, name order; "linen" inside "Clothlinen" starts no word, so that one comes last.
+  expect(await items("cloth linen")).toEqual(["Bolt of Linen Cloth", "Linen Cloth", "Clothlinen Scrap"]);
+  expect(await items("linen cloth")).toEqual(["Linen Cloth", "Bolt of Linen Cloth", "Clothlinen Scrap"]);
+  expect(await items("lin clo")).toEqual(["Bolt of Linen Cloth", "Linen Cloth", "Clothlinen Scrap"]);
+  // One word ranks as before: prefix, then contains, in name order.
+  expect(await items("linen")).toEqual(["Linen Cap", "Linen Cloth", "Bolt of Linen Cloth", "Clothlinen Scrap"]);
+  const { suggest } = await import("./site-search");
+  expect((await suggest("cloth linen", "item", undefined, { tolerant: true })).map((r) => r.id)).toEqual([2, 1, 3]);
+});
+
+test("a typo finds the name when nothing matches as typed, and says how it read the query", async () => {
+  mocks.names.items = new Map([[1, "Linen Cloth"], [2, "Wool Cloth"]]);
+  mocks.names.npcs = new Map([[77, "Hoggrin"], [78, "Hoggrin's Pup"]]);
+  const groups = await search("lnen clth");
+  expect(groups.find((g) => g.type === "item")!.results.map((r) => [r.label, r.exact])).toEqual([["Linen Cloth", false]]);
+  expect(groups[0].respelled).toBe("linen cloth");
+  const npcs = (await search("hogrin")).find((g) => g.type === "npc")!;
+  expect(npcs.results.map((r) => r.href)).toEqual(["/database/npcs/77", "/database/npcs/78"]);
+  expect(npcs.respelled).toBe("hoggrin");
+  const { suggest } = await import("./site-search");
+  expect((await suggest("lnen clth", undefined, undefined, { tolerant: true })).map((r) => r.label)).toEqual(["Linen Cloth"]);
+  expect((await suggest("hogrin", "npc", undefined, { tolerant: true })).map((r) => r.id)).toEqual([77, 78]);
+});
+
+test("a query with a hit never reads typos, and an id or a short word never does", async () => {
+  mocks.names.items = new Map([[1, "Linen Cloth"], [2, "Linen Clot"]]);
+  const groups = await search("linen clot");
+  expect(groups.find((g) => g.type === "item")!.results.map((r) => r.label)).toEqual(["Linen Clot", "Linen Cloth"]);
+  expect(groups.some((g) => g.respelled)).toBe(false);
+  mocks.names.items = new Map([[1, "Linen Cloth"]]);
+  expect((await search("clth")).some((g) => g.type === "item")).toBe(true);
+  // Three letters are typed right or not at all.
+  expect((await search("clo linnen")).find((g) => g.type === "item")?.results.map((r) => r.label)).toEqual(["Linen Cloth"]);
+  expect((await search("clx")).find((g) => g.type === "item")).toBeUndefined();
+  expect((await search("12345")).find((g) => g.type === "item")!.results.map((r) => r.label)).toEqual(["Item 12345"]);
+});
+
+test("the public suggestions keep matching the text as one phrase: no word order, no typos", async () => {
+  mocks.names.items = new Map([[1, "Linen Cloth"]]);
+  const { suggest } = await import("./site-search");
+  expect(await suggest("cloth linen", "item")).toEqual([]);
+  expect(await suggest("lnen clth", "item")).toEqual([]);
+  expect((await suggest("linen cl", "item")).map((r) => r.id)).toEqual([1]);
+});
+
+test("the typo matcher's length pruning never drops a word one or two edits away", async () => {
+  const { byTypo, editDistance } = await import("./site-search");
+  // The full table, no bounds: what the pruned, early-exit version must agree with.
+  const full = (a: string, b: string) => {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => Array.from({ length: b.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)));
+    for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
+      d[i]![j] = Math.min(d[i - 1]![j]! + 1, d[i]![j - 1]! + 1, d[i - 1]![j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i]![j] = Math.min(d[i]![j]!, d[i - 2]![j - 2]! + 1);
+    }
+    return d[a.length]![b.length]!;
+  };
+  let seed = 7;
+  const next = (n: number) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+  const letters = "abcdeilnorst";
+  const word = (len: number) => Array.from({ length: len }, () => letters[next(letters.length)]).join("");
+  const edit = (w: string) => {
+    const i = next(w.length), c = letters[next(letters.length)];
+    switch (next(4)) {
+      case 0: return w.slice(0, i) + w.slice(i + 1);
+      case 1: return w.slice(0, i) + c + w.slice(i);
+      case 2: return w.slice(0, i) + c + w.slice(i + 1);
+      default: return i + 1 < w.length ? w.slice(0, i) + w[i + 1] + w[i] + w.slice(i + 2) : w + c;
+    }
+  };
+  for (let n = 0; n < 3000; n++) {
+    const a = word(3 + next(8)), b = next(3) ? edit(next(2) ? a : edit(a)) : word(3 + next(8));
+    const exact = full(a, b);
+    for (const max of [1, 2]) expect(editDistance(a, b, max), `${a} ${b} ${max}`).toBe(Math.min(exact, max + 1));
+    // As a one-word query against a two-word name: matched exactly when the full table allows it.
+    const match = byTypo(a);
+    if (!match) continue;
+    const allowed = a.length >= 8 ? 2 : 1;
+    const name = `zz ${b}`;
+    const r = match(name);
+    if (name.includes(a)) expect(r).toBe(5);
+    else expect(r, `${a} ${b}`).toBe(exact <= allowed ? 5 + exact : null);
+  }
 });
 
 test("a name nobody matches gives no groups", async () => {

@@ -12,7 +12,7 @@ import {
 import type { Crumb } from "@/lib/jsonld";
 import { trailFor } from "@/lib/breadcrumbs";
 import {
-  AH_PATH, HOUSES, agreementSoFar, crossRealmHref, findBoard, houseCounts, itemHref, itemIdParam, money, onRuleset, pendingRealms, percent, realmBoards,
+  AH_PATH, agreementSoFar, crossRealmHref, findBoard, houseCounts, itemHref, itemIdParam, money, onRuleset, pendingRealms, percent, realmBoards,
   realmHref, rulesetSummaries, slugWords,
 } from "@/lib/auction-house";
 import { AFTER_LAUNCH, REGION_LABEL, RULESET_LABEL, inRegion, isRulesetSlug, mappedRulesets, realmRegion, realmRuleset, type RegionFilter } from "@/lib/realms";
@@ -22,6 +22,7 @@ import {
   type AhQuery, type AhSort, type BrowseRow, type TreeNode,
 } from "./browse";
 import { Contribute, Facts, ItemLink, PendingRealms, RealmName, RulesetSummaryTable, Sparkline, count } from "./parts";
+import { RealmHousePicker } from "./RealmHousePicker";
 import TimeAgo from "./TimeAgo";
 
 type Search = Record<string, string | string[] | undefined>;
@@ -35,11 +36,6 @@ const WIDE_SORTS: AhSort[] = ["name", "ilvl", "req"];
 
 /** Only the plain view is indexed; a filter, a house, a ruleset, a sort or a later page points its canonical at it. */
 export const isPlainView = (q: AhQuery) => activeFilters(q) === 0 && !q.house && !q.region && !q.ruleset && !q.sort && q.page === 1;
-
-/** A house tab's item count: read out everywhere, drawn from 640 px up so the four tabs fit a phone. */
-function HouseCount({ n }: { n: number }) {
-  return <span data-house-count className="sr-only tabular-nums text-muted sm:not-sr-only sm:ml-1">{` (${n.toLocaleString("en-US")})`}</span>;
-}
 
 /** One category in the left tree, its open children under it. */
 function TreeItem({ node, depth }: { node: TreeNode; depth: number }) {
@@ -124,10 +120,10 @@ export async function browseView({ slug, search }: { slug: string | null; search
   const showRealm = !slug;
 
   const counts = state ? houseCounts(state, now, slug ?? undefined, ruleset, q.region) : new Map<AuctionHouse | null, number>();
-  const houseTabs = [
-    { href: here({ house: null }), label: <>All<span className="sr-only sm:not-sr-only sm:ml-1"> houses</span><HouseCount n={counts.get(null) ?? 0} /></>, current: !q.house },
-    ...HOUSES.map((h) => ({ href: here({ house: h }), label: <>{h}<HouseCount n={counts.get(h) ?? 0} /></>, current: q.house === h })),
-  ];
+  // The realm and house picker's links: another realm keeps the filters (not the ruleset, which is the all-realms page's).
+  const pickHref = (realm: string | null, house: AuctionHouse | null) => (realm === slug
+    ? here({ house })
+    : ahHref(realm ? realmHref({ slug: realm }) : AH_PATH, { ...q, house, ...(realm ? { ruleset: undefined } : {}), page: 1 }));
 
   const rulesetTabs = summaries.flatMap(({ ruleset: r, items }) => (isRulesetSlug(r)
     ? [{ href: here({ ruleset: r }), label: RULESET_LABEL[r], count: items, current: ruleset === r }]
@@ -158,13 +154,6 @@ export async function browseView({ slug, search }: { slug: string | null; search
       ],
     },
     {
-      type: "menu", key: "realm", label: "Realm",
-      options: [
-        { label: "All realms", href: ahHref(AH_PATH, { ...q, page: 1 }), on: !slug, reset: true },
-        ...realmsHere.map((b) => ({ label: <RealmName name={b.realm.name} />, href: ahHref(realmHref(b.realm), { ...q, ruleset: undefined, page: 1 }), on: b.realm.slug === slug, count: b.items })),
-      ],
-    },
-    {
       type: "menu", key: "quality", label: "Quality",
       options: [
         { label: "Any quality", href: here({ quality: undefined }), on: !q.quality, reset: true },
@@ -192,7 +181,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
       key: "name", header: "Item", sortable: true,
       cell: ({ row }) => <ItemLink id={row.value.itemId} href={itemHref(row.realm, row.value.itemId)} tip={tips.get(row.value.itemId)} names={names} />,
     },
-    ...(showRealm ? [{ key: "realm", header: "Realm", nowrap: true, cell: ({ row }: BrowseRow) => <Link href={ahHref(realmHref(row.realm), { house: q.house, region: q.region })} className="text-fg-2 hover:text-fg hover:underline underline-offset-4"><RealmName name={row.realm.name} /></Link> }] : []),
+    ...(showRealm ? [{ key: "realm", header: "Realm", nowrap: true, cell: ({ row }: BrowseRow) => <Link prefetch={false} href={ahHref(realmHref(row.realm), { house: q.house, region: q.region })} className="text-fg-2 hover:text-fg hover:underline underline-offset-4"><RealmName name={row.realm.name} /></Link> }] : []),
     ...(showRealm ? [{ key: "region", header: "Region", nowrap: true, cell: ({ row }: BrowseRow) => REGION_LABEL[realmRegion(row.realm.name) ?? "unknown"] }] : []),
     // Every row is one house's price; with every house shown, the row says which.
     ...(!q.house ? [{ key: "house", header: "House", nowrap: true, cell: ({ row }: BrowseRow) => row.house }] : []),
@@ -296,7 +285,17 @@ export async function browseView({ slug, search }: { slug: string | null; search
             )}
           </>
         )}
-        <LinkTabs label="Auction house" tabs={houseTabs} />
+        <RealmHousePicker
+          realms={realmsHere.map((b) => ({ slug: b.realm.slug, name: b.realm.name, count: b.items }))}
+          realm={slug}
+          house={q.house}
+          href={pickHref}
+          allRealms
+          allHouses
+          counts={counts}
+          remember="link"
+          linkBase={AH_PATH}
+        />
         <div className="mt-3 grid gap-4 lg:grid-cols-[13rem_minmax(0,1fr)]">
           <aside aria-label="Browse" className="min-w-0 space-y-3">
             <form action={path} method="get" role="search" className="flex">

@@ -104,7 +104,8 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
         <Tabs
           label={`${title}: relations`}
           tabs={[{
-            id: "drops", label: "Drops", count: facts.unreachable ? undefined : page.drops.length,
+            // No rates yet but loot on record (none with an item, short of 3 installs, or outside the rates): no count, so the tab and its line stay.
+            id: "drops", label: "Drops", count: facts.unreachable || (!page.drops.length && (page.zero || page.queued || pending)) ? undefined : page.drops.length,
             panel: facts.unreachable ? <Unreachable />
               : <>
                 {page.drops.length ? <DataTable dense caption={`What players looted from ${title}`} columns={columns} rows={page.drops} rowKey={(d) => String(d.itemId)} />

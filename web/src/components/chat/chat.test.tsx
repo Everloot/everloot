@@ -259,8 +259,8 @@ describe("the chat page", () => {
   test("without a key, Send shows Everloot's search results, labelled and without the raw Source lines", async () => {
     api({ signed: false });
     await render(<ChatClient profiles />);
-    await click(button("Where does Linen Cloth drop?"));
-    expect(calls.map((c) => c.url)).toContain("/api/tools/answer_sources?question=Where+does+Linen+Cloth+drop%3F&limit=3");
+    await click(button("Where is Hogger?"));
+    expect(calls.map((c) => c.url)).toContain("/api/tools/answer_sources?question=Where+is+Hogger%3F&limit=3");
     expect(text()).toContain("Dropped by humanoids.");
     expect(text()).toContain("From Everloot");
     expect(text()).toContain("Everloot search");

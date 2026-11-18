@@ -6,7 +6,8 @@ import DataTable, { type Column } from "@/components/ui/DataTable";
 import type { PeopleSearch, PersonGroup, PersonResult } from "@/lib/people-search-types";
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
-export const PEOPLE_PAGE_TIMEOUT_MS = 3000;
+// Above the Blizzard lookup's 4 s answer (lib/armory-lookup.ts) plus the stored search, so a found character arrives.
+export const PEOPLE_PAGE_TIMEOUT_MS = 6000;
 
 /**
  * The Characters and Guilds groups of the /search overview. The page's HTML is kept by the CDN for minutes, and a

@@ -88,14 +88,14 @@ test("with the switch off every guild page is a 404 and nothing is read", async 
   expect(hidden).not.toHaveBeenCalled();
 });
 
-test("before any agreed kill the hub shows the start state, not an empty table", async () => {
+test("before any agreed kill the hub says in one line when the ladders start, not an empty table", async () => {
   on();
   holder.records = [...world, memberKills[6]!];
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-11-05T12:00:00Z"));
   const before = await hub();
-  expect(before).toContain("Ranking starts when raids open on December 9.");
-  expect(before).toContain("What will be here");
+  expect(before).toContain("Progression ladders start December 9.");
+  expect(before).not.toContain("What will be here");
   expect(before).not.toContain("<table");
   expect(before).toContain('href="/tools/guild-board"');
   vi.setSystemTime(new Date("2026-12-10T12:00:00Z"));
@@ -227,17 +227,27 @@ test("the hub's search finds guilds by the start of the name", async () => {
   expect(await hub({ q: "x" })).toContain("Type 2 to 24 letters");
 });
 
-test("with the armory on, the hub links the armory's guild directory and carries a search over that its rule takes", async () => {
+test("with the armory on, the hub holds the guild directory under the same search box, and nothing links the old address", async () => {
   on();
-  expect(await hub()).not.toContain("/armory/guilds");
+  expect(await hub()).not.toContain("Read from Blizzard");
   vi.stubEnv("EVERLOOT_ARMORY", "1");
   const plain = await hub();
-  expect(plain).toContain('href="/armory/guilds"');
-  expect(plain).not.toContain("Search it for");
+  expect(plain).toContain("Read from Blizzard");
+  expect(plain).not.toContain("/armory/guilds");
+  // One box: the members' search and the directory both read q.
   const searched = await hub({ q: "Nig" });
-  expect(searched).toContain('href="/armory/guilds?q=nig"');
+  expect(searched.match(/role="search"/g)).toHaveLength(1);
   expect(searched).toContain("1 guild starting with");
-  expect(await hub({ q: "Night Watch" })).not.toContain("Search it for");
+  expect(searched).toContain("No guild read yet starts with “nig”.");
+  // The directory matches one word, so a name of two searches it by the first.
+  const spaced = await hub({ q: "Night Watch" });
+  expect(spaced).not.toContain("Type 2 to 24 letters");
+  expect(spaced).toContain("No guild read yet starts with “night”.");
+  // Text neither search takes says the rule once.
+  expect(await hub({ q: "x" })).toContain("Type 2 to 24 letters");
+  // Blizzard's data keeps the page out of search engines, as on every armory page.
+  const { generateMetadata } = await import("./page");
+  expect(await generateMetadata({ searchParams: Promise.resolve({}) })).toMatchObject({ robots: { index: false } });
 });
 
 test("a players table that cannot be read leaves the hub's search as it was, and marks the answer partial", async () => {

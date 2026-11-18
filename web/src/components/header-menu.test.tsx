@@ -12,6 +12,7 @@ vi.mock("next/link", () => ({
 }));
 
 import Header from "./Header";
+import { REPORT_BUG_EVENT } from "./BugReport";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -82,7 +83,7 @@ test("the phone menu lists the same places", async () => {
   const toggle = Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "Menu")!;
   await act(async () => toggle.click());
   const panel = container.querySelector("#site-navigation")!;
-  for (const href of ["/database", "/map", "/changes", "/lore", "/guides", "/chat", "/docs", "/tools/talents", "/census", "/account", "/tools/builds", "/tools/alts", "/about"])
+  for (const href of ["/database", "/map", "/changes", "/lore", "/database/instances", "/chat", "/docs", "/tools/talents", "/census", "/account", "/tools/builds", "/tools/alts", "/about"])
     expect(panel.querySelector(`a[href="${href}"]`), href).not.toBeNull();
   for (const href of ["/upload", "/tools/farming-routes", "/tools/collections"]) expect(panel.querySelector(`a[href="${href}"]`), href).toBeNull();
   expect(panel.querySelector('form[action="/search"]')).not.toBeNull();
@@ -125,4 +126,19 @@ test("the phone menu enters with the menu motion", async () => {
   const toggle = Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "Menu")!;
   await act(async () => toggle.click());
   expect(container.querySelector("#site-navigation")!.className).toMatch(/^pop /);
+});
+
+test("the phone menu's More group reports a bug: the menu closes, focus goes to Menu and the report dialog is asked to open", async () => {
+  const toggle = container.querySelector<HTMLButtonElement>('button[aria-controls="site-navigation"]')!;
+  await act(async () => toggle.click());
+  const report = Array.from(container.querySelectorAll<HTMLButtonElement>("#site-navigation button")).find((b) => b.textContent === "Report a bug")!;
+  expect(report).toBeTruthy();
+  expect(report.getAttribute("aria-haspopup")).toBe("dialog");
+  const heard = vi.fn();
+  window.addEventListener(REPORT_BUG_EVENT, heard);
+  await act(async () => report.click());
+  window.removeEventListener(REPORT_BUG_EVENT, heard);
+  expect(heard).toHaveBeenCalledTimes(1);
+  expect(container.querySelector("#site-navigation")).toBeNull();
+  expect(document.activeElement).toBe(toggle);
 });

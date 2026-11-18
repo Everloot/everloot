@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { track } from "@/lib/analytics/track";
 import AccountControls from "./AccountControls";
+import { REPORT_BUG_EVENT } from "./BugReport";
 import GameVersionLabel from "./GameVersionLabel";
 import { SuggestField } from "./ui/SearchBar";
 import { TOOL_GROUPS, toolGroups, type ToolGroup } from "@/data/tools";
@@ -14,7 +15,7 @@ type NavLink = { label: string; href: string };
 export type NavItem = { label: string; href: string; links?: undefined } | { label: string; href?: undefined; links: NavLink[] };
 
 /** The switches the layout passes in; each one adds the pages it turns on. */
-type NavSwitches = { guilds?: boolean; players?: boolean; profiles?: boolean; savedBuilds?: boolean };
+type NavSwitches = { guilds?: boolean; players?: boolean; profiles?: boolean; savedBuilds?: boolean; reviewedGuides?: boolean };
 
 // The catalogue's groups live in data/tools.ts so the home page lists the same tools.
 export { TOOL_GROUPS };
@@ -24,11 +25,11 @@ export { TOOL_GROUPS };
  * Guides (static reference), Chat, and Profile (the player's own pages, and the lists kept in this browser). The
  * phone menu shows the same items as groups. Only existing pages are linked; hidden tools are left out.
  */
-export function navItems({ guilds = false, players = false, profiles = false, savedBuilds = false }: NavSwitches = {}): NavItem[] {
+export function navItems({ guilds = false, players = false, profiles = false, savedBuilds = false, reviewedGuides = false }: NavSwitches = {}): NavItem[] {
   const groups = toolGroups(guilds);
   const catalogue = (title: ToolGroup) => groups.find((g) => g.title === title)?.links ?? [];
   return [
-    { label: "Lookup", links: [...(players ? [{ label: "Characters", href: "/players" }] : []), ...catalogue("Lookup")] },
+    { label: "Lookup", links: [...(players ? [{ label: "Players", href: "/players" }] : []), ...catalogue("Lookup")] },
     {
       label: "Database",
       links: [
@@ -42,7 +43,21 @@ export function navItems({ guilds = false, players = false, profiles = false, sa
       ],
     },
     { label: "Tools", links: [...catalogue("Tools"), { label: "All tools", href: "/tools" }] },
-    { label: "Guides", links: [{ label: "All guides", href: "/guides" }, ...catalogue("Guides"), { label: "Lore archive", href: "/lore" }, { label: "Changes", href: "/changes" }] },
+    // Guides lists the guides that exist today. The class guides list joins once a guide is reviewed (lib/guides.ts
+    // publishedGuides), so the menu never opens on an empty list.
+    {
+      label: "Guides",
+      links: [
+        ...(reviewedGuides ? [{ label: "All guides", href: "/guides" }] : []),
+        { label: "Dungeons and raids", href: "/database/instances" },
+        { label: "Herbalism gathering", href: "/tools/professions/herbalism/gathering" },
+        { label: "Addon directory guide", href: "/docs/guides/addon-directory" },
+        { label: "Write a wiki page", href: "/docs/guides/wiki" },
+        ...catalogue("Guides"),
+        { label: "Lore archive", href: "/lore" },
+        { label: "Changes", href: "/changes" },
+      ],
+    },
     { label: "Chat", href: "/chat" },
     {
       label: "Profile",
@@ -62,7 +77,7 @@ const isCurrent = (path: string, href: string) => path === href || path.startsWi
  *  ledger, not the Tools menu's "All tools". Every switch counts as on, so a page behind one still marks its item. */
 function currentPlace(path: string): { label: string; href: string } | undefined {
   let best: { label: string; href: string } | undefined;
-  for (const item of navItems({ guilds: true, players: true, profiles: true, savedBuilds: true })) {
+  for (const item of navItems({ guilds: true, players: true, profiles: true, savedBuilds: true, reviewedGuides: true })) {
     for (const href of item.links ? item.links.map((l) => l.href) : [item.href]) {
       if (isCurrent(path, href) && (!best || href.length > best.href.length)) best = { label: item.label, href };
     }
@@ -102,17 +117,19 @@ function SearchIcon() {
  * builds to the avatar menu (EVERLOOT_SAVED_BUILDS); `accountSwitching` is true with Better Auth (EVERLOOT_AUTH_V2),
  * which can hold several accounts on one browser; `profiles` is EVERLOOT_PROFILES, without which the avatar menu
  * never asks for the player's shell. With it, the menu fetches the player from /api/me/shell itself, and Profile lists
- * Settings. `guilds` is EVERLOOT_GUILDS: Lookup then offers Guilds in place of the guild board. `players` is
- * EVERLOOT_PLAYER_PAGES: Lookup then starts with the character search.
+ * Settings. `guilds` is EVERLOOT_GUILDS or the armory: Lookup then offers Guilds in place of the guild board. `players`
+ * is EVERLOOT_PLAYER_PAGES or the armory: Lookup then starts with Players, the one character search.
+ * `reviewedGuides` is true once kb/guides holds a reviewed guide: Guides then starts with the guides list.
  */
-export default function Header({ savedBuilds = false, profiles = false, accountSwitching = false, guilds = false, players = false }: {
+export default function Header({ savedBuilds = false, profiles = false, accountSwitching = false, guilds = false, players = false, reviewedGuides = false }: {
   savedBuilds?: boolean;
   profiles?: boolean;
   accountSwitching?: boolean;
   guilds?: boolean;
   players?: boolean;
+  reviewedGuides?: boolean;
 }) {
-  const items = navItems({ guilds, players, profiles, savedBuilds });
+  const items = navItems({ guilds, players, profiles, savedBuilds, reviewedGuides });
   const path = usePathname() ?? "/";
   const place = currentPlace(path);
   const current = place?.label;
@@ -264,7 +281,8 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
               <label htmlFor="menu-search" className="sr-only">Search Everloot</label>
               <input id="menu-search" name="q" type="search" maxLength={200} placeholder="Search Everloot" className="w-full min-w-0 bg-transparent text-fg placeholder:text-muted focus:outline-none" />
             </form>
-            {/* The top bar's menus as groups, in the same order; More holds Chat and the pages outside the bar. */}
+            {/* The top bar's menus as groups, in the same order; More holds Chat, the pages outside the bar, and the bug
+                report, whose floating pill is hidden below md. Focus moves to Menu first, so closing the dialog returns there. */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-6">
               {phoneGroups(items).map((group) => (
                 <div key={group.label}>
@@ -273,6 +291,15 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
                     {group.links.map((link) => (
                       <li key={link.href}><Link href={link.href} onClick={closeAll} aria-current={place?.href === link.href ? "page" : undefined} className={menuLink}>{link.label}</Link></li>
                     ))}
+                    {group.label === "More" && (
+                      <li>
+                        <button type="button" aria-haspopup="dialog" className={`${menuLink} w-full text-left`} onClick={() => {
+                          closeAll();
+                          toggle.current?.focus();
+                          window.dispatchEvent(new Event(REPORT_BUG_EVENT));
+                        }}>Report a bug</button>
+                      </li>
+                    )}
                   </ul>
                 </div>
               ))}

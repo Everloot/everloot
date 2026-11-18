@@ -1,23 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
-import { Card, Container, DataTable, Input, PageHeader, SectionHeading, type Column } from "@/components/ui";
+import { Card, Container, DataTable, PageHeader, SectionHeading, type Column } from "@/components/ui";
 import {
-  ARMORY_BOARDS, ARMORY_HIDE_PATH, ARMORY_KEPT_DAYS, ARMORY_METRICS, ARMORY_PATH, ARMORY_SUBMIT_PATH, armoryBoardPath, armoryCharacterPath,
-  armoryGuildPath, armoryNameQuery, armoryOn, classTokenOfName, regionLabel, SEARCH_RULE,
+  ARMORY_BOARDS, ARMORY_HIDE_PATH, ARMORY_KEPT_DAYS, ARMORY_METRICS, ARMORY_PATH, ARMORY_SUBMIT_PATH, armoryBoardPath, armoryOn, regionLabel,
 } from "@/lib/armory";
-import { armoryStore, type ArmoryCount, type ArmoryGuildHit, type ArmoryHit } from "@/lib/armory-store";
-import { armoryGuildHidden, GUILD_DIRECTORY_PATH } from "@/lib/armory-guilds";
-import { playerStore } from "@/lib/player-store";
-import { classText } from "@/app/players/player-view";
+import { armoryStore, type ArmoryCount } from "@/lib/armory-store";
+import { GUILD_DIRECTORY_PATH } from "@/lib/armory-guilds";
 import { ArmoryCredit, armoryMetadata, first, link, newest, NOT_FOUND_METADATA, Unreachable } from "./parts";
 
-// Dynamic, not revalidated: the search reads ?q= and ?guild= on every request, and a page that 404s at build (switch
-// off) would otherwise be kept as a static 404 with no search.
+// Dynamic, not revalidated: an old search address (?q=, ?guild=) is redirected on every request, and a page that 404s
+// at build (switch off) would otherwise be kept as a static 404.
 export const dynamic = "force-dynamic";
-
-const SEARCH_LIMIT = 25;
 
 export async function generateMetadata(): Promise<Metadata> {
   if (!armoryOn()) return NOT_FOUND_METADATA;
@@ -37,61 +32,15 @@ const countColumns: Column<ArmoryCount>[] = [
   { key: "guilds", header: "Guilds", numeric: true, cell: (c) => number(c.guilds) },
 ];
 
-const hitColumns: Column<ArmoryHit>[] = [
-  { key: "name", header: "Character", cell: (h) => <Link href={armoryCharacterPath(h.region, h.slug)} className={`${link} font-medium`}>{h.name} {h.surname}</Link> },
-  { key: "level", header: "Level", numeric: true, cell: (h) => h.level },
-  { key: "class", header: "Class", nowrap: true, cell: (h) => <span className={classText(classTokenOfName(h.class))}>{h.class}</span> },
-  { key: "race", header: "Race", nowrap: true, cell: (h) => h.race },
-  { key: "guild", header: "Guild", cell: (h) => h.guildName ?? <span className="text-muted">None</span> },
-  { key: "where", header: "Realm", nowrap: true, cell: (h) => `${regionLabel(h.region)} ${h.ruleset}` },
-];
-
-const guildColumns: Column<ArmoryGuildHit>[] = [
-  { key: "name", header: "Guild", cell: (g) => <Link href={armoryGuildPath(g.region, g.slug)} className={`${link} font-medium`}>{g.name}</Link> },
-  { key: "faction", header: "Faction", nowrap: true, cell: (g) => g.faction },
-  { key: "members", header: "Members", numeric: true, cell: (g) => number(g.memberCount) },
-  { key: "where", header: "Realm", nowrap: true, cell: (g) => `${regionLabel(g.region)} ${g.ruleset}` },
-];
-
-function SearchForm({ id, name, label, value, maxLength = 24 }: { id: string; name: string; label: string; value: string; maxLength?: number }) {
-  return (
-    <form action={ARMORY_PATH} method="get" role="search" className="flex max-w-xl flex-col gap-2 sm:flex-row">
-      <label htmlFor={id} className="sr-only">{label}</label>
-      <Input id={id} name={name} type="search" defaultValue={value} maxLength={maxLength} autoComplete="off" placeholder={`${label}, 2 letters or more`} className="flex-1" />
-      <button type="submit" className="btn btn-primary min-h-11">Search</button>
-    </form>
-  );
-}
-
-const guildQuery = (raw: string) => { const p = raw.normalize("NFC").toLowerCase(); return SEARCH_RULE.test(p) ? p : null; };
-
-/** What a search found, or why it found nothing. Never throws: a storage failure says so. */
-async function results<T>(raw: string, read: (raw: string) => string | null, find: (prefix: string) => Promise<T[]>): Promise<{ prefix: string; rows: T[] | "unreachable" } | "invalid" | null> {
-  if (!raw) return null;
-  const prefix = read(raw);
-  if (!prefix) return "invalid";
-  try { return { prefix, rows: await find(prefix) }; } catch { return { prefix, rows: "unreachable" }; }
-}
-
 export default async function ArmoryPage(props: { searchParams: Promise<{ q?: string | string[]; guild?: string | string[] }> }) {
   if (!armoryOn()) notFound();
   const params = await props.searchParams;
-  // Room for a full name: a 12-letter first name, a space and a 24-letter surname, with decomposed accents.
-  const q = (first(params.q) ?? "").trim().slice(0, 64);
-  const g = (first(params.guild) ?? "").trim().slice(0, 24);
-  const store = armoryStore();
-  const [counts, characters, guilds] = await Promise.all([
-    store.counts().catch(() => null),
-    results(q, armoryNameQuery, (p) => store.search(p, SEARCH_LIMIT)),
-    // A guild hidden through /guilds/hide is left out; without the hide list no guild is listed.
-    results(g, guildQuery, async (p) => {
-      // Both reads settle before either failure is raised, so neither rejection is left unhandled.
-      const reads = [store.searchGuilds(p, SEARCH_LIMIT), (async () => playerStore().hiddenGuilds())()] as const;
-      await Promise.allSettled(reads);
-      const [hits, hidden] = await Promise.all(reads);
-      return hits.filter((h) => !armoryGuildHidden(hidden, h.region, h.name));
-    }),
-  ]);
+  // The searches moved: characters to /players, which lists the armory's and the addon's in one list, guilds to /guilds.
+  const q = (first(params.q) ?? "").trim();
+  const g = (first(params.guild) ?? "").trim();
+  if (q) permanentRedirect(`/players?q=${encodeURIComponent(q)}`);
+  if (g) permanentRedirect(`${GUILD_DIRECTORY_PATH}?q=${encodeURIComponent(g)}`);
+  const counts = await armoryStore().counts().catch(() => null);
 
   return (
     <Container width="reading">
@@ -105,27 +54,17 @@ export default async function ArmoryPage(props: { searchParams: Promise<{ q?: st
 
         <section aria-labelledby="armory-find" className="space-y-3">
           <SectionHeading id="armory-find">Find a character or a guild</SectionHeading>
-          <SearchForm id="armory-q" name="q" label="Name, surname or full name" value={q} maxLength={64} />
-          <SearchForm id="armory-guild" name="guild" label="Guild name" value={g} />
-          {characters === "invalid" && <p className="text-sm text-fg-2">Type 2 to 24 letters of a name or surname, or a full name, with no digits or hyphens.</p>}
-          {guilds === "invalid" && <p className="text-sm text-fg-2">Type 2 to 24 letters, no digits, spaces or hyphens.</p>}
-          {characters && characters !== "invalid" && (
-            characters.rows === "unreachable" ? <Unreachable /> : characters.rows.length === 0
-              ? <p className="text-sm text-fg-2">No character starts with &ldquo;{characters.prefix}&rdquo; yet. <Link href={ARMORY_SUBMIT_PATH} className={link}>Add one</Link>.</p>
-              : <DataTable dense caption={`Characters whose name, surname or full name starts with ${characters.prefix}`} columns={hitColumns} rows={characters.rows} rowKey={(h) => `${h.region}/${h.slug}`} />
-          )}
-          {guilds && guilds !== "invalid" && (
-            guilds.rows === "unreachable" ? <Unreachable /> : guilds.rows.length === 0
-              ? <p className="text-sm text-fg-2">No guild starts with &ldquo;{guilds.prefix}&rdquo; yet.</p>
-              : <DataTable dense caption={`Guilds whose name starts with ${guilds.prefix}`} columns={guildColumns} rows={guilds.rows} rowKey={(r) => `${r.region}/${r.slug}`} />
-          )}
+          <p className="text-sm text-fg-2">
+            Search characters on <Link href="/players" className={link}>Players</Link>, with the ones the Everloot addon has seen, and guilds
+            on <Link href={GUILD_DIRECTORY_PATH} className={link}>Guilds</Link>.
+          </p>
         </section>
 
         <section aria-labelledby="armory-boards" className="space-y-3">
           <SectionHeading id="armory-boards">Rankings</SectionHeading>
           <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
             {ARMORY_METRICS.map((m) => <li key={m}><Link href={armoryBoardPath(m)} className={link}>{ARMORY_BOARDS[m].title}</Link></li>)}
-            <li><Link href={GUILD_DIRECTORY_PATH} className={link}>Guild directory</Link></li>
+            <li><Link href={GUILD_DIRECTORY_PATH} className={link}>Guilds</Link></li>
           </ul>
         </section>
 
