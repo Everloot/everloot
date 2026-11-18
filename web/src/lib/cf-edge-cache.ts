@@ -148,6 +148,9 @@ export function cacheVersionFor(pathname: string, versions: EdgeCacheVersions): 
   return `t.${t}`;
 }
 
+/** Routes that match their text in lower case: one key for every case and outer spacing of `q`. */
+const CASELESS_Q: ReadonlySet<string> = new Set(["/api/suggest", "/search", "/search/suggest"]);
+
 /**
  * The cache key: the URL plus the route's content version, so a deploy only starts an empty cache for the pages
  * whose content changed. Parameters the page never reads (tracking tags, cache busters bots add, this cache's own
@@ -163,8 +166,8 @@ export function edgeCacheKey(req: Request, version: string): Request {
     : [...url.searchParams].filter(([k]) => !isTracking(k));
   // Array.prototype.sort is stable: equal names stay in request order.
   kept.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  // The suggest box answers `Thunder` and `thunder ` alike (app/api/suggest/route.ts), so they share a key.
-  if (url.pathname === "/api/suggest") for (const pair of kept) if (pair[0] === "q") pair[1] = pair[1].trim().toLowerCase();
+  // Search and the suggest boxes answer `Thunder` and `thunder ` alike (they match in lower case), so they share a key.
+  if (CASELESS_Q.has(url.pathname)) for (const pair of kept) if (pair[0] === "q") pair[1] = pair[1].trim().toLowerCase();
   url.search = new URLSearchParams(kept).toString();
   url.searchParams.set("__edge_version", version || "unknown");
   return new Request(url.toString(), { method: "GET" });

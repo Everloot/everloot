@@ -392,11 +392,15 @@ test("a missing content version disables the cache instead of sharing a made-up 
   expect(store.entries.size).toBe(0);
 });
 
-test("the suggest box shares one cache key for a query however it is cased or padded", () => {
+test("search and the suggest boxes share one cache key for a query however it is cased or padded", () => {
   const key = (u: string) => edgeCacheKey(new Request(u), "v1").url;
-  expect(key("https://everloot.app/api/suggest?q=Thunder")).toBe(key("https://everloot.app/api/suggest?q=thunder%20"));
-  expect(key("https://everloot.app/api/suggest?q=thunder")).not.toBe(key("https://everloot.app/api/suggest?q=thunderfury"));
-  expect(key("https://everloot.app/search?q=Thunder")).not.toBe(key("https://everloot.app/search?q=thunder"));
+  for (const path of ["/api/suggest", "/search/suggest", "/search"]) {
+    expect(key(`https://everloot.app${path}?q=Thunder`), path).toBe(key(`https://everloot.app${path}?q=thunder%20`));
+    expect(key(`https://everloot.app${path}?q=thunder`), path).not.toBe(key(`https://everloot.app${path}?q=thunderfury`));
+  }
+  expect(key("https://everloot.app/search?q=%20Thrall&in=npc")).toBe("https://everloot.app/search?in=npc&q=thrall&__edge_version=v1");
+  // Other pages keep their text as sent.
+  expect(key("https://everloot.app/database/npcs?q=Thunder")).not.toBe(key("https://everloot.app/database/npcs?q=thunder"));
 });
 
 test.each(["item/2589", "spell/10", "vendor/3934"])("a %s hover card is cached for every visitor: its credentials never reach the handler or key", async (cardPath) => {
