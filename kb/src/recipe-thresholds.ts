@@ -53,7 +53,8 @@ export function recipeFactsFromRecords(records: unknown[]): { observations: Reci
   return { observations: recipeObservationsFromRecords(records), prices: facts.prices, vendorPrices: facts.vendorPrices };
 }
 
-export interface TrainerRow { installId: string; profession: string; recipe: string; requiredRank: number; costCopper?: number }
+/** `trainerNpcId` and `skillLineId` are kept when the addon sent them; older addons send neither. */
+export interface TrainerRow { installId: string; profession: string; recipe: string; requiredRank: number; costCopper?: number; trainerNpcId?: number; skillLineId?: number }
 
 export function trainerRowsFromRecords(records: unknown[]): TrainerRow[] {
   const out: TrainerRow[] = [];
@@ -62,7 +63,12 @@ export function trainerRowsFromRecords(records: unknown[]): TrainerRow[] {
     if (r?.kind !== "trainer_seen" || typeof r.installId !== "string" || typeof r.profession !== "string" ||
       typeof r.recipe !== "string" || !Number.isInteger(r.requiredRank) || (r.requiredRank as number) < 1) continue;
     const cost = Number.isInteger(r.costCopper) && (r.costCopper as number) >= 0 ? (r.costCopper as number) : undefined;
-    out.push({ installId: r.installId, profession: r.profession, recipe: r.recipe, requiredRank: r.requiredRank as number, costCopper: cost });
+    const id = (v: unknown) => (Number.isInteger(v) && (v as number) > 0 ? { value: v as number } : null);
+    const npc = id(r.trainerNpcId), line = id(r.skillLineId);
+    out.push({
+      installId: r.installId, profession: r.profession, recipe: r.recipe, requiredRank: r.requiredRank as number, costCopper: cost,
+      ...(npc ? { trainerNpcId: npc.value } : {}), ...(line ? { skillLineId: line.value } : {}),
+    });
   }
   return out;
 }

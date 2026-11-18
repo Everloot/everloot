@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { ForeverApi, type Region } from "../../../kb/src/armory/api";
 import { armoryLookupOn, browserLookup, LOOKUP_BUDGET_MS, lookupCharacter, lookupSlug, type LookupDeps } from "./armory-lookup";
 import { createMemoryArmoryStore, type MemoryArmoryStore } from "./armory-store";
+import { PEOPLE_PAGE_TIMEOUT_MS } from "@/app/search/PeopleResults";
 
 // Invented characters and guild; no game names.
 const profile = (region: Region) => ({
@@ -12,7 +13,7 @@ const profile = (region: Region) => ({
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
 /** Blizzard in memory: the slugs each region knows, every call it was asked, and an optional hang. */
-function blizzard(known: Partial<Record<Region, boolean>>, opts: { hang?: boolean } = {}) {
+function blizzard(known: Partial<Record<Region, boolean>>, opts: { hang?: boolean; slowDetailsMs?: number } = {}) {
   const calls: string[] = [];
   const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input));
@@ -21,6 +22,8 @@ function blizzard(known: Partial<Record<Region, boolean>>, opts: { hang?: boolea
     calls.push(`${region} ${url.pathname}`);
     if (opts.hang) return new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(new Error("aborted"))));
     if (!known[region]) return new Response(null, { status: 404 });
+    const details = url.pathname.endsWith("/equipment") || url.pathname.endsWith("/pvp-summary");
+    if (details && opts.slowDetailsMs) await new Promise((resolve) => setTimeout(resolve, opts.slowDetailsMs));
     if (url.pathname.endsWith("/equipment")) return json({ equipped_items: [] });
     if (url.pathname.endsWith("/pvp-summary")) return json({ honorable_kills: 12, pvp_rank: 0 });
     return json(profile(region));
@@ -134,7 +137,38 @@ test("a slow Blizzard answers null within the budget, keeps no miss, and stores 
   expect(Date.now() - started).toBeLessThan(1000);
   expect(await store.lookupRegions("volvik-morningstar")).toEqual(["us", "eu"]);
   expect(await store.character("us", "volvik-morningstar")).toBeNull();
-  expect(LOOKUP_BUDGET_MS).toBeLessThan(2000);
+  // The answer's wait stays inside what the /search page waits for it.
+  expect(LOOKUP_BUDGET_MS).toBeLessThan(PEOPLE_PAGE_TIMEOUT_MS);
+});
+
+test("a character found after the deadline is still stored after the answer, and the next search lists it", async () => {
+  const b = blizzard({ us: true, eu: true }, { slowDetailsMs: 80 });
+  const later: Promise<unknown>[] = [];
+  const hit = await lookupCharacter("Volvik Morningstar", deps(b, { budgetMs: 30, background: (work) => later.push(work) }));
+  expect(hit).toBeNull();
+  expect(later).toHaveLength(1);
+  await Promise.all(later);
+  expect(await store.character("us", "volvik-morningstar")).not.toBeNull();
+  // The EU was never asked and no miss was kept: the found character ends the lookup.
+  expect(b.calls.some((c) => c.startsWith("eu "))).toBe(false);
+  expect(await store.lookupRegions("volvik-morningstar")).toEqual(["eu"]);
+  expect(admitted).toBe(1);
+});
+
+test("a name no region knows that answers after the deadline keeps no miss and asks no further region", async () => {
+  const b = blizzard({});
+  const later: Promise<unknown>[] = [];
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const api = (region: Region) => {
+    const real = b.api(region);
+    return { get: async (path: string, ns: "profile") => { await gate; return real.get(path, ns); } };
+  };
+  expect(await lookupCharacter("Volvik Morningstar", deps(b, { api, budgetMs: 20, background: (work) => later.push(work) }))).toBeNull();
+  release();
+  await Promise.all(later);
+  expect(b.calls).toEqual(["us /profile/wow/character/volvik-morningstar"]);
+  expect(await store.lookupRegions("volvik-morningstar")).toEqual(["us", "eu"]);
 });
 
 test("a Blizzard error is not kept as a miss", async () => {
