@@ -182,18 +182,19 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("guild ladder failed", err);
     }
-    // Each realm's "Vendor these" lists (lib/vendor-these-store.ts), from the market and the game files' sell prices, which
-    // are read here rather than on a page view. Like the auction reports it waits while the market is still catching up.
-    // It rebuilds at most hourly for a changed market (at once on a new UTC day or after an incomplete run, which the
-    // next run retries), writes each realm apart, and a failure is logged.
-    let vendorThese: { written: boolean; realms?: number; failed?: number; unread?: number } | null = null;
-    try { if (!(market.remaining ?? 0)) vendorThese = await writeVendorThese(); } catch (err) { console.error("vendor lists failed", err); }
     // A rollup with uploads left over is pending: the next run folds them even when no new upload arrived.
     await uploadStore.writeCronRun(
       completion.remaining > 0 || completion.rebuilding || (market.remaining ?? 0) > 0 || (census?.remaining ?? 0) > 0,
       result.dataAsOf,
       settled?.written ? week : work.settledWeek ?? null,
     );
+    // Each realm's "Vendor these" lists (lib/vendor-these-store.ts), from the market and the game files' sell prices, which
+    // are read here rather than on a page view. It runs last, after the heartbeat, so a build cut short by the Worker's
+    // limits cannot cost the other views or the heartbeat. Like the auction reports it waits while the market is still
+    // catching up. At most one attempt an hour (the first run of a UTC day aside), under a lease and a shard budget; a
+    // failure is logged.
+    let vendorThese: Awaited<ReturnType<typeof writeVendorThese>> | null = null;
+    try { if (!(market.remaining ?? 0)) vendorThese = await writeVendorThese(); } catch (err) { console.error("vendor lists failed", err); }
     return NextResponse.json({ ok: true, rebuild, ...result, market, completion, coverage, settled, census, itemView, aggregates, auctionHistory, auctionReports, professions, mapPins, databaseActivity, guildLadder, vendorThese });
   } catch (err) {
     console.error("snapshot failed", err);

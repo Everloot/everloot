@@ -9,14 +9,18 @@ import { VENDOR_SHOWN, vendorCandidates, vendorThese } from "./vendor-these";
 
 /**
  * "Vendor these" as a stored view: the snapshot cron works out each realm's lists once, from the market rollup and the
- * game files' sell prices, and writes one small object per realm, all its houses in it. The realm page reads that one
- * object when a house is picked, and reads no tooltip for the list. One object per realm rather than per house: a
- * realm has at most three houses of VENDOR_SHOWN rows, a third of the writes, and a realm's houses always share one stamp.
+ * game files' sell prices, and writes one small object per realm, all its houses in it. The realm page reads the index
+ * and that one object when a house is picked, and reads no tooltip for the list. One object per realm rather than per
+ * house: a realm has at most three houses of VENDOR_SHOWN rows, a third of the writes, and a realm's houses always
+ * share one snapshot.
+ *
+ * Each build is a generation: its realm objects go under `g/<generation>/`, and the index, written last, says which
+ * generation holds each realm. A page therefore never reads a mix of builds, nor an object not written yet.
  */
 const ROOT = "snapshots/vendor-these";
 const INDEX = `${ROOT}/index.json`;
 /** Names the stored shape; an index of another revision makes the next run rebuild. */
-const REVISION = "vendor-these-1";
+const REVISION = "vendor-these-2";
 
 export interface StoredVendorRow {
   itemId: number;
@@ -55,12 +59,15 @@ export interface SellPrices {
   /** Sell price per unit in copper, for each item whose tooltip was read; 0 when a vendor will not buy it. */
   prices: Map<number, number>;
   names: Map<number, string>;
-  /** Items whose tooltip could not be read. */
+  /** Items whose tooltip could not be read: a failed read, or left for the build's budget. */
   unread: Set<number>;
+  /** Tooltip shards left unread for the budget. */
+  skipped: number;
 }
 
-const realmKey = (slug: string) => `${ROOT}/${slug}.json`;
+const realmKey = (generation: string, slug: string) => `${ROOT}/g/${generation}/${slug}.json`;
 const validSlug = (slug: string) => /^[a-z0-9][a-z0-9-]{0,80}$/.test(slug);
+const validGeneration = (id: string) => /^[A-Za-z0-9-]{1,64}$/.test(id);
 
 /** Every realm's lists, from one read of the sell prices for every realm's candidates. */
 export async function buildVendorLists(state: MarketState, now: Date, dataAsOf: string | null, read: (ids: number[]) => Promise<SellPrices>): Promise<Map<string, StoredVendorRealm>> {
@@ -100,12 +107,24 @@ function storage(deps: Deps) {
   const request = async (key: string, init?: RequestInit) => (deps.fetch ?? fetch)(await client.sign(url(key), init), { cache: "no-store" });
   return { client, url, request };
 }
+type Storage = NonNullable<ReturnType<typeof storage>>;
 
-/** The game files' sell prices and the auction tool's names, read in the cron where its longer budget applies. */
-async function readSellPrices(ids: number[]): Promise<SellPrices> {
+/** At most one build attempt an hour, complete or not, apart from the first after a UTC day change. */
+export const VENDOR_REBUILD_MS = 60 * 60_000;
+/** A build's lease: another run that sees one younger than this skips. Well over a build's wall-time cap. */
+export const VENDOR_LEASE_MS = 15 * 60_000;
+/**
+ * A build's budget for tooltip shards: read 4 at a time (the Worker opens about 6 connections at once, and a read
+ * queued behind others times out), at most 120 in all, and none started after 60 s. Past it the build stops reading,
+ * publishes what it has and is marked incomplete with counts; the next attempt is an hour later.
+ */
+export const VENDOR_BUDGET = { concurrency: 4, maxShards: 120, wallMs: 60_000 };
+
+/** The game files' sell prices and the auction tool's names, read in the cron within the build's budget. */
+async function readSellPrices(ids: number[], deadline: number): Promise<SellPrices> {
   const [{ loadSiteAssets, readItemTips }, { loadShownNames }, { shownItemName }] = await Promise.all([import("./game-assets"), import("./shown-item-names"), import("./items")]);
   const assets = ids.length ? await loadSiteAssets() : null;
-  const read = await readItemTips(assets, ids);
+  const read = await readItemTips(assets, ids, undefined, { concurrency: VENDOR_BUDGET.concurrency, maxShards: VENDOR_BUDGET.maxShards, deadline });
   const prices = new Map([...read.tips].map(([id, tip]) => [id, tip.sellPrice]));
   const names = new Map<number, string>();
   const listed = ids.filter((id) => (read.tips.get(id)?.sellPrice ?? 0) > 0);
@@ -116,76 +135,188 @@ async function readSellPrices(ids: number[]): Promise<SellPrices> {
       if (shown) names.set(id, shown.name);
     }
   }
-  return { prices, names, unread: read.unread };
+  return { prices, names, unread: read.unread, skipped: read.skipped };
 }
 
-/** At most one rebuild an hour for a changed market: each one reads every candidate's tooltip shard and writes every realm. */
-export const VENDOR_REBUILD_MS = 60 * 60_000;
+interface VendorIndex {
+  version: 2;
+  revision: string;
+  /** The generation of the last published build; null before the first. */
+  generation: string | null;
+  /** Each realm's generation: this build's, or the last one that wrote it when this build's write failed. */
+  realms: Record<string, string>;
+  /** The previous build's map, kept so a page that read the old index mid-switch still finds its object. */
+  retired: Record<string, string>;
+  dataAsOf: string | null;
+  builtAt: string | null;
+  complete: boolean;
+  failed: number;
+  unread: number;
+  skipped: number;
+  /** When the last build started: the hourly cap counts from here, so a build that throws or never publishes still counts. */
+  attemptAt: string | null;
+  /** The lease of a build in progress. */
+  building: { since: string; id: string } | null;
+}
 
-interface VendorIndex { version: 1; revision: string; dataAsOf: string | null; builtAt: string; complete: boolean }
+const isMap = (x: unknown): x is Record<string, string> =>
+  typeof x === "object" && x !== null && !Array.isArray(x) && Object.entries(x).every(([k, v]) => validSlug(k) && typeof v === "string" && validGeneration(v));
+const isTime = (x: unknown): x is string | null => x === null || (typeof x === "string" && Number.isFinite(Date.parse(x)));
 
-/**
- * Whether this run rebuilds, from the index the last build wrote: always when there is none, it is of another revision,
- * or the last build was incomplete (the retry); at a new UTC day, since a market goes stale by the calendar; and for a
- * changed market only once VENDOR_REBUILD_MS has passed since the last build. An index that cannot be read waits for
- * the next run rather than rebuilding, as the other stored views do.
- */
-async function rebuildDue(s: NonNullable<ReturnType<typeof storage>>, dataAsOf: string | null, now: Date): Promise<boolean> {
-  let res: Response;
+/** The index when it is an object of this shape; anything else (JSON null, an older shape) is no usable index. */
+function parseIndex(raw: unknown): VendorIndex | null {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
+  const x = raw as Partial<VendorIndex>;
+  const lease = x.building;
+  const leaseOk = lease === null || (typeof lease === "object" && lease !== undefined && typeof lease.since === "string" && isTime(lease.since) && typeof lease.id === "string");
+  const generationOk = x.generation === null || (typeof x.generation === "string" && validGeneration(x.generation));
+  if (x.version !== 2 || typeof x.revision !== "string" || !generationOk || !isMap(x.realms) || !isMap(x.retired) ||
+    !isTime(x.dataAsOf) || !isTime(x.builtAt) || !isTime(x.attemptAt) || typeof x.complete !== "boolean" ||
+    ![x.failed, x.unread, x.skipped].every(Number.isInteger) || !leaseOk) return null;
+  return x as VendorIndex;
+}
+
+type IndexRead = { ok: false } | { ok: true; index: VendorIndex | null; etag: string | null; exists: boolean };
+async function readIndex(s: Storage): Promise<IndexRead> {
   try {
-    res = await s.request(INDEX, { method: "GET", headers: { "accept-encoding": "identity" } });
-  } catch (err) {
-    console.warn("vendor list index unreadable; skipping this run", err);
-    return false;
+    const res = await s.request(INDEX, { method: "GET", headers: { "accept-encoding": "identity" } });
+    if (res.status === 404) return { ok: true, index: null, etag: null, exists: false };
+    if (!res.ok) return { ok: false };
+    let raw: unknown = null;
+    try { raw = await res.json(); } catch { raw = null; }
+    return { ok: true, index: parseIndex(raw), etag: res.headers.get("etag"), exists: true };
+  } catch {
+    return { ok: false };
   }
-  if (res.status === 404) return true;
-  if (!res.ok) {
-    console.warn(`vendor list index unreadable (${res.status}); skipping this run`);
-    return false;
-  }
-  let index: Partial<VendorIndex>;
-  try { index = await res.json() as Partial<VendorIndex>; } catch { return true; }
-  const builtAt = typeof index.builtAt === "string" ? Date.parse(index.builtAt) : NaN;
-  if (index.version !== 1 || index.revision !== REVISION || index.complete !== true || !Number.isFinite(builtAt)) return true;
-  if (new Date(builtAt).toISOString().slice(0, 10) !== now.toISOString().slice(0, 10)) return true;
-  return index.dataAsOf !== dataAsOf && now.getTime() - builtAt >= VENDOR_REBUILD_MS;
 }
 
 /**
- * Rebuild every realm's lists when `rebuildDue` says so. Each realm is written in its own try; the index is written
- * last, with the build time, and marked incomplete when a realm failed or a sell price could not be read, so the next
- * run tries again. A realm that failed keeps its last object, which carries its own snapshot time.
+ * Write the index only if it is still the copy this run read: R2 honours `if-match` (and `if-none-match: *` for a
+ * first write), as the market rollup's writes rely on, so two runs cannot both claim or both publish. A 412 means
+ * another run wrote it first.
  */
-export async function writeVendorThese(now = new Date(), deps: Deps & { market?: () => Promise<{ state: MarketState | null; dataAsOf: string | null }>; read?: (ids: number[]) => Promise<SellPrices> } = {}): Promise<{ written: boolean; realms?: number; failed?: number; unread?: number }> {
+async function putIndex(s: Storage, index: VendorIndex, read: { etag: string | null; exists: boolean }): Promise<{ ok: true } | { ok: false; lost: boolean; status: number }> {
+  if (read.exists && !read.etag) throw new Error("vendor list index has no ETag: cannot write it safely");
+  const condition: Record<string, string> = read.exists ? { "if-match": read.etag! } : { "if-none-match": "*" };
+  const res = await s.request(INDEX, {
+    method: "PUT", body: JSON.stringify(index),
+    headers: { "content-type": "application/json", [STAMP]: stampOf(index.dataAsOf, REVISION), ...condition },
+  });
+  if (res.ok) return { ok: true };
+  return { ok: false, lost: res.status === 412, status: res.status };
+}
+
+const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+/** Why this run does not build, or null when it does. */
+function notDue(index: VendorIndex | null, dataAsOf: string | null, now: number): "building" | "throttled" | "current" | null {
+  if (index?.building && now - Date.parse(index.building.since) < VENDOR_LEASE_MS) return "building";
+  if (!index || index.revision !== REVISION || index.attemptAt === null) return null;
+  const attempt = Date.parse(index.attemptAt);
+  // The first run of a new UTC day builds: a market goes stale by the calendar.
+  if (utcDay(attempt) !== utcDay(now)) return null;
+  // Within the hour nothing builds, a retry after an incomplete build included.
+  if (now - attempt < VENDOR_REBUILD_MS) return "throttled";
+  return index.complete && index.dataAsOf === dataAsOf ? "current" : null;
+}
+
+const emptyIndex = (): VendorIndex => ({
+  version: 2, revision: REVISION, generation: null, realms: {}, retired: {}, dataAsOf: null, builtAt: null, complete: false,
+  failed: 0, unread: 0, skipped: 0, attemptAt: null, building: null,
+});
+
+export type VendorRun =
+  | { written: false; reason: "index unreadable" | "building" | "throttled" | "current" | "lost the lease" }
+  | { written: true; realms: number; failed: number; unread: number; skipped: number };
+
+/**
+ * One build of every realm's lists, when due (`notDue`): at most one attempt an hour whether the last one was complete
+ * or not, except the first run of a new UTC day. Builds never overlap:
+ * 1. The run claims the index with a lease and the attempt time, by a conditional write, before any expensive work.
+ *    A run that sees a lease younger than VENDOR_LEASE_MS skips; a build that throws keeps its attempt time, so the
+ *    hourly cap holds, and its lease runs out.
+ * 2. It reads sell prices within VENDOR_BUDGET and writes each realm under its own generation, each realm in its own try.
+ * 3. It reads the index again, gives up if another run took the lease, and publishes the index pointing at its
+ *    generation with a conditional write. A realm whose write failed keeps its last generation.
+ * 4. Best effort, it deletes the objects that only the build before the previous one used.
+ */
+export async function writeVendorThese(now = new Date(), deps: Deps & {
+  market?: () => Promise<{ state: MarketState | null; dataAsOf: string | null }>;
+  read?: (ids: number[], deadline: number) => Promise<SellPrices>;
+  /** For tests: the generation id, and the wall clock the budget runs on. */
+  id?: string;
+  clock?: () => number;
+} = {}): Promise<VendorRun> {
   const s = storage(deps);
   if (!s) throw new Error("the vendor lists need the cloud store");
   const market = await (deps.market ?? (async () => (await import("./upload-store")).uploadStore.loadMarket()))();
   if (!market.state) throw new Error("market unavailable");
-  if (!await rebuildDue(s, market.dataAsOf, now)) return { written: false };
-  const realms = await buildVendorLists(market.state, now, market.dataAsOf, deps.read ?? readSellPrices);
+  const first = await readIndex(s);
+  if (!first.ok) {
+    console.warn("vendor list index unreadable; skipping this run");
+    return { written: false, reason: "index unreadable" };
+  }
+  const reason = notDue(first.index, market.dataAsOf, now.getTime());
+  if (reason) return { written: false, reason };
+
+  const id = deps.id ?? crypto.randomUUID();
+  if (!validGeneration(id)) throw new Error("unusable generation id");
+  const at = now.toISOString();
+  const previous = first.index ?? emptyIndex();
+  const claim = await putIndex(s, { ...previous, revision: REVISION, attemptAt: at, building: { since: at, id } }, first);
+  if (!claim.ok) {
+    if (claim.lost) return { written: false, reason: "building" };
+    throw new Error(`vendor list lease failed (${claim.status})`);
+  }
+
+  const deadline = (deps.clock ?? Date.now)() + VENDOR_BUDGET.wallMs;
+  let skipped = 0;
+  const realms = await buildVendorLists(market.state, now, market.dataAsOf, async (ids) => {
+    const sell = await (deps.read ?? readSellPrices)(ids, deadline);
+    skipped = sell.skipped;
+    return sell;
+  });
+  const written: string[] = [];
   let failed = 0;
   let unread = 0;
   for (const [slug, realm] of realms) {
     unread += realm.houses.reduce((n, h) => n + h.unread, 0);
     try {
       if (!validSlug(slug)) throw new Error(`unusable realm slug ${JSON.stringify(slug)}`);
-      const put = await s.request(realmKey(slug), { method: "PUT", body: JSON.stringify(realm), headers: { "content-type": "application/json", [STAMP]: stampOf(market.dataAsOf, REVISION) } });
+      const put = await s.request(realmKey(id, slug), { method: "PUT", body: JSON.stringify(realm), headers: { "content-type": "application/json", [STAMP]: stampOf(market.dataAsOf, REVISION) } });
       if (!put.ok) throw new Error(`write failed (${put.status})`);
+      written.push(slug);
     } catch (err) {
       failed++;
       console.error(`vendor list failed for ${slug}`, err);
     }
   }
-  const complete = failed === 0 && unread === 0;
-  const index: VendorIndex & { realms: number; failed: number; unread: number } = {
-    version: 1, revision: REVISION, dataAsOf: market.dataAsOf, builtAt: now.toISOString(), complete, realms: realms.size, failed, unread,
+  const forget = (keys: string[]) => Promise.allSettled(keys.map((key) => s.request(key, { method: "DELETE" })));
+
+  const before = await readIndex(s);
+  if (!before.ok || before.index?.building?.id !== id) {
+    await forget(written.map((slug) => realmKey(id, slug)));
+    return { written: false, reason: "lost the lease" };
+  }
+  const map: Record<string, string> = {};
+  for (const slug of realms.keys()) {
+    if (written.includes(slug)) map[slug] = id;
+    else if (previous.realms[slug]) map[slug] = previous.realms[slug]!;
+  }
+  const published: VendorIndex = {
+    version: 2, revision: REVISION, generation: id, realms: map, retired: previous.realms, dataAsOf: market.dataAsOf, builtAt: at,
+    complete: failed === 0 && unread === 0 && skipped === 0, failed, unread, skipped, attemptAt: at, building: null,
   };
-  const put = await s.request(INDEX, {
-    method: "PUT", body: JSON.stringify(index),
-    headers: { "content-type": "application/json", [STAMP]: stampOf(market.dataAsOf, REVISION) },
-  });
-  if (!put.ok) throw new Error(`vendor list index write failed (${put.status})`);
-  return { written: true, realms: realms.size, failed, unread };
+  const put = await putIndex(s, published, before);
+  if (!put.ok) {
+    await forget(written.map((slug) => realmKey(id, slug)));
+    if (put.lost) return { written: false, reason: "lost the lease" };
+    throw new Error(`vendor list index write failed (${put.status})`);
+  }
+  // The build before the previous one: drop what neither this map nor the previous one (kept for pages mid-switch) uses.
+  const kept = new Set([...Object.entries(map), ...Object.entries(previous.realms)].map(([slug, gen]) => realmKey(gen, slug)));
+  await forget(Object.entries(previous.retired).map(([slug, gen]) => realmKey(gen, slug)).filter((key) => !kept.has(key)));
+  return { written: true, realms: realms.size, failed, unread, skipped };
 }
 
 const isHouse = (h: unknown): h is StoredVendorHouse => {
@@ -194,19 +325,26 @@ const isHouse = (h: unknown): h is StoredVendorHouse => {
 };
 
 /**
- * A realm's stored lists: null when the object is not there yet, or cannot be read ("not built yet" and "unavailable"
- * are told apart by `missing`). No market or tooltip fallback: the page never builds the list itself.
+ * A realm's stored lists, from the generation the index names for it: `missing` when the index or the realm is not
+ * there yet ("not built yet"), `realm: null` without `missing` when a read failed. No market or tooltip fallback: the
+ * page never builds the list itself.
  */
 async function readVendorThese(slug: string, deps: Deps = {}): Promise<{ realm: StoredVendorRealm | null; missing: boolean }> {
   if (!validSlug(slug)) return { realm: null, missing: true };
   const s = storage(deps);
   if (!s) return { realm: null, missing: false };
+  const index = await readIndex(s);
+  if (!index.ok) return { realm: null, missing: false };
+  if (!index.exists) return { realm: null, missing: true };
+  if (!index.index) return { realm: null, missing: false };
+  const generation = index.index.realms[slug];
+  if (!generation) return { realm: null, missing: true };
   try {
-    const res = await s.request(realmKey(slug), { method: "GET", headers: { "accept-encoding": "identity" } });
-    if (res.status === 404) return { realm: null, missing: true };
+    const res = await s.request(realmKey(generation, slug), { method: "GET", headers: { "accept-encoding": "identity" } });
     if (!res.ok) return { realm: null, missing: false };
     const raw = await res.json() as StoredVendorRealm;
-    const ok = raw?.version === 1 && (raw.dataAsOf === null || typeof raw.dataAsOf === "string") && typeof raw.realm === "string" && Array.isArray(raw.houses) && raw.houses.every(isHouse);
+    const ok = typeof raw === "object" && raw !== null && raw.version === 1 && (raw.dataAsOf === null || typeof raw.dataAsOf === "string") &&
+      typeof raw.realm === "string" && Array.isArray(raw.houses) && raw.houses.every(isHouse);
     return ok ? { realm: raw, missing: false } : { realm: null, missing: false };
   } catch {
     return { realm: null, missing: false };

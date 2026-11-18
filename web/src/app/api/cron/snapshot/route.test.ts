@@ -391,11 +391,14 @@ test("the snapshot refreshes the guild ladder even when no new uploads arrive an
   expect((await GET(req())).status).toBe(200);
 });
 
-test("the vendor lists are built after the other views, wait for a market still catching up, and a failure breaks nothing", async () => {
-  vendor.writeVendorThese.mockResolvedValue({ written: true, realms: 2, failed: 0, unread: 0 });
+test("the vendor lists are built last, after the heartbeat, wait for a market still catching up, and a failure breaks nothing", async () => {
+  vendor.writeVendorThese.mockResolvedValue({ written: true, realms: 2, failed: 0, unread: 0, skipped: 0 });
   let res = await GET(req());
   expect(res.status).toBe(200);
-  expect((await res.json()).vendorThese).toEqual({ written: true, realms: 2, failed: 0, unread: 0 });
+  expect((await res.json()).vendorThese).toEqual({ written: true, realms: 2, failed: 0, unread: 0, skipped: 0 });
+  // A build cut short by the Worker's limits cannot cost the heartbeat or the other views.
+  expect(store.writeCronRun.mock.invocationCallOrder[0]).toBeLessThan(vendor.writeVendorThese.mock.invocationCallOrder[0]!);
+  expect(guilds.writeGuildLadder.mock.invocationCallOrder[0]).toBeLessThan(vendor.writeVendorThese.mock.invocationCallOrder[0]!);
   vendor.writeVendorThese.mockClear();
   store.writeMarket.mockResolvedValue({ added: 5, scans: 5, remaining: 3 });
   expect((await GET(req())).status).toBe(200);

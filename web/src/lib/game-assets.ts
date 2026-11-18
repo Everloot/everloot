@@ -310,11 +310,15 @@ export async function loadItemTips(assets: SiteAssets | null, ids: readonly numb
  * shard, or a record for an asked-for item that is not a record. An item its shard does not hold is neither.
  * `unread` holds the asked-for items whose tooltip could not be looked up at all (no store, no usable index, or a
  * shard that failed or was broken), so a count of them can say a list built from these tooltips is incomplete.
+ * With `limits` (the cron's bulk read), at most `concurrency` shards are read at once and at most `maxShards` in all,
+ * and none is started after `deadline` (epoch ms): the items of a shard left unread for these are `unread` too, and
+ * `skipped` counts those shards. Without it, every shard needed is read at once, as a page does for its few items.
  */
-export async function readItemTips(assets: SiteAssets | null, ids: readonly number[], store: PrivateStore | null = privateStoreFromEnv()): Promise<{ tips: Map<number, ItemTip>; unreachable: boolean; degraded: boolean; unread: Set<number> }> {
+export interface TipReadLimits { concurrency: number; maxShards: number; deadline: number }
+export async function readItemTips(assets: SiteAssets | null, ids: readonly number[], store: PrivateStore | null = privateStoreFromEnv(), limits?: TipReadLimits): Promise<{ tips: Map<number, ItemTip>; unreachable: boolean; degraded: boolean; unread: Set<number>; skipped: number }> {
   const out = new Map<number, ItemTip>();
   const unread = new Set<number>();
-  const result = { tips: out, unreachable: false, degraded: false, unread };
+  const result = { tips: out, unreachable: false, degraded: false, unread, skipped: 0 };
   const wanted = [...new Set(ids)].filter((id) => Number.isInteger(id) && id > 0);
   const folder = assets ? buildFolder(assets.base) : null;
   const none = () => { for (const id of wanted) unread.add(id); return result; };
@@ -329,9 +333,12 @@ export async function readItemTips(assets: SiteAssets | null, ids: readonly numb
     const s = itemShard(id, index.data.shardSize);
     byShard.set(s, [...(byShard.get(s) ?? []), id]);
   }
-  await Promise.all([...byShard].map(async ([shard, ids]) => {
+  // A shard the index does not list holds no item asked for: no tooltip, but nothing to read or count as unread.
+  const jobs = [...byShard].flatMap(([shard, ids]) => {
     const file = index.data.shards[String(shard)]?.file;
-    if (!file) return;
+    return file ? [{ file, ids }] : [];
+  });
+  const readShard = async ({ file, ids }: { file: string; ids: number[] }) => {
     const shardRead = await store.read(`${folder}/${file}`);
     if (shardRead === PRIVATE_UNREACHABLE) { result.unreachable = true; for (const id of ids) unread.add(id); return; }
     const body = z.record(z.string(), z.unknown()).safeParse(shardRead);
@@ -342,6 +349,21 @@ export async function readItemTips(assets: SiteAssets | null, ids: readonly numb
       const r = ItemRecordSchema.safeParse(raw);
       if (r.success) out.set(id, itemTip(r.data, assets, id));
       else { result.degraded = true; unread.add(id); }
+    }
+  };
+  if (!limits) {
+    await Promise.all(jobs.map(readShard));
+    return result;
+  }
+  const skip = (job: { ids: number[] }) => { result.skipped++; for (const id of job.ids) unread.add(id); };
+  const queue = jobs.slice(0, Math.max(0, limits.maxShards));
+  for (const job of jobs.slice(queue.length)) skip(job);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(Math.max(1, limits.concurrency), queue.length) }, async () => {
+    while (next < queue.length) {
+      const job = queue[next++]!;
+      if (Date.now() >= limits.deadline) skip(job);
+      else await readShard(job);
     }
   }));
   return result;

@@ -144,6 +144,31 @@ test("the items whose tooltip could not be looked up are named, apart from an it
   expect([...(await readItemTips(a, [9], null)).unread]).toEqual([9]);
 });
 
+test("a bulk read with limits reads a few shards at a time, stops at its shard budget and its deadline, and counts what it left", async () => {
+  const a = parseSiteManifest(siteManifest, BASE)!;
+  // Ten shards, item 9 of each (9, 521, 1033, ...), every one listed in the index.
+  const ids = Array.from({ length: 10 }, (_, s) => s * 512 + 9);
+  const files: Record<string, unknown> = { [`${FOLDER}/items.json`]: { ...itemIndex, shards: Object.fromEntries(ids.map((_, s) => [String(s), { file: `items/${s}.json`, bytes: 1, sha256: "0".repeat(64) }])) } };
+  ids.forEach((id, s) => { files[`${FOLDER}/items/${s}.json`] = { [String(id)]: shard0["9"] }; });
+  let open = 0, most = 0;
+  const slow = { read: async (path: string) => { open++; most = Math.max(most, open); await new Promise((r) => setTimeout(r, 2)); open--; return files[path] ?? null; } };
+  const all = await readItemTips(a, ids, slow, { concurrency: 4, maxShards: 120, deadline: Date.now() + 60_000 });
+  expect(all.tips.size).toBe(10);
+  expect(most).toBe(4);
+  expect(all).toMatchObject({ skipped: 0, unreachable: false });
+  // A budget of 6 shards: the other 4 shards' items are unread and counted.
+  const capped = await readItemTips(a, ids, memoryStore(files), { concurrency: 4, maxShards: 6, deadline: Date.now() + 60_000 });
+  expect(capped.tips.size).toBe(6);
+  expect(capped.skipped).toBe(4);
+  expect([...capped.unread].sort((x, y) => x - y)).toEqual(ids.slice(6));
+  // Past the deadline no shard is started.
+  const late = memoryStore(files);
+  const none = await readItemTips(a, ids, late, { concurrency: 4, maxShards: 120, deadline: Date.now() - 1 });
+  expect(none).toMatchObject({ skipped: 10 });
+  expect(none.unread.size).toBe(10);
+  expect(late.reads).toEqual([`${FOLDER}/items.json`]);
+});
+
 test("a broken item folder is told apart from an item with no tooltip: a listed shard missing or not a shard, or a bad record", async () => {
   const a = parseSiteManifest(siteManifest, BASE)!;
   const withShard = (shard?: unknown) => memoryStore({ [`${FOLDER}/items.json`]: itemIndex, ...(shard === undefined ? {} : { [`${FOLDER}/items/0.json`]: shard }) });

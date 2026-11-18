@@ -39,7 +39,7 @@ export function VendorThese({ found, house, realm, now }: {
   now: Date;
 }) {
   if (found.state === "missing") {
-    return <Section><p data-vendor-missing className="text-sm text-fg-2">{"This list isn't built yet. It's worked out when the market updates; check back soon."}</p></Section>;
+    return <Section><p data-vendor-missing className="text-sm text-fg-2">{"This list isn't built yet. It's worked out from the market at most once an hour; check back soon."}</p></Section>;
   }
   const list = found.state === "stored" ? found.list : null;
   if (!list || (list.candidates > 0 && list.unread >= list.candidates)) {
