@@ -304,6 +304,18 @@ test("a <ref> inside a comment or a quoted attribute does not swallow prose", ()
   expect(wtf(repairTemplates("A<ref><!-- </ref> -->citation</ref>KEEP")).text()).toBe("AKEEP");
 });
 
+test("comments, literal tags and code are read in context, by their exact names", () => {
+  // A tag inside a comment is not a tag.
+  expect(wtf(repairTemplates("<!-- <nowiki> --> <code>KEEP</code>")).text()).toBe("KEEP");
+  // Comment syntax inside <nowiki> is text, as the wiki shows it.
+  expect(wtf(repairTemplates("<nowiki><!--</nowiki><code>KEEP</code>")).text()).toBe("<!-- KEEP");
+  // A longer name is another tag: <nowikix> is not <nowiki>, <codex> is not <code>.
+  expect(wtf(repairTemplates("<nowikix>x <code>KEEP</code>")).text()).toBe("x KEEP");
+  expect(wtf(repairTemplates("<prex>x <code>KEEP</code> and <codex>y</codex>")).text()).toBe("x KEEP and y");
+  // A </code> inside a comment does not close the code.
+  expect(repairTemplates("<code>a<!-- </code> -->b</code>c")).toBe("a<!-- </code> -->bc");
+});
+
 test("letters that grow when lower-cased do not shift where tags are found", () => {
   // "İ".toLowerCase() is two characters; reading tags from a fully lower-cased copy cut text in the wrong place.
   expect(wtf(repairTemplates("A<ref>İİİİİİİİ</ref>KEEP <b>tail</b>")).text()).toBe("AKEEP tail");
@@ -327,6 +339,8 @@ test("long space runs, unclosed tags and near-miss close tags convert in linear 
     "a" + " ".repeat(40_000) + "b", "<ref>".repeat(40_000), "<ref ".repeat(40_000), "<pre>".repeat(40_000), "<!--".repeat(40_000),
     "<ref>".repeat(n) + "</references>".repeat(n), "<ref>".repeat(n) + "<!-- </ref> -->".repeat(n), "<code>".repeat(n) + "<!-- </code> -->".repeat(n),
     '<ref a="'.repeat(20_000), '<ref a="x\n'.repeat(20_000), "<nowiki>".repeat(20_000) + "<code>".repeat(20_000),
+    "<code>" + "<nowiki>a</nowiki>".repeat(20_000), "<ref>a</refx>".repeat(20_000), "<ref><!--</ref>".repeat(20_000),
+    "<nowikix>".repeat(20_000) + "<code>x</code>".repeat(5_000),
   ]) {
     repairTemplates(src.slice(0, 1000)); // warm up
     const start = performance.now();

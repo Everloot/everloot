@@ -187,87 +187,17 @@ function render(inner: string): string | null {
   return null;
 }
 
-/** Tags whose content is shown as written (or, for a comment, not at all): their spaces are never collapsed. */
-const VERBATIM_TAGS = new Set(["code", "pre", "nowiki", "poem", "syntaxhighlight", "source"]);
+/** Tags whose content the wiki shows as written: comment syntax and other tags inside them are plain text. */
+const LITERAL_TAGS = new Set(["nowiki", "pre", "poem", "syntaxhighlight", "source"]);
 
-/** Every closing tag the pass looks for, matched exactly: `</references>` is not `</ref>`. */
-const CLOSER = /<\/(ref|code|pre|nowiki|poem|syntaxhighlight|source)\s*>/g;
+/** The closing tag of each tag the pass reads, matched exactly at a position: `</references>` is not `</ref>`. */
+const CLOSERS = new Map([...LITERAL_TAGS, "code", "ref"].map((name) => [name, new RegExp(`</${name}\\s*>`, "y")]));
 
 /** Holds a verbatim span's place while the spaces around it are collapsed. */
 const HELD = (n: number) => `\u0002${n}\u0003`;
 
-interface Span { start: number; end: number }
-
 /** Lower-cases A to Z only, so every offset in the result is the same offset in the original ("İ" would grow). */
 const asciiLower = (s: string) => s.replace(/[A-Z]+/g, (m) => m.toLowerCase());
-
-/** First index in a list sorted by `start` whose start is at or after `pos`. */
-function firstAtOrAfter(list: Span[], pos: number): number {
-  let lo = 0, hi = list.length;
-  while (lo < hi) { const mid = (lo + hi) >> 1; if (list[mid].start < pos) lo = mid + 1; else hi = mid; }
-  return lo;
-}
-
-/** The span of a sorted, non-overlapping list that contains `pos`, if any. */
-function containing(list: Span[], pos: number): Span | undefined {
-  const i = firstAtOrAfter(list, pos + 1) - 1;
-  return i >= 0 && list[i].end > pos ? list[i] : undefined;
-}
-
-/** Comments, read left to right; an unclosed one runs to the end of the page, as on the wiki. */
-function commentSpans(lower: string): Span[] {
-  const out: Span[] = [];
-  for (let i = lower.indexOf("<!--"); i !== -1; i = lower.indexOf("<!--", i)) {
-    const close = lower.indexOf("-->", i + 4);
-    const end = close === -1 ? lower.length : close + 3;
-    out.push({ start: i, end });
-    i = end;
-  }
-  return out;
-}
-
-/** Overlapping spans merged into one sorted, non-overlapping list. */
-function union(...lists: Span[][]): Span[] {
-  const out: Span[] = [];
-  for (const s of lists.flat().sort((a, b) => a.start - b.start)) {
-    const last = out[out.length - 1];
-    if (last && s.start < last.end) last.end = Math.max(last.end, s.end);
-    else out.push({ ...s });
-  }
-  return out;
-}
-
-/**
- * Finds a tag's own closing tag. Every closing tag is listed once, up front. Where one sits inside a span
- * the tag must skip (a comment inside a ref, a `<nowiki>` inside `<code>`), the next usable one is
- * remembered for it, failures included, so no search repeats work.
- */
-function closerFinder(lower: string, skips: Record<string, Span[]>) {
-  const closers = new Map<string, Span[]>();
-  for (const m of lower.matchAll(CLOSER)) {
-    const list = closers.get(m[1]) ?? [];
-    list.push({ start: m.index!, end: m.index! + m[0].length });
-    closers.set(m[1], list);
-  }
-  const usable = new Map<string, Int32Array>(); // per closer: the first usable one from it, -1 none, -2 not yet known
-  return (name: string, from: number): Span | null => {
-    const list = closers.get(name) ?? [];
-    let memo = usable.get(name);
-    if (!memo) { memo = new Int32Array(list.length).fill(-2); usable.set(name, memo); }
-    const skip = skips[name] ?? [];
-    const path: number[] = [];
-    let found = -1;
-    for (let j = firstAtOrAfter(list, from); j < list.length;) {
-      if (memo[j] !== -2) { found = memo[j]; break; }
-      path.push(j);
-      const inside = containing(skip, list[j].start);
-      if (!inside) { found = j; break; }
-      j = firstAtOrAfter(list, inside.end);
-    }
-    for (const p of path) memo[p] = found;
-    return found === -1 ? null : list[found];
-  };
-}
 
 /**
  * Reads the opening tag at `start` up to its `>`, however long. A quoted attribute value may hold a ">"
@@ -309,72 +239,133 @@ function gtFinder(text: string) {
 }
 
 /**
- * The pass before templates render, in one forward scan:
+ * The pass before templates render. One forward scan reads the page the way the wiki does, each part in
+ * its own context:
  *
- * - `<ref>` footnotes go. The converter drops them too but leaves a space for each, so a name with three
- *   sources (`'''Helhounds'''<ref>…</ref><ref>…</ref><ref>…</ref> are`) read "Helhounds  are". A ref ends
- *   at its own `</ref>`, not one inside a comment; a ref that never closes is left for the converter.
- * - `<code>` is unwrapped (with any `<nowiki>` inside it): the converter drops everything inside `<code>`,
- *   which lost lore lines like `<code>{{api|C_Map}}</code>`. A `</code>` inside a comment or `<nowiki>`
+ * - A comment is opaque: a tag inside it is not a tag. It is kept as written.
+ * - `<nowiki>`, `<pre>`, `<poem>`, `<syntaxhighlight>` and `<source>` are literal: comment syntax and tags
+ *   inside them are text, and only their own closing tag ends them. They are kept as written.
+ * - `<code>` is unwrapped (with any `<nowiki>` inside it), and its text kept as written: the converter drops
+ *   everything inside `<code>`, which lost lore lines like `<code>{{api|C_Map}}</code>`, and the spaces in
+ *   code are content. Inside it, comments and literal tags are read as above, so a `</code>` inside them
  *   does not close it.
- * - Comments and the verbatim tags (code, pre, nowiki, poem, syntaxhighlight, source) are kept as written:
- *   a `<ref>` inside them is not a footnote, and the spaces in code are content. One that never closes
- *   runs to the end of the page.
+ * - `<ref>` footnotes go. The converter drops them too but leaves a space for each, so a name with three
+ *   sources (`'''Helhounds'''<ref>…</ref><ref>…</ref><ref>…</ref> are`) read "Helhounds  are". A ref ends at
+ *   its own `</ref>`, not at one inside a comment; a ref that never closes is left for the converter.
+ * - A comment, literal tag or `<code>` that never closes runs to the end of the page, kept as written.
  * - Everywhere else, runs of spaces collapse. A browser shows a run as one space, so the wiki never shows
  *   the doubled spaces its source often has (`after  completing`, `'''Garn Cloudsong ''' is`,
  *   `In ''[[World of Warcraft: Classic| Classic]]''`); kept, they would read as a dropped template. A
  *   doubled space left in the output therefore still means a template was lost. A line that starts with a
  *   space is preformatted on the wiki and shows its spaces, so it is left as written.
+ *
+ * Every search moves forward and each part of the page is read about once, so the pass is linear.
  */
 function prepare(wikitext: string): string {
   const lower = asciiLower(wikitext);
-  const comments = commentSpans(lower);
-  const skips: Record<string, Span[]> = { ref: comments };
-  const findClose = closerFinder(lower, skips);
-  const nowikis: Span[] = [];
-  const nowikiGt = gtFinder(wikitext);
-  for (let i = lower.indexOf("<nowiki"); i !== -1; i = lower.indexOf("<nowiki", i + 1)) {
-    const tag = readTag(wikitext, i, 6, lower.indexOf("<", i + 1), nowikiGt(i));
-    if (!tag || tag.selfClosing) continue;
-    const close = findClose("nowiki", tag.end);
-    nowikis.push({ start: i, end: close ? close.end : lower.length });
-    if (!close) break;
-    i = close.end - 1;
-  }
-  skips.code = union(comments, nowikis); // read when the first <code> looks for its close, after this
+  const length = wikitext.length;
+  const gt = gtFinder(wikitext);
   const held: string[] = [];
   const hold = (s: string) => HELD(held.push(s) - 1);
   // A marker character already in the text is held itself, so it cannot be read as a held span.
   const plain = (s: string) => s.replace(/[\u0002\u0003]/g, hold);
-  const gt = gtFinder(wikitext);
+
+  /** Where the comment opening at `at` ends. */
+  const commentEnd = (at: number) => { const close = lower.indexOf("-->", at + 4); return close === -1 ? length : close + 3; };
+
+  /** The end of `</name>` exactly at `at`, or -1. */
+  const closesAt = (name: string, at: number): number => {
+    const re = CLOSERS.get(name)!;
+    re.lastIndex = at;
+    return re.test(lower) ? re.lastIndex : -1;
+  };
+
+  /** The opening tag at `lt` when it is one this pass reads, by its exact name. */
+  const openTag = (lt: number) => {
+    const name = /^[a-z]+/.exec(lower.slice(lt + 1, lt + 17))?.[0] ?? "";
+    if (name !== "ref" && name !== "code" && !LITERAL_TAGS.has(name)) return null;
+    const boundary = lower[lt + 1 + name.length];
+    if (!(boundary === undefined || boundary === ">" || boundary === "/" || /\s/.test(boundary))) return null;
+    const tag = readTag(wikitext, lt, name.length, lower.indexOf("<", lt + 1), gt(lt));
+    return tag && { name, ...tag };
+  };
+
+  /** Where a literal tag's own closing tag starts and ends; nothing inside it is read. */
+  const literalClose = (name: string, from: number): { start: number; end: number } | null => {
+    for (let at = lower.indexOf(`</${name}`, from); at !== -1; at = lower.indexOf(`</${name}`, at + 1)) {
+      const end = closesAt(name, at);
+      if (end !== -1) return { start: at, end };
+    }
+    return null;
+  };
+
+  /** Where `</code>` closes a code body, skipping comments and literal tags; null when it never does. */
+  const codeClose = (from: number): { start: number; end: number } | null => {
+    for (let at = lower.indexOf("<", from); at !== -1; at = lower.indexOf("<", at)) {
+      if (lower.startsWith("<!--", at)) { at = commentEnd(at); continue; }
+      const end = closesAt("code", at);
+      if (end !== -1) return { start: at, end };
+      const tag = openTag(at);
+      if (tag && LITERAL_TAGS.has(tag.name) && !tag.selfClosing) {
+        const close = literalClose(tag.name, tag.end);
+        if (!close) return null;
+        at = close.end;
+        continue;
+      }
+      at = tag ? tag.end : at + 1;
+    }
+    return null;
+  };
+
+  // Once a ref finds no `</ref>` from some point on, no later ref can find one either.
+  let refNeverCloses = Infinity;
+  /** Where `</ref>` closes a ref body, skipping comments; null when it never does. */
+  const refClose = (from: number): { start: number; end: number } | null => {
+    if (from >= refNeverCloses) return null;
+    let comment = lower.indexOf("<!--", from);
+    let closer = lower.indexOf("</ref", from);
+    while (closer !== -1) {
+      if (comment !== -1 && comment < closer) {
+        const after = commentEnd(comment);
+        if (closer < after) closer = lower.indexOf("</ref", after);
+        comment = lower.indexOf("<!--", after);
+        continue;
+      }
+      const end = closesAt("ref", closer);
+      if (end !== -1) return { start: closer, end };
+      closer = lower.indexOf("</ref", closer + 1);
+    }
+    refNeverCloses = from;
+    return null;
+  };
+
   let out = "";
   let i = 0;
-  while (i < wikitext.length) {
+  while (i < length) {
     const lt = lower.indexOf("<", i);
     if (lt === -1) { out += plain(wikitext.slice(i)); break; }
     out += plain(wikitext.slice(i, lt));
     i = lt;
-    const comment = lower.startsWith("<!--", lt) ? containing(comments, lt) : undefined;
-    if (comment) { out += hold(wikitext.slice(lt, comment.end)); i = comment.end; continue; }
-    const name = /^[a-z]+/.exec(lower.slice(lt + 1, lt + 17))?.[0] ?? "";
-    const boundary = lower[lt + 1 + name.length];
-    const tag = (name === "ref" || VERBATIM_TAGS.has(name)) && (boundary === undefined || boundary === ">" || boundary === "/" || /\s/.test(boundary))
-      ? readTag(wikitext, lt, name.length, lower.indexOf("<", lt + 1), gt(lt))
-      : null;
+    if (lower.startsWith("<!--", lt)) {
+      i = commentEnd(lt);
+      out += hold(wikitext.slice(lt, i));
+      continue;
+    }
+    const tag = openTag(lt);
     if (!tag) { out += "<"; i = lt + 1; continue; }
     if (tag.selfClosing) {
-      if (name !== "ref" && name !== "code") out += hold(wikitext.slice(lt, tag.end));
+      if (LITERAL_TAGS.has(tag.name)) out += hold(wikitext.slice(lt, tag.end));
       i = tag.end;
       continue;
     }
-    const close = findClose(name, tag.end);
+    const close = tag.name === "ref" ? refClose(tag.end) : tag.name === "code" ? codeClose(tag.end) : literalClose(tag.name, tag.end);
     if (!close) {
-      if (name === "ref") { out += "<"; i = lt + 1; continue; }
-      out += hold(wikitext.slice(lt)); // a verbatim tag that never closes keeps the rest of the page as written
+      if (tag.name === "ref") { out += "<"; i = lt + 1; continue; }
+      out += hold(wikitext.slice(lt)); // never closes: the rest of the page stays as written
       break;
     }
-    if (name === "code") out += hold(wikitext.slice(tag.end, close.start).replace(/<\/?nowiki\s*>/gi, ""));
-    else if (name !== "ref") out += hold(wikitext.slice(lt, close.end));
+    if (tag.name === "code") out += hold(wikitext.slice(tag.end, close.start).replace(/<\/?nowiki\s*>/gi, ""));
+    else if (tag.name !== "ref") out += hold(wikitext.slice(lt, close.end));
     i = close.end;
   }
   return out
