@@ -17,7 +17,7 @@ async function database(): Promise<PGlite> {
   await db.exec(links.slice(0, links.indexOf("alter table public.api_keys")));
   for (const migration of [
     "20261021130000_players", "20261109120000_armory", "20261109130000_armory_touch_members", "20261112190000_armory_profiles",
-    "20261117120000_armory_progress", "20261117140000_armory_full_name_search",
+    "20261117120000_armory_progress", "20261117140000_armory_full_name_search", "20261117160000_armory_discovery",
   ]) await db.exec(read(`migrations/${migration}.sql`));
   return db;
 }
