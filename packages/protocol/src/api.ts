@@ -139,6 +139,44 @@ export const dropsResponse = z.object({
 }).extend(pageSchema.shape);
 export type DropsResponse = z.infer<typeof dropsResponse>;
 
+const disenchantMaterial = z.object({
+  itemId: z.number().int().positive().describe("The material."),
+  withMaterial: z.number().int().nonnegative().describe("Disenchants in the band that gave it."),
+  chance: z.number().min(0).max(1).describe("withMaterial / the band's disenchants."),
+  perDisenchant: z.number().nonnegative().describe("Units over all the band's disenchants, the ones that gave none included: the mean a disenchant yields."),
+  min: z.number().int().positive().describe("Fewest units one disenchant gave."),
+  max: z.number().int().positive().describe("Most units one disenchant gave."),
+});
+
+const disenchantBand = z.object({
+  bandId: z.number().int().positive().describe("`ItemDisenchantLoot` id in the game files."),
+  itemClass: z.enum(["armor", "weapon"]),
+  quality: z.enum(["uncommon", "rare", "epic"]),
+  minLevel: z.number().int().describe("Lowest item level in the band."),
+  maxLevel: z.number().int().describe("Highest item level in the band."),
+  label: z.string().describe("The band in words: \"Uncommon armor, item level 5 to 15\"."),
+  state: z.enum(["none", "short", "rated"]).describe("`rated` once 3 installs disenchanted items in the band; `short` with fewer; `none` without disenchants."),
+  windows: z.number().int().nonnegative().describe("Disenchants recorded in the band."),
+  installs: z.number().int().nonnegative(),
+  first: z.string().nullable().describe("The first capture day (UTC), or null."),
+  last: z.string().nullable().describe("The last capture day (UTC), or null."),
+  missingInstalls: z.number().int().nonnegative().describe("Installs still needed before the materials show."),
+  materials: z.array(disenchantMaterial).describe("What came out, most likely first; empty until the band is rated."),
+});
+
+/** GET /api/rollups/disenchant: what each disenchant band yields, from the disenchants players recorded. */
+export const disenchantResponse = z.object({
+  generatedAt: ISO_TIME,
+  dataAsOf: ISO_TIME.nullable(),
+  unreachable: z.boolean().describe("True when storage could not be read: the bands then show no disenchants, not zero."),
+  build: z.string().describe("The game build whose files give the bands."),
+  bands: z.array(disenchantBand),
+  unplaced: z.number().int().nonnegative().describe("Disenchants of items no band places yet: no item level in the files and no player report of one."),
+  attribution: attributionSchema.describe("For the disenchant results: Everloot's data under its licence."),
+  gameData: gameDataNoticeSchema.describe("For the bands (class, quality, item level range): Blizzard's, found in game files, unconfirmed, with the build."),
+});
+export type DisenchantResponse = z.infer<typeof disenchantResponse>;
+
 const edge = z.object({
   fromKind: z.enum(ENTITY_KINDS),
   fromId: z.number().int().positive(),
@@ -415,6 +453,7 @@ export const API_SCHEMAS = {
   marketRealmsResponse,
   marketPricesResponse,
   dropsResponse,
+  disenchantResponse,
   edgesResponse,
   itemsResponse,
   itemCategoriesResponse,
@@ -488,6 +527,13 @@ export const API_ROUTES: readonly ApiRoute[] = [
     access: "key-or-rate-limited", data: "observed", paged: true,
     query: PAGING,
     responses: { "200": { description: "The page of rates and zeros.", schema: "dropsResponse" }, ...ERROR_RESPONSES },
+  },
+  {
+    method: "GET", path: "/api/rollups/disenchant",
+    summary: "What each disenchant band yields, from disenchants players recorded",
+    description: "The game files sort a disenchanted item into a band by class, quality and item level; the server draws its materials from that band's table. A band's materials are public once three installs disenchanted items in it, each with its chance and its mean units per disenchant. Never another addon's tables: WoW: Forever's bands are its own.",
+    access: "key-or-rate-limited", data: "mixed",
+    responses: { "200": { description: "Every band of the current build.", schema: "disenchantResponse" }, ...ERROR_RESPONSES },
   },
   {
     method: "GET", path: "/api/edges",

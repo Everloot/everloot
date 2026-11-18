@@ -1,0 +1,263 @@
+{
+  "$id": "https://everloot.app/schema/api/disenchantResponse.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+    },
+    "dataAsOf": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "unreachable": {
+      "type": "boolean",
+      "description": "True when storage could not be read: the bands then show no disenchants, not zero."
+    },
+    "build": {
+      "type": "string",
+      "description": "The game build whose files give the bands."
+    },
+    "bands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "bandId": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "`ItemDisenchantLoot` id in the game files."
+          },
+          "itemClass": {
+            "type": "string",
+            "enum": [
+              "armor",
+              "weapon"
+            ]
+          },
+          "quality": {
+            "type": "string",
+            "enum": [
+              "uncommon",
+              "rare",
+              "epic"
+            ]
+          },
+          "minLevel": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Lowest item level in the band."
+          },
+          "maxLevel": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Highest item level in the band."
+          },
+          "label": {
+            "type": "string",
+            "description": "The band in words: \"Uncommon armor, item level 5 to 15\"."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "none",
+              "short",
+              "rated"
+            ],
+            "description": "`rated` once 3 installs disenchanted items in the band; `short` with fewer; `none` without disenchants."
+          },
+          "windows": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Disenchants recorded in the band."
+          },
+          "installs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "first": {
+            "description": "The first capture day (UTC), or null.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last": {
+            "description": "The last capture day (UTC), or null.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "missingInstalls": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Installs still needed before the materials show."
+          },
+          "materials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "itemId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "The material."
+                },
+                "withMaterial": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Disenchants in the band that gave it."
+                },
+                "chance": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "description": "withMaterial / the band's disenchants."
+                },
+                "perDisenchant": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Units over all the band's disenchants, the ones that gave none included: the mean a disenchant yields."
+                },
+                "min": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Fewest units one disenchant gave."
+                },
+                "max": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Most units one disenchant gave."
+                }
+              },
+              "required": [
+                "itemId",
+                "withMaterial",
+                "chance",
+                "perDisenchant",
+                "min",
+                "max"
+              ],
+              "additionalProperties": false
+            },
+            "description": "What came out, most likely first; empty until the band is rated."
+          }
+        },
+        "required": [
+          "bandId",
+          "itemClass",
+          "quality",
+          "minLevel",
+          "maxLevel",
+          "label",
+          "state",
+          "windows",
+          "installs",
+          "first",
+          "last",
+          "missingInstalls",
+          "materials"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "unplaced": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991,
+      "description": "Disenchants of items no band places yet: no item level in the files and no player report of one."
+    },
+    "attribution": {
+      "type": "object",
+      "properties": {
+        "licence": {
+          "type": "string"
+        },
+        "licenceUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "credit": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "format": "uri"
+        },
+        "terms": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "licence",
+        "licenceUrl",
+        "credit",
+        "source",
+        "terms"
+      ],
+      "additionalProperties": false,
+      "description": "For the disenchant results: Everloot's data under its licence."
+    },
+    "gameData": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "The evidence label pages show, such as \"found in game files, unconfirmed\"."
+        },
+        "build": {
+          "type": "string",
+          "description": "The game build the rows were read from."
+        },
+        "extractedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "credit": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "build"
+      ],
+      "additionalProperties": {},
+      "description": "For the bands (class, quality, item level range): Blizzard's, found in game files, unconfirmed, with the build."
+    }
+  },
+  "required": [
+    "generatedAt",
+    "dataAsOf",
+    "unreachable",
+    "build",
+    "bands",
+    "unplaced",
+    "attribution",
+    "gameData"
+  ],
+  "additionalProperties": false
+}

@@ -30,7 +30,7 @@ const charactersOnly = (d: string) => {
 /** The house a price request asked for, as the site names it in its answer. */
 const houseOf = (url: string) => ({ alliance: "Alliance", horde: "Horde", neutral: "Neutral" })[new URL(url).searchParams.get("house") ?? ""];
 const pricesFor = (asked: string[]) => vi.fn(async (url: string) => {
-  if (url.includes("/api/rollups/drops")) return new Response("", { status: 503 });
+  if (url.includes("/api/rollups/drops") || url.includes("/api/rollups/disenchant")) return new Response("", { status: 503 });
   const realm = new URL(url).searchParams.get("realm")!;
   asked.push(`${realm} ${houseOf(url)}`);
   return new Response(JSON.stringify({ ok: true, dataAsOf: "2026-10-18", realm, house: houseOf(url), fields: [], items: [[1, 10, 9, 11, 5, "2026-10-17", 3]] }));
@@ -97,7 +97,7 @@ test("a refresh fetches each house of the scanned and followed realms and writes
   const asked: string[] = [];
   const send = vi.fn(async (url: string) => {
     // The drop rates are down: the prices are written all the same.
-    if (url.includes("/api/rollups/drops")) return new Response("", { status: 503 });
+    if (url.includes("/api/rollups/drops") || url.includes("/api/rollups/disenchant")) return new Response("", { status: 503 });
     const realm = new URL(url).searchParams.get("realm")!;
     asked.push(`${realm} ${houseOf(url)}`);
     return new Response(JSON.stringify({ ok: true, dataAsOf: "2026-10-18", realm, house: houseOf(url), fields: [], items: [[1, 10, 9, 11, 5, "2026-10-17", 3]] }));

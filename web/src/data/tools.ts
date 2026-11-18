@@ -91,6 +91,18 @@ export const tools: Tool[] = [
     keywords: [],
   },
   {
+    slug: "disenchanting",
+    group: "Lookup",
+    line: "What disenchanting gives by item level band, from recorded disenchants, its value on your auction house, and the items worth buying to disenchant.",
+    href: "/tools/disenchanting",
+    title: "Disenchanting",
+    shortTitle: "Disenchanting",
+    tagline: "What disenchanting gives by item level band, and the items worth buying to disenchant on your auction house.",
+    description: "What disenchanting gives by item level band, from recorded disenchants, its value on your auction house, and the items worth buying to disenchant.",
+    status: "collecting",
+    keywords: [],
+  },
+  {
     slug: "addons",
     group: "Lookup",
     line: "Addons made for WoW: Forever, ranked by GitHub stars.",

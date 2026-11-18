@@ -1,8 +1,8 @@
 /**
  * Writes the bulk export (web/src/lib/bulk-export.ts) into a folder: one NDJSON file per dataset and an
  * index.json. Reads the same storage the site reads, so run it with the production R2 variables
- * (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET) or, locally, with EVERLOOT_UPLOADS
- * pointing at a local uploads folder:
+ * (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET) and corpus index variables
+ * (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY):
  *   npm run export-bulk -- <outDir>
  * Then upload the folder with scripts/upload-bulk.mjs. See docs/RELEASING.md, "Bulk export".
  */

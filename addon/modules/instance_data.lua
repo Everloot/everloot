@@ -5,7 +5,7 @@
 
 Everloot = Everloot or {}
 Everloot.InstanceData = {
-  build = "1.60.1.70938",
+  build = "1.60.1.70959",
   mapNamesBuild = "1.60.1.70634",
   asOf = "2026-11-17T22:30:16.820Z",
   instances = {

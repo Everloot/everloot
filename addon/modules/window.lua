@@ -32,6 +32,7 @@ U.NAV = {
   { key = "gold", label = "Gold", icon = "INV_Misc_Coin_02" },
   { key = "collection", label = "Collection", icon = "INV_Misc_Bag_10" },
   { key = "professions", label = "Professions", icon = "Trade_BlackSmithing" },
+  { key = "disenchanting", label = "Disenchanting", icon = "Trade_Engraving" },
   { key = "settings", label = "Settings", icon = "Trade_Engineering", bottom = true },
 }
 

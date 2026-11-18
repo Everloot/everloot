@@ -354,19 +354,24 @@ local QUALITY = {
 
 local function rememberItem(itemId)
   if not GetItemInfo then return end
-  local name, _, quality = GetItemInfo(itemId)
+  local name, _, quality, level, _, _, _, _, _, _, _, class = GetItemInfo(itemId)
   local label = QUALITY[quality]
   -- An item the client has not cached yet answers with a stand-in name, which is not the item's name.
   if not name or not label or name:find("^Item %d+$") then return end
+  -- Armor and weapons (class 4 and 2) carry their item level: the site sorts a disenchanted piece into its band by
+  -- it when the game files give the item no level. Other items do not need it.
+  level = E.Readable(level)
+  local gear = (E.Readable(class) == 2 or E.Readable(class) == 4) and type(level) == "number" and level >= 1
+    and level <= 1000 and level == math.floor(level)
   -- One row per item: the same item in another loot window or on another vendor adds nothing. A new row is
-  -- stored only when the client shows a different name or quality for it.
+  -- stored only when the client shows a different name, quality or (for gear) item level for it.
   EverlootDB.itemSeenIds = EverlootDB.itemSeenIds or {}
-  local seen = label .. " " .. name
+  local seen = label .. " " .. name .. (gear and (" " .. level) or "")
   if EverlootDB.itemSeenIds[itemId] == seen then return end
   local stored = E:Store("item_seen", {
     installId = EverlootDB.installId,
     capturedAt = date("!%Y-%m-%dT%H:%M:%SZ"),
-    itemId = itemId, name = name, quality = label,
+    itemId = itemId, name = name, quality = label, itemLevel = gear and level or nil,
   })
   if stored then EverlootDB.itemSeenIds[itemId] = seen end
 end
@@ -534,6 +539,11 @@ local function lootCapture(_, isFromItem)
       group.installId = EverlootDB.installId
       group.capturedAt = date("!%Y-%m-%dT%H:%M:%SZ")
       group.sourceEvidence = "loot-api"
+      if lootType == "disenchant" then
+        -- The item destroyed: its level places the disenchant in its band when the game files give it none.
+        rememberItem(group.sourceItemId)
+        if E.Disenchant then E.Disenchant.Record(group.sourceItemId, group.items, guid) end
+      end
       if E:Store("loot", group, nil, group.sourceItemId and ITEMS or group.sourceObjectId and OBJECTS or CREATURES) then
         -- Local-only corpse identity, by GUID and loot type so a kill and a skinning window on one corpse are both
         -- kept: retained across reloads, never exported as a row.

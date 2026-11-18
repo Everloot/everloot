@@ -33,10 +33,10 @@ test("the top bar is Lookup, Database, Tools, Guides, Chat and Profile; Chat is 
   }
 });
 
-test("Lookup holds the live data: census, rankings, the guild board, the Auction House, bag prices and addons", () => {
-  expect(menuHrefs("Lookup")).toEqual(["/census", "/rankings", "/tools/guild-board", "/tools/auctions", "/tools/bags", "/addons"]);
+test("Lookup holds the live data: census, rankings, the guild board, the Auction House, bag prices, disenchanting and addons", () => {
+  expect(menuHrefs("Lookup")).toEqual(["/census", "/rankings", "/tools/guild-board", "/tools/auctions", "/tools/bags", "/tools/disenchanting", "/addons"]);
   // The switches put the character search first and Guilds in place of the guild board.
-  expect(menuHrefs("Lookup", navItems({ players: true, guilds: true }))).toEqual(["/players", "/census", "/rankings", "/guilds", "/tools/auctions", "/tools/bags", "/addons"]);
+  expect(menuHrefs("Lookup", navItems({ players: true, guilds: true }))).toEqual(["/players", "/census", "/rankings", "/guilds", "/tools/auctions", "/tools/bags", "/tools/disenchanting", "/addons"]);
 });
 
 test("Database holds the reference pages and the map", () => {

@@ -43,7 +43,7 @@ export default async function TerrainPage() {
   };
   const zoneLink = (id: number) => {
     const z = zoneByMapId(id);
-    return z ? <Link href={zoneHref(id, z.name)} className={LINK}>{z.name}</Link> : null;
+    return z ? <Link prefetch={false} href={zoneHref(id, z.name)} className={LINK}>{z.name}</Link> : null;
   };
 
   return (
@@ -82,7 +82,7 @@ export default async function TerrainPage() {
                     <div><dt className="inline font-semibold text-fg">Parts of zones: </dt><dd className="inline text-fg-2">{[...t.parts].map(([id, parts], i) => <span key={id}>{i > 0 && "; "}{parts.join(", ")} in {zoneLink(id)}</span>)}</dd></div>
                   )}
                   {shownInstances.length > 0 && (
-                    <div><dt className="inline font-semibold text-fg">Instances: </dt><dd className="inline text-fg-2">{shownInstances.map((id, i) => <span key={id}>{i > 0 && ", "}<Link href={instanceHref(id, instances.get(id) ?? null)} className={LINK}>{instances.get(id) ?? `Instance ${id}`}</Link></span>)}</dd></div>
+                    <div><dt className="inline font-semibold text-fg">Instances: </dt><dd className="inline text-fg-2">{shownInstances.map((id, i) => <span key={id}>{i > 0 && ", "}<Link prefetch={false} href={instanceHref(id, instances.get(id) ?? null)} className={LINK}>{instances.get(id) ?? `Instance ${id}`}</Link></span>)}</dd></div>
                   )}
                 </dl>
                 {bound.length > 0 && <TerrainGearTable gear={bound} names={names} caption={`Gear whose effect needs ${t.name}`} />}
