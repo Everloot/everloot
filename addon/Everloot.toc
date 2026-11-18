@@ -43,6 +43,7 @@ modules\prices.lua
 modules\drops.lua
 modules\disenchant_data.lua
 modules\disenchant.lua
+modules\sellcheck.lua
 modules\shopping.lua
 modules\auctiontab.lua
 modules\gph.lua
