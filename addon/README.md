@@ -62,8 +62,9 @@ turns it off.
 The Everloot tab's **Vendor these** button lists the bag items this house pays less for than a vendor, by its current
 market values after the cut, or for so little more that the shortest auction's deposit cancels the gain; items are
 grouped across stacks, with what vendoring and posting them would bring. It is a list only: nothing is sold or posted.
-Two helpers are on in a new install, each with its own switch. In the Sell tab, when the house lists none of the item,
-Everloot replaces Blizzard's default (a multiple of the vendor price) with this house's current market value, rounded
+Two helpers are on in a new install, each with its own switch. In the Sell tab, once the house's search has answered
+with none of the item listed, and only while the game's own setting to fill in auction prices is on and no starting bid
+was typed, Everloot replaces Blizzard's default (a multiple of the vendor price) with this house's current market value, rounded
 down to whole silver where the house takes no copper, and only when posting at it beats a vendor by more than the
 deposit; a matched listing and a price you typed are never changed, and posting is always your own press of Post. If
 the game ever blocks an action and blames Everloot while such a price is in the box, the fill turns itself off and says

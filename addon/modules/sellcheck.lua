@@ -268,16 +268,51 @@ end
 -- The price Everloot put in each sell frame: { itemId, unit, source }, until the item changes.
 S.priced = {}
 
---- After Blizzard's search for the item answers: when nothing was matched and the price box still holds Blizzard's
---- default, puts this house's current market value there, if posting at it beats a vendor by more than the deposit.
---- Returns the unit price it set, or nil.
+-- Which of Blizzard's two sell frames each one is: commodities are searched by item id, other items by item key.
+S.kind = {}
+
+local function readCall(fn, ...)
+  if type(fn) ~= "function" then return nil end
+  local ok, value = pcall(fn, ...)
+  return ok and E.Readable(value) or nil
+end
+
+--- True only once Blizzard's search for this item has fully answered and found nothing listed. Blizzard also runs its
+--- price selection the moment an item is placed, before the search answers: that is not an empty market.
+local function nothingListed(frame, location, itemId)
+  if type(C_AuctionHouse) ~= "table" then return false end
+  local full, count
+  if S.kind[frame] == "commodity" then
+    full = readCall(C_AuctionHouse.HasFullCommoditySearchResults, itemId)
+    count = readCall(C_AuctionHouse.GetNumCommoditySearchResults, itemId)
+  else
+    local key = readCall(C_AuctionHouse.GetItemKeyFromItem, location)
+    if type(key) ~= "table" then return false end
+    full = readCall(C_AuctionHouse.HasFullItemSearchResults, key)
+    count = readCall(C_AuctionHouse.GetNumItemSearchResults, key)
+  end
+  return full == true and count == 0
+end
+
+--- After Blizzard's search for the item has answered with nothing listed, and only when Blizzard fills prices itself
+--- (its own setting), the price box still holds Blizzard's default and no starting bid was typed: puts this house's
+--- current market value there, if posting at it beats a vendor by more than the deposit. Returns the unit price it
+--- set, or nil.
 function S.Suggest(frame)
   if not (S.PriceOn() and frame and frame.PriceInput) then return nil end
+  if type(C_AuctionHouse) ~= "table" or readCall(C_AuctionHouse.ShouldAutoPopulatePrice) ~= true then return nil end
   if call(frame, "GetSearchResultPrice") ~= nil then return nil end
   local price, default = call(frame.PriceInput, "GetAmount"), call(frame, "GetDefaultPrice")
-  if not (whole(price) and price == default) then return nil end
+  if not (whole(price) and price >= 1 and price == default) then return nil end
+  -- A starting bid the player typed belongs with the buyout they left: neither is changed.
+  local bid = frame.SecondaryPriceInput
+  if type(bid) == "table" and call(bid, "IsShown") == true then
+    local amount = call(bid, "GetAmount")
+    if not (amount == nil or amount == 0) then return nil end
+  end
   local listing = S.Read(frame)
   if not listing or not whole(listing.quantity) or listing.quantity < 1 then return nil end
+  if not nothingListed(frame, call(frame, "GetItem"), listing.itemId) then return nil end
   local market, source = marketUnit(realmName(), listing.itemId)
   if not market then return nil end
   local unit = market
@@ -359,6 +394,7 @@ function S.Attach()
       if not S.hooked[frame] then
         S.hooked[frame] = pcall(function()
           noteFor(frame)
+          S.kind[frame] = key == "CommoditiesSellFrame" and "commodity" or "item"
           hooksecurefunc(frame, "UpdatePostState", function(self) pcall(S.Update, self) end)
           if type(frame.UpdatePriceSelection) == "function" then
             hooksecurefunc(frame, "UpdatePriceSelection", function(self) pcall(S.Suggest, self) end)

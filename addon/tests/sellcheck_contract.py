@@ -304,61 +304,135 @@ click(p.vendorButton); click(p.vendorButton)
 assert(p.mode == 'lookup' and p.lookup.shown and not v.page.shown)
 """)
 
-# The suggested price: only when nothing is listed and the box still holds Blizzard's default; never below the vendor.
+# The suggested price: only after the search answered with nothing listed, only when Blizzard fills prices itself, only
+# over Blizzard's own default and never with a typed bid; never below the vendor.
 lua.execute(r"""
 local E, S = Everloot, Everloot.SellCheck
-local goods = AuctionHouseFrame.CommoditiesSellFrame
-S.hooked, S.notes, S.priced = {}, {}, {}
-AuctionHouseFrame = { ItemSellFrame = sellFrame(), CommoditiesSellFrame = sellFrame() }
-goods = AuctionHouseFrame.CommoditiesSellFrame
-assert(S.Attach())
-local note = S.notes[goods]
+S.hooked, S.notes, S.priced, S.kind = {}, {}, {}, {}
+-- Blizzard's searches as the house answers them: per item id, full or not, and the prices listed.
+SEARCH = {}
+AUTOPOP = true
+C_AuctionHouse.ShouldAutoPopulatePrice = function() return AUTOPOP end
+C_AuctionHouse.HasFullCommoditySearchResults = function(id) return SEARCH[id] ~= nil and SEARCH[id].full end
+C_AuctionHouse.GetNumCommoditySearchResults = function(id) return SEARCH[id] and #SEARCH[id] or 0 end
+C_AuctionHouse.GetItemKeyFromItem = function(location) return { itemID = location.id } end
+C_AuctionHouse.HasFullItemSearchResults = function(key) return SEARCH[key.itemID] ~= nil and SEARCH[key.itemID].full end
+C_AuctionHouse.GetNumItemSearchResults = function(key) return SEARCH[key.itemID] and #SEARCH[key.itemID] or 0 end
 C_AuctionHouse.SupportsCopperValues = function() return false end
--- Item 302: vendor 1s, market 3s here. Nothing listed, Blizzard's default 1s 50c in the box: Everloot puts 3s there.
-setSell(goods, 302, 150, 5, 25)
-goods.default = 150
-goods:UpdatePriceSelection()
+-- Blizzard's own selection, as its sell frames run it: the default price is 0 unless it fills prices; it selects the
+-- cheapest listing only when the box still holds the default and no bid was typed.
+local function blizzard(f)
+  f.GetDefaultPrice = function(self) return AUTOPOP and (rawget(self, 'default') or 150) or 0 end
+  f.UpdatePriceSelection = function(self)
+    self.searchPrice = nil
+    local id = rawget(self, 'item') and self.item.id
+    local found = id and SEARCH[id]
+    local bid = rawget(self, 'bid') or 0
+    if AUTOPOP and bid == 0 and (rawget(self, 'unit') or 0) == self:GetDefaultPrice() and found and #found > 0 then
+      self.PriceInput:SetAmount(found[1])
+      self.searchPrice = found[1]
+    end
+  end
+  f.SecondaryPriceInput = {
+    IsShown = function() return rawget(f, 'bidShown') == true end,
+    GetAmount = function() return rawget(f, 'bid') or 0 end,
+  }
+  return f
+end
+AuctionHouseFrame = { ItemSellFrame = blizzard(sellFrame()), CommoditiesSellFrame = blizzard(sellFrame()) }
+local goods, items = AuctionHouseFrame.CommoditiesSellFrame, AuctionHouseFrame.ItemSellFrame
+assert(S.Attach())
+assert(S.kind[goods] == 'commodity' and S.kind[items] == 'item')
+local note = S.notes[goods]
+-- Placing an item: Blizzard puts its default in the box and runs its selection before the search answers.
+local function place(f, id, quantity, deposit)
+  f.item, f.quantity, f.deposit, f.searchPrice = { id = id }, quantity, deposit, nil
+  f.unit = f:GetDefaultPrice()
+  -- Blizzard's SetItem updates the post state, then runs its price selection.
+  f:UpdatePostState()
+  f:UpdatePriceSelection()
+end
+local function answer(f, id, prices)
+  SEARCH[id] = prices
+  prices.full = true
+  f:UpdatePriceSelection()
+end
+
+-- Item 302 (vendor 1s, market 3s here). Before the search answers, Everloot waits.
+SEARCH = {}
+place(goods, 302, 5, 25)
+assert(goods.unit == 150, 'no fill before the search answers')
+-- The search finds a listing at 10s: Blizzard matches it, and Everloot never replaced it first.
+answer(goods, 302, { 1000 })
+assert(goods.unit == 1000 and goods.searchPrice == 1000)
+-- The search answers with nothing listed: Everloot puts the market value there, and the note says where it came from.
+SEARCH = {}
+place(goods, 302, 5, 25)
+answer(goods, 302, {})
 assert(goods.unit == 300, goods.unit)
 assert(note:IsShown() and note.text:find('Everloot set this price from this house') and note.text:find('community 2026%-11%-17'))
--- A price the player types afterwards is theirs; the line goes.
+-- A price the player types afterwards is theirs; the line goes, and a later selection never replaces it.
 goods.PriceInput:SetAmount(275)
-assert(goods.unit == 275 and not (note.text or ''):find('Everloot set this price'))
+assert(not (note.text or ''):find('Everloot set this price'))
 goods:UpdatePriceSelection()
 assert(goods.unit == 275, 'a typed price is never replaced')
--- A matched listing is Blizzard's: left alone.
-setSell(goods, 302, 150, 5, 25)
-goods.searchPrice = 140
+-- An answer still incomplete is not an empty market.
+SEARCH = {}
+place(goods, 302, 5, 25)
+SEARCH[302] = { full = false }
 goods:UpdatePriceSelection()
 assert(goods.unit == 150)
-goods.searchPrice = nil
+-- Blizzard's own "fill prices" setting off: its default is 0, and Everloot fills nothing either.
+AUTOPOP = false
+SEARCH = {}
+place(goods, 302, 5, 25)
+answer(goods, 302, {})
+assert(goods.unit == 0, goods.unit)
+AUTOPOP = true
+-- The item frame: a starting bid the player typed keeps the buyout as it is.
+SEARCH = {}
+items.bidShown, items.bid = true, 1400
+place(items, 302, 1, 25)
+answer(items, 302, {})
+assert(items.unit == 150, 'a typed bid keeps the default buyout')
+items.bid = 0
+place(items, 302, 1, 25)
+answer(items, 302, {})
+assert(items.unit == 300, items.unit)
+items.bidShown = false
 -- Item 300's market (1s 4c) after the cut is under its 1s vendor price: Blizzard's default stays and the warning says why.
-setSell(goods, 300, 150, 5, 25)
-goods:UpdatePriceSelection()
+SEARCH = {}
+place(goods, 300, 5, 25)
+answer(goods, 300, {})
 assert(goods.unit == 150 and note.text:find('vendor'))
 -- Where the house takes no copper, rounded down to whole silver: item 301's 1s 10c becomes 1s, under the vendor after
 -- the cut, so Blizzard's default stays.
-setSell(goods, 301, 150, 5, 5)
-goods:UpdatePriceSelection()
+SEARCH = {}
+place(goods, 301, 5, 5)
+answer(goods, 301, {})
 assert(goods.unit == 150, goods.unit)
 -- With copper prices allowed, the market value itself: 5 x 1s 10c after the cut is 5s 22c, 22c over the vendor, more
--- than the 5c deposit: set.
+-- than the 5c deposit: set. With a 25c deposit it is barely worth posting: left alone.
 C_AuctionHouse.SupportsCopperValues = function() return true end
-setSell(goods, 301, 150, 5, 5)
-goods:UpdatePriceSelection()
+SEARCH = {}
+place(goods, 301, 5, 5)
+answer(goods, 301, {})
 assert(goods.unit == 110, goods.unit)
--- The same with a 25c deposit is barely worth posting: left alone.
-setSell(goods, 301, 150, 5, 25)
-goods:UpdatePriceSelection()
+SEARCH = {}
+place(goods, 301, 5, 25)
+answer(goods, 301, {})
 assert(goods.unit == 150, goods.unit)
 -- Switched off: Blizzard's default stays.
 EverlootDB.sellPrice = false
-setSell(goods, 302, 150, 5, 25)
-goods:UpdatePriceSelection()
+SEARCH = {}
+place(goods, 302, 5, 25)
+answer(goods, 302, {})
 assert(goods.unit == 150)
 EverlootDB.sellPrice = nil
 -- The safety net: a block that blames Everloot while its price is in the box switches the fill off, once.
-setSell(goods, 302, 150, 5, 25)
-goods:UpdatePriceSelection()
+SEARCH = {}
+place(goods, 302, 5, 25)
+answer(goods, 302, {})
 assert(goods.unit == 300 and next(S.priced))
 assert(S.frame.events.ADDON_ACTION_BLOCKED and S.frame.events.ADDON_ACTION_FORBIDDEN)
 S.frame.onEvent(S.frame, 'ADDON_ACTION_BLOCKED', 'SomeOtherAddon', 'PostItem()')
@@ -366,8 +440,9 @@ assert(EverlootDB.sellPrice ~= false, 'another addon blamed: nothing changes')
 S.frame.onEvent(S.frame, 'ADDON_ACTION_FORBIDDEN', 'Everloot', 'C_AuctionHouse.PostCommodity()')
 assert(EverlootDB.sellPrice == false and next(S.priced) == nil and said('no longer fills in prices'))
 assert(goods.unit == 300, 'the price stays for the player')
-setSell(goods, 302, 150, 5, 25)
-goods:UpdatePriceSelection()
+SEARCH = {}
+place(goods, 302, 5, 25)
+answer(goods, 302, {})
 assert(goods.unit == 150, 'off now')
 assert(not S.Blocked('Everloot', 'x'), 'nothing of Everloot in the box: not blamed again')
 EverlootDB.sellPrice = nil
