@@ -83,7 +83,17 @@ const USAGE = { total: 3_400_000, parts: { backups: 2_900_000, updates: 0, chat:
 
 // ---------- reading the markup ----------
 
-const text = (html: string) => html.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+/** The words of a piece of markup: every tag dropped by walking the characters (a test helper, never a sanitiser). */
+function text(html: string): string {
+  let out = "";
+  let inTag = false;
+  for (const ch of html) {
+    if (ch === "<") inTag = true;
+    else if (ch === ">" && inTag) inTag = false;
+    else if (!inTag) out += ch;
+  }
+  return out.replace(/\s+/g, " ").trim();
+}
 const h1 = (html: string) => text(/<h1[^>]*>([\s\S]*?)<\/h1>/.exec(html)?.[1] ?? "");
 /** The text of every role="status" element. */
 const statusLines = (html: string) => [...html.matchAll(/<(\w+)[^>]*role="status"[^>]*>([\s\S]*?)<\/\1>/g)].map((m) => text(m[2]));
