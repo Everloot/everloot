@@ -9,6 +9,11 @@ vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
   uploadStore: { loadMarket: store.loadMarket, loadCorpus: store.loadCorpus },
 }));
+// The item pages read their one item; these spies say whether anything built a realm's whole board instead.
+vi.mock("@/lib/auction-house", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/auction-house")>();
+  return { ...real, realmBoards: vi.fn(real.realmBoards), itemAcrossRealms: vi.fn(real.itemAcrossRealms), itemByHouse: vi.fn(real.itemByHouse), findBoard: vi.fn(real.findBoard) };
+});
 vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a>,
 }));
@@ -29,6 +34,7 @@ import { UNNAMED_REASON } from "./parts";
 import DatabaseItemPage from "../../database/items/[id]/page";
 import { GET as sitemapIndex } from "../../auctions-sitemap.xml/route";
 import { GET as sitemapChunk } from "../../auctions-sitemap/[n]/route";
+import * as auctionHouse from "@/lib/auction-house";
 
 const today = new Date();
 const dayAgo = (n: number) => new Date(today.getTime() - n * 86_400_000).toISOString();
@@ -239,6 +245,23 @@ test("an item with no market value in 14 days, or none at all, is not indexed, a
   expect(html).not.toContain('"@type":"Dataset"');
   expect((await itemMetadata(item("forever", "9999"))).robots).toMatchObject({ index: false });
   await expect(RealmItemPage(item("forever", "02589"))).rejects.toThrow("NOT_FOUND");
+});
+
+test("the item pages read only their item: no realm board is built for them", async () => {
+  const spies = [auctionHouse.realmBoards, auctionHouse.itemAcrossRealms, auctionHouse.itemByHouse, auctionHouse.findBoard].map((f) => vi.mocked(f));
+  for (const spy of spies) spy.mockClear();
+  const realmPage = text(renderToStaticMarkup(await RealmItemPage(item("forever", "2589"))));
+  await itemMetadata(item("forever", "2589"));
+  const crossPage = text(renderToStaticMarkup(await CrossRealmItemPage({ params: Promise.resolve({ itemId: "2589" }) })));
+  await crossMetadata({ params: Promise.resolve({ itemId: "2589" }) });
+  for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+  // The same answer as the boards give: Forever's Horde price leads, Mal'Ganis is the other realm.
+  expect(realmPage).toContain("Market value1s 98c");
+  expect(realmPage).toMatch(/Houses \(1\)/);
+  expect(realmPage).toMatch(/Other realms \(1\)/);
+  expect(crossPage).toContain("Lowest market value1s 98cForever, Horde");
+  // A realm whose scans are all below the gate is named from its slug, not from an upload.
+  expect(text(renderToStaticMarkup(await RealmItemPage(item("nightfall", "2589"))))).toContain(" on Nightfall yet: it needs scans from 3 players in one auction house.");
 });
 
 test("the cross-realm page compares every realm with a price", async () => {
