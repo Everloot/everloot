@@ -400,6 +400,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the loot observations table sorts frequency by its 95% Wilson lower bound while still showing the observed share.
 
 ### Changed
+- Site: item, NPC, quest and zone pages lead with what is known: a relation tab with no rows is left out (one line in place of the strip when none has rows), an item names up to three places to get it in its quick facts and shows auction prices after its relations, and a zone lists what players confirmed before its lore and a closed Terrain section.
 - Site: the Blizzard character lookup on /search is switched on: a full "First Surname" nobody has stored is looked up in the US, then the EU, within its per-address and site-wide limits.
 - Addon: the Everloot window opens inside the game's gold dialog frame, the gold of the minimap button's ring, in place of the thin bronze edge; the resize grip moves inside the frame. The settings page and the raid panel keep the bronze edge.
 - Site: an item's auction price pages read that one item from the market rollup instead of building every realm's board, and the realm item page no longer reads the whole upload corpus when the stored history file is missing (the history then says unrecorded). `/tools/bags`, `/tools/disenchanting` and `/tools/farming-routes` are kept at the CDN for five minutes like the auction pages.

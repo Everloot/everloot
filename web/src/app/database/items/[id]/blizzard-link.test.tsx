@@ -54,6 +54,9 @@ test("the item page, which carries ads, reads no Blizzard data and only links to
   expect(blizzard.load).not.toHaveBeenCalled();
   expect(html).toContain("adsbygoogle");
   expect(html).toContain("data-market-box");
+  // The prices come after the relations, which answer where the item comes from.
+  expect(html.indexOf('role="tablist"')).toBeGreaterThan(-1);
+  expect(html.indexOf("data-market-box")).toBeGreaterThan(html.indexOf('role="tablist"'));
   expect(html).not.toMatch(/31337|31,337|42424|42,424|Alliance, house 110|Data from Blizzard|data-blizzard-auctions/);
   const link = new JSDOM(html).window.document.querySelector('a[href="/blizzard-auctions/2589"]')!;
   expect(link.textContent).toBe("Blizzard auction house data for this item");
