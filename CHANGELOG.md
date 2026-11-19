@@ -248,6 +248,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the world map shows zone or continent coordinates on hover and shares pins in the address; Shift-click or use Pin map centre, and Clear pin removes it.
 - Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
 
+### Changed
+
+- Addon: compact item tooltip market and scan metadata, show drop rates with windows on one row, and date drop and disenchant evidence only when stale.
+
 ### Fixed
 - Addon: the Everloot panel at the auction house sits above the house's own page controls, so the Auctions page's top tab, and the Sell page's item slot and Post button, no longer show through it; the house's dialogs still cover it.
 - Addon: at the auction house, the NPC portrait and the ring around it sit whole over the Everloot panel's corner, and the Everloot heading starts right of the portrait.
