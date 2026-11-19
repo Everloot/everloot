@@ -7,6 +7,8 @@ import { createCloudArmoryStore, createMemoryArmoryStore, type ArmoryStore, type
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 vi.mock("@/components/guild-profile", () => ({ default: () => <section aria-label="Guild profile">Claim or edit this guild</section> }));
 
+vi.mock("@/components/progression/GuildProgression", () => ({ default: () => <section data-guild-progression-hook /> }));
+
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
 }));

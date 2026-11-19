@@ -66,7 +66,7 @@ export default async function RankingsHub(props: { searchParams?: Promise<Search
           {boards.characters !== null && <RegionTabs region={region} />}
           {boards.characters !== null && <BestOfClass rows={boards.bestOfClass} />}
           {boards.characters !== null && <CharacterBoards boards={boards.characters} region={region} />}
-          {(boards.guildGear !== null || boards.raids !== null) && <GuildBoards gear={boards.guildGear} raids={boards.raids} region={region} />}
+          {(boards.guildGear !== null || boards.raids !== null) && <GuildBoards gear={boards.guildGear} raids={boards.raids} region={region} progression={boards.progression} />}
           {boards.characters !== null && <Card>
             <p className="text-fg">Not on the boards? <Link href="/armory/submit" className="underline underline-offset-4">Add your character</Link> or <Link href="/armory/guilds/submit" className="underline underline-offset-4">Add your guild</Link>.</p>
             <p className="mt-1 text-sm text-fg-2">The armory reads Blizzard&apos;s API on its next run, usually within hours.</p>

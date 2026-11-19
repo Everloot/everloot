@@ -1,3 +1,4 @@
+import { loadGuildProgressionRanking, type GuildProgressionRank } from "./progression";
 import { unstable_cache } from "next/cache";
 import { ARMORY_BOARDS, ARMORY_METRICS, armoryOn, isArmoryRegion, type ArmoryMetric, type ArmoryRegion } from "./armory";
 import { loadGuildDirectory } from "./armory-guilds";
@@ -20,6 +21,7 @@ export type GuildGear = { state: "ready"; rows: ArmoryGuildRow[] } | { state: "n
 export interface RaidProgress { rows: RankedRow[]; instance: string | null; open: boolean; unreachable: boolean }
 
 export interface Leaderboards {
+  progression?: GuildProgressionRank[];
   region: ArmoryRegion | null;
   /** Null while the armory is off. */
   characters: CharacterBoard[] | null;
@@ -85,5 +87,6 @@ export async function loadLeaderboards(region: ArmoryRegion | null): Promise<Lea
     guildsOn() ? raidProgress().catch((): RaidProgress => ({ rows: [], instance: null, open: raidsOpen(), unreachable: true })) : null,
     armory ? bestOfClass(region).catch(() => null) : null,
   ]);
-  return { region, characters, guildGear: gear, raids, bestOfClass: best };
+  const progression = armory && raids ? await loadGuildProgressionRanking(region) : [];
+  return { region, characters, guildGear: gear, raids, bestOfClass: best, ...(progression.length ? { progression } : {}) };
 }

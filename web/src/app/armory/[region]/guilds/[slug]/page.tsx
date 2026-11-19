@@ -1,3 +1,4 @@
+import GuildProgression from "@/components/progression/GuildProgression";
 import type { Metadata } from "next";
 import GuildProfile from "@/components/guild-profile";
 import Link from "next/link";
@@ -124,6 +125,7 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params>; 
 
         <GuildProfile guild={g} />
         <Summary guild={g} members={members} summary={rosterSummary(members)} />
+        <GuildProgression members={members} region={g.region} />
 
         <section aria-labelledby="armory-roster" className="space-y-3">
           <SectionHeading id="armory-roster" note="Item level and Gear Score show once the character itself has been read.">Roster</SectionHeading>
