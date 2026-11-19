@@ -14,9 +14,9 @@ import { loadObjectFacts } from "@/lib/objects";
 import { loreFor } from "@/lib/lore-links";
 import LoreSection from "@/components/LoreSection";
 import { pageMetadata } from "@/lib/seo";
-import { Container, DataTable, Facts, InShort, installsNeeded, OpenData, Tabs, TooltipFrame, type Column } from "@/components/ui";
+import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame, type Column } from "@/components/ui";
 import type { Crumb } from "@/lib/jsonld";
-import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, FREQUENCY, known, LINK, percent, PinTable, Unreachable } from "../../entity";
+import { EntityLayout, EntitySidebar, EMPTY, EmptyTab, EntityHeader, EntityTop, FREQUENCY, known, LINK, percent, PinTable, Unreachable } from "../../entity";
 import { entitySummary, observedLine } from "@/lib/evidence";
 
 export const dynamic = "force-dynamic";
@@ -110,14 +110,14 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
               : <>
                 {page.drops.length ? <DataTable dense caption={`What players looted from ${title}`} columns={columns} rows={page.drops} rowKey={(d) => String(d.itemId)} />
                   : page.zero ? <p className="py-3 text-meta text-fg">{formatMeasuredZero(page.zero.kills)} · {page.zero.reporters} install IDs.</p>
-                  : <EmptyTab message={page.queued ? "Observed, not yet public: fewer than 3 installs so far." : `Nobody has looted this object in Forever yet. ${installsNeeded()}`} />}
+                  : <EmptyTab message={page.queued ? EMPTY.queued : EMPTY.drops("this object")} />}
                 {pending}
               </>,
           }, {
             id: "map", label: "Map", count: facts.unreachable ? undefined : pins.length,
             panel: facts.unreachable ? <Unreachable />
               : pins.length ? <PinTable caption={`Where players saw ${title} on the minimap`} rows={pins} rowKey={(p) => `${p.mapId}-${p.x}-${p.y}`} />
-              : <EmptyTab message="No agreed position yet. A pin needs 3 installs at the same spot." />,
+              : <EmptyTab message={EMPTY.position} />,
           }]}
         />
         <div className="mt-6 space-y-6 empty:hidden">

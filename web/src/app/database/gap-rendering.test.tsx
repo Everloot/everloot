@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
 import { edgeDegraded } from "@/lib/cf-edge-cache";
@@ -16,6 +17,8 @@ vi.mock("next/link", () => ({
 
 import DatabasePage from "./(hub)/page";
 import DropsPage from "./drops/page";
+import { EMPTY } from "./entity";
+import VendorListPage from "./vendors/page";
 
 const loot = (install: string, npc: number, items: { itemId: number; count: number }[], n: number) => ({
   kind: "loot", eventId: `${install}:${npc}:${n}`, installId: install, capturedAt: "2026-10-09T00:00:00.000Z",
@@ -114,4 +117,21 @@ test("the drops list shows the sample range and few-windows mark for 3 of 4", as
   const drops = await html(() => DropsPage({}));
   expect(drops).toContain("75.0% (30.1%–95.4%) · few windows");
   expect(drops).toContain("95% Wilson");
+});
+
+test("every empty player-data tab on the NPC, vendor, quest and object pages names the 3-install rule, from one table", () => {
+  const sentences = Object.values(EMPTY).map((m) => (typeof m === "function" ? m("this NPC") : m));
+  for (const sentence of sentences) expect(sentence).toContain("3 installs");
+  for (const file of ["npcs/[id]/page.tsx", "vendors/[id]/page.tsx", "quests/[id]/page.tsx", "objects/[id]/page.tsx", "loot-tables.tsx"]) {
+    const source = readFileSync(new URL(file, import.meta.url), "utf8");
+    const messages = [...source.matchAll(/<EmptyTab\b[^>]*?\bmessage=(\{[^}]*\}|"[^"]*")/g)].map(([, m]) => m);
+    expect(messages.length, file).toBeGreaterThan(0);
+    for (const message of messages) expect(message, file).toMatch(/^\{(page\.queued \? )?EMPTY\./);
+  }
+});
+
+test("the vendors list says why a vendor is listed, with the addon link", async () => {
+  store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], dataAsOf: "2026-10-09T00:00:00.000Z" });
+  const vendors = await html(() => VendorListPage({}));
+  expect(vendors).toMatch(/A vendor is listed once 3 installs agree on an item and its price\. <a href="\/addon"[^>]*>Get the addon<\/a>/);
 });
