@@ -17,7 +17,7 @@ import { VendorGoods } from "../goods";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
 import { Container, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
 import { hasCard } from "@/lib/tooltip";
-import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, known, LINK, PinTable, Unreachable, zoneName, type Pin } from "../../entity";
+import { EntityLayout, EntitySidebar, EMPTY, EmptyTab, EntityHeader, EntityTop, known, LINK, PinTable, Unreachable, zoneName, type Pin } from "../../entity";
 import { vendorIndexable } from "@/lib/indexable";
 import { entityTitle, vendorDescription } from "@/lib/entity-meta";
 import { loreFor } from "@/lib/lore-links";
@@ -123,13 +123,13 @@ export default async function VendorPage(props: { params: Promise<{ id: string }
                 : page.offers.length ? (
                   <VendorGoods title={title} offers={page.offers} tips={tips} items={items} />
                 )
-                : <EmptyTab message="No agreed goods yet. An item shows once 3 installs see it for sale." />,
+                : <EmptyTab message={EMPTY.goods} />,
             },
             {
               id: "map", label: "Map", count: facts.unreachable ? undefined : places.length,
               panel: facts.unreachable ? <Unreachable />
                 : places.length ? <PinTable caption={`Where ${title} stands`} rows={places} rowKey={(p) => p.href} />
-                : <EmptyTab message="No agreed position yet. A pin needs 3 installs at the same spot." />,
+                : <EmptyTab message={EMPTY.position} />,
             },
           ]}
         />

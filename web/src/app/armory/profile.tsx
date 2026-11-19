@@ -20,7 +20,8 @@ const quality = (q: string | null) => QUALITY_TEXT[qualityName(q) as Quality] ??
  * The character's gear. Every equipped slot draws its icon in its quality's border: the item's own art where the game files
  * have it, else the game's question mark (`unknownIcon`, as item pages do); no icon at all without the asset files.
  */
-export function Equipment({ character: c, tips, unknownIcon = null }: { character: ArmoryCharacter; tips: Map<number, Tip>; unknownIcon?: string | null }) {
+/** `heading={false}` inside a tab, whose label names it already. */
+export function Equipment({ character: c, tips, unknownIcon = null, heading = true }: { character: ArmoryCharacter; tips: Map<number, Tip>; unknownIcon?: string | null; heading?: boolean }) {
   const equipped = new Map(c.equipment.map((item) => [item.slot, item]));
   const slot = (key: string) => {
     const item = equipped.get(key);
@@ -36,8 +37,8 @@ export function Equipment({ character: c, tips, unknownIcon = null }: { characte
       </div> : <p className="flex min-h-11 items-center text-sm text-muted">Not equipped</p>}
     </li>;
   };
-  return <section aria-labelledby="armory-gear" className="space-y-3">
-    <SectionHeading id="armory-gear">Equipment</SectionHeading>
+  return <section aria-labelledby={heading ? "armory-gear" : undefined} aria-label={heading ? undefined : "Equipment"} className="space-y-3">
+    {heading && <SectionHeading id="armory-gear">Equipment</SectionHeading>}
     {c.equipment.length === 0 && <p className="text-sm text-fg-2">Nothing equipped when it was read.</p>}
     <div data-paper-doll className="grid gap-x-6 sm:grid-cols-[minmax(0,1fr)_minmax(0,6rem)_minmax(0,1fr)]">
       <ol aria-label="Left side">{LEFT.map(slot)}</ol>
@@ -69,7 +70,7 @@ function byCategory(rows: Achievement[], categories: ReadonlyMap<number, string>
   return [...groups].sort(([a], [b]) => Number(a === "Other") - Number(b === "Other"));
 }
 
-function Achievements({ rows, categories }: { rows: Achievement[]; categories: ReadonlyMap<number, string> }) {
+export function Achievements({ rows, categories }: { rows: Achievement[]; categories: ReadonlyMap<number, string> }) {
   const newest = [...rows].sort((a, b) => b.completedAt.localeCompare(a.completedAt));
   const open = newest.slice(0, OPEN_ACHIEVEMENTS), rest = newest.slice(OPEN_ACHIEVEMENTS);
   return <>
@@ -90,50 +91,83 @@ export function readTimes(c: ArmoryCharacter): string[] {
     .filter((t): t is string => typeof t === "string");
 }
 
+type Details = NonNullable<ArmoryCharacter["details"]>;
+
+export function StatList({ rows }: { rows: NonNullable<Details["statistics"]>["rows"] }) {
+  return <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
+    {rows.map((stat) => <div key={stat.label}><dt className="text-meta text-muted">{stat.label}</dt><dd className="font-mono text-lg tabular-nums text-fg">{stat.value.toLocaleString("en-US", { maximumFractionDigits: 2 })}{stat.percent ? "%" : ""}</dd></div>)}
+  </dl>;
+}
+
+/**
+ * The talent trees as Blizzard lists them, and a link to the calculator for the class. The armory keeps talent names
+ * and ranks, not the calculator's node ids, so the build itself cannot be opened there. `open` lists every talent.
+ */
+export function TalentTrees({ character: c, trees, open = false }: { character: ArmoryCharacter; trees: NonNullable<Details["talents"]>["trees"]; open?: boolean }) {
+  const classSlug = classTokenOfName(c.class).toLowerCase();
+  return <>
+    <div className="divide-y divide-line">
+      {trees.map((tree) => <div key={tree.name} className="py-3">
+        <p className="flex justify-between gap-3 text-sm text-fg"><span>{tree.name}</span><span className="font-mono tabular-nums">{tree.points} points</span></p>
+        {tree.talents.length > 0 && <details open={open} className="mt-2 text-sm text-fg-2"><summary className="min-h-11 cursor-pointer py-2">Talent details</summary><ul className="space-y-1">{tree.talents.map((talent) => <li key={talent.name} className="flex justify-between gap-3"><span>{talent.name}</span><span className="font-mono tabular-nums">Rank {talent.rank}</span></li>)}</ul></details>}
+      </div>)}
+    </div>
+    {classSlug && <p className="text-sm"><Link href={`/tools/talents/${classSlug}`} className={link}>Plan a build in the talent calculator</Link></p>}
+  </>;
+}
+
+export function ProfessionList({ rows }: { rows: NonNullable<Details["professions"]>["rows"] }) {
+  return <>
+    <ul className="space-y-4">{rows.map((profession) => <li key={profession.name}>
+      <div className="mb-1 flex justify-between gap-3 text-sm"><span className="text-fg">{profession.name}</span><span className="font-mono tabular-nums text-fg-2">{profession.rank} / {profession.max}</span></div>
+      <progress className="h-2 w-full accent-accent" value={profession.rank} max={profession.max} aria-label={`${profession.name} skill`} />
+    </li>)}</ul>
+    <p className="text-sm"><Link href="/tools/professions" className={link}>Find profession leveling routes</Link></p>
+  </>;
+}
+
+export function ReputationList({ rows }: { rows: NonNullable<Details["reputations"]>["rows"] }) {
+  return <ul className="divide-y divide-line">{rows.map((r) => <li key={r.id} className="flex min-h-11 items-center justify-between gap-3 py-2 text-sm">
+    <Link href={`/database/factions/${r.id}`} className={link}>{r.name}</Link>
+    <span className="shrink-0 text-fg-2">{r.standing}</span>
+  </li>)}</ul>;
+}
+
+export function QuestCount({ completed }: { completed: readonly number[] }) {
+  return <p className="text-sm text-fg"><span className="font-mono tabular-nums">{completed.length.toLocaleString("en-US")}</span> completed quests</p>;
+}
+
+/** A read that asked for achievements and found none completed. */
+export const NO_ACHIEVEMENTS = "None completed when it was read.";
+
 export function ProfileDetailsView({ character: c, categories = new Map() }: { character: ArmoryCharacter; categories?: ReadonlyMap<number, string> }) {
   const details = c.details;
   if (!details) return null;
-  const classSlug = classTokenOfName(c.class).toLowerCase();
   return <>
     {details.statistics && <section aria-labelledby="armory-stats" className="space-y-3">
       <SectionHeading id="armory-stats">Character stats</SectionHeading>
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
-        {details.statistics.rows.map((stat) => <div key={stat.label}><dt className="text-meta text-muted">{stat.label}</dt><dd className="font-mono text-lg tabular-nums text-fg">{stat.value.toLocaleString("en-US", { maximumFractionDigits: 2 })}{stat.percent ? "%" : ""}</dd></div>)}
-      </dl>
+      <StatList rows={details.statistics.rows} />
     </section>}
     {details.talents && <section aria-labelledby="armory-talents" className="space-y-3">
       <SectionHeading id="armory-talents">Talents</SectionHeading>
-      <div className="divide-y divide-line">
-        {details.talents.trees.map((tree) => <div key={tree.name} className="py-3">
-          <p className="flex justify-between gap-3 text-sm text-fg"><span>{tree.name}</span><span className="font-mono tabular-nums">{tree.points} points</span></p>
-          {tree.talents.length > 0 && <details className="mt-2 text-sm text-fg-2"><summary className="min-h-11 cursor-pointer py-2">Talent details</summary><ul className="space-y-1">{tree.talents.map((talent) => <li key={talent.name} className="flex justify-between gap-3"><span>{talent.name}</span><span className="font-mono tabular-nums">Rank {talent.rank}</span></li>)}</ul></details>}
-        </div>)}
-      </div>
-      {classSlug && <p className="text-sm"><Link href={`/tools/talents/${classSlug}`} className={link}>Plan a build in the talent calculator</Link></p>}
+      <TalentTrees character={c} trees={details.talents.trees} />
     </section>}
     {details.professions && <section aria-labelledby="armory-professions" className="space-y-3">
       <SectionHeading id="armory-professions">Professions</SectionHeading>
-      <ul className="space-y-4">{details.professions.rows.map((profession) => <li key={profession.name}>
-        <div className="mb-1 flex justify-between gap-3 text-sm"><span className="text-fg">{profession.name}</span><span className="font-mono tabular-nums text-fg-2">{profession.rank} / {profession.max}</span></div>
-        <progress className="h-2 w-full accent-accent" value={profession.rank} max={profession.max} aria-label={`${profession.name} skill`} />
-      </li>)}</ul>
-      <p className="text-sm"><Link href="/tools/professions" className={link}>Find profession leveling routes</Link></p>
+      <ProfessionList rows={details.professions.rows} />
     </section>}
     {details.achievements && <section aria-labelledby="armory-achievements" className="space-y-3">
       <SectionHeading id="armory-achievements">Achievements</SectionHeading>
-      {details.achievements.rows.length === 0 ? <p className="text-sm text-fg-2">None completed when it was read.</p>
+      {details.achievements.rows.length === 0 ? <p className="text-sm text-fg-2">{NO_ACHIEVEMENTS}</p>
         : <Achievements rows={details.achievements.rows} categories={categories} />}
     </section>}
     {details.reputations && details.reputations.rows.length > 0 && <section aria-labelledby="armory-reputations" className="space-y-3">
       <SectionHeading id="armory-reputations">Reputations</SectionHeading>
-      <ul className="divide-y divide-line">{details.reputations.rows.map((r) => <li key={r.id} className="flex min-h-11 items-center justify-between gap-3 py-2 text-sm">
-        <Link href={`/database/factions/${r.id}`} className={link}>{r.name}</Link>
-        <span className="shrink-0 text-fg-2">{r.standing}</span>
-      </li>)}</ul>
+      <ReputationList rows={details.reputations.rows} />
     </section>}
     {details.quests && <section aria-labelledby="armory-quests" className="space-y-3">
       <SectionHeading id="armory-quests">Quests</SectionHeading>
-      <p className="text-sm text-fg"><span className="font-mono tabular-nums">{details.quests.completed.length.toLocaleString("en-US")}</span> completed quests</p>
+      <QuestCount completed={details.quests.completed} />
     </section>}
   </>;
 }
