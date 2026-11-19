@@ -120,9 +120,9 @@ export interface NameHit<T> { row: T; r: number }
  * The rows whose name matches `q` (trimmed and lowercase), in the rows' own order with each one's rank: the words
  * in any order, or, when none matches that way and a word is long enough, within a typo or two, `respelled` then
  * saying how the query was read. A row with no name never matches. The caller orders the hits; a list keeps its
- * default order within a rank by sorting on the rank alone.
+ * default order within a rank by sorting on the rank alone. `typo: false` (an id was typed too) reads no typo.
  */
-export function matchNames<T>(rows: readonly T[], q: string, name: (row: T) => string | null | undefined): { hits: NameHit<T>[]; respelled?: string } {
+export function matchNames<T>(rows: readonly T[], q: string, name: (row: T) => string | null | undefined, { typo: allowTypo = true }: { typo?: boolean } = {}): { hits: NameHit<T>[]; respelled?: string } {
   const run = (match: Match) => {
     const hits: NameHit<T>[] = [];
     for (const row of rows) {
@@ -135,7 +135,7 @@ export function matchNames<T>(rows: readonly T[], q: string, name: (row: T) => s
   };
   const hits = run(byWords(q));
   if (hits.length) return { hits };
-  const typo = byTypo(q);
+  const typo = allowTypo ? byTypo(q) : null;
   if (!typo) return { hits };
   const near = run(typo);
   if (!near.length) return { hits: near };

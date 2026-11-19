@@ -119,6 +119,21 @@ test("quests show category, side and group, and filter by category and side", as
   await expect(html(QuestList(search({ side: "neutral" })))).rejects.toThrow("NEXT_NOT_FOUND");
 });
 
+test("the lists match every word in any order, an exact name first, and read a typo when nothing matches as typed", async () => {
+  expect(rows(await html(QuestList(search({ q: "hogger wanted" }))), "quests")).toEqual([176]);
+  expect(rows(await html(QuestList(search({ q: "wanted hoggr" }))), "quests")).toEqual([176]);
+  expect(await html(QuestList(search({ q: "wanted hoggr" })))).toContain("Showing results for wanted hogger");
+  expect(await html(QuestList(search({ q: "hogger wanted" })))).not.toContain("Showing results for");
+  // An id keeps its own rule and never respells; a sort asked for wins over the rank.
+  expect(rows(await html(QuestList(search({ q: "176" }))), "quests")).toEqual([176]);
+  expect(await html(QuestList(search({ q: "176" })))).not.toContain("Showing results for");
+  expect(rows(await html(NpcList(search({ q: "guard hogger", sort: "-level" }))), "npcs")).toEqual([]);
+  expect(rows(await html(NpcList(search({ q: "hogger" }))), "npcs")).toEqual([448]);
+  expect(rows(await html(NpcList(search({ q: "thomas guard" }))), "npcs")).toEqual([1]);
+  expect(places(await html(ZoneList(search({ q: "forest elwynn" }))), "zones").length).toBeGreaterThan(0);
+  expect(rows(await html(ObjectList(search({ q: "zzzz qqqq" }))), "objects")).toEqual([]);
+});
+
 test("vendors list the agreed vendor with its name and zone", async () => {
   const page = await html(VendorList(search()));
   expect(page).toContain(">Guard Thomas<");

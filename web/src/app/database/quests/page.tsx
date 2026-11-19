@@ -12,7 +12,7 @@ import { loadWorldFacts } from "@/lib/rollup-compute";
 import { loadShownNames } from "@/lib/shown-item-names";
 import { bareQuestRow, publicQuests, type QuestRow } from "@/lib/world-lists";
 import { LINK } from "../entity";
-import {
+import { byRank, nameMatches, Respelled,
   flag, LEVEL_BRACKETS, listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, range, rangeParam, sortParam, sortRows, Unreadable,
   type ListQuery, type Search,
 } from "../list-parts";
@@ -66,8 +66,9 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
   const titleOf = (x: QuestRow) => x.title ?? wikiTitles?.names.get(x.questId)?.name ?? null;
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
+  const { ranked, respelled } = nameMatches(all, text, id, titleOf);
   const matched = all.filter((x) =>
-    (!text || (id !== null ? x.questId === id : Boolean(titleOf(x)?.toLowerCase().includes(text))))
+    (!text || (id !== null ? x.questId === id : ranked!.has(x)))
     && (!q.level || (x.level !== null && x.level >= q.level.min && x.level <= q.level.max)) && (!q.rewards || x.rewards.length > 0)
     && (!q.category || x.category === q.category) && (!q.side || x.side === SIDES[q.side]));
   const sort = q.sort ?? DEFAULT_SORT;
@@ -75,7 +76,7 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
   const key = (x: QuestRow): string | number | null => sort.key === "name" ? titleOf(x)?.toLowerCase() ?? null : sort.key === "level" ? x.level
     : sort.key === "category" ? x.category?.toLowerCase() ?? null : sort.key === "side" ? x.side : sort.key === "group" ? x.suggestedGroup
     : sort.key === "giver" ? npcKey(x.giverNpcId) : sort.key === "turnin" ? npcKey(x.turnInNpcId) : sort.key === "rewards" ? x.rewards.length : x.questId;
-  const rows = sortRows(matched, key, sort.desc, (x) => x.questId);
+  const rows = byRank(sortRows(matched, key, sort.desc, (x) => x.questId), ranked, Boolean(q.sort));
   const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
   if (q.page > pages) notFound();
   const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
@@ -171,6 +172,7 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
           clearHref="/database/quests"
         />
         {/* With nothing to list at all, the one line says so without a row of column headers over it. */}
+        {respelled && <Respelled q={respelled} />}
         <div className="mt-2">{all.length === 0 ? empty : (
           <DataTable
             dense

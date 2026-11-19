@@ -9,7 +9,7 @@ import { loadWorldFacts } from "@/lib/rollup-compute";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { hasConfirmed, publicZones, zoneContents, zoneHref, type ZoneContents, type ZoneSummary } from "@/lib/zones";
-import { listHref, listMetadata, listQuery, nextSort, NoMatches, PER_PAGE, sortParam, sortRows, type ListQuery, type Search } from "../list-parts";
+import { byRank, nameMatches, Respelled, listHref, listMetadata, listQuery, nextSort, NoMatches, PER_PAGE, sortParam, sortRows, type ListQuery, type Search } from "../list-parts";
 
 export const dynamic = "force-dynamic";
 
@@ -44,10 +44,12 @@ export default async function ZonesPage(props: { searchParams?: Promise<Search> 
   const pictures = new Map((assets?.maps ?? []).filter((m) => m.kind === "zone" && !m.heldBack).map((m) => [m.uiMapId, m.smallUrl ?? m.url]));
   const noneConfirmed = !zones.some((z) => hasConfirmed(contents.get(z.mapId)));
   const text = q.q?.toLowerCase();
-  const matched = zones.filter((z) => !text || z.name.toLowerCase().includes(text)).map((z): Row => ({ ...z, contents: contents.get(z.mapId) ?? null }));
+  const all = zones.map((z): Row => ({ ...z, contents: contents.get(z.mapId) ?? null }));
+  const { ranked, respelled } = nameMatches(all, text, null, (z) => z.name);
+  const matched = all.filter((z) => !text || ranked!.has(z));
   const sort = q.sort ?? DEFAULT_SORT;
   // A continent's zones stay A to Z inside it: the name is the second half of the continent key.
-  const rows = sortRows(matched, (z) => (sort.key === "continent" ? `${z.continentName}\u0000${z.name}` : z.name), sort.desc, (z) => z.mapId);
+  const rows = byRank(sortRows(matched, (z) => (sort.key === "continent" ? `${z.continentName}\u0000${z.name}` : z.name), sort.desc, (z) => z.mapId), ranked, Boolean(q.sort));
   const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
   if (q.page > pages) notFound();
   const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
@@ -96,6 +98,7 @@ export default async function ZonesPage(props: { searchParams?: Promise<Search> 
           active={q.q ? 1 : 0}
           clearHref={META.path}
         />
+        {respelled && <Respelled q={respelled} />}
         <div className="mt-2">
           <DataTable
             dense
