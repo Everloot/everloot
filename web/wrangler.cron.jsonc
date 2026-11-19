@@ -58,8 +58,10 @@
     { "type": "Text", "globs": ["repo/**/*.md", "repo/**/*.yaml", "repo/**/*.yml", "repo/**/*.json"], "fallthrough": true }
   ],
   // The same values as wrangler.jsonc's vars, which say what each one does (cf-crons.test.ts holds them equal).
-  // EVERLOOT_CRON_WORKER is never set here: on this Worker it would stop the jobs it exists to run.
+  // Except EVERLOOT_CRON_WORKER, which differs: "cron" runs every job but the ones that stay on the site
+  // (SITE_JOBS in src/lib/cf-crons.ts). Its value "1" belongs on the site and would stop this Worker's jobs.
   "vars": {
+    "EVERLOOT_CRON_WORKER": "cron",
     "NODE_ENV": "production",
     "NEXT_CACHE_DO_QUEUE_MAX_RETRIES": "2",
     "EVERLOOT_PLATFORM": "cloudflare",
