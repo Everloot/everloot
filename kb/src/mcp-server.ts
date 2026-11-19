@@ -21,7 +21,7 @@ import { formatItemNumbers, itemToolFactsFromRecords } from "./item-page-tool.js
 import { reportedItemFacts } from "./item-facts.js";
 import { formatObjectPage, objectFactsFromRecords, objectPage, type ObjectFacts } from "./object-page.js";
 import {
-  busiestHouseMarket, handleMarketValue, lookupRealm, realmLookupFields, realmLookupText, resolveRealm, scanDayLine, type MarketState, type PublicDay, type RealmLookup,
+  busiestHouseMarket, handleMarketValue, lookupRealm, marketCoverage, realmLookupFields, realmLookupText, resolveRealm, scanDayLine, type MarketState, type PublicDay, type RealmLookup,
 } from "./market.js";
 import { loadUploadRecords } from "./load-uploads.js";
 import { KNOWLEDGE_KINDS, MCP_PROMPT_NAMES, MCP_PROMPTS, MCP_RESOURCE_TEMPLATE_URIS, MCP_RESOURCE_TEMPLATES, MCP_RESOURCE_URIS, MCP_RESOURCES, MCP_TOOL_NAMES, MCP_TOOLS, parseRecords, type AuctionHouse, type McpToolArgs, type McpToolDef, type McpToolName } from "@everloot/protocol";
@@ -271,8 +271,9 @@ export async function marketValueAnswer(args: { realm: string; itemId: number },
   // The text names every house; the page carries the house with the most units listed (ties: Alliance, then Horde, then
   // Neutral), which the text names too.
   const busiest = realm ? busiestHouseMarket(market.state, realm, args.itemId, now) : null;
-  const value = busiest?.value ?? null;
   const points = busiest?.points ?? [];
+  // The page's value carries what it rests on: the public days behind it, counted.
+  const value = busiest ? { ...busiest.value, coverage: marketCoverage(points, now) } : null;
   const url = realm && (value || points.length) ? marketItemUrl(realm, args.itemId) : undefined;
   const pageRealm = shownRealm(args.realm, lookup);
   const page = { realm: pageRealm, house: { realm: pageRealm, faction: busiest?.house ?? null }, itemId: args.itemId, value, history: points, ...realmLookupFields(lookup) };
@@ -507,8 +508,12 @@ async function answerFromTooledPublicCorpus<T>(
  * The local-files path is a version-less dev fallback and stays unmemoized.
  */
 export function fromTooledUploads<T>(
-  tool: ToolName, render: (facts: T) => string, loader?: CorpusLoader, recheck: readonly RecheckScope[] = [],
+  tool: ToolName, render: (facts: T) => string, loader?: CorpusLoader, recheck: readonly RecheckScope[] = [], stored?: StoredFactsLoader,
 ): string | Promise<string> {
+  if (stored) {
+    return readStoredFacts<T>(stored, tool).then((hit) =>
+      hit ? `${render(hit.facts)}\n${answerFooter(hit.dataAsOf)}` : fromTooledUploads(tool, render, loader, recheck));
+  }
   const kinds = TOOL_KINDS[tool];
   const build = TOOL_FACT_BUILDERS[tool] as (records: unknown[], scopes: readonly RecheckScope[]) => T;
   if (loader) return answerFromTooledLoader(loader, tool, render, recheck);
@@ -529,9 +534,32 @@ export function fromTooledUploads<T>(
 export const observationsConfigured = (loader?: CorpusLoader): boolean =>
   Boolean(loader || process.env.EVERLOOT_PUBLIC_CORPUS_URL?.trim() || process.env.EVERLOOT_UPLOADS?.trim());
 
+/**
+ * Facts a host already holds for a tool, worked out ahead of time (the site's stored aggregate set, which its pages
+ * read): the same value the tool's fact builder would make from the corpus, with the corpus time. Read before the
+ * corpus, so a tool call on a fresh server never replays every upload for a table the cron already built. Null for a
+ * tool the host holds nothing for, or when what it holds is for other recheck scopes: the corpus is read as before.
+ */
+export type StoredFactsLoader = (tool: ToolName) => Promise<{ facts: unknown; dataAsOf: string | null } | null>;
+
+/** The host's stored facts for a tool, or null: none for this tool, or the read failed (the corpus then answers as before). */
+async function readStoredFacts<T>(stored: StoredFactsLoader, tool: ToolName): Promise<{ facts: T; dataAsOf: string | null } | null> {
+  try {
+    const hit = await stored(tool);
+    return hit ? { facts: hit.facts as T, dataAsOf: hit.dataAsOf } : null;
+  } catch (err) {
+    console.warn(`${tool}: the stored facts could not be read: ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
+}
+
 export async function readTooledFacts<T>(
-  tool: ToolName, loader?: CorpusLoader, recheck: readonly RecheckScope[] = [],
+  tool: ToolName, loader?: CorpusLoader, recheck: readonly RecheckScope[] = [], stored?: StoredFactsLoader,
 ): Promise<{ facts: T; dataAsOf: string | null } | null> {
+  if (stored) {
+    const hit = await readStoredFacts<T>(stored, tool);
+    if (hit) return hit;
+  }
   const build = TOOL_FACT_BUILDERS[tool] as (records: unknown[], scopes: readonly RecheckScope[]) => T;
   if (loader) {
     let corpus;
@@ -798,9 +826,9 @@ function uploadsConfigured(loader?: CorpusLoader): boolean {
 export async function readPage<T>(
   tool: ToolName, loader: CorpusLoader | undefined,
   page: (facts: T, dataAsOf: string | null) => { text: string; page: object; url?: string },
-  recheck: readonly RecheckScope[] = [],
+  recheck: readonly RecheckScope[] = [], stored?: StoredFactsLoader,
 ): Promise<StructuredAnswer> {
-  const read = await readTooledFacts<T>(tool, loader, recheck);
+  const read = await readTooledFacts<T>(tool, loader, recheck, stored);
   if (!read) {
     const reason = uploadsConfigured(loader) ? UNAVAILABLE : UPLOADS_UNSET;
     return { text: reason, structured: { connected: false, dataAsOf: null, reason } };
@@ -821,18 +849,18 @@ const inGameFiles = (itemId: number): boolean => categoryOf(CLIENT_TAXONOMY, ite
 
 /** The page of an entity entity_relations was asked about, when the site has one with something on it. */
 async function entityPageUrl(
-  kind: EntityKind, id: number, loader?: CorpusLoader, recheck: readonly RecheckScope[] = [],
+  kind: EntityKind, id: number, loader?: CorpusLoader, recheck: readonly RecheckScope[] = [], stored?: StoredFactsLoader,
 ): Promise<string | undefined> {
   if (kind === "item") {
-    const read = await readTooledFacts<ReturnType<typeof itemFactsFromRecords>>("item_page", loader, recheck);
+    const read = await readTooledFacts<ReturnType<typeof itemFactsFromRecords>>("item_page", loader, recheck, stored);
     return read ? itemPageUrl(itemPage(id, read.facts), inGameFiles(id)) : undefined;
   }
   if (kind === "object") {
-    const read = await readTooledFacts<ObjectFacts>("object_page", loader, recheck);
+    const read = await readTooledFacts<ObjectFacts>("object_page", loader, recheck, stored);
     return read ? objectPageUrl(objectPage(id, read.facts)) : undefined;
   }
   if (kind === "npc" || kind === "quest") {
-    const read = await readTooledFacts<ReturnType<typeof worldFactsFromRecords>>(kind === "npc" ? "npc_page" : "quest_page", loader, recheck);
+    const read = await readTooledFacts<ReturnType<typeof worldFactsFromRecords>>(kind === "npc" ? "npc_page" : "quest_page", loader, recheck, stored);
     if (!read) return undefined;
     return kind === "npc" ? npcPageUrl(npcPage(id, read.facts)) : questPageUrl(questPage(id, read.facts));
   }
@@ -870,7 +898,9 @@ function professionSkillLineId(profession: string): number | undefined {
 /** The readers a host lends the tools: the site's store in process, or nothing for a standalone server. */
 export interface ToolOptions { answerSources?: AnswerSourcesLoader; catalog?: CatalogLoader; corpus?: CorpusLoader; market?: MarketLoader; auctionHistory?: AuctionHistoryLoader; gameData?: GameDataLoader; completion?: CompletionLoader; changes?: ChangesLoader; ecosystem?: EcosystemLoader; census?: CensusLoader; coverage?: CoverageLoader; settledSummary?: SettledSummaryLoader; guilds?: GuildReader; recheck?: readonly RecheckScope[];
   /** Everloot's own install ids (trusted-source.ts): a browsing day one of them scanned is public under 3, as in the market rollup. */
-  trusted?: ReadonlySet<string> }
+  trusted?: ReadonlySet<string>;
+  /** Per-tool facts the host worked out ahead of time (StoredFactsLoader): read before `corpus` by the page tools. */
+  storedFacts?: StoredFactsLoader }
 
 /** The guild ladder's tools: registered only when the host lends a guild reader (EVERLOOT_GUILDS on the site). */
 export const GUILD_TOOLS: readonly McpToolName[] = ["guild_search", "guild_rankings"];
@@ -940,8 +970,8 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
   const confirmedOf = (hits: readonly { id: number; kind: string }[]): Promise<ConfirmedIds | null> =>
     hits.some(isConfirmable) ? confirmedCatalog(options.completion) : Promise.resolve(null);
   const readPageIn = <T>(tool: ToolName, page: (facts: T, dataAsOf: string | null) => { text: string; page: object; url?: string }) =>
-    readPage<T>(tool, options.corpus, page, recheck);
-  const readFacts = <T>(tool: ToolName, render: (facts: T) => string) => fromTooledUploads(tool, render, options.corpus, recheck);
+    readPage<T>(tool, options.corpus, page, recheck, options.storedFacts);
+  const readFacts = <T>(tool: ToolName, render: (facts: T) => string) => fromTooledUploads(tool, render, options.corpus, recheck, options.storedFacts);
   const handlers: ToolHandlers = {
     search_knowledge: async (args) => {
       const result = await searchResult(db, args, await catalogOf((!args.version || args.version === "forever") && gameplayKind(args.kind)));
@@ -1003,7 +1033,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
       // A supplied stored reader is authoritative: a miss must not replay the corpus.
       const read = options.answerSources
         ? await options.answerSources().catch(() => null)
-        : await readTooledFacts<AnswerSourcesFacts>("answer_sources", options.corpus, recheck);
+        : await readTooledFacts<AnswerSourcesFacts>("answer_sources", options.corpus, recheck, options.storedFacts);
       const files = options.gameData ? await options.gameData() : null;
       const result = await answerSources(db, args, read?.facts ?? null, read?.dataAsOf ?? null, files);
       // The fallback is said in the text; the structured answer keeps its published shape.
@@ -1064,7 +1094,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
       return { text: handleWorldMapNear(args, WORLD_MAP_DATA, facts), page, url };
     }),
     entity_relations: async (args) => {
-      const url = await entityPageUrl(args.kind, args.id, options.corpus, recheck);
+      const url = await entityPageUrl(args.kind, args.id, options.corpus, recheck, options.storedFacts);
       return readPageIn("entity_relations", (observed: Edge[]) => ({
         text: handleEntityRelations(args, observed, CLIENT_EDGES),
         page: entityRelationsStructured(args, observed, CLIENT_EDGES),
@@ -1166,7 +1196,7 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
       let browse: { points: AuctionPoint[]; dataAsOf: string | null } | null = null;
       if (!ambiguous) try { browse = (await options.auctionHistory?.(realm, args.itemId)) ?? null; } catch { browse = null; }
       if (!browse && !ambiguous) {
-        const read = await readTooledFacts<AuctionSighting[]>("auction_history", options.corpus, recheck);
+        const read = await readTooledFacts<AuctionSighting[]>("auction_history", options.corpus, recheck, options.storedFacts);
         if (read) browse = { points: auctionHistory(realm, args.itemId, read.facts, options.trusted).points, dataAsOf: read.dataAsOf };
       }
       if (!browse && !market) {

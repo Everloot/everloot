@@ -1,0 +1,97 @@
+// The cron Worker: the site's own build (the same .open-next output as wrangler.jsonc) deployed a second time under
+// another name, carrying only the scheduled jobs, so their memory never shares an isolate with visitor traffic
+// (#1354). It has no route and no workers.dev host: nothing reaches it from outside, and its triggers call the cron
+// routes through its own self-binding. Everything else matches wrangler.jsonc, and cf-crons.test.ts holds the two
+// files equal apart from the lines marked here. Secrets are its own (docs/OPERATIONS.md, "The cron Worker").
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Differs from wrangler.jsonc.
+  "name": "everloot-cron",
+  // scripts/cf-entry.mjs, copied here by scripts/cf-bundle-files.mjs: OpenNext's worker plus the scheduled jobs.
+  "main": ".open-next/cf-entry.mjs",
+  // The cron routes run as self-requests (scripts/cf-entry.mjs), so the per-request CPU limit applies to them.
+  // Thirty seconds of CPU, the Workers default; cron requests must fit this ceiling too.
+  "limits": { "cpu_ms": 30000 },
+  // Differs from wrangler.jsonc: no routes and no workers.dev or preview host, so it serves no visitor.
+  "workers_dev": false,
+  "preview_urls": false,
+  // The schedules in src/lib/cf-crons.ts (cf-crons.test.ts holds this list, wrangler.jsonc's and that file's equal).
+  "triggers": { "crons": ["*/10 * * * *", "23 * * * *", "7,37 * * * *"] },
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  // Differs from wrangler.jsonc: the jobs' requests come back to this Worker, not to the site.
+  "services": [
+    { "binding": "WORKER_SELF_REFERENCE", "service": "everloot-cron" }
+  ],
+  // The page cache: pre-built and ISR pages (OpenNext incremental cache), the revalidation queue and the tags
+  // revalidateTag and revalidatePath write. Shared with the site, so a tag the blue job revalidates reaches its pages.
+  "r2_buckets": [
+    { "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "everloot-next-cache" }
+  ],
+  // Differs from wrangler.jsonc: the revalidation queue is the site's Durable Object (`script_name`), so this Worker
+  // declares no class and no migration of its own.
+  "durable_objects": {
+    "bindings": [
+      { "name": "NEXT_CACHE_DO_QUEUE", "class_name": "DOQueueHandler", "script_name": "everloot-web" }
+    ]
+  },
+  "d1_databases": [
+    { "binding": "NEXT_TAG_CACHE_D1", "database_name": "everloot-next-tags", "database_id": "807622c4-4651-476c-b86a-d2cfd41ad59c" },
+    // The knowledge release (lore pages, search, /api/tools, /mcp), one database per release, imported from the SQL
+    // files scripts/cf-release-d1.mjs writes. Set here and in wrangler.jsonc, with KNOWLEDGE_RELEASE_SHA256, to the
+    // same release.
+    { "binding": "KNOWLEDGE_D1", "database_name": "everloot-knowledge-2026-11-01", "database_id": "47ac29c7-c9f8-4574-bb31-c27774de1e7e" }
+  ],
+  // Name lookups per address per minute on /search/people (src/app/search/people/route.ts), counted at each
+  // Cloudflare location. The zone's one rate-limiting rule (Free plan) is the /database/* scraper rule.
+  "ratelimits": [
+    { "name": "PEOPLE_SEARCH_LIMIT", "namespace_id": "1001", "simple": { "limit": 60, "period": 60 } }
+  ],
+  // Repository files the pages read at run time (news, guides, wiki pages), copied into .open-next/repo by
+  // scripts/cf-bundle-files.mjs and uploaded as text modules, so node:fs finds them under /bundle/repo.
+  "find_additional_modules": true,
+  "rules": [
+    { "type": "Text", "globs": ["repo/**/*.md", "repo/**/*.yaml", "repo/**/*.yml", "repo/**/*.json"], "fallthrough": true }
+  ],
+  // The same values as wrangler.jsonc's vars, which say what each one does (cf-crons.test.ts holds them equal).
+  // Except EVERLOOT_CRON_WORKER, which differs: "cron" runs every job but the ones that stay on the site
+  // (SITE_JOBS in src/lib/cf-crons.ts). Its value "1" belongs on the site and would stop this Worker's jobs.
+  "vars": {
+    "EVERLOOT_CRON_WORKER": "cron",
+    "NODE_ENV": "production",
+    "NEXT_CACHE_DO_QUEUE_MAX_RETRIES": "2",
+    "EVERLOOT_PLATFORM": "cloudflare",
+    "EVERLOOT_DEPLOY_ENV": "production",
+    "EVERLOOT_DATA_GUARD": "1",
+    "EVERLOOT_MCP_QUOTA_SCOPE": "mcp",
+    "EVERLOOT_FORM_QUOTA_SCOPE": "form",
+    "EVERLOOT_MARKET_QUOTA_SCOPE": "market",
+    "EVERLOOT_MCP_PUBLIC": "1",
+    "EVERLOOT_PLAYER_PAGES": "1",
+    "EVERLOOT_SAVED_BUILDS": "1",
+    "EVERLOOT_GUILDS": "1",
+    "EVERLOOT_CHARACTER_GUILD_FACTS": "1",
+    "EVERLOOT_PROFILES": "1",
+    "EVERLOOT_CHAT_WORKSPACE": "1",
+    "EVERLOOT_CHARACTER_LINKS": "1",
+    "EVERLOOT_SHOWCASE": "1",
+    "EVERLOOT_ARMORY": "1",
+    "EVERLOOT_ARMORY_LOOKUP": "1",
+    "EVERLOOT_PRIVATE_SYNC": "1",
+    "EVERLOOT_LEADERBOARDS": "1",
+    "NEWS_DIR": "/bundle/repo/kb/news",
+    "GUIDES_DIR": "/bundle/repo/kb/guides",
+    "WIKI_DIR": "/bundle/repo/kb/wiki",
+    "PROTOCOL_SCHEMA_DIR": "/bundle/repo/protocol-schema",
+    "KNOWLEDGE_RELEASE_SHA256": "6bcd27976d32ce83ccd392e3753d41e2951fcd1004c6a67b3014777eb3861a38"
+  },
+  // Differs from wrangler.jsonc: every invocation is logged (a few dozen an hour), not one in ten.
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}
