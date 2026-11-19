@@ -8,7 +8,7 @@ import {
   PERIODS, categoryLabel, characterKey, installHint, isMoneyLedger, narrowLedger, periodStats, rosterLabel, summarizeMoney,
   type CategoryTotal, type GoldSeries, type MoneyLedger, type Period, type Receipt, type RiverDay, type RosterRow,
 } from "@/lib/money-ledger";
-import { formatCopper } from "../../../../../kb/src/gold-ledger";
+import { formatCopper } from "@kb/gold-ledger";
 import SpendingInsights, { AuctionSales } from "./SpendingInsights";
 
 /** Where "Remember on this browser" keeps the summary. The raw file is never stored. */

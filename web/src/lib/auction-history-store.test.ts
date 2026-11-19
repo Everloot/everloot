@@ -1,5 +1,5 @@
 import { beforeEach, expect, test, vi } from "vitest";
-import { auctionSightingsFromRecords, handleAuctionHistory, handleStoredAuctionHistory } from "../../../kb/src/auction-history";
+import { auctionSightingsFromRecords, handleAuctionHistory, handleStoredAuctionHistory } from "@kb/auction-history";
 import {
   AUCTION_HISTORY_KEY, buildAuctionHistory, forgetAuctionHistory, parseAuctionHistory, storedAuctionHistory, writeAuctionHistory,
 } from "./auction-history-store";

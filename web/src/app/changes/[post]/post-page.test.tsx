@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, test, vi } from "vitest";
 import type { BlueWriteup, ChangeEntry } from "@/lib/changes";
-import { MAX_EXCERPT_CHARS } from "../../../../../kb/src/text-safety";
+import { MAX_EXCERPT_CHARS } from "@kb/text-safety";
 
 const data = vi.hoisted((): { entries: ChangeEntry[]; writeups: Map<string, BlueWriteup> } => ({ entries: [], writeups: new Map() }));
 vi.mock("@/lib/changes", async (importOriginal) => {

@@ -31,7 +31,7 @@ vi.mock("@/lib/lore", async (importOriginal) => ({
 }));
 
 import FactionPage, { generateMetadata } from "./page";
-import { emptyCompletion, foldCompletion } from "../../../../../../kb/src/completion-rollup";
+import { emptyCompletion, foldCompletion } from "@kb/completion-rollup";
 
 const at = "2026-11-08T00:00:00Z";
 let seq = 0;

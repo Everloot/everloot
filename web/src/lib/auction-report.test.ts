@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { emptyMarket, foldMarket } from "../../../kb/src/market";
+import { emptyMarket, foldMarket } from "@kb/market";
 import { buildAuctionReports } from "./auction-report";
 const now = new Date("2026-11-15T12:00:00Z");
 const scans = (day: string, house = "Horde", quantity = 40, reporters = 3) => Array.from({ length: reporters }, (_, i) => ({ kind: "auction_snapshot", installId: `reporter-${i}`, realm: "CAMWOW US1 Realm 4 PvP", house, capturedAt: `${day}T18:00:00Z`, items: [[765, 8, quantity, day === "2026-11-14" ? 200 : 100, day === "2026-11-14" ? 200 : 100]] }));

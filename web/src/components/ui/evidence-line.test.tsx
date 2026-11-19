@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vitest";
 import EvidenceLine from "./EvidenceLine";
 import Badge from "./Badge";
-import type { Edge } from "../../../../kb/src/edges";
+import type { Edge } from "@kb/edges";
 
 const file: Edge = {
   fromKind: "item", fromId: 1, rel: "dropped_by", toKind: "npc", toId: 2,

@@ -7,7 +7,7 @@ import { READING, ROLE_DOES, listed, notOffered, optionOffered, optionWeights } 
 import { ROLES, classLabel, type ClassSlug } from "@/lib/class-context";
 import { chooserIndexable, loadChooser } from "@/lib/class-chooser-file";
 import { pageMetadata } from "@/lib/seo";
-import type { ClassChooserData } from "../../../../../kb/src/guides/class-chooser";
+import type { ClassChooserData } from "@kb/guides/class-chooser";
 import ClassChooser from "./ClassChooser";
 
 // Built once per deploy, like the class hubs: the chooser's files are read from kb/guides while the site builds, and

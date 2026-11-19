@@ -31,7 +31,7 @@ vi.mock("next/navigation", () => ({
 import ZonesPage, { generateMetadata as zonesMetadata } from "./page";
 import ZonePage, { generateMetadata } from "./[zone]/page";
 import { EntityRelations } from "@/components/EntityRelations";
-import type { Edge } from "../../../../../kb/src/edges";
+import type { Edge } from "@kb/edges";
 
 const sighting = (installId: string, npcId: number, name: string, mapId: number, x: number, y: number) => ({
   kind: "npc_sighting", installId, eventId: `e:${installId}:${npcId}`, capturedAt: "2026-10-10T00:00:00.000Z",

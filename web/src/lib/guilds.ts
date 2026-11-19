@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
-import { canonicalJson } from "../../../kb/src/corpus";
+import { canonicalJson } from "@kb/corpus";
 import { validGuildName, type IntakeRecord } from "@everloot/protocol";
-import { guildBoard, type GuildBoard, type GuildFacts } from "../../../kb/src/guild-board";
+import { guildBoard, type GuildBoard, type GuildFacts } from "@kb/guild-board";
 import {
   agreedKills, guildDirectory, guildKey, guildLadder, guildProgression, guildRanks, guildSlug, LADDER_PAGE,
   mergeKills, searchGuilds,
   type AgreedKill, type GuildFaction, type GuildPage, type GuildProgress, type GuildReader, type GuildSummary, type InstanceDef, type LadderFilter, type LadderRow,
-} from "../../../kb/src/guilds";
+} from "@kb/guilds";
 import { buildGuildRollup, type GuildRollup } from "./guild-rollup";
 import { loadStoredGuildLadder } from "./guild-ladder-store";
 import { loadGuildAlts, memberKey, type GuildAlt } from "./guild-alts";

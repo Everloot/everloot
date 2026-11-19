@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import type { GuildSummary } from "../../../kb/src/guilds";
+import type { GuildSummary } from "@kb/guilds";
 import { createMemoryArmoryStore, type MemoryArmoryStore } from "./armory-store";
 import { createMemoryPlayerStore, type PlayerStore } from "./player-store";
 

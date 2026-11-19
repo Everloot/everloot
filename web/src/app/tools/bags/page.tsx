@@ -11,7 +11,7 @@ import { uploadStore } from "@/lib/upload-store";
 import { AH_PATH, busiestHouse, findBoard, houseSlug, itemHref, money, type MarketRow } from "@/lib/auction-house";
 import { loadMarketBoards } from "@/lib/market-boards";
 import { BAGS_BUILD, BAG_SLOTS, bagsParam, cheapestBySize, pricedSizes, upgrades, type Upgrade } from "@/lib/bags";
-import { MARKET_RULE, formatCopper } from "../../../../../kb/src/market";
+import { MARKET_RULE, formatCopper } from "@kb/market";
 import { auctionNames, itemArt, type ItemTip } from "../auctions/art";
 import { Contribute, ItemLink, RealmName } from "../auctions/parts";
 import { RealmHousePicker, realmHouseHref, realmHouseParams } from "../auctions/RealmHousePicker";

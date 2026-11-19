@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { GameCard, type CardContent } from "@/components/game/GameCard";
 import Card from "@/components/ui/Card";
 import { suggestItems, type ItemChoice, type ItemRef } from "@/lib/chat/items";
-import { pendingLine, type PendingCount } from "../../../../kb/src/pending-loot";
+import { pendingLine, type PendingCount } from "@kb/pending-loot";
 
 // An answer's item inside Chat: the site's own card (/database/card/item/<id>) and the drops the player-data tool
 // publishes (/api/tools/item_page), fetched fresh each time the answer is shown. Both stay on this page: nothing

@@ -7,7 +7,7 @@
  * until players see it in play, and what nobody has reported is not recorded, which is not a
  * measured zero.
  */
-import type { Edge } from "../../../kb/src/edges";
+import type { Edge } from "@kb/edges";
 import { agreementLabel } from "@/components/ui/AgreementMeter";
 import { timeAgo } from "./time";
 

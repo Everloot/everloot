@@ -17,7 +17,7 @@ import type { AccountShell, ShellCharacter } from "@/lib/account-shell-types";
 import { loadAccountShell } from "@/lib/account-shell";
 import { ADD_FROM_COOKIE } from "@/lib/auth/device-accounts";
 import { filterTimeline, loadTimeline, TYPE_LABEL } from "@/lib/changes";
-import { postPath } from "../../../../kb/src/blue-pages";
+import { postPath } from "@kb/blue-pages";
 import { HOME_REWRITE_HEADER, profilesOn } from "@/lib/profiles";
 import { editPath, savedBuildsOn, type AccountBuilds } from "@/lib/saved-builds";
 import { listOwn } from "@/lib/saved-builds-store";

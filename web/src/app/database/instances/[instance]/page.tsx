@@ -19,7 +19,7 @@ import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { wikiHref } from "@/lib/wiki";
 import { prepPage } from "@/lib/wiki-dungeon";
-import { npcLootTable } from "../../../../../../kb/src/loot-tables";
+import { npcLootTable } from "@kb/loot-tables";
 import EntityLink from "@/components/EntityLink";
 import { loadItemSetNames, loadItemTips, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";

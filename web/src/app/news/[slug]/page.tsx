@@ -7,7 +7,7 @@ import { longDate } from "@/data/wow-forever";
 import { trailFor } from "@/lib/breadcrumbs";
 import { couldBeBluePost, loadTimeline, postPathForUrl } from "@/lib/changes";
 import { newsArticleJsonLd } from "@/lib/jsonld";
-import { FIGURE_SIZE, postFigure } from "../../../../../kb/src/news/post";
+import { FIGURE_SIZE, postFigure } from "@kb/news/post";
 import { bodyForPage, lastChanged, loadNews, newsHref, postDescription, publishedPost, publishedPosts, readingMinutes, relatedPosts, sourceNames } from "@/lib/news";
 import { pageMetadata } from "@/lib/seo";
 import { NewsCard } from "../news-card";

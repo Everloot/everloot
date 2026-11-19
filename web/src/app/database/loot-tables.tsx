@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { DataTable, installsNeeded, type Column } from "@/components/ui";
-import { datedPhrase, METHOD_LINE, missingLine, shortLine, spanPhrase, type ItemDropSources, type LootTableRow, type NpcLootTable } from "../../../../kb/src/loot-tables";
-import { DROP_SETTLE_MIN_WINDOWS, measureDropRate } from "../../../../kb/src/drop-rate-settling";
+import { datedPhrase, METHOD_LINE, missingLine, shortLine, spanPhrase, type ItemDropSources, type LootTableRow, type NpcLootTable } from "@kb/loot-tables";
+import { DROP_SETTLE_MIN_WINDOWS, measureDropRate } from "@kb/drop-rate-settling";
 import { EmptyTab, FREQUENCY, percent } from "./entity";
 
 /**

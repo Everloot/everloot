@@ -2,7 +2,7 @@ import { createRequire } from "node:module";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
-import { emptyMarket, foldMarket } from "../../../../../kb/src/market";
+import { emptyMarket, foldMarket } from "@kb/market";
 
 const store = vi.hoisted(() => ({ loadMarket: vi.fn(), loadCorpus: vi.fn() }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({

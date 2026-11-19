@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { CLASSES } from "@/design/tokens";
-import { FACTIONS as KB_FACTIONS, RACE_QUESTION, parseClassChooser, type ClassChooserData } from "../../../kb/src/guides/class-chooser";
+import { FACTIONS as KB_FACTIONS, RACE_QUESTION, parseClassChooser, type ClassChooserData } from "@kb/guides/class-chooser";
 import {
   FACTIONS, RACE, answersHash, chooseClasses, chooserReviewed, notOffered, optionOffered, optionWeights, parseAnswers, raceChoices, type Answers,
 } from "./class-chooser";

@@ -1,9 +1,9 @@
-import { publicDropRate, publicMeasuredZero } from "../../../kb/src/drop-rollup";
+import { publicDropRate, publicMeasuredZero } from "@kb/drop-rollup";
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { bulkIndex, CREDIT_LINE, LICENCE, LICENCE_URL, PROTOCOL_VERSION, PUBLIC_RECORD_KINDS, SITE, type BulkFile, type BulkIndex } from "@everloot/protocol";
-import { filterItems, describe } from "../../../kb/src/item-taxonomy";
+import { filterItems, describe } from "@kb/item-taxonomy";
 import { loadStoredAggregates } from "./aggregate-store";
 import { attribution } from "./data-guard";
 import { gameDataNotice, loadEdges } from "./edges";

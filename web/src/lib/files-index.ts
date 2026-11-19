@@ -14,7 +14,7 @@ import rogue from "@/data/game-data/talents/rogue.json";
 import shaman from "@/data/game-data/talents/shaman.json";
 import warlock from "@/data/game-data/talents/warlock.json";
 import warrior from "@/data/game-data/talents/warrior.json";
-import { buildFilesIndex, type FilesIndex } from "../../../kb/src/files-evidence";
+import { buildFilesIndex, type FilesIndex } from "@kb/files-evidence";
 
 let index: FilesIndex | null = null;
 

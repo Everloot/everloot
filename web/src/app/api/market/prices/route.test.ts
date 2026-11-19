@@ -1,5 +1,5 @@
 import { beforeEach, expect, test, vi } from "vitest";
-import { MAX_PRICE_ROWS, emptyMarket, foldMarket } from "../../../../../../kb/src/market";
+import { MAX_PRICE_ROWS, emptyMarket, foldMarket } from "@kb/market";
 
 const store = vi.hoisted(() => ({ loadMarket: vi.fn(), market: vi.fn() }));
 vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadMarket: store.loadMarket } }));

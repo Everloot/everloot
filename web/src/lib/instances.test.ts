@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import type { WorldMapData } from "../../../kb/src/world-map-data";
-import type { EncounterRow, InstanceEntranceRow } from "../../../kb/src/instances";
+import type { WorldMapData } from "@kb/world-map-data";
+import type { EncounterRow, InstanceEntranceRow } from "@kb/instances";
 
 // The loaders read storage; these tests hand the readers their facts directly.
 vi.mock("./rollup-compute", () => ({ loadInstanceFacts: vi.fn(), loadItemFacts: vi.fn() }));

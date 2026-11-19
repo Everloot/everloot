@@ -7,7 +7,7 @@
  */
 import { CLASSES } from "@/design/tokens";
 import type { BuffEntry, BuffTable, Family } from "@/data/game-data/raid";
-import type { GuideRole } from "../../../kb/src/guides/guide";
+import type { GuideRole } from "@kb/guides/guide";
 import { ROLES, parseClassContext, type ClassSlug } from "./class-context";
 import { GROUP_SIZE, SIZES, coverage, encodeRaid, groupsOf, treeNames, type Size, type Slot, type Slots } from "./raid";
 

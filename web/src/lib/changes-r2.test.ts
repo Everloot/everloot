@@ -3,7 +3,7 @@ import { loadTimeline, buildTimeline, groupAnnouncements, manualEntries } from "
 import posts from "../../../kb/changes/blue-posts.json";
 import builds from "../../../kb/changes/builds.json";
 import manual from "../../../kb/curated/manual-changes.json";
-import type { BlueStore } from "../../../kb/src/blue-posts";
+import type { BlueStore } from "@kb/blue-posts";
 import { latestForeverBuild } from "./changes-facts";
 import { compareGameBuilds } from "./talents/freshness";
 

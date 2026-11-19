@@ -5,8 +5,8 @@ import { parseEverlootLua, parsePolestarTable } from "@/lib/sv-parse";
 import { convertRecorder, type RecorderPayload } from "@/lib/polestar-recorder";
 import { censusSummary, prepareUpload, sendBatches, type SharingChoices, type UploadSession } from "@/lib/upload-batches";
 import { contributionFiles } from "@/lib/ops/attribution-input";
-import type { SharingCategory } from "../../../../kb/src/publication";
-import { parseSettledList, settledSkip, type SettledList } from "../../../../kb/src/settled-list";
+import type { SharingCategory } from "@kb/publication";
+import { parseSettledList, settledSkip, type SettledList } from "@kb/settled-list";
 import Card from "@/components/ui/Card";
 import SectionHeading from "@/components/ui/SectionHeading";
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { SectionHeading } from "@/components/ui";
-import { GEAR_SCORE_DIVISOR, GEAR_SCORE_VERSION, GEAR_WEIGHTS_BUILD, GROUP_BUDGET } from "../../../../kb/src/gear-score";
+import { GEAR_SCORE_DIVISOR, GEAR_SCORE_VERSION, GEAR_WEIGHTS_BUILD, GROUP_BUDGET } from "@kb/gear-score";
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 

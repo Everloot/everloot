@@ -18,7 +18,7 @@ vi.mock("next/link", () => ({
 import CensusPage, { metadata } from "./page";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { CLASSES, LAUNCH_AT, RACES } from "@/data/wow-forever";
-import { CENSUS_CLASSES, CENSUS_LAUNCH, CENSUS_RACES } from "../../../../kb/src/census";
+import { CENSUS_CLASSES, CENSUS_LAUNCH, CENSUS_RACES } from "@kb/census";
 
 let n = 0;
 /** `count` characters of one race and class, reported by three installs in turn. */

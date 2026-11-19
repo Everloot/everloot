@@ -1,8 +1,8 @@
 import { AwsClient } from "aws4fetch";
 import { ITEM_FACTS } from "@everloot/protocol";
-import type { ItemFactState } from "../../../kb/src/item-facts";
+import type { ItemFactState } from "@kb/item-facts";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
-import { agreedItemNames } from "../../../kb/src/item-page";
+import { agreedItemNames } from "@kb/item-page";
 import { loadItemSeen, type ItemSeen } from "./item-seen";
 import { keep } from "./kept";
 import { SOURCES, type SourceSlug } from "./items";

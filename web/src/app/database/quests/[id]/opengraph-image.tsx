@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { questPage } from "../../../../../../kb/src/world-pages";
+import { questPage } from "@kb/world-pages";
 import { AGREEMENT_NEEDED } from "@/components/ui/AgreementMeter";
 import { loadQuestNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";

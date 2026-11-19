@@ -1,6 +1,6 @@
 import { cache } from "react";
-import { agreedItemNames } from "../../../kb/src/item-page";
-import { npcReportedName, type WorldFacts } from "../../../kb/src/world-pages";
+import { agreedItemNames } from "@kb/item-page";
+import { npcReportedName, type WorldFacts } from "@kb/world-pages";
 import { loadItemNames, PRIVATE_UNREACHABLE, type ItemNames, type QuestNames } from "@/lib/game-assets";
 import { CLIENT_LAYER, shownItemName } from "@/lib/items";
 import { npcNames, questTitles, type Names } from "@/lib/names";

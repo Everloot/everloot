@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import type { ItemRow } from "../../../kb/src/item-taxonomy";
-import type { ClientClassGear } from "../../../kb/src/client-class-gear";
+import type { ItemRow } from "@kb/item-taxonomy";
+import type { ClientClassGear } from "@kb/client-class-gear";
 import { CLIENT_CLASS_GEAR } from "@/data/game-data/client-class-gear";
 import { CLIENT_TAXONOMY } from "@/lib/items";
 import { classUse } from "./class-gear";

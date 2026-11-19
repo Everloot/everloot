@@ -5,7 +5,7 @@ import { expect, test } from "vitest";
 import { createSharingStore } from "./sharing-store";
 import { createUploadStore } from "./upload-store";
 import type { CloudConfig } from "./upload-store";
-import { authorizeRecord } from "../../../kb/src/publication";
+import { authorizeRecord } from "@kb/publication";
 import { goldSnapshot } from "@everloot/protocol";
 const now = () => new Date("2026-10-07T00:00:00Z");
 const grantInput = { installId: "install-one", realm: "Moon Guard", subjectType: "character" as const,

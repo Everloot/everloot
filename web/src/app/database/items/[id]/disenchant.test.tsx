@@ -7,7 +7,7 @@ vi.mock("next/link", () => ({
 }));
 
 import { CLIENT_DISENCHANT } from "@/data/game-data/client-disenchant";
-import { bandYield, disenchantTablesFromRecords, placer } from "../../../../../../kb/src/disenchant";
+import { bandYield, disenchantTablesFromRecords, placer } from "@kb/disenchant";
 import { DisenchantPanel, showsDisenchant } from "./disenchant";
 
 let n = 0;

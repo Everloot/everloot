@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const hoisted = vi.hoisted(() => ({ status: 200, record: vi.fn(), handler: vi.fn(), stored: vi.fn(), scopes: [] as import("../../../kb/src/coverage").RecheckScope[] }));
-vi.mock("../../../kb/src/mcp-http-server", () => ({
+const hoisted = vi.hoisted(() => ({ status: 200, record: vi.fn(), handler: vi.fn(), stored: vi.fn(), scopes: [] as import("@kb/coverage").RecheckScope[] }));
+vi.mock("@kb/mcp-http-server", () => ({
   createMcpHttpHandler: () => async (req: Request) => {
     hoisted.handler(await req.text());
     return new Response("{}", { status: hoisted.status });
@@ -15,13 +15,13 @@ import { createMount, toolLoaders } from "./mcp-mount";
 import { loadCoverageForTool } from "./coverage-answer";
 import { RECHECK_SCOPES } from "./recheck-scopes";
 import { readSettledList } from "./settled-store";
-import { emptySettledList } from "../../../kb/src/settled-list";
-import { createToolHandlers } from "../../../kb/src/mcp-server";
-import { openDb } from "../../../kb/src/db";
+import { emptySettledList } from "@kb/settled-list";
+import { createToolHandlers } from "@kb/mcp-server";
+import { openDb } from "@kb/db";
 import { uploadStore } from "./upload-store";
 import { anonymousAggregates, encodeAggregates, parseAggregates } from "./aggregate-store";
 import type { IntakeRecord } from "@everloot/protocol";
-import { answerSourcesFactsFromRecords } from "../../../kb/src/answer-sources";
+import { answerSourcesFactsFromRecords } from "@kb/answer-sources";
 
 vi.mock("./recheck-scopes", () => ({ RECHECK_SCOPES: hoisted.scopes }));
 

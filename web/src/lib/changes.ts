@@ -2,16 +2,16 @@ import postsFile from "../../../kb/changes/blue-posts.json";
 import buildsFile from "../../../kb/changes/builds.json";
 import manualFile from "../../../kb/curated/manual-changes.json";
 import writeupsFile from "../../../kb/curated/blue-writeups.json";
-import type { BlueStore } from "../../../kb/src/blue-posts";
-import { writeupsById, type BlueWriteup } from "../../../kb/src/blue-writeups";
-import { buildTimeline, groupAnnouncements, manualEntries, postPath, type BuildLike, type ChangeEntry } from "../../../kb/src/changes";
+import type { BlueStore } from "@kb/blue-posts";
+import { writeupsById, type BlueWriteup } from "@kb/blue-writeups";
+import { buildTimeline, groupAnnouncements, manualEntries, postPath, type BuildLike, type ChangeEntry } from "@kb/changes";
 import { BLUE_POSTS_KEY, bluePosts, blueStorage } from "./blue-store";
 
 export {
   CHANGE_FILTERS, GAME_LABEL, TYPE_LABEL, blueThreads, buildTimeline, filterTimeline, forumRegions, groupAnnouncements, manualEntries, parseFilter, postIdOfSegment,
   postPath, renderFeed, type BlueThread, type ChangeEntry, type ChangeGame, type ChangeFilter,
-} from "../../../kb/src/changes";
-export type { BlueWriteup } from "../../../kb/src/blue-writeups";
+} from "@kb/changes";
+export type { BlueWriteup } from "@kb/blue-writeups";
 
 /**
  * Builds stay bundled. The blue cron updates posts in R2; the bundled posts cover an unavailable store.

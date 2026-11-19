@@ -2,8 +2,8 @@ import { CoinText } from "@/components/ui/Coins";
 import type { AuctionHouse } from "@everloot/protocol";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { QUALITIES } from "../../../../../kb/src/item-taxonomy";
-import { MARKET_RULE, formatCopper } from "../../../../../kb/src/market";
+import { QUALITIES } from "@kb/item-taxonomy";
+import { MARKET_RULE, formatCopper } from "@kb/market";
 import { uploadStore } from "@/lib/upload-store";
 import { loadMarketBoards } from "@/lib/market-boards";
 import {

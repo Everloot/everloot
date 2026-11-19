@@ -16,7 +16,7 @@ vi.mock("./rollup-compute", () => ({
   loadReportedItemFacts: async () => { throw new Error("a card with a stored view must not read the aggregates"); },
 }));
 vi.mock("./item-seen", () => ({ loadItemSeen: async (read?: unknown) => { reads.passed.push(read); return reads.seen; } }));
-vi.mock("../../../kb/src/item-page", () => ({ agreedItemNames: (f: { names: { itemId: number; name: string }[] }) => new Map(f.names.map((n) => [n.itemId, n.name])) }));
+vi.mock("@kb/item-page", () => ({ agreedItemNames: (f: { names: { itemId: number; name: string }[] }) => new Map(f.names.map((n) => [n.itemId, n.name])) }));
 vi.mock("./game-assets", () => ({ PRIVATE_UNREACHABLE: Symbol.for("unreachable"), loadItemNames: async () => reads.names }));
 
 import { loadCardFacts, loadListNames, loadListSeen } from "./item-view";

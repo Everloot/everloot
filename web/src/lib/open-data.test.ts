@@ -2,8 +2,8 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
-import { writeOpenData } from "../../../kb/src/open-data/write";
-import { readOpenDataGameFiles } from "../../../kb/src/open-data/game-data";
+import { writeOpenData } from "@kb/open-data/write";
+import { readOpenDataGameFiles } from "@kb/open-data/game-data";
 import { loadOpenData } from "./open-data";
 
 const BASE = "https://data.example.test";

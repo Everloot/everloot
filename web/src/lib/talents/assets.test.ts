@@ -2,9 +2,9 @@ import { mkdtempSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { afterEach, beforeAll, expect, test, vi } from "vitest";
-import { openDb } from "../../../../kb/src/db";
-import { replaceSourceRows } from "../../../../kb/src/entities";
-import { snapshot } from "../../../../kb/src/snapshot";
+import { openDb } from "@kb/db";
+import { replaceSourceRows } from "@kb/entities";
+import { snapshot } from "@kb/snapshot";
 import { assetsBaseUrl, CREDIT, hasNodeFrames, loadGameAssets, parseManifest } from "./assets";
 
 const BASE = "https://assets.example.test/wow_classic_beta-70450-84bea423";

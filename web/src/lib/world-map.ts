@@ -1,13 +1,13 @@
 import mapJson from "@/data/game-data/map.json";
-import { rollupMapBounds, type MapBoundsRow, type ZoneBounds } from "../../../kb/src/map-bounds";
-import { objectSpawns } from "../../../kb/src/object-spawns";
-import { checkReportedBounds, placeEntrances, placeFlights, worldToMap, zoneTable, zoneToMap, type BoundsCheck, type EntrancePin } from "../../../kb/src/world-coords";
-import { WorldMapData } from "../../../kb/src/world-map-data";
-import { allZones, observedPins } from "../../../kb/src/world-map-near";
+import { rollupMapBounds, type MapBoundsRow, type ZoneBounds } from "@kb/map-bounds";
+import { objectSpawns } from "@kb/object-spawns";
+import { checkReportedBounds, placeEntrances, placeFlights, worldToMap, zoneTable, zoneToMap, type BoundsCheck, type EntrancePin } from "@kb/world-coords";
+import { WorldMapData } from "@kb/world-map-data";
+import { allZones, observedPins } from "@kb/world-map-near";
 import { PUBLIC_RECORD_KINDS } from "@everloot/protocol";
 import { mapHref, type Candidate, type MapEntrance, type MapFlightLine, type MapFlightMaster, type MapPin, type MapPinSet, type MapTreasure } from "./map-view";
 import { placedEntrances, treasurePins, type ZoneSightings } from "./zones";
-import { isPinPosition, vendorPage, WORLD_AGREEMENT, worldFactsFromRecords, type WorldFacts } from "../../../kb/src/world-pages";
+import { isPinPosition, vendorPage, WORLD_AGREEMENT, worldFactsFromRecords, type WorldFacts } from "@kb/world-pages";
 import { RECHECK_SCOPES } from "./recheck-scopes";
 
 export const CONTINENTS = [

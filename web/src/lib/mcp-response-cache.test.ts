@@ -55,8 +55,8 @@ test("missing data, changed data during computation and cache failures fall back
 });
 
 test("real transport: cached answers preserve output, each id, CORS, origin and per-instance quota", async () => {
-  const { createMcpHttpHandler } = await import("../../../kb/src/mcp-http-server");
-  const { openDb } = await import("../../../kb/src/db");
+  const { createMcpHttpHandler } = await import("@kb/mcp-http-server");
+  const { openDb } = await import("@kb/db");
   const db = openDb(":memory:");
   try {
     const store = cache();

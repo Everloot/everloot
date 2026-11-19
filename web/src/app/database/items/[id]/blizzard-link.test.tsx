@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { emptyMarket, foldMarket } from "../../../../../../kb/src/market";
+import { emptyMarket, foldMarket } from "@kb/market";
 
 const store = vi.hoisted(() => ({ loadMarket: vi.fn(), loadCorpus: vi.fn() }));
 const blizzard = vi.hoisted(() => ({ load: vi.fn() }));

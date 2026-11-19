@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, vi } from "vitest";
-import { emptySettledList, encodeIds } from "../../../kb/src/settled-list";
+import { emptySettledList, encodeIds } from "@kb/settled-list";
 import { APP_REFRESH_MS, APP_STALE_MS, appSettledList } from "./settled-cache";
 
 const BUILD = "1.60.1.70450";

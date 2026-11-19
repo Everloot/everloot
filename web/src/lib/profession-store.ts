@@ -1,8 +1,8 @@
 import { AwsClient } from "aws4fetch";
 import { keep } from "./kept";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
-import { derivedSteps, pathFactsFromRecords } from "../../../kb/src/recipe-thresholds";
-import { objectSpawnRowsFromRecords } from "../../../kb/src/object-spawns";
+import { derivedSteps, pathFactsFromRecords } from "@kb/recipe-thresholds";
+import { objectSpawnRowsFromRecords } from "@kb/object-spawns";
 import { uploadStore, type Corpus, type R2Config } from "./upload-store";
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { ObjectSpawnRow } from "../../../kb/src/object-spawns";
+import type { ObjectSpawnRow } from "@kb/object-spawns";
 import { gatherAreas, HERB_IDS, HERBALISM_SKILL_LINE, herbIndex, herbZones, professionTrainers } from "./farming";
 import { publicZones, type ZoneSummary } from "./zones";
 

@@ -1,6 +1,6 @@
 import { AwsClient } from "aws4fetch";
 import type { AuctionHouse } from "@everloot/protocol";
-import type { MarketState, PublicDay } from "../../../kb/src/market";
+import type { MarketState, PublicDay } from "@kb/market";
 import {
   HOUSES, agreementSoFar, board, busiestFirst, pendingRealms, realmBoards, realmSlug,
   type MarketRow, type PendingRealm, type RealmBoard, type RealmRef,

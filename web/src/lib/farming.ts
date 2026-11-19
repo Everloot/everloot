@@ -1,6 +1,6 @@
 import { CLIENT_TAXONOMY } from "./items";
-import { agreedGatherKinds, objectSpawns, skillRange, type ObjectSpawnRow, type SkillRange } from "../../../kb/src/object-spawns";
-import { INDEPENDENT_INSTALLS } from "../../../kb/src/drop-rollup";
+import { agreedGatherKinds, objectSpawns, skillRange, type ObjectSpawnRow, type SkillRange } from "@kb/object-spawns";
+import { INDEPENDENT_INSTALLS } from "@kb/drop-rollup";
 import type { NpcRow } from "./world-lists";
 import type { ZoneSummary } from "./zones";
 

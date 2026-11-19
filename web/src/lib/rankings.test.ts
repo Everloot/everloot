@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { censusFromRows, type CensusRow, type CensusWindow, type Faction } from "../../../kb/src/census";
+import { censusFromRows, type CensusRow, type CensusWindow, type Faction } from "@kb/census";
 import {
   RANKINGS, START_LINE, censusHrefOf, firstWeek, hubIndexable, hubMetrics, parseRankingQuery, rankRows, rankedCount, rankingDef, rankingHref,
   rankingIndexable, rankingView, rankingWeeks, topMovers, weekStart, weeklyCharacters, type RankRow,

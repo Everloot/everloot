@@ -9,7 +9,7 @@ import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasCard } from "@/lib/tooltip";
-import { isPinPosition, npcPage, questPage } from "../../../../../../kb/src/world-pages";
+import { isPinPosition, npcPage, questPage } from "@kb/world-pages";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { pinLink } from "@/lib/world-map";
 import { trailFor } from "@/lib/breadcrumbs";

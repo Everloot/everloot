@@ -17,8 +17,8 @@ import {
 import { playerStore } from "@/lib/player-store";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
-import type { GuildSummary } from "../../../../kb/src/guilds";
-import { LADDER_PAGE } from "../../../../kb/src/guilds";
+import type { GuildSummary } from "@kb/guilds";
+import { LADDER_PAGE } from "@kb/guilds";
 import { ArmoryCredit, newest, NOINDEX, RegionRuleset, Unreachable } from "../armory/parts";
 import { BossStrip, day, FactionMark, guildRobots, link, number, Progress, rulesetLabel } from "./parts";
 

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import type { GuildFaction, GuildProgress } from "../../../../kb/src/guilds";
+import type { GuildFaction, GuildProgress } from "@kb/guilds";
 import { Card } from "@/components/ui";
 import { factionLabel, guildIndexingOn } from "@/lib/guilds";
 

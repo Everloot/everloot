@@ -1,5 +1,5 @@
-import type { ScoreInstance } from "../../../kb/src/everloot-score";
-import type { InstanceDef } from "../../../kb/src/guilds";
+import type { ScoreInstance } from "@kb/everloot-score";
+import type { InstanceDef } from "@kb/guilds";
 import type { InstanceRow } from "./instances";
 
 /**

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test } from "vitest";
-import { disenchantLua } from "../../../kb/src/disenchant-lua";
+import { disenchantLua } from "@kb/disenchant-lua";
 import table from "../data/game-data/client-disenchant.json";
 
 test("addon disenchant classification exactly matches the current game-file extract", () => {

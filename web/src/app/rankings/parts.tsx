@@ -4,8 +4,8 @@ import { Card, DataTable, EmptyState, Explainer, type Column } from "@/component
 import { CLASS_BG, CLASS_FILL, CLASS_STROKE, classColour } from "@/components/ui/class-colour";
 import { guildsOn } from "@/lib/guild-switch";
 import { ARMORY_BOARDS, ARMORY_METRICS, armoryBoardPath, armoryOn } from "@/lib/armory";
-import { CENSUS_MIN_CHARACTERS, CENSUS_MIN_INSTALLS, CENSUS_MIN_REPORTERS, CENSUS_ROUND_TO, HIDDEN_LABEL } from "../../../../kb/src/census";
-import type { CensusCount, Faction } from "../../../../kb/src/census";
+import { CENSUS_MIN_CHARACTERS, CENSUS_MIN_INSTALLS, CENSUS_MIN_REPORTERS, CENSUS_ROUND_TO, HIDDEN_LABEL } from "@kb/census";
+import type { CensusCount, Faction } from "@kb/census";
 import {
   COLLECTING_LINE, HUB_ROWS, RAIL_GROUPS, START_LINE, censusHrefOf, rankingPath,
   type Change, type ChartSeries, type HubMetrics, type Mover, type RankRow, type RankingView, type RankingWeek,

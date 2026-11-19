@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { mergeCensusRows } from "../../../../../kb/src/census-rows";
+import { mergeCensusRows } from "@kb/census-rows";
 
 /**
  * The route is the only place that decides what a submitter is told. It must persist the parsed

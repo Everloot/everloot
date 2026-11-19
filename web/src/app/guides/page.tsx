@@ -9,7 +9,7 @@ import { ACTIVITY_LABEL, ROLE_LABEL, guideHref, guidesFor, loadGuides, published
 import { pageMetadata } from "@/lib/seo";
 import { TALENT_CLASSES, isTalentClass, loadCatalog, type TalentClassSlug } from "@/lib/talents/catalogs";
 import { PUBLISHED_CHANGES, classTalentChanges } from "@/lib/talents/freshness-records";
-import { GUIDE_ACTIVITIES, type GuideActivity, type GuideRole } from "../../../../kb/src/guides/guide";
+import { GUIDE_ACTIVITIES, type GuideActivity, type GuideRole } from "@kb/guides/guide";
 
 // The published guides by class, each marked when it is not current. A link's class, activity, role and level narrow
 // the list through the guide reader (guidesFor); a narrowed list stays out of search, canonical to the plain one. The

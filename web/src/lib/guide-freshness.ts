@@ -1,5 +1,5 @@
-import type { GuideFrontMatter } from "../../../kb/src/guides/guide";
-import { MIN_PROSE_WORDS, proseWords } from "../../../kb/src/wiki/check";
+import type { GuideFrontMatter } from "@kb/guides/guide";
+import { MIN_PROSE_WORDS, proseWords } from "@kb/wiki/check";
 import type { Guide } from "./guides";
 import { codeFreshness, compareGameBuilds, freshnessLines, planFreshness, type ClassTalentChanges, type PlanFreshness } from "./talents/freshness";
 import { importPlan } from "./talents/import";

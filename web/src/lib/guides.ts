@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { GuideFrontMatter, parseGuide, type GuideActivity, type GuideRole } from "../../../kb/src/guides/guide";
-import type { Block } from "../../../kb/src/wiki/page";
+import { GuideFrontMatter, parseGuide, type GuideActivity, type GuideRole } from "@kb/guides/guide";
+import type { Block } from "@kb/wiki/page";
 
 /**
  * The guides under kb/guides, read from disk once per server instance (they change only with a deploy). Pure apart

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { LAUNCH, LAUNCH_AT, longDate } from "@/data/wow-forever";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { NPC_CREATURE_TYPES, NPC_RANKS, type NpcRank, type NpcReaction } from "../../../../../kb/src/world-pages";
+import { NPC_CREATURE_TYPES, NPC_RANKS, type NpcRank, type NpcReaction } from "@kb/world-pages";
 import { Container, DataTable, DataTitle, filledColumns, FilterBar, ResultStrip, type FilterControl, type SparseColumn } from "@/components/ui";
 import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
 import { bareNpcRow, npcRows, publicQuests, publicVendors, type NpcRow } from "@/lib/world-lists";

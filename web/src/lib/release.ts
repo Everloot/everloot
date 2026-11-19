@@ -1,8 +1,8 @@
 import { join } from "node:path";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { openD1Release, openPublicSnapshot } from "../../../kb/src/public-snapshot";
-import { sqliteReleaseDb, type D1Like, type ReleaseDb } from "../../../kb/src/release-db";
-import type { Manifest } from "../../../kb/src/snapshot";
+import { openD1Release, openPublicSnapshot } from "@kb/public-snapshot";
+import { sqliteReleaseDb, type D1Like, type ReleaseDb } from "@kb/release-db";
+import type { Manifest } from "@kb/snapshot";
 import { keep, type Keeper } from "./kept";
 
 /**

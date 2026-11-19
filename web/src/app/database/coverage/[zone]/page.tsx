@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { fieldLabel, type CoverageNeed, type FieldCell } from "../../../../../../kb/src/coverage";
+import { fieldLabel, type CoverageNeed, type FieldCell } from "@kb/coverage";
 import { Container, DataTable, DataTitle, agreementLabel, type SparseColumn } from "@/components/ui";
 import { loadCoverage } from "@/lib/coverage-compute";
 import { loadSightings } from "@/lib/instances";

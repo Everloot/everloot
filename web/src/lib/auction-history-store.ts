@@ -1,7 +1,7 @@
 import { AwsClient } from "aws4fetch";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
-import { auctionHistories, auctionHistoryKey, auctionSightingsFromRecords, type AuctionPoint } from "../../../kb/src/auction-history";
-import { trustedInstalls } from "../../../kb/src/trusted-source";
+import { auctionHistories, auctionHistoryKey, auctionSightingsFromRecords, type AuctionPoint } from "@kb/auction-history";
+import { trustedInstalls } from "@kb/trusted-source";
 import { keep } from "./kept";
 import { uploadStore, type Corpus, type R2Config } from "./upload-store";
 

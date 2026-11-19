@@ -21,7 +21,7 @@ import { gatheredObjects, zoneFarmLinks } from "@/lib/farming";
 import { itemNames } from "@/lib/names";
 import { loadProfessions } from "@/lib/profession-store";
 import { rateWithRange } from "../../loot-tables";
-import { METHOD_LINE } from "../../../../../../kb/src/loot-tables";
+import { METHOD_LINE } from "@kb/loot-tables";
 import { zoneItems, type ZoneItem, type ZoneItemSource } from "@/lib/zone-items";
 import { wikiHref, zoneWikiPage } from "@/lib/wiki";
 import { bossLine, entranceLinks, instanceHref, loadSightings } from "@/lib/instances";

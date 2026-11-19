@@ -1,8 +1,8 @@
-import { isDevelopmentItemName } from "../../../kb/src/dev-item-names";
-import { itemHasFacts, npcHasFacts, objectHasFacts, questHasFacts, vendorHasFacts } from "../../../kb/src/page-urls";
-import type { ItemPage } from "../../../kb/src/item-page";
-import type { ObjectPage } from "../../../kb/src/object-page";
-import type { NpcPage, QuestPage, VendorPage } from "../../../kb/src/world-pages";
+import { isDevelopmentItemName } from "@kb/dev-item-names";
+import { itemHasFacts, npcHasFacts, objectHasFacts, questHasFacts, vendorHasFacts } from "@kb/page-urls";
+import type { ItemPage } from "@kb/item-page";
+import type { ObjectPage } from "@kb/object-page";
+import type { NpcPage, QuestPage, VendorPage } from "@kb/world-pages";
 import type { ShownItemName } from "./items";
 
 /**

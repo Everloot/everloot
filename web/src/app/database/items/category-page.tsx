@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { trailFor } from "@/lib/breadcrumbs";
-import { isDevelopmentItemName } from "../../../../../kb/src/dev-item-names";
+import { isDevelopmentItemName } from "@kb/dev-item-names";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { describe, filterItems, QUALITIES, resolveClass, resolveLegacyClass, resolveSubclass, slotOf, type ItemClass, type ItemRow, type ItemSubclass } from "../../../../../kb/src/item-taxonomy";
+import { describe, filterItems, QUALITIES, resolveClass, resolveLegacyClass, resolveSubclass, slotOf, type ItemClass, type ItemRow, type ItemSubclass } from "@kb/item-taxonomy";
 import {
   activeFilters, BINDINGS, CLIENT_TAXONOMY as T, categoryNamedEnough, categoryQuery, developmentLeftovers, itemFacets, ITEM_LEVEL_BRACKETS, itemsHref,
   listItems, NAME_FROM, SOURCES, shownItemName, subclassLabel, toggled, UNRECORDED, type CategoryQuery, type NameSource,

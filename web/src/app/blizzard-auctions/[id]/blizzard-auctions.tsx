@@ -2,7 +2,7 @@ import { CoinText } from "@/components/ui/Coins";
 import { DataTable, type Column } from "@/components/ui";
 import type { BlizzardPrice, BlizzardRead } from "@/lib/blizzard-auctions";
 import { houseLabel, houseOrder } from "@/lib/blizzard-houses";
-import { formatCopper } from "../../../../../kb/src/market";
+import { formatCopper } from "@kb/market";
 
 const UTC = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" });
 

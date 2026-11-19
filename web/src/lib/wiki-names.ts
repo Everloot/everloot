@@ -1,4 +1,4 @@
-import type { TokenKind } from "../../../kb/src/wiki/page";
+import type { TokenKind } from "@kb/wiki/page";
 import { entityHref } from "@/components/EntityLink";
 import { factionHref, loadCatalog } from "@/lib/completion-lists";
 import { loadQuestNames } from "@/lib/game-assets";

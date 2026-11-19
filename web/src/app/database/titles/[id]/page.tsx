@@ -11,7 +11,7 @@ import { entitySummary } from "@/lib/evidence";
 import { loreFor } from "@/lib/lore-links";
 import { pageMetadata } from "@/lib/seo";
 import LoreSection from "@/components/LoreSection";
-import { CLIENT_LABEL } from "../../../../../../kb/src/edges";
+import { CLIENT_LABEL } from "@kb/edges";
 import { EmptyTab, EntityHeader, EntityTop, known, LINK, Unreachable } from "../../entity";
 
 export const dynamic = "force-dynamic";

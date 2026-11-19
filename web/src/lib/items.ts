@@ -1,6 +1,6 @@
-import { CLIENT_EDGES, CLIENT_LAYER, CLIENT_SKILLS, CLIENT_TAXONOMY } from "../../../kb/src/client-layer-file";
-import { isDevelopmentItemName } from "../../../kb/src/dev-item-names";
-import { describe, filterItems, QUALITIES, slotOf, slugify, type ItemRow } from "../../../kb/src/item-taxonomy";
+import { CLIENT_EDGES, CLIENT_LAYER, CLIENT_SKILLS, CLIENT_TAXONOMY } from "@kb/client-layer-file";
+import { isDevelopmentItemName } from "@kb/dev-item-names";
+import { describe, filterItems, QUALITIES, slotOf, slugify, type ItemRow } from "@kb/item-taxonomy";
 import { PER_PAGE } from "@/app/database/list-parts";
 
 export { CLIENT_LAYER, CLIENT_TAXONOMY };
