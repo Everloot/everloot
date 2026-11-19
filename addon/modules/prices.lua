@@ -580,8 +580,35 @@ function E.ItemIdFrom(text)
   local id = text:match("|Hitem:(%d+)") or text:match("^item:(%d+)") or text:match("^(%d+)$")
   if id then return tonumber(id) end
   if text == "" then return nil end
-  local link = GetItemInfo and select(2, GetItemInfo(text))
-  return link and tonumber(link:match("item:(%d+)")) or nil
+  -- Forever (build 70959) has no global GetItemInfo: its Blizzard_Deprecated files no longer define it, so only
+  -- C_Item.GetItemInfo names an item, and only one the client has loaded. A name it does not know is looked for
+  -- among the names the player's scans of this realm gave with their rows.
+  local info = (type(C_Item) == "table" and C_Item.GetItemInfo) or GetItemInfo
+  if type(info) == "function" then
+    local ok, _, link = pcall(info, text)
+    link = ok and E.Readable(link)
+    local id = type(link) == "string" and tonumber(link:match("item:(%d+)"))
+    if id then return id end
+  end
+  local realm = E.Readable(GetRealmName and GetRealmName())
+  if type(realm) ~= "string" then return nil end
+  return (E.ScanItemsNamed(realm, text))
+end
+
+--- The items this realm's scans named whose name holds `text`, case-insensitively: the id of the one named exactly
+--- so, else nil and every match as { id, name }, sorted by name. Empty with no scan names or nothing typed.
+function E.ScanItemsNamed(realm, text)
+  local names = type(EverlootDB) == "table" and type(EverlootDB.scanNames) == "table" and EverlootDB.scanNames[realm]
+  text = tostring(text or ""):gsub("^%s+", ""):gsub("%s+$", ""):lower()
+  if type(names) ~= "table" or text == "" then return nil, {} end
+  local matches = {}
+  for id, name in pairs(names) do
+    local lower = name:lower()
+    if lower == text then return id, { { id, name } } end
+    if lower:find(text, 1, true) then matches[#matches + 1] = { id, name } end
+  end
+  table.sort(matches, function(a, b) return a[2] < b[2] end)
+  return nil, matches
 end
 
 --- Why a price command found nothing, said exactly: no file, a file without this realm, a file that failed its
@@ -634,7 +661,9 @@ function E.PriceCommand(text, tries)
   if entry.status == "verifying" and (tries or 0) < 100 and C_Timer and C_Timer.After then
     return C_Timer.After(0, function() E.PriceCommand(text, (tries or 0) + 1) end)
   end
-  local name = (GetItemInfo and select(2, GetItemInfo(id))) or ("item " .. id)
+  local info = (type(C_Item) == "table" and C_Item.GetItemInfo) or GetItemInfo
+  local named, _, link = pcall(info or error, id)
+  local name = named and E.Readable(link) or ("item " .. id)
   print("Everloot price: " .. name .. " on " .. realm .. (entry.house and (", " .. entry.house .. " auction house") or ""))
   -- A failed checksum, or an older realm-only file, is said even when the player's own scan answers: the community
   -- prices were there to be shown.

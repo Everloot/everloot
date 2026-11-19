@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Addon: while a scan runs, a bar across the top of the auction tab says what the scan is doing and how far it is: waiting for the house's listings, with the seconds and the most the scan allows, reading the listings, reading again the ones whose items had not loaded, or sampling search prices. It shows on the shopping page too and goes when the scan reports.
 - Site: /rankings leads with the leaderboards: characters by item level, Gear Score and honorable kills, guilds by average item level and by raid progress in the newest raid, each a top 10 with a link to its full list and an All, US or EU tab in the URL; the census rankings follow under Who plays. The hub stays out of search engines while it shows Blizzard's boards, as every armory page does.
 - Site: the scheduled jobs can run in a Worker of their own (`everloot-cron`, same build, no routes), so the snapshot job no longer shares memory with page and MCP traffic; off until the maintainer deploys it and sets `EVERLOOT_CRON_WORKER` on the site (docs/OPERATIONS.md, "The cron Worker").
 - Site: the private operations summary job stays on the site Worker when the cron Worker takes the other jobs, since only the site holds its pseudonym key; the cron Worker no longer needs the character or operations secrets.
@@ -246,6 +247,9 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
 
 ### Fixed
+- Addon: the Everloot panel at the auction house sits above the house's own page controls, so the Auctions page's top tab, and the Sell page's item slot and Post button, no longer show through it; the house's dialogs still cover it.
+- Addon: at the auction house, the NPC portrait and the ring around it sit whole over the Everloot panel's corner, and the Everloot heading starts right of the portrait.
+- Addon: the auction tab's price lookup finds an item by name again. Forever has no global GetItemInfo, so a typed name never resolved and the hint came back; the lookup now asks C_Item and then the names the player's scans gave with their rows. Part of a name lists the matching scanned items with the scan's prices, and a name nothing matches says so instead of the hint.
 - Site: empty NPC, vendor, quest and object tabs all say what would fill them (3 installs agreeing), in one shared set of sentences, and the vendors list says a vendor is listed once 3 installs agree on an item and its price.
 - Site: the public MCP, /api/tools and the changes pages hold one copy of the uploads and the patch-notes timeline per server instance instead of one per request, which ran the site out of memory and answered 503; the MCP coverage tool says "not measured yet" when no stored score can be read instead of working it out from every report.
 - Site: the coverage pages (/database/coverage and each zone's) show the score and plateau the data update stores, instead of working them out from every report on each visit, which could make the page fail to load. Until the next data update stores the plateau, the page says it is not measured yet.
