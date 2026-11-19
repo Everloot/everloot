@@ -39,6 +39,17 @@ test("profession slugs have their own name and the profession hub as parent", ()
   expect(trailFor("/tools/professions/not-a-profession")).toBeNull();
 });
 
+test("a realm's Market changes view trails through the Auction House and the realm page", () => {
+  expect(trailFor("/tools/auctions/camwow-us1-realm-4-pvp/changes")).toEqual([
+    ...trailFor("/tools/auctions")!,
+    { name: "Camwow Us1 Realm 4 Pvp", path: "/tools/auctions/camwow-us1-realm-4-pvp" },
+    { name: "Market changes", path: "/tools/auctions/camwow-us1-realm-4-pvp/changes" },
+  ]);
+  expect(trailFor("/tools/auctions/forever/changes/")).toEqual(trailFor("/tools/auctions/forever/changes"));
+  expect(trailFor("/tools/auctions/forever")).toBeNull();
+  expect(trailFor("/tools/auctions/a/b/changes")).toBeNull();
+});
+
 test("pages use the shared Home crumb", () => {
   function pages(dir: string): string[] {
     return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
