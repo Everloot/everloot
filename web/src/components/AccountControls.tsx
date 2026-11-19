@@ -72,7 +72,7 @@ export default function AccountControls({ savedBuilds = false, initialShell = nu
     }
   }
 
-  const alert = error && <p role="alert" className="absolute right-0 top-full mt-2 w-56 rounded-lg border border-line bg-canvas p-3 text-sm text-fg">{error}</p>;
+  const alert = error && <p role="alert" className="absolute right-0 top-full mt-2 w-56 rounded-card border border-line bg-canvas p-3 text-sm text-fg">{error}</p>;
   const signIn = status === "anonymous" ? <a href="/sign-in" className={controlClass}>Sign in</a>
     : status === "unavailable" ? <button type="button" aria-label="Retry account status" onClick={() => setRetry(retry + 1)} className={controlClass}>Retry</button>
     : <button type="button" disabled aria-busy="true" className={controlClass}>Account</button>;

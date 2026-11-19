@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
-import { emptyMarket, foldMarket } from "../../../../../kb/src/market";
+import { emptyMarket, foldMarket } from "@kb/market";
 
 // The ruleset tabs with the realm map as it might read on launch day; ./market.test.tsx covers the hub with the map empty.
 const map = vi.hoisted(() => ({ realms: [] as { name: string; ruleset: string; region: string }[] }));

@@ -1,15 +1,15 @@
 import { tools, toolHref } from "@/data/tools";
 import { allDocsPages } from "@/lib/docs/nav";
 import { entityHref } from "@/components/EntityLink";
-import { describe } from "../../../kb/src/item-taxonomy";
-import { objectList } from "../../../kb/src/object-page";
+import { describe } from "@kb/item-taxonomy";
+import { objectList } from "@kb/object-page";
 import { achievementHref, chainHref, factionHref, loadCatalog, titleDisplayName, titleHref } from "./completion-lists";
 import { CLIENT_TAXONOMY } from "./items";
-import { allTerms, type SearchHit } from "../../../kb/src/search";
+import { allTerms, type SearchHit } from "@kb/search";
 import { classLabel } from "./class-context";
 import { CLASSES } from "@/design/tokens";
 import { instanceHref, instanceRows, instanceTitle, levelLabel, type InstanceRow } from "./instances";
-import { loreSlug, MAX_QUERY, searchLore, searchLoreSomeWords, UNAVAILABLE } from "./lore";
+import { laterExpansionPages, loreSlug, MAX_QUERY, searchLore, searchLoreSomeWords, UNAVAILABLE } from "./lore";
 import { loadNames, type Names } from "./names";
 import { loadObjectFacts } from "./objects";
 import { loadWiki, publishedPages, wikiHref } from "./wiki";
@@ -372,12 +372,18 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
 
     const lore = await loreRead;
     if (lore) {
+      // When the words also name something in WoW: Forever, the lore pages about later expansions (their wiki
+      // categories name only expansions after the original game: Mechagon, the Argent Tournament) are left out.
+      const forever = [...GAME].some((t) => (found.get(t)?.total ?? 0) > 0);
+      const later = forever ? await laterExpansionPages([...lore.hits, ...(lore.some ?? [])].map((h) => h.id)) : new Set<number>();
+      const kept = (hits: SearchHit[]) => hits.filter((h) => !later.has(h.id));
       const loreHit = (h: SearchHit) => ({ label: h.name, href: `/lore/${loreSlug(h)}`, note: h.snippet, exact: h.name.toLowerCase() === q });
       if (lore.hits.length || !lore.some) {
-        const hits = lore.hits.map(loreHit);
+        const hits = kept(lore.hits).map(loreHit);
         found.set("lore", { results: hits.slice(0, LORE_LIMIT), total: hits.length });
       } else {
-        found.set("lore", { results: lore.some.map(loreHit), total: lore.some.length, heading: LORE_SOME_WORDS });
+        const some = kept(lore.some).map(loreHit);
+        found.set("lore", { results: some, total: some.length, heading: LORE_SOME_WORDS });
       }
     }
 
@@ -415,12 +421,12 @@ const DATABASE: ReadonlySet<SearchType> = new Set([...GAME, "class", "achievemen
 
 /**
  * Where a group sits, lowest first; the order above within a tier. An exact name or id on a game entry leads,
- * then any other exact hit, then the game entries, then the rest of the database. The lore archive (Warcraft
- * Wiki copies) comes after every database group, even on an exact name: the Forever record comes first.
+ * then any other exact hit, then the game entries, then the rest of the database, tools and docs. The lore archive
+ * (Warcraft Wiki copies) comes after every other group, even on an exact name: the Forever record comes first.
  */
 function tier(g: SearchGroup): number {
   const exact = g.results.some((r) => r.exact);
-  if (g.type === "lore") return 4;
+  if (g.type === "lore") return 6;
   if (exact) return GAME.has(g.type) ? 0 : 1;
   return GAME.has(g.type) ? 2 : DATABASE.has(g.type) ? 3 : 5;
 }

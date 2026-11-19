@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { createUploadStore, type CloudConfig } from "./upload-store";
-import { loadUploadRecords } from "../../../kb/src/load-uploads";
+import { loadUploadRecords } from "@kb/load-uploads";
 
 const row = (id = "epoch:1", count = 1) => ({ kind: "loot" as const, installId: "install-one",
   eventId: id, capturedAt: "2026-10-07T00:00:00Z", sourceNpcId: 42, items: [{ itemId: 5, count }] });

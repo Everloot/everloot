@@ -8,7 +8,7 @@ import {
   boardHref, boardQuery, boardRows, changeSince, initials, sortBoard, TAG_LABEL,
   type BoardQuery, type BoardRow, type BoardSort, type Search,
 } from "@/lib/addon-board";
-import { Badge, Container, DataTable, EmptyState, Explainer, FilterBar, LinkTabs, PageHeader, type Column } from "@/components/ui";
+import { Badge, Card, Container, DataTable, EmptyState, Explainer, FilterBar, LinkTabs, PageHeader, type Column } from "@/components/ui";
 
 export const metadata: Metadata = {
   ...pageMetadata({ title: "WoW Forever Addons", description: "Addons and tools made for WoW: Forever, ranked by GitHub stars, with weekly change, recent commits, releases and installs, as a leaderboard or as cards.", path: "/addons" }),
@@ -100,7 +100,7 @@ function AddonCard({ row, showChange, showInstalls }: { row: BoardRow; showChang
     ...(showInstalls ? [["Installs", row.installs ?? dash] as [string, React.ReactNode]] : []),
   ];
   return (
-    <li id={`addon-${p.id}`} data-card className="flex min-w-0 scroll-mt-24 flex-col gap-3 rounded-card border border-line bg-panel p-4">
+    <Card as="li" padding="sm" id={`addon-${p.id}`} className="flex scroll-mt-24 flex-col gap-3">
       <div className="flex min-w-0 items-center gap-3">
         <Logo row={row} size={40} />
         <div className="min-w-0 flex-1">
@@ -125,7 +125,7 @@ function AddonCard({ row, showChange, showInstalls }: { row: BoardRow; showChang
         {source?.wago && <a href={source.wago} rel={EXT} className={`inline-flex min-h-8 items-center ${link}`}>Wago<span className="sr-only"> page of {p.name}</span></a>}
         {page && <Link href={page} className={`inline-flex min-h-8 items-center ${link}`}>On Everloot<span className="sr-only">: {p.name}</span></Link>}
       </div>
-    </li>
+    </Card>
   );
 }
 

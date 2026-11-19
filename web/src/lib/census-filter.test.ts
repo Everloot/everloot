@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   CENSUS_CLASSES, CENSUS_LAUNCH, CENSUS_RACES, FACTIONS, LEVEL_BANDS, rollupCensus, type CensusCount, type CensusRow, type CensusWindow,
-} from "../../../kb/src/census";
+} from "@kb/census";
 import { activeDims, censusHref, filterCensus, parseCensusFilter, type CensusFilter } from "./census-filter";
 
 const AS_OF = "2026-11-16T12:00:00Z";

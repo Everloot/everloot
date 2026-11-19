@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { emptyMarket, foldMarket, itemMarket, formatCopper as serverCopper } from "../../../../kb/src/market";
-import { marketValueAnswer } from "../../../../kb/src/mcp-server";
+import { emptyMarket, foldMarket, itemMarket, formatCopper as serverCopper } from "@kb/market";
+import { marketValueAnswer } from "@kb/mcp-server";
 import { FIXTURE_ANSWER, FIXTURE_ITEM, FIXTURE_LABEL, FIXTURE_REALM, FIXTURE_STRUCTURED, FIXTURE_URL } from "./market-fixture";
 import { resolveItem } from "./items";
 import { answerMarketQuestion, formatCopper, MARKET_ANSWER_BUDGET, MARKET_QUERY_BUDGET_MS, parseMarketQuestion, type MarketDeps } from "./market-question";

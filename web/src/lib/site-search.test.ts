@@ -176,6 +176,26 @@ test("game entries lead: an item named like a lore page comes first, and the lor
   for (const t of database) expect(types.indexOf(t), t).toBeLessThan(types.indexOf("lore"));
 });
 
+test("the lore archive comes after every other group, tools and docs included", async () => {
+  // "quest" finds a lore page, a tool and a docs page.
+  const types = (await search("quest")).map((g) => g.type);
+  expect(types).toEqual(expect.arrayContaining(["tool", "doc", "lore"]));
+  expect(types.at(-1)).toBe("lore");
+});
+
+test("when the words name something in Forever, lore pages about later expansions are left out; otherwise they stay", async () => {
+  // Fixture lore rows "Zone N" are in Legion or Battle for Azeroth categories only.
+  const alone = (await search("grommash")).find((g) => g.type === "lore");
+  expect(alone?.total).toBeGreaterThan(0);
+  mocks.names.npcs = new Map([[3000, "Grommash"]]);
+  const groups = await search("grommash");
+  expect(groups[0].type).toBe("npc");
+  expect(groups.find((g) => g.type === "lore")).toBeUndefined();
+  // A page with no expansion category (Thrall) stays beside a Forever match.
+  mocks.names.npcs = new Map([[4000, "Thrall"]]);
+  expect((await search("thrall")).find((g) => g.type === "lore")!.results[0]).toMatchObject({ label: "Thrall" });
+});
+
 test("an exact game entry leads an exact tool; a game entry that only contains the words still beats the lore archive", async () => {
   mocks.names.items = new Map([[1, "Talent Calculator"]]);
   const exact = (await search("talent calculator")).map((g) => g.type);

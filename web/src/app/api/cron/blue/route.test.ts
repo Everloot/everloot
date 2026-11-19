@@ -2,14 +2,14 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/blue-store", async (actual) => ({ ...(await actual<object>()), readBlueStore: vi.fn(), writeBlueStore: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidateTag: vi.fn() }));
-vi.mock("../../../../../../kb/src/blue-posts", () => ({ ingestBluePosts: vi.fn() }));
+vi.mock("@kb/blue-posts", () => ({ ingestBluePosts: vi.fn() }));
 import { GET } from "./route";
 import { readBlueStore, STORE_TIMEOUT_MS, writeBlueStore } from "@/lib/blue-store";
 import { CANCEL_MS, REQUEST_TIMEOUT_MS, RUN_BUDGET_MS, WORK_ENDS_MS, WRITE_RESERVE_MS } from "./budget";
 import { revalidateTag } from "next/cache";
-import { ingestBluePosts } from "../../../../../../kb/src/blue-posts";
+import { ingestBluePosts } from "@kb/blue-posts";
 import posts from "../../../../../../kb/changes/blue-posts.json";
-import type { BluePost } from "../../../../../../kb/src/blue-posts";
+import type { BluePost } from "@kb/blue-posts";
 
 beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); vi.clearAllMocks(); });

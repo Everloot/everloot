@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import LinkTabs from "@/components/ui/LinkTabs";
+import Icon from "@/components/ui/Icon";
 import { DOCS_TABS, tabFor, type DocsTab } from "@/lib/docs/nav";
 import DocsIcon from "./DocsIcon";
 
@@ -45,7 +46,7 @@ function SidebarLinks({ tab, path, onNavigate }: { tab: DocsTab; path: string; o
                     className={`flex min-h-9 items-center gap-2 rounded-control px-3 py-1.5 text-sm transition-colors ${on ? "bg-accent/10 font-medium text-accent" : "text-fg-2 hover:bg-panel hover:text-fg"}`}
                   >
                     {page.method && (
-                      <span className={`rounded-[4px] px-1 font-mono text-[10px] font-semibold leading-4 ${page.method === "GET" ? "bg-accent/15 text-accent" : "bg-warning/15 text-warning"}`}>{page.method}</span>
+                      <span className={`rounded-control px-1 font-mono text-[10px] font-semibold leading-4 ${page.method === "GET" ? "bg-accent/15 text-accent" : "bg-warning/15 text-warning"}`}>{page.method}</span>
                     )}
                     <span className={`min-w-0 [overflow-wrap:anywhere] ${page.method || tab.id === "mcp" && page.href.includes("/tools/") ? "font-mono text-[13px]" : ""}`}>{page.title}</span>
                   </Link>
@@ -91,7 +92,7 @@ export function DocsSidebar() {
           className="btn mb-6 min-h-10 w-full justify-between px-4 text-sm"
         >
           <span>{tab.label} menu</span>
-          <svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" className={open ? "rotate-180" : ""}><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
+          <Icon name="chevron" className={open ? "rotate-180" : undefined} />
         </button>
         {open && (
           <nav id="docs-menu" aria-label={`${tab.label} pages`} className="mb-8 rounded-card border border-line bg-panel p-3">

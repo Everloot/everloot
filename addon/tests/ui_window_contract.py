@@ -3,8 +3,8 @@
 The Everloot window (modules/window.lua): built the first time it opens, from the minimap button or
 /everloot window, and drawn only from what the client and the saved file hold. A value it cannot read is a
 dash, never a number. It registers no events, so recording never runs through it: an error inside it closes
-the window and leaves capture as it was, and the off switch keeps it from being built at all. Its title is
-Everloot in fel green, and the settings page borrows its look at load without building it. The item
+the window and leaves capture as it was, and the off switch keeps it from being built at all. Its crest sits
+centred on the top edge with EVERLOOT in gold beneath it, and the settings page borrows its look at load without building it. The item
 tooltip keeps its lines under one "Everloot" header, and the crest texture ships in the addon zip.
 """
 import shutil
@@ -112,6 +112,12 @@ assert(b.insets.left == 11 and b.insets.right == 12 and b.insets.top == 12 and b
 assert(f.border[1] == 1 and f.border[2] == 1 and f.border[3] == 1, 'untinted, so the edge stays gold')
 assert(f.grip.point[1] == 'BOTTOMRIGHT' and f.grip.point[2] <= -12 and f.grip.point[3] >= 12, 'the grip sits inside the gold edge')
 assert(f.crest.path == 'Interface\\\\AddOns\\\\Everloot\\\\media\\\\crest', 'the crest')
+-- The title crown: the crest centred on the top edge, half above it, and the name centred beneath it, all above the
+-- views and the sidebar, which start 48 below the top.
+assert(f.crest.point[1] == 'TOP' and f.crest.point[2] == 0 and f.crest.point[3] == 20 and f.crest.width == 44, 'the crest on the top edge')
+assert(f.title.point[1] == 'TOP' and f.title.point[2] == f.crest and f.title.point[3] == 'BOTTOM', 'the name beneath the crest')
+assert(f.crest.point[3] - f.crest.width + f.title.point[5] - 18 > -48, 'the crown ends above the views')
+assert(f.subtitle.point[1] == 'TOPLEFT' and f.subtitle.point[2] == 20, 'the page name in the top-left corner')
 
 -- The corner grip, as on the game's chat windows: dragging right by a quarter of the window's width makes it a quarter
 -- bigger with the top-left corner held; the size is kept, held to the limits and to the screen, and a right-click
@@ -147,8 +153,8 @@ U.Toggle(); assert(U.Open() == true and scale == (600 - 32) / 450, 'never larger
 UIParent.GetHeight = function() return 1080 end
 EverlootDB.windowScale = nil
 U.Toggle(); assert(U.Open() == true and scale == 1, 'normal size until the grip is used')
-assert(f.title.text == 'Everloot' and f.title.color[2] > 0.9 and f.title.color[1] < 0.7 and f.title.color[3] < 0.3,
-  'Everloot in fel green, as in the tooltip')
+assert(f.title.text == 'EVERLOOT' and f.title.color[1] > 0.9 and f.title.color[2] > 0.7 and f.title.color[3] < 0.4,
+  'EVERLOOT in gold, as the frame')
 assert(f.subtitle.text == 'Home' and f.home.shown ~= false and f.nav.home.on.shown, 'Home is open, its nav item lit')
 assert(f.name.text == 'Samplechar' and f.realm.text == 'Forever', f.name.text)
 assert(f.class.text:find('^Level 24 Orc |cff0070dd') and f.class.text:find('Shaman'), f.class.text)
@@ -310,7 +316,7 @@ NumberFontNormal = { GetFont = function() return 'Fonts\\\\2002B.TTF', 12, '' en
 lua.execute("""
 assert(Everloot.Window.Open())
 local f = EverlootWindow
-assert(f.title.font == 'Fonts\\\\2002.TTF', 'the title uses the client font: ' .. tostring(f.title.font))
+assert(f.title.font == 'Fonts\\\\2002.TTF', 'without a quest title font the title uses the client font: ' .. tostring(f.title.font))
 assert(f.realm.font == 'Fonts\\\\2002.TTF', 'the realm line too: ' .. tostring(f.realm.font))
 assert(f.onHand.font == 'Fonts\\\\2002B.TTF', 'numbers use the client number font: ' .. tostring(f.onHand.font))
 assert(Everloot.Window.NARROW == 'Fonts\\\\2002B.TTF')
@@ -322,6 +328,15 @@ NumberFontNormal = { GetFont = function() error('no font') end }
 lua.execute("""
 assert(Everloot.Window.Open())
 assert(EverlootWindow.title.font == 'Fonts\\\\FRIZQT__.TTF' and Everloot.Window.NARROW == 'Fonts\\\\ARIALN.TTF', 'a bad value falls back to the Latin fonts')
+""")
+lua = fresh("{ installId = 'abcd-1234', toggles = {}, records = {} }", """
+QuestTitleFont = { GetFont = function() return 'Fonts\\\\MORPHEUS.TTF', 18, '' end }
+""")
+lua.execute("""
+assert(Everloot.Window.Open())
+local f = EverlootWindow
+assert(f.title.font == 'Fonts\\\\MORPHEUS.TTF', 'the name uses the game quest title face: ' .. tostring(f.title.font))
+assert(f.realm.font == 'Fonts\\\\FRIZQT__.TTF', 'the other text keeps the text font')
 """)
 
 # --- A value the client cannot give, or will not let the addon read, is a dash ---

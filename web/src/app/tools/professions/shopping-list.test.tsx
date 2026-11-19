@@ -36,7 +36,7 @@ test("device preferences, dated house prices, skip recomputation and clipboard m
  expect(host.textContent).toContain("Alliance, 2026-11-14");
  expect(host.textContent).toContain("Item 2: source not confirmed yet");
  expect(vi.mocked(fetch).mock.calls.every(([url]) => String(url).startsWith("/api/market/prices"))).toBe(true);
- const button=(text:string)=>[...host.querySelectorAll("button")].find(b=>b.textContent===text)!;
+ const button=(text:string)=>[...host.querySelectorAll("button")].find(b=>(b.querySelector("[data-copy-labels] > span")?.textContent ?? b.textContent)===text)!;
  await act(async()=>button("Skip this recipe: Potion").click());
  expect(host.textContent).toContain("9 Iron Ore — 90c");
  await act(async()=>button("Copy shopping list").click());

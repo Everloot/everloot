@@ -83,7 +83,7 @@ test("the phone menu lists the same places", async () => {
   const toggle = Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "Menu")!;
   await act(async () => toggle.click());
   const panel = container.querySelector("#site-navigation")!;
-  for (const href of ["/database", "/map", "/changes", "/lore", "/database/instances", "/chat", "/docs", "/tools/talents", "/census", "/account", "/tools/builds", "/tools/alts", "/about"])
+  for (const href of ["/database", "/map", "/changes", "/lore", "/database/instances", "/chat", "/docs", "/tools/talents", "/census", "/settings", "/tools/builds", "/tools/alts", "/about"])
     expect(panel.querySelector(`a[href="${href}"]`), href).not.toBeNull();
   for (const href of ["/upload", "/tools/farming-routes", "/tools/collections"]) expect(panel.querySelector(`a[href="${href}"]`), href).toBeNull();
   expect(panel.querySelector('form[action="/search"]')).not.toBeNull();
@@ -141,4 +141,27 @@ test("the phone menu's More group reports a bug: the menu closes, focus goes to 
   expect(heard).toHaveBeenCalledTimes(1);
   expect(container.querySelector("#site-navigation")).toBeNull();
   expect(document.activeElement).toBe(toggle);
+});
+
+test("on a phone each group shows three links and More… for the rest; the open menu covers the page", async () => {
+  const toggle = container.querySelector<HTMLButtonElement>('button[aria-controls="site-navigation"]')!;
+  await act(async () => toggle.click());
+  const nav = container.querySelector("#site-navigation")!;
+  expect(nav.className).toContain("fixed");
+  expect(nav.className).toContain("bottom-0");
+  const guides = container.querySelector("#guides-menu-phone")!;
+  const items = Array.from(guides.querySelectorAll("li"));
+  const links = items.filter((li) => li.querySelector("a"));
+  // Every link stays in the HTML, in its order; past the third they wait for More… below md.
+  expect(links.length).toBeGreaterThan(3);
+  expect(links.slice(0, 3).every((li) => !li.className.includes("hidden"))).toBe(true);
+  expect(links.slice(3).every((li) => li.className === "hidden md:block")).toBe(true);
+  const more = Array.from(guides.querySelectorAll("button")).find((b) => b.textContent === "More…")!;
+  expect(more.closest("li")!.className).toBe("md:hidden");
+  await act(async () => more.click());
+  expect(Array.from(guides.querySelectorAll("li")).every((li) => !li.className.includes("hidden"))).toBe(true);
+  expect(Array.from(guides.querySelectorAll("button")).some((b) => b.textContent === "More…")).toBe(false);
+  // Opening one group leaves the others folded.
+  const tools = container.querySelector("#tools-menu-phone")!;
+  expect(Array.from(tools.querySelectorAll("button")).some((b) => b.textContent === "More…")).toBe(true);
 });

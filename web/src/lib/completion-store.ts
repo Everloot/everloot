@@ -1,5 +1,5 @@
-import { authorizedOwners, completionFactsOf } from "../../../kb/src/completion-rollup";
-import type { CompletionFacts } from "../../../kb/src/completion";
+import { authorizedOwners, completionFactsOf } from "@kb/completion-rollup";
+import type { CompletionFacts } from "@kb/completion";
 import { sharingStore, uploadStore } from "./upload-store";
 
 /**

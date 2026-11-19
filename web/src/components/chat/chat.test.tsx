@@ -114,7 +114,7 @@ describe("the chat page", () => {
     expect(details!.open).toBe(true);
     expect(details!.textContent).toContain("Everloot search is ready");
     expect(details!.textContent).toContain("(sign in first)");
-    expect(details!.querySelector("a")?.getAttribute("href")).toBe("/sign-in?returnTo=%2Faccount%23chat-keys");
+    expect(details!.querySelector("a")?.getAttribute("href")).toBe("/sign-in?returnTo=%2Fsettings%23chat-keys");
   });
 
   test("the mode chip follows the free/search choice and keeps provider disclosure reachable", async () => {
@@ -164,13 +164,13 @@ describe("the chat page", () => {
     expect(sessionStorage.getItem(PROVIDERS)).toContain(KEY);
     expect(text()).toContain("Keys last only in this tab. Closing it forgets them.");
   });
-  test("no key, signed in: search is ready, optional Assistant setup links to /account, the account label and four suggestions", async () => {
+  test("no key, signed in: search is ready, optional Assistant setup links to Settings, the account label and four suggestions", async () => {
     api();
     await render(<ChatClient profiles />);
     expect(container.querySelectorAll("textarea")).toHaveLength(1);
     expect(container.querySelector('input[type="password"]')).toBeNull();
     const setup = Array.from(container.querySelectorAll("a")).find((a) => a.textContent === "Assistant setup");
-    expect(setup?.getAttribute("href")).toBe("/account#chat-keys");
+    expect(setup?.getAttribute("href")).toBe("/settings#chat-keys");
     // Search is presented as working and the model as optional, with its cost the player's own account.
     expect(text()).toContain("Everloot search is ready");
     expect(text()).toContain("optional AI model");
@@ -185,16 +185,16 @@ describe("the chat page", () => {
     api({ signed: false });
     await render(<ChatClient profiles />);
     const setup = Array.from(container.querySelectorAll("a")).find((a) => a.textContent === "Assistant setup");
-    expect(setup?.getAttribute("href")).toBe("/sign-in?returnTo=%2Faccount%23chat-keys");
+    expect(setup?.getAttribute("href")).toBe("/sign-in?returnTo=%2Fsettings%23chat-keys");
     expect(text()).toContain("Signed out: lookups use the public limits");
     expect(text()).not.toContain("Game data through your Everloot account");
   });
 
-  test("with profiles off, setup still links to /account, and the page has no key field of its own", async () => {
+  test("with profiles off, setup still links to Settings, and the page has no key field of its own", async () => {
     api();
     await render(<ChatClient />);
     const setup = Array.from(container.querySelectorAll("a")).find((a) => a.textContent === "Assistant setup");
-    expect(setup?.getAttribute("href")).toBe("/account#chat-keys");
+    expect(setup?.getAttribute("href")).toBe("/settings#chat-keys");
     expect(container.querySelector("dialog")).toBeNull();
     expect(container.querySelector('input[name="key"]')).toBeNull();
   });
@@ -269,9 +269,44 @@ describe("the chat page", () => {
   });
 
   test("an answer the tools did not back is labelled From the model", async () => {
-    await render(<AssistantMessage m={{ role: "assistant", text: "Tailors make it.", at: "", model: "m", sources: [], pages: [], steps: [] }} copied={false} onCopy={() => {}} />);
+    await render(<AssistantMessage m={{ role: "assistant", text: "Tailors make it.", at: "", model: "m", sources: [], pages: [], steps: [] }} />);
     expect(text()).toContain("From the model");
     expect(text()).not.toContain("From Everloot");
+  });
+
+  test("while the answer is pending a still skeleton shows; a failed turn offers Retry, which sends the same question once more", async () => {
+    api();
+    saveKey();
+    const site = fetch as unknown as (input: string, init?: RequestInit) => Promise<Response>;
+    let release: () => void = () => {};
+    let failed = false;
+    vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
+      if (String(input) === "https://openrouter.ai/api/v1/chat/completions" && !failed) {
+        failed = true;
+        calls.push({ url: String(input), init });
+        await new Promise<void>((r) => { release = r; });
+        return Response.json({ error: { message: "Rate limited" } }, { status: 429 });
+      }
+      return site(input, init);
+    }));
+    await render(<ChatClient profiles />);
+    await act(async () => setValue(textarea(), "Where does Linen Cloth drop?"));
+    await act(async () => textarea().form!.requestSubmit());
+    await settle();
+    expect(container.querySelector("[data-answer-pending]")).not.toBeNull();
+    expect(text()).toContain("Answering…");
+    expect(button("Retry")).toBeUndefined();
+
+    await act(async () => release());
+    await settle();
+    expect(container.querySelector("[data-answer-pending]")).toBeNull();
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    await click(button("Retry"));
+    expect(text()).toContain("Humanoids drop it.");
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(button("Retry")).toBeUndefined();
+    // The question is asked once in the conversation, not once per try.
+    expect(text().split("Where does Linen Cloth drop?").length - 1).toBe(1);
   });
 
   test("Ctrl+Shift+O starts a new chat", async () => {

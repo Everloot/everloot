@@ -1,5 +1,5 @@
 import { beforeEach, expect, test, vi } from "vitest";
-import type { WorldFacts } from "../../../kb/src/world-pages";
+import type { WorldFacts } from "@kb/world-pages";
 
 // No name here comes from the private files: the fixtures stand in for the agreed names, the world rows and the wiki file.
 const mocks = vi.hoisted(() => ({
@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   wiki: null as { version: string; names: Map<number | string, { name: string; wikiPage: string }> } | null,
 }));
 vi.mock("@/lib/names", () => ({ loadNames: async () => mocks.agreed }));
-vi.mock("@/lib/shown-item-names", () => ({ loadShownNames: async () => ({ matched: null }) }));
+vi.mock("@/lib/shown-item-names", async (importOriginal) => ({ ...await importOriginal<typeof import("@/lib/shown-item-names")>(), loadShownNames: async () => ({ matched: null }) }));
 vi.mock("@/lib/game-assets", () => ({ loadQuestNames: async () => null }));
 vi.mock("@/lib/rollup-compute", () => ({ loadWorldFacts: async () => mocks.world }));
 vi.mock("@/lib/wiki-entity-names", () => ({ loadWikiEntityNames: async (kind: string) => (kind === "npc" ? mocks.wiki : null) }));

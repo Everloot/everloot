@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { InstanceDef } from "../../../kb/src/guilds";
+import type { InstanceDef } from "@kb/guilds";
 import { scoreInstances } from "./everloot-score";
 import type { InstanceRow } from "./instances";
 

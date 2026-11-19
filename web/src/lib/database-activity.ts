@@ -1,10 +1,10 @@
-import { itemFactsFromRecords, recheckLootRecords, lootWindowsFromRecords, rollupDrops } from "../../../kb/src/drop-rollup";
-import { agreedItemNames } from "../../../kb/src/item-page";
-import { agreedObjectNames } from "../../../kb/src/object-spawns";
-import { agreedNpcNames, agreedQuestTitles, npcPage, questPage, questScope, worldFactsFromRecords, zonesFor } from "../../../kb/src/world-pages";
-import { recheckRows } from "../../../kb/src/fact-states";
-import { scopeSince } from "../../../kb/src/recheck-scopes";
-import { confirmedEntrances, instanceBosses, instanceFactsFromRecords } from "../../../kb/src/instances";
+import { itemFactsFromRecords, recheckLootRecords, lootWindowsFromRecords, rollupDrops } from "@kb/drop-rollup";
+import { agreedItemNames } from "@kb/item-page";
+import { agreedObjectNames } from "@kb/object-spawns";
+import { agreedNpcNames, agreedQuestTitles, npcPage, questPage, questScope, worldFactsFromRecords, zonesFor } from "@kb/world-pages";
+import { recheckRows } from "@kb/fact-states";
+import { scopeSince } from "@kb/recheck-scopes";
+import { confirmedEntrances, instanceBosses, instanceFactsFromRecords } from "@kb/instances";
 import { RECHECK_SCOPES } from "./recheck-scopes";
 import type { Corpus } from "./upload-store";
 

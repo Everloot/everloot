@@ -8,9 +8,10 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { webApplicationJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import { uploadStore } from "@/lib/upload-store";
-import { AH_PATH, agreementSoFar, busiestHouse, findBoard, houseSlug, itemHref, money, realmBoards, type MarketRow } from "@/lib/auction-house";
+import { AH_PATH, busiestHouse, findBoard, houseSlug, itemHref, money, type MarketRow } from "@/lib/auction-house";
+import { loadMarketBoards } from "@/lib/market-boards";
 import { BAGS_BUILD, BAG_SLOTS, bagsParam, cheapestBySize, pricedSizes, upgrades, type Upgrade } from "@/lib/bags";
-import { MARKET_RULE, formatCopper } from "../../../../../kb/src/market";
+import { MARKET_RULE, formatCopper } from "@kb/market";
 import { auctionNames, itemArt, type ItemTip } from "../auctions/art";
 import { Contribute, ItemLink, RealmName } from "../auctions/parts";
 import { RealmHousePicker, realmHouseHref, realmHouseParams } from "../auctions/RealmHousePicker";
@@ -45,12 +46,12 @@ export default async function BagsPage(props: { searchParams: Promise<Search> })
   const current = bagsParam(search);
   const now = new Date();
   const market = await uploadStore.loadMarket();
-  const state = market.state;
-  const realms = state ? realmBoards(state, now) : [];
+  const stored = await loadMarketBoards(market, now);
+  const realms = stored ? stored.boards(null) : [];
   const realm = slug ? findBoard(realms, slug) : null;
   // A house is its own market: with none asked for, the realm's busiest house, named on the page; never a blend.
   const house: AuctionHouse | null = asked ?? (realm ? busiestHouse(realm.rows)?.house ?? null : null);
-  const board = state && slug && house ? findBoard(realmBoards(state, now, house), slug) : null;
+  const board = stored && slug && house ? findBoard(stored.boards(house), slug) : null;
   const cheapest = board ? cheapestBySize(board.rows) : new Map<number, MarketRow>();
   // Sizes some house prices, so a size only bags that bind when picked up come in never lists.
   const sizes = [...new Set([...pricedSizes(realms), ...cheapest.keys()])].sort((a, b) => a - b);
@@ -60,7 +61,7 @@ export default async function BagsPage(props: { searchParams: Promise<Search> })
 
   const ids = [...cheapest.values()].map((r) => r.value.itemId);
   const tips: Map<number, ItemTip> = ids.length ? (await itemArt(ids)).tips : new Map();
-  const names = await auctionNames(ids, tips);
+  const names = await auctionNames(ids, tips, stored?.names);
   const realmName = realm?.realm.name ?? null;
   const where = house && realmName ? `the ${house} auction house on ${realmName}` : null;
 
@@ -82,12 +83,12 @@ export default async function BagsPage(props: { searchParams: Promise<Search> })
   const smallest = Math.min(...current);
 
   let body;
-  if (!state) {
+  if (!stored) {
     body = <Card><p className="text-fg-2" role="status">Market values are unavailable right now. They are unrecorded, not zero.</p></Card>;
   } else if (!slug || !house) {
     body = <EmptyState message={realms.length ? "Pick a realm and an auction house to see what bags cost there." : "No realm has public prices yet: a realm shows here once 3 reporters scan the same item there."} />;
   } else if (!board) {
-    body = <EmptyState count={agreementSoFar(state, slug, undefined, house)} message={`No public prices in the ${house} auction house on ${realmName ?? "this realm"} yet: a price shows once 3 reporters scan the same item there.`} />;
+    body = <EmptyState count={stored.agreement(slug, house)} message={`No public prices in the ${house} auction house on ${realmName ?? "this realm"} yet: a price shows once 3 reporters scan the same item there.`} />;
   } else {
     body = (
       <div className="space-y-8">

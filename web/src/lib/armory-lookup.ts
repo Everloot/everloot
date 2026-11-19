@@ -1,6 +1,6 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { ApiError, ForeverApi, type Region } from "../../../kb/src/armory/api";
-import { parseCharacter } from "../../../kb/src/armory/parse";
+import { ApiError, ForeverApi, type Region } from "@kb/armory/api";
+import { parseCharacter } from "@kb/armory/parse";
 import { armoryOn, characterSlugOf } from "./armory";
 import { armoryStore, type ArmoryHit, type ArmoryStore } from "./armory-store";
 

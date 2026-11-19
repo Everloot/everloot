@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { COVERAGE_TYPES, type CoverageType, type ZoneCoverage } from "../../../../../kb/src/coverage";
+import { COVERAGE_TYPES, type CoverageType, type ZoneCoverage } from "@kb/coverage";
 import { Container, DataTable, DataTitle, FilterBar, type SparseColumn } from "@/components/ui";
 import { loadCoverage } from "@/lib/coverage-compute";
 import { cellDetail, cellRank, COVERAGE_SORTS, measuredLine, shareText, TYPE_LABEL, zoneCoverageHref, type CoverageSort } from "@/lib/coverage-view";
 import { pageMetadata } from "@/lib/seo";
-import { PLATEAU_TYPES, type TypePlateau } from "../../../../../kb/src/plateau";
+import { PLATEAU_TYPES, type TypePlateau } from "@kb/plateau";
 import { LINK } from "../entity";
 import { listHref, listQuery, NoMatches, nextSort, sortParam, sortRows, Unreadable, type Search } from "../list-parts";
 import { loadPlateau, plateauDetail, plateauMeasured, plateauShare, plateauVerdict } from "./plateau";

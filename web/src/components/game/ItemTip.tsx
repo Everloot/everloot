@@ -1,6 +1,6 @@
 "use client";
 
-import { cloneElement, isValidElement, useEffect, useId, useState, type ReactElement } from "react";
+import { cloneElement, isValidElement, useEffect, useId, useState, type ReactElement, type ReactNode } from "react";
 import type { ItemTip as Tip } from "@/lib/game-assets";
 import { CardPopup, GameCard } from "./GameCard";
 import { splitWhy } from "@/lib/placeholder";
@@ -13,11 +13,12 @@ import GameIcon from "./GameIcon";
 // screen reader gets it without hovering. Touch gets no card: a tap goes to the page.
 // Without a tip (no asset URL, or no record for the item) the link is returned exactly as it was.
 
-export default function ItemTip({ tip, size = 20, children }: { tip: Tip | null | undefined; size?: number; children: ReactElement }) {
-  return tip ? <Tipped tip={tip} size={size}>{children}</Tipped> : children;
+// `icon` replaces the icon drawn in front (a caller that draws its own frame or fallback); the card keeps the tip's icon.
+export default function ItemTip({ tip, size = 20, icon, children }: { tip: Tip | null | undefined; size?: number; icon?: ReactNode; children: ReactElement }) {
+  return tip ? <Tipped tip={tip} size={size} icon={icon}>{children}</Tipped> : children;
 }
 
-function Tipped({ tip, size, children }: { tip: Tip; size: number; children: ReactElement }) {
+function Tipped({ tip, size, icon, children }: { tip: Tip; size: number; icon?: ReactNode; children: ReactElement }) {
   const id = useId();
   const anchorId = `item${id}`;
   const descId = `${anchorId}-desc`;
@@ -42,7 +43,7 @@ function Tipped({ tip, size, children }: { tip: Tip; size: number; children: Rea
       onFocus={(e) => setOpen({ anchor: e.currentTarget, x: null })}
       onBlur={() => setOpen(null)}
     >
-      {tip.icon && <GameIcon src={tip.icon} size={size} quality={QUALITIES.find((q) => q === tip.quality.toLowerCase())} />}
+      {icon !== undefined ? icon : tip.icon && <GameIcon src={tip.icon} size={size} quality={QUALITIES.find((q) => q === tip.quality.toLowerCase())} />}
       {link}
       <span id={descId} hidden>{[`${tip.name}, ${tip.quality}`, ...tip.lines, tip.label].join(". ")}</span>
       {open && (

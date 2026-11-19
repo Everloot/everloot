@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MCP_TOOL_NAMES } from "@everloot/protocol";
 import { afterEach, beforeAll, expect, test, vi } from "vitest";
-import { openDb } from "../../../kb/src/db";
-import { replaceSourceRows } from "../../../kb/src/entities";
-import { snapshot } from "../../../kb/src/snapshot";
+import { openDb } from "@kb/db";
+import { replaceSourceRows } from "@kb/entities";
+import { snapshot } from "@kb/snapshot";
 import { safeReturnTo, signInPath } from "./auth/return-to";
 import {
   BUILD_COLUMNS, codeClass, editPath, LIMITS, MY_BUILDS, ORDER_COLUMNS, parseBuildInput, parseCharacterInput, savedBuildsOn, toBuild, toCharacters,

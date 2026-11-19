@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import type { RecheckScope } from "../../../kb/src/coverage";
-import { worldFactsFromRecords } from "../../../kb/src/world-pages";
+import type { RecheckScope } from "@kb/coverage";
+import { worldFactsFromRecords } from "@kb/world-pages";
 import { npcRows, publicQuests, publicVendors } from "./world-lists";
 
 const day = (n: number) => new Date(Date.UTC(2026, 9, 1 + n)).toISOString();

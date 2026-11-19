@@ -217,14 +217,14 @@ export default async function AddonPage() {
         </div>
 
         <section id="why" aria-labelledby="why-title" className="scroll-mt-20 space-y-6">
-          <div className="max-w-reading">
+          <Container width="reading">
             <SectionHeading id="why-title">Why run the addon</SectionHeading>
             <p className="text-fg-2">
               Blizzard hides some WoW: Forever details until an item drops, and runs no public test realm. What players
               saw in play is how this site learns what is real. You play as you always do, and the addon writes down what
               the game showed you.
             </p>
-          </div>
+          </Container>
           <div className="grid items-start gap-6 md:grid-cols-3">
             <Card as="section" aria-labelledby="why-records" className="space-y-3">
               <SectionHeading id="why-records" as="h3">What it records</SectionHeading>

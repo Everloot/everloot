@@ -1,11 +1,11 @@
-import { SOURCES } from "../../../kb/src/sources";
-import { search, searchSomeWords, type SearchHit } from "../../../kb/src/search";
-import type { Facets, LoreType } from "../../../kb/src/importers/wiki-classify";
-import type { Infobox } from "../../../kb/src/importers/wiki-infobox";
+import { SOURCES } from "@kb/sources";
+import { search, searchSomeWords, type SearchHit } from "@kb/search";
+import type { Facets, LoreType } from "@kb/importers/wiki-classify";
+import type { Infobox } from "@kb/importers/wiki-infobox";
 import { getRelease } from "./release";
 
-export type { Facets, LoreType } from "../../../kb/src/importers/wiki-classify";
-export type { Infobox } from "../../../kb/src/importers/wiki-infobox";
+export type { Facets, LoreType } from "@kb/importers/wiki-classify";
+export type { Infobox } from "@kb/importers/wiki-infobox";
 
 /**
  * The lore archive: Warcraft Wiki pages from the approved knowledge release, served on the site.
@@ -41,8 +41,8 @@ export function parseLetter(raw: string | undefined): string | null {
 
 // The slug helpers and the indexing rule live with the knowledge base, so the MCP server names the same
 // pages and links only the ones the site indexes.
-import { INDEXABLE_MIN_BODY } from "../../../kb/src/lore-slug";
-export { INDEXABLE_MIN_BODY, isIndexable, loreSlug, slugify } from "../../../kb/src/lore-slug";
+import { INDEXABLE_MIN_BODY } from "@kb/lore-slug";
+export { INDEXABLE_MIN_BODY, isIndexable, loreSlug, slugify } from "@kb/lore-slug";
 
 /**
  * Wiki ids are digits (`291323-frostwhisper`); curated ids are kebab strings and carry no name
@@ -281,6 +281,29 @@ export async function searchLoreSomeWords(q: string, limit: number): Promise<Sea
   const release = await getRelease();
   if (!release) return UNAVAILABLE;
   return searchSomeWords(release.db, q.slice(0, MAX_QUERY), limit, { kinds: ["lore_page"] });
+}
+
+/** The expansion the wiki's own categories name for the original game; every other one came later. */
+const ORIGINAL_GAME = "World of Warcraft";
+
+/**
+ * Of these lore pages (entity ids), the ones whose wiki categories name only expansions after the original game
+ * (`facets.expansion`, read from categories such as "Battle for Azeroth zones"). A page with no expansion category,
+ * or from a release built before classification, is never in the set.
+ */
+export async function laterExpansionPages(ids: readonly number[]): Promise<Set<number>> {
+  const release = await getRelease();
+  if (!release || ids.length === 0) return new Set();
+  const rows = await release.db.all<{ id: number; expansion: string | null }>(
+    `SELECT id, json_extract(data, '$.facets.expansion') AS expansion FROM entities WHERE id IN (${ids.map(() => "?").join(",")})`, ...ids,
+  );
+  const later = new Set<number>();
+  for (const row of rows) {
+    let names: unknown;
+    try { names = row.expansion ? JSON.parse(row.expansion) : null; } catch { names = null; }
+    if (Array.isArray(names) && names.length > 0 && !names.includes(ORIGINAL_GAME)) later.add(row.id);
+  }
+  return later;
 }
 
 /** The count scans every body (seconds on the real file); a read-only release cannot change, so count once per open. */

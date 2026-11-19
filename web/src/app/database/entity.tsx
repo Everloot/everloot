@@ -1,9 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import JsonLd from "@/components/JsonLd";
-import GameIcon from "@/components/game/GameIcon";
 import { AgreementMeter, DataTable, GET_THE_ADDON, QUALITY_TEXT, type Column, type Quality } from "@/components/ui";
-import { UNCONFIRMED_TITLE } from "@/components/ui/Badge";
 import { trailFor } from "@/lib/breadcrumbs";
 import { breadcrumbJsonLd, type Crumb } from "@/lib/jsonld";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
@@ -13,36 +11,6 @@ import { pinLink, WORLD_MAP } from "@/lib/world-map";
 // quest chain, zone and instance), read like an item database: a compact title with its type line, the tooltip box
 // and the quick facts side by side, then full-width tabs of dense tables. Stacked on a phone. No breadcrumb on
 // screen: the trail is only the BreadcrumbList JSON-LD.
-
-/**
- * The quiet "unconfirmed" marker as an edge: a 1 px dashed frame around what it wraps (the header icon),
- * with the tooltip and sr-only text of the `files` Badge. Never a chip or a sentence.
- */
-export function Unconfirmed({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return (
-    <span data-unconfirmed title={UNCONFIRMED_TITLE} className={`inline-flex rounded-[3px] border border-dashed border-edge ${className}`.trim()}>
-      {children}
-      <span className="sr-only"> unconfirmed</span>
-    </span>
-  );
-}
-
-/**
- * The header's icon: omitted when game art is unavailable. An item's icon
- * (the page passes the game's question mark where its own is missing) has its quality border and no frame; with no
- * asset files an item has no icon at all.
- */
-export function EntityIcon({ src, quality, unconfirmed = false, item = false }: { src?: string | null; quality?: Quality; unconfirmed?: boolean; item?: boolean }) {
-  if (!src) return null;
-  if (item) return (
-    <span className="shrink-0" data-unconfirmed={unconfirmed || undefined} title={unconfirmed ? UNCONFIRMED_TITLE : undefined}>
-      <GameIcon src={src} quality={quality} size={40} className="rounded-[3px]" />
-      {unconfirmed && <span className="sr-only"> unconfirmed</span>}
-    </span>
-  );
-  const icon = <GameIcon src={src} quality={quality} size={40} className="rounded-[3px]" />;
-  return unconfirmed ? <Unconfirmed className="shrink-0 p-px">{icon}</Unconfirmed> : <span className="shrink-0">{icon}</span>;
-}
 
 /**
  * The page title of every database detail page: an optional icon, the name (in its quality colour for items) and

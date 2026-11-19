@@ -171,7 +171,7 @@ export default function TalentTreeView({ catalog, tree, ranks, available, spent,
               onPointerEnter={(e) => { if (e.pointerType === "mouse") onTip(node.id, "hover"); }}
               onPointerLeave={(e) => { if (e.pointerType === "mouse") onTip(null, "hover"); }}
               onClick={() => onAdd(node.id)}
-              className={`absolute flex flex-col items-center justify-between px-0.5 py-1 text-[11px] leading-tight text-center ${base}`}
+              className={`absolute flex flex-col items-center justify-between px-0.5 py-1 text-caption leading-tight text-center ${base}`}
             >
               <span className={`w-full min-w-0 [overflow-wrap:anywhere] hyphens-auto ${nameSize(entryAtRank(node, rank).name)}`}>{entryAtRank(node, rank).name}</span>
               <span className={`font-mono tabular-nums ${rank > 0 ? CLASS_TEXT[slug] : ""}`}>

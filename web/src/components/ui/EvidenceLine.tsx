@@ -1,5 +1,5 @@
 import { evidenceLine } from "@/lib/evidence";
-import type { Edge } from "../../../../kb/src/edges";
+import type { Edge } from "@kb/edges";
 
 /**
  * The line that goes with a count: how many installs agree, and when it was last seen. Only the

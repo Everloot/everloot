@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { MCP_TOOLS, SITE, type McpToolName } from "@everloot/protocol";
 import { z } from "zod";
-import { createToolHandlers, registeredToolNames, ToolArgumentError, type ToolHandlers } from "../../../../../../kb/src/mcp-server";
+import { createToolHandlers, registeredToolNames, ToolArgumentError, type ToolHandlers } from "@kb/mcp-server";
 import { admit, attributionHeaders } from "@/lib/data-guard";
 import { toolLoaders } from "@/lib/mcp-mount";
 import { myBuildsRoute } from "@/lib/my-builds-tool";

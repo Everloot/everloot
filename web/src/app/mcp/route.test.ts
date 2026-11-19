@@ -2,9 +2,9 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeAll, expect, test, vi } from "vitest";
-import { openDb } from "../../../../kb/src/db";
-import { replaceSourceRows } from "../../../../kb/src/entities";
-import { snapshot } from "../../../../kb/src/snapshot";
+import { openDb } from "@kb/db";
+import { replaceSourceRows } from "@kb/entities";
+import { snapshot } from "@kb/snapshot";
 
 const store = vi.hoisted(() => ({ loadCorpus: vi.fn() }));
 vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: store.loadCorpus } }));

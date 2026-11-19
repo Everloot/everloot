@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
-// `@/` is a tsconfig path alias; the app bundler resolves it, vitest needs it too.
+// `@/` and `@kb/` are tsconfig path aliases; the app bundler resolves them, vitest needs them too.
 export default defineConfig({
   // Next preserves JSX for its own compiler; component tests need a transform.
   oxc: { jsx: { runtime: "automatic" } },
@@ -10,6 +10,6 @@ export default defineConfig({
   // better-auth loads next/headers itself (nextCookies); inlining it lets a test mock that module.
   test: { testTimeout: 15_000, setupFiles: ["./vitest.setup.ts"], server: { deps: { inline: ["better-auth"] } } },
   resolve: {
-    alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
+    alias: { "@": fileURLToPath(new URL("./src", import.meta.url)), "@kb": fileURLToPath(new URL("../kb/src", import.meta.url)) },
   },
 });

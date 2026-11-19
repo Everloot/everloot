@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { emptyMarket, foldMarket } from "../../../../../kb/src/market";
+import { emptyMarket, foldMarket } from "@kb/market";
 import { realmBoards } from "@/lib/auction-house";
 import { ahHref, ahQuery, browseRows, categoryRow, categoryTree, inCategory, type AhQuery, type BrowseContext } from "./browse";
 

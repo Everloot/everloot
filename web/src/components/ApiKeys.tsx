@@ -11,12 +11,12 @@ interface Ready { status: "ready"; keys: KeyRow[]; limit: number; ownScope: bool
 type State = { status: "loading" } | { status: "signed-out" } | { status: "off" } | { status: "error"; message: string } | Ready;
 interface Fresh { token: string; name: string; expiresAt: string | null; rolled: boolean }
 
-const button = "inline-flex items-center justify-center min-h-11 px-3 rounded-lg border border-line text-sm text-fg hover:text-accent disabled:opacity-60";
-const primary = "inline-flex items-center justify-center min-h-11 px-4 rounded-lg bg-accent text-bg text-sm font-semibold hover:bg-accent/90 disabled:opacity-60";
+const button = "inline-flex items-center justify-center min-h-11 px-3 rounded-control border border-line text-sm text-fg hover:text-accent disabled:opacity-60";
+const primary = "inline-flex items-center justify-center min-h-11 px-4 rounded-control bg-accent text-bg text-sm font-semibold hover:bg-accent/90 disabled:opacity-60";
 /** The design system's pill buttons, for the Integrations cards; the list keeps `button` and `primary`. */
 const pill = "btn min-h-11 px-3 text-sm";
 const pillPrimary = "btn btn-primary min-h-11 px-3 text-sm";
-const input = "min-h-11 w-full rounded-lg border border-line bg-canvas px-3 text-sm text-fg aria-[invalid=true]:border-accent";
+const input = "min-h-11 w-full rounded-control border border-line bg-canvas px-3 text-sm text-fg aria-[invalid=true]:border-accent";
 const DAY_MS = 86_400_000;
 const EXPIRY_LABEL: Record<number, string> = { 7: "7 days", 30: "30 days", 90: "90 days", 365: "1 year" };
 const day = (iso: string | null) => (iso ? iso.slice(0, 10) : "Never");
@@ -39,12 +39,12 @@ async function send(method: "POST" | "DELETE", url: string, body?: object) {
 
 /**
  * Dispatched on window whenever this account's keys change (made, rolled, revoked or deleted), from the list or from
- * Remove access. The list reads its keys again, and on /account KeysRefresh reads the server-rendered parts again.
+ * Disconnect. The list reads its keys again, and on /settings KeysRefresh reads the server-rendered parts again.
  */
 export const KEYS_CHANGED_EVENT = "everloot:keys-changed";
 const changed = () => window.dispatchEvent(new Event(KEYS_CHANGED_EVENT));
 
-/** Dispatched on window with a sentence for the status line KeysRefresh keeps on /account. */
+/** Dispatched on window with a sentence for the status line KeysRefresh keeps on /settings. */
 const KEYS_SAID_EVENT = "everloot:keys-said";
 const say = (text: string) => window.dispatchEvent(new CustomEvent(KEYS_SAID_EVENT, { detail: text }));
 
@@ -57,7 +57,7 @@ function notListed(err: unknown): boolean {
   return status === 404 && body?.ok === false && body.error === NO_LIVE_KEY;
 }
 
-/** Revokes in flight, by key id: the list and Remove access asking for the same key share one request. */
+/** Revokes in flight, by key id: the list and Disconnect asking for the same key share one request. */
 const revoking = new Map<string, Promise<Revoked>>();
 
 /**
@@ -103,7 +103,7 @@ function Confirm({ action, name, hint, busy, confirmRef, onConfirm, onCancel, pi
   confirmRef: Ref<HTMLButtonElement>; onConfirm: () => void; onCancel: () => void; pills?: boolean;
 }) {
   return (
-    <div role="group" aria-label={`Confirm ${action} ${name}`} className="space-y-2 rounded-lg border border-line bg-panel p-3">
+    <div role="group" aria-label={`Confirm ${action} ${name}`} className="space-y-2 rounded-card border border-line bg-panel p-3">
       <p className="text-sm text-fg">
         {action === "revoke"
           ? `Revoke ${name}? Anything using evl_…${hint} stops working at once.`
@@ -125,12 +125,12 @@ function Reveal({ fresh, onDone }: { fresh: Fresh; onDone: () => void }) {
   const id = useId();
   useEffect(() => { heading.current?.focus(); }, [fresh.token]);
   return (
-    <section aria-labelledby={`${id}-title`} className="space-y-3 rounded-xl border border-accent bg-panel p-4">
+    <section aria-labelledby={`${id}-title`} className="space-y-3 rounded-card border border-accent bg-panel p-4">
       <h3 id={`${id}-title`} ref={heading} tabIndex={-1} className="font-semibold text-fg">
         {fresh.rolled ? `New secret for ${fresh.name}` : `Your new key: ${fresh.name}`}
       </h3>
       <p className="text-sm text-fg">Copy it now. It won&apos;t be shown again.{fresh.rolled && " The old secret has stopped working."}</p>
-      <code className="block break-all rounded-lg border border-line bg-canvas p-3 font-mono text-sm text-fg">{fresh.token}</code>
+      <code className="block break-all rounded-control border border-line bg-canvas p-3 font-mono text-sm text-fg">{fresh.token}</code>
       <p className="text-sm text-muted">{fresh.expiresAt ? `It expires on ${day(fresh.expiresAt)}.` : "It has no end date."}</p>
       <div className="flex flex-wrap gap-2">
         <CopyButton text={fresh.token} label="Copy key" failedLabel="Copy failed" className={primary} />
@@ -193,7 +193,7 @@ function CreateForm({ ready, onMade, onCancel }: { ready: Ready; onMade: (fresh:
   const fieldError = (field: keyof Errors) => errors[field] && <p id={`${id}-${field}-error`} className="text-sm text-fg">{errors[field]}</p>;
 
   return (
-    <form noValidate onSubmit={submit} aria-labelledby={`${id}-title`} className="space-y-4 rounded-xl border border-line bg-panel p-4">
+    <form noValidate onSubmit={submit} aria-labelledby={`${id}-title`} className="space-y-4 rounded-card border border-line bg-panel p-4">
       <h3 id={`${id}-title`} className="font-semibold text-fg">Create API key</h3>
 
       <div className="space-y-1">
@@ -263,7 +263,7 @@ function CreateForm({ ready, onMade, onCancel }: { ready: Ready; onMade: (fresh:
 }
 
 /**
- * The signed-in player's keys on /account and /docs/api/keys: create one (name, purpose, permissions, expiry), see
+ * The signed-in player's keys on /settings and /docs/api/keys: create one (name, purpose, permissions, expiry), see
  * each key's permissions, dates and last use, roll one to a new secret, revoke one, delete a revoked or expired one.
  * Before 20261022120000_api_key_expiry.sql is applied the server says `records: false`, and the form asks only for
  * a name and permissions, as before.
@@ -292,7 +292,7 @@ export default function ApiKeys() {
     setReturnTo(null);
   }, [returnTo, confirming, state]);
 
-  // A key can change under an open question (Remove access revoked it, or it expired). Once the list is read again, a
+  // A key can change under an open question (Disconnect revoked it, or it expired). Once the list is read again, a
   // question its row no longer offers closes, and focus that was in it goes to the row.
   useEffect(() => {
     if (!confirming || state.status !== "ready") return;
@@ -302,7 +302,7 @@ export default function ApiKeys() {
   }, [confirming, state]);
 
   // An error stays with its key until that key's own action is settled: once the list is read again, an error whose
-  // row no longer offers its action (the key was revoked or deleted, from here or from Remove access) goes. A change
+  // row no longer offers its action (the key was revoked or deleted, from here or from Disconnect) goes. A change
   // to another key leaves it.
   useEffect(() => {
     if (!error || state.status !== "ready") return;
@@ -445,7 +445,7 @@ export default function ApiKeys() {
 }
 
 /**
- * Remove access, on the Integrations of /account: one key's Revoke, asked with the list's own question and sent through
+ * Disconnect, on the Integrations of /settings: one key's Revoke, asked with the list's own question and sent through
  * the list's own revoke, so both share one request. The key's card leaves once the page is read again, so focus that
  * was in it first moves to `focusAfter` (an id), and the removal is said in KeysRefresh's status line, which stays.
  */
@@ -462,7 +462,7 @@ export function RemoveAccess({ id, name, hint, focusAfter }: { id: string; name:
   // name and in what is said, and the second of two keys with one name is told apart and heard.
   const key = `${name} (evl_…${hint})`;
 
-  // Into the question when it opens; back to Remove access when Cancel closes it.
+  // Into the question when it opens; back to Disconnect when Cancel closes it.
   useEffect(() => {
     if (asking) asked.current = true;
     if (asked.current) (asking ? confirmButton : opener).current?.focus();
@@ -475,8 +475,8 @@ export function RemoveAccess({ id, name, hint, focusAfter }: { id: string; name:
       const outcome = await revokeKey(id);
       if (focusFree(box.current)) document.getElementById(focusAfter)?.focus();
       setRemoved(true);
-      // "Access removed" only when this request revoked the key.
-      say(outcome === "revoked" ? `Access removed for ${key}.` : `${key} is no longer on this account's list.`);
+      // "Disconnected" only when this request revoked the key.
+      say(outcome === "revoked" ? `Disconnected ${key}.` : `${key} is no longer on this account's list.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "That did not work. Try again.");
     } finally {
@@ -490,7 +490,7 @@ export function RemoveAccess({ id, name, hint, focusAfter }: { id: string; name:
       {asking ? (
         <Confirm action="revoke" name={name} hint={hint} busy={busy} confirmRef={confirmButton} onConfirm={() => void revoke()} onCancel={() => setAsking(false)} pills />
       ) : (
-        <button ref={opener} type="button" className={pill} aria-label={`Remove access for ${key}`} onClick={() => setAsking(true)}>Remove access</button>
+        <button ref={opener} type="button" className={pill} aria-label={`Disconnect ${key}`} onClick={() => setAsking(true)}>Disconnect</button>
       )}
       {error && <p role="alert" className="text-sm text-fg">{error}</p>}
     </div>
@@ -498,8 +498,8 @@ export function RemoveAccess({ id, name, hint, focusAfter }: { id: string; name:
 }
 
 /**
- * On /account: when the keys change, the parts the server renders (the overview's counts, Integrations) are read again.
- * It also keeps the status line Remove access speaks through. The line is on the page before any click and outside the
+ * On /settings: when the keys change, the parts the server renders (the overview's counts, Integrations) are read again.
+ * It also keeps the status line Disconnect speaks through. The line is on the page before any click and outside the
  * cards, so a screen reader hears it, and it still says so after the refresh takes the card away.
  */
 export function KeysRefresh() {

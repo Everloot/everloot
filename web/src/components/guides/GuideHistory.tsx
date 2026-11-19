@@ -1,5 +1,5 @@
 import { SectionHeading } from "@/components/ui";
-import type { GuideFrontMatter } from "../../../../kb/src/guides/guide";
+import type { GuideFrontMatter } from "@kb/guides/guide";
 
 // Every published version of a guide, newest first: who reviewed it, on which day, against which game build, and what
 // changed. The guide check never lets a published entry change or go, so each version keeps its words and its anchor

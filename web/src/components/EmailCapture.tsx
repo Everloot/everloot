@@ -34,7 +34,7 @@ export default function EmailCapture({ toolSlug }: { toolSlug: string }) {
 
   if (state === "submitted") {
     return (
-      <div className="rounded-lg border border-q-uncommon/40 bg-q-uncommon/5 p-4 text-sm text-fg">
+      <div className="rounded-card border border-q-uncommon/40 bg-q-uncommon/5 p-4 text-sm text-fg">
         You&apos;re on the list. We&apos;ll email once it&apos;s live.
       </div>
     );

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { AUCTION_AGREEMENT } from "../../../../../../kb/src/auction-history";
-import { MARKET_RULE, MAX_PRICE_ITEMS, MAX_PRICE_ROWS, marketHouses, marketPrices, marketRealms, parseHouse, validRealm } from "../../../../../../kb/src/market";
+import { AUCTION_AGREEMENT } from "@kb/auction-history";
+import { MARKET_RULE, MAX_PRICE_ITEMS, MAX_PRICE_ROWS, marketHouses, marketPrices, marketRealms, parseHouse, validRealm } from "@kb/market";
 import { admit, attribution, attributionHeaders } from "@/lib/data-guard";
 import { pendingRealms } from "@/lib/auction-house";
 import { uploadStore } from "@/lib/upload-store";

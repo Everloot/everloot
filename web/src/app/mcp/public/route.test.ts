@@ -8,9 +8,9 @@ import { z } from "zod";
 const PUBLIC_NAMES = MCP_TOOL_NAMES.filter((name) => name !== "guild_search" && name !== "guild_rankings");
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { MY_BUILDS_REFUSAL } from "@/lib/saved-builds";
-import { openDb } from "../../../../../kb/src/db";
-import { replaceSourceRows } from "../../../../../kb/src/entities";
-import { snapshot } from "../../../../../kb/src/snapshot";
+import { openDb } from "@kb/db";
+import { replaceSourceRows } from "@kb/entities";
+import { snapshot } from "@kb/snapshot";
 
 const deps = vi.hoisted(() => ({ mcp: vi.fn(), loadCorpus: vi.fn(), recordUsage: vi.fn() }));
 const changeFixtures = vi.hoisted(() => ({ entries: [] as import("@/lib/changes").ChangeEntry[] }));

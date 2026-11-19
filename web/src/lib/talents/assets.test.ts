@@ -2,9 +2,9 @@ import { mkdtempSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { afterEach, beforeAll, expect, test, vi } from "vitest";
-import { openDb } from "../../../../kb/src/db";
-import { replaceSourceRows } from "../../../../kb/src/entities";
-import { snapshot } from "../../../../kb/src/snapshot";
+import { openDb } from "@kb/db";
+import { replaceSourceRows } from "@kb/entities";
+import { snapshot } from "@kb/snapshot";
 import { assetsBaseUrl, CREDIT, hasNodeFrames, loadGameAssets, parseManifest } from "./assets";
 
 const BASE = "https://assets.example.test/wow_classic_beta-70450-84bea423";
@@ -107,8 +107,8 @@ const SHOWS_ART = new Set([
   // Approved entity share icons use the same page art switch and item visibility rule.
   "web/src/lib/og-card.tsx", "web/src/app/database/items/[id]/opengraph-image.tsx",
   "web/src/lib/talents/assets.ts", "web/src/lib/game-assets.ts", "web/src/lib/game-assets.fixture.ts",
-  "web/src/components/RaidBuilder.tsx",
-  "web/src/app/page.tsx", "web/src/app/sign-in/page.tsx", "web/src/app/sign-up/page.tsx", "web/src/components/AuthShell.tsx", "web/src/app/map/map-screen.tsx", "web/src/components/RaidView.tsx", "web/src/app/tools/auctions/page.tsx", "web/src/app/tools/auctions/art.ts",
+  "web/src/app/tools/raid/RaidBuilder.tsx",
+  "web/src/app/page.tsx", "web/src/app/sign-in/page.tsx", "web/src/app/sign-up/page.tsx", "web/src/components/AuthShell.tsx", "web/src/app/map/map-screen.tsx", "web/src/app/tools/raid/RaidView.tsx", "web/src/app/tools/auctions/page.tsx", "web/src/app/tools/auctions/art.ts",
   "web/src/app/tools/professions/page.tsx", "web/src/app/tools/professions/[profession]/page.tsx", "web/src/app/tools/professions/[profession]/gathering/page.tsx", "web/src/app/database/drops/page.tsx", "web/src/app/database/items/[id]/page.tsx", "web/src/app/database/items/category-page.tsx",
   "web/src/lib/tooltip.ts", // the embeddable hover card: one item per request
   "web/src/app/database/vendors/[id]/page.tsx", "web/src/app/database/npcs/[id]/page.tsx", "web/src/app/database/quests/[id]/page.tsx", "web/src/app/changes/page.tsx", "web/src/app/changes/[post]/page.tsx", "web/src/app/lore/page.tsx", "web/src/lib/spell-mentions.ts", "web/src/app/wow-forever/page.tsx", "web/src/app/tools/talents/page.tsx",
@@ -166,6 +166,9 @@ const SHOWS_ART = new Set([
   // The daily market report's stored view: one icon for the report's featured good, which has a public auction value,
   // under the same rule as the Auction House pages (tools/auctions/art.ts).
   "web/src/lib/auction-report-store.ts",
+  // The Auction House boards' stored view: the shown name of each item with a public auction value, under the same rule
+  // as the Auction House pages (tools/auctions/art.ts), read from the tooltips in the cron instead of on each page.
+  "web/src/lib/market-boards.ts",
 ]);
 
 test("nothing outside the pages that show the art can read the asset URL or the manifest modules", () => {

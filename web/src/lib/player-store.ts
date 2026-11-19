@@ -1,4 +1,4 @@
-import { guildKey, guildSlug } from "../../../kb/src/guilds";
+import { guildKey, guildSlug } from "@kb/guilds";
 import { linkRealmKey } from "./character-links";
 import { DEFAULT_RULESET, realmSlug, type Player, type PlayerUpsert } from "./player-pages";
 import { readAllRows } from "./postgrest-pages";

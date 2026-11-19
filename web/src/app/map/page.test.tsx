@@ -30,8 +30,8 @@ vi.mock("next/navigation", () => ({
 }));
 // What the page hands the map view is what lands in the page's HTML (the props travel with it), so a test can weigh it.
 const handed = vi.hoisted(() => ({ props: null as null | Record<string, unknown> }));
-vi.mock("@/components/WorldMapView", async (importOriginal) => {
-  const real = await importOriginal<typeof import("@/components/WorldMapView")>();
+vi.mock("@/app/map/WorldMapView", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/app/map/WorldMapView")>();
   return { default: (props: Parameters<typeof real.default>[0]) => { handed.props = props as never; return real.default(props); } };
 });
 

@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { computeCoverage } from "../../../kb/src/coverage";
-import { answerCoverage } from "../../../kb/src/coverage-tool";
+import { computeCoverage } from "@kb/coverage";
+import { answerCoverage } from "@kb/coverage-tool";
 import { loadCoverageForTool } from "./coverage-answer";
 import { forgetCoverageSummary, loadCoverageSummary, loadStoredCoverage, readStoredReport } from "./coverage-summary";
 

@@ -6,11 +6,11 @@ import { withBagSlots } from "@/lib/bags";
 import { itemTipText, qualityColor } from "@/lib/item-names";
 import { ICON_CATEGORIES, type PoiIcons } from "@/lib/map-marks";
 import { assetPath, assetsBaseUrl, MANIFEST_SCHEMA } from "@/lib/talents/assets";
-import type { ItemRecord } from "../../../kb/src/assets/items";
-import { worldToMap } from "../../../kb/src/world-coords";
-import { mayShowName } from "../../../kb/src/item-name-rule";
-import { mayShowQuestTitle, mayShowSetName, mayShowSpellName } from "../../../kb/src/game-name-rule";
-import type { EdgeKind } from "../../../kb/src/edges";
+import type { ItemRecord } from "@kb/assets/items";
+import { worldToMap } from "@kb/world-coords";
+import { mayShowName } from "@kb/item-name-rule";
+import { mayShowQuestTitle, mayShowSetName, mayShowSpellName } from "@kb/game-name-rule";
+import type { EdgeKind } from "@kb/edges";
 
 // Blizzard's icons, item tooltip facts and map pictures across the site (docs/DATA_POLICY.md,
 // "Blizzard's icons, tooltip text and window frame"; docs/ASSETS.md). Server-side only: pages call it

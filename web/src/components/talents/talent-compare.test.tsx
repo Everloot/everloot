@@ -340,7 +340,7 @@ test("the compare pages are noindex, point at their class page and stay out of t
 // Last in the file: it loads the browser code again from a fresh module registry.
 test("the page's browser code loads without the change records or the schemas that check them", async () => {
   // The server reads the records and hands the browser this class's changes; the browser only compares.
-  const serverOnly = ["../../../../kb/src/build-watch/changes", "zod", "@/data/game-data/changes/wowf-70630.json", "@/data/game-data/changes/wow_classic_beta-70532.json"];
+  const serverOnly = ["@kb/build-watch/changes", "zod", "@/data/game-data/changes/wowf-70630.json", "@/data/game-data/changes/wow_classic_beta-70532.json"];
   const loaded: string[] = [];
   vi.resetModules();
   for (const id of serverOnly) vi.doMock(id, () => { loaded.push(id); return { default: {} }; });

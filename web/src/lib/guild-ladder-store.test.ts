@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import type { PublicationState } from "../../../kb/src/publication";
+import type { PublicationState } from "@kb/publication";
 const stores = vi.hoisted(() => ({ loadCorpus: vi.fn(), loadState: vi.fn() }));
 vi.mock("./upload-store", () => ({ uploadStore: { loadCorpus: stores.loadCorpus }, sharingStore: { loadState: stores.loadState } }));
 import { buildGuildRollup } from "./guild-rollup";

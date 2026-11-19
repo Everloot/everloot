@@ -1,7 +1,7 @@
 import { beforeEach, expect, test, vi } from "vitest";
-import type { EncounterRow, InstanceEntranceRow } from "../../../kb/src/instances";
-import type { PageType } from "../../../kb/src/wiki/page";
-import type { WorldMapData } from "../../../kb/src/world-map-data";
+import type { EncounterRow, InstanceEntranceRow } from "@kb/instances";
+import type { PageType } from "@kb/wiki/page";
+import type { WorldMapData } from "@kb/world-map-data";
 
 // The loaders read storage; the facts tests hand the readers their facts directly.
 const storage = vi.hoisted(() => ({ instances: vi.fn(), items: vi.fn() }));

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
 import { edgeDegraded } from "@/lib/cf-edge-cache";
-import { emptyMarket, foldMarket } from "../../../../../../kb/src/market";
+import { emptyMarket, foldMarket } from "@kb/market";
 
 const store = vi.hoisted(() => ({ loadCorpus: vi.fn(), loadMarket: vi.fn() }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({

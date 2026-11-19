@@ -12,7 +12,7 @@ import {
   raidSizeFor, removeClass, withSize, type GroupPlan, type GroupSize, type Talent,
 } from "@/lib/class-group";
 import { GROUP_SIZE } from "@/lib/raid";
-import type { GuideRole } from "../../../../../kb/src/guides/guide";
+import type { GuideRole } from "@kb/guides/guide";
 
 const table = TABLES[CURRENT_BUILD];
 const LARGEST = GROUP_SIZES[GROUP_SIZES.length - 1];

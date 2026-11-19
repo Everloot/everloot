@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { MCP_TOOL_NAMES, MCP_TOOLS, toolAnswerResponse } from "@everloot/protocol";
 import { z } from "zod";
-import { openDb } from "../../../../../../kb/src/db";
-import { replaceSourceRows } from "../../../../../../kb/src/entities";
+import { openDb } from "@kb/db";
+import { replaceSourceRows } from "@kb/entities";
 
 const store = vi.hoisted(() => ({ fail: null as Error | null, api: vi.fn(), mcp: vi.fn(), loadCorpus: vi.fn(), loadMarket: vi.fn(), release: { db: null as unknown } }));
 vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { api: store.api, mcp: store.mcp } }));
 vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: store.loadCorpus, loadMarket: store.loadMarket } }));
 vi.mock("@/lib/release", () => ({ getRelease: () => (store.release.db ? store.release : null) }));
 // A handler whose store read throws (the real handlers degrade most of those to "unrecorded"), set per test.
-vi.mock("../../../../../../kb/src/mcp-server", async (importOriginal) => {
-  const real = await importOriginal<typeof import("../../../../../../kb/src/mcp-server")>();
+vi.mock("@kb/mcp-server", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@kb/mcp-server")>();
   return {
     ...real,
     createToolHandlers: (...args: Parameters<typeof real.createToolHandlers>) => {

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { GAME_DATA_CREDIT } from "@everloot/protocol";
-import { CLIENT_SKILLS } from "../../../kb/src/client-layer-file";
-import { CLIENT_LABEL, edgesFrom, entityLabel, evidenceLabel, groupByRel, type Edge, type EdgeKind, type Rel } from "../../../kb/src/edges";
+import { CLIENT_SKILLS } from "@kb/client-layer-file";
+import { CLIENT_LABEL, edgesFrom, entityLabel, evidenceLabel, groupByRel, type Edge, type EdgeKind, type Rel } from "@kb/edges";
 import { professionHrefById } from "@/lib/professions";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
 import GameIcon from "./game/GameIcon";

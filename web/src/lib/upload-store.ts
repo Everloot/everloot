@@ -2,15 +2,15 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { AwsClient } from "aws4fetch";
 import { CENSUS_KINDS, parseRecords, type IntakeRecord, type StoredCensusRecord, type StoredUpload } from "@everloot/protocol";
-import { mergeCorpus, mergeCorpusBatches, publicRecords, type CorpusState } from "../../../kb/src/corpus";
-import { HISTORY_DAYS, MARKET_MAX_BYTES, emptyMarket, foldMarket, marketBytes, trimMarket, uploadScans, type FoldStats, type MarketState } from "../../../kb/src/market";
-import { mergeCensusRows } from "../../../kb/src/census-rows";
-import { TRUSTED_REPORTER, trustedInstalls } from "../../../kb/src/trusted-source";
+import { mergeCorpus, mergeCorpusBatches, publicRecords, type CorpusState } from "@kb/corpus";
+import { HISTORY_DAYS, MARKET_MAX_BYTES, emptyMarket, foldMarket, marketBytes, trimMarket, uploadScans, type FoldStats, type MarketState } from "@kb/market";
+import { mergeCensusRows } from "@kb/census-rows";
+import { TRUSTED_REPORTER, trustedInstalls } from "@kb/trusted-source";
 import { createSharingStore } from "./sharing-store";
 import {
   COMPLETION_MAX_BYTES, authorizedOwners, emptyCompletion, foldCompletion, isCompletionState, normalizeCompletion, trimCompletion, type CompletionState, type CompletionUpload,
-} from "../../../kb/src/completion-rollup";
-import type { PublicationState } from "../../../kb/src/publication";
+} from "@kb/completion-rollup";
+import type { PublicationState } from "@kb/publication";
 
 /**
  * Where uploads and waitlist signups live.

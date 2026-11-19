@@ -66,9 +66,10 @@ export default async function ProfessionsPage(props: { searchParams: Promise<Sea
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-professions>
             {CLIENT_PROFESSIONS.map((p) => (
               <li key={p.slug}>
-                <Link
+                <Card
                   href={withClassContext(professionHref(p.slug), context)}
-                  className="flex min-h-16 items-center gap-3 rounded-card border border-line bg-panel px-4 py-3 hover:border-accent"
+                  padding="custom"
+                  className="flex min-h-16 items-center gap-3 px-4 py-3"
                 >
                   {icon(p.name)
                     ? <GameIcon src={icon(p.name)!} size={36} />
@@ -79,7 +80,7 @@ export default async function ProfessionsPage(props: { searchParams: Promise<Sea
                       <span className="font-mono tabular-nums">{p.recipes.length}</span> {p.recipes.length === 1 ? "recipe" : "recipes"} in the files
                     </span>
                   </span>
-                </Link>
+                </Card>
               </li>
             ))}
           </ul>

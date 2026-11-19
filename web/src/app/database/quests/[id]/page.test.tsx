@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
-import type { WorldFacts } from "../../../../../../kb/src/world-pages";
+import type { WorldFacts } from "@kb/world-pages";
 
 const data = vi.hoisted(() => ({
   facts: { npcs: [], quests: [], vendors: [], unreachable: false, dataAsOf: "2026-11-10T00:00:00Z" } as WorldFacts & { unreachable: boolean; dataAsOf: string | null },

@@ -1,14 +1,14 @@
 import { expect, test, vi } from "vitest";
-import * as market from "../../../kb/src/market";
-import { emptyMarket, foldMarket } from "../../../kb/src/market";
+import * as market from "@kb/market";
+import { emptyMarket, foldMarket } from "@kb/market";
 import {
   SPARK_BOX, agreementSoFar, findBoard, houseCounts, pendingRealms, houseParam, itemAcrossRealms, itemByHouse, itemIdParam, itemLabel, itemRows, percent, priceMove,
   realmBoards, realmForSlug, realmSlug, sitemapPaths, slugParam, sparkline, timeAgo,
 } from "./auction-house";
 
 // Counts the per-item reads, so a test can tell one item's read from a whole board's.
-vi.mock("../../../kb/src/market", async (importOriginal) => {
-  const real = await importOriginal<typeof import("../../../kb/src/market")>();
+vi.mock("@kb/market", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@kb/market")>();
   return { ...real, itemMarket: vi.fn(real.itemMarket) };
 });
 

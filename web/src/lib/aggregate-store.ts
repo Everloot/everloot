@@ -1,6 +1,7 @@
 import { AwsClient } from "aws4fetch";
+import { keep } from "./kept";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
-import { namedRecord } from "../../../kb/src/corpus";
+import { namedRecord } from "@kb/corpus";
 import { buildAggregates, type AggregateSet } from "./aggregate-set";
 import { uploadStore, type Corpus, type R2Config } from "./upload-store";
 
@@ -116,7 +117,8 @@ export async function writeAggregates(opts: { added: number; rebuild?: boolean; 
 }
 
 /** The read set and what identifies the file it came from. */
-let kept: { at: number; set: AggregateSet | null; generatedAt?: string; etag?: string; failed?: boolean } | null = null;
+type Read = { set: AggregateSet | null; generatedAt?: string; etag?: string; failed?: boolean };
+type Deps = { cloud?: R2Config | null; fetch?: typeof fetch; now?: () => number; strict?: boolean };
 
 /**
  * The stored set, kept KEEP_MS per server instance; null when there is none or it cannot be read, and the caller works
@@ -124,43 +126,39 @@ let kept: { at: number; set: AggregateSet | null; generatedAt?: string; etag?: s
  * downloaded again, and a file with the same `generatedAt` keeps the set already read (and every memo keyed on it).
  * A failed re-read keeps the set already read for another minute; a missing file or an unknown shape drops it.
  * Strict readers (complete hover cards) receive null during a failed re-read, including that retry minute.
+ * One shared download/parse (`share`); strictness is applied separately for every waiting reader.
  */
-async function readStoredAggregates(deps: { cloud?: R2Config | null; fetch?: typeof fetch; now?: () => number; strict?: boolean } = {}): Promise<AggregateSet | null> {
-  const now = (deps.now ?? Date.now)();
-  if (kept && now - kept.at < KEEP_MS) return deps.strict && kept.failed ? null : kept.set;
+const stored = keep<Read, { cloud: R2Config; fetch: typeof fetch }>(async ({ cloud, fetch: doFetch }, kept) => {
+  const retry = { keepMs: RETRY_MS };
   try {
-    const cloud = deps.cloud === undefined ? r2FromEnv() : deps.cloud;
-    if (!cloud) return null;
-    const etag = kept?.set ? kept.etag : undefined;
-    const res = await (deps.fetch ?? fetch)(await r2(cloud).sign(r2Url(cloud), {
+    const etag = kept?.value.set ? kept.value.etag : undefined;
+    const res = await doFetch(await r2(cloud).sign(r2Url(cloud), {
       method: "GET", headers: { "accept-encoding": "identity", ...(etag ? { "if-none-match": etag } : {}) },
     }));
-    if (res.status === 304 && kept?.set) {
-      kept = { ...kept, at: now, failed: false };
-    } else if (res.ok) {
+    if (res.status === 304 && kept?.value.set) return { value: { ...kept.value, failed: false } };
+    if (res.ok) {
       const read = parseAggregates(await res.text());
-      const same = read && kept?.set && kept.generatedAt === read.generatedAt;
-      kept = read
-        ? { at: now, set: same ? kept!.set : read.set, generatedAt: read.generatedAt, etag: res.headers.get("etag") ?? undefined }
-        : { at: now - KEEP_MS + RETRY_MS, set: null };
-    } else if (res.status === 404 || !kept?.set) {
-      kept = { at: now - KEEP_MS + RETRY_MS, set: null };
-    } else {
-      kept = { ...kept, at: now - KEEP_MS + RETRY_MS, failed: true };
+      const same = read && kept?.value.set && kept.value.generatedAt === read.generatedAt;
+      return read
+        ? { value: { set: same ? kept!.value.set : read.set, generatedAt: read.generatedAt, etag: res.headers.get("etag") ?? undefined } }
+        : { value: { set: null }, ...retry };
     }
+    if (res.status === 404 || !kept?.value.set) return { value: { set: null }, ...retry };
+    return { value: { ...kept.value, failed: true }, ...retry };
   } catch {
-    kept = kept?.set ? { ...kept, at: now - KEEP_MS + RETRY_MS, failed: true } : { at: now - KEEP_MS + RETRY_MS, set: null };
+    return kept?.value.set ? { value: { ...kept.value, failed: true }, ...retry } : { value: { set: null }, ...retry };
   }
-  return deps.strict && kept.failed ? null : kept.set;
-}
+}, { ttlMs: KEEP_MS });
 
-/** One shared download/parse; strictness is applied separately for every waiting reader. */
-let pending: Promise<AggregateSet | null> | null = null;
-export async function loadStoredAggregates(deps: Parameters<typeof readStoredAggregates>[0] = {}): Promise<AggregateSet | null> {
-  if (!pending) pending = readStoredAggregates({ ...deps, strict: false }).finally(() => { pending = null; });
-  const set = await pending;
-  return deps.strict && kept?.failed ? null : set;
+export async function loadStoredAggregates(deps: Deps = {}): Promise<AggregateSet | null> {
+  const now = (deps.now ?? Date.now)();
+  const strict = (read: Read) => (deps.strict && read.failed ? null : read.set);
+  const hit = stored.fresh(now);
+  if (hit) return strict(hit.value);
+  const cloud = deps.cloud === undefined ? r2FromEnv() : deps.cloud;
+  if (!cloud) return null;
+  return strict(await stored.get({ cloud, fetch: deps.fetch ?? fetch }, now));
 }
 
 /** For tests: forget the kept file. */
-export const forgetStoredAggregates = () => { kept = null; pending = null; };
+export const forgetStoredAggregates = () => stored.forget();

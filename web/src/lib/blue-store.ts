@@ -1,6 +1,6 @@
 import postsFile from "../../../kb/changes/blue-posts.json";
-import { type BlueStore } from "../../../kb/src/blue-posts";
-import { sanitizePost } from "../../../kb/src/changes";
+import { type BlueStore } from "@kb/blue-posts";
+import { sanitizePost } from "@kb/changes";
 import { r2Client, r2Config } from "./upload-store";
 
 export const BLUE_POSTS_KEY = "changes/blue-posts.json";

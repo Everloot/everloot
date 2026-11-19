@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import BrowseFilters from "@/components/BrowseFilters";
+import BrowseFilters from "./BrowseFilters";
 import { Card, Container, PageHeader, Pager } from "@/components/ui";
 import LoreSource from "@/components/LoreSource";
 import { trailFor } from "@/lib/breadcrumbs";

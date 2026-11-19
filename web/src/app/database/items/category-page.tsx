@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { trailFor } from "@/lib/breadcrumbs";
-import { isDevelopmentItemName } from "../../../../../kb/src/dev-item-names";
+import { isDevelopmentItemName } from "@kb/dev-item-names";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { describe, filterItems, QUALITIES, resolveClass, resolveLegacyClass, resolveSubclass, slotOf, type ItemClass, type ItemRow, type ItemSubclass } from "../../../../../kb/src/item-taxonomy";
+import { describe, filterItems, QUALITIES, resolveClass, resolveLegacyClass, resolveSubclass, slotOf, type ItemClass, type ItemRow, type ItemSubclass } from "@kb/item-taxonomy";
 import {
   activeFilters, BINDINGS, CLIENT_TAXONOMY as T, categoryNamedEnough, categoryQuery, developmentLeftovers, itemFacets, ITEM_LEVEL_BRACKETS, itemsHref,
   listItems, NAME_FROM, SOURCES, shownItemName, subclassLabel, toggled, UNRECORDED, type CategoryQuery, type NameSource,
@@ -99,6 +99,8 @@ export async function categoryMetadata(classSlug: string | undefined, subclassKe
 
 /** Why a row has no name, and when that changes: names come from the addon once players see the items. */
 const namesArrive = () => (Date.now() < Date.parse(LAUNCH_AT) ? `Their names arrive from the addon after launch on ${longDate(LAUNCH.date)}.` : "Their names arrive from the addon as players see them.");
+/** A small bordered toggle, as the filter bar's yes-only filters draw. */
+const TOGGLE = "inline-flex h-6 items-center rounded-full border border-edge px-2 text-cell-2 text-fg-2 hover:border-fg-2 hover:text-fg";
 const plural = (n: number) => `${n.toLocaleString("en-US")} item${n === 1 ? "" : "s"}`;
 /** A level range as a menu writes it: "11–20", "81+" for the open top bracket. */
 const bracket = (r: { min: number; max: number }) => (r.max >= 999 ? `${r.min}+` : r.min === r.max ? String(r.min) : `${r.min}–${r.max}`);
@@ -312,6 +314,14 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
     </div>
   ) : <p className="py-4 text-cell text-fg-2">{context ? `No items in this category a ${classLabel(context.classSlug)} can use${context.level !== undefined ? ` by level ${context.level}` : ""}.` : "No items in this category."}</p>;
 
+  // The development leftovers and the unnamed items are held back on one line, with a toggle for each.
+  const showUnnamed = unnamedCount > 0 && (folded || q.unnamed);
+  const hidden = [
+    held > 0 && !q.dev && "test, placeholder and retired items the game files still list",
+    showUnnamed && folded && `${plural(unnamedCount)} the game files do not name yet`,
+  ].filter(Boolean);
+  const hiddenLine = `${hidden.length ? `Not listed: ${hidden.join(", and ")}.` : ""}${showUnnamed ? `${hidden.length ? " " : ""}${namesArrive()}` : ""}`;
+
   return (
     <Container width="data">
       <EdgeDegraded when={degraded || seen.unreachable} />
@@ -342,32 +352,27 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
             </span>
           )}
         </ClassContextChip>
-        {(held > 0 || (unnamedCount > 0 && (folded || q.unnamed))) && <p className="mt-2 flex flex-wrap gap-x-2 text-cell-2 text-muted">
-        {held > 0 && (
-          <span>
-            <Link href={here({ dev: q.dev ? undefined : true })} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">
-              {q.dev ? "Hide" : "Show"} {held.toLocaleString("en-US")} development {held === 1 ? "leftover" : "leftovers"}
-            </Link>
-            {" "}
-            {q.dev ? "Test, placeholder and retired items the game files still list are in the list." : "Test, placeholder and retired items the game files still list stay out of it."}
-          </span>
+        {(held > 0 || showUnnamed) && (
+          <p data-hidden-items className="mt-2 flex flex-wrap items-center gap-2 text-cell-2 text-muted">
+            <span>{hiddenLine}</span>
+            {held > 0 && (
+              <Link href={here({ dev: q.dev ? undefined : true })} className={TOGGLE}>
+                {q.dev ? "Hide" : "Show"} {held.toLocaleString("en-US")} development {held === 1 ? "leftover" : "leftovers"}
+              </Link>
+            )}
+            {showUnnamed && (
+              <Link href={here({ unnamed: q.unnamed ? undefined : true })} className={TOGGLE}>
+                {`${q.unnamed ? "Hide the" : "Show"} ${unnamedCount.toLocaleString("en-US")} unnamed ${unnamedCount === 1 ? "item" : "items"}`}
+              </Link>
+            )}
+          </p>
         )}
-        {unnamedCount > 0 && (folded || q.unnamed) && (
-          <span>
-            {folded ? `${unnamedCount.toLocaleString("en-US")} ${unnamedCount === 1 ? "item" : "items"} the game files do not name yet. ` : ""}
-            {namesArrive()}{" "}
-            <Link href={here({ unnamed: q.unnamed ? undefined : true })} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">
-              {q.unnamed ? `Hide the ${unnamedCount.toLocaleString("en-US")} unnamed ${unnamedCount === 1 ? "item" : "items"}` : "Show them"}
-            </Link>
-          </span>
-        )}
-        </p>}
         <div className="mt-2">
           <DataTable
             dense
             caption={`${title}: ${plural(rows.length)}`}
-            // A column with nothing in the whole result (Source, before anyone reports one) is left out.
-            columns={filledColumns(columns, rows)}
+            // A column with nothing on this page (Source, until a row here has one) is left out.
+            columns={filledColumns(columns, shown)}
             rows={shown}
             rowKey={(row) => String(row[0])}
             // The default order (named items first) is no one column, so no header shows an arrow for it.

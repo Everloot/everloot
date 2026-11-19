@@ -4,8 +4,8 @@ import { itemIndex, memoryStore, siteManifest } from "./game-assets.fixture";
 
 // A made-up check of the Cutlass: no weapon has been read off the game's tooltip yet. With it in the list, the range
 // reaches the tooltip only if the shard's damage inputs survive the shard reader.
-vi.mock("../../../kb/src/assets/weapon-damage", async (original) => ({
-  ...(await original<typeof import("../../../kb/src/assets/weapon-damage")>()),
+vi.mock("@kb/assets/weapon-damage", async (original) => ({
+  ...(await original<typeof import("@kb/assets/weapon-damage")>()),
   CHECKED_WEAPONS: [{
     id: 851, n: "Cutlass", l: 15, q: 1, d: 2200, w: { t: "ItemDamageOneHand", dps: 6.957369327545166, dv: 0.6000000238418579, ds: 0 },
     game: { min: 10, max: 20 }, seen: "2026-11-04", build: "1.60.1.99999",

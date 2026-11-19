@@ -1,10 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Card, DataTable, EmptyState, Explainer, type Column } from "@/components/ui";
+import { CLASS_BG, CLASS_FILL, CLASS_STROKE, classColour } from "@/components/ui/class-colour";
 import { guildsOn } from "@/lib/guild-switch";
 import { ARMORY_BOARDS, ARMORY_METRICS, armoryBoardPath, armoryOn } from "@/lib/armory";
-import { CENSUS_MIN_CHARACTERS, CENSUS_MIN_INSTALLS, CENSUS_MIN_REPORTERS, CENSUS_ROUND_TO, HIDDEN_LABEL } from "../../../../kb/src/census";
-import type { CensusCount, Faction } from "../../../../kb/src/census";
+import { CENSUS_MIN_CHARACTERS, CENSUS_MIN_INSTALLS, CENSUS_MIN_REPORTERS, CENSUS_ROUND_TO, HIDDEN_LABEL } from "@kb/census";
+import type { CensusCount, Faction } from "@kb/census";
 import {
   COLLECTING_LINE, HUB_ROWS, RAIL_GROUPS, START_LINE, censusHrefOf, rankingPath,
   type Change, type ChartSeries, type HubMetrics, type Mover, type RankRow, type RankingView, type RankingWeek,
@@ -15,23 +16,6 @@ const number = (n: number) => n.toLocaleString("en-US");
 /** A share of the shown total, both rounded already; a whole percent claims no more than the counts do. */
 export const percent = (share: number) => `${Math.round(share * 100)}%`;
 export const weekLabel = (w: RankingWeek) => (w.current ? `This week so far (from ${w.start})` : `Week of ${w.start}`);
-
-// Whole class names, so Tailwind sees them.
-const CLASS_BG: Record<string, string> = {
-  WARRIOR: "bg-class-warrior", PALADIN: "bg-class-paladin", HUNTER: "bg-class-hunter",
-  ROGUE: "bg-class-rogue", PRIEST: "bg-class-priest", SHAMAN: "bg-class-shaman",
-  MAGE: "bg-class-mage", WARLOCK: "bg-class-warlock", DRUID: "bg-class-druid",
-};
-const CLASS_STROKE: Record<string, string> = {
-  WARRIOR: "stroke-class-warrior", PALADIN: "stroke-class-paladin", HUNTER: "stroke-class-hunter",
-  ROGUE: "stroke-class-rogue", PRIEST: "stroke-class-priest", SHAMAN: "stroke-class-shaman",
-  MAGE: "stroke-class-mage", WARLOCK: "stroke-class-warlock", DRUID: "stroke-class-druid",
-};
-const CLASS_FILL: Record<string, string> = {
-  WARRIOR: "fill-class-warrior", PALADIN: "fill-class-paladin", HUNTER: "fill-class-hunter",
-  ROGUE: "fill-class-rogue", PRIEST: "fill-class-priest", SHAMAN: "fill-class-shaman",
-  MAGE: "fill-class-mage", WARLOCK: "fill-class-warlock", DRUID: "fill-class-druid",
-};
 
 /**
  * The list of rankings: a rail on wide screens, a bar of links that scrolls sideways on a phone. Plain links,
@@ -123,7 +107,7 @@ const markOf = (r: RankRow): Mark => (r.classToken ? { classToken: r.classToken 
  * dashed ring for the Horde, a muted dot where nothing has a colour. Decorative; the name beside it carries identity.
  */
 export function Swatch({ classToken, faction }: Mark) {
-  const look = classToken ? CLASS_BG[classToken] : faction === "Horde" ? "border border-dashed border-fg-2" : faction === "Alliance" ? "bg-fg-2" : "bg-muted";
+  const look = classToken ? classColour(CLASS_BG, classToken) : faction === "Horde" ? "border border-dashed border-fg-2" : faction === "Alliance" ? "bg-fg-2" : "bg-muted";
   return <span aria-hidden="true" data-class-mark={classToken ? "" : undefined} className={`h-2.5 w-2.5 shrink-0 rounded-full ${look}`} />;
 }
 
@@ -131,7 +115,7 @@ export function Swatch({ classToken, faction }: Mark) {
 export function ShareBar({ share, classToken, className = "" }: { share: number; classToken?: string; className?: string }) {
   return (
     <span aria-hidden="true" className={`block h-1 shrink-0 rounded-full bg-line ${className}`}>
-      <span className={`block h-1 rounded-full ${classToken ? CLASS_BG[classToken] : "bg-fg-2"}`} style={{ width: percent(Math.min(1, share)) }} />
+      <span className={`block h-1 rounded-full ${classToken ? classColour(CLASS_BG, classToken) : "bg-fg-2"}`} style={{ width: percent(Math.min(1, share)) }} />
     </span>
   );
 }
@@ -260,9 +244,9 @@ export function StartState() {
 /** A race carries its faction (Skyborne is on both sides). */
 const nameOf = (s: ChartSeries) => (s.faction && s.label !== s.faction ? `${s.label} (${s.faction})` : s.label);
 const weekTick = (w: RankingWeek) => (w.current ? "so far" : w.start.slice(5));
-const stroke = (s: ChartSeries) => (s.classToken && !s.faction ? CLASS_STROKE[s.classToken] : "stroke-fg-2");
-const fill = (s: ChartSeries) => (s.classToken && !s.faction ? CLASS_FILL[s.classToken] : "fill-fg-2");
-const swatch = (s: ChartSeries) => (s.classToken && !s.faction ? CLASS_BG[s.classToken] : s.faction === "Horde" ? "border border-dashed border-fg-2" : "bg-fg-2");
+const stroke = (s: ChartSeries) => (s.classToken && !s.faction ? classColour(CLASS_STROKE, s.classToken) : "stroke-fg-2");
+const fill = (s: ChartSeries) => (s.classToken && !s.faction ? classColour(CLASS_FILL, s.classToken) : "fill-fg-2");
+const swatch = (s: ChartSeries) => (s.classToken && !s.faction ? classColour(CLASS_BG, s.classToken) : s.faction === "Horde" ? "border border-dashed border-fg-2" : "bg-fg-2");
 
 const W = 720;
 const H = 300;
@@ -300,11 +284,11 @@ export function WeeklyChart({ weeks, series, title }: { weeks: RankingWeek[]; se
           {[0, max / 2, max].map((v) => (
             <g key={v}>
               <line x1={PAD.left} x2={W - PAD.right} y1={y(v)} y2={y(v)} className="stroke-line" strokeWidth={1} />
-              <text x={PAD.left - 6} y={y(v) + 4} textAnchor="end" className="fill-muted font-mono text-[11px]">{percent(v)}</text>
+              <text x={PAD.left - 6} y={y(v) + 4} textAnchor="end" className="fill-muted font-mono text-caption">{percent(v)}</text>
             </g>
           ))}
           {weeks.map((w, i) => (
-            <text key={w.start} x={x(i)} y={H - 8} textAnchor="middle" className="fill-muted font-mono text-[11px]">{weekTick(w)}</text>
+            <text key={w.start} x={x(i)} y={H - 8} textAnchor="middle" className="fill-muted font-mono text-caption">{weekTick(w)}</text>
           ))}
           {series.map((s) => (
             <g key={s.key}>
@@ -318,7 +302,7 @@ export function WeeklyChart({ weeks, series, title }: { weeks: RankingWeek[]; se
             </g>
           ))}
           {ends.map((e) => (
-            <text key={e.key} x={W - PAD.right + 8} y={e.y + 4} className="fill-fg-2 text-[11px]">{e.label}</text>
+            <text key={e.key} x={W - PAD.right + 8} y={e.y + 4} className="fill-fg-2 text-caption">{e.label}</text>
           ))}
         </svg>
         <figcaption className="mt-3">
@@ -378,7 +362,7 @@ export function StackedWeeks({ weeks, series, hidden = false, title }: { weeks: 
           {[0, 0.5, 1].map((v) => (
             <g key={v}>
               <line x1={SPAD.left} x2={SW - SPAD.right} y1={y(v)} y2={y(v)} className="stroke-line" strokeWidth={1} />
-              <text x={SPAD.left - 6} y={y(v) + 4} textAnchor="end" className="fill-muted font-mono text-[11px]">{percent(v)}</text>
+              <text x={SPAD.left - 6} y={y(v) + 4} textAnchor="end" className="fill-muted font-mono text-caption">{percent(v)}</text>
             </g>
           ))}
           {bars.map(({ week, i, top, segments }) => (
@@ -389,9 +373,9 @@ export function StackedWeeks({ weeks, series, hidden = false, title }: { weeks: 
                 </rect>
               ))}
               {partial[i] && (
-                <text x={x(i) + barW / 2} y={top - 6} textAnchor="middle" className="fill-muted text-[11px]">{partial[i]}</text>
+                <text x={x(i) + barW / 2} y={top - 6} textAnchor="middle" className="fill-muted text-caption">{partial[i]}</text>
               )}
-              <text x={x(i) + barW / 2} y={SH - 8} textAnchor="middle" className="fill-muted font-mono text-[11px]">{weekTick(week)}</text>
+              <text x={x(i) + barW / 2} y={SH - 8} textAnchor="middle" className="fill-muted font-mono text-caption">{weekTick(week)}</text>
             </g>
           ))}
         </svg>
@@ -470,11 +454,11 @@ const NotYet = ({ why }: { why: string }) => <><span aria-hidden="true" classNam
 
 function Tile({ label, value, note }: { label: string; value: ReactNode; note: ReactNode }) {
   return (
-    <div className="min-w-0 rounded-card border border-line bg-panel p-4 sm:p-5">
+    <Card padding="custom" className="p-4 sm:p-5">
       <dt className="text-meta text-muted">{label}</dt>
       <dd className="mt-1 truncate font-mono text-h2-sm tabular-nums text-fg sm:text-h2">{value}</dd>
       <dd className="mt-1 text-cell-2 text-fg-2">{note}</dd>
-    </div>
+    </Card>
   );
 }
 
@@ -501,9 +485,11 @@ export function MetricTiles({ m }: { m: HubMetrics }) {
         note={collecting ? "Still collecting" : weekLabel(m.week)}
       />
       <Tile
-        label="Against last week"
+        label={m.change?.sameDays ? "Against the same days last week" : "Against last week"}
         value={m.change ? signed(m.change.by) : <NotYet why="not yet" />}
-        note={m.change ? (m.change.share === null ? "characters" : `${signedPercent(m.change.share)} characters`) : "Starts once two weeks have numbers"}
+        note={m.change
+          ? (m.change.share === null ? "characters" : `${signedPercent(m.change.share)} characters`)
+          : m.week.current && m.week.sameDaysBefore?.collecting ? "Waiting for last week's same days to have numbers" : "Starts once two weeks have numbers"}
       />
       <Tile
         label={leaders.length > 1 ? "Leading published classes" : "Leading published class"}
@@ -540,22 +526,22 @@ export function WeeklyTotals({ points }: { points: { week: RankingWeek; count: C
         {[0, top / 2, top].map((v) => (
           <g key={v}>
             <line x1={TPAD.left} x2={TW - TPAD.right} y1={y(v)} y2={y(v)} className="stroke-line" strokeWidth={1} />
-            <text x={TPAD.left - 6} y={y(v) + 4} textAnchor="end" className="fill-muted font-mono text-[11px]">{number(v)}</text>
+            <text x={TPAD.left - 6} y={y(v) + 4} textAnchor="end" className="fill-muted font-mono text-caption">{number(v)}</text>
           </g>
         ))}
         {points.map((p, i) => (
           <g key={p.week.start}>
             {p.count === null ? (
-              <text x={x(i) + barW / 2} y={y(0) - 6} textAnchor="middle" className="fill-muted text-[11px]">collecting</text>
+              <text x={x(i) + barW / 2} y={y(0) - 6} textAnchor="middle" className="fill-muted text-caption">collecting</text>
             ) : (
               <>
                 <rect x={x(i)} y={y(p.count)} width={barW} height={Math.max(0, y(0) - y(p.count))} rx={2} className="fill-fg-2">
                   <title>{`${weekLabel(p.week)}: ${number(p.count)} characters`}</title>
                 </rect>
-                <text x={x(i) + barW / 2} y={y(p.count) - 6} textAnchor="middle" className="fill-fg-2 font-mono text-[11px]">{number(p.count)}</text>
+                <text x={x(i) + barW / 2} y={y(p.count) - 6} textAnchor="middle" className="fill-fg-2 font-mono text-caption">{number(p.count)}</text>
               </>
             )}
-            <text x={x(i) + barW / 2} y={TH - 8} textAnchor="middle" className="fill-muted font-mono text-[11px]">{weekTick(p.week)}</text>
+            <text x={x(i) + barW / 2} y={TH - 8} textAnchor="middle" className="fill-muted font-mono text-caption">{weekTick(p.week)}</text>
           </g>
         ))}
       </svg>

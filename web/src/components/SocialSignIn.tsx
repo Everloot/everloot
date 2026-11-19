@@ -54,9 +54,9 @@ export default function SocialSignIn({ providers, returnTo, mode = "sign-in", ad
   async function start(provider: string) {
     if (busy) return;
     setBusy(provider); setError(null);
-    const callbackURL = mode === "link" ? "/account#sign-in-methods" : safeReturnTo(returnTo) ?? "/account";
+    const callbackURL = mode === "link" ? "/settings#sign-in-methods" : safeReturnTo(returnTo) ?? "/settings";
     // Better Auth appends its own `error` parameter, so the flow marker has a different name.
-    const errorCallbackURL = mode === "link" ? "/account?linkError=1#sign-in-methods"
+    const errorCallbackURL = mode === "link" ? "/settings?linkError=1#sign-in-methods"
       : `/sign-in?flow=social${safeReturnTo(returnTo) ? `&returnTo=${encodeURIComponent(returnTo!)}` : ""}${addAccount ? "&add=1&ready=1" : ""}`;
     try {
       const response = await fetch(mode === "link" ? "/api/auth/link-social" : "/api/auth/sign-in/social", {

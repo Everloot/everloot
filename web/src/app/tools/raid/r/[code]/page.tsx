@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import RaidView from "@/components/RaidView";
+import RaidView from "../../RaidView";
 import { decodeRaid, describeRaid } from "@/lib/raid";
 import { pageMetadata } from "@/lib/seo";
 

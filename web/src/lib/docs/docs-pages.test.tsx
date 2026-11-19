@@ -29,7 +29,7 @@ import { allDocsPages, endpointSlug } from "./nav";
 import corsPrerenderedPaths from "@/data/cors-prerendered-paths.json";
 import { FILE_SCHEMAS, PAGE_INTERNAL_ROUTES } from "./file-schemas";
 import { MY_BUILDS_REFUSAL } from "@/lib/saved-builds";
-import { promptText } from "../../../../kb/src/prompts";
+import { promptText } from "@kb/prompts";
 
 type PageModule = { default: (props: { params: Promise<Record<string, string>> }) => unknown };
 const modules = import.meta.glob<PageModule>("../../app/docs/**/page.tsx", { eager: true });

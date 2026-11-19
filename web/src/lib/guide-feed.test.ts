@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, test, vi } from "vitest";
-import { GuideFrontMatter } from "../../../kb/src/guides/guide";
+import { GuideFrontMatter } from "@kb/guides/guide";
 import current from "@/data/game-data/changes/wowf-70630.json";
 import { PUBLISHED_CHANGES } from "./talents/freshness-records";
 import { encodeBuild } from "./talents/share";

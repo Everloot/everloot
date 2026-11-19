@@ -5,8 +5,8 @@ import { parseEverlootLua, parsePolestarTable } from "@/lib/sv-parse";
 import { convertRecorder, type RecorderPayload } from "@/lib/polestar-recorder";
 import { censusSummary, prepareUpload, sendBatches, type SharingChoices, type UploadSession } from "@/lib/upload-batches";
 import { contributionFiles } from "@/lib/ops/attribution-input";
-import type { SharingCategory } from "../../../../kb/src/publication";
-import { parseSettledList, settledSkip, type SettledList } from "../../../../kb/src/settled-list";
+import type { SharingCategory } from "@kb/publication";
+import { parseSettledList, settledSkip, type SettledList } from "@kb/settled-list";
 import Card from "@/components/ui/Card";
 import SectionHeading from "@/components/ui/SectionHeading";
 
@@ -240,7 +240,7 @@ export default function UploadClient({ playerPages = false, pullSummaries = fals
         {complete && !contributionChoices.some(file => file.completionKeys.length) && <p className="mt-3 text-sm text-fg-2">This file has no matching character key for attribution. Keep these uploads anonymous; observed character names cannot establish a submitter.</p>}
         <button className={outlineButton + " mt-3"} disabled={contributionBusy || busy} onClick={() => void loadContributionOptions()}>Manage contribution identity</button>
         {contributionOptions && <div className="mt-3 space-y-3 text-sm text-fg-2">
-          {contributionOptions.links.length === 0 && <p>No eligible character yet. <a href="/account" className="underline">Link your own character and turn on its public page</a> before opting in.</p>}
+          {contributionOptions.links.length === 0 && <p>No eligible character yet. <a href="/settings#characters" className="underline">Link your own character and turn on its public page</a> before opting in.</p>}
           {complete && contributionChoices.length > 1 && <label className="block">Uploaded installation
               <select className={input + " mt-1"} value={contributionFile} onChange={e => { setContributionFile(Number(e.target.value)); setContributionConsent(false); }}>
                 {contributionChoices.map((file, index) => <option key={file.installId} value={index}>Installation {index + 1}: {file.uploadIds.length} receipts</option>)}

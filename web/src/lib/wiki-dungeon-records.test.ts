@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import { worldFactsFromRecords } from "../../../kb/src/world-pages";
-import type { ItemFacts } from "../../../kb/src/item-page";
+import { worldFactsFromRecords } from "@kb/world-pages";
+import type { ItemFacts } from "@kb/item-page";
 import type { InstanceRow } from "./instances";
 import { dungeonRecords } from "./wiki-dungeon-records";
 

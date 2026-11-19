@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { emptyMarket, foldMarket } from "../../../../kb/src/market";
+import { emptyMarket, foldMarket } from "@kb/market";
 import { itemIndex, shard0, siteManifest } from "@/lib/game-assets.fixture";
 import { forgetPrivateReads, forgetSiteAssets } from "@/lib/game-assets";
 import { CREDIT } from "@/lib/talents/assets";
@@ -18,8 +18,8 @@ vi.mock("next/link", () => ({
 }));
 
 // The map's pictures are drawn in the browser, so the page hands them to the map as props: this puts them in the markup to read.
-vi.mock("@/components/WorldMapView", async (importOriginal) => {
-  const real = await importOriginal<typeof import("@/components/WorldMapView")>();
+vi.mock("@/app/map/WorldMapView", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/app/map/WorldMapView")>();
   return { default: (props: Parameters<typeof real.default>[0]) => <><i data-map-art={JSON.stringify(props.art ?? null)} />{real.default(props)}</> };
 });
 

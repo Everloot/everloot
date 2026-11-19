@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { describe, filterItems, resolveClass, resolveLegacyClass, resolveSubclass, type ItemFilter } from "../../../../../kb/src/item-taxonomy";
+import { describe, filterItems, resolveClass, resolveLegacyClass, resolveSubclass, type ItemFilter } from "@kb/item-taxonomy";
 import { admit, badPage, pageOf, pageRequest } from "@/lib/data-guard";
 import { gameDataNotice } from "@/lib/edges";
 import { CLIENT_TAXONOMY as T, itemFacets, matchesFacets, QUALITY_SLUGS, SLOT_SLUGS, type CategoryQuery } from "@/lib/items";

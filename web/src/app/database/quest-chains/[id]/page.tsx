@@ -10,7 +10,7 @@ import { chainHref, loadCatalog, parseSegment } from "@/lib/completion-lists";
 import { asOfLine, entitySummary } from "@/lib/evidence";
 import { loadNames } from "@/lib/names";
 import { pageMetadata } from "@/lib/seo";
-import { CLIENT_LABEL } from "../../../../../../kb/src/edges";
+import { CLIENT_LABEL } from "@kb/edges";
 import { EntityHeader, EntityTop, LINK, Unreachable } from "../../entity";
 import { loadQuestNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";

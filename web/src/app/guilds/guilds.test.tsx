@@ -159,7 +159,7 @@ test("the ruleset filter keeps the realms of that ruleset and ignores a malforme
 
 test("a first kill needs two installs on one kill: reports a week apart never beat a kill two installs saw together", async () => {
   const { bossFirsts } = await import("@/lib/guilds");
-  const { agreedKills, guildKey, guildProgression } = await import("../../../../kb/src/guilds");
+  const { agreedKills, guildKey, guildProgression } = await import("@kb/guilds");
   const mc = { instanceMapId: 409, name: "Molten Core", instanceType: "raid" as const, tier: 2, bosses: [{ encounterId: 663, name: "Lucifron" }] };
   const rows = [
     kill("a", "Ashen", 663, "Lucifron", "2026-12-09T20:00:00Z"), kill("b", "Ashen", 663, "Lucifron", "2026-12-16T20:00:00Z"),
@@ -176,7 +176,7 @@ test("a first kill needs two installs on one kill: reports a week apart never be
 test("guilds with the same first-kill time share the first, in name order whatever the input order", async () => {
   on();
   const { bossFirsts } = await import("@/lib/guilds");
-  const { agreedKills, guildProgression } = await import("../../../../kb/src/guilds");
+  const { agreedKills, guildProgression } = await import("@kb/guilds");
   const mc = { instanceMapId: 409, name: "Molten Core", instanceType: "raid" as const, tier: 2, bosses: [{ encounterId: 663, name: "Lucifron" }] };
   const at = "2026-10-20T20:00:00Z";
   const rows = [kill("a", "Zephyr", 663, "Lucifron", at), kill("b", "Zephyr", 663, "Lucifron", at), kill("c", "Anvil", 663, "Lucifron", at), kill("d", "Anvil", 663, "Lucifron", at)] as Parameters<typeof agreedKills>[0];

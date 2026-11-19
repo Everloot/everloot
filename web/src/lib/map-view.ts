@@ -77,8 +77,14 @@ export interface MapTreasure {
   /** The latest time an install saw it; absent on an answer cached before treasures had dates. */
   lastSeen?: string | null;
 }
-export interface MapFlightMaster { id: string; name: string; x: number; y: number; heldBack: boolean }
-export interface MapFlightLine { id: string; from: string; to: string; points: [number, number][]; heldBack: boolean }
+/** Which side's flight map shows a flight master or line, from the game files; absent when they do not say. */
+export type FlightSide = "alliance" | "horde" | "both";
+export interface MapFlightMaster { id: string; name: string; x: number; y: number; heldBack: boolean; faction?: FlightSide }
+export interface MapFlightLine { id: string; from: string; to: string; points: [number, number][]; heldBack: boolean; faction?: FlightSide }
+/** The sidebar's side switch: every flight, or one side's. */
+export type MapSide = "both" | "alliance" | "horde";
+/** A flight serves a side when the files give it that side or both; one the files give no side stays shown. */
+export const servesSide = (faction: FlightSide | undefined, side: MapSide) => side === "both" || !faction || faction === "both" || faction === side;
 export interface MapPin {
   id: string; kind: "npc" | "vendor"; npcId: number; name: string | null; mapId: number; zoneName: string;
   x: number; y: number; zoneX: number; zoneY: number; reporters: number; heldBack: boolean;
@@ -101,14 +107,14 @@ export function readPinSet(body: unknown): MapPinSet | null {
 }
 
 /** What the categories and the spoiler switch let through. Pure: the same inputs always give the same list. */
-export function visibleItems(items: MapItems, show: CategoryState, spoilers: boolean): MapItems {
+export function visibleItems(items: MapItems, show: CategoryState, spoilers: boolean, side: MapSide = "both"): MapItems {
   return {
     zones: show.zone ? items.zones.filter((z) => spoilers || !z.heldBack) : [],
     entrances: items.entrances.filter((e) => (e.raid ? show.raid : show.dungeon)),
     pins: items.pins.filter((p) => (p.kind === "npc" ? show.npc : show.vendor) && (spoilers || !p.heldBack)),
     treasures: show.chest ? items.treasures : [],
-    flightMasters: show.flight ? items.flightMasters.filter((f) => spoilers || !f.heldBack) : [],
-    flightLines: show.path ? items.flightLines.filter((l) => spoilers || !l.heldBack) : [],
+    flightMasters: show.flight ? items.flightMasters.filter((f) => (spoilers || !f.heldBack) && servesSide(f.faction, side)) : [],
+    flightLines: show.path ? items.flightLines.filter((l) => (spoilers || !l.heldBack) && servesSide(l.faction, side)) : [],
   };
 }
 
@@ -122,8 +128,8 @@ const within = (scope: Box, z: Box) => inside(scope, z.x, z.y) && inside(scope, 
  * list and search show them: a few names have two nodes on one spot. A flight path counts when either end is in
  * scope. Waiting categories have no items yet, so they count 0.
  */
-export function categoryCounts(items: MapItems, spoilers: boolean, scope: Box | null = null): Record<CategoryId, number> {
-  const all = visibleItems(items, DEFAULT_CATEGORIES, spoilers);
+export function categoryCounts(items: MapItems, spoilers: boolean, scope: Box | null = null, side: MapSide = "both"): Record<CategoryId, number> {
+  const all = visibleItems(items, DEFAULT_CATEGORIES, spoilers, side);
   const at = (x: number, y: number) => !scope || inside(scope, x, y);
   const counts = Object.fromEntries(CATEGORY_IDS.map((id) => [id, 0])) as Record<CategoryId, number>;
   counts.zone = all.zones.filter((z) => !scope || within(scope, z)).length;
@@ -337,13 +343,16 @@ export function continentFromSlug(slug: string): number | null {
 }
 
 export type SidebarTab = "categories" | "list";
-/** What the sidebar shows, kept in the address: `show` (only when not every category), `q` (while a search is open), `view=list`. */
-export interface MapUrlState { show: CategoryState; q: string; tab: SidebarTab }
+/**
+ * What the sidebar shows, kept in the address: `show` (only when not every category), `q` (while a search is open),
+ * `view=list`, and `side=alliance` or `side=horde` when the flights are one side's (absent: both).
+ */
+export interface MapUrlState { show: CategoryState; q: string; tab: SidebarTab; side?: MapSide }
 export const DEFAULT_URL_STATE: MapUrlState = { show: DEFAULT_CATEGORIES, q: "", tab: "categories" };
 const QUERY_MAX = 80;
 
 /** Reads `show`, `q` and `view`. Anything unknown is dropped, so a bad link opens the plain sidebar. */
-export function parseMapUrl(query: { show?: string | string[]; q?: string | string[]; view?: string | string[] }): MapUrlState {
+export function parseMapUrl(query: { show?: string | string[]; q?: string | string[]; view?: string | string[]; side?: string | string[] }): MapUrlState {
   const raw = first(query.show);
   let show = DEFAULT_CATEGORIES;
   if (raw === "none") show = allCategories(false);
@@ -351,7 +360,11 @@ export function parseMapUrl(query: { show?: string | string[]; q?: string | stri
     const ids = raw.split(",").map((s) => s.trim()).filter((s): s is CategoryId => (CATEGORY_IDS as readonly string[]).includes(s));
     if (ids.length) show = Object.fromEntries(CATEGORY_IDS.map((id) => [id, ids.includes(id)])) as CategoryState;
   }
-  return { show, q: (first(query.q) ?? "").trim().slice(0, QUERY_MAX), tab: first(query.view) === "list" ? "list" : "categories" };
+  const side = first(query.side);
+  return {
+    show, q: (first(query.q) ?? "").trim().slice(0, QUERY_MAX), tab: first(query.view) === "list" ? "list" : "categories",
+    ...(side === "alliance" || side === "horde" ? { side } : {}),
+  };
 }
 
 /** `show` for a set of categories: null when every one is on, `none` when none is, else the ids in the sidebar's order. */
@@ -364,12 +377,13 @@ export function showParam(show: CategoryState): string | null {
 /** The address with the sidebar's state written in; the default state leaves no trace. */
 export function mapUrlSearch(base: URLSearchParams, state: MapUrlState): URLSearchParams {
   const q = new URLSearchParams(base);
-  for (const k of ["show", "q", "view"]) q.delete(k);
+  for (const k of ["show", "q", "view", "side"]) q.delete(k);
   const show = showParam(state.show);
   if (show) q.set("show", show);
   const text = state.q.trim().slice(0, QUERY_MAX);
   if (text) q.set("q", text);
   if (state.tab === "list") q.set("view", "list");
+  if (state.side && state.side !== "both") q.set("side", state.side);
   return q;
 }
 

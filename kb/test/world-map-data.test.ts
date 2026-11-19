@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { chunkOf, terrainRowId } from "../src/terrain-area.js";
-import { assignmentRect, buildWorldMapData, thinLine, WorldMapData, WORLD_MAP_SCHEMA } from "../src/world-map-data.js";
+import { assignmentRect, buildWorldMapData, taxiFaction, thinLine, WorldMapData, WORLD_MAP_SCHEMA } from "../src/world-map-data.js";
 
 // Synthetic rows in the shape of the client tables (column names from WoWDBDefs). The numbers are made up.
 type Row = Record<string, unknown>;
@@ -237,7 +237,7 @@ describe("flight masters and flight lines from the taxi tables", () => {
   const taxi: typeof tables = {
     ...tables,
     TaxiNodes: rows([
-      node(2, "Stormwind, Elwynn", 0, [-8832.77, 478.62, 109]),
+      { ...node(2, "Stormwind, Elwynn", 0, [-8832.77, 478.62, 109]), Flags: 1025 },
       node(4, "Sentinel Hill, Westfall", 0, [-10628.89, 1036.68, 34]),
       node(5, "Generic, World target", 0, [-8644, 433, 59]),
       node(6, "Southshore Ferry, Hillsbrad", 0, [-700, -500, 1]),
@@ -256,7 +256,12 @@ describe("flight masters and flight lines from the taxi tables", () => {
 
   test("a flight master is a taxi node a flight starts or ends at; stand-ins, ferries, test rows and other maps are left out", () => {
     expect(flights.flightNodes.map((n) => n.name)).toEqual(["Stormwind, Elwynn", "Sentinel Hill, Westfall"]);
-    expect(flights.flightNodes[0]).toEqual({ id: 2, name: "Stormwind, Elwynn", continentId: 0, worldX: -8832.8, worldY: 478.6 });
+    expect(flights.flightNodes[0]).toEqual({ id: 2, name: "Stormwind, Elwynn", continentId: 0, worldX: -8832.8, worldY: 478.6, faction: "alliance" });
+    expect(flights.flightNodes[1]).not.toHaveProperty("faction");
+  });
+
+  test("a node's side is the flight map its Flags show it on: 1 Alliance, 2 Horde, both bits both", () => {
+    expect([taxiFaction(1025), taxiFaction(1026), taxiFaction(1027), taxiFaction(1024), taxiFaction(undefined)]).toEqual(["alliance", "horde", "both", undefined, undefined]);
   });
 
   test("a pair of nodes has one line, from the lower path id, through its points in order", () => {

@@ -8,20 +8,20 @@ import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasCard } from "@/lib/tooltip";
-import { itemNameReporters, itemPage } from "../../../../../../kb/src/item-page";
+import { itemNameReporters, itemPage } from "@kb/item-page";
 import { loadShownNames } from "@/lib/shown-item-names";
 import { loadEdges } from "@/lib/edges";
 import { loadItemSeen } from "@/lib/item-seen";
 import { itemSourceValue } from "./item-source";
 import { DisenchantPanel, showsDisenchant } from "./disenchant";
 import { loadDisenchant } from "@/lib/disenchant";
-import { bandYield } from "../../../../../../kb/src/disenchant";
+import { bandYield } from "@kb/disenchant";
 import { RelationTarget, SameIcon } from "@/components/EntityRelations";
 import { gameNameFor, loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames, unknownItemIcon } from "@/lib/game-assets";
 import { Badge, Container, DataTable, EvidenceLine, Facts, InShort, OpenData, QUALITY_TEXT, Tabs, filledTabs, TooltipFrame, TooltipLines, qualityOf, reportedLabel, type Column, type Fact, type TabItem } from "@/components/ui";
-import { isDevelopmentItemName } from "../../../../../../kb/src/dev-item-names";
-import { categoryOf } from "../../../../../../kb/src/item-taxonomy";
-import { edgesFrom, evidenceLabel, type Edge, type Rel } from "../../../../../../kb/src/edges";
+import { isDevelopmentItemName } from "@kb/dev-item-names";
+import { categoryOf } from "@kb/item-taxonomy";
+import { edgesFrom, evidenceLabel, type Edge, type Rel } from "@kb/edges";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, itemsHref, shownItemName, subclassLabel as labelOf } from "@/lib/items";
 import { FACT_WORD, tipLines, withReported } from "@/lib/item-names";
 import { PLACEHOLDER, splitWhy } from "@/lib/placeholder";
@@ -30,15 +30,16 @@ import { loadNames, nameOf } from "@/lib/names";
 import { loreForShownItem } from "@/lib/lore-links";
 import EntityLink from "@/components/EntityLink";
 import LoreSection from "@/components/LoreSection";
-import DarkmoonItemNote from "@/components/DarkmoonItemNote";
+import DarkmoonItemNote from "./DarkmoonItemNote";
 import { CategoryPage, categoryMetadata } from "../category-page";
 import { itemIndexable } from "@/lib/indexable";
 import { entityTitle, itemDescription } from "@/lib/entity-meta";
 import { MarketBox, loadMarketBox } from "@/app/tools/auctions/MarketBox";
-import { pendingLine } from "../../../../../../kb/src/pending-loot";
-import { itemDropSources } from "../../../../../../kb/src/loot-tables";
+import { pendingLine } from "@kb/pending-loot";
+import { itemDropSources } from "@kb/loot-tables";
 import { loadLootTables, loadReportedItemFacts } from "@/lib/rollup-compute";
-import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityIcon, EntityTop, known, LINK, PinTable, Unreachable } from "../../entity";
+import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, known, LINK, PinTable, Unreachable } from "../../entity";
+import { EntityIcon } from "@/components/game/EntityIcon";
 import { ItemSourcesPanel } from "../../loot-tables";
 import { unknownItem } from "../../unknown";
 import { itemSummary } from "@/lib/evidence";
@@ -304,7 +305,7 @@ export default async function ItemPage(props: Props) {
                 <TooltipLines lines={boxLines} />
               </TooltipFrame>
               {boxNotes.length > 0 && (
-                <div data-card-notes className="mt-1 space-y-0.5 rounded-[4px] border border-line bg-panel px-2 py-1 text-xs text-muted">
+                <div data-card-notes className="mt-1 space-y-0.5 rounded-control border border-line bg-panel px-2 py-1 text-xs text-muted">
                   {boxNotes.map((note) => <p key={note}>{note}</p>)}
                 </div>
               )}

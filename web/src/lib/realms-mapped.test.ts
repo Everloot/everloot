@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { emptyMarket, foldMarket } from "../../../kb/src/market";
+import { emptyMarket, foldMarket } from "@kb/market";
 
 // The realm map as it might read on launch day: two PvP realms, one Normal, one Hardcore; Forever stays unlisted.
 vi.mock("../data/realms", async (importOriginal) => ({

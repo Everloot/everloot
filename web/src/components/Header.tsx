@@ -8,6 +8,7 @@ import AccountControls from "./AccountControls";
 import { REPORT_BUG_EVENT } from "./BugReport";
 import GameVersionLabel from "./GameVersionLabel";
 import { SuggestField } from "./ui/SearchBar";
+import Icon from "./ui/Icon";
 import { TOOL_GROUPS, toolGroups, type ToolGroup } from "@/data/tools";
 
 type NavLink = { label: string; href: string };
@@ -25,7 +26,7 @@ export { TOOL_GROUPS };
  * Guides (static reference), Chat, and Profile (the player's own pages, and the lists kept in this browser). The
  * phone menu shows the same items as groups. Only existing pages are linked; hidden tools are left out.
  */
-export function navItems({ guilds = false, players = false, profiles = false, savedBuilds = false, reviewedGuides = false }: NavSwitches = {}): NavItem[] {
+export function navItems({ guilds = false, players = false, savedBuilds = false, reviewedGuides = false }: NavSwitches = {}): NavItem[] {
   const groups = toolGroups(guilds);
   const catalogue = (title: ToolGroup) => groups.find((g) => g.title === title)?.links ?? [];
   return [
@@ -62,8 +63,8 @@ export function navItems({ guilds = false, players = false, profiles = false, sa
     {
       label: "Profile",
       links: [
-        { label: "Account", href: "/account" },
-        ...(profiles ? [{ label: "Settings", href: "/settings" }] : []),
+        // One Settings page holds the account, profile, integrations and keys (#1278); /account sends there.
+        { label: "Settings", href: "/settings" },
         ...(savedBuilds ? [{ label: "My builds", href: "/me" }] : []),
         ...catalogue("Profile"),
       ],
@@ -95,6 +96,9 @@ const navItem = "inline-flex min-h-11 items-center whitespace-nowrap border-b-2 
 const navState = (on: boolean) => (on ? "border-accent text-fg" : "border-transparent text-fg-2 hover:text-accent");
 const menuLink = "flex min-h-11 items-center rounded-control px-3 text-sm text-fg-2 hover:bg-canvas hover:text-accent";
 
+/** Below md, how many links a phone menu group shows before its More…. */
+const PHONE_LINKS = 3;
+
 /** The phone menu: each top bar menu as a group, then More with the single links (Chat), Docs and About. */
 export function phoneGroups(items: NavItem[]): { label: string; links: NavLink[] }[] {
   const singles = items.flatMap((item) => (item.links ? [] : [{ label: item.label, href: item.href }]));
@@ -106,9 +110,7 @@ export function phoneGroups(items: NavItem[]): { label: string; links: NavLink[]
 
 function SearchIcon() {
   return (
-    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
-    </svg>
+    <Icon name="search" />
   );
 }
 
@@ -116,7 +118,7 @@ function SearchIcon() {
  * The compact bar (docs/design/specs/2026-10-20-account-shell-design.md). From the layout: `savedBuilds` adds Your
  * builds to the avatar menu (EVERLOOT_SAVED_BUILDS); `accountSwitching` is true with Better Auth (EVERLOOT_AUTH_V2),
  * which can hold several accounts on one browser; `profiles` is EVERLOOT_PROFILES, without which the avatar menu
- * never asks for the player's shell. With it, the menu fetches the player from /api/me/shell itself, and Profile lists
+ * never asks for the player's shell. With it, the menu fetches the player from /api/me/shell itself. Profile always lists
  * Settings. `guilds` is EVERLOOT_GUILDS or the armory: Lookup then offers Guilds in place of the guild board. `players`
  * is EVERLOOT_PLAYER_PAGES or the armory: Lookup then starts with Players, the one character search.
  * `reviewedGuides` is true once kb/guides holds a reviewed guide: Guides then starts with the guides list.
@@ -134,6 +136,8 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
   const place = currentPlace(path);
   const current = place?.label;
   const [open, setOpen] = useState(false);
+  // The phone menu groups opened past their first links with More….
+  const [moreOpen, setMoreOpen] = useState<string[]>([]);
   // The top bar menu that is open, by its label; one at a time.
   const [menu, setMenu] = useState<string | null>(null);
   // Below 1280 px the bar has no room for the field: the search icon opens it full width under the bar.
@@ -184,9 +188,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
       <div className="mx-auto flex h-header max-w-data items-center gap-1 px-2 sm:gap-3 sm:px-4 lg:gap-4 lg:px-6">
         <Link href="/" className="inline-flex min-h-11 shrink-0 items-center gap-2 text-lg font-bold tracking-tight text-fg focus-visible:outline-offset-[-2px]" onClick={closeAll}>
           {/* The favicon's diamond, outlined in the accent green. */}
-          <svg aria-hidden="true" viewBox="8 8 48 48" width="16" height="16" className="text-accent">
-            <path d="M32 12 52 32 32 52 12 32Z" fill="none" stroke="currentColor" strokeWidth="5" strokeLinejoin="round" />
-          </svg>
+          <Icon name="diamond" className="text-accent" />
           everloot
         </Link>
 
@@ -207,7 +209,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
                   className={`${navItem} gap-1.5 ${navState(on || expanded)}`}
                 >
                   {item.label}
-                  <svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" className={expanded ? "rotate-180" : undefined}><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
+                  <Icon name="chevron" className={expanded ? "rotate-180" : undefined} />
                 </button>
                 {/* Always in the page, so the links are in the HTML for crawlers; hidden until opened. */}
                 <div id={id} hidden={!expanded} className={`pop absolute left-0 top-full mt-2 w-60 rounded-card border border-edge bg-panel p-2 ${expanded ? "block" : "hidden"}`}>
@@ -237,7 +239,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
               listClassName="-left-9 -right-3 mt-2"
               className="h-7 w-full min-w-0 bg-transparent text-sm text-fg placeholder:text-muted focus:outline-none"
             />
-            <kbd aria-hidden="true" className="rounded-[4px] border border-line px-1.5 font-mono text-xs text-muted">/</kbd>
+            <kbd aria-hidden="true" className="rounded-control border border-line px-1.5 font-mono text-xs text-muted">/</kbd>
           </form>
         </div>
 
@@ -274,7 +276,8 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
       </div>
 
       {open && (
-        <nav id="site-navigation" aria-label="Site menu" className="pop absolute inset-x-0 top-full max-h-[75vh] overflow-y-auto border-b border-edge bg-panel xl:hidden">
+        // Fixed from under the bar to the bottom of the window, so the open menu covers the page instead of showing it beneath.
+        <nav id="site-navigation" aria-label="Site menu" className="pop fixed inset-x-0 bottom-0 top-header overflow-y-auto overscroll-contain bg-panel xl:hidden">
           <div className="mx-auto max-w-data space-y-6 px-4 py-6 lg:px-6">
             <form action="/search" method="get" role="search" onSubmit={() => track("search", { surface: "menu" })} className="flex items-center gap-2 rounded-full border border-edge bg-canvas px-3 text-muted focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">
               <SearchIcon />
@@ -284,13 +287,23 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
             {/* The top bar's menus as groups, in the same order; More holds Chat, the pages outside the bar, and the bug
                 report, whose floating pill is hidden below md. Focus moves to Menu first, so closing the dialog returns there. */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-6">
-              {phoneGroups(items).map((group) => (
+              {phoneGroups(items).map((group) => {
+                // Below md a group shows its first PHONE_LINKS links; More… opens the rest, which stay in the HTML. The
+                // group holding the page opens by itself.
+                const rest = group.links.slice(PHONE_LINKS);
+                const expanded = moreOpen.includes(group.label) || rest.some((link) => link.href === place?.href);
+                return (
                 <div key={group.label}>
                   <p className="mb-1 px-3 font-mono text-xs text-muted">{group.label}</p>
-                  <ul>
-                    {group.links.map((link) => (
-                      <li key={link.href}><Link href={link.href} onClick={closeAll} aria-current={place?.href === link.href ? "page" : undefined} className={menuLink}>{link.label}</Link></li>
+                  <ul id={`${menuId(group.label)}-phone`}>
+                    {group.links.map((link, i) => (
+                      <li key={link.href} className={i < PHONE_LINKS || expanded ? undefined : "hidden md:block"}><Link href={link.href} onClick={closeAll} aria-current={place?.href === link.href ? "page" : undefined} className={menuLink}>{link.label}</Link></li>
                     ))}
+                    {rest.length > 0 && !expanded && (
+                      <li className="md:hidden">
+                        <button type="button" aria-expanded={false} aria-controls={`${menuId(group.label)}-phone`} className={`${menuLink} w-full text-left`} onClick={() => setMoreOpen([...moreOpen, group.label])}>More…</button>
+                      </li>
+                    )}
                     {group.label === "More" && (
                       <li>
                         <button type="button" aria-haspopup="dialog" className={`${menuLink} w-full text-left`} onClick={() => {
@@ -302,7 +315,8 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
                     )}
                   </ul>
                 </div>
-              ))}
+                );
+              })}
             </div>
             <GameVersionLabel className="px-3" />
             <AccountControls place="menu" />

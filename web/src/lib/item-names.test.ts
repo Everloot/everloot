@@ -1,8 +1,8 @@
 import { ITEM_FACTS } from "@everloot/protocol";
 import { expect, test } from "vitest";
-import type { ItemRecord } from "../../../kb/src/assets/items";
-import type { CheckedWeapon } from "../../../kb/src/assets/weapon-damage";
-import type { ReportedFact } from "../../../kb/src/item-facts";
+import type { ItemRecord } from "@kb/assets/items";
+import type { CheckedWeapon } from "@kb/assets/weapon-damage";
+import type { ReportedFact } from "@kb/item-facts";
 import { shard0 } from "./game-assets.fixture";
 import { factLine, itemTipText, withReported, WHY } from "./item-names";
 
@@ -87,7 +87,7 @@ test("once checks confirm a reading, the files' range prints with where it came 
   expect(itemTipText({ ...cutlass, w: { ...cutlass.w!, ds: 9 } }, checked).lines).toContain("[?] - [?] Damage · Speed 2.20");
 });
 
-import { siteItemFacts, type ItemFactRow } from "../../../kb/src/item-facts";
+import { siteItemFacts, type ItemFactRow } from "@kb/item-facts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import TooltipLines from "@/components/ui/TooltipLines";

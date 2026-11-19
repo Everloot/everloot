@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import JsonLd from "@/components/JsonLd";
-import { PageHeader, Prose, ReadingLayout, type TocItem } from "@/components/ui";
+import { Card, PageHeader, Prose, ReadingLayout, type TocItem } from "@/components/ui";
 import { longDate } from "@/data/wow-forever";
 import { trailFor } from "@/lib/breadcrumbs";
 import { couldBeBluePost, loadTimeline, postPathForUrl } from "@/lib/changes";
 import { newsArticleJsonLd } from "@/lib/jsonld";
-import { FIGURE_SIZE, postFigure } from "../../../../../kb/src/news/post";
+import { FIGURE_SIZE, postFigure } from "@kb/news/post";
 import { bodyForPage, lastChanged, loadNews, newsHref, postDescription, publishedPost, publishedPosts, readingMinutes, relatedPosts, sourceNames } from "@/lib/news";
 import { pageMetadata } from "@/lib/seo";
 import { NewsCard } from "../news-card";
@@ -139,7 +139,7 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
           </div>
 
           {post.sources.length > 0 && (
-            <section aria-labelledby="sources" className="mt-12 rounded-card border border-line bg-panel p-5">
+            <Card as="section" padding="custom" aria-labelledby="sources" className="mt-12 p-5">
               <h2 id="sources" className="scroll-mt-24 text-base font-semibold text-fg">Sources</h2>
               <ul className="mt-2 space-y-1.5 text-[15px]">
                 {post.sources.map((s) => {
@@ -152,7 +152,7 @@ export default async function NewsArticle(props: { params: Promise<{ slug: strin
                   );
                 })}
               </ul>
-            </section>
+            </Card>
           )}
 
           {(related.length > 0 || body.relatedBlocks.length > 0) && (

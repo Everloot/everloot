@@ -65,7 +65,7 @@ export default async function SignInPage({ searchParams }: { searchParams?: Prom
     add = state === "ready";
   }
   const returnTo = safeReturnTo(params?.returnTo) ?? (add ? "/" : null);
-  if (!add && await getUser().catch(() => null)) redirect(returnTo ?? "/account");
+  if (!add && await getUser().catch(() => null)) redirect(returnTo ?? "/settings");
   // After an add through Battle.net the landing page checks whether the same account came back (home page notice).
   const bnetReturn = add && returnTo ? `${returnTo}${returnTo.includes("?") ? "&" : "?"}added=bnet` : returnTo;
   const methods = signInMethods();

@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { COVERAGE_SCHEMA, COVERAGE_TYPES } from "../../../kb/src/coverage";
+import { COVERAGE_SCHEMA, COVERAGE_TYPES } from "@kb/coverage";
 import { coverageKey, forgetCoverageSummary, loadCoverageSummary, summarizeCoverage } from "./coverage-summary";
 
 const cloud = { r2AccountId: "acct", r2AccessKeyId: "id", r2SecretAccessKey: "secret", r2Bucket: "b" };

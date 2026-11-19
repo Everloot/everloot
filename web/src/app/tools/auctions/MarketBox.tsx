@@ -3,7 +3,7 @@ import Link from "next/link";
 import { DataTable, type Column } from "@/components/ui";
 import { uploadStore } from "@/lib/upload-store";
 import { crossRealmHref, itemHref, itemRows, money, type MarketRow } from "@/lib/auction-house";
-import { formatCopper } from "../../../../../kb/src/market";
+import { formatCopper } from "@kb/market";
 import { RealmName } from "./RealmName";
 
 /**

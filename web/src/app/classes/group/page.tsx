@@ -7,7 +7,7 @@ import { reviewedRoles } from "@/lib/class-group";
 import { classGuides } from "@/lib/class-hub";
 import { pageMetadata } from "@/lib/seo";
 import { TALENT_CLASSES } from "@/lib/talents/catalogs";
-import type { GuideRole } from "../../../../../kb/src/guides/guide";
+import type { GuideRole } from "@kb/guides/guide";
 import GroupPlanner from "./GroupPlanner";
 
 // Built once per deploy, like the class hubs: the roles come from the reviewed guides in kb/guides, read while the
@@ -40,7 +40,7 @@ export default function GroupPage() {
       />
       <GroupPlanner roles={roles} />
 
-      <section aria-labelledby="about" className="mt-12 max-w-[75ch] space-y-3 text-sm text-fg-2">
+      <section aria-labelledby="about" className="mt-12 max-w-lede space-y-3 text-sm text-fg-2">
         <SectionHeading id="about">How the planner works</SectionHeading>
         <p>
           What a class brings is the raid builder&apos;s coverage, read from the game files of build {CURRENT_BUILD} and

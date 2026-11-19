@@ -83,6 +83,11 @@ export const WorldMapData = z.object({
   /** Flight masters: the taxi nodes that a flight starts or ends at (TaxiNodes). World yards, as everything else here. */
   flightNodes: z.array(z.object({
     id: z.number().int(), name: z.string(), continentId: z.number().int(), worldX: z.number(), worldY: z.number(), uiMapId: z.number().int().optional(),
+    /**
+     * Which side's flight map shows the node (TaxiNodes `Flags`: 1 the Alliance map, 2 the Horde map, both bits both).
+     * Absent when the row sets neither, and in files made before the field.
+     */
+    faction: z.enum(["alliance", "horde", "both"]).optional(),
   })).default([]),
   /** One flight line per pair of nodes (TaxiPath, drawn through its TaxiPathNode points), points as [worldX, worldY] yards, thinned. */
   flightPaths: z.array(z.object({
@@ -319,6 +324,14 @@ export function thinLine(points: [number, number][], tolerance: number): [number
   return [...thinLine(points.slice(0, at + 1), tolerance).slice(0, -1), ...thinLine(points.slice(at), tolerance)];
 }
 
+/** TaxiNodes `Flags`: bit 1 shows a node on the Alliance flight map, bit 2 on the Horde one. */
+export function taxiFaction(flags: unknown): "alliance" | "horde" | "both" | undefined {
+  const f = num(flags);
+  if (f === null) return undefined;
+  const alliance = (f & 1) !== 0, horde = (f & 2) !== 0;
+  return alliance && horde ? "both" : alliance ? "alliance" : horde ? "horde" : undefined;
+}
+
 /**
  * Flight masters and flight lines from the taxi tables. A node counts when a flight starts or ends at it and
  * it lies on one of the continents; a line is kept once for a pair of nodes (the return trip runs the same
@@ -334,7 +347,8 @@ export function buildFlights(nodes: Rows | undefined, paths: Rows | undefined, p
     const id = Number(n.ID), at = Array.isArray(n.Pos) ? n.Pos.map(num) : [];
     if (!used.has(id) || typeof n.Name_lang !== "string" || NOT_A_FLIGHT_MASTER.test(n.Name_lang.trim()) || !continentIds.has(Number(n.ContinentID))) continue;
     if (at.length < 2 || at[0] === null || at[1] === null) continue;
-    kept.set(id, { id, name: n.Name_lang.trim(), continentId: Number(n.ContinentID), worldX: round(at[0]), worldY: round(at[1]) });
+    const faction = taxiFaction(n.Flags);
+    kept.set(id, { id, name: n.Name_lang.trim(), continentId: Number(n.ContinentID), worldX: round(at[0]), worldY: round(at[1]), ...(faction ? { faction } : {}) });
   }
   const byPath = new Map<number, { index: number; x: number; y: number }[]>();
   for (const q of pathNodes.values()) {

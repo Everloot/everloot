@@ -1,5 +1,5 @@
 import type { AuctionHouse, DisenchantResponse } from "@everloot/protocol";
-import { allBandYields, auctionCut, bandLabel, expectedValue, placer, type BandYield, type DisenchantTables, type Placer } from "../../../kb/src/disenchant";
+import { allBandYields, auctionCut, bandLabel, expectedValue, placer, type BandYield, type DisenchantTables, type Placer } from "@kb/disenchant";
 import type { MarketRow, RealmBoard } from "./auction-house";
 import { CLIENT_DISENCHANT } from "../data/game-data/client-disenchant";
 import { loadDisenchantTables } from "./rollup-compute";

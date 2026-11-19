@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { DocsIcon as IconName } from "@/lib/docs/nav";
+import Card from "@/components/ui/Card";
 import DocsIcon from "./DocsIcon";
 
 /** The building blocks of a docs page. Server components; the interactive ones are in DocsClient. */
@@ -25,7 +26,7 @@ export function P({ children }: { children: ReactNode }) {
 }
 
 export function C({ children }: { children: ReactNode }) {
-  return <code className="rounded-[4px] border border-line bg-panel px-1.5 py-0.5 font-mono text-[0.85em] text-fg [overflow-wrap:anywhere]">{children}</code>;
+  return <code className="rounded-control border border-line bg-panel px-1.5 py-0.5 font-mono text-[0.85em] text-fg [overflow-wrap:anywhere]">{children}</code>;
 }
 
 export function List({ children, ordered = false }: { children: ReactNode; ordered?: boolean }) {
@@ -94,8 +95,8 @@ export function Params({ rows, empty = "None." }: { rows: ParamRow[]; empty?: st
         <div key={row.name} className="py-4">
           <dt className="flex flex-wrap items-center gap-2">
             <code className="font-mono text-sm font-semibold text-accent">{row.name}</code>
-            <span className="rounded-[4px] bg-panel px-1.5 font-mono text-xs text-fg-2">{row.type}</span>
-            {row.required && <span className="rounded-[4px] bg-danger/10 px-1.5 font-mono text-xs text-danger">required</span>}
+            <span className="rounded-control bg-panel px-1.5 font-mono text-xs text-fg-2">{row.type}</span>
+            {row.required && <span className="rounded-control bg-danger/10 px-1.5 font-mono text-xs text-danger">required</span>}
           </dt>
           {row.description ? <dd className="mt-2 text-sm leading-6 text-fg-2">{row.description}</dd> : null}
         </div>
@@ -119,9 +120,9 @@ export function Table({ head, rows }: { head: string[]; rows: ReactNode[][] }) {
 /** The method badge and path an endpoint page opens with. */
 export function Endpoint({ method, path, base }: { method: "GET" | "POST"; path: string; base: string }) {
   return (
-    <div className="mt-6 flex min-w-0 items-center gap-3 rounded-card border border-line bg-panel px-3 py-2.5">
+    <Card padding="custom" className="mt-6 flex items-center gap-3 px-3 py-2.5">
       <span className={`rounded-control px-2 py-0.5 font-mono text-xs font-semibold ${method === "GET" ? "bg-accent/15 text-accent" : "bg-warning/15 text-warning"}`}>{method}</span>
       <code className="min-w-0 truncate font-mono text-sm text-fg" title={`${base}${path}`}><span className="text-muted">{base}</span>{path}</code>
-    </div>
+    </Card>
   );
 }

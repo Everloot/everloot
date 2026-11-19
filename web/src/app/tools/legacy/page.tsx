@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import LegacyPerks from "@/components/LegacyPerks";
+import LegacyPerks from "./LegacyPerks";
 import { Container, PageHeader } from "@/components/ui";
 import { LEGACY_PERKS } from "@/data/game-data/legacy-perks";
 import { trailFor } from "@/lib/breadcrumbs";

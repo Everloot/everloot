@@ -1,39 +1,96 @@
 import Link from "next/link";
+import GameIcon from "@/components/game/GameIcon";
 import ItemTip from "@/components/game/ItemTip";
-import { SectionHeading } from "@/components/ui";
+import { Disclosure, SectionHeading } from "@/components/ui";
 import { QUALITY_TEXT, type Quality } from "@/components/ui/quality";
+import { QUALITIES } from "@/design/tokens";
 import { classTokenOfName, slotLabel } from "@/lib/armory";
 import type { ArmoryCharacter } from "@/lib/armory-store";
 import type { ItemTip as Tip } from "@/lib/game-assets";
-import { ArmoryCredit, link } from "./parts";
+import { link } from "./parts";
 
-const SLOTS = ["HEAD", "NECK", "SHOULDER", "BACK", "CHEST", "SHIRT", "TABARD", "WRIST", "HANDS", "WAIST", "LEGS", "FEET", "FINGER_1", "FINGER_2", "TRINKET_1", "TRINKET_2", "MAIN_HAND", "OFF_HAND", "RANGED"];
-const quality = (q: string | null) => QUALITY_TEXT[q?.toLowerCase() as Quality] ?? "text-fg";
+// The game's paper doll: armour down the left, jewellery and the rest down the right, weapons below, the model's place left empty.
+const LEFT = ["HEAD", "NECK", "SHOULDER", "BACK", "CHEST", "SHIRT", "TABARD", "WRIST"];
+const RIGHT = ["HANDS", "WAIST", "LEGS", "FEET", "FINGER_1", "FINGER_2", "TRINKET_1", "TRINKET_2"];
+const WEAPONS = ["MAIN_HAND", "OFF_HAND", "RANGED"];
+const qualityName = (q: string | null | undefined): Quality | undefined => QUALITIES.find((x) => x === q?.toLowerCase());
+const quality = (q: string | null) => QUALITY_TEXT[qualityName(q) as Quality] ?? "text-fg";
 
-export function Equipment({ character: c, tips }: { character: ArmoryCharacter; tips: Map<number, Tip> }) {
+/**
+ * The character's gear. Every equipped slot draws its icon in its quality's border: the item's own art where the game files
+ * have it, else the game's question mark (`unknownIcon`, as item pages do); no icon at all without the asset files.
+ */
+export function Equipment({ character: c, tips, unknownIcon = null }: { character: ArmoryCharacter; tips: Map<number, Tip>; unknownIcon?: string | null }) {
   const equipped = new Map(c.equipment.map((item) => [item.slot, item]));
+  const slot = (key: string) => {
+    const item = equipped.get(key);
+    const tip = item ? tips.get(item.itemId) : undefined;
+    const src = tip?.icon ?? unknownIcon;
+    const icon = item && src ? <GameIcon src={src} size={36} quality={qualityName(item.quality) ?? qualityName(tip?.quality)} /> : null;
+    const name = item && <Link href={`/database/items/${item.itemId}`} className={`text-sm underline decoration-edge underline-offset-4 hover:decoration-fg ${quality(item.quality)}`}>{item.name}</Link>;
+    return <li key={key} data-equipment-slot={key} className="min-w-0 border-b border-line py-3">
+      <p className="mb-1 text-meta text-muted">{slotLabel(key)}</p>
+      {item ? <div className="flex min-h-11 items-center justify-between gap-3">
+        {tip ? <ItemTip tip={tip} size={36} icon={icon}>{name!}</ItemTip> : <span className="inline-flex items-center gap-1.5 align-middle">{icon}{name}</span>}
+        {item.level !== null && <span className="shrink-0 font-mono text-meta tabular-nums text-fg-2" aria-label={`Item level ${item.level}`}>{item.level}</span>}
+      </div> : <p className="flex min-h-11 items-center text-sm text-muted">Not equipped</p>}
+    </li>;
+  };
   return <section aria-labelledby="armory-gear" className="space-y-3">
     <SectionHeading id="armory-gear">Equipment</SectionHeading>
     {c.equipment.length === 0 && <p className="text-sm text-fg-2">Nothing equipped when it was read.</p>}
-    <ol className="grid gap-x-6 sm:grid-cols-2">
-      {SLOTS.map((slot) => {
-        const item = equipped.get(slot);
-        return <li key={slot} data-equipment-slot={slot} className="min-w-0 border-b border-line py-3">
-          <p className="mb-1 text-meta text-muted">{slotLabel(slot)}</p>
-          {item ? <div className="flex min-h-11 items-center justify-between gap-3">
-            <ItemTip tip={tips.get(item.itemId)} size={36}>
-              <Link href={`/database/items/${item.itemId}`} className={`text-sm underline decoration-edge underline-offset-4 hover:decoration-fg ${quality(item.quality)}`}>{item.name}</Link>
-            </ItemTip>
-            {item.level !== null && <span className="shrink-0 font-mono text-meta tabular-nums text-fg-2" aria-label={`Item level ${item.level}`}>{item.level}</span>}
-          </div> : <p className="flex min-h-11 items-center text-sm text-muted">Not equipped</p>}
-        </li>;
-      })}
-    </ol>
-    <ArmoryCredit at={c.fetchedAt} />
+    <div data-paper-doll className="grid gap-x-6 sm:grid-cols-[minmax(0,1fr)_minmax(0,6rem)_minmax(0,1fr)]">
+      <ol aria-label="Left side">{LEFT.map(slot)}</ol>
+      <div aria-hidden="true" data-model-space className="hidden sm:block" />
+      <ol aria-label="Right side">{RIGHT.map(slot)}</ol>
+    </div>
+    <ol aria-label="Weapons" className="grid gap-x-6 sm:grid-cols-3">{WEAPONS.map(slot)}</ol>
   </section>;
 }
 
-export function ProfileDetailsView({ character: c }: { character: ArmoryCharacter }) {
+type Achievement = { id: number; name: string; completedAt: string };
+/** The achievements shown open before the rest close under a disclosure. */
+export const OPEN_ACHIEVEMENTS = 5;
+
+function AchievementRows({ rows }: { rows: Achievement[] }) {
+  return <ul className="divide-y divide-line">{rows.map((a) => <li key={a.id} className="flex min-h-11 items-center justify-between gap-3 py-2 text-sm">
+    <Link href={`/database/achievements/${a.id}`} className={link}>{a.name}</Link>
+    <time dateTime={a.completedAt} className="shrink-0 font-mono text-meta tabular-nums text-fg-2">{a.completedAt.slice(0, 10)}</time>
+  </li>)}</ul>;
+}
+
+/** Newest first, then grouped by category (player-confirmed names; "Other" where none is confirmed), groups by their newest. */
+function byCategory(rows: Achievement[], categories: ReadonlyMap<number, string>): [string, Achievement[]][] {
+  const groups = new Map<string, Achievement[]>();
+  for (const a of rows) {
+    const name = categories.get(a.id) || "Other";
+    groups.set(name, [...(groups.get(name) ?? []), a]);
+  }
+  return [...groups].sort(([a], [b]) => Number(a === "Other") - Number(b === "Other"));
+}
+
+function Achievements({ rows, categories }: { rows: Achievement[]; categories: ReadonlyMap<number, string> }) {
+  const newest = [...rows].sort((a, b) => b.completedAt.localeCompare(a.completedAt));
+  const open = newest.slice(0, OPEN_ACHIEVEMENTS), rest = newest.slice(OPEN_ACHIEVEMENTS);
+  return <>
+    <AchievementRows rows={open} />
+    {rest.length > 0 && <Disclosure summary={`${rest.length.toLocaleString("en-US")} more, by category`} wide>
+      {byCategory(rest, categories).map(([name, list]) => <div key={name} data-achievement-category={name} className="space-y-1">
+        <p className="text-meta text-muted">{name}</p>
+        <AchievementRows rows={list} />
+      </div>)}
+    </Disclosure>}
+  </>;
+}
+
+/** The read times of a character's Blizzard data: the profile and each detail section, for one credit line. */
+export function readTimes(c: ArmoryCharacter): string[] {
+  const d = c.details;
+  return [c.fetchedAt, d?.statistics?.asOf, d?.talents?.asOf, d?.professions?.asOf, d?.achievements?.asOf, d?.reputations?.asOf, d?.quests?.asOf]
+    .filter((t): t is string => typeof t === "string");
+}
+
+export function ProfileDetailsView({ character: c, categories = new Map() }: { character: ArmoryCharacter; categories?: ReadonlyMap<number, string> }) {
   const details = c.details;
   if (!details) return null;
   const classSlug = classTokenOfName(c.class).toLowerCase();
@@ -43,7 +100,6 @@ export function ProfileDetailsView({ character: c }: { character: ArmoryCharacte
       <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
         {details.statistics.rows.map((stat) => <div key={stat.label}><dt className="text-meta text-muted">{stat.label}</dt><dd className="font-mono text-lg tabular-nums text-fg">{stat.value.toLocaleString("en-US", { maximumFractionDigits: 2 })}{stat.percent ? "%" : ""}</dd></div>)}
       </dl>
-      <ArmoryCredit at={details.statistics.asOf} />
     </section>}
     {details.talents && <section aria-labelledby="armory-talents" className="space-y-3">
       <SectionHeading id="armory-talents">Talents</SectionHeading>
@@ -54,7 +110,6 @@ export function ProfileDetailsView({ character: c }: { character: ArmoryCharacte
         </div>)}
       </div>
       {classSlug && <p className="text-sm"><Link href={`/tools/talents/${classSlug}`} className={link}>Plan a build in the talent calculator</Link></p>}
-      <ArmoryCredit at={details.talents.asOf} />
     </section>}
     {details.professions && <section aria-labelledby="armory-professions" className="space-y-3">
       <SectionHeading id="armory-professions">Professions</SectionHeading>
@@ -63,16 +118,11 @@ export function ProfileDetailsView({ character: c }: { character: ArmoryCharacte
         <progress className="h-2 w-full accent-accent" value={profession.rank} max={profession.max} aria-label={`${profession.name} skill`} />
       </li>)}</ul>
       <p className="text-sm"><Link href="/tools/professions" className={link}>Find profession leveling routes</Link></p>
-      <ArmoryCredit at={details.professions.asOf} />
     </section>}
     {details.achievements && <section aria-labelledby="armory-achievements" className="space-y-3">
       <SectionHeading id="armory-achievements">Achievements</SectionHeading>
       {details.achievements.rows.length === 0 ? <p className="text-sm text-fg-2">None completed when it was read.</p>
-        : <ul className="divide-y divide-line">{details.achievements.rows.map((a) => <li key={a.id} className="flex min-h-11 items-center justify-between gap-3 py-2 text-sm">
-          <Link href={`/database/achievements/${a.id}`} className={link}>{a.name}</Link>
-          <time dateTime={a.completedAt} className="shrink-0 font-mono text-meta tabular-nums text-fg-2">{a.completedAt.slice(0, 10)}</time>
-        </li>)}</ul>}
-      <ArmoryCredit at={details.achievements.asOf} />
+        : <Achievements rows={details.achievements.rows} categories={categories} />}
     </section>}
     {details.reputations && details.reputations.rows.length > 0 && <section aria-labelledby="armory-reputations" className="space-y-3">
       <SectionHeading id="armory-reputations">Reputations</SectionHeading>
@@ -80,12 +130,10 @@ export function ProfileDetailsView({ character: c }: { character: ArmoryCharacte
         <Link href={`/database/factions/${r.id}`} className={link}>{r.name}</Link>
         <span className="shrink-0 text-fg-2">{r.standing}</span>
       </li>)}</ul>
-      <ArmoryCredit at={details.reputations.asOf} />
     </section>}
     {details.quests && <section aria-labelledby="armory-quests" className="space-y-3">
       <SectionHeading id="armory-quests">Quests</SectionHeading>
       <p className="text-sm text-fg"><span className="font-mono tabular-nums">{details.quests.completed.length.toLocaleString("en-US")}</span> completed quests</p>
-      <ArmoryCredit at={details.quests.asOf} />
     </section>}
   </>;
 }
