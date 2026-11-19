@@ -174,8 +174,17 @@ second one. A boss is listed for an instance once three installs report its enco
 encounter and object names arrive in the player's client language, so each is shown only when three
 installs report the same one; an object's spawn point needs three installs within one cluster (positions closer than 1 on the
 0 to 100 map scale), and a place seen by one or two installs is only counted, never drawn. An object's
-name is shown only when three installs report the same one; otherwise it is "Object" and its id. Fishing
-gives the zone only, never a pin. Object places come from play only: nothing is read from the game's
+name is shown only when three installs report the same one; otherwise it is "Object" and its id.
+
+**Public drop source label exception (19 November 2026).** `GET /api/rollups/drops` may label an already-public
+NPC or object source with a name from two distinct installs that agree exactly, provided all its counted name
+reports agree. `DROP_NAME_INSTALLS = 2` names this exception; the existing three-install name rule takes precedence.
+The drop rows still require three installs: this names a source whose drops are already published, and never
+publishes a new source or rate. One install never supplies this fallback. Recheck cutoffs still apply. The Desktop
+App carries the label into its price file for addon tooltips. Other APIs, pages, bulk exports and MCP name rules
+stay unchanged.
+
+Fishing gives the zone only, never a pin. Object places come from play only: nothing is read from the game's
 files for them.
 
 **Item numbers players report.** *Proposed 2026-10-21, in the pull request that adds the `item_fact` kind

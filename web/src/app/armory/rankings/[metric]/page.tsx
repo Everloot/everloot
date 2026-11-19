@@ -4,11 +4,12 @@ import { notFound } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Container, DataTable, FilterBar, LinkTabs, PageHeader, type Column, type FilterControl } from "@/components/ui";
 import {
-  ARMORY_BOARDS, ARMORY_METRICS, ARMORY_REGIONS, ARMORY_RULESETS, armoryBoardHref, armoryBoardPath, armoryBoardQuery,
-  armoryCharacterPath, armoryOn, classTokenOfName, isArmoryMetric, metricValue, regionLabel, type ArmoryBoardQuery, type ArmoryMetric,
+  ARMORY_CLASSES, ARMORY_FACTIONS, ARMORY_BOARDS, ARMORY_METRICS, ARMORY_REGIONS, ARMORY_RULESETS, armoryBoardHref, armoryBoardPath, armoryBoardQuery,
+  armoryCharacterPath, armoryOn, isArmoryMetric, regionLabel, type ArmoryBoardQuery, type ArmoryMetric,
 } from "@/lib/armory";
 import { armoryStore, type ArmoryBoardRow } from "@/lib/armory-store";
 import { classText } from "@/app/players/player-view";
+import { BoardClass, BoardGuild, BoardMetric, BoardValue } from "../../board-parts";
 import { ArmoryCredit, armoryMetadata, link, newest, NOT_FOUND_METADATA, RegionRuleset, Unreachable } from "../../parts";
 
 export const revalidate = 1800;
@@ -46,19 +47,25 @@ function controls(metric: ArmoryMetric, q: ArmoryBoardQuery): FilterControl[] {
         ...ARMORY_REGIONS.map((r) => ({ label: regionLabel(r), href: href({ region: r }), on: q.region === r })),
       ],
     },
+    ...([{ key: "class", label: "Class", values: ARMORY_CLASSES }, { key: "faction", label: "Faction", values: ARMORY_FACTIONS }] as const).map(({ key, label, values }) => ({
+      type: "menu" as const, key, label,
+      options: [
+        { label: key === "class" ? "All classes" : "Both factions", href: href({ [key]: null }), on: !q[key], reset: true },
+        ...values.map((value) => ({ label: value, className: key === "class" ? classText(value.toUpperCase()) : undefined, href: href({ [key]: value }), on: q[key] === value })),
+      ],
+    })),
   ];
 }
 
-function columns(metric: ArmoryMetric): Column<ArmoryBoardRow>[] {
+function columns(metric: ArmoryMetric, top: number): Column<ArmoryBoardRow>[] {
   return [
-    { key: "rank", header: "Rank", numeric: true, cell: (r) => <span className="text-muted">{r.rank}</span> },
-    { key: "name", header: "Character", cell: (r) => <Link href={armoryCharacterPath(r.region, r.slug)} className={`${link} font-medium`}>{r.name} {r.surname}</Link> },
+    { key: "name", header: "Rank / character", cell: (r) => <span className="flex items-baseline gap-2"><span className="w-6 shrink-0 font-mono tabular-nums text-muted">{r.rank}</span><Link href={armoryCharacterPath(r.region, r.slug)} className={`${link} font-medium`}>{r.name} {r.surname}</Link></span> },
     { key: "level", header: "Level", numeric: true, cell: (r) => r.level },
-    { key: "class", header: "Class", nowrap: true, cell: (r) => <span className={classText(classTokenOfName(r.class))}>{r.class}</span> },
+    { key: "class", header: "Class", nowrap: true, cell: (r) => <BoardClass row={r} /> },
     { key: "race", header: "Race", nowrap: true, cell: (r) => r.race },
-    { key: "guild", header: "Guild", cell: (r) => r.guildName ?? <span className="text-muted">None</span> },
+    { key: "guild", header: "Guild", cell: (r) => <BoardGuild row={r} /> },
     { key: "where", header: "Realm", nowrap: true, cell: (r) => <RegionRuleset region={r.region} ruleset={r.ruleset} /> },
-    { key: "value", header: ARMORY_BOARDS[metric].column, numeric: true, cell: (r) => <span className="font-medium text-fg">{metricValue(metric, r.value)}</span> },
+    { key: "value", header: <BoardMetric metric={metric} />, numeric: true, cell: (r) => <BoardValue row={r} metric={metric} top={top} /> },
   ];
 }
 
@@ -70,8 +77,8 @@ export default async function ArmoryBoardPage(props: { params: Promise<{ metric:
   if (!q) notFound();
   const def = ARMORY_BOARDS[metric];
   const path = armoryBoardPath(metric);
-  const rows = await armoryStore().board(def.key, q.region, q.ruleset, BOARD_ROWS).catch(() => null);
-  const active = [q.ruleset, q.region].filter((v) => v !== null).length;
+  const rows = await armoryStore().boardFiltered(def.key, q.region, q.ruleset, q.class ?? null, q.faction ?? null, BOARD_ROWS).catch(() => null);
+  const active = [q.ruleset, q.region, q.class ?? null, q.faction ?? null].filter((v) => v !== null).length;
 
   return (
     <Container width="data">
@@ -88,7 +95,8 @@ export default async function ArmoryBoardPage(props: { params: Promise<{ metric:
             <FilterBar label="Ranking filters" controls={controls(metric, q)} active={active} clearHref={path} />
             {rows.length === 0
               ? <p className="text-sm text-fg-2">No character with this number here yet.</p>
-              : <DataTable dense caption={`${def.title}, top ${rows.length}`} columns={columns(metric)} rows={rows} rowKey={(r) => `${r.region}/${r.slug}`} />}
+              : <DataTable dense caption={`${def.title}, top ${rows.length}`} columns={columns(metric, rows[0]?.value ?? 0)} rows={rows} rowKey={(r) => `${r.region}/${r.slug}`}
+                meta={(r) => <span className="flex flex-wrap items-center gap-2"><BoardClass row={r} /><BoardGuild row={r} /><BoardValue row={r} metric={metric} top={rows[0]?.value ?? 0} /></span>} />}
           </>
         )}
         <p className="text-sm text-fg-2">

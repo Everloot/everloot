@@ -12,6 +12,8 @@ import { normName } from "./name-normalization.js";
 import { npcZones, scopeSince, type ScopedFact } from "./recheck-scopes.js";
 
 export { WORLD_AGREEMENT } from "./fact-states.js";
+// Drop labels describe a source already public at 3 installs; two exact, unanimous names can label it.
+export const DROP_NAME_INSTALLS = 2;
 
 /** How the NPC stood toward the player who saw it, as the addon records it. */
 export type NpcReaction = "friendly" | "neutral" | "hostile";
@@ -122,9 +124,9 @@ function agreedLabel(rows: (Timed & { label: string })[], since?: string | null)
 
 /**
  * `agreedLabel` for many ids in one pass: id -> the label 3 installs agree on, ids without one left out. `sinceOf`
- * gives an id's recheck cut-off.
+ * gives an id's recheck cut-off. `publicDrops` also allows the two-install label exception.
  */
-export function agreedLabelsById(rows: (Timed & { id: number; label: string })[], sinceOf?: (id: number) => string | null): Map<number, string> {
+export function agreedLabelsById(rows: (Timed & { id: number; label: string })[], sinceOf?: (id: number) => string | null, publicDrops = false): Map<number, string> {
   const byId = new Map<number, (Timed & { label: string })[]>();
   for (const row of rows) {
     const list = byId.get(row.id) ?? [];
@@ -133,7 +135,13 @@ export function agreedLabelsById(rows: (Timed & { id: number; label: string })[]
   }
   const out = new Map<number, string>();
   for (const [id, list] of byId) {
-    const label = agreedLabel(list, sinceOf?.(id));
+    const since = sinceOf?.(id);
+    let label = agreedLabel(list, since);
+    if (!label && publicDrops) {
+      const named = recheckRows(list, since, { value: (r) => r.label }).rows.filter((r) => r.installId.trim() && r.label.trim());
+      const names = new Set(named.map((r) => r.label));
+      if (names.size === 1 && new Set(named.map((r) => r.installId.trim())).size >= DROP_NAME_INSTALLS) label = named[0]!.label;
+    }
     if (label) out.set(id, label);
   }
   return out;
@@ -189,15 +197,15 @@ export function questScope(questId: number, rows: readonly QuestSighting[], zone
   return { types: ["quests"], zones: [lead("giverNpcId") ?? lead("turnInNpcId")], ids: [questId, ...rewards] };
 }
 
-/** Every NPC with an agreed name, by id: the names `npcPage` gives, in one pass over the sightings. */
-export function agreedNpcNames(facts: Pick<WorldFacts, "npcs"> & Pick<Partial<WorldFacts>, "recheck">): Map<number, string> {
+/** Every NPC name in one pass; `publicDrops` also allows the two-install label exception for public drops only. */
+export function agreedNpcNames(facts: Pick<WorldFacts, "npcs"> & Pick<Partial<WorldFacts>, "recheck">, publicDrops = false): Map<number, string> {
   const scopes = facts.recheck ?? NO_SCOPES;
   let sinceOf: ((id: number) => string | null) | undefined;
   if (scopes.length) {
     const zones = zonesFor(facts.npcs), byId = groupRows(facts.npcs, (r) => r.npcId);
     sinceOf = (id) => scopeSince(scopes, npcScope(id, byId.get(id) ?? [], zones.get(id) ?? null).npc);
   }
-  return agreedLabelsById(facts.npcs.map((row) => ({ id: row.npcId, installId: row.installId, label: row.name, ...at(row) })), sinceOf);
+  return agreedLabelsById(facts.npcs.map((row) => ({ id: row.npcId, installId: row.installId, label: row.name, ...at(row) })), sinceOf, publicDrops);
 }
 
 /** Every quest with an agreed title, by id: the titles `questPage` gives, in one pass. Scopes by zone need the NPCs. */

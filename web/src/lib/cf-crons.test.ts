@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { unstable_readConfig } from "wrangler";
-import { CF_CRONS, cronPaths, cronRequest, runCrons, type CronEnv } from "./cf-crons";
+import { CF_CRONS, SITE_JOBS, cronPaths, cronRequest, runCrons, type CronEnv } from "./cf-crons";
 
 const read = (file: string) => unstable_readConfig({ config: join(__dirname, "..", "..", file) }, {});
 const site = read("wrangler.jsonc");
@@ -23,8 +23,8 @@ test("the cron Worker serves no visitor and sends its jobs to itself", () => {
   // The revalidation queue stays the site's Durable Object: the cron Worker binds to it and declares no class.
   expect(cron.durable_objects.bindings).toEqual(site.durable_objects.bindings.map((b: object) => ({ ...b, script_name: "everloot-web" })));
   expect(cron.migrations).toEqual([]);
-  // On the cron Worker the switch would stop the jobs it exists to run.
-  expect(cron.vars.EVERLOOT_CRON_WORKER).toBeUndefined();
+  // The cron Worker runs every job but the site's own; "1" would make it run only those.
+  expect(cron.vars.EVERLOOT_CRON_WORKER).toBe("cron");
 });
 
 test("the cron Worker is the site's build with the site's bindings and vars, apart from the lines that must differ", () => {
@@ -34,8 +34,9 @@ test("the cron Worker is the site's build with the site's bindings and vars, apa
   const rest = (config: Record<string, unknown>, drop: string[] = []) =>
     Object.fromEntries(Object.entries(config).filter(([key]) => !differ.has(key) && !drop.includes(key)));
   const { EVERLOOT_CRON_WORKER: _switch, ...siteVars } = site.vars as Record<string, unknown>;
+  const { EVERLOOT_CRON_WORKER: _role, ...cronVars } = cron.vars as Record<string, unknown>;
   expect(rest(cron as unknown as Record<string, unknown>, ["vars"])).toEqual(rest(site as unknown as Record<string, unknown>, ["vars"]));
-  expect(cron.vars).toEqual(siteVars);
+  expect(cronVars).toEqual(siteVars);
   expect(cron.observability?.enabled).toBe(true);
 });
 
@@ -74,13 +75,19 @@ test("a trigger runs its jobs through the self-binding, and a failed job fails t
   await expect(runCrons("*/10 * * * *", worker({}).env)).rejects.toThrow(/CRON_SECRET is not set/);
 });
 
-test("with EVERLOOT_CRON_WORKER at 1 the site's triggers return without running anything", async () => {
-  for (const schedule of Object.keys(CF_CRONS)) {
-    const { env, called } = worker({ CRON_SECRET: "s3cret", EVERLOOT_CRON_WORKER: "1" });
-    await expect(runCrons(schedule, env)).resolves.toEqual([]);
-    expect(called).toEqual([]);
-  }
-  // Even without the secret: the switch is read first, so the site needs nothing else to stand down.
+test("the cron Worker runs every job but the site's own, and the site at 1 runs only its own", async () => {
+  const all = Object.keys(CF_CRONS).flatMap(cronPaths);
+  const ran = async (role: string) => {
+    const paths: string[] = [];
+    for (const schedule of Object.keys(CF_CRONS)) paths.push(...await runCrons(schedule, worker({ CRON_SECRET: "s3cret", EVERLOOT_CRON_WORKER: role }).env));
+    return paths;
+  };
+  expect(SITE_JOBS).toEqual(new Set(["/api/cron/ops"]));
+  expect(await ran("cron")).toEqual(all.filter((path) => !SITE_JOBS.has(path)));
+  expect(await ran("1")).toEqual(["/api/cron/ops"]);
+  // Between them every job runs exactly once.
+  expect([...await ran("cron"), ...await ran("1")].sort()).toEqual([...all].sort());
+  // A trigger with nothing left to run needs no secret, so the site stands down on it with nothing else set.
   await expect(runCrons("*/10 * * * *", worker({ EVERLOOT_CRON_WORKER: "1" }).env)).resolves.toEqual([]);
   // Any other value leaves the jobs running.
   const { env, called } = worker({ CRON_SECRET: "s3cret", EVERLOOT_CRON_WORKER: "0" });

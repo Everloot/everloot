@@ -1,4 +1,5 @@
-import { ARMORY_RULESETS, classTokenOfId, isArmoryRegion, SEARCH_RULE, type ArmoryRegion } from "./armory";
+import { ARMORY_RECHECK_DAYS, ARMORY_RULESETS, classTokenOfId, isArmoryRegion, SEARCH_RULE, validArmorySlug, type ArmoryRegion } from "./armory";
+import { LEVEL_BANDS as CENSUS_LEVEL_BANDS } from "@kb/census";
 import { armoryStore, type ArmoryGuildRow, type ArmoryGuildSort, type ArmoryMember } from "./armory-store";
 import { guildProfileStore } from "./guild-profile-store";
 
@@ -16,6 +17,19 @@ import { guildProfileStore } from "./guild-profile-store";
  */
 
 export const GUILD_DIRECTORY_PATH = "/guilds";
+export const GUILD_SUBMIT_PATH = "/armory/guilds/submit";
+
+/** The queue and Forever API identify a guild by region and slug, without a realm or ruleset. */
+export function guildSlugOf(name: string): string | null {
+  const slug = name.normalize("NFC").trim().toLowerCase().replace(/\s+/g, "-");
+  return validArmorySlug(slug) ? slug : null;
+}
+
+export const guildReadDue = (checkedAt: string, now = Date.now()) =>
+  now - Date.parse(checkedAt) >= ARMORY_RECHECK_DAYS * 86_400_000;
+
+export const guildSubmitHref = (g: { region: string; name: string }) =>
+  `${GUILD_SUBMIT_PATH}?${new URLSearchParams({ region: g.region, name: g.name })}`;
 
 export const GUILD_DIRECTORY_PAGE = 50;
 
@@ -160,14 +174,7 @@ export async function loadGuildDirectory(d: GuildDirectoryQuery, hidden: Readonl
 }
 
 /** Level bands on a guild page, highest first. */
-export const LEVEL_BANDS = [
-  { label: "60", min: 60, max: 60 },
-  { label: "50–59", min: 50, max: 59 },
-  { label: "40–49", min: 40, max: 49 },
-  { label: "30–39", min: 30, max: 39 },
-  { label: "20–29", min: 20, max: 29 },
-  { label: "1–19", min: 1, max: 19 },
-] as const;
+export const LEVEL_BANDS = [...CENSUS_LEVEL_BANDS].reverse();
 
 export interface RosterSummary {
   /** Class token ("MAGE") and count, most first; members whose class Blizzard did not give are left out. */
@@ -178,6 +185,7 @@ export interface RosterSummary {
   /** The average over members whose character has been read; null when none has. */
   averageItemLevel: number | null;
   itemLevelsRead: number;
+  itemLevels: { label: string; count: number }[];
 }
 
 /** The class mix, level spread and average item level of the roster as shown (hidden members are already out). */
@@ -189,11 +197,17 @@ export function rosterSummary(members: readonly ArmoryMember[]): RosterSummary {
   }
   const levels = LEVEL_BANDS.map((b) => ({ label: b.label, count: members.filter((m) => m.level !== null && m.level >= b.min && m.level <= b.max).length }));
   const read = members.map((m) => m.itemLevel).filter((v): v is number => v !== null);
+  const itemBands = new Map<number, number>();
+  for (const value of read) {
+    const band = Math.floor(value / 10) * 10;
+    itemBands.set(band, (itemBands.get(band) ?? 0) + 1);
+  }
   return {
     classes: [...classes].map(([token, count]) => ({ token, count })).sort((a, b) => b.count - a.count || a.token.localeCompare(b.token)),
     levels,
     levelUnknown: members.filter((m) => m.level === null || m.level < 1 || m.level > 60).length,
     averageItemLevel: read.length ? Math.round((read.reduce((a, b) => a + b, 0) / read.length) * 10) / 10 : null,
     itemLevelsRead: read.length,
+    itemLevels: [...itemBands].sort(([a], [b]) => a - b).map(([band, count]) => ({ label: `${band}–${band + 9}`, count })),
   };
 }

@@ -211,6 +211,7 @@ test("the faction list shows the standing header, and a faction with no header s
 test("filters, sort and the name box work from the URL; a bad value is a 404", async () => {
   expect(linked(await html(AchievementList(search({ category: "Quests" }))), "achievements")).toEqual(["4-ten-quests"]);
   expect(linked(await html(AchievementList(search({ q: "elwynn" }))), "achievements")).toEqual(["9-explore-elwynn-forest"]);
+  expect(linked(await html(AchievementList(search({ q: "forest elwynn" }))), "achievements")).toEqual(["9-explore-elwynn-forest"]);
   expect(linked(await html(AchievementList(search({ q: "#2" }))), "achievements")).toEqual(["2-level-10"]);
   expect(linked(await html(AchievementList(search({ sort: "-points" }))), "achievements")).toEqual(["2-level-10", "9-explore-elwynn-forest", "4-ten-quests"]);
   expect(linked(await html(FactionList(search({ header: "Horde" }))), "factions")).toEqual(["76-orgrimmar"]);

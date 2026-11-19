@@ -2,7 +2,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 const reads = vi.hoisted(() => ({ items: vi.fn(), world: vi.fn(), tips: vi.fn() }));
-vi.mock("./rollup-compute", () => ({ loadItemFacts: reads.items, loadWorldFacts: reads.world }));
+vi.mock("./rollup-compute", () => ({ loadItemFacts: reads.items, loadWorldFacts: reads.world, computeRollups: async () => ({ rates: [], measuredZeros: [], rejected: [], stats: { uploads: 0, lootWindows: 0, records: 0, unreachable: false, dataAsOf: null } }) }));
 vi.mock("./objects", () => ({ loadObjectFacts: async () => ({ rates: [], measuredZeros: [], names: [], unreachable: false }) }));
 vi.mock("./game-assets", () => ({
   loadItemNames: async () => null,
@@ -28,12 +28,18 @@ beforeEach(() => {
   reads.tips.mockImplementation(async (_assets, ids: number[]) => new Map(ids.map((id) => [id, { icon: `https://assets.everloot.app/b/icons/${id}.webp` }])));
 });
 
-test.each(["item", undefined])("a search page shares one item fact read between names and allowed icons (%s)", async (scope) => {
-  const html = renderToStaticMarkup(await SearchPage({ searchParams: Promise.resolve({ q: "Linen Cloth", in: scope }) }));
+test("a search page shares one item fact read between names and allowed icons", async () => {
+  const html = renderToStaticMarkup(await SearchPage({ searchParams: Promise.resolve({ q: "Linen Cloth" }) }));
   expect(html).toContain("/database/items/2589");
   expect(html).toContain("icons/2589.webp");
   expect(reads.items).toHaveBeenCalledTimes(1);
   expect(reads.world).toHaveBeenCalledTimes(1);
+});
+
+test("a search scoped to one type is that type's list: it redirects before any fact read", async () => {
+  await expect(SearchPage({ searchParams: Promise.resolve({ q: "Linen Cloth", in: "item" }) })).rejects.toThrow("NEXT_REDIRECT");
+  expect(reads.items).not.toHaveBeenCalled();
+  expect(reads.world).not.toHaveBeenCalled();
 });
 
 test("type-ahead shares facts within a request but rechecks publication on the next request", async () => {

@@ -239,7 +239,8 @@ test("with the armory on, the hub holds the guild directory under the same searc
   vi.stubEnv("EVERLOOT_ARMORY", "1");
   const plain = await hub();
   expect(plain).toContain("Read from Blizzard");
-  expect(plain).not.toContain("/armory/guilds");
+  expect(plain).not.toContain('href="/armory/guilds"');
+  expect(plain).toContain('href="/armory/guilds/submit"');
   // One box: the members' search and the directory both read q.
   const searched = await hub({ q: "Nig" });
   expect(searched.match(/role="search"/g)).toHaveLength(1);

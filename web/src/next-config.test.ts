@@ -298,7 +298,7 @@ test("every path in the CORS list sends Access-Control-Allow-Origin, and the API
 });
 
 test("auction browse and item pages are shared for five minutes, deeper paths are not", async () => {
-  for (const path of ["/tools/auctions", "/tools/auctions/forever", "/tools/auctions/era-us-pvp", "/tools/auctions/item/2589", "/tools/auctions/forever/2589"]) {
+  for (const path of ["/tools/auctions", "/tools/auctions/forever", "/tools/auctions/era-us-pvp", "/tools/auctions/item/2589", "/tools/auctions/forever/2589", "/tools/auctions/forever/changes"]) {
     expect((await headersFor(path))["CDN-Cache-Control"], path).toBe("max-age=300");
   }
   for (const path of ["/tools/auctions/forever/2589/extra"]) {

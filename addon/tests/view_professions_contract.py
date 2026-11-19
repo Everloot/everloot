@@ -413,3 +413,127 @@ print("Lua 5.1 Professions view: book ranks with bars, recipe counts by colour a
       "recipes with cost and trainer, other characters' professions, the open-the-window line, no book, no professions; "
       "crafting costs with vendor-cheaper reagents, unpriced reagents and products, ambiguous reagent names, estimated "
       "profit and name sort, the profitable filter, what-to-buy totals with reagent paging and the price file's age")
+
+# Listing changes are not sales. Synthetic products and scans exercise the row and its hover.
+CHANGE_RECORDS = """{
+ recipe_observed = { { profession = 'Mining', recipe = 'Shape Glimmerdust', recipeId = 990101,
+   productItemId = 990102, reagents = { { item = 'Glimmerdust', count = 2 } } } },
+ item_seen = { { itemId = 990103, name = 'Glimmerdust' } },
+ vendor = { { vendorNpcId = 990104, items = { { itemId = 990103, priceCopper = 10 } } } },
+ auction_snapshot = {
+   { realm = 'Forever', house = 'Alliance', scanId = 'older', capturedAt = '2026-10-30T06:00:00Z',
+     part = 1, parts = 1, items = { { 990102, 4, 20, 100, 110 } } },
+   { realm = 'Forever', house = 'Alliance', scanId = 'latest', capturedAt = '2026-10-30T09:00:00Z',
+     part = 1, parts = 1, items = { { 990102, 3, 12, 120, 130 } } },
+   { realm = 'Forever', house = 'Horde', scanId = 'other-house', capturedAt = '2026-10-30T08:00:00Z',
+     part = 1, parts = 1, items = { { 990102, 1, 999, 999, 999 } } },
+ } }"""
+CHANGE_API = API + """
+now = 1793354400 -- 2026-10-30 10:00 UTC
+GameTooltip = { lines = {}, SetOwner = function(self) self.lines = {} end,
+ AddLine = function(self, s) self.lines[#self.lines + 1] = s end,
+ Show = function(self) self.shown = true end, Hide = function(self) self.shown = false end }
+"""
+CHANGE_ROWS = '990102,150,140,100,40,2026-10-30,3'
+CHANGE_FILE = ("EverlootPricesDB = { realms = { ['forever|alliance'] = { data = '" + CHANGE_ROWS
+               + "', sum = " + str(zlib.adler32(CHANGE_ROWS.encode())) + ", dataAsOf = '2026-10-30T09:00:00Z' } } }")
+
+
+def change_world(records=CHANGE_RECORDS, prices=CHANGE_FILE):
+    world = fresh("{ installId = 'abcd-1234', toggles = {}, records = " + records
+                  + ", houseScans = { Forever = { Alliance = { scanId = 'latest', at = 1793350800 } } } }",
+                  CHANGE_API + prices)
+    world.execute("assert(Everloot.Window.Open('professions')); EverlootWindow.professions.toggle.scripts.OnClick(); "
+                  "r = EverlootWindow.professions.craft.rows[1]; assert(not Everloot.Window.failed)")
+    return world
+
+
+lua = change_world()
+lua.execute(r"""
+assert(r.cost.text == Everloot.Window.MoneyShort(20))
+assert(r.value.text == Everloot.Window.MoneyShort(150) and r.profit.text == Everloot.Window.MoneyShort(130))
+r.scripts.OnEnter(r)
+local said = table.concat(GameTooltip.lines, '|')
+assert(said:find('Min buyout: +20.0%', 1, true), said)
+assert(said:find('Units listed: -8', 1, true), said)
+assert(said:find('over the last 3 h', 1, true) and said:find('4 h ago', 1, true), said)
+assert(said:find('+50.0% vs 60-day median', 1, true), said)
+-- 100,110,120,130 from scans, 150,100 from file: spread / mean = 42.3%.
+assert(said:find('42.3% swing', 1, true), said)
+assert(said:find('not sales', 1, true), said)
+assert(r.change.text == '▲' and r.change.color[2] == Everloot.Window.COLORS.accent[2])
+assert(r.bars[1].shown and r.bars[2].shown and not r.bars[3].shown)
+assert(r.bars[1].path == 'Interface\\Buttons\\WHITE8X8')
+assert(math.abs(r.bars[1].height - 10) < 0.01 and r.bars[2].height == 12)
+assert(r.bars[2].point[2] + r.bars[2].width <= r.width and r.bars[2].height <= r.height)
+r.scripts.OnLeave(); assert(not GameTooltip.shown)
+-- A downward move changes both sign and palette; redraw also clears old bars.
+EverlootDB.records.auction_snapshot[2].items[1][4] = 80
+Everloot.ownScanCache = nil
+Everloot.Window.Views.professions.refresh(EverlootWindow)
+r.scripts.OnEnter(r)
+assert(table.concat(GameTooltip.lines, '|'):find('Min buyout: -20.0%', 1, true))
+assert(r.change.text == '▼' and r.change.color[1] == Everloot.Window.COLORS.gold[1])
+""")
+lua = change_world(prices='')
+lua.execute("""
+r.scripts.OnEnter(r)
+local said = table.concat(GameTooltip.lines, '|')
+assert(said:find('— vs 60-day median', 1, true), said)
+assert(said:find('26.1% swing', 1, true), said)
+assert(r.value.text == 'no price', 'scan estimates do not replace the price file value')
+""")
+lua = change_world(CHANGE_RECORDS.replace("house = 'Alliance', scanId = 'older'", "house = 'Neutral', scanId = 'older'"), '')
+lua.execute("""
+r.scripts.OnEnter(r)
+local said = table.concat(GameTooltip.lines, '|')
+assert(said:find('one scan so far: scan again later to see change', 1, true), said)
+assert(r.change.text == '—' and r.bars[1].shown and not r.bars[2].shown)
+""")
+lua = change_world(CHANGE_RECORDS.replace('990102, 4, 20, 100, 110', '990105, 4, 20, 100, 110')
+                   .replace('990102, 3, 12, 120, 130', '990105, 3, 12, 120, 130'), '')
+lua.execute("""
+r.scripts.OnEnter(r)
+local said = table.concat(GameTooltip.lines, '|')
+assert(said:find('Min buyout: —', 1, true) and said:find('Units listed: —', 1, true), said)
+assert(said:find('— swing', 1, true) and not r.bars[1].shown, said)
+""")
+print('Professions market changes: signed price and listing changes, age, history, swing, missing data, glyph and bars PASS')
+
+# All three scans draw oldest first, regardless of record order; multipart scans count once.
+third = """{ realm = 'Forever', house = 'Alliance', scanId = 'third', capturedAt = '2026-10-29T06:00:00Z',
+ part = 1, parts = 2, items = { { 990102, 5, 30, 60, 70 } } },
+ { realm = 'Forever', house = 'Alliance', scanId = 'third', capturedAt = '2026-10-29T06:00:00Z',
+ part = 2, parts = 2, items = { { 990106, 1, 1, 900, 900 } } },"""
+three = CHANGE_RECORDS.replace(' auction_snapshot = {', ' auction_snapshot = { ' + third)
+lua = change_world(three, '')
+lua.execute("""
+assert(r.bars[1].height == 6 and r.bars[2].height == 10 and r.bars[3].height == 12)
+r.scripts.OnEnter(r)
+local said = table.concat(GameTooltip.lines, '|')
+assert(said:find('Min buyout: +20.0%', 1, true), 'compare the previous scan, not the oldest')
+-- An incomplete older scan must not affect swing or the bars.
+table.remove(EverlootDB.records.auction_snapshot, 2)
+Everloot.Window.Views.professions.refresh(EverlootWindow)
+assert(r.bars[1].height == 10 and r.bars[2].height == 12 and not r.bars[3].shown)
+""")
+lua = change_world(CHANGE_RECORDS.replace('2026-10-30T06:00:00Z', '2026-10-29T06:00:00Z'))
+lua.execute("""
+r.scripts.OnEnter(r)
+local said = table.concat(GameTooltip.lines, '|')
+assert(said:find('over the last 27 h', 1, true) and said:find('28 h ago', 1, true), said)
+""")
+# A single usable price point cannot describe a spread, and missing history cannot be a percentage.
+lua = change_world(CHANGE_RECORDS.replace("house = 'Alliance', scanId = 'older'", "house = 'Neutral', scanId = 'older'")
+                  .replace('990102, 3, 12, 120, 130', '990102, 3, 12, 120'), '')
+lua.execute("""
+r.scripts.OnEnter(r)
+assert(table.concat(GameTooltip.lines, '|'):find('— swing', 1, true))
+""")
+lua = change_world(CHANGE_RECORDS.replace("house = 'Alliance'", "house = 'Neutral'"), '')
+lua.execute("""
+r.scripts.OnEnter(r)
+assert(table.concat(GameTooltip.lines, '|'):find('No own scan of this house yet.', 1, true))
+assert(r.change.text == '—' and not r.bars[1].shown and not Everloot.Window.failed)
+""")
+print('Professions market changes: three scans, multipart completeness, long intervals and sparse prices PASS')

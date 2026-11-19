@@ -3,6 +3,7 @@ import { expect, test } from "vitest";
 import { Tabs } from "@/components/ui";
 import { armoryCharacter } from "@/lib/armory.fixture";
 import { CHARACTER_TABS, EMPTY_TAB, characterTabs } from "./character-tabs";
+import { characterProgression, progressionCatalogue } from "@kb/progression";
 
 const at = "2026-11-17T08:00:00.000Z";
 const full = armoryCharacter({
@@ -41,14 +42,29 @@ test("a character with every part stored draws every tab, none of them empty", (
 
 test("the strip holds Gear to Quests and nothing that waits on the privacy decision", () => {
   const labels = CHARACTER_TABS.map(([, label]) => label);
-  expect(labels).toEqual(["Gear", "Talents", "Stats", "PvP", "Achievements", "Professions", "Reputations", "Quests"]);
+  expect(labels).toEqual(["Gear", "Talents", "Stats", "PvP", "Achievements", "Professions", "Reputations", "Quests", "Progress"]);
   for (const out of ["Gold", "Completionist", "Alts", "Legacy perks"]) expect(labels).not.toContain(out);
+});
+
+test("Progress always holds the full catalogue and renders only the permitted history supplied by its loader", () => {
+  const catalogue = progressionCatalogue({ entrances: [], encounters: [] });
+  const unknown = render();
+  expect([...unknown.matchAll(/data-progression-instance=/g)]).toHaveLength(catalogue.length);
+  expect(unknown).toContain("no data from this character");
+  const progress = characterTabs(full, { tips: new Map(), progression: {
+    instances: characterProgression(catalogue, [{ instanceMapId: 33, encounterId: 2748, lastKillAt: at }]),
+    links: { 33: "/database/instances/33-shadowfang-keep" },
+  } }).find((t) => t.id === "progress")!;
+  const html = renderToStaticMarkup(<>{progress.panel}</>);
+  expect(html).toContain("1 / 8 bosses");
+  expect(html).toContain(">partial</span>");
+  expect(html).toContain('href="/database/instances/33-shadowfang-keep"');
 });
 
 test("a character with partial data keeps every tab, and each empty one says why in one sentence", () => {
   const html = render(partial);
   expect(tabIds(html)).toEqual(CHARACTER_TABS.map(([id]) => id));
-  expect(emptyIds(html)).toEqual(CHARACTER_TABS.map(([id]) => id));
+  expect(emptyIds(html)).toEqual(CHARACTER_TABS.filter(([id]) => id !== "progress").map(([id]) => id));
   for (const sentence of Object.values(EMPTY_TAB)) {
     expect(html).toContain(sentence.replaceAll("'", "&#x27;"));
     expect(sentence.match(/[.!?]/g)).toHaveLength(1);

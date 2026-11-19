@@ -238,3 +238,18 @@ test("the forms keep their fields, confirm, and say what went wrong", async () =
   holder.store = broken();
   expect(await html(pages.hide())).toContain("Read time unrecorded");
 });
+
+test("classification filters reach storage, preserve each other in links and link guilds", async () => {
+  const spy = vi.spyOn(mem, "boardFiltered");
+  const out = await html(pages.board("gear-score", { region: "eu", ruleset: "2", class: "hunter", faction: "horde" }));
+  expect(spy).toHaveBeenCalledWith("gear_score", "eu", 2, "Hunter", "Horde", 100);
+  expect(out).toContain('href="/armory/eu/guilds/ember-wardens"');
+  expect(out).toContain('class=hunter&amp;faction=horde');
+  expect(out).toContain('class=mage&amp;faction=horde');
+  expect(out).toContain('aria-label="Gear Score: 61.2.');
+  expect(out).toContain('Read Nov 9, 2026');
+  expect(out).toContain('aria-describedby=');
+  expect(out).toContain('text-class-hunter');
+  await expect(pages.board("gear-score", { class: "invented" })).rejects.toThrow("NEXT_NOT_FOUND");
+  await expect(pages.board("gear-score", { faction: "invented" })).rejects.toThrow("NEXT_NOT_FOUND");
+});

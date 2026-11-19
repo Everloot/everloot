@@ -130,19 +130,25 @@ answers 503 `stale` (#1354, #1392).
 `web/src/lib/cf-crons.test.ts` holds the two files equal apart from those lines. A change to the
 site's vars, bindings, knowledge release or compatibility date goes into both files.
 
-Which Worker runs the jobs is the site's var `EVERLOOT_CRON_WORKER`. Unset, the site runs them as
-before. At `"1"`, the site's triggers still fire but return without running anything
-(`runCrons` in `web/src/lib/cf-crons.ts`), and only the cron Worker runs them. The var is never set
-on the cron Worker. It is left out of the edge cache's versions (`web/scripts/cache-versions.mjs`),
-so switching it does not empty the page cache.
+Which Worker runs which job is the var `EVERLOOT_CRON_WORKER` (`runCrons` in
+`web/src/lib/cf-crons.ts`):
+
+- unset, on the site before the switch: every job, as before;
+- `"cron"`, on the cron Worker (set in `wrangler.cron.jsonc`): every job but `SITE_JOBS`;
+- `"1"`, on the site after the switch: `SITE_JOBS` only.
+
+`SITE_JOBS` is `/api/cron/ops`. It keys install pseudonyms with `EVERLOOT_OPS_HMAC_SECRET`, which
+only the site holds; the cron Worker would need the same value, and another one would change every
+pseudonym in the summary. The var is left out of the edge cache's versions
+(`web/scripts/cache-versions.mjs`), so switching it does not empty the page cache.
 
 The cron routes on the site stay where they are, behind `CRON_SECRET`, so a job can still be called
 by hand on `https://everloot.app/api/cron/...`. Those calls run in the site's isolates.
 
 ### Both Workers running the jobs for a while
 
-Between the cron Worker's first run and the switch, both Workers run every job at the same minute.
-That is safe:
+Between the cron Worker's first run and the switch, both Workers run every job but `/api/cron/ops`
+at the same minute. That is safe:
 
 - The corpus snapshot, market, completion and census writes are conditional on the ETag each run
   read at its start (`web/src/lib/upload-store.ts`). When both runs fold the same uploads, the later
@@ -155,30 +161,29 @@ That is safe:
 - The prunes (intake quota, API keys, players, pull summaries) delete by age; a second pass deletes
   nothing more.
 - `/api/cron/blue` reads the forum feeds twice in that slot and both runs write the same store.
-  `/api/cron/indexnow` can submit the same URLs twice in the hour. `/api/cron/ops` overwrites its
-  summary. `/api/cron/profiles` deletes a file that is already gone, which counts as success.
+  `/api/cron/indexnow` can submit the same URLs twice in the hour. `/api/cron/profiles` deletes a
+  file that is already gone, which counts as success.
 
 The cost is a red trigger now and then on whichever Worker lost a race, and twice the R2 and
 Supabase reads. Keep the overlap short: switch after the first good run.
 
 ### Secrets
 
-The cron Worker has its own secrets; it does not see the site's. Give it these, with the same
-values as on `everloot-web` (Cloudflare does not show a secret's value; take them from where they
-are kept). The names are from `npx wrangler secret list --name everloot-web` and from what the five
-cron routes import.
+The cron Worker has its own secrets; it does not see the site's. Cloudflare does not show a
+secret's value. The names are from `npx wrangler secret list --name everloot-web` and from what the
+four cron routes it runs import.
 
-| Name | Read by |
-|---|---|
-| `CRON_SECRET` | the trigger and every cron route |
-| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | every stored file: uploads, snapshot, rollups, views, heartbeat, blue posts |
-| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | the upload index the snapshot reads, and the quota, API key, player and pull prunes |
-| `EVERLOOT_TRUSTED_INSTALLS` | which installs publish market and census alone; a different value builds different data |
-| `EVERLOOT_CHARACTER_KEY` | `web/src/lib/census-intake.ts`, reached from the player and pull stores the snapshot job prunes with; copy it rather than leave a difference |
-| `GAME_DATA_ACCESS_KEY_ID`, `GAME_DATA_SECRET_ACCESS_KEY`, `GAME_DATA_BUCKET`, `GAME_DATA_S3_ENDPOINT` | the private game-data store the auction reports, market boards and coverage read |
-| `INDEXNOW_KEY` | `/api/cron/indexnow` |
-| `EVERLOOT_OPS_HMAC_SECRET`, `EVERLOOT_OPS_METRICS`, `EVERLOOT_OPS_EXCLUDED_INSTALLS`, `EVERLOOT_USAGE_METRICS` | `/api/cron/ops` |
-| `EVERLOOT_OPS_WORKER_NAME` | `/api/cron/ops`; keep the site's value, `everloot-web`, so the summary still reports the site |
+| Name | Read by | Value |
+|---|---|---|
+| `CRON_SECRET` | the trigger and every cron route | its own; the site's routes keep the site's |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | every stored file: uploads, snapshot, rollups, views, heartbeat, blue posts | any key pair that can read, write and delete in `everloot-uploads` |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | the upload index the snapshot reads, and the quota, API key, player and pull prunes | the project's service role key or a secret key |
+| `EVERLOOT_TRUSTED_INSTALLS` | which installs publish market and census alone | the site's: a different list builds different data |
+| `GAME_DATA_ACCESS_KEY_ID`, `GAME_DATA_SECRET_ACCESS_KEY`, `GAME_DATA_BUCKET`, `GAME_DATA_S3_ENDPOINT` | the private game-data store the auction reports, market boards and coverage read | a key that can read `everloot-game-data` |
+| `INDEXNOW_KEY` | `/api/cron/indexnow` | the site's, which `https://everloot.app/indexnow.txt` shows |
+
+`EVERLOOT_CHARACTER_KEY` and the `EVERLOOT_OPS_*` and `EVERLOOT_USAGE_METRICS` values are not
+needed: no job the cron Worker runs calls `characterSecret()`, and `/api/cron/ops` stays on the site.
 
 Not needed by any cron route: `AHLEDGER_API_KEY`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`,
 `BNET_CLIENT_ID`, `BNET_CLIENT_SECRET`, `BNET_REDIRECT_URI`, `DISCORD_CLIENT_ID`,
@@ -233,9 +238,9 @@ is unset.
 4. **Switch.** In a pull request, add `"EVERLOOT_CRON_WORKER": "1"` to the vars in
    `web/wrangler.jsonc` (the comment there marks the place) and nothing to
    `web/wrangler.cron.jsonc`. Merge it once step 3 has shown a good run. The deploy that follows
-   stops the site running the jobs. Afterwards `npx wrangler tail everloot-web` shows the triggers
-   ending `ok` with no `/api/cron/*` request, and `/api/health` stays `fresh` for the next half
-   hour.
+   stops the site running the jobs but `/api/cron/ops`. Afterwards `npx wrangler tail everloot-web`
+   shows the triggers ending `ok` with no `/api/cron/*` request except `/api/cron/ops` at minute 23,
+   and `/api/health` stays `fresh` for the next half hour.
 
 A later change can remove the site's triggers; they cost one empty invocation per schedule until
 then.
