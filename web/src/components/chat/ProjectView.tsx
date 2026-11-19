@@ -10,6 +10,7 @@ import {
 import { WORKSPACE_LIMITS, type WorkspaceConversationSummary, type WorkspaceEntry, type WorkspaceProject } from "@/lib/chat/workspace-types";
 import { editPath, type AccountBuilds, type SavedBuild } from "@/lib/saved-builds";
 import ItemResult from "./ItemResult";
+import Container from "@/components/ui/Container";
 import PrivateBuildForm from "./PrivateBuildForm";
 
 const link = "underline underline-offset-4 hover:text-accent";
@@ -219,7 +220,7 @@ export default function ProjectView({ project, opts, failed, busy, onBack, onNew
   );
 
   return (
-    <div className="mx-auto w-full max-w-reading space-y-6 px-4 py-6">
+    <Container width="reading" className="mx-auto space-y-6 px-4 py-6">
       <div className="space-y-2">
         <button type="button" className={`min-h-9 text-sm text-fg-2 ${link}`} onClick={onBack}>Back to chat</button>
         <h2 className="text-2xl font-semibold text-fg">{project.name}</h2>
@@ -295,6 +296,6 @@ export default function ProjectView({ project, opts, failed, busy, onBack, onNew
         </form>
       </section>
       {more && <button type="button" className="btn min-h-9 px-3 text-sm" disabled={loadingEntries} onClick={() => void loadMore()}>{loadingEntries ? "Loading saved items..." : "Load more saved items"}</button>}
-    </div>
+    </Container>
   );
 }

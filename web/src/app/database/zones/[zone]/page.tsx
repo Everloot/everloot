@@ -305,7 +305,7 @@ export default async function ZonePage(props: Props) {
             <section aria-labelledby="lore">
               <SectionHeading id="lore">Lore</SectionHeading>
               <Card as="div">
-                <p className="max-w-[65ch] text-fg">{lore.text}</p>
+                <p className="max-w-prose text-fg">{lore.text}</p>
                 <p className="mt-3 text-sm text-muted">
                   From the archive of the Warcraft Wiki, 2023 · {lore.licence} ·{" "}
                   <Link href={lore.href} className={link}>Read {lore.name} in the lore archive</Link>

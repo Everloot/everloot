@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { callbackUrl, DESKTOP_KEY_LABEL, sealForDesktop, type ConnectRequest } from "@/lib/desktop-connect";
 
-const primary = "inline-flex items-center justify-center min-h-11 px-5 rounded-lg bg-accent text-bg text-sm font-semibold hover:bg-accent/90 disabled:opacity-60";
-const secondary = "inline-flex items-center justify-center min-h-11 px-4 rounded-lg border border-line text-sm text-fg hover:text-accent disabled:opacity-60";
+const primary = "inline-flex items-center justify-center min-h-11 px-5 rounded-control bg-accent text-bg text-sm font-semibold hover:bg-accent/90 disabled:opacity-60";
+const secondary = "inline-flex items-center justify-center min-h-11 px-4 rounded-control border border-line text-sm text-fg hover:text-accent disabled:opacity-60";
 
 /**
  * The confirm step: Connect makes a key named "Everloot Desktop App" (with the saved-builds permission when

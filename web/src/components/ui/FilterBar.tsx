@@ -55,7 +55,7 @@ function Menu({ c: given, phone }: { c: Extract<FilterControl, { type: "menu" }>
         {c.options.map((o, i) => (
           <li key={i}>
             <Link href={o.href} aria-current={o.on ? "true" : undefined} className="flex min-h-8 items-center gap-2 rounded-control px-2 text-control text-fg-2 hover:bg-canvas hover:text-fg">
-              {c.multi && <span aria-hidden="true" className={`h-3.5 w-3.5 shrink-0 rounded-[3px] border ${o.on ? "border-accent bg-accent" : "border-edge"}`} />}
+              {c.multi && <span aria-hidden="true" className={`h-3.5 w-3.5 shrink-0 rounded-control border ${o.on ? "border-accent bg-accent" : "border-edge"}`} />}
               <span className={`min-w-0 flex-1 truncate ${o.on && !c.multi ? "text-fg" : ""} ${o.className ?? ""}`} style={o.style}>{o.label}</span>
               {o.count !== undefined && <span className="tabular-nums text-muted">{o.count.toLocaleString("en-US")}</span>}
               {o.on && <span className="sr-only">(selected)</span>}
@@ -91,7 +91,7 @@ function Controls({ search, controls, active, clearHref, phone }: FilterBarProps
         // Keyed on its choices, so after a client-side navigation the menu comes back closed.
         ? <Menu key={`${c.key}-${c.options.map((o) => Number(o.on)).join("")}`} c={c} phone={phone} />
         : <Link key={c.key} href={c.href} aria-current={c.on ? "true" : undefined} className={`${control} ${c.on ? lit : idle}`}>
-            <span aria-hidden="true" className={`h-3 w-3 shrink-0 rounded-[3px] border ${c.on ? "border-accent bg-accent" : "border-edge"}`} />{c.label}
+            <span aria-hidden="true" className={`h-3 w-3 shrink-0 rounded-control border ${c.on ? "border-accent bg-accent" : "border-edge"}`} />{c.label}
           </Link>)}
       {active > 0 && <Link href={clearHref} className="ctl inline-flex items-center px-2 text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Clear filters</Link>}
     </>

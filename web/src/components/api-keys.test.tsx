@@ -370,7 +370,7 @@ test("Remove access asks with the card's pill buttons, and the list's question k
   expect(classes(cardCancel)).toContain("btn");
   expect(classes(cardCancel)).not.toContain("btn-primary");
   for (const b of [listRevoke, listCancel]) {
-    expect(classes(b)).toContain("rounded-lg");
+    expect(classes(b)).toContain("rounded-control");
     expect(classes(b)).not.toContain("btn");
   }
 });

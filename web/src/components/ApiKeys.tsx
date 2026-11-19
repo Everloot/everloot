@@ -11,12 +11,12 @@ interface Ready { status: "ready"; keys: KeyRow[]; limit: number; ownScope: bool
 type State = { status: "loading" } | { status: "signed-out" } | { status: "off" } | { status: "error"; message: string } | Ready;
 interface Fresh { token: string; name: string; expiresAt: string | null; rolled: boolean }
 
-const button = "inline-flex items-center justify-center min-h-11 px-3 rounded-lg border border-line text-sm text-fg hover:text-accent disabled:opacity-60";
-const primary = "inline-flex items-center justify-center min-h-11 px-4 rounded-lg bg-accent text-bg text-sm font-semibold hover:bg-accent/90 disabled:opacity-60";
+const button = "inline-flex items-center justify-center min-h-11 px-3 rounded-control border border-line text-sm text-fg hover:text-accent disabled:opacity-60";
+const primary = "inline-flex items-center justify-center min-h-11 px-4 rounded-control bg-accent text-bg text-sm font-semibold hover:bg-accent/90 disabled:opacity-60";
 /** The design system's pill buttons, for the Integrations cards; the list keeps `button` and `primary`. */
 const pill = "btn min-h-11 px-3 text-sm";
 const pillPrimary = "btn btn-primary min-h-11 px-3 text-sm";
-const input = "min-h-11 w-full rounded-lg border border-line bg-canvas px-3 text-sm text-fg aria-[invalid=true]:border-accent";
+const input = "min-h-11 w-full rounded-control border border-line bg-canvas px-3 text-sm text-fg aria-[invalid=true]:border-accent";
 const DAY_MS = 86_400_000;
 const EXPIRY_LABEL: Record<number, string> = { 7: "7 days", 30: "30 days", 90: "90 days", 365: "1 year" };
 const day = (iso: string | null) => (iso ? iso.slice(0, 10) : "Never");
@@ -103,7 +103,7 @@ function Confirm({ action, name, hint, busy, confirmRef, onConfirm, onCancel, pi
   confirmRef: Ref<HTMLButtonElement>; onConfirm: () => void; onCancel: () => void; pills?: boolean;
 }) {
   return (
-    <div role="group" aria-label={`Confirm ${action} ${name}`} className="space-y-2 rounded-lg border border-line bg-panel p-3">
+    <div role="group" aria-label={`Confirm ${action} ${name}`} className="space-y-2 rounded-card border border-line bg-panel p-3">
       <p className="text-sm text-fg">
         {action === "revoke"
           ? `Revoke ${name}? Anything using evl_…${hint} stops working at once.`
@@ -125,12 +125,12 @@ function Reveal({ fresh, onDone }: { fresh: Fresh; onDone: () => void }) {
   const id = useId();
   useEffect(() => { heading.current?.focus(); }, [fresh.token]);
   return (
-    <section aria-labelledby={`${id}-title`} className="space-y-3 rounded-xl border border-accent bg-panel p-4">
+    <section aria-labelledby={`${id}-title`} className="space-y-3 rounded-card border border-accent bg-panel p-4">
       <h3 id={`${id}-title`} ref={heading} tabIndex={-1} className="font-semibold text-fg">
         {fresh.rolled ? `New secret for ${fresh.name}` : `Your new key: ${fresh.name}`}
       </h3>
       <p className="text-sm text-fg">Copy it now. It won&apos;t be shown again.{fresh.rolled && " The old secret has stopped working."}</p>
-      <code className="block break-all rounded-lg border border-line bg-canvas p-3 font-mono text-sm text-fg">{fresh.token}</code>
+      <code className="block break-all rounded-control border border-line bg-canvas p-3 font-mono text-sm text-fg">{fresh.token}</code>
       <p className="text-sm text-muted">{fresh.expiresAt ? `It expires on ${day(fresh.expiresAt)}.` : "It has no end date."}</p>
       <div className="flex flex-wrap gap-2">
         <CopyButton text={fresh.token} label="Copy key" failedLabel="Copy failed" className={primary} />
@@ -193,7 +193,7 @@ function CreateForm({ ready, onMade, onCancel }: { ready: Ready; onMade: (fresh:
   const fieldError = (field: keyof Errors) => errors[field] && <p id={`${id}-${field}-error`} className="text-sm text-fg">{errors[field]}</p>;
 
   return (
-    <form noValidate onSubmit={submit} aria-labelledby={`${id}-title`} className="space-y-4 rounded-xl border border-line bg-panel p-4">
+    <form noValidate onSubmit={submit} aria-labelledby={`${id}-title`} className="space-y-4 rounded-card border border-line bg-panel p-4">
       <h3 id={`${id}-title`} className="font-semibold text-fg">Create API key</h3>
 
       <div className="space-y-1">

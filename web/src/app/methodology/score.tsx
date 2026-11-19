@@ -29,7 +29,7 @@ function Example() {
   const both = (s: (typeof EXAMPLE_SCORES)[number], i: number) =>
     `${EXAMPLE_CHARACTERS[i + 1].name} has Progress ${scored(s.progress)?.points} and Completion ${scored(s.completion)?.points}`;
   return (
-    <div className="space-y-3 rounded-lg border border-edge p-4">
+    <div className="space-y-3 rounded-card border border-edge p-4">
       <p className="text-fg"><strong>Made-up example.</strong> No boss, list or character below is real.</p>
       <p className="text-fg-2">
         Every kill of Character A&apos;s is in a pull summary another player uploaded, from another install and another address, in

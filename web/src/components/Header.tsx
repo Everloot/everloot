@@ -239,7 +239,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
               listClassName="-left-9 -right-3 mt-2"
               className="h-7 w-full min-w-0 bg-transparent text-sm text-fg placeholder:text-muted focus:outline-none"
             />
-            <kbd aria-hidden="true" className="rounded-[4px] border border-line px-1.5 font-mono text-xs text-muted">/</kbd>
+            <kbd aria-hidden="true" className="rounded-control border border-line px-1.5 font-mono text-xs text-muted">/</kbd>
           </form>
         </div>
 

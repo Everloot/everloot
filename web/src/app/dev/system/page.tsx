@@ -106,8 +106,8 @@ export default function DesignSystemPage() {
           <div className="space-y-4">
             <p className="text-3xl font-bold tracking-tight text-fg sm:text-4xl">Page title, 36 px (30 px on a phone)</p>
             <p className="text-xl font-semibold tracking-tight text-fg">Section heading, 20 px</p>
-            <p className="max-w-[65ch] text-lg text-fg-2">Lede, 18 px: one line that says what the page is.</p>
-            <p className="max-w-[65ch] text-fg">Body, 16 px. A number comes with its denominator and its date: 3 of 3 installs, 2026-10-19.</p>
+            <p className="max-w-prose text-lg text-fg-2">Lede, 18 px: one line that says what the page is.</p>
+            <p className="max-w-prose text-fg">Body, 16 px. A number comes with its denominator and its date: 3 of 3 installs, 2026-10-19.</p>
             <p className="text-sm text-muted">Small, 14 px, muted: notes and table text.</p>
             <p className="font-mono text-sm tabular-nums text-fg-2">Mono 14 px · build 1.60.1.70450 · item 19019 · 31,849</p>
           </div>

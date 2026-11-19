@@ -26,7 +26,7 @@ export function P({ children }: { children: ReactNode }) {
 }
 
 export function C({ children }: { children: ReactNode }) {
-  return <code className="rounded-[4px] border border-line bg-panel px-1.5 py-0.5 font-mono text-[0.85em] text-fg [overflow-wrap:anywhere]">{children}</code>;
+  return <code className="rounded-control border border-line bg-panel px-1.5 py-0.5 font-mono text-[0.85em] text-fg [overflow-wrap:anywhere]">{children}</code>;
 }
 
 export function List({ children, ordered = false }: { children: ReactNode; ordered?: boolean }) {
@@ -95,8 +95,8 @@ export function Params({ rows, empty = "None." }: { rows: ParamRow[]; empty?: st
         <div key={row.name} className="py-4">
           <dt className="flex flex-wrap items-center gap-2">
             <code className="font-mono text-sm font-semibold text-accent">{row.name}</code>
-            <span className="rounded-[4px] bg-panel px-1.5 font-mono text-xs text-fg-2">{row.type}</span>
-            {row.required && <span className="rounded-[4px] bg-danger/10 px-1.5 font-mono text-xs text-danger">required</span>}
+            <span className="rounded-control bg-panel px-1.5 font-mono text-xs text-fg-2">{row.type}</span>
+            {row.required && <span className="rounded-control bg-danger/10 px-1.5 font-mono text-xs text-danger">required</span>}
           </dt>
           {row.description ? <dd className="mt-2 text-sm leading-6 text-fg-2">{row.description}</dd> : null}
         </div>

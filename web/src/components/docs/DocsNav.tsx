@@ -46,7 +46,7 @@ function SidebarLinks({ tab, path, onNavigate }: { tab: DocsTab; path: string; o
                     className={`flex min-h-9 items-center gap-2 rounded-control px-3 py-1.5 text-sm transition-colors ${on ? "bg-accent/10 font-medium text-accent" : "text-fg-2 hover:bg-panel hover:text-fg"}`}
                   >
                     {page.method && (
-                      <span className={`rounded-[4px] px-1 font-mono text-[10px] font-semibold leading-4 ${page.method === "GET" ? "bg-accent/15 text-accent" : "bg-warning/15 text-warning"}`}>{page.method}</span>
+                      <span className={`rounded-control px-1 font-mono text-[10px] font-semibold leading-4 ${page.method === "GET" ? "bg-accent/15 text-accent" : "bg-warning/15 text-warning"}`}>{page.method}</span>
                     )}
                     <span className={`min-w-0 [overflow-wrap:anywhere] ${page.method || tab.id === "mcp" && page.href.includes("/tools/") ? "font-mono text-[13px]" : ""}`}>{page.title}</span>
                   </Link>

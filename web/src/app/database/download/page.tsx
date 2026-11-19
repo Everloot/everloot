@@ -45,7 +45,7 @@ export default async function DownloadPage() {
 
         {ok ? (
           <>
-            <div className="mt-4 max-w-reading">
+            <Container width="reading" className="mt-4">
               <Facts layout="list" label="This export" items={[
                 { label: "Made", value: day(ok.manifest.generatedAt), numeric: true },
                 { label: "Data as of", value: day(ok.manifest.dataAsOf), numeric: true },
@@ -53,7 +53,7 @@ export default async function DownloadPage() {
                 { label: "Read", value: `${n(ok.manifest.source.records)} public records from ${n(ok.manifest.source.installs)} ${ok.manifest.source.installs === 1 ? "install" : "installs"}`, numeric: true },
                 { label: "Rule", value: `${ok.manifest.method.agreement} or more installs agree` },
               ]} />
-            </div>
+            </Container>
             <p className={P}>
               Exports are made by hand, not on a schedule, so this one can be older than the live site. Rows is what is in the file. Of how many is
               what the rows were chosen from, and the next column says what that counts.

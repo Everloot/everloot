@@ -89,7 +89,7 @@ test("one spacing scale, one card radius, three content widths", () => {
   expect(RADIUS).toEqual({ control: 6, card: 12 });
   expect(WIDTH).toEqual({ reading: 768, wide: 1152, data: 1440 });
   const extend = config.theme!.extend!;
-  expect(extend.maxWidth).toEqual({ reading: "768px", wide: "1152px", data: "1440px", tip: "320px" });
+  expect(extend.maxWidth).toEqual({ reading: "768px", wide: "1152px", data: "1440px", tip: "320px", prose: "65ch", lede: "75ch" });
   expect(extend.borderRadius).toEqual({ control: "6px", card: "12px" });
   expect(extend.spacing).toEqual({ 18: "4.5rem" });
 });

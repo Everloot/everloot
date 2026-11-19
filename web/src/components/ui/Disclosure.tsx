@@ -13,7 +13,7 @@ export default function Disclosure({ summary, as: Tag = "h3", id, wide = false, 
         <Tag className="text-base font-semibold text-fg">{summary}</Tag>
         <span aria-hidden="true" className="shrink-0 font-mono text-muted transition-transform group-open:rotate-45">+</span>
       </summary>
-      <div className={`${wide ? "" : "max-w-[65ch] "}space-y-3 pb-4 text-fg-2`}>{children}</div>
+      <div className={`${wide ? "" : "max-w-prose "}space-y-3 pb-4 text-fg-2`}>{children}</div>
     </details>
   );
 }
