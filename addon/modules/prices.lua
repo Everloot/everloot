@@ -64,6 +64,24 @@ function E.DayNumber(text)
   return era * 146097 + doe - 719468
 end
 
+-- Short English dates keep tooltip evidence readable in every client language.
+local MONTHS = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
+function E.ShortDay(text)
+  local month, day = tostring(text):match("^%d%d%d%d%-(%d%d)%-(%d%d)")
+  month, day = tonumber(month), tonumber(day)
+  if month and MONTHS[month] and day >= 1 and day <= 31 then return MONTHS[month] .. " " .. day end
+end
+
+function E.ListedCount(n)
+  local text = string.format("%.0f", n):reverse():gsub("(%d%d%d)", "%1,"):reverse()
+  return (text:gsub("^,", ""))
+end
+
+function E.StaleDay(text)
+  local today, seen = E.DayNumber(date("!%Y-%m-%d")), E.DayNumber(text)
+  if today and seen and today - seen > E.STALE_DAYS then return E.ShortDay(text) end
+end
+
 -- Community prices per realm and house ("forever|horde"): { status = "verifying" | "ready" | "bad", data, asOf, house }.
 local community = {}
 
@@ -262,7 +280,8 @@ local function priceLines(realm, itemId)
     out[#out].compact = true
     add("  min " .. E.Coins(row.min), LABEL, "  Min buyout", coinIcons(row.min))
     add("  historical " .. E.Coins(row.historical), LABEL, "  Historical", coinIcons(row.historical))
-    add(string.format("  %d units listed%s, %d reporters on %s", row.quantity, thin and " (thin)" or "", row.reporters, row.day), META)
+    add(string.format("  %s listed%s · %d %s · %s", E.ListedCount(row.quantity), thin and " (thin)" or "",
+      row.reporters, row.reporters == 1 and "reporter" or "reporters", E.ShortDay(row.day) or row.day), META)
     -- Two separate facts. The item's newest public day says how old its prices are; the file's build time says
     -- how long since the companion last ran. A file built today can still hold an item nobody scanned for a week.
     local today = E.DayNumber(date("!%Y-%m-%d"))
@@ -277,8 +296,6 @@ local function priceLines(realm, itemId)
       add("  price file age unknown (stale?)", WARN, nil, nil, true)
     elseif today - built > E.STALE_DAYS then
       add(string.format("  OLD FILE: built %s; the Everloot Desktop App refreshes it, then /reload", entry.asOf:sub(1, 10)), WARN, nil, nil, true)
-    else
-      add("  price file built " .. entry.asOf:sub(1, 10), META)
     end
   end
   local own = E:OwnScan(realm)
@@ -288,8 +305,8 @@ local function priceLines(realm, itemId)
     add("Your scan: min " .. E.Coins(item[4]) .. " · per unit", OWN, "Your scan · min buyout", coinIcons(item[4]))
     out[#out].compact = true
     add("  value " .. E.Coins(item[5]), OWN, "  Value", coinIcons(item[5]))
-    add(string.format("  %d units listed, scanned %s, %s", item[3], hours < 1 and "under 1 h ago" or (hours .. " h ago"),
-      own.house and (own.house .. " house") or "house not recorded"), META)
+    add(string.format("  %s listed · %s%s", E.ListedCount(item[3]), hours < 1 and "under 1 h ago" or (hours .. " h ago"),
+      own.house and "" or " · house not recorded"), META)
   end
   -- The game's own vendor price, for comparison beside an auction price; by itself it is no reason for these lines.
   if #out > 0 then
@@ -566,7 +583,6 @@ local function addLines(tooltip, itemId)
   for _, line in ipairs(lines) do
     if columns and line.left and line.right then
       tooltip:AddDoubleLine(line.left, line.right, line.r, line.g, line.b, VALUE[1], VALUE[2], VALUE[3])
-      if line.detail then tooltip:AddLine(line.detail, META[1], META[2], META[3], true) end
     else
       tooltip:AddLine(line.text, line.r, line.g, line.b, line.wrap)
     end
