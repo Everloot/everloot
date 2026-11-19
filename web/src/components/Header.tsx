@@ -149,8 +149,9 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
   const searchRow = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (searchOpen) searchRow.current?.focus(); }, [searchOpen]);
-  // A new page closes the opened field.
-  useEffect(() => setSearchOpen(false), [path]);
+  // A new page closes the opened field and the menu: a suggestion picked in either is a client-side link, and the
+  // menu would otherwise stay over the page it opened.
+  useEffect(() => { setSearchOpen(false); setOpen(false); }, [path]);
 
   // A click outside the bar's menus closes the open one.
   useEffect(() => {
@@ -281,8 +282,14 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
           <div className="mx-auto max-w-data space-y-6 px-4 py-6 lg:px-6">
             <form action="/search" method="get" role="search" onSubmit={() => track("search", { surface: "menu" })} className="flex items-center gap-2 rounded-full border border-edge bg-canvas px-3 text-muted focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">
               <SearchIcon />
-              <label htmlFor="menu-search" className="sr-only">Search Everloot</label>
-              <input id="menu-search" name="q" type="search" maxLength={200} placeholder="Search Everloot" className="w-full min-w-0 bg-transparent text-fg placeholder:text-muted focus:outline-none" />
+              {/* The bar's suggesting field, so the menu's search finds the same pages as you type. */}
+              <SuggestField
+                id="menu-search"
+                label="Search Everloot"
+                placeholder="Search Everloot"
+                listClassName="-left-9 -right-3 mt-2"
+                className="h-9 w-full min-w-0 bg-transparent text-base text-fg placeholder:text-muted focus:outline-none"
+              />
             </form>
             {/* The top bar's menus as groups, in the same order; More holds Chat, the pages outside the bar, and the bug
                 report, whose floating pill is hidden below md. Focus moves to Menu first, so closing the dialog returns there. */}

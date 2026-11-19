@@ -409,6 +409,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Changed
 - Site: the search and the search box suggestions read the names they match from one small file the snapshot cron writes beside the aggregates (`snapshots/search-names.json`), so a fresh server instance no longer downloads and parses the whole aggregate set for a keystroke; without the file they read the aggregates as before.
+- Site: the phone menu's search box suggests pages as you type, the same field as the bar's, instead of a plain box with no suggestions.
 - Site: cards, icons and copy buttons look and behave the same everywhere; small corners, captions and line lengths follow the site's sizes.
 - Site: the Auction House, a realm's prices, Bag upgrades and Disenchanting open faster: the price boards are worked out once each time new scans come in, not again for every visit.
 - Site: the armory crawl fails its hourly job only when 3 Blizzard rows or 1% of the rows it read fail (fewer are deferred for 7 days and shown as a warning), still fails at once when storage refuses a row, and names the response field that broke, never the character.
