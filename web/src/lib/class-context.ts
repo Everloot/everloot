@@ -4,7 +4,7 @@
  * what its address says. A class this browser remembers is offered beside it, never put in its place. The server
  * pages and the browser both read it, so this file reads no files and does not load the guide schema.
  */
-import type { GuideRole } from "../../../kb/src/guides/guide";
+import type { GuideRole } from "@kb/guides/guide";
 import { CLASSES } from "@/design/tokens";
 
 export type ClassSlug = (typeof CLASSES)[number];

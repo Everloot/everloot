@@ -8,7 +8,7 @@ import { NEW_COMBOS, RACES, type ClassName } from "@/data/wow-forever";
 import { classLabel, type ClassSlug } from "./class-context";
 import { guidesFor, loadGuides, type Guide } from "./guides";
 import { RACE_TABLE } from "./race-traits";
-import type { RaceTable } from "../../../kb/src/client-races";
+import type { RaceTable } from "@kb/client-races";
 import { TALENT_CLASSES } from "./talents/catalogs";
 
 /** The class's published guides, the lowest levels first. */

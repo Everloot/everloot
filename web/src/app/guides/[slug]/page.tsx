@@ -19,8 +19,8 @@ import { PUBLISHED_CHANGES, classTalentChanges } from "@/lib/talents/freshness-r
 import type { TalentCatalog } from "@/lib/talents/types";
 import { loadWiki, publishedPage, type Block } from "@/lib/wiki";
 import { resolveTokens } from "@/lib/wiki-names";
-import { guideLinkTarget, sitePath } from "../../../../../kb/src/guides/guide";
-import { slugify } from "../../../../../kb/src/lore-slug";
+import { guideLinkTarget, sitePath } from "@kb/guides/guide";
+import { slugify } from "@kb/lore-slug";
 import { WikiBlock, type TextContext } from "../../wiki/wiki-text";
 
 // One published guide: how current it is, its plan, its four sections, its sources and its versions. Only published

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
-import { emptyMarket, foldMarket } from "../../../../../kb/src/market";
+import { emptyMarket, foldMarket } from "@kb/market";
 
 const store = vi.hoisted(() => ({ loadMarket: vi.fn(), loadCorpus: vi.fn(), stored: vi.fn() }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
@@ -47,17 +47,12 @@ test("the history comes from the stored file and the corpus is not read", async 
   expect(html).toContain("2026-11-01  1s 50c  3 reporters");
 });
 
-test("with no stored file the page reads the corpus as before, with the same answer", async () => {
+test("with no stored file the history says unrecorded, not empty, and the corpus is still not read", async () => {
   store.stored.mockResolvedValue(null);
   const html = await page();
-  expect(store.loadCorpus).toHaveBeenCalledOnce();
-  expect(html).toContain("2026-11-01  1s 50c  3 reporters");
-});
-
-test("with no stored file and the corpus out of reach the history says unrecorded, not empty", async () => {
-  store.stored.mockResolvedValue(null);
-  store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], unreachable: true });
-  const html = await page();
+  expect(store.loadCorpus).not.toHaveBeenCalled();
+  expect(html).toContain("Single listings seen while browsing");
   expect(html).toContain("Storage unreachable. These figures are unrecorded, not zero.");
   expect(html).not.toContain("Price unrecorded. A day goes on the history");
+  expect(html).not.toContain("2026-11-01  1s 50c  3 reporters");
 });

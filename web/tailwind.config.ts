@@ -1,6 +1,6 @@
 import type { Config } from "tailwindcss";
 import plugin from "tailwindcss/plugin";
-import { cssVariables, DATA_SIZE, DATA_TYPE, MOTION, motionVariables, RADIUS, SITE_MODE, tokens, WIDTH, type TokenName } from "./src/design/tokens";
+import { CAPTION_SIZE, cssVariables, DATA_SIZE, DATA_TYPE, MEASURE, MOTION, motionVariables, RADIUS, SITE_MODE, tokens, WIDTH, type TokenName } from "./src/design/tokens";
 
 const tokenColors = Object.fromEntries(
   (Object.keys(tokens.dark) as TokenName[]).map((name) => [name, `rgb(var(--${name}) / <alpha-value>)`]),
@@ -32,8 +32,8 @@ const config: Config = {
   theme: {
     extend: {
       colors: tokenColors,
-      maxWidth: { reading: `${WIDTH.reading}px`, wide: `${WIDTH.wide}px`, data: `${WIDTH.data}px`, tip: px(DATA_SIZE.tip) },
-      fontSize: dataFontSize,
+      maxWidth: { reading: `${WIDTH.reading}px`, wide: `${WIDTH.wide}px`, data: `${WIDTH.data}px`, tip: px(DATA_SIZE.tip), prose: `${MEASURE.prose}ch`, lede: `${MEASURE.lede}ch` },
+      fontSize: { ...dataFontSize, caption: px(CAPTION_SIZE) },
       // `h-row`, `h-th`, `h-control`, `min-h-row-sm`…, and `top-header` for sticky table headers.
       height: dataSize,
       minHeight: dataSize,

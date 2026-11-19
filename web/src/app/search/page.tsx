@@ -137,6 +137,7 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
         ) : (
           // Characters and guilds sit after the database groups, above the lore archive, tools and docs.
           <>
+            {groups[0]?.respelled && <p className="mb-2 text-cell text-fg-2">Showing results for {groups[0].respelled}</p>}
             {groups.slice(0, split).map((group) => <ResultTable key={group.type} group={group} q={q} scoped={Boolean(scope)} icons={icons} unknown={unknown} />)}
             {people && <PeopleResults q={q} />}
             {groups.slice(split).map((group) => <ResultTable key={group.type} group={group} q={q} scoped={Boolean(scope)} icons={icons} unknown={unknown} />)}

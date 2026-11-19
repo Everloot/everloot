@@ -1,4 +1,4 @@
-import type { ObjectFacts } from "../../../kb/src/object-page";
+import type { ObjectFacts } from "@kb/object-page";
 import { computeRollups, loadInstanceFacts, loadItemFacts } from "./rollup-compute";
 
 /** Object facts from the shared aggregates: the drop rollup, the agreed names, minimap sightings and pending windows, no second scan. */

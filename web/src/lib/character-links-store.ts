@@ -262,7 +262,7 @@ export async function linkAccount(req: Request, keys: boolean): Promise<string |
   }
   if (req.headers.get("origin") !== siteUrl()) return fail(403, "Invalid origin");
   const user = await getUser();
-  if (!user) return NextResponse.json({ error: "Sign in to link a character.", signIn: signInPath("/account") }, { status: 401, headers: NO_STORE });
+  if (!user) return NextResponse.json({ error: "Sign in to link a character.", signIn: signInPath("/settings") }, { status: 401, headers: NO_STORE });
   return user.id;
 }
 
@@ -273,6 +273,6 @@ export async function linkAccount(req: Request, keys: boolean): Promise<string |
 export async function linkSession(): Promise<string | Response> {
   if (!characterLinksOn()) return fail(404, "Not found");
   const user = await getUser();
-  if (!user) return NextResponse.json({ error: "Sign in to see your linked characters.", signIn: signInPath("/account") }, { status: 401, headers: NO_STORE });
+  if (!user) return NextResponse.json({ error: "Sign in to see your linked characters.", signIn: signInPath("/settings") }, { status: 401, headers: NO_STORE });
   return user.id;
 }

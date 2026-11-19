@@ -1,9 +1,9 @@
 import { AUCTION_HOUSES, type AuctionHouse } from "@everloot/protocol";
-import { AUCTION_AGREEMENT } from "../../../kb/src/auction-history";
+import { AUCTION_AGREEMENT } from "@kb/auction-history";
 import {
   MARKET_LIMITS, TRIM_FACTOR, TRIM_MIN_DAYS, agreed, formatCopper, houseKey, itemListings, itemMarket, parseHouse, realmName, validRealm,
   type ItemDays, type MarketState, type MarketValue, type PublicDay, type RealmDays,
-} from "../../../kb/src/market";
+} from "@kb/market";
 import { AFTER_LAUNCH, DEFAULT_RULESET, RULESET_SLUGS, inRegion, isRulesetSlug, mappedRulesets, realmInfo, realmRuleset, rulesetFromName, type RegionFilter, type RulesetSlug } from "./realms";
 
 /**
@@ -111,28 +111,42 @@ function groupsOf(installs: ItemDays["open"][string]): Set<string> {
   return new Set(Object.entries(installs).map(([installId, scan]) => scan[5] || `install:${installId}`));
 }
 
+/** The realm a house bucket belongs to; null when its name is not a realm name. */
+function realmOf(state: MarketState, key: string, stored: RealmDays): RealmRef | null {
+  const name = realmName(state, stored.name);
+  return name && validRealm(name) ? { key, name, slug: realmSlug(name), ruleset: realmRuleset(name) } : null;
+}
+
+/** One item's row in one house of a realm; null without a public value. */
+function itemRow(state: MarketState, realm: RealmRef, house: AuctionHouse, itemId: number, days: ItemDays, now: Date): MarketRow | null {
+  const { value, points } = itemMarket(state, realm.key, itemId, now, house);
+  if (!value) return null;
+  let updatedAt: number | null = null;
+  for (const installs of Object.values(days.open)) {
+    if (!agreed([...groupsOf(installs)])) continue;
+    for (const scan of Object.values(installs)) updatedAt = Math.max(updatedAt ?? 0, scan[4]);
+  }
+  const listings = itemListings(state, realm.key, itemId, now, house)[value.day] ?? null;
+  return { realm, house, value, points, listings, updatedAt };
+}
+
 /** One house of one realm, and the reporter groups behind its open public days. */
 function houseBoard(state: MarketState, key: string, now: Date, house: AuctionHouse): { board: RealmBoard; groups: Set<string> } | null {
   const stored: RealmDays | undefined = state.houses?.[houseKey(key, house)];
-  const name = stored && realmName(state, stored.name);
-  if (!stored || !name || !validRealm(name)) return null;
-  const realm: RealmRef = { key, name, slug: realmSlug(name), ruleset: realmRuleset(name) };
+  const realm = stored && realmOf(state, key, stored);
+  if (!stored || !realm) return null;
   const reporters = new Set<string>();
   let realmUpdated: number | null = null;
   const rows: MarketRow[] = [];
   for (const [id, days] of Object.entries(stored.items)) {
-    const { value, points } = itemMarket(state, key, Number(id), now, house);
-    if (!value) continue;
-    let updatedAt: number | null = null;
+    const row = itemRow(state, realm, house, Number(id), days, now);
+    if (!row) continue;
     for (const installs of Object.values(days.open)) {
       const groups = groupsOf(installs);
-      if (!agreed([...groups])) continue;
-      for (const g of groups) reporters.add(g);
-      for (const scan of Object.values(installs)) updatedAt = Math.max(updatedAt ?? 0, scan[4]);
+      if (agreed([...groups])) for (const g of groups) reporters.add(g);
     }
-    if (updatedAt !== null) realmUpdated = Math.max(realmUpdated ?? 0, updatedAt);
-    const listings = itemListings(state, key, Number(id), now, house)[value.day] ?? null;
-    rows.push({ realm, house, value, points, listings, updatedAt });
+    if (row.updatedAt !== null) realmUpdated = Math.max(realmUpdated ?? 0, row.updatedAt);
+    rows.push(row);
   }
   if (!rows.length) return null;
   return { board: board(realm, house, rows, reporters.size, realmUpdated), groups: reporters };
@@ -141,7 +155,8 @@ function houseBoard(state: MarketState, key: string, now: Date, house: AuctionHo
 const byUnits = (a: MarketRow, b: MarketRow) =>
   b.value.quantity - a.value.quantity || a.value.itemId - b.value.itemId || HOUSES.indexOf(a.house) - HOUSES.indexOf(b.house);
 
-function board(realm: RealmRef, house: AuctionHouse | null, rows: MarketRow[], reporters: number, updatedAt: number | null): RealmBoard {
+/** A board from its rows, sorted as `realmBoards` sorts them; the stored boards (./market-boards.ts) are put back together with it. */
+export function board(realm: RealmRef, house: AuctionHouse | null, rows: MarketRow[], reporters: number, updatedAt: number | null): RealmBoard {
   rows.sort(byUnits);
   const byItem = new Map<number, MarketRow[]>();
   for (const r of [...rows].sort((a, b) => HOUSES.indexOf(a.house) - HOUSES.indexOf(b.house))) {
@@ -160,6 +175,14 @@ function allHouses(parts: { board: RealmBoard; groups: Set<string> }[]): RealmBo
 /** The realm keys that have a bucket for `house`. */
 const houseRealmKeys = (state: MarketState, house: AuctionHouse) =>
   Object.keys(state.houses ?? {}).filter((k) => k.endsWith(`|${houseSlug(house)}`)).map((k) => k.slice(0, k.lastIndexOf("|")));
+
+/** The order `realmBoards` lists realms in: the most items first, then by name. */
+export const busiestFirst = (a: RealmBoard, b: RealmBoard) => b.items - a.items || a.realm.name.localeCompare(b.realm.name);
+
+/** Where the boards come from: the rollup (built here), or a function handing back one house's boards, or every house's with null. */
+export type BoardSource = MarketState | ((house: AuctionHouse | null) => RealmBoard[]);
+const boardsOf = (source: BoardSource, now: Date, house: AuctionHouse | null) =>
+  typeof source === "function" ? source(house) : realmBoards(source, now, house);
 
 const boardsMemo = new WeakMap<MarketState, Map<string, { day: number; boards: RealmBoard[] }>>();
 
@@ -180,18 +203,18 @@ export function realmBoards(state: MarketState, now: Date = new Date(), house: A
       return !parts.length ? null : house ? parts[0]!.board : allHouses(parts);
     })
     .filter((b): b is RealmBoard => b !== null)
-    .sort((a, b) => b.items - a.items || a.realm.name.localeCompare(b.realm.name));
+    .sort(busiestFirst);
   memo.set(house ?? "all", { day: todayNumber(now), boards });
   return boards;
 }
 
 /** Items with a public value on each house of a realm (or across realms without `slug`, or a ruleset's realms), for the house switch. */
-export function houseCounts(state: MarketState, now: Date, slug?: string, ruleset: RulesetSlug | null = null, region?: RegionFilter): Map<AuctionHouse | null, number> {
+export function houseCounts(source: BoardSource, now: Date, slug?: string, ruleset: RulesetSlug | null = null, region?: RegionFilter): Map<AuctionHouse | null, number> {
   const count = (boards: RealmBoard[]) => {
     const mine = slug === undefined ? onRuleset(boards, ruleset) : boards.filter((b) => b.realm.slug === slug);
     return new Set(mine.filter((b) => inRegion(b.realm.name, region)).flatMap((b) => b.rows.map((r) => r.value.itemId))).size;
   };
-  return new Map<AuctionHouse | null, number>([null, ...HOUSES].map((h) => [h, count(realmBoards(state, now, h))]));
+  return new Map<AuctionHouse | null, number>([null, ...HOUSES].map((h) => [h, count(boardsOf(source, now, h))]));
 }
 
 /** One item on one realm in each house that has a public value for it, in the game's house order. */
@@ -243,8 +266,8 @@ export const MOVES_SHOWN = 3;
  * One line per ruleset for the hub: the launch rulesets always, Hardcore once a realm is mapped to it or a realm
  * with prices is named for it, and "forever" when a realm with prices has neither. Counts come from public values only.
  */
-export function rulesetSummaries(state: MarketState, now: Date, house: AuctionHouse | null = null, region?: RegionFilter): RulesetSummary[] {
-  const groups = boardsByRuleset(realmBoards(state, now, house).filter((b) => inRegion(b.realm.name, region)));
+export function rulesetSummaries(source: BoardSource, now: Date, house: AuctionHouse | null = null, region?: RegionFilter): RulesetSummary[] {
+  const groups = boardsByRuleset(boardsOf(source, now, house).filter((b) => inRegion(b.realm.name, region)));
   const mapped = new Set<string>([...mappedRulesets(), ...groups.keys()]);
   const shown: string[] = RULESET_SLUGS.filter((r) => !AFTER_LAUNCH.has(r) || mapped.has(r));
   if (groups.has(DEFAULT_RULESET)) shown.push(DEFAULT_RULESET);
@@ -401,11 +424,43 @@ export function sparkline(points: PublicDay[], now: Date): string | null {
   return recent.map((p) => `${x(p.day).toFixed(1)},${y(p.market).toFixed(1)}`).join(" ");
 }
 
+const byRealmThenHouse = (a: MarketRow, b: MarketRow) => a.realm.name.localeCompare(b.realm.name) || HOUSES.indexOf(a.house) - HOUSES.indexOf(b.house);
+
 /** An item in every house of every realm that has a public value for it, by realm name, then the game's house order. */
 export function itemAcrossRealms(boards: RealmBoard[], itemId: number): MarketRow[] {
-  return boards
-    .flatMap((b) => b.byItem.get(itemId) ?? [])
-    .sort((a, b) => a.realm.name.localeCompare(b.realm.name) || HOUSES.indexOf(a.house) - HOUSES.indexOf(b.house));
+  return boards.flatMap((b) => b.byItem.get(itemId) ?? []).sort(byRealmThenHouse);
+}
+
+/**
+ * The same rows as `itemAcrossRealms(realmBoards(state, now), itemId)`, read from the rollup for this one item
+ * without building every realm's board: a realm's board holds the item's row exactly when this finds it.
+ */
+export function itemRows(state: MarketState, now: Date, itemId: number): MarketRow[] {
+  const rows: MarketRow[] = [];
+  for (const house of HOUSES) for (const key of houseRealmKeys(state, house)) {
+    const stored = state.houses![houseKey(key, house)]!;
+    const days = stored.items[String(itemId)];
+    const realm = days && realmOf(state, key, stored);
+    const row = realm && itemRow(state, realm, house, itemId, days, now);
+    if (row) rows.push(row);
+  }
+  return rows.sort(byRealmThenHouse);
+}
+
+/**
+ * The realm a slug names among the realms with a public value, as `findBoard(realmBoards(state, now), slug)` finds it,
+ * without building the boards. A realm whose scans are all below the gate is none, so its uploaded name is not shown.
+ */
+export function realmForSlug(state: MarketState, now: Date, slug: string): RealmRef | null {
+  const found = new Map<string, RealmRef>();
+  for (const house of HOUSES) for (const key of houseRealmKeys(state, house)) {
+    if (found.has(key)) continue;
+    const stored = state.houses![houseKey(key, house)]!;
+    const realm = realmOf(state, key, stored);
+    if (realm?.slug === slug && Object.keys(stored.items).some((id) => itemMarket(state, key, Number(id), now, house).value)) found.set(key, realm);
+  }
+  // Two realms spelt into one slug: the boards pick the one with more items, so let them pick.
+  return found.size > 1 ? findBoard(realmBoards(state, now), slug)?.realm ?? null : [...found.values()][0] ?? null;
 }
 
 /** The row a single-price view leads with: the house with the most units listed, so the page names a house, never a blend. */

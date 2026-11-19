@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { TitleEntry } from "../../../../../kb/src/completion";
+import type { TitleEntry } from "@kb/completion";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
 import { loadCatalog, titleDisplayName, titleHref, type Listed } from "@/lib/completion-lists";
 import { LINK } from "../entity";

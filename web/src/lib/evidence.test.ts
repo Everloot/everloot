@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { asOfLine, EVIDENCE_KEY, entitySummary, evidenceLine, itemSummary, observedLine, type ItemSummaryInput } from "./evidence";
-import type { Edge } from "../../../kb/src/edges";
+import type { Edge } from "@kb/edges";
 
 const NOW = Date.parse("2026-10-20T12:00:00.000Z");
 

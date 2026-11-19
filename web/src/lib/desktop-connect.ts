@@ -7,7 +7,7 @@
  * Pure WebCrypto, so the page and the app (Node) run the same code.
  */
 
-/** The label of the key the connect page makes; /account reads it to tell whether the app has a key. */
+/** The label of the key the connect page makes; /settings reads it to tell whether the app has a key. */
 export const DESKTOP_KEY_LABEL = "Everloot Desktop App";
 
 const INFO = new TextEncoder().encode("everloot desktop connect v1");

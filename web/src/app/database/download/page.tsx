@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CREDIT_LINE, LICENCE, LICENCE_URL } from "@everloot/protocol";
-import type { ManifestFile } from "../../../../../kb/src/open-data/manifest";
-import { GAME_FILES_LABEL, OPEN_DATA_EXCLUDED, OPEN_DATA_METHOD, OPEN_DATA_NOT_YET, OPEN_DATA_READING, OPEN_DATA_VERIFY } from "../../../../../kb/src/open-data/text";
+import type { ManifestFile } from "@kb/open-data/manifest";
+import { GAME_FILES_LABEL, OPEN_DATA_EXCLUDED, OPEN_DATA_METHOD, OPEN_DATA_NOT_YET, OPEN_DATA_READING, OPEN_DATA_VERIFY } from "@kb/open-data/text";
 import { Container, DataTable, DataTitle, Facts } from "@/components/ui";
 import { loadOpenData } from "@/lib/open-data";
 import { pageMetadata } from "@/lib/seo";
@@ -13,7 +13,9 @@ export const metadata: Metadata = pageMetadata({
   description: "Everloot's published WoW: Forever data as NDJSON files: what three installs agree on, and the game files' layer, with the licence and the counts.",
   path: "/database/download",
 });
-export const dynamic = "force-dynamic";
+// Its one read, the bulk bucket's manifest, is a public fetch kept five minutes (lib/open-data.ts); no store, no cookies.
+// Five minutes is the lists row of lib/cache-policy.js, which next-config.test.ts holds this number to.
+export const revalidate = 300;
 
 const n = (x: number) => x.toLocaleString("en-US");
 const day = (iso: string | null) => (iso ? `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC` : "[?]");
@@ -45,7 +47,7 @@ export default async function DownloadPage() {
 
         {ok ? (
           <>
-            <div className="mt-4 max-w-reading">
+            <Container width="reading" className="mt-4">
               <Facts layout="list" label="This export" items={[
                 { label: "Made", value: day(ok.manifest.generatedAt), numeric: true },
                 { label: "Data as of", value: day(ok.manifest.dataAsOf), numeric: true },
@@ -53,7 +55,7 @@ export default async function DownloadPage() {
                 { label: "Read", value: `${n(ok.manifest.source.records)} public records from ${n(ok.manifest.source.installs)} ${ok.manifest.source.installs === 1 ? "install" : "installs"}`, numeric: true },
                 { label: "Rule", value: `${ok.manifest.method.agreement} or more installs agree` },
               ]} />
-            </div>
+            </Container>
             <p className={P}>
               Exports are made by hand, not on a schedule, so this one can be older than the live site. Rows is what is in the file. Of how many is
               what the rows were chosen from, and the next column says what that counts.

@@ -10,7 +10,7 @@
  * be missing, never shown as zero.
  */
 
-import { TRUSTED_SOURCE_LABEL } from "../../../../kb/src/trusted-source";
+import { TRUSTED_SOURCE_LABEL } from "@kb/trusted-source";
 
 export const MARKET_ANSWER_BUDGET = 600;
 /** The newest public day is called stale after this many days, as the game addon does. */

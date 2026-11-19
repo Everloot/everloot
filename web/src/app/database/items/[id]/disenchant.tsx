@@ -2,8 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { DataTable, type Column } from "@/components/ui";
 import { chanceText } from "@/lib/disenchant";
-import { bandLabel, unitsRange, type BandYield, type DisenchantTally, type Placement, type YieldRow } from "../../../../../../kb/src/disenchant";
-import { INDEPENDENT_INSTALLS } from "../../../../../../kb/src/drop-rollup";
+import { bandLabel, unitsRange, type BandYield, type DisenchantTally, type Placement, type YieldRow } from "@kb/disenchant";
+import { INDEPENDENT_INSTALLS } from "@kb/drop-rollup";
 import { EmptyTab, LINK } from "../../entity";
 
 const NOTE = "py-2 text-meta text-fg-2";

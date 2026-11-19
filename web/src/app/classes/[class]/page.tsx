@@ -15,8 +15,8 @@ import { guideHref } from "@/lib/guides";
 import { RACE_TABLE, RACIAL_NOTES, traitsFor } from "@/lib/race-traits";
 import { pageMetadata } from "@/lib/seo";
 import { TALENT_CLASSES, isTalentClass } from "@/lib/talents/catalogs";
-import { CENSUS_CLASSES } from "../../../../../kb/src/census";
-import type { GuideActivity, GuideRole } from "../../../../../kb/src/guides/guide";
+import { CENSUS_CLASSES } from "@kb/census";
+import type { GuideActivity, GuideRole } from "@kb/guides/guide";
 
 // Built once per deploy, one page per class; `dynamic = "error"` fails the build if the page ever reads the request.
 // The guides are read from kb/guides while the site builds: the function bundles do not carry that folder, so a page

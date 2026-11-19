@@ -1,6 +1,6 @@
 import { loadWikiEntityNames, shownNpcName } from "@/lib/wiki-entity-names";
 import { notFound } from "next/navigation";
-import { npcNameReporters, npcPage } from "../../../../../../kb/src/world-pages";
+import { npcNameReporters, npcPage } from "@kb/world-pages";
 import { AGREEMENT_NEEDED } from "@/components/ui/AgreementMeter";
 import { CARD_SIZE, renderEntityCard } from "@/lib/og-card";
 import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";

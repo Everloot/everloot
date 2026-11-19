@@ -4,9 +4,9 @@
  * own gate. The level and entrance the game files give are unconfirmed; an entrance or a boss players report is listed
  * once 3 installs agree, with how many and when last. What no source gives is left out, never shown as zero.
  */
-import { slugify } from "../../../kb/src/lore-slug";
-import type { PageType } from "../../../kb/src/wiki/page";
-import type { WorldMapData } from "../../../kb/src/world-map-data";
+import { slugify } from "@kb/lore-slug";
+import type { PageType } from "@kb/wiki/page";
+import type { WorldMapData } from "@kb/world-map-data";
 import { instanceHref, instanceRows, levelLabel, loadSightings, type InstanceRow } from "./instances";
 import { loadWiki, publishedPages, type WikiPage } from "./wiki";
 import { WORLD_MAP } from "./world-map";

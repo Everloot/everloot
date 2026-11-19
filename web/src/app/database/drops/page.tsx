@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { measureDropRate } from "../../../../../kb/src/drop-rate-settling";
+import { measureDropRate } from "@kb/drop-rate-settling";
 import { computeRollups } from "@/lib/rollup-compute";
 import { dataAgeLabel } from "@/lib/data-age";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";

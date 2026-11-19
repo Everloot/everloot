@@ -29,16 +29,15 @@ function blocks(html: string): Record<string, any>[] {
 const visible = (html: string) => html.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/\s+/g, " ");
 const h1 = (html: string) => visible(html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)![1]).trim();
 
-test("the home page advertises site search, and its lore form searches only the archive", async () => {
+test("the home page advertises site search, and its one search box searches the whole site", async () => {
   const { default: Home } = await import("./page");
   const html = renderToStaticMarkup(await Home());
   const [org, site] = blocks(html);
   expect(org["@type"]).toBe("Organization");
   expect(site["@type"]).toBe("WebSite");
   expect(site.potentialAction.name).toBe("Search Everloot");
-  expect(visible(html)).toContain("Search the lore archive");
   expect(html).toContain('action="/search"');
-  expect(html).toContain('name="in" value="lore"');
+  expect(html).not.toContain('name="in" value="lore"');
 });
 
 test("the footer shows the email and the blurb the Organization repeats", async () => {

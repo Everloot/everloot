@@ -1,4 +1,4 @@
-import { NO_REPORTED_FACTS, type ItemFactState } from "../../../kb/src/item-facts";
+import { NO_REPORTED_FACTS, type ItemFactState } from "@kb/item-facts";
 import { loadItemNames, PRIVATE_UNREACHABLE } from "./game-assets";
 import type { ItemSeen } from "./item-seen";
 import { loadItemSeen } from "./item-seen";

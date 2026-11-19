@@ -31,7 +31,7 @@ vi.mock("@/lib/lore", async (importOriginal) => ({
 }));
 
 import FactionPage, { generateMetadata } from "./page";
-import { emptyCompletion, foldCompletion } from "../../../../../../kb/src/completion-rollup";
+import { emptyCompletion, foldCompletion } from "@kb/completion-rollup";
 
 const at = "2026-11-08T00:00:00Z";
 let seq = 0;
@@ -80,8 +80,10 @@ test("a confirmed faction page has the header meta, the facts, In short, Open da
   // Open data: the copy button, and no Raw JSON link since no tooltip route serves a faction.
   expect(out).toContain("Copy for AI");
   expect(out).not.toContain("Raw JSON");
-  // The relation tab is there, empty, and names the 3-install rule without sending anyone to the addon for a fact it cannot change.
-  expect(out).toContain("Reputation from");
+  // Its one relation has no rows: one line in place of a lone "(0)" tab, naming the 3-install rule without sending
+  // anyone to the addon for a fact it cannot change.
+  expect(out).not.toContain('role="tablist"');
+  expect(out).toContain("data-tabs-empty");
   expect(out).toContain("data-empty-state");
   expect(out).toContain("No quest is linked to this faction yet. A quest shows once 3 installs report it");
   expect(out).not.toContain("Get the addon");

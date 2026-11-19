@@ -1,5 +1,5 @@
-import { CENSUS_RACES } from "../../../../../../../kb/src/census";
-import { guildSlug, type GuildProgress } from "../../../../../../../kb/src/guilds";
+import { CENSUS_RACES } from "@kb/census";
+import { guildSlug, type GuildProgress } from "@kb/guilds";
 import { memberKey } from "@/lib/guild-alts";
 import { guildPath, guildsOn, loadGuildPage, type GuildMember } from "@/lib/guilds";
 import type { Player } from "@/lib/player-pages";

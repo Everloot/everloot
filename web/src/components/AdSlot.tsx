@@ -53,7 +53,7 @@ export default function AdSlot({ slot, client = process.env.NEXT_PUBLIC_ADSENSE_
   const filled = status === "filled";
   return (
     <aside aria-label={filled ? "Advertisement" : undefined} aria-hidden={filled ? undefined : true} className={filled ? "not-prose my-8" : "not-prose h-0 overflow-hidden"}>
-      {filled && <p className="mb-1 text-[11px] font-mono text-muted">Advertisement</p>}
+      {filled && <p className="mb-1 text-caption font-mono text-muted">Advertisement</p>}
       <ins
         ref={unit}
         className="adsbygoogle"

@@ -440,7 +440,7 @@ describe("one page for a character: the owner's showcase and what the addon saw"
     expect(out).toContain('href="/privacy#player-pages"');
     expect(out).not.toMatch(/\b\d{2}:\d{2}\b/);
     // Breadcrumb: Home, Characters (the search), the character.
-    expect(out).toMatch(/"name":"Characters","item":"[^"]*\/players"/);
+    expect(out).toMatch(/"name":"Players","item":"[^"]*\/players"/);
     expect(out).toMatch(/"name":"Thrallina","item":"[^"]*\/characters\/forever\/forever-pioneer\/thrallina"/);
   });
 

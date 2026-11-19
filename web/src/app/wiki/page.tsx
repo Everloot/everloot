@@ -4,7 +4,7 @@ import { Container, PageHeader, SectionHeading } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { pageMetadata } from "@/lib/seo";
 import { hubIndexable, loadWiki, publishedPages, recentPages, TYPE_LABEL, wikiHref } from "@/lib/wiki";
-import { PAGE_TYPES } from "../../../../kb/src/wiki/page";
+import { PAGE_TYPES } from "@kb/wiki/page";
 import WikiIndex, { type WikiGroup } from "./WikiIndex";
 
 // The pages change only with a deploy; an hour matches the pages themselves.

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { QUALITIES, slotOf } from "../../../../../../kb/src/item-taxonomy";
+import { QUALITIES, slotOf } from "@kb/item-taxonomy";
 import { gameDataNotice } from "@/lib/edges";
 import { CLIENT_TAXONOMY as T } from "@/lib/items";
 import { recordUsage } from "@/lib/usage-metrics";

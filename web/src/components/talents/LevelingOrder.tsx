@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { DATA_SIZE } from "@/design/tokens";
+import Icon from "@/components/ui/Icon";
 import { deriveOrder, orderSteps, prefixRanks, type MovedPoint } from "@/lib/talents/order";
 import { entryAtRank, forSet, nodeMap, pointsAtLevel, pointsByTree, pointsSpent } from "@/lib/talents/rules";
 import type { PlanSet, Ranks, TalentCatalog, TalentNode } from "@/lib/talents/types";
@@ -180,9 +181,7 @@ export default function LevelingOrder({ catalog, set, slot, setName, moved, prev
                       return (
                         <button key={way} type="button" className="btn size-11 flex-none !px-0" aria-label={`Move ${what} ${way}`} aria-disabled={stuck}
                           disabled={preview !== null} onClick={() => onMove(i, to)}>
-                          <svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" className={way === "earlier" ? "rotate-180" : undefined}>
-                            <path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
-                          </svg>
+                          <Icon name="chevron" className={way === "earlier" ? "rotate-180" : undefined} />
                         </button>
                       );
                     })}

@@ -8,20 +8,20 @@ import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasCard } from "@/lib/tooltip";
-import { itemNameReporters, itemPage } from "../../../../../../kb/src/item-page";
+import { itemNameReporters, itemPage } from "@kb/item-page";
 import { loadShownNames } from "@/lib/shown-item-names";
 import { loadEdges } from "@/lib/edges";
 import { loadItemSeen } from "@/lib/item-seen";
 import { itemSourceValue } from "./item-source";
 import { DisenchantPanel, showsDisenchant } from "./disenchant";
 import { loadDisenchant } from "@/lib/disenchant";
-import { bandYield } from "../../../../../../kb/src/disenchant";
+import { bandYield } from "@kb/disenchant";
 import { RelationTarget, SameIcon } from "@/components/EntityRelations";
 import { gameNameFor, loadItemSetNames, loadItemTips, loadQuestNames, loadSiteAssets, loadSpellNames, unknownItemIcon } from "@/lib/game-assets";
-import { Badge, Container, DataTable, EvidenceLine, Facts, InShort, OpenData, QUALITY_TEXT, Tabs, TooltipFrame, TooltipLines, qualityOf, reportedLabel, type Column, type Fact, type TabItem } from "@/components/ui";
-import { isDevelopmentItemName } from "../../../../../../kb/src/dev-item-names";
-import { categoryOf } from "../../../../../../kb/src/item-taxonomy";
-import { edgesFrom, evidenceLabel, type Edge, type Rel } from "../../../../../../kb/src/edges";
+import { Badge, Container, DataTable, EvidenceLine, Facts, InShort, OpenData, QUALITY_TEXT, Tabs, filledTabs, TooltipFrame, TooltipLines, qualityOf, reportedLabel, type Column, type Fact, type TabItem } from "@/components/ui";
+import { isDevelopmentItemName } from "@kb/dev-item-names";
+import { categoryOf } from "@kb/item-taxonomy";
+import { edgesFrom, evidenceLabel, type Edge, type Rel } from "@kb/edges";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, itemsHref, shownItemName, subclassLabel as labelOf } from "@/lib/items";
 import { FACT_WORD, tipLines, withReported } from "@/lib/item-names";
 import { PLACEHOLDER, splitWhy } from "@/lib/placeholder";
@@ -30,15 +30,16 @@ import { loadNames, nameOf } from "@/lib/names";
 import { loreForShownItem } from "@/lib/lore-links";
 import EntityLink from "@/components/EntityLink";
 import LoreSection from "@/components/LoreSection";
-import DarkmoonItemNote from "@/components/DarkmoonItemNote";
+import DarkmoonItemNote from "./DarkmoonItemNote";
 import { CategoryPage, categoryMetadata } from "../category-page";
 import { itemIndexable } from "@/lib/indexable";
 import { entityTitle, itemDescription } from "@/lib/entity-meta";
 import { MarketBox, loadMarketBox } from "@/app/tools/auctions/MarketBox";
-import { pendingLine } from "../../../../../../kb/src/pending-loot";
-import { itemDropSources } from "../../../../../../kb/src/loot-tables";
+import { pendingLine } from "@kb/pending-loot";
+import { itemDropSources } from "@kb/loot-tables";
 import { loadLootTables, loadReportedItemFacts } from "@/lib/rollup-compute";
-import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityIcon, EntityTop, known, LINK, PinTable, Unreachable } from "../../entity";
+import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, known, LINK, PinTable, Unreachable } from "../../entity";
+import { EntityIcon } from "@/components/game/EntityIcon";
 import { ItemSourcesPanel } from "../../loot-tables";
 import { unknownItem } from "../../unknown";
 import { itemSummary } from "@/lib/evidence";
@@ -177,7 +178,8 @@ export default async function ItemPage(props: Props) {
   const materialTips = materialIds.length ? await loadItemTips(assets ?? await loadSiteAssets(), materialIds.filter(showsTip)) : new Map<number, { icon: string | null }>();
   const tabs: TabItem[] = [
     {
-      id: "dropped-by", label: "Dropped by", count: facts.unreachable ? undefined : page.drops.length,
+      // No rates yet but loot windows short of 3 installs or outside the rates: no count, so the tab and its line stay.
+      id: "dropped-by", label: "Dropped by", count: facts.unreachable || (!page.drops.length && (sources.short || page.pendingLoot)) ? undefined : page.drops.length,
       panel: facts.unreachable ? <Unreachable />
         : <>
           <ItemSourcesPanel
@@ -237,7 +239,16 @@ export default async function ItemPage(props: Props) {
   const subclassLabel = category?.subclass ? labelOf(category.subclass).label : undefined;
 
   // The same per-item index and 3-install gate as the item lists' Source column; no row when nothing is reported.
-  const source = itemSourceValue(itemSeen.from.get(itemId), tabs.map((t) => t.id));
+  const source = itemSourceValue(itemSeen.from.get(itemId), filledTabs(tabs).map((t) => t.id));
+  // Where to get it, above the fold: the first three sources the tabs below list, drops, then vendors, then recipes.
+  const getFrom = [
+    ...(facts.unreachable ? [] : sources.rows.map((d) => (d.sourceNpcId !== undefined
+      ? <EntityLink key={`npc-${d.sourceNpcId}`} kind="npc" id={d.sourceNpcId} name={names.npcs.get(d.sourceNpcId)} />
+      : <EntityLink key={`object-${d.sourceObjectId}`} kind="object" id={d.sourceObjectId!} />))),
+    ...[...rel("sold_by"), ...rel("created_by")].map((e) => (
+      <span key={`${e.rel}-${e.toKind}-${e.toId}`}><RelationTarget edge={e} rel={e.rel} client={edges.client} nameOf={nameFor} gameName={gameName} /></span>
+    )),
+  ].slice(0, 3);
   // The page in four lines: what it is, what players saw, what nobody has reported, and where the name came from.
   const requiredLevel = tip?.lines.find((l) => l.startsWith("Requires Level"))?.replace("Requires Level ", "") ?? null;
   const identity = [
@@ -263,6 +274,7 @@ export default async function ItemPage(props: Props) {
       { label: "Slot", value: category.slot?.name ?? "—" },
       { label: "Quality", value: category.quality ? <span className={shownQuality ? QUALITY_TEXT[shownQuality] : undefined}>{category.quality.name}</span> : known(null) },
     ] : [{ label: "Game files", value: "Not found" }]),
+    ...(getFrom.length ? [{ label: "Get it from", value: <span className="inline-flex flex-col gap-1">{getFrom}</span> }] : []),
     ...(facts.unreachable ? [] : [
       { label: "Reported name", value: known(page.name, itemNameReporters(itemId, facts)) },
       { label: "Drop sources", value: known(page.drops.length || null), numeric: true },
@@ -293,7 +305,7 @@ export default async function ItemPage(props: Props) {
                 <TooltipLines lines={boxLines} />
               </TooltipFrame>
               {boxNotes.length > 0 && (
-                <div data-card-notes className="mt-1 space-y-0.5 rounded-[4px] border border-line bg-panel px-2 py-1 text-xs text-muted">
+                <div data-card-notes className="mt-1 space-y-0.5 rounded-control border border-line bg-panel px-2 py-1 text-xs text-muted">
                   {boxNotes.map((note) => <p key={note}>{note}</p>)}
                 </div>
               )}
@@ -321,6 +333,9 @@ export default async function ItemPage(props: Props) {
             jsonHref={!facts.unreachable && hasCard.item(page) ? `/api/tooltip/item/${itemId}` : undefined}
           />
         </EntitySidebar>
+        <Tabs label={`${title}: relations`} tabs={tabs} className="mt-6" />
+        <DarkmoonItemNote name={name?.name} />
+        {/* The prices after where the item comes from: the relations answer "where do I get this" first. */}
         <MarketBox itemId={itemId} rows={auctions} />
         {/* Blizzard Developer API Terms: no ads on a page showing Blizzard data. This page carries ads, so it reads none
             and only links to the ad-free page. A plain link, not next/link: the router's prefetch would fetch that
@@ -328,8 +343,6 @@ export default async function ItemPage(props: Props) {
         <p className="mt-2 mb-6 text-meta">
           <a href={`/blizzard-auctions/${itemId}`} className={LINK}>Blizzard auction house data for this item</a>
         </p>
-        <Tabs label={`${title}: relations`} tabs={tabs} className="mt-6" />
-        <DarkmoonItemNote name={name?.name} />
         <div className="mt-6 space-y-6 empty:hidden">
           <LoreSection match={lore} />
           {!facts.unreachable && (page.name !== null || page.drops.length > 0) && <AdSlot slot="inContent" />}

@@ -114,8 +114,18 @@ export function placeEntrances(data: Pick<WorldMapData, "entrances">): EntranceP
   return pins;
 }
 
-export interface FlightMasterPin { id: number; name: string; world: WorldPoint; map: MapPoint; heldBack: boolean }
-export interface FlightLine { from: number; to: number; continentId: number; points: MapPoint[]; heldBack: boolean }
+/** Which side's flight map shows a node or a line; absent when the files do not say. */
+export type FlightSide = "alliance" | "horde" | "both";
+export interface FlightMasterPin { id: number; name: string; world: WorldPoint; map: MapPoint; heldBack: boolean; faction?: FlightSide }
+export interface FlightLine { from: number; to: number; continentId: number; points: MapPoint[]; heldBack: boolean; faction?: FlightSide }
+
+/** A line serves the sides both its ends serve: unknown when either end is, or when they share none. */
+export function lineSide(a: FlightSide | undefined, b: FlightSide | undefined): FlightSide | undefined {
+  if (!a || !b) return undefined;
+  if (a === "both") return b;
+  if (b === "both" || a === b) return a;
+  return undefined;
+}
 
 /**
  * Flight masters and flight lines on the stitched map. One whose zone (`zoneAt`: the game files' zone, else the
@@ -126,14 +136,20 @@ export function placeFlights(data: Pick<WorldMapData, "flightNodes" | "flightPat
   const all = zoneTable({ zones: [...data.zones, ...data.heldBackZones] }), held = new Set(data.heldBackZones.map((z) => z.uiMapId));
   const masters = data.flightNodes.map((n): FlightMasterPin => {
     const world = { continentId: n.continentId, worldX: n.worldX, worldY: n.worldY };
-    return { id: n.id, name: n.name, world, map: worldToMap(world), heldBack: held.has(zoneAt(all, world, n.uiMapId)?.mapId ?? -1) || data.heldBackZones.some((z) => n.name.toLowerCase().includes(z.name.toLowerCase())) };
+    const heldBack = held.has(zoneAt(all, world, n.uiMapId)?.mapId ?? -1) || data.heldBackZones.some((z) => n.name.toLowerCase().includes(z.name.toLowerCase()));
+    return { id: n.id, name: n.name, world, map: worldToMap(world), heldBack, ...(n.faction ? { faction: n.faction } : {}) };
   });
   const hidden = new Set(masters.filter((m) => m.heldBack).map((m) => m.id));
-  const lines = data.flightPaths.map((p): FlightLine => ({
-    from: p.from, to: p.to, continentId: p.continentId,
-    points: p.points.map(([worldX, worldY]) => worldToMap({ continentId: p.continentId, worldX, worldY })),
-    heldBack: hidden.has(p.from) || hidden.has(p.to),
-  }));
+  const side = new Map(masters.map((m) => [m.id, m.faction]));
+  const lines = data.flightPaths.map((p): FlightLine => {
+    const faction = lineSide(side.get(p.from), side.get(p.to));
+    return {
+      from: p.from, to: p.to, continentId: p.continentId,
+      points: p.points.map(([worldX, worldY]) => worldToMap({ continentId: p.continentId, worldX, worldY })),
+      heldBack: hidden.has(p.from) || hidden.has(p.to),
+      ...(faction ? { faction } : {}),
+    };
+  });
   return { masters, lines };
 }
 

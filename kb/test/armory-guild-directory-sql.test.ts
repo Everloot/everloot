@@ -22,5 +22,9 @@ test("the guild directory migration counts read members, honours both hides, and
     for (let i = 0; i < 2; i++) await db.exec(read("migrations/20261117170000_armory_guild_directory.sql"));
     await db.exec(read("tests/armory_guild_directory.sql"));
     expect((await db.query("select count(*)::int as n from public.armory_guilds")).rows).toEqual([{ n: 0 }]);
+    // Disbanded guilds (Blizzard's "DELETED" record) leave the directory and the counts; the directory's own checks still pass.
+    for (let i = 0; i < 2; i++) await db.exec(read("migrations/20261118120000_armory_disbanded_guilds.sql"));
+    await db.exec(read("tests/armory_guild_directory.sql"));
+    await db.exec(read("tests/armory_disbanded_guilds.sql"));
   } finally { await db.close(); }
 }, 60_000);

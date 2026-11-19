@@ -11,7 +11,7 @@ import { blueWriteupJsonLd, breadcrumbJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import { mentionIndex, siteSpellNames, type MentionIndex } from "@/lib/spell-mentions";
 import { writeupBlocks, writeupText, type Inline } from "@/lib/writeup";
-import { clampExcerpt, clampText } from "../../../../../kb/src/text-safety";
+import { clampExcerpt, clampText } from "@kb/text-safety";
 import ChangeList from "../change-list";
 import WithSpells from "../with-spells";
 

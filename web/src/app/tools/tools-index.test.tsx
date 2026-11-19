@@ -23,23 +23,42 @@ test("the catalogue keeps the old slugs with the current names and destinations"
   expect(getTool("guild-tracker")).toMatchObject({ title: "Guild board", shortTitle: "Guild board", href: "/tools/guild-board" });
 });
 
-test("/tools is one card per planner, most used first: Raid builder, Talent calculator, Professions", async () => {
+test("/tools lists every tool the header offers, under the header's group names, in the menus' order", async () => {
   const { default: ToolsPage } = await import("./page");
   const html = renderToStaticMarkup(await ToolsPage());
-  expect(hrefs(html)).toEqual(["/tools/raid", "/tools/talents", "/tools/professions"]);
+  const headings = [...html.matchAll(/<h2 [^>]*>([^<]+)<\/h2>/g)].map((m) => m[1]);
+  expect(headings).toEqual(["Lookup", "Tools", "Guides", "Profile"]);
+  expect(hrefs(html)).toEqual(TOOL_GROUPS.flatMap((g) => g.links.map((l) => l.href)));
+  for (const href of ["/tools/auctions", "/tools/bags", "/tools/disenchanting", "/tools/guild-board", "/tools/raid", "/tools/talents", "/tools/professions", "/tools/legacy", "/tools/gold-ledger", "/tools/builds", "/tools/alts"]) {
+    expect(hrefs(html), href).toContain(href);
+  }
+  // Each card under its own group's heading, with its one line.
+  const section = (title: string) => html.slice(html.indexOf(`>${title}</h2>`), html.indexOf("</section>", html.indexOf(`>${title}</h2>`)));
+  for (const group of TOOL_GROUPS) {
+    for (const link of group.links) {
+      expect(section(group.title), link.label).toContain(`>${link.label}</a>`);
+      expect(section(group.title), link.href).toContain(TOOL_LINES[link.href].replaceAll("'", "&#x27;"));
+    }
+  }
   expect(TOOL_GROUPS.find((g) => g.title === "Tools")!.links.map((l) => l.label)).toEqual(["Raid builder", "Talent calculator", "Professions"]);
-  for (const link of TOOL_GROUPS.find((g) => g.title === "Tools")!.links) expect(html, link.label).toContain(`>${link.label}</a>`);
-  // One grid, no group headings.
-  expect(html).not.toMatch(/<h2/);
 });
 
-test("/tools leaves out Farming, hidden until polished, and the pages that moved to Lookup, Guides and Profile", async () => {
+test("/tools leaves out the tools hidden until polished, and the top bar's own items (Database, Chat)", async () => {
   const { default: ToolsPage } = await import("./page");
   const html = renderToStaticMarkup(await ToolsPage());
   expect(getTool("farming-routes")).toMatchObject({ group: "Tools", hidden: true });
-  for (const href of ["/tools/farming-routes", "/tools/auctions", "/census", "/tools/legacy", "/tools/builds", "/tools/alts", "/tools/collections", "/upload", "/chat"]) {
+  for (const href of ["/tools/farming-routes", "/tools/collections", "/upload", "/chat", "/database", "/guilds"]) {
     expect(html, href).not.toContain(`href="${href}"`);
   }
+});
+
+test("with the guild switch on, /tools offers Guilds in place of the guild board", async () => {
+  vi.stubEnv("EVERLOOT_GUILDS", "1");
+  const { default: ToolsPage } = await import("./page");
+  const html = renderToStaticMarkup(await ToolsPage());
+  expect(html).toContain('<a href="/guilds"');
+  expect(html).toContain(">Guilds</a>");
+  expect(html).not.toContain('href="/tools/guild-board"');
 });
 
 test("/about names the tools as the menu does and no longer uses the old names", async () => {

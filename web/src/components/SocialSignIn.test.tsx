@@ -36,7 +36,7 @@ test("linking uses the signed-in endpoint and lands in account settings", async 
   expect(container.textContent).toContain("Link Discord");
   await act(async () => container.querySelector<HTMLButtonElement>("button")!.click());
   expect(fetcher.mock.calls[0][0]).toBe("/api/auth/link-social");
-  expect(JSON.parse(String(fetcher.mock.calls[0][1].body))).toMatchObject({ callbackURL: "/account#sign-in-methods" });
+  expect(JSON.parse(String(fetcher.mock.calls[0][1].body))).toMatchObject({ callbackURL: "/settings#sign-in-methods" });
   expect(container.querySelector('[role="alert"]')?.textContent).toContain("Sign in again");
 });
 
@@ -45,7 +45,7 @@ test("network errors and unsafe return paths fail safely", async () => {
   vi.stubGlobal("fetch", fetcher);
   await act(async () => root.render(<SocialSignIn providers={["twitch"]} returnTo="//evil.example" />));
   await act(async () => container.querySelector<HTMLButtonElement>("button")!.click());
-  expect(JSON.parse(String(fetcher.mock.calls[0][1].body)).callbackURL).toBe("/account");
+  expect(JSON.parse(String(fetcher.mock.calls[0][1].body)).callbackURL).toBe("/settings");
   expect(container.querySelector('[role="alert"]')).not.toBeNull();
 });
 

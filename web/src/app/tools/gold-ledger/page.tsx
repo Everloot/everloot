@@ -4,7 +4,7 @@ import { webApplicationJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { MoneyText } from "@/components/ui/Coins";
-import { goldFactsFromRecords, handleGoldLedger } from "../../../../../kb/src/gold-ledger";
+import { goldFactsFromRecords, handleGoldLedger } from "@kb/gold-ledger";
 import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT, uploadStore } from "@/lib/upload-store";
 import { dataAgeLabel } from "@/lib/data-age";
 import { trailFor } from "@/lib/breadcrumbs";

@@ -1,7 +1,7 @@
 import { SITE, TOOLTIP_TYPES, type TooltipResponse, type TooltipType } from "@everloot/protocol";
-import { itemPage } from "../../../kb/src/item-page";
-import { objectPage } from "../../../kb/src/object-page";
-import { npcPage, questPage } from "../../../kb/src/world-pages";
+import { itemPage } from "@kb/item-page";
+import { objectPage } from "@kb/object-page";
+import { npcPage, questPage } from "@kb/world-pages";
 import { attribution } from "./data-guard";
 import { loadItemTips, loadSiteAssets } from "./game-assets";
 import { loadWorldFacts, loadItemFacts, loadReportedItemFacts } from "./rollup-compute";

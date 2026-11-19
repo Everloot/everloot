@@ -3,7 +3,7 @@ import JsonLd from "@/components/JsonLd";
 import { webApplicationJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
-import { guildFactsFromRecords, handleGuildBoard } from "../../../../../kb/src/guild-board";
+import { guildFactsFromRecords, handleGuildBoard } from "@kb/guild-board";
 import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT, uploadStore } from "@/lib/upload-store";
 import { officerBoardState } from "@/lib/guilds";
 import { dataAgeLabel } from "@/lib/data-age";

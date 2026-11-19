@@ -1,8 +1,8 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
-import { MIN_PROSE_WORDS, proseWords } from "../../../kb/src/wiki/check";
-import { FrontMatter, parsePage, SECTIONS, type Block, type Inline, type PageType } from "../../../kb/src/wiki/page";
+import { MIN_PROSE_WORDS, proseWords } from "@kb/wiki/check";
+import { FrontMatter, parsePage, SECTIONS, type Block, type Inline, type PageType } from "@kb/wiki/page";
 
 export type { Block, Inline, PageType };
 

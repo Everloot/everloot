@@ -1,13 +1,13 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { loadTimeline, buildTimeline, groupAnnouncements, manualEntries } from "./changes";
+import { forgetTimeline, loadTimeline, buildTimeline, groupAnnouncements, manualEntries } from "./changes";
 import posts from "../../../kb/changes/blue-posts.json";
 import builds from "../../../kb/changes/builds.json";
 import manual from "../../../kb/curated/manual-changes.json";
-import type { BlueStore } from "../../../kb/src/blue-posts";
+import type { BlueStore } from "@kb/blue-posts";
 import { latestForeverBuild } from "./changes-facts";
 import { compareGameBuilds } from "./talents/freshness";
 
-afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); forgetTimeline(); });
 
 const bundled = () => groupAnnouncements([...buildTimeline((posts as unknown as BlueStore).posts, builds.builds), ...manualEntries(manual)]);
 it("withholds the unverified source seed rather than publishing unsupported claims", () => {
@@ -20,6 +20,7 @@ it("retains the newest wowf build as the latest Forever build with live posts an
   vi.stubEnv("R2_ACCOUNT_ID", "");
   const fallback = await loadTimeline();
   expect(latestForeverBuild(fallback)?.version).toBe(newestForever);
+  forgetTimeline();
   configure();
   vi.stubGlobal("fetch", vi.fn(async () => Response.json({ posts: [] })));
   const live = await loadTimeline();
@@ -53,4 +54,21 @@ it("reads R2 posts through the blue tagged fetch cache", async () => {
   vi.stubGlobal("fetch", fetcher);
   expect(await loadTimeline()).toEqual(groupAnnouncements([...buildTimeline([], builds.builds), ...manualEntries(manual)]));
   expect(fetcher).toHaveBeenCalledWith(expect.any(Request), { next: { tags: ["blue"], revalidate: 600 } });
+});
+
+it("keeps one timeline per instance for a minute instead of reading and parsing the posts on every call", async () => {
+  configure();
+  const fetcher = vi.fn(async () => Response.json({ posts: [] }));
+  vi.stubGlobal("fetch", fetcher);
+  const now = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+  try {
+    const first = await loadTimeline();
+    expect(await loadTimeline()).toBe(first);
+    expect(fetcher).toHaveBeenCalledOnce();
+    now.mockReturnValue(1_000_000 + 60_000);
+    expect(await loadTimeline()).not.toBe(first);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  } finally {
+    now.mockRestore();
+  }
 });

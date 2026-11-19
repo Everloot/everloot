@@ -1,13 +1,13 @@
 import registryFile from "../../../kb/curated/ecosystem.json";
 import snapshotFile from "../../../kb/changes/ecosystem.json";
 import buildsFile from "../../../kb/changes/builds.json";
-import { buildView, currentForeverInterface, parseRegistry, parseSnapshot, type EcosystemView } from "../../../kb/src/ecosystem";
+import { buildView, currentForeverInterface, parseRegistry, parseSnapshot, type EcosystemView } from "@kb/ecosystem";
 import { loadPopularAddons } from "./rollup-compute";
 
 export {
   BADGES, BOARD_IDS, buildBoards, starGainLabel,
   type Board, type BadgeId, type EcosystemView, type ProjectView,
-} from "../../../kb/src/ecosystem";
+} from "@kb/ecosystem";
 
 /** The refresh keeps one count per day; past this many hours the addon pages say the GitHub facts are old. */
 export const STALE_AFTER_HOURS = 26;

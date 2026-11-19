@@ -1,10 +1,9 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { computeCoverage } from "../../../kb/src/coverage";
-import { answerCoverage } from "../../../kb/src/coverage-tool";
+import { computeCoverage } from "@kb/coverage";
+import { computePlateau } from "@kb/plateau";
+import { answerCoverage } from "@kb/coverage-tool";
 import { loadCoverageForTool } from "./coverage-answer";
-import { forgetCoverageSummary, loadCoverageSummary, loadStoredCoverage, readStoredReport } from "./coverage-summary";
-
-vi.mock("./coverage-compute", () => ({ loadCoverage: vi.fn() }));
+import { COVERAGE_STORED_VERSION, forgetCoverageSummary, loadCoverageForPages, loadCoverageSummary, loadStoredCoverage, readStoredPlateau, readStoredReport } from "./coverage-summary";
 
 const cloud = { r2AccountId: "acct", r2AccessKeyId: "id", r2SecretAccessKey: "secret", r2Bucket: "b" };
 const BUILD = "1.60.1.70862";
@@ -20,15 +19,13 @@ const report = (build = BUILD) => computeCoverage({
 });
 const reply = (body: unknown, init: ResponseInit = {}) => new Response(JSON.stringify(body), { status: 200, ...init });
 const deps = (fetcher: typeof fetch) => ({ cloud, fetch: fetcher, now: () => 0, build: BUILD });
-const live = () => vi.fn(async () => ({ ...report(), dataAsOf: "2026-11-09T00:00:00.000Z" }));
 
 afterEach(() => forgetCoverageSummary());
 
 test("the tool and the home page read the same stored report, so the numbers agree and the corpus is not replayed", async () => {
   const fetcher = vi.fn(async () => reply(report()));
   const summary = await loadCoverageSummary(deps(fetcher));
-  const replay = live();
-  const loaded = await loadCoverageForTool({ stored: () => loadStoredCoverage(deps(fetcher)), live: replay });
+  const loaded = await loadCoverageForTool({ stored: () => loadStoredCoverage(deps(fetcher)) });
   expect(summary!.confirmed).toBeGreaterThan(0);
   expect(summary!.waiting).toBeGreaterThan(0);
   const answer = await answerCoverage({}, async () => loaded);
@@ -39,22 +36,21 @@ test("the tool and the home page read the same stored report, so the numbers agr
   expect(text).toContain(`${summary!.confirmed} confirmed (includes settled)`);
   expect(text).toContain(`Fields needing one or two more installs: ${summary!.waiting} `);
   expect(text).toContain(`Data as of ${summary!.dataAsOf} (stored report`);
-  expect(replay).not.toHaveBeenCalled();
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
 
-test("with no usable stored report the tool computes the score live and says so", async () => {
+test("with no usable stored report the tool says not measured yet and computes nothing", async () => {
   for (const fetcher of [
     async () => new Response("", { status: 404 }),
     async () => new Response("not json", { status: 200 }),
     async () => { throw new Error("offline"); },
   ]) {
     forgetCoverageSummary();
-    const replay = live();
-    const loaded = await loadCoverageForTool({ stored: () => loadStoredCoverage(deps(fetcher)), live: replay });
-    expect(replay).toHaveBeenCalledOnce();
-    expect(loaded).toMatchObject({ source: "live", dataAsOf: "2026-11-09T00:00:00.000Z" });
-    expect((await answerCoverage({}, async () => loaded)).text).toContain("Data as of 2026-11-09T00:00:00.000Z (computed from the corpus now");
+    const loaded = await loadCoverageForTool({ stored: () => loadStoredCoverage(deps(fetcher)) });
+    expect(loaded).toEqual({ notMeasured: true });
+    const answer = await answerCoverage({}, async () => loaded);
+    expect(answer.text).toContain("Coverage not measured yet");
+    expect(answer.structured).toMatchObject({ connected: false, dataAsOf: null });
   }
 });
 
@@ -62,9 +58,7 @@ test("a stored report for another build is not used, though the home page still 
   const fetcher = vi.fn(async () => reply(report("1.60.1.70450")));
   expect(await loadStoredCoverage(deps(fetcher))).toBeNull();
   expect(await loadCoverageSummary(deps(fetcher))).toMatchObject({ build: "1.60.1.70450" });
-  const replay = live();
-  expect(await loadCoverageForTool({ stored: () => loadStoredCoverage(deps(fetcher)), live: replay })).toMatchObject({ source: "live" });
-  expect(replay).toHaveBeenCalledOnce();
+  expect(await loadCoverageForTool({ stored: () => loadStoredCoverage(deps(fetcher)) })).toEqual({ notMeasured: true });
 });
 
 test("a stored report missing something the tool prints is unusable, not a partial answer", () => {
@@ -76,42 +70,37 @@ test("a stored report missing something the tool prints is unusable, not a parti
   expect(readStoredReport({ ...report(), zones: [{ ...report().zones[0], types: {} }] }, BUILD)).toBeNull();
 });
 
-test("nothing stored and nothing live is unknown", async () => {
-  expect(await loadCoverageForTool({ stored: async () => null, live: async () => null })).toBeNull();
+test("nothing stored is not measured yet, never a score", async () => {
+  expect(await loadCoverageForTool({ stored: async () => null })).toEqual({ notMeasured: true });
 });
 
 /** Warm the per-instance cache at t=0, then let the keep window lapse so the next read goes back to storage. */
 const warm = async (fetcher: typeof fetch) => { await loadCoverageSummary({ cloud, fetch: fetcher, now: () => 0, build: BUILD }); };
 const at = (fetcher: typeof fetch, now: number) => ({ cloud, fetch: fetcher, now: () => now, build: BUILD });
 
-test("a warmed cache whose refresh fails is not served as stored: the tool computes live, and the stored answer returns on recovery", async () => {
+test("a warmed cache whose refresh fails is not served as stored: the tool says not measured yet, and the stored answer returns on recovery", async () => {
   const ok = JSON.stringify(report());
   let down = false;
   const fetcher = vi.fn(async () => (down ? new Response("", { status: 503 }) : new Response(ok, { status: 200 })));
   await warm(fetcher);
-  expect(await loadCoverageForTool({ stored: () => loadStoredCoverage(at(fetcher, 200_000)), live: live() })).toMatchObject({ source: "stored" });
+  expect(await loadCoverageForTool({ stored: () => loadStoredCoverage(at(fetcher, 200_000)) })).toMatchObject({ source: "stored" });
 
   down = true;
-  const replay = live();
-  const during = await loadCoverageForTool({ stored: () => loadStoredCoverage(at(fetcher, 400_000)), live: replay });
-  expect(during).toMatchObject({ source: "live", dataAsOf: "2026-11-09T00:00:00.000Z" });
-  expect(replay).toHaveBeenCalledOnce();
-  expect((await answerCoverage({}, async () => during)).text).toContain("(computed from the corpus now");
+  const during = await loadCoverageForTool({ stored: () => loadStoredCoverage(at(fetcher, 400_000)) });
+  expect(during).toEqual({ notMeasured: true });
   // still down a minute later, and the retry has not turned the old report into a fresh one
   expect(await loadStoredCoverage(at(fetcher, 400_000 + 61_000))).toBeNull();
 
   down = false;
-  const after = live();
-  expect(await loadCoverageForTool({ stored: () => loadStoredCoverage(at(fetcher, 400_000 + 122_000)), live: after })).toMatchObject({ source: "stored", installs: 7 });
-  expect(after).not.toHaveBeenCalled();
+  expect(await loadCoverageForTool({ stored: () => loadStoredCoverage(at(fetcher, 400_000 + 122_000)) })).toMatchObject({ source: "stored", installs: 7 });
 });
 
-test("a network failure on refresh behaves the same, and the tool says unavailable when live fails too", async () => {
+test("a network failure on refresh behaves the same", async () => {
   const fetcher = vi.fn(async () => reply(report()));
   await warm(fetcher);
   fetcher.mockRejectedValue(new Error("offline"));
   expect(await loadStoredCoverage(at(fetcher, 400_000))).toBeNull();
-  expect(await loadCoverageForTool({ stored: () => loadStoredCoverage(at(fetcher, 400_000)), live: async () => null })).toBeNull();
+  expect(await loadCoverageForTool({ stored: () => loadStoredCoverage(at(fetcher, 400_000)) })).toEqual({ notMeasured: true });
 });
 
 test("an unchanged file (304) keeps the stored report fresh, and the home page keeps its dated summary through the same outage", async () => {
@@ -123,4 +112,57 @@ test("an unchanged file (304) keeps the stored report fresh, and the home page k
   fetcher.mockResolvedValue(new Response("", { status: 503 }));
   expect(await loadStoredCoverage(at(fetcher, 700_000))).toBeNull();
   expect(await loadCoverageSummary(at(fetcher, 700_000))).toMatchObject({ installs: 7, dataAsOf: asOf });
+});
+
+/** The version-2 file the cron writes now: the score, its version, and the plateau measured beside it. */
+const v2 = (build = BUILD) => {
+  const input = { asOf, build, zones: [{ mapId: 1429, name: "Zone A" }], records: [
+    ...Array.from({ length: 5 }, (_, i) => ({ kind: "npc_sighting", installId: `a-${i}`, npcId: 123, name: "Agreed", mapId: 1429, x: 42, y: 65, positionKind: "interaction", capturedAt: "2026-10-01T00:00:00.000Z" })),
+  ] };
+  const score = computeCoverage(input);
+  return { ...score, version: COVERAGE_STORED_VERSION, plateau: computePlateau(input, score) };
+};
+
+test("the tool reads both stored shapes: a version-1 score and a version-2 file with the plateau, which it never passes on", async () => {
+  for (const [file, installs] of [[report(), 7], [v2(), 5]] as const) {
+    forgetCoverageSummary();
+    const fetcher = vi.fn(async () => reply(file));
+    const loaded = await loadCoverageForTool({ stored: () => loadStoredCoverage(deps(fetcher)) });
+    expect(loaded).toMatchObject({ source: "stored", installs, build: BUILD });
+    expect(loaded).not.toHaveProperty("plateau");
+    expect(loaded).not.toHaveProperty("version");
+    expect(await loadCoverageSummary(deps(fetcher))).toMatchObject({ installs });
+    expect(fetcher).toHaveBeenCalledOnce();
+  }
+});
+
+test("the pages get the plateau from a version-2 file from the same read, and none from a version-1 file", async () => {
+  const fetcher = vi.fn(async () => reply(v2()));
+  const pages = await loadCoverageForPages(deps(fetcher));
+  expect(pages?.report.installs).toBe(5);
+  expect(pages?.plateau).toMatchObject({ dataAsOf: asOf, installs: 5, windowStart: "2026-10-13T07:50:00.000Z" });
+  expect(await loadStoredCoverage(deps(fetcher))).toMatchObject({ installs: 5 });
+  expect(fetcher).toHaveBeenCalledOnce();
+  forgetCoverageSummary();
+  expect(await loadCoverageForPages(deps(vi.fn(async () => reply(report()))))).toMatchObject({ report: { installs: 7 }, plateau: null });
+});
+
+test("the pages keep the last good copy through a failed refresh, like the home page; a missing file drops it", async () => {
+  const fetcher = vi.fn(async () => reply(v2()));
+  await loadCoverageForPages(at(fetcher, 0));
+  fetcher.mockResolvedValue(new Response("", { status: 503 }));
+  expect(await loadCoverageForPages(at(fetcher, 400_000))).toMatchObject({ report: { installs: 5 } });
+  fetcher.mockResolvedValue(new Response("", { status: 404 }));
+  expect(await loadCoverageForPages(at(fetcher, 400_000 + 61_000))).toBeNull();
+});
+
+test("a stored plateau is shown only when it is whole and measured on the score's data date", () => {
+  const file = v2();
+  const score = readStoredReport(file, BUILD)!;
+  expect(readStoredPlateau(file, score)).toMatchObject({ installs: 5 });
+  expect(readStoredPlateau({ ...file, version: undefined }, score)).toBeNull();
+  expect(readStoredPlateau({ ...file, plateau: { ...file.plateau, dataAsOf: "2026-11-01T00:00:00.000Z" } }, score)).toBeNull();
+  expect(readStoredPlateau({ ...file, plateau: { ...file.plateau, types: file.plateau.types.slice(1) } }, score)).toBeNull();
+  expect(readStoredPlateau({ ...file, plateau: { ...file.plateau, types: [{ ...file.plateau.types[0], shares: { confirmed: 2 } }, ...file.plateau.types.slice(1)] } }, score)).toBeNull();
+  expect(readStoredPlateau({ ...file, plateau: null }, score)).toBeNull();
 });

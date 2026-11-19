@@ -160,7 +160,10 @@ player is within a few yards of that NPC, so the addon records the player's posi
 on), once per NPC, service and zone. When the player opens a herb, ore vein, chest or other object, its
 loot row carries the player's position, how it was opened (from the spell cast on it) and the object's
 name as the game showed it, taken only from a herb, ore or chest cast, so the target of any other spell (a
-player you healed, say) never becomes a name. Where you stand when you only target or mouse over an NPC
+player you healed, say) never becomes a name. A herb, ore or skinning window also carries the player's own rank in
+the skill the cast used (`gatherSkill`), as the game's profession book shows it, rank plus the bonus from race and gear: a
+number about the character, never a name, that goes wherever its loot row goes (the public corpus included). The
+gathering lists read it only as the lowest and middle rank among 3 or more installs. Where you stand when you only target or mouse over an NPC
 (`positionKind: "player"`) is never used as the NPC's place. A Polestar Recorder file's NPC windows become
 the same `interaction` positions, and its kills and rares seen on the unit become `player` ones. A rare or
 treasure the minimap showed is at its own position, as the game's vignette API gives it (`vignette` for a
@@ -546,7 +549,9 @@ and instances (`Map`, `UiMap`), dungeon and raid entrance points (`Map.Corpse`) 
 and flight master, the zone the files put it in (for an entrance, the outdoor `AreaTable` area named
 after the instance when there is one, else the terrain chunk's area in the ADT files; either way up
 `AreaTable` to the area a zone's `UiMapAssignment` names; only the zone id is published), each stamped
-with the build it came from. Like the talent catalog, it may be shown on the site and committed as
+with the build it came from. It also holds flight masters and flight paths (`TaxiNodes`, `TaxiPath`,
+`TaxiPathNode`), and for each master the side whose flight map shows it (the `TaxiNodes` flags: Alliance, Horde
+or both; none when the flags say neither). Like the talent catalog, it may be shown on the site and committed as
 a clearly marked game-data file in `web/src/data/game-data/`, with a README that says it is
 Blizzard's and outside our licence. It is labelled *found in game files, unconfirmed* until
 checked in game. General rule: new zones or other content found only in the game files stay hidden
@@ -835,11 +840,13 @@ things are asked in return: credit it, and use a free key when you copy all of i
 characters, its name, what its owner says it is for, its permissions, its account, when it was
 made, when it expires, when it was last used and revoked, and a count of its requests per day and
 endpoint. Not what was asked. The purpose is asked when a key is made so we know what keys are used
-for; it is not published. A key made on /account expires on the date its owner picks (7, 30, 90 or
+for; it is not published. The last-used time is shown only to the key's owner, on /settings, beside the key;
+it records when, never which app or what was asked, and is written at most once a minute per key. A key made on
+/settings expires on the date its owner picks (7, 30, 90 or
 365 days, or a date up to a year ahead); past it, every endpoint refuses the key, as it does a
 revoked one. Keys made before expiry existed, and the Desktop App's key, have no end date. Daily
 counts are kept 90 days. A revoked key and its counts are deleted 30 days after it was revoked, or
-at once when its owner deletes it on /account; an expired key stays until its owner deletes it. Deleting an account (write to hello@everloot.app) deletes its keys and counts. Anonymous
+at once when its owner deletes it on /settings; an expired key stays until its owner deletes it. Deleting an account (write to hello@everloot.app) deletes its keys and counts. Anonymous
 requests are counted per hour against a keyed hash of the address, which is deleted after about a
 day; the address itself is never stored.
 

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { ClientTerrain } from "../../../kb/src/client-terrain";
+import type { ClientTerrain } from "@kb/client-terrain";
 import { CLIENT_TERRAIN } from "@/data/game-data/client-terrain";
 import { gearFor, instanceTerrain, speedGear, speedLabel, terrainGear, terrainSlug, terrainTypes, triggerLabel, zoneTerrain } from "./terrain";
 import { publicZones } from "./zones";

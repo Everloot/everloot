@@ -4,8 +4,8 @@ import { preload } from "react-dom";
 import JsonLd from "@/components/JsonLd";
 import { webApplicationJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
-import { allZones } from "../../../../kb/src/world-map-near";
-import { zoneToMap } from "../../../../kb/src/world-coords";
+import { allZones } from "@kb/world-map-near";
+import { zoneToMap } from "@kb/world-coords";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { loadMapPins } from "@/lib/map-pins-store";
@@ -16,10 +16,12 @@ import {
 import { CONTINENTS, continentCandidates, continentMapFromBounds, continentPinSet, continentTreasureCandidates, WORLD_MAP } from "@/lib/world-map";
 import { instanceHref, instanceRows, loadSightings } from "@/lib/instances";
 import { publicZones, zoneHref } from "@/lib/zones";
-import WorldMapView from "@/components/WorldMapView";
+import WorldMapView from "./WorldMapView";
 import { LIST_LIMIT } from "@/components/map/MapList";
 import { continentArt, instanceThumbs, loadSiteAssets, poiIcons } from "@/lib/game-assets";
 import { SiteCredit } from "@/components/Footer";
+import { gatherAreas } from "@/lib/farming";
+import { loadStoredProfessions } from "@/lib/profession-store";
 
 export const TITLE = "WoW Forever World Map";
 export const DESCRIPTION = "Zones, entrances, flight masters and flight paths, and player-observed NPCs on one map of WoW: Forever, from game files. No game art.";
@@ -29,6 +31,7 @@ export const withArt = (text: string) => text.replace(" No game art.", " The map
 export type MapQuery = {
   continent?: string | string[]; zone?: string | string[]; x?: string | string[]; y?: string | string[]; spoilers?: string | string[];
   at?: string | string[]; z?: string | string[]; pin?: string | string[]; show?: string | string[]; q?: string | string[]; view?: string | string[];
+  side?: string | string[];
 };
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
@@ -91,7 +94,8 @@ export async function renderMapScreen(query: MapQuery, pageContinent: number | n
   const path = continentPath(continentId);
   const title = pageContinent === null ? TITLE : continentTitle(pageContinent);
 
-  const [corpus, sightings] = await Promise.all([loadMapPins(), loadSightings()]);
+  // The herb zones come from the stored professions file only: the map never reads the whole corpus.
+  const [corpus, sightings, gathering] = await Promise.all([loadMapPins(), loadSightings(), loadStoredProfessions()]);
   const seen = sightings.unreachable ? {} : sightings;
   const map = continentMapFromBounds(continentId, corpus.bounds, WORLD_MAP, spoilers);
   const facts = corpus.facts;
@@ -126,7 +130,10 @@ export async function renderMapScreen(query: MapQuery, pageContinent: number | n
   const items: MapItems = { ...full, entrances, flightLines: [], pins: shownPins.slice(0, LIST_LIMIT) };
   const focus = zoneId ?? link?.mapId ?? null;
   const scope = focus !== null ? map.zones.find((z) => z.mapId === focus) ?? null : null;
-  const zonePages = Object.fromEntries(publicZones().filter((z) => z.continentId === continentId).map((z) => [z.mapId, zoneHref(z.mapId, z.name)]));
+  const continentZones = publicZones().filter((z) => z.continentId === continentId);
+  const zonePages = Object.fromEntries(continentZones.map((z) => [z.mapId, zoneHref(z.mapId, z.name)]));
+  // Zones where 3 installs placed an herb spot, the gathering guide's own list.
+  const herbZones = gathering ? gatherAreas(gathering.sightings, "herb", continentZones).map((a) => a.zone.mapId) : [];
 
   const at = link ? zoneToMap(everyZone, link.mapId, link.x / 100, link.y / 100) : null;
   const marker = link && target && at ? { x: at.x, y: at.y, label: `${target.name} ${link.x}, ${link.y}`, mapId: target.mapId } : null;
@@ -181,11 +188,12 @@ export async function renderMapScreen(query: MapQuery, pageContinent: number | n
           items={items}
           pinsUrl={`/api/map/pins?continent=${continentId}${spoilers ? "&spoilers=1" : ""}`}
           seed={{
-            counts: categoryCounts(full, spoilers, scope),
+            counts: categoryCounts(full, spoilers, scope, url.side),
             pins: { npc: shownPins.filter((p) => p.kind === "npc").length, vendor: shownPins.filter((p) => p.kind === "vendor").length },
           }}
           candidates={[...continentCandidates(continentId, facts, spoilers), ...continentTreasureCandidates(continentId, seen)]}
           zonePages={zonePages}
+          herbZones={herbZones}
           instancePages={instancePages}
           spoilers={spoilers}
           spoilerHref={switchHref}

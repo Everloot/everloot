@@ -6,9 +6,9 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
 import EntityLink from "@/components/EntityLink";
-import ZonePreview from "@/components/ZonePreview";
+import ZonePreview from "./ZonePreview";
 import {
-  AgreementMeter, Badge, Card, Container, DataTable, EmptyState, InShort, OpenData, ResultStrip, SectionHeading, Tabs,
+  AgreementMeter, Badge, Card, Container, DataTable, Disclosure, EmptyState, InShort, OpenData, ResultStrip, SectionHeading, Tabs,
   type Column, type TabItem,
 } from "@/components/ui";
 import { observedLine, reportedLine } from "@/lib/evidence";
@@ -21,7 +21,7 @@ import { gatheredObjects, zoneFarmLinks } from "@/lib/farming";
 import { itemNames } from "@/lib/names";
 import { loadProfessions } from "@/lib/profession-store";
 import { rateWithRange } from "../../loot-tables";
-import { METHOD_LINE } from "../../../../../../kb/src/loot-tables";
+import { METHOD_LINE } from "@kb/loot-tables";
 import { zoneItems, type ZoneItem, type ZoneItemSource } from "@/lib/zone-items";
 import { wikiHref, zoneWikiPage } from "@/lib/wiki";
 import { bossLine, entranceLinks, instanceHref, loadSightings } from "@/lib/instances";
@@ -280,49 +280,6 @@ export default async function ZonePage(props: Props) {
         </EntitySidebar>
 
         <div className="space-y-6">
-          {lore && lore !== UNAVAILABLE && (
-            <section aria-labelledby="lore">
-              <SectionHeading id="lore">Lore</SectionHeading>
-              <Card as="div">
-                <p className="max-w-[65ch] text-fg">{lore.text}</p>
-                <p className="mt-3 text-sm text-muted">
-                  From the archive of the Warcraft Wiki, 2023 · {lore.licence} ·{" "}
-                  <Link href={lore.href} className={link}>Read {lore.name} in the lore archive</Link>
-                </p>
-              </Card>
-            </section>
-          )}
-
-          {(terrain.length > 0 || gear.length > 0) && (
-            <section aria-labelledby="terrain" data-zone-terrain>
-              <SectionHeading id="terrain" note={`Read from the game files, build ${TERRAIN_BUILD}: the kinds of ground some item effects need, and the gear whose effect works here. Found in game files, unconfirmed.`}>
-                Terrain
-              </SectionHeading>
-              {terrain.length > 0 && (
-                <p className="mb-3 flex flex-wrap items-center gap-2 text-meta text-fg-2">
-                  {terrain.map(({ type, parts }) => (
-                    <Link prefetch={false} key={type.slug} href={`${TERRAIN_PATH}#${type.slug}`} className="inline-flex h-6 items-center rounded-full border border-line px-2.5 font-mono text-xs text-fg-2 hover:text-fg">
-                      {type.name}{parts ? ` · ${parts.join(", ")}` : ""}
-                    </Link>
-                  ))}
-                </p>
-              )}
-              {gear.length > 0 && (
-                <TerrainGearTable
-                  gear={gear}
-                  zone={zone.mapId}
-                  caption={`Gear whose effect works in ${zone.name}`}
-                  names={{
-                    item: (id) => ({ name: gearName.get(id) ?? tips.get(id)?.name, icon: tips.get(id)?.icon }),
-                    spell: (id) => spellNames?.names.get(id),
-                    set: (id) => setNames?.names.get(id),
-                    instances: new Map([...instanceRows()].map(([id, r]) => [id, r.name])),
-                  }}
-                />
-              )}
-            </section>
-          )}
-
           <section aria-labelledby="known">
             <SectionHeading id="known" note="Positions, quests, bosses and treasures are public once 3 installs agree. Entrances are read from the game files and confirmed once 3 installs zoned in.">
               What we know here
@@ -335,7 +292,7 @@ export default async function ZonePage(props: Props) {
                 />
               </div>
             )}
-            <Tabs label={`Known in ${zone.name}`} tabs={tabs} />
+            <Tabs label={`Known in ${zone.name}`} tabs={tabs} empty={empty(noEntrance)} />
             {farmLinks.length > 0 && (
               <p data-farm-links className="mt-3 text-meta text-fg-2">
                 Farming and gathering:{" "}
@@ -343,6 +300,50 @@ export default async function ZonePage(props: Props) {
               </p>
             )}
           </section>
+
+          {lore && lore !== UNAVAILABLE && (
+            <section aria-labelledby="lore">
+              <SectionHeading id="lore">Lore</SectionHeading>
+              <Card as="div">
+                <p className="max-w-prose text-fg">{lore.text}</p>
+                <p className="mt-3 text-sm text-muted">
+                  From the archive of the Warcraft Wiki, 2023 · {lore.licence} ·{" "}
+                  <Link href={lore.href} className={link}>Read {lore.name} in the lore archive</Link>
+                </p>
+              </Card>
+            </section>
+          )}
+
+          {(terrain.length > 0 || gear.length > 0) && (
+            <section aria-label="Terrain" data-zone-terrain>
+              {/* Closed until asked for: what players confirmed here comes first, the game files' gear list after. */}
+              <Disclosure as="h2" id="terrain" wide summary={gear.length ? `Terrain: ${gear.length} ${gear.length === 1 ? "item whose effect works" : "items whose effect works"} here` : "Terrain"}>
+                <p className="text-meta text-fg-2">Read from the game files, build {TERRAIN_BUILD}: the kinds of ground some item effects need, and the gear whose effect works here. Found in game files, unconfirmed.</p>
+                {terrain.length > 0 && (
+                  <p className="flex flex-wrap items-center gap-2 text-meta text-fg-2">
+                    {terrain.map(({ type, parts }) => (
+                      <Link prefetch={false} key={type.slug} href={`${TERRAIN_PATH}#${type.slug}`} className="inline-flex h-6 items-center rounded-full border border-line px-2.5 font-mono text-xs text-fg-2 hover:text-fg">
+                        {type.name}{parts ? ` · ${parts.join(", ")}` : ""}
+                      </Link>
+                    ))}
+                  </p>
+                )}
+                {gear.length > 0 && (
+                  <TerrainGearTable
+                    gear={gear}
+                    zone={zone.mapId}
+                    caption={`Gear whose effect works in ${zone.name}`}
+                    names={{
+                      item: (id) => ({ name: gearName.get(id) ?? tips.get(id)?.name, icon: tips.get(id)?.icon }),
+                      spell: (id) => spellNames?.names.get(id),
+                      set: (id) => setNames?.names.get(id),
+                      instances: new Map([...instanceRows()].map(([id, r]) => [id, r.name])),
+                    }}
+                  />
+                )}
+              </Disclosure>
+            </section>
+          )}
         </div>
         {!facts.unreachable && hasContent(here) && <AdSlot slot="inContent" />}
       </EntityLayout>

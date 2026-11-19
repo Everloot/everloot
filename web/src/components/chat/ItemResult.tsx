@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { GameCard, type CardContent } from "@/components/game/GameCard";
+import Card from "@/components/ui/Card";
 import { suggestItems, type ItemChoice, type ItemRef } from "@/lib/chat/items";
-import { pendingLine, type PendingCount } from "../../../../kb/src/pending-loot";
+import { pendingLine, type PendingCount } from "@kb/pending-loot";
 
 // An answer's item inside Chat: the site's own card (/database/card/item/<id>) and the drops the player-data tool
 // publishes (/api/tools/item_page), fetched fresh each time the answer is shown. Both stay on this page: nothing
@@ -17,6 +18,8 @@ type Card = { state: "loading" | "missing" | "unavailable" } | { state: "ok"; ca
 
 const link = "underline underline-offset-4 hover:text-accent";
 const count = (n: number) => n.toLocaleString("en-US");
+/** How long the card and drops may take before the answer shows them as unavailable. */
+export const LOAD_MS = 10_000;
 const ICON_HOST = /^(?:\/(?![\/\\])|https:\/\/assets\.everloot\.app\/)/;
 
 async function loadCard(id: number, signal: AbortSignal): Promise<Card> {
@@ -59,20 +62,23 @@ function ItemCard({ id, onSave }: { id: number; onSave?: (id: number) => void })
 
   useEffect(() => {
     const ctl = new AbortController();
+    let gone = false;
     setCard({ state: "loading" });
     setDrops({ state: "loading" });
-    loadCard(id, ctl.signal).then((c) => { if (!ctl.signal.aborted) setCard(c); }, () => { if (!ctl.signal.aborted) setCard({ state: "unavailable" }); });
-    loadDrops(id, ctl.signal).then((d) => { if (!ctl.signal.aborted) setDrops(d); }, () => { if (!ctl.signal.aborted) setDrops({ state: "unavailable" }); });
-    return () => ctl.abort();
+    // A request still open after LOAD_MS (a challenge page that never answers) is given up as unavailable.
+    const slow = setTimeout(() => ctl.abort(), LOAD_MS);
+    loadCard(id, ctl.signal).then((c) => { if (!gone) setCard(c); }, () => { if (!gone) setCard({ state: "unavailable" }); });
+    loadDrops(id, ctl.signal).then((d) => { if (!gone) setDrops(d); }, () => { if (!gone) setDrops({ state: "unavailable" }); });
+    return () => { gone = true; clearTimeout(slow); ctl.abort(); };
   }, [id]);
 
   const page = `/database/items/${id}`;
   return (
-    <section aria-label="Item" aria-busy={card.state === "loading" || drops.state === "loading"} data-no-hover-card className="max-w-md space-y-3 rounded-card border border-line bg-panel p-3 text-sm">
+    <Card as="section" padding="custom" aria-label="Item" aria-busy={card.state === "loading" || drops.state === "loading"} data-no-hover-card className="max-w-md space-y-3 p-3 text-sm">
       {card.state === "ok" && <GameCard card={card.card} />}
       {card.state === "loading" && <p className="text-muted">Loading the item card…</p>}
       {card.state === "missing" && <p className="text-muted">No card for this item yet.</p>}
-      {card.state === "unavailable" && <p className="text-muted">The item card is unavailable right now.</p>}
+      {card.state === "unavailable" && <p className="text-muted">The item card is unavailable right now. <a href={page} className={link}>Open the item page</a></p>}
 
       <div className="space-y-1">
         <h3 className="text-xs font-semibold text-fg-2">Known drops</h3>
@@ -110,7 +116,7 @@ function ItemCard({ id, onSave }: { id: number; onSave?: (id: number) => void })
           <button type="button" className={`min-h-9 ${link}`} onClick={() => onSave(id)}>Save item to a project</button>
         </div>
       ) : <a href={page} className={`${link} text-xs`}>Open in the database</a>}
-    </section>
+    </Card>
   );
 }
 

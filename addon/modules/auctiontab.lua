@@ -1,5 +1,5 @@
 -- Everloot tab at the auction house: the scan and its cooldown, whether the last scan is in the saved
--- file yet, a Share now button (a /reload, which writes the file so the Desktop App can send it) and a
+-- file yet, a Save scan button (a /reload, which writes the file so the Desktop App can send it) and a
 -- price lookup with the same lines as the tooltip. The tab sits beside Blizzard's tabs without joining
 -- their tab system, so their code is never changed: it shows a panel over the house, and clicking any of
 -- their tabs hides it. Nothing here posts, bids or buys, and a scan starts only from the player's click.
@@ -16,8 +16,12 @@ E.AuctionTab = T
 T.SITE = "everloot.app/tools/auctions"
 local TEMPLATES = { "PanelTabButtonTemplate", "CharacterFrameTabButtonTemplate", "UIPanelButtonTemplate" }
 local sessionStart = time()   -- a scan before this load is already in the saved file
--- The text column: wide enough for a label and its value, narrow enough that the eye finds one from the other.
-local COLUMN, SCROLLBAR, PAD, GAP = 460, 26, 8, 12
+-- The text column until the panel has a size; once shown it spans the panel, the scroll bar at its right edge.
+local COLUMN, SCROLLBAR, PAD, GAP = 686, 26, 8, 12
+-- Blizzard's auction house tabs (build 70959): PanelTemplates_SetNumTabs re-anchors each one 3 to the right of the
+-- one before (PanelTemplates_AnchorTabs; the -15 in their XML is replaced at load), and AuctionHouseFrameTabMixin
+-- sizes them with 20 padding and a 70 minimum. The Everloot tab follows both, so it sits beside Auctions as they do.
+local TAB_GAP, TAB_PADDING, TAB_MIN_WIDTH = 3, 20, 70
 local HINT = "Type an item's name or id, or shift-click an item here."
 local NONE = "No Everloot price for that item on this realm yet."
 -- The shopping page: rows on screen at once, their height, and each column's left edge and width.
@@ -39,26 +43,22 @@ local function realmName()
   return type(realm) == "string" and #realm >= 2 and realm or nil
 end
 
---- The status lines: scan readiness, the last scan of this realm, and whether it is saved for sharing.
+-- Scan readiness lives on the action; the toolbar shows only the last scan, the footer its saved state.
 function T.StatusLines()
   local lines = {}
-  local wait = (EverlootDB.lastScanAt or 0) + E.SCAN_COOLDOWN - time()
-  if E:Scanning() then lines[1] = "Scanning. Keep the auction house open until it reports."
-  elseif wait > 0 then lines[1] = string.format("Next scan in %d:%02d.", math.floor(wait / 60), wait % 60)
-  else lines[1] = "Ready to scan." end
   local realm = realmName()
   local own = realm and E:OwnScan(realm)
   if not own then
-    lines[2] = "No scan on this realm yet."
+    lines[1] = "No scan on this realm yet."
     return lines
   end
   local items = 0
   for _ in pairs(own.items) do items = items + 1 end
   local minutes = math.floor((time() - own.at) / 60)
-  lines[2] = string.format("Last scan on this realm: %d items, %s.", items,
+  lines[1] = string.format("Last scan on this realm: %d items, %s.", items,
     minutes < 1 and "just now" or minutes < 60 and (minutes .. " min ago") or (math.floor(minutes / 60) .. " h ago"))
-  lines[3] = own.at < sessionStart and "Saved in your file: the Desktop App, or everloot.app/upload, sends it."
-    or "Not saved yet: Share now, or log out, and the Desktop App, or everloot.app/upload, sends it."
+  lines[2] = own.at < sessionStart and "Saved in your file."
+    or "Not saved yet. Save scan reloads the UI."
   return lines
 end
 
@@ -172,6 +172,9 @@ local function layoutResults(panel)
   local scroll = panel.results
   local limit = math.max(0, y - (tonumber(scroll:GetHeight()) or 0))
   scroll:SetVerticalScroll(math.min(tonumber(scroll:GetVerticalScroll()) or 0, limit))
+  -- The scroll bar only when there is something to scroll: an empty one floats in the page.
+  local bar = scroll.ScrollBar
+  if type(bar) == "table" and bar.SetShown then bar:SetShown(limit > 0) end
 end
 
 -- Shows one result. A line with a label and an amount is one row, the label in the line's colour and the amount
@@ -216,16 +219,25 @@ end
 local function layout(panel, width)
   width = tonumber(width) or tonumber(panel:GetWidth())
   if not width or width <= 0 then return end
-  local column = math.floor(math.max(160, math.min(COLUMN, width - 32 - SCROLLBAR)))
+  local column = math.floor(math.max(160, width - 32 - SCROLLBAR))
   panel.column = column
-  panel.intro:SetWidth(column)
-  panel.status:SetWidth(column)
-  panel.lookup:SetWidth(math.max(80, math.min(260, column - 12)))
-  local buttonWidth = math.min(160, math.floor((column - 8) / 2))
+  local buttonWidth = math.min(140, math.floor((column - 12) / 2))
   panel.scanButton:SetWidth(buttonWidth)
-  panel.shareButton:SetWidth(buttonWidth)
+  panel.status:ClearAllPoints()
+  panel.lookupLabel:ClearAllPoints()
+  if column < 400 then
+    panel.status:SetPoint("TOPLEFT", panel.scanButton, "BOTTOMLEFT", 0, -8)
+    panel.status:SetWidth(column)
+    panel.lookupLabel:SetPoint("TOPLEFT", panel.status, "BOTTOMLEFT", 0, -16)
+  else
+    panel.status:SetPoint("LEFT", panel.scanButton, "RIGHT", 12, 0)
+    panel.status:SetWidth(column - buttonWidth - 12)
+    panel.lookupLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -90)
+  end
+  panel.shareButton:SetWidth(math.min(120, column / 2))
+  panel.lookup:SetWidth(math.max(40, math.min(300, column - 90)))
   panel.results:SetWidth(column)
-  panel.footer:SetWidth(math.max(1, width - 32))
+  panel.footer:SetWidth(math.max(1, width - 48 - panel.shareButton:GetWidth()))
   layoutResults(panel)
 end
 
@@ -549,7 +561,7 @@ function T.SetMode(mode)
   local vendor = type(panel.vendor) == "table" and panel.vendor or nil
   if mode ~= "shop" and not (mode == "vendor" and vendor) then mode = "lookup" end
   panel.mode = mode
-  for _, part in ipairs({ panel.intro, panel.scanButton, panel.shareButton, panel.status, panel.lookupLabel, panel.lookup, panel.results }) do
+  for _, part in ipairs({ panel.scanButton, panel.shareButton, panel.status, panel.footer, panel.lookupLabel, panel.lookup, panel.searchButton, panel.results }) do
     if mode == "lookup" then part:Show() else part:Hide() end
   end
   if mode == "shop" then
@@ -579,7 +591,12 @@ end
 
 function T.Refresh()
   if T.panel and T.panel.status then
-    T.panel.status:SetText(table.concat(T.StatusLines(), "\n"))
+    local lines = T.StatusLines()
+    T.panel.status:SetText(lines[1])
+    T.panel.footer:SetText(lines[2] or "Prices from scans appear in your tooltips.")
+    local realm = realmName()
+    local own = realm and E:OwnScan(realm)
+    T.panel.shareButton:SetEnabled(own ~= nil and own.at >= sessionStart)
     local label, enabled = E:ScanAction()
     T.panel.scanButton:SetText(label)
     T.panel.scanButton:SetEnabled(enabled)
@@ -600,13 +617,20 @@ function T.Show()
     T.returnTab = native
     native:Enable()
   end
+  if native and not native.isDisabled and PanelTemplates_DeselectTab then pcall(PanelTemplates_DeselectTab, native) end
+  if T.tab and PanelTemplates_SelectTab then pcall(PanelTemplates_SelectTab, T.tab); T.tab:Enable() end
   T.panel:Show()
   layout(T.panel)
   T.Refresh()
 end
 
 function T.Hide()
+  local shown = T.panel and T.panel:IsShown()
   if T.panel then T.panel:Hide() end
+  if shown and PanelTemplates_DeselectTab then pcall(PanelTemplates_DeselectTab, T.tab) end
+  local tabs = T.house and T.house.Tabs
+  local selected = type(tabs) == "table" and tabs[T.house.selectedTab]
+  if shown and selected and not selected.isDisabled and PanelTemplates_SelectTab then pcall(PanelTemplates_SelectTab, selected) end
   local native = T.returnTab
   T.returnTab = nil
   if native and T.house.Tabs[T.house.selectedTab] == native and not native.isDisabled then native:Disable() end
@@ -616,46 +640,58 @@ local function buildPanel(house)
   local panel = CreateFrame("Frame", "EverlootAuctionPanel", house, "BackdropTemplate")
   -- If a later control is unavailable, a partial panel must not cover the native house.
   panel:Hide()
-  panel:SetPoint("TOPLEFT", house, "TOPLEFT", 8, -60)
+  panel:SetPoint("TOPLEFT", house, "TOPLEFT", 8, -32)
   panel:SetPoint("BOTTOMRIGHT", house, "BOTTOMRIGHT", -8, 28)
   local level = house.GetFrameLevel and house:GetFrameLevel()
   if type(level) == "number" then panel:SetFrameLevel(level + 20) end
   if panel.EnableMouse then panel:EnableMouse(true) end
   if panel.SetBackdrop then
-    panel:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    -- The dialog texture has transparent pixels: it cannot hide Blizzard's categories,
+    -- search and results underneath this page. Use a solid surface below the house title.
+    panel:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
       tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+    panel:SetBackdropColor(0.08, 0.075, 0.065, 1)
   end
   panel.title = words(panel, "GameFontNormalLarge")
   panel.title:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -14)
   panel.title:SetText("Everloot")
-  local intro = words(panel, "GameFontHighlight")
-  intro:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -46)
-  intro:SetWidth(COLUMN)
-  intro:SetText("Scan this house's item prices and quantities, never sellers. Prices appear in your tooltips immediately. "
-    .. "Reload or log out to save; the Desktop App or everloot.app/upload sends the file.")
-  panel.intro = intro
+  local help = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+  help:SetSize(22, 22)
+  help:SetPoint("LEFT", panel.title, "RIGHT", 8, 0)
+  help:SetText("?")
+  help:SetScript("OnEnter", function(self)
+    if not GameTooltip then return end
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText("Auction prices")
+    GameTooltip:AddLine("Scan this house's prices and quantities, never sellers. Keep the house open until scanning finishes.", 1, 1, 1, true)
+    GameTooltip:AddLine("Save scan reloads the UI to write the file. The Desktop App or everloot.app/upload sends it.", 1, 1, 1, true)
+    GameTooltip:AddLine("Full price history: " .. T.SITE, 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  help:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+  panel.helpButton = help
 
   local scanButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
   scanButton:SetSize(160, 24)
-  scanButton:SetPoint("TOPLEFT", intro, "BOTTOMLEFT", 0, -12)
+  scanButton:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -46)
   scanButton:SetText("Scan prices")
   scanButton:SetScript("OnClick", function() E:StartScan(); T.Refresh() end)
   panel.scanButton = scanButton
 
   local shareButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
   shareButton:SetSize(160, 24)
-  shareButton:SetPoint("LEFT", scanButton, "RIGHT", 8, 0)
-  shareButton:SetText("Share now (/reload)")
+  shareButton:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -16, 10)
+  shareButton:SetText("Save scan")
   shareButton:SetScript("OnClick", function() if ReloadUI then ReloadUI() end end)
   panel.shareButton = shareButton
 
   local status = words(panel, "GameFontHighlight")
-  status:SetPoint("TOPLEFT", scanButton, "BOTTOMLEFT", 0, -10)
+  status:SetPoint("LEFT", scanButton, "RIGHT", 12, 0)
   status:SetWidth(COLUMN)
   panel.status = status
 
   local label = words(panel, "GameFontNormal")
-  label:SetPoint("TOPLEFT", status, "BOTTOMLEFT", 0, -16)
+  label:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -90)
   label:SetText("Look up a price")
   panel.lookupLabel = label
   local box = CreateFrame("EditBox", "EverlootAuctionLookup", panel, "InputBoxTemplate")
@@ -668,6 +704,12 @@ local function buildPanel(house)
   end)
   box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
   panel.lookup = box
+  local search = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+  search:SetSize(80, 22)
+  search:SetPoint("LEFT", box, "RIGHT", 8, 0)
+  search:SetText("Search")
+  search:SetScript("OnClick", function() T.ShowResult(box:GetText()); box:ClearFocus() end)
+  panel.searchButton = search
 
   local footer = words(panel, "GameFontDisable")
   footer:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 16, 12)
@@ -679,6 +721,7 @@ local function buildPanel(house)
   -- without the scroll frame template gets a plain scroll frame, still moved by the mouse wheel.
   local made, scroll = pcall(CreateFrame, "ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
   if not made or not scroll then scroll = CreateFrame("ScrollFrame", nil, panel) end
+  scroll.scrollBarHideable = true
   scroll:SetPoint("TOPLEFT", box, "BOTTOMLEFT", -6, -10)
   scroll:SetPoint("BOTTOMLEFT", footer, "TOPLEFT", 0, 8)
   scroll:SetWidth(COLUMN)
@@ -766,12 +809,20 @@ function T.Attach(house)
   local built, why = pcall(function()
     local tabs = type(house.Tabs) == "table" and house.Tabs or {}
     local last = tabs[#tabs]
-    if last then tab:SetPoint("LEFT", last, "RIGHT", -15, 0)
+    if last then tab:SetPoint("BOTTOMLEFT", last, "BOTTOMRIGHT", TAB_GAP, 0)
     else tab:SetPoint("TOPLEFT", house, "BOTTOMLEFT", 20, 2) end
     local width = tab.GetWidth and tab:GetWidth()
     if type(width) ~= "number" or width < 60 then tab:SetSize(100, 24) end
+    local height = last and last:GetHeight()
+    if type(height) == "number" and height > 0 then tab:SetHeight(height) end
     tab:SetText("Everloot")
-    if PanelTemplates_TabResize then pcall(PanelTemplates_TabResize, tab, 0) end
+    local function size()
+      if PanelTemplates_TabResize then pcall(PanelTemplates_TabResize, tab, TAB_PADDING, nil, TAB_MIN_WIDTH) end
+    end
+    size()
+    -- The template's own OnShow resizes with the house's padding, which is none; size it again after, as theirs are.
+    if tab.HookScript then tab:HookScript("OnShow", size) end
+    if PanelTemplates_DeselectTab then pcall(PanelTemplates_DeselectTab, tab) end
     T.panel = buildPanel(house)
     tab:SetScript("OnClick", function() if T.panel:IsShown() then T.Hide() else T.Show() end end)
     for _, blizzard in ipairs(tabs) do

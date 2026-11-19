@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { emptyMarket, foldMarket } from "../../../kb/src/market";
+import { emptyMarket, foldMarket } from "@kb/market";
 
 // The realm map as it is until launch: empty. Everything must behave as it did before the map existed.
 vi.mock("../data/realms", async (importOriginal) => ({ ...(await importOriginal<typeof import("../data/realms")>()), REALMS: [] }));

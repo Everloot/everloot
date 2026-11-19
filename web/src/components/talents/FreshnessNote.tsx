@@ -1,4 +1,4 @@
-import { LABEL } from "../../../../kb/src/talents/catalog";
+import { LABEL } from "@kb/talents/catalog";
 import { codeFreshness, freshnessLines } from "@/lib/talents/freshness";
 import { PUBLISHED_CHANGES, classTalentChanges } from "@/lib/talents/freshness-records";
 import type { TalentCatalog } from "@/lib/talents/types";

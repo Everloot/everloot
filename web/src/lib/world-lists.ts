@@ -1,4 +1,4 @@
-import { npcPage, npcTraits, questPage, questTraits, vendorPage, type NpcPage, type NpcRank, type NpcReaction, type QuestPage, type QuestSide, type QuestTag, type VendorPage, type WorldFacts } from "../../../kb/src/world-pages";
+import { npcPage, npcTraits, questPage, questTraits, vendorPage, type NpcPage, type NpcRank, type NpcReaction, type QuestPage, type QuestSide, type QuestTag, type VendorPage, type WorldFacts } from "@kb/world-pages";
 import { publicZones, type ZoneSummary } from "./zones";
 
 // The NPCs, quests and vendors that have at least one public fact (3 installs agree), for the list pages

@@ -1,5 +1,5 @@
-import { createMcpHttpHandler } from "../../../kb/src/mcp-http-server";
-import type { ToolOptions } from "../../../kb/src/mcp-server";
+import { createMcpHttpHandler } from "@kb/mcp-http-server";
+import type { ToolOptions } from "@kb/mcp-server";
 import { loadStoredAggregates } from "./aggregate-store";
 import { catalogIndex } from "./catalog-index";
 import { loadTimeline } from "./changes";
@@ -16,8 +16,8 @@ import { publicMcpCache } from "./mcp-response-cache";
 import { RECHECK_SCOPES } from "./recheck-scopes";
 import { loadCensus } from "./rollup-compute";
 import { readSettledList } from "./settled-store";
-import { settledKeys } from "../../../kb/src/settled-list";
-import { trustedInstalls } from "../../../kb/src/trusted-source";
+import { settledKeys } from "@kb/settled-list";
+import { trustedInstalls } from "@kb/trusted-source";
 import { uploadStore } from "./upload-store";
 import { mcpLedgerMetrics } from "./question-ledger";
 import { mcpToolMetrics, recordUsage } from "./usage-metrics";
@@ -47,7 +47,7 @@ export function toolLoaders(): ToolOptions {
       if (!set || JSON.stringify(set.world.recheck ?? []) !== JSON.stringify(RECHECK_SCOPES)) return null;
       return { facts: { items: set.items, world: set.world }, dataAsOf: set.dataAsOf };
     },
-    // The stored report the home page counts; the live computation only when it is missing or for another build.
+    // The stored report the home page counts; "not measured yet" when it is missing or for another build, never a replay.
     coverage: () => loadCoverageForTool(),
     settledSummary: async (build) => {
       const list = await readSettledList(build);

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import CopyButton from "@/components/ui/CopyButton";
-import ArmoryConnection from "@/components/ArmoryConnection";
+import ArmoryConnection from "./ArmoryConnection";
 
 /** One link as GET /api/me/characters/links lists it. */
 export interface ListedLink {
@@ -37,8 +37,8 @@ const BLIZZARD: Record<BlizzardPart, { name: string; show: string }> = {
 interface Label { id: string; name: string; classSlug: string }
 type State = { status: "loading" } | { status: "signed-out" } | { status: "off" } | { status: "error"; message: string } | { status: "ready"; links: ListedLink[] };
 
-const button = "inline-flex items-center justify-center min-h-11 px-3 rounded-lg border border-line text-sm text-fg hover:text-accent disabled:opacity-60";
-const primary = "inline-flex items-center justify-center min-h-11 px-4 rounded-lg bg-accent text-bg text-sm font-semibold hover:bg-accent/90 disabled:opacity-60";
+const button = "inline-flex items-center justify-center min-h-11 px-3 rounded-control border border-line text-sm text-fg hover:text-accent disabled:opacity-60";
+const primary = "inline-flex items-center justify-center min-h-11 px-4 rounded-control bg-accent text-bg text-sm font-semibold hover:bg-accent/90 disabled:opacity-60";
 const day = (iso: string) => iso.slice(0, 10);
 /** CODE_MINUTES in web/src/lib/character-links.ts, which is server code and cannot be imported here. */
 const CODE_MINUTES = 15;
@@ -209,7 +209,7 @@ export default function LinkedCharacters() {
       <div className="space-y-2">
         <button type="button" className={primary} onClick={() => void makeCode()} disabled={busy !== null}>{busy === "code" ? "Making a code…" : "Make a link code"}</button>
         {code && (
-          <div className="space-y-2 rounded-lg border border-line p-3 text-sm">
+          <div className="space-y-2 rounded-card border border-line p-3 text-sm">
             <p className="text-fg">On the character you want to link, type <code className="font-mono">{command}</code> then <code>/reload</code>.</p>
             <CopyButton text={command} label="Copy the command" className={button} />
             <p className="text-fg-2">
@@ -222,7 +222,7 @@ export default function LinkedCharacters() {
       {state.links.length === 0 ? (
         <p className="text-sm text-fg-2">No linked characters yet.</p>
       ) : (
-        <ul className="divide-y divide-line rounded-lg border border-line">
+        <ul className="divide-y divide-line rounded-card border border-line">
           {state.links.map((link) => (
             <li key={link.id} className="space-y-1 p-3 text-sm">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -287,7 +287,7 @@ export default function LinkedCharacters() {
                       <label className="flex flex-wrap items-center gap-2">
                         <span className="text-fg">Planned builds from</span>
                         <select
-                          className="min-h-11 rounded-lg border border-line bg-bg px-2 text-sm text-fg"
+                          className="min-h-11 rounded-control border border-line bg-bg px-2 text-sm text-fg"
                           value={link.page.label?.id ?? ""}
                           onChange={(e) => void setLabel(link, e.target.value || null)}
                           disabled={busy !== null}

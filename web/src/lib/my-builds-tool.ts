@@ -1,6 +1,6 @@
 import { GAME_DATA_CREDIT, type McpToolDef } from "@everloot/protocol";
 import { z } from "zod";
-import type { ExtraTool } from "../../../kb/src/mcp-server";
+import type { ExtraTool } from "@kb/mcp-server";
 import { describeBuilds } from "@/components/builds/describe";
 import { publishedClassChanges } from "@/lib/talents/freshness-records";
 import { presentedKey } from "./api-keys";

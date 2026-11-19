@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { ReleaseDb } from "../../../kb/src/release-db";
+import type { ReleaseDb } from "@kb/release-db";
 
 /** Test-only: one spy that records the SQL and parameters of every read the release runs, through `all` or `get`. */
 export function spyOnQueries(db: ReleaseDb) {

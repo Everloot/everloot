@@ -68,6 +68,20 @@ test("a class whose only subclass repeats its own name lists no subclass under i
   expect(page).not.toContain('<a href="/database/items/quest/quest"');
 });
 
+test("each item class is one line with its count; its types wait behind a closed Disclosure", async () => {
+  store.loadCorpus.mockResolvedValue({ uploads: 3, dataAsOf: "2026-10-10T00:00:00.000Z", records: [] });
+  const page = renderToStaticMarkup(await DatabasePage());
+  const start = page.indexOf('<a href="/database/items/armor">Armor</a>');
+  expect(start).toBeGreaterThan(-1);
+  const armor = page.slice(start, page.indexOf("</section>", start));
+  // The heading keeps the class link and its count.
+  expect(armor).toMatch(/^<a href="\/database\/items\/armor">Armor<\/a><span[^>]*>[\d,]+<\/span><\/h2>/);
+  expect(armor).toContain("<details data-disclosure");
+  expect(armor).not.toMatch(/<details[^>]* open/);
+  expect(armor).toMatch(/<h3[^>]*>[^<]*Cloth[^<]* and \d+ more<\/h3>/);
+  expect(armor).toContain('<a href="/database/items/armor/cloth"');
+});
+
 test("a hub with no count of its own is linked without one, not with a blank or a zero", async () => {
   store.loadCorpus.mockResolvedValue({ uploads: 3, dataAsOf: "2026-10-10T00:00:00.000Z", records: [] });
   const page = renderToStaticMarkup(await DatabasePage());

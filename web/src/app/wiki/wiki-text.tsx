@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 import { tokenKey, type TokenTarget } from "@/lib/wiki-names";
 import { wikiHref, type Block, type Inline, type WikiPage } from "@/lib/wiki";
-import { MARKDOWN_LINK, wikiLinkTarget } from "../../../../kb/src/wiki/page";
+import { MARKDOWN_LINK, wikiLinkTarget } from "@kb/wiki/page";
 
 /**
  * What a page needs to draw its text: the entity tokens' names and links, and the pages a `[[slug]]` or a Markdown

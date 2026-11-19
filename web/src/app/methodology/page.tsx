@@ -15,7 +15,7 @@ import { MAP_SOURCE } from "@/lib/world-map";
 import { PageHeader, ReadingLayout, SectionHeading, type TocItem } from "@/components/ui";
 import { GearSection } from "./gear";
 import { ScoreSection } from "./score";
-import { TRUSTED_SOURCE_LABEL } from "../../../../kb/src/trusted-source";
+import { TRUSTED_SOURCE_LABEL } from "@kb/trusted-source";
 
 const description =
   "How Everloot turns addon uploads into WoW Forever facts: three installs must agree, addresses are never published, and names only on the player pages.";

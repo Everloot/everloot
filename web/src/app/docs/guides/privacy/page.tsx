@@ -108,7 +108,7 @@ export default function Page() {
           ["An upload", <>Email <a key="m" className={docLink} href="mailto:hello@everloot.app">hello@everloot.app</a>. Uploads you ask us to remove are deleted, and the next rebuild of the published counts removes anything derived from them.</>],
           ...(pagesOn ? [["A character on the player pages", <>Use the <Link key="h" href="/players/opt-out" className={docLink}>hide form</Link>. No account needed.</>]] : []),
           ["Your account", "Email us. Deleting an account removes the data tied to it."],
-          ["An API key", "Revoke or delete it on your account page."],
+          ["An API key", "Revoke or delete it in Settings."],
           ["Census, player and addon list rows", <>Turn the feature off in the game: <C>/everloot census off</C>, <C>/everloot players off</C> or <C>/everloot addons off</C>. Each deletes its rows from your file.</>],
         ]}
       />

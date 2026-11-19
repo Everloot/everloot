@@ -1,9 +1,9 @@
 import { loadSiteAssets, loadItemTips } from "@/lib/game-assets";
 import { qualityOf } from "@/components/ui/quality";
 import { notFound } from "next/navigation";
-import { edgesFrom } from "../../../../../../kb/src/edges";
-import { itemNameReporters, itemPage } from "../../../../../../kb/src/item-page";
-import { categoryOf } from "../../../../../../kb/src/item-taxonomy";
+import { edgesFrom } from "@kb/edges";
+import { itemNameReporters, itemPage } from "@kb/item-page";
+import { categoryOf } from "@kb/item-taxonomy";
 import { AGREEMENT_NEEDED } from "@/components/ui/AgreementMeter";
 import { loadEdges } from "@/lib/edges";
 import { loadItemSeen } from "@/lib/item-seen";

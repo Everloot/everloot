@@ -1,6 +1,6 @@
 import {
   CENSUS_CLASSES, CENSUS_RACES, FACTIONS, LEVEL_BANDS, type CensusCount, type CensusWindow, type Faction, type LevelBand,
-} from "../../../kb/src/census";
+} from "@kb/census";
 import { DEFAULT_RULESET } from "./player-pages";
 
 /**

@@ -1,13 +1,17 @@
 import picomatch from "next/dist/compiled/picomatch";
 import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
 import { matchHas } from "next/dist/shared/lib/router/utils/prepare-destination";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { expect, test } from "vitest";
 import nextConfig from "../next.config.js";
+import { CACHE_POLICY, cdnCacheControl } from "./lib/cache-policy.js";
 import corsPrerenderedPaths from "./data/cors-prerendered-paths.json";
 import { PREFIXES, SERVED } from "./lib/build-versions";
 import { CHAT_PROVIDERS } from "./lib/chat/providers";
 import { isProtectedPath } from "./lib/document-boundary";
 import { isPrivatePath } from "./lib/cf-edge-cache";
+import { loadGuides, publishedGuides } from "./lib/guides";
 
 test("download shortcuts are exact permanent redirects, leaving files and desktop connect alone", async () => {
   const redirects = await nextConfig.redirects!();
@@ -79,6 +83,10 @@ test("every route that reads the wiki pages carries them in its bundle", () => {
   }
 });
 
+test("the header's guides switch is the guide reader's gate: on only once kb/guides holds a reviewed guide", () => {
+  expect(nextConfig.env!.EVERLOOT_REVIEWED_GUIDES).toBe(publishedGuides(loadGuides()).length > 0 ? "1" : "");
+});
+
 test("every route that reads the guides carries them in its bundle", () => {
   const includes = nextConfig.outputFileTracingIncludes!;
   // The guide index reads kb/guides on each request, a guide page when it is rebuilt and the sitemap on each request.
@@ -108,7 +116,7 @@ test("the public pages rendered on every request are kept at the CDN; the pages 
   // Found live 10/27: /database, /map and /changes answered private, no-store, so every visit ran the server.
   const hour = "max-age=3600, stale-while-revalidate=86400";
   const brief = "max-age=300, stale-while-revalidate=3600";
-  for (const [path, value] of [["/database/items", hour], ["/database/items/2589", hour], ["/map", hour], ["/map/kalimdor", hour], ["/changes", brief], ["/search", brief], ["/tools/professions", brief], ["/tools/professions/alchemy", brief], ["/tools/professions/blacksmithing", brief]] as const) {
+  for (const [path, value] of [["/database/items", hour], ["/database/items/2589", hour], ["/map", hour], ["/map/kalimdor", hour], ["/changes", brief], ["/search", brief], ["/tools/professions", brief], ["/tools/professions/alchemy", brief], ["/tools/professions/blacksmithing", brief], ["/tools/bags", brief], ["/tools/disenchanting", brief], ["/tools/farming-routes", brief]] as const) {
     const got = await headersFor(path);
     expect(got["CDN-Cache-Control"], path).toBe(value);
   }
@@ -123,7 +131,7 @@ test("the public pages rendered on every request are kept at the CDN; the pages 
   for (const type of ["npcs", "quests", "objects", "vendors", "spells", "achievements", "titles", "factions", "quest-chains", "zones", "instances", "coverage"]) {
     expect((await headersFor(`/database/${type}/123`))["CDN-Cache-Control"], type).toBe(hour);
   }
-  for (const path of ["/chat", "/account", "/settings", "/sign-in", "/api/tools/search_knowledge", "/changes/feed.xml", "/tools/profession-planner"]) {
+  for (const path of ["/chat", "/account", "/settings", "/sign-in", "/api/tools/search_knowledge", "/changes/feed.xml", "/tools/profession-planner", "/tools/collections"]) {
     expect(await headersFor(path), path).not.toHaveProperty("CDN-Cache-Control");
   }
 });
@@ -165,6 +173,9 @@ test("only the public pages rendered per request are marked for the shared CDN c
     "/tools/auctions",
     "/tools/auctions/:realm",
     "/tools/auctions/:realm/:itemId",
+    "/tools/bags",
+    "/tools/disenchanting",
+    "/tools/farming-routes",
     "/tools/professions/:path*",
   ].sort());
   // The pages that hold a session, the account or a collection never join that list, whatever a future edit adds.
@@ -173,6 +184,39 @@ test("only the public pages rendered per request are marked for the shared CDN c
     // Nor a session route the edge cache refuses by route: the two lists must never overlap.
     expect(isPrivatePath(source.replace(/\/:path\*$/, "") || "/"), source).toBe(false);
     expect(source, source).not.toMatch(/^\/(?:guilds?|players?|u|account|settings|chat|tools\/collections)(?:\/|$)/);
+  }
+});
+
+test("every CDN rule in the config comes from the freshness table, and every row of the table is used", async () => {
+  const prefix = PREFIXES[SERVED.id] ?? "";
+  // The private row is also sent under the served version's prefix.
+  const unprefixed = (source: string) => (prefix && source.startsWith(`${prefix}/`) ? source.slice(prefix.length) : source);
+  const rows = Object.entries(CACHE_POLICY);
+  const used = new Set<string>();
+  for (const entry of await nextConfig.headers!()) {
+    const cdn = entry.headers.find((header) => header.key === "CDN-Cache-Control");
+    if (!cdn) continue;
+    const owners = rows.filter(([, row]) => row.sources.includes(unprefixed(entry.source)));
+    expect(owners.map(([group]) => group), entry.source).toHaveLength(1);
+    const [group, row] = owners[0]!;
+    expect(cdn.value, entry.source).toBe(cdnCacheControl(row));
+    used.add(`${group} ${unprefixed(entry.source)}`);
+  }
+  for (const [group, row] of rows) {
+    expect(row.reason.trim(), group).not.toBe("");
+    expect(row.sources.length + (row.pages?.length ?? 0), group).toBeGreaterThan(0);
+    for (const source of row.sources) expect(used.has(`${group} ${source}`), `${group} ${source}`).toBe(true);
+  }
+});
+
+test("a page the freshness table lists revalidates on its row's schedule and is not forced dynamic", () => {
+  // Next reads `revalidate` from the page's own source, so the page holds the number and this holds it to the table.
+  for (const [group, row] of Object.entries(CACHE_POLICY)) {
+    for (const page of row.pages ?? []) {
+      const source = readFileSync(join(__dirname, "app", page, "page.tsx"), "utf8");
+      expect(source, `${group} ${page}`).toMatch(new RegExp(`^export const revalidate = ${row.maxAge};`, "m"));
+      expect(source, `${group} ${page}`).not.toContain('export const dynamic = "force-dynamic"');
+    }
   }
 });
 

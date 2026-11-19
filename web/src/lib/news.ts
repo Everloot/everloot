@@ -1,8 +1,8 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { clampText } from "../../../kb/src/text-safety";
-import { parsePost, postFigure, PostFrontMatter } from "../../../kb/src/news/post";
-import { inlineText, type Block } from "../../../kb/src/wiki/page";
+import { clampText } from "@kb/text-safety";
+import { parsePost, postFigure, PostFrontMatter } from "@kb/news/post";
+import { inlineText, type Block } from "@kb/wiki/page";
 
 /**
  * The news posts under kb/news, read from disk once per server instance (they change only with a deploy;

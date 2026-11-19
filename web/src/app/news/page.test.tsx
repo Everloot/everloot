@@ -338,7 +338,7 @@ test("all 18 published posts retain their editorial source and survive pages, hu
     expect(html.match(/id="sources"/g) ?? []).toHaveLength(post.sources.length ? 1 : 0);
     expect(html.match(/id="related"/g)).toHaveLength(1);
     expect(html.match(/data-related-card=/g)).toHaveLength(3);
-    const sources = html.split('<section aria-labelledby="sources"')[1]?.split("</section>")[0] ?? "";
+    const sources = html.split('aria-labelledby="sources"')[1]?.split("</section>")[0] ?? "";
     for (const source of post.sources) expect(sources).toContain(`href="${source.url.replace(/&/g, "&amp;")}"`);
     expect(html).not.toContain("data-ad-slot");
     expect(html).not.toContain("data-ad-in-article");

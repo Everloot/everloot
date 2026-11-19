@@ -1,5 +1,5 @@
 import recheckFile from "../../../kb/curated/recheck.json";
-import { RecheckFile, type RecheckScope } from "../../../kb/src/coverage";
+import { RecheckFile, type RecheckScope } from "@kb/coverage";
 
 /**
  * The recheck scopes in kb/curated/recheck.json, bundled like the other curated files; a malformed file scopes nothing.

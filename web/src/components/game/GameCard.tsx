@@ -41,7 +41,7 @@ export function GameCard({ card }: { card: CardContent }) {
       >
         {card.lines.length > 0 ? <TooltipLines lines={card.lines} /> : null}
       </TooltipFrame>
-      {notes && <div data-card-notes className="mt-1 space-y-0.5 rounded-[4px] border border-line bg-panel px-2 py-1 text-xs text-muted">{notes.map((note, i) => <p key={i}>{note}</p>)}</div>}
+      {notes && <div data-card-notes className="mt-1 space-y-0.5 rounded-control border border-line bg-panel px-2 py-1 text-xs text-muted">{notes.map((note, i) => <p key={i}>{note}</p>)}</div>}
     </div>
   );
 }

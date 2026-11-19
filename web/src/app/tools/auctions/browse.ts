@@ -1,5 +1,5 @@
 import type { AuctionHouse } from "@everloot/protocol";
-import { QUALITIES, resolveClass, resolveSubclass, slotOf, type ItemClass, type ItemRow, type ItemSubclass } from "../../../../../kb/src/item-taxonomy";
+import { QUALITIES, resolveClass, resolveSubclass, slotOf, type ItemClass, type ItemRow, type ItemSubclass } from "@kb/item-taxonomy";
 import { CLIENT_TAXONOMY as T } from "@/lib/items";
 import { HOUSES, houseParam, houseSlug, priceMove, type MarketRow, type Move } from "@/lib/auction-house";
 import { regionParam, rulesetParam, type RegionFilter, type RulesetSlug } from "@/lib/realms";

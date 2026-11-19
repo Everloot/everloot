@@ -7,10 +7,7 @@ Everloot Desktop App, and adds auction prices to item tooltips. It uses only the
 plays the character. Records match the upload contract (`packages/protocol`, see its `schema/records/`) field for
 field.
 
-**Status:** 0.3.24, a regular release. The automated contract tests pass. 0.3.24 was checked in the live Forever client on 2026-11-17: the feature chooser, the removal of the kinds Blizzard's API now supplies, the one-time player names notice and an empty loot window. The in-client checks in
-`docs/2026-10-08-beta-client-checklist.md`, `docs/2026-10-18-addon-0.3.2-beta-checklist.md`,
-`docs/2026-10-19-addon-0.3.3-beta-checklist.md` and `docs/2026-10-21-addon-0.3.10-launch-checklist.md` are still open, and the full scan
-(`docs/design/specs/2026-10-16-forever-market-design.md`) has not run in the Forever client.
+**Status:** 0.3.25, a regular release. The automated contract tests pass. In the live Forever client on 2026-11-18 the auction house tab and page and the Sell-tab vendor warning were tried; the rest of `docs/2026-11-17-auction-ui-checklist.md` and the window, minimap, Collection and gathering checks were not run before release.
 
 ## Run it
 
@@ -187,7 +184,9 @@ innkeeper) records where you stand as that NPC's place (`positionKind = "interac
 service, once per NPC, role and zone. Targeting still records `positionKind = "player"`, which never becomes a
 pin. Looting an object adds where you stand (`mapId`, `x`, `y`), a `gatherKind` (herb, ore, chest, fishing,
 other) from the spell you cast just before (`UNIT_SPELLCAST_SENT`) and the object's name from that cast's
-target (`sourceObjectName`). A kill's loot window with nothing in it is recorded too, so drop rates count the
+target (`sourceObjectName`). A herb, ore or skinning window also carries your own rank in that skill
+(`gatherSkill`), from the game's profession book, plus the rank bonus from race and gear (what a node's requirement is checked against); when the client cannot give it,
+the row has none. A kill's loot window with nothing in it is recorded too, so drop rates count the
 corpses that dropped nothing: the game names no source for an empty window, so the addon takes the one dead
 creature you could loot among the units you interacted with, pointed at or targeted, and writes a loot row with no
 items and no coin (`sourceEvidence = "empty-window"`), once per corpse. Two different dead creatures there, a

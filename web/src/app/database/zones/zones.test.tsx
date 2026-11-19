@@ -31,7 +31,7 @@ vi.mock("next/navigation", () => ({
 import ZonesPage, { generateMetadata as zonesMetadata } from "./page";
 import ZonePage, { generateMetadata } from "./[zone]/page";
 import { EntityRelations } from "@/components/EntityRelations";
-import type { Edge } from "../../../../../kb/src/edges";
+import type { Edge } from "@kb/edges";
 
 const sighting = (installId: string, npcId: number, name: string, mapId: number, x: number, y: number) => ({
   kind: "npc_sighting", installId, eventId: `e:${installId}:${npcId}`, capturedAt: "2026-10-10T00:00:00.000Z",
@@ -86,7 +86,7 @@ test("a zone page shows its confirmed NPCs, its lore, and the map link; the name
 test("a zone with two installs and no entrance is noindex and says what is missing", async () => {
   store.loadCorpus.mockResolvedValue(corpus(three(100, "Guard Orin", 1450, 40, 50).slice(0, 2)));
   const page = await html(ZonePage(props("1450-moonglade")));
-  expect(page).toContain("No NPC has a confirmed position here yet");
+  expect(page).toContain("Players have not confirmed anything in Moonglade yet.");
   expect(page).not.toContain("Guard Orin");
   expect((await generateMetadata(props("1450-moonglade"))).robots).toMatchObject({ index: false });
 });
@@ -131,9 +131,10 @@ test("an empty zone page makes one addon call; its empty lists are single muted 
   store.loadCorpus.mockResolvedValue(corpus([]));
   const page = await html(ZonePage(props("1429-elwynn-forest")));
   expect(page.match(/href="\/addon"/g)).toHaveLength(1);
-  // The notice, then one line for each of the six lists.
-  expect(page.match(/data-empty-state/g)).toHaveLength(7);
-  expect(page).toContain("No NPC has a confirmed position here yet.");
+  // The notice, then one line in place of six empty tabs.
+  expect(page.match(/data-empty-state/g)).toHaveLength(2);
+  expect(page).not.toContain('role="tab"');
+  expect(page).toContain("No entrance recorded yet: the game files place none here and players have not confirmed one.");
 });
 
 test("the zone index says a dash is unrecorded, not none, and says so plainly when no zone has anything", async () => {
@@ -193,7 +194,8 @@ test("a source fewer than 3 installs looted adds no item, and an unpinned source
   const page = await html(ZonePage(props("1436-westfall")));
   expect(page).not.toContain('href="/database/items/750"');
   expect(page).not.toContain('href="/database/items/2589"');
-  expect(page).toContain("No item has an agreed drop from a confirmed NPC or object here yet. A rate needs loot windows from 3 installs.");
+  // No item: no "Items (0)" tab beside the NPC that has a row.
+  expect(page).not.toContain('data-tab-panel="items"');
 });
 
 test("herbs gathered at a spot 3 installs placed are items found here too, and link the herbalism page", async () => {
@@ -210,10 +212,10 @@ test("herbs gathered at a spot 3 installs placed are items found here too, and l
   expect(page).toContain("1 looted item");
 });
 
-test("an empty zone says what a rate needs and links coverage, but no farming, gathering or wiki page it has nothing for", async () => {
+test("an empty zone says what a fact needs and links coverage, but no farming, gathering or wiki page it has nothing for", async () => {
   store.loadCorpus.mockResolvedValue(corpus([]));
   const page = await html(ZonePage(props("1411-durotar")));
-  expect(page).toContain("No item has an agreed drop from a confirmed NPC or object here yet. A rate needs loot windows from 3 installs.");
+  expect(page).toContain("A fact appears when 3 installs agree on it");
   expect(page).toContain('href="/database/coverage/1411-durotar"');
   expect(page).not.toContain("Farming and gathering");
   expect(page).not.toContain("/tools/farming-routes");
@@ -303,7 +305,12 @@ test("when only the loot tables cannot be read the Items tab says so, the page i
 test("a zone page shows the terrain types the game files give it and the gear whose effect works there", async () => {
   store.loadCorpus.mockResolvedValue(corpus([]));
   const page = await html(ZonePage(props("1436-westfall")));
-  const section = page.slice(page.indexOf("data-zone-terrain"), page.indexOf('aria-labelledby="known"'));
+  // After what players confirmed, closed until asked for, its summary counting the gear.
+  expect(page.indexOf('aria-labelledby="known"')).toBeLessThan(page.indexOf("data-zone-terrain"));
+  const section = page.slice(page.indexOf("data-zone-terrain"));
+  expect(section).toMatch(/<details[^>]*id="terrain"/);
+  expect(section).not.toMatch(/<details[^>]*open/);
+  expect(section).toMatch(/Terrain: \d+ items? whose effect works? here/);
   expect(section).toContain('href="/database/terrain#forest-and-grassland"');
   expect(section).toContain('href="/database/terrain#wasteland"');
   expect(section).not.toContain("#desert");

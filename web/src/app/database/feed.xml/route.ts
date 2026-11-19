@@ -1,4 +1,4 @@
-import { renderRssChannel } from "../../../../../kb/src/changes";
+import { renderRssChannel } from "@kb/changes";
 import { loadDatabaseActivity } from "@/lib/database-activity-store";
 import { absoluteUrl, SITE_URL } from "@/lib/seo";
 

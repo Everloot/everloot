@@ -82,8 +82,8 @@ test("a zone page confirms the game files' entrance, lists its boss and the trea
   expect(page).toContain('href="/database/objects/2843"');
   expect(page).toContain("Battered Chest");
   // The game files place the Deadmines: the players' entrance confirms it, it adds no second row. (The Terrain
-  // section above may link it too, as a place a zone-bound item works.)
-  expect(page.slice(page.indexOf('aria-labelledby="known"')).match(/>Deadmines</g) ?? []).toHaveLength(1);
+  // section below may link it too, as a place a zone-bound item works.)
+  expect(page.slice(page.indexOf('aria-labelledby="known"')).split('aria-label="Terrain"')[0].match(/>Deadmines</g) ?? []).toHaveLength(1);
 });
 
 test("two voters leave every one of these out", async () => {
@@ -97,5 +97,7 @@ test("two voters leave every one of these out", async () => {
   const westfall = await html(Zone(zone("1436-westfall")));
   expect(westfall).not.toContain("Confirmed by");
   expect(westfall).not.toContain("Edwin VanCleef");
-  expect(westfall).toContain("No treasure has a confirmed position here yet.");
+  // Nothing confirmed: the page says so once, and the strip has no empty Objects tab.
+  expect(westfall).toContain("Players have not confirmed anything in Westfall yet.");
+  expect(westfall).not.toContain('data-tab-panel="objects"');
 });

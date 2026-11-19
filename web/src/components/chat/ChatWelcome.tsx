@@ -3,20 +3,20 @@ import GameIcon from "@/components/game/GameIcon";
 import Glint from "@/components/glint/Glint";
 
 /** The game's icons for the suggestion cards, read by the page from the asset manifest; absent without the asset URL. */
-export interface ChatIcons { warrior?: string; tailoring?: string }
+export interface ChatIcons { warrior?: string }
 
-type Glyph = "item" | "class" | "changes" | "market";
+type Glyph = "place" | "class" | "changes" | "market";
 
 /** The four starting questions, each with the game icon (when the page has one) or a drawn glyph. */
 export const WELCOME: { text: string; glyph: Glyph; icon?: keyof ChatIcons }[] = [
-  { text: "Where does Linen Cloth drop?", glyph: "item", icon: "tailoring" },
+  { text: "Where is Hogger?", glyph: "place" },
   { text: "Plan a level 40 Fury warrior", glyph: "class", icon: "warrior" },
   { text: "What changed in the last build?", glyph: "changes" },
   { text: "What sells best on my realm?", glyph: "market" },
 ];
 
 const PATHS: Record<Glyph, ReactNode> = {
-  item: <path d="M12 3 20 12 12 21 4 12Z" />,
+  place: <><path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11Z" /><circle cx="12" cy="10" r="2" /></>,
   class: <><path d="M14.5 4.5 19.5 4.5 19.5 9.5 10 19 5 14Z" /><path d="m4 20 3-3" /></>,
   changes: <><circle cx="12" cy="12" r="8" /><path d="M12 8v4l3 2" /></>,
   market: <><ellipse cx="12" cy="7" rx="7" ry="3" /><path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7" /><path d="M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5" /></>,

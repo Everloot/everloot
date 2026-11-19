@@ -1,5 +1,6 @@
-import { mapBoundsFromRecords, rollupMapBounds, type ZoneBounds } from "../../../kb/src/map-bounds";
+import { mapBoundsFromRecords, rollupMapBounds, type ZoneBounds } from "@kb/map-bounds";
 import { AwsClient } from "aws4fetch";
+import { keep } from "./kept";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
 import { RECHECK_SCOPES } from "./recheck-scopes";
 import { observedFacts } from "./world-map";
@@ -86,7 +87,30 @@ export async function writeMapPins(opts: { added: number; rebuild?: boolean; dat
 }
 
 /** The read set and what identifies the file it came from. */
-let kept: { at: number; set: MapPinsView | null; generatedAt?: string; etag?: string } | null = null;
+type Read = { set: MapPinsView | null; generatedAt?: string; etag?: string };
+
+/** One read per caller, as before this file used kept.ts: no read is shared between requests. */
+const stored = keep<Read, { cloud: R2Config; fetch: typeof fetch }>(async ({ cloud, fetch: doFetch }, kept) => {
+  const retry = { keepMs: RETRY_MS };
+  try {
+    const etag = kept?.value.set ? kept.value.etag : undefined;
+    const res = await doFetch(await r2(cloud).sign(r2Url(cloud), {
+      method: "GET", headers: { "accept-encoding": "identity", ...(etag ? { "if-none-match": etag } : {}) },
+    }));
+    if (res.status === 304 && kept?.value.set) return { value: kept.value };
+    if (res.ok) {
+      const read = parseMapPins(await res.text());
+      const same = read && kept?.value.set && kept.value.generatedAt === read.generatedAt;
+      return read
+        ? { value: { set: same ? kept!.value.set : read.set, generatedAt: read.generatedAt, etag: res.headers.get("etag") ?? undefined } }
+        : { value: { set: null }, ...retry };
+    }
+    if (res.status === 404 || !kept?.value.set) return { value: { set: null }, ...retry };
+    return { value: kept.value, ...retry };
+  } catch {
+    return { value: kept?.value.set ? kept.value : { set: null }, ...retry };
+  }
+}, { ttlMs: KEEP_MS, share: false });
 
 /**
  * The stored set, kept KEEP_MS per server instance; null when there is none or it cannot be read, and the caller works
@@ -96,35 +120,15 @@ let kept: { at: number; set: MapPinsView | null; generatedAt?: string; etag?: st
  */
 export async function loadStoredMapPins(deps: { cloud?: R2Config | null; fetch?: typeof fetch; now?: () => number } = {}): Promise<MapPinsView | null> {
   const now = (deps.now ?? Date.now)();
-  if (kept && now - kept.at < KEEP_MS) return kept.set;
-  try {
-    const cloud = deps.cloud === undefined ? r2FromEnv() : deps.cloud;
-    if (!cloud) return null;
-    const etag = kept?.set ? kept.etag : undefined;
-    const res = await (deps.fetch ?? fetch)(await r2(cloud).sign(r2Url(cloud), {
-      method: "GET", headers: { "accept-encoding": "identity", ...(etag ? { "if-none-match": etag } : {}) },
-    }));
-    if (res.status === 304 && kept?.set) {
-      kept = { ...kept, at: now };
-    } else if (res.ok) {
-      const read = parseMapPins(await res.text());
-      const same = read && kept?.set && kept.generatedAt === read.generatedAt;
-      kept = read
-        ? { at: now, set: same ? kept!.set : read.set, generatedAt: read.generatedAt, etag: res.headers.get("etag") ?? undefined }
-        : { at: now - KEEP_MS + RETRY_MS, set: null };
-    } else if (res.status === 404 || !kept?.set) {
-      kept = { at: now - KEEP_MS + RETRY_MS, set: null };
-    } else {
-      kept = { ...kept, at: now - KEEP_MS + RETRY_MS };
-    }
-  } catch {
-    kept = kept?.set ? { ...kept, at: now - KEEP_MS + RETRY_MS } : { at: now - KEEP_MS + RETRY_MS, set: null };
-  }
-  return kept.set;
+  const hit = stored.fresh(now);
+  if (hit) return hit.value.set;
+  const cloud = deps.cloud === undefined ? r2FromEnv() : deps.cloud;
+  if (!cloud) return null;
+  return (await stored.get({ cloud, fetch: deps.fetch ?? fetch }, now)).set;
 }
 
 /** For tests: forget the kept file. */
-export const forgetStoredMapPins = () => { kept = null; };
+export const forgetStoredMapPins = () => stored.forget();
 
 /** Stored facts when available; a failed corpus read stays unrecorded. */
 export async function loadMapPins(): Promise<MapPinsView & { unreachable: boolean }> {

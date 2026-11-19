@@ -10,8 +10,8 @@ vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; chil
 import DownloadPage, { metadata } from "./page";
 import { DESCRIPTION_MAX, DESCRIPTION_MIN } from "@/lib/seo";
 import { DATABASE_HUBS } from "@/lib/database-hubs";
-import { OpenDataManifest } from "../../../../../kb/src/open-data/manifest";
-import { OPEN_DATA_EXCLUDED, OPEN_DATA_VERIFY } from "../../../../../kb/src/open-data/text";
+import { OpenDataManifest } from "@kb/open-data/manifest";
+import { OPEN_DATA_EXCLUDED, OPEN_DATA_VERIFY } from "@kb/open-data/text";
 
 const sha = (c: string) => c.repeat(64);
 /** The text as React writes it into markup. */

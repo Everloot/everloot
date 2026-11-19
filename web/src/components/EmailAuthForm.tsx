@@ -8,7 +8,7 @@ const input = "min-h-11 w-full rounded-control border border-edge bg-canvas px-3
 const button = "btn btn-primary w-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait";
 
 // Where each form posts, and the body Better Auth expects.
-function request(mode: Mode, form: FormData, token?: string, returnTo = "/account"): [string, object] {
+function request(mode: Mode, form: FormData, token?: string, returnTo = "/settings"): [string, object] {
   const email = String(form.get("email") ?? "").trim();
   const password = String(form.get("password") ?? "");
   switch (mode) {
@@ -38,7 +38,7 @@ const done: Record<Mode, string> = {
  * `returnTo` is where a sign-in, or the confirmation link of a sign-up, lands: a path the page has already checked;
  * /account without one.
  */
-export default function EmailAuthForm({ mode, token, returnTo = "/account" }: { mode: Mode; token?: string; returnTo?: string }) {
+export default function EmailAuthForm({ mode, token, returnTo = "/settings" }: { mode: Mode; token?: string; returnTo?: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);

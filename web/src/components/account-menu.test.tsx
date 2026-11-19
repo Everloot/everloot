@@ -95,9 +95,9 @@ describe("signed in without a shell (EVERLOOT_PROFILES off)", () => {
     expect(create).toEqual([["Plan a build", "/tools/talents"], ["Upload addon data", "/upload"], ["New character", "/me"]]);
   });
 
-  it("lists what exists today: Your builds, Your account, API keys, Desktop App and addon, Sign out", async () => {
+  it("lists what exists today: Your builds, Settings, API keys, Desktop App and addon, Sign out", async () => {
     await act(async () => root.render(<Header savedBuilds accountSwitching />));
-    expect(menuLinks()).toEqual([["Thrall#1", "/account"], ["Your builds", "/me"], ["Your account", "/account"], ["API keys", "/account#keys"], ["Desktop App and addon", "/addon"]]);
+    expect(menuLinks()).toEqual([["Thrall#1", "/settings"], ["Your builds", "/me"], ["Settings", "/settings"], ["API keys", "/settings#keys"], ["Desktop App and addon", "/addon"]]);
     expect(buttons(accountMenu(), "Sign out")).toHaveLength(1);
     expect(container.querySelector('button[aria-label="Switch account"]')).toBeNull();
     expect(accountMenu().textContent).toContain("Thrall#1");
@@ -106,7 +106,7 @@ describe("signed in without a shell (EVERLOOT_PROFILES off)", () => {
   it("drops Your builds and New character while saved builds are off", async () => {
     await act(async () => root.render(<Header />));
     expect(container.querySelector('a[href="/me"]')).toBeNull();
-    expect(menuLinks().slice(1, 3)).toEqual([["Your account", "/account"], ["API keys", "/account#keys"]]);
+    expect(menuLinks().slice(1, 3)).toEqual([["Settings", "/settings"], ["API keys", "/settings#keys"]]);
   });
 
   it("opens and closes like the other header menus: Escape returns focus, a click outside closes", async () => {
@@ -150,15 +150,14 @@ describe("signed in with a shell", () => {
     expect(accountMenu().textContent).toContain("@jaina");
     expect(container.querySelector('button[aria-label="Switch account"]')).not.toBeNull();
     expect(menuLinks()).toEqual([
-      ["Jaina Proudmoore", "/account"],
+      ["Jaina Proudmoore", "/settings"],
       ["🔥Raiding Molten Core", "/settings#status"],
       ["Your profile", "/u/jaina"],
       ["Your characters", "/me"],
       ["Your builds", "/me"],
-      ["Your account", "/account"],
-      ["API keys", "/account#keys"],
-      ["Desktop App and addon", "/addon"],
       ["Settings", "/settings"],
+      ["API keys", "/settings#keys"],
+      ["Desktop App and addon", "/addon"],
       ["Add another account", "/sign-in?add=1"],
     ]);
     expect(buttons(accountMenu(), "Sign out")).toHaveLength(1);
@@ -168,7 +167,7 @@ describe("signed in with a shell", () => {
     withShell(shell({ handle: null, status: null, mainCharacterId: null }));
     await act(async () => root.render(<Header profiles />));
     const links = menuLinks();
-    expect(links[0]).toEqual(["Jaina Proudmoore", "/account"]);
+    expect(links[0]).toEqual(["Jaina Proudmoore", "/settings"]);
     expect(links[1]).toEqual(["Choose a handle", "/settings"]);
     expect(links[2]).toEqual(["Set status", "/settings#status"]);
     expect(links[3]).toEqual(["Your profile", "/settings"]);
@@ -204,7 +203,7 @@ describe("signed in with a shell", () => {
     let finish!: (r: Response) => void;
     api({ "/api/me/shell": () => new Promise<Response>((resolve) => { finish = resolve; }) });
     await act(async () => root.render(<Header profiles savedBuilds accountSwitching />));
-    const today = [["Thrall#1", "/account"], ["Your builds", "/me"], ["Your account", "/account"], ["API keys", "/account#keys"], ["Desktop App and addon", "/addon"]];
+    const today = [["Thrall#1", "/settings"], ["Your builds", "/me"], ["Settings", "/settings"], ["API keys", "/settings#keys"], ["Desktop App and addon", "/addon"]];
     expect(menuLinks()).toEqual(today);
     await act(async () => finish(Response.json({ error: "Sign in first." }, { status: 401 })));
     expect(menuLinks()).toEqual(today);
@@ -323,7 +322,7 @@ describe("helpers", () => {
     }
   });
 
-  it("without saved builds the shell menu keeps profile, account and settings only", () => {
-    expect(accountMenuSections(shell(), false).flat().map((l) => l.label)).toEqual(["Your profile", "Your account", "API keys", "Desktop App and addon", "Settings"]);
+  it("without saved builds the shell menu keeps profile, settings, keys and the Desktop App only", () => {
+    expect(accountMenuSections(shell(), false).flat().map((l) => l.label)).toEqual(["Your profile", "Settings", "API keys", "Desktop App and addon"]);
   });
 });

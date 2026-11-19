@@ -10,7 +10,7 @@ import {
 } from "@/lib/rankings";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
-import { CENSUS_CLASSES, FACTIONS } from "../../../../../kb/src/census";
+import { CENSUS_CLASSES, FACTIONS } from "@kb/census";
 import { HowItCounts, OneWeek, RankTable, RankingRail, StartState, WeeklyChart, weekLabel } from "../parts";
 
 export const dynamic = "force-dynamic";

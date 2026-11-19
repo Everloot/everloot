@@ -1,5 +1,5 @@
 import { CLIENT_RECIPES } from "@/data/game-data/client-recipes";
-import { slugify } from "../../../kb/src/item-taxonomy";
+import { slugify } from "@kb/item-taxonomy";
 
 /**
  * The professions and their recipes as the game files list them (data/game-data/client-recipes.json), shaped for

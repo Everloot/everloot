@@ -51,7 +51,7 @@ export default function PageHeader({ title, lede, trail, meta, actions, icon, qu
         <Banner image={banner.image}>
           <h1 className={`${TITLE} text-fg`}>{title}</h1>
         </Banner>
-        {lede && <p className="mt-3 max-w-[75ch] text-cell text-fg-2">{lede}</p>}
+        {lede && <p className="mt-3 max-w-lede text-cell text-fg-2">{lede}</p>}
         {(meta || actions) && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-x-8 gap-y-2">
             {metaRow}
@@ -70,7 +70,7 @@ export default function PageHeader({ title, lede, trail, meta, actions, icon, qu
             {icon && <span className="shrink-0">{icon}</span>}
             <h1 className={`min-w-0 ${TITLE} ${quality ? QUALITY_TEXT[quality] : "text-fg"}`}>{title}</h1>
           </div>
-          {lede && <p className="mt-1 max-w-[75ch] text-cell text-fg-2">{lede}</p>}
+          {lede && <p className="mt-1 max-w-lede text-cell text-fg-2">{lede}</p>}
           {meta && <div className="mt-2">{metaRow}</div>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}

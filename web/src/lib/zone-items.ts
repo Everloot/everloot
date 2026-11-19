@@ -1,4 +1,4 @@
-import { npcLootTable, objectLootRows, type LootTableRow, type LootTables } from "../../../kb/src/loot-tables";
+import { npcLootTable, objectLootRows, type LootTableRow, type LootTables } from "@kb/loot-tables";
 import type { ZoneContents } from "./zones";
 
 /** One item from one source standing in a zone: the loot-table row, with the source's name as players agree on it. */

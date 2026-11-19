@@ -13,19 +13,19 @@ const fns = vi.hoisted(() => ({
   trends: vi.fn(() => ({})),
 }));
 // No recheck scopes: the cut-off hands the same records back, so the windows are read once.
-vi.mock("../../../kb/src/drop-rollup", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../kb/src/drop-rollup")>()),
+vi.mock("@kb/drop-rollup", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@kb/drop-rollup")>()),
   itemFactsFromRecords: fns.itemFacts,
   recheckLootRecords: (records: unknown[]) => records,
 }));
-vi.mock("../../../kb/src/world-pages", () => ({ worldFactsFromRecords: fns.worldFacts }));
-vi.mock("../../../kb/src/addon-rollup", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../kb/src/addon-rollup")>()),
+vi.mock("@kb/world-pages", () => ({ worldFactsFromRecords: fns.worldFacts }));
+vi.mock("@kb/addon-rollup", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@kb/addon-rollup")>()),
   popularAddonsFromRecords: fns.addons,
   addonTrends: fns.trends,
 }));
-vi.mock("../../../kb/src/edges", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../../kb/src/edges")>()),
+vi.mock("@kb/edges", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@kb/edges")>()),
   observedEdges: fns.edges,
 }));
 vi.mock("./rollups", () => ({ lootWindowsFromRecords: fns.windows, rollupDrops: fns.rollup }));

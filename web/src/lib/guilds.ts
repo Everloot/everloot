@@ -1,12 +1,10 @@
-import { createHash } from "node:crypto";
-import { canonicalJson } from "../../../kb/src/corpus";
 import { validGuildName, type IntakeRecord } from "@everloot/protocol";
-import { guildBoard, type GuildBoard, type GuildFacts } from "../../../kb/src/guild-board";
+import { guildBoard, type GuildBoard, type GuildFacts } from "@kb/guild-board";
 import {
   agreedKills, guildDirectory, guildKey, guildLadder, guildProgression, guildRanks, guildSlug, LADDER_PAGE,
   mergeKills, searchGuilds,
   type AgreedKill, type GuildFaction, type GuildPage, type GuildProgress, type GuildReader, type GuildSummary, type InstanceDef, type LadderFilter, type LadderRow,
-} from "../../../kb/src/guilds";
+} from "@kb/guilds";
 import { buildGuildRollup, type GuildRollup } from "./guild-rollup";
 import { loadStoredGuildLadder } from "./guild-ladder-store";
 import { loadGuildAlts, memberKey, type GuildAlt } from "./guild-alts";
@@ -117,6 +115,8 @@ export function withoutHiddenPlayers(facts: GuildFacts, hidden: ReadonlySet<stri
 }
 
 let memo: GuildRollup | null = null;
+let memoRecords: readonly IntakeRecord[] | null = null;
+let liveRollups = 0;
 let shownMemo: { key: string; boards: Map<string, GuildBoard> } | null = null;
 
 /**
@@ -162,9 +162,13 @@ export async function loadGuildData(): Promise<GuildData> {
     const corpus = await uploadStore.loadCorpus();
     if (corpus.unreachable) return UNREAD;
     dataAsOf = corpus.dataAsOf ?? null;
-    // Publication may remove a member inside a snapshot without changing its row count.
-    const key = createHash("sha256").update(canonicalJson(corpus.records)).update(dataAsOf ?? "").digest("hex");
-    if (memo === null || memo.key !== key) memo = buildGuildRollup(key, corpus.records, dataAsOf ? new Date(dataAsOf) : new Date());
+    // Publication may remove a member inside a snapshot without changing its row count. The store hands out one
+    // records array per corpus state and publication authority, so a new array is what says the rollup is stale: no
+    // hash of the whole corpus on every request (#1354).
+    if (memo === null || memoRecords !== corpus.records) {
+      memo = buildGuildRollup(`live|${dataAsOf ?? ""}|${++liveRollups}`, corpus.records, dataAsOf ? new Date(dataAsOf) : new Date());
+      memoRecords = corpus.records;
+    }
     rolled = memo;
   }
   const asOf = dataAsOf ? new Date(dataAsOf) : new Date();

@@ -6,7 +6,7 @@ import { BLIZZARD_HOUSES, houseLabel } from "@/lib/blizzard-houses";
 import { trailFor } from "@/lib/breadcrumbs";
 import { shownItemName } from "@/lib/items";
 import { loadShownNames } from "@/lib/shown-item-names";
-import { formatCopper } from "../../../../kb/src/market";
+import { formatCopper } from "@kb/market";
 import { blizzardTime } from "./[id]/blizzard-auctions";
 
 // Same ad-free document boundary and shared-cache exclusion as the item page.

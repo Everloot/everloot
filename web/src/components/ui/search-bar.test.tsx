@@ -7,7 +7,7 @@ vi.mock("next/link", () => ({
   default: ({ children, onNavigate: _onNavigate, ...props }: { children: React.ReactNode; onNavigate?: () => void; href: string }) => <a {...props}>{children}</a>,
 }));
 
-import SearchBar, { couldBeName } from "./SearchBar";
+import SearchBar, { couldBeName, suggestUrl } from "./SearchBar";
 
 // Each test types its own text: the suggestion cache outlives a render.
 // The suggestions arrive 120 ms after the last key. Until they do, the list still shows the rows for what was
@@ -117,16 +117,16 @@ test("the new suggestions start with nothing picked, and the arrow keys pick fro
   await type("heal");
   await answer("heal", [suggestion(3, "Healing Potion"), suggestion(2, "Heavy Hide")]);
   const rows = () => [...container.querySelectorAll("[role=option]")].map((r) => r.getAttribute("aria-selected"));
-  expect(rows()).toEqual(["false", "false"]);
+  expect(rows()).toEqual(["false", "false", "false"]);
   await press("ArrowDown");
-  expect(rows()).toEqual(["true", "false"]);
+  expect(rows()).toEqual(["true", "false", "false"]);
 });
 
 test("a dungeon row says which it is and its level, and is picked like any other row", async () => {
   await type("deadm");
   await answer("deadm", [{ type: "instance", id: 36, label: "Deadmines", href: "/database/instances/36-deadmines", note: "Dungeon, level 16" }, suggestion(4, "Deadmines Map")]);
   const options = [...container.querySelectorAll("[role=option]")];
-  expect(options.map((o) => o.textContent)).toEqual(["DeadminesDungeon, level 16", "Deadmines MapItem 4"]);
+  expect(options.map((o) => o.textContent)).toEqual(["DeadminesDungeon, level 16", "Deadmines MapItem 4", "All results for “deadm”Search"]);
   await press("ArrowDown");
   const clicks = watchClicks();
   await press("Enter");
@@ -135,7 +135,8 @@ test("a dungeon row says which it is and its level, and is picked like any other
 
 const person = (type: "character" | "guild", label: string, meta: string, exact = false) =>
   ({ type, label, href: type === "character" ? `/players/forever/pioneer/${label.toLowerCase()}` : `/guilds/pioneer/${label.toLowerCase()}`, meta, exact });
-const texts = () => [...container.querySelectorAll("[role=option]")].map((o) => o.textContent);
+/** The database, character and guild rows, without the closing "All results" row (pinned in its own test). */
+const texts = () => [...container.querySelectorAll("[role=option]")].map((o) => o.textContent).filter((t) => !t!.startsWith("All results for"));
 
 test("characters and guilds come after the database pages, at most 3, and the 8 rows still hold", async () => {
   people.body = {
@@ -244,4 +245,25 @@ test("a failed character lookup leaves the database rows; a scoped box never ask
 test("a surname or a full Forever name could be a name, so the box asks /search/people for it", () => {
   for (const text of ["Volvik", "Morningstar", "Volvik Morningstar", "Volvik  Morn", "Aeriwen Thistlewhisperingvale"]) expect(couldBeName(text)).toBe(true);
   for (const text of ["6948", "V", "Volvik Morningstar Third2"]) expect(couldBeName(text)).toBe(false);
+});
+
+test("any suggestions end with a row for every result on the search page, in the box's scope", async () => {
+  await type("  Westfall ");
+  await answer("westfall", [{ type: "zone", id: 1436, label: "Westfall", href: "/database/zones/1436-westfall", note: "Zone" }]);
+  const options = [...container.querySelectorAll("[role=option]")];
+  expect(options.map((o) => o.textContent)).toEqual(["WestfallZone", "All results for “Westfall”Search"]);
+  expect(options[1].querySelector("a")!.getAttribute("href")).toBe("/search?q=Westfall");
+  await press("ArrowUp");
+  const clicks = watchClicks();
+  await press("Enter");
+  expect(clicks).toEqual(["/search?q=Westfall"]);
+  // No suggestion, no row: Enter then submits the form itself.
+  await type("zzzz");
+  await answer("zzzz", []);
+  expect(container.querySelectorAll("[role=option]")).toHaveLength(0);
+});
+
+test("the type-ahead asks in lower case, so every casing is one cached request", () => {
+  expect(suggestUrl(" Thrall ", "")).toBe("/search/suggest?q=thrall");
+  expect(suggestUrl("THRALL", "npc")).toBe("/search/suggest?q=thrall&in=npc");
 });

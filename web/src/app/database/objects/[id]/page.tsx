@@ -5,11 +5,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
 import { hasCard } from "@/lib/tooltip";
-import { objectPage, type ObjectDrop, type ObjectFacts, type ObjectPage as ObjectFactsPage } from "../../../../../../kb/src/object-page";
-import { pendingLine } from "../../../../../../kb/src/pending-loot";
+import { objectPage, type ObjectDrop, type ObjectFacts, type ObjectPage as ObjectFactsPage } from "@kb/object-page";
+import { pendingLine } from "@kb/pending-loot";
 import { objectIndexable } from "@/lib/indexable";
 import { entityTitle, objectDescription } from "@/lib/entity-meta";
-import { formatMeasuredZero } from "../../../../../../kb/src/item-page";
+import { formatMeasuredZero } from "@kb/item-page";
 import { loadObjectFacts } from "@/lib/objects";
 import { loreFor } from "@/lib/lore-links";
 import LoreSection from "@/components/LoreSection";
@@ -104,7 +104,8 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
         <Tabs
           label={`${title}: relations`}
           tabs={[{
-            id: "drops", label: "Drops", count: facts.unreachable ? undefined : page.drops.length,
+            // No rates yet but loot on record (none with an item, short of 3 installs, or outside the rates): no count, so the tab and its line stay.
+            id: "drops", label: "Drops", count: facts.unreachable || (!page.drops.length && (page.zero || page.queued || pending)) ? undefined : page.drops.length,
             panel: facts.unreachable ? <Unreachable />
               : <>
                 {page.drops.length ? <DataTable dense caption={`What players looted from ${title}`} columns={columns} rows={page.drops} rowKey={(d) => String(d.itemId)} />

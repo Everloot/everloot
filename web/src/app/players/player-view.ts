@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CENSUS_CLASSES, CENSUS_RACES } from "../../../../kb/src/census";
+import { CENSUS_CLASSES, CENSUS_RACES } from "@kb/census";
 import { CLASSES } from "@/design/tokens";
 import { playerIndexingOn, type Player } from "@/lib/player-pages";
 

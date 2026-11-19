@@ -1,18 +1,12 @@
 import { useRef } from "react";
+import Card from "@/components/ui/Card";
+import CopyButton from "@/components/ui/CopyButton";
 import { answerOrigin, NO_SOURCED_ANSWER, sourceLink } from "@/lib/chat/agent";
 import type { ChatMessage } from "@/lib/chat/store";
+import AnswerText, { pageKind, pagePath } from "./AnswerText";
 import ItemResult from "./ItemResult";
 
-/** An everloot.app page as its path, which says what it is: /database/item/2589. */
-const pagePath = (url: string) => url.replace(/^https:\/\/(?:www\.)?everloot\.app/, "") || "/";
-
-const KINDS: [RegExp, string][] = [
-  [/^\/database\/items?\//, "Item"], [/^\/database\/npcs?\//, "NPC"], [/^\/database\/quests?\//, "Quest"],
-  [/^\/database\/objects?\//, "Object"], [/^\/database\/spells?\//, "Spell"], [/^\/database\/zones?\//, "Zone"],
-  [/^\/lore\//, "Lore"], [/^\/changes(?:\/|$)/, "Change"], [/^\/tools\//, "Tool"],
-];
-/** What an Everloot page is, from its path: Item, NPC, Quest… */
-export const pageKind = (path: string) => KINDS.find(([re]) => re.test(path))?.[1] ?? "Page";
+export { pageKind } from "./AnswerText";
 
 const card = "flex min-h-11 min-w-0 flex-col justify-center rounded-control border border-line bg-panel px-3 py-1.5 transition-colors hover:border-accent";
 
@@ -24,10 +18,10 @@ function shownText(m: ChatMessage): string {
 
 export function UserMessage({ m }: { m: ChatMessage }) {
   return (
-    <div className="ml-auto w-fit max-w-[85%] rounded-card border border-line bg-panel px-4 py-2">
+    <Card padding="custom" className="ml-auto w-fit max-w-[85%] px-4 py-2">
       <p className="whitespace-pre-wrap break-words text-fg">{m.text}</p>
       {m.context && <p className="mt-1 text-xs text-muted">{m.context}</p>}
-    </div>
+    </Card>
   );
 }
 
@@ -35,8 +29,8 @@ export function UserMessage({ m }: { m: ChatMessage }) {
  * An answer, its item, its origin (From Everloot with the pages, From the model), the model and a copy button. With
  * the workspace on, `onSave` gets the text selected inside the answer (or all of it) and `onSaveItem` its item.
  */
-export function AssistantMessage({ m, copied, onCopy, onChoose = () => {}, onSave, onSaveItem }: {
-  m: ChatMessage; copied: boolean; onCopy: () => void; onChoose?: (id: number) => void;
+export function AssistantMessage({ m, onChoose = () => {}, onSave, onSaveItem }: {
+  m: ChatMessage; onChoose?: (id: number) => void;
   onSave?: (text: string) => void; onSaveItem?: (id: number) => void;
 }) {
   const body = useRef<HTMLDivElement>(null);
@@ -51,7 +45,12 @@ export function AssistantMessage({ m, copied, onCopy, onChoose = () => {}, onSav
   });
   return (
     <div className="space-y-2">
-      <div ref={body} className="whitespace-pre-wrap break-words leading-7 text-fg">{shownText(m)}</div>
+      {/* A model's answer is drawn as Markdown with its first sentence as the summary; search hits stay as written. */}
+      <div ref={body}>
+        {m.model
+          ? <AnswerText text={m.text} summary />
+          : <div className="whitespace-pre-wrap break-words text-base leading-[1.6] text-fg">{shownText(m)}</div>}
+      </div>
       {m.item && <ItemResult item={m.item} onChoose={onChoose} onSave={onSaveItem} />}
       {everloot && (
         <div className="space-y-2 text-xs text-fg-2">
@@ -89,7 +88,7 @@ export function AssistantMessage({ m, copied, onCopy, onChoose = () => {}, onSav
         <span>{m.model ?? "Everloot search"}</span>
         {m.steps.length > 0 && <span>{m.steps.length} lookup{m.steps.length === 1 ? "" : "s"}</span>}
         {m.text !== NO_SOURCED_ANSWER && (
-          <button type="button" className="min-h-9 underline underline-offset-4 hover:text-accent" onClick={onCopy}>{copied ? "Copied" : "Copy"}</button>
+          <CopyButton text={m.text} label="Copy" className="min-h-9 underline underline-offset-4 hover:text-accent" />
         )}
         {onSave && m.text !== NO_SOURCED_ANSWER && (
           // The selection is read as the pointer goes down, before the click can move it.

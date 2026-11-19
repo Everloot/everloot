@@ -1,10 +1,18 @@
 import { AwsClient } from "aws4fetch";
-import { COVERAGE_SCHEMA, COVERAGE_TYPES, type CoverageCell, type CoverageReport } from "../../../kb/src/coverage";
+import { COVERAGE_SCHEMA, COVERAGE_TYPES, type CoverageCell, type CoverageReport } from "@kb/coverage";
+import type { PlateauReport } from "@kb/plateau";
 import { CLIENT_LAYER } from "./items";
+import { keep } from "./kept";
 import { r2Config, type R2Config } from "./upload-store";
 
 /** Where the snapshot cron keeps the coverage score for a client build: counts only, beside the corpus snapshot. */
 export const coverageKey = (build: string): string => `coverage/${build}.json`;
+
+/**
+ * The stored file's own version. 1 (no `version` field) is the score alone; 2 adds `plateau`, measured by the cron
+ * from the same records. The score inside keeps its own `schema`; readers accept both versions.
+ */
+export const COVERAGE_STORED_VERSION = 2;
 
 /**
  * The four numbers the home page shows, taken from the stored score (`coverage/<build>.json`) the cron already
@@ -63,7 +71,30 @@ export function readStoredReport(raw: unknown, build: string): CoverageReport | 
   if (raw.expected !== null && !(isObject(raw.expected) && (raw.expected.dataAsOf === null || typeof raw.expected.dataAsOf === "string"))) return null;
   if (!cellsOf(raw.totals) || !areaOf(raw.unplaced) || !isObject(raw.locate) || !Array.isArray(raw.locate.quests) || !Array.isArray(raw.locate.npcs)) return null;
   if (!Array.isArray(raw.zones) || raw.zones.length === 0 || !raw.zones.every((z) => areaOf(z) && Number.isInteger((z as { mapId?: unknown }).mapId) && typeof (z as { name?: unknown }).name === "string")) return null;
-  return raw as unknown as CoverageReport;
+  // The stored file's envelope (version 2) is not part of the score.
+  const { plateau: _plateau, version: _version, ...report } = raw;
+  return report as unknown as CoverageReport;
+}
+
+const share = (v: unknown) => v === null || (typeof v === "number" && v >= 0 && v <= 1);
+const typePlateauOf = (v: unknown) => isObject(v) && COVERAGE_TYPES.includes(v.type as never) && (v.denominator === null || count(v.denominator))
+  && count(v.confirmed) && count(v.settled) && count(v.recheck) && (v.newlyConfirmed === null || count(v.newlyConfirmed))
+  && isObject(v.shares) && share(v.shares.confirmed) && share(v.shares.settled) && share(v.shares.newlyConfirmed)
+  && (v.atPlateau === null || typeof v.atPlateau === "boolean");
+
+/**
+ * The plateau a version-2 file stores beside `report`, or null: a version-1 file has none, and one that is malformed
+ * or not measured on the same data date as the score is not shown beside it.
+ */
+export function readStoredPlateau(raw: unknown, report: CoverageReport): PlateauReport | null {
+  if (!isObject(raw) || raw.version !== COVERAGE_STORED_VERSION) return null;
+  const p = raw.plateau;
+  if (!isObject(p) || p.dataAsOf !== report.dataAsOf || typeof p.method !== "string" || !count(p.installs) || !count(p.windowInstalls)) return null;
+  if (p.windowStart !== null && typeof p.windowStart !== "string") return null;
+  if (!(p.site === null || typeof p.site === "boolean") || !count(p.refreshDays)) return null;
+  const types: unknown = p.types;
+  if (!Array.isArray(types) || !COVERAGE_TYPES.every((t) => types.some((x) => isObject(x) && x.type === t)) || !types.every(typePlateauOf)) return null;
+  return p as unknown as PlateauReport;
 }
 
 /** How long one server instance keeps the read: the cron rewrites the score at most every 10 minutes. */
@@ -71,9 +102,36 @@ const KEEP_MS = 5 * 60_000;
 /** A failed read is asked for again after a minute. */
 const RETRY_MS = 60_000;
 
-/** `okAt` is when the storage last answered for this file (a 200 or a 304); a failed refresh moves `at` but never `okAt`. */
-type Kept = { build: string; at: number; okAt: number; summary: CoverageSummary | null; report: CoverageReport | null; etag?: string };
-let kept: Kept | null = null;
+/**
+ * The parts of the stored file the readers use. `okAt` is when the storage last answered for this file (a 200 or a
+ * 304); a failed refresh keeps the last good parts but never moves `okAt`.
+ */
+type Read = { build: string; okAt: number; summary: CoverageSummary | null; report: CoverageReport | null; plateau: PlateauReport | null; etag?: string };
+
+/** One read per caller (`share: false`): a Worker cancels work one request awaits on another's behalf (release.ts). */
+const stored = keep<Read, { build: string; cloud: R2Config; fetch: typeof fetch }>(async ({ build, cloud, fetch: doFetch }, kept, now) => {
+  const last = kept?.value.build === build ? kept.value : null;
+  const retry = { keepMs: RETRY_MS };
+  try {
+    const client = new AwsClient({ accessKeyId: cloud.r2AccessKeyId, secretAccessKey: cloud.r2SecretAccessKey, service: "s3", region: "auto" });
+    const url = `https://${cloud.r2AccountId}.r2.cloudflarestorage.com/${cloud.r2Bucket}/${coverageKey(build)}`;
+    const etag = last?.summary ? last.etag : undefined;
+    const res = await doFetch(await client.sign(url, { method: "GET", headers: { "accept-encoding": "identity", ...(etag ? { "if-none-match": etag } : {}) } }));
+    if (res.status === 304 && last?.summary) return { value: { ...last, okAt: now } };
+    if (res.ok) {
+      let raw: unknown = null;
+      try { raw = JSON.parse(await res.text()); } catch { /* unreadable: summarize says null */ }
+      const summary = summarizeCoverage(raw);
+      if (!summary) return { value: { build, okAt: now, summary: null, report: null, plateau: null }, ...retry };
+      const report = readStoredReport(raw, build);
+      return { value: { build, okAt: now, summary, report, plateau: report && readStoredPlateau(raw, report), etag: res.headers.get("etag") ?? undefined } };
+    }
+    const keepLast = res.status !== 404;
+    return { value: { build, okAt: last?.okAt ?? now, summary: keepLast ? last?.summary ?? null : null, report: keepLast ? last?.report ?? null : null, plateau: keepLast ? last?.plateau ?? null : null, etag: last?.etag }, ...retry };
+  } catch {
+    return { value: { build, okAt: last?.okAt ?? now, summary: last?.summary ?? null, report: last?.report ?? null, plateau: last?.plateau ?? null, etag: last?.etag }, ...retry };
+  }
+}, { ttlMs: KEEP_MS, share: false });
 
 type Deps = { cloud?: R2Config | null; fetch?: typeof fetch; now?: () => number; build?: string };
 
@@ -81,7 +139,7 @@ type Deps = { cloud?: R2Config | null; fetch?: typeof fetch; now?: () => number;
  * The summary for the build the site reads, from the stored score: one small GET per instance every five minutes,
  * conditional on the ETag so an unchanged file is not downloaded again. Null when storage is not configured, the file
  * is missing or unreadable: the page then says "unrecorded". A failed re-read keeps the last good summary, which
- * carries its own date: a display policy for the page only, the tool's reader below does not share it. Never throws.
+ * carries its own date: a display policy for the pages only, the tool's reader below does not share it. Never throws.
  */
 export async function loadCoverageSummary(deps: Deps = {}): Promise<CoverageSummary | null> {
   return (await readKept(deps))?.summary ?? null;
@@ -100,34 +158,29 @@ export async function loadStoredCoverage(deps: Deps = {}): Promise<CoverageRepor
   return k?.report && (deps.now ?? Date.now)() - k.okAt < KEEP_MS ? k.report : null;
 }
 
-async function readKept(deps: Deps): Promise<Kept | null> {
+/**
+ * What the coverage pages show, from the same read: the stored score and, when the cron has stored it (version 2),
+ * the plateau measured beside it. The pages never compute the score themselves: null (storage not configured, the
+ * file missing, unreadable or for another build) renders "unreachable". Like the home page, a failed refresh keeps
+ * the last good copy, which the pages print with its data date. Never throws.
+ */
+export async function loadCoverageForPages(deps: Deps = {}): Promise<{ report: CoverageReport; plateau: PlateauReport | null } | null> {
+  const k = await readKept(deps);
+  return k?.report ? { report: k.report, plateau: k.plateau } : null;
+}
+
+async function readKept(deps: Deps): Promise<Read | null> {
   const now = (deps.now ?? Date.now)();
   const build = deps.build ?? CLIENT_LAYER.build.version;
-  if (kept && kept.build === build && now - kept.at < KEEP_MS) return kept;
-  const last = kept?.build === build ? kept : null;
-  try {
-    const cloud = deps.cloud === undefined ? r2Config() : deps.cloud;
-    if (!cloud) return null;
-    const client = new AwsClient({ accessKeyId: cloud.r2AccessKeyId, secretAccessKey: cloud.r2SecretAccessKey, service: "s3", region: "auto" });
-    const url = `https://${cloud.r2AccountId}.r2.cloudflarestorage.com/${cloud.r2Bucket}/${coverageKey(build)}`;
-    const etag = last?.summary ? last.etag : undefined;
-    const res = await (deps.fetch ?? fetch)(await client.sign(url, { method: "GET", headers: { "accept-encoding": "identity", ...(etag ? { "if-none-match": etag } : {}) } }));
-    if (res.status === 304 && last?.summary) {
-      kept = { ...last, at: now, okAt: now };
-    } else if (res.ok) {
-      let raw: unknown = null;
-      try { raw = JSON.parse(await res.text()); } catch { /* unreadable: summarize says null */ }
-      const summary = summarizeCoverage(raw);
-      kept = summary ? { build, at: now, okAt: now, summary, report: readStoredReport(raw, build), etag: res.headers.get("etag") ?? undefined } : { build, at: now - KEEP_MS + RETRY_MS, okAt: now, summary: null, report: null };
-    } else {
-      const keep = res.status !== 404;
-      kept = { build, at: now - KEEP_MS + RETRY_MS, okAt: last?.okAt ?? now, summary: keep ? last?.summary ?? null : null, report: keep ? last?.report ?? null : null, etag: last?.etag };
-    }
-  } catch {
-    kept = { build, at: now - KEEP_MS + RETRY_MS, okAt: last?.okAt ?? now, summary: last?.summary ?? null, report: last?.report ?? null, etag: last?.etag };
-  }
-  return kept;
+  const hit = stored.fresh(now);
+  if (hit?.value.build === build) return hit.value;
+  let cloud: R2Config | null;
+  try { cloud = deps.cloud === undefined ? r2Config() : deps.cloud; } catch { return null; }
+  if (!cloud) return null;
+  // A fresh copy of another build would be served as-is: drop it and read this build's own file.
+  if (hit) stored.forget();
+  return stored.get({ build, cloud, fetch: deps.fetch ?? fetch }, now);
 }
 
 /** For tests: forget the kept read. */
-export const forgetCoverageSummary = () => { kept = null; };
+export const forgetCoverageSummary = () => stored.forget();

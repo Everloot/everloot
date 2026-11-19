@@ -2,8 +2,9 @@ import { loadItemTips, loadSiteAssets, unknownItemIcon } from "./game-assets";
 import { loadShownNames, type ShownNames } from "./shown-item-names";
 
 /**
- * The game icons of the items a search result list shows (/search and the type-ahead), by id: only for items
- * whose page shows its game file tooltip (`showsTip`, the item lists' rule), and only the few ids asked for.
+ * The game icons of the items a search result list shows (/search and the type-ahead), by id. This file is the
+ * asset half only: which items may show one is `showsTip` in shown-item-names.ts (the policy at the top of names.ts),
+ * and only the few ids asked for are read.
  * `unknown` is the game's question mark from the same asset folder, for a row without one; null when no icon
  * was read. Pages only, like the names it reads. Empty without the asset files.
  */

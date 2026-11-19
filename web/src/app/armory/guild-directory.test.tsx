@@ -13,7 +13,8 @@ vi.mock("next/link", () => ({
 }));
 vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
-  usePathname: () => "/armory/guilds", useRouter: () => ({ push: () => {} }), useSearchParams: () => new URLSearchParams(),
+  permanentRedirect: (to: string) => { throw new Error(`NEXT_REDIRECT 308 ${to}`); },
+  usePathname: () => "/guilds", useRouter: () => ({ push: () => {} }), useSearchParams: () => new URLSearchParams(),
 }));
 
 const holder = vi.hoisted(() => ({ store: null as ArmoryStore | null }));
@@ -38,16 +39,26 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); held.__everlootPlayers = undefined; });
 
 const pages = {
-  directory: async (search: Record<string, string> = {}) => (await import("./guilds/page")).default({ searchParams: Promise.resolve(search) }),
+  directory: async (search: Record<string, string> = {}) => (await import("../guilds/page")).default({ searchParams: Promise.resolve(search) }),
+  moved: async (search: Record<string, string | string[]> = {}) => (await import("./guilds/page")).default({ searchParams: Promise.resolve(search) }),
   guild: async (region: string, slug: string) => (await import("./[region]/guilds/[slug]/page")).default({ params: Promise.resolve({ region, slug }) }),
   board: async (metric: string) => (await import("./rankings/[metric]/page")).default({ params: Promise.resolve({ metric }), searchParams: Promise.resolve({}) }),
 };
 const html = async (page: Promise<React.ReactElement>) => renderToStaticMarkup(await page);
 
 describe("the guild directory", () => {
-  test("is a 404 with the armory switch off", async () => {
+  test("is a 404 on /guilds with the armory and guild switches off", async () => {
     vi.stubEnv("EVERLOOT_ARMORY", "");
     await expect(pages.directory()).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+
+  test("its old address redirects to /guilds for good, the filters carried over under their new names", async () => {
+    await expect(pages.moved()).rejects.toThrow("NEXT_REDIRECT 308 /guilds");
+    await expect(pages.moved({ q: "ash", region: "us", ruleset: "roleplay-pvp", sort: "level-60", page: "2" }))
+      .rejects.toThrow("NEXT_REDIRECT 308 /guilds?q=ash&region=us&rules=roleplay-pvp&sort=level-60&p=2");
+    // The switch does not matter: the address moved either way.
+    vi.stubEnv("EVERLOOT_ARMORY", "");
+    await expect(pages.moved({ q: "émber" })).rejects.toThrow("NEXT_REDIRECT 308 /guilds?q=%C3%A9mber");
   });
 
   test("lists guilds by members read with region chips, counts, the credit and sort and filter links in the address", async () => {
@@ -58,10 +69,29 @@ describe("the guild directory", () => {
     expect(out).toContain("text-region-eu");
     expect(out).toContain(">53.7<");
     expect(out).toContain(BLIZZARD_CREDIT);
-    expect(out).toContain('href="/armory/guilds?sort=item-level"');
-    expect(out).toContain('href="/armory/guilds?sort=level-60"');
-    expect(out).toContain('href="/armory/guilds?region=us"');
-    expect(out).toContain('href="/armory/guilds?ruleset=roleplay-pvp"');
+    expect(out).toContain('href="/guilds?sort=item-level"');
+    expect(out).toContain('href="/guilds?sort=level-60"');
+    expect(out).toContain('href="/guilds?region=us"');
+    expect(out).toContain('href="/guilds?rules=roleplay-pvp"');
+  });
+
+  test("leaves out a disbanded guild (Blizzard's DELETED record) from the rows and the counts, and says so", async () => {
+    mem.putGuild(armoryGuild({ region: "us", slug: "old-oath", guildId: 78, name: "DELETED", memberCount: 0 }), []);
+    const out = await html(pages.directory());
+    expect(out).not.toContain(">DELETED<");
+    expect(out).not.toContain("old-oath");
+    expect(out).toContain("Ash Pact");
+    expect(out).toContain("Disbanded guilds are left out of this list and its counts.");
+    expect((await mem.guildDirectory({ prefix: null, region: null, rulesetId: null, sort: "members", limit: 50, offset: 0 }))!.total).toBe(2);
+    expect((await mem.counts()).reduce((n, c) => n + c.guilds, 0)).toBe(2);
+    // A cloud answer that still carries the row (the migration not yet applied) is filtered on the page too.
+    const { loadGuildDirectory, guildDirectoryQuery, isDisbandedGuild } = await import("@/lib/armory-guilds");
+    expect(isDisbandedGuild("DELETED")).toBe(true);
+    expect(isDisbandedGuild("Deleted Dreams")).toBe(false);
+    const row = { region: "us", slug: "old-oath", name: "DELETED", faction: "Alliance", ruleset_id: 1, ruleset: "PvP", member_count: 0, members_read: 0, average_item_level: null, level_60: 0, fetched_at: "2026-11-09T09:00:00.000Z", total: 1 };
+    holder.store = createCloudArmoryStore((async () => [row]) as never);
+    const dir = await loadGuildDirectory(guildDirectoryQuery({}), new Set());
+    expect(dir.state === "ready" && dir.rows).toEqual([]);
   });
 
   test("searches by name prefix, keeps filters in the form, and says when nothing matches", async () => {
@@ -76,8 +106,8 @@ describe("the guild directory", () => {
   test("pages through the list with page in the address", async () => {
     for (let i = 0; i < 55; i++) mem.putGuild(armoryGuild({ slug: `hall-${i}`, name: `Hall ${String(i).padStart(2, "0")}` }), []);
     const first = await html(pages.directory());
-    expect(first).toContain('href="/armory/guilds?page=2"');
-    const second = await html(pages.directory({ page: "2" }));
+    expect(first).toContain('href="/guilds?p=2"');
+    const second = await html(pages.directory({ p: "2" }));
     expect(second).toContain("Hall 54");
     expect(second).not.toContain("Ember Wardens");
   });
@@ -120,7 +150,7 @@ describe("the guild page summary", () => {
     expect(out).toMatch(/text-class-warrior[^>]*>Warrior<\/span> <span[^>]*>1</);
     expect(out).toContain("53.7 (2 read)");
     expect(out).toContain("2026-11-09");
-    expect(out).toContain("Guild directory"); // the BreadcrumbList runs Armory › Guild directory › the guild
+    expect(out).toContain('"name":"Guilds","item":"https://everloot.app/guilds"'); // the trail runs Home › Guilds › the guild
     expect(out).toContain('href="/armory/eu/torvin-ashbrook"');
   });
 

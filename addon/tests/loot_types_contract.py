@@ -329,7 +329,68 @@ UnitGUID = function(unit) if unit == 'softinteract' then error('secret') end ret
 emptyWindow()
 assert(#rows() == count, 'an unreadable interact unit: no guess')
 UnitGUID, UnitIsDead, UnitIsTapDenied, IsFishingLoot = function() end, nil, nil, nil
+
+-- A herb, ore or skinning window carries the player's rank in that skill, matched by skill line in the profession
+-- book (Herbalism 182, Mining 186, Skinning 393), as the game's own book reads it. No other window carries one.
+count = #rows()
+local book = { [3] = { 'Herbalism', 'icon', 75, 150, 2, 0, 182, 15 }, [5] = { 'Mining', 'icon', 120, 150, 2, 0, 186, 0 },
+  [7] = { 'Skinning', 'icon', 40, 75, 2, 0, 393, 0 } }
+GetProfessions = function() return 3, 5, nil, nil, nil end
+GetProfessionInfo = function(index) local p = book[index]; if p then return unpack(p) end end
+event('UNIT_SPELLCAST_SENT', 'player', 'Peacebloom', 'Cast-40', 2366)
+window('GameObject-0-1-2-3-1618-0000000060', { { 2447, 1 } })
+assert(last().lootType == 'gather' and last().gatherKind == 'herb' and last().gatherSkill == 90, 'rank plus bonus (75 + 15), what the node is checked against')
+event('UNIT_SPELLCAST_SENT', 'player', 'Copper Vein', 'Cast-41', 2575)
+window('GameObject-0-1-2-3-1731-0000000060', { { 2770, 1 } })
+assert(last().gatherKind == 'ore' and last().gatherSkill == 120)
+event('UNIT_SPELLCAST_SENT', 'player', 'Bloom', 'Cast-42', 2366)
+window('Creature-0-1-2-3-320-0000000001', { { 2447, 1 } })
+assert(last().lootType == 'skinning' and last().gatherSkill == 90, 'herb gathering on a creature is Herbalism, bonus included')
+event('UNIT_SPELLCAST_SENT', 'player', 'Wolf', 'Cast-43', 8613)
+event('UNIT_SPELLCAST_SUCCEEDED', 'player', 'Cast-43', 8613)
+window('Creature-0-1-2-3-321-0000000001', { { 783, 1 } })
+assert(last().lootType == 'skinning' and last().gatherSkill == nil, 'a skill the book does not hold is left out')
+GetProfessions = function() return 7, 5 end
+event('UNIT_SPELLCAST_SENT', 'player', 'Wolf', 'Cast-44', 8613)
+event('UNIT_SPELLCAST_SUCCEEDED', 'player', 'Cast-44', 8613)
+window('Creature-0-1-2-3-322-0000000001', { { 783, 1 } })
+assert(last().lootType == 'skinning' and last().gatherSkill == 40)
+event('UNIT_SPELLCAST_SENT', 'player', 'Battered Chest', 'Cast-45', 3365)
+window('GameObject-0-1-2-3-2843-0000000060', { { 2589, 1 } })
+assert(last().gatherKind == 'chest' and last().gatherSkill == nil, 'a chest has no gathering skill')
+window('GameObject-0-1-2-3-2843-0000000061', { { 2589, 1 } })
+assert(last().lootType == 'gather' and last().gatherSkill == nil, 'no cast, no skill')
+window('Creature-0-1-2-3-323-0000000001', { { 2589, 1 } })
+assert(last().lootType == 'kill' and last().gatherSkill == nil)
+-- A value the client cannot give is left out, never guessed: an error, a secret, a rank past 500, no profession API.
+local function herbWindow(n)
+  event('UNIT_SPELLCAST_SENT', 'player', 'Peacebloom', 'Cast-5' .. n, 2366)
+  window('GameObject-0-1-2-3-1618-000000007' .. n, { { 2447, 1 } })
+  assert(last().gatherKind == 'herb', 'window ' .. n)
+  return last().gatherSkill
+end
+GetProfessions = function() return 3 end
+GetProfessionInfo = function() error('unavailable') end
+assert(herbWindow(1) == nil)
+GetProfessionInfo = function() return 'Herbalism', 'icon', 501, 525, 2, 0, 182, 0 end
+assert(herbWindow(2) == nil)
+-- A bonus the client cannot give (missing or secret) counts as none: the rank alone is still a true lower bound.
+GetProfessionInfo = function() return 'Herbalism', 'icon', 75, 150, 2, 0, 182, nil end
+assert(herbWindow(6) == 75, 'no bonus value: the rank alone')
+issecretvalue = function(v) return v == 15 end
+GetProfessionInfo = function(index) local p = book[index]; if p then return unpack(p) end end
+assert(herbWindow(7) == 75, 'a secret bonus: the rank alone')
+issecretvalue = nil
+issecretvalue = function(v) return v == 75 end
+GetProfessionInfo = function(index) local p = book[index]; if p then return unpack(p) end end
+assert(herbWindow(3) == nil)
+issecretvalue = nil
+GetProfessions = function() error('unavailable') end
+assert(herbWindow(4) == nil)
+GetProfessions, GetProfessionInfo = nil, nil
+assert(herbWindow(5) == nil)
+assert(#rows() == count + 15)
 """)
 counts = check_all(lua)
 # The two item_seen rows: the disenchanted bracers (with their level) and the dust it gave.
-assert counts == {"loot": 38, "item_seen": 2}, counts
+assert counts == {"loot": 53, "item_seen": 2}, counts

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { CHOOSER_FILES, parseClassChooser, type ClassChooserData } from "../../../kb/src/guides/class-chooser";
+import { CHOOSER_FILES, parseClassChooser, type ClassChooserData } from "@kb/guides/class-chooser";
 import { chooserReviewed } from "./class-chooser";
 import { guidesDir } from "./guides";
 

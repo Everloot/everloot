@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { callbackUrl, DESKTOP_KEY_LABEL, sealForDesktop, type ConnectRequest } from "@/lib/desktop-connect";
 
-const primary = "inline-flex items-center justify-center min-h-11 px-5 rounded-lg bg-accent text-bg text-sm font-semibold hover:bg-accent/90 disabled:opacity-60";
-const secondary = "inline-flex items-center justify-center min-h-11 px-4 rounded-lg border border-line text-sm text-fg hover:text-accent disabled:opacity-60";
+const primary = "inline-flex items-center justify-center min-h-11 px-5 rounded-control bg-accent text-bg text-sm font-semibold hover:bg-accent/90 disabled:opacity-60";
+const secondary = "inline-flex items-center justify-center min-h-11 px-4 rounded-control border border-line text-sm text-fg hover:text-accent disabled:opacity-60";
 
 /**
  * The confirm step: Connect makes a key named "Everloot Desktop App" (with the saved-builds permission when
@@ -46,10 +46,10 @@ export default function DesktopConnect({ request, name, links = false }: { reque
         <li>Chat and the in-game <code>/ask</code> count against your account, with a higher limit.</li>
         <li>Your saved talent builds sync into the game.</li>
         {links && <li>Codes you type with <code>/everloot link</code> in game are sent to your account, to link those characters.</li>}
-        <li>It gets a key named <b>Everloot Desktop App</b>. You can revoke it any time on <Link href="/account" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">your account</Link>. Uploads never carry it, and the app never sees your Battle.net password.</li>
+        <li>It gets a key named <b>Everloot Desktop App</b>. You can disconnect it any time in <Link href="/settings#integrations" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Settings</Link>. Uploads never carry it, and the app never sees your Battle.net password.</li>
       </ul>
       {done === "connected" ? (
-        <p role="status" className="text-fg">Connected. Go back to the Desktop App; you can close this tab. If the app does not show you signed in (it stops waiting after five minutes), press Sign in there again and revoke the unused key on <Link href="/account" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">your account</Link>.</p>
+        <p role="status" className="text-fg">Connected. Go back to the Desktop App; you can close this tab. If the app does not show you signed in (it stops waiting after five minutes), press Sign in there again and disconnect the unused key in <Link href="/settings#integrations" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Settings</Link>.</p>
       ) : done === "cancelled" ? (
         <p role="status" className="text-fg-2">Cancelled. Nothing was made. You can close this tab.</p>
       ) : (
@@ -58,7 +58,7 @@ export default function DesktopConnect({ request, name, links = false }: { reque
           <button type="button" className={secondary} onClick={cancel} disabled={busy}>Cancel</button>
         </div>
       )}
-      {error && <p role="alert" className="text-sm text-fg">{error} {/keys/.test(error) && <Link href="/account" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Manage your keys</Link>}</p>}
+      {error && <p role="alert" className="text-sm text-fg">{error} {/keys/.test(error) && <Link href="/settings#integrations" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Manage your keys</Link>}</p>}
     </article>
   );
 }

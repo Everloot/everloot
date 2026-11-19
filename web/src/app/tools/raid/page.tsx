@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import RaidView, { TITLE, description } from "@/components/RaidView";
+import RaidView, { TITLE, description } from "./RaidView";
 import { getTool } from "@/data/tools";
 import { pageMetadata } from "@/lib/seo";
 

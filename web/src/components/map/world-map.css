@@ -1,6 +1,6 @@
 /* The world map's look, on top of Leaflet's own stylesheet. Colours are the design tokens. */
 
-/* The full-screen shell (components/WorldMapView.tsx). A desk: the sidebar is a 320 px column beside the map, and
+/* The full-screen shell (app/map/WorldMapView.tsx). A desk: the sidebar is a 320 px column beside the map, and
    collapsed it is a 48 px rail. */
 @media (min-width: 768px) {
   [data-map-shell][data-collapsed] [data-map-panel],
