@@ -87,6 +87,34 @@ function wikiNpcNames(facts: WorldFacts & { unreachable?: boolean }, wiki: WikiE
   return out;
 }
 
+// The same rule from the stored names file (search-names-store.ts): its candidates are the unanimous names already
+// worked out, so the match is one map lookup each. Kept per file and wiki file version.
+const wikiCandidateMemo = new WeakMap<object, WeakMap<object, Map<number, { name: string }>>>();
+function wikiNamesOfCandidates(candidates: Map<number, string>, wiki: WikiEntityNames | null): Map<number, { name: string }> | null {
+  if (!wiki?.names.size) return null;
+  let inner = wikiCandidateMemo.get(candidates);
+  if (!inner) { inner = new WeakMap(); wikiCandidateMemo.set(candidates, inner); }
+  let out = inner.get(wiki);
+  if (!out) {
+    out = new Map();
+    for (const [id, candidate] of candidates) { const hit = wiki.names.get(candidate); if (hit) out.set(id, { name: hit.name }); }
+    inner.set(wiki, out);
+  }
+  return out;
+}
+
+/** `shownSearchNames` from the stored names file: the same merges, with the file's agreed names and NPC candidates. */
+export function shownSearchNamesFromStored(stored: { names: Names; candidates: Map<number, string> }, sources: {
+  matched: ItemNames | null; quests: QuestNames | null; npcWiki: WikiEntityNames | null;
+}): Names {
+  return {
+    items: mergedOnce(stored.names.items, sources.matched?.names),
+    npcs: mergedOnce(stored.names.npcs, wikiNamesOfCandidates(stored.candidates, sources.npcWiki)),
+    objects: stored.names.objects,
+    quests: mergedOnce(stored.names.quests, sources.quests?.names),
+  };
+}
+
 /**
  * Item names, NPC names, object names and quest titles as the pages print them, for the site's own search: the name
  * 3 installs agree on, else the game files and Warcraft Wiki match for items, the Warcraft Wiki name a unanimous report

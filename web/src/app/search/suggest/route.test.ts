@@ -5,20 +5,27 @@ const mocks = vi.hoisted(() => ({
   agreed: { items: new Map<number, string>(), npcs: new Map([[448, "Hogger"]]), objects: new Map<number, string>(), quests: new Map<number, string>() },
   matched: new Map([[19019, { name: "Thunderfury, Blessed Blade of the Windseeker", color: "#ff8000", wikiPage: "x" }], [647, { name: "Destiny", color: "#a335ee", wikiPage: "y" }]]),
   quests: new Map([[176, { name: "Wanted: Hogger", wikiPage: "z" }]]),
+  // The stored names file, none unless a test sets it; and how often the aggregate-backed names were read.
+  stored: null as unknown,
+  shownReads: 0,
+  objectReads: 0,
 }));
+vi.mock("@/lib/search-names-store", () => ({ loadStoredSearchNames: async () => mocks.stored }));
 vi.mock("@/lib/names", () => ({ loadNames: async () => mocks.agreed }));
 vi.mock("@/lib/shown-item-names", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/shown-item-names")>(),
-  loadShownNames: async () => ({ matched: { names: mocks.matched }, showsTip: (id: number) => mocks.matched.has(id) }),
+  loadShownNames: async () => { mocks.shownReads++; return { matched: { names: mocks.matched }, showsTip: (id: number) => mocks.matched.has(id) }; },
 }));
 vi.mock("@/lib/game-assets", () => ({
   loadQuestNames: async () => ({ names: mocks.quests }),
+  loadItemNames: async () => ({ names: mocks.matched }),
+  PRIVATE_UNREACHABLE: Symbol("private bucket unreachable"),
   loadSiteAssets: async () => ({ base: "https://assets.everloot.app/b" }),
   unknownItemIcon: (base: string) => `${base}/icons/134400.webp`,
   // Only Thunderfury has an icon in these game files.
   loadItemTips: async (_a: unknown, ids: number[]) => new Map(ids.filter((id) => id === 19019).map((id) => [id, { icon: "https://assets.everloot.app/b/icons/1.webp" }])),
 }));
-vi.mock("@/lib/objects", () => ({ loadObjectFacts: async () => ({ rates: [], measuredZeros: [], names: [], unreachable: false }) }));
+vi.mock("@/lib/objects", () => ({ loadObjectFacts: async () => { mocks.objectReads++; return { rates: [], measuredZeros: [], names: [], unreachable: false }; } }));
 
 import { GET } from "./route";
 import { GET as apiGET } from "../../api/suggest/route";
@@ -61,4 +68,23 @@ test("a wrong scope or an overlong query is a 400 that is not cached", async () 
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect(res.headers.get("cdn-cache-control")).toBeNull();
   }
+});
+
+
+test("with the stored names file the type-ahead reads no item facts: names and icons come from the file and the game files", async () => {
+  mocks.stored = {
+    generatedAt: "2026-11-19T06:00:00.000Z", dataAsOf: "2026-11-19T06:00:00.000Z",
+    names: { items: new Map([[1003, "Linen Cloth"]]), npcs: new Map([[448, "Hogger"]]), objects: new Map([[600, "Copper Vein"], [601, "Silver Vein"]]), quests: new Map() },
+    candidates: new Map(), dropped: new Set([1003]), objectIds: new Set([600]),
+  };
+  mocks.shownReads = 0;
+  mocks.objectReads = 0;
+  expect((await get("?q=linen"))[0]).toMatchObject({ label: "Linen Cloth", href: "/database/items/1003" });
+  // Only an object the list shows is suggested, from the file's ids: no object facts are read.
+  expect((await get("?q=vein")).map((r) => r.href)).toEqual(["/database/objects/600"]);
+  expect(mocks.objectReads).toBe(0);
+  expect((await get("?q=hogger"))[0]).toMatchObject({ label: "Hogger" });
+  expect((await get("?q=thunderfury"))[0]).toMatchObject({ label: "Thunderfury, Blessed Blade of the Windseeker", icon: "https://assets.everloot.app/b/icons/1.webp" });
+  expect(mocks.shownReads).toBe(0);
+  mocks.stored = null;
 });
