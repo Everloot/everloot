@@ -98,18 +98,18 @@ function SearchStart() {
 /** The quest and NPC rows behind the overview's hits, as the lists draw them. */
 interface OverviewFacts { quests: Map<number, QuestRow>; npcs: Map<number, NpcRow> }
 const NO_FACTS: OverviewFacts = { quests: new Map(), npcs: new Map() };
-type FactsRead = Promise<[Awaited<ReturnType<typeof loadWorldFacts>>, Awaited<ReturnType<typeof computeRollups>>] | null>;
 
 /**
  * The level, side and category of the quests the overview lists, and the level, type, zone and public drop count of
- * its NPCs: the same rows /database/quests and /database/npcs build, from the same aggregate, narrowed to these ids
- * so a row never says more than its page. Nothing when the aggregate is out of reach.
+ * its NPCs: the same rows /database/quests and /database/npcs build, from the same aggregate (the one the object
+ * group of the search already read this request), narrowed to these ids so a row never says more than its page.
+ * Read only when a quest or an NPC was found; nothing when the aggregate is out of reach.
  */
-async function overviewFacts(groups: SearchGroup[], read: FactsRead | null): Promise<OverviewFacts> {
+async function overviewFacts(groups: SearchGroup[]): Promise<OverviewFacts> {
   const ids = (type: SearchType) => new Set(groups.find((g) => g.type === type)?.results.flatMap((r) => (r.id === undefined ? [] : [r.id])) ?? []);
   const questIds = ids("quest"), npcIds = ids("npc");
-  if (!read || (questIds.size === 0 && npcIds.size === 0)) return NO_FACTS;
-  const got = await read;
+  if (questIds.size === 0 && npcIds.size === 0) return NO_FACTS;
+  const got = await Promise.all([loadWorldFacts(), computeRollups()]).catch(() => null);
   if (!got || got[0].unreachable) return NO_FACTS;
   const [facts, rollup] = got;
   const quests = questIds.size ? publicQuests({ ...facts, quests: facts.quests.filter((r) => questIds.has(r.questId)) }) : [];
@@ -130,14 +130,12 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
 
   // Reuse item facts only within this render; the next request rechecks publication.
   const shown = q ? loadShownNames() : undefined;
-  // The aggregate the quest and NPC facts come from starts now; the object group of the search reads the same one.
-  const factsRead: FactsRead | null = q ? Promise.all([loadWorldFacts(), computeRollups()]).catch(() => null) : null;
   // Matched on the names the database pages show, so a name a list prints is found here too.
   const groups = q ? await siteSearch(q, { limit: OVERVIEW_LIMIT, names: loadShownSearchNames(shown) }) : null;
   // The game icon beside each item hit, where its page shows one, and the facts beside each quest and NPC hit.
   const [{ icons, unknown }, facts] = await Promise.all([
     shownItemIcons(groups?.find((g) => g.type === "item")?.results.flatMap((r) => (r.id === undefined ? [] : [r.id])) ?? [], shown),
-    overviewFacts(groups ?? [], factsRead),
+    overviewFacts(groups ?? []),
   ]);
   const base = `/search?q=${encodeURIComponent(q)}`;
   // The overview also lists characters and guilds when their pages are on and the text could start a name. The
