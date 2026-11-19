@@ -85,7 +85,7 @@ const source = (path: string) => resolve(process.cwd(), "src", path);
 
 const $ = <T extends Element = HTMLElement>(sel: string) => container.querySelector<T>(sel)!;
 const button = (label: string, scope: ParentNode = container) =>
-  Array.from(scope.querySelectorAll("button")).find((b) => b.getAttribute("aria-label") === label || b.textContent?.trim() === label)!;
+  Array.from(scope.querySelectorAll("button")).find((b) => b.getAttribute("aria-label") === label || (b.querySelector("[data-copy-labels] > span") ?? b).textContent?.trim() === label)!;
 const click = (el: Element) => act(async () => (el as HTMLElement).click());
 const shell = () => $("[data-map-shell]");
 const panel = () => $("#map-panel");

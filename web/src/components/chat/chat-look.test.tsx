@@ -38,7 +38,7 @@ test("a card shows the game icon when the page has one, and the drawn glyph with
 
 test("an answer's pages are source cards that say what each page is; cited sources say they open a new tab", () => {
   const html = renderToStaticMarkup(
-    <AssistantMessage copied={false} onCopy={() => {}} m={{
+    <AssistantMessage m={{
       role: "assistant", text: "Humanoids drop it.", at: "", model: "m", steps: [],
       pages: ["https://everloot.app/database/item/2589", "https://everloot.app/database/npcs/1"],
       sources: ["https://warcraft.wiki.gg/wiki/Linen_Cloth (CC-BY-SA-4.0, retrieved 2023-11-13)"],

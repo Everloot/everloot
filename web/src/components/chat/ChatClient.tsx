@@ -97,7 +97,6 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
   const [live, setLive] = useState<ChatProgress | null>(null);
   const [error, setError] = useState("");
   const [signed, setSigned] = useState<boolean | null>(null);
-  const [copied, setCopied] = useState<number | null>(null);
   const [railOpen, setRailOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [own, setOwn] = useState<Characters>({ characters: [], builds: [] });
@@ -578,10 +577,6 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
     if (c.id === currentId) newChat();
   }
 
-  async function copy(i: number, text: string) {
-    try { await navigator.clipboard.writeText(text); setCopied(i); setTimeout(() => setCopied(null), 1500); } catch { /* the browser refused; nothing to undo */ }
-  }
-
   async function createProject(name: string): Promise<string | null> {
     const o = ws.opts();
     if (!o) return "Sign in to create projects.";
@@ -808,7 +803,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
                   <div role="log" aria-label="Conversation" aria-relevant="additions" className="space-y-6">
                     {messages.map((m, i) => m.role === "user"
                       ? <UserMessage key={i} m={m} />
-                      : <AssistantMessage key={i} m={m} copied={copied === i} onCopy={() => void copy(i, m.text)} onChoose={(item) => choose(i, item)}
+                      : <AssistantMessage key={i} m={m} onChoose={(item) => choose(i, item)}
                           {...(inAccount && !busy ? {
                             onSave: (text: string) => setSaving({ kind: "answer", title: messages[i - 1]?.text ?? "Saved answer", text, sources: m.sources }),
                             onSaveItem: (id: number) => setSaving({ kind: "page", href: `/database/items/${id}`, title: `/database/items/${id}` }),
