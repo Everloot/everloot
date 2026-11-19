@@ -56,6 +56,19 @@ lost on an unsold auction, or when this house's current market value after the c
 note when the disenchant estimate's materials beat both. Stale, thin or incomplete prices say nothing. It reads
 Blizzard's own sell window and never changes a price or posts; Esc > Options > AddOns > Everloot > Auction House
 turns it off.
+The Everloot tab's **Vendor these** button lists the bag items this house pays less for than a vendor, by its current
+market values after the cut, or for so little more that the shortest auction's deposit cancels the gain; items are
+grouped across stacks, with what vendoring and posting them would bring. It is a list only: nothing is sold or posted.
+Two helpers are on in a new install, each with its own switch. In the Sell tab, once the house's search has answered
+with none of the item listed, and only while the game's own setting to fill in auction prices is on and no starting bid
+was typed, Everloot replaces Blizzard's default (a multiple of the vendor price) with this house's current market value, rounded
+down to whole silver where the house takes no copper, and only when posting at it beats a vendor by more than the
+deposit; a matched listing and a price you typed are never changed, and posting is always your own press of Post. If
+the game ever blocks an action and blames Everloot while such a price is in the box, the fill turns itself off and says
+so in chat. At a
+merchant, a button under the window sells up to 12 stacks per press (what the buyback tab can undo) of items a vendor
+pays more for than your auction house after its cut; items on a shopping list are kept, and greys stay with Blizzard's
+Sell All Junk button.
 Below the prices, the tooltip shows where the item drops when three installs looted the source: each rate as
 drops of loot windows, with its installs and the date of the uploads behind it, from the drop rates the Desktop
 App writes into the same `EverlootPrices` file. Once that file is in the game, a missing price or drop source is

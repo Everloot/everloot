@@ -23,6 +23,10 @@ O.ROWS = {
     text = "Explain scanning once in chat when you first visit an auction house. No floating popup. Scanning works either way." },
   { key = "sellCheck", group = "auction", field = true, live = true, label = "Vendor check when you sell",
     text = "In the Sell tab, a line under Post when a vendor pays more than your price brings in after the house's cut, when the gain is smaller than the deposit you lose if it does not sell, or when disenchanting looks better. Never changes a price or posts. Records nothing; applies at once." },
+  { key = "sellPrice", group = "auction", field = true, live = true, label = "Suggested price when nothing is listed",
+    text = "When the house lists none of the item you put in the Sell tab, Everloot fills in this house's market value instead of Blizzard's multiple of the vendor price, only when that beats a vendor by more than the deposit. Never changes a matched listing or a price you typed, and never posts. Applies at once." },
+  { key = "merchantSell", group = "helpers", field = true, live = true, label = "Sell low-value items at merchants",
+    text = "A button under the merchant window sells, one press at a time, up to 12 stacks a vendor pays more for than your auction house after its cut. The buyback tab undoes them; items on a shopping list are kept. Greys stay with Blizzard's Sell All Junk button. Applies at once." },
   { key = "autoVendor", group = "helpers", command = "vendor", field = true, defaultOff = true, label = "Sell greys and repair at merchants",
     text = "When a merchant window opens: sells grey items and repairs with your own gold, never the guild bank. Records nothing itself." },
   { key = "mailCollect", group = "helpers", command = "mail", field = true, defaultOff = true, label = "Collect all at the mailbox",
@@ -600,12 +604,12 @@ O.SETUP = {
   everything = {
     toggles = { openworld = true, professions = true, mapbounds = true, auctions = true, window = true,
       gold = true, roster = true, guild = true },
-    fields = { scanPrompt = true, sellCheck = true, minimapButton = true, tooltip = "full", tooltipMarket = true, tooltipHistory = true, tooltipSources = true, tooltipDisenchant = true },
+    fields = { scanPrompt = true, sellCheck = true, sellPrice = true, merchantSell = true, minimapButton = true, tooltip = "full", tooltipMarket = true, tooltipHistory = true, tooltipSources = true, tooltipDisenchant = true },
   },
   collect = {
     toggles = { openworld = true, professions = true, mapbounds = true, auctions = true, window = false, buttons = false,
       gold = false, roster = false, guild = false },
-    fields = { scanPrompt = false, sellCheck = false, minimapButton = false, tooltip = "off", autoVendor = false, mailCollect = false },
+    fields = { scanPrompt = false, sellCheck = false, sellPrice = false, merchantSell = false, minimapButton = false, tooltip = "off", autoVendor = false, mailCollect = false },
   },
 }
 

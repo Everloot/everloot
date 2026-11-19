@@ -37,6 +37,14 @@ function sellFrame()
   f.GetTotalPrice = function(self) return (rawget(self, 'quantity') or 1) * (rawget(self, 'unit') or 0) end
   f.UpdatePostState = function(self) self.updated = (rawget(self, 'updated') or 0) + 1 end
   f.PostItem = function() posted = posted + 1 end
+  -- The price box, Blizzard's default (a multiple of the vendor price) and the price of a matched listing.
+  f.PriceInput = {
+    GetAmount = function() return rawget(f, 'unit') or 0 end,
+    SetAmount = function(_, v) f.unit = v; f:UpdatePostState() end,
+  }
+  f.GetDefaultPrice = function(self) return rawget(self, 'default') or 100 end
+  f.GetSearchResultPrice = function(self) return rawget(self, 'searchPrice') end
+  f.UpdatePriceSelection = function(self) end
   return f
 end
 function setSell(f, id, unit, quantity, deposit)
@@ -100,7 +108,7 @@ local S = Everloot.SellCheck
 AuctionHouseFrame = { ItemSellFrame = sellFrame(), CommoditiesSellFrame = sellFrame() }
 local items, goods = AuctionHouseFrame.ItemSellFrame, AuctionHouseFrame.CommoditiesSellFrame
 assert(S.Attach() and S.Attach(), 'attaching twice is harmless')
-assert(#hooks == 2, 'one hook per sell frame, not one per attach')
+assert(#hooks == 4, 'the post state and the price selection of each sell frame, hooked once')
 local note = S.notes[goods]
 assert(note and not note:IsShown())
 local own = {}
@@ -211,8 +219,333 @@ S.frame.onEvent(S.frame, 'ADDON_LOADED', 'Blizzard_AuctionHouseUI')
 assert(S.hooked[AuctionHouseFrame.ItemSellFrame] and S.hooked[AuctionHouseFrame.CommoditiesSellFrame])
 """)
 
+# The bag list: which stacks this house pays less for than a vendor, and the page that shows them.
+for file in ("modules/shopping.lua", "modules/auctiontab.lua"):
+    lua.execute((root / file).read_text(encoding="utf-8"))
+lua.execute(r"""
+local E, S, T = Everloot, Everloot.SellCheck, Everloot.AuctionTab
+local function prices(data)
+  EverlootPricesDB.realms = { ['forever|alliance'] = { data = data, sum = E.Adler32(data), dataAsOf = '2026-11-17' } }
+  E:ResetPrices()
+end
+-- 300 vendor pays more (market 1s 4c, 95% of it under the 1s vendor price); 301 beats the vendor by less than the
+-- deposit; 302 sells well here; 303 has no price here; 304 is soulbound; 305 is grey; 306 the house will not take;
+-- 400 a vendor will not buy.
+prices('300,104,100,100,100,2026-11-17,3;301,110,100,100,100,2026-11-17,3;302,300,100,100,100,2026-11-17,3;'
+  .. '304,1,1,1,100,2026-11-17,3;305,1,1,1,100,2026-11-17,3;306,1,1,1,100,2026-11-17,3;400,1,1,1,100,2026-11-17,3')
+GetItemInfo = function(id)
+  local sell = id == 400 and 0 or 100
+  return 'Item ' .. id, 'item:' .. id, 1, 10, 1, '', '', 20, '', 123, sell, 7
+end
+local bag = {
+  { itemID = 300, stackCount = 20, quality = 1 }, { itemID = 301, stackCount = 10, quality = 1 },
+  { itemID = 302, stackCount = 5, quality = 1 }, { itemID = 303, stackCount = 5, quality = 1 },
+  { itemID = 304, stackCount = 1, quality = 2, isBound = true }, { itemID = 305, stackCount = 3, quality = 0 },
+  { itemID = 306, stackCount = 2, quality = 1 }, { itemID = 400, stackCount = 2, quality = 1 },
+  { itemID = 300, stackCount = 5, quality = 1 }, nil,
+}
+NUM_BAG_SLOTS = 0
+C_Container = {
+  GetContainerNumSlots = function(b) return b == 0 and 10 or 0 end,
+  GetContainerItemInfo = function(b, slot) return bag[slot] end,
+}
+ItemLocation = { CreateFromBagAndSlot = function(_, b, slot) return { bag = b, slot = slot } end }
+C_AuctionHouse = {
+  -- 5c a unit for the shortest auction.
+  CalculateItemDeposit = function(location, duration, count) assert(duration == 1); return 5 * count end,
+  IsSellItemValid = function(location) return bag[location.slot].itemID ~= 306 end,
+}
+E.auctionHouseOpen = true
+
+local found = S.BagCandidates()
+assert(#found.rows == 2, #found.rows)
+local first, second = found.rows[1], found.rows[2]
+assert(first.itemId == 300 and first.count == 25 and first.vendor == 2500 and first.auction == 2470 and first.reason == 'vendor',
+  'both stacks of 300 in one row, 95% of 25 x 104c against 25 x 1s')
+assert(second.itemId == 301 and second.vendor == 1000 and second.auction == 1045 and second.deposit == 50 and second.reason == 'deposit',
+  '45c over the vendor, 50c deposit')
+assert(found.vendor == 3500 and found.auction == 3515 and found.unpriced == 1)
+-- At the neutral house the 15% cut puts 301 under the vendor price too.
+E.auctionHouseKind = 'Neutral'
+EverlootPricesDB.realms['forever|neutral'] = EverlootPricesDB.realms['forever|alliance']
+E:ResetPrices()
+found = S.BagCandidates()
+assert(#found.rows == 2 and found.rows[1].itemId == 300 and found.rows[2].itemId == 301 and found.rows[2].reason == 'vendor')
+E.auctionHouseKind = nil
+-- Without the house's deposit the "barely" case is not guessed.
+C_AuctionHouse.CalculateItemDeposit = nil
+found = S.BagCandidates()
+assert(#found.rows == 1 and found.rows[1].itemId == 300)
+C_AuctionHouse.CalculateItemDeposit = function(location, duration, count) return 5 * count end
+
+-- The page in the Everloot auction house tab.
+AuctionHouseFrame = CreateFrame('Frame', 'AuctionHouseFrame')
+AuctionHouseFrame.Tabs = { CreateFrame('Button', 'Buy') }
+assert(T.Attach(AuctionHouseFrame))
+T.Show()
+local p = T.panel
+local function click(b) b.scripts.OnClick(b) end
+assert(p.vendorButton.text == 'Vendor these' and not p.vendor.page.shown and p.lookup.shown)
+click(p.vendorButton)
+local v = p.vendor
+assert(p.mode == 'vendor' and v.page.shown and not p.lookup.shown and not p.scanButton.shown and not p.shop.page.shown)
+assert(p.vendorButton.text == 'Price lookup' and p.modeButton.text == 'Shopping list')
+assert(v.rows[1].shown and v.rows[1].name.text == 'item:300' and v.rows[1].count.text == '25')
+assert(v.rows[1].why.text == 'vendor pays more' and v.rows[2].why.text == 'gain under deposit' and not v.rows[3].shown)
+assert(v.total.text:find('Vendoring these brings') and v.unpriced.text == '1 other item has no current price here.')
+assert(not v.empty.shown and v.caps.text:find('nothing is sold or posted'))
+-- Selling the stacks empties the list.
+for i = 1, 9 do if bag[i] and (bag[i].itemID == 300 or bag[i].itemID == 301) then bag[i] = nil end end
+T.Refresh()
+assert(v.empty.shown and not v.rows[1].shown and v.total.text == '')
+click(p.modeButton)
+assert(p.mode == 'shop' and p.shop.page.shown and not v.page.shown and p.vendorButton.text == 'Vendor these')
+click(p.vendorButton); click(p.vendorButton)
+assert(p.mode == 'lookup' and p.lookup.shown and not v.page.shown)
+""")
+
+# The suggested price: only after the search answered with nothing listed, only when Blizzard fills prices itself, only
+# over Blizzard's own default and never with a typed bid; never below the vendor.
+lua.execute(r"""
+local E, S = Everloot, Everloot.SellCheck
+S.hooked, S.notes, S.priced, S.kind = {}, {}, {}, {}
+-- Blizzard's searches as the house answers them: per item id, full or not, and the prices listed.
+SEARCH = {}
+AUTOPOP = true
+C_AuctionHouse.ShouldAutoPopulatePrice = function() return AUTOPOP end
+C_AuctionHouse.HasFullCommoditySearchResults = function(id) return SEARCH[id] ~= nil and SEARCH[id].full end
+C_AuctionHouse.GetNumCommoditySearchResults = function(id) return SEARCH[id] and #SEARCH[id] or 0 end
+C_AuctionHouse.GetItemKeyFromItem = function(location) return { itemID = location.id } end
+C_AuctionHouse.HasFullItemSearchResults = function(key) return SEARCH[key.itemID] ~= nil and SEARCH[key.itemID].full end
+C_AuctionHouse.GetNumItemSearchResults = function(key) return SEARCH[key.itemID] and #SEARCH[key.itemID] or 0 end
+C_AuctionHouse.SupportsCopperValues = function() return false end
+-- Blizzard's own selection, as its sell frames run it: the default price is 0 unless it fills prices; it selects the
+-- cheapest listing only when the box still holds the default and no bid was typed.
+local function blizzard(f)
+  f.GetDefaultPrice = function(self) return AUTOPOP and (rawget(self, 'default') or 150) or 0 end
+  f.UpdatePriceSelection = function(self)
+    self.searchPrice = nil
+    local id = rawget(self, 'item') and self.item.id
+    local found = id and SEARCH[id]
+    local bid = rawget(self, 'bid') or 0
+    if AUTOPOP and bid == 0 and (rawget(self, 'unit') or 0) == self:GetDefaultPrice() and found and #found > 0 then
+      self.PriceInput:SetAmount(found[1])
+      self.searchPrice = found[1]
+    end
+  end
+  f.SecondaryPriceInput = {
+    IsShown = function() return rawget(f, 'bidShown') == true end,
+    GetAmount = function() return rawget(f, 'bid') or 0 end,
+  }
+  return f
+end
+AuctionHouseFrame = { ItemSellFrame = blizzard(sellFrame()), CommoditiesSellFrame = blizzard(sellFrame()) }
+local goods, items = AuctionHouseFrame.CommoditiesSellFrame, AuctionHouseFrame.ItemSellFrame
+assert(S.Attach())
+assert(S.kind[goods] == 'commodity' and S.kind[items] == 'item')
+local note = S.notes[goods]
+-- Placing an item: Blizzard puts its default in the box and runs its selection before the search answers.
+local function place(f, id, quantity, deposit)
+  f.item, f.quantity, f.deposit, f.searchPrice = { id = id }, quantity, deposit, nil
+  f.unit = f:GetDefaultPrice()
+  -- Blizzard's SetItem updates the post state, then runs its price selection.
+  f:UpdatePostState()
+  f:UpdatePriceSelection()
+end
+local function answer(f, id, prices)
+  SEARCH[id] = prices
+  prices.full = true
+  f:UpdatePriceSelection()
+end
+
+-- Item 302 (vendor 1s, market 3s here). Before the search answers, Everloot waits.
+SEARCH = {}
+place(goods, 302, 5, 25)
+assert(goods.unit == 150, 'no fill before the search answers')
+-- The search finds a listing at 10s: Blizzard matches it, and Everloot never replaced it first.
+answer(goods, 302, { 1000 })
+assert(goods.unit == 1000 and goods.searchPrice == 1000)
+-- The search answers with nothing listed: Everloot puts the market value there, and the note says where it came from.
+SEARCH = {}
+place(goods, 302, 5, 25)
+answer(goods, 302, {})
+assert(goods.unit == 300, goods.unit)
+assert(note:IsShown() and note.text:find('Everloot set this price from this house') and note.text:find('community 2026%-11%-17'))
+-- A price the player types afterwards is theirs; the line goes, and a later selection never replaces it.
+goods.PriceInput:SetAmount(275)
+assert(not (note.text or ''):find('Everloot set this price'))
+goods:UpdatePriceSelection()
+assert(goods.unit == 275, 'a typed price is never replaced')
+-- An answer still incomplete is not an empty market.
+SEARCH = {}
+place(goods, 302, 5, 25)
+SEARCH[302] = { full = false }
+goods:UpdatePriceSelection()
+assert(goods.unit == 150)
+-- Blizzard's own "fill prices" setting off: its default is 0, and Everloot fills nothing either.
+AUTOPOP = false
+SEARCH = {}
+place(goods, 302, 5, 25)
+answer(goods, 302, {})
+assert(goods.unit == 0, goods.unit)
+AUTOPOP = true
+-- The item frame: a starting bid the player typed keeps the buyout as it is.
+SEARCH = {}
+items.bidShown, items.bid = true, 1400
+place(items, 302, 1, 25)
+answer(items, 302, {})
+assert(items.unit == 150, 'a typed bid keeps the default buyout')
+items.bid = 0
+place(items, 302, 1, 25)
+answer(items, 302, {})
+assert(items.unit == 300, items.unit)
+items.bidShown = false
+-- Item 300's market (1s 4c) after the cut is under its 1s vendor price: Blizzard's default stays and the warning says why.
+SEARCH = {}
+place(goods, 300, 5, 25)
+answer(goods, 300, {})
+assert(goods.unit == 150 and note.text:find('vendor'))
+-- Where the house takes no copper, rounded down to whole silver: item 301's 1s 10c becomes 1s, under the vendor after
+-- the cut, so Blizzard's default stays.
+SEARCH = {}
+place(goods, 301, 5, 5)
+answer(goods, 301, {})
+assert(goods.unit == 150, goods.unit)
+-- With copper prices allowed, the market value itself: 5 x 1s 10c after the cut is 5s 22c, 22c over the vendor, more
+-- than the 5c deposit: set. With a 25c deposit it is barely worth posting: left alone.
+C_AuctionHouse.SupportsCopperValues = function() return true end
+SEARCH = {}
+place(goods, 301, 5, 5)
+answer(goods, 301, {})
+assert(goods.unit == 110, goods.unit)
+SEARCH = {}
+place(goods, 301, 5, 25)
+answer(goods, 301, {})
+assert(goods.unit == 150, goods.unit)
+-- Switched off: Blizzard's default stays.
+EverlootDB.sellPrice = false
+SEARCH = {}
+place(goods, 302, 5, 25)
+answer(goods, 302, {})
+assert(goods.unit == 150)
+EverlootDB.sellPrice = nil
+-- The safety net: a block that blames Everloot while its price is in the box switches the fill off, once.
+SEARCH = {}
+place(goods, 302, 5, 25)
+answer(goods, 302, {})
+assert(goods.unit == 300 and next(S.priced))
+assert(S.frame.events.ADDON_ACTION_BLOCKED and S.frame.events.ADDON_ACTION_FORBIDDEN)
+S.frame.onEvent(S.frame, 'ADDON_ACTION_BLOCKED', 'SomeOtherAddon', 'PostItem()')
+assert(EverlootDB.sellPrice ~= false, 'another addon blamed: nothing changes')
+S.frame.onEvent(S.frame, 'ADDON_ACTION_FORBIDDEN', 'Everloot', 'C_AuctionHouse.PostCommodity()')
+assert(EverlootDB.sellPrice == false and next(S.priced) == nil and said('no longer fills in prices'))
+assert(goods.unit == 300, 'the price stays for the player')
+SEARCH = {}
+place(goods, 302, 5, 25)
+answer(goods, 302, {})
+assert(goods.unit == 150, 'off now')
+assert(not S.Blocked('Everloot', 'x'), 'nothing of Everloot in the box: not blamed again')
+EverlootDB.sellPrice = nil
+assert(posted == 0, 'still never posts')
+""")
+
+# The merchant button: what a vendor pays more for, minus shopping-list items, 12 stacks a press, only at a merchant.
+lua.execute(r"""
+local E, S = Everloot, Everloot.SellCheck
+local function stacks(id, n) local t = {}; for i = 1, n do t[i] = { itemID = id, stackCount = 1, quality = 1 } end; return t end
+-- 14 single stacks of 300 (vendor pays more), 2 of 301 (gain under deposit: kept), 1 of 302 (sells well here).
+bag = {}
+for _, part in ipairs({ stacks(300, 14), stacks(301, 2), stacks(302, 1) }) do
+  for _, info in ipairs(part) do bag[#bag + 1] = info end
+end
+-- The earlier bag was a local of its own block; this one is read from here on.
+C_Container.GetContainerNumSlots = function(b) return b == 0 and 20 or 0 end
+C_Container.GetContainerItemInfo = function(b, slot) return bag[slot] end
+used = {}
+C_Container.UseContainerItem = function(b, slot) used[#used + 1] = slot; bag[slot] = nil end
+E.auctionHouseOpen = false
+GameTooltip = CreateFrame('GameTooltip', 'GameTooltip')
+MerchantFrame = CreateFrame('Frame', 'MerchantFrame')
+MerchantFrame.shown = false
+
+-- Away from a merchant nothing is sold.
+assert(S.SellToMerchant() == 0 and #used == 0)
+MerchantFrame.shown = true
+S.frame.onEvent(S.frame, 'MERCHANT_SHOW')
+local button = S.merchantButton
+assert(button and button.shown and button.text == 'Everloot: sell 12 low-value stacks', button and button.text)
+assert(button.point[2] == MerchantFrame and button.point[3] == 'BOTTOMLEFT', 'below the merchant window')
+button.scripts.OnEnter(button)
+local list = S.MerchantList()
+assert(#list.rows == 1 and list.rows[1].itemId == 300 and list.stacks == 14)
+-- A press sells 12, the buyback tab's worth; the next sells the other 2.
+button.scripts.OnClick(button)
+assert(#used == 12 and said('sold 12 stacks a vendor pays more for'))
+S.frame.onEvent(S.frame, 'BAG_UPDATE_DELAYED')
+assert(button.shown and button.text == 'Everloot: sell 2 low-value stacks')
+button.scripts.OnClick(button)
+assert(#used == 14)
+S.frame.onEvent(S.frame, 'BAG_UPDATE_DELAYED')
+assert(not button.shown, 'nothing left to sell')
+
+-- Items on a shopping list are kept.
+bag = stacks(300, 3)
+EverlootDB.shopping = nil
+local list, why = E.Shopping.Create('Crafting')
+assert(E.Shopping.Set(300, 10, nil, 'Item 300'))
+assert(#S.MerchantList().rows == 0)
+E.Shopping.Remove(300)
+assert(#S.MerchantList().rows == 1)
+-- A slot that changed since the list was read is not sold.
+local real = C_Container.GetContainerItemInfo
+local reads = 0
+C_Container.GetContainerItemInfo = function(b, slot)
+  reads = reads + 1
+  if reads > 3 and slot == 1 then return { itemID = 999, stackCount = 1, quality = 1 } end
+  return real(b, slot)
+end
+used = {}
+S.SellToMerchant()
+assert(#used == 2 and used[1] == 2, 'the changed slot was skipped')
+C_Container.GetContainerItemInfo = real
+-- Switched off: no button, nothing sold.
+bag = stacks(300, 2)
+EverlootDB.merchantSell = false
+S.frame.onEvent(S.frame, 'MERCHANT_SHOW')
+assert(not button.shown and S.SellToMerchant() == 0)
+EverlootDB.merchantSell = nil
+S.frame.onEvent(S.frame, 'MERCHANT_CLOSED')
+assert(not button.shown)
+""")
+
+# The item tooltip says when a vendor pays more than this house, after its cut.
+lua.execute(r"""
+local E, S = Everloot, Everloot.SellCheck
+E:InitModules()
+local function hover(id)
+  local tip = { lines = {} }
+  tip.AddLine = function(self, t) self.lines[#self.lines + 1] = t end
+  tip.AddDoubleLine = function(self, l, r) self.lines[#self.lines + 1] = l .. ': ' .. r end
+  for _, f in ipairs(tooltipCalls) do f(tip, { id = id }) end
+  return table.concat(tip.lines, '\n')
+end
+assert(S.VendorBeats('Forever', 300) and not S.VendorBeats('Forever', 302) and not S.VendorBeats('Forever', 303))
+assert(hover(300):find('A vendor pays more than this house, after its cut', 1, true))
+assert(not hover(302):find('A vendor pays more', 1, true), 'sells well here')
+EverlootDB.tooltip = 'compact'
+assert(hover(300):find('A vendor pays more', 1, true), 'compact tooltips keep it, as a warning')
+EverlootDB.tooltip = 'full'
+EverlootDB.sellCheck = false
+assert(not hover(300):find('A vendor pays more', 1, true), 'the vendor check switch turns it off')
+EverlootDB.sellCheck = nil
+""")
+
 source = (root / "modules/sellcheck.lua").read_text(encoding="utf-8")
-for call in ("PostItem", "PostCommodity", "CancelAuction", "PlaceBid", "SetAmount", "SetQuantity", "ConfirmPost"):
-    assert call not in source, f"the check must never call {call}"
+code = "\n".join(line.split("--")[0] for line in source.splitlines())
+for call in ("PostItem", "PostCommodity", "CancelAuction", "PlaceBid", "SetQuantity", "ConfirmPost", "PickupContainerItem",
+             "StartCommoditiesPurchase", "ConfirmCommoditiesPurchase", "SellAllJunkItems"):
+    assert call not in code, f"the check must never call {call}"
+# One place sets a price (S.Suggest) and one place sells (S.SellToMerchant).
+assert code.count("SetAmount") == 1 and code.count("UseContainerItem") == 1
 assert "modules\\sellcheck.lua" in (root / "Everloot.toc").read_text(encoding="utf-8")
 print("Sell check contract: PASS")

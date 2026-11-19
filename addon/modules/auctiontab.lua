@@ -6,7 +6,8 @@
 -- The panel uses the game's fonts, gold headings and standard controls.
 -- A button at its top right swaps the panel for the shopping lists (modules/shopping.lua): the active list with each
 -- item's wanted count, max price, market value and what a search found, and a Search button per item that sends one
--- search per press.
+-- search per press. The button beside it shows the bag items this house pays less for than a vendor
+-- (modules/sellcheck.lua S.BagCandidates); it lists them and sells nothing.
 
 local E = Everloot
 local T = {}
@@ -28,6 +29,11 @@ local SHOP_ROWS, SHOP_ROW_H = 10, 18
 local SHOP_COLUMNS = { { "name", 0, 220 }, { "want", 226, 40 }, { "max", 272, 90 }, { "market", 368, 130 }, { "found", 504, 90 } }
 local SHOP_HELP = "Item: a name, an id or shift-click. Want: how many. Max each: like 1g 50s, blank for no limit."
 local SHOP_EMPTY = "Nothing on this list yet. Add an item above, or a recipe's reagents from the Professions tab of the Everloot window."
+-- The vendor page: each column's left edge and width, and what it says above the rows.
+local VENDOR_COLUMNS = { { "name", 0, 230 }, { "count", 236, 44 }, { "vendor", 286, 110 }, { "auction", 402, 130 }, { "why", 540, 146 } }
+local VENDOR_HELP = "Bag items whose market value at this house, after its cut, is no more than a vendor pays, "
+  .. "or beats it by no more than the shortest auction's deposit. Greys, soulbound items and items without a current price here are left out."
+local VENDOR_EMPTY = "Nothing in your bags is worth more to a vendor than to this house, by this house's current prices."
 local FALLBACK_COLORS = { text = { 1, 1, 1, 1 }, muted = { 0.788, 0.765, 0.69, 1 }, accent = { 0.612, 0.941, 0.227, 1 } }
 local WARN = { 1, 0.4, 0.4, 1 }  -- the tooltip's warning red (prices.lua)
 
@@ -453,23 +459,129 @@ local function buildShop(panel)
   S.OnChange = T.RefreshShop
 end
 
---- Shows the price lookup ("lookup") or the shopping lists ("shop"); each hides what the other shows.
+local function money(copper) return E.Shopping and E.Shopping.Money and E.Shopping.Money(copper) or E.Coins(copper) end
+
+--- Draws the vendor page from the bags as they are now.
+function T.RefreshVendor()
+  local page = T.panel and T.panel.vendor
+  local S = E.SellCheck
+  if type(page) ~= "table" or not S then return end
+  local found = S.BagCandidates()
+  page.offset = math.min(page.offset, math.floor(math.max(#found.rows - 1, 0) / SHOP_ROWS) * SHOP_ROWS)
+  for i, line in ipairs(page.rows) do
+    local row = found.rows[page.offset + i]
+    if row then
+      line.name:SetText(itemName(row.itemId))
+      line.count:SetText(tostring(row.count))
+      line.vendor:SetText(money(row.vendor))
+      line.auction:SetText(money(row.auction))
+      line.why:SetText(row.reason == "vendor" and "vendor pays more" or "gain under deposit")
+      line.why:SetTextColor(unpack(row.reason == "vendor" and WARN or tone("text")))
+      line:Show()
+    else
+      line:Hide()
+    end
+  end
+  if #found.rows == 0 then page.empty:Show() else page.empty:Hide() end
+  if page.offset > 0 then page.up:Show() else page.up:Hide() end
+  if page.offset + SHOP_ROWS < #found.rows then page.down:Show() else page.down:Hide() end
+  local total = #found.rows > 0 and string.format("Vendoring these brings %s; posting them at market brings %s after the cut.",
+    money(found.vendor), money(found.auction)) or ""
+  local unpriced = found.unpriced > 0 and string.format("%d other item%s %s no current price here.", found.unpriced,
+    found.unpriced == 1 and "" or "s", found.unpriced == 1 and "has" or "have") or ""
+  page.total:SetText(total)
+  page.unpriced:SetText(unpriced)
+end
+
+-- The vendor page: what it lists, the column heads, the rows, the totals, then what it never does.
+local function buildVendor(panel)
+  local vendor = { offset = 0, rows = {} }
+  local page = CreateFrame("Frame", nil, panel)
+  page:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -46)
+  page:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -16, 30)
+  page:Hide()
+  vendor.page = page
+  vendor.help = words(page, "GameFontHighlight")
+  vendor.help:SetPoint("TOPLEFT", page, "TOPLEFT", 0, 0)
+  vendor.help:SetWidth(686)
+  vendor.help:SetText(VENDOR_HELP)
+  local heads = { name = "Item", count = "Count", vendor = "Vendor pays", auction = "Auction, after cut", why = "Why" }
+  for _, col in ipairs(VENDOR_COLUMNS) do
+    local s = words(page, "GameFontDisable")
+    s:SetPoint("TOPLEFT", page, "TOPLEFT", col[2], -40)
+    s:SetWidth(col[3])
+    if col[1] ~= "name" and col[1] ~= "why" then s:SetJustifyH("RIGHT") end
+    s:SetText(heads[col[1]])
+  end
+  for i = 1, SHOP_ROWS do
+    local line = CreateFrame("Frame", nil, page)
+    line:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -56 - (i - 1) * SHOP_ROW_H)
+    line:SetSize(686, SHOP_ROW_H)
+    for _, col in ipairs(VENDOR_COLUMNS) do
+      local s = words(line, "GameFontHighlight")
+      s:SetPoint("LEFT", line, "LEFT", col[2], 0)
+      s:SetWidth(col[3])
+      if s.SetWordWrap then s:SetWordWrap(false) end
+      if col[1] ~= "name" and col[1] ~= "why" then s:SetJustifyH("RIGHT") end
+      line[col[1]] = s
+    end
+    vendor.rows[i] = line
+  end
+  vendor.empty = words(page, "GameFontHighlight")
+  vendor.empty:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -58)
+  vendor.empty:SetWidth(560)
+  vendor.empty:SetText(VENDOR_EMPTY)
+  vendor.total = words(page, "GameFontHighlight")
+  vendor.total:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -64 - SHOP_ROWS * SHOP_ROW_H)
+  vendor.total:SetWidth(600)
+  vendor.unpriced = words(page, "GameFontDisable")
+  vendor.unpriced:SetPoint("TOPLEFT", vendor.total, "BOTTOMLEFT", 0, -4)
+  vendor.caps = words(page, "GameFontDisable")
+  vendor.caps:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", 0, 0)
+  vendor.caps:SetText("A list only: nothing is sold or posted for you. Sell them at any merchant.")
+  local function pageButton(label, onClick)
+    local b = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
+    b:SetSize(48, 20)
+    b:SetText(label)
+    b:SetScript("OnClick", function() onClick(); T.RefreshVendor() end)
+    return b
+  end
+  vendor.up = pageButton("Up", function() vendor.offset = math.max(0, vendor.offset - SHOP_ROWS) end)
+  vendor.up:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -54, 12)
+  vendor.down = pageButton("Down", function() vendor.offset = vendor.offset + SHOP_ROWS end)
+  vendor.down:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", 0, 12)
+  panel.vendor = vendor
+end
+
+--- Shows the price lookup ("lookup"), the shopping lists ("shop") or the bag items to vendor ("vendor"); each hides
+--- what the others show.
 function T.SetMode(mode)
   local panel = T.panel
   if not (panel and panel.shop) then return end
-  local shopping = mode == "shop"
-  panel.mode = shopping and "shop" or "lookup"
+  local vendor = type(panel.vendor) == "table" and panel.vendor or nil
+  if mode ~= "shop" and not (mode == "vendor" and vendor) then mode = "lookup" end
+  panel.mode = mode
   for _, part in ipairs({ panel.scanButton, panel.shareButton, panel.status, panel.footer, panel.lookupLabel, panel.lookup, panel.searchButton, panel.results }) do
-    if shopping then part:Hide() else part:Show() end
+    if mode == "lookup" then part:Show() else part:Hide() end
   end
-  if shopping then
+  if mode == "shop" then
     panel.shop.page:Show()
     T.RefreshShop()
   else
     panel.shop.confirmDelete = false
     panel.shop.page:Hide()
   end
-  panel.modeButton:SetText(shopping and "Price lookup" or "Shopping list")
+  if vendor then
+    if mode == "vendor" then
+      vendor.offset = 0
+      vendor.page:Show()
+      T.RefreshVendor()
+    else
+      vendor.page:Hide()
+    end
+    panel.vendorButton:SetText(mode == "vendor" and "Price lookup" or "Vendor these")
+  end
+  panel.modeButton:SetText(mode == "shop" and "Price lookup" or "Shopping list")
 end
 
 --- Looks up what the player typed and shows it in the panel.
@@ -492,6 +604,7 @@ function T.Refresh()
   -- A search the house never answered is let go after a while; the shopping page redraws its ages and results.
   if E.Shopping then E.Shopping.Tick() end
   if T.panel and T.panel.mode == "shop" then T.RefreshShop() end
+  if T.panel and T.panel.mode == "vendor" then T.RefreshVendor() end
 end
 
 function T.Show()
@@ -640,6 +753,15 @@ local function buildPanel(house)
     panel.modeButton:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -16, -12)
     panel.modeButton:SetText("Shopping list")
     panel.modeButton:SetScript("OnClick", function() T.SetMode(panel.mode == "shop" and "lookup" or "shop") end)
+    -- The bag items this house pays less for than a vendor, when the sell check's file is loaded.
+    if E.SellCheck and E.SellCheck.BagCandidates then
+      buildVendor(panel)
+      panel.vendorButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+      panel.vendorButton:SetSize(120, 22)
+      panel.vendorButton:SetPoint("TOPRIGHT", panel.modeButton, "TOPLEFT", -6, 0)
+      panel.vendorButton:SetText("Vendor these")
+      panel.vendorButton:SetScript("OnClick", function() T.SetMode(panel.mode == "vendor" and "lookup" or "vendor") end)
+    end
   end
   -- A hook, not a script: the backdrop template keeps its own size handler.
   panel:HookScript("OnSizeChanged", function(self, width) layout(self, width) end)

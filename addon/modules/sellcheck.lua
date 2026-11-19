@@ -5,6 +5,16 @@
 -- deposit) after Blizzard updates it, through hooksecurefunc. Display only: it never changes a price and never posts,
 -- cancels or blocks Post. Everything Everloot is unsure of (no vendor price, a stale or thin market, an incomplete
 -- disenchant estimate) stays unsaid.
+-- S.BagCandidates applies the same comparison to the bags, at this house's market values, for the Everloot auction
+-- house tab's Vendor these page (modules/auctiontab.lua).
+-- Two helpers need no setup and are on in a new install, each with its own switch:
+-- * Suggested price: when the house lists none of the item, Blizzard fills the price with a multiple of the vendor price.
+--   Everloot puts this house's current market value there instead, only when that beats a vendor by more than the
+--   deposit. A matched listing and anything the player typed are left alone. The player still presses Post. Should the
+--   game ever block an action and blame Everloot while such a price is in the box, the fill switches itself off.
+-- * At a merchant, a button under the window sells, one press at a time, up to 12 stacks a vendor pays more for than
+--   this house (what the buyback tab can undo). Greys are Blizzard's own Sell All Junk button's. Items on a shopping
+--   list are kept.
 
 local E = Everloot
 local S = {}
@@ -14,7 +24,7 @@ E.SellCheck = S
 -- 5% at the faction houses, 15% at the neutral goblin ones. kb/src/disenchant.ts auctionCut uses the same numbers.
 S.CUT = { Alliance = 0.05, Horde = 0.05, Neutral = 0.15 }
 local DEFAULT_CUT = 0.05
-local RED, AMBER, BODY = { 1, 0.4, 0.4 }, { 1, 0.67, 0.2 }, { 0.9, 0.9, 0.9 }
+local RED, AMBER, BODY, MUTED = { 1, 0.4, 0.4 }, { 1, 0.67, 0.2 }, { 0.9, 0.9, 0.9 }, { 0.788, 0.765, 0.69 }
 local SELL_FRAMES = { "ItemSellFrame", "CommoditiesSellFrame" }
 -- Our note and hook state per sell frame, kept here so nothing is written into Blizzard's frames.
 S.notes, S.hooked = {}, {}
@@ -139,6 +149,104 @@ function S.On()
   return not (type(EverlootDB) == "table" and EverlootDB.sellCheck == false)
 end
 
+--- For the item tooltip: true when this house's current, not-thin market value after its cut is no more than the vendor
+--- price, so selling to a vendor is the better deal. Follows the vendor check's switch.
+function S.VendorBeats(realm, itemId)
+  if not S.On() then return false end
+  local sell = vendorUnit(itemId)
+  local market = sell and marketUnit(realm, itemId)
+  if not market then return false end
+  return math.floor(market * (1 - S.Cut(E:MarketHouse()))) <= sell
+end
+
+--- The suggested price and the merchant button: each on unless turned off.
+function S.PriceOn() return not (type(EverlootDB) == "table" and EverlootDB.sellPrice == false) end
+function S.MerchantOn() return not (type(EverlootDB) == "table" and EverlootDB.merchantSell == false) end
+
+local function bagSlots(bag)
+  local ok, n = pcall(C_Container.GetContainerNumSlots, bag)
+  n = ok and E.Readable(n)
+  return whole(n) and n or 0
+end
+
+--- One bag slot's ItemLocation, or nil on a client without the mixin.
+local function slotLocation(bag, slot)
+  if not (ItemLocation and ItemLocation.CreateFromBagAndSlot) then return nil end
+  local ok, location = pcall(ItemLocation.CreateFromBagAndSlot, ItemLocation, bag, slot)
+  return ok and location or nil
+end
+
+--- What the shortest auction of this stack would cost to post, or nil when the house cannot say.
+local function stackDeposit(location, count)
+  if not (location and C_AuctionHouse and C_AuctionHouse.CalculateItemDeposit) then return nil end
+  local ok, deposit = pcall(C_AuctionHouse.CalculateItemDeposit, location, 1, count)
+  deposit = ok and E.Readable(deposit)
+  return whole(deposit) and deposit or nil
+end
+
+--- The bag items this house pays less for than a vendor: the stacks of each item whose current market value here,
+--- after the cut, is at or below the vendor price ("vendor"), or beats it by no more than the deposit of its shortest
+--- auction ("deposit"). Greys, items a vendor will not buy, items the house will not take (soulbound, quest) and items
+--- without a current, not-thin price at this house are left out; `unpriced` counts the last. Returns
+--- { rows = { { itemId, count, vendor, auction, deposit, reason } }, vendor, auction, unpriced }, the rows sorted by what
+--- vendoring gains over posting, and the totals of both. Reads only; sells and posts nothing.
+function S.BagCandidates()
+  local out = { rows = {}, vendor = 0, auction = 0, unpriced = 0 }
+  if not (C_Container and C_Container.GetContainerItemInfo and C_Container.GetContainerNumSlots) then return out end
+  local realm = realmName()
+  local cut = S.Cut(E:MarketHouse())
+  local canCheck = E.auctionHouseOpen and C_AuctionHouse and C_AuctionHouse.IsSellItemValid
+  local byItem, unpriced = {}, {}
+  for bag = 0, type(NUM_BAG_SLOTS) == "number" and NUM_BAG_SLOTS or 4 do
+    for slot = 1, bagSlots(bag) do
+      local ok, info = pcall(C_Container.GetContainerItemInfo, bag, slot)
+      local id = ok and type(info) == "table" and E.Readable(info.itemID)
+      local count = id and E.Readable(info.stackCount)
+      local quality = id and E.Readable(info.quality)
+      if whole(id) and whole(count) and count >= 1 and quality ~= 0 and not E.Readable(info.hasNoValue)
+        and not E.Readable(info.isBound) then
+        local location = slotLocation(bag, slot)
+        local postable = true
+        if canCheck and location then
+          local okValid, valid = pcall(C_AuctionHouse.IsSellItemValid, location, false)
+          postable = not okValid or E.Readable(valid) ~= false
+        end
+        local sell = postable and vendorUnit(id)
+        if sell then
+          local market = marketUnit(realm, id)
+          if market then
+            local row = byItem[id] or { itemId = id, count = 0, vendor = 0, auction = 0, deposit = 0, market = market, slots = {} }
+            byItem[id] = row
+            row.count = row.count + count
+            row.slots[#row.slots + 1] = { bag = bag, slot = slot, count = count }
+            row.vendor = row.vendor + sell * count
+            row.auction = row.auction + math.floor(market * count * (1 - cut))
+            local deposit = stackDeposit(location, count)
+            if deposit then row.deposit = row.deposit + deposit else row.depositUnknown = true end
+          else
+            unpriced[id] = true
+          end
+        end
+      end
+    end
+  end
+  for _, row in pairs(byItem) do
+    if row.auction <= row.vendor then row.reason = "vendor"
+    elseif not row.depositUnknown and row.auction - row.vendor <= row.deposit then row.reason = "deposit" end
+    if row.reason then
+      out.rows[#out.rows + 1] = row
+      out.vendor, out.auction = out.vendor + row.vendor, out.auction + row.auction
+    end
+  end
+  for _ in pairs(unpriced) do out.unpriced = out.unpriced + 1 end
+  table.sort(out.rows, function(a, b)
+    local ga, gb = a.vendor - a.auction, b.vendor - b.auction
+    if ga ~= gb then return ga > gb end
+    return a.itemId < b.itemId
+  end)
+  return out
+end
+
 -- One text block per sell frame, in the empty space Blizzard leaves under its Post button.
 local function noteFor(frame)
   if S.notes[frame] then return S.notes[frame] end
@@ -157,6 +265,86 @@ local function hex(color)
   return string.format("|cff%02x%02x%02x", color[1] * 255, color[2] * 255, color[3] * 255)
 end
 
+-- The price Everloot put in each sell frame: { itemId, unit, source }, until the item changes.
+S.priced = {}
+
+-- Which of Blizzard's two sell frames each one is: commodities are searched by item id, other items by item key.
+S.kind = {}
+
+local function readCall(fn, ...)
+  if type(fn) ~= "function" then return nil end
+  local ok, value = pcall(fn, ...)
+  return ok and E.Readable(value) or nil
+end
+
+--- True only once Blizzard's search for this item has fully answered and found nothing listed. Blizzard also runs its
+--- price selection the moment an item is placed, before the search answers: that is not an empty market.
+local function nothingListed(frame, location, itemId)
+  if type(C_AuctionHouse) ~= "table" then return false end
+  local full, count
+  if S.kind[frame] == "commodity" then
+    full = readCall(C_AuctionHouse.HasFullCommoditySearchResults, itemId)
+    count = readCall(C_AuctionHouse.GetNumCommoditySearchResults, itemId)
+  else
+    local key = readCall(C_AuctionHouse.GetItemKeyFromItem, location)
+    if type(key) ~= "table" then return false end
+    full = readCall(C_AuctionHouse.HasFullItemSearchResults, key)
+    count = readCall(C_AuctionHouse.GetNumItemSearchResults, key)
+  end
+  return full == true and count == 0
+end
+
+--- After Blizzard's search for the item has answered with nothing listed, and only when Blizzard fills prices itself
+--- (its own setting), the price box still holds Blizzard's default and no starting bid was typed: puts this house's
+--- current market value there, if posting at it beats a vendor by more than the deposit. Returns the unit price it
+--- set, or nil.
+function S.Suggest(frame)
+  if not (S.PriceOn() and frame and frame.PriceInput) then return nil end
+  if type(C_AuctionHouse) ~= "table" or readCall(C_AuctionHouse.ShouldAutoPopulatePrice) ~= true then return nil end
+  if call(frame, "GetSearchResultPrice") ~= nil then return nil end
+  local price, default = call(frame.PriceInput, "GetAmount"), call(frame, "GetDefaultPrice")
+  if not (whole(price) and price >= 1 and price == default) then return nil end
+  -- A starting bid the player typed belongs with the buyout they left: neither is changed.
+  local bid = frame.SecondaryPriceInput
+  if type(bid) == "table" and call(bid, "IsShown") == true then
+    local amount = call(bid, "GetAmount")
+    if not (amount == nil or amount == 0) then return nil end
+  end
+  local listing = S.Read(frame)
+  if not listing or not whole(listing.quantity) or listing.quantity < 1 then return nil end
+  if not nothingListed(frame, call(frame, "GetItem"), listing.itemId) then return nil end
+  local market, source = marketUnit(realmName(), listing.itemId)
+  if not market then return nil end
+  local unit = market
+  local copper = type(C_AuctionHouse) == "table" and C_AuctionHouse.SupportsCopperValues or nil
+  local okCopper, supports = false, nil
+  if copper then okCopper, supports = pcall(copper) end
+  -- A house without copper prices takes whole silver: round down, so the suggestion is never above the market.
+  if not (okCopper and supports == true) then unit = math.max(100, math.floor(unit / 100) * 100) end
+  local verdict = S.Verdict({ quantity = listing.quantity, total = unit * listing.quantity, deposit = listing.deposit,
+    house = E:MarketHouse(), vendorUnit = vendorUnit(listing.itemId) })
+  if verdict.level == "vendor" or verdict.level == "thin" then return nil end
+  if not pcall(frame.PriceInput.SetAmount, frame.PriceInput, unit) then return nil end
+  S.priced[frame] = { itemId = listing.itemId, unit = unit, source = source }
+  if type(frame.UpdatePostState) == "function" then pcall(frame.UpdatePostState, frame) end
+  return unit
+end
+
+--- The game names the addon it blames when it blocks a protected action. If that is Everloot while a price Everloot
+--- filled in is still in a sell window, the fill is the likely cause: the suggested price switches off for good (the
+--- settings switch shows it off), the player is told once in chat, and the price stays in the box for them to post.
+--- Returns true when it switched the fill off.
+function S.Blocked(addon, action)
+  addon = E.Readable(addon)
+  if addon ~= "Everloot" or next(S.priced) == nil then return false end
+  if type(EverlootDB) == "table" then EverlootDB.sellPrice = false end
+  S.priced = {}
+  print("Everloot: the game blocked " .. tostring(E.Readable(action) or "an action") .. " after Everloot filled in a price, "
+    .. "so Everloot no longer fills in prices (Esc > Options > AddOns > Everloot > Auction House turns it back on). "
+    .. "Retype the price and press Post again.")
+  return true
+end
+
 --- Reads the sell frame and shows or hides its note. Called after each of Blizzard's own updates.
 function S.Update(frame)
   local note = frame and S.notes[frame]
@@ -171,6 +359,15 @@ function S.Update(frame)
       listing.marketUnit, listing.marketSource = marketUnit(realm, listing.itemId)
       listing.disenchantUnit = disenchantUnit(realm, listing.itemId)
       verdict = S.Verdict(listing)
+      -- Say where a price Everloot set came from, while it is still the price in the box.
+      local priced = S.priced[frame]
+      local unit = frame.PriceInput and call(frame.PriceInput, "GetAmount")
+      if priced and priced.itemId == listing.itemId and unit == priced.unit then
+        verdict.lines[#verdict.lines + 1] = { text = "Everloot set this price from this house's market value ("
+          .. (priced.source or "market value") .. "). Nothing here is listed now.", color = MUTED }
+      elseif priced and priced.itemId ~= listing.itemId then
+        S.priced[frame] = nil
+      end
     end
   end
   if not verdict or #verdict.lines == 0 then
@@ -197,7 +394,11 @@ function S.Attach()
       if not S.hooked[frame] then
         S.hooked[frame] = pcall(function()
           noteFor(frame)
+          S.kind[frame] = key == "CommoditiesSellFrame" and "commodity" or "item"
           hooksecurefunc(frame, "UpdatePostState", function(self) pcall(S.Update, self) end)
+          if type(frame.UpdatePriceSelection) == "function" then
+            hooksecurefunc(frame, "UpdatePriceSelection", function(self) pcall(S.Suggest, self) end)
+          end
           frame:HookScript("OnHide", function(self) if S.notes[self] then S.notes[self]:Hide() end end)
         end)
       end
@@ -207,11 +408,140 @@ function S.Attach()
   return any
 end
 
+-- Merchant ------------------------------------------------------------------------------------------
+
+S.SELL_PER_PRESS = 12 -- the merchant's buyback tab holds the last 12 sales
+
+--- True when a shopping list wants the item: it is kept, whatever it sells for.
+local function wanted(itemId)
+  local shop = E.Shopping
+  local ok, db = pcall(function() return shop and shop.DB() end)
+  if not ok or type(db) ~= "table" or type(db.lists) ~= "table" then return false end
+  for _, list in ipairs(db.lists) do
+    for _, item in ipairs(list.items or {}) do if item.itemId == itemId then return true end end
+  end
+  return false
+end
+
+--- What the merchant button would sell now: the bag items a vendor pays more for than this house, after its cut,
+--- minus those on a shopping list. { rows, stacks, vendor }.
+function S.MerchantList()
+  local found = S.BagCandidates()
+  local out = { rows = {}, stacks = 0, vendor = 0 }
+  for _, row in ipairs(found.rows) do
+    if row.reason == "vendor" and not wanted(row.itemId) then
+      out.rows[#out.rows + 1] = row
+      out.stacks = out.stacks + #row.slots
+      out.vendor = out.vendor + row.vendor
+    end
+  end
+  return out
+end
+
+local function merchantOpen()
+  return type(MerchantFrame) == "table" and MerchantFrame.IsShown and MerchantFrame:IsShown() and true or false
+end
+
+--- Sells up to S.SELL_PER_PRESS stacks from S.MerchantList, each only if its slot still holds that item. Returns the
+--- stacks sold and the copper a vendor pays for them.
+function S.SellToMerchant()
+  if not (S.MerchantOn() and merchantOpen()) then return 0, 0 end
+  local use = C_Container and C_Container.UseContainerItem
+  if not use then return 0, 0 end
+  local list = S.MerchantList()
+  local sold, earned = 0, 0
+  for _, row in ipairs(list.rows) do
+    local each = math.floor(row.vendor / row.count)
+    for _, at in ipairs(row.slots) do
+      if sold >= S.SELL_PER_PRESS then return sold, earned end
+      local ok, info = pcall(C_Container.GetContainerItemInfo, at.bag, at.slot)
+      local id = ok and type(info) == "table" and E.Readable(info.itemID)
+      local count = id and E.Readable(info.stackCount)
+      if id == row.itemId and whole(count) and pcall(use, at.bag, at.slot) then
+        sold = sold + 1
+        earned = earned + each * count
+      end
+    end
+  end
+  return sold, earned
+end
+
+local function merchantTooltip(button)
+  if not GameTooltip then return end
+  local list = S.MerchantList()
+  GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+  GameTooltip:AddLine("Everloot: a vendor pays more for these")
+  for i, row in ipairs(list.rows) do
+    if i > 10 then GameTooltip:AddLine(string.format("and %d more", #list.rows - 10), 0.788, 0.765, 0.69); break end
+    GameTooltip:AddDoubleLine(S.ItemLabel(row.itemId) .. " x" .. row.count, E.Coins(row.vendor), 1, 1, 1, 1, 1, 1)
+  end
+  GameTooltip:AddLine("This house pays less after its cut. Each press sells up to 12 stacks; the buyback tab undoes them. "
+    .. "Items on a shopping list are kept.", 0.788, 0.765, 0.69, true)
+  GameTooltip:Show()
+end
+
+--- The item as the game names it, or its id while the client has not loaded it.
+function S.ItemLabel(itemId)
+  local info = (type(C_Item) == "table" and C_Item.GetItemInfo) or GetItemInfo
+  if type(info) == "function" then
+    local ok, name = pcall(info, itemId)
+    name = ok and E.Readable(name)
+    if type(name) == "string" and name ~= "" then return name end
+  end
+  return "Item " .. itemId
+end
+
+--- Shows the button with the count and value it would sell, or hides it when there is nothing or it is off.
+function S.RefreshMerchant()
+  local button = S.merchantButton
+  if not button then return end
+  local list = (S.MerchantOn() and merchantOpen()) and S.MerchantList() or { stacks = 0, vendor = 0 }
+  if list.stacks == 0 then button:Hide(); return end
+  local n = math.min(list.stacks, S.SELL_PER_PRESS)
+  button:SetText(string.format("Everloot: sell %d low-value stack%s", n, n == 1 and "" or "s"))
+  button:Show()
+end
+
+local function merchantButton()
+  if S.merchantButton then return S.merchantButton end
+  if type(MerchantFrame) ~= "table" then return nil end
+  local ok, button = pcall(CreateFrame, "Button", "EverlootMerchantSell", MerchantFrame, "UIPanelButtonTemplate")
+  if not ok or not button then return nil end
+  button:SetSize(240, 22)
+  -- Below the window, away from Blizzard's own buttons, pages and buyback slot.
+  button:SetPoint("TOPLEFT", MerchantFrame, "BOTTOMLEFT", 4, -2)
+  button:SetScript("OnClick", function(self)
+    local sold, earned = S.SellToMerchant()
+    if sold > 0 then
+      print(string.format("Everloot: sold %d stack%s a vendor pays more for, for %s. The buyback tab undoes them.",
+        sold, sold == 1 and "" or "s", E.Coins(earned)))
+    end
+    if GameTooltip and GameTooltip.Hide then GameTooltip:Hide() end
+  end)
+  button:SetScript("OnEnter", merchantTooltip)
+  button:SetScript("OnLeave", function() if GameTooltip and GameTooltip.Hide then GameTooltip:Hide() end end)
+  button:Hide()
+  S.merchantButton = button
+  return button
+end
+
 -- Blizzard's auction house UI loads on demand: attach when it loads or when the house opens, whichever comes first.
+-- The merchant button follows the merchant window and the bags while it is open.
 local listener = CreateFrame("Frame")
 S.frame = listener
-pcall(listener.RegisterEvent, listener, "ADDON_LOADED")
-pcall(listener.RegisterEvent, listener, "AUCTION_HOUSE_SHOW")
-listener:SetScript("OnEvent", function(_, event, name)
-  if event == "AUCTION_HOUSE_SHOW" or name == "Blizzard_AuctionHouseUI" then pcall(S.Attach) end
+for _, event in ipairs({ "ADDON_LOADED", "AUCTION_HOUSE_SHOW", "MERCHANT_SHOW", "MERCHANT_CLOSED", "BAG_UPDATE_DELAYED",
+  "ADDON_ACTION_BLOCKED", "ADDON_ACTION_FORBIDDEN" }) do
+  pcall(listener.RegisterEvent, listener, event)
+end
+listener:SetScript("OnEvent", function(_, event, name, action)
+  if event == "ADDON_ACTION_BLOCKED" or event == "ADDON_ACTION_FORBIDDEN" then pcall(S.Blocked, name, action)
+  elseif event == "AUCTION_HOUSE_SHOW" or name == "Blizzard_AuctionHouseUI" then pcall(S.Attach)
+  elseif event == "MERCHANT_SHOW" then
+    if S.MerchantOn() then pcall(merchantButton) end
+    pcall(S.RefreshMerchant)
+  elseif event == "MERCHANT_CLOSED" then
+    if S.merchantButton then S.merchantButton:Hide() end
+  elseif event == "BAG_UPDATE_DELAYED" and S.merchantButton and merchantOpen() then
+    pcall(S.RefreshMerchant)
+  end
 end)
