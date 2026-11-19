@@ -122,7 +122,7 @@ test("the public pages rendered on every request are kept at the CDN; the pages 
   }
   // Public lists keep their existing freshness; database detail pages keep a complete render for an hour.
   const brieflyKept = [
-    "/database", "/census", "/rankings", "/rankings/gear-score", "/rankings/item-level", "/rankings/era-us-pvp-level-60",
+    "/database", "/census",
     "/database/drops",
     ...["npcs", "quests", "objects", "vendors", "spells", "achievements", "titles", "factions", "quest-chains", "zones", "instances", "coverage"]
       .map((type) => `/database/${type}`),
@@ -131,7 +131,8 @@ test("the public pages rendered on every request are kept at the CDN; the pages 
   for (const type of ["npcs", "quests", "objects", "vendors", "spells", "achievements", "titles", "factions", "quest-chains", "zones", "instances", "coverage"]) {
     expect((await headersFor(`/database/${type}/123`))["CDN-Cache-Control"], type).toBe(hour);
   }
-  for (const path of ["/chat", "/account", "/settings", "/sign-in", "/api/tools/search_knowledge", "/changes/feed.xml", "/tools/profession-planner", "/tools/collections"]) {
+  // /rankings shows Blizzard's boards, so its tree is ad-free and never shared, its census pages included.
+  for (const path of ["/chat", "/account", "/settings", "/sign-in", "/api/tools/search_knowledge", "/changes/feed.xml", "/tools/profession-planner", "/tools/collections", "/rankings", "/rankings/classes"]) {
     expect(await headersFor(path), path).not.toHaveProperty("CDN-Cache-Control");
   }
 });
@@ -168,7 +169,6 @@ test("only the public pages rendered per request are marked for the shared CDN c
     "/database/zones/:path*",
     "/map",
     "/map/:path*",
-    "/rankings/:path*",
     "/search",
     "/tools/auctions",
     "/tools/auctions/:realm",
