@@ -106,6 +106,8 @@ const ALLOWED = [
   "web/src/app/database/items/[id]/page.tsx",
   // Names the page's path in its matcher only, to answer client fetches of it without the page; reads nothing.
   "web/src/middleware.ts",
+  // Names the page's path in the freshness table only, to keep it out of every shared cache; reads nothing.
+  "web/src/lib/cache-policy.js",
   "kb/src/cli.ts",
 ];
 /** The hourly job's own folder. */

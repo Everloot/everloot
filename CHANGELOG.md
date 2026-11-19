@@ -408,6 +408,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 ### Changed
 - Site: the Auction House, a realm's prices, Bag upgrades and Disenchanting open faster: the price boards are worked out once each time new scans come in, not again for every visit.
 - Site: the armory crawl fails its hourly job only when 3 Blizzard rows or 1% of the rows it read fail (fewer are deferred for 7 days and shown as a warning), still fails at once when storage refuses a row, and names the response field that broke, never the character.
+- Site: the open data download page (/database/download) is now built ahead and refreshed every five minutes, so it opens without waiting on the export's manifest; every other page keeps the freshness it had.
 - Site: item, NPC, quest and zone pages lead with what is known: a relation tab with no rows is left out (one line in place of the strip when none has rows), an item names up to three places to get it in its quick facts and shows auction prices after its relations, and a zone lists what players confirmed before its lore and a closed Terrain section.
 - Site: the Blizzard character lookup on /search is switched on: a full "First Surname" nobody has stored is looked up in the US, then the EU, within its per-address and site-wide limits.
 - Site: pages load their names and catalogue once per request; a title page, for one, read its catalogue twice.
