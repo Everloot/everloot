@@ -6,7 +6,7 @@ let db: PGlite;
 const owner = "00000000-0000-0000-0000-000000000001";
 const editor = "00000000-0000-0000-0000-000000000002";
 const other = "00000000-0000-0000-0000-000000000003";
-const migration = readFileSync(new URL("../../supabase/migrations/20261119120000_guild_profiles.sql", import.meta.url), "utf8");
+const migration = readFileSync(new URL("../../supabase/migrations/20261119190000_guild_profiles.sql", import.meta.url), "utf8");
 const fields = ["A plain bio", { raidDays: "Tuesday", discord: "https://discord.gg/example", website: "https://example.org" }, { on: true, lookingFor: "Healers", classes: ["PRIEST"] }];
 async function call(name: string, user = owner, extra: unknown[] = []) {
   const args = [user, "us", "star-watch", ...extra];

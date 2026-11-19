@@ -26,8 +26,8 @@ test("armory profile migration and behavior on a disposable PostgreSQL database"
     await db.exec(read("tests/armory_progress.sql"));
     await db.exec(read("migrations/20261117160000_armory_discovery.sql"));
     await db.exec(read("tests/armory_discovery.sql"));
-    await db.exec(read("migrations/20261119120000_guild_profiles.sql"));
-    await db.exec(read("migrations/20261119120000_guild_profiles.sql"));
+    await db.exec(read("migrations/20261119190000_guild_profiles.sql"));
+    await db.exec(read("migrations/20261119190000_guild_profiles.sql"));
     const crest = { emblem: { id: 1, color: { rgba: { r: 1, g: 2, b: 3, a: 1 } } }, border: { id: 2, color: { rgba: { r: 4, g: 5, b: 6, a: 1 } } }, background: { color: { rgba: { r: 7, g: 8, b: 9, a: 1 } } } };
     await db.query("select public.armory_upsert_guild('us',$1::jsonb,'[]'::jsonb)", [JSON.stringify({ slug: "star-watch", guild_id: 12, name: "Star Watch", faction: "Alliance", ruleset_id: 2, ruleset: "Normal", member_count: 0, crest })]);
     expect((await db.query<{ crest: unknown }>("select crest from public.armory_guild('us','star-watch')")).rows[0].crest).toEqual(crest);
