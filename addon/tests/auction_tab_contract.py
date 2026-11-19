@@ -85,6 +85,10 @@ function Frame.SetBackdrop(self, b) self.backdrop = b end
 function Frame.SetBackdropColor(self, r, g, b, a) self.bg = { r, g, b, a } end
 function Frame.SetBackdropBorderColor(self, r, g, b, a) self.border = { r, g, b, a } end
 function Frame.SetScrollChild(self, child) self.child = child end
+function Frame.SetFrameLevel(self, l) self.level = l end
+function Frame.GetFrameLevel(self) return rawget(self, 'level') or 1 end
+function Frame.SetValue(self, v) self.value = v end
+function Frame.SetMinMaxValues(self, low, high) self.low, self.high = low, high end
 function Frame.GetVerticalScroll(self) return rawget(self, 'offset') or 0 end
 function Frame.SetVerticalScroll(self, v) self.offset = v end
 local function region() return setmetatable({ scripts = {}, hooks = {}, hooked = {} }, Frame) end
@@ -112,18 +116,19 @@ GetRealmName = function() return 'Forever' end
 UnitFactionGroup = function() return 'Horde', 'Horde' end
 UnitExists = function() return false end
 LINEN = '|cffffffff|Hitem:2589::|h[Linen Cloth]|h|r'
-GetItemInfo = function(item) if item == 2589 or item == 'Linen Cloth' then return 'Linen Cloth', LINEN end end
+-- Forever (build 70959) has no global GetItemInfo: only C_Item names an item, and only a loaded one.
+C_Item = { GetItemInfo = function(item) if item == 2589 or item == 'Linen Cloth' then return 'Linen Cloth', LINEN end end }
 TooltipDataProcessor = { AddTooltipPostCall = function() end }
 Enum = { TooltipDataType = { Item = 0 } }
 
-rows = { { 2589, 20, 2000 }, { 765, 5, 500 } }
+rows = { { 2589, 20, 2000, 'Linen Cloth' }, { 765, 5, 500, 'Silverleaf' } }
 replicateCalls = 0
 C_AuctionHouse = {
   ReplicateItems = function() replicateCalls = replicateCalls + 1 end,
   GetNumReplicateItems = function() return #rows end,
   GetReplicateItemInfo = function(i)
     local r = rows[i]
-    return nil, 1, r[2], 1, true, 1, 0, 0, 0, r[3], 0, false, nil, nil, nil, 0, r[1], true
+    return r[4], 1, r[2], 1, true, 1, 0, 0, 0, r[3], 0, false, nil, nil, nil, 0, r[1], true
   end,
 }
 
@@ -133,6 +138,9 @@ function openHouse()
   blizzardTabs = { CreateFrame('Button', 'Buy'), CreateFrame('Button', 'Sell'), CreateFrame('Button', 'Auctions') }
   AuctionHouseFrame = CreateFrame('Frame', 'AuctionHouseFrame')
   AuctionHouseFrame.Tabs = blizzardTabs
+  -- The house's border and portrait, at the levels PortraitFrameTemplate gives them (build 70959).
+  AuctionHouseFrame.NineSlice = CreateFrame('Frame'); AuctionHouseFrame.NineSlice.level = 2
+  AuctionHouseFrame.PortraitContainer = CreateFrame('Frame'); AuctionHouseFrame.PortraitContainer.level = 400
   blizzardTabs[3]:SetHeight(32)
   fire('AUCTION_HOUSE_SHOW')
 end
@@ -331,6 +339,8 @@ assert(EverlootDB.toggles.auctions == true, 'a new install starts with auction s
 blizzardTabs = { CreateFrame('Button', 'Buy'), CreateFrame('Button', 'Sell'), CreateFrame('Button', 'Auctions') }
 AuctionHouseFrame = CreateFrame('Frame', 'AuctionHouseFrame')
 AuctionHouseFrame.Tabs = blizzardTabs
+AuctionHouseFrame.NineSlice = CreateFrame('Frame'); AuctionHouseFrame.NineSlice.level = 2
+AuctionHouseFrame.PortraitContainer = CreateFrame('Frame'); AuctionHouseFrame.PortraitContainer.level = 400
 printed = {}
 Everloot.auctionHintFrame.onEvent(nil, 'AUCTION_HOUSE_SHOW')
 assert(said('Everloot tab') and said('never sellers') and said('/everloot auctions off'), table.concat(printed, ' | '))
@@ -344,11 +354,22 @@ assert(Everloot.scanButton == nil, 'with the tab there is no separate scan butto
 for _, tab in ipairs(blizzardTabs) do assert(tab.hooked.OnClick, 'each Blizzard tab hides the panel') end
 assert(T.panel and not T.panel.shown, 'the panel starts hidden')
 assert(replicateCalls == 0, 'opening the house never scans')
+-- The house's Auctions page keeps its selected top tab at level 300 and the Sell page its controls at 350; its
+-- dialogs start at 1000. The panel sits between, so no page control shows through it and a dialog still covers it.
+assert(T.panel.level > 350 and T.panel.level < 1000, 'the panel sits above the house pages and under its dialogs: ' .. tostring(T.panel.level))
 
 -- Native fonts and a gold heading, even when the main Everloot window is available.
 local p = T.panel
 assert(p.helpButton.scripts.OnEnter and p.helpButton.scripts.OnLeave, 'scan instructions are available on hover')
 assert(p.title.text == 'Everloot' and p.title.template == 'GameFontNormalLarge', 'native gold heading')
+-- The house's portrait hangs 57 into the panel's top left corner: the heading starts past it, and the border and the
+-- portrait sit above the panel while it shows (the ring whole, the portrait's lower half there), back after.
+assert(p.title.points.TOPLEFT[1] == p and p.title.points.TOPLEFT[3] >= 50, 'the heading starts right of the portrait: ' .. tostring(p.title.points.TOPLEFT[3]))
+assert(p.scanButton.points.TOPLEFT[4] <= -46, 'the scan row sits below the portrait')
+showPanel()
+assert(T.house.PortraitContainer.level == p.level + 1 and T.house.NineSlice.level == p.level + 1, 'the portrait and the border are lifted above the shown panel')
+T.Hide()
+assert(T.house.PortraitContainer.level == 400 and T.house.NineSlice.level == 2, 'hidden, the panel gives the house its levels back')
 assert(rawget(p, 'crest') == nil and rawget(p.status, 'font') == nil, 'native fonts rather than the main window style')
 assert(Everloot.Window.frame == nil, 'opening the auction house does not build the main window')
 assert(Everloot.scanPrompt == nil, 'no floating reminder alongside the tab')
@@ -359,14 +380,27 @@ assert(T.panel.shown, 'the tab shows the panel')
 assert(p.scanButton.text == 'Scan prices' and p.scanButton.enabled, 'one available scan action')
 assert(T.panel.status.text == 'No scan on this realm yet.', T.panel.status.text)
 assert(p.message.shown and p.message.text == "Type an item's name or id, or shift-click an item here." and p.used == 0, 'the lookup starts with how to use it')
+assert(not p.progress.shown and p.status.shown, 'between scans the status line is there and the bar is not')
 T.panel.scanButton.scripts.OnClick()
 assert(replicateCalls == 1, 'Scan prices starts one scan')
 assert(p.scanButton.text == 'Scanning...' and not p.scanButton.enabled, 'busy scan action disabled')
 assert(not string.find(T.panel.status.text, 'Scanning', 1, true), 'scan state belongs on its button only')
+-- The bar across the top, beside the title: the wait says its seconds and the most the scan allows, filling toward
+-- them; the last-scan line stays where it was.
+now = now + 3
+T.Refresh()
+assert(p.progress.shown and p.status.shown, 'the running scan shows its bar at the top and keeps the status line')
+assert(p.progress.text.text == "Waiting for the house's listings: 3 s, up to 30 s", p.progress.text.text)
+assert(math.abs(p.progress.value - 0.1) < 0.001 and p.progress.low == 0 and p.progress.high == 1, 'the wait fills toward the seconds allowed: ' .. tostring(p.progress.value))
+assert(p.progress.kind == 'StatusBar' and p.progress.text.template == 'GameFontHighlightSmall', 'a native status bar with the game font')
+assert(p.progress.points.TOPLEFT[1] == p.helpButton and p.progress.points.BOTTOMLEFT[1] == p.helpButton, 'the bar starts beside the help button, as tall as it')
+assert(p.progress.width >= 300 and p.progress.width <= 784 - 16 - 22 - 8 - 16 - 16, 'the bar ends before the panel edge: ' .. tostring(p.progress.width))
+if type(rawget(p, 'shop')) == 'table' then T.SetMode('shop'); assert(p.progress.shown, 'the bar stays at the top on the shopping page'); T.SetMode('lookup') end
 fire('REPLICATE_ITEM_LIST_UPDATE')
 drain()
-now = now + 125
+now = now + 122
 T.Refresh()
+assert(not p.progress.shown and p.status.shown, 'the scan reported: the bar is gone and the status line stays')
 assert(p.scanButton.text == 'Ready in 12:55' and not p.scanButton.enabled, 'cooldown shown on disabled action')
 local status = T.panel.status.text
 assert(not string.find(status, '12:55', 1, true), 'the cooldown is not repeated')
@@ -399,6 +433,20 @@ assert(not p.unit.shown, 'no amounts, no unit')
 assert(T.Lookup('99999'):find('No Everloot price file in the game yet:', 1, true))
 lookup('')
 assert(p.message.text == "Type an item's name or id, or shift-click an item here.", p.message.text)
+-- A name the client has not loaded is found among the names the scan's rows gave; part of a name lists the
+-- matches with the scan's own prices; a name nothing matches says so, not the hint.
+assert(EverlootDB.scanNames.Forever[765] == 'Silverleaf', 'the scan kept the names its rows carried')
+lookup('silverleaf')
+assert(shownText():find('Your scan', 1, true) and p.item.text:find('Item 765', 1, true), 'a scanned item found by its name alone: ' .. tostring(p.item.text))
+lookup('l')
+assert(p.item.shown and p.item.text:find('Items named like "l"', 1, true) and p.item.text:find('Forever', 1, true), p.item.text)
+assert(shownText():find('2 items in your scans match "l". Type one full name:', 1, true), shownText())
+assert(shownText():find('Linen Cloth  ·  min 1s 0c  ·  20 listed', 1, true) and shownText():find('Silverleaf  ·  min 1s 0c  ·  5 listed', 1, true), shownText())
+assert(not p.unit.shown, 'a list of matches has no per-unit heading')
+checkLayout()
+lookup('Peacebloom')
+assert(p.message.shown and p.message.text:find('No item named "Peacebloom" in your scans of this realm', 1, true) and p.used == 0, p.message.text)
+assert(Everloot.ItemIdFrom('SILVERLEAF') == 765 and Everloot.ItemIdFrom('silver') == nil, 'the exact name alone resolves to an id')
 
 -- A shift-clicked item goes into the box while it has focus.
 local box = T.panel.lookup

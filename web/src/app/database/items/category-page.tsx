@@ -4,7 +4,7 @@ import { isDevelopmentItemName } from "@kb/dev-item-names";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { describe, filterItems, QUALITIES, resolveClass, resolveLegacyClass, resolveSubclass, slotOf, type ItemClass, type ItemRow, type ItemSubclass } from "@kb/item-taxonomy";
-import {
+import { matchItemNames,
   activeFilters, BINDINGS, CLIENT_TAXONOMY as T, categoryNamedEnough, categoryQuery, developmentLeftovers, itemFacets, ITEM_LEVEL_BRACKETS, itemsHref,
   listItems, NAME_FROM, SOURCES, shownItemName, subclassLabel, toggled, UNRECORDED, type CategoryQuery, type NameSource,
 } from "@/lib/items";
@@ -21,7 +21,7 @@ import Badge, { UNCONFIRMED_TITLE } from "@/components/ui/Badge";
 import { Container, DataTable, DataTitle, FilterBar, filledColumns, QUALITY_TEXT, ResultStrip, qualityOf, type FilterControl, type SparseColumn } from "@/components/ui";
 import type { Crumb } from "@/lib/jsonld";
 import { LAUNCH, LAUNCH_AT, longDate } from "@/data/wow-forever";
-import { LEVEL_BRACKETS, PER_PAGE } from "../list-parts";
+import { Respelled, LEVEL_BRACKETS, PER_PAGE } from "../list-parts";
 
 type Search = Record<string, string | string[] | undefined>;
 
@@ -134,7 +134,8 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const wide = Boolean(q.ilvl || q.req || q.bind) || q.sort?.key === "ilvl" || q.sort?.key === "req";
   const every = wide ? await tipsFor(base.map((row) => row[0]).filter(showsTip)) : null;
   const ctx = { name: nameOf, seen: seen.seen, sources: (id: number) => seen.from.get(id), tip: (id: number) => every?.tips.get(id) };
-  const listed = listItems(base, q, ctx);
+  const match = matchItemNames(base, q, ctx);
+  const listed = listItems(base, q, ctx, match);
   // The items no source names ("Item N") are one line above the table unless asked for, in the unrecorded quality
   // view (which lists them by design) or by id; not when nothing in the list has a name (names out of reach),
   // where the line would hide the whole list. They sort last either way.
@@ -149,7 +150,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
   const leftovers = developmentLeftovers(T.items, nameOf);
   const gone = (id: number) => unnamed.has(id) || (!q.dev && leftovers.has(id));
   const pool = base.filter((row) => !gone(row[0]));
-  const held = q.dev ? rows.filter((row) => leftovers.has(row[0])).length : listItems(base, { ...q, dev: true }, ctx).filter((row) => !unnamed.has(row[0])).length - rows.length;
+  const held = q.dev ? rows.filter((row) => leftovers.has(row[0])).length : listItems(base, { ...q, dev: true }, ctx, match).filter((row) => !unnamed.has(row[0])).length - rows.length;
   const hiddenIn = (classId?: number, subclassId?: number) => T.items.reduce((n, row) => n + Number((classId === undefined || (row[1] === classId && (subclassId === undefined || row[2] === subclassId))) && (gone(row[0]) || !fits(row))), 0);
   // The rows a class context keeps without the files deciding, for the line under the chip.
   const undecided = usable ? rows.reduce((n, row) => n + Number(usable(row) === "unknown"), 0) : 0;
@@ -367,6 +368,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
             )}
           </p>
         )}
+        {match.respelled && rows.length > 0 && <Respelled q={match.respelled} />}
         <div className="mt-2">
           <DataTable
             dense

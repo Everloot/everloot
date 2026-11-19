@@ -70,6 +70,16 @@ test.each(["dark", "light"] as const)("the primary fill stands out from the canv
 
 test("channels", () => expect(channels("#0E0F0D")).toBe("14 15 13"));
 
+test.each(["dark", "light"] as const)("census fills preserve ink and faction contrast (%s)", (m) => {
+  for (const bg of ["canvas", "panel"] as const) for (const f of ["faction-alliance", "faction-horde"] as const)
+    expect(contrast(tokens[m][f], tokens[m][bg])).toBeGreaterThanOrEqual(3);
+  const ramp = ["census-1", "census-2", "census-3", "census-4", "census-5"] as const;
+  ramp.forEach((t, i) => {
+    expect(contrast(tokens[m].fg, tokens[m][t])).toBeGreaterThanOrEqual(4.5);
+    if (i) expect(luminance(tokens[m][t])).toBeLessThan(luminance(tokens[m][ramp[i - 1]]));
+  });
+});
+
 test("css variables cover every token in both modes", () => {
   expect(cssVariables("dark")["--canvas"]).toBe("14 15 13");
   expect(Object.keys(cssVariables("light"))).toHaveLength(Object.keys(tokens.light).length);

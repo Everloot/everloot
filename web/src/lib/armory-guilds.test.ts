@@ -146,12 +146,13 @@ describe("the roster summary", () => {
     ]);
     expect(s.classes).toEqual([{ token: "MAGE", count: 2 }, { token: "WARRIOR", count: 1 }]);
     expect(s.levels).toEqual([
-      { label: "60", count: 1 }, { label: "50–59", count: 1 }, { label: "40–49", count: 1 },
-      { label: "30–39", count: 0 }, { label: "20–29", count: 0 }, { label: "1–19", count: 1 },
+      { label: "At 60", count: 1 }, { label: "50–59", count: 1 }, { label: "40–49", count: 1 },
+      { label: "30–39", count: 0 }, { label: "20–29", count: 0 }, { label: "10–19", count: 1 }, { label: "1–9", count: 0 },
     ]);
     expect(s.levelUnknown).toBe(1);
     expect(s.averageItemLevel).toBe(65.5);
     expect(s.itemLevelsRead).toBe(2);
+    expect(s.itemLevels).toEqual([{ label: "60–69", count: 1 }, { label: "70–79", count: 1 }]);
     expect(rosterSummary([]).averageItemLevel).toBeNull();
   });
 });
