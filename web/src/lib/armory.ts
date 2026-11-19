@@ -138,22 +138,30 @@ export const armoryBoardPath = (metric: ArmoryMetric) => `/armory/rankings/${met
 export const metricValue = (metric: ArmoryMetric, value: number) =>
   value.toLocaleString("en-US", { maximumFractionDigits: metric === "honorable-kills" ? 0 : 2 });
 
-export interface ArmoryBoardQuery { region: ArmoryRegion | null; ruleset: number | null }
+export const ARMORY_CLASSES = ["Warrior", "Paladin", "Hunter", "Rogue", "Priest", "Shaman", "Mage", "Warlock", "Druid"] as const;
+export const ARMORY_FACTIONS = ["Alliance", "Horde"] as const;
+export interface ArmoryBoardQuery { region: ArmoryRegion | null; ruleset: number | null; class?: string | null; faction?: string | null }
 
 /** `?ruleset=1&region=eu`; null when a value is not one we know (the page answers 404 rather than guess). */
 export function armoryBoardQuery(search: Record<string, string | string[] | undefined>): ArmoryBoardQuery | null {
+  if (Array.isArray(search.class) || Array.isArray(search.faction)) return null;
   const one = (k: string) => (typeof search[k] === "string" ? (search[k] as string) : "");
   const rawRegion = one("region"), rawRuleset = one("ruleset");
   const region = rawRegion === "" ? null : isArmoryRegion(rawRegion) ? rawRegion : undefined;
   const ruleset = rawRuleset === "" ? null : ARMORY_RULESETS.find((r) => String(r.id) === rawRuleset)?.id ?? undefined;
-  if (region === undefined || ruleset === undefined) return null;
-  return { region, ruleset };
+  const classification = one("class"), side = one("faction");
+  const className = classification ? ARMORY_CLASSES.find((c) => c.toLowerCase() === classification.toLowerCase()) : null;
+  const faction = side ? ARMORY_FACTIONS.find((f) => f.toLowerCase() === side.toLowerCase()) : null;
+  if (region === undefined || ruleset === undefined || className === undefined || faction === undefined) return null;
+  return { region, ruleset, class: className, faction };
 }
 
 export function armoryBoardHref(metric: ArmoryMetric, q: ArmoryBoardQuery): string {
   const params = new URLSearchParams();
   if (q.ruleset !== null) params.set("ruleset", String(q.ruleset));
   if (q.region) params.set("region", q.region);
+  if (q.class) params.set("class", q.class.toLowerCase());
+  if (q.faction) params.set("faction", q.faction.toLowerCase());
   const s = params.toString();
   return s ? `${armoryBoardPath(metric)}?${s}` : armoryBoardPath(metric);
 }

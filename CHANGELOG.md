@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: character boards filter by class and faction; /rankings shows the best Gear Score in each class, character and guild name searches, and links to add your character or guild.
 - Site: /rankings leads with the leaderboards: characters by item level, Gear Score and honorable kills, guilds by average item level and by raid progress in the newest raid, each a top 10 with a link to its full list and an All, US or EU tab in the URL; the census rankings follow under Who plays. The hub stays out of search engines while it shows Blizzard's boards, as every armory page does.
 - Site: the scheduled jobs can run in a Worker of their own (`everloot-cron`, same build, no routes), so the snapshot job no longer shares memory with page and MCP traffic; off until the maintainer deploys it and sets `EVERLOOT_CRON_WORKER` on the site (docs/OPERATIONS.md, "The cron Worker").
 - Site: armory character pages show the header with when the character was last read, and put gear, talents, stats, PvP, achievements, professions, reputations and quests in tabs; a tab with nothing stored says why in one sentence.
@@ -409,6 +410,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the loot observations table sorts frequency by its 95% Wilson lower bound while still showing the observed share.
 
 ### Changed
+- Site: rankings use class colours, faction swatches, relative value bars, linked guild names and keyboard-accessible metric explanations with each character's read time.
 - Site: the search and the search box suggestions read the names they match from one small file the snapshot cron writes beside the aggregates (`snapshots/search-names.json`), so a fresh server instance no longer downloads and parses the whole aggregate set for a keystroke; without the file they read the aggregates as before.
 - Site: the phone menu's search box suggests pages as you type, the same field as the bar's, instead of a plain box with no suggestions.
 - Site: cards, icons and copy buttons look and behave the same everywhere; small corners, captions and line lengths follow the site's sizes.

@@ -32,4 +32,5 @@ export { filledTabs } from "./tab-style";
 export { default as ReadingLayout, RailFacts, type TocItem } from "./ReadingLayout";
 export { default as TooltipFrame, type TooltipFrameProps } from "./TooltipFrame";
 export { default as TooltipLines } from "./TooltipLines";
+export { default as Tooltip } from "./Tooltip";
 export { QUALITY_LABEL, QUALITY_TEXT, qualityOf, type Quality } from "./quality";
