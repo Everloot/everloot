@@ -4,7 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import ApiKeys from "@/components/ApiKeys";
 import ChatKeys from "@/components/chat/ChatKeys";
-import LinkedCharacters from "@/components/LinkedCharacters";
+import LinkedCharacters from "./LinkedCharacters";
 import { Container } from "@/components/ui";
 import YourEverlootHeader from "@/components/YourEverloot";
 import { loadOverview, type AccountOverview } from "@/lib/account-overview";

@@ -12,15 +12,15 @@ import {
 import type { PoiIcons } from "@/lib/map-marks";
 import { mapCoordinates, mapPoint, parseCoordinatePin, serialiseCoordinatePin } from "@/lib/map-coordinate-pin";
 import { confirmedLine } from "@/lib/report-labels";
-import MapList, { HELD_LABEL } from "./map/MapList";
-import type { FitRequest, MapMarker, MapViewChange } from "./map/LeafletMap";
-import "./map/world-map.css";
+import MapList, { HELD_LABEL } from "@/components/map/MapList";
+import type { FitRequest, MapMarker, MapViewChange } from "@/components/map/LeafletMap";
+import "@/components/map/world-map.css";
 
 export type { MapMarker };
 
 // Leaflet is loaded here and nowhere else: the rest of the site never downloads it, and the List tab is rendered
 // on the server, so the page reads without it.
-const LeafletMap = dynamic(() => import("./map/LeafletMap"), {
+const LeafletMap = dynamic(() => import("@/components/map/LeafletMap"), {
   ssr: false,
   loading: () => <p className="grid h-full place-items-center px-4 text-center text-sm text-muted">Loading the map. The same places are in the List tab.</p>,
 });

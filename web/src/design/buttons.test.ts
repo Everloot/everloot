@@ -82,10 +82,9 @@ const PRIMARY = [
   "app/upload/UploadClient.tsx",
   "app/not-found-parts.tsx",
   "app/page.tsx",
-  "components/BrowseFilters.tsx",
+  "app/lore/browse/[type]/BrowseFilters.tsx",
   "components/CookieConsent.tsx",
   "components/EmailCapture.tsx",
-  "components/IdLookup.tsx",
   "components/LoreSearchForm.tsx",
 ];
 

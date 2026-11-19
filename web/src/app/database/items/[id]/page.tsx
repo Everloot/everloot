@@ -30,7 +30,7 @@ import { loadNames, nameOf } from "@/lib/names";
 import { loreForShownItem } from "@/lib/lore-links";
 import EntityLink from "@/components/EntityLink";
 import LoreSection from "@/components/LoreSection";
-import DarkmoonItemNote from "@/components/DarkmoonItemNote";
+import DarkmoonItemNote from "./DarkmoonItemNote";
 import { CategoryPage, categoryMetadata } from "../category-page";
 import { itemIndexable } from "@/lib/indexable";
 import { entityTitle, itemDescription } from "@/lib/entity-meta";

@@ -5,7 +5,7 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { categoryCounts, CATEGORY_IDS, DEFAULT_URL_STATE, spotBox, type MapItems } from "@/lib/map-view";
-import type { LeafletMapProps } from "./map/LeafletMap";
+import type { LeafletMapProps } from "@/components/map/LeafletMap";
 
 // The map itself needs a real browser; a stand-in records what the view hands it.
 const leaflet = vi.hoisted(() => ({ props: null as unknown as LeafletMapProps }));

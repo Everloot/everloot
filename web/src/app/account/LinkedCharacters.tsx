@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import CopyButton from "@/components/ui/CopyButton";
-import ArmoryConnection from "@/components/ArmoryConnection";
+import ArmoryConnection from "./ArmoryConnection";
 
 /** One link as GET /api/me/characters/links lists it. */
 export interface ListedLink {

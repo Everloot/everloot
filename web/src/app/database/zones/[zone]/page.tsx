@@ -6,7 +6,7 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
 import EntityLink from "@/components/EntityLink";
-import ZonePreview from "@/components/ZonePreview";
+import ZonePreview from "./ZonePreview";
 import {
   AgreementMeter, Badge, Card, Container, DataTable, Disclosure, EmptyState, InShort, OpenData, ResultStrip, SectionHeading, Tabs,
   type Column, type TabItem,

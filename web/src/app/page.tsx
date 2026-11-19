@@ -5,7 +5,7 @@ import TrackedDownload from "@/components/TrackedDownload";
 import JsonLd from "@/components/JsonLd";
 import GlintHero from "@/components/glint/GlintHero";
 import StartHere from "@/components/start/StartHere";
-import HomeTrust from "@/components/HomeTrust";
+import HomeTrust from "./HomeTrust";
 import { loadCoverageSummary } from "@/lib/coverage-summary";
 import { Banner, Card, SectionHeading } from "@/components/ui";
 import HomeSearch from "@/components/HomeSearch";
