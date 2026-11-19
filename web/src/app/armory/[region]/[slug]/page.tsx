@@ -17,6 +17,7 @@ import { loadCatalog } from "@/lib/completion-lists";
 import { publicArmoryLink } from "@/lib/armory-links";
 import { readTimes } from "../../profile";
 import { characterTabs } from "../../character-tabs";
+import { loadCharacterProgression } from "@/lib/progression";
 import Portrait from "../../portrait";
 import { addonProfile } from "../../addon-profile";
 import { classText } from "@/app/players/player-view";
@@ -99,6 +100,7 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
   const lastRead = newest(readTimes(c));
   // The honorable-kills rank sits with the kills in the PvP tab; the gear ranks stay with the numbers above the tabs.
   const pvpRanks = rankFacts(c, ranks.filter((r) => r.metric === "honorable_kills"));
+  const progression = await loadCharacterProgression(c.region, c.slug);
   const facts: Fact[] = [
     ...(c.itemLevel !== null ? [{ label: "Item level", value: metricValue("item-level", c.itemLevel), numeric: true }] : []),
     ...(c.averageItemLevel !== null ? [{ label: "Average item level", value: c.averageItemLevel, numeric: true }] : []),
@@ -138,7 +140,7 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
 
         {facts.length > 0 && <Facts label="Numbers" items={facts} />}
 
-        <Tabs label={`${fullName}: character sheet`} tabs={characterTabs(c, { tips, unknownIcon: assets ? unknownItemIcon(assets.base) : null, categories, pvpFacts: pvpRanks })} />
+        <Tabs label={`${fullName}: character sheet`} tabs={characterTabs(c, { tips, unknownIcon: assets ? unknownItemIcon(assets.base) : null, categories, pvpFacts: pvpRanks, progression })} />
 
         {addon && <section aria-labelledby="armory-addon" className="space-y-6 border-t border-line pt-8">
           <SectionHeading id="armory-addon">Shared through the Everloot addon</SectionHeading>
