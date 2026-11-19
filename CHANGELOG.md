@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: character sheets gain a Progress tab with every instance and boss in the client files, observed availability and private, consented owner kill history; a shared progression model and roster loader prepare guild member progress.
 - Site: character boards filter by class and faction; /rankings shows the best Gear Score in each class, character and guild name searches, and links to add your character or guild.
 
 - Site: Guild pages show population tiles, class mix, level and item level bars, and a sortable roster.
