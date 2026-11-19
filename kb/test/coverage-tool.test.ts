@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { z } from "zod";
 import { MCP_TOOLS } from "@everloot/protocol";
 import { computeCoverage } from "../src/coverage.js";
-import type { CoverageAnswer } from "../src/coverage-tool.js";
+import { COVERAGE_NOT_MEASURED, type CoverageAnswer, type CoverageLoader } from "../src/coverage-tool.js";
 import { createToolHandlers } from "../src/mcp-server.js";
 import type { DB } from "../src/db.js";
 
@@ -19,9 +19,9 @@ const report = () => computeCoverage({
     { zone: "1429", types: { npc: 10 }, fields: { npc: { name: 10 } } },
   ] },
 });
-const answer = (args = {}, loader = async () => report()) => createToolHandlers({} as DB, { coverage: loader }).coverage(args);
+const answer = (args = {}, loader: CoverageLoader = async () => report()) => createToolHandlers({} as DB, { coverage: loader }).coverage(args);
 const textOf = async (a: unknown) => ((await a) as CoverageAnswer).text;
-const call = (args = {}, loader = async () => report()) => textOf(answer(args, loader));
+const call = (args = {}, loader: CoverageLoader = async () => report()) => textOf(answer(args, loader));
 
 test("coverage declares optional zone, type, detail, offset and limit and a read-only structured output", () => {
   const def = MCP_TOOLS.coverage;
@@ -94,6 +94,14 @@ test("unavailable, disconnected and unknown zones are explicit", async () => {
   expect(await call({ zone: 9999 })).toContain("No released zone matches");
 });
 
+test("a host with no stored score answers not measured yet, unknown and never zero", async () => {
+  const a = (await answer({}, async () => COVERAGE_NOT_MEASURED)) as CoverageAnswer;
+  expect(a.text).toContain("Coverage not measured yet: no stored score for this build could be read");
+  expect(a.text).toContain("not measured zero");
+  expect(a.structured).toMatchObject({ connected: false, dataAsOf: null });
+  expect(a.structured.page).toBeUndefined();
+});
+
 test("scoped totals keep whole-fact settled-list counts separate, dated and counts-only", async () => {
   const { text } = await createToolHandlers({} as DB, {
     coverage: async () => report(),
@@ -129,8 +137,7 @@ test("a capped list never invents an exhaustive type-filtered needs count", asyn
   expect(text).toContain("Fields needing one or two more installs: [?]");
 });
 
-test("the date line says whether the score is the stored report or computed live, and stays as it was when the host does not say", async () => {
+test("the date line says the score is the stored report, and stays as it was when the host does not say", async () => {
   expect(await call({}, async () => ({ ...report(), source: "stored" as const }))).toContain(`Data as of ${asOf} (stored report, written by the snapshot cron for this build); build test-build`);
-  expect(await call({}, async () => ({ ...report(), source: "live" as const }))).toContain(`Data as of ${asOf} (computed from the corpus now: no stored report for this build was usable); build test-build`);
   expect(await call()).toContain(`Data as of ${asOf}; build test-build`);
 });

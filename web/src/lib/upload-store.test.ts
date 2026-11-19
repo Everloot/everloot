@@ -259,6 +259,77 @@ describe("corpus snapshot", () => {
   const SNAP = `${R2}snapshots/corpus.json`;
   const INDEX = "https://sb.example/rest/v1/uploads";
 
+  /** A snapshot store that answers 304 to its current ETag, and can hold its GETs until released. */
+  function snapshotStore() {
+    const state = { etag: '"v1"', generatedAt: "2026-10-04T11:00:00.000Z", gets: [] as (string | null)[], gate: null as Promise<void> | null };
+    const fn = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      const asked = req.headers.get("if-none-match");
+      state.gets.push(asked);
+      if (state.gate) await state.gate;
+      if (asked === state.etag) return new Response(null, { status: 304 });
+      return Response.json({ generatedAt: state.generatedAt, uploads: 1, records: [lootRow()], lastReceivedAt: null, lastIds: [] }, { headers: { etag: state.etag } });
+    }) as typeof fetch;
+    return { state, fn };
+  }
+
+  test("an expired corpus is asked for with its ETag: unchanged, it is not downloaded or parsed again and the records stay one array", async () => {
+    const { state, fn } = snapshotStore();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(0);
+    try {
+      const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now, cacheMs: 1000 });
+      const first = await store.loadCorpus();
+      expect(first.records).toEqual([lootRow()]);
+      expect((await store.loadCorpus()).records).toBe(first.records);
+      expect(state.gets).toEqual([null]);
+
+      clock.mockReturnValue(1000);
+      const again = await store.loadCorpus();
+      expect(state.gets).toEqual([null, '"v1"']);
+      expect(again.records).toBe(first.records);
+      expect(again.dataAsOf).toBe("2026-10-04T11:00:00.000Z");
+
+      state.etag = '"v2"'; state.generatedAt = "2026-10-04T11:10:00.000Z";
+      clock.mockReturnValue(2000);
+      const changed = await store.loadCorpus();
+      expect(state.gets).toEqual([null, '"v1"', '"v1"']);
+      expect(changed.dataAsOf).toBe("2026-10-04T11:10:00.000Z");
+      expect(changed.records).not.toBe(first.records);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  test("while one request reads a newer corpus, the others answer from the copy held instead of reading a second one", async () => {
+    const { state, fn } = snapshotStore();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(0);
+    try {
+      const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now, cacheMs: 1000 });
+      const first = await store.loadCorpus();
+      clock.mockReturnValue(1000);
+      state.etag = '"v2"'; state.generatedAt = "2026-10-04T11:10:00.000Z";
+      let release!: () => void;
+      state.gate = new Promise((r) => { release = r; });
+      const reading = store.loadCorpus();
+      await vi.waitFor(() => expect(state.gets).toHaveLength(2));
+      const meanwhile = await store.loadCorpus();
+      expect(meanwhile.records).toBe(first.records);
+      expect(state.gets).toHaveLength(2);
+      release();
+      expect((await reading).dataAsOf).toBe("2026-10-04T11:10:00.000Z");
+      expect((await store.loadCorpus()).dataAsOf).toBe("2026-10-04T11:10:00.000Z");
+      expect(state.gets).toHaveLength(2);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  test("with no copy held, a failed read is unreachable, never an empty corpus", async () => {
+    const fn = (async () => new Response("down", { status: 503 })) as unknown as typeof fetch;
+    const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now, cacheMs: 1000 });
+    expect(await store.loadCorpus()).toEqual({ uploads: 0, records: [], unreachable: true });
+  });
+
   test("the first snapshot reads every indexed upload and records where it stopped", async () => {
     const { fn, calls } = fakeFetch([
       [SNAP, "GET", () => new Response("missing", { status: 404 })],
