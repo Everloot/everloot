@@ -12,6 +12,7 @@ vi.mock("@/lib/lore", async (importOriginal) => ({ ...(await importOriginal<type
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
 
 vi.mock("@/lib/wiki-entity-names", async (original) => ({ ...await original<typeof import("@/lib/wiki-entity-names")>(), loadWikiEntityNames: mocks.wiki }));
+import { EMPTY } from "../../entity";
 import NpcPage, { generateMetadata } from "./page";
 import VendorPage from "../../vendors/[id]/page";
 
@@ -79,8 +80,8 @@ test("empty and below-threshold tabs explain the three-install rule without publ
       continue;
     }
     // Short of 3 installs the tab stays, with its meter and the rule.
-    expect(panel(out, "goods")).toContain("No agreed goods yet. A price needs 3 installs.");
-    expect(panel(out, "quests")).toContain("No agreed quest yet. A quest needs its giver or turn-in from 3 installs.");
+    expect(panel(out, "goods")).toContain(EMPTY.goods);
+    expect(panel(out, "quests")).toContain(EMPTY.quests);
     expect(panel(out, "goods")).toContain(`data-agreement="${count}"`);
     expect(panel(out, "quests")).toContain(`data-agreement="${count}"`);
   }

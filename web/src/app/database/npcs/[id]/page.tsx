@@ -16,7 +16,7 @@ import { pinLink, WORLD_MAP } from "@/lib/world-map";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
-import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, known, LINK, PinTable, Unreachable } from "../../entity";
+import { EntityLayout, EntitySidebar, EMPTY, EmptyTab, EntityHeader, EntityTop, known, LINK, PinTable, Unreachable } from "../../entity";
 import { NpcLootPanel } from "../../loot-tables";
 import { VendorGoods } from "../../vendors/goods";
 import { npcRelations } from "../relations";
@@ -187,7 +187,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
                   <p className="py-2 text-meta text-fg-2">This NPC sells goods. <Link href={`/database/vendors/${npcId}`} className={LINK}>Open the vendor page</Link></p>
                   <VendorGoods title={title} offers={goods} tips={tips} items={names} evidence={goodsEvidence} />
                 </>
-                : <EmptyTab reported={goodsReported} message="No agreed goods yet. A price needs 3 installs." />,
+                : <EmptyTab reported={goodsReported} message={EMPTY.goods} />,
             },
             {
               id: "quests", label: "Quests", count: unreachable || (!quests.length && questsReported) ? undefined : quests.length,
@@ -203,13 +203,13 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
                   rows={quests}
                   rowKey={(q) => `${q.questId}-${q.role}`}
                 />
-                : <EmptyTab reported={questsReported} message="No agreed quest yet. A quest needs its giver or turn-in from 3 installs." />,
+                : <EmptyTab reported={questsReported} message={EMPTY.quests} />,
             },
             {
               id: "map", label: "Map", count: unreachable ? undefined : page.pins.length,
               panel: unreachable ? <Unreachable />
                 : page.pins.length ? <PinTable caption={`Where ${title} stands`} rows={page.pins} rowKey={(p) => String(p.mapId)} />
-                : <EmptyTab message="No agreed position yet. A pin needs 3 installs at the same spot." />,
+                : <EmptyTab message={EMPTY.position} />,
             },
           ]}
         />
