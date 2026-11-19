@@ -250,6 +250,7 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
                     rowKey={(g) => `${g.region}/${g.slug}`}
                     meta={(g) => `${regionLabel(g.region)} ${g.ruleset} · ${number(g.memberCount)} on the roster`}
                   />}
+              <p className="text-meta text-muted" data-disbanded-note>Disbanded guilds are left out of this list and its counts.</p>
             </section>
           ))}
           {found && (

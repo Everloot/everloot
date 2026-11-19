@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Card, DataTable, EmptyState, Explainer, type Column } from "@/components/ui";
+import { CLASS_BG, CLASS_FILL, CLASS_STROKE, classColour } from "@/components/ui/class-colour";
 import { guildsOn } from "@/lib/guild-switch";
 import { ARMORY_BOARDS, ARMORY_METRICS, armoryBoardPath, armoryOn } from "@/lib/armory";
 import { CENSUS_MIN_CHARACTERS, CENSUS_MIN_INSTALLS, CENSUS_MIN_REPORTERS, CENSUS_ROUND_TO, HIDDEN_LABEL } from "../../../../kb/src/census";
@@ -15,23 +16,6 @@ const number = (n: number) => n.toLocaleString("en-US");
 /** A share of the shown total, both rounded already; a whole percent claims no more than the counts do. */
 export const percent = (share: number) => `${Math.round(share * 100)}%`;
 export const weekLabel = (w: RankingWeek) => (w.current ? `This week so far (from ${w.start})` : `Week of ${w.start}`);
-
-// Whole class names, so Tailwind sees them.
-const CLASS_BG: Record<string, string> = {
-  WARRIOR: "bg-class-warrior", PALADIN: "bg-class-paladin", HUNTER: "bg-class-hunter",
-  ROGUE: "bg-class-rogue", PRIEST: "bg-class-priest", SHAMAN: "bg-class-shaman",
-  MAGE: "bg-class-mage", WARLOCK: "bg-class-warlock", DRUID: "bg-class-druid",
-};
-const CLASS_STROKE: Record<string, string> = {
-  WARRIOR: "stroke-class-warrior", PALADIN: "stroke-class-paladin", HUNTER: "stroke-class-hunter",
-  ROGUE: "stroke-class-rogue", PRIEST: "stroke-class-priest", SHAMAN: "stroke-class-shaman",
-  MAGE: "stroke-class-mage", WARLOCK: "stroke-class-warlock", DRUID: "stroke-class-druid",
-};
-const CLASS_FILL: Record<string, string> = {
-  WARRIOR: "fill-class-warrior", PALADIN: "fill-class-paladin", HUNTER: "fill-class-hunter",
-  ROGUE: "fill-class-rogue", PRIEST: "fill-class-priest", SHAMAN: "fill-class-shaman",
-  MAGE: "fill-class-mage", WARLOCK: "fill-class-warlock", DRUID: "fill-class-druid",
-};
 
 /**
  * The list of rankings: a rail on wide screens, a bar of links that scrolls sideways on a phone. Plain links,
@@ -123,7 +107,7 @@ const markOf = (r: RankRow): Mark => (r.classToken ? { classToken: r.classToken 
  * dashed ring for the Horde, a muted dot where nothing has a colour. Decorative; the name beside it carries identity.
  */
 export function Swatch({ classToken, faction }: Mark) {
-  const look = classToken ? CLASS_BG[classToken] : faction === "Horde" ? "border border-dashed border-fg-2" : faction === "Alliance" ? "bg-fg-2" : "bg-muted";
+  const look = classToken ? classColour(CLASS_BG, classToken) : faction === "Horde" ? "border border-dashed border-fg-2" : faction === "Alliance" ? "bg-fg-2" : "bg-muted";
   return <span aria-hidden="true" data-class-mark={classToken ? "" : undefined} className={`h-2.5 w-2.5 shrink-0 rounded-full ${look}`} />;
 }
 
@@ -131,7 +115,7 @@ export function Swatch({ classToken, faction }: Mark) {
 export function ShareBar({ share, classToken, className = "" }: { share: number; classToken?: string; className?: string }) {
   return (
     <span aria-hidden="true" className={`block h-1 shrink-0 rounded-full bg-line ${className}`}>
-      <span className={`block h-1 rounded-full ${classToken ? CLASS_BG[classToken] : "bg-fg-2"}`} style={{ width: percent(Math.min(1, share)) }} />
+      <span className={`block h-1 rounded-full ${classToken ? classColour(CLASS_BG, classToken) : "bg-fg-2"}`} style={{ width: percent(Math.min(1, share)) }} />
     </span>
   );
 }
@@ -260,9 +244,9 @@ export function StartState() {
 /** A race carries its faction (Skyborne is on both sides). */
 const nameOf = (s: ChartSeries) => (s.faction && s.label !== s.faction ? `${s.label} (${s.faction})` : s.label);
 const weekTick = (w: RankingWeek) => (w.current ? "so far" : w.start.slice(5));
-const stroke = (s: ChartSeries) => (s.classToken && !s.faction ? CLASS_STROKE[s.classToken] : "stroke-fg-2");
-const fill = (s: ChartSeries) => (s.classToken && !s.faction ? CLASS_FILL[s.classToken] : "fill-fg-2");
-const swatch = (s: ChartSeries) => (s.classToken && !s.faction ? CLASS_BG[s.classToken] : s.faction === "Horde" ? "border border-dashed border-fg-2" : "bg-fg-2");
+const stroke = (s: ChartSeries) => (s.classToken && !s.faction ? classColour(CLASS_STROKE, s.classToken) : "stroke-fg-2");
+const fill = (s: ChartSeries) => (s.classToken && !s.faction ? classColour(CLASS_FILL, s.classToken) : "fill-fg-2");
+const swatch = (s: ChartSeries) => (s.classToken && !s.faction ? classColour(CLASS_BG, s.classToken) : s.faction === "Horde" ? "border border-dashed border-fg-2" : "bg-fg-2");
 
 const W = 720;
 const H = 300;
@@ -501,9 +485,11 @@ export function MetricTiles({ m }: { m: HubMetrics }) {
         note={collecting ? "Still collecting" : weekLabel(m.week)}
       />
       <Tile
-        label="Against last week"
+        label={m.change?.sameDays ? "Against the same days last week" : "Against last week"}
         value={m.change ? signed(m.change.by) : <NotYet why="not yet" />}
-        note={m.change ? (m.change.share === null ? "characters" : `${signedPercent(m.change.share)} characters`) : "Starts once two weeks have numbers"}
+        note={m.change
+          ? (m.change.share === null ? "characters" : `${signedPercent(m.change.share)} characters`)
+          : m.week.current && m.week.sameDaysBefore?.collecting ? "Waiting for last week's same days to have numbers" : "Starts once two weeks have numbers"}
       />
       <Tile
         label={leaders.length > 1 ? "Leading published classes" : "Leading published class"}

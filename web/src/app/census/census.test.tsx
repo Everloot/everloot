@@ -79,6 +79,12 @@ test("factions, classes, races and level bands show rounded counts; a hidden cou
   expect(page).toMatch(/<th scope="col"[^>]*>Class<\/th>/);
   expect(page).toContain("Factions");
   expect(page).toContain("Level bands");
+  // Class share bars take the class colour; other tables keep the plain bar.
+  const classes = page.slice(page.indexOf('id="classes"'), page.indexOf('id="races"'));
+  expect(classes).toContain("bg-class-hunter");
+  expect(classes).not.toMatch(/h-1 rounded-full bg-fg-2"/);
+  const factions = page.slice(page.indexOf('id="factions"'), page.indexOf('id="classes"'));
+  expect(factions).not.toContain("bg-class-");
 });
 
 test("the race and class grid is Blizzard's table per faction, with counts in the playable cells", async () => {

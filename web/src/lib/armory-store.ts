@@ -237,6 +237,9 @@ export interface MemoryArmoryStore extends ArmoryStore {
   queued(): { region: string; kind: string; slug: string; source: string }[];
 }
 
+/** Blizzard's name for a disbanded guild; the directory and the counts leave it out (armory-guilds.ts isDisbandedGuild). */
+const DISBANDED = "DELETED";
+
 /** The same rules as the SQL, for development without a database. */
 export function createMemoryArmoryStore(now: () => Date = () => new Date()): MemoryArmoryStore {
   const characters = new Map<string, ArmoryCharacter>();
@@ -295,7 +298,7 @@ export function createMemoryArmoryStore(now: () => Date = () => new Date()): Mem
       const p = f.prefix === null ? null : prefixOf(f.prefix);
       if (f.prefix !== null && !p) return { rows: [], total: 0 };
       const rows: ArmoryGuildRow[] = [...guilds.values()]
-        .filter((g) => (f.region === null || g.region === f.region) && (f.rulesetId === null || g.rulesetId === f.rulesetId) && (p === null || g.name.toLowerCase().startsWith(p)))
+        .filter((g) => g.name !== DISBANDED && (f.region === null || g.region === f.region) && (f.rulesetId === null || g.rulesetId === f.rulesetId) && (p === null || g.name.toLowerCase().startsWith(p)))
         .map((g) => {
           const read = [...characters.values()].filter((c) => c.region === g.region && c.guildSlug === g.slug);
           const levels = read.map((c) => c.itemLevel).filter((v): v is number => v !== null);
@@ -335,7 +338,7 @@ export function createMemoryArmoryStore(now: () => Date = () => new Date()): Mem
       };
       const newer = (a: string | null, b: string) => (a === null || Date.parse(b) > Date.parse(a) ? b : a);
       for (const c of characters.values()) { const x = cell(c.region, c.rulesetId, c.ruleset); x.characters += 1; x.newest = newer(x.newest, c.fetchedAt); }
-      for (const g of guilds.values()) { const x = cell(g.region, g.rulesetId, g.ruleset); x.guilds += 1; x.newest = newer(x.newest, g.fetchedAt); }
+      for (const g of guilds.values()) if (g.name !== DISBANDED) { const x = cell(g.region, g.rulesetId, g.ruleset); x.guilds += 1; x.newest = newer(x.newest, g.fetchedAt); }
       return [...out.values()].sort((a, b) => a.region.localeCompare(b.region) || a.rulesetId - b.rulesetId);
     },
     async hide(region, slug) {
