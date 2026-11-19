@@ -12,13 +12,14 @@ import {
   metricOfKey, metricValue, regionLabel, slugFromSegment, validArmorySlug, ARMORY_BOARDS,
 } from "@/lib/armory";
 import { armoryStore, type ArmoryCharacter, type ArmoryRank } from "@/lib/armory-store";
-import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
+import { loadItemTips, loadSiteAssets, unknownItemIcon } from "@/lib/game-assets";
+import { loadCatalog } from "@/lib/completion-lists";
 import { publicArmoryLink } from "@/lib/armory-links";
-import { Equipment, ProfileDetailsView } from "../../profile";
+import { Equipment, ProfileDetailsView, readTimes } from "../../profile";
 import Portrait from "../../portrait";
 import { addonProfile } from "../../addon-profile";
 import { classText } from "@/app/players/player-view";
-import { ArmoryCredit, armoryMetadata, day, link, NOT_FOUND_METADATA, Unreachable } from "../../parts";
+import { ArmoryCredit, armoryMetadata, day, link, newest, NOT_FOUND_METADATA, Unreachable } from "../../parts";
 
 /** Read on every request, so a hidden character is gone at once. */
 export const dynamic = "force-dynamic";
@@ -78,6 +79,10 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
   const addon = associated?.sharesData ? await addonProfile(associated.identity).catch(() => null) : null;
   const assets = await loadSiteAssets().catch(() => null);
   const tips = await loadItemTips(assets, c.equipment.map((item) => item.itemId)).catch(() => new Map());
+  // Achievement category names come from player reports only (the game files carry the id); none read leaves "Other".
+  const categories = c.details?.achievements?.rows.length
+    ? await loadCatalog().then((cat) => new Map((cat?.achievements ?? []).flatMap((a) => (a.category ? [[a.achievementId, a.category] as const] : [])))).catch(() => new Map<number, string>())
+    : new Map<number, string>();
   const race = assets?.races.get(c.race.toLowerCase());
   const portrait = c.details?.avatar?.url ?? (c.gender === "FEMALE" ? race?.female : race?.male) ?? assets?.classes.get(c.class.toLowerCase())?.icon ?? null;
   const refresh = (await props.searchParams)?.refresh;
@@ -124,16 +129,14 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
           {playerPagesOn() && c.addonSeen && Date.now() - Date.parse(c.addonSeen) < 30 * 86_400_000 && <span className="text-meta text-muted">Seen in addon uploads {c.addonSeen}</span>}
           <form action={`${path}/refresh`} method="post"><button type="submit" className="btn btn-secondary min-h-11">Update character</button></form>
           <a href={`https://worldofwarcraft.blizzard.com/forever/${c.region}/armory/character/${encodeURIComponent(c.slug)}`} className={link}>View Blizzard armory</a>
-          <ArmoryCredit at={c.fetchedAt} />
+          <ArmoryCredit at={newest(readTimes(c))} />
         </div>
         {refresh && refreshMessages[refresh] && <p role="status" className="text-sm text-fg-2">{refreshMessages[refresh]}</p>}
 
         {facts.length > 0 && <Facts label="Numbers" items={facts} />}
 
-        <div className="grid items-start gap-10 lg:grid-cols-2">
-          <Equipment character={c} tips={tips} />
-          <div className="space-y-8"><ProfileDetailsView character={c} /></div>
-        </div>
+        <Equipment character={c} tips={tips} unknownIcon={assets ? unknownItemIcon(assets.base) : null} />
+        <div className="grid items-start gap-10 lg:grid-cols-2"><ProfileDetailsView character={c} categories={categories} /></div>
 
         {addon && <section aria-labelledby="armory-addon" className="space-y-6 border-t border-line pt-8">
           <SectionHeading id="armory-addon">Shared through the Everloot addon</SectionHeading>
@@ -142,7 +145,6 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
         </section>}
 
         <footer className="space-y-3">
-          <ArmoryCredit at={c.fetchedAt} />
           <Card className="text-sm text-fg-2">
             <p>
               Is this your character, and do you want it off Everloot?{" "}

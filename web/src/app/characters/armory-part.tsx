@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Facts, SectionHeading } from "@/components/ui";
-import { Equipment, ProfileDetailsView } from "@/app/armory/profile";
-import { ArmoryCredit, day, link } from "@/app/armory/parts";
+import { Equipment, ProfileDetailsView, readTimes } from "@/app/armory/profile";
+import { ArmoryCredit, day, link, newest } from "@/app/armory/parts";
 import { armoryCharacterPath, metricValue } from "@/lib/armory";
 import { shownCharacter, type CharacterArmory } from "@/lib/character-armory";
 import type { ItemTip } from "@/lib/game-assets";
@@ -11,7 +11,7 @@ export const armoryHeading = (fetchedAt: string) => `From Blizzard's API, ${day(
 
 /**
  * Blizzard's data for a linked character, as its own part of the page: never mixed into the owner's uploads, labelled
- * with its source and the time of the read, and credited. Each section carries its own read time. Only the parts the
+ * with its source and the time of the read, and credited once with the newest read. Only the parts the
  * caller allows reach the markup (shownCharacter).
  */
 export function ArmoryPart({ armory, tips }: { armory: CharacterArmory; tips: Map<number, ItemTip> }) {
@@ -30,7 +30,7 @@ export function ArmoryPart({ armory, tips }: { armory: CharacterArmory; tips: Ma
         <p className="text-sm">
           <Link href={armoryCharacterPath(c.region, c.slug)} className={link}>{c.name} {c.surname} in the armory</Link>
         </p>
-        <ArmoryCredit at={c.fetchedAt} />
+        <ArmoryCredit at={newest(readTimes(c))} />
       </div>
       {armory.shown.gear && <Equipment character={c} tips={tips} />}
       <div className="space-y-8"><ProfileDetailsView character={c} /></div>
