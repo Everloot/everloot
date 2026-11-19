@@ -93,8 +93,11 @@ export function staticAssetsFingerprint(staticDir, buildId) {
   return digest(files.map((f) => `${f}\0${sha(readFileSync(join(staticDir, f)))}`).join("\n"));
 }
 
-/** The text variables of the Worker (feature switches), as one value. The knowledge release has its own version, so it is left out. */
-export const varsDigest = (vars) => digest(JSON.stringify(Object.entries(vars).filter(([k, v]) => k !== "KNOWLEDGE_RELEASE_SHA256" && typeof v === "string").sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))));
+/**
+ * The text variables of the Worker (feature switches), as one value. The knowledge release has its own version, so it is
+ * left out, and so is EVERLOOT_CRON_WORKER: it decides which Worker runs the scheduled jobs and no page reads it.
+ */
+export const varsDigest = (vars) => digest(JSON.stringify(Object.entries(vars).filter(([k, v]) => k !== "KNOWLEDGE_RELEASE_SHA256" && k !== "EVERLOOT_CRON_WORKER" && typeof v === "string").sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))));
 
 /** The public build-time values, as one value: they are inlined into the pages, so a changed one changes them. */
 export const publicEnvDigest = (env) => digest(JSON.stringify(Object.entries(env).filter(([k, v]) => k.startsWith("NEXT_PUBLIC_") && typeof v === "string").sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))));
