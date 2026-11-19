@@ -135,9 +135,12 @@ local function paint(now)
   f.marker:ClearAllPoints()
   f.marker:SetPoint("CENTER", f, "TOPLEFT", 16 + f.length * progress, -12)
   local text = active.duration and ("about " .. stamp(active.duration - elapsed) .. " left")
-    or "first flight on this route: timing it"
-  -- Escape markup in client names before putting them in a font string.
-  f.label:SetText(active.origin:gsub("|", "||") .. " → " .. active.destination:gsub("|", "||") .. " · " .. text)
+    or (active.key and "first flight on this route: timing it" or "timing unknown")
+  -- Escape markup in client names before putting them in a font string. A flight whose selection the addon did
+  -- not see (a /reload in the air) has no names and teaches nothing.
+  local route = active.origin and active.destination
+    and (active.origin:gsub("|", "||") .. " → " .. active.destination:gsub("|", "||") .. " · ") or "On a flight path · "
+  f.label:SetText(route .. text)
   f:Show()
 end
 
@@ -147,20 +150,18 @@ function F.Clear()
   if driver then driver:SetScript("OnUpdate", nil) end
 end
 
-local function arrived(route)
-  if route.cancelled or not route.key then return false end
-  -- A selected route can stop at a midpoint. Timing alone never proves arrival.
-  local stop = route.destination:match("^([^,]+)"):match("^%s*(.-)%s*$")
-  for _, fn in ipairs({ GetSubZoneText or false, GetRealZoneText or false }) do
-    local place = name(read(fn))
-    if place and (place == route.destination or place == stop) then return true end
-  end
-  return false
+-- A flight ends at the node the player chose unless they asked for an early landing (the hook marks the route) or
+-- logged out (which clears it). The landing zone's text is not compared with the node's name: a node is named
+-- "Town, Zone" and the zone text under it is something else, so that match would almost never confirm a trip.
+-- A trip under this many seconds is a dismount at the start, not a flight.
+local MIN_FLIGHT = 10
+local function arrived(route, elapsed)
+  return not route.cancelled and route.key ~= nil and elapsed >= MIN_FLIGHT
 end
 
 local function finish(now)
   local elapsed = now - active.started
-  if elapsed > 0 and arrived(active) then
+  if arrived(active, elapsed) then
     local values = samples(active)
     values[#values + 1] = elapsed
     while #values > 3 do table.remove(values, 1) end
@@ -182,7 +183,7 @@ local function check()
   if not readable then F.Clear(); return end
   if flying == true or flying == 1 then
     if not active then
-      active = pending or { origin = "Origin", destination = "Destination" }
+      active = pending or {}
       pending = nil
       active.started = now
       active.duration = active.key and median(active)
@@ -207,6 +208,26 @@ local function watch()
   end)
 end
 
+-- The flight map (Blizzard_FlightMap, which the client's build ships) names its nodes through C_TaxiMap by the
+-- map it shows, each with the slot index TakeTaxiNode gets; the older taxi frame names them by that index
+-- directly. Both are read, so the route has names whichever frame the client opened.
+local function mapNodes()
+  if not (type(C_TaxiMap) == "table" and C_TaxiMap.GetAllTaxiNodes and type(FlightMapFrame) == "table") then return {} end
+  local mapId = read(FlightMapFrame.GetMapID, FlightMapFrame)
+  local list = type(mapId) == "number" and read(C_TaxiMap.GetAllTaxiNodes, mapId)
+  if type(list) ~= "table" then return {} end
+  local current = type(Enum) == "table" and type(Enum.FlightPathState) == "table" and Enum.FlightPathState.Current
+  local bySlot = {}
+  for _, node in ipairs(list) do
+    if type(node) == "table" then
+      local n = name(E.Readable(node.name))
+      if n and type(node.slotIndex) == "number" then bySlot[node.slotIndex] = n end
+      if n and current ~= nil and node.state == current then bySlot.current = n end
+    end
+  end
+  return bySlot
+end
+
 local function selected(index)
   if not E:IsEnabled("flight") or active then return end
   local now = clock()
@@ -219,8 +240,13 @@ local function selected(index)
       if read(TaxiNodeGetType, i) == "CURRENT" then origin = name(read(TaxiNodeName, i)); break end
     end
   end
+  if not (origin and destination) then
+    local nodes = mapNodes()
+    destination = destination or nodes[index]
+    origin = origin or nodes.current
+  end
   local realm = name(read(GetRealmName))
-  pending = { origin = origin or "Origin", destination = destination or "Destination", realm = realm, selected = now }
+  pending = { origin = origin, destination = destination, realm = realm, selected = now }
   if origin and destination and realm and origin ~= destination then pending.key = origin .. "|" .. destination end
   watch()
 end

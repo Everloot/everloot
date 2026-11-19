@@ -107,13 +107,45 @@ def test_first_and_known_flights():
     assert "about 0:00 left" in lua.eval("Everloot.Flight.frame.label.text")
 
 
-def test_early_stops_and_unconfirmed_arrivals_never_teach_a_duration():
-    for action in ["landing = 'Coppercloud Quay'", "landing = 'Somewhere Else'",
-                   "landing = secret", "hooks.TaxiRequestEarlyLanding(); landing = 'Amberwing Rest'"]:
+def test_early_stops_and_dismounts_never_teach_a_duration():
+    for action in ["hooks.TaxiRequestEarlyLanding()", "tick(-15)"]:
         lua = fresh()
         lua.execute("depart(); tick(20); " + action + "; flying = false; event('PLAYER_CONTROL_GAINED')")
         assert lua.eval("EverlootDB.flights == nil")
         assert not lua.eval("Everloot.Flight.frame.shown")
+    # The landing zone's text is not the node's name ("Town, Zone"): an uncancelled flight long enough to be one
+    # is an arrival whatever the zone says, a secret value included.
+    for action in ["landing = 'Somewhere Else'", "landing = secret"]:
+        lua = fresh()
+        lua.execute("depart(); tick(20); " + action + "; flying = false; event('PLAYER_CONTROL_GAINED')")
+        assert lua.eval("EverlootDB.flights.Glasswind['Coppercloud Quay|Amberwing Rest'][1]") == 20
+
+
+def test_flight_map_names_when_the_taxi_frame_globals_are_missing():
+    # Forever's flight map names its nodes through C_TaxiMap by slot index; the current node carries that state.
+    lua = fresh('''
+TaxiNodeName, NumTaxiNodes, TaxiNodeGetType = nil, nil, nil
+Enum = { FlightPathState = { Current = 0, Reachable = 1, Unreachable = 2 } }
+FlightMapFrame = { GetMapID = function() return 1414 end }
+C_TaxiMap = { GetAllTaxiNodes = function(mapId)
+  if mapId ~= 1414 then return {} end
+  return { { name = 'Coppercloud Quay', slotIndex = 1, state = 0 }, { name = 'Amberwing Rest', slotIndex = 2, state = 1 },
+    { name = secret, slotIndex = 3, state = 1 } }
+end }
+''')
+    lua.execute("depart(); tick(20)")
+    assert "Coppercloud Quay → Amberwing Rest" in lua.eval("Everloot.Flight.frame.label.text")
+    lua.execute("arrive(40)")
+    assert lua.eval("EverlootDB.flights.Glasswind['Coppercloud Quay|Amberwing Rest'][1]") == 60
+
+
+def test_a_flight_seen_without_its_selection_names_nothing_and_teaches_nothing():
+    lua = fresh()
+    lua.execute("flying = true; event('PLAYER_CONTROL_LOST'); tick(20)")
+    assert lua.eval("Everloot.Flight.frame.label.text") == "On a flight path · timing unknown"
+    lua.execute("arrive(60)")
+    assert lua.eval("EverlootDB.flights == nil")
+    assert not lua.eval("Everloot.Flight.frame.shown")
 
 
 def test_median_last_three_and_realm_separation():
