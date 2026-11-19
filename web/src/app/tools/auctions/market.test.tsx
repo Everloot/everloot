@@ -164,7 +164,11 @@ test("a realm page sorts, filters and switches house in the URL; only its plain 
   expect((await realmMetadata(realm("forever", { sort: "market" }))).robots).toMatchObject({ index: false });
   expect((await realmMetadata(realm("forever", { house: "horde" }))).robots).toMatchObject({ index: false });
 
-  const horde = text(await realmHtml("forever", { house: "horde" }));
+  // The realm page links its Market changes view, keeping the house.
+  expect(html).toContain('href="/tools/auctions/forever/changes"');
+  const hordeHtml = await realmHtml("forever", { house: "horde" });
+  expect(hordeHtml).toContain('href="/tools/auctions/forever/changes?house=horde"');
+  const horde = text(hordeHtml);
   expect(horde).toContain("Linen Cloth");
   expect(horde).toContain("Forever, Horde auction house: 3 items");
   const cloth = text(await realmHtml("forever", { class: "trade-goods", sub: "cloth" }));
