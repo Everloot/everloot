@@ -145,11 +145,11 @@ const SHAPE = `{
   "ok": true,
   "dataAsOf": "…",
   "rule": "A day is public when 3 reporters scanned this item on this realm with a full scan …",
-  "fields": ["itemId", "market", "min", "historical", "quantity", "day", "reporters"],
+  "fields": ["itemId", "market", "min", "historical", "quantity", "day", "reporters", "updatedAt", "ageDays", "change1d"],
   "realm": "<realm>",
   "house": "Alliance",
   "items": [
-    [2589, 12345, 11000, 12000, 800, "2026-11-04", 4]
+    [2589, 12345, 11000, 12000, 800, "2026-11-04", 4, "2026-11-04T06:12:00.000Z", 0, 0.031]
   ],
   "attribution": { "…": "…" }
 }`;

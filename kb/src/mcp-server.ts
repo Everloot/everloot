@@ -21,7 +21,7 @@ import { formatItemNumbers, itemToolFactsFromRecords } from "./item-page-tool.js
 import { reportedItemFacts } from "./item-facts.js";
 import { formatObjectPage, objectFactsFromRecords, objectPage, type ObjectFacts } from "./object-page.js";
 import {
-  busiestHouseMarket, handleMarketValue, lookupRealm, realmLookupFields, realmLookupText, resolveRealm, scanDayLine, type MarketState, type PublicDay, type RealmLookup,
+  busiestHouseMarket, handleMarketValue, lookupRealm, marketCoverage, realmLookupFields, realmLookupText, resolveRealm, scanDayLine, type MarketState, type PublicDay, type RealmLookup,
 } from "./market.js";
 import { loadUploadRecords } from "./load-uploads.js";
 import { KNOWLEDGE_KINDS, MCP_PROMPT_NAMES, MCP_PROMPTS, MCP_RESOURCE_TEMPLATE_URIS, MCP_RESOURCE_TEMPLATES, MCP_RESOURCE_URIS, MCP_RESOURCES, MCP_TOOL_NAMES, MCP_TOOLS, parseRecords, type AuctionHouse, type McpToolArgs, type McpToolDef, type McpToolName } from "@everloot/protocol";
@@ -271,8 +271,9 @@ export async function marketValueAnswer(args: { realm: string; itemId: number },
   // The text names every house; the page carries the house with the most units listed (ties: Alliance, then Horde, then
   // Neutral), which the text names too.
   const busiest = realm ? busiestHouseMarket(market.state, realm, args.itemId, now) : null;
-  const value = busiest?.value ?? null;
   const points = busiest?.points ?? [];
+  // The page's value carries what it rests on: the public days behind it, counted.
+  const value = busiest ? { ...busiest.value, coverage: marketCoverage(points, now) } : null;
   const url = realm && (value || points.length) ? marketItemUrl(realm, args.itemId) : undefined;
   const pageRealm = shownRealm(args.realm, lookup);
   const page = { realm: pageRealm, house: { realm: pageRealm, faction: busiest?.house ?? null }, itemId: args.itemId, value, history: points, ...realmLookupFields(lookup) };

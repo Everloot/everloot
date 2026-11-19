@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { MARKET_PRICE_FIELDS } from "@everloot/protocol";
 import { AUCTION_AGREEMENT } from "@kb/auction-history";
 import { MARKET_RULE, MAX_PRICE_ITEMS, MAX_PRICE_ROWS, marketHouses, marketPrices, marketRealms, parseHouse, validRealm } from "@kb/market";
 import { admit, attribution, attributionHeaders } from "@/lib/data-guard";
@@ -6,7 +7,8 @@ import { pendingRealms } from "@/lib/auction-house";
 import { uploadStore } from "@/lib/upload-store";
 export const dynamic = "force-dynamic";
 
-const FIELDS = ["itemId", "market", "min", "historical", "quantity", "day", "reporters"] as const;
+/** The positions of a row, from the protocol: the seven first given, then updatedAt, ageDays and change1d. Only ever appended to. */
+const FIELDS = MARKET_PRICE_FIELDS;
 // The rollup changes once per cron run (ten minutes); let the CDN answer repeat requests. On the Worker only
 // `CDN-Cache-Control` is honoured (lib/cf-edge-cache.ts keeps a response for its max-age); `s-maxage` is for
 // the rollback host. A request that hits the edge cache never reaches the quota.

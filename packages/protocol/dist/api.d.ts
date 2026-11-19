@@ -76,20 +76,21 @@ export declare const marketRealmsResponse: z.ZodObject<{
         terms: z.ZodString;
     }, z.core.$strip>;
 }, z.core.$strip>;
-export declare const MARKET_PRICE_FIELDS: readonly ["itemId", "market", "min", "historical", "quantity", "day", "reporters"];
+/** The positions of one price row. New positions are only ever appended, so a reader by position keeps working. */
+export declare const MARKET_PRICE_FIELDS: readonly ["itemId", "market", "min", "historical", "quantity", "day", "reporters", "updatedAt", "ageDays", "change1d"];
 /** GET /api/market/prices?realm=: most-listed or explicitly selected public items, in `fields` order. */
 export declare const marketPricesResponse: z.ZodObject<{
     ok: z.ZodLiteral<true>;
     dataAsOf: z.ZodNullable<z.ZodString>;
     rule: z.ZodString;
-    fields: z.ZodTuple<[z.ZodLiteral<"itemId">, z.ZodLiteral<"market">, z.ZodLiteral<"min">, z.ZodLiteral<"historical">, z.ZodLiteral<"quantity">, z.ZodLiteral<"day">, z.ZodLiteral<"reporters">], null>;
+    fields: z.ZodTuple<[z.ZodLiteral<"itemId">, z.ZodLiteral<"market">, z.ZodLiteral<"min">, z.ZodLiteral<"historical">, z.ZodLiteral<"quantity">, z.ZodLiteral<"day">, z.ZodLiteral<"reporters">, z.ZodLiteral<"updatedAt">, z.ZodLiteral<"ageDays">, z.ZodLiteral<"change1d">], null>;
     realm: z.ZodNullable<z.ZodString>;
     house: z.ZodOptional<z.ZodEnum<{
         Alliance: "Alliance";
         Horde: "Horde";
         Neutral: "Neutral";
     }>>;
-    items: z.ZodArray<z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber, z.ZodNumber, z.ZodNumber, z.ZodString, z.ZodNumber], null>>;
+    items: z.ZodArray<z.ZodTuple<[z.ZodNumber, z.ZodNullable<z.ZodNumber>, z.ZodNumber, z.ZodNumber, z.ZodNumber, z.ZodString, z.ZodNumber, z.ZodNullable<z.ZodString>, z.ZodNumber, z.ZodNullable<z.ZodNumber>], null>>;
     attribution: z.ZodObject<{
         licence: z.ZodString;
         licenceUrl: z.ZodString;
@@ -1468,14 +1469,14 @@ export declare const API_SCHEMAS: {
         ok: z.ZodLiteral<true>;
         dataAsOf: z.ZodNullable<z.ZodString>;
         rule: z.ZodString;
-        fields: z.ZodTuple<[z.ZodLiteral<"itemId">, z.ZodLiteral<"market">, z.ZodLiteral<"min">, z.ZodLiteral<"historical">, z.ZodLiteral<"quantity">, z.ZodLiteral<"day">, z.ZodLiteral<"reporters">], null>;
+        fields: z.ZodTuple<[z.ZodLiteral<"itemId">, z.ZodLiteral<"market">, z.ZodLiteral<"min">, z.ZodLiteral<"historical">, z.ZodLiteral<"quantity">, z.ZodLiteral<"day">, z.ZodLiteral<"reporters">, z.ZodLiteral<"updatedAt">, z.ZodLiteral<"ageDays">, z.ZodLiteral<"change1d">], null>;
         realm: z.ZodNullable<z.ZodString>;
         house: z.ZodOptional<z.ZodEnum<{
             Alliance: "Alliance";
             Horde: "Horde";
             Neutral: "Neutral";
         }>>;
-        items: z.ZodArray<z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber, z.ZodNumber, z.ZodNumber, z.ZodString, z.ZodNumber], null>>;
+        items: z.ZodArray<z.ZodTuple<[z.ZodNumber, z.ZodNullable<z.ZodNumber>, z.ZodNumber, z.ZodNumber, z.ZodNumber, z.ZodString, z.ZodNumber, z.ZodNullable<z.ZodString>, z.ZodNumber, z.ZodNullable<z.ZodNumber>], null>>;
         attribution: z.ZodObject<{
             licence: z.ZodString;
             licenceUrl: z.ZodString;

@@ -7,6 +7,15 @@ required, or tightening a limit is a major release.
 ## [Unreleased]
 
 ### Added
+- 3.0.0 (record protocol unchanged, 1.17.0): a price row of `GET /api/market/prices` (`marketPricesResponse`) gains three
+  trailing positions, `updatedAt` (when the scans behind the newest open public day were taken, ISO, or null once only
+  closed days remain), `ageDays` (calendar days since `day`) and `change1d` (the newest solid day's market value against
+  the solid day one calendar day before it, `(to - from) / from`, or null without such a pair), and `fields` names them.
+  The first seven positions are unchanged, so a reader by position keeps working; a reader that checks the row length
+  against 7 must take 10, which is the major bump: the row's `minItems` and `maxItems` tighten, and the package's rule
+  counts a tightened limit as breaking. The row's `market` is now stated nullable, as a thin item's row has always been
+  sent. `marketValue` (market_value's page) gains optional `coverage` (`solidDays14`, `days60`, `thinDays`, `trimmedDays`,
+  `newestDay`, `trustedOnly`): the public days behind the values, counted. The pending minor additions below ride along.
 - Pending next minor package release: optional API drop-rate bounds (`rateLow`, `rateHigh`) and `settled`, plus
   documented `items` selection for market prices. `GET /api/rollups/disenchant` (`disenchantResponse`): what each
   disenchant band of the game files yields, from the disenchants players recorded, public per band once three

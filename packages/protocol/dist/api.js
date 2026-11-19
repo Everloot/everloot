@@ -64,19 +64,26 @@ export const marketRealmsResponse = z.object({
         .describe("Realms with scans but no public values yet: the most reporters (upload addresses) that scanned one item there on one day in the last 7, out of the `needed` that make a day public. A count only, never a value."),
     attribution: attributionSchema,
 });
-export const MARKET_PRICE_FIELDS = ["itemId", "market", "min", "historical", "quantity", "day", "reporters"];
+/** The positions of one price row. New positions are only ever appended, so a reader by position keeps working. */
+export const MARKET_PRICE_FIELDS = ["itemId", "market", "min", "historical", "quantity", "day", "reporters", "updatedAt", "ageDays", "change1d"];
 /** GET /api/market/prices?realm=: most-listed or explicitly selected public items, in `fields` order. */
 export const marketPricesResponse = z.object({
     ok: z.literal(true),
     dataAsOf: ISO_TIME.nullable(),
     rule: z.string().describe("How a day becomes public and how the values are computed."),
-    fields: z.tuple([z.literal("itemId"), z.literal("market"), z.literal("min"), z.literal("historical"), z.literal("quantity"), z.literal("day"), z.literal("reporters")]),
+    fields: z.tuple([
+        z.literal("itemId"), z.literal("market"), z.literal("min"), z.literal("historical"), z.literal("quantity"), z.literal("day"), z.literal("reporters"),
+        z.literal("updatedAt"), z.literal("ageDays"), z.literal("change1d"),
+    ]),
     realm: z.string().nullable(),
     house: z.enum(AUCTION_HOUSES).optional().describe("Present when the request named a house: the values come only from scans of that house."),
     items: z.array(z.tuple([
-        z.number().int().positive(), z.number().int().nonnegative(), z.number().int().nonnegative(), z.number().int().nonnegative(),
+        z.number().int().positive(), z.number().int().nonnegative().nullable(), z.number().int().nonnegative(), z.number().int().nonnegative(),
         z.number().int().nonnegative(), z.string(), z.number().int().nonnegative(),
-    ])).describe("[itemId, market, min, historical, quantity, day, reporters]; copper per unit."),
+        ISO_TIME.nullable(), z.number().int().nonnegative(), z.number().nullable(),
+    ])).describe("[itemId, market, min, historical, quantity, day, reporters, updatedAt, ageDays, change1d]; copper per unit. market is null for a thin item (no solid public day in the last 14). " +
+        "updatedAt: when the scans behind the newest open public day were taken; null once only closed days remain. ageDays: calendar days since day. " +
+        "change1d: the newest solid day's market value against the solid day one calendar day before it, (to - from) / from; null without such a pair."),
     attribution: attributionSchema,
 });
 const dropRate = z.object({
