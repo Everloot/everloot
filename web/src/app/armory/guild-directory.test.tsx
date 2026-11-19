@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+vi.mock("@/components/guild-profile", () => ({ default: () => <section aria-label="Guild profile">Claim or edit this guild</section> }));
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { BLIZZARD_CREDIT } from "@/lib/armory";
 import { armoryCharacter, armoryGuild } from "@/lib/armory.fixture";
@@ -145,6 +146,7 @@ describe("the guild directory", () => {
 describe("the guild page summary", () => {
   test("shows the class mix, the level spread, the average item level of members read and the roster read time", async () => {
     const out = await html(pages.guild("eu", "ember-wardens"));
+    expect(out).toContain('aria-label="Guild profile"');
     expect(out).toContain("Class mix");
     expect(out).toMatch(/text-class-hunter[^>]*>Hunter<\/span> <span[^>]*>2</);
     expect(out).toMatch(/text-class-warrior[^>]*>Warrior<\/span> <span[^>]*>1</);

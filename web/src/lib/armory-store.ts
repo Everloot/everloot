@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { GuildCrest as CrestSchema } from "@kb/armory/crest";
 import { ARMORY_RECHECK_DAYS, armoryNameQuery, namesFromSlug, SEARCH_RULE, type ArmoryMetricKey } from "./armory";
 import { authQuery, StorageError } from "./supabase/server";
 import { ArmoryDetails, type ProfileDetails } from "@kb/armory/details";
@@ -26,6 +27,7 @@ export interface ArmoryCharacter {
 }
 
 export interface ArmoryGuild {
+  crest?: import("@kb/armory/crest").GuildCrest | null;
   region: string; slug: string; guildId: number; name: string; faction: string; rulesetId: number; ruleset: string;
   memberCount: number; createdAt: string | null; fetchedAt: string; checkedAt: string;
 }
@@ -43,6 +45,7 @@ export type ArmoryGuildSort = "members" | "item_level" | "level_60";
 export interface ArmoryGuildFilter { prefix: string | null; region: string | null; rulesetId: number | null; sort: ArmoryGuildSort; limit: number; offset: number }
 /** One guild in the directory: its roster size from Blizzard, and what the armory has read of its characters. */
 export interface ArmoryGuildRow {
+  recruiting?: boolean;
   region: string; slug: string; name: string; faction: string; rulesetId: number; ruleset: string; memberCount: number;
   membersRead: number; averageItemLevel: number | null; level60: number; fetchedAt: string;
 }
@@ -120,11 +123,13 @@ const CharacterRow = z.object({
 }));
 
 const GuildRow = z.object({
+  crest: z.unknown().optional(),
   region: z.string(), slug: z.string(), guild_id: num, name: z.string(), faction: z.string(), ruleset_id: num, ruleset: z.string(),
   member_count: num, created_at: textOrNull, fetched_at: z.string(), checked_at: z.string(),
 }).transform((r): ArmoryGuild => ({
   region: r.region, slug: r.slug, guildId: r.guild_id, name: r.name, faction: r.faction, rulesetId: r.ruleset_id, ruleset: r.ruleset,
   memberCount: r.member_count, createdAt: r.created_at, fetchedAt: r.fetched_at, checkedAt: r.checked_at,
+  ...(r.crest ? { crest: CrestSchema.safeParse(r.crest).data ?? null } : {}),
 }));
 
 // armory_members allows null names (and null level, class, race and rank); a member without names reads them off its
