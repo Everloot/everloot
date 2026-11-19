@@ -21,8 +21,8 @@ export default {
     return cachedResponse(request, cacheVersions, (r) => handler.fetch(r, env, ctx), caches.default, ctx);
   },
 
-  // Each job runs as its own request through the Worker's self-binding (src/lib/cf-crons.ts). On the site Worker with
-  // EVERLOOT_CRON_WORKER set to "1" nothing runs: the cron Worker runs the jobs.
+  // Each job runs as its own request through the Worker's self-binding (src/lib/cf-crons.ts). EVERLOOT_CRON_WORKER
+  // says which jobs this Worker runs: the cron Worker runs them, and the site keeps only SITE_JOBS once it is "1".
   async scheduled(controller, env) {
     await runCrons(controller.cron, env);
   },

@@ -456,6 +456,7 @@ test.each([
   "/tools/auctions/camwow-us1-realm-4-pvp",
   "/tools/auctions/camwow-us1-realm-4-pvp/2589",
   "/tools/auctions/item/2589",
+  "/tools/auctions/camwow-us1-realm-4-pvp/changes",
 ])("the public auction page %s drops credentials: a signed-in visitor reads the shared copy", (path) => {
   const req = new Request(`https://everloot.app${path}?house=horde`, { headers: { cookie: "__Secure-everloot.session_token=abc; cf_clearance=x", authorization: "Bearer t" } });
   const prepared = withoutCredentials(req);
@@ -472,6 +473,7 @@ test.each([
   "/tools/auctions/report", "/tools/auctions/report/2026-11-17",
   // Spellings the auction pages redirect or refuse: they keep their credentials and bypass the cache.
   "/tools/auctions/", "/tools/auctions/CamWow-US1", "/tools/auctions/realm/02589", "/tools/auctions/realm/2589/extra", "/tools/auctionsx",
+  "/tools/auctions/CamWow-US1/changes", "/tools/auctions/realm/changes/extra", "/tools/auctions/report/changes",
 ])("%s keeps its credentials and bypasses the shared cache", (path) => {
   const req = new Request(`https://everloot.app${path}`, { headers: { cookie: "session=private" } });
   expect(withoutCredentials(req)).toBe(req);

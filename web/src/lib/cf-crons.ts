@@ -5,8 +5,10 @@
  *
  * Two Workers carry these triggers, both built from the same bundle: the site (`everloot-web`, wrangler.jsonc) and
  * the cron Worker (`everloot-cron`, wrangler.cron.jsonc), which serves no visitor, so a job's memory never shares an
- * isolate with page traffic (#1354). The site runs the jobs until its EVERLOOT_CRON_WORKER var is "1"; from then on
- * its triggers return without running anything and the cron Worker alone runs them (docs/OPERATIONS.md).
+ * isolate with page traffic (#1354). Their EVERLOOT_CRON_WORKER var says which jobs each one runs (docs/OPERATIONS.md):
+ * - unset, on the site before the hand-off: every job;
+ * - "cron", on the cron Worker: every job but SITE_JOBS;
+ * - "1", on the site after the hand-off: SITE_JOBS only.
  */
 export const CF_CRONS: Readonly<Record<string, readonly string[]>> = {
   "*/10 * * * *": ["/api/cron/snapshot", "/api/cron/blue"],
@@ -14,6 +16,12 @@ export const CF_CRONS: Readonly<Record<string, readonly string[]>> = {
   // Every 30 minutes, off the 10-minute marks so it never starts with the snapshot run (profile pipeline).
   "7,37 * * * *": ["/api/cron/profiles"],
 };
+
+/**
+ * The jobs that stay on the site after the hand-off. /api/cron/ops keys install pseudonyms with
+ * EVERLOOT_OPS_HMAC_SECRET, a secret only the site holds; another key would change every pseudonym in the summary.
+ */
+export const SITE_JOBS: ReadonlySet<string> = new Set(["/api/cron/ops"]);
 
 /** The routes one trigger runs; none for a schedule this file does not list. */
 export function cronPaths(cron: string): readonly string[] {
@@ -28,7 +36,7 @@ export function cronRequest(path: string, secret: string, origin = "https://ever
 /** What a trigger reads from the Worker's environment. */
 export interface CronEnv {
   CRON_SECRET?: string;
-  /** "1" on the site Worker once the cron Worker runs the jobs: its triggers then run nothing. */
+  /** "cron" on the cron Worker; "1" on the site once the cron Worker runs the jobs. See the top of this file. */
   EVERLOOT_CRON_WORKER?: string;
   WORKER_SELF_REFERENCE: { fetch(request: Request): Promise<Response> };
 }
@@ -39,10 +47,12 @@ export interface CronEnv {
  * history shows it (logs are sampled; this is not). Returns the paths it called.
  */
 export async function runCrons(cron: string, env: CronEnv): Promise<readonly string[]> {
-  if (env.EVERLOOT_CRON_WORKER === "1") return [];
+  const role = env.EVERLOOT_CRON_WORKER;
+  const paths = cronPaths(cron).filter((path) =>
+    role === "1" ? SITE_JOBS.has(path) : role === "cron" ? !SITE_JOBS.has(path) : true);
+  if (!paths.length) return [];
   const secret = env.CRON_SECRET;
   if (!secret) throw new Error("[cron] CRON_SECRET is not set; nothing ran");
-  const paths = cronPaths(cron);
   const failures: string[] = [];
   await Promise.all(paths.map(async (path) => {
     const res = await env.WORKER_SELF_REFERENCE.fetch(cronRequest(path, secret));

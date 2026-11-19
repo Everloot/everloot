@@ -4,7 +4,7 @@ import Link from "next/link";
 import { cache } from "react";
 import { notFound, permanentRedirect } from "next/navigation";
 import { pageMetadata } from "@/lib/seo";
-import { formatCopper, MARKET_RULE, reportersText } from "@kb/market";
+import { coverageText, formatCopper, MARKET_RULE, marketCoverage, reportersText } from "@kb/market";
 import { handleStoredAuctionHistory } from "@kb/auction-history";
 import { STORAGE_UNREACHABLE, uploadStore } from "@/lib/upload-store";
 import { storedAuctionHistory } from "@/lib/auction-history-store";
@@ -146,7 +146,7 @@ export default async function RealmItemPage(props: Props) {
               { label: "Historical", value: <CoinText text={formatCopper(v.historical)} />, note: "60-day median" },
               { label: "Units listed", value: v.quantity.toLocaleString("en-US"), note: v.thin ? "Thin: left out of the market value" : `On ${v.day}` },
               ...moves,
-            ]} />
+            ]} note={coverageText(marketCoverage(row.points, now))} />
             <section aria-labelledby="ah-chart">
               <SectionHeading id="ah-chart">Last 60 days, {row.house} auction house</SectionHeading>
               <Card><PriceChart points={row.points} /></Card>

@@ -1,6 +1,7 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import JsonLd from "@/components/JsonLd";
-import { Card, Container, EmptyState, PageHeader, SectionHeading } from "@/components/ui";
+import { Card, Container, EmptyState, Field, PageHeader, SectionHeading } from "@/components/ui";
 import { armoryOn } from "@/lib/armory";
 import { dataAgeLabel } from "@/lib/data-age";
 import { guildIndexingOn, guildsOn } from "@/lib/guilds";
@@ -10,7 +11,7 @@ import {
 } from "@/lib/rankings";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
-import { CharacterBoards, GuildBoards, RegionTabs } from "./leaderboards";
+import { BestOfClass, CharacterBoards, GuildBoards, RegionTabs } from "./leaderboards";
 import { HowItCounts, MetricTiles, Movers, ONE_WEEK_LINE, RankCard, RankingRail, StackedWeeks, StartState, WeeklyTotals } from "./parts";
 
 export const dynamic = "force-dynamic";
@@ -53,10 +54,23 @@ export default async function RankingsHub(props: { searchParams?: Promise<Search
           meta={!unreachable && <span>{dataAgeLabel(dataAsOf)}</span>}
         />
         <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            {[{ label: "Character name", action: "/players", button: "Find character" }, { label: "Guild name", action: "/guilds", button: "Find guild" }].map((search) => (
+              <form key={search.action} action={search.action} method="get" role="search" aria-label={search.button} className="flex items-end gap-2">
+                <div className="min-w-0 flex-1"><Field label={search.label} name="q" type="search" maxLength={40} required autoComplete="off" /></div>
+                <button type="submit" className="min-h-11 shrink-0 rounded-control border border-edge px-3 text-control text-fg hover:bg-panel">{search.button}</button>
+              </form>
+            ))}
+          </div>
           <RankingRail row />
           {boards.characters !== null && <RegionTabs region={region} />}
+          {boards.characters !== null && <BestOfClass rows={boards.bestOfClass} />}
           {boards.characters !== null && <CharacterBoards boards={boards.characters} region={region} />}
           {(boards.guildGear !== null || boards.raids !== null) && <GuildBoards gear={boards.guildGear} raids={boards.raids} region={region} />}
+          {boards.characters !== null && <Card>
+            <p className="text-fg">Not on the boards? <Link href="/armory/submit" className="underline underline-offset-4">Add your character</Link> or <Link href="/armory/guilds/submit" className="underline underline-offset-4">Add your guild</Link>.</p>
+            <p className="mt-1 text-sm text-fg-2">The armory reads Blizzard&apos;s API on its next run, usually within hours.</p>
+          </Card>}
           {leaderboards && (
             <SectionHeading id="who-plays" note="From players who turned the census on, each character counted once a week.">Who plays</SectionHeading>
           )}

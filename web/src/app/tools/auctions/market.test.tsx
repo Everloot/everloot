@@ -164,7 +164,11 @@ test("a realm page sorts, filters and switches house in the URL; only its plain 
   expect((await realmMetadata(realm("forever", { sort: "market" }))).robots).toMatchObject({ index: false });
   expect((await realmMetadata(realm("forever", { house: "horde" }))).robots).toMatchObject({ index: false });
 
-  const horde = text(await realmHtml("forever", { house: "horde" }));
+  // The realm page links its Market changes view, keeping the house.
+  expect(html).toContain('href="/tools/auctions/forever/changes"');
+  const hordeHtml = await realmHtml("forever", { house: "horde" });
+  expect(hordeHtml).toContain('href="/tools/auctions/forever/changes?house=horde"');
+  const horde = text(hordeHtml);
   expect(horde).toContain("Linen Cloth");
   expect(horde).toContain("Forever, Horde auction house: 3 items");
   const cloth = text(await realmHtml("forever", { class: "trade-goods", sub: "cloth" }));
@@ -376,6 +380,16 @@ test("an unreadable rollup is unavailable, not zero", async () => {
     expect(html).toContain("unavailable");
     expect(html).not.toContain("0c");
   }
+});
+
+test("an item page says what its values rest on: the public days counted, never a 60-day history", async () => {
+  // Forever's Horde house holds 2589 on two days, today and three days ago, both solid.
+  const html = text(renderToStaticMarkup(await RealmItemPage(item("forever", "2589"))));
+  expect(html).toContain("Historical is the median of 2 public days in the last 60; market value from 2 solid days in the last 14.");
+  expect(html).not.toContain("Everloot's own scans only");
+  // An item whose only day is past the market window: a historical with no solid day in 14.
+  const old = text(renderToStaticMarkup(await RealmItemPage(item("forever", "4306"))));
+  expect(old).toContain("Historical is the median of 1 public day in the last 60; market value unrecorded (no solid public day in the last 14).");
 });
 
 test("item prices show one-day and seven-day moves from solid days", async () => {

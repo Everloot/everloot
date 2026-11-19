@@ -153,7 +153,7 @@ end
 
 --- The drop lines for one item as { text, r, g, b }, and a note when there is nothing to show: no source with three
 --- installs, no drops block in the file, or a failed checksum. Nil and nil while the block is still being checked.
---- A rate always carries its denominator (loot windows), its installs and the date of the uploads behind it.
+--- A rate carries its windows; only old uploads need a date beneath the sources.
 function E:DropLines(itemId)
   local entry = dropFile()
   if entry.status == "absent" then return {}, "drop sources not in the price file yet" end
@@ -164,22 +164,29 @@ function E:DropLines(itemId)
   local out = {}
   for i = 1, math.min(#sources, E.DROP_SOURCES_SHOWN) do
     local s = sources[i]
-    local source, rate = string.format("%s %d", s.kind == "npc" and "NPC" or "object", s.id), string.format("%.1f%%", 100 * s.drops / s.windows)
+    local source = string.format("%s %d", s.kind == "npc" and "NPC" or "object", s.id)
+    local percent = 100 * s.drops / s.windows
+    local rate = string.format(percent < 1 and "%.1f%%" or "%.0f%%", percent)
+    local value = rate .. " · " .. s.windows .. " windows"
     -- A source is named as this install's client showed it (its own rows, modules/openworld.lua), else by the name
     -- the site knows (the slot file's names). Chat keeps the id beside the name, the tooltip shows the name alone.
     local name = (E.SourceName and E:SourceName(s.kind, s.id)) or entry.names[(s.kind == "npc" and "n" or "o") .. s.id]
     local label = name or (s.kind == "npc" and "an unnamed NPC" or "an unnamed object")
     local said = label .. " (" .. source .. ")"
     -- `text` is the plain sentence for chat and a tooltip without two columns. The game's tooltip shows `left` and
-    -- `right` as a row, the rate in the value column like a price, with `detail` (its denominator) muted beneath.
+    -- `right` as a row, the rate and windows in the value column like a price.
     out[#out + 1] = { r = 0.9, g = 0.8, b = 0.5, wrap = true,
-      text = string.format("Everloot drop: %s · %s (%d of %d loot windows) · %d installs", said, rate, s.drops, s.windows, s.installs),
-      left = "Drops from " .. label, right = rate, detail = string.format("  %d of %d loot windows, %d installs", s.drops, s.windows, s.installs) }
+      text = "Everloot drop: " .. said .. " · " .. value,
+      left = "Drops from " .. label, right = value }
   end
-  local day = type(entry.asOf) == "string" and entry.asOf:match("^%d%d%d%d%-%d%d%-%d%d")
+  local day = E.StaleDay(entry.asOf)
+  if day then
+    out[#out + 1] = { r = 0.788, g = 0.765, b = 0.69, wrap = true, text = "  drops as of " .. day }
+  end
   local more = #sources - E.DROP_SOURCES_SHOWN
-  local tail = more > 1 and string.format(" · %d more sources", more) or more == 1 and " · 1 more source" or ""
-  out[#out + 1] = { r = 0.788, g = 0.765, b = 0.69, wrap = true,
-    text = "  " .. (day and ("drop rates from uploads as of " .. day) or "drop rates: upload date unknown") .. tail }
+  if more > 0 then
+    out[#out + 1] = { r = 0.788, g = 0.765, b = 0.69, wrap = true,
+      text = string.format("  %d more %s", more, more == 1 and "source" or "sources") }
+  end
   return out, nil
 end
