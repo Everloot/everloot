@@ -44,7 +44,7 @@ const read = (rows: unknown[], asOf: string) => {
   const at = new Date(Date.parse(asOf) + minute++ * 1000).toISOString();
   return { rows, dataAsOf: at };
 };
-const hub = async () => renderToStaticMarkup(await RankingsHub());
+const hub = async () => renderToStaticMarkup(await RankingsHub({}));
 const ranking = async (slug: string, search: Record<string, string> = {}) =>
   renderToStaticMarkup(await RankingPage({ params: Promise.resolve({ slug }), searchParams: Promise.resolve(search) }));
 const meta = (slug: string, search: Record<string, string> = {}) => rankingMetadata({ params: Promise.resolve({ slug }), searchParams: Promise.resolve(search) });

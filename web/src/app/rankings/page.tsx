@@ -35,7 +35,7 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function RankingsHub(props: { searchParams?: Promise<Search> } = {}) {
+export default async function RankingsHub(props: { searchParams?: Promise<Search> }) {
   const region = leaderboardRegion(first((await props.searchParams)?.region));
   const [{ weeks, unreachable, dataAsOf }, boards] = await Promise.all([loadRankingWeeks(), loadLeaderboards(region)]);
   const views = RANKINGS.map((def) => rankingView(def, weeks));
