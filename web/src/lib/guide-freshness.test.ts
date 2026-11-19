@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Block } from "../../../kb/src/wiki/page";
+import type { Block } from "@kb/wiki/page";
 import { guideFreshness, guideIndexable, REVIEW_AFTER_DAYS, type GuideFreshness, type GuidePlanFields } from "./guide-freshness";
 import { freshnessLines, planFreshness } from "./talents/freshness";
 import { classTalentChanges } from "./talents/freshness-records";

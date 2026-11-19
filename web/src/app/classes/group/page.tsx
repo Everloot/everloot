@@ -7,7 +7,7 @@ import { reviewedRoles } from "@/lib/class-group";
 import { classGuides } from "@/lib/class-hub";
 import { pageMetadata } from "@/lib/seo";
 import { TALENT_CLASSES } from "@/lib/talents/catalogs";
-import type { GuideRole } from "../../../../../kb/src/guides/guide";
+import type { GuideRole } from "@kb/guides/guide";
 import GroupPlanner from "./GroupPlanner";
 
 // Built once per deploy, like the class hubs: the roles come from the reviewed guides in kb/guides, read while the

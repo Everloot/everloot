@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { mergeCorpus, publicRecords, eventKey } from "../../../kb/src/corpus";
+import { mergeCorpus, publicRecords, eventKey } from "@kb/corpus";
 import { parseRecords } from "@everloot/protocol";
 
 function deduplicateRecords(rows: unknown[]) {

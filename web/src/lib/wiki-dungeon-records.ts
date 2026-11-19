@@ -1,5 +1,5 @@
-import type { ItemFacts } from "../../../kb/src/item-page";
-import type { WorldFacts } from "../../../kb/src/world-pages";
+import type { ItemFacts } from "@kb/item-page";
+import type { WorldFacts } from "@kb/world-pages";
 import type { InstanceRow } from "./instances";
 import { itemNames } from "./names";
 import { computeRollups, loadItemFacts, loadWorldFacts } from "./rollup-compute";

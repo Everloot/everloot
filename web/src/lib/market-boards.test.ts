@@ -1,5 +1,5 @@
 import { beforeEach, expect, test, vi } from "vitest";
-import { emptyMarket, foldMarket } from "../../../kb/src/market";
+import { emptyMarket, foldMarket } from "@kb/market";
 import { HOUSES, agreementSoFar, pendingRealms, realmBoards } from "./auction-house";
 import { STAMP } from "./stored-view-freshness";
 

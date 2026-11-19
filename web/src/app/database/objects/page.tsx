@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
-import { objectList } from "../../../../../kb/src/object-page";
+import { objectList } from "@kb/object-page";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
 import { loadObjectFacts } from "@/lib/objects";
 import { objectNames } from "@/lib/names";

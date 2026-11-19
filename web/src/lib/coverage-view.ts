@@ -1,4 +1,4 @@
-import { COVERAGE_TYPES, coverageShares, type CoverageCell, type CoverageReport, type CoverageType, type ZoneCoverage } from "../../../kb/src/coverage";
+import { COVERAGE_TYPES, coverageShares, type CoverageCell, type CoverageReport, type CoverageType, type ZoneCoverage } from "@kb/coverage";
 import { dataAgeLabel } from "./data-age";
 import { PLACEHOLDER } from "./item-names";
 import { zoneSlug } from "./zones";

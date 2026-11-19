@@ -1,4 +1,4 @@
-import { mapBoundsFromRecords, rollupMapBounds, type ZoneBounds } from "../../../kb/src/map-bounds";
+import { mapBoundsFromRecords, rollupMapBounds, type ZoneBounds } from "@kb/map-bounds";
 import { AwsClient } from "aws4fetch";
 import { keep } from "./kept";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";

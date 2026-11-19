@@ -1,5 +1,5 @@
 import { SectionHeading } from "@/components/ui";
-import type { GuideFrontMatter } from "../../../../kb/src/guides/guide";
+import type { GuideFrontMatter } from "@kb/guides/guide";
 
 // A guide's sources: the Blizzard posts it cites, each linked where the claim it supports is made and listed with the
 // day it was last checked. A guide that cites none says what it rests on instead, rather than leaving the list empty.

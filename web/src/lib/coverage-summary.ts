@@ -1,5 +1,5 @@
 import { AwsClient } from "aws4fetch";
-import { COVERAGE_SCHEMA, COVERAGE_TYPES, type CoverageCell, type CoverageReport } from "../../../kb/src/coverage";
+import { COVERAGE_SCHEMA, COVERAGE_TYPES, type CoverageCell, type CoverageReport } from "@kb/coverage";
 import { CLIENT_LAYER } from "./items";
 import { r2Config, type R2Config } from "./upload-store";
 

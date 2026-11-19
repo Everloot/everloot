@@ -2,10 +2,10 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { NextResponse } from "next/server";
 import { stringify } from "yaml";
-import { checkGuides, type GuideFile } from "../../../kb/src/guides/check";
-import { GUIDE_ACTIVITIES, GUIDE_ROLES, GUIDE_SECTIONS, guideLinkTarget, sitePath, type GuideActivity, type GuideRole } from "../../../kb/src/guides/guide";
-import { MARKDOWN_LINK, parsePage, type Block } from "../../../kb/src/wiki/page";
-import { zoneTable } from "../../../kb/src/world-coords";
+import { checkGuides, type GuideFile } from "@kb/guides/check";
+import { GUIDE_ACTIVITIES, GUIDE_ROLES, GUIDE_SECTIONS, guideLinkTarget, sitePath, type GuideActivity, type GuideRole } from "@kb/guides/guide";
+import { MARKDOWN_LINK, parsePage, type Block } from "@kb/wiki/page";
+import { zoneTable } from "@kb/world-coords";
 import { readProfile } from "./account-shell";
 import { signInPath } from "./auth/return-to";
 import { withoutVersionPrefix } from "./build-versions";
@@ -288,7 +288,7 @@ const COMMUNITY_FILE = "community/community-draft.md";
 let known: { items: Set<number>; zones: Set<number> } | null = null;
 async function knownData() {
   if (!known) {
-    const { CLIENT_LAYER } = await import("../../../kb/src/client-layer-file");
+    const { CLIENT_LAYER } = await import("@kb/client-layer-file");
     known = { items: new Set(CLIENT_LAYER.items.map(([id]) => id)), zones: new Set(zoneTable(WORLD_MAP).map((z) => z.mapId)) };
   }
   return known;

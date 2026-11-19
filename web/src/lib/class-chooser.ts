@@ -7,8 +7,8 @@
  * runs in the browser, so this file reads no files and does not load the files' schema.
  */
 import { CLASSES } from "@/design/tokens";
-import type { ClassChooserData } from "../../../kb/src/guides/class-chooser";
-import type { GuideRole } from "../../../kb/src/guides/guide";
+import type { ClassChooserData } from "@kb/guides/class-chooser";
+import type { GuideRole } from "@kb/guides/guide";
 import { classLabel, type ClassSlug } from "./class-context";
 
 type Question = ClassChooserData["chooser"]["questions"][number];

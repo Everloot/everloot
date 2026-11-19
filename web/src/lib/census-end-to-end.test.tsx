@@ -18,8 +18,8 @@ vi.mock("@/lib/upload-store", async (importOriginal) => ({
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
 
 import CensusPage from "../app/census/page";
-import { populationAnswer } from "../../../kb/src/population";
-import { CENSUS_RACES } from "../../../kb/src/census";
+import { populationAnswer } from "@kb/population";
+import { CENSUS_RACES } from "@kb/census";
 import { toolLoaders } from "./mcp-mount";
 import { loadCensus } from "./rollup-compute";
 import { createUploadStore } from "./upload-store";

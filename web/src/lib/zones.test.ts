@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import type { WorldMapData } from "../../../kb/src/world-map-data";
-import type { WorldFacts } from "../../../kb/src/world-pages";
+import type { WorldMapData } from "@kb/world-map-data";
+import type { WorldFacts } from "@kb/world-pages";
 import { WORLD_MAP } from "./world-map";
 import { hasContent, parseZoneSegment, placedEntrances, publicZones, zoneByMapId, zoneContents, zoneHref, zoneMapHref, zoneSlug } from "./zones";
 

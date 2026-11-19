@@ -1,5 +1,5 @@
 import { beforeEach, expect, test, vi } from "vitest";
-import type { WorldFacts } from "../../../kb/src/world-pages";
+import type { WorldFacts } from "@kb/world-pages";
 
 // No name here comes from the private files: the fixtures stand in for the agreed names, the world rows and the wiki file.
 const mocks = vi.hoisted(() => ({

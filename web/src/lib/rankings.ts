@@ -1,7 +1,7 @@
 import {
   CENSUS_CLASSES, CENSUS_LAUNCH, CENSUS_MIN_CHARACTERS, CENSUS_MIN_INSTALLS, CENSUS_MIN_REPORTERS, CENSUS_RACES, FACTIONS, rollupCensus,
   type CensusCount, type CensusRow, type CensusWindow, type Faction,
-} from "../../../kb/src/census";
+} from "@kb/census";
 import { longDate } from "@/data/wow-forever";
 import { censusHref } from "./census-filter";
 import type { JsonLd } from "./jsonld";

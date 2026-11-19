@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { DataTable, SectionHeading, type Column } from "@/components/ui";
-import type { LegacyPerkCatalog, Node, Tree } from "../../../../../kb/src/legacy-perks/catalog";
+import type { LegacyPerkCatalog, Node, Tree } from "@kb/legacy-perks/catalog";
 
 /**
  * The Legacy perk catalog as the game files hold it, read-only (docs/LEGACY_PERKS.md). Ids, ranks and prerequisites

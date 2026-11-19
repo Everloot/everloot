@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { craftedItemsFromRecords } from "../../../kb/src/item-source";
+import { craftedItemsFromRecords } from "@kb/item-source";
 import { buildItemSources } from "./item-seen";
 import { activeFilters, categoryQuery, CLIENT_TAXONOMY, itemsHref, listItems, subclassLabel, toggled, type CategoryQuery, type SourceSlug } from "./items";
 

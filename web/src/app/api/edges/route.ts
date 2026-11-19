@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { RELS, type EdgeKind, type Evidence, type Rel } from "../../../../../kb/src/edges";
+import { RELS, type EdgeKind, type Evidence, type Rel } from "@kb/edges";
 import { admit, attribution, attributionHeaders, badPage, pageOf, pageRequest } from "@/lib/data-guard";
 import { filterEdges, gameDataNotice, loadEdges, type EdgeFilter } from "@/lib/edges";
 import { recordUsage } from "@/lib/usage-metrics";

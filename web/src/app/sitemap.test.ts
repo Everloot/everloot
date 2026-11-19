@@ -8,7 +8,7 @@ import { MAP_DATA_EXTRACTED_AT, TALENT_DATA_EXTRACTED_AT } from "@/lib/build-sta
 import { loadTimeline, postPath } from "@/lib/changes";
 import { CLIENT_TAXONOMY, itemsHref } from "@/lib/items";
 import { PER_PAGE } from "./database/list-parts";
-import { filterItems } from "../../../kb/src/item-taxonomy";
+import { filterItems } from "@kb/item-taxonomy";
 import { instanceHref, instanceRows } from "@/lib/instances";
 import { loadCatalog, TALENT_CLASSES } from "@/lib/talents/catalogs";
 import { encodeBuild, encodeOrder } from "@/lib/talents/share";

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { pageMetadata } from "@/lib/seo";
-import { MARKET_RULE } from "../../../../../../../kb/src/market";
+import { MARKET_RULE } from "@kb/market";
 import { uploadStore } from "@/lib/upload-store";
 import { marketDatasetJsonLd } from "@/lib/jsonld";
 import JsonLd from "@/components/JsonLd";

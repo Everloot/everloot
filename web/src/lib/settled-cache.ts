@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { parseSettledList, type SettledList } from "../../../kb/src/settled-list";
+import { parseSettledList, type SettledList } from "@kb/settled-list";
 
 /**
  * The Desktop App's copy of the settled list (kb/src/settled-list.ts, docs/design/specs/2026-10-21-coverage-plateau-design.md,

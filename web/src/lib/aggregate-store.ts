@@ -1,7 +1,7 @@
 import { AwsClient } from "aws4fetch";
 import { keep } from "./kept";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
-import { namedRecord } from "../../../kb/src/corpus";
+import { namedRecord } from "@kb/corpus";
 import { buildAggregates, type AggregateSet } from "./aggregate-set";
 import { uploadStore, type Corpus, type R2Config } from "./upload-store";
 

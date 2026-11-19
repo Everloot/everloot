@@ -34,6 +34,7 @@ function resolveImport(from: string, spec: string): string | null {
   let base: string;
   if (spec.startsWith(".")) base = resolve(dirname(from), spec);
   else if (spec.startsWith("@/")) base = resolve(repo, "web/src", spec.slice(2));
+  else if (spec.startsWith("@kb/")) base = resolve(repo, "kb/src", spec.slice(4));
   else return null;
   const stem = base.replace(/\.(m?js)$/, "");
   for (const candidate of [base, `${stem}.ts`, `${stem}.tsx`, `${stem}.mts`, `${stem}.mjs`, `${stem}.js`, `${stem}.json`, resolve(base, "index.ts")]) {

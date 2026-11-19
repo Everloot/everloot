@@ -9,7 +9,7 @@ import {
   type Answers, type ChooserResult, type ClassFit, type RaceChoice,
 } from "@/lib/class-chooser";
 import { classHubHref, classLabel } from "@/lib/class-context";
-import type { ClassChooserData } from "../../../../../kb/src/guides/class-chooser";
+import type { ClassChooserData } from "@kb/guides/class-chooser";
 
 const LINK = "underline decoration-edge underline-offset-4 hover:decoration-fg";
 const control = "min-h-11 w-full rounded-control border border-edge bg-canvas px-3 text-base text-fg";

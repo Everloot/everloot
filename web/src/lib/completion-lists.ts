@@ -1,7 +1,7 @@
 import { cache } from "react";
-import { agreedCatalog } from "../../../kb/src/completion-rollup";
-import type { AchievementEntry, ChainEntry, FactionEntry, TitleEntry } from "../../../kb/src/completion";
-import { slugify } from "../../../kb/src/lore-slug";
+import { agreedCatalog } from "@kb/completion-rollup";
+import type { AchievementEntry, ChainEntry, FactionEntry, TitleEntry } from "@kb/completion";
+import { slugify } from "@kb/lore-slug";
 import { CLIENT_ACHIEVEMENTS } from "@/data/game-data/client-achievements";
 import { CLIENT_FACTIONS } from "@/data/game-data/client-factions";
 import { CLIENT_QUEST_LINES } from "@/data/game-data/client-quest-lines";

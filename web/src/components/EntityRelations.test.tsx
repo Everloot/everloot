@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test, vi } from "vitest";
-import type { Edge } from "../../../kb/src/edges";
+import type { Edge } from "@kb/edges";
 
 const links = vi.hoisted(() => [] as { href: string; prefetch?: boolean }[]);
 vi.mock("next/link", () => ({

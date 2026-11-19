@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
-import type { MapBoundsRow } from "../../../kb/src/map-bounds";
-import type { WorldMapData } from "../../../kb/src/world-map-data";
-import { worldToZone, zoneAt, zoneTable } from "../../../kb/src/world-coords";
+import type { MapBoundsRow } from "@kb/map-bounds";
+import type { WorldMapData } from "@kb/world-map-data";
+import { worldToZone, zoneAt, zoneTable } from "@kb/world-coords";
 import { continentCandidates, continentFlights, continentMap, continentPins, MAP_RECORD_KINDS, observedFacts, pinLink, WORLD_MAP } from "./world-map";
 import { PUBLIC_RECORD_KINDS } from "@everloot/protocol";
 

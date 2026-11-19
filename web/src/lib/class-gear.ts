@@ -3,8 +3,8 @@
  * proficiencies name, at the level it gets each, and the item's own class mask. Found in game files, unconfirmed.
  * Where the files say nothing about an item, it is kept and counted, never hidden.
  */
-import type { ItemRow } from "../../../kb/src/item-taxonomy";
-import type { ClientClassGear } from "../../../kb/src/client-class-gear";
+import type { ItemRow } from "@kb/item-taxonomy";
+import type { ClientClassGear } from "@kb/client-class-gear";
 import type { ClassSlug } from "@/lib/class-context";
 
 /**

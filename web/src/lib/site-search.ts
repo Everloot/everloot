@@ -1,11 +1,11 @@
 import { tools, toolHref } from "@/data/tools";
 import { allDocsPages } from "@/lib/docs/nav";
 import { entityHref } from "@/components/EntityLink";
-import { describe } from "../../../kb/src/item-taxonomy";
-import { objectList } from "../../../kb/src/object-page";
+import { describe } from "@kb/item-taxonomy";
+import { objectList } from "@kb/object-page";
 import { achievementHref, chainHref, factionHref, loadCatalog, titleDisplayName, titleHref } from "./completion-lists";
 import { CLIENT_TAXONOMY } from "./items";
-import { allTerms, type SearchHit } from "../../../kb/src/search";
+import { allTerms, type SearchHit } from "@kb/search";
 import { classLabel } from "./class-context";
 import { CLASSES } from "@/design/tokens";
 import { instanceHref, instanceRows, instanceTitle, levelLabel, type InstanceRow } from "./instances";

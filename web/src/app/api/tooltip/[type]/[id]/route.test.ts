@@ -10,7 +10,7 @@ vi.mock("@/lib/game-assets", () => ({ loadSiteAssets: mocks.assets, loadItemTips
 
 import { GET, OPTIONS } from "./route";
 import { itemTipText } from "@/lib/item-names";
-import type { ItemRecord } from "../../../../../../../kb/src/assets/items";
+import type { ItemRecord } from "@kb/assets/items";
 
 const three = (make: (installId: string) => object) => ["a", "b", "c"].map(make);
 const call = (type: string, id: string) => GET(new Request(`https://everloot.app/api/tooltip/${type}/${id}`), { params: Promise.resolve({ type, id }) });

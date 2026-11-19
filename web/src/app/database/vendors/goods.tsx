@@ -2,7 +2,7 @@ import Coins from "@/components/ui/Coins";
 import EntityLink from "@/components/EntityLink";
 import ItemTip from "@/components/game/ItemTip";
 import { DataTable } from "@/components/ui";
-import { stockLabel, type VendorOffer } from "../../../../../kb/src/world-pages";
+import { stockLabel, type VendorOffer } from "@kb/world-pages";
 import type { ComponentProps, ReactNode } from "react";
 
 export function VendorGoods({ title, offers, tips, items, evidence }: {

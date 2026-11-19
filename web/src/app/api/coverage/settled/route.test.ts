@@ -1,5 +1,5 @@
 import { beforeEach, expect, test, vi } from "vitest";
-import { emptySettledList, encodeIds } from "../../../../../../kb/src/settled-list";
+import { emptySettledList, encodeIds } from "@kb/settled-list";
 
 const read = vi.hoisted(() => ({ list: vi.fn() }));
 vi.mock("@/lib/settled-store", () => ({ readSettledList: read.list }));

@@ -3,10 +3,10 @@
 // A number this file does not know is printed as unknown, never guessed; a stat kind it does not know is left out.
 import { ITEM_FACTS } from "@everloot/protocol";
 import { tokens } from "@/design/tokens";
-import { formatCopper } from "../../../kb/src/market";
-import type { ItemRecord } from "../../../kb/src/assets/items";
-import { checkedDamageRange, CHECKED_WEAPONS, type CheckedDamageRange, type CheckedWeapon } from "../../../kb/src/assets/weapon-damage";
-import type { ItemFactName, ItemFactState } from "../../../kb/src/item-facts";
+import { formatCopper } from "@kb/market";
+import type { ItemRecord } from "@kb/assets/items";
+import { checkedDamageRange, CHECKED_WEAPONS, type CheckedDamageRange, type CheckedWeapon } from "@kb/assets/weapon-damage";
+import type { ItemFactName, ItemFactState } from "@kb/item-facts";
 import { PLACEHOLDER } from "./placeholder";
 import { ARMOR, PAIR, SLOT, WEAPON } from "./tip-line";
 

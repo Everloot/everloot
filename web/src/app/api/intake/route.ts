@@ -5,19 +5,19 @@ import { uploadStore, sharingStore } from "@/lib/upload-store";
 import { intakeQuota, type QuotaResult } from "@/lib/intake-quota";
 import { recordUsage } from "@/lib/usage-metrics";
 import { censusDateProblem, characterSecret, isCensusRow, storedCensusRow } from "@/lib/census-intake";
-import { MARKET_LIMITS, realmKey } from "../../../../../kb/src/market";
-import { authorizeRecord, sharingCategory, type PublicationGrant } from "../../../../../kb/src/publication";
+import { MARKET_LIMITS, realmKey } from "@kb/market";
+import { authorizeRecord, sharingCategory, type PublicationGrant } from "@kb/publication";
 import { isPlayerRow, playerDateProblem, playerPagesOn, playerStoreProblem, playerUpsert, PLAYERS_PER_UPLOAD, type PlayerUpsert } from "@/lib/player-pages";
 import { playerStore } from "@/lib/player-store";
 import { isLinkRow } from "@/lib/character-links";
 import { isPullRow, pullProblem, pullSummariesOn, pullUpsert, type PullUpsert } from "@/lib/pull-summaries";
 import { pullStore } from "@/lib/pull-store";
 import { guildKillProblem, guildsOn, hiddenGuildsForIntake, isGuildKillRow } from "@/lib/guilds";
-import { censusDailyCap } from "../../../../../kb/src/census-rows";
-import { isRecorderInstall } from "../../../../../kb/src/recorder-installs";
+import { censusDailyCap } from "@kb/census-rows";
+import { isRecorderInstall } from "@kb/recorder-installs";
 import { RECORDER_KINDS, RECORDER_SOURCE, recorderCharacter } from "@/lib/polestar-recorder";
 import { settledForIntake, settledTally, settledTallyOn } from "@/lib/settled-store";
-import { matchSettled } from "../../../../../kb/src/settled-list";
+import { matchSettled } from "@kb/settled-list";
 import { outcomeReason, recordIntakeTelemetry, type IntakeTelemetry } from "@/lib/ops/telemetry";
 
 /**

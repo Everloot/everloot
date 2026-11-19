@@ -1,6 +1,6 @@
-import { guildBoard, guildFactsFromRecords, type GuildBoard, type GuildFacts } from "../../../kb/src/guild-board";
-import { guildKey, guildKillsFromRecords, instanceDefs, officerKills, type AgreedKill, type GuildKillRow, type InstanceDef } from "../../../kb/src/guilds";
-import { instanceFactsFromRecords } from "../../../kb/src/instances";
+import { guildBoard, guildFactsFromRecords, type GuildBoard, type GuildFacts } from "@kb/guild-board";
+import { guildKey, guildKillsFromRecords, instanceDefs, officerKills, type AgreedKill, type GuildKillRow, type InstanceDef } from "@kb/guilds";
+import { instanceFactsFromRecords } from "@kb/instances";
 import { playerHideKey } from "./player-store";
 
 /** What one corpus read rolls up to, kept until the corpus changes. */

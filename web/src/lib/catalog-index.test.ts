@@ -10,7 +10,7 @@ import { achievementHref, chainHref, factionHref, loadCatalog, titleHref } from 
 
 afterEach(() => {
   resetCatalogIndex();
-  vi.doUnmock("../../../kb/src/catalog-index");
+  vi.doUnmock("@kb/catalog-index");
   vi.resetModules();
   vi.restoreAllMocks();
 });
@@ -38,7 +38,7 @@ test("every catalog answer for the four completionist kinds links a page the sit
 
 test("a catalog that cannot be built is attempted once, said once, and leaves no index", async () => {
   const build = vi.fn(() => { throw new Error("client-titles.json: wrong shape"); });
-  vi.doMock("../../../kb/src/catalog-index", async (importOriginal) => ({ ...(await importOriginal<typeof import("../../../kb/src/catalog-index")>()), buildCatalogIndex: build }));
+  vi.doMock("@kb/catalog-index", async (importOriginal) => ({ ...(await importOriginal<typeof import("@kb/catalog-index")>()), buildCatalogIndex: build }));
   const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
   vi.resetModules();
   const { catalogIndex: broken } = await import("./catalog-index");

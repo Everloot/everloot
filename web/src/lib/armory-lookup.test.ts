@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { ForeverApi, type Region } from "../../../kb/src/armory/api";
+import { ForeverApi, type Region } from "@kb/armory/api";
 import { armoryLookupOn, browserLookup, LOOKUP_BUDGET_MS, lookupCharacter, lookupSlug, type LookupDeps } from "./armory-lookup";
 import { createMemoryArmoryStore, type MemoryArmoryStore } from "./armory-store";
 import { PEOPLE_PAGE_TIMEOUT_MS } from "@/app/search/PeopleResults";

@@ -1,6 +1,6 @@
 import { SectionHeading } from "@/components/ui";
-import { CLOCK_SKEW_MINUTES, CONFIRMATION, KILL_DAYS_BACK, LEVEL_SLACK, SCORE_VERSION, WEIGHTS, type ComponentScore, type PartKey } from "../../../../kb/src/everloot-score";
-import { EXAMPLE_ACCOUNT, EXAMPLE_CHARACTERS, EXAMPLE_SCORES } from "../../../../kb/src/everloot-score-example";
+import { CLOCK_SKEW_MINUTES, CONFIRMATION, KILL_DAYS_BACK, LEVEL_SLACK, SCORE_VERSION, WEIGHTS, type ComponentScore, type PartKey } from "@kb/everloot-score";
+import { EXAMPLE_ACCOUNT, EXAMPLE_CHARACTERS, EXAMPLE_SCORES } from "@kb/everloot-score-example";
 
 /**
  * The Everloot Score's formula and a worked example on made-up data. The score itself is not shown anywhere: this

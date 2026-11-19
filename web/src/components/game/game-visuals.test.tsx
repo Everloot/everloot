@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { emptyMarket, foldMarket } from "../../../../kb/src/market";
+import { emptyMarket, foldMarket } from "@kb/market";
 import { itemIndex, shard0, siteManifest } from "@/lib/game-assets.fixture";
 import { forgetPrivateReads, forgetSiteAssets } from "@/lib/game-assets";
 import { CREDIT } from "@/lib/talents/assets";

@@ -1,4 +1,4 @@
-import { computeCoverage, parseCoverageExpected, type CoverageExpected, type CoverageReport } from "../../../kb/src/coverage";
+import { computeCoverage, parseCoverageExpected, type CoverageExpected, type CoverageReport } from "@kb/coverage";
 import { buildFolder, privateStoreFromEnv, type PrivateStore } from "./game-assets";
 import { CLIENT_LAYER } from "./items";
 import { assetsBaseUrl } from "./talents/assets";

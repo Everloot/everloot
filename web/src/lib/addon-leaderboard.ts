@@ -1,5 +1,5 @@
-import type { AddonPopularity, AddonTrend } from "../../../kb/src/addon-rollup";
-import type { ProjectView } from "../../../kb/src/ecosystem";
+import type { AddonPopularity, AddonTrend } from "@kb/addon-rollup";
+import type { ProjectView } from "@kb/ecosystem";
 import { approvedAddon } from "@/data/addon-repos";
 import type { AddonGithubSummaryResult } from "./addon-github";
 import { logoUrl, repoOwner } from "./addon-board";

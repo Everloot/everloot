@@ -700,7 +700,7 @@ describe("market rollup", () => {
     const open = body.state.realms.forever.items["2589"].open["2026-10-04"];
     expect(Object.values(open).map((v) => (v as unknown[])[5])).toEqual([same, same, same]);
     // Three installs, one address: not a public day.
-    const { itemMarket } = await import("../../../kb/src/market");
+    const { itemMarket } = await import("@kb/market");
     expect(itemMarket(body.state, "Forever", 2589, now()).points).toEqual([]);
   });
 
@@ -717,7 +717,7 @@ describe("market rollup", () => {
   });
 
   test("a rollup past its size limit sheds its oldest closed days and is written, and says so", async () => {
-    const { foldMarket, emptyMarket } = await import("../../../kb/src/market");
+    const { foldMarket, emptyMarket } = await import("@kb/market");
     const day = (d: string, id: string, price: number) => ({ ...scan(id, price), eventId: `scan:${id}:${d}`, scanId: `scan-${id}-${d}`, capturedAt: `${d}T10:00:00Z` });
     const old = ["install-1", "install-2", "install-3"].flatMap((id) => [day("2026-09-10", id, 100), day("2026-09-11", id, 100)]);
     const prev = foldMarket(emptyMarket(), old, now());
@@ -975,7 +975,7 @@ describe("completion rollup", () => {
     await createUploadStore({ cloud, localDir: "unused", fetch: fn, now }).writeCompletion();
     const body = JSON.parse(calls.find((c) => c.method === "PUT")!.body);
     expect(body.state.catalog.t["4"][0].v).toEqual([`r:${same}`]);
-    const { agreedCatalog } = await import("../../../kb/src/completion-rollup");
+    const { agreedCatalog } = await import("@kb/completion-rollup");
     expect(agreedCatalog(body.state).titles.size).toBe(0);
   });
 

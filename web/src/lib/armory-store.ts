@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { ARMORY_RECHECK_DAYS, armoryNameQuery, namesFromSlug, SEARCH_RULE, type ArmoryMetricKey } from "./armory";
 import { authQuery, StorageError } from "./supabase/server";
-import { ArmoryDetails, type ProfileDetails } from "../../../kb/src/armory/details";
-import type { CharacterRow } from "../../../kb/src/armory/parse";
+import { ArmoryDetails, type ProfileDetails } from "@kb/armory/details";
+import type { CharacterRow } from "@kb/armory/parse";
 
 /**
  * Where the armory rows live: Supabase in production (the functions of 20261109120000_armory.sql, called with the

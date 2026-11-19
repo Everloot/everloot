@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { AwsClient } from "aws4fetch";
-import { canonicalJson } from "../../../kb/src/corpus";
-import type { PublicationState } from "../../../kb/src/publication";
+import { canonicalJson } from "@kb/corpus";
+import type { PublicationState } from "@kb/publication";
 import { buildGuildRollup, type GuildRollup } from "./guild-rollup";
 import { sharingStore, uploadStore, type R2Config } from "./upload-store";
 import { STAMP, stampOf } from "./stored-view-freshness";

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { WorldFacts } from "../../../kb/src/world-pages";
+import type { WorldFacts } from "@kb/world-pages";
 import { itemNames, npcNames, objectNames, questTitles, type Names } from "./names";
 import { shownSearchNames, tokenNamer } from "./shown-item-names";
 

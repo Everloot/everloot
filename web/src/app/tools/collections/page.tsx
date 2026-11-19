@@ -3,10 +3,10 @@ import JsonLd from "@/components/JsonLd";
 import { webApplicationJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
-import { agreedCollectionItems, collectionFactsFromRecords, handleCollectionGap } from "../../../../../kb/src/collection-gap";
+import { agreedCollectionItems, collectionFactsFromRecords, handleCollectionGap } from "@kb/collection-gap";
 import {
   ANOTHER_CHARACTER_NOTE, COMPLETION_AGREEMENT, completionEmptyState, completionProgress, droppedCharactersNote, overviewOf,
-} from "../../../../../kb/src/completion";
+} from "@kb/completion";
 import { loadCompletion } from "@/lib/completion-store";
 import { STORAGE_UNREACHABLE, STORAGE_UNREACHABLE_SHORT, uploadStore } from "@/lib/upload-store";
 import { dataAgeLabel } from "@/lib/data-age";

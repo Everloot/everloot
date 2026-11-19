@@ -1,8 +1,8 @@
-import { agreedCatalog } from "../../../kb/src/completion-rollup";
-import type { EdgeKind } from "../../../kb/src/edges";
-import { agreedObjectNames } from "../../../kb/src/object-spawns";
-import { agreedItemNames, type ItemFacts } from "../../../kb/src/item-page";
-import { agreedNpcNames, agreedQuestTitles, type WorldFacts } from "../../../kb/src/world-pages";
+import { agreedCatalog } from "@kb/completion-rollup";
+import type { EdgeKind } from "@kb/edges";
+import { agreedObjectNames } from "@kb/object-spawns";
+import { agreedItemNames, type ItemFacts } from "@kb/item-page";
+import { agreedNpcNames, agreedQuestTitles, type WorldFacts } from "@kb/world-pages";
 import type { FactNames } from "./character-facts";
 import type { StoredFact } from "./private-sync-store";
 import { RECHECK_SCOPES } from "./recheck-scopes";

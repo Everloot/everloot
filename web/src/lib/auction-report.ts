@@ -1,4 +1,4 @@
-import { itemListings, type MarketState } from "../../../kb/src/market";
+import { itemListings, type MarketState } from "@kb/market";
 import { realmBoards, solidDays } from "./auction-house";
 import { realmRegion, REGION_LABEL, RULESET_LABEL } from "./realms";
 

@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Badge, Card, CopyButton, Input, SectionHeading } from "@/components/ui";
-import { formatCopper } from "../../../../../kb/src/profession-path";
+import { formatCopper } from "@kb/profession-path";
 import { cheapestPrices, planShopping, type ListedPrice, type PlannerRecipe, type SearchRecipe } from "@/lib/profession-planner";
 import { SELECT_CLASS } from "./controls";
 import { realmRuleset, RULESET_LABEL } from "@/lib/realms";

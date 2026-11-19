@@ -1,5 +1,5 @@
 import { CLIENT_TERRAIN } from "@/data/game-data/client-terrain";
-import type { ClientTerrain } from "../../../kb/src/client-terrain";
+import type { ClientTerrain } from "@kb/client-terrain";
 import { publicZones } from "./zones";
 
 /**

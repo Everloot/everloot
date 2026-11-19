@@ -2,7 +2,7 @@ import { DataTable, type Column } from "@/components/ui";
 import { CoinText } from "@/components/ui/Coins";
 import type { BlizzardBrowseRead, BlizzardHistoryPrice } from "@/lib/blizzard-auctions";
 import { houseLabel, houseOrder } from "@/lib/blizzard-houses";
-import { formatCopper } from "../../../../../kb/src/market";
+import { formatCopper } from "@kb/market";
 import { blizzardTime } from "./blizzard-auctions";
 
 export function BlizzardHistory({ read }: { read: BlizzardBrowseRead<BlizzardHistoryPrice> }) {

@@ -1,4 +1,4 @@
-import type { LoadedCoverage } from "../../../kb/src/coverage-tool";
+import type { LoadedCoverage } from "@kb/coverage-tool";
 import { loadCoverage } from "./coverage-compute";
 import { loadStoredCoverage } from "./coverage-summary";
 

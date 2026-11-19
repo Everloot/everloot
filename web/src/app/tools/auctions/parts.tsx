@@ -6,7 +6,7 @@ import { AGREEMENT_NEEDED, AgreementMeter, Card, Contribute as ContributeCard, D
 import { SPARK_BOX, itemHref, itemLabel, money, percent, realmHref, sparkline, type ItemNames, type MarketRow, type PendingRealm, type RulesetSummary } from "@/lib/auction-house";
 import { RULESET_LABEL, isRulesetSlug, type RulesetSlug } from "@/lib/realms";
 import { RealmName } from "./RealmName";
-import { HISTORY_DAYS, formatCopper, reportersText, type PublicDay } from "../../../../../kb/src/market";
+import { HISTORY_DAYS, formatCopper, reportersText, type PublicDay } from "@kb/market";
 import type { ItemTip as Tip } from "./art";
 import { categoryRow } from "./browse";
 import TimeAgo from "./TimeAgo";

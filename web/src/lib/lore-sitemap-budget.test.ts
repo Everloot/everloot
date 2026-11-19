@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest";
-import { openPublicSnapshot } from "../../../kb/src/public-snapshot";
+import { openPublicSnapshot } from "@kb/public-snapshot";
 import { buildLoreRelease } from "@/test/lore-release";
 
 // The lore sitemap's bill: it asks the release for the archive pages of every name a database kind holds, a batch of

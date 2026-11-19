@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import type { WorldFacts } from "../../../../../../kb/src/world-pages";
+import type { WorldFacts } from "@kb/world-pages";
 
 const mocks = vi.hoisted(() => ({ world: vi.fn(), rollup: vi.fn(), items: vi.fn(), wiki: vi.fn() }));
 vi.mock("@/lib/rollup-compute", () => ({

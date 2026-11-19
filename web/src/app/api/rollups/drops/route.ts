@@ -1,5 +1,5 @@
-import { publicDropRate, publicMeasuredZero } from "../../../../../../kb/src/drop-rollup";
-import { measureDropRate } from "../../../../../../kb/src/drop-rate-settling";
+import { publicDropRate, publicMeasuredZero } from "@kb/drop-rollup";
+import { measureDropRate } from "@kb/drop-rate-settling";
 import { NextResponse } from "next/server";
 import { admit, attribution, attributionHeaders, badPage, pageOf, pageRequest } from "@/lib/data-guard";
 import { computeRollups } from "@/lib/rollup-compute";

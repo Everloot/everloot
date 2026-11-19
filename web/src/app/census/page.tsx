@@ -18,7 +18,7 @@ import {
 } from "@/lib/census-filter";
 import {
   CENSUS_CLASSES, CENSUS_RACES, FACTIONS, HIDDEN_LABEL, HIDDEN_MEANING, LEVEL_BANDS, type CensusCount, type CensusView, type CensusWindow,
-} from "../../../../kb/src/census";
+} from "@kb/census";
 
 const description =
   "Who plays what on WoW Forever: factions, races, classes and levels from Everloot uploads. Each character counts once; a count shows from 10 characters.";

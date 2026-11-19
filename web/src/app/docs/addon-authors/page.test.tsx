@@ -22,7 +22,7 @@ import { CREDIT_LINE, GAME_DATA_CREDIT, LOOT_TYPES, parseRecords } from "@everlo
 import { GET } from "@/app/api/corpus/public/route";
 import { docsPage } from "@/lib/docs/nav";
 import { llmsTxt } from "@/lib/llms";
-import { countsAsKillOrGather } from "../../../../../kb/src/drop-rollup";
+import { countsAsKillOrGather } from "@kb/drop-rollup";
 import AddonAuthorsPage from "./page";
 import { JS, PY, ROW } from "./samples";
 

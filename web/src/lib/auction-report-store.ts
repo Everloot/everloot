@@ -57,7 +57,7 @@ export async function writeAuctionReports(now = new Date(), deps: Deps & { build
  }
  const reports = await (deps.build ?? (async () => {
   const [{ uploadStore }, { CLIENT_TAXONOMY }, { loadShownNames }, { loadSiteAssets, loadItemTips }, { buildAuctionReports }] = await Promise.all([
-   import("./upload-store"), import("../../../kb/src/client-layer-file"), import("./shown-item-names"), import("./game-assets"), import("./auction-report"),
+   import("./upload-store"), import("@kb/client-layer-file"), import("./shown-item-names"), import("./game-assets"), import("./auction-report"),
   ]);
   const market = await uploadStore.loadMarket(); if (!market.state) throw new Error("market unavailable");
   const names = await loadShownNames();

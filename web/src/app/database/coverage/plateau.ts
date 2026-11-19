@@ -1,5 +1,5 @@
-import { computeCoverage, type CoverageReport } from "../../../../../kb/src/coverage";
-import { measurePlateau, plateauInput, PLATEAU_WINDOW_DAYS, type PlateauReport, type TypePlateau } from "../../../../../kb/src/plateau";
+import { computeCoverage, type CoverageReport } from "@kb/coverage";
+import { measurePlateau, plateauInput, PLATEAU_WINDOW_DAYS, type PlateauReport, type TypePlateau } from "@kb/plateau";
 import { COVERAGE_BUILD, loadCoverageExpected, RECHECK_SCOPES } from "@/lib/coverage-compute";
 import { dataAgeLabel } from "@/lib/data-age";
 import { PLACEHOLDER } from "@/lib/item-names";

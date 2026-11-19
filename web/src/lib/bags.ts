@@ -1,5 +1,5 @@
 import bagsJson from "@/data/game-data/client-bags.json";
-import type { ClientBags } from "../../../kb/src/client-bags";
+import type { ClientBags } from "@kb/client-bags";
 import type { MarketRow, RealmBoard } from "./auction-house";
 import { SLOT } from "./tip-line";
 

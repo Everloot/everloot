@@ -60,7 +60,7 @@ import ChainPage, { generateMetadata as chainMetadata } from "./quest-chains/[id
 import sitemap from "@/lib/site-sitemap";
 import { loadCatalog } from "@/lib/completion-lists";
 import { siteSearch } from "@/lib/site-search";
-import { emptyCompletion, foldCompletion } from "../../../../kb/src/completion-rollup";
+import { emptyCompletion, foldCompletion } from "@kb/completion-rollup";
 
 const at = "2026-10-19T00:00:00Z";
 let seq = 0;

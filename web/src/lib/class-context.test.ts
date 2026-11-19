@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
-import { GUIDE_ROLES } from "../../../kb/src/guides/guide";
+import { GUIDE_ROLES } from "@kb/guides/guide";
 import { CLASSES } from "@/design/tokens";
 import {
   CLASS_CONTEXT_SLOT, MAX_LEVEL, ROLES, classHubHref, contextLabel, contextLinks, forgetClassContext, hasClassContext, parseClassContext,

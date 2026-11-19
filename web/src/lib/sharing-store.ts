@@ -3,8 +3,8 @@ import { mkdir, readFile, readdir, writeFile, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import type { CloudConfig } from "./upload-store";
-import { publicRecords, namedRecord, type CorpusState } from "../../../kb/src/corpus";
-import { authorizeRecord, type PublicationState, type PublicationGrant } from "../../../kb/src/publication";
+import { publicRecords, namedRecord, type CorpusState } from "@kb/corpus";
+import { authorizeRecord, type PublicationState, type PublicationGrant } from "@kb/publication";
 import { readAllRows } from "./postgrest-pages";
 
 const grantSchema = z.object({

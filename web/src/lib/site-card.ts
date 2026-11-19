@@ -1,15 +1,15 @@
 import { loadWikiEntityNames, shownNpcName } from "./wiki-entity-names";
 import type { TooltipType } from "@everloot/protocol";
-import { npcPage, vendorPage } from "../../../kb/src/world-pages";
+import { npcPage, vendorPage } from "@kb/world-pages";
 import { loadWorldFacts } from "./rollup-compute";
 import { loadStoredAggregates } from "./aggregate-store";
-import { categoryOf } from "../../../kb/src/item-taxonomy";
+import { categoryOf } from "@kb/item-taxonomy";
 import { loadSiteAssets, PRIVATE_MALFORMED, PRIVATE_UNREACHABLE, readItemTips, readQuestNames, readSpellNames, tipLabel } from "./game-assets";
 import { withReported } from "./item-names";
 import { loadCardFacts, loadListNames } from "./item-view";
 import { splitWhy } from "./placeholder";
 import { CLIENT_LAYER, CLIENT_TAXONOMY, NAME_FROM, shownItemName } from "./items";
-import { CLIENT_EDGES } from "../../../kb/src/client-layer-file";
+import { CLIENT_EDGES } from "@kb/client-layer-file";
 import { loadSpellTalents } from "./talents/spell-talents";
 import { pinLink } from "./world-map";
 import { assetsBaseUrl } from "./talents/assets";

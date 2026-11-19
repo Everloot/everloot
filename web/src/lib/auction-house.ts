@@ -1,9 +1,9 @@
 import { AUCTION_HOUSES, type AuctionHouse } from "@everloot/protocol";
-import { AUCTION_AGREEMENT } from "../../../kb/src/auction-history";
+import { AUCTION_AGREEMENT } from "@kb/auction-history";
 import {
   MARKET_LIMITS, TRIM_FACTOR, TRIM_MIN_DAYS, agreed, formatCopper, houseKey, itemListings, itemMarket, parseHouse, realmName, validRealm,
   type ItemDays, type MarketState, type MarketValue, type PublicDay, type RealmDays,
-} from "../../../kb/src/market";
+} from "@kb/market";
 import { AFTER_LAUNCH, DEFAULT_RULESET, RULESET_SLUGS, inRegion, isRulesetSlug, mappedRulesets, realmInfo, realmRuleset, rulesetFromName, type RegionFilter, type RulesetSlug } from "./realms";
 
 /**

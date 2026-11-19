@@ -12,7 +12,7 @@ export {
   type LootRow,
   type MeasuredZero,
   type RollupResult,
-} from "../../../kb/src/drop-rollup";
+} from "@kb/drop-rollup";
 
 export const rollupFile = z.object({
   generatedAt: z.string(),

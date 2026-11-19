@@ -11,7 +11,7 @@ import { Banner, Card, SectionHeading } from "@/components/ui";
 import HomeSearch from "@/components/HomeSearch";
 import { ADDON_LIVE_VERIFIED, latestAddonRelease } from "@/lib/addon-release";
 import { loadTimeline } from "@/lib/changes";
-import { TYPE_LABEL, postPath } from "../../../kb/src/changes";
+import { TYPE_LABEL, postPath } from "@kb/changes";
 import { longDate } from "@/data/wow-forever";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/jsonld";
 import { FEED } from "@/lib/seo";

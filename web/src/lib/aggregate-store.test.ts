@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { recordSchemas, type IntakeRecord } from "@everloot/protocol";
-import { namedRecord } from "../../../kb/src/corpus";
+import { namedRecord } from "@kb/corpus";
 
 const store = vi.hoisted(() => ({ loadCorpus: vi.fn() }));
 vi.mock("./upload-store", () => ({ uploadStore: { loadCorpus: store.loadCorpus } }));

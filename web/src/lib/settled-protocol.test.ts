@@ -1,6 +1,6 @@
 import { API_ROUTES, settledListResponse } from "@everloot/protocol";
 import { expect, test } from "vitest";
-import { computeSettled, emptySettledList, listOf, SettledList } from "../../../kb/src/settled-list";
+import { computeSettled, emptySettledList, listOf, SettledList } from "@kb/settled-list";
 
 /** The protocol cannot import the knowledge base, so this keeps its response schema and the list the route serves in step. */
 

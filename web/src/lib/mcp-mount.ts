@@ -1,5 +1,5 @@
-import { createMcpHttpHandler } from "../../../kb/src/mcp-http-server";
-import type { ToolOptions } from "../../../kb/src/mcp-server";
+import { createMcpHttpHandler } from "@kb/mcp-http-server";
+import type { ToolOptions } from "@kb/mcp-server";
 import { loadStoredAggregates } from "./aggregate-store";
 import { catalogIndex } from "./catalog-index";
 import { loadTimeline } from "./changes";
@@ -16,8 +16,8 @@ import { publicMcpCache } from "./mcp-response-cache";
 import { RECHECK_SCOPES } from "./recheck-scopes";
 import { loadCensus } from "./rollup-compute";
 import { readSettledList } from "./settled-store";
-import { settledKeys } from "../../../kb/src/settled-list";
-import { trustedInstalls } from "../../../kb/src/trusted-source";
+import { settledKeys } from "@kb/settled-list";
+import { trustedInstalls } from "@kb/trusted-source";
 import { uploadStore } from "./upload-store";
 import { mcpLedgerMetrics } from "./question-ledger";
 import { mcpToolMetrics, recordUsage } from "./usage-metrics";
