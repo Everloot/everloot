@@ -146,7 +146,7 @@ EverlootPricesDB.drops = { data = data, sum = Everloot.Adler32(data), dataAsOf =
 Everloot:ResetDrops()
 local lines = Everloot:DropLines(900001)
 assert(lines[1].right == '0.4% · 250 windows' and lines[1].detail == nil)
-assert(lines[1].text == 'Everloot drop: NPC 900002 · 0.4% · 250 windows')
+assert(lines[1].text == 'Everloot drop: an unnamed NPC (NPC 900002) · 0.4% · 250 windows', lines[1].text)
 assert(#lines == 2 and lines[2].text == '  drops as of Oct 1' and lines[2].wrap and lines[2].r < 0.8)
 EverlootPricesDB.drops.dataAsOf = 'unknown'
 Everloot:ResetDrops()
