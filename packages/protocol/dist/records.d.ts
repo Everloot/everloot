@@ -129,6 +129,7 @@ export declare const lootWindow: z.ZodObject<{
         other: "other";
     }>>;
     sourceObjectName: z.ZodOptional<z.ZodString>;
+    gatherSkill: z.ZodOptional<z.ZodNumber>;
 }, z.core.$strip>;
 export declare const questEvent: z.ZodObject<{
     installId: z.ZodString;
@@ -1077,6 +1078,7 @@ export declare const recordSchemas: {
             other: "other";
         }>>;
         sourceObjectName: z.ZodOptional<z.ZodString>;
+        gatherSkill: z.ZodOptional<z.ZodNumber>;
     }, z.core.$strip>;
     readonly quest: z.ZodObject<{
         installId: z.ZodString;
@@ -1814,6 +1816,7 @@ export declare const anyRecord: z.ZodDiscriminatedUnion<[z.ZodObject<{
         other: "other";
     }>>;
     sourceObjectName: z.ZodOptional<z.ZodString>;
+    gatherSkill: z.ZodOptional<z.ZodNumber>;
 }, z.core.$strip>, z.ZodObject<{
     installId: z.ZodString;
     eventId: z.ZodOptional<z.ZodString>;

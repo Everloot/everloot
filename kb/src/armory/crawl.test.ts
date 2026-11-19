@@ -1,7 +1,7 @@
 import { it, expect, vi } from "vitest";
 import { ApiError } from "./api.js";
 import { StoreError } from "./store.js";
-import { runCrawl } from "./crawl.js";
+import { rowFailureLimit, runCrawl } from "./crawl.js";
 import type { ProfileDetails } from "./details.js";
 import profile from "./fixtures/character.json";
 import equipment from "./fixtures/equipment.json";
@@ -188,6 +188,7 @@ it("guild summary", async () => {
     },
     invalid: 0,
     rejected: 0,
+    failures: {},
     touch_failed: { character: 0, guild: 0 },
     enqueued: 4,
     purged: 3,
@@ -441,9 +442,10 @@ it.each(["schema", "href", 400, 410])(
       }
       return { status: 200, body: bodyFor(path), lastModified: "date" };
     });
+    // One bad row among twelve is under the alert line: deferred, warned about, and the job succeeds.
     await expect(
       runCrawl({ region: "eu", budget: 36, store, api, log }),
-    ).rejects.toThrow("row failures");
+    ).resolves.toMatchObject({ invalid: 1 });
     expect(store.retry).toHaveBeenCalledWith(
       "eu",
       "character",
@@ -456,9 +458,46 @@ it.each(["schema", "href", 400, 410])(
     expect(summary.rejected).toBe(0);
     expect(summary.characters.fetched).toBe(11);
     expect(summary.characters.fetched + summary.invalid).toBe(12);
+    expect(Object.values(summary.failures)).toEqual([1]);
+    const warning = log.mock.calls.map((c) => String(c[0])).find((l) => l.startsWith("::warning::"));
+    expect(warning).toContain("1 of 12 rows deferred for 7 days, under the alert line of 3");
+    // The log names the failure, never the character.
+    expect(log.mock.calls.map((c) => String(c[0])).join("\n")).not.toContain("ember-vale");
     expect(store.purge).toHaveBeenCalled();
   },
 );
+
+it("names the field a schema failure broke, with indices folded, and no value", async () => {
+  const { store, api } = setup(1);
+  const log = vi.fn();
+  api.get.mockImplementation(async (path) => ({
+    status: 200,
+    body: path.endsWith("pvp-summary") ? { honorable_kills: "Ember Vale" } : bodyFor(path),
+    lastModified: null,
+  }));
+  const s = await runCrawl({ region: "eu", budget: 3, store, api, log });
+  expect(Object.keys(s.failures)).toEqual([
+    "row failure: Armory response schema validation failure at honorable_kills (invalid_type)",
+  ]);
+  expect(log.mock.calls.map((c) => String(c[0])).join("\n")).not.toContain("Ember Vale");
+});
+
+it("fails the job at the alert line: three bad rows, or 1% of the rows read", async () => {
+  expect(rowFailureLimit(12)).toBe(3);
+  expect(rowFailureLimit(1000)).toBe(10);
+  const { store, api } = setup(12);
+  const log = vi.fn();
+  api.get.mockImplementation(async (path) => {
+    if (/vale-[012]\//.test(path + "/") && path.endsWith("pvp-summary"))
+      return { status: 200, body: {}, lastModified: null };
+    return { status: 200, body: bodyFor(path), lastModified: null };
+  });
+  await expect(runCrawl({ region: "eu", budget: 36, store, api, log })).rejects.toThrow(
+    "3 armory row failures deferred for 7 days",
+  );
+  expect(log.mock.calls.some((c) => String(c[0]).startsWith("::warning::"))).toBe(false);
+  expect(JSON.parse(log.mock.calls.at(-1)![0]).invalid).toBe(3);
+});
 it("reads stored guild rosters conditionally and touches on 304 without guild GET", async () => {
   const { store, api } = setup(0);
   store.take.mockImplementation(async (_r, k) =>
