@@ -19,7 +19,10 @@ import { TALENT_CLASSES, loadCatalog } from "@/lib/talents/catalogs";
 // The class is read from the catalog list, never typed here: fixtures name no game class (docs/DATA_POLICY.md).
 const slug = TALENT_CLASSES[0]!;
 const params = (value: string) => ({ params: Promise.resolve({ class: value }) });
-const text = (html: string) => html.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ");
+// The text between the tags of a markup fragment (the h1 holds no script), with the two entities React writes decoded.
+const text = (html: string) =>
+  html.split("<").map((part) => (part.includes(">") ? part.slice(part.indexOf(">") + 1) : part)).join(" ")
+    .replace(/&#x27;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ");
 
 test("one page per catalog class is built, and no other address is served", () => {
   expect(route.dynamicParams).toBe(false);
