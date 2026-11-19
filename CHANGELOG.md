@@ -246,6 +246,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
 
 ### Fixed
+- Site: the coverage pages (/database/coverage and each zone's) show the score and plateau the data update stores, instead of working them out from every report on each visit, which could make the page fail to load. Until the next data update stores the plateau, the page says it is not measured yet.
 - Site: the Blizzard character lookup on /search finds real characters: it waits up to 4 s instead of 1.8 s (every live hit ran out of time), and a character Blizzard finds after that is still stored, so searching again lists it.
 - Site: character search finds a Forever character by first name, surname or full name (“Volvik Morningstar”), and the header and /search list armory characters with their region. Surnames and full names need the 20261117140000 migration.
 - Site: terrain page and zone and dungeon Terrain links load on click instead of prefetching into the edge rate limit.

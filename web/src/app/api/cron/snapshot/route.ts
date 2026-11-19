@@ -96,8 +96,8 @@ export async function GET(req: Request) {
     if (!market) return NextResponse.json({ ok: false, error: "market rollup failed", rebuild, ...result, completion }, { status: 500 });
     if (!completion) return NextResponse.json({ ok: false, error: "completion rollup failed", rebuild, ...result, market }, { status: 500 });
     // The coverage score changes only with the snapshot, so an idle run never recomputes it. It is dated by the
-    // snapshot's time, the heartbeat's `dataAsOf`. The pages compute it themselves, so a failure here is logged and
-    // the cron carries on; the next run that adds uploads writes it again.
+    // snapshot's time, the heartbeat's `dataAsOf`. The pages show the last stored score (or say it is unreachable),
+    // so a failure here is logged and the cron carries on; the next run that adds uploads writes it again.
     let coverage: { written: boolean } | null = null;
     try {
       coverage = idle ? { written: false } : await writeCoverage({ added: result.added, rebuild, dataAsOf: result.dataAsOf });

@@ -1,8 +1,9 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { computeCoverage } from "@kb/coverage";
+import { computePlateau } from "@kb/plateau";
 import { answerCoverage } from "@kb/coverage-tool";
 import { loadCoverageForTool } from "./coverage-answer";
-import { forgetCoverageSummary, loadCoverageSummary, loadStoredCoverage, readStoredReport } from "./coverage-summary";
+import { COVERAGE_STORED_VERSION, forgetCoverageSummary, loadCoverageForPages, loadCoverageSummary, loadStoredCoverage, readStoredPlateau, readStoredReport } from "./coverage-summary";
 
 vi.mock("./coverage-compute", () => ({ loadCoverage: vi.fn() }));
 
@@ -123,4 +124,59 @@ test("an unchanged file (304) keeps the stored report fresh, and the home page k
   fetcher.mockResolvedValue(new Response("", { status: 503 }));
   expect(await loadStoredCoverage(at(fetcher, 700_000))).toBeNull();
   expect(await loadCoverageSummary(at(fetcher, 700_000))).toMatchObject({ installs: 7, dataAsOf: asOf });
+});
+
+/** The version-2 file the cron writes now: the score, its version, and the plateau measured beside it. */
+const v2 = (build = BUILD) => {
+  const input = { asOf, build, zones: [{ mapId: 1429, name: "Zone A" }], records: [
+    ...Array.from({ length: 5 }, (_, i) => ({ kind: "npc_sighting", installId: `a-${i}`, npcId: 123, name: "Agreed", mapId: 1429, x: 42, y: 65, positionKind: "interaction", capturedAt: "2026-10-01T00:00:00.000Z" })),
+  ] };
+  const score = computeCoverage(input);
+  return { ...score, version: COVERAGE_STORED_VERSION, plateau: computePlateau(input, score) };
+};
+
+test("the tool reads both stored shapes: a version-1 score and a version-2 file with the plateau, which it never passes on", async () => {
+  for (const [file, installs] of [[report(), 7], [v2(), 5]] as const) {
+    forgetCoverageSummary();
+    const fetcher = vi.fn(async () => reply(file));
+    const replay = live();
+    const loaded = await loadCoverageForTool({ stored: () => loadStoredCoverage(deps(fetcher)), live: replay });
+    expect(loaded).toMatchObject({ source: "stored", installs, build: BUILD });
+    expect(loaded).not.toHaveProperty("plateau");
+    expect(loaded).not.toHaveProperty("version");
+    expect(replay).not.toHaveBeenCalled();
+    expect(await loadCoverageSummary(deps(fetcher))).toMatchObject({ installs });
+    expect(fetcher).toHaveBeenCalledOnce();
+  }
+});
+
+test("the pages get the plateau from a version-2 file from the same read, and none from a version-1 file", async () => {
+  const fetcher = vi.fn(async () => reply(v2()));
+  const pages = await loadCoverageForPages(deps(fetcher));
+  expect(pages?.report.installs).toBe(5);
+  expect(pages?.plateau).toMatchObject({ dataAsOf: asOf, installs: 5, windowStart: "2026-10-13T07:50:00.000Z" });
+  expect(await loadStoredCoverage(deps(fetcher))).toMatchObject({ installs: 5 });
+  expect(fetcher).toHaveBeenCalledOnce();
+  forgetCoverageSummary();
+  expect(await loadCoverageForPages(deps(vi.fn(async () => reply(report()))))).toMatchObject({ report: { installs: 7 }, plateau: null });
+});
+
+test("the pages keep the last good copy through a failed refresh, like the home page; a missing file drops it", async () => {
+  const fetcher = vi.fn(async () => reply(v2()));
+  await loadCoverageForPages(at(fetcher, 0));
+  fetcher.mockResolvedValue(new Response("", { status: 503 }));
+  expect(await loadCoverageForPages(at(fetcher, 400_000))).toMatchObject({ report: { installs: 5 } });
+  fetcher.mockResolvedValue(new Response("", { status: 404 }));
+  expect(await loadCoverageForPages(at(fetcher, 400_000 + 61_000))).toBeNull();
+});
+
+test("a stored plateau is shown only when it is whole and measured on the score's data date", () => {
+  const file = v2();
+  const score = readStoredReport(file, BUILD)!;
+  expect(readStoredPlateau(file, score)).toMatchObject({ installs: 5 });
+  expect(readStoredPlateau({ ...file, version: undefined }, score)).toBeNull();
+  expect(readStoredPlateau({ ...file, plateau: { ...file.plateau, dataAsOf: "2026-11-01T00:00:00.000Z" } }, score)).toBeNull();
+  expect(readStoredPlateau({ ...file, plateau: { ...file.plateau, types: file.plateau.types.slice(1) } }, score)).toBeNull();
+  expect(readStoredPlateau({ ...file, plateau: { ...file.plateau, types: [{ ...file.plateau.types[0], shares: { confirmed: 2 } }, ...file.plateau.types.slice(1)] } }, score)).toBeNull();
+  expect(readStoredPlateau({ ...file, plateau: null }, score)).toBeNull();
 });
