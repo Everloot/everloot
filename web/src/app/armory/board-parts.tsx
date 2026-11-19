@@ -6,7 +6,7 @@ import { ARMORY_BOARDS, armoryGuildPath, metricValue, type ArmoryMetric } from "
 import type { ArmoryBoardRow } from "@/lib/armory-store";
 
 export function BoardClass({ row }: { row: ArmoryBoardRow }) {
-  return <span className="inline-flex items-center gap-1.5 text-cell-2"><span role="img" aria-label={row.faction} className={`h-2 w-2 rounded-full ${row.faction === "Alliance" ? "bg-region-us" : row.faction === "Horde" ? "bg-danger" : "bg-muted"}`} /><span className={classText(row.class.toUpperCase())}>{row.class}</span></span>;
+  return <span className="inline-flex items-center gap-1.5 text-cell-2"><span role="img" aria-label={row.faction} className={`h-2 w-2 rounded-full ${row.faction === "Alliance" ? "bg-faction-alliance" : row.faction === "Horde" ? "bg-faction-horde" : "bg-muted"}`} /><span className={classText(row.class.toUpperCase())}>{row.class}</span></span>;
 }
 
 export function BoardGuild({ row }: { row: ArmoryBoardRow }) {

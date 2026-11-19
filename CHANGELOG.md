@@ -259,6 +259,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
 
 ### Changed
+- Site: the rankings boards' faction dots use the faction colours the census introduced, the same blue and red on both pages.
 
 - Addon: compact item tooltip market and scan metadata, show drop rates with windows on one row, and date drop and disenchant evidence only when stale.
 
