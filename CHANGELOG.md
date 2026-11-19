@@ -15,6 +15,9 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+
+- Site: Guild pages show population tiles, class mix, level and item level bars, and a sortable roster.
+- Site: Add a missing guild or ask for an older guild to be read again from the armory's add-a-guild form.
 - Site: /players lists Blizzard profiles before a name is typed, with class, race, faction, region, ruleset, level and guild filters, gear sorting and 25 profiles per page; name searches still show addon sightings and hide links.
 - Site: each realm's Auction House page links a Market changes view (`/tools/auctions/<realm>/changes`): for one house, the week's risers and fallers by market value on solid days (up to 25 each, with from and to values, the days compared, units listed and reporters), then the items with no comparison and why (new, thin, trimmed, stale, no baseline); it reads the stored boards only and says so when they are unavailable.
 - Addon: a flight path bar traces the trip with your portrait, a mount icon and the Everloot crest; confirmed arrivals teach a local estimate for the next flight, and /everloot flight on|off controls it.

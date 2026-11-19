@@ -41,7 +41,7 @@ afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); held.__everlootPlayers 
 const pages = {
   directory: async (search: Record<string, string> = {}) => (await import("../guilds/page")).default({ searchParams: Promise.resolve(search) }),
   moved: async (search: Record<string, string | string[]> = {}) => (await import("./guilds/page")).default({ searchParams: Promise.resolve(search) }),
-  guild: async (region: string, slug: string) => (await import("./[region]/guilds/[slug]/page")).default({ params: Promise.resolve({ region, slug }) }),
+  guild: async (region: string, slug: string, search: Record<string, string> = {}) => (await import("./[region]/guilds/[slug]/page")).default({ params: Promise.resolve({ region, slug }), searchParams: Promise.resolve(search) }),
   board: async (metric: string) => (await import("./rankings/[metric]/page")).default({ params: Promise.resolve({ metric }), searchParams: Promise.resolve({}) }),
 };
 const html = async (page: Promise<React.ReactElement>) => renderToStaticMarkup(await page);
@@ -100,6 +100,7 @@ describe("the guild directory", () => {
     expect(found).not.toContain("Ember Wardens");
     expect(found).toContain('name="region" value="us"');
     expect(await html(pages.directory({ q: "zz" }))).toContain("No guild read yet starts with “zz”.");
+    expect(await html(pages.directory({ q: "zz" }))).toContain('href="/armory/guilds/submit"');
     expect(await html(pages.directory({ q: "a1" }))).toContain("Type 2 to 24 letters");
   });
 
@@ -143,11 +144,58 @@ describe("the guild directory", () => {
 });
 
 describe("the guild page summary", () => {
+  test("population tiles and labelled bars count only shown members", async () => {
+    const out = await html(pages.guild("eu", "ember-wardens"));
+    expect(out).toContain("On the roster");
+    expect(out).toContain("Members read");
+    expect(out).toContain("Level 60");
+    expect(out).toMatch(/On the roster<\/dt><dd[^>]*>3<\/dd>/);
+    expect(out).toMatch(/Members read<\/dt><dd[^>]*>2<\/dd>/);
+    expect(out).toMatch(/Level 60<\/dt><dd[^>]*>1<\/dd>/);
+    expect(out).toContain('data-population="classes"');
+    expect(out).toContain("2 (66.7%)");
+    expect(out).toContain("1 (33.3%)");
+    expect(out).toContain("bg-class-hunter");
+    expect(out).toContain('data-population="item-levels"');
+    expect(out).toContain("50–59");
+    expect(out).toContain("2 (100%)");
+    expect(out).toContain('action="/guilds"');
+    expect(out).toContain('href="/armory/guilds/submit?region=eu&amp;name=Ember+Wardens"');
+    await mem.hide("eu", "torvin-ashbrook");
+    const hidden = await html(pages.guild("eu", "ember-wardens"));
+    expect(hidden).not.toContain("bg-class-warrior");
+    expect(hidden).not.toContain("Torvin");
+    expect(hidden).toContain("2 (100%)");
+    expect(hidden).toMatch(/On the roster<\/dt><dd[^>]*>2<\/dd>/);
+    expect(hidden).toMatch(/Members read<\/dt><dd[^>]*>1<\/dd>/);
+  });
+
+  test("sort parameters order roster rows and keep unread item levels last", async () => {
+    for (const [sort, first, last] of [["rank", "Brannoc", "Torvin"], ["level", "Velkara", "Brannoc"], ["item-level", "Velkara", "Brannoc"], ["name", "Brannoc", "Velkara"], ["invalid", "Brannoc", "Torvin"]]) {
+      const out = await html(pages.guild("eu", "ember-wardens", { sort: sort! }));
+      expect(out.indexOf(first!)).toBeLessThan(out.indexOf(last!));
+      expect(out).toContain(`?sort=item-level`);
+    }
+  });
+
+  test("refresh link is available only after the recheck window using checkedAt", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-11-29T09:00:00Z"));
+      mem.putGuild(armoryGuild({ checkedAt: "2026-11-09T09:00:00.001Z" }), []);
+      expect(await html(pages.guild("eu", "ember-wardens"))).not.toContain(">Refresh this guild<");
+      mem.putGuild(armoryGuild({ checkedAt: "2026-11-09T09:00:00Z" }), []);
+      expect(await html(pages.guild("eu", "ember-wardens"))).toContain(">Refresh this guild<");
+    } finally { vi.useRealTimers(); }
+  });
+
   test("shows the class mix, the level spread, the average item level of members read and the roster read time", async () => {
     const out = await html(pages.guild("eu", "ember-wardens"));
     expect(out).toContain("Class mix");
-    expect(out).toMatch(/text-class-hunter[^>]*>Hunter<\/span> <span[^>]*>2</);
-    expect(out).toMatch(/text-class-warrior[^>]*>Warrior<\/span> <span[^>]*>1</);
+    expect(out).toContain("bg-class-hunter");
+    expect(out).toContain("bg-class-warrior");
+    expect(out).toContain("2 (66.7%)");
+    expect(out).toContain("1 (33.3%)");
     expect(out).toContain("53.7 (2 read)");
     expect(out).toContain("2026-11-09");
     expect(out).toContain('"name":"Guilds","item":"https://everloot.app/guilds"'); // the trail runs Home › Guilds › the guild

@@ -236,7 +236,7 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
                     dir.state === "ready" && d.page > 1 && dir.total > 0 ? "No guilds on this page."
                     : d.prefix ? `No guild read yet starts with “${d.prefix}”.`
                     : dir.state === "ready" ? "No guild matches these filters yet." : "No guild to list yet."
-                  } />
+                  } action={{ href: "/armory/guilds/submit", label: "Add a guild" }} />
                 : <DataTable
                     dense
                     caption={d.prefix ? `Guilds whose name starts with ${d.prefix}` : "Guilds read from Blizzard's API"}
