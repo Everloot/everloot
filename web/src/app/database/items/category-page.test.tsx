@@ -186,6 +186,9 @@ test("the Source column and filter: reported items show where they come from, th
     expect(all).toContain(">Drop</td>");
     // Only the reported item has a source; the rest of the page shows a dash.
     expect(all.match(/>Drop<\/td>/g)).toHaveLength(1);
+    // A page with no reported row leaves the column out.
+    expect(all).toContain(">Source</a></th>");
+    if (cloth.length > PER_PAGE) expect(await html(SubclassPage(sub("armor", "cloth", { unnamed: "1", sort: "-id" })))).not.toContain(">Source</a></th>");
     const only = await html(SubclassPage(sub("armor", "cloth", { src: "drop", quality: "epic" })));
     expect(only).toContain("No items match these filters.");
     expect(only).toContain('href="/database/items/armor/cloth?src=drop"');
@@ -258,6 +261,9 @@ test("items no source names are one line above the list, sort last when shown, a
     expect(list).toMatch(/Their names arrive from the addon (after launch on November 4, 2026|as players see them)\./);
     expect(list).toContain('href="/database/items/armor/cloth?unnamed=1"');
     expect(list).toContain(`>${"1"}</span> item`);
+    // One line holds what is held back, with a toggle for each part.
+    expect(list.match(/data-hidden-items/g)).toHaveLength(1);
+    expect(list).toContain(`Show ${(total - 1).toLocaleString("en-US")} unnamed items`);
     // Expanded: the named row first, then the ids with the placeholder tile; the view is its own URL, noindex.
     const open = await html(SubclassPage(sub("armor", "cloth", { unnamed: "1" })));
     expect(open.indexOf("Linen Cap")).toBeLessThan(open.indexOf(`>Item ${first}<`));

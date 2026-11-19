@@ -3,14 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AdSlot from "@/components/AdSlot";
 import JsonLd from "@/components/JsonLd";
-import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, type FilterControl } from "@/components/ui";
+import { Badge, Card, Container, DataTitle, FilterBar, ResultStrip, type FilterControl } from "@/components/ui";
 import { CHANGE_FILTERS, GAME_LABEL, TYPE_LABEL, filterTimeline, forumRegions, loadTimeline, parseFilter, postPath, type ChangeEntry, type ChangeFilter } from "@/lib/changes";
 import { latestBuildLine } from "@/lib/changes-facts";
 import { loadSiteAssets } from "@/lib/game-assets";
 import { changesJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import { mentionIndex, siteSpellNames } from "@/lib/spell-mentions";
-import { listHref, listQuery, nextSort, NoMatches, PER_PAGE, sortParam, type ListQuery, type Search } from "../database/list-parts";
+import { listHref, listQuery, NoMatches, PER_PAGE, sortParam, type ListQuery, type Search } from "../database/list-parts";
 import WithSpells from "./with-spells";
 
 export const metadata: Metadata = {
@@ -20,8 +20,6 @@ export const metadata: Metadata = {
 const TITLE = "Changes";
 const LEAD = "Blue posts, hotfixes and new game builds, newest first.";
 const LINK = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
-/** Blizzard's posts and hotfixes, never builds, in the blue of a blue post. */
-const BLUE = "text-blue-post hover:underline underline-offset-4";
 
 /** UTC to the minute, whatever offset the time was written with. */
 const stamp = (iso: string) => `${new Date(iso).toISOString().slice(0, 16).replace("T", " ")} UTC`;
@@ -106,72 +104,48 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
   const assets = await loadSiteAssets();
   const index = mentionIndex(assets, assets ? await siteSpellNames() : []);
 
-  const dash = <span className="text-muted">—</span>;
-  // Sorted by date, a day's date shows once, on its first row on this page (in the date column, or a phone's muted
-  // line); the rows under it keep it for screen readers.
-  const sameDayAsAbove = new Set(sort.key === "date" ? shown.filter((e, i) => i > 0 && e.at.slice(0, 10) === shown[i - 1].at.slice(0, 10)).map((e) => e.id) : []);
-  const titleLink = (e: ChangeEntry) => {
-    const page = postPath(e);
-    const title = page
-      ? <Link href={page} className={`${BLUE} font-medium`}>{e.title}</Link>
-      : e.source === "news" && e.url ? <a href={e.url} className={`${BLUE} font-medium`}>{e.title}</a>
-      : <span className="font-medium">{e.title}</span>;
-    return e.source === "manual" ? <>{title}<span className="block text-cell-2 text-muted">Summary by Everloot. {e.url && <a href={e.url} className={LINK}>Original source</a>}</span></> : title;
-  };
+  const typeLabel = (e: ChangeEntry) => e.source === "manual" && e.type === "post" ? "Post" : TYPE_LABEL[e.type];
   const isBluePost = (e: ChangeEntry) => e.type !== "build" && (e.source === "forum" || e.source === "news" || e.source === "bluesky");
-  const blueCard = (e: ChangeEntry) => (
-    <blockquote data-blue-card className="min-w-0 rounded-control border border-line border-l-4 border-l-blue-post bg-panel p-3 whitespace-normal">
-      {titleLink(e)}
-      {q.game === "all" && <span className="ml-2 text-cell-2 text-muted">{GAME_LABEL[e.game]}</span>}
-      <header className="my-2 flex flex-wrap items-center gap-2 text-cell-2">
-        {e.author && <Link href={here({ author: e.author })} title={e.role || undefined} className={BLUE}>{e.author}</Link>}
-        <span className="rounded-full border border-blue-post px-2 text-blue-post">Blizzard</span>
-        {e.role && <span className="text-fg-2">{e.role}</span>}
-        <span data-source-chip title={e.category || undefined} className="rounded-full border border-edge px-2 text-fg-2">{SOURCE_LABEL(e)}</span>
-      </header>
-      {(e.summary ?? e.excerpt) && <p className="text-cell text-blue-post [&_a]:text-blue-post"><WithSpells text={(e.summary ?? e.excerpt)!} index={index} /></p>}
-    </blockquote>
-  );
-  const columns: Column<ChangeEntry>[] = [
-    {
-      // On a phone this is the only column shown, so it carries the title and the muted line holds the date.
-      key: "date", header: "Date", sortable: true, nowrap: true, cell: (e) => (
-        <>
-          <time
-            dateTime={e.source === "manual" ? e.at.slice(0, 10) : e.at}
-            title={e.source === "manual" ? e.at.slice(0, 10) : e.type === "build" ? `${stamp(e.at)}, when Everloot first saw it` : stamp(e.at)}
-            className={sameDayAsAbove.has(e.id) ? "sr-only" : "hidden font-mono tabular-nums text-fg-2 sm:inline"}
-          >
-            {e.at.slice(0, 10)}
-          </time>
-          <div data-phone-title className="whitespace-normal py-1 sm:hidden">{isBluePost(e) ? blueCard(e) : titleLink(e)}{e.source === "manual" && e.summary && <span className="block text-cell-2 text-muted">{e.summary}</span>}</div>
-        </>
-      ),
-    },
-    // Plain mono, as on the home page: a pill on every row is noise (design system rule 8).
-    { key: "type", header: "Type", sortable: true, nowrap: true, cell: (e) => <span data-type className="font-mono text-xs text-muted">{e.source === "manual" && e.type === "post" ? "Post" : TYPE_LABEL[e.type]}</span> },
-    {
-      key: "title", header: "Title", sortable: true, cell: (e) => {
-        if (isBluePost(e)) return <div data-change-row data-blue-post="" className="min-w-0 py-1">{blueCard(e)}</div>;
-        const line = e.type === "build"
-          ? <>First seen by Everloot.{e.diffUrl && <> <a href={e.diffUrl} className={LINK}>See what changed</a></>}</>
-          : (e.summary ?? e.excerpt) && <WithSpells text={(e.summary ?? e.excerpt)!} index={index} />;
-        return (
-          <div data-change-row data-blue-post={postPath(e) ? "" : undefined} className="min-w-0 py-1">
-            {titleLink(e)}
-            {q.game === "all" && <span className="ml-2 text-cell-2 text-muted">{GAME_LABEL[e.game]}</span>}
-            {line && <p className="line-clamp-2 text-cell-2 text-muted">{line}</p>}
-          </div>
-        );
-      },
-    },
-    {
-      key: "author", header: "Author", sortable: true, nowrap: true, cell: (e) => e.author
-        ? <Link href={here({ author: e.author })} title={e.role || undefined} className={BLUE}>{e.author}</Link>
-        : dash,
-    },
-    { key: "source", header: "Where", sortable: true, nowrap: true, cell: (e) => SOURCE_LABEL(e) ? <span title={e.category || undefined} className="text-fg-2">{SOURCE_LABEL(e)}</span> : dash },
-  ];
+  // The title is the card's one link: a post's page on Everloot, a news article or an Everloot summary's original,
+  // and a build's diff when there is one.
+  const title = (e: ChangeEntry) => {
+    const target = postPath(e) ?? (e.type === "build" ? e.diffUrl : e.source === "news" || e.source === "manual" ? e.url : null) ?? null;
+    const style = `font-semibold ${isBluePost(e) ? "text-blue-post" : "text-fg"} [overflow-wrap:anywhere]`;
+    if (!target) return <span className={style}>{e.title}</span>;
+    return target.startsWith("/")
+      ? <Link href={target} className={`${style} hover:underline underline-offset-4`}>{e.title}</Link>
+      : <a href={target} className={`${style} hover:underline underline-offset-4`}>{e.title}</a>;
+  };
+  const excerpt = (e: ChangeEntry) => e.type === "build"
+    ? "First seen by Everloot."
+    : e.source === "manual"
+      ? <>Summary by Everloot{e.url ? "; the title links the original source" : ""}.{e.summary && <> {e.summary}</>}</>
+      : (e.summary ?? e.excerpt) && <WithSpells text={(e.summary ?? e.excerpt)!} index={index} />;
+  const card = (e: ChangeEntry) => {
+    const body = excerpt(e);
+    const byline = [e.author && (e.role ? `${e.author} (${e.role})` : e.author), SOURCE_LABEL(e)].filter(Boolean).join(" · ");
+    return (
+      <Card as="li" key={e.id} padding="none" className={`p-4${isBluePost(e) ? " border-l-4 border-l-blue-post" : ""}`}>
+        <div data-change-row data-blue-post={isBluePost(e) ? "" : undefined} className="min-w-0 space-y-1.5">
+          <p className="flex flex-wrap items-center gap-2 text-cell-2 text-fg-2">
+            <time
+              dateTime={e.source === "manual" ? e.at.slice(0, 10) : e.at}
+              title={e.source === "manual" ? e.at.slice(0, 10) : e.type === "build" ? `${stamp(e.at)}, when Everloot first saw it` : stamp(e.at)}
+              className="font-mono tabular-nums"
+            >
+              {e.at.slice(0, 10)}
+            </time>
+            <span data-type><Badge tone="neutral">{typeLabel(e)}</Badge></span>
+            {q.game === "all" && <span className="text-muted">{GAME_LABEL[e.game]}</span>}
+          </p>
+          <h2 className="text-base">{title(e)}</h2>
+          {byline && <p data-byline className="text-cell-2 text-fg-2">{byline}</p>}
+          {body && <p data-excerpt className="text-cell text-fg">{body}</p>}
+        </div>
+      </Card>
+    );
+  };
+  const sortOptions: [string, Sort, boolean][] = [["Newest first", "date", true], ["Oldest first", "date", false], ["Type", "type", false], ["Title", "title", false], ["Author", "author", false], ["Where", "source", false]];
 
   const count = (f: (e: ChangeEntry) => boolean) => scope.filter(f).length;
   // An announcement counts once for each person who posted a copy of it.
@@ -209,6 +183,13 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
         label: a, href: here({ author: a }), on: q.author === a, count: n,
       }))],
     },
+    {
+      type: "menu", key: "sort", label: "Sort",
+      options: sortOptions.map(([label, key, desc]) => ({
+        label, href: here({ sort: key === DEFAULT_SORT.key && desc === DEFAULT_SORT.desc ? undefined : { key, desc } }), on: sort.key === key && sort.desc === desc,
+        ...(key === DEFAULT_SORT.key && desc === DEFAULT_SORT.desc ? { reset: true } : {}),
+      })),
+    },
   ];
   const keep = Object.fromEntries(new URLSearchParams(href({ ...q, q: undefined, page: 1 }).split("?")[1] ?? ""));
   const strip = <ResultStrip total={rows.length} noun={rows.length === 1 ? "entry" : "entries"} page={q.page} perPage={PER_PAGE} href={(page) => href({ ...q, page })} label="Change pages" />;
@@ -241,17 +222,9 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
           clearHref="/changes"
         />
         <div className="mt-2">
-          <DataTable
-            dense
-            caption={`Changes, ${GAMES[q.game]}: ${rows.length}`}
-            columns={columns}
-            rows={shown}
-            rowKey={(e) => e.id}
-            sort={{ key: sort.key, direction: sort.desc ? "desc" : "asc" }}
-            sortHref={(k, d) => here({ sort: nextSort(k, d, DEFAULT_SORT) })}
-            meta={(e) => [sameDayAsAbove.has(e.id) ? undefined : e.at.slice(0, 10), e.source === "manual" && e.type === "post" ? "Post" : TYPE_LABEL[e.type], e.author, SOURCE_LABEL(e)].filter(Boolean).join(" · ")}
-            empty={empty}
-          />
+          {shown.length > 0
+            ? <ol data-change-feed aria-label={`Changes, ${GAMES[q.game]}: ${rows.length}`} className="max-w-3xl space-y-3">{shown.map(card)}</ol>
+            : empty}
         </div>
         {pages > 1 && <div className="mt-2">{strip}</div>}
         <AdSlot slot="inContent" />

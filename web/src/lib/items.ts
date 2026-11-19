@@ -58,7 +58,7 @@ export function developmentLeftovers(rows: readonly ItemRow[], name: (id: number
 
 /**
  * Whether a page of a category's plain list has enough names to be indexed. It reads the plain list's own
- * order (sortItems with no sort: named rows first, each part by id), so page `page` holds the named rows left
+ * order (sortItems with no sort: named rows first), so page `page` holds the named rows left
  * after the earlier pages, then unnamed ones. No row gets a name it does not have. `hidden` rows (the
  * development leftovers) are not in the plain list, so they are not counted.
  */
@@ -153,7 +153,7 @@ export interface CategoryQuery {
   dev?: boolean;
   /** List the items no source names ("Item N") too; a list folds them into one line unless asked. Also a view, not a filter. */
   unnamed?: boolean;
-  /** Absent: named items first, each part by id (sortItems). */
+  /** Absent: named items first, those players have seen leading, A to Z by name (sortItems). */
   sort?: { key: ItemSort; desc: boolean };
   page: number;
 }
@@ -298,11 +298,20 @@ export function listItems(base: readonly ItemRow[], q: CategoryQuery, ctx: ItemL
 
 /**
  * Text keys sort A to Z and levels low to high, with the rows that have none last, whichever way; ties go by id.
- * With no sort, items with a name the page shows come first, each part by id, so a list opens on real items
- * rather than "Item N"; `sort=id` is the plain id order. categoryNamedEnough reads this order.
+ * With no sort, items with a name the page shows come first, so a list opens on real items rather than "Item N":
+ * the named items players have seen, then the other named items, each A to Z by name; then the unnamed ones, seen
+ * first, by id. `sort=id` is the plain id order. categoryNamedEnough reads this order (only whether a row is named).
  */
 export function sortItems(rows: ItemRow[], sort: CategoryQuery["sort"], ctx: ItemListContext = {}): ItemRow[] {
-  if (!sort && ctx.name) return [...rows.filter((row) => ctx.name!(row[0]) !== undefined), ...rows.filter((row) => ctx.name!(row[0]) === undefined)];
+  if (!sort && ctx.name) {
+    const keyed = rows.map((row) => {
+      const name = ctx.name!(row[0]);
+      const seen = ctx.seen?.has(row[0]) ?? false;
+      return { row, name: name?.toLowerCase(), tier: (name === undefined ? 2 : 0) + (seen ? 0 : 1) };
+    });
+    keyed.sort((a, b) => a.tier - b.tier || (a.name !== undefined && b.name !== undefined ? a.name.localeCompare(b.name) : 0) || a.row[0] - b.row[0]);
+    return keyed.map((x) => x.row);
+  }
   if (!sort || sort.key === "id") return sort?.desc ? [...rows].sort((a, b) => b[0] - a[0]) : rows;
   const dir = sort.desc ? -1 : 1;
   const key = (row: ItemRow): string | number | null => {

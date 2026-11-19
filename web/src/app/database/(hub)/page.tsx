@@ -13,7 +13,7 @@ import { instanceRows } from "@/lib/instances";
 import { publicZones } from "@/lib/zones";
 import { terrainTypes } from "@/lib/terrain";
 import JsonLd from "@/components/JsonLd";
-import { AgreementMeter, Container, DataTitle, SearchBar } from "@/components/ui";
+import { AgreementMeter, Container, DataTitle, Disclosure, SearchBar } from "@/components/ui";
 import { asOfLine, EVIDENCE_KEY } from "@/lib/evidence";
 import { loadSpellNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
@@ -31,8 +31,27 @@ export const dynamic = "force-dynamic";
 
 const n = (x: number) => x.toLocaleString("en-US");
 
-/** One block of the browse index: a heading with its count, then its links, 13 px on 26 px lines. */
-function Block({ heading, href, count, note, links }: { heading: string; href?: string; count?: ReactNode; note?: ReactNode; links: { href: string; label: string; count?: ReactNode }[] }) {
+/** The types under a class heading, closed until asked for: "Cloth, Leather and 13 more". */
+const typesSummary = (links: { label: string }[]) =>
+  links.length <= 2 ? links.map((l) => l.label).join(" and ") : `${links.slice(0, 2).map((l) => l.label).join(", ")} and ${links.length - 2} more`;
+
+/**
+ * One block of the browse index: a heading with its count, then its links, 13 px on 26 px lines. `collapsed` keeps
+ * the links behind a Disclosure (a class's item types), so the index reads as one line per class.
+ */
+function Block({ heading, href, count, note, links, collapsed = false }: { heading: string; href?: string; count?: ReactNode; note?: ReactNode; links: { href: string; label: string; count?: ReactNode }[]; collapsed?: boolean }) {
+  const list = (
+    <ul className="mt-1">
+      {links.map((l) => (
+        <li key={l.href}>
+          <Link href={l.href} className="flex h-[26px] items-center justify-between gap-3 text-meta text-fg-2 hover:text-accent">
+            <span className="min-w-0 truncate">{l.label}</span>
+            {l.count !== undefined && <span className="shrink-0 tabular-nums text-muted">{l.count}</span>}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
   return (
     <section className="mb-6 break-inside-avoid">
       <h2 className="flex items-baseline justify-between gap-3 text-cell font-semibold text-fg">
@@ -40,18 +59,7 @@ function Block({ heading, href, count, note, links }: { heading: string; href?: 
         {count !== undefined && <span className="text-meta font-normal tabular-nums text-muted">{count}</span>}
       </h2>
       {note && <p className="mt-1 text-meta text-muted">{note}</p>}
-      {links.length > 0 && (
-        <ul className="mt-1">
-          {links.map((l) => (
-            <li key={l.href}>
-              <Link href={l.href} className="flex h-[26px] items-center justify-between gap-3 text-meta text-fg-2 hover:text-accent">
-                <span className="min-w-0 truncate">{l.label}</span>
-                {l.count !== undefined && <span className="shrink-0 tabular-nums text-muted">{l.count}</span>}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      {links.length > 0 && (collapsed ? <div className="mt-1"><Disclosure summary={typesSummary(links)}>{list}</Disclosure></div> : list)}
     </section>
   );
 }
@@ -131,6 +139,7 @@ export default async function DatabasePage() {
               href={itemsHref(c.slug)}
               count={n(c.items)}
               links={subclassLinks(c)}
+              collapsed
             />
           ))}
         </nav>
