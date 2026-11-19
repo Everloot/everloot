@@ -301,6 +301,12 @@ export const loadRealmPage = cache(async (slug: string): Promise<RealmPageData |
 
 /** The day raids open on Forever (UTC). Before it, while no raid has an agreed kill, the hub says when raid ranking starts. */
 export const RAIDS_OPEN_DAY = "2026-12-09";
+/** Said where the ladder will go once raids are open and nobody has an agreed kill yet. */
+export const START_LINE = "The ladder starts with the first kill two members report.";
+/** Before raids open, said in place of a raid ranking. Nothing is estimated in its place. */
+export const RAIDS_LINE = "Ranking starts when raids open on December 9.";
+/** Before any agreed kill and before raids open: one line where the ladder will go. */
+export const LADDER_LINE = "Progression ladders start December 9.";
 export const raidsOpen = (now: Date = new Date()): boolean => now.toISOString().slice(0, 10) >= RAIDS_OPEN_DAY;
 
 export interface LadderQuery { instance?: number; ruleset?: string; realm?: string; faction?: GuildFaction; page?: number }

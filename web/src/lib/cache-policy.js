@@ -61,14 +61,14 @@ const CACHE_POLICY = {
   lists: {
     maxAge: 300,
     staleWhileRevalidate: 3600,
-    reason: "The database index, lists, census and rankings render from the whole corpus; five minutes, so a page drawn while storage was unreachable heals soon.",
+    reason: "The database index, lists and census render from the whole corpus; five minutes, so a page drawn while storage was unreachable heals soon.",
     sources: [
       "/database",
       // A type's `:path*` source matches its list too; its detail pages take the entity row below, which comes later.
       ...["npcs", "quests", "objects", "vendors", "spells", "achievements", "titles", "factions", "quest-chains", "drops", "zones", "instances", "coverage"]
         .map((type) => `/database/${type}/:path*`),
       "/census",
-      "/rankings/:path*",
+      // /rankings is not here: its hub shows Blizzard's boards, so the tree is ad-free (data/ad-free-paths.json) and never shared.
     ],
     // Its one read is the public bulk bucket's manifest, which the page's fetch already keeps five minutes.
     pages: ["database/download"],

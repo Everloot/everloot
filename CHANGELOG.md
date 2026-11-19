@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: /rankings leads with the leaderboards: characters by item level, Gear Score and honorable kills, guilds by average item level and by raid progress in the newest raid, each a top 10 with a link to its full list and an All, US or EU tab in the URL; the census rankings follow under Who plays. The hub stays out of search engines while it shows Blizzard's boards, as every armory page does.
 - Site: the scheduled jobs can run in a Worker of their own (`everloot-cron`, same build, no routes), so the snapshot job no longer shares memory with page and MCP traffic; off until the maintainer deploys it and sets `EVERLOOT_CRON_WORKER` on the site (docs/OPERATIONS.md, "The cron Worker").
 - Site: armory character pages show the header with when the character was last read, and put gear, talents, stats, PvP, achievements, professions, reputations and quests in tabs; a tab with nothing stored says why in one sentence.
 - Site: chat answers read at 16 px with tables and code drawn, the first sentence as a summary line and the links next to each claim as source chips; a still skeleton shows until the first words arrive, a failed answer offers Retry, and an item card that cannot load says so after 10 seconds and links the item page.
@@ -409,6 +410,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Changed
 - Site: the search and the search box suggestions read the names they match from one small file the snapshot cron writes beside the aggregates (`snapshots/search-names.json`), so a fresh server instance no longer downloads and parses the whole aggregate set for a keystroke; without the file they read the aggregates as before.
+- Site: the phone menu's search box suggests pages as you type, the same field as the bar's, instead of a plain box with no suggestions.
 - Site: cards, icons and copy buttons look and behave the same everywhere; small corners, captions and line lengths follow the site's sizes.
 - Site: the Auction House, a realm's prices, Bag upgrades and Disenchanting open faster: the price boards are worked out once each time new scans come in, not again for every visit.
 - Site: the armory crawl fails its hourly job only when 3 Blizzard rows or 1% of the rows it read fail (fewer are deferred for 7 days and shown as a warning), still fails at once when storage refuses a row, and names the response field that broke, never the character.

@@ -3,7 +3,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/tools/raid", useRouter: () => ({ refresh: () => {} }) }));
+const nav = vi.hoisted(() => ({ path: "/tools/raid" }));
+vi.mock("next/navigation", () => ({ usePathname: () => nav.path, useRouter: () => ({ refresh: () => {} }) }));
 vi.mock("./AccountControls", () => ({ default: () => null }));
 vi.mock("next/link", () => ({
   default: ({ children, onClick, ...props }: { children: React.ReactNode; onClick?: () => void; href: string }) => (
@@ -40,6 +41,28 @@ test("the menu keeps both build links reachable below the desktop build chip bre
   expect(nav.className).toContain("xl:hidden");
   expect(nav.querySelector('a[href^="/changes?show=builds"]')).not.toBeNull();
   expect(nav.querySelector('a[title^="The newest WoW"]')).not.toBeNull();
+});
+
+test("the menu's search box is the same suggesting field as the bar's: a combobox over its own suggestion list, in a GET form", async () => {
+  const toggle = container.querySelector<HTMLButtonElement>('button[aria-controls="site-navigation"]')!;
+  await act(async () => toggle.click());
+  const field = container.querySelector<HTMLInputElement>("#site-navigation #menu-search")!;
+  expect(field).not.toBeNull();
+  expect(field.getAttribute("role")).toBe("combobox");
+  expect(field.getAttribute("aria-controls")).toBe("menu-search-suggestions");
+  expect(field.getAttribute("name")).toBe("q");
+  expect(field.closest("form")?.getAttribute("action")).toBe("/search");
+});
+
+test("a page change closes the open menu, so a suggestion picked in it never leaves the menu over the new page", async () => {
+  nav.path = "/tools/raid";
+  const toggle = container.querySelector<HTMLButtonElement>('button[aria-controls="site-navigation"]')!;
+  await act(async () => toggle.click());
+  expect(container.querySelector("#site-navigation")).not.toBeNull();
+  nav.path = "/database/npcs/448";
+  await act(async () => root.render(<Header />));
+  expect(container.querySelector("#site-navigation")).toBeNull();
+  nav.path = "/tools/raid";
 });
 
 test("Tools opens its menu and says so; opening another menu closes it", async () => {
