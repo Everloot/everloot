@@ -5,7 +5,7 @@ import type { TitleEntry } from "@kb/completion";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
 import { loadCatalog, titleDisplayName, titleHref, type Listed } from "@/lib/completion-lists";
 import { LINK } from "../entity";
-import {
+import { byRank, nameMatches, Respelled,
   confirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, nextSort, NoMatches, noneListed, NoObservations, PER_PAGE,
   sortParam, sortRows, Unreadable, type ListQuery, type Search,
 } from "../list-parts";
@@ -34,9 +34,10 @@ export default async function TitleListPage(props: { searchParams?: Promise<Sear
   const confirmations = catalog?.confirmations ?? false;
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
-  const matched = all.filter((x) => !text || (id !== null ? x.titleId === id : x.name.toLowerCase().includes(text)));
+  const { ranked, respelled } = nameMatches(all, text, id, (x) => x.name);
+  const matched = all.filter((x) => !text || (id !== null ? x.titleId === id : ranked!.has(x)));
   const sort = q.sort ?? DEFAULT_SORT;
-  const rows = sortRows(matched, (x) => (sort.key === "name" ? x.name.toLowerCase() : x.titleId), sort.desc, (x) => x.titleId);
+  const rows = byRank(sortRows(matched, (x) => (sort.key === "name" ? x.name.toLowerCase() : x.titleId), sort.desc, (x) => x.titleId), ranked, Boolean(q.sort));
   const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
   if (q.page > pages) notFound();
   const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
@@ -66,6 +67,7 @@ export default async function TitleListPage(props: { searchParams?: Promise<Sear
           active={q.q ? 1 : 0}
           clearHref="/database/titles"
         />
+        {respelled && rows.length > 0 && <Respelled q={respelled} />}
         <div className="mt-2">
           <DataTable
             dense

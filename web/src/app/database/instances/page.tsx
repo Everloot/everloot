@@ -12,7 +12,7 @@ import EdgeDegraded from "@/components/EdgeDegraded";
 import { wikiHref } from "@/lib/wiki";
 import { prepPages } from "@/lib/wiki-dungeon";
 import { zoneHref } from "@/lib/zones";
-import { listHref, listMetadata, listQuery, nextSort, NoMatches, PER_PAGE, sortParam, sortRows, type ListQuery, type Search } from "../list-parts";
+import { byRank, nameMatches, Respelled, listHref, listMetadata, listQuery, nextSort, NoMatches, PER_PAGE, sortParam, sortRows, type ListQuery, type Search } from "../list-parts";
 
 export const dynamic = "force-dynamic";
 
@@ -48,12 +48,13 @@ export default async function InstancesPage(props: { searchParams?: Promise<Sear
   // The box takes a name or an id: an instance with no name yet is found by its number.
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
-  const matched = all.filter((r) => !text || (id !== null ? r.instanceMapId === id : Boolean(r.name?.toLowerCase().includes(text))));
+  const { ranked, respelled } = nameMatches(all, text, id, (r) => r.name);
+  const matched = all.filter((r) => !text || (id !== null ? r.instanceMapId === id : ranked!.has(r)));
   const sort = q.sort ?? DEFAULT_SORT;
   // The plain list keeps its own order (level, then name); a level sorts by its low end, then its high end.
   const key = (r: InstanceRow): string | number | null => sort.key === "name" ? r.name?.toLowerCase() ?? null
     : sort.key === "type" ? (r.raid === null ? null : r.raid ? "raid" : "dungeon") : r.level ? r.level.min * 1000 + r.level.max : null;
-  const rows = q.sort ? sortRows(matched, key, sort.desc, (r) => r.instanceMapId) : matched.sort(compareInstances);
+  const rows = byRank(q.sort ? sortRows(matched, key, sort.desc, (r) => r.instanceMapId) : matched.sort(compareInstances), ranked, Boolean(q.sort));
   const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
   if (q.page > pages) notFound();
   const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
@@ -117,6 +118,7 @@ export default async function InstancesPage(props: { searchParams?: Promise<Sear
           active={q.q ? 1 : 0}
           clearHref={META.path}
         />
+        {respelled && rows.length > 0 && <Respelled q={respelled} />}
         <div className="mt-2">
           <DataTable
             dense
