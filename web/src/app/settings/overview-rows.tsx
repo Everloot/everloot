@@ -10,7 +10,7 @@ const count = (n: number) => n.toLocaleString("en-US");
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
 
 /**
- * The overview on /account: one dense list of what the account has. Rows behind a switch that is off are left
+ * The overview at the top of /settings: one dense list of what the account has. Rows behind a switch that is off are left
  * out; with no overview (storage trouble) only the sign-in rows and the Desktop App links show.
  */
 export default function OverviewRows({ name, methods, overview }: { name: string; methods: string[]; overview: AccountOverview | null }) {

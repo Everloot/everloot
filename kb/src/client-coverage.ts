@@ -93,7 +93,7 @@ export const NEEDED_FIELDS: Partial<Record<keyof typeof CLIENT_TABLES, readonly 
   Achievement: ["Title_lang", "Category", "Points", "IconFileID", "Flags"],
   Achievement_Category: ["Name_lang", "Parent"],
   CurrencyCategory: ["Name_lang"],
-  TaxiNodes: ["Name_lang", "Pos", "ContinentID"],
+  TaxiNodes: ["Name_lang", "Pos", "ContinentID", "Flags"],
   TaxiPath: ["FromTaxiNode", "ToTaxiNode", "Cost"],
   TaxiPathNode: ["PathID", "NodeIndex", "Loc", "ContinentID"],
   CreatureDifficulty: ["CreatureID", "MinLevel", "MaxLevel"],

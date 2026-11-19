@@ -25,7 +25,7 @@ export default function Composer(p: {
   busy: boolean;
   providers: SavedProvider[];
   onPickModel: (kind: SavedProvider["kind"], model: string) => void;
-  /** Where to set keys up: /account#chat-keys, through sign-in when signed out. */
+  /** Where to set keys up: /settings#chat-keys, through sign-in when signed out. */
   keysHref: string;
   signed: boolean | null;
   /** The free model's providers, in the order they are tried; empty while it is off. `mode` is what Send uses without a key. */

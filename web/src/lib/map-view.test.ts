@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   allCategories, candidateCounts, categoryCounts, CATEGORY_GROUPS, CATEGORY_IDS, continentFromSlug, continentPath, DEFAULT_CATEGORIES, DEFAULT_SPOILERS,
   DEFAULT_URL_STATE, initialView, labelFontPx, mapHref, mapUrlSearch, openPageLink, parseDeepLink, parseMapUrl, parseViewState, parseZoneLink, pinHref,
-  placeLabels, readPinSet, searchMap, showParam, SPOT_SPAN, spotBox, viewSearch, visibleItems, wayCommand, zoneHref, zoneSearch, zoneSpot,
+  placeLabels, readPinSet, searchMap, servesSide, showParam, SPOT_SPAN, spotBox, viewSearch, visibleItems, wayCommand, zoneHref, zoneSearch, zoneSpot,
   type CategoryState, type MapItems, type MapUrlState,
 } from "./map-view";
 
@@ -47,6 +47,23 @@ describe("categories and the spoiler switch", () => {
     expect(shown.pins.map((p) => p.id)).toEqual(["n1", "n2", "v1"]);
     expect(shown.flightMasters).toHaveLength(2);
     expect(shown.flightLines).toHaveLength(2);
+  });
+
+  test("one side's flights: its own, the neutral ones and those the files give no side; counts follow", () => {
+    const sided: MapItems = {
+      ...items,
+      flightMasters: [
+        { id: "a", name: "A", x: 1, y: 1, heldBack: false, faction: "alliance" }, { id: "h", name: "H", x: 2, y: 2, heldBack: false, faction: "horde" },
+        { id: "n", name: "N", x: 3, y: 3, heldBack: false, faction: "both" }, { id: "u", name: "U", x: 4, y: 4, heldBack: false },
+      ],
+      flightLines: [{ id: "ah", from: "a", to: "h", points: [[1, 1], [2, 2]], heldBack: false, faction: "horde" }],
+    };
+    expect(visibleItems(sided, DEFAULT_CATEGORIES, false, "alliance").flightMasters.map((f) => f.id)).toEqual(["a", "n", "u"]);
+    expect(visibleItems(sided, DEFAULT_CATEGORIES, false, "alliance").flightLines).toEqual([]);
+    expect(visibleItems(sided, DEFAULT_CATEGORIES, false, "horde").flightLines.map((l) => l.id)).toEqual(["ah"]);
+    expect(visibleItems(sided, DEFAULT_CATEGORIES, false).flightMasters).toHaveLength(4);
+    expect(categoryCounts(sided, false, null, "horde").flight).toBe(3);
+    expect([servesSide("horde", "alliance"), servesSide(undefined, "horde"), servesSide("both", "alliance")]).toEqual([false, true, true]);
   });
 
   test("each category toggles on its own; dungeon and raid entrances apart", () => {
@@ -256,7 +273,7 @@ describe("links", () => {
 describe("the sidebar in the address: show, q, view", () => {
   const read = (search: string) => {
     const q = new URLSearchParams(search);
-    return parseMapUrl({ show: q.get("show") ?? undefined, q: q.get("q") ?? undefined, view: q.get("view") ?? undefined });
+    return parseMapUrl({ show: q.get("show") ?? undefined, q: q.get("q") ?? undefined, view: q.get("view") ?? undefined, side: q.get("side") ?? undefined });
   };
   const only = (...ids: (keyof CategoryState)[]) => Object.fromEntries(CATEGORY_IDS.map((id) => [id, ids.includes(id)])) as CategoryState;
 
@@ -273,8 +290,15 @@ describe("the sidebar in the address: show, q, view", () => {
       { show: DEFAULT_CATEGORIES, q: "", tab: "list" },
       { show: only("zone"), q: "ragefire chasm", tab: "list" },
       { show: { ...DEFAULT_CATEGORIES, path: false }, q: "", tab: "categories" },
+      { show: DEFAULT_CATEGORIES, q: "", tab: "categories", side: "alliance" },
+      { show: only("flight"), q: "", tab: "list", side: "horde" },
     ];
     for (const s of states) expect(read(mapUrlSearch(new URLSearchParams("zone=1411&spoilers=1"), s).toString()), JSON.stringify(s)).toEqual(s);
+  });
+
+  test("side is written only for one side; both, or an unknown value, leaves no trace", () => {
+    expect(mapUrlSearch(new URLSearchParams("side=horde"), { ...DEFAULT_URL_STATE, side: "both" }).toString()).toBe("");
+    expect(read("side=goblin")).toEqual(DEFAULT_URL_STATE);
   });
 
   test("show is written in the sidebar's order, as none when nothing is on, and not at all when everything is", () => {

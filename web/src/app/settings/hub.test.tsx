@@ -22,14 +22,14 @@ test("every hub page gets the site's page header and one tab row, its own tab ma
   expect(html).toContain("data-page-header");
   expect(html).toContain(">My builds</h1>");
   expect(html).toContain('aria-label="Your Everloot"');
-  expect(tabs(html)).toEqual(["/account", "/settings", "/me", "/tools/builds", "/tools/alts", "/upload"]);
+  expect(tabs(html)).toEqual(["/settings", "/me", "/tools/builds", "/tools/alts", "/upload"]);
   expect(html.match(/aria-current="page"/g)).toHaveLength(1);
   expect(html).toMatch(/<a href="\/me"[^>]*aria-current="page"/);
 });
 
-test("pages behind a switch that is off are left out of the tabs", () => {
-  const html = renderToStaticMarkup(<YourEverlootHeader current="/account" title="Your account" />);
-  expect(tabs(html)).toEqual(["/account", "/tools/builds", "/tools/alts", "/upload"]);
+test("pages behind a switch that is off are left out of the tabs; Settings, which holds the account, is always first", () => {
+  const html = renderToStaticMarkup(<YourEverlootHeader current="/settings" title="Settings" />);
+  expect(tabs(html)).toEqual(["/settings", "/tools/builds", "/tools/alts", "/upload"]);
 });
 
 test("linked logins show their provider's logo; Battle.net and email keep letters", () => {
