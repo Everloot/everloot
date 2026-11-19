@@ -16,6 +16,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Added
 - Site: /players lists Blizzard profiles before a name is typed, with class, race, faction, region, ruleset, level and guild filters, gear sorting and 25 profiles per page; name searches still show addon sightings and hide links.
+- Site: each realm's Auction House page links a Market changes view (`/tools/auctions/<realm>/changes`): for one house, the week's risers and fallers by market value on solid days (up to 25 each, with from and to values, the days compared, units listed and reporters), then the items with no comparison and why (new, thin, trimmed, stale, no baseline); it reads the stored boards only and says so when they are unavailable.
 - Addon: a flight path bar traces the trip with your portrait, a mount icon and the Everloot crest; confirmed arrivals teach a local estimate for the next flight, and /everloot flight on|off controls it.
 - Addon: crafting cost rows show scan price direction and tiny price bars; hover for listed-unit changes, elapsed scan time, the 60-day median comparison and price swing, never estimated sales.
 - Addon: while a scan runs, a bar across the top of the auction tab says what the scan is doing and how far it is: waiting for the house's listings, with the seconds and the most the scan allows, reading the listings, reading again the ones whose items had not loaded, or sampling search prices. It shows on the shopping page too and goes when the scan reports.

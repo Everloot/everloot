@@ -250,5 +250,14 @@ export async function loadMarketBoards(market: Market, now: Date = new Date(), d
   return kept?.file && kept.view && fileIsCurrent(kept.file, market, now) ? kept.view : liveBoards(market.state, now);
 }
 
+/**
+ * The stored file's boards alone, for a page that must never build the boards on request (the Market changes view):
+ * null without a rollup or a current file, and the page then says the boards are unavailable.
+ */
+export async function storedMarketBoards(market: Market, now: Date = new Date(), deps: { cloud?: R2Config | null; fetch?: typeof fetch; clock?: () => number } = {}): Promise<MarketBoards | null> {
+  const view = await loadMarketBoards(market, now, deps);
+  return view?.source === "file" ? view : null;
+}
+
 /** For tests: forget the kept file. */
 export const forgetMarketBoards = () => { kept = null; pending = null; };
