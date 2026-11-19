@@ -245,6 +245,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
 
 ### Fixed
+- Site: public drop sources can carry a name from two installs that report exactly the same name, when none disagree; rates still require three installs.
+- Addon: drop tooltips say "an unnamed object" or "an unnamed NPC" when no source name is known; chat keeps the source id for debugging.
 - Site: empty NPC, vendor, quest and object tabs all say what would fill them (3 installs agreeing), in one shared set of sentences, and the vendors list says a vendor is listed once 3 installs agree on an item and its price.
 - Site: the public MCP, /api/tools and the changes pages hold one copy of the uploads and the patch-notes timeline per server instance instead of one per request, which ran the site out of memory and answered 503; the MCP coverage tool says "not measured yet" when no stored score can be read instead of working it out from every report.
 - Site: the coverage pages (/database/coverage and each zone's) show the score and plateau the data update stores, instead of working them out from every report on each visit, which could make the page fail to load. Until the next data update stores the plateau, the page says it is not measured yet.
