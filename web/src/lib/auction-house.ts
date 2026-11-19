@@ -1,8 +1,8 @@
 import { AUCTION_HOUSES, type AuctionHouse } from "@everloot/protocol";
 import { AUCTION_AGREEMENT } from "@kb/auction-history";
 import {
-  MARKET_LIMITS, TRIM_FACTOR, TRIM_MIN_DAYS, agreed, formatCopper, houseKey, itemListings, itemMarket, parseHouse, realmName, validRealm,
-  type ItemDays, type MarketState, type MarketValue, type PublicDay, type RealmDays,
+  MARKET_LIMITS, agreed, formatCopper, houseKey, itemListings, itemMarket, marketUpdatedAt, parseHouse, priceMoveOf, realmName, solidDays, validRealm,
+  type ItemDays, type MarketState, type MarketValue, type MoveSpan, type PublicDay, type RealmDays,
 } from "@kb/market";
 import { AFTER_LAUNCH, DEFAULT_RULESET, RULESET_SLUGS, inRegion, isRulesetSlug, mappedRulesets, realmInfo, realmRuleset, rulesetFromName, type RegionFilter, type RulesetSlug } from "./realms";
 
@@ -124,11 +124,7 @@ function realmOf(state: MarketState, key: string, stored: RealmDays): RealmRef |
 function itemRow(state: MarketState, realm: RealmRef, house: AuctionHouse, itemId: number, days: ItemDays, now: Date): MarketRow | null {
   const { value, points } = itemMarket(state, realm.key, itemId, now, house);
   if (!value) return null;
-  let updatedAt: number | null = null;
-  for (const installs of Object.values(days.open)) {
-    if (!agreed([...groupsOf(installs)])) continue;
-    for (const scan of Object.values(installs)) updatedAt = Math.max(updatedAt ?? 0, scan[4]);
-  }
+  const updatedAt = marketUpdatedAt(days, now);
   const listings = itemListings(state, realm.key, itemId, now, house)[value.day] ?? null;
   return { realm, house, value, points, listings, updatedAt };
 }
@@ -373,17 +369,10 @@ export function sitemapPaths(boards: RealmBoard[]): string[] {
   return [...realms, ...items, ...[...cross].sort((a, b) => a - b).map(crossRealmHref)];
 }
 
-/** Public days that can carry a move: not thin, and not an outlier the market value trims. */
-export function solidDays(points: PublicDay[]): PublicDay[] {
-  const solid = points.filter((p) => !p.thin);
-  if (solid.length < TRIM_MIN_DAYS) return solid;
-  const sorted = solid.map((p) => p.market).sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  const historical = sorted.length % 2 ? sorted[mid]! : Math.round((sorted[mid - 1]! + sorted[mid]!) / 2);
-  return solid.filter((p) => p.market <= historical * TRIM_FACTOR && p.market * TRIM_FACTOR >= historical);
-}
+/** Public days that can carry a move: not thin, and not an outlier the market value trims (kb/src/market.ts, the one trim). */
+export { solidDays };
 
-export type MoveSpan = 1 | 7;
+export type { MoveSpan };
 
 export interface Move {
   row: MarketRow;
@@ -394,18 +383,13 @@ export interface Move {
 }
 
 /**
- * The market value's move over a day or a week: the newest solid day (today or yesterday) against the
- * solid day `span` days before it (a week allows up to three days earlier, as scans are not daily).
+ * The market value's move over a day or a week, by the rule the price file's `change1d` uses (kb/src/market.ts):
+ * the newest solid day (today or yesterday) against the solid day `span` days before it. A value that did not
+ * move is no move for the boards: null, as without a pair.
  */
 export function priceMove(row: MarketRow, span: MoveSpan, now: Date): Move | null {
-  const solid = solidDays(row.points);
-  const to = solid.at(-1);
-  if (!to || todayNumber(now) - dayNumber(to.day) > 1) return null;
-  const target = dayNumber(to.day) - span;
-  const slack = span === 1 ? 0 : 3;
-  const from = [...solid].reverse().find((p) => dayNumber(p.day) <= target && dayNumber(p.day) >= target - slack);
-  if (!from || from.market <= 0 || from.market === to.market) return null;
-  return { row, from, to, change: (to.market - from.market) / from.market };
+  const move = priceMoveOf(row.points, span, now);
+  return move && move.change !== 0 ? { row, ...move } : null;
 }
 
 export const SPARK_DAYS = 14;

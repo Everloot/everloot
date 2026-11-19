@@ -382,6 +382,16 @@ test("an unreadable rollup is unavailable, not zero", async () => {
   }
 });
 
+test("an item page says what its values rest on: the public days counted, never a 60-day history", async () => {
+  // Forever's Horde house holds 2589 on two days, today and three days ago, both solid.
+  const html = text(renderToStaticMarkup(await RealmItemPage(item("forever", "2589"))));
+  expect(html).toContain("Historical is the median of 2 public days in the last 60; market value from 2 solid days in the last 14.");
+  expect(html).not.toContain("Everloot's own scans only");
+  // An item whose only day is past the market window: a historical with no solid day in 14.
+  const old = text(renderToStaticMarkup(await RealmItemPage(item("forever", "4306"))));
+  expect(old).toContain("Historical is the median of 1 public day in the last 60; market value unrecorded (no solid public day in the last 14).");
+});
+
 test("item prices show one-day and seven-day moves from solid days", async () => {
   const html = text(renderToStaticMarkup(await RealmItemPage(item("forever", "765"))));
   expect(html).toContain("1-day change+10%");

@@ -7,7 +7,7 @@ import { completionProgress, type CompletionFacts } from "../src/completion.js";
 import { openDb, type DB } from "../src/db.js";
 import { entityRelationsStructured, observedEdgesFromRecords } from "../src/edges.js";
 import { CLIENT_EDGES } from "../src/client-layer-file.js";
-import { emptyMarket, foldMarket, itemMarket } from "../src/market.js";
+import { emptyMarket, foldMarket, itemMarket, marketCoverage } from "../src/market.js";
 import { COMPLETION_UNSET, createKnowledgeServer, MARKET_UNSET } from "../src/mcp-server.js";
 import { professionPath } from "../src/profession-path.js";
 import { pathFactsFromRecords, recipeFactsFromRecords, recipeThresholdsStructured } from "../src/recipe-thresholds.js";
@@ -139,7 +139,10 @@ test("completion_progress and market_value answer from their own loaders, and sa
   const market = OUT.market_value.parse(marketResult.structuredContent);
   // The page carries one house's value (the busiest); these scans read the Alliance house.
   const expected = itemMarket(state, "Forever", 2589, now, "Alliance");
-  expect(market).toEqual({ connected: true, dataAsOf: AS_OF, url: "https://everloot.app/tools/auctions?realm=Forever&item=2589", page: { realm: "Forever", house: { realm: "Forever", faction: "Alliance" }, itemId: 2589, value: expected.value, history: expected.points, realmStatus: "exact" } });
+  // The value carries what it rests on: here one public day, solid, from 3 reporters.
+  const value = { ...expected.value, coverage: marketCoverage(expected.points, now) };
+  expect(market).toEqual({ connected: true, dataAsOf: AS_OF, url: "https://everloot.app/tools/auctions?realm=Forever&item=2589", page: { realm: "Forever", house: { realm: "Forever", faction: "Alliance" }, itemId: 2589, value, history: expected.points, realmStatus: "exact" } });
+  expect(value.coverage).toEqual({ solidDays14: 1, days60: 1, thinDays: 0, trimmedDays: 0, newestDay: now.toISOString().slice(0, 10), trustedOnly: false });
   expect(market.page!.value).toMatchObject({ itemId: 2589, market: 110, reporters: 3 });
   expect(JSON.stringify(marketResult.content)).toContain("More: https://everloot.app/tools/auctions?realm=Forever&item=2589");
   // An item nobody scanned has an empty price page: no link.
