@@ -1,18 +1,10 @@
 import { useRef } from "react";
 import { answerOrigin, NO_SOURCED_ANSWER, sourceLink } from "@/lib/chat/agent";
 import type { ChatMessage } from "@/lib/chat/store";
+import AnswerText, { pageKind, pagePath } from "./AnswerText";
 import ItemResult from "./ItemResult";
 
-/** An everloot.app page as its path, which says what it is: /database/item/2589. */
-const pagePath = (url: string) => url.replace(/^https:\/\/(?:www\.)?everloot\.app/, "") || "/";
-
-const KINDS: [RegExp, string][] = [
-  [/^\/database\/items?\//, "Item"], [/^\/database\/npcs?\//, "NPC"], [/^\/database\/quests?\//, "Quest"],
-  [/^\/database\/objects?\//, "Object"], [/^\/database\/spells?\//, "Spell"], [/^\/database\/zones?\//, "Zone"],
-  [/^\/lore\//, "Lore"], [/^\/changes(?:\/|$)/, "Change"], [/^\/tools\//, "Tool"],
-];
-/** What an Everloot page is, from its path: Item, NPC, Quest… */
-export const pageKind = (path: string) => KINDS.find(([re]) => re.test(path))?.[1] ?? "Page";
+export { pageKind } from "./AnswerText";
 
 const card = "flex min-h-11 min-w-0 flex-col justify-center rounded-control border border-line bg-panel px-3 py-1.5 transition-colors hover:border-accent";
 
@@ -51,7 +43,12 @@ export function AssistantMessage({ m, copied, onCopy, onChoose = () => {}, onSav
   });
   return (
     <div className="space-y-2">
-      <div ref={body} className="whitespace-pre-wrap break-words leading-7 text-fg">{shownText(m)}</div>
+      {/* A model's answer is drawn as Markdown with its first sentence as the summary; search hits stay as written. */}
+      <div ref={body}>
+        {m.model
+          ? <AnswerText text={m.text} summary />
+          : <div className="whitespace-pre-wrap break-words text-base leading-[1.6] text-fg">{shownText(m)}</div>}
+      </div>
       {m.item && <ItemResult item={m.item} onChoose={onChoose} onSave={onSaveItem} />}
       {everloot && (
         <div className="space-y-2 text-xs text-fg-2">
