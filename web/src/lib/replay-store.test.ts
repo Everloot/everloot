@@ -25,20 +25,23 @@ const cloud: CloudConfig = { r2AccountId: "acct", r2AccessKeyId: "key", r2Secret
 function fixture() {
   const objects = new Map<string, string>();
   const index: {id: string; object_key: string; received_at: string}[] = [];
+  const revisions = new Map<string, number>();
   let revision = 0;
   const fetcher = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const req = new Request(input, init);
     if (req.url.startsWith("https://db.test")) return Response.json(index);
     const key = new URL(req.url).pathname.replace("/bucket/", "");
     if (req.method === "GET") return objects.has(key)
-      ? new Response(objects.get(key), { headers: { etag: `"${revision}"` } })
+      ? new Response(objects.get(key), { headers: { etag: `"${revisions.get(key)}"` } })
       : new Response(null, { status: 404 });
+    if (req.method === "DELETE") { objects.delete(key); return new Response(null, { status: 204 }); }
     // As R2 does, the precondition and the write are one step: the body is read first, so no await falls between
-    // them and two writers cannot both pass the check before either stores.
+    // them and two writers cannot both pass the check before either stores. A write with no precondition always lands.
     const body = await req.text();
-    if (req.headers.get("if-match") !== (objects.has(key) ? `"${revision}"` : null) ||
-        (!objects.has(key) && req.headers.get("if-none-match") !== "*")) return new Response(null, { status: 412 });
-    objects.set(key, body); revision++;
+    const conditional = req.headers.has("if-match") || req.headers.has("if-none-match");
+    if (conditional && (req.headers.get("if-match") !== (objects.has(key) ? `"${revisions.get(key)}"` : null) ||
+        (!objects.has(key) && req.headers.get("if-none-match") !== "*"))) return new Response(null, { status: 412 });
+    objects.set(key, body); revisions.set(key, ++revision);
     return new Response(null, { status: 200 });
   }) as typeof fetch;
   const add = (id: string, records = [row()]) => {
@@ -54,12 +57,18 @@ test("incremental snapshot, conflict replay and full rebuild have identical even
   f.add("b", [row(), row("epoch:2")]); await store.writeSnapshot();
   f.add("c", [row("epoch:1", 9)]); await store.writeSnapshot();
   f.add("d"); await store.writeSnapshot();
-  const before = JSON.parse(f.objects.get("snapshots/corpus.json")!);
-  expect(before.records).toEqual([]);
-  expect(before.corpusState.events.map((e: { record: unknown }) => e.record)).toEqual([row("epoch:2")]);
+  // The stored state: the part list's state with the events of its parts.
+  const stored = () => {
+    const list = JSON.parse(f.objects.get("snapshots/corpus.json")!);
+    expect(list.format).toBe(2);
+    expect(list.records).toBeUndefined();
+    return { ...list.state, events: list.parts.flatMap((key: string) => JSON.parse(f.objects.get(key)!)) };
+  };
+  const before = stored();
+  expect(before.events.map((e: { record: unknown }) => e.record)).toEqual([row("epoch:2")]);
   expect((await store.loadCorpus()).records).toEqual([row("epoch:2")]);
   await store.writeSnapshot({ rebuild: true });
-  expect(JSON.parse(f.objects.get("snapshots/corpus.json")!).corpusState).toEqual(before.corpusState);
+  expect(stored()).toEqual(before);
 });
 test("concurrent snapshot writers cannot overwrite each other's conflict state", async () => {
   const f = fixture(); f.add("a");

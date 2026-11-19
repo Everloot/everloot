@@ -17,8 +17,8 @@ import type { PublicationState } from "@kb/publication";
  * Where uploads and waitlist signups live.
  * Cloud: the raw upload is an R2 object (cheap, the record of truth) and Supabase holds one index
  * row per upload plus the waitlist. Every rollup can be rebuilt from the R2 objects.
- * Pages read one snapshot object (`snapshots/corpus.json`) that a cron job extends with only the
- * uploads it has not seen yet. With no snapshot they fall back to reading every indexed object.
+ * Pages read one snapshot (`snapshots/corpus.json`, which lists its parts under `snapshots/corpus/`) that a cron
+ * job extends with only the uploads it has not seen yet. With no snapshot they fall back to reading every indexed object.
  * Full auction scans skip the corpus: the same cron folds them into `snapshots/market.json`
  * (kb/src/market.ts), which the market page, API and MCP tool read.
  * Local (no cloud variables, i.e. dev): the same files under web/data, as before.
@@ -68,6 +68,9 @@ interface Snapshot extends Corpus {
   corpusState?: CorpusState;
   seenUploadIds?: string[];
   etag?: string;
+  /** Format 2: the part objects that hold the events, and the previous write's, deleted by the write after next. */
+  parts?: string[];
+  retired?: string[];
   generatedAt: string;
   /** received_at of the newest upload included, and the ids sharing it, so ties are not re-read. */
   lastReceivedAt: string | null;
@@ -200,6 +203,13 @@ const MARKET_STALE_MS = 60 * 60_000;
 const MARKET_RETRY_MS = 30_000;
 const SNAPSHOT_KEY = "snapshots/corpus.json";
 /**
+ * The snapshot's events are stored in parts under this prefix, one folder per write, and SNAPSHOT_KEY lists them
+ * (format 2). Read whole, the 31 MB file (2026-11-19) was a 59 MB string beside its 48 MB of parsed events, past the
+ * Worker's 128 MB before any work began (#1354). A part holds at most SNAPSHOT_PART_CHARS of JSON.
+ */
+const SNAPSHOT_PARTS_PREFIX = "snapshots/corpus/";
+const SNAPSHOT_PART_CHARS = 2_000_000;
+/**
  * While one request of an instance reads a newer corpus, the others answer from the copy it already holds instead of
  * parsing a second one beside it (#1354). Past this long the read is taken for lost (a cancelled request) and the next
  * caller reads again.
@@ -210,6 +220,31 @@ const COMPLETION_KEY = "snapshots/completion.json";
 const CENSUS_KEY = "snapshots/census.json";
 /** A rebuild is folded here over several runs and swapped into COMPLETION_KEY when done, so pages never read a partial one. */
 const COMPLETION_REBUILD_KEY = "snapshots/completion-rebuild.json";
+
+/**
+ * The snapshot's events as part bodies, each a JSON array of at most `maxChars` (a single larger event gets a part of
+ * its own). Strings are built one part at a time, so the whole corpus is never one string.
+ */
+export function* snapshotParts(events: readonly unknown[], maxChars = SNAPSHOT_PART_CHARS): Generator<string> {
+  let chunk: string[] = [];
+  let size = 2;
+  for (const event of events) {
+    const text = JSON.stringify(event);
+    if (chunk.length && size + text.length + 1 > maxChars) {
+      yield `[${chunk.join(",")}]`;
+      chunk = [];
+      size = 2;
+    }
+    chunk.push(text);
+    size += text.length + 1;
+  }
+  if (chunk.length) yield `[${chunk.join(",")}]`;
+}
+
+/** The folder one snapshot write puts its parts in: its time and a random suffix, so two racing writes never share one. */
+export function snapshotPartsFolder(generatedAt: string): string {
+  return `${SNAPSHOT_PARTS_PREFIX}${generatedAt.replace(/[^0-9TZ]/g, "")}-${crypto.randomUUID().slice(0, 8)}/`;
+}
 
 function rawRecordsOf(payload: unknown): unknown[] {
   const records = (payload as { records?: unknown })?.records;
@@ -894,11 +929,26 @@ export function createUploadStore(opts: {
     if (etag && res.status === 304) return "unchanged";
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`snapshot read failed (${res.status})`);
-    let parsed: Partial<Snapshot>;
+    let parsed: Partial<Snapshot> & { format?: unknown; state?: Omit<CorpusState, "events"> };
     try {
-      parsed = JSON.parse(await res.text()) as Partial<Snapshot>;
+      parsed = JSON.parse(await res.text()) as typeof parsed;
     } catch {
       throw new Error("snapshot is not JSON");
+    }
+    if (parsed.format === 2) {
+      // The events come from the parts, one at a time, so no string larger than a part is ever held.
+      if (!Array.isArray(parsed.parts) || !parsed.parts.every((k) => typeof k === "string" && k.startsWith(SNAPSHOT_PARTS_PREFIX)) ||
+          typeof parsed.state !== "object" || parsed.state === null) throw new Error("snapshot part list is invalid");
+      const events: CorpusState["events"] = [];
+      for (const key of parsed.parts) {
+        const part = await r2Fetch(key, { method: "GET", headers: { "accept-encoding": "identity" } });
+        if (!part.ok) throw new Error(`snapshot part read failed (${part.status})`);
+        let list: unknown;
+        try { list = JSON.parse(await part.text()); } catch { throw new Error("snapshot part is not JSON"); }
+        if (!Array.isArray(list)) throw new Error("snapshot part is not a list");
+        for (const event of list) events.push(event as CorpusState["events"][number]);
+      }
+      parsed.corpusState = { ...parsed.state, events } as CorpusState;
     }
     // A snapshot with replay state carries its records there (writeSnapshot stores them once, as events), so the
     // records array is read, and required, only for a snapshot from before the replay state existed.
@@ -910,6 +960,8 @@ export function createUploadStore(opts: {
       conflictTombstones: parsed.conflictTombstones,
       seenUploadIds: parsed.seenUploadIds,
       etag: res.headers.get("etag") ?? undefined,
+      parts: parsed.parts,
+      retired: Array.isArray(parsed.retired) ? parsed.retired.filter((k) => typeof k === "string" && k.startsWith(SNAPSHOT_PARTS_PREFIX)) : undefined,
       generatedAt: parsed.generatedAt ?? "",
       uploads: typeof parsed.uploads === "number" ? parsed.uploads : 0,
       records: replayable ? [] : parseRecords(parsed.records ?? []).records,
@@ -918,10 +970,20 @@ export function createUploadStore(opts: {
     };
   }
 
+  /** When the snapshot was written and its newest upload, from the part list alone: no event is read. */
+  async function readSnapshotMark(): Promise<{ generatedAt: string; lastReceivedAt: string | null } | null> {
+    const res = await r2Fetch(SNAPSHOT_KEY, { method: "GET", headers: { "accept-encoding": "identity" } });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`snapshot read failed (${res.status})`);
+    let parsed: Partial<Snapshot>;
+    try { parsed = JSON.parse(await res.text()) as Partial<Snapshot>; } catch { throw new Error("snapshot is not JSON"); }
+    return { generatedAt: parsed.generatedAt ?? "", lastReceivedAt: parsed.lastReceivedAt ?? null };
+  }
+
   /** One bounded index probe before any corpus replay. A successful run records its corpus generation. */
   async function snapshotWork(): Promise<{ idle: boolean; retryRollups: boolean; dataAsOf: string | null; settledWeek: string | null }> {
     if (!cloud) throw new Error("snapshots need the cloud store");
-    const snapshot = await readSnapshot();
+    const snapshot = await readSnapshotMark();
     const filter = snapshot?.lastReceivedAt ? `&received_at=gt.${encodeURIComponent(snapshot.lastReceivedAt)}` : "";
     const res = await doFetch(rest(`uploads?select=id&limit=1${filter}`), { headers: restHeaders() });
     if (!res.ok) throw new Error(`upload index probe failed (${res.status})`);
@@ -1019,19 +1081,40 @@ export function createUploadStore(opts: {
     const lastIds = rows.length > 0 ? rows.filter((r) => r.received_at === lastReceivedAt).map((r) => r.id) : prev?.lastIds ?? [];
     const generatedAt = now().toISOString();
     const uploads = (prev?.uploads ?? 0) + fresh.length;
+    // The events go to a new folder of parts first; the part list below is the only object written conditionally,
+    // so a reader sees the old list and its parts or the new list and its parts, never a mix.
+    const folder = snapshotPartsFolder(generatedAt);
+    const parts: string[] = [];
+    const dropParts = (keys: readonly string[]) => Promise.all(keys.map((key) =>
+      r2Fetch(key, { method: "DELETE" }).then((r) => r.body?.cancel()).catch((err) => console.error("snapshot part cleanup failed", key, err))));
+    try {
+      for (const part of snapshotParts(read.state.events)) {
+        const key = `${folder}${parts.length}.json`;
+        const res = await r2Fetch(key, { method: "PUT", body: part, headers: { "content-type": "application/json" } });
+        if (!res.ok) throw new Error(`snapshot part write failed (${res.status})`);
+        parts.push(key);
+      }
+    } catch (err) {
+      await dropParts(parts);
+      throw err;
+    }
+    const { events: _events, ...state } = read.state;
     const body = JSON.stringify({
+      // Format 2 has no `records` and no `corpusState`, so a reader from before the parts refuses it (no records
+      // array) rather than reading an empty corpus.
+      format: 2,
       generatedAt,
       uploads,
-      // The records are the replay state's events, stored once. The empty array keeps the file readable by the
-      // previous reader, which required it.
-      records: [],
-      corpusState: read.state,
+      state,
+      parts,
+      // The previous write's parts stay for readers that listed them; the write after this one deletes them.
+      retired: current?.parts ?? [],
       // A legacy watermark query covers only a suffix of the index. Stay in that
       // mode until a full rebuild supplies the complete upload inventory.
       seenUploadIds: seen || !prev ? [...new Set([...(prev?.seenUploadIds ?? []), ...rows.map((r) => r.id)])].sort() : undefined,
       lastReceivedAt,
       lastIds,
-    } satisfies Omit<Snapshot, "etag" | "records"> & { records: [] });
+    });
     const put = await r2Fetch(SNAPSHOT_KEY, {
       method: "PUT",
       body,
@@ -1039,7 +1122,11 @@ export function createUploadStore(opts: {
       // https://developers.cloudflare.com/r2/api/s3/api/
       headers: { "content-type": "application/json", ...(current ? { "if-match": etag! } : { "if-none-match": "*" }) },
     });
-    if (!put.ok) throw new Error(`snapshot write failed (${put.status})`);
+    if (!put.ok) {
+      await dropParts(parts);
+      throw new Error(`snapshot write failed (${put.status})`);
+    }
+    if (current?.retired?.length) await dropParts(current.retired);
     // The state just written is what a read of the file would replay, so the corpus the rollups read next is this one,
     // not the file downloaded and parsed again (a second whole copy, and another read of the same R2 object).
     corpusKept.set({ value: { uploads, state: read.state, dataAsOf: validTime(generatedAt), etag: put.headers.get("etag") ?? undefined } });
