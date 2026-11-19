@@ -21,6 +21,12 @@ local COLUMN, SCROLLBAR, PAD, GAP = 686, 26, 8, 12
 -- one before (PanelTemplates_AnchorTabs; the -15 in their XML is replaced at load), and AuctionHouseFrameTabMixin
 -- sizes them with 20 padding and a 70 minimum. The Everloot tab follows both, so it sits beside Auctions as they do.
 local TAB_GAP, TAB_PADDING, TAB_MIN_WIDTH = 3, 20, 70
+-- The house gives some of its own controls a level of their own, not the one under their frame (build 70959, the
+-- auction house XML): the Auctions page's selected top tab 300, the Sell page's item slot, Post button and buyout
+-- check box 350, the portrait 400, the title and close button 510, the buy dialog and its overlay 1000 and up. A
+-- panel 20 above the house sat under the Auctions tab, which showed through it. The panel sits above every control
+-- of a page and under the dialogs, which must still cover it.
+local PANEL_LEVEL = 600
 local HINT = "Type an item's name or id, or shift-click an item here."
 local NONE = "No Everloot price for that item on this realm yet."
 -- The shopping page: rows on screen at once, their height, and each column's left edge and width.
@@ -218,14 +224,19 @@ local function layout(panel, width)
   local buttonWidth = math.min(140, math.floor((column - 12) / 2))
   panel.scanButton:SetWidth(buttonWidth)
   panel.status:ClearAllPoints()
+  panel.progress:ClearAllPoints()
   panel.lookupLabel:ClearAllPoints()
   if column < 400 then
     panel.status:SetPoint("TOPLEFT", panel.scanButton, "BOTTOMLEFT", 0, -8)
     panel.status:SetWidth(column)
+    panel.progress:SetPoint("TOPLEFT", panel.scanButton, "BOTTOMLEFT", 0, -8)
+    panel.progress:SetWidth(column)
     panel.lookupLabel:SetPoint("TOPLEFT", panel.status, "BOTTOMLEFT", 0, -16)
   else
     panel.status:SetPoint("LEFT", panel.scanButton, "RIGHT", 12, 0)
     panel.status:SetWidth(column - buttonWidth - 12)
+    panel.progress:SetPoint("LEFT", panel.scanButton, "RIGHT", 12, 0)
+    panel.progress:SetWidth(column - buttonWidth - 12)
     panel.lookupLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -90)
   end
   panel.shareButton:SetWidth(math.min(120, column / 2))
@@ -463,11 +474,13 @@ function T.SetMode(mode)
     if shopping then part:Hide() else part:Show() end
   end
   if shopping then
+    panel.progress:Hide()
     panel.shop.page:Show()
     T.RefreshShop()
   else
     panel.shop.confirmDelete = false
     panel.shop.page:Hide()
+    T.Refresh() -- the status line, or the running scan's bar in its place
   end
   panel.modeButton:SetText(shopping and "Price lookup" or "Shopping list")
 end
@@ -488,6 +501,17 @@ function T.Refresh()
     local label, enabled = E:ScanAction()
     T.panel.scanButton:SetText(label)
     T.panel.scanButton:SetEnabled(enabled)
+    -- The bar takes the status line's place while a scan runs, and gives it back when the scan reports.
+    local doing, fraction = E:ScanProgress()
+    if doing and T.panel.mode ~= "shop" then
+      T.panel.progress.text:SetText(doing)
+      T.panel.progress:SetValue(fraction)
+      T.panel.status:Hide()
+      T.panel.progress:Show()
+    else
+      T.panel.progress:Hide()
+      if T.panel.mode ~= "shop" then T.panel.status:Show() end
+    end
   end
   -- A search the house never answered is let go after a while; the shopping page redraws its ages and results.
   if E.Shopping then E.Shopping.Tick() end
@@ -529,8 +553,8 @@ local function buildPanel(house)
   panel:Hide()
   panel:SetPoint("TOPLEFT", house, "TOPLEFT", 8, -32)
   panel:SetPoint("BOTTOMRIGHT", house, "BOTTOMRIGHT", -8, 28)
-  local level = house.GetFrameLevel and house:GetFrameLevel()
-  if type(level) == "number" then panel:SetFrameLevel(level + 20) end
+  local level = tonumber(house.GetFrameLevel and house:GetFrameLevel()) or 0
+  panel:SetFrameLevel(math.max(level + 20, PANEL_LEVEL))
   if panel.EnableMouse then panel:EnableMouse(true) end
   if panel.SetBackdrop then
     -- The dialog texture has transparent pixels: it cannot hide Blizzard's categories,
@@ -564,6 +588,22 @@ local function buildPanel(house)
   scanButton:SetText("Scan prices")
   scanButton:SetScript("OnClick", function() E:StartScan(); T.Refresh() end)
   panel.scanButton = scanButton
+
+  -- While a scan runs, a bar in the status line's place says what the scan is doing and how far it is.
+  local progress = CreateFrame("StatusBar", nil, panel)
+  progress:SetSize(COLUMN, 20)
+  progress:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+  progress:SetStatusBarColor(unpack(tone("accent")))
+  progress:SetMinMaxValues(0, 1)
+  progress:SetValue(0)
+  progress.back = progress:CreateTexture(nil, "BACKGROUND")
+  progress.back:SetAllPoints()
+  progress.back:SetColorTexture(0, 0, 0, 0.5)
+  progress.text = words(progress, "GameFontHighlightSmall")
+  progress.text:SetPoint("CENTER", progress, "CENTER", 0, 0)
+  progress.text:SetJustifyH("CENTER")
+  progress:Hide()
+  panel.progress = progress
 
   local shareButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
   shareButton:SetSize(160, 24)
@@ -644,10 +684,11 @@ local function buildPanel(house)
   -- A hook, not a script: the backdrop template keeps its own size handler.
   panel:HookScript("OnSizeChanged", function(self, width) layout(self, width) end)
 
+  -- Once a second; five times a second while a scan runs, so the bar moves with the read.
   local elapsed = 0
   panel:SetScript("OnUpdate", function(_, dt)
     elapsed = elapsed + (dt or 0)
-    if elapsed >= 1 then elapsed = 0; T.Refresh() end
+    if elapsed >= (E:Scanning() and 0.2 or 1) then elapsed = 0; T.Refresh() end
   end)
   panel:Hide()
   return panel

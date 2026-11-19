@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Addon: while a scan runs, a bar in the auction tab's status line says what the scan is doing and how far it is: waiting for the house's listings with the seconds, reading the listings, reading again the ones whose items had not loaded, or sampling search prices. The last-scan line returns when the scan reports.
 - Site: /rankings leads with the leaderboards: characters by item level, Gear Score and honorable kills, guilds by average item level and by raid progress in the newest raid, each a top 10 with a link to its full list and an All, US or EU tab in the URL; the census rankings follow under Who plays. The hub stays out of search engines while it shows Blizzard's boards, as every armory page does.
 - Site: armory character pages show the header with when the character was last read, and put gear, talents, stats, PvP, achievements, professions, reputations and quests in tabs; a tab with nothing stored says why in one sentence.
 - Site: chat answers read at 16 px with tables and code drawn, the first sentence as a summary line and the links next to each claim as source chips; a still skeleton shows until the first words arrive, a failed answer offers Retry, and an item card that cannot load says so after 10 seconds and links the item page.
@@ -244,6 +245,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
 
 ### Fixed
+- Addon: the Everloot panel at the auction house sits above the house's own page controls, so the Auctions page's top tab, and the Sell page's item slot and Post button, no longer show through it; the house's dialogs still cover it.
 - Site: empty NPC, vendor, quest and object tabs all say what would fill them (3 installs agreeing), in one shared set of sentences, and the vendors list says a vendor is listed once 3 installs agree on an item and its price.
 - Site: the public MCP, /api/tools and the changes pages hold one copy of the uploads and the patch-notes timeline per server instance instead of one per request, which ran the site out of memory and answered 503; the MCP coverage tool says "not measured yet" when no stored score can be read instead of working it out from every report.
 - Site: the coverage pages (/database/coverage and each zone's) show the score and plateau the data update stores, instead of working them out from every report on each visit, which could make the page fail to load. Until the next data update stores the plateau, the page says it is not measured yet.

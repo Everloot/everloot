@@ -84,3 +84,58 @@ assert(not Everloot:Scanning(), 'the scan finished')
 local message = printed[#printed]
 assert(string.find(message, 'Desktop App', 1, true) and string.find(message, 'everloot.app/upload', 1, true), 'scan completion names both upload routes')
 """)
+print("Lua 5.1 auctions: a full scan reports both upload routes")
+
+# The scan's progress, for the tab's bar: words and a fraction through the wait, the read and the second read; nothing
+# between scans. Three rows read one a frame; the second row's item has not loaded until the second read.
+lua = LuaRuntime()
+lua.execute("""
+date = function() return '2026-11-19T00:00:00Z' end
+now = 1000000
+time = function() return now end
+print = function() end
+SlashCmdList = {}
+GetRealmName = function() return 'Forever' end
+CreateFrame = function() return {
+ RegisterEvent=function() end, SetScript=function(self, _, f) self.onEvent=f end,
+ HookScript=function(self, _, f) self.hooks=self.hooks or {}; table.insert(self.hooks,f) end
+} end
+timers = {}
+C_Timer = { After = function(seconds, f) table.insert(timers, { seconds = seconds, f = f }) end }
+function step() table.remove(timers, 1).f() end
+loaded = { true, false, true }
+C_AuctionHouse = {
+ ReplicateItems = function() end,
+ GetNumReplicateItems = function() return 3 end,
+ GetReplicateItemInfo = function(i)
+  local ready = loaded[i]
+  loaded[i] = true
+  -- A row whose item has not loaded yet has no item id, and says so in its last value.
+  return 'Item', nil, 1, nil, nil, nil, nil, nil, nil, 100, nil, nil, nil, nil, nil, nil, ready and 2588 + i or nil, ready
+ end
+}
+""")
+for file in ["core.lua", "modules/auctions.lua"]:
+    lua.execute((root / file).read_text(encoding="utf-8"))
+lua.execute("""
+Everloot.SCAN_CHUNK = 1
+Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'AUCTION_HOUSE_SHOW') end
+assert(Everloot:ScanProgress() == nil, 'no progress between scans')
+Everloot:StartScan()
+now = now + 4
+local words, fraction = Everloot:ScanProgress()
+assert(words == "Waiting for the house's listings, 4 s" and fraction == 0, tostring(words))
+timers = {}
+for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'REPLICATE_ITEM_LIST_UPDATE') end
+words, fraction = Everloot:ScanProgress()
+assert(words == 'Reading 1 of 3 listings' and math.abs(fraction - 1 / 3) < 0.001, tostring(words) .. ' ' .. tostring(fraction))
+step(); step()
+words, fraction = Everloot:ScanProgress()
+assert(words == 'Reading again 0 of 1 listings whose items had not loaded' and fraction == 0, tostring(words))
+assert(timers[1].seconds == 2, 'the second read waits for the item data')
+step()
+assert(Everloot:ScanProgress() == nil and not Everloot:Scanning(), 'the scan reported and the progress is gone')
+assert(#EverlootDB.records.auction_snapshot[1].items == 3, 'the second read got the row whose item had not loaded')
+""")
+print("Lua 5.1 auctions: scan progress through the wait, the read and the second read")

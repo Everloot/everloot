@@ -85,6 +85,10 @@ function Frame.SetBackdrop(self, b) self.backdrop = b end
 function Frame.SetBackdropColor(self, r, g, b, a) self.bg = { r, g, b, a } end
 function Frame.SetBackdropBorderColor(self, r, g, b, a) self.border = { r, g, b, a } end
 function Frame.SetScrollChild(self, child) self.child = child end
+function Frame.SetFrameLevel(self, l) self.level = l end
+function Frame.GetFrameLevel(self) return rawget(self, 'level') or 1 end
+function Frame.SetValue(self, v) self.value = v end
+function Frame.SetMinMaxValues(self, low, high) self.low, self.high = low, high end
 function Frame.GetVerticalScroll(self) return rawget(self, 'offset') or 0 end
 function Frame.SetVerticalScroll(self, v) self.offset = v end
 local function region() return setmetatable({ scripts = {}, hooks = {}, hooked = {} }, Frame) end
@@ -344,6 +348,9 @@ assert(Everloot.scanButton == nil, 'with the tab there is no separate scan butto
 for _, tab in ipairs(blizzardTabs) do assert(tab.hooked.OnClick, 'each Blizzard tab hides the panel') end
 assert(T.panel and not T.panel.shown, 'the panel starts hidden')
 assert(replicateCalls == 0, 'opening the house never scans')
+-- The house's Auctions page keeps its selected top tab at level 300 and the Sell page its controls at 350; its
+-- dialogs start at 1000. The panel sits between, so no page control shows through it and a dialog still covers it.
+assert(T.panel.level > 350 and T.panel.level < 1000, 'the panel sits above the house pages and under its dialogs: ' .. tostring(T.panel.level))
 
 -- Native fonts and a gold heading, even when the main Everloot window is available.
 local p = T.panel
@@ -359,14 +366,24 @@ assert(T.panel.shown, 'the tab shows the panel')
 assert(p.scanButton.text == 'Scan prices' and p.scanButton.enabled, 'one available scan action')
 assert(T.panel.status.text == 'No scan on this realm yet.', T.panel.status.text)
 assert(p.message.shown and p.message.text == "Type an item's name or id, or shift-click an item here." and p.used == 0, 'the lookup starts with how to use it')
+assert(not p.progress.shown and p.status.shown, 'between scans the status line is there and the bar is not')
 T.panel.scanButton.scripts.OnClick()
 assert(replicateCalls == 1, 'Scan prices starts one scan')
 assert(p.scanButton.text == 'Scanning...' and not p.scanButton.enabled, 'busy scan action disabled')
 assert(not string.find(T.panel.status.text, 'Scanning', 1, true), 'scan state belongs on its button only')
+-- The bar in the status line's place: the wait has words and seconds and no fill, the same width and anchor as the line.
+now = now + 3
+T.Refresh()
+assert(p.progress.shown and not p.status.shown, 'the running scan shows its bar where the status line was')
+assert(p.progress.text.text == "Waiting for the house's listings, 3 s", p.progress.text.text)
+assert(p.progress.value == 0 and p.progress.low == 0 and p.progress.high == 1, 'the wait fills nothing')
+assert(p.progress.kind == 'StatusBar' and p.progress.text.template == 'GameFontHighlightSmall', 'a native status bar with the game font')
+assert(p.progress.width == p.status.width and p.progress.points.LEFT[1] == p.scanButton, "the bar takes the status line's place beside the button")
 fire('REPLICATE_ITEM_LIST_UPDATE')
 drain()
-now = now + 125
+now = now + 122
 T.Refresh()
+assert(not p.progress.shown and p.status.shown, 'the scan reported: the status line is back and the bar gone')
 assert(p.scanButton.text == 'Ready in 12:55' and not p.scanButton.enabled, 'cooldown shown on disabled action')
 local status = T.panel.status.text
 assert(not string.find(status, '12:55', 1, true), 'the cooldown is not repeated')
@@ -442,6 +459,7 @@ assert(p.rows[4].note:GetStringHeight() > 12, 'a long warning wraps inside the c
 p.hooked.OnSizeChanged(p, 280, 450)
 assert(p.results.width <= 280 - 32, 'the results fit a narrow panel: ' .. p.results.width)
 assert(p.scanButton.width <= p.results.width and p.status.width <= p.results.width, 'scan controls fit a narrow page')
+assert(p.progress.width == p.status.width and p.progress.points.TOPLEFT[1] == p.scanButton, 'the bar follows the status line under the button on a narrow page')
 assert(p.shareButton.points.BOTTOMRIGHT[1] == p, 'saving is a footer action')
 sameAsLines(STUB)
 checkLayout()
