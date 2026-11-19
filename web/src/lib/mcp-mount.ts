@@ -47,7 +47,7 @@ export function toolLoaders(): ToolOptions {
       if (!set || JSON.stringify(set.world.recheck ?? []) !== JSON.stringify(RECHECK_SCOPES)) return null;
       return { facts: { items: set.items, world: set.world }, dataAsOf: set.dataAsOf };
     },
-    // The stored report the home page counts; the live computation only when it is missing or for another build.
+    // The stored report the home page counts; "not measured yet" when it is missing or for another build, never a replay.
     coverage: () => loadCoverageForTool(),
     settledSummary: async (build) => {
       const list = await readSettledList(build);

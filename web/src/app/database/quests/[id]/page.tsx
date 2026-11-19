@@ -14,7 +14,7 @@ import { loadWorldFacts } from "@/lib/rollup-compute";
 import { pinLink } from "@/lib/world-map";
 import { trailFor } from "@/lib/breadcrumbs";
 import { agreementLabel, reportedLabel, Badge, Container, DataTable, Facts, InShort, OpenData, Tabs, TooltipFrame } from "@/components/ui";
-import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, ShowOnMap, Unreachable } from "../../entity";
+import { EntityLayout, EntitySidebar, EMPTY, EmptyTab, EntityHeader, EntityTop, known, LINK, MAP_LINK_HEADER, ShowOnMap, Unreachable } from "../../entity";
 import { unknownQuest } from "../../unknown";
 import { entitySummary, observedLine } from "@/lib/evidence";
 import { loadItemFacts } from "@/lib/rollup-compute";
@@ -180,7 +180,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
                     rowKey={String}
                   />
                 )
-                : <EmptyTab message="No agreed rewards yet. A reward shows once 3 installs report it." />,
+                : <EmptyTab message={EMPTY.rewards} />,
             },
             {
               id: "givers", label: "Giver and turn-in", count: facts.unreachable ? undefined : people.length,
@@ -198,7 +198,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
                     rowKey={(p) => p.role}
                   />
                 )
-                : <EmptyTab message="No agreed giver or turn-in yet. Each shows once 3 installs report it." />,
+                : <EmptyTab message={EMPTY.givers} />,
             },
           ]}
         />

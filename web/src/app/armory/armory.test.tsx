@@ -88,6 +88,9 @@ describe("the character page", () => {
     expect(out).toContain("Level 60 Troll Hunter");
     expect(out).toContain('href="/armory/eu/guilds/ember-wardens"');
     expect(out).toContain("Last login");
+    expect(out).toMatch(/Last read <time dateTime="2026-11-09T10:00:00.000Z"[^>]*>2026-11-09<\/time>/);
+    expect(out).toContain('role="tablist"');
+    expect(out).toContain('data-tab-panel="pvp"');
     expect(out).toContain("57.41");
     expect(out).toContain("61.2");
     expect(out).toContain("1,234");

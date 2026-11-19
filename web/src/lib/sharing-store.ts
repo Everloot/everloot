@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import type { CloudConfig } from "./upload-store";
 import { publicRecords, namedRecord, type CorpusState } from "@kb/corpus";
+import type { IntakeRecord } from "@everloot/protocol";
 import { authorizeRecord, type PublicationState, type PublicationGrant } from "@kb/publication";
 import { readAllRows } from "./postgrest-pages";
 
@@ -106,10 +107,28 @@ export function createSharingStore(opts: { cloud: CloudConfig | null; localDir: 
     }
     return true;
   }
-  async function publish(state: CorpusState) {
-    if (!state.events.some((event) => namedRecord(event.record))) return publicRecords(state);
+  /**
+   * The last public copy: its corpus state, the authority it was checked against (null: the state names nobody) and
+   * when the first grant it relied on expires. Authority is still read on every call; only when it and the state are
+   * the same, and no grant has expired since, is the copy handed out again instead of a new array per request (#1354).
+   * Callers treat the array as read-only.
+   */
+  let published: { state: CorpusState; authority: string | null; until: number; records: IntakeRecord[] } | null = null;
+  async function publish(state: CorpusState): Promise<IntakeRecord[]> {
+    const same = published?.state === state ? published : null;
+    const named = same ? same.authority !== null : state.events.some((event) => namedRecord(event.record));
+    if (!named) {
+      if (!same) published = { state, authority: null, until: Infinity, records: publicRecords(state) };
+      return published!.records;
+    }
     const authority = await loadState();
-    return publicRecords(state, (row, hashes) => authorizeRecord(row, hashes, authority, now()));
+    const at = now().getTime();
+    const key = JSON.stringify(authority);
+    if (same && same.authority === key && at < same.until) return same.records;
+    const records = publicRecords(state, (row, hashes) => authorizeRecord(row, hashes, authority, new Date(at)));
+    const until = authority.grants.reduce((first, g) => { const t = Date.parse(g.expiresAt); return t > at && t < first ? t : first; }, Infinity);
+    published = { state, authority: key, until, records };
+    return records;
   }
   return { issue, lookup, loadState, revoke, optOut, publish };
 }

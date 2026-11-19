@@ -150,18 +150,29 @@ function objectRows(facts: ObjectFacts, names: Map<number, string>): { ids: Set<
   if (!byZeros) { byZeros = new WeakMap(); publicObjects.set(facts.rates, byZeros); }
   let ids = byZeros.get(facts.measuredZeros);
   if (!ids) { ids = new Set(objectList(facts).map((o) => o.objectId)); byZeros.set(facts.measuredZeros, ids); }
+  return { ids, rows: objectRowsOf(ids, names) };
+}
+
+/** The named objects among `ids`, in name order, built once per id set and names version. */
+function objectRowsOf(ids: Set<number>, names: Map<number, string>): NamedRow[] {
   let byIds = namedObjects.get(names);
   if (!byIds) { byIds = new WeakMap(); namedObjects.set(names, byIds); }
   let rows = byIds.get(ids);
-  if (!rows) { const kept = ids; rows = sortedNames(names).filter((row) => kept.has(row.id)); byIds.set(ids, rows); }
-  return { ids, rows };
+  if (!rows) { rows = sortedNames(names).filter((row) => ids.has(row.id)); byIds.set(ids, rows); }
+  return rows;
 }
 
-/** Names and ids from the same public object list as /database/objects; unavailable facts yield no hits. */
-async function objectHits(match: Match, id: number | null, names: Map<number, string>, read: Promise<ObjectFacts> = loadObjectFacts()): Promise<(SearchResult & { r: number })[]> {
-  const facts = await read;
-  if (facts.unreachable) return [];
-  const { ids, rows } = objectRows(facts, names);
+/**
+ * Names and ids from the same public object list as /database/objects: the list's ids when the caller holds them (the
+ * stored search names file), else from the object facts; unavailable facts yield no hits.
+ */
+async function objectHits(match: Match, id: number | null, names: Map<number, string>, read: Promise<ObjectFacts> | Set<number> = loadObjectFacts()): Promise<(SearchResult & { r: number })[]> {
+  let ids: Set<number>, rows: NamedRow[];
+  if (read instanceof Set) { ids = read; rows = objectRowsOf(ids, names); } else {
+    const facts = await read;
+    if (facts.unreachable) return [];
+    ({ ids, rows } = objectRows(facts, names));
+  }
   const out: (SearchResult & { r: number })[] = [];
   if (id !== null && ids.has(id)) out.push({ label: names.get(id) ?? `Object ${id}`, href: entityHref("object", id), note: `id ${id}`, exact: true, id, r: -1 });
   for (const { entry, exact, r } of bySortedName(rows, match)) if (entry.id !== id) out.push({ label: entry.name, href: entityHref("object", entry.id), note: `id ${entry.id}`, exact, id: entry.id, r });
@@ -182,8 +193,10 @@ async function loreHits(text: string): Promise<{ hits: SearchHit[]; some: Search
  * `names` when a page passes the ones it shows (never the API's caller); zones are the released ones on the map,
  * lore comes from the archive, tools from the tool list. A group with an exact id or name match comes first; an
  * empty group is left out. `only` keeps one result type; `limit` is the rows per group. Paged scopes clamp the page to the last match and return at most 50 rows.
+ * `objects` is the ids /database/objects lists when the caller already holds them (the stored search names file): the
+ * object group then reads no facts.
  */
-export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page = 1, names: given }: { only?: ResultScope; limit?: number; page?: number; names?: Names | Promise<Names> } = {}): Promise<SearchGroup[]> {
+export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page = 1, names: given, objects }: { only?: ResultScope; limit?: number; page?: number; names?: Names | Promise<Names>; objects?: Set<number> | Promise<Set<number> | undefined> } = {}): Promise<SearchGroup[]> {
   const text = raw.trim().slice(0, MAX_QUERY);
   const q = text.toLowerCase();
   if (!q) return [];
@@ -195,10 +208,12 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
   if (paged) limit = Number.isFinite(limit) ? Math.max(1, Math.min(50, Math.floor(limit))) : 50;
   // No read depends on another, so they all start now. Item, NPC, quest and object scopes do not need the completion
   // catalogue; only the unscoped page asks the lore archive.
-  const objectsRead = want("object") ? loadObjectFacts() : null;
+  // The object ids the caller holds, else the facts, both started now; a caller's promise that settles to no ids
+  // (the aggregate path) reads the facts once the names are in, which that path has loaded by then.
+  const objectsRead: Promise<ObjectFacts> | Promise<Set<number> | undefined> | Set<number> | null = want("object") ? (objects === undefined ? loadObjectFacts() : objects) : null;
   const loreRead = only ? null : loreHits(text);
   // A failed name read rejects the search before these are awaited; their own failure must not go unhandled then.
-  objectsRead?.catch(() => {});
+  if (objectsRead instanceof Promise) objectsRead.catch(() => {});
   loreRead?.catch(() => {});
   const [names, catalog] = await Promise.all([given ?? loadNames(), only && !paged ? null : loadCatalog()]);
   // The things a player meets in the game, by every typed word in any order; when none matches and no id was typed, by
@@ -206,7 +221,10 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
   const game = async (match: Match) => {
     const hits = new Map<SearchType, (SearchResult & { r: number })[]>();
     for (const kind of ["item", "npc", "quest"] as const) if (want(kind)) hits.set(kind, agreed(kind, names[`${kind}s`], match, id).results);
-    if (objectsRead) hits.set("object", await objectHits(match, id, names.objects, objectsRead));
+    if (objectsRead) {
+      const held = await objectsRead;
+      hits.set("object", await objectHits(match, id, names.objects, held instanceof Set ? held : held === undefined ? loadObjectFacts() : Promise.resolve(held)));
+    }
     if (!only || paged) {
       if (want("zone")) hits.set("zone", zoneHits(match).map(({ label, href, exact, r }) => ({ label, href, note: "zone", exact, r })));
       if (want("instance")) hits.set("instance", instanceHits(match));
@@ -346,9 +364,9 @@ export const SUGGEST_LIMIT = 8;
  * and raids (or one of the first four). Names only where players agree on them, as on /search; instances from the
  * same rows as /search; no lore or tools, so it stays cheap per keystroke. `tolerant` (the site's own boxes) also
  * matches the words in any order and, when nothing matches and no id was typed, within a typo or two, as /search
- * does; without it (/api/suggest) the text matches as one phrase, as it always has.
+ * does; without it (/api/suggest) the text matches as one phrase, as it always has. `objects` as for siteSearch.
  */
-export async function suggest(raw: string, scope?: Scope, names?: Names, { tolerant = false }: { tolerant?: boolean } = {}): Promise<Suggestion[]> {
+export async function suggest(raw: string, scope?: Scope, names?: Names, { tolerant = false, objects }: { tolerant?: boolean; objects?: Set<number> } = {}): Promise<Suggestion[]> {
   const q = raw.trim().slice(0, MAX_QUERY).toLowerCase();
   if (!q) return [];
   const id = exactId(q);
@@ -358,7 +376,7 @@ export async function suggest(raw: string, scope?: Scope, names?: Names, { toler
     const ranked: { s: Suggestion; r: number; t: number }[] = [];
     for (const [t, type] of order.entries()) {
       if (type === "object") {
-        for (const o of (await objectHits(match, id, all.objects)).slice(0, SUGGEST_LIMIT)) ranked.push({ s: { type, id: o.id!, label: o.label, href: o.href }, r: o.r, t });
+        for (const o of (await objectHits(match, id, all.objects, objects)).slice(0, SUGGEST_LIMIT)) ranked.push({ s: { type, id: o.id!, label: o.label, href: o.href }, r: o.r, t });
         continue;
       }
       for (const x of agreed(type, all[`${type}s`], match, id).results.slice(0, SUGGEST_LIMIT)) {

@@ -751,3 +751,13 @@ test("a stored ladder is withheld when the live guild hide list cannot be checke
   expect(await hub()).not.toContain(">Night Watch</a>");
   expect(holder.reads).toBe(0);
 });
+
+test("without a stored ladder the live rollup is kept while the store hands out the same records, and rebuilt for a new array", async () => {
+  const { loadGuildData } = await import("@/lib/guilds");
+  const first = await loadGuildData();
+  expect(first.unreachable).toBe(false);
+  expect((await loadGuildData()).instances).toBe(first.instances);
+  // A publication change (an opt-out inside a roster) comes as a new array, even with the same rows.
+  holder.records = [...holder.records];
+  expect((await loadGuildData()).instances).not.toBe(first.instances);
+});

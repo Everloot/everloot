@@ -18,11 +18,7 @@ afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); vi.restoreAllMocks(); n
 const siteSearch = vi.hoisted(() => ({ groups: [] as unknown[], names: undefined as unknown }));
 const namesRead = vi.hoisted(() => ({ pending: null as Promise<unknown> | null }));
 vi.mock("@/lib/site-search", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/site-search")>()), siteSearch: async (_q: string, options: { names?: unknown }) => { siteSearch.names = options.names; await options.names; return siteSearch.groups; } }));
-vi.mock("@/lib/shown-item-names", () => ({ loadShownNames: async () => ({
-  facts: { rates: [], names: [], npcs: [], unreachable: false }, agreed: new Map(), matched: null,
-  named: { has: () => false }, showsTip: () => false,
-}) }));
-vi.mock("@/lib/shown-search-names", () => ({ loadShownSearchNames: () => namesRead.pending ?? Promise.resolve({ items: new Map(), npcs: new Map(), quests: new Map() }) }));
+vi.mock("@/lib/shown-search-names", () => ({ loadSearchShown: () => (namesRead.pending ?? Promise.resolve({ items: new Map(), npcs: new Map(), quests: new Map() })).then((names) => ({ names, showsTip: () => false })) }));
 const icons = vi.hoisted(() => ({ asked: [] as number[][], map: new Map<number, string>() }));
 vi.mock("@/lib/item-icons", () => ({ shownItemIcons: async (ids: number[]) => { icons.asked.push(ids); return { icons: icons.map, unknown: icons.map.size ? "https://assets.everloot.app/b/icons/134400.webp" : null }; } }));
 // The Characters and Guilds groups load in the browser; here a marker shows where they would sit, and the fallback.
@@ -57,7 +53,11 @@ test("the page starts search without waiting for its independent name loader", a
   const { default: SearchPage } = await import("./page");
   const answer = SearchPage({ searchParams: Promise.resolve({ q: "Linen Cloth" }) });
   await Promise.resolve();
-  const passedPendingNames = siteSearch.names === namesRead.pending;
+  // The names promise handed to the search is still pending: the page did not wait for the loader before searching.
+  let settled = false;
+  (siteSearch.names as Promise<unknown>).then(() => { settled = true; });
+  await Promise.resolve();
+  const passedPendingNames = !settled;
   finish({ items: new Map(), npcs: new Map(), quests: new Map(), objects: new Map() });
   await answer;
   expect(passedPendingNames).toBe(true);

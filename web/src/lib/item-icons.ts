@@ -8,7 +8,7 @@ import { loadShownNames, type ShownNames } from "./shown-item-names";
  * `unknown` is the game's question mark from the same asset folder, for a row without one; null when no icon
  * was read. Pages only, like the names it reads. Empty without the asset files.
  */
-export async function shownItemIcons(ids: readonly number[], shownRead?: Promise<ShownNames>): Promise<{ icons: Map<number, string>; unknown: string | null }> {
+export async function shownItemIcons(ids: readonly number[], shownRead?: Promise<Pick<ShownNames, "showsTip">>): Promise<{ icons: Map<number, string>; unknown: string | null }> {
   const none = { icons: new Map<number, string>(), unknown: null };
   if (!ids.length) return none;
   const { showsTip } = await (shownRead ?? loadShownNames());

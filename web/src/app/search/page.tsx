@@ -8,8 +8,7 @@ import { Container, DataTable, DataTitle, Entry, EntryList, filledColumns, LinkT
 import { CC_BY_SA } from "@/lib/jsonld";
 import { BROWSE_HEADINGS, BROWSE_TYPES, hasTypes, loreSlug, MAX_QUERY, searchLore, UNAVAILABLE, UNAVAILABLE_COPY, type BrowseSlug, type LoreType } from "@/lib/lore";
 import { HEADINGS, isResultScope, siteSearch, type ResultScope, type SearchGroup, type SearchResult, type SearchType } from "@/lib/site-search";
-import { loadShownSearchNames } from "@/lib/shown-search-names";
-import { loadShownNames } from "@/lib/shown-item-names";
+import { loadSearchShown } from "@/lib/shown-search-names";
 import { shownItemIcons } from "@/lib/item-icons";
 import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
 import { npcRows, publicQuests, SIDE_LABEL, type NpcRow, type QuestRow } from "@/lib/world-lists";
@@ -137,10 +136,11 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
   const scope = first(params.in);
   if (isResultScope(scope)) redirect(listHrefFor(scope, q)!);
 
-  // Reuse item facts only within this render; the next request rechecks publication.
-  const shown = q ? loadShownNames() : undefined;
+  // The names the database pages show (the stored names file, else the aggregates within this render), and from the
+  // same read which item rows show an icon; the next request rechecks publication.
+  const shown = q ? loadSearchShown() : undefined;
   // Matched on the names the database pages show, so a name a list prints is found here too.
-  const groups = q ? await siteSearch(q, { limit: OVERVIEW_LIMIT, names: loadShownSearchNames(shown) }) : null;
+  const groups = q ? await siteSearch(q, { limit: OVERVIEW_LIMIT, names: shown!.then((s) => s.names), objects: shown!.then((s) => s.objects) }) : null;
   // The game icon beside each item hit, where its page shows one, and the facts beside each quest and NPC hit.
   const [{ icons, unknown }, facts] = await Promise.all([
     shownItemIcons(groups?.find((g) => g.type === "item")?.results.flatMap((r) => (r.id === undefined ? [] : [r.id])) ?? [], shown),

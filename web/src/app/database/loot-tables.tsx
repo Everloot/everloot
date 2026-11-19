@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
-import { DataTable, installsNeeded, type Column } from "@/components/ui";
+import { DataTable, type Column } from "@/components/ui";
 import { datedPhrase, METHOD_LINE, missingLine, shortLine, spanPhrase, type ItemDropSources, type LootTableRow, type NpcLootTable } from "@kb/loot-tables";
 import { DROP_SETTLE_MIN_WINDOWS, measureDropRate } from "@kb/drop-rate-settling";
-import { EmptyTab, FREQUENCY, percent } from "./entity";
+import { EMPTY, EmptyTab, FREQUENCY, percent } from "./entity";
 
 /**
  * The NPC loot table and the item-source table (docs/design/specs/2026-10-21-loot-tables-design.md, section 9):
@@ -28,7 +28,7 @@ function Method({ dataAsOf, lead, ranges = true }: { dataAsOf: string | null; le
 
 /** The Drops tab of an NPC page. */
 export function NpcLootPanel({ table, title, item, dataAsOf }: { table: NpcLootTable; title: string; item: (itemId: number) => ReactNode; dataAsOf: string | null }) {
-  if (table.state === "none") return <EmptyTab message={`Nobody has looted this NPC in Forever yet. ${installsNeeded()}`} />;
+  if (table.state === "none") return <EmptyTab message={EMPTY.drops("this NPC")} />;
   if (table.state === "short") return <p className="py-3 text-meta text-fg">{missingLine(table)}</p>;
   if (table.rows.length === 0) {
     return <>
@@ -52,7 +52,7 @@ export function NpcLootPanel({ table, title, item, dataAsOf }: { table: NpcLootT
 /** The Dropped by tab of an item page. */
 export function ItemSourcesPanel({ sources, title, source, dataAsOf }: { sources: ItemDropSources; title: string; source: (row: LootTableRow) => ReactNode; dataAsOf: string | null }) {
   const short = sources.short ? <p className={NOTE}>{shortLine(sources.short)}</p> : null;
-  if (sources.rows.length === 0) return short ?? <EmptyTab message={`Nobody has looted this in Forever yet. ${installsNeeded()}`} />;
+  if (sources.rows.length === 0) return short ?? <EmptyTab message={EMPTY.drops("this")} />;
   const columns: Column<LootTableRow>[] = [
     { key: "source", header: "Source", cell: source },
     { key: "with", header: "Windows with it", numeric: true, cell: (r) => r.withItem },
