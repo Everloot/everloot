@@ -422,6 +422,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: while a week is still running, the rankings headline compares it with the same days of last week rather than the whole week, and the census class table colours each class's share bar in its class colour.
 - Site: signed-in visitors now get the shared cached copy of the Auction House browse, realm and item price pages, which read no cookie, instead of a fresh render on every visit.
 - Addon: the Everloot window opens inside the game's gold dialog frame, the gold of the minimap button's ring, in place of the thin bronze edge; the resize grip moves inside the frame. The settings page and the raid panel keep the bronze edge.
+- Addon: the Everloot window's crest sits centred on the top of the gold frame with EVERLOOT in gold beneath it, in the game's quest title lettering, like a title crown; the open page's name moves to the top-left corner.
 - Site: /changes reads as one column of cards, each with its date, type, title, who posted it and where, and the excerpt; the title is the card's link, and the filters and a sort menu sit above.
 - Site: item lists open on the items players have seen, then the other named items, A to Z; the Source column shows once a row on the page has one, and the held-back items are one line with a toggle each.
 - Site: search lists the lore archive after every other group, and when your words also name something in WoW: Forever it leaves out lore pages about later expansions.

@@ -19,10 +19,16 @@ do
   local ok, path = pcall(function() return NumberFontNormal:GetFont() end)
   if ok and type(path) == "string" and path ~= "" then NARROW = path end
 end
+-- The game's quest title face for the window's name, as the client sets it for its language; the text font without it.
+local TITLE = FRIZ
+do
+  local ok, path = pcall(function() return QuestTitleFont:GetFont() end)
+  if ok and type(path) == "string" and path ~= "" then TITLE = path end
+end
 local COLORS = {
   canvas = { 0.055, 0.059, 0.051, 0.97 }, surface = { 0.082, 0.09, 0.102, 1 }, line = { 0.17, 0.176, 0.157, 1 },
   bronze = { 0.478, 0.416, 0.298, 1 }, text = { 0.957, 0.937, 0.867, 1 }, muted = { 0.788, 0.765, 0.69, 1 },
-  accent = { 0.612, 0.941, 0.227, 1 },
+  accent = { 0.612, 0.941, 0.227, 1 }, gold = { 0.941, 0.78, 0.353, 1 },
 }
 
 -- In sidebar order. A view is looked up in U.Views by key when it is selected; `open` hands over to another part
@@ -514,20 +520,21 @@ local function build()
   f:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
   goldFrame(f)
 
-  -- The crest breaks out of the top-left corner.
+  -- The crest sits centred on the frame's top edge with the name in gold beneath it, a title crown like the game's
+  -- own windows. Both stay above the views, which start 48 below the top.
   local crest = f:CreateTexture(nil, "OVERLAY")
-  crest:SetSize(64, 64)
-  crest:SetPoint("TOPLEFT", -20, 22)
+  crest:SetSize(44, 44)
+  crest:SetPoint("TOP", 0, 20)
   crest:SetTexture(U.CREST)
   f.crest = crest
-
-  -- Everloot in fel green, as the tooltip, the settings page and the auction house tab write it.
-  local title = text(f, 17, FRIZ, COLORS.accent)
-  title:SetPoint("TOPLEFT", 54, -16)
-  title:SetText("Everloot")
+  local title = text(f, 16, TITLE, COLORS.gold)
+  title:SetJustifyH("CENTER")
+  title:SetPoint("TOP", crest, "BOTTOM", 0, -1)
+  title:SetText("EVERLOOT")
   f.title = title
+  -- The open page's name in the top-left corner, above the sidebar.
   f.subtitle = text(f, 12, FRIZ, COLORS.muted)
-  f.subtitle:SetPoint("LEFT", title, "RIGHT", 10, -1)
+  f.subtitle:SetPoint("TOPLEFT", 20, -22)
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", -2, -2)
   f.close = close
