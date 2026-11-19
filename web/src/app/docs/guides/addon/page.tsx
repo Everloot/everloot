@@ -114,6 +114,7 @@ export default function Page() {
           [<C key="a3">/everloot buttons off</C>, <>The drawer starts off for new installs; existing players keep their setting. Stops gathering other addons&apos; minimap buttons into the Everloot button (hover the crest to open them). They return to the minimap after <C>/reload</C>; <C>buttons on</C> gathers them again.</>],
           [<C key="a">/everloot status</C>, "Prints the version and your install id, each part of the addon and how many rows it holds."],
           [<C key="b">/everloot version</C>, "Prints the addon version."],
+          [<C key="flight">/everloot flight on|off</C>, <>The flight path bar starts on. It learns a local estimate from confirmed arrivals; a first flight shows no ETA. Off hides it immediately; on applies after <C>/reload</C>.</>],
           [<C key="c">/everloot auctions off</C>, <>Turns off auction capture, which is on in a new install. <C>auctions on</C> turns it back on. Type <C>/reload</C> to apply either.</>],
           [<C key="d">/everloot scan</C>, "At the auction house, starts a full scan, like the Scan this house button. At most one scan every 15 minutes, and nothing scans until you ask."],
           [<C key="d2">/everloot scanprompt off</C>, <>Stops the small Scan prices for Everloot prompt that shows when you open the auction house. <C>scanprompt on</C> brings it back. The button and <C>/everloot scan</C> still work.</>],

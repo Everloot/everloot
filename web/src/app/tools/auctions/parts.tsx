@@ -152,10 +152,11 @@ export function Facts({ items }: { items: ReactNode[] }) {
 
 export const count = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
-/** Market value, minimum buyout, historical and units in one card. */
-export function PriceFacts({ facts }: { facts: { label: string; value: ReactNode; note?: string }[] }) {
+/** Market value, minimum buyout, historical and units in one card; `note` is one line under them, what the values rest on. */
+export function PriceFacts({ facts, note }: { facts: { label: string; value: ReactNode; note?: string }[]; note?: ReactNode }) {
   return (
     <Card>
+      {note && <p className="mb-4 text-meta text-fg-2">{note}</p>}
       <dl className="grid grid-cols-2 gap-x-6 gap-y-5 lg:grid-cols-4">
         {facts.map((f) => (
           <div key={f.label} className="min-w-0">

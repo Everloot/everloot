@@ -148,3 +148,22 @@ test("on a phone the first column carries the rank with the name, so a folded ro
   expect(characters).toMatch(new RegExp(`<td[^>]*><span[^>]*><span[^>]*>1</span><a href="/armory/${me.region}/${me.slug}"`));
   expect(characters).not.toContain(">#<");
 });
+
+test("the hub has labelled directory searches, class winners, guild links and add tools", async () => {
+  vi.stubEnv("EVERLOOT_ARMORY", "1");
+  const out = await hub();
+  expect(out).toContain('action="/players"');
+  expect(out).toContain('action="/guilds"');
+  expect(out.match(/name="q"/g)).toHaveLength(2);
+  expect(out).toContain('Character name');
+  expect(out).toContain('Guild name');
+  const winners = section(out, "best-of-class");
+  expect(winners).toContain("Best of each class");
+  expect(winners).toContain('href="/armory/eu/velkara-duskmantle"');
+  expect(winners).toContain('href="/armory/eu/guilds/ember-wardens"');
+  expect(winners).toContain('text-class-hunter');
+  expect(winners).toContain('aria-label="Gear Score:');
+  expect(section(out, "characters")).toContain('href="/armory/eu/guilds/ember-wardens"');
+  expect(out).toContain('href="/armory/submit"');
+  expect(out).toContain('href="/armory/guilds/submit"');
+});

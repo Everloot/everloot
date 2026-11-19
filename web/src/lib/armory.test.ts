@@ -42,8 +42,8 @@ test("a slug is one or more lower-case words of letters and digits joined by hyp
 });
 
 test("board filters accept the four rulesets and two regions, and refuse anything else", () => {
-  expect(armoryBoardQuery({})).toEqual({ region: null, ruleset: null });
-  expect(armoryBoardQuery({ region: "eu", ruleset: "15" })).toEqual({ region: "eu", ruleset: 15 });
+  expect(armoryBoardQuery({})).toEqual({ region: null, ruleset: null, class: null, faction: null });
+  expect(armoryBoardQuery({ region: "eu", ruleset: "15" })).toEqual({ region: "eu", ruleset: 15, class: null, faction: null });
   for (const bad of [{ region: "kr" }, { ruleset: "4" }, { ruleset: "pvp" }]) expect(armoryBoardQuery(bad)).toBeNull();
   expect(armoryBoardHref("item-level", { region: null, ruleset: null })).toBe("/armory/rankings/item-level");
   expect(armoryBoardHref("honorable-kills", { region: "us", ruleset: 1 })).toBe("/armory/rankings/honorable-kills?ruleset=1&region=us");

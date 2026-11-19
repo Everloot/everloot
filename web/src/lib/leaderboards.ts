@@ -25,6 +25,7 @@ export interface Leaderboards {
   characters: CharacterBoard[] | null;
   /** Null while the armory is off. */
   guildGear: GuildGear | null;
+  bestOfClass: ArmoryBoardRow[] | null;
   /** Null while guild progression is off. */
   raids: RaidProgress | null;
 }
@@ -48,9 +49,13 @@ const characterBoards = unstable_cache(async (region: ArmoryRegion | null): Prom
   const store = armoryStore();
   return Promise.all(ARMORY_METRICS.map(async (metric) => ({
     metric,
-    rows: await store.board(ARMORY_BOARDS[metric].key, region, null, BOARD_PREVIEW).catch(() => null),
+    rows: await store.boardFiltered(ARMORY_BOARDS[metric].key, region, null, null, null, BOARD_PREVIEW).catch(() => null),
   })));
 }, ["rankings-character-boards"], { revalidate: BOARDS_KEPT_SECONDS, tags: [PLAYER_SEARCH_TAG] });
+
+const bestOfClass = unstable_cache(async (region: ArmoryRegion | null) =>
+  armoryStore().topPerClass("gear_score", region, null),
+  ["rankings-best-of-class"], { revalidate: BOARDS_KEPT_SECONDS, tags: [PLAYER_SEARCH_TAG] });
 
 /** The directory's top of the average-item-level sort; an unreachable read throws, so it is never kept. */
 const guildGear = unstable_cache(async (region: ArmoryRegion | null): Promise<GuildGear> => {
@@ -74,10 +79,11 @@ async function raidProgress(): Promise<RaidProgress> {
 /** Every board at once; a board that cannot be read says so on its own, never the whole hub. */
 export async function loadLeaderboards(region: ArmoryRegion | null): Promise<Leaderboards> {
   const armory = armoryOn();
-  const [characters, gear, raids] = await Promise.all([
+  const [characters, gear, raids, best] = await Promise.all([
     armory ? characterBoards(region) : null,
     armory ? guildGear(region).catch((): GuildGear => ({ state: "unreachable" })) : null,
     guildsOn() ? raidProgress().catch((): RaidProgress => ({ rows: [], instance: null, open: raidsOpen(), unreachable: true })) : null,
+    armory ? bestOfClass(region).catch(() => null) : null,
   ]);
-  return { region, characters, guildGear: gear, raids };
+  return { region, characters, guildGear: gear, raids, bestOfClass: best };
 }

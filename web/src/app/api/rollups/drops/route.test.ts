@@ -37,6 +37,63 @@ test("every answer carries the licence and credit line, in the body and the head
   expect(store.api).not.toHaveBeenCalled();
 });
 
+test("public rates keep upload names from loot, minimap objects and targeted NPC sightings", async () => {
+  const loot = (installId: string, sourceObjectId: number, sourceObjectName?: string) => ({
+    kind: "loot", installId, sourceObjectId, sourceEvidence: "loot-api",
+    items: [{ itemId: 8001, count: 1 }], ...(sourceObjectName ? { sourceObjectName } : {}),
+  });
+  const records = ["fixture-a", "fixture-b", "fixture-c"].flatMap((installId) => [
+    loot(installId, 7001, "Fixture Chest"), loot(installId, 7002), loot(installId, 7003),
+    { ...loot(installId, 7004), sourceObjectId: undefined, sourceNpcId: 7004 },
+    { kind: "object_sighting", installId, objectId: 7003, name: "Fixture Treasure", mapId: 1, x: 20, y: 30 },
+    { kind: "npc_sighting", installId, npcId: 7004, name: "Fixture Creature", positionKind: "player", mapId: 1, x: 20, y: 30 },
+  ]);
+  store.loadCorpus.mockResolvedValue({ uploads: 3, records, dataAsOf: "2026-11-19T00:00:00.000Z" });
+  const body = await (await GET(req())).json();
+  expect(body.rates).toHaveLength(4);
+  expect(body.rates.find((r: { sourceObjectId: number }) => r.sourceObjectId === 7001)).toHaveProperty("sourceName", "Fixture Chest");
+  expect(body.rates.find((r: { sourceObjectId: number }) => r.sourceObjectId === 7002)).not.toHaveProperty("sourceName");
+  expect(body.rates.find((r: { sourceObjectId: number }) => r.sourceObjectId === 7003)).toHaveProperty("sourceName", "Fixture Treasure");
+  expect(body.rates.find((r: { sourceNpcId: number }) => r.sourceNpcId === 7004)).toHaveProperty("sourceName", "Fixture Creature");
+});
+
+test.each(["npc", "object"] as const)("public %s drop labels require two exact, unanimous upload names", async (kind) => {
+  const installs = ["fixture-a", "fixture-b", "fixture-c"];
+  const labels = [["Fixture Solo"], ["Fixture Pair", "Fixture Pair"], ["Fixture East", "Fixture West"],
+    ["Fixture Case", "fixture case"], ["Fixture Pair", "Fixture Pair", "Fixture Other"], ["Fixture Repeat"]];
+  const records: unknown[] = labels.flatMap((names, i) => {
+    const id = 7101 + i;
+    return [
+      ...installs.map((installId) => ({ kind: "loot", installId, sourceEvidence: "loot-api",
+        ...(kind === "npc" ? { sourceNpcId: id } : { sourceObjectId: id }), items: [{ itemId: 8001, count: 1 }] })),
+      ...names.map((name, n) => ({ installId: installs[n], name, mapId: 1, x: 20, y: 30,
+        ...(kind === "npc" ? { kind: "npc_sighting", npcId: id, positionKind: "player" } : { kind: "object_sighting", objectId: id }) })),
+    ];
+  });
+  // Repeating one install's name never supplies the second install.
+  records.push(records[records.length - 1]);
+  for (const installId of installs.slice(0, 2)) {
+    records.push(
+      { kind: "loot", installId, sourceEvidence: "loot-api", items: [{ itemId: 8001, count: 1 }],
+        ...(kind === "npc" ? { sourceNpcId: 7199 } : { sourceObjectId: 7199 }) },
+      { installId, name: "Fixture Queued", mapId: 1, x: 20, y: 30,
+        ...(kind === "npc" ? { kind: "npc_sighting", npcId: 7199 } : { kind: "object_sighting", objectId: 7199 }) },
+    );
+  }
+  store.loadCorpus.mockResolvedValue({ uploads: 3, records, dataAsOf: kind === "npc" ? "2026-11-19T01:00:00.000Z" : "2026-11-19T02:00:00.000Z" });
+  const body = await (await GET(req())).json();
+  expect(body.rates).toHaveLength(6);
+  expect(body.queued).toBe(1);
+  const nameOf = (id: number) => body.rates.find((r: { sourceNpcId?: number; sourceObjectId?: number }) =>
+    (kind === "npc" ? r.sourceNpcId : r.sourceObjectId) === id).sourceName;
+  expect(nameOf(7101)).toBeUndefined();
+  expect(nameOf(7102)).toBe("Fixture Pair");
+  expect(nameOf(7103)).toBeUndefined();
+  expect(nameOf(7104)).toBeUndefined();
+  expect(nameOf(7105)).toBeUndefined();
+  expect(nameOf(7106)).toBeUndefined();
+});
+
 test("guard on: the drop list is paged for anonymous callers and limited per IP", async () => {
   vi.stubEnv("EVERLOOT_DATA_GUARD", "1");
   vi.resetModules();
@@ -83,7 +140,7 @@ test("each rate names its source when the site knows the name, so the price file
     }),
   }));
   vi.doMock("@/lib/names", () => ({
-    loadNames: async () => ({ npcs: new Map([[3114, "Razormane Battleguard"]]), objects: new Map([[106318, "Battered Chest"]]), items: new Map(), quests: new Map() }),
+    loadDropSourceNames: async () => ({ npcs: new Map([[3114, "Razormane Battleguard"]]), objects: new Map([[106318, "Battered Chest"]]), items: new Map(), quests: new Map() }),
   }));
   const { GET: named } = await import("./route");
   const body = await (await named(req())).json();
@@ -103,7 +160,7 @@ test("public rates carry likely ranges and settling without changing counts or l
       stats: { uploads: 5, lootWindows: 1006, records: 1006, unreachable: false, dataAsOf: "2026-11-13T00:00:00.000Z" },
     }),
   }));
-  vi.doMock("@/lib/names", () => ({ loadNames: async () => ({ npcs: new Map([[3114, "Razormane Battleguard"]]), objects: new Map() }) }));
+  vi.doMock("@/lib/names", () => ({ loadDropSourceNames: async () => ({ npcs: new Map([[3114, "Razormane Battleguard"]]), objects: new Map() }) }));
   try {
     const { GET: ranges } = await import("./route");
     const body = await (await ranges(req())).json();
@@ -131,7 +188,7 @@ test("public drop responses keep exactly the existing keys", async () => {
     sources: [{ sourceNpcId: 7, averageCopper: 123 }],
     stats: { uploads: 3, lootWindows: 9, records: 9, unreachable: false, dataAsOf: null },
   }) }));
-  vi.doMock("@/lib/names", () => ({ loadNames: async () => ({ npcs: new Map([[7, "Wolf"]]), objects: new Map() }) }));
+  vi.doMock("@/lib/names", () => ({ loadDropSourceNames: async () => ({ npcs: new Map([[7, "Wolf"]]), objects: new Map() }) }));
   try {
     const { GET: projected } = await import("./route");
     const body = await (await projected(req())).json();

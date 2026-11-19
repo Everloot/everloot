@@ -177,8 +177,8 @@ assert(Everloot:Status():find('auction_snapshot'), 'status counts the snapshot r
 # and show only with a valid checksum.
 lua.execute("""
 local own = tooltipFor(2589)
-assert(own:find('Your scan: min 1s 0c') and own:find('value 1s 10c') and own:find('100 units listed, scanned under 1 h ago'), own)
-assert(own:find('scanned under 1 h ago, house not recorded'), 'a scan whose auctioneer was not read says its house is unknown: ' .. own)
+assert(own:find('Your scan: min 1s 0c') and own:find('value 1s 10c') and own:find('100 listed · under 1 h ago'), own)
+assert(own:find('under 1 h ago · house not recorded'), 'a scan whose auctioneer was not read says its house is unknown: ' .. own)
 assert(not own:find('Alliance house'), 'an own scan is not the community price: ' .. own)
 assert(tooltipFor(424242) == '', 'no line for an item with no price')
 tripped = false
@@ -254,7 +254,7 @@ local stale = tooltipFor(2589)
 assert(stale:find('STALE') and stale:find('2026%-10%-20'), 'prices ten days old are marked stale: ' .. stale)
 date = function() return '2026-10-21T10:00:00Z' end
 local fresh = tooltipFor(2589)
-assert(fresh:find('price file built 2026%-10%-20') and not fresh:find('STALE'), 'prices from yesterday are not stale: ' .. fresh)
+assert(not fresh:find('price file built') and not fresh:find('STALE'), 'prices from yesterday are not stale: ' .. fresh)
 assert(not fresh:find('fetched'), 'the file date is when the file was built, not when it was fetched: ' .. fresh)
 date = function() return '2026-10-20T10:00:00Z' end
 assert(Everloot.DayNumber('1970-01-01') == 0 and Everloot.DayNumber('2000-03-01') == 11017 and Everloot.DayNumber('2026-10-20') - Everloot.DayNumber('2026-10-19') == 1)
@@ -275,7 +275,7 @@ assert(#timers >= 1 and timers[1].seconds == 0, 'the checksum continues on the n
 local frames = drain()
 assert(frames == math.ceil(#data / 20000) - 1, 'one slice per frame: ' .. frames)
 local ready = tooltipFor(7)
-assert(ready:find('Everloot market 5s 0c') and ready:find('50 units listed'), ready)
+assert(ready:find('Everloot market 5s 0c') and ready:find('50 listed'), ready)
 local absent = tooltipFor(3001)
 assert(not absent:find('Everloot market') and absent:find('Not in the local price file'), 'an id that is not in a full file is not in the file, and 7 does not match 70 or 17: ' .. absent)
 assert(not absent:find('No price on'), 'a full file cannot say the item has no public price: ' .. absent)
@@ -307,7 +307,7 @@ end
 date = function() return '2026-10-30T10:00:00Z' end
 local oldItem = priceFile('2026-10-30T09:50:00.000Z', '2026-10-20')
 assert(oldItem:find('STALE') and oldItem:find('2026%-10%-20') and oldItem:find('10 days'), 'a new file does not freshen an old item: ' .. oldItem)
-assert(oldItem:find('price file built 2026%-10%-30') and not oldItem:find('OLD FILE'), 'the file itself is new: ' .. oldItem)
+assert(not oldItem:find('price file built') and not oldItem:find('OLD FILE'), 'the file itself is new: ' .. oldItem)
 assert(oldItem:find('Everloot market 2s 5c'), 'a stale item keeps its numbers: ' .. oldItem)
 local oldFile = priceFile('2026-10-20T06:30:00.000Z', '2026-10-30')
 assert(oldFile:find('OLD FILE') and oldFile:find('2026%-10%-20'), 'an old file is called old: ' .. oldFile)
@@ -486,18 +486,18 @@ for i, w in ipairs(want) do
 end
 
 -- The evidence stays, on its own quieter lines under the values it qualifies: the community day, units and
--- reporters and the file date before the player's own scan, the scan's units and age after its values.
-local day = lineAt(rows, '  40 units listed, 3 reporters on 2026-10-20')
-local built = lineAt(rows, '  price file built 2026-10-20')
-local scanned = lineAt(rows, '  100 units listed, scanned under 1 h ago')
-assert(day and built and scanned, 'dates, units and reporters stay in the tooltip')
-assert(select(2, labelled(rows, 'Historical')) < day and day < built and built < select(2, labelled(rows, 'Your scan · min buyout')), 'community evidence under the community values')
+-- reporters before the player's own scan, the scan's units and age after its values.
+local day = lineAt(rows, '  40 listed · 3 reporters · Oct 20')
+assert(not lineAt(rows, '  price file built'), 'fresh file dates stay out of the tooltip')
+local scanned = lineAt(rows, '  100 listed · under 1 h ago')
+assert(day and scanned, 'dates, units and reporters stay in the tooltip')
+assert(select(2, labelled(rows, 'Historical')) < day and day < select(2, labelled(rows, 'Your scan · min buyout')), 'community evidence under the community values')
 assert(select(2, labelled(rows, 'Value')) < scanned and scanned < select(2, labelled(rows, 'Vendor')), 'the own scan evidence under its values')
 local dropRow, drop = labelled(rows, 'Drops from Defias Bandit')
 assert(drop and drop > select(2, labelled(rows, 'Vendor')), 'the drop lines follow the prices, as before')
--- A drop rate is a row like a price, its rate in the value column, its loot windows and installs muted beneath.
-assert(dropRow.right == '12.4%' and dropRow.rr == 1, 'the rate in the value column: ' .. dropRow.right)
-assert(rows[drop + 1].text == '  42 of 340 loot windows, 5 installs' and rows[drop + 1].wrap == true, 'its denominator beneath: ' .. tostring(rows[drop + 1].text))
+-- A drop rate and its windows share the value column.
+assert(dropRow.right == '12% · 340 windows' and dropRow.rr == 1, 'the rate in the value column: ' .. dropRow.right)
+assert(not (rows[drop + 1].text or ''):find('loot windows'), 'no redundant drop detail beneath')
 for _, row in ipairs(rows) do
   assert(contrast(row.r, row.g, row.b) >= 4.5, 'legible on the tooltip background: ' .. (row.left or row.text))
   if row.rr then assert(contrast(row.rr, row.rg, row.rb) >= 4.5, 'legible value: ' .. row.right) end
@@ -582,7 +582,7 @@ GetItemInfo = function() return nil end
 rows = nativeTooltipFor(765)
 assert(wordOf(labelled(rows, 'Market value · Alliance house').right) == 'unrecorded', 'unrecorded, not zero')
 assert(coinsOf(labelled(rows, 'Min buyout').right) == '30c' and coinsOf(labelled(rows, 'Historical').right) == '33c')
-local evidence, stale = lineAt(rows, '  900 units listed, 4 reporters on 2026-10-05'), lineAt(rows, 'STALE: newest public day 2026-10-05 is 15 days old')
+local evidence, stale = lineAt(rows, '  900 listed · 4 reporters · Oct 5'), lineAt(rows, 'STALE: newest public day 2026-10-05 is 15 days old')
 assert(evidence and stale == evidence + 1 and rows[stale].wrap == true, 'the stale day sits under its evidence and wraps')
 
 -- Thin markets (5 units or fewer on the newest day) are marked on their units, as the site marks them.
@@ -593,10 +593,20 @@ end
 priceFile('2,,400,450,2,2026-10-20,3;3,500,400,450,4,2026-10-20,3;4,10005,10000,123456,50,2026-10-20,3')
 rows = nativeTooltipFor(2)
 assert(wordOf(labelled(rows, 'Market value · Alliance house').right) == 'unrecorded (thin)', 'a thin unrecorded market')
-assert(lineAt(rows, '  2 units listed (thin), 3 reporters on 2026-10-20'), 'thin units are marked')
+assert(lineAt(rows, '  2 listed (thin) · 3 reporters · Oct 20'), 'thin units are marked')
 rows = nativeTooltipFor(3)
-assert(coinsOf(labelled(rows, 'Market value · Alliance house').right) == '5s 0c' and lineAt(rows, '  4 units listed (thin), 3 reporters on 2026-10-20'),
+assert(coinsOf(labelled(rows, 'Market value · Alliance house').right) == '5s 0c' and lineAt(rows, '  4 listed (thin) · 3 reporters · Oct 20'),
   'a market value over a thin newest day keeps its value and marks the day thin')
+-- Compact metadata uses grouped counts and singular reporters, including our own scan.
+priceFile('900001,205,200,190,3749,2026-11-07,1')
+rows = nativeTooltipFor(900001)
+assert(lineAt(rows, '  3,749 listed · 1 reporter · Nov 7'), 'grouped units, singular reporter and short day')
+local ownScan = Everloot.OwnScan
+Everloot.OwnScan = function() return { at = time() - 3 * 3600, house = 'Alliance', items = { [900001] = { 0, 0, 2327, 70, 89 } } } end
+rows = nativeTooltipFor(900001)
+assert(lineAt(rows, '  2,327 listed · 3 h ago'), 'own scan count and age without a repeated house')
+Everloot.OwnScan = ownScan
+priceFile('2,,400,450,2,2026-10-20,3;3,500,400,450,4,2026-10-20,3;4,10005,10000,123456,50,2026-10-20,3')
 -- Gold keeps its silver and copper, as E.Coins writes them, and the plain line says the same amount.
 local gold = {}
 for _, line in ipairs(Everloot.PriceLines('Forever', 4)) do
@@ -611,7 +621,7 @@ assert(table.concat(gold, '|') == '1g 0s 5c|1g 0s 0c|12g 34s 56c', table.concat(
 date = function() return '2026-10-30T10:00:00Z' end
 priceFile('2589,205,200,190,40,2026-10-20,3', '2026-10-20T06:30:00.000Z')
 rows = nativeTooltipFor(2589)
-local listed = lineAt(rows, '  40 units listed, 3 reporters on 2026-10-20')
+local listed = lineAt(rows, '  40 listed · 3 reporters · Oct 20')
 local itemStale, fileOld = lineAt(rows, 'STALE: newest public day 2026-10-20 is 10 days old'), lineAt(rows, 'OLD FILE: built 2026-10-20')
 assert(listed and itemStale == listed + 1 and fileOld == listed + 2 and fileOld < select(2, labelled(rows, 'Your scan · min buyout')), 'warnings beside the community values')
 assert(rows[itemStale].wrap and rows[fileOld].wrap and coinsOf(labelled(rows, 'Market value · Alliance house').right) == '2s 5c', 'they wrap, and the values stay')
@@ -621,7 +631,7 @@ date = function() return '2026-10-20T10:00:00Z' end
 EverlootPricesDB = nil
 Everloot:ResetPrices()
 rows = nativeTooltipFor(2589)
-assert(labelled(rows, 'Your scan · min buyout') and labelled(rows, 'Value') and lineAt(rows, '  100 units listed, scanned under 1 h ago, house not recorded'), 'the own scan alone')
+assert(labelled(rows, 'Your scan · min buyout') and labelled(rows, 'Value') and lineAt(rows, '  100 listed · under 1 h ago · house not recorded'), 'the own scan alone')
 for _, row in ipairs(rows) do assert(not (row.left or row.text):find('Alliance house', 1, true), 'an own scan is not a community price') end
 assert(wordOf(rows[1].right) == 'Forever · per unit', 'its values are per unit too')
 
@@ -969,7 +979,7 @@ local file = Everloot:PriceFile(realm)
 assert(file.legacy and file.status == 'bad' and file.silent, 'the file says it holds an older realm-only block')
 local tip = tooltipFor(2589)
 assert(not tip:find('7s 0c') and tip:find('from before houses were kept apart', 1, true), 'the tooltip says why there is no price: ' .. tip)
-assert(tip:find('Everloot drop: NPC 116', 1, true), 'the rest of an older file still reads: ' .. tip)
+assert(tip:find('Everloot drop: an unnamed NPC (NPC 116)', 1, true), 'the rest of an older file still reads: ' .. tip)
 printed = {}
 Everloot.PriceCommand('2589')
 local said = table.concat(printed, '\\n')
@@ -1020,7 +1030,7 @@ assert(horde and horde.house == 'Horde' and horde.items[2589][4] == 900, 'a Hord
 house = 'Alliance'
 assert(Everloot:OwnScan(realm).items[2589][4] == 100, 'an Alliance character sees the Alliance scan')
 assert(Everloot:OwnScan(realm, 'Neutral') == nil, 'no scan of the neutral house: none shown')
-assert(tooltipFor(2589):find('scanned under 1 h ago, Alliance house', 1, true), 'the own scan line names its house')
+assert(tooltipFor(2589):find('listed · under 1 h ago', 1, true), 'the own scan line keeps its count and age')
 -- Three more Alliance scans: the Horde scan is older than the three kept, and stays as that house's latest.
 for _ = 1, 3 do scanAt('Alliance', 120) end
 house = 'Horde'

@@ -84,7 +84,7 @@ export class ForeverApi {
 
   async get(
     path: string,
-    kind: "profile" | "dynamic",
+    kind: "profile" | "dynamic" | "static",
     opts?: { ifModifiedSince?: string },
   ): Promise<ApiResult> {
     const url = new URL(`https://${this.cfg.region}.api.blizzard.com${path}`);

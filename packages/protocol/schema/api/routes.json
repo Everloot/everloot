@@ -450,6 +450,16 @@
             "2589,2592"
           ]
         }
+      },
+      {
+        "name": "fields",
+        "description": "`full` appends three positions to every row and to `fields`: updatedAt (when the scans behind the newest open public day were taken, or null once only closed days remain), ageDays and change1d (the one-day change of the market value, (to - from) / from, or null without a solid day and the solid day before it). Without it rows are the seven positions readers have always had.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "full"
+          ]
+        }
       }
     ],
     "responses": {
@@ -458,7 +468,7 @@
         "schema": "marketPricesResponse"
       },
       "400": {
-        "description": "Invalid realm, house or items. items requires a realm and one list of at most 100 positive safe-integer IDs.",
+        "description": "Invalid realm, house, items or fields. items requires a realm and one list of at most 100 positive safe-integer IDs; fields is `full` or absent.",
         "schema": "apiError"
       },
       "429": {

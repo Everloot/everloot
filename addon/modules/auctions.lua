@@ -15,6 +15,7 @@ E.SCANS_KEPT = 3          -- full scans kept per realm in SavedVariables
 E.SAMPLES_KEPT = 2        -- partial price samples kept per realm: the newest earlier one beside the one being taken
 E.SCAN_WAIT_SECONDS = 30  -- how long a scan waits for REPLICATE_ITEM_LIST_UPDATE before giving up
 local RETRY_SECONDS = 2   -- one more read for rows whose item data had not loaded
+local FALLBACK_REQUESTS = 40  -- search requests the sample sends at most
 
 local function say(msg)
   print("Everloot: " .. msg)
@@ -222,7 +223,7 @@ local function fallbackResult(s, event, arg)
     local full
     if s.commodity then full = readable(C_AuctionHouse.HasFullCommoditySearchResults(key.itemID))
     else full = readable(C_AuctionHouse.HasFullItemSearchResults(key)) end
-    if full == false and s.pages < 3 and s.requests < 40 then
+    if full == false and s.pages < 3 and s.requests < FALLBACK_REQUESTS then
       s.pending = "moreSearch"
     else
       storeFallbackItem(s)
@@ -258,7 +259,7 @@ local function startFallback(s)
         if s.phase == "browse" then finishFallback(s) else nextFallbackItem(s) end
       end
       if scan ~= s or not s.pending then return end
-      if s.requests >= 40 then finishFallback(s); return end
+      if s.requests >= FALLBACK_REQUESTS then finishFallback(s); return end
       if readable(C_AuctionHouse.IsThrottledMessageSystemReady()) ~= true then return end
       local pending = s.pending
       s.pending, s.awaiting, s.sentAt = nil, true, elapsed
@@ -297,10 +298,13 @@ end
 
 --- One replicate row into the scan: "ok", "skip" (no price, bad size) or "incomplete" (data not loaded).
 local function readRow(i)
-  local _, _, count, _, _, _, _, _, _, buyout, _, _, _, _, _, _, itemId, hasAllInfo = C_AuctionHouse.GetReplicateItemInfo(i)
+  local name, _, count, _, _, _, _, _, _, buyout, _, _, _, _, _, _, itemId, hasAllInfo = C_AuctionHouse.GetReplicateItemInfo(i)
   if type(itemId) ~= "number" or type(count) ~= "number" or type(buyout) ~= "number" then
     return hasAllInfo == false and "incomplete" or "skip"
   end
+  -- The name the house gave with the row, for the tab's lookup by name: the client names only items it has loaded.
+  name = readable(name)
+  if type(name) == "string" and name ~= "" then scan.names[itemId] = name end
   if count < 1 or buyout <= 0 then return "skip" end
   count = math.floor(count)
   -- A buyout below its stack size is under 1 copper a unit: not a price.
@@ -364,6 +368,12 @@ local function finish()
     EverlootDB.houseScans[s.realm][s.house] = { scanId = scanId, at = s.startedAt }
   end
   pruneScans(s.realm)
+  -- The names the rows carried, by realm, so the tab finds an item the client has not loaded by its name. Not a
+  -- record: nothing uploads them, and a later scan adds to them.
+  local names = EverlootDB.scanNames and EverlootDB.scanNames[s.realm] or {}
+  for id, name in pairs(s.names) do names[id] = name end
+  EverlootDB.scanNames = EverlootDB.scanNames or {}
+  EverlootDB.scanNames[s.realm] = names
   EverlootDB.lastScans = EverlootDB.lastScans or {}
   EverlootDB.lastScans[s.realm] = { scanId = scanId, at = s.startedAt }
   E.ownScanCache = nil
@@ -388,6 +398,7 @@ end
 local function retryFrom(s, from)
   return guarded(function()
     if scan ~= s then return end
+    s.retryNext = from
     local last = math.min(#s.retry, from + E.SCAN_CHUNK - 1)
     for k = from, last do
       if readRow(s.retry[k]) ~= "ok" then s.incomplete = s.incomplete + 1 end
@@ -428,7 +439,7 @@ function E:StartScan()
   local started = {
     realm = realm, startedAt = time(), at = date("!%Y-%m-%dT%H:%M:%SZ"), waiting = true,
     faction = playerFaction(), house = E.auctionHouseKind,
-    byItem = {}, retry = {}, skipped = 0, incomplete = 0, next = 1, total = 0,
+    byItem = {}, names = {}, retry = {}, skipped = 0, incomplete = 0, next = 1, total = 0, retryNext = 1,
     previousScanAt = EverlootDB.lastScanAt,
   }
   scan = started
@@ -448,6 +459,32 @@ end
 --- True while a full scan is waiting for or reading the house.
 function E:Scanning()
   return scan ~= nil
+end
+
+--- What the running scan is doing, for a progress bar: a line of words and how far along it is, 0 to 1; nothing
+--- between scans. The house answers the replicate request in one piece, after a wait of its own, so the wait says
+--- its seconds and the most the scan allows before it falls back to a sample, and fills toward them. The read and
+--- the second read fill it by rows; the sample counts requests.
+function E:ScanProgress()
+  local s = scan
+  if not s then return nil end
+  if s.fallback then
+    return string.format("Sampling search prices: %d of %d requests, %d items", s.requests, FALLBACK_REQUESTS, s.stored),
+      math.min(1, s.requests / FALLBACK_REQUESTS)
+  end
+  if s.waiting then
+    local seconds = math.max(0, time() - s.startedAt)
+    return string.format("Waiting for the house's listings: %d s, up to %d s", seconds, E.SCAN_WAIT_SECONDS),
+      math.min(1, seconds / E.SCAN_WAIT_SECONDS)
+  end
+  if s.total > 0 and s.next <= s.total then
+    return string.format("Reading %d of %d listings", s.next - 1, s.total), (s.next - 1) / s.total
+  end
+  local again = #s.retry
+  if again > 0 then
+    return string.format("Reading again %d of %d listings whose items had not loaded", s.retryNext - 1, again), (s.retryNext - 1) / again
+  end
+  return "Finishing", 1
 end
 
 local function addButton()

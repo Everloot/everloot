@@ -200,9 +200,9 @@ function placed(row: ObjectSpawnRow): row is PlacedRow {
 
 /**
  * Object names 3 installs agree on, by object id. Ids without one are left out: show "Object <id>". Under `recheck`,
- * an object is placed on the map most installs saw it on.
+ * an object is placed on the map most installs saw it on. `publicDrops` also allows the two-install label exception.
  */
-export function agreedObjectNames(rows: ObjectSpawnRow[], recheck: readonly RecheckScope[] = []): Map<number, string> {
+export function agreedObjectNames(rows: ObjectSpawnRow[], recheck: readonly RecheckScope[] = [], publicDrops = false): Map<number, string> {
   let sinceOf: ((id: number) => string | null) | undefined;
   if (recheck.length) {
     const maps = new Map<number, Map<number, Set<string>>>();
@@ -214,7 +214,7 @@ export function agreedObjectNames(rows: ObjectSpawnRow[], recheck: readonly Rech
     }
     sinceOf = (id) => scopeSince(recheck, { types: ["treasures"], zones: [busiestMap(maps.get(id) ?? new Map())], ids: [id] });
   }
-  return agreedLabelsById(rows.filter((r) => r.name !== undefined).map((r) => ({ id: r.objectId, installId: r.installId, label: r.name!, ...(r.capturedAt ? { capturedAt: r.capturedAt } : {}) })), sinceOf);
+  return agreedLabelsById(rows.filter((r) => r.name !== undefined).map((r) => ({ id: r.objectId, installId: r.installId, label: r.name!, ...(r.capturedAt ? { capturedAt: r.capturedAt } : {}) })), sinceOf, publicDrops);
 }
 
 /** How each object is opened, by object id, when 3 installs agree on one kind. */
