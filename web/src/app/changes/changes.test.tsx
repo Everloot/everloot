@@ -50,7 +50,8 @@ test("compact ChangeList manual rows show Everloot summary and clickable origina
 test("manual retail rows link the original from the title, say Everloot wrote the summary, and keep day precision", async () => {
   timeline.entries = [...entries, manualRow];
   const html = await page({ game: "retail" });
-  expect(html).toMatch(new RegExp(`<a href="${manualRow.url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*>Retail source fixture</a>`));
+  const original = /<a href="([^"]+)"[^>]*>Retail source fixture<\/a>/.exec(html);
+  expect(original?.[1]).toBe(manualRow.url);
   expect(html).toContain("Summary by Everloot; the title links the original source. Everloot summary fixture.");
   expect(html).toContain('dateTime="2026-10-23"');
   expect(html).toContain('"datePublished":"2026-10-23"');
