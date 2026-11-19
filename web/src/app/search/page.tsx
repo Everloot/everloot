@@ -7,8 +7,7 @@ import { Container, DataTable, DataTitle, Entry, EntryList, filledColumns, LinkT
 import { CC_BY_SA } from "@/lib/jsonld";
 import { BROWSE_HEADINGS, BROWSE_TYPES, hasTypes, loreSlug, MAX_QUERY, searchLore, UNAVAILABLE, UNAVAILABLE_COPY, type BrowseSlug, type LoreType } from "@/lib/lore";
 import { HEADINGS, isScope, isResultScope, isPagedScope, siteSearch, type ResultScope, type SearchGroup, type SearchResult, type SearchType } from "@/lib/site-search";
-import { loadShownSearchNames } from "@/lib/shown-search-names";
-import { loadShownNames } from "@/lib/shown-item-names";
+import { loadSearchShown } from "@/lib/shown-search-names";
 import { shownItemIcons } from "@/lib/item-icons";
 import { guildSearchPrefix, guildsOn } from "@/lib/guilds";
 import { playerPagesOn, searchPrefix } from "@/lib/player-pages";
@@ -90,10 +89,11 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
   if (first(params.in) === "lore" || params.page !== undefined || params.type !== undefined) return LoreResults({ q, params });
   const scope = isResultScope(first(params.in)) ? (first(params.in) as ResultScope) : undefined;
 
-  // Reuse item facts only within this render; the next request rechecks publication.
-  const shown = q ? loadShownNames() : undefined;
+  // The names the database pages show (the stored names file, else the aggregates within this render), and from the
+  // same read which item rows show an icon; the next request rechecks publication.
+  const shown = q ? loadSearchShown() : undefined;
   // Matched on the names the database pages show, so a name a list prints is found here too.
-  const groups = q ? await siteSearch(q, { ...(scope ? { only: scope, limit: SCOPED_LIMIT, ...(isPagedScope(scope) ? { page: pageNumber(first(params.p)) } : {}) } : {}), names: loadShownSearchNames(shown) }) : null;
+  const groups = q ? await siteSearch(q, { ...(scope ? { only: scope, limit: SCOPED_LIMIT, ...(isPagedScope(scope) ? { page: pageNumber(first(params.p)) } : {}) } : {}), names: shown!.then((s) => s.names), objects: shown!.then((s) => s.objects) }) : null;
   // The game icon beside each item hit, where its page shows one.
   const { icons, unknown } = await shownItemIcons(groups?.find((g) => g.type === "item")?.results.flatMap((r) => (r.id === undefined ? [] : [r.id])) ?? [], shown);
   const base = `/search?q=${encodeURIComponent(q)}`;

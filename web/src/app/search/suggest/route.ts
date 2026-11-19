@@ -1,7 +1,6 @@
 import { MAX_QUERY } from "@/lib/lore";
 import { isScope, suggest, SUGGEST_LIMIT } from "@/lib/site-search";
-import { loadShownSearchNames } from "@/lib/shown-search-names";
-import { loadShownNames } from "@/lib/shown-item-names";
+import { loadSearchShown } from "@/lib/shown-search-names";
 import { shownItemIcons } from "@/lib/item-icons";
 
 /**
@@ -21,11 +20,11 @@ export async function GET(req: Request) {
   const scope = params.get("in");
   if (q.length > MAX_QUERY) return Response.json({ ok: false, error: `q is at most ${MAX_QUERY} characters.` }, { status: 400, headers: ERROR_HEADERS });
   if (scope !== null && !isScope(scope)) return Response.json({ ok: false, error: "in must be one of item, npc, quest, object." }, { status: 400, headers: ERROR_HEADERS });
-  // Names and icons use one publication-checked item fact set for this request.
-  const shown = q ? loadShownNames() : undefined;
-  const rows = q ? await suggest(q, scope ?? undefined, await loadShownSearchNames(shown), { tolerant: true }) : [];
+  // Names and icons come from one read: the stored names file, or one publication-checked item fact set for this request.
+  const shown = q ? await loadSearchShown() : undefined;
+  const rows = shown ? await suggest(q, scope ?? undefined, shown.names, { tolerant: true, objects: shown.objects }) : [];
   // Item rows carry the game icon where the item's page shows one.
-  const { icons } = await shownItemIcons(rows.flatMap((r) => (r.type === "item" ? [r.id] : [])), shown);
+  const { icons } = await shownItemIcons(rows.flatMap((r) => (r.type === "item" ? [r.id] : [])), shown && Promise.resolve(shown));
   const results = rows.map((r) => (r.type === "item" && icons.has(r.id) ? { ...r, icon: icons.get(r.id) } : r));
   return Response.json({ q, limit: SUGGEST_LIMIT, results }, { headers: HEADERS });
 }
