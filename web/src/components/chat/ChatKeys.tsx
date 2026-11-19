@@ -169,7 +169,7 @@ function ProviderCard({ preset, saved, isDefault, busy, onSave, onTest, onRemove
 }
 
 /**
- * The Chat keys section of /account: one card per provider Chat supports, each with its key's status, its model and
+ * The Chat keys part of /settings: one card per provider Chat supports, each with its key's status, its model and
  * Add, Replace, Test and Remove, and the default provider Chat uses. Everything is read from and written to this
  * tab's sessionStorage (lib/chat/store.ts); nothing here talks to Everloot. Test sends the key to its own
  * provider only.

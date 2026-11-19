@@ -840,11 +840,13 @@ things are asked in return: credit it, and use a free key when you copy all of i
 characters, its name, what its owner says it is for, its permissions, its account, when it was
 made, when it expires, when it was last used and revoked, and a count of its requests per day and
 endpoint. Not what was asked. The purpose is asked when a key is made so we know what keys are used
-for; it is not published. A key made on /account expires on the date its owner picks (7, 30, 90 or
+for; it is not published. The last-used time is shown only to the key's owner, on /settings, beside the key;
+it records when, never which app or what was asked, and is written at most once a minute per key. A key made on
+/settings expires on the date its owner picks (7, 30, 90 or
 365 days, or a date up to a year ahead); past it, every endpoint refuses the key, as it does a
 revoked one. Keys made before expiry existed, and the Desktop App's key, have no end date. Daily
 counts are kept 90 days. A revoked key and its counts are deleted 30 days after it was revoked, or
-at once when its owner deletes it on /account; an expired key stays until its owner deletes it. Deleting an account (write to hello@everloot.app) deletes its keys and counts. Anonymous
+at once when its owner deletes it on /settings; an expired key stays until its owner deletes it. Deleting an account (write to hello@everloot.app) deletes its keys and counts. Anonymous
 requests are counted per hour against a keyed hash of the address, which is deleted after about a
 day; the address itself is never stored.
 

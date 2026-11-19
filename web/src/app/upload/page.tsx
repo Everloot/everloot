@@ -33,7 +33,7 @@ export default function UploadPage() {
       <div className="space-y-6">
         {armoryOn() && <p className="text-sm text-fg-2">
           Want a character profile? <Link href="/armory/submit" className={link}>Add your full character name or Blizzard armory link</Link>.
-          {" "}<Link href="/account" className={link}>Connect your linked character</Link> to choose which addon details to share on it.
+          {" "}<Link href="/settings#characters" className={link}>Connect your linked character</Link> to choose which addon details to share on it.
         </p>}
         <p className="text-fg-2">
           Open-world sightings stay anonymous, and guild data publishes only through your officers.

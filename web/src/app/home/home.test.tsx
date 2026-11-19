@@ -227,7 +227,7 @@ test("no characters and no builds: one card with the ways in, no empty rails and
   expect(card).toContain("Bring in your characters");
   // The addon is the filled action; Battle.net goes to the account's existing integrations; the rest are links.
   expect(card).toMatch(/<a href="\/addon" class="btn btn-primary[^"]*">Get the addon</);
-  expect(card).toMatch(/<a href="\/account#integrations" class="btn [^"]*">Connect Battle.net</);
+  expect(card).toMatch(/<a href="\/settings#integrations" class="btn [^"]*">Connect Battle.net</);
   expect(card).toContain('href="/me"');
   expect(card).toContain('href="/upload"');
   expect(card.match(/btn-primary/g)).toHaveLength(1);

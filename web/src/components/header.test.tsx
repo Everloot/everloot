@@ -53,9 +53,9 @@ test("Guides holds the guides that exist: dungeons and raids, Herbalism gatherin
   expect(menuHrefs("Guides", navItems({ reviewedGuides: true }))).toEqual(["/guides", ...today]);
 });
 
-test("Profile holds the account pages and the lists kept on this device; Settings and My builds follow their switches", () => {
-  expect(menuHrefs("Profile")).toEqual(["/account", "/tools/gold-ledger", "/tools/builds", "/tools/alts"]);
-  expect(menuHrefs("Profile", navItems({ profiles: true, savedBuilds: true }))).toEqual(["/account", "/settings", "/me", "/tools/gold-ledger", "/tools/builds", "/tools/alts"]);
+test("Profile holds Settings (the account since #1278) and the lists kept on this device; My builds follows its switch", () => {
+  expect(menuHrefs("Profile")).toEqual(["/settings", "/tools/gold-ledger", "/tools/builds", "/tools/alts"]);
+  expect(menuHrefs("Profile", navItems({ profiles: true, savedBuilds: true }))).toEqual(["/settings", "/me", "/tools/gold-ledger", "/tools/builds", "/tools/alts"]);
 });
 
 test("Farming, Collections and Upload are hidden until polished: no menu, phone menu or footer links them", () => {

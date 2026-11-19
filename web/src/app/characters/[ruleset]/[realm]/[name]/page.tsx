@@ -202,7 +202,7 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
     if (owner !== "unavailable" && seen !== "unavailable") notFound();
     return (
       <Container width="reading">
-        <PageHeader trail={trailFor("/account")!.slice(0, 1)} title="Character" />
+        <PageHeader trail={trailFor("/settings")!.slice(0, 1)} title="Character" />
         <div className="space-y-4">
           {owner === "unavailable" && <Unavailable text={UNAVAILABLE} />}
           {seen === "unavailable" && <Unavailable text={PLAYER_STORAGE_UNAVAILABLE} />}

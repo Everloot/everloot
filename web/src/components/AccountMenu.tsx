@@ -44,13 +44,13 @@ export function currentStatus(status: AccountStatus | null | undefined, now = Da
 }
 
 /**
- * The middle sections of the avatar menu. Every variant links to the account page by name, with API keys as a
- * second entry into it. Without a shell (EVERLOOT_PROFILES off), the links there are today.
+ * The middle sections of the avatar menu. Every variant links to Settings, which holds the account (#1278), with API
+ * keys as a second entry into it. Without a shell (EVERLOOT_PROFILES off), the links there are today.
  */
 export function accountMenuSections(shell: AccountShell | null | undefined, savedBuilds: boolean): MenuLink[][] {
   const builds = savedBuilds ? [{ label: "Your builds", href: "/me" }] : [];
-  const account = { label: "Your account", href: "/account" };
-  const apiKeys = { label: "API keys", href: "/account#keys" };
+  const account = { label: "Settings", href: "/settings" };
+  const apiKeys = { label: "API keys", href: "/settings#keys" };
   const desktop = { label: "Desktop App and addon", href: "/addon" };
   if (!shell) return [[...builds, account, apiKeys, desktop]];
   return [
@@ -60,7 +60,7 @@ export function accountMenuSections(shell: AccountShell | null | undefined, save
       ...(savedBuilds ? [{ label: "Your characters", href: "/me" }] : []),
       ...builds,
     ],
-    [account, apiKeys, desktop, { label: "Settings", href: "/settings" }],
+    [account, apiKeys, desktop],
   ];
 }
 
@@ -276,7 +276,7 @@ export function AvatarMenu({ name, initialShell = null, profiles = false, savedB
         <div className="flex items-center gap-3 px-3 py-2">
           <Avatar name={shown} fill={fill} size="md" />
           <div className="min-w-0 flex-1">
-            <a href="/account" className="block truncate font-semibold text-fg hover:underline underline-offset-4">{shown}</a>
+            <a href="/settings" className="block truncate font-semibold text-fg hover:underline underline-offset-4">{shown}</a>
             {shell && (shell.handle
               ? <p className="truncate text-sm text-muted">@{shell.handle}</p>
               : <a href="/settings" className="text-sm text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Choose a handle</a>)}
