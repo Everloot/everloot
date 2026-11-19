@@ -1,8 +1,8 @@
-import { computeCoverage, parseCoverageExpected, type CoverageExpected, type CoverageInput, type CoverageReport } from "@kb/coverage";
+import { parseCoverageExpected, type CoverageExpected, type CoverageInput } from "@kb/coverage";
 import { buildFolder, privateStoreFromEnv, type PrivateStore } from "./game-assets";
 import { CLIENT_LAYER } from "./items";
 import { assetsBaseUrl } from "./talents/assets";
-import { uploadStore, type Corpus } from "./upload-store";
+import type { Corpus } from "./upload-store";
 import { WORLD_MAP } from "./world-map";
 import { RECHECK_SCOPES } from "./recheck-scopes";
 import { placedEntrances, publicZones } from "./zones";
@@ -36,24 +36,4 @@ export function coverageInput(corpus: Pick<Corpus, "records" | "dataAsOf">, expe
     heldBack: WORLD_MAP.heldBackZones.map((z) => z.uiMapId),
     fileEntrances, expected, recheck: RECHECK_SCOPES,
   };
-}
-
-/** The score for one corpus (`coverageInput`). */
-export function coverageFor(corpus: Pick<Corpus, "records" | "dataAsOf">, expected: CoverageExpected | null, asOf: string | null = corpus.dataAsOf ?? null): CoverageReport {
-  return computeCoverage(coverageInput(corpus, expected, asOf));
-}
-
-let memo: { key: string; expected: CoverageExpected | null; report: CoverageReport } | null = null;
-
-/**
- * The score computed live from the corpus, once per corpus version (the key rollup-compute.ts uses) and expected
- * file: only the MCP tool's fallback when the stored score is unusable. The pages read the stored score instead.
- * Null when storage is out of reach: unknown, never zero.
- */
-export async function loadCoverage(): Promise<CoverageReport | null> {
-  const [corpus, expected] = await Promise.all([uploadStore.loadCorpus(), loadCoverageExpected()]);
-  if (corpus.unreachable) return null;
-  const key = `${corpus.uploads}|${corpus.dataAsOf ?? ""}|${corpus.records.length}`;
-  if (!memo || memo.key !== key || memo.expected !== expected) memo = { key, expected, report: coverageFor(corpus, expected) };
-  return memo.report;
 }

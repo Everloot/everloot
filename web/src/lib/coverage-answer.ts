@@ -1,16 +1,13 @@
-import type { LoadedCoverage } from "@kb/coverage-tool";
-import { loadCoverage } from "./coverage-compute";
+import { COVERAGE_NOT_MEASURED, type CoverageLoader } from "@kb/coverage-tool";
 import { loadStoredCoverage } from "./coverage-summary";
 
 /**
- * The score the MCP coverage tool answers from. The stored report for this build is what the home page counts, so it
- * is read first and nothing replays the corpus while it is usable. Only when it is missing, unreadable or for another
- * build does the tool compute the score live, as the coverage pages do, and the answer's date line says which it was.
+ * The score the MCP coverage tool answers from: the stored report for this build, the one the home page counts. When
+ * it is missing, unreadable or for another build, the tool says the score is not measured yet. It never computes the
+ * score from the corpus: that replay loaded the whole corpus into a request and ran the Worker out of memory (#1354).
  * `source` is never part of the stored file: it is added here, per answer.
  */
-export async function loadCoverageForTool(deps: { stored?: typeof loadStoredCoverage; live?: typeof loadCoverage } = {}): Promise<LoadedCoverage | null> {
+export async function loadCoverageForTool(deps: { stored?: typeof loadStoredCoverage } = {}): ReturnType<CoverageLoader> {
   const stored = await (deps.stored ?? loadStoredCoverage)();
-  if (stored) return { ...stored, source: "stored" };
-  const live = await (deps.live ?? loadCoverage)();
-  return live ? { ...live, source: "live" } : null;
+  return stored ? { ...stored, source: "stored" } : COVERAGE_NOT_MEASURED;
 }

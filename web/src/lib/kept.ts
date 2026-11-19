@@ -41,6 +41,8 @@ export interface Keeper<T, A> {
   fresh(now?: number): Kept<T> | null;
   /** The last entry kept, fresh or not. */
   last(): Kept<T> | null;
+  /** Keep a value the caller already holds (a store that just wrote it), as if a read starting at `now` had returned it. */
+  set(fresh: Fresh<T>, now?: number): void;
   /** For tests: forget the entry and any read in flight. */
   forget(): void;
 }
@@ -76,6 +78,9 @@ export function keep<T, A = void>(load: (arg: A, last: Kept<T> | null, now: numb
       return kept && now < kept.until ? kept : null;
     },
     last: () => kept,
+    set(fresh, now = Date.now()) {
+      kept = { value: fresh.value, at: now, until: now + (fresh.keepMs ?? opts.ttlMs) };
+    },
     forget() { kept = null; pending = null; },
   };
 }
