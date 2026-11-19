@@ -110,6 +110,15 @@ With scans off, the first visit instead explains how to opt in. The scan action 
 **Scanning...** or **Ready in M:SS**, and is disabled while busy or cooling down. Last-scan age and saved-file
 status remain in the tab. The tab and settings use native WoW fonts, gold headings and standard controls.
 
+### Crafting market changes
+
+In the Everloot window's Professions view, **Crafting costs** keeps each recipe's cost, value and estimated
+profit beside a Scan indicator. Its arrow shows the product's min-buyout direction; the bars show up to three
+kept scans, oldest first. Hover a recipe for its min-buyout percentage and units-listed change since the previous
+scan of this house, the scan interval and older scan's age, the price file's market value vs its 60-day median,
+and the price swing across those sources. These are listing changes, never sales. Missing prices stay unknown;
+one scan asks you to scan again later. Green points up, gold points down, and a dash means no direction is known.
+
 ### Shopping lists
 
 **Shopping list**, at the top right of the Everloot tab at the auction house, swaps the scan controls and the price
