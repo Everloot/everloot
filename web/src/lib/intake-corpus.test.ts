@@ -209,6 +209,10 @@ describe("intake through the store into published facts", () => {
       if (req.method === "POST" && url.startsWith("https://sb.example/rest/v1/uploads")) {
         return new Response(null, { status: 201 });
       }
+      if (url.startsWith(`${R2}snapshots/corpus/`)) {
+        if (req.method === "PUT") { stored[url] = await req.text(); return new Response(null, { status: 200 }); }
+        return url in stored ? new Response(stored[url]) : new Response("missing", { status: 404 });
+      }
       if (req.method === "PUT" && url === `${R2}snapshots/corpus.json`) {
         snapshotBody = await req.text();
         return new Response(null, { status: 200 });
@@ -222,7 +226,7 @@ describe("intake through the store into published facts", () => {
         ]);
       }
       if (req.method === "GET" && url.startsWith(`${R2}uploads/`)) {
-        const body = Object.values(stored)[0];
+        const body = Object.entries(stored).find(([key]) => key.startsWith(`${R2}uploads/`))?.[1];
         return body ? new Response(body) : new Response("missing", { status: 404 });
       }
       return new Response("no route", { status: 404 });
@@ -231,15 +235,18 @@ describe("intake through the store into published facts", () => {
     const writer = createUploadStore({ cloud, localDir: "unused", fetch: fn, now, cacheMs: 0 });
     const POST = await postWith(writer);
     expect((await POST(jsonRequest(mixedPayload))).status).toBe(200);
-    expect(Object.values(stored).map((body) => JSON.parse(body))).toEqual([
+    expect(Object.entries(stored).filter(([url]) => url.startsWith(`${R2}uploads/`)).map(([, body]) => JSON.parse(body))).toEqual([
       { addonVersion: "0.1.0", records: [goodLoot] },
     ]);
 
     expect(await writer.writeSnapshot()).toMatchObject({ uploads: 1, added: 1 });
-    // The snapshot carries its records as replay events, once; the records array stays empty for the older reader.
+    // The snapshot lists its parts, which carry its records as replay events, once. It has no records array, so a
+    // reader from before the parts refuses it rather than reading an empty corpus.
     const snapshot = JSON.parse(snapshotBody);
-    expect(snapshot.records).toEqual([]);
-    expect(snapshot.corpusState.events.map((e: { record: unknown }) => e.record)).toEqual([goodLoot]);
+    expect(snapshot.format).toBe(2);
+    expect(snapshot.records).toBeUndefined();
+    const events = snapshot.parts.flatMap((key: string) => JSON.parse(stored[`${R2}${key}`]));
+    expect(events.map((e: { record: unknown }) => e.record)).toEqual([goodLoot]);
 
     const reader = createUploadStore({ cloud, localDir: "unused", fetch: fn, now, cacheMs: 0 });
     const corpus = await reader.loadCorpus();

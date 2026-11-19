@@ -20,7 +20,7 @@ test.each([false, true])("recovery snapshot conflicts survive subsequent replay,
   const store = createUploadStore({ cloud, localDir: "unused", fetch });
   expect((await store.loadCorpus()).records).toEqual([]);
   await store.writeSnapshot({ rebuild });
-  expect(saved).toMatchObject({ records: [], corpusState: { conflicts: ['["install-one","event-one"]'] } });
+  expect(saved).toMatchObject({ format: 2, state: { conflicts: ['["install-one","event-one"]'] } });
 });
 
 test("legacy watermark updates do not turn a partial index into a complete inventory", async () => {

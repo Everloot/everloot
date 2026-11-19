@@ -29,6 +29,14 @@ function fakeFetch(routes: Array<[string, string, () => Response]>) {
   return { fn, calls };
 }
 
+/** The snapshot a write stored: its part list, and the events of the parts it wrote, in order. */
+function storedSnapshot(calls: Call[]) {
+  const list = JSON.parse(calls.find((c) => c.method === "PUT" && c.url === `${R2}snapshots/corpus.json`)!.body);
+  const parts = new Map(calls.filter((c) => c.method === "PUT" && c.url.startsWith(`${R2}snapshots/corpus/`)).map((c) => [c.url, c.body]));
+  const events = (list.parts as string[]).flatMap((key) => JSON.parse(parts.get(`${R2}${key}`)!) as { record: unknown }[]);
+  return { list, events };
+}
+
 const R2 = "https://acct.r2.cloudflarestorage.com/everloot-uploads/";
 const now = () => new Date("2026-10-04T12:00:00Z");
 const capturedAt = "2026-10-04T07:00:00.000Z";
@@ -339,20 +347,25 @@ describe("corpus snapshot", () => {
       ])],
       [`${R2}uploads/a.json`, "GET", () => Response.json({ records: [lootRow()] })],
       [`${R2}uploads/b.json`, "GET", () => Response.json({ records: [questRow()] })],
+      [`${R2}snapshots/corpus/`, "PUT", () => new Response(null, { status: 200 })],
       [SNAP, "PUT", () => new Response(null, { status: 200 })],
     ]);
     const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now });
     expect(await store.writeSnapshot()).toMatchObject({ uploads: 2, added: 2 });
-    const put = calls.find((c) => c.method === "PUT")!;
-    expect(JSON.parse(put.body)).toMatchObject({
+    const { list, events } = storedSnapshot(calls);
+    expect(list).toMatchObject({
+      format: 2,
       generatedAt: "2026-10-04T12:00:00.000Z",
       uploads: 2,
-      records: [],
       lastReceivedAt: "2026-10-04T08:00:00+00:00",
       lastIds: ["b"],
     });
-    expect(JSON.parse(put.body).corpusState.events.map((e: { record: unknown }) => e.record)).toEqual([lootRow(), questRow()]);
+    expect(list.records).toBeUndefined();
+    expect(events.map((e) => e.record)).toEqual([lootRow(), questRow()]);
+    // Only the part list is written conditionally, and after the parts, which go to a folder of their own.
+    const put = calls.find((c) => c.method === "PUT" && c.url === SNAP)!;
     expect(put.headers.get("if-none-match")).toBe("*");
+    expect(calls.findIndex((c) => c.url === SNAP && c.method === "PUT")).toBeGreaterThan(calls.findIndex((c) => c.url.startsWith(`${R2}snapshots/corpus/`)));
   });
 
   test("a later snapshot reads only uploads it has not seen", async () => {
@@ -366,17 +379,19 @@ describe("corpus snapshot", () => {
         { id: "c", object_key: "uploads/c.json", received_at: "2026-10-04T09:00:00+00:00" },
       ])],
       [`${R2}uploads/c.json`, "GET", () => Response.json({ records: [vendorRow()] })],
+      [`${R2}snapshots/corpus/`, "PUT", () => new Response(null, { status: 200 })],
       [SNAP, "PUT", () => new Response(null, { status: 200 })],
     ]);
     const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now });
     expect(await store.writeSnapshot()).toMatchObject({ uploads: 3, added: 1 });
     expect(calls.some((c) => c.url.endsWith("uploads/b.json"))).toBe(false);
     expect(calls.find((c) => c.method === "GET" && c.url.startsWith(INDEX))!.url).toContain("received_at=gte.2026-10-04T08%3A00%3A00%2B00%3A00");
-    const put = JSON.parse(calls.find((c) => c.method === "PUT")!.body);
-    // Stored once, as replay events; the records array stays empty so the previous reader still opens the file.
-    expect(put.records).toEqual([]);
-    expect(put.corpusState.events.map((e: { record: unknown }) => e.record)).toEqual([lootRow(), questRow(), vendorRow()]);
-    expect(put.lastIds).toEqual(["c"]);
+    const { list, events } = storedSnapshot(calls);
+    // Stored once, as replay events in the parts. The part list has no records array, so a reader from before the
+    // parts refuses it instead of reading an empty corpus.
+    expect(list.records).toBeUndefined();
+    expect(events.map((e) => e.record)).toEqual([lootRow(), questRow(), vendorRow()]);
+    expect(list.lastIds).toEqual(["c"]);
   });
 
   test("an unreadable object is not a silent empty corpus and is not cached", async () => {
@@ -403,6 +418,7 @@ describe("corpus snapshot", () => {
       [SNAP, "GET", () => new Response("missing", { status: 404 })],
       [INDEX, "GET", () => Response.json([{ id: "a", object_key: "uploads/a.json", received_at: "2026-10-04T07:00:00+00:00" }])],
       [`${R2}uploads/a.json`, "GET", () => new Response("down", { status: 500 })],
+      [`${R2}snapshots/corpus/`, "PUT", () => new Response(null, { status: 200 })],
       [SNAP, "PUT", () => new Response(null, { status: 200 })],
     ]);
     const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now });
@@ -481,14 +497,13 @@ describe("corpus normalization", () => {
         { id: "c", object_key: "uploads/c.json", received_at: "2026-10-04T09:00:00+00:00" },
       ])],
       [`${R2}uploads/c.json`, "GET", () => Response.json({ records: [vendorRow(), ...badRows] })],
+      [`${R2}snapshots/corpus/`, "PUT", () => new Response(null, { status: 200 })],
       [SNAP, "PUT", () => new Response(null, { status: 200 })],
     ]);
     const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now });
 
     expect(await store.writeSnapshot()).toMatchObject({ uploads: 2, added: 1 });
-    const put = JSON.parse(calls.find((c) => c.method === "PUT")!.body);
-    expect(put.records).toEqual([]);
-    expect(put.corpusState.events.map((e: { record: unknown }) => e.record)).toEqual([lootRow(), vendorRow()]);
+    expect(storedSnapshot(calls).events.map((e) => e.record)).toEqual([lootRow(), vendorRow()]);
   });
 
   test("a corpus larger than the 2000-row request cap keeps every valid record", async () => {
