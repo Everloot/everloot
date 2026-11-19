@@ -75,6 +75,17 @@ test("realms come from the player's own auction scans, once each; guild and gold
   expect(readRealms(more)).toEqual(["Forever", "Doomhowl"]);
 });
 
+test("positions the site appends after the seven known ones are read past, and the file keeps its seven", async () => {
+  const items = [
+    [2589, 100, 90, 95, 40, "2026-11-10", 3, "2026-11-10T10:00:00.000Z", 0, 0.05],
+    [765, null, 5, 5, 5, "2026-11-10", 3, null, 0, null],
+    [1, 2, 3],
+  ];
+  const prices = await fetchRealmPrices("https://e.example", "Forever", "Horde", vi.fn().mockResolvedValue(Response.json({ ...body, house: "Horde", items })));
+  expect(prices.items).toEqual([[2589, 100, 90, 95, 40, "2026-11-10", 3], [765, null, 5, 5, 5, "2026-11-10", 3]]);
+  expect(renderPricesAddon([prices]).lua).toContain("2589,100,90,95,40,2026-11-10,3;765,,5,5,5,2026-11-10,3");
+});
+
 test("a long answer is cut to the site's row cap", async () => {
   const items = Array.from({ length: 2500 }, (_, i) => [i + 1, 5, 5, 5, 5, "2026-10-20", 3]);
   const prices = await fetchRealmPrices("https://e.example", "Forever", "Horde", vi.fn().mockResolvedValue(Response.json({ ...body, house: "Horde", items })));

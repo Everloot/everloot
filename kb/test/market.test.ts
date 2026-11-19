@@ -1,7 +1,8 @@
 import { expect, test } from "vitest";
 import {
-  MARKET_LIMITS, MARKET_MAX_BYTES, MAX_PRICE_ROWS, OPEN_DAYS, THIN_UNITS, emptyMarket, foldMarket, handleMarketValue, itemListings, itemMarket,
-  marketBytes, marketHouses, marketPrices, marketRealms, parseHouse, realmMarket, trimMarket, uploadScans, validRealm, type MarketState,
+  MARKET_LIMITS, MARKET_MAX_BYTES, MAX_PRICE_ROWS, OPEN_DAYS, THIN_UNITS, TRUSTED_ONLY_TEXT, change1d, coverageText, emptyMarket, foldMarket, handleMarketValue,
+  itemListings, itemMarket, marketBytes, marketCoverage, marketHouses, marketPrices, marketRealms, marketUpdatedAt, parseHouse, realmMarket, trimMarket,
+  uploadScans, validRealm, type MarketState,
 } from "../src/market.js";
 
 const NOW = new Date("2026-10-20T12:00:00Z");
@@ -448,6 +449,7 @@ test("scans that name their house make that house's own market and never a realm
   expect(itemMarket(state, "Forever", 2589, NOW).value).toBeNull();
   expect(state.realms).toEqual({});
   expect(marketPrices(state, "Forever", NOW, MAX_PRICE_ROWS, "Horde")).toMatchObject({ realm: "Forever", house: "Horde", items: [[2589, 100, 100, 100, 100, day, 3]] });
+  expect(marketPrices(state, "Forever", NOW, MAX_PRICE_ROWS, "Horde", undefined, true).items).toEqual([[2589, 100, 100, 100, 100, day, 3, `${day}T10:00:00.000Z`, 0, null]]);
   expect(marketPrices(state, "Forever", NOW)).toEqual({ realm: "Forever", items: [] });
   expect(marketHouses(state, NOW)).toEqual({ Forever: ["Alliance", "Horde"] });
   expect(marketRealms(state, NOW)).toEqual(["Forever"]);
@@ -541,4 +543,73 @@ test("a trusted install makes a day public on its own, labelled; strangers still
   // Two strangers without a trusted install are still not public.
   const strangers = [snapshot("install-x", day, [[765, 1, 10, 5, 5]], { reporter: "1111111111111111" }), snapshot("install-y", day, [[765, 1, 10, 5, 5]], { reporter: "2222222222222222" })];
   expect(itemMarket(foldMarket(emptyMarket(), strangers, NOW, {}, undefined, trusted), "Forever", 765, NOW).value).toBeNull();
+});
+
+// --- Price age, one-day change and coverage ---
+
+/** The price file with `fields=full`: the seven positions, then updatedAt, ageDays and change1d. */
+const fullPrices = (state: MarketState) => marketPrices(state, "Forever", NOW, MAX_PRICE_ROWS, null, undefined, true).items;
+
+test("a full price row ends with when its scans were taken, the price age and the one-day change; the default row stays the seven", () => {
+  const state = foldMarket(emptyMarket(), [...trio(dayBefore(1), 1000), ...trio(dayBefore(0), 1100)], NOW);
+  // Weighted mean of 1100 (today, weight 15) and 1000 (yesterday, weight 14); historical the median of the two.
+  const seven = [2589, 1052, 1100, 1050, 100, dayBefore(0), 3];
+  expect(marketPrices(state, "Forever", NOW).items).toEqual([seven]);
+  expect(fullPrices(state)).toEqual([[...seven, `${dayBefore(0)}T10:00:00.000Z`, 0, 0.1]]);
+});
+
+test("change1d is null without yesterday's solid day, zero when the value held, and updatedAt is null once only closed days remain", () => {
+  const points = (rows: ReturnType<typeof trio>) => itemMarket(foldMarket(emptyMarket(), rows, NOW), "Forever", 2589, NOW).points;
+  // Only today: nothing to compare with.
+  expect(fullPrices(foldMarket(emptyMarket(), trio(dayBefore(0), 1000), NOW))[0]!.slice(7)).toEqual([`${dayBefore(0)}T10:00:00.000Z`, 0, null]);
+  // Yesterday is thin: no solid pair.
+  expect(change1d(points([...trio(dayBefore(1), 1000, 2589, {}, THIN_UNITS), ...trio(dayBefore(0), 1100)]), NOW)).toBeNull();
+  // The day before yesterday is not yesterday.
+  expect(change1d(points([...trio(dayBefore(2), 1000), ...trio(dayBefore(0), 1100)]), NOW)).toBeNull();
+  // A newest solid day older than yesterday carries no change.
+  expect(change1d(points([...trio(dayBefore(3), 1000), ...trio(dayBefore(2), 1100)]), NOW)).toBeNull();
+  // The same value both days is a change of zero, not a missing pair.
+  expect(change1d(points([...trio(dayBefore(1), 1000), ...trio(dayBefore(0), 1000)]), NOW)).toBe(0);
+  // A closed day keeps no capture time; its age still counts.
+  const closed = foldMarket(emptyMarket(), trio(dayBefore(10), 1000), NOW);
+  expect(fullPrices(closed)[0]!.slice(7)).toEqual([null, 10, null]);
+  expect(marketUpdatedAt(closed.realms.forever!.items["2589"], NOW)).toBeNull();
+  // An open day below 3 reporters is not public, so its scans do not date the price.
+  const pending = foldMarket(closed, trio(dayBefore(0), 1000).slice(0, 2), NOW);
+  expect(marketUpdatedAt(pending.realms.forever!.items["2589"], NOW)).toBeNull();
+  expect(fullPrices(pending)[0]!.slice(5)).toEqual([dayBefore(10), 3, null, 10, null]);
+});
+
+test("marketCoverage counts the public days behind the values, and whether only Everloot's own scans made them public", () => {
+  const rows = [
+    ...Array.from({ length: 5 }, (_, i) => trio(dayBefore(i + 1), 1000)).flat(), // five solid days in the last 14
+    ...trio(dayBefore(0), 1000, 2589, {}, THIN_UNITS), // the newest day, thin
+    ...trio(dayBefore(6), 9000), // further than 3x from historical: trimmed
+    ...trio(dayBefore(30), 1000), // solid, past the market window
+  ];
+  const { points } = itemMarket(foldMarket(emptyMarket(), rows, NOW), "Forever", 2589, NOW);
+  const coverage = marketCoverage(points, NOW);
+  expect(coverage).toEqual({ solidDays14: 5, days60: 8, thinDays: 1, trimmedDays: 1, newestDay: dayBefore(0), trustedOnly: false });
+  expect(coverageText(coverage)).toBe("Historical is the median of 8 public days in the last 60 (1 thin left out, 1 trimmed as an outlier); market value from 5 solid days in the last 14.");
+  expect(marketCoverage([], NOW)).toEqual({ solidDays14: 0, days60: 0, thinDays: 0, trimmedDays: 0, newestDay: null, trustedOnly: false });
+  // One trusted install's scan is public alone: the coverage says so.
+  const own = [snapshot("install-own", dayBefore(0), [[2589, 4, 80, 100, 110]], { reporter: "0123456789abcdef" })];
+  const trusted = marketCoverage(itemMarket(foldMarket(emptyMarket(), own, NOW, {}, undefined, new Set(["install-own"])), "Forever", 2589, NOW).points, NOW);
+  expect(trusted).toMatchObject({ trustedOnly: true, days60: 1, solidDays14: 1 });
+  expect(coverageText(trusted)).toBe(`Historical is the median of 1 public day in the last 60; market value from 1 solid day in the last 14. ${TRUSTED_ONLY_TEXT}`);
+  // All days thin: historical is their median, and the text says so rather than counting solid days.
+  const thin = marketCoverage(itemMarket(foldMarket(emptyMarket(), trio(dayBefore(0), 1000, 2589, {}, 1), NOW), "Forever", 2589, NOW).points, NOW);
+  expect(coverageText(thin)).toBe("Historical is the median of 1 public day in the last 60 (all thin); market value unrecorded (no solid public day in the last 14).");
+});
+
+test("market_value says what each value rests on", () => {
+  const rows = [...trio(dayBefore(1), 1000, 2589, { house: "Horde" }), ...trio(dayBefore(0), 1100, 2589, { house: "Horde" }, THIN_UNITS)];
+  const text = handleMarketValue({ realm: "Forever", itemId: 2589 }, foldMarket(emptyMarket(), rows, NOW), NOW);
+  expect(text).toContain("Market value: 10s 0c, from 1 solid day in the last 14");
+  expect(text).toContain("Historical: 10s 0c, the median of 2 public days in the last 60 (1 thin left out)");
+  expect(text).not.toContain(TRUSTED_ONLY_TEXT);
+  const own = [snapshot("install-own", dayBefore(0), [[2589, 4, 80, 100, 110]], { house: "Horde", reporter: "0123456789abcdef" })];
+  const ownText = handleMarketValue({ realm: "Forever", itemId: 2589 }, foldMarket(emptyMarket(), own, NOW, {}, undefined, new Set(["install-own"])), NOW);
+  expect(ownText).toContain("Market value: 1s 10c, from 1 solid day in the last 14");
+  expect(ownText).toContain(TRUSTED_ONLY_TEXT);
 });

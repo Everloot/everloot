@@ -16,10 +16,14 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Added
 - Addon: a flight path bar traces the trip with your portrait, a mount icon and the Everloot crest; confirmed arrivals teach a local estimate for the next flight, and /everloot flight on|off controls it.
+- Addon: crafting cost rows show scan price direction and tiny price bars; hover for listed-unit changes, elapsed scan time, the 60-day median comparison and price swing, never estimated sales.
+- Addon: while a scan runs, a bar across the top of the auction tab says what the scan is doing and how far it is: waiting for the house's listings, with the seconds and the most the scan allows, reading the listings, reading again the ones whose items had not loaded, or sampling search prices. It shows on the shopping page too and goes when the scan reports.
 - Site: /rankings leads with the leaderboards: characters by item level, Gear Score and honorable kills, guilds by average item level and by raid progress in the newest raid, each a top 10 with a link to its full list and an All, US or EU tab in the URL; the census rankings follow under Who plays. The hub stays out of search engines while it shows Blizzard's boards, as every armory page does.
 - Site: the scheduled jobs can run in a Worker of their own (`everloot-cron`, same build, no routes), so the snapshot job no longer shares memory with page and MCP traffic; off until the maintainer deploys it and sets `EVERLOOT_CRON_WORKER` on the site (docs/OPERATIONS.md, "The cron Worker").
+- Site: the private operations summary job stays on the site Worker when the cron Worker takes the other jobs, since only the site holds its pseudonym key; the cron Worker no longer needs the character or operations secrets.
 - Site: armory character pages show the header with when the character was last read, and put gear, talents, stats, PvP, achievements, professions, reputations and quests in tabs; a tab with nothing stored says why in one sentence.
 - Site: chat answers read at 16 px with tables and code drawn, the first sentence as a summary line and the links next to each claim as source chips; a still skeleton shows until the first words arrive, a failed answer offers Retry, and an item card that cannot load says so after 10 seconds and links the item page.
+- Site: `/api/market/prices` takes `fields=full`, which appends to every row when the scans behind the price were taken (`updatedAt`), the price's age in days and its one-day change; without it the seven-field rows are answered as before, so installed Desktop Apps keep reading them. `market_value` and the item auction pages say what each value rests on: how many public days in the last 60, with the thin and trimmed ones counted, how many solid days in the last 14, and when only Everloot's own scans made them public. Protocol 2.5.0 (record protocol unchanged).
 - Site: search and the search box suggestions find a name with its words in any order ("cloth linen") and past a small typo ("lnen clth"); when a typo was read, the search page says which words it searched for.
 - Site: the header and database search find NPCs by the Warcraft Wiki name their pages print and suggest zones as you type; each suggestion says what it is, the list ends with "All results", and search answers every casing of a query from one cached page.
 - Site: Herbalism has a gathering guide at /tools/professions/herbalism/gathering: herb zones with the herbs looted in each, every herb's zones and the Herbalism trainers players saw, all at 3 installs.
@@ -245,7 +249,14 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the world map shows zone or continent coordinates on hover and shares pins in the address; Shift-click or use Pin map centre, and Clear pin removes it.
 - Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
 
+### Changed
+
+- Addon: compact item tooltip market and scan metadata, show drop rates with windows on one row, and date drop and disenchant evidence only when stale.
+
 ### Fixed
+- Addon: the Everloot panel at the auction house sits above the house's own page controls, so the Auctions page's top tab, and the Sell page's item slot and Post button, no longer show through it; the house's dialogs still cover it.
+- Addon: at the auction house, the NPC portrait and the ring around it sit whole over the Everloot panel's corner, and the Everloot heading starts right of the portrait.
+- Addon: the auction tab's price lookup finds an item by name again. Forever has no global GetItemInfo, so a typed name never resolved and the hint came back; the lookup now asks C_Item and then the names the player's scans gave with their rows. Part of a name lists the matching scanned items with the scan's prices, and a name nothing matches says so instead of the hint.
 - Site: empty NPC, vendor, quest and object tabs all say what would fill them (3 installs agreeing), in one shared set of sentences, and the vendors list says a vendor is listed once 3 installs agree on an item and its price.
 - Site: the public MCP, /api/tools and the changes pages hold one copy of the uploads and the patch-notes timeline per server instance instead of one per request, which ran the site out of memory and answered 503; the MCP coverage tool says "not measured yet" when no stored score can be read instead of working it out from every report.
 - Site: the coverage pages (/database/coverage and each zone's) show the score and plateau the data update stores, instead of working them out from every report on each visit, which could make the page fail to load. Until the next data update stores the plateau, the page says it is not measured yet.
@@ -410,6 +421,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the loot observations table sorts frequency by its 95% Wilson lower bound while still showing the observed share.
 
 ### Changed
+- Site: a search lists up to five results per type with a quest's level, side and category and an NPC's level, type, zone and drop count beside the name; the tab row opens each type's database list with the query applied (Characters and Guilds included), a scoped search lands on that list, and the lists find a name by its words in any order or past a small typo, exact names first; the empty search page lists all fifteen kinds a search covers, and an old lore-list link lands on the lore list's own address.
+- Site: the MCP page tools and GET /api/tools/{tool} (item, NPC, quest, vendor and object pages, entity relations) read the cron's stored aggregate set, the file the pages already keep, instead of replaying every upload on a fresh server instance (#1354).
 - Site: the search and the search box suggestions read the names they match from one small file the snapshot cron writes beside the aggregates (`snapshots/search-names.json`), so a fresh server instance no longer downloads and parses the whole aggregate set for a keystroke; without the file they read the aggregates as before.
 - Site: the phone menu's search box suggests pages as you type, the same field as the bar's, instead of a plain box with no suggestions.
 - Site: cards, icons and copy buttons look and behave the same everywhere; small corners, captions and line lengths follow the site's sizes.

@@ -50,6 +50,9 @@ test("with no sort the named items come first, seen by players first and then A 
   // Seen and named, then named A to Z, then the unnamed ones with the seen one first, then by id.
   expect(list({})).toEqual([rows[20][0], rows[30][0], rows[5][0], rows[35][0], ...rows.map((r) => r[0]).filter((id) => !named.has(id) && !seen.has(id))]);
   expect(list({ sort: { key: "id", desc: false } })).toEqual(rows.map((r) => r[0]));
+  // A text finds a name by its words in any order, and past a typo when nothing matches as typed.
+  expect(list({ q: "cloth linen" })).toEqual([rows[30][0]]);
+  expect(list({ q: "lnen cloth" })).toEqual([rows[30][0]]);
   // Without names (the API's case) the order stays by id.
   expect(ids({})).toEqual(rows.map((r) => r[0]));
 });
