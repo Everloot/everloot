@@ -143,8 +143,9 @@ test("a category row shows a name the game files and the wiki agree on, in its q
   expect(page).not.toContain(NAME_SOURCE.wiki);
   expect(page).not.toContain(NAME_SOURCE.players);
   expect(page).not.toContain("warcraft.wiki.gg/wiki/");
-  // Tooltip facts are asked for the matched item and the reported one only.
-  expect(state.tipCalls).toEqual([[ids[0], ids[1]]]);
+  // Tooltip facts are asked for the matched item and the reported one only, in the list's order: the item players
+  // have seen (its agreed name) leads.
+  expect(state.tipCalls).toEqual([[ids[1], ids[0]]]);
   expect(await html(SubclassPage({ params: Promise.resolve({ id: "armor", subclass: "cloth" }), searchParams: Promise.resolve({ unnamed: "1" }) }))).toContain(`>Item ${ids[2]}<`);
 });
 
@@ -241,7 +242,8 @@ test("level and binding filters match only items whose facts show; unknown value
     [ids[4], { level: 15, required: 10, binding: 2 }],
   ]);
   const ilvl = await clothRows({ ilvl: "11-20" });
-  expect(ilvl.rows).toEqual([ids[0], ids[2], ids[3]]);
+  // The item players have seen (its agreed name) leads the default order.
+  expect(ilvl.rows).toEqual([ids[3], ids[0], ids[2]]);
   // The filter reads the facts of every row that may show them, and only those.
   expect(state.tipCalls).toEqual([ids.slice(0, 4)]);
   // No required level is no value: it does not match a required level range.

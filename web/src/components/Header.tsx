@@ -95,6 +95,9 @@ const navItem = "inline-flex min-h-11 items-center whitespace-nowrap border-b-2 
 const navState = (on: boolean) => (on ? "border-accent text-fg" : "border-transparent text-fg-2 hover:text-accent");
 const menuLink = "flex min-h-11 items-center rounded-control px-3 text-sm text-fg-2 hover:bg-canvas hover:text-accent";
 
+/** Below md, how many links a phone menu group shows before its More…. */
+const PHONE_LINKS = 3;
+
 /** The phone menu: each top bar menu as a group, then More with the single links (Chat), Docs and About. */
 export function phoneGroups(items: NavItem[]): { label: string; links: NavLink[] }[] {
   const singles = items.flatMap((item) => (item.links ? [] : [{ label: item.label, href: item.href }]));
@@ -134,6 +137,8 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
   const place = currentPlace(path);
   const current = place?.label;
   const [open, setOpen] = useState(false);
+  // The phone menu groups opened past their first links with More….
+  const [moreOpen, setMoreOpen] = useState<string[]>([]);
   // The top bar menu that is open, by its label; one at a time.
   const [menu, setMenu] = useState<string | null>(null);
   // Below 1280 px the bar has no room for the field: the search icon opens it full width under the bar.
@@ -274,7 +279,8 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
       </div>
 
       {open && (
-        <nav id="site-navigation" aria-label="Site menu" className="pop absolute inset-x-0 top-full max-h-[75vh] overflow-y-auto border-b border-edge bg-panel xl:hidden">
+        // Fixed from under the bar to the bottom of the window, so the open menu covers the page instead of showing it beneath.
+        <nav id="site-navigation" aria-label="Site menu" className="pop fixed inset-x-0 bottom-0 top-header overflow-y-auto overscroll-contain bg-panel xl:hidden">
           <div className="mx-auto max-w-data space-y-6 px-4 py-6 lg:px-6">
             <form action="/search" method="get" role="search" onSubmit={() => track("search", { surface: "menu" })} className="flex items-center gap-2 rounded-full border border-edge bg-canvas px-3 text-muted focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">
               <SearchIcon />
@@ -284,13 +290,23 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
             {/* The top bar's menus as groups, in the same order; More holds Chat, the pages outside the bar, and the bug
                 report, whose floating pill is hidden below md. Focus moves to Menu first, so closing the dialog returns there. */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-6">
-              {phoneGroups(items).map((group) => (
+              {phoneGroups(items).map((group) => {
+                // Below md a group shows its first PHONE_LINKS links; More… opens the rest, which stay in the HTML. The
+                // group holding the page opens by itself.
+                const rest = group.links.slice(PHONE_LINKS);
+                const expanded = moreOpen.includes(group.label) || rest.some((link) => link.href === place?.href);
+                return (
                 <div key={group.label}>
                   <p className="mb-1 px-3 font-mono text-xs text-muted">{group.label}</p>
-                  <ul>
-                    {group.links.map((link) => (
-                      <li key={link.href}><Link href={link.href} onClick={closeAll} aria-current={place?.href === link.href ? "page" : undefined} className={menuLink}>{link.label}</Link></li>
+                  <ul id={`${menuId(group.label)}-phone`}>
+                    {group.links.map((link, i) => (
+                      <li key={link.href} className={i < PHONE_LINKS || expanded ? undefined : "hidden md:block"}><Link href={link.href} onClick={closeAll} aria-current={place?.href === link.href ? "page" : undefined} className={menuLink}>{link.label}</Link></li>
                     ))}
+                    {rest.length > 0 && !expanded && (
+                      <li className="md:hidden">
+                        <button type="button" aria-expanded={false} aria-controls={`${menuId(group.label)}-phone`} className={`${menuLink} w-full text-left`} onClick={() => setMoreOpen([...moreOpen, group.label])}>More…</button>
+                      </li>
+                    )}
                     {group.label === "More" && (
                       <li>
                         <button type="button" aria-haspopup="dialog" className={`${menuLink} w-full text-left`} onClick={() => {
@@ -302,7 +318,8 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
                     )}
                   </ul>
                 </div>
-              ))}
+                );
+              })}
             </div>
             <GameVersionLabel className="px-3" />
             <AccountControls place="menu" />
