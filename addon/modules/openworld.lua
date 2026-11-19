@@ -196,6 +196,8 @@ local LOOT_BY_ID = {
   [921] = "pickpocket", [8613] = "skinning", [8617] = "skinning", [8618] = "skinning", [10768] = "skinning",
   [13262] = "disenchant", [1804] = "container",
 }
+-- The skill lines a gathering cast uses, by the game files' SkillLine ids: Herbalism, Mining, Skinning.
+local GATHER_SKILL_LINES = { herb = 182, ore = 186, skinning = 393 }
 -- A loot window more than this many seconds after the cast is not that cast's. A fish can take longer to bite.
 local GATHER_WINDOW, FISHING_WINDOW = 8, 30
 local NAMED_KINDS = { herb = true, ore = true, chest = true }
@@ -416,6 +418,31 @@ local function lootTypeOf(group, cast)
   return "kill"
 end
 
+-- The player's own rank in the gathering skill the cast used, read the way the game's profession book reads it:
+-- GetProfessions, then the rank, skill line and rank bonus GetProfessionInfo gives. The value is rank plus bonus
+-- (race, gear), what a node's requirement is checked against and what the book shows as "rank (+bonus)". Nil when the
+-- cast was no gathering cast or the client cannot say; never guessed.
+local function gatherSkill(cast)
+  local skillLine = cast and (cast.lootKind == "skinning" and GATHER_SKILL_LINES.skinning or GATHER_SKILL_LINES[cast.gatherKind])
+  if not skillLine or type(GetProfessions) ~= "function" or type(GetProfessionInfo) ~= "function" then return nil end
+  -- Five slots (two professions, then the secondary ones); one the character has not filled is nil.
+  local got = { pcall(GetProfessions) }
+  if not got[1] then return nil end
+  for slot = 2, 6 do
+    local index = E.Readable(got[slot])
+    if type(index) == "number" then
+      local ok, _, _, rank, _, _, _, line, bonus = pcall(GetProfessionInfo, index)
+      if ok and E.Readable(line) == skillLine then
+        rank, bonus = E.Readable(rank), E.Readable(bonus)
+        if type(rank) ~= "number" then return nil end
+        -- A bonus the client cannot read counts as none: the trained rank is still a true lower bound.
+        return whole(rank + (type(bonus) == "number" and bonus > 0 and bonus or 0), 1, 500)
+      end
+    end
+  end
+  return nil
+end
+
 -- The units an empty window can have come from: the corpse the player interacted with, pointed at or targeted.
 local EMPTY_WINDOW_UNITS = { "softinteract", "mouseover", "target" }
 
@@ -536,6 +563,8 @@ local function lootCapture(_, isFromItem)
         if where then group.mapId, group.x, group.y = where.mapId, where.x, where.y end
         if cast then group.gatherKind, group.sourceObjectName = cast.gatherKind, cast.name end
       end
+      -- A herb, ore or skinning window carries the player's rank in that skill.
+      if lootType == "gather" or lootType == "skinning" then group.gatherSkill = gatherSkill(cast) end
       group.installId = EverlootDB.installId
       group.capturedAt = date("!%Y-%m-%dT%H:%M:%SZ")
       group.sourceEvidence = "loot-api"
