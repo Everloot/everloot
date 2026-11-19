@@ -41,8 +41,7 @@ changes the player's filters. Up to 500 recipes are read in chunks; reaching tha
 recipes are written (the status counts the others). For each recipe and colour the file keeps the lowest and the
 highest rank it was seen at: the highest is written when the colour changes, or at the first logout or reload on a
 new UTC day, so levelling a profession adds a few rows per recipe, not one per skill point or per reload. Disabling professions stops queued chunks.
-Tooltip prices show the item's newest public observation day separately from when the price file was built,
-and warn when either is old. Community values are one auction house's: the character's faction house, or the open
+Tooltip prices show the item's newest public observation day, and warn when it or the price file is old. Community values are one auction house's: the character's faction house, or the open
 auctioneer's (a goblin house is the neutral one), named on the line; another house's price is never shown, and an older
 price file keyed by realm alone is not read, since its values may mix both factions: with the 0.1.21 Desktop App release
 or earlier the tooltip says so instead of showing a price, and the 0.3.22 addon release or earlier finds no community price in a newer
@@ -57,7 +56,7 @@ note when the disenchant estimate's materials beat both. Stale, thin or incomple
 Blizzard's own sell window and never changes a price or posts; Esc > Options > AddOns > Everloot > Auction House
 turns it off.
 Below the prices, the tooltip shows where the item drops when three installs looted the source: each rate as
-drops of loot windows, with its installs and the date of the uploads behind it, from the drop rates the Desktop
+a percentage beside its loot-window count, with a date only for old uploads, from the drop rates the Desktop
 App writes into the same `EverlootPrices` file. Once that file is in the game, a missing price or drop source is
 said in one muted line; nothing is written to your SavedVariables. Without the file, tooltips carry no community line,
 and the first item tooltip says once per install, in chat, that community prices come from the Everloot Desktop App
@@ -67,9 +66,8 @@ Nothing in the addon calls a buy, bid or post API; `addon/tests/market_contract.
 Price tooltips use separate label/value rows with native coin icons. Community market, minimum and historical
 values stay distinct from your own scan; the vendor sell price appears beside them when the client knows it.
 The amounts are per unit. The header names your realm with its ruleset (PvP, PvE, RP, RP-PvP, Hardcore) split off
-the name in its own colour, as the realm list shows it; drop rates sit in the value column too, their loot windows
-and installs beneath. A source you have met is named as your client showed it ("Drops from Defias Bandit"), read
-from your own sightings and loot in the saved file; one you have not met keeps its id ("NPC 116"). Dates, units listed, reporters, all-house scope and stale-data warnings remain visible.
+the name in its own colour, as the realm list shows it; drop rates and their windows share the value column. A source you have met is named as your client showed it ("Drops from Defias Bandit"), read
+from your own sightings and loot in the saved file; one you have not met keeps its id ("NPC 116"). Listed units, reporters and the public day share one muted line; stale-data warnings remain visible.
 `/everloot price` prints the same amounts as plain text. Disenchant estimates come only from disenchants players
 recorded (see the disenchant row below); the addon never guesses them from an item's color or type.
 
@@ -110,6 +108,15 @@ With scans off, the first visit instead explains how to opt in. The scan action 
 **Scanning...** or **Ready in M:SS**, and is disabled while busy or cooling down. Last-scan age and saved-file
 status remain in the tab. The tab and settings use native WoW fonts, gold headings and standard controls.
 
+### Crafting market changes
+
+In the Everloot window's Professions view, **Crafting costs** keeps each recipe's cost, value and estimated
+profit beside a Scan indicator. Its arrow shows the product's min-buyout direction; the bars show up to three
+kept scans, oldest first. Hover a recipe for its min-buyout percentage and units-listed change since the previous
+scan of this house, the scan interval and older scan's age, the price file's market value vs its 60-day median,
+and the price swing across those sources. These are listing changes, never sales. Missing prices stay unknown;
+one scan asks you to scan again later. Green points up, gold points down, and a dash means no direction is known.
+
 ### Shopping lists
 
 **Shopping list**, at the top right of the Everloot tab at the auction house, swaps the scan controls and the price
@@ -141,6 +148,7 @@ guide at everloot.app/docs/guides/addon; `addon/tests/commands_contract.py` fail
 | `/everloot status` | Prints the version, each module and how many rows it holds, and any paused collection. |
 | `/everloot version` | Prints the addon version. |
 | `/everloot auctions on\|off` | Auction scans, on in a new install; `/reload` to apply. |
+| `/everloot flight on\|off` | The flight path bar, on by default; off hides it immediately, on after a reload. Confirmed arrivals teach the median of the last three times per route and realm, kept locally. Unknown routes show no ETA. |
 | `/everloot scan` | At the auction house, starts a full scan, like the **Scan prices** button; at most one every 15 minutes. |
 | `/everloot scanprompt on\|off` | The once-per-install chat introduction at the auction house; the button and `/everloot scan` still work with it off. |
 | `/everloot vendor on\|off` | At a merchant, sell grey items and repair with your own gold; never the guild bank. |

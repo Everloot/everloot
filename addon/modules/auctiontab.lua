@@ -1,8 +1,8 @@
 -- Everloot tab at the auction house: the scan and its cooldown, whether the last scan is in the saved
 -- file yet, a Save scan button (a /reload, which writes the file so the Desktop App can send it) and a
--- price lookup with the same lines as the tooltip. The tab sits beside Blizzard's tabs without joining
--- their tab system, so their code is never changed: it shows a panel over the house, and clicking any of
--- their tabs hides it. Nothing here posts, bids or buys, and a scan starts only from the player's click.
+-- price lookup, by link, id or name, with the same lines as the tooltip. The tab sits beside Blizzard's tabs
+-- without joining their tab system, so their code is never changed: it shows a panel over the house, and clicking
+-- any of their tabs hides it. Nothing here posts, bids or buys, and a scan starts only from the player's click.
 -- The panel uses the game's fonts, gold headings and standard controls.
 -- A button at its top right swaps the panel for the shopping lists (modules/shopping.lua): the active list with each
 -- item's wanted count, max price, market value and what a search found, and a Search button per item that sends one
@@ -21,7 +21,17 @@ local COLUMN, SCROLLBAR, PAD, GAP = 686, 26, 8, 12
 -- one before (PanelTemplates_AnchorTabs; the -15 in their XML is replaced at load), and AuctionHouseFrameTabMixin
 -- sizes them with 20 padding and a 70 minimum. The Everloot tab follows both, so it sits beside Auctions as they do.
 local TAB_GAP, TAB_PADDING, TAB_MIN_WIDTH = 3, 20, 70
+-- The house gives some of its own controls a level of their own, not the one under their frame (build 70959, the
+-- auction house XML): the Auctions page's selected top tab 300, the Sell page's item slot, Post button and buyout
+-- check box 350, the portrait 400, the title and close button 510, the buy dialog and its overlay 1000 and up. A
+-- panel 20 above the house sat under the Auctions tab, which showed through it. The panel sits above every control
+-- of a page and under the dialogs, which must still cover it.
+local PANEL_LEVEL = 600
+-- The house's portrait (PortraitFrameTemplate: 62 wide, from 5 left of the house's top left corner to 57 in and 55
+-- down) hangs over the panel's top left corner. The heading starts to its right; the scan row is below it.
+local TITLE_X = 52
 local HINT = "Type an item's name or id, or shift-click an item here."
+local MATCHES = 20  -- the most items a part of a name lists
 local NONE = "No Everloot price for that item on this realm yet."
 -- The shopping page: rows on screen at once, their height, and each column's left edge and width.
 local SHOP_ROWS, SHOP_ROW_H = 10, 18
@@ -67,13 +77,38 @@ local function itemName(id)
   return "Item " .. id
 end
 
---- What the lookup shows for what the player typed (a link, an id or a loaded item's name): { item, realm, lines }
---- with the tooltip's own price lines, or { message } saying why there are none. Community prices still being
---- checked, or refused by their checksum, are said in words, beside the player's own scan when there is one.
+-- What the lookup shows for words no item resolved to: the hint for nothing typed; the items of this realm's scans
+-- whose names hold the words, each with the scan's own price, when some do; or that none does.
+local function named(realm, text)
+  text = tostring(text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+  if text == "" then return { message = HINT } end
+  local matches = {}
+  if realm and E.ScanItemsNamed then matches = select(2, E.ScanItemsNamed(realm, text)) end
+  if #matches == 0 then
+    return { message = string.format('No item named "%s" in your scans of this realm, and the game has not loaded one by that name. Type the full name, the item\'s id, or shift-click the item here.', text) }
+  end
+  local own = E:OwnScan(realm)
+  local lines = { { text = string.format('%d items in your scans match "%s". Type one full name:', #matches, text) } }
+  for k = 1, math.min(#matches, MATCHES) do
+    local id, name = matches[k][1], matches[k][2]
+    local item = own and own.items[id]
+    local priced = item and ("  ·  min " .. E.Coins(item[4]) .. "  ·  " .. item[3] .. " listed") or ""
+    lines[#lines + 1] = { text = "  " .. name .. priced }
+  end
+  if #matches > MATCHES then
+    lines[#lines + 1] = { text = string.format("  and %d more", #matches - MATCHES), r = 0.788, g = 0.765, b = 0.69 }
+  end
+  return { item = string.format('Items named like "%s"', text), realm = realm, lines = lines }
+end
+
+--- What the lookup shows for what the player typed (a link, an id, a loaded item's name or a name a scan gave):
+--- { item, realm, lines } with the tooltip's own price lines, or { message } saying why there are none. Community
+--- prices still being checked, or refused by their checksum, are said in words, beside the player's own scan when
+--- there is one. Part of a name lists the scanned items it matches.
 function T.Result(text)
   local id = E.ItemIdFrom(text)
-  if not id then return { message = HINT } end
   local realm = realmName()
+  if not id then return named(realm, text) end
   local lines, entry
   if realm and E.PriceLines then lines, entry = E.PriceLines(realm, id) end
   lines = type(lines) == "table" and lines or {}
@@ -228,6 +263,10 @@ local function layout(panel, width)
     panel.status:SetWidth(column - buttonWidth - 12)
     panel.lookupLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -90)
   end
+  -- The scan's bar runs from the help button to the page button, or to the panel's edge without one.
+  local used = TITLE_X + (tonumber(panel.title:GetStringWidth()) or 80) + 8 + 22 + 16
+  local right = 16 + (panel.modeButton and (120 + 16) or 0)
+  panel.progress:SetWidth(math.max(60, width - used - right))
   panel.shareButton:SetWidth(math.min(120, column / 2))
   panel.lookup:SetWidth(math.max(40, math.min(300, column - 90)))
   panel.results:SetWidth(column)
@@ -468,6 +507,7 @@ function T.SetMode(mode)
   else
     panel.shop.confirmDelete = false
     panel.shop.page:Hide()
+    T.Refresh()
   end
   panel.modeButton:SetText(shopping and "Price lookup" or "Shopping list")
 end
@@ -488,6 +528,15 @@ function T.Refresh()
     local label, enabled = E:ScanAction()
     T.panel.scanButton:SetText(label)
     T.panel.scanButton:SetEnabled(enabled)
+    -- The bar at the top shows while a scan runs, on either page, and goes when the scan reports.
+    local doing, fraction = E:ScanProgress()
+    if doing then
+      T.panel.progress.text:SetText(doing)
+      T.panel.progress:SetValue(fraction)
+      T.panel.progress:Show()
+    else
+      T.panel.progress:Hide()
+    end
   end
   -- A search the house never answered is let go after a while; the shopping page redraws its ages and results.
   if E.Shopping then E.Shopping.Tick() end
@@ -506,6 +555,17 @@ function T.Show()
   end
   if native and not native.isDisabled and PanelTemplates_DeselectTab then pcall(PanelTemplates_DeselectTab, native) end
   if T.tab and PanelTemplates_SelectTab then pcall(PanelTemplates_SelectTab, T.tab); T.tab:Enable() end
+  -- The house's border (NineSlice, at the house's own level) and portrait (PortraitContainer, 400) reach into the
+  -- panel's top left corner: under the panel, the ring is cut flat and the portrait's lower half is gone. Both are
+  -- lifted one above the panel while it shows and put back when it hides; the house's dialogs stay above all of it.
+  T.lifted = T.lifted or {}
+  local function lift(frame)
+    if type(frame) ~= "table" or not (frame.GetFrameLevel and frame.SetFrameLevel) then return end
+    if T.lifted[frame] == nil then T.lifted[frame] = tonumber(frame:GetFrameLevel()) or 0 end
+    frame:SetFrameLevel((tonumber(T.panel:GetFrameLevel()) or PANEL_LEVEL) + 1)
+  end
+  lift(T.house and T.house.NineSlice)
+  lift(T.house and T.house.PortraitContainer)
   T.panel:Show()
   layout(T.panel)
   T.Refresh()
@@ -514,6 +574,8 @@ end
 function T.Hide()
   local shown = T.panel and T.panel:IsShown()
   if T.panel then T.panel:Hide() end
+  for frame, level in pairs(T.lifted or {}) do frame:SetFrameLevel(level) end
+  T.lifted = nil
   if shown and PanelTemplates_DeselectTab then pcall(PanelTemplates_DeselectTab, T.tab) end
   local tabs = T.house and T.house.Tabs
   local selected = type(tabs) == "table" and tabs[T.house.selectedTab]
@@ -529,8 +591,8 @@ local function buildPanel(house)
   panel:Hide()
   panel:SetPoint("TOPLEFT", house, "TOPLEFT", 8, -32)
   panel:SetPoint("BOTTOMRIGHT", house, "BOTTOMRIGHT", -8, 28)
-  local level = house.GetFrameLevel and house:GetFrameLevel()
-  if type(level) == "number" then panel:SetFrameLevel(level + 20) end
+  local level = tonumber(house.GetFrameLevel and house:GetFrameLevel()) or 0
+  panel:SetFrameLevel(math.max(level + 20, PANEL_LEVEL))
   if panel.EnableMouse then panel:EnableMouse(true) end
   if panel.SetBackdrop then
     -- The dialog texture has transparent pixels: it cannot hide Blizzard's categories,
@@ -540,7 +602,7 @@ local function buildPanel(house)
     panel:SetBackdropColor(0.08, 0.075, 0.065, 1)
   end
   panel.title = words(panel, "GameFontNormalLarge")
-  panel.title:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -14)
+  panel.title:SetPoint("TOPLEFT", panel, "TOPLEFT", TITLE_X, -14)
   panel.title:SetText("Everloot")
   local help = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
   help:SetSize(22, 22)
@@ -641,13 +703,32 @@ local function buildPanel(house)
     panel.modeButton:SetText("Shopping list")
     panel.modeButton:SetScript("OnClick", function() T.SetMode(panel.mode == "shop" and "lookup" or "shop") end)
   end
+  -- While a scan runs, a bar across the top of the page, from the help button to the page button, says what the
+  -- scan is doing and how far it is. The top is the same on both pages, so it shows on either; layout sets its width.
+  local progress = CreateFrame("StatusBar", nil, panel)
+  progress:SetPoint("TOPLEFT", help, "TOPRIGHT", 16, 0)
+  progress:SetPoint("BOTTOMLEFT", help, "BOTTOMRIGHT", 16, 0)
+  progress:SetWidth(COLUMN)
+  progress:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+  progress:SetStatusBarColor(unpack(tone("accent")))
+  progress:SetMinMaxValues(0, 1)
+  progress:SetValue(0)
+  progress.back = progress:CreateTexture(nil, "BACKGROUND")
+  progress.back:SetAllPoints()
+  progress.back:SetColorTexture(0, 0, 0, 0.5)
+  progress.text = words(progress, "GameFontHighlightSmall")
+  progress.text:SetPoint("CENTER", progress, "CENTER", 0, 0)
+  progress.text:SetJustifyH("CENTER")
+  progress:Hide()
+  panel.progress = progress
   -- A hook, not a script: the backdrop template keeps its own size handler.
   panel:HookScript("OnSizeChanged", function(self, width) layout(self, width) end)
 
+  -- Once a second; five times a second while a scan runs, so the bar moves with the read.
   local elapsed = 0
   panel:SetScript("OnUpdate", function(_, dt)
     elapsed = elapsed + (dt or 0)
-    if elapsed >= 1 then elapsed = 0; T.Refresh() end
+    if elapsed >= (E:Scanning() and 0.2 or 1) then elapsed = 0; T.Refresh() end
   end)
   panel:Hide()
   return panel

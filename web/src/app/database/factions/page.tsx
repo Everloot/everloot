@@ -5,7 +5,7 @@ import type { FactionEntry } from "@kb/completion";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column, type FilterControl } from "@/components/ui";
 import { factionHref, loadCatalog, type Listed } from "@/lib/completion-lists";
 import { LINK } from "../entity";
-import {
+import { byRank, nameMatches, Respelled,
   confirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, nextSort, NoMatches, noneListed, NoObservations, PER_PAGE,
   sortParam, sortRows, Unreadable, type ListQuery, type Search,
 } from "../list-parts";
@@ -45,11 +45,12 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
   const all = catalog?.factions ?? [];
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
+  const { ranked, respelled } = nameMatches(all, text, id, (x) => x.name);
   const matched = all.filter((x) =>
-    (!text || (id !== null ? x.factionId === id : x.name.toLowerCase().includes(text))) && (!q.header || x.header === q.header));
+    (!text || (id !== null ? x.factionId === id : ranked!.has(x))) && (!q.header || x.header === q.header));
   const sort = q.sort ?? DEFAULT_SORT;
   const key = (x: Listed<FactionEntry>): string | number | null => sort.key === "name" ? x.name.toLowerCase() : sort.key === "header" ? x.header?.toLowerCase() ?? null : x.factionId;
-  const rows = sortRows(matched, key, sort.desc, (x) => x.factionId);
+  const rows = byRank(sortRows(matched, key, sort.desc, (x) => x.factionId), ranked, Boolean(q.sort));
   const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
   if (q.page > pages) notFound();
   const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
@@ -94,6 +95,7 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
           active={filters(q)}
           clearHref="/database/factions"
         />
+        {respelled && rows.length > 0 && <Respelled q={respelled} />}
         <div className="mt-2">
           <DataTable
             dense

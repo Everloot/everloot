@@ -105,7 +105,7 @@ end
 local defaults = {
   version = E.VERSION,
   installId = nil,
-  toggles = { openworld = true, guild = true, auctions = true, gold = true, roster = true, addons = false, completion = false, census = true, players = true, professions = true },
+  toggles = { flight = true, openworld = true, guild = true, auctions = true, gold = true, roster = true, addons = false, completion = false, census = true, players = true, professions = true },
   records = {},
 }
 
@@ -498,6 +498,10 @@ SlashCmdList["EVERLOOT"] = function(msg)
     E.PrintTalents()
   elseif (msg == "raid" or msg == "raid code") and E.RaidCommand then
     E.RaidCommand(msg == "raid code" and "code" or nil)
+  elseif msg == "flight on" or msg == "flight off" then
+    EverlootDB.toggles.flight = (msg == "flight on")
+    if not EverlootDB.toggles.flight and E.Flight then E.Flight.Clear() end
+    print("Everloot: flight bar " .. (EverlootDB.toggles.flight and "on" or "off") .. ". /reload to apply.")
   elseif msg == "auctions on" or msg == "auctions off" then
     EverlootDB.toggles.auctions = (msg == "auctions on")
     print("Everloot: auction scans " .. (EverlootDB.toggles.auctions and "on" or "off") .. ". /reload to apply.")
@@ -575,6 +579,6 @@ SlashCmdList["EVERLOOT"] = function(msg)
       print("Everloot: installed addon list off; all recorded addon rows were deleted from this file. /reload to apply.")
     end
   else
-    print("Everloot commands: /everloot window, /everloot options, /everloot setup, /everloot planner [talents|raid], /everloot buttons on|off, /everloot status, /everloot version, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot where [item link|item id|NPC name], /everloot gph [start|pause|stop|reset|show|hide|cut on|off|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], " .. (E.Pulls and "/everloot pulls [on|off], " or "") .. "/everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number|hide|clear], /everloot raid [code], /ask <question>")
+    print("Everloot commands: /everloot window, /everloot options, /everloot setup, /everloot planner [talents|raid], /everloot buttons on|off, /everloot status, /everloot version, /everloot auctions on|off, /everloot flight on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot where [item link|item id|NPC name], /everloot gph [start|pause|stop|reset|show|hide|cut on|off|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], " .. (E.Pulls and "/everloot pulls [on|off], " or "") .. "/everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number|hide|clear], /everloot raid [code], /ask <question>")
   end
 end

@@ -146,7 +146,8 @@ function D.Lines(realm, id, compact)
   end
   add(comparison)
   if not compact then
-    add(string.format("  Observed: %d disenchants, at least 3 installs · %s", rows[1].n, file.asOf or "upload date unknown"))
+    local day = E.StaleDay(file.asOf)
+    add(string.format("  Observed: %d disenchants%s", rows[1].n, day and (" · " .. day) or ""))
     add("  " .. (E:MarketHouse() or "Unknown") .. " house · gross before fees; sale and skill not guaranteed")
     if not fresh and not missing then add("  Prices are stale, thin or their age is unknown") end
   end

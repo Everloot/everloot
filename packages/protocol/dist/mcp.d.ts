@@ -728,6 +728,15 @@ export declare const completionProgress: z.ZodObject<{
     unknownCharacter: z.ZodOptional<z.ZodString>;
     droppedCharacters: z.ZodNumber;
 }, z.core.$strip>;
+/** What an item's values rest on: the public days behind them, counted. Never more days than exist. */
+export declare const marketCoverage: z.ZodObject<{
+    solidDays14: z.ZodNumber;
+    days60: z.ZodNumber;
+    thinDays: z.ZodNumber;
+    trimmedDays: z.ZodNumber;
+    newestDay: z.ZodNullable<z.ZodString>;
+    trustedOnly: z.ZodBoolean;
+}, z.core.$strip>;
 export declare const marketValue: z.ZodObject<{
     itemId: z.ZodNumber;
     market: z.ZodNullable<z.ZodNumber>;
@@ -738,6 +747,14 @@ export declare const marketValue: z.ZodObject<{
     ageDays: z.ZodNumber;
     reporters: z.ZodNumber;
     thin: z.ZodBoolean;
+    coverage: z.ZodOptional<z.ZodObject<{
+        solidDays14: z.ZodNumber;
+        days60: z.ZodNumber;
+        thinDays: z.ZodNumber;
+        trimmedDays: z.ZodNumber;
+        newestDay: z.ZodNullable<z.ZodString>;
+        trustedOnly: z.ZodBoolean;
+    }, z.core.$strip>>;
 }, z.core.$strip>;
 export declare const marketPage: z.ZodObject<{
     realmStatus: z.ZodOptional<z.ZodEnum<{
@@ -768,6 +785,14 @@ export declare const marketPage: z.ZodObject<{
         ageDays: z.ZodNumber;
         reporters: z.ZodNumber;
         thin: z.ZodBoolean;
+        coverage: z.ZodOptional<z.ZodObject<{
+            solidDays14: z.ZodNumber;
+            days60: z.ZodNumber;
+            thinDays: z.ZodNumber;
+            trimmedDays: z.ZodNumber;
+            newestDay: z.ZodNullable<z.ZodString>;
+            trustedOnly: z.ZodBoolean;
+        }, z.core.$strip>>;
     }, z.core.$strip>>;
     history: z.ZodArray<z.ZodObject<{
         day: z.ZodString;
@@ -2926,6 +2951,14 @@ export declare const MCP_TOOLS: {
                     ageDays: z.ZodNumber;
                     reporters: z.ZodNumber;
                     thin: z.ZodBoolean;
+                    coverage: z.ZodOptional<z.ZodObject<{
+                        solidDays14: z.ZodNumber;
+                        days60: z.ZodNumber;
+                        thinDays: z.ZodNumber;
+                        trimmedDays: z.ZodNumber;
+                        newestDay: z.ZodNullable<z.ZodString>;
+                        trustedOnly: z.ZodBoolean;
+                    }, z.core.$strip>>;
                 }, z.core.$strip>>;
                 history: z.ZodArray<z.ZodObject<{
                     day: z.ZodString;
@@ -4969,6 +5002,14 @@ export declare const MCP_TOOL_LIST: ({
                 ageDays: z.ZodNumber;
                 reporters: z.ZodNumber;
                 thin: z.ZodBoolean;
+                coverage: z.ZodOptional<z.ZodObject<{
+                    solidDays14: z.ZodNumber;
+                    days60: z.ZodNumber;
+                    thinDays: z.ZodNumber;
+                    trimmedDays: z.ZodNumber;
+                    newestDay: z.ZodNullable<z.ZodString>;
+                    trustedOnly: z.ZodBoolean;
+                }, z.core.$strip>>;
             }, z.core.$strip>>;
             history: z.ZodArray<z.ZodObject<{
                 day: z.ZodString;

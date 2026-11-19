@@ -247,6 +247,90 @@ local function indexRows()
   end
 end
 
+-- Snapshot parts carry UTC text; OwnScan's time is seconds since the epoch.
+local function scanTime(at)
+  local day = E.DayNumber(at)
+  local h, m, sec = tostring(at):match("T(%d%d):(%d%d):(%d%d)Z$")
+  if day and h then return day * 86400 + tonumber(h) * 3600 + tonumber(m) * 60 + tonumber(sec) end
+end
+
+-- Read complete scans of this house only. Missing items stay missing, never zero listings or sales.
+local function keptScans(realm)
+  local latest = realm and E:OwnScan(realm)
+  if not latest or not latest.house then return {} end
+  local groups, out = {}, {}
+  for _, r in ipairs(E:Rows("auction_snapshot")) do
+    if r.realm == realm and r.house == latest.house then
+      local at = scanTime(r.capturedAt)
+      if at and at <= latest.at then
+        local g = groups[r.scanId]
+        if not g then
+          g = { at = at, items = {}, parts = {}, total = r.parts }
+          groups[r.scanId] = g
+        end
+        g.parts[r.part] = true
+        for _, item in ipairs(r.items) do g.items[item[1]] = item end
+      end
+    end
+  end
+  for id, g in pairs(groups) do
+    local complete = true
+    for part = 1, g.total do if not g.parts[part] then complete = false end end
+    if complete and id ~= latest.scanId then out[#out + 1] = g end
+  end
+  table.sort(out, function(a, b) return a.at > b.at end)
+  while #out > 2 do table.remove(out) end
+  table.insert(out, 1, latest)
+  return out
+end
+
+local function percent(value, base)
+  if value and base and base > 0 then return (value - base) / base * 100 end
+end
+local function signed(value)
+  return value and string.format("%+.1f%%", value) or "—"
+end
+local function hours(seconds)
+  return seconds < 3600 and "under 1 h" or (math.floor(seconds / 3600) .. " h")
+end
+
+local function marketChange(itemId, scans, public)
+  local out = { bars = {}, lines = { "Listing changes, not sales. Scans are snapshots of asking prices." } }
+  local latest, previous = scans[1], scans[2]
+  local item = latest and latest.items[itemId]
+  local older = previous and previous.items[itemId]
+  if previous then
+    out.lines[#out.lines + 1] = "Change since the previous " .. latest.house .. " scan, over the last "
+      .. hours(latest.at - previous.at) .. " (older scan: " .. hours(math.max(0, time() - previous.at)) .. " ago)"
+    out.change = percent(item and item[4], older and older[4])
+    out.lines[#out.lines + 1] = "Min buyout: " .. signed(out.change)
+    local units = item and older and item[3] - older[3]
+    out.lines[#out.lines + 1] = "Units listed: " .. (units and string.format("%+d", units) or "—")
+  else
+    out.lines[#out.lines + 1] = latest and "one scan so far: scan again later to see change"
+      or "No own scan of this house yet."
+  end
+  out.lines[#out.lines + 1] = signed(public and percent(public.market, public.historical)) .. " vs 60-day median"
+  local prices = {}
+  local function add(price) if type(price) == "number" and price > 0 then prices[#prices + 1] = price end end
+  for i = #scans, 1, -1 do
+    local point = scans[i].items[itemId]
+    out.bars[#out.bars + 1] = point and point[4] or false
+    if point then add(point[4]); add(point[5]) end
+  end
+  if public then add(public.market); add(public.historical) end
+  local swing
+  if #prices >= 2 then
+    local lo, hi, sum = prices[1], prices[1], 0
+    for _, price in ipairs(prices) do lo = math.min(lo, price); hi = math.max(hi, price); sum = sum + price end
+    swing = (hi - lo) / (sum / #prices) * 100
+  end
+  out.lines[#out.lines + 1] = (swing and string.format("%.1f%%", swing) or "—") .. " swing"
+  out.lines[#out.lines + 1] = "Swing is (highest - lowest) / average of kept scan min/value and price file market/median."
+  out.lines[#out.lines + 1] = "Bars: oldest to newest kept scan, min buyout relative to the highest. Gaps mean no item price."
+  return out
+end
+
 -- One redraw's prices, each item looked up once: the price file's market value, or the lowest vendor price this
 -- install saw when that is lower or the only one. A reagent named by a recipe gets its id from this install's item
 -- rows, else from the client when it has the item loaded. A name this install saw with two ids stays ambiguous: the
@@ -254,6 +338,7 @@ end
 local AMBIGUOUS = "ambiguous"
 local function pricer(realm)
   local ids, units, markets = {}, {}, {}
+  local scans = keptScans(realm)
   local P = {}
   -- The item id for a reagent name, or nil and true when the name is ambiguous.
   function P.id(name)
@@ -268,9 +353,14 @@ local function pricer(realm)
   function P.market(itemId)
     if markets[itemId] == nil then
       local row = realm and E.CommunityPrice and E:CommunityPrice(realm, itemId)
-      markets[itemId] = row and row.market or false
+      markets[itemId] = row or false
     end
-    return markets[itemId] or nil
+    local row = markets[itemId]
+    return row and row.market or nil
+  end
+  function P.change(itemId)
+    if itemId then P.market(itemId) end
+    return marketChange(itemId, scans, itemId and markets[itemId])
   end
   -- The price of one unit and whether it is a vendor's, or nil.
   function P.unit(itemId)
@@ -301,6 +391,7 @@ local function evaluate(recipe, P)
   end
   if out.unpriced == 0 then out.cost = cost end
   out.value = recipe.product and P.market(recipe.product) or nil
+  out.marketChange = P.change(recipe.product)
   if out.cost and out.value then out.profit = out.value - out.cost end
   return out
 end
@@ -408,6 +499,21 @@ local function drawCraftRow(line, row, selected)
   line.value:SetText(row.value and U.MoneyShort(row.value) or "no price")
   line.profit:SetText(row.profit and U.MoneyShort(row.profit) or "-")
   line.profit:SetTextColor(unpack(row.profit and row.profit > 0 and COLORS.accent or COLORS.text))
+  local change = row.marketChange
+  local direction = change.change
+  local color = direction and direction > 0 and COLORS.accent or (direction and direction < 0 and COLORS.gold or COLORS.muted)
+  line.change:SetText(direction and direction > 0 and "▲" or (direction and direction < 0 and "▼" or "—"))
+  line.change:SetTextColor(unpack(color))
+  local max = 0
+  for _, price in ipairs(change.bars) do if price then max = math.max(max, price) end end
+  for i, bar in ipairs(line.bars) do
+    local price = change.bars[i]
+    if price and price > 0 and max > 0 then
+      bar:SetSize(5, math.max(1, 12 * price / max))
+      bar:SetVertexColor(unpack(color))
+      bar:Show()
+    else bar:Hide() end
+  end
 end
 
 local function refreshCrafting(c)
@@ -537,6 +643,10 @@ buildCrafting = function(parent)
     if col[1] ~= "name" then s:SetJustifyH("RIGHT") end
     c.head[col[1]] = s
   end
+  c.head.change = text(list, 12, nil, COLORS.muted)
+  c.head.change:SetPoint("TOPLEFT", 553, -6)
+  c.head.change:SetWidth(43)
+  c.head.change:SetText("Scan")
   c.head.name:SetText("Recipe")
   c.head.cost:SetText("Cost")
   c.head.value:SetText("Value per item")
@@ -554,6 +664,24 @@ buildCrafting = function(parent)
       if col[1] ~= "name" then s:SetJustifyH("RIGHT") end
       line[col[1]] = s
     end
+    line.change = text(line, 12, nil, COLORS.muted)
+    line.change:SetPoint("LEFT", 549, 0)
+    line.change:SetWidth(14)
+    line.bars = {}
+    for j = 1, 3 do
+      local bar = line:CreateTexture(nil, "ARTWORK")
+      bar:SetTexture("Interface\\Buttons\\WHITE8X8")
+      bar:SetPoint("BOTTOMLEFT", 567 + (j - 1) * 7, 2)
+      line.bars[j] = bar
+    end
+    line:SetScript("OnEnter", function(self)
+      if not (GameTooltip and self.row) then return end
+      GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+      GameTooltip:AddLine(self.row.name)
+      for _, said in ipairs(self.row.marketChange.lines) do GameTooltip:AddLine(said, COLORS.text[1], COLORS.text[2], COLORS.text[3], true) end
+      GameTooltip:Show()
+    end)
+    line:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
     line:SetScript("OnClick", function()
       if line.row then c.selected = line.row.key; c.added = nil; redraw() end
     end)
