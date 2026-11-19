@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { DocsIcon as IconName } from "@/lib/docs/nav";
+import Card from "@/components/ui/Card";
 import DocsIcon from "./DocsIcon";
 
 /** The building blocks of a docs page. Server components; the interactive ones are in DocsClient. */
@@ -119,9 +120,9 @@ export function Table({ head, rows }: { head: string[]; rows: ReactNode[][] }) {
 /** The method badge and path an endpoint page opens with. */
 export function Endpoint({ method, path, base }: { method: "GET" | "POST"; path: string; base: string }) {
   return (
-    <div className="mt-6 flex min-w-0 items-center gap-3 rounded-card border border-line bg-panel px-3 py-2.5">
+    <Card padding="custom" className="mt-6 flex items-center gap-3 px-3 py-2.5">
       <span className={`rounded-control px-2 py-0.5 font-mono text-xs font-semibold ${method === "GET" ? "bg-accent/15 text-accent" : "bg-warning/15 text-warning"}`}>{method}</span>
       <code className="min-w-0 truncate font-mono text-sm text-fg" title={`${base}${path}`}><span className="text-muted">{base}</span>{path}</code>
-    </div>
+    </Card>
   );
 }

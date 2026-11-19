@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import Card from "@/components/ui/Card";
 import CopyButton from "@/components/ui/CopyButton";
 import { articleMarkdown } from "@/lib/docs/markdown";
 
@@ -103,7 +104,7 @@ function highlight(code: string, lang: string) {
 export function CodeGroup({ tabs, title, className = "" }: { tabs: CodeTab[]; title?: string; className?: string }) {
   const [active, setActive] = useState(0);
   return (
-    <div data-code-block className={`min-w-0 max-w-full overflow-hidden rounded-card border border-line bg-panel ${className}`.trim()}>
+    <Card padding="none" data-code-block className={`max-w-full ${className}`.trim()}>
       <div data-md-skip className="flex items-center gap-1 border-b border-line px-2">
         {title && <span className="mr-2 px-2 py-2 font-mono text-xs text-muted">{title}</span>}
         <div role="tablist" aria-label={title ?? "Code examples"} className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
@@ -142,7 +143,7 @@ export function CodeGroup({ tabs, title, className = "" }: { tabs: CodeTab[]; ti
           {highlight(tab.code, tab.lang)}
         </pre>
       ))}
-    </div>
+    </Card>
   );
 }
 

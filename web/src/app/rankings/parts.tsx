@@ -454,11 +454,11 @@ const NotYet = ({ why }: { why: string }) => <><span aria-hidden="true" classNam
 
 function Tile({ label, value, note }: { label: string; value: ReactNode; note: ReactNode }) {
   return (
-    <div className="min-w-0 rounded-card border border-line bg-panel p-4 sm:p-5">
+    <Card padding="custom" className="p-4 sm:p-5">
       <dt className="text-meta text-muted">{label}</dt>
       <dd className="mt-1 truncate font-mono text-h2-sm tabular-nums text-fg sm:text-h2">{value}</dd>
       <dd className="mt-1 text-cell-2 text-fg-2">{note}</dd>
-    </div>
+    </Card>
   );
 }
 

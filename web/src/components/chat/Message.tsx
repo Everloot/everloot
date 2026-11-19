@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import Card from "@/components/ui/Card";
 import { answerOrigin, NO_SOURCED_ANSWER, sourceLink } from "@/lib/chat/agent";
 import type { ChatMessage } from "@/lib/chat/store";
 import AnswerText, { pageKind, pagePath } from "./AnswerText";
@@ -16,10 +17,10 @@ function shownText(m: ChatMessage): string {
 
 export function UserMessage({ m }: { m: ChatMessage }) {
   return (
-    <div className="ml-auto w-fit max-w-[85%] rounded-card border border-line bg-panel px-4 py-2">
+    <Card padding="custom" className="ml-auto w-fit max-w-[85%] px-4 py-2">
       <p className="whitespace-pre-wrap break-words text-fg">{m.text}</p>
       {m.context && <p className="mt-1 text-xs text-muted">{m.context}</p>}
-    </div>
+    </Card>
   );
 }
 

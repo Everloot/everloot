@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { GameCard, type CardContent } from "@/components/game/GameCard";
+import Card from "@/components/ui/Card";
 import { suggestItems, type ItemChoice, type ItemRef } from "@/lib/chat/items";
 import { pendingLine, type PendingCount } from "../../../../kb/src/pending-loot";
 
@@ -73,7 +74,7 @@ function ItemCard({ id, onSave }: { id: number; onSave?: (id: number) => void })
 
   const page = `/database/items/${id}`;
   return (
-    <section aria-label="Item" aria-busy={card.state === "loading" || drops.state === "loading"} data-no-hover-card className="max-w-md space-y-3 rounded-card border border-line bg-panel p-3 text-sm">
+    <Card as="section" padding="custom" aria-label="Item" aria-busy={card.state === "loading" || drops.state === "loading"} data-no-hover-card className="max-w-md space-y-3 p-3 text-sm">
       {card.state === "ok" && <GameCard card={card.card} />}
       {card.state === "loading" && <p className="text-muted">Loading the item card…</p>}
       {card.state === "missing" && <p className="text-muted">No card for this item yet.</p>}
@@ -115,7 +116,7 @@ function ItemCard({ id, onSave }: { id: number; onSave?: (id: number) => void })
           <button type="button" className={`min-h-9 ${link}`} onClick={() => onSave(id)}>Save item to a project</button>
         </div>
       ) : <a href={page} className={`${link} text-xs`}>Open in the database</a>}
-    </section>
+    </Card>
   );
 }
 

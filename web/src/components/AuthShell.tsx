@@ -3,6 +3,7 @@ import Link from "next/link";
 import { BannerArt } from "@/components/game/PageBanner";
 import Glint from "@/components/glint/Glint";
 import { BANNER_CAPTION } from "@/components/ui/Banner";
+import Card from "@/components/ui/Card";
 import type { LoadingArt } from "@/lib/game-assets";
 
 // The home hero's crop of Onyxia's Lair, so the page shows the same picture as the front page.
@@ -29,7 +30,7 @@ export default function AuthShell({ art, title, lede, children, footer }: {
 }) {
   return (
     <div data-auth-shell className="mx-auto w-full max-w-md space-y-4 py-4">
-      <div data-auth-art className="relative overflow-hidden rounded-card border border-line bg-panel">
+      <Card padding="none" data-auth-art className="relative">
         {art && (
           <>
             <BannerArt art={art} eager position={ART_POSITION} sizes="(min-width: 640px) 448px, 100vw" />
@@ -45,8 +46,8 @@ export default function AuthShell({ art, title, lede, children, footer }: {
             Every drop. Every guild. <span className="text-accent">Every reset.</span>
           </p>
         </div>
-      </div>
-      <div className="rounded-card border border-line bg-panel p-5 sm:p-8">
+      </Card>
+      <Card padding="custom" className="p-5 sm:p-8">
         <div className="space-y-6">
           <header className="space-y-1 text-center">
             <h1 className="text-title-sm text-fg sm:text-title">{title}</h1>
@@ -54,7 +55,7 @@ export default function AuthShell({ art, title, lede, children, footer }: {
           </header>
           {children}
         </div>
-      </div>
+      </Card>
       <div className="space-y-4 px-4 pt-2 text-center">
         {footer}
         <nav aria-label="Legal" className="flex flex-wrap justify-center gap-x-5 gap-y-1 text-sm text-muted">
