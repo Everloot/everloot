@@ -11,3 +11,5 @@ Approved scope: the 2026-11-17 request to apply the discussed Auctionator-inspir
 - No posting, buying, cancellation, automatic scans, new dependencies or release/version changes.
 
 Verification: Lua 5.1 contracts for tab attachment and failure paths, first-use introduction, scan state transitions, settings routing on both client APIs, and the full addon suite. A live client check remains necessary before publication.
+
+Live feedback correction: the native tab must share the adjacent tab's bottom edge and height; only the active page appears selected. Keep one compact scan toolbar with the last scan, an explicit Search button beside item lookup, and Shopping list as the secondary mode. Move the explanation and upload routes to hover help. Show the cooldown only on Scan prices. Use Save scan in the footer, enabled only for an unsaved scan, and state that it reloads the UI. The page remains opaque. A spacing-only patch left the workflow confusing, so this replaces the paragraph-heavy layout while retaining the existing scan and lookup behavior.
