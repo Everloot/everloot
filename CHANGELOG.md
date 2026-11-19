@@ -410,6 +410,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the loot observations table sorts frequency by its 95% Wilson lower bound while still showing the observed share.
 
 ### Changed
+- Site: the MCP page tools and GET /api/tools/{tool} (item, NPC, quest, vendor and object pages, entity relations) read the cron's stored aggregate set, the file the pages already keep, instead of replaying every upload on a fresh server instance (#1354).
 - Site: the search and the search box suggestions read the names they match from one small file the snapshot cron writes beside the aggregates (`snapshots/search-names.json`), so a fresh server instance no longer downloads and parses the whole aggregate set for a keystroke; without the file they read the aggregates as before.
 - Site: the phone menu's search box suggests pages as you type, the same field as the bar's, instead of a plain box with no suggestions.
 - Site: cards, icons and copy buttons look and behave the same everywhere; small corners, captions and line lengths follow the site's sizes.
