@@ -406,6 +406,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 ### Changed
 - Site: item, NPC, quest and zone pages lead with what is known: a relation tab with no rows is left out (one line in place of the strip when none has rows), an item names up to three places to get it in its quick facts and shows auction prices after its relations, and a zone lists what players confirmed before its lore and a closed Terrain section.
 - Site: the Blizzard character lookup on /search is switched on: a full "First Surname" nobody has stored is looked up in the US, then the EU, within its per-address and site-wide limits.
+- Site: pages load their names and catalogue once per request; a title page, for one, read its catalogue twice.
 - Site: the Auction House, bag upgrades, disenchanting and the AH Ledger crafting margins on profession pages share one realm and house picker: a realm menu and a tab per auction house, with the same `realm` and `house` in every link. This browser remembers your last realm and opens it when a page has none (the all-realms list offers a link instead); older links, including the margins' `?market=`, keep working.
 - Site: the Auction House box on an item's database page reads that one item's prices instead of building every realm's board.
 - Site: signed-in visitors now get the shared cached copy of the Auction House browse, realm and item price pages, which read no cookie, instead of a fresh render on every visit.

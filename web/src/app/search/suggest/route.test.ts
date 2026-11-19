@@ -7,7 +7,10 @@ const mocks = vi.hoisted(() => ({
   quests: new Map([[176, { name: "Wanted: Hogger", wikiPage: "z" }]]),
 }));
 vi.mock("@/lib/names", () => ({ loadNames: async () => mocks.agreed }));
-vi.mock("@/lib/shown-item-names", () => ({ loadShownNames: async () => ({ matched: { names: mocks.matched }, showsTip: (id: number) => mocks.matched.has(id) }) }));
+vi.mock("@/lib/shown-item-names", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/shown-item-names")>(),
+  loadShownNames: async () => ({ matched: { names: mocks.matched }, showsTip: (id: number) => mocks.matched.has(id) }),
+}));
 vi.mock("@/lib/game-assets", () => ({
   loadQuestNames: async () => ({ names: mocks.quests }),
   loadSiteAssets: async () => ({ base: "https://assets.everloot.app/b" }),
