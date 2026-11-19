@@ -444,3 +444,63 @@ test("the frame never shows Leaflet's grey: the panel colour beats it, and the c
   expect(leafletSource).toContain("p.art?.continent");
   expect(leafletSource).toContain("m.getBoundsZoom(limit, Boolean(picture))");
 });
+
+test("a spot's card copies a link in the zone's own coordinates and links the zone's pages", async () => {
+  const writeText = vi.fn(async () => {});
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  await mount({ herbZones: [1411] });
+  await act(async () => leaflet.props.onPoint(250, 400));
+  const card = $("[data-map-card]");
+  expect(card.querySelector('a[href="/database/zones/1411-durotar"]')!.textContent).toBe("Open zone page");
+  expect(card.querySelector('a[href="/tools/professions/herbalism/gathering"]')!.textContent).toBe("Herbalism gathering");
+  await click(button("Copy link", card));
+  expect(writeText).toHaveBeenLastCalledWith(`${window.location.origin}/map?zone=1411&x=25&y=40`);
+  // The Barrens has no herb spot 3 installs placed, so no gathering link.
+  await act(async () => leaflet.props.onPoint(1500, 400));
+  expect($("[data-map-card]").querySelector('a[href="/tools/professions/herbalism/gathering"]')).toBeNull();
+});
+
+test("a zone in focus links its zone page, and the gathering guide where players placed herb spots", async () => {
+  await mount({ herbZones: [1411] });
+  await act(async () => leaflet.props.onZone(1411));
+  const links = $("[data-map-zone-links]");
+  expect(Array.from(links.querySelectorAll("a")).map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
+    ["Zone page", "/database/zones/1411-durotar"], ["Herbalism gathering", "/tools/professions/herbalism/gathering"],
+  ]);
+  await act(async () => leaflet.props.onZone(1413));
+  expect(container.querySelector("[data-map-zone-links]")).toBeNull();
+});
+
+test("the side switch shows one side's flights, keeps neutral ones, and goes into the address", async () => {
+  const sided = {
+    ...pinSet,
+    flightMasters: [
+      { ...items.flightMasters[0]!, faction: "horde" as const },
+      { ...items.flightMasters[1]!, faction: "both" as const },
+      { id: "f3", name: "Outpost, Durotar", x: 200, y: 200, heldBack: false, faction: "alliance" as const },
+    ],
+    flightLines: [{ ...items.flightLines[0]!, faction: "horde" as const }],
+  };
+  fetcher = answer({ ok: true, ...sided });
+  vi.stubGlobal("fetch", fetcher);
+  vi.useFakeTimers();
+  await mount();
+  const names = () => leaflet.props.items.flightMasters.map((f) => f.id);
+  expect(names()).toEqual(["f1", "f2", "f3"]);
+  await click(button("Alliance"));
+  expect(names()).toEqual(["f2", "f3"]);
+  expect(leaflet.props.items.flightLines).toEqual([]);
+  await act(async () => vi.advanceTimersByTime(300));
+  expect(new URLSearchParams(window.location.search).get("side")).toBe("alliance");
+  await click(button("Horde"));
+  expect(names()).toEqual(["f1", "f2"]);
+  expect(leaflet.props.items.flightLines.map((l) => l.id)).toEqual(["l1"]);
+  await click(button("Both sides"));
+  await act(async () => vi.advanceTimersByTime(300));
+  expect(new URLSearchParams(window.location.search).has("side")).toBe(false);
+});
+
+test("without sides in the files there is no side switch", async () => {
+  await mount();
+  expect(container.querySelector("[data-map-side]")).toBeNull();
+});
