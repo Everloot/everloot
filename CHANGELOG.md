@@ -612,6 +612,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - MCP: rank answering claims before subject matches, state unavailable requested facts,
   and report separate answerability rates.
 - Site: describe the in-game Everloot window, feature chooser, local data and how to reopen it or report a window error.
+- Site: the census adds headline tiles, faction and class colours, race and level bars, a race-by-class heatmap, and a daily chart with hover counts; every table stays, hidden counts stay hidden, and class and race icons load from Blizzard when available.
 
 ## [0.3.25] - 2026-11-18
 
