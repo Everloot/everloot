@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: armory character pages show the header with when the character was last read, and put gear, talents, stats, PvP, achievements, professions, reputations and quests in tabs; a tab with nothing stored says why in one sentence.
 - Site: chat answers read at 16 px with tables and code drawn, the first sentence as a summary line and the links next to each claim as source chips; a still skeleton shows until the first words arrive, a failed answer offers Retry, and an item card that cannot load says so after 10 seconds and links the item page.
 - Site: search and the search box suggestions find a name with its words in any order ("cloth linen") and past a small typo ("lnen clth"); when a typo was read, the search page says which words it searched for.
 - Site: the header and database search find NPCs by the Warcraft Wiki name their pages print and suggest zones as you type; each suggestion says what it is, the list ends with "All results", and search answers every casing of a query from one cached page.
