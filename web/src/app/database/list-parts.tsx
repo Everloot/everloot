@@ -37,9 +37,12 @@ export function nameMatches<T>(rows: readonly T[], text: string | undefined, id:
   return { ranked: new Map(found.hits.map((h) => [h.row, h.r])), ...(found.respelled ? { respelled: found.respelled } : {}) };
 }
 
-/** Text matches best first (an exact name leads) unless a sort was asked for; the list's own order holds within a rank. */
+/**
+ * Text matches best first (an exact name leads) unless a sort was asked for; the list's own order holds within a rank.
+ * A row the text never ranked is one the list kept by its id (the objects list keeps both): it leads, as on /search.
+ */
 export function byRank<T>(rows: T[], ranked: Map<T, number> | null, sorted: boolean): T[] {
-  return ranked && !sorted ? [...rows].sort((a, b) => (ranked.get(a) ?? 9) - (ranked.get(b) ?? 9)) : rows;
+  return ranked && !sorted ? [...rows].sort((a, b) => (ranked.get(a) ?? -1) - (ranked.get(b) ?? -1)) : rows;
 }
 
 /** The one line above a list when the typo fallback read the query, as /search says it. */

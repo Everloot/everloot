@@ -124,10 +124,9 @@ test("the lists match every word in any order, an exact name first, and read a t
   expect(rows(await html(QuestList(search({ q: "wanted hoggr" }))), "quests")).toEqual([176]);
   expect(await html(QuestList(search({ q: "wanted hoggr" })))).toContain("Showing results for wanted hogger");
   expect(await html(QuestList(search({ q: "hogger wanted" })))).not.toContain("Showing results for");
-  // An id keeps its own rule and never respells; a sort asked for wins over the rank.
+  // An id keeps its own rule and never respells (the rank order under a sort is list-parts.test.ts).
   expect(rows(await html(QuestList(search({ q: "176" }))), "quests")).toEqual([176]);
   expect(await html(QuestList(search({ q: "176" })))).not.toContain("Showing results for");
-  expect(rows(await html(NpcList(search({ q: "guard hogger", sort: "-level" }))), "npcs")).toEqual([]);
   expect(rows(await html(NpcList(search({ q: "hogger" }))), "npcs")).toEqual([448]);
   expect(rows(await html(NpcList(search({ q: "thomas guard" }))), "npcs")).toEqual([1]);
   expect(places(await html(ZoneList(search({ q: "forest elwynn" }))), "zones").length).toBeGreaterThan(0);
