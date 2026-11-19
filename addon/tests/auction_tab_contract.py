@@ -116,18 +116,19 @@ GetRealmName = function() return 'Forever' end
 UnitFactionGroup = function() return 'Horde', 'Horde' end
 UnitExists = function() return false end
 LINEN = '|cffffffff|Hitem:2589::|h[Linen Cloth]|h|r'
-GetItemInfo = function(item) if item == 2589 or item == 'Linen Cloth' then return 'Linen Cloth', LINEN end end
+-- Forever (build 70959) has no global GetItemInfo: only C_Item names an item, and only a loaded one.
+C_Item = { GetItemInfo = function(item) if item == 2589 or item == 'Linen Cloth' then return 'Linen Cloth', LINEN end end }
 TooltipDataProcessor = { AddTooltipPostCall = function() end }
 Enum = { TooltipDataType = { Item = 0 } }
 
-rows = { { 2589, 20, 2000 }, { 765, 5, 500 } }
+rows = { { 2589, 20, 2000, 'Linen Cloth' }, { 765, 5, 500, 'Silverleaf' } }
 replicateCalls = 0
 C_AuctionHouse = {
   ReplicateItems = function() replicateCalls = replicateCalls + 1 end,
   GetNumReplicateItems = function() return #rows end,
   GetReplicateItemInfo = function(i)
     local r = rows[i]
-    return nil, 1, r[2], 1, true, 1, 0, 0, 0, r[3], 0, false, nil, nil, nil, 0, r[1], true
+    return r[4], 1, r[2], 1, true, 1, 0, 0, 0, r[3], 0, false, nil, nil, nil, 0, r[1], true
   end,
 }
 
@@ -371,19 +372,22 @@ T.panel.scanButton.scripts.OnClick()
 assert(replicateCalls == 1, 'Scan prices starts one scan')
 assert(p.scanButton.text == 'Scanning...' and not p.scanButton.enabled, 'busy scan action disabled')
 assert(not string.find(T.panel.status.text, 'Scanning', 1, true), 'scan state belongs on its button only')
--- The bar in the status line's place: the wait has words and seconds and no fill, the same width and anchor as the line.
+-- The bar across the top, beside the title: the wait says its seconds and the most the scan allows, filling toward
+-- them; the last-scan line stays where it was.
 now = now + 3
 T.Refresh()
-assert(p.progress.shown and not p.status.shown, 'the running scan shows its bar where the status line was')
-assert(p.progress.text.text == "Waiting for the house's listings, 3 s", p.progress.text.text)
-assert(p.progress.value == 0 and p.progress.low == 0 and p.progress.high == 1, 'the wait fills nothing')
+assert(p.progress.shown and p.status.shown, 'the running scan shows its bar at the top and keeps the status line')
+assert(p.progress.text.text == "Waiting for the house's listings: 3 s, up to 30 s", p.progress.text.text)
+assert(math.abs(p.progress.value - 0.1) < 0.001 and p.progress.low == 0 and p.progress.high == 1, 'the wait fills toward the seconds allowed: ' .. tostring(p.progress.value))
 assert(p.progress.kind == 'StatusBar' and p.progress.text.template == 'GameFontHighlightSmall', 'a native status bar with the game font')
-assert(p.progress.width == p.status.width and p.progress.points.LEFT[1] == p.scanButton, "the bar takes the status line's place beside the button")
+assert(p.progress.points.TOPLEFT[1] == p.helpButton and p.progress.points.BOTTOMLEFT[1] == p.helpButton, 'the bar starts beside the help button, as tall as it')
+assert(p.progress.width >= 300 and p.progress.width <= 784 - 16 - 22 - 8 - 16 - 16, 'the bar ends before the panel edge: ' .. tostring(p.progress.width))
+if type(rawget(p, 'shop')) == 'table' then T.SetMode('shop'); assert(p.progress.shown, 'the bar stays at the top on the shopping page'); T.SetMode('lookup') end
 fire('REPLICATE_ITEM_LIST_UPDATE')
 drain()
 now = now + 122
 T.Refresh()
-assert(not p.progress.shown and p.status.shown, 'the scan reported: the status line is back and the bar gone')
+assert(not p.progress.shown and p.status.shown, 'the scan reported: the bar is gone and the status line stays')
 assert(p.scanButton.text == 'Ready in 12:55' and not p.scanButton.enabled, 'cooldown shown on disabled action')
 local status = T.panel.status.text
 assert(not string.find(status, '12:55', 1, true), 'the cooldown is not repeated')
@@ -416,6 +420,20 @@ assert(not p.unit.shown, 'no amounts, no unit')
 assert(T.Lookup('99999'):find('No Everloot price file in the game yet:', 1, true))
 lookup('')
 assert(p.message.text == "Type an item's name or id, or shift-click an item here.", p.message.text)
+-- A name the client has not loaded is found among the names the scan's rows gave; part of a name lists the
+-- matches with the scan's own prices; a name nothing matches says so, not the hint.
+assert(EverlootDB.scanNames.Forever[765] == 'Silverleaf', 'the scan kept the names its rows carried')
+lookup('silverleaf')
+assert(shownText():find('Your scan', 1, true) and p.item.text:find('Item 765', 1, true), 'a scanned item found by its name alone: ' .. tostring(p.item.text))
+lookup('l')
+assert(p.item.shown and p.item.text:find('Items named like "l"', 1, true) and p.item.text:find('Forever', 1, true), p.item.text)
+assert(shownText():find('2 items in your scans match "l". Type one full name:', 1, true), shownText())
+assert(shownText():find('Linen Cloth  ·  min 1s 0c  ·  20 listed', 1, true) and shownText():find('Silverleaf  ·  min 1s 0c  ·  5 listed', 1, true), shownText())
+assert(not p.unit.shown, 'a list of matches has no per-unit heading')
+checkLayout()
+lookup('Peacebloom')
+assert(p.message.shown and p.message.text:find('No item named "Peacebloom" in your scans of this realm', 1, true) and p.used == 0, p.message.text)
+assert(Everloot.ItemIdFrom('SILVERLEAF') == 765 and Everloot.ItemIdFrom('silver') == nil, 'the exact name alone resolves to an id')
 
 -- A shift-clicked item goes into the box while it has focus.
 local box = T.panel.lookup
@@ -459,7 +477,6 @@ assert(p.rows[4].note:GetStringHeight() > 12, 'a long warning wraps inside the c
 p.hooked.OnSizeChanged(p, 280, 450)
 assert(p.results.width <= 280 - 32, 'the results fit a narrow panel: ' .. p.results.width)
 assert(p.scanButton.width <= p.results.width and p.status.width <= p.results.width, 'scan controls fit a narrow page')
-assert(p.progress.width == p.status.width and p.progress.points.TOPLEFT[1] == p.scanButton, 'the bar follows the status line under the button on a narrow page')
 assert(p.shareButton.points.BOTTOMRIGHT[1] == p, 'saving is a footer action')
 sameAsLines(STUB)
 checkLayout()

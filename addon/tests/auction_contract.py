@@ -125,7 +125,7 @@ assert(Everloot:ScanProgress() == nil, 'no progress between scans')
 Everloot:StartScan()
 now = now + 4
 local words, fraction = Everloot:ScanProgress()
-assert(words == "Waiting for the house's listings, 4 s" and fraction == 0, tostring(words))
+assert(words == "Waiting for the house's listings: 4 s, up to 30 s" and math.abs(fraction - 4 / 30) < 0.001, tostring(words) .. ' ' .. tostring(fraction))
 timers = {}
 for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'REPLICATE_ITEM_LIST_UPDATE') end
 words, fraction = Everloot:ScanProgress()
@@ -137,5 +137,7 @@ assert(timers[1].seconds == 2, 'the second read waits for the item data')
 step()
 assert(Everloot:ScanProgress() == nil and not Everloot:Scanning(), 'the scan reported and the progress is gone')
 assert(#EverlootDB.records.auction_snapshot[1].items == 3, 'the second read got the row whose item had not loaded')
+assert(EverlootDB.scanNames.Forever[2589] == 'Item' and EverlootDB.scanNames.Forever[2590] == 'Item' and EverlootDB.scanNames.Forever[2591] == 'Item', 'the names the rows carried are kept by realm, the second read included')
+assert(#EverlootDB.records.auction_snapshot[1].items[1] == 5, 'a stored row keeps its five numbers: names are not uploaded')
 """)
 print("Lua 5.1 auctions: scan progress through the wait, the read and the second read")
