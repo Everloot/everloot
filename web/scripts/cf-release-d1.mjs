@@ -216,5 +216,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const { files, sha256 } = await writeD1Release({ release, out, partBytes: partMb * 1024 * 1024 });
   console.log(`[d1] import into a new database, in order (add --remote for Cloudflare, --local for wrangler dev):`);
   for (const file of files) console.log(`  npx wrangler d1 execute KNOWLEDGE_D1 --file ${file}`);
-  console.log(`[d1] then set KNOWLEDGE_RELEASE_SHA256 to ${sha256} in wrangler.jsonc`);
+  console.log(`[d1] then set KNOWLEDGE_RELEASE_SHA256 to ${sha256} in wrangler.jsonc and wrangler.cron.jsonc`);
 }

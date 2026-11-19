@@ -91,8 +91,11 @@ Cron times are UTC.
   It runs only while the repository variable `WORKER_DEPLOY` is `1`, and only for a push to `main`
   in this repository whose checks passed. A commit the live site already includes, or one that
   changes nothing under `web/`, `kb/` or `packages/protocol/`, is skipped. After the deploy it warms
-  the edge cache and fails if any page in the sitemap does not answer 200.
-- **What it needs.** `WORKER_DEPLOY` (variable) as the switch. `CLOUDFLARE_API_TOKEN` (secret) and
+  the edge cache and fails if any page in the sitemap does not answer 200. While the repository
+  variable `DEPLOY_CRON_WORKER` is `true`, the same build is also deployed as the cron Worker
+  (`web/wrangler.cron.jsonc`) right after the site ([OPERATIONS.md](OPERATIONS.md), "The cron Worker").
+- **What it needs.** `WORKER_DEPLOY` (variable) as the switch, and `DEPLOY_CRON_WORKER` (variable) for the
+  cron Worker. `CLOUDFLARE_API_TOKEN` (secret) and
   `CLOUDFLARE_ACCOUNT_ID` (variable) for the deploy. The public build-time values are variables:
   `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_GAME_ASSETS_URL`, `NEXT_PUBLIC_BULK_URL`,
   `NEXT_PUBLIC_ADSENSE_CLIENT`, `NEXT_PUBLIC_GA_ID`, `NEXT_PUBLIC_METRICOOL_HASH`,
@@ -101,7 +104,8 @@ Cron times are UTC.
   zone's challenge and rate-limit rules.
 - **A failure means.** In the build or deploy step: the live site still serves the previous commit.
   In the warm step: the new version is live but at least one sitemap page did not answer 200; the
-  step's log names the page.
+  step's log names the page. In the cron Worker step: the site's new version is live and the cron
+  Worker still runs the previous build.
 
 ### Desktop release (`desktop-release.yml`)
 
