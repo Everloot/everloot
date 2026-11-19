@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: character boards filter by class and faction; /rankings shows the best Gear Score in each class, character and guild name searches, and links to add your character or guild.
 
 - Site: Guild pages show population tiles, class mix, level and item level bars, and a sortable roster.
 - Site: Add a missing guild or ask for an older guild to be read again from the armory's add-a-guild form.
@@ -426,6 +427,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the loot observations table sorts frequency by its 95% Wilson lower bound while still showing the observed share.
 
 ### Changed
+- Site: rankings use class colours, faction swatches, relative value bars, linked guild names and keyboard-accessible metric explanations with each character's read time.
 - Site: a search lists up to five results per type with a quest's level, side and category and an NPC's level, type, zone and drop count beside the name; the tab row opens each type's database list with the query applied (Characters and Guilds included), a scoped search lands on that list, and the lists find a name by its words in any order or past a small typo, exact names first; the empty search page lists all fifteen kinds a search covers, and an old lore-list link lands on the lore list's own address.
 - Site: the MCP page tools and GET /api/tools/{tool} (item, NPC, quest, vendor and object pages, entity relations) read the cron's stored aggregate set, the file the pages already keep, instead of replaying every upload on a fresh server instance (#1354).
 - Site: the search and the search box suggestions read the names they match from one small file the snapshot cron writes beside the aggregates (`snapshots/search-names.json`), so a fresh server instance no longer downloads and parses the whole aggregate set for a keystroke; without the file they read the aggregates as before.

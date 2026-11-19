@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, DataTable, LinkTabs, SectionHeading, type Column } from "@/components/ui";
+import { Card, DataTable, LinkTabs, SectionHeading, Tooltip, type Column } from "@/components/ui";
 import { ARMORY_BOARDS, ARMORY_REGIONS, armoryBoardHref, armoryCharacterPath, armoryGuildPath, metricValue, regionLabel, type ArmoryRegion } from "@/lib/armory";
 import { guildDirectoryHref } from "@/lib/armory-guilds";
 import type { ArmoryBoardRow, ArmoryGuildRow } from "@/lib/armory-store";
@@ -7,6 +7,7 @@ import { guildPath, LADDER_LINE, START_LINE, type RankedRow } from "@/lib/guilds
 import { BOARD_PREVIEW, type CharacterBoard, type GuildGear, type RaidProgress } from "@/lib/leaderboards";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { ArmoryCredit, newest, RegionRuleset } from "../armory/parts";
+import { BoardClass, BoardGuild, BoardMetric, BoardValue } from "../armory/board-parts";
 import { day, Progress } from "../guilds/parts";
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
@@ -28,7 +29,7 @@ export function RegionTabs({ region }: { region: ArmoryRegion | null }) {
 }
 
 /** The rank sits in the name cell: on a phone a dense table keeps its first column only. */
-const rankMark = (rank: number) => <span className="w-6 shrink-0 font-mono tabular-nums text-fg-2">{rank}</span>;
+const rankMark = (rank: number) => <span className="w-6 shrink-0 font-mono tabular-nums text-muted">{rank}</span>;
 
 const characterColumns = (board: CharacterBoard): Column<ArmoryBoardRow>[] => [
   {
@@ -37,13 +38,13 @@ const characterColumns = (board: CharacterBoard): Column<ArmoryBoardRow>[] => [
       <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
         {rankMark(r.rank)}
         <Link href={armoryCharacterPath(r.region, r.slug)} className={`${link} font-medium`}>{r.name} {r.surname}</Link>
-        <span className="text-cell-2 text-fg-2">{r.class}</span>
+        <BoardClass row={r} />
       </span>
     ),
   },
-  { key: "guild", header: "Guild", cell: (r) => r.guildName ?? muted("—") },
+  { key: "guild", header: "Guild", cell: (r) => <BoardGuild row={r} /> },
   { key: "where", header: "Region", nowrap: true, cell: (r) => <RegionRuleset region={r.region} ruleset={r.ruleset} /> },
-  { key: "value", header: ARMORY_BOARDS[board.metric].column, numeric: true, cell: (r) => <span className="font-medium text-fg">{metricValue(board.metric, r.value)}</span> },
+  { key: "value", header: <BoardMetric metric={board.metric} />, numeric: true, cell: (r) => <BoardValue row={r} metric={board.metric} top={board.rows?.[0]?.value ?? 0} /> },
 ];
 
 /** The armory's three character boards side by side, each the top of its full list. */
@@ -68,7 +69,7 @@ export function CharacterBoards({ boards, region }: { boards: CharacterBoard[]; 
                   columns={characterColumns(board)}
                   rows={board.rows}
                   rowKey={(r) => `${r.region}/${r.slug}`}
-                  meta={(r) => [r.class, r.guildName, regionLabel(r.region), metricValue(board.metric, r.value)].filter(Boolean).join(" · ")}
+                  meta={(r) => <span className="flex flex-wrap items-center gap-2"><BoardGuild row={r} /><span>{regionLabel(r.region)}</span><BoardValue row={r} metric={board.metric} top={board.rows?.[0]?.value ?? 0} /></span>}
                   empty={<p className="px-4 py-3 text-cell text-fg-2">No character with this number here yet.</p>}
                   toolbar={<h4 aria-hidden="true" className="px-4 pt-3 text-h2-sm text-fg">{def.title}</h4>}
                   footer={<Link href={all} className={link}>Top 100 by {def.title.toLowerCase()}</Link>}
@@ -82,11 +83,15 @@ export function CharacterBoards({ boards, region }: { boards: CharacterBoard[]; 
   );
 }
 
+function GuildItemLevel({ guild: g }: { guild: ArmoryGuildRow }) {
+  return g.averageItemLevel === null ? muted("Not read") : <Tooltip label={`Average item level: ${metricValue("item-level", g.averageItemLevel)}. Average of the guild members read. Read ${new Date(g.fetchedAt).toUTCString()}.`}>{metricValue("item-level", g.averageItemLevel)}</Tooltip>;
+}
+
 const gearColumns: Column<ArmoryGuildRow>[] = [
   { key: "name", header: "Guild", cell: (g) => <Link href={armoryGuildPath(g.region, g.slug)} className={`${link} font-medium`}>{g.name}</Link> },
   { key: "where", header: "Region", nowrap: true, cell: (g) => <RegionRuleset region={g.region} ruleset={g.ruleset} /> },
   { key: "read", header: "Members read", numeric: true, cell: (g) => number(g.membersRead) },
-  { key: "il", header: "Avg item level", numeric: true, cell: (g) => <span className="font-medium text-fg">{g.averageItemLevel === null ? muted("Not read") : metricValue("item-level", g.averageItemLevel)}</span> },
+  { key: "il", header: <Tooltip label="Average item level of the guild members the armory has read. Item level averages the gear a character wears.">Avg item level</Tooltip>, numeric: true, cell: (g) => <GuildItemLevel guild={g} /> },
 ];
 
 const raidColumns: Column<RankedRow>[] = [
@@ -118,7 +123,7 @@ export function GuildBoards({ gear, raids, region }: { gear: GuildGear | null; r
                   columns={gearColumns}
                   rows={gear.rows}
                   rowKey={(g) => `${g.region}/${g.slug}`}
-                  meta={(g) => [regionLabel(g.region), `${number(g.membersRead)} read`, g.averageItemLevel === null ? "Not read" : metricValue("item-level", g.averageItemLevel)].join(" · ")}
+                  meta={(g) => <span className="flex flex-wrap items-center gap-2"><span>{regionLabel(g.region)} · {number(g.membersRead)} read</span><GuildItemLevel guild={g} /></span>}
                   empty={<p className="px-4 py-3 text-cell text-fg-2">No guild with a member read here yet.</p>}
                   toolbar={<h4 aria-hidden="true" className="px-4 pt-3 text-h2-sm text-fg">Gear</h4>}
                   footer={<Link href={guildDirectoryHref({ region, sort: "item-level" })} className={link}>Every guild by average item level</Link>}
@@ -148,4 +153,20 @@ export function GuildBoards({ gear, raids, region }: { gear: GuildGear | null; r
       </div>
     </section>
   );
+}
+
+/** Every class gets a place, even when its best character is outside the overall top 100. */
+export function BestOfClass({ rows }: { rows: ArmoryBoardRow[] | null }) {
+  return <section aria-labelledby="best-of-class" className="space-y-3">
+    <SectionHeading id="best-of-class" note="The highest Gear Score read for each class, in the selected region.">Best of each class</SectionHeading>
+    {rows === null ? unreachable : <Card padding="none"><DataTable dense caption="Best of each class by Gear Score"
+      columns={[
+        { key: "class", header: "Class", cell: (r) => <span className="flex flex-wrap items-center gap-2"><BoardClass row={r} /><Link href={armoryCharacterPath(r.region, r.slug)} className={link}>{r.name} {r.surname}</Link></span> },
+        { key: "guild", header: "Guild", cell: (r) => <BoardGuild row={r} /> },
+        { key: "region", header: "Region", cell: (r) => <RegionRuleset region={r.region} ruleset={r.ruleset} /> },
+        { key: "value", header: <BoardMetric metric="gear-score" />, numeric: true, cell: (r) => <BoardValue row={r} metric="gear-score" top={Math.max(0, ...rows.map((r) => r.value))} /> },
+      ]} rows={rows} rowKey={(r) => r.class}
+      meta={(r) => <span className="flex flex-wrap items-center gap-2"><BoardGuild row={r} /><span>{regionLabel(r.region)}</span><BoardValue row={r} metric="gear-score" top={Math.max(0, ...rows.map((r) => r.value))} /></span>}
+      empty={<p className="p-4 text-fg-2">No Gear Score read yet.</p>} /></Card>}
+  </section>;
 }
