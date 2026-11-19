@@ -367,6 +367,15 @@ export const completionProgress = z.object({
   unknownCharacter: z.string().optional().describe("The character key that was asked for and not found."),
   droppedCharacters: z.number().int().describe("Characters of this install the site no longer holds."),
 });
+/** What an item's values rest on: the public days behind them, counted. Never more days than exist. */
+export const marketCoverage = z.object({
+  solidDays14: z.number().int().describe("Solid public days (not thin, not trimmed) up to 14 calendar days old: the days the market value is a weighted mean of. Zero when market is null."),
+  days60: z.number().int().describe("Public days in the last 60 calendar days: the days historical is the median of, thin days left out when a solid day exists."),
+  thinDays: z.number().int().describe("Of days60, the days with 5 units listed or fewer."),
+  trimmedDays: z.number().int().describe("Of days60, the solid days trimmed as outliers (further than 3x from historical, with 5 or more solid days)."),
+  newestDay: z.string().nullable(),
+  trustedOnly: z.boolean().describe("True when the newest day is public under 3 reporters: through Everloot's own installs only."),
+});
 export const marketValue = z.object({
   itemId: z.number().int(),
   market: z.number().int().nullable().describe("Null when no solid public day falls in the last 14: unrecorded, not zero."),
@@ -377,6 +386,7 @@ export const marketValue = z.object({
   ageDays: z.number().int(),
   reporters: z.number().int(),
   thin: z.boolean(),
+  coverage: marketCoverage.optional().describe("The public days behind the values, counted. Older servers omit it."),
 });
 export const marketPage = z.object({
   realm: z.string(),

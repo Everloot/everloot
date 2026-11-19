@@ -74,7 +74,12 @@ local lines = D.Lines('Forever', 100)
 local function joined(lines) local t = {}; for _, l in ipairs(lines) do t[#t + 1] = l.text end; return table.concat(t, '\n') end
 assert(joined(lines):find('80.0%%') and joined(lines):find('1%-3 units'))
 assert(joined(lines):find('Disenchant estimate is higher'))
-assert(joined(lines):find('10 disenchants, at least 3 installs'))
+assert(joined(lines):find('  Observed: 10 disenchants\n', 1, true))
+now = now + 2 * 86400
+assert(joined(D.Lines('Forever', 100)):find('  Observed: 10 disenchants\n', 1, true), 'two days is fresh')
+now = now + 86400
+assert(joined(D.Lines('Forever', 100)):find('Observed: 10 disenchants · Nov 17', 1, true), 'old uploads carry a short day')
+now = now - 3 * 86400
 prices(10, 70)
 assert(joined(D.Lines('Forever', 100)):find('Auction estimate is higher'))
 prices(1, 2)

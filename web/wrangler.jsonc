@@ -98,7 +98,8 @@
     // Item level and Gear Score boards for linked characters whose owner chose "Rank my gear" (owner, 2026-11-06).
     "EVERLOOT_LEADERBOARDS": "1",
     // "EVERLOOT_CRON_WORKER": "1" once the cron Worker (wrangler.cron.jsonc) runs the scheduled jobs: this Worker's
-    // triggers then return without running anything. Unset, this Worker runs them (docs/OPERATIONS.md, "The cron Worker").
+    // triggers then run only the jobs that stay here (SITE_JOBS in src/lib/cf-crons.ts). Unset, this Worker runs them
+    // all (docs/OPERATIONS.md, "The cron Worker").
     "NEWS_DIR": "/bundle/repo/kb/news",
     "GUIDES_DIR": "/bundle/repo/kb/guides",
     "WIKI_DIR": "/bundle/repo/kb/wiki",

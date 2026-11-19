@@ -149,6 +149,12 @@ export function trailFor(pathname: string): Crumb[] | null {
   if (profession && PROFESSIONS.includes(profession[1])) {
     return [...trailFor("/tools/professions")!, { name: profession[1].split("-").map(titleCase).join(" "), path }];
   }
+  // A realm's Market changes view: the realm page (named from its slug, as that page does without a board) sits between.
+  const changes = path.match(/^\/tools\/auctions\/([\p{L}\p{N}][\p{L}\p{N}-]*)\/changes$/u);
+  if (changes) {
+    const realm = `/tools/auctions/${changes[1]}`;
+    return [...trailFor("/tools/auctions")!, { name: changes[1].split("-").map(titleCase).join(" "), path: realm }, { name: "Market changes", path }];
+  }
   if (!NAMES[path]) return null;
   const trail: Crumb[] = [];
   for (let p: string | undefined = path; p; p = PARENT[p]) trail.unshift({ name: NAMES[p], path: p });

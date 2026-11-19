@@ -15,6 +15,8 @@ O.ROWS = {
     text = "The window from the minimap button and /everloot window. It shows what this file holds and records nothing; off leaves recording as it is." },
   { key = "minimapButton", group = "general", field = true, label = "Minimap button",
     text = "The Everloot button on the minimap: click it for the window, right-click for these settings, hover it for other addons' buttons. Off hides it after a reload; /everloot window still opens the window." },
+  { key = "flight", group = "general", command = "flight", label = "Flight path bar",
+    text = "A route bar at the top of the screen while flying. Learns the time from confirmed arrivals and estimates the next trip. The last three times per route and realm stay in this file; never uploaded." },
   { key = "buttons", group = "general", command = "buttons", label = "Addon buttons in the Everloot button",
     text = "Other addons' minimap buttons gather into the Everloot minimap button; hover it to use them. Records nothing; off puts them back after a reload." },
   { key = "auctions", group = "auction", command = "auctions", label = "Auction scans",

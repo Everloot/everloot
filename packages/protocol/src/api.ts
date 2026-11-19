@@ -77,22 +77,40 @@ export const marketRealmsResponse = z.object({
   attribution: attributionSchema,
 });
 
+/** The positions of one price row, as every reader is given them. */
 export const MARKET_PRICE_FIELDS = ["itemId", "market", "min", "historical", "quantity", "day", "reporters"] as const;
+/** The positions with `fields=full`: the seven, then when the scans were taken, the price age and the one-day change. Only ever appended to. */
+export const MARKET_PRICE_FIELDS_FULL = [...MARKET_PRICE_FIELDS, "updatedAt", "ageDays", "change1d"] as const;
 
-/** GET /api/market/prices?realm=: most-listed or explicitly selected public items, in `fields` order. */
+/**
+ * GET /api/market/prices?realm=: most-listed or explicitly selected public items, in `fields` order. Rows are seven
+ * wide; with `fields=full` in the request they are ten, and `fields` names all ten. Both shapes parse here, and
+ * every row is as wide as `fields`.
+ */
 export const marketPricesResponse = z.object({
   ok: z.literal(true),
   dataAsOf: ISO_TIME.nullable(),
   rule: z.string().describe("How a day becomes public and how the values are computed."),
-  fields: z.tuple([z.literal("itemId"), z.literal("market"), z.literal("min"), z.literal("historical"), z.literal("quantity"), z.literal("day"), z.literal("reporters")]),
+  fields: z.tuple([
+    z.literal("itemId"), z.literal("market"), z.literal("min"), z.literal("historical"), z.literal("quantity"), z.literal("day"), z.literal("reporters"),
+    z.literal("updatedAt").optional(), z.literal("ageDays").optional(), z.literal("change1d").optional(),
+  ]).describe("The row positions: seven, or ten when the request asked for fields=full."),
   realm: z.string().nullable(),
   house: z.enum(AUCTION_HOUSES).optional().describe("Present when the request named a house: the values come only from scans of that house."),
   items: z.array(z.tuple([
-    z.number().int().positive(), z.number().int().nonnegative(), z.number().int().nonnegative(), z.number().int().nonnegative(),
+    z.number().int().positive(), z.number().int().nonnegative().nullable(), z.number().int().nonnegative(), z.number().int().nonnegative(),
     z.number().int().nonnegative(), z.string(), z.number().int().nonnegative(),
-  ])).describe("[itemId, market, min, historical, quantity, day, reporters]; copper per unit."),
+    ISO_TIME.nullable().optional(), z.number().int().nonnegative().optional(), z.number().nullable().optional(),
+  ])).describe(
+    "[itemId, market, min, historical, quantity, day, reporters]; copper per unit. market is null for a thin item (no solid public day in the last 14). " +
+    "With fields=full three positions follow. updatedAt: when the scans behind the newest open public day were taken; null once only closed days remain. " +
+    "ageDays: calendar days since day. change1d: the newest solid day's market value against the solid day one calendar day before it, (to - from) / from; null without such a pair.",
+  ),
   attribution: attributionSchema,
-});
+}).refine(
+  (r) => (r.fields.length === 7 || r.fields.length === 10) && r.items.every((row) => row.length === r.fields.length),
+  { message: "fields names 7 or 10 positions and every row is as wide as fields" },
+);
 export type MarketPricesResponse = z.infer<typeof marketPricesResponse>;
 
 const dropRate = z.object({
@@ -602,11 +620,12 @@ export const API_ROUTES: readonly ApiRoute[] = [
       { name: "realm", description: "Realm name. Omit it to list realms.", schema: { type: "string", minLength: 2, maxLength: 40 } },
       { name: "house", description: "Alliance, Horde or Neutral (any case). Needs realm. Without it, only scans that recorded no house are read.", schema: { type: "string", enum: ["alliance", "horde", "neutral"] } },
       { name: "items", description: "Comma-separated positive item IDs, at most 100 entries, with a realm. Selected before the row cap; unknown and non-public items are omitted. Repeated IDs are deduplicated; repeated items parameters are rejected.", schema: { type: "string", minLength: 1, maxLength: 1700, pattern: "^[1-9][0-9]*(,[1-9][0-9]*)*$", examples: ["2589,2592"] } },
+      { name: "fields", description: "`full` appends three positions to every row and to `fields`: updatedAt (when the scans behind the newest open public day were taken, or null once only closed days remain), ageDays and change1d (the one-day change of the market value, (to - from) / from, or null without a solid day and the solid day before it). Without it rows are the seven positions readers have always had.", schema: { type: "string", enum: ["full"] } },
     ],
     responses: {
       "200": { description: "Realms when `realm` is absent (marketRealmsResponse), prices when present.", schema: "marketPricesResponse" },
       ...ERROR_RESPONSES,
-      "400": { description: "Invalid realm, house or items. items requires a realm and one list of at most 100 positive safe-integer IDs.", schema: "apiError" },
+      "400": { description: "Invalid realm, house, items or fields. items requires a realm and one list of at most 100 positive safe-integer IDs; fields is `full` or absent.", schema: "apiError" },
     },
   },
   {

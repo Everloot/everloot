@@ -439,15 +439,124 @@ function publicDays(days: ItemDays, now: Date): PublicDay[] {
   return points.sort((a, b) => a.day.localeCompare(b.day));
 }
 
-function valueOf(itemId: number, points: PublicDay[], now: Date): MarketValue | null {
-  if (!points.length) return null;
+/**
+ * The market value's trim, which the pages' moves and the coverage share: historical is the median of the solid
+ * (not thin) days, or of every day when all are thin. With TRIM_MIN_DAYS or more solid days, a solid day further
+ * than TRIM_FACTOR from historical (either way) is an outlier, not a price move, and is trimmed.
+ */
+export function trimDays(points: readonly PublicDay[]): { historical: number; solid: PublicDay[]; trimmed: Set<PublicDay> } {
   const solid = points.filter((p) => !p.thin);
-  const historical = median((solid.length ? solid : points).map((p) => p.market));
-  // With enough solid days, one that sits far from the rest is an outlier, not a price move.
+  const historical = points.length ? median((solid.length ? solid : points).map((p) => p.market)) : 0;
   const trimmed = new Set<PublicDay>();
   if (solid.length >= TRIM_MIN_DAYS) {
     for (const p of solid) if (p.market > historical * TRIM_FACTOR || p.market * TRIM_FACTOR < historical) trimmed.add(p);
   }
+  return { historical, solid, trimmed };
+}
+
+/** Public days that can carry a value or a move: not thin, and not an outlier the trim takes out. In the order given. */
+export function solidDays(points: readonly PublicDay[]): PublicDay[] {
+  const { solid, trimmed } = trimDays(points);
+  return solid.filter((p) => !trimmed.has(p));
+}
+
+export type MoveSpan = 1 | 7;
+
+export interface PriceMove {
+  from: PublicDay;
+  to: PublicDay;
+  /** (to - from) / from. */
+  change: number;
+}
+
+/**
+ * The market value's move over a day or a week: the newest solid day (today or yesterday) against the solid day
+ * `span` days before it (a week allows up to three days earlier, as scans are not daily). Null without such a
+ * pair. Zero when both days hold the same value. `points` are oldest first, as itemMarket gives them.
+ */
+export function priceMoveOf(points: readonly PublicDay[], span: MoveSpan, now: Date): PriceMove | null {
+  const solid = solidDays(points);
+  const to = solid.at(-1);
+  if (!to || today(now) - dayNumber(to.day)! > 1) return null;
+  const target = dayNumber(to.day)! - span;
+  const slack = span === 1 ? 0 : 3;
+  const from = [...solid].reverse().find((p) => dayNumber(p.day)! <= target && dayNumber(p.day)! >= target - slack);
+  if (!from || from.market <= 0) return null;
+  return { from, to, change: (to.market - from.market) / from.market };
+}
+
+/** The one-day change of the market value, `(to - from) / from`, or null when no solid day pairs with the solid day before it. */
+export function change1d(points: readonly PublicDay[], now: Date): number | null {
+  return priceMoveOf(points, 1, now)?.change ?? null;
+}
+
+/**
+ * When the scans behind the item's newest open public day were taken (epoch ms): the latest capture among the
+ * open days that are public. Null once only closed days remain, which keep no capture time.
+ */
+export function marketUpdatedAt(days: ItemDays | undefined, now: Date): number | null {
+  let updatedAt: number | null = null;
+  for (const [day, installs] of Object.entries(days?.open ?? {})) {
+    if (!inHistory(dayNumber(day)!, now) || !agreed(groupKeys(reporterGroups(installs)))) continue;
+    for (const scan of Object.values(installs)) updatedAt = Math.max(updatedAt ?? 0, scan[4]);
+  }
+  return updatedAt;
+}
+
+/** What an item's values rest on: counts of the public days behind them, never a claim of more days than exist. */
+export interface MarketCoverage {
+  /** Solid days (not thin, not trimmed) up to MARKET_WINDOW_DAYS old: the days the market value is a weighted mean of. */
+  solidDays14: number;
+  /** Public days in the last HISTORY_DAYS: the days historical is the median of, thin days left out when a solid day exists. */
+  days60: number;
+  /** Of days60, the days with THIN_UNITS units listed or fewer. */
+  thinDays: number;
+  /** Of days60, the solid days trimmed as outliers. */
+  trimmedDays: number;
+  newestDay: string | null;
+  /** The newest day is public under AUCTION_AGREEMENT reporters: through Everloot's own installs only. */
+  trustedOnly: boolean;
+}
+
+/** The coverage of one item's public days (oldest first, as itemMarket gives them). Pure: nothing is read. */
+export function marketCoverage(points: readonly PublicDay[], now: Date): MarketCoverage {
+  const { trimmed } = trimDays(points);
+  const newest = points.at(-1) ?? null;
+  return {
+    solidDays14: solidDays(points).filter((p) => Math.max(0, today(now) - dayNumber(p.day)!) <= MARKET_WINDOW_DAYS).length,
+    days60: points.length,
+    thinDays: points.filter((p) => p.thin).length,
+    trimmedDays: trimmed.size,
+    newestDay: newest?.day ?? null,
+    trustedOnly: newest !== null && newest.reporters < AUCTION_AGREEMENT,
+  };
+}
+
+/** "the median of 4 public days in the last 60 (2 thin left out, 1 trimmed as an outlier)". */
+export function historicalBasis(c: MarketCoverage): string {
+  const notes = [
+    c.thinDays ? (c.thinDays === c.days60 ? "all thin" : `${c.thinDays} thin left out`) : null,
+    c.trimmedDays ? `${c.trimmedDays} trimmed as ${c.trimmedDays === 1 ? "an outlier" : "outliers"}` : null,
+  ].filter((n): n is string => n !== null);
+  return `the median of ${c.days60} public ${c.days60 === 1 ? "day" : "days"} in the last ${HISTORY_DAYS}${notes.length ? ` (${notes.join(", ")})` : ""}`;
+}
+
+/** "from 3 solid days in the last 14", or "no solid public day in the last 14". */
+export function marketBasis(c: MarketCoverage): string {
+  return c.solidDays14 ? `from ${c.solidDays14} solid ${c.solidDays14 === 1 ? "day" : "days"} in the last ${MARKET_WINDOW_DAYS}` : `no solid public day in the last ${MARKET_WINDOW_DAYS}`;
+}
+
+export const TRUSTED_ONLY_TEXT = "Public through Everloot's own scans only.";
+
+/** One sentence for a page: what historical and the market value rest on, and whether only Everloot's own scans made the days public. */
+export function coverageText(c: MarketCoverage): string {
+  const market = c.solidDays14 ? marketBasis(c) : `unrecorded (${marketBasis(c)})`;
+  return `Historical is ${historicalBasis(c)}; market value ${market}.${c.trustedOnly ? ` ${TRUSTED_ONLY_TEXT}` : ""}`;
+}
+
+function valueOf(itemId: number, points: PublicDay[], now: Date): MarketValue | null {
+  if (!points.length) return null;
+  const { historical, trimmed } = trimDays(points);
   const trusted = points.filter((p) => !trimmed.has(p));
   const newest = trusted.at(-1)!;
   let weighted = 0;
@@ -500,13 +609,21 @@ export function itemListings(state: MarketState, realm: string, itemId: number, 
   return out;
 }
 
-/** Every item with a public value in one house of the realm (or, without `house`, in its house-unknown view), most units first. */
-export function realmMarket(state: MarketState, realm: string, now: Date, house?: AuctionHouse | null): MarketValue[] {
+/** Every item with a public value in one bucket, most units first, with the public days and the stored days behind it. */
+function realmRows(state: MarketState, realm: string, now: Date, house?: AuctionHouse | null): { value: MarketValue; points: PublicDay[]; days: ItemDays }[] {
   const items = bucketOf(state, realm, house)?.items ?? {};
   return Object.entries(items)
-    .map(([itemId, days]) => valueOf(Number(itemId), publicDays(days, now), now))
-    .filter((v): v is MarketValue => v !== null)
-    .sort((a, b) => b.quantity - a.quantity || a.itemId - b.itemId);
+    .flatMap(([itemId, days]) => {
+      const points = publicDays(days, now);
+      const value = valueOf(Number(itemId), points, now);
+      return value ? [{ value, points, days }] : [];
+    })
+    .sort((a, b) => b.value.quantity - a.value.quantity || a.value.itemId - b.value.itemId);
+}
+
+/** Every item with a public value in one house of the realm (or, without `house`, in its house-unknown view), most units first. */
+export function realmMarket(state: MarketState, realm: string, now: Date, house?: AuctionHouse | null): MarketValue[] {
+  return realmRows(state, realm, now, house).map((r) => r.value);
 }
 
 /** Realms that hold any public value, in a house or in the house-unknown view, by display name. */
@@ -638,19 +755,33 @@ export function busiestHouseMarket(state: MarketState, realm: string, itemId: nu
   return itemMarketByHouse(state, realm, itemId, now).sort((a, b) => b.value.quantity - a.value.quantity)[0] ?? null;
 }
 
+/** One row of the price file as every reader was given it; the protocol's MARKET_PRICE_FIELDS name the positions. */
+export type PriceRow = readonly [itemId: number, market: number | null, min: number, historical: number, quantity: number, day: string, reporters: number];
+/** A row asked for with `fields=full`: the seven, then when its scans were taken, the price age and the one-day change (MARKET_PRICE_FIELDS_FULL). */
+export type FullPriceRow = readonly [...PriceRow, updatedAt: string | null, ageDays: number, change1d: number | null];
+
 /**
- * The companion's price file for one realm: [itemId, market|null, min, historical, quantity, day, reporters].
- * Tuples keep the file small; at most `limit` rows, the items with the most units listed. A thin item
- * has no market value (null), only its minimum. Optional item ids narrow the public rows before the cap.
+ * The price file for one realm, the companion's and any script's: [itemId, market|null, min, historical, quantity,
+ * day, reporters]. Tuples keep the file small; at most `limit` rows, the items with the most units listed. A thin
+ * item has no market value (null), only its minimum. Optional item ids narrow the public rows before the cap.
+ * With `full`, three positions follow: `updatedAt`, when the scans behind the newest open public day were taken
+ * (ISO), null once only closed days remain; `ageDays`; and `change1d`, the one-day move of the market value, null
+ * without a solid day and the solid day before it. The default row stays seven wide: readers that check its length
+ * (the Desktop App's did) keep working, and a reader asks for more.
  */
-export function marketPrices(state: MarketState, realm: string, now: Date, limit = MAX_PRICE_ROWS, house?: AuctionHouse | null, itemIds?: readonly number[]) {
+export function marketPrices(state: MarketState, realm: string, now: Date, limit = MAX_PRICE_ROWS, house?: AuctionHouse | null, itemIds?: readonly number[], full = false): { realm: string; house?: AuctionHouse; items: PriceRow[] | FullPriceRow[] } {
   const selected = itemIds ? new Set(itemIds) : null;
+  const rows = realmRows(state, realm, now, house).filter((r) => !selected || selected.has(r.value.itemId)).slice(0, limit);
+  const row = (v: MarketValue): PriceRow => [v.itemId, v.market, v.min, v.historical, v.quantity, v.day, v.reporters];
   return {
     realm: realmName(state, realm),
     ...(house ? { house } : {}),
-    items: realmMarket(state, realm, now, house)
-      .filter((v) => !selected || selected.has(v.itemId)).slice(0, limit)
-      .map((v) => [v.itemId, v.market, v.min, v.historical, v.quantity, v.day, v.reporters] as const),
+    items: full
+      ? rows.map(({ value, points, days }): FullPriceRow => {
+        const updatedAt = marketUpdatedAt(days, now);
+        return [...row(value), updatedAt === null ? null : new Date(updatedAt).toISOString(), value.ageDays, change1d(points, now)];
+      })
+      : rows.map(({ value }) => row(value)),
   };
 }
 
@@ -696,12 +827,15 @@ export function handleMarketValue(args: { realm: string; itemId: number }, state
     return lines.join("\n");
   }
   for (const { house, value, points } of houses) {
+    // What each number rests on: the public days behind it, counted, never "60 days of history".
+    const coverage = marketCoverage(points, now);
     lines.push(
       `${house} auction house:`,
-      `Market value: ${value.market === null ? "unrecorded (no solid public day in the last 14)" : formatCopper(value.market)}`,
+      `Market value: ${value.market === null ? `unrecorded (${marketBasis(coverage)})` : `${formatCopper(value.market)}, ${marketBasis(coverage)}`}`,
       `Minimum buyout: ${formatCopper(value.min)} (${value.day}, ${value.ageDays} days ago, ${reportersText(value.reporters)})`,
-      `Historical: ${formatCopper(value.historical)}`,
+      `Historical: ${formatCopper(value.historical)}, ${historicalBasis(coverage)}`,
       `Units listed: ${value.quantity}${value.thin ? " (thin: not counted in the market value)" : ""}`,
+      ...(coverage.trustedOnly ? [TRUSTED_ONLY_TEXT] : []),
       "History:",
       ...points.map(scanDayLine),
     );

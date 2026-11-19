@@ -61,7 +61,7 @@ const CREDENTIAL_FREE_PATH = /^\/database\/card\/(?:item|npc|quest|object|spell|
  */
 function credentialFreeAuctionPath(pathname: string): boolean {
   if (pathname === "/tools/auctions") return true;
-  const item = AUCTION_ITEM_PATH.exec(pathname);
+  const item = AUCTION_ITEM_PATH.exec(pathname) ?? AUCTION_CHANGES_PATH.exec(pathname);
   if (item) return plainRealm(item[1]);
   const list = AUCTION_LIST_PATH.exec(pathname);
   return list?.[1] !== undefined && plainRealm(list[1]);
@@ -310,6 +310,8 @@ export async function cachedResponse(
  */
 const AUCTION_LIST_PATH = /^\/tools\/auctions(?:\/([^/]+))?$/;
 const AUCTION_ITEM_PATH = /^\/tools\/auctions\/([^/]+)\/[1-9]\d{0,9}$/;
+// A realm's Market changes view reads the stored boards only, like the realm page; its house is a query parameter.
+const AUCTION_CHANGES_PATH = /^\/tools\/auctions\/([^/]+)\/changes$/;
 const AUCTION_REALM_SLUG = /^[\p{L}\p{N}][\p{L}\p{N}-]*$/u;
 const REVALIDATION_HEADERS = ["x-prerender-revalidate", "x-isr"];
 // Static folders beside [realm] in app/tools/auctions: not realms, and the market reports answer 404 with no report stored.
