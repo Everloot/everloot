@@ -367,7 +367,9 @@ test("an answer's selected text and an item's page are saved to a project, witho
   await click("Where does Linen Cloth drop?");
   expect(text()).toContain("Linen Cloth");
 
-  const body = Array.from(container.querySelectorAll("div")).find((d) => d.textContent === "Humanoids drop it. Farm Defias.")!;
+  // The answer's first sentence is its summary line, drawn on its own.
+  const body = container.querySelector("[data-summary]")!;
+  expect(body.textContent).toBe("Humanoids drop it.");
   const range = document.createRange();
   range.setStart(body.firstChild!, 0);
   range.setEnd(body.firstChild!, 18);

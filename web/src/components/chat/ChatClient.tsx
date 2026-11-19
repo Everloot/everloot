@@ -22,6 +22,7 @@ import ChatLibrary, { type ConversationPatch } from "./ChatLibrary";
 import ChatWelcome, { WELCOME, type ChatIcons } from "./ChatWelcome";
 import Composer from "./Composer";
 import ConversationRail from "./ConversationRail";
+import AnswerText from "./AnswerText";
 import { AssistantMessage, UserMessage } from "./Message";
 import ProjectView, { type AttachedNote } from "./ProjectView";
 import SaveToProject, { type SaveRequest } from "./SaveToProject";
@@ -689,6 +690,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
 
   const keysHref = signed === false ? signInPath(KEYS_PATH) : KEYS_PATH;
   const empty = messages.length === 0 && !busy;
+  const unanswered = messages.at(-1)?.role === "user" ? messages.at(-1)!.text : null;
   const inAccount = workspace && Boolean(ws.account);
   const project = view?.kind === "project" ? ws.projects.find((p) => p.id === view.id) ?? null : null;
   const localChats: LocalChat[] = [
@@ -811,17 +813,33 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
                             onSave: (text: string) => setSaving({ kind: "answer", title: messages[i - 1]?.text ?? "Saved answer", text, sources: m.sources }),
                             onSaveItem: (id: number) => setSaving({ kind: "page", href: `/database/items/${id}`, title: `/database/items/${id}` }),
                           } : {})} />)}
-                    {busy && (
-                      <div aria-busy="true" className="whitespace-pre-wrap break-words leading-7 text-fg">
-                        {live?.text}
-                        <span aria-hidden="true" className="text-accent">▍</span>
-                      </div>
-                    )}
+                    {busy && (live?.text
+                      ? (
+                        <div aria-busy="true">
+                          <AnswerText text={live.text} />
+                          <span aria-hidden="true" className="text-accent">▍</span>
+                        </div>
+                      )
+                      : (
+                        // Before the first words arrive: three still lines where the answer will be, and what is happening.
+                        <div aria-busy="true" data-answer-pending className="space-y-2">
+                          <div aria-hidden="true" className="space-y-2">
+                            <div className="h-3 w-4/5 rounded-full bg-line" />
+                            <div className="h-3 w-full rounded-full bg-line" />
+                            <div className="h-3 w-3/5 rounded-full bg-line" />
+                          </div>
+                          {!live?.tool && <p className="text-xs text-muted">Answering…</p>}
+                        </div>
+                      ))}
                   </div>
                 )}
                 <p role="status" className="sr-only">{busy ? (live?.tool ? `Looking up ${live.tool}` : "Answering") : ""}</p>
                 {busy && live?.tool && <p className="mt-2 text-xs text-muted">Looking up {live.tool}…</p>}
                 {error && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}
+                {/* A question left unanswered by a failed or stopped turn can be sent again as it was. */}
+                {error && !busy && !full && unanswered && (
+                  <button type="button" className="btn mt-2 min-h-9 px-3 text-sm" disabled={unknown} onClick={() => void ask(unanswered)}>Retry</button>
+                )}
                 {full && <button type="button" className="btn mt-2 min-h-9 px-3 text-sm" disabled={busy} onClick={() => newChat()}>Start a new chat</button>}
               </div>
             </div>
