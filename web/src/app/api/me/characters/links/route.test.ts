@@ -67,7 +67,7 @@ describe("who may send", () => {
     auth.getUser.mockResolvedValue(null);
     const res = await send({ records: [row] });
     expect(res.status).toBe(401);
-    expect((await res.json()).signIn).toBe("/sign-in?returnTo=%2Faccount");
+    expect((await res.json()).signIn).toBe("/sign-in?returnTo=%2Fsettings");
     expect((await makeCode()).status).toBe(401);
   });
 
@@ -345,7 +345,7 @@ describe("the owner's list", () => {
     auth.getUser.mockResolvedValue(null);
     const res = await list();
     expect(res.status).toBe(401);
-    expect((await res.json()).signIn).toBe("/sign-in?returnTo=%2Faccount");
+    expect((await res.json()).signIn).toBe("/sign-in?returnTo=%2Fsettings");
     expect(auth.authQuery).not.toHaveBeenCalled();
   });
 

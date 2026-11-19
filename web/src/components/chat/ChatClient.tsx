@@ -31,7 +31,7 @@ import Container from "@/components/ui/Container";
 import WorkspaceRail, { type LocalChat } from "./WorkspaceRail";
 
 export const SUGGESTIONS = WELCOME.map((s) => s.text);
-export const KEYS_PATH = "/account#chat-keys";
+export const KEYS_PATH = "/settings#chat-keys";
 
 interface Characters { characters: ShellCharacter[]; builds: SavedBuild[] }
 
@@ -78,7 +78,7 @@ function viewIn(search: string): View {
 /**
  * The /chat conversation: a full-screen thread, one composer, and the conversation list.
  * `savedBuilds` (EVERLOOT_SAVED_BUILDS) offers my_builds to a signed-in visitor's model; `profiles`
- * (EVERLOOT_PROFILES) offers the account's characters as context. Keys are set up on /account#chat-keys.
+ * (EVERLOOT_PROFILES) offers the account's characters as context. Keys are set up on /settings#chat-keys.
  * `workspace` (EVERLOOT_CHAT_WORKSPACE) adds private account projects and chats; without it chats stay in the browser.
  * `freeChat` (EVERLOOT_FREE_CHAT_KEY, EVERLOOT_FREE_CHAT_CF_*) names the providers of Everloot (free), the built-in
  * model a visitor without a key of their own gets by default; empty while it is off. A key the player added always comes first.

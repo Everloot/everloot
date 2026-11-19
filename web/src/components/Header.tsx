@@ -26,7 +26,7 @@ export { TOOL_GROUPS };
  * Guides (static reference), Chat, and Profile (the player's own pages, and the lists kept in this browser). The
  * phone menu shows the same items as groups. Only existing pages are linked; hidden tools are left out.
  */
-export function navItems({ guilds = false, players = false, profiles = false, savedBuilds = false, reviewedGuides = false }: NavSwitches = {}): NavItem[] {
+export function navItems({ guilds = false, players = false, savedBuilds = false, reviewedGuides = false }: NavSwitches = {}): NavItem[] {
   const groups = toolGroups(guilds);
   const catalogue = (title: ToolGroup) => groups.find((g) => g.title === title)?.links ?? [];
   return [
@@ -63,8 +63,8 @@ export function navItems({ guilds = false, players = false, profiles = false, sa
     {
       label: "Profile",
       links: [
-        { label: "Account", href: "/account" },
-        ...(profiles ? [{ label: "Settings", href: "/settings" }] : []),
+        // One Settings page holds the account, profile, integrations and keys (#1278); /account sends there.
+        { label: "Settings", href: "/settings" },
         ...(savedBuilds ? [{ label: "My builds", href: "/me" }] : []),
         ...catalogue("Profile"),
       ],
@@ -118,7 +118,7 @@ function SearchIcon() {
  * The compact bar (docs/design/specs/2026-10-20-account-shell-design.md). From the layout: `savedBuilds` adds Your
  * builds to the avatar menu (EVERLOOT_SAVED_BUILDS); `accountSwitching` is true with Better Auth (EVERLOOT_AUTH_V2),
  * which can hold several accounts on one browser; `profiles` is EVERLOOT_PROFILES, without which the avatar menu
- * never asks for the player's shell. With it, the menu fetches the player from /api/me/shell itself, and Profile lists
+ * never asks for the player's shell. With it, the menu fetches the player from /api/me/shell itself. Profile always lists
  * Settings. `guilds` is EVERLOOT_GUILDS or the armory: Lookup then offers Guilds in place of the guild board. `players`
  * is EVERLOOT_PLAYER_PAGES or the armory: Lookup then starts with Players, the one character search.
  * `reviewedGuides` is true once kb/guides holds a reviewed guide: Guides then starts with the guides list.

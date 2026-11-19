@@ -7,7 +7,7 @@ import { profilesOn } from "./profiles";
 import { CHARACTER_COLUMNS, savedBuildsOn, type CharacterRow } from "./saved-builds";
 import { authQuery, type AccountUser } from "./supabase/server";
 
-/** The top of /account. A part is null when its switch is off, so the page leaves its rows out. */
+/** The top of /settings. A part is null when its switch is off, so the page leaves its rows out. */
 export interface AccountOverview {
   /** ISO time the account was made; null for an old row without one. */
   memberSince: string | null;

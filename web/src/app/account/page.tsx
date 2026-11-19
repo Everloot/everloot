@@ -1,180 +1,21 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import ApiKeys from "@/components/ApiKeys";
-import ChatKeys from "@/components/chat/ChatKeys";
-import LinkedCharacters from "./LinkedCharacters";
-import { Container } from "@/components/ui";
-import YourEverlootHeader from "@/components/YourEverloot";
-import { loadOverview, type AccountOverview } from "@/lib/account-overview";
-import { authV2Enabled, withAuth, signInMethods } from "@/lib/auth/auth";
-import { configuredSocialProviders, type SocialProvider } from "@/lib/auth/social";
-import { isPlaceholderEmail } from "@/lib/auth/battlenet";
-import { signInPath } from "@/lib/auth/return-to";
-import { characterLinksOn } from "@/lib/character-links";
-import { guardOn } from "@/lib/data-guard";
-import { playerPagesOn } from "@/lib/player-pages";
-import { profilesOn } from "@/lib/profiles";
-import { savedBuildsOn } from "@/lib/saved-builds";
-import { pageMetadata } from "@/lib/seo";
-import { getUser } from "@/lib/supabase/server";
-import Integrations from "./integrations";
-import OverviewRows from "./overview-rows";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  ...pageMetadata({ title: "Your account", description: "Your Everloot account settings.", path: "/account" }),
-  robots: { index: false, follow: false },
-};
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
-const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
-const heading = "text-cell font-semibold text-fg";
-const section = "scroll-mt-20 space-y-2";
-
-// The Profile section only renders when it holds more than its one sentence; the nav lists what renders.
-const sections = (withProfile: boolean, withLinks: boolean) => [
-  { id: "overview", label: "Overview" },
-  ...(withProfile ? [{ id: "profile", label: "Profile" }] : []),
-  ...(withLinks ? [{ id: "characters", label: "Linked characters" }] : []),
-  { id: "integrations", label: "Integrations" },
-  { id: "keys", label: "API keys" },
-  { id: "chat-keys", label: "Assistant setup" },
-  { id: "data", label: "Data and privacy" },
-];
-
-const listed = (parts: string[]) =>
-  parts.length < 2 ? parts.join("") : `${parts.slice(0, -1).join(", ")}${parts.length > 2 ? "," : ""} and ${parts[parts.length - 1]}`;
-
-// With Better Auth on, the session also carries the email and the sign-in methods.
-async function details() {
-  if (!authV2Enabled()) return { email: null, methods: ["battlenet"] };
-  const requestHeaders = await headers();
-  const [session, accounts] = await withAuth((auth) => Promise.all([
-    auth.api.getSession({ headers: requestHeaders }),
-    auth.api.listUserAccounts({ headers: requestHeaders }),
-  ]));
-  const email = session?.user.email;
-  return { email: email && !isPlaceholderEmail(email) ? email : null, methods: accounts.map((a) => a.providerId) };
-}
-
-export default async function AccountPage({ searchParams }: { searchParams?: Promise<{ linkError?: string | string[] }> }) {
-  let account;
-  try {
-    const user = await getUser();
-    account = user && { user, ...await details() };
-  } catch {
-    return (
-      <Container width="reading">
-        <YourEverlootHeader current="/account" title="Your account" />
-        <p role="alert" className="text-fg-2">Your account is unavailable right now. Try again in a minute.</p>
-      </Container>
-    );
+/**
+ * The account page is a section of /settings now (#1278). Old links keep working: the query (a social link's
+ * linkError) comes along, and the browser keeps the #fragment across the redirect, so /account#keys lands on
+ * /settings#keys. Every old anchor (overview, profile, characters, integrations, sign-in-methods, keys, chat-keys,
+ * data) is still on /settings.
+ */
+export default async function AccountPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+  const params = new URLSearchParams();
+  for (const [name, value] of Object.entries((await searchParams) ?? {})) {
+    for (const one of Array.isArray(value) ? value : value === undefined ? [] : [value]) params.append(name, one);
   }
-  if (!account) redirect(signInPath("/account"));
-  const { user, email, methods } = account;
-  const availableLogins: (SocialProvider | "battlenet")[] = authV2Enabled()
-    ? [...(signInMethods().battlenet ? ["battlenet" as const] : []), ...configuredSocialProviders()] : [];
-  const linkError = (await searchParams)?.linkError === "1";
-  // The counts are extras: when they cannot be read, the rest of the page still works.
-  let overview: AccountOverview | null = null;
-  try {
-    overview = await loadOverview(user);
-  } catch {}
-  const profile = overview?.profile ?? null;
-  const kept = [
-    "your sign-in details",
-    guardOn() && "your API keys with a daily count of their requests",
-    savedBuildsOn() && "your saved builds and characters",
-    profilesOn() && "your profile",
-    characterLinksOn() && "the characters you linked",
-  ].filter((part): part is string => typeof part === "string");
-  const withProfile = Boolean(email || profile || profilesOn() || methods.includes("credential"));
-  const privateNote = (
-    <p className="text-sm text-fg-2">
-      Only you see your account name{email && " and email"}.
-      {profilesOn() && " A public profile shows your handle and display name, never these."}
-    </p>
-  );
-
-  return (
-    <Container width="reading">
-      <YourEverlootHeader current="/account" title="Your account" lede="Your sign-in methods, keys, connected apps and data." />
-      <nav aria-label="Account sections" className="mb-6 flex flex-wrap gap-x-4 gap-y-1 border-b border-line pb-2 text-meta">
-        {sections(withProfile, characterLinksOn()).map((s) => <a key={s.id} href={`#${s.id}`} className="text-fg-2 hover:text-accent">{s.label}</a>)}
-      </nav>
-
-      <div className="space-y-8">
-        <section id="overview" aria-labelledby="overview-heading" className={section}>
-          <h2 id="overview-heading" className={heading}>Overview</h2>
-          <OverviewRows name={user.name} methods={methods} overview={overview} />
-          {!overview && <p role="alert" className="text-sm text-fg-2">Some details are unavailable right now. Try again in a minute.</p>}
-          {!withProfile && privateNote}
-        </section>
-
-        {withProfile && (
-          <section id="profile" aria-labelledby="profile-heading" className={section}>
-            <h2 id="profile-heading" className={heading}>Profile</h2>
-            {(email || profile) && (
-              <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
-                {profile && <><dt className="text-muted">Display name</dt><dd className="text-fg">{profile.displayName}</dd></>}
-                {email && <><dt className="text-muted">Email</dt><dd className="text-fg">{email}</dd></>}
-              </dl>
-            )}
-            {privateNote}
-            <ul className="space-y-1 text-sm">
-              {profilesOn() && <li><Link href="/settings" className={link}>Edit your handle, display name and status</Link></li>}
-              {methods.includes("credential") && <li><Link href="/reset-password" className={link}>Change your password</Link></li>}
-            </ul>
-          </section>
-        )}
-
-        {characterLinksOn() && (
-          <section id="characters" aria-labelledby="characters-heading" className="scroll-mt-20 space-y-3">
-            <h2 id="characters-heading" className={heading}>Linked characters</h2>
-            <LinkedCharacters />
-          </section>
-        )}
-
-        <section id="integrations" aria-labelledby="integrations-heading" className="scroll-mt-20 space-y-4">
-          <h2 id="integrations-heading" className={heading}>Integrations</h2>
-          {linkError && <p role="alert" className="text-sm text-fg">That login could not be linked. Use a provider account with a verified email that is not already linked to another Everloot account.</p>}
-          <Integrations methods={methods} name={user.name} overview={overview} availableLogins={availableLogins} />
-        </section>
-
-        <section id="keys" aria-labelledby="keys-heading" className="scroll-mt-20 space-y-3">
-          <h2 id="keys-heading" className={heading}>API keys</h2>
-          <p className="text-sm text-fg-2">
-            Keys for the Everloot API and MCP server. How to use them is in <Link href="/docs/api/keys" className={link}>the docs</Link>.
-          </p>
-          <ApiKeys />
-        </section>
-
-        <section id="chat-keys" aria-labelledby="chat-keys-heading" className="scroll-mt-20 space-y-3">
-          <h2 id="chat-keys-heading" className={heading}>Assistant setup</h2>
-          <ChatKeys />
-        </section>
-
-        <section id="data" aria-labelledby="data-heading" className={section}>
-          <h2 id="data-heading" className={heading}>Data and privacy</h2>
-          <p className="text-sm text-fg-2">
-            Everloot keeps {listed(kept)}. Chat keys stay in this tab until it closes. The{" "}
-            <Link href="/privacy" className={link}>Privacy Policy</Link> says what each one holds and how long it is kept.
-          </p>
-          <ul className="space-y-1 text-sm text-fg-2">
-            {guardOn() && <li>Revoke or delete API keys <a href="#keys" className={link}>above</a>.</li>}
-            {savedBuildsOn() && <li>Delete saved builds and characters on <Link href="/me" className={link}>My builds</Link>.</li>}
-            {profilesOn() && <li>Change your profile or make it private on <Link href="/settings" className={link}>Settings</Link>.</li>}
-            {characterLinksOn() && <li>Unlink a character <a href="#characters" className={link}>above</a>.</li>}
-            {playerPagesOn() && <li>Hide a character&apos;s public player page with the <Link href="/players/opt-out" className={link}>hide form</Link>.</li>}
-            <li>
-              To delete your account and everything tied to it, email{" "}
-              <a href="mailto:hello@everloot.app" className={link}>hello@everloot.app</a>. We answer within a month.
-            </li>
-          </ul>
-        </section>
-      </div>
-    </Container>
-  );
+  const query = params.toString();
+  redirect(query ? `/settings?${query}` : "/settings");
 }

@@ -94,8 +94,8 @@ const NAMES: Record<string, string> = {
 /** The parent of a page, when it is not Home. */
 const PARENT: Record<string, string> = {
   // The lists kept in this browser are part of Profile, beside the account pages.
-  "/tools/builds": "/account",
-  "/tools/alts": "/account",
+  "/tools/builds": "/settings",
+  "/tools/alts": "/settings",
   "/tools/professions/herbalism": "/tools/professions",
   "/tools/professions/herbalism/gathering": "/tools/professions/herbalism",
   "/database/objects": "/database",

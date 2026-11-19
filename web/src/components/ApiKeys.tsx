@@ -39,12 +39,12 @@ async function send(method: "POST" | "DELETE", url: string, body?: object) {
 
 /**
  * Dispatched on window whenever this account's keys change (made, rolled, revoked or deleted), from the list or from
- * Remove access. The list reads its keys again, and on /account KeysRefresh reads the server-rendered parts again.
+ * Disconnect. The list reads its keys again, and on /settings KeysRefresh reads the server-rendered parts again.
  */
 export const KEYS_CHANGED_EVENT = "everloot:keys-changed";
 const changed = () => window.dispatchEvent(new Event(KEYS_CHANGED_EVENT));
 
-/** Dispatched on window with a sentence for the status line KeysRefresh keeps on /account. */
+/** Dispatched on window with a sentence for the status line KeysRefresh keeps on /settings. */
 const KEYS_SAID_EVENT = "everloot:keys-said";
 const say = (text: string) => window.dispatchEvent(new CustomEvent(KEYS_SAID_EVENT, { detail: text }));
 
@@ -57,7 +57,7 @@ function notListed(err: unknown): boolean {
   return status === 404 && body?.ok === false && body.error === NO_LIVE_KEY;
 }
 
-/** Revokes in flight, by key id: the list and Remove access asking for the same key share one request. */
+/** Revokes in flight, by key id: the list and Disconnect asking for the same key share one request. */
 const revoking = new Map<string, Promise<Revoked>>();
 
 /**
@@ -263,7 +263,7 @@ function CreateForm({ ready, onMade, onCancel }: { ready: Ready; onMade: (fresh:
 }
 
 /**
- * The signed-in player's keys on /account and /docs/api/keys: create one (name, purpose, permissions, expiry), see
+ * The signed-in player's keys on /settings and /docs/api/keys: create one (name, purpose, permissions, expiry), see
  * each key's permissions, dates and last use, roll one to a new secret, revoke one, delete a revoked or expired one.
  * Before 20261022120000_api_key_expiry.sql is applied the server says `records: false`, and the form asks only for
  * a name and permissions, as before.
@@ -292,7 +292,7 @@ export default function ApiKeys() {
     setReturnTo(null);
   }, [returnTo, confirming, state]);
 
-  // A key can change under an open question (Remove access revoked it, or it expired). Once the list is read again, a
+  // A key can change under an open question (Disconnect revoked it, or it expired). Once the list is read again, a
   // question its row no longer offers closes, and focus that was in it goes to the row.
   useEffect(() => {
     if (!confirming || state.status !== "ready") return;
@@ -302,7 +302,7 @@ export default function ApiKeys() {
   }, [confirming, state]);
 
   // An error stays with its key until that key's own action is settled: once the list is read again, an error whose
-  // row no longer offers its action (the key was revoked or deleted, from here or from Remove access) goes. A change
+  // row no longer offers its action (the key was revoked or deleted, from here or from Disconnect) goes. A change
   // to another key leaves it.
   useEffect(() => {
     if (!error || state.status !== "ready") return;
@@ -445,7 +445,7 @@ export default function ApiKeys() {
 }
 
 /**
- * Remove access, on the Integrations of /account: one key's Revoke, asked with the list's own question and sent through
+ * Disconnect, on the Integrations of /settings: one key's Revoke, asked with the list's own question and sent through
  * the list's own revoke, so both share one request. The key's card leaves once the page is read again, so focus that
  * was in it first moves to `focusAfter` (an id), and the removal is said in KeysRefresh's status line, which stays.
  */
@@ -462,7 +462,7 @@ export function RemoveAccess({ id, name, hint, focusAfter }: { id: string; name:
   // name and in what is said, and the second of two keys with one name is told apart and heard.
   const key = `${name} (evl_…${hint})`;
 
-  // Into the question when it opens; back to Remove access when Cancel closes it.
+  // Into the question when it opens; back to Disconnect when Cancel closes it.
   useEffect(() => {
     if (asking) asked.current = true;
     if (asked.current) (asking ? confirmButton : opener).current?.focus();
@@ -475,8 +475,8 @@ export function RemoveAccess({ id, name, hint, focusAfter }: { id: string; name:
       const outcome = await revokeKey(id);
       if (focusFree(box.current)) document.getElementById(focusAfter)?.focus();
       setRemoved(true);
-      // "Access removed" only when this request revoked the key.
-      say(outcome === "revoked" ? `Access removed for ${key}.` : `${key} is no longer on this account's list.`);
+      // "Disconnected" only when this request revoked the key.
+      say(outcome === "revoked" ? `Disconnected ${key}.` : `${key} is no longer on this account's list.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "That did not work. Try again.");
     } finally {
@@ -490,7 +490,7 @@ export function RemoveAccess({ id, name, hint, focusAfter }: { id: string; name:
       {asking ? (
         <Confirm action="revoke" name={name} hint={hint} busy={busy} confirmRef={confirmButton} onConfirm={() => void revoke()} onCancel={() => setAsking(false)} pills />
       ) : (
-        <button ref={opener} type="button" className={pill} aria-label={`Remove access for ${key}`} onClick={() => setAsking(true)}>Remove access</button>
+        <button ref={opener} type="button" className={pill} aria-label={`Disconnect ${key}`} onClick={() => setAsking(true)}>Disconnect</button>
       )}
       {error && <p role="alert" className="text-sm text-fg">{error}</p>}
     </div>
@@ -498,8 +498,8 @@ export function RemoveAccess({ id, name, hint, focusAfter }: { id: string; name:
 }
 
 /**
- * On /account: when the keys change, the parts the server renders (the overview's counts, Integrations) are read again.
- * It also keeps the status line Remove access speaks through. The line is on the page before any click and outside the
+ * On /settings: when the keys change, the parts the server renders (the overview's counts, Integrations) are read again.
+ * It also keeps the status line Disconnect speaks through. The line is on the page before any click and outside the
  * cards, so a screen reader hears it, and it still says so after the refresh takes the card away.
  */
 export function KeysRefresh() {

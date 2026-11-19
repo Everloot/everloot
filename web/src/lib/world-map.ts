@@ -81,9 +81,12 @@ export function continentFlights(continentId: number, spoilers = false, data: Wo
   const { masters, lines } = placeFlights(data);
   return {
     masters: masters.filter((m) => m.world.continentId === continentId && (spoilers || !m.heldBack))
-      .map((m) => ({ id: `f${m.id}`, name: m.name, x: m.map.x, y: m.map.y, heldBack: m.heldBack })),
+      .map((m) => ({ id: `f${m.id}`, name: m.name, x: m.map.x, y: m.map.y, heldBack: m.heldBack, ...(m.faction ? { faction: m.faction } : {}) })),
     lines: lines.filter((l) => l.continentId === continentId && (spoilers || !l.heldBack))
-      .map((l) => ({ id: `l${l.from}-${l.to}`, from: `f${l.from}`, to: `f${l.to}`, points: l.points.map((p): [number, number] => [p.x, p.y]), heldBack: l.heldBack })),
+      .map((l) => ({
+        id: `l${l.from}-${l.to}`, from: `f${l.from}`, to: `f${l.to}`, points: l.points.map((p): [number, number] => [p.x, p.y]), heldBack: l.heldBack,
+        ...(l.faction ? { faction: l.faction } : {}),
+      })),
   };
 }
 

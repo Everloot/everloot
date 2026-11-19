@@ -6,8 +6,8 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffec
 import { Badge, Card, CopyButton, LinkTabs, Segmented } from "@/components/ui";
 import {
   allCategories, candidateCounts, categoryCounts, CATEGORY_GROUPS, CATEGORY_IDS, continentPath, initialView, mapUrlSearch, openPageLink,
-  parseDeepLink, parseZoneLink, pinHref, readPinSet, searchMap, spotBox, viewSearch, visibleItems, wayCommand, zoneSearch, zoneSpot,
-  type Box, type Candidate, type CategoryId, type CategoryState, type MapArtLayer, type MapItems, type MapPinSet, type MapUrlState, type SearchHit,
+  mapHref, parseDeepLink, parseZoneLink, pinHref, readPinSet, searchMap, spotBox, viewSearch, visibleItems, wayCommand, zoneSearch, zoneSpot,
+  type Box, type Candidate, type CategoryId, type CategoryState, type MapArtLayer, type MapItems, type MapPinSet, type MapSide, type MapUrlState, type SearchHit,
 } from "@/lib/map-view";
 import type { PoiIcons } from "@/lib/map-marks";
 import { mapCoordinates, mapPoint, parseCoordinatePin, serialiseCoordinatePin } from "@/lib/map-coordinate-pin";
@@ -84,6 +84,8 @@ function Icon({ name }: { name: "categories" | "search" | "list" | "open" | "clo
 }
 
 const SHEET_LABEL: Record<Sheet, string> = { categories: "Categories", search: "Search", list: "List" };
+/** The Herbalism gathering guide, linked from a zone where players placed herb spots. */
+export const HERB_GUIDE = "/tools/professions/herbalism/gathering";
 
 /** What a pin on the map is, for its card. */
 interface Subject {
@@ -131,6 +133,8 @@ export interface WorldMapViewProps {
   zonePages: Record<number, string>;
   /** Each instance's page, by instance id, for an entrance card's Open instance page. */
   instancePages?: Record<number, string>;
+  /** Zones where 3 installs placed an herb spot: their card and header link to the Herbalism gathering guide. */
+  herbZones?: number[];
   /** The sidebar's state from the address: categories shown, the search, the tab. */
   url: MapUrlState;
   spoilers: boolean;
@@ -169,6 +173,7 @@ export default function WorldMapView(props: WorldMapViewProps) {
   const sharedPin = useRef(props.coordinatePin && parseCoordinatePin(props.coordinatePin) ? props.coordinatePin : null);
   const icons: PoiIcons = props.poi ?? EMPTY_ICONS;
   const [show, setShow] = useState<CategoryState>(props.url.show);
+  const [side, setSide] = useState<MapSide>(props.url.side ?? "both");
   const [showArt, setShowArt] = useState(true);
   const [query, setQuery] = useState(props.url.q);
   // Everything the map draws besides the zones, once /api/map/pins answers; until then, what the page carried.
@@ -225,12 +230,14 @@ export default function WorldMapView(props: WorldMapViewProps) {
   }, [props.pinsUrl]);
 
   const items = useMemo<MapItems>(() => (pinSet ? { zones: props.items.zones, ...pinSet } : props.items), [pinSet, props.items]);
-  const shown = useMemo(() => visibleItems(items, show, spoilers), [items, show, spoilers]);
+  const shown = useMemo(() => visibleItems(items, show, spoilers, side), [items, show, spoilers, side]);
+  // The side switch shows only when the game files give the flights a side.
+  const sided = items.flightMasters.some((f) => f.faction);
   // Zones the reader may see, whatever the zone category says: coordinates and a click on a zone use them.
   const zones = useMemo(() => items.zones.filter((z) => spoilers || !z.heldBack), [items.zones, spoilers]);
   const focus = focusZone !== null ? items.zones.find((z) => z.mapId === focusZone) : undefined;
   // Counts in the zone in focus, else the continent. Until the pins load, the page's own counts for the opening view.
-  const counts = useMemo(() => (pinSet ? categoryCounts(items, spoilers, focus ?? null) : props.seed.counts), [pinSet, items, spoilers, focus, props.seed.counts]);
+  const counts = useMemo(() => (pinSet ? categoryCounts(items, spoilers, focus ?? null, side) : props.seed.counts), [pinSet, items, spoilers, focus, side, props.seed.counts]);
   const candidates = useMemo(() => candidateCounts(props.candidates, zones, focus ?? null), [props.candidates, zones, focus]);
   const pinTotal = pinSet ? undefined : (show.npc ? props.seed.pins.npc : 0) + (show.vendor ? props.seed.pins.vendor : 0);
 
@@ -371,8 +378,8 @@ export default function WorldMapView(props: WorldMapViewProps) {
 
   // The address keeps the zone, spot and spoiler switch it was opened with, and adds where the reader is and what
   // the sidebar shows. Camera moves replace the entry; only zone changes add one (pushZone).
-  const urlState = useRef<MapUrlState>({ show, q: query, tab: view });
-  urlState.current = { show, q: query, tab: view };
+  const urlState = useRef<MapUrlState>({ show, q: query, tab: view, side });
+  urlState.current = { show, q: query, tab: view, side };
   const sync = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
@@ -383,7 +390,7 @@ export default function WorldMapView(props: WorldMapViewProps) {
     }, 250);
   }, []);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
-  useEffect(() => { sync(); }, [selectedId, show, query, view, sync]);
+  useEffect(() => { sync(); }, [selectedId, show, query, view, side, sync]);
   const onView = useCallback((v: MapViewChange) => { camera.current = v; sync(); }, [sync]);
   const placePin = (x: number, y: number) => {
     const pin = mapCoordinates(coordinateBounds, { x, y });
@@ -426,7 +433,13 @@ export default function WorldMapView(props: WorldMapViewProps) {
     : spot ? { name: here?.zone.name ?? "", at: here } : null;
   const command = target?.at ? wayCommand(target.at.x, target.at.y, target.name) : null;
   // The card's own link: the continent's page with the item selected; a held-back item's link keeps spoilers on.
-  const permalink = selected ? pinHref(props.continentId, selected.id, spoilers && Boolean(selected.heldBack)) : null;
+  // A spot's link is the zone's own coordinates, the way the card shows them and /way takes them.
+  const permalink = selected
+    ? pinHref(props.continentId, selected.id, spoilers && Boolean(selected.heldBack))
+    : here ? `${mapHref({ mapId: here.zone.mapId, x: here.x, y: here.y })}${here.zone.heldBack ? "&spoilers=1" : ""}` : null;
+  const herbs = useMemo(() => new Set(props.herbZones ?? []), [props.herbZones]);
+  const cardZone = selected ? selectedSpot?.zone : here?.zone;
+  const gatherLink = cardZone && herbs.has(cardZone.mapId) ? HERB_GUIDE : null;
   const page = selected
     ? openPageLink({ kind: selected.kind, npcId: selected.npcId, objectId: selected.objectId, instanceMapIds: selected.instanceMapIds, x: selected.x, y: selected.y }, zones, props.zonePages, props.instancePages)
     : spot ? openPageLink({ kind: "spot", x: spot.x, y: spot.y }, zones, props.zonePages) : null;
@@ -437,7 +450,7 @@ export default function WorldMapView(props: WorldMapViewProps) {
 
   // The continent tabs keep the spoiler switch, the categories and the tab.
   const tabHref = (id: number) => {
-    const s = mapUrlSearch(new URLSearchParams(spoilers ? "spoilers=1" : ""), { show, q: "", tab: view }).toString();
+    const s = mapUrlSearch(new URLSearchParams(spoilers ? "spoilers=1" : ""), { show, q: "", tab: view, side }).toString();
     return `${continentPath(id)}${s ? `?${s}` : ""}`;
   };
   const cardSpot = selected ? selectedSpot : here;
@@ -516,6 +529,12 @@ export default function WorldMapView(props: WorldMapViewProps) {
               <button type="button" onClick={goHome} className="inline-flex min-h-11 shrink-0 items-center text-fg underline decoration-edge underline-offset-4 hover:decoration-fg md:min-h-8">All of {props.name}</button>
             </div>
           )}
+          {focus && (props.zonePages[focus.mapId] || herbs.has(focus.mapId)) && (
+            <p data-map-zone-links className="-mt-3 flex flex-wrap gap-x-4 text-sm">
+              {props.zonePages[focus.mapId] && <Link href={props.zonePages[focus.mapId]!} className="inline-flex min-h-11 items-center text-fg underline decoration-edge underline-offset-4 hover:decoration-fg md:min-h-8">Zone page</Link>}
+              {herbs.has(focus.mapId) && <Link href={HERB_GUIDE} className="inline-flex min-h-11 items-center text-fg underline decoration-edge underline-offset-4 hover:decoration-fg md:min-h-8">Herbalism gathering</Link>}
+            </p>
+          )}
 
           <form role="search" onSubmit={(e) => { e.preventDefault(); if (hits[0]) goHit(hits[0]); }}>
             <label htmlFor="map-search" className="sr-only">Search the map for a zone, entrance, flight master, NPC or treasure</label>
@@ -581,6 +600,16 @@ export default function WorldMapView(props: WorldMapViewProps) {
                   </fieldset>
                 );
               })}
+              {sided && (
+                <div data-map-side className="space-y-1">
+                  <p className="text-sm font-medium text-fg">Flights for</p>
+                  <Segmented
+                    label="Flights for" stretch value={side} onChange={setSide}
+                    options={[{ value: "both", label: "Both sides" }, { value: "alliance", label: "Alliance" }, { value: "horde", label: "Horde" }]}
+                  />
+                  <p className="text-xs text-muted">Flight masters and paths each side&apos;s flight map shows, from the game files. Neutral ones stay on both.</p>
+                </div>
+              )}
               {spoilers && (
                 <p className="flex items-center gap-2 text-xs text-muted">
                   <svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><rect x="1" y="1" width="16" height="12" strokeWidth="1.2" strokeDasharray="3 2" className="fill-warning/10 stroke-warning" /></svg>
@@ -669,6 +698,7 @@ export default function WorldMapView(props: WorldMapViewProps) {
                   />
                 )}
                 {page && <Link href={page.href} className="btn min-h-11 px-4 text-sm">{page.label}</Link>}
+                {gatherLink && <Link href={gatherLink} className="btn min-h-11 px-4 text-sm">Herbalism gathering</Link>}
               </div>
               {command && <p className="font-mono text-xs text-muted" data-way>{command}</p>}
               <p role="status" className="text-xs text-fg-2">{copyStatus}</p>
