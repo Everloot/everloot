@@ -1,8 +1,11 @@
 import picomatch from "next/dist/compiled/picomatch";
 import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
 import { matchHas } from "next/dist/shared/lib/router/utils/prepare-destination";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { expect, test } from "vitest";
 import nextConfig from "../next.config.js";
+import { CACHE_POLICY, cdnCacheControl } from "./lib/cache-policy.js";
 import corsPrerenderedPaths from "./data/cors-prerendered-paths.json";
 import { PREFIXES, SERVED } from "./lib/build-versions";
 import { CHAT_PROVIDERS } from "./lib/chat/providers";
@@ -181,6 +184,39 @@ test("only the public pages rendered per request are marked for the shared CDN c
     // Nor a session route the edge cache refuses by route: the two lists must never overlap.
     expect(isPrivatePath(source.replace(/\/:path\*$/, "") || "/"), source).toBe(false);
     expect(source, source).not.toMatch(/^\/(?:guilds?|players?|u|account|settings|chat|tools\/collections)(?:\/|$)/);
+  }
+});
+
+test("every CDN rule in the config comes from the freshness table, and every row of the table is used", async () => {
+  const prefix = PREFIXES[SERVED.id] ?? "";
+  // The private row is also sent under the served version's prefix.
+  const unprefixed = (source: string) => (prefix && source.startsWith(`${prefix}/`) ? source.slice(prefix.length) : source);
+  const rows = Object.entries(CACHE_POLICY);
+  const used = new Set<string>();
+  for (const entry of await nextConfig.headers!()) {
+    const cdn = entry.headers.find((header) => header.key === "CDN-Cache-Control");
+    if (!cdn) continue;
+    const owners = rows.filter(([, row]) => row.sources.includes(unprefixed(entry.source)));
+    expect(owners.map(([group]) => group), entry.source).toHaveLength(1);
+    const [group, row] = owners[0]!;
+    expect(cdn.value, entry.source).toBe(cdnCacheControl(row));
+    used.add(`${group} ${unprefixed(entry.source)}`);
+  }
+  for (const [group, row] of rows) {
+    expect(row.reason.trim(), group).not.toBe("");
+    expect(row.sources.length + (row.pages?.length ?? 0), group).toBeGreaterThan(0);
+    for (const source of row.sources) expect(used.has(`${group} ${source}`), `${group} ${source}`).toBe(true);
+  }
+});
+
+test("a page the freshness table lists revalidates on its row's schedule and is not forced dynamic", () => {
+  // Next reads `revalidate` from the page's own source, so the page holds the number and this holds it to the table.
+  for (const [group, row] of Object.entries(CACHE_POLICY)) {
+    for (const page of row.pages ?? []) {
+      const source = readFileSync(join(__dirname, "app", page, "page.tsx"), "utf8");
+      expect(source, `${group} ${page}`).toMatch(new RegExp(`^export const revalidate = ${row.maxAge};`, "m"));
+      expect(source, `${group} ${page}`).not.toContain('export const dynamic = "force-dynamic"');
+    }
   }
 });
 

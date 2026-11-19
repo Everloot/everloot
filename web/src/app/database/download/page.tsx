@@ -13,7 +13,9 @@ export const metadata: Metadata = pageMetadata({
   description: "Everloot's published WoW: Forever data as NDJSON files: what three installs agree on, and the game files' layer, with the licence and the counts.",
   path: "/database/download",
 });
-export const dynamic = "force-dynamic";
+// Its one read, the bulk bucket's manifest, is a public fetch kept five minutes (lib/open-data.ts); no store, no cookies.
+// Five minutes is the lists row of lib/cache-policy.js, which next-config.test.ts holds this number to.
+export const revalidate = 300;
 
 const n = (x: number) => x.toLocaleString("en-US");
 const day = (iso: string | null) => (iso ? `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC` : "[?]");
