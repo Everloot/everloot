@@ -3,13 +3,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { COVERAGE_TYPES, type CoverageType, type ZoneCoverage } from "@kb/coverage";
 import { Container, DataTable, DataTitle, FilterBar, type SparseColumn } from "@/components/ui";
-import { loadCoverage } from "@/lib/coverage-compute";
+import { loadCoverageForPages } from "@/lib/coverage-summary";
 import { cellDetail, cellRank, COVERAGE_SORTS, measuredLine, shareText, TYPE_LABEL, zoneCoverageHref, type CoverageSort } from "@/lib/coverage-view";
 import { pageMetadata } from "@/lib/seo";
 import { PLATEAU_TYPES, type TypePlateau } from "@kb/plateau";
 import { LINK } from "../entity";
 import { listHref, listQuery, NoMatches, nextSort, sortParam, sortRows, Unreadable, type Search } from "../list-parts";
-import { loadPlateau, plateauDetail, plateauMeasured, plateauShare, plateauVerdict } from "./plateau";
+import { plateauDetail, plateauMeasured, plateauShare, plateauVerdict } from "./plateau";
 
 const META = {
   title: "WoW Forever Database Coverage",
@@ -35,8 +35,10 @@ export async function generateMetadata(props: { searchParams?: Promise<Search> }
 export default async function CoveragePage(props: { searchParams?: Promise<Search> }) {
   const q = coverageQuery((await props.searchParams) ?? {});
   if (!q) notFound();
-  const report = await loadCoverage();
-  const plateau = report && (await loadPlateau(report));
+  // The stored score and plateau the cron writes; the page never works either out from the corpus.
+  const stored = await loadCoverageForPages();
+  const report = stored?.report ?? null;
+  const plateau = stored?.plateau ?? null;
   const deciding = plateau ? PLATEAU_TYPES.map((t) => plateau.types.find((p) => p.type === t)!) : [];
   const href = (over: Partial<typeof q>) => listHref(META.path, [["q", "q" in over ? over.q : q.q], ["sort", sortParam("sort" in over ? over.sort : q.sort)]]);
 
@@ -85,12 +87,14 @@ export default async function CoveragePage(props: { searchParams?: Promise<Searc
               Lowest first, so the zones that need players most are on top. {report.method}
             </p>
             <p className="mb-3 max-w-reading text-meta text-muted">{measuredLine(report)}</p>
-            {plateau && (
+            {plateau ? (
               <p className="mb-3 max-w-reading text-cell text-fg-2">
                 Plateau: {plateau.site === true ? "reached" : plateau.site === false ? "not yet" : "[?]"}.{" "}
                 {deciding.map((t, i) => <span key={t.type}>{i ? ", " : ""}{TYPE_LABEL[t.type]} {plateauVerdict(t.atPlateau)}</span>)}.{" "}
                 <a href="#plateau" className={LINK}>The numbers</a>
               </p>
+            ) : (
+              <p className="mb-3 max-w-reading text-cell text-fg-2">Plateau: not measured yet. It is measured with the next data update.</p>
             )}
             {id !== null && (
               <p className="mb-3 text-cell text-fg-2">
