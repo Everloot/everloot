@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { QUALITIES } from "../../../../../kb/src/item-taxonomy";
 import { MARKET_RULE, formatCopper } from "../../../../../kb/src/market";
 import { uploadStore } from "@/lib/upload-store";
+import { loadMarketBoards } from "@/lib/market-boards";
 import {
   Card, Container, DataTable, DataTitle, Disclosure, EmptyState, FilterBar, LinkTabs, QUALITY_TEXT, ResultStrip, qualityOf as qualityToken,
   type Column, type FilterControl,
@@ -12,7 +13,7 @@ import {
 import type { Crumb } from "@/lib/jsonld";
 import { trailFor } from "@/lib/breadcrumbs";
 import {
-  AH_PATH, agreementSoFar, crossRealmHref, findBoard, houseCounts, itemHref, itemIdParam, money, onRuleset, pendingRealms, percent, realmBoards,
+  AH_PATH, crossRealmHref, findBoard, houseCounts, itemHref, itemIdParam, money, onRuleset, percent,
   realmHref, rulesetSummaries, slugWords,
 } from "@/lib/auction-house";
 import { AFTER_LAUNCH, REGION_LABEL, RULESET_LABEL, inRegion, isRulesetSlug, mappedRulesets, realmRegion, realmRuleset, type RegionFilter } from "@/lib/realms";
@@ -71,8 +72,10 @@ export async function browseView({ slug, search }: { slug: string | null; search
   const now = new Date();
   const market = await uploadStore.loadMarket();
   const state = market.state;
-  const realmWide = state ? realmBoards(state, now).filter((b) => inRegion(b.realm.name, q.region)) : [];
-  const boards = state ? realmBoards(state, now, q.house).filter((b) => inRegion(b.realm.name, q.region)) : [];
+  // The cron's stored boards when they are current for this rollup, else built here (lib/market-boards.ts).
+  const stored = await loadMarketBoards(market, now);
+  const realmWide = stored ? stored.boards(null).filter((b) => inRegion(b.realm.name, q.region)) : [];
+  const boards = stored ? stored.boards(q.house).filter((b) => inRegion(b.realm.name, q.region)) : [];
   // A realm is on one ruleset, so the ruleset tabs are the all-realms page's only.
   const ruleset = slug ? null : q.ruleset ?? null;
   const rulesetName = ruleset ? RULESET_LABEL[ruleset] : null;
@@ -86,7 +89,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
   const wide = Boolean(q.q || q.lvl) || WIDE_SORTS.includes(q.sort?.key as AhSort);
 
   // The ruleset tabs and their summary, counted across every house so they do not change with the house tab.
-  const summaries = state && !slug ? rulesetSummaries(state, now, null, q.region) : [];
+  const summaries = stored && !slug ? rulesetSummaries(stored.boards, now, null, q.region) : [];
   // The summary is the unfiltered first page's; a search or filter shows only its results.
   const summaryRows = activeFilters(q) || q.page > 1 ? [] : ruleset ? summaries.filter((r) => r.ruleset === ruleset) : summaries;
   // The summary's movers are named in the same read as the results, so the page reads the corpus once.
@@ -98,7 +101,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
   if (wide) {
     const ids = withMoves(allIds);
     tips = (await itemArt(ids)).tips;
-    names = await auctionNames(ids, tips);
+    names = await auctionNames(ids, tips, stored?.names);
   }
   const results = browseRows(rows, q, { now, name: (id) => names.get(id), levels: (id) => tips.get(id) });
   const pages = Math.max(1, Math.ceil(results.length / AH_PER_PAGE));
@@ -107,7 +110,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
   if (!wide) {
     const ids = withMoves(shown.map((b) => b.row.value.itemId));
     tips = (await itemArt(ids)).tips;
-    names = await auctionNames(ids, tips);
+    names = await auctionNames(ids, tips, stored?.names);
   }
 
   const here = (over: Partial<AhQuery>) => ahHref(path, { ...q, page: 1, ...over });
@@ -119,7 +122,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
   const trail: Crumb[] = [...trailFor(AH_PATH)!, ...(slug ? [{ name: title, path }] : [])];
   const showRealm = !slug;
 
-  const counts = state ? houseCounts(state, now, slug ?? undefined, ruleset, q.region) : new Map<AuctionHouse | null, number>();
+  const counts = stored ? houseCounts(stored.boards, now, slug ?? undefined, ruleset, q.region) : new Map<AuctionHouse | null, number>();
   // The realm and house picker's links: another realm keeps the filters (not the ruleset, which is the all-realms page's).
   const pickHref = (realm: string | null, house: AuctionHouse | null) => (realm === slug
     ? here({ house })
@@ -133,8 +136,8 @@ export async function browseView({ slug, search }: { slug: string | null; search
   const laterRulesets = [...AFTER_LAUNCH].filter((r) => !mapped.has(r));
 
   // Realms with scans but no public price, on the all-realms page's plain first page: counted across every house.
-  const pending = state && !slug && !q.house && activeFilters(q) === 0 && q.page === 1
-    ? pendingRealms(state, now).filter((p) => inRegion(p.realm, q.region) && (!ruleset || realmRuleset(p.realm) === ruleset))
+  const pending = stored && !slug && !q.house && activeFilters(q) === 0 && q.page === 1
+    ? stored.pending().filter((p) => inRegion(p.realm, q.region) && (!ruleset || realmRuleset(p.realm) === ruleset))
     : [];
 
   const inCat = rows.filter((r) => inCategory(r.value.itemId, q));
@@ -218,7 +221,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
     </nav>
   );
   let body;
-  if (!state) {
+  if (!stored) {
     body = <Card><p className="text-fg-2" role="status">Market values are unavailable right now. They are unrecorded, not zero.</p></Card>;
   } else if (rows.length === 0 && ruleset && AFTER_LAUNCH.has(ruleset) && !mapped.has(ruleset)) {
     body = <EmptyState message={`${rulesetName} opens after launch, and no realm is on ${rulesetName} yet.`} />;
@@ -227,7 +230,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
   } else if (rows.length === 0) {
     const where = `${q.house ? `the ${q.house} auction house on ` : ""}${realmName ?? (q.house ? "any realm" : "")}${q.region && !realmName ? ` in ${REGION_LABEL[q.region]}` : ""}`;
     body = slug
-      ? <EmptyState count={agreementSoFar(state, slug, undefined, q.house)} message={`No public prices in ${where} yet: a price shows once 3 players scan the same item there.`} />
+      ? <EmptyState count={stored.agreement(slug, q.house)} message={`No public prices in ${where} yet: a price shows once 3 players scan the same item there.`} />
       : <EmptyState message={q.house
         ? `No public prices in ${where} yet: a price shows once 3 players scan the same item in that house.`
       : q.region ? `No public prices in ${REGION_LABEL[q.region]} yet: a price shows once 3 players scan the same item in one recorded market.`

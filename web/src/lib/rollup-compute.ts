@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { AddonRollup, AddonTrend } from "../../../kb/src/addon-rollup";
 import { censusFromRows, type CensusView } from "../../../kb/src/census";
 import type { Edge } from "../../../kb/src/edges";
@@ -38,8 +39,9 @@ let memoized: AggregateSet | null = null;
  * server instance reads one file instead of downloading and replaying the whole corpus; when there is no stored set
  * yet, or it cannot be read, the same set is worked out from the corpus as before. `read` is a corpus the caller
  * already loaded, so a page that needs the records too reads the store once: that set is always worked out from it.
+ * Read once per request and `read` (React `cache`), however many of the answers below one page asks for.
  */
-async function loadAggregates(read?: Corpus): Promise<AggregateSet | null> {
+const aggregatesFor = cache(async (read: Corpus | undefined): Promise<AggregateSet | null> => {
   if (!read) {
     const stored = await loadStoredAggregates();
     if (stored) return stored;
@@ -48,7 +50,9 @@ async function loadAggregates(read?: Corpus): Promise<AggregateSet | null> {
   if (corpus.unreachable) return null;
   if (memoized === null || memoized.key !== corpusKey(corpus)) memoized = buildAggregates(corpus);
   return memoized;
-}
+});
+/** Always one argument, so `loadAggregates()` and `loadAggregates(undefined)` share the request's read. */
+const loadAggregates = (read?: Corpus) => aggregatesFor(read);
 
 /** Every stored upload, loot windows pulled out, rolled up. */
 export async function computeRollups(read?: Corpus): Promise<Omit<RollupResult, "sources"> & { stats: CorpusStats }> {

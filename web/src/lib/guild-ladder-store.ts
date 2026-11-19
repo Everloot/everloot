@@ -5,6 +5,7 @@ import type { PublicationState } from "../../../kb/src/publication";
 import { buildGuildRollup, type GuildRollup } from "./guild-rollup";
 import { sharingStore, uploadStore, type R2Config } from "./upload-store";
 import { STAMP, stampOf } from "./stored-view-freshness";
+import { keep } from "./kept";
 
 export const GUILD_LADDER_KEY = "snapshots/guild-ladder.json";
 const AUTHORITY = "x-amz-meta-authority";
@@ -77,7 +78,12 @@ export async function writeGuildLadder(opts: { added: number; rebuild?: boolean;
   return { written: true, bytes: new TextEncoder().encode(body).length };
 }
 
-let kept: { at: number; set: StoredGuildLadder } | null = null;
+/** A missing or unreadable file is kept for no time: the next read asks again. A read that throws keeps nothing. */
+const stored = keep<StoredGuildLadder | null, { cloud: R2Config; fetch: typeof fetch }>(async ({ cloud, fetch: doFetch }) => {
+  const res = await doFetch(await client(cloud).sign(url(cloud), { method: "GET", headers: { "accept-encoding": "identity" } }));
+  const set = res.ok ? parse(await res.text()) : null;
+  return { value: set, keepMs: set ? KEEP_MS : 0 };
+}, { ttlMs: KEEP_MS, share: false });
 /**
  * Recheck CURRENT publication authority on every read, including a memory hit. A revoke, expiry or suppression makes
  * the stored view unusable immediately; the caller uses the live corpus until the cron rebuilds. Guild and character
@@ -88,15 +94,10 @@ export async function loadStoredGuildLadder(deps: StorageDeps = {}): Promise<Sto
   try {
     const cloud = deps.cloud === undefined ? r2FromEnv() : deps.cloud;
     if (!cloud) return null;
-    const now = Date.now();
-    if (!kept || now - kept.at >= KEEP_MS) {
-      const res = await (deps.fetch ?? fetch)(await client(cloud).sign(url(cloud), { method: "GET", headers: { "accept-encoding": "identity" } }));
-      const set = res.ok ? parse(await res.text()) : null;
-      if (!set) { kept = null; return null; }
-      kept = { at: now, set };
-    }
+    const set = await stored.get({ cloud, fetch: deps.fetch ?? fetch });
+    if (!set) return null;
     const current = authorityKey(await sharingStore.loadState());
-    return kept.set.authority === current ? kept.set : null;
+    return set.authority === current ? set : null;
   } catch { return null; }
 }
-export const forgetStoredGuildLadder = () => { kept = null; };
+export const forgetStoredGuildLadder = () => stored.forget();

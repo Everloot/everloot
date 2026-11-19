@@ -1,9 +1,34 @@
+import { agreedCatalog } from "../../../kb/src/completion-rollup";
 import type { EdgeKind } from "../../../kb/src/edges";
 import { agreedObjectNames } from "../../../kb/src/object-spawns";
 import { agreedItemNames, type ItemFacts } from "../../../kb/src/item-page";
 import { agreedNpcNames, agreedQuestTitles, type WorldFacts } from "../../../kb/src/world-pages";
+import type { FactNames } from "./character-facts";
+import type { StoredFact } from "./private-sync-store";
 import { RECHECK_SCOPES } from "./recheck-scopes";
 import { loadItemFacts, loadWorldFacts } from "./rollup-compute";
+import { uploadStore } from "./upload-store";
+
+/*
+ * What an id is called: the one policy for every module that names items, NPCs, objects, quests, spells and
+ * completion entries (docs/DATA_POLICY.md has the rules this follows).
+ *
+ * AGREED names live here, in names.ts: the name 3 distinct installs report alike (the kb `agreed*` rules, with the
+ * recheck cutoffs), and the completion catalog's agreed entries. Every surface may use them, and the API
+ * (/api/suggest), the MCP server, the bulk export and the embeddable cards use only them. This file never imports
+ * the private game-file store or the shown names.
+ *
+ * SHOWN names live in shown-item-names.ts: what a database page prints. The agreed name first; else, for items, the
+ * game files where the Warcraft Wiki agrees (or the files alone, unconfirmed); for NPCs, one or two installs'
+ * unanimous name where it matches a Warcraft Wiki NPC name; for quests, the game files' or wiki's title; spell
+ * names from the game files. Objects have agreed names only. Item, NPC, quest and spell names beyond the agreed
+ * ones come from the private store and are for pages only: server-rendered pages, the site's own /search and
+ * /search/suggest, and the site's hover cards, never the API, MCP or bulk export (the asset test in the talents folder checks).
+ *
+ * The game assets module is the only reader of the private bucket (wiki-entity-names.ts parses its NPC file through
+ * it). This file does not spell out its path: that test is a plain text search, and names.ts serves the API.
+ * The old module paths (shown-search-names, wiki-names, item-icons, character-facts-names) keep their exports.
+ */
 
 /**
  * Names players agree on (3 installs, as on the pages themselves), by id, for lists that would
@@ -69,4 +94,15 @@ export function matchName(names: Map<number, string>, name: string): NameMatch {
 export function idForName(names: Map<number, string>, name: string): number | null {
   const match = matchName(names, name);
   return match.kind === "unique" ? match.id : null;
+}
+
+/**
+ * The names a character's synced facts are shown with, read only when it has synced titles: the agreed completion
+ * catalog. A read that fails leaves the titles out, so a slow store never takes the page down. Server only.
+ */
+export async function loadFactNames(facts: readonly StoredFact[]): Promise<FactNames> {
+  const catalog = facts.some((f) => f.category === "achievements")
+    ? await uploadStore.loadCompletion().then((read) => (read.state ? agreedCatalog(read.state) : null)).catch(() => null)
+    : null;
+  return { catalog };
 }

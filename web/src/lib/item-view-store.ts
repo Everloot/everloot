@@ -4,6 +4,7 @@ import type { ItemFactState } from "../../../kb/src/item-facts";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
 import { agreedItemNames } from "../../../kb/src/item-page";
 import { loadItemSeen, type ItemSeen } from "./item-seen";
+import { keep } from "./kept";
 import { SOURCES, type SourceSlug } from "./items";
 import { loadAllReportedItemFacts, loadItemFacts } from "./rollup-compute";
 import { uploadStore, type Corpus, type R2Config } from "./upload-store";
@@ -118,17 +119,10 @@ export function parseItemView(raw: unknown): ItemView | null {
 
 /** The read view with its maps built once, so each page view only looks things up. `reported` is null in an older file. */
 export interface ReadView { view: ItemView; agreed: Map<number, string>; dropped: Set<number>; seen: ItemSeen; reported: Map<number, ItemFactState> | null }
-let kept: { at: number; read: ReadView | null } | null = null;
-
-/** The stored view, kept KEEP_MS per server instance; null when there is none or it cannot be read. Never throws. */
-export async function loadItemView(deps: { cloud?: R2Config | null; fetch?: typeof fetch; now?: () => number } = {}): Promise<ReadView | null> {
-  const now = (deps.now ?? Date.now)();
-  if (kept && now - kept.at < KEEP_MS) return kept.read;
-  const cloud = deps.cloud === undefined ? r2FromEnv() : deps.cloud;
-  if (!cloud) return null;
+const stored = keep<ReadView | null, { cloud: R2Config; fetch: typeof fetch }>(async ({ cloud, fetch: doFetch }) => {
   let read: ReadView | null = null;
   try {
-    const res = await (deps.fetch ?? fetch)(await r2(cloud).sign(r2Url(cloud), { method: "GET", headers: { "accept-encoding": "identity" } }));
+    const res = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "GET", headers: { "accept-encoding": "identity" } }));
     const view = res.ok ? parseItemView(JSON.parse(await res.text())) : null;
     if (view) {
       read = {
@@ -143,9 +137,18 @@ export async function loadItemView(deps: { cloud?: R2Config | null; fetch?: type
     read = null;
   }
   // A missing or unreadable file is asked for again after a minute, not after the full KEEP_MS.
-  kept = { at: read ? now : now - KEEP_MS + 60_000, read };
-  return read;
+  return { value: read, keepMs: read ? KEEP_MS : 60_000 };
+}, { ttlMs: KEEP_MS, share: false });
+
+/** The stored view, kept KEEP_MS per server instance; null when there is none or it cannot be read. Never throws. */
+export async function loadItemView(deps: { cloud?: R2Config | null; fetch?: typeof fetch; now?: () => number } = {}): Promise<ReadView | null> {
+  const now = (deps.now ?? Date.now)();
+  const hit = stored.fresh(now);
+  if (hit) return hit.value;
+  const cloud = deps.cloud === undefined ? r2FromEnv() : deps.cloud;
+  if (!cloud) return null;
+  return stored.get({ cloud, fetch: deps.fetch ?? fetch }, now);
 }
 
 /** For tests: forget the kept file. */
-export const forgetItemView = () => { kept = null; };
+export const forgetItemView = () => stored.forget();

@@ -75,6 +75,25 @@ describe("the guild directory", () => {
     expect(out).toContain('href="/guilds?rules=roleplay-pvp"');
   });
 
+  test("leaves out a disbanded guild (Blizzard's DELETED record) from the rows and the counts, and says so", async () => {
+    mem.putGuild(armoryGuild({ region: "us", slug: "old-oath", guildId: 78, name: "DELETED", memberCount: 0 }), []);
+    const out = await html(pages.directory());
+    expect(out).not.toContain(">DELETED<");
+    expect(out).not.toContain("old-oath");
+    expect(out).toContain("Ash Pact");
+    expect(out).toContain("Disbanded guilds are left out of this list and its counts.");
+    expect((await mem.guildDirectory({ prefix: null, region: null, rulesetId: null, sort: "members", limit: 50, offset: 0 }))!.total).toBe(2);
+    expect((await mem.counts()).reduce((n, c) => n + c.guilds, 0)).toBe(2);
+    // A cloud answer that still carries the row (the migration not yet applied) is filtered on the page too.
+    const { loadGuildDirectory, guildDirectoryQuery, isDisbandedGuild } = await import("@/lib/armory-guilds");
+    expect(isDisbandedGuild("DELETED")).toBe(true);
+    expect(isDisbandedGuild("Deleted Dreams")).toBe(false);
+    const row = { region: "us", slug: "old-oath", name: "DELETED", faction: "Alliance", ruleset_id: 1, ruleset: "PvP", member_count: 0, members_read: 0, average_item_level: null, level_60: 0, fetched_at: "2026-11-09T09:00:00.000Z", total: 1 };
+    holder.store = createCloudArmoryStore((async () => [row]) as never);
+    const dir = await loadGuildDirectory(guildDirectoryQuery({}), new Set());
+    expect(dir.state === "ready" && dir.rows).toEqual([]);
+  });
+
   test("searches by name prefix, keeps filters in the form, and says when nothing matches", async () => {
     const found = await html(pages.directory({ q: "ash", region: "us" }));
     expect(found).toContain("Ash Pact");

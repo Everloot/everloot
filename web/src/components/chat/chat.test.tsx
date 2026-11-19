@@ -274,6 +274,41 @@ describe("the chat page", () => {
     expect(text()).not.toContain("From Everloot");
   });
 
+  test("while the answer is pending a still skeleton shows; a failed turn offers Retry, which sends the same question once more", async () => {
+    api();
+    saveKey();
+    const site = fetch as unknown as (input: string, init?: RequestInit) => Promise<Response>;
+    let release: () => void = () => {};
+    let failed = false;
+    vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
+      if (String(input) === "https://openrouter.ai/api/v1/chat/completions" && !failed) {
+        failed = true;
+        calls.push({ url: String(input), init });
+        await new Promise<void>((r) => { release = r; });
+        return Response.json({ error: { message: "Rate limited" } }, { status: 429 });
+      }
+      return site(input, init);
+    }));
+    await render(<ChatClient profiles />);
+    await act(async () => setValue(textarea(), "Where does Linen Cloth drop?"));
+    await act(async () => textarea().form!.requestSubmit());
+    await settle();
+    expect(container.querySelector("[data-answer-pending]")).not.toBeNull();
+    expect(text()).toContain("Answering…");
+    expect(button("Retry")).toBeUndefined();
+
+    await act(async () => release());
+    await settle();
+    expect(container.querySelector("[data-answer-pending]")).toBeNull();
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    await click(button("Retry"));
+    expect(text()).toContain("Humanoids drop it.");
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(button("Retry")).toBeUndefined();
+    // The question is asked once in the conversation, not once per try.
+    expect(text().split("Where does Linen Cloth drop?").length - 1).toBe(1);
+  });
+
   test("Ctrl+Shift+O starts a new chat", async () => {
     api();
     saveKey();

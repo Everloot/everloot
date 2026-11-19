@@ -8,7 +8,8 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { webApplicationJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import { uploadStore } from "@/lib/upload-store";
-import { AH_PATH, busiestHouse, findBoard, itemHref, itemLabel, realmBoards, type ItemNames } from "@/lib/auction-house";
+import { AH_PATH, busiestHouse, findBoard, itemHref, itemLabel, type ItemNames } from "@/lib/auction-house";
+import { loadMarketBoards } from "@/lib/market-boards";
 import { DISENCHANT_BUILD, bandValues, chanceText, disenchantDeals, loadDisenchant, materialRows, type BandValue, type Deal, type MaterialRow } from "@/lib/disenchant";
 import { bandLabel, unitsRange, type BandYield } from "../../../../../kb/src/disenchant";
 import { INDEPENDENT_INSTALLS } from "../../../../../kb/src/drop-rollup";
@@ -48,11 +49,12 @@ export default async function DisenchantingPage(props: { searchParams: Promise<S
   const now = new Date();
   const [view, market] = await Promise.all([loadDisenchant(), uploadStore.loadMarket()]);
   const state = market.state;
-  const realms = state ? realmBoards(state, now) : [];
+  const stored = await loadMarketBoards(market, now);
+  const realms = stored ? stored.boards(null) : [];
   const realm = slug ? findBoard(realms, slug) : null;
   // A house is its own market: with none asked for, the realm's busiest house, named on the page; never a blend.
   const house: AuctionHouse | null = asked ?? (realm ? busiestHouse(realm.rows)?.house ?? null : null);
-  const board = state && slug && house ? findBoard(realmBoards(state, now, house), slug) : null;
+  const board = stored && slug && house ? findBoard(stored.boards(house), slug) : null;
 
   const rated = view.yields.filter((y) => y.state === "rated");
   const collecting = view.yields.filter((y) => y.state === "short").sort((a, b) => b.windows - a.windows);
@@ -62,7 +64,7 @@ export default async function DisenchantingPage(props: { searchParams: Promise<S
 
   const ids = [...new Set([...materials.map((m) => m.itemId), ...deals.map((d) => d.itemId)])];
   const tips: Map<number, ItemTip> = ids.length ? (await itemArt(ids)).tips : new Map();
-  const names: ItemNames = await auctionNames(ids, tips);
+  const names: ItemNames = await auctionNames(ids, tips, stored?.names);
   const realmName = realm?.realm.name ?? null;
   const where = house && realmName ? `the ${house} auction house on ${realmName}` : null;
   // A material links to its price on the chosen house, else to its database page.

@@ -9,6 +9,7 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { playerPagesOn } from "@/lib/player-pages";
 import { guildsOn } from "@/lib/guild-switch";
 import { PLAYER_PAGE_SHOWS } from "../players/player-view";
+import { CLASS_BG, classColour } from "@/components/ui/class-colour";
 import {
   Card, Container, DataTable, EmptyState, Explainer, FilterBar, LinkTabs, PageHeader, SectionHeading, type Column, type FilterControl,
 } from "@/components/ui";
@@ -42,9 +43,10 @@ type Row = { key: string; label: string; count: CensusCount; href?: string };
 
 /**
  * One slice: a row per group with its count and its share of `total` (the window's characters, or the filter's
- * count; no share column when that is hidden). A row with an `href` links to the census filtered to it.
+ * count; no share column when that is hidden). A row with an `href` links to the census filtered to it. `byClass`: the rows are
+ * classes, and each share bar takes its class colour.
  */
-function CountTable({ id, title, item, rows, total }: { id: string; title: string; item: string; rows: Row[]; total: number | null }) {
+function CountTable({ id, title, item, rows, total, byClass = false }: { id: string; title: string; item: string; rows: Row[]; total: number | null; byClass?: boolean }) {
   const columns: Column<Row>[] = [
     {
       key: "label", header: item,
@@ -60,7 +62,7 @@ function CountTable({ id, title, item, rows, total }: { id: string; title: strin
         <div className="flex min-w-32 items-center gap-3">
           <span className="w-10 text-right font-mono tabular-nums">{percent(row.count, total)}</span>
           <div aria-hidden="true" className="h-1 flex-1 rounded-full bg-line">
-            <div className="h-1 rounded-full bg-fg-2" style={{ width: percent(row.count, total) }} />
+            <div className={`h-1 rounded-full ${(byClass && classColour(CLASS_BG, row.label)) || "bg-fg-2"}`} style={{ width: percent(row.count, total) }} />
           </div>
         </div>
       ),
@@ -195,6 +197,7 @@ function Filtered({ view: v, window: w }: { view: FilteredCensus; window: Census
           item={BY_TITLE[b.by][1]}
           total={total}
           rows={b.rows}
+          byClass={b.by === "class"}
         />
       ))}
     </div>
@@ -292,7 +295,7 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
             {!w.collecting && !filtering && (
               <>
                 <CountTable id="factions" title="Factions" item="Faction" total={w.characters!} rows={FACTIONS.map((f) => ({ key: f, label: f, count: w.factions.find((x) => x.faction === f)!.count, href: censusHref({ ...filter, faction: f }, chosen) }))} />
-                <CountTable id="classes" title="Classes" item="Class" total={w.characters!} rows={w.classes.map((c) => ({ key: c.class, label: CLASS_NAME.get(c.class)!, count: c.count, href: censusHref({ ...filter, class: c.class }, chosen) }))} />
+                <CountTable id="classes" title="Classes" item="Class" byClass total={w.characters!} rows={w.classes.map((c) => ({ key: c.class, label: CLASS_NAME.get(c.class)!, count: c.count, href: censusHref({ ...filter, class: c.class }, chosen) }))} />
                 <CountTable id="races" title="Races" item="Race" total={w.characters!} rows={w.races.map((r) => ({ key: `${r.faction}/${r.race}`, label: `${RACE_NAME.get(r.race)} (${r.faction})`, count: r.count, href: censusHref({ ...filter, race: r.race, faction: r.race === "Skyborne" ? r.faction : undefined }, chosen) }))} />
                 <section aria-labelledby="grid" className="space-y-6">
                   <SectionHeading

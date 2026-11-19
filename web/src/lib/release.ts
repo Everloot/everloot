@@ -3,6 +3,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { openD1Release, openPublicSnapshot } from "../../../kb/src/public-snapshot";
 import { sqliteReleaseDb, type D1Like, type ReleaseDb } from "../../../kb/src/release-db";
 import type { Manifest } from "../../../kb/src/snapshot";
+import { keep, type Keeper } from "./kept";
 
 /**
  * The approved knowledge release, opened once per instance and shared by the MCP mounts and the
@@ -33,28 +34,28 @@ function d1Release(): { d1: D1Like; sha256: string } | null {
   return { d1: env.KNOWLEDGE_D1 as D1Like, sha256: String(env.KNOWLEDGE_RELEASE_SHA256 ?? "") };
 }
 
-let handle: Release | null = null;
-let failedAt = 0;
 /** After a failed open (which hashes the whole file), wait this long before trying again. */
 export const RETRY_AFTER_MS = 60_000;
 
-export async function getRelease(): Promise<Release | null> {
-  if (handle) return handle;
-  if (failedAt && Date.now() - failedAt < RETRY_AFTER_MS) return null;
-  // Each request opens on its own (no shared promise): a Worker cancels work one request awaits on another's behalf.
+/**
+ * An opened release is kept for the instance's life; a failure is kept for RETRY_AFTER_MS from when it failed.
+ * Each request opens on its own (`share: false`, no shared promise): a Worker cancels work one request awaits on
+ * another's behalf.
+ */
+const opened: Keeper<Release | null, void> = keep<Release | null>(async (_, _last, startedAt) => {
   try {
     const d1 = d1Release();
-    if (d1) {
-      handle = await openD1Release(d1.d1, d1.sha256);
-    } else {
-      const file = openPublicSnapshot(releasePath());
-      handle = { db: sqliteReleaseDb(file.db), manifest: file.manifest };
-    }
-    failedAt = 0;
+    if (d1) return { value: await openD1Release(d1.d1, d1.sha256), keepMs: Infinity };
+    const file = openPublicSnapshot(releasePath());
+    return { value: { db: sqliteReleaseDb(file.db), manifest: file.manifest }, keepMs: Infinity };
   } catch (err) {
-    failedAt = Date.now();
     console.error("[release] knowledge release unavailable", err);
-    return null;
+    // A request that opened it meanwhile keeps its handle; this failure does not replace it.
+    const held = opened.last()?.value;
+    return held ? { value: held, keepMs: Infinity } : { value: null, keepMs: Date.now() - startedAt + RETRY_AFTER_MS };
   }
-  return handle;
+}, { ttlMs: Infinity, share: false });
+
+export async function getRelease(): Promise<Release | null> {
+  return opened.get();
 }

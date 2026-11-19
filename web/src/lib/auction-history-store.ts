@@ -2,6 +2,7 @@ import { AwsClient } from "aws4fetch";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
 import { auctionHistories, auctionHistoryKey, auctionSightingsFromRecords, type AuctionPoint } from "../../../kb/src/auction-history";
 import { trustedInstalls } from "../../../kb/src/trusted-source";
+import { keep } from "./kept";
 import { uploadStore, type Corpus, type R2Config } from "./upload-store";
 
 /**
@@ -82,7 +83,19 @@ export function parseAuctionHistory(raw: unknown): AuctionHistoryFile | null {
   return { version: 1, generatedAt: v.generatedAt, dataAsOf: typeof v.dataAsOf === "string" ? v.dataAsOf : null, histories: v.histories };
 }
 
-let kept: { at: number; read: { dataAsOf: string | null; byKey: Map<string, AuctionPoint[]> } | null } | null = null;
+type Read = { dataAsOf: string | null; byKey: Map<string, AuctionPoint[]> } | null;
+const stored = keep<Read, { cloud: R2Config; fetch: typeof fetch }>(async ({ cloud, fetch: doFetch }) => {
+  let read: Read = null;
+  try {
+    const res = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "GET", headers: { "accept-encoding": "identity" } }));
+    const file = res.ok ? parseAuctionHistory(JSON.parse(await res.text())) : null;
+    if (file) read = { dataAsOf: file.dataAsOf, byKey: new Map(file.histories) };
+  } catch {
+    read = null;
+  }
+  // A missing or unreadable file is asked for again after a minute, not after the full KEEP_MS.
+  return { value: read, keepMs: read ? KEEP_MS : 60_000 };
+}, { ttlMs: KEEP_MS, share: false });
 
 /**
  * One realm and item's public days from the stored file, kept KEEP_MS per server instance. Null when there is no file
@@ -92,23 +105,15 @@ export async function storedAuctionHistory(realm: string, itemId: number, deps: 
   cloud?: R2Config | null; fetch?: typeof fetch; now?: () => number;
 } = {}): Promise<{ points: AuctionPoint[]; dataAsOf: string | null } | null> {
   const now = (deps.now ?? Date.now)();
-  if (!kept || now - kept.at >= KEEP_MS) {
+  let read = stored.fresh(now)?.value;
+  if (read === undefined) {
     const cloud = deps.cloud === undefined ? r2FromEnv() : deps.cloud;
     if (!cloud) return null;
-    let read: NonNullable<typeof kept>["read"] = null;
-    try {
-      const res = await (deps.fetch ?? fetch)(await r2(cloud).sign(r2Url(cloud), { method: "GET", headers: { "accept-encoding": "identity" } }));
-      const file = res.ok ? parseAuctionHistory(JSON.parse(await res.text())) : null;
-      if (file) read = { dataAsOf: file.dataAsOf, byKey: new Map(file.histories) };
-    } catch {
-      read = null;
-    }
-    // A missing or unreadable file is asked for again after a minute, not after the full KEEP_MS.
-    kept = { at: read ? now : now - KEEP_MS + 60_000, read };
+    read = await stored.get({ cloud, fetch: deps.fetch ?? fetch }, now);
   }
-  if (!kept.read) return null;
-  return { points: kept.read.byKey.get(auctionHistoryKey(realm, itemId)) ?? [], dataAsOf: kept.read.dataAsOf };
+  if (!read) return null;
+  return { points: read.byKey.get(auctionHistoryKey(realm, itemId)) ?? [], dataAsOf: read.dataAsOf };
 }
 
 /** For tests: forget the kept file. */
-export const forgetAuctionHistory = () => { kept = null; };
+export const forgetAuctionHistory = () => stored.forget();

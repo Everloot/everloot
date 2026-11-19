@@ -107,6 +107,13 @@ export function armoryGuildHidden(hidden: ReadonlySet<string>, region: string, n
   return false;
 }
 
+/**
+ * Blizzard answers a disbanded guild with a record named "DELETED", which the crawler stores as it comes. Such a row is
+ * left out of the directory and of every guild count, as 20261118120000_armory_disbanded_guilds.sql does in SQL.
+ */
+export const DISBANDED_GUILD_NAME = "DELETED";
+export const isDisbandedGuild = (name: string) => name === DISBANDED_GUILD_NAME;
+
 export type GuildDirectory =
   | { state: "ready"; rows: ArmoryGuildRow[]; total: number }
   /** The migration is not applied: the guilds whose name starts with the search, without counts. */
@@ -120,7 +127,7 @@ export type GuildDirectory =
  */
 export async function loadGuildDirectory(d: GuildDirectoryQuery, hidden: ReadonlySet<string> | null): Promise<GuildDirectory> {
   if (hidden === null) return { state: "unreachable" };
-  const shown = (rows: ArmoryGuildRow[]) => rows.filter((r) => !armoryGuildHidden(hidden, r.region, r.name));
+  const shown = (rows: ArmoryGuildRow[]) => rows.filter((r) => !isDisbandedGuild(r.name) && !armoryGuildHidden(hidden, r.region, r.name));
   const store = armoryStore();
   try {
     const sort = GUILD_SORTS.find((s) => s.slug === d.sort)!.key;

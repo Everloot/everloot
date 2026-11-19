@@ -1,4 +1,5 @@
 import { writeAuctionReports } from "@/lib/auction-report-store";
+import { writeMarketBoards } from "@/lib/market-boards";
 import { NextResponse } from "next/server";
 import { sharingStore, uploadStore, type Corpus } from "@/lib/upload-store";
 import { intakeQuota } from "@/lib/intake-quota";
@@ -152,6 +153,10 @@ export async function GET(req: Request) {
     }
     let auctionReports: { written: boolean; reports?: number } | null = null;
     try { if (!(market.remaining ?? 0)) auctionReports = await writeAuctionReports(); } catch (err) { console.error("auction reports failed", err); }
+    // The Auction House boards (lib/market-boards.ts), built once here instead of on every browse, realm, bags and
+    // disenchanting request: rewritten when the rollup or the UTC day changed. A failure is logged and the pages build them.
+    let marketBoards: { written: boolean; bytes?: number; ms?: number } | null = null;
+    try { marketBoards = await writeMarketBoards(); } catch (err) { console.error("market boards failed", err); }
     // The profession and map views follow the auction history's rule: an idle run also rewrites a file built from
     // another snapshot, so a failed write catches up on the next run.
     let professions: { written: boolean; bytes?: number } | null = null;
@@ -187,7 +192,7 @@ export async function GET(req: Request) {
       result.dataAsOf,
       settled?.written ? week : work.settledWeek ?? null,
     );
-    return NextResponse.json({ ok: true, rebuild, ...result, market, completion, coverage, settled, census, itemView, aggregates, auctionHistory, auctionReports, professions, mapPins, databaseActivity, guildLadder });
+    return NextResponse.json({ ok: true, rebuild, ...result, market, completion, coverage, settled, census, itemView, aggregates, auctionHistory, auctionReports, marketBoards, professions, mapPins, databaseActivity, guildLadder });
   } catch (err) {
     console.error("snapshot failed", err);
     return NextResponse.json({ ok: false, error: "snapshot failed" }, { status: 500 });

@@ -85,6 +85,7 @@ export const lootWindow = base.extend({
     y: z.number().min(0).max(100).optional().describe("The player's y on that map, 0 to 100."),
     gatherKind: z.enum(GATHER_KINDS).optional().describe("How the object was opened, from the spell cast on it (`GATHER_KINDS`); `other` when the spell is not one the addon knows."),
     sourceObjectName: z.string().min(1).max(120).optional().describe("The object's name as the game showed it. Public only when 3 installs agree on it."),
+    gatherSkill: z.number().int().min(1).max(500).optional().describe("With a gather or skinning window: the player's own rank in the skill the cast used (Herbalism, Mining or Skinning), with the bonus from race and gear added, the value a node's requirement is checked against. Absent when the client could not read it, for other windows and from older addons."),
 }).refine((r) => r.sourceNpcId !== undefined || r.sourceObjectId !== undefined || r.sourceItemId !== undefined, {
     message: RULES.loot[0],
 }).refine((r) => (r.mapId === undefined) === (r.x === undefined) && (r.x === undefined) === (r.y === undefined), {

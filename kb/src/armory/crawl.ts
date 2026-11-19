@@ -35,6 +35,8 @@ export interface Summary {
   };
   invalid: number;
   rejected: number;
+  /** Row failures by reason (which field of which response, never the character), so a changed API is diagnosable. */
+  failures: Record<string, number>;
   touch_failed: Record<Kind, number>;
   enqueued: number;
   purged: number;
@@ -43,6 +45,16 @@ export interface Summary {
 }
 /** The job fails when this many runs in a row made no call: the queue has starved. */
 export const ZERO_RUN_LIMIT = 6;
+/**
+ * Blizzard rows a run may fail to read before the job fails: this many, or 1% of the rows it read, whichever is more.
+ * One odd character among a thousand is deferred and reported as a warning; a changed API breaks many rows at once
+ * (and ten stop the run). A row storage refuses still fails the job at once: that points at our own schema.
+ */
+export const ROW_FAILURE_FLOOR = 3;
+export const rowFailureLimit = (rowsRead: number) => Math.max(ROW_FAILURE_FLOOR, Math.ceil(rowsRead * 0.01));
+/** "equipment.equipped_items.3.level" becomes "equipped_items.#.level": one reason per field, not per item. */
+const issuePath = (path: readonly PropertyKey[]) =>
+  path.map((p) => (typeof p === "number" ? "#" : String(p))).join(".") || "(root)";
 const MIGRATION = "supabase/migrations/20261117160000_armory_discovery.sql";
 /** PostgREST answers 404 for a function that does not exist yet. */
 const missingFunction = (error: unknown) => error instanceof StoreError && error.status === 404;
@@ -79,6 +91,7 @@ export async function runCrawl(cfg: {
     },
     invalid: 0,
     rejected: 0,
+    failures: {},
     touch_failed: { character: 0, guild: 0 },
     enqueued: 0,
     purged: 0,
@@ -89,10 +102,17 @@ export async function runCrawl(cfg: {
   let nonTransientFailures = 0;
   const logged = new Set<string>();
   function reason(error: unknown): string {
+    if (error instanceof ZodError) {
+      // The first issue's field and code only: no value, so no name or other character data reaches the log.
+      const issue = error.issues[0];
+      return issue
+        ? `Armory response schema validation failure at ${issuePath(issue.path)} (${issue.code})`
+        : "Armory response schema validation failure";
+    }
     return error instanceof ApiError || error instanceof StoreError
       ? error.message
-      : error instanceof ZodError || error instanceof SyntaxError
-        ? "Armory response schema validation failure"
+      : error instanceof SyntaxError
+        ? "Armory response is not valid JSON"
         : error instanceof URIError
           ? "Armory malformed guild href"
           : "Armory unexpected failure";
@@ -124,6 +144,8 @@ export async function runCrawl(cfg: {
     nonTransientFailures++;
     if (rejected) summary.rejected++;
     else summary.invalid++;
+    const why = `${rejected ? "storage row rejected" : "row failure"}: ${reason(error)}`;
+    summary.failures[why] = (summary.failures[why] ?? 0) + 1;
     logError(rejected ? "storage row rejected" : "row failure", error);
     if (nonTransientFailures === 10) {
       fatal = new Error("Stopped after 10 non-transient row failures");
@@ -418,11 +440,20 @@ export async function runCrawl(cfg: {
       else fail(error);
     }
   }
+  const rowsRead =
+    summary.characters.fetched + summary.guilds.fetched + summary.invalid;
+  const rowFailuresFail =
+    summary.rejected > 0 || summary.invalid >= rowFailureLimit(rowsRead);
+  if (summary.invalid && !rowFailuresFail)
+    // A GitHub Actions warning: shown on the run, not a failed job. Printed before the summary, which stays last.
+    cfg.log?.(
+      `::warning::armory ${region}: ${summary.invalid} of ${rowsRead} rows deferred for 7 days, under the alert line of ${rowFailureLimit(rowsRead)} (${Object.keys(summary.failures).join("; ")})`,
+    );
   cfg.log?.(JSON.stringify(summary));
   if (fatal) throw fatal;
   if (unmigrated)
     throw Error(`Armory discovery functions are missing: apply ${MIGRATION}`);
-  if (summary.invalid + summary.rejected)
+  if (rowFailuresFail)
     throw Error(
       `${summary.invalid + summary.rejected} armory row failures deferred for 7 days`,
     );
