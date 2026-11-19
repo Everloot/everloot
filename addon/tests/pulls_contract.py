@@ -195,12 +195,15 @@ for case in main:
             assert actual.count("tooltipDisenchant") == 1
             # So is the vendor check in the auction house's Sell tab.
             assert actual.count("sellCheck") == 1
-            actual = [key for key in actual if key not in {"tooltip", "inventoryCapture", "tooltipDisenchant", "sellCheck"}]
+            # Flight timing is independent of pull recording.
+            assert actual.count("flight") == 1
+            actual = [key for key in actual if key not in {"tooltip", "inventoryCapture", "tooltipDisenchant", "sellCheck", "flight"}]
         if part == "printed":
             # The feature chooser adds /everloot setup to the command list for every install, independently of pull
             # recording. Keep the historical fixture and compare every other word.
             assert sum("/everloot setup, " in line for line in actual) == sum(line.startswith("Everloot commands:") for line in actual)
-            actual = [line.replace("/everloot setup, ", "") for line in actual]
+            assert sum("/everloot flight on|off, " in line for line in actual) == sum(line.startswith("Everloot commands:") for line in actual)
+            actual = [line.replace("/everloot setup, ", "").replace("/everloot flight on|off, ", "") for line in actual]
             # The same change turns player names on in a new install, which says so once at the first load; an
             # upgraded install keeps them off and is not told. Compare every other line.
             notices = [line for line in actual if line.startswith("Everloot: player names on.")]
@@ -213,7 +216,8 @@ for case in main:
             assert actual["toggles"]["players"] is (case == "new") and actual.get("playersNotice") is (True if case == "new" else None)
             expected = {**expected, "toggles": {k: v for k, v in expected["toggles"].items() if k not in {"gear", "talents", "players"}}}
             actual = {k: v for k, v in actual.items() if k != "playersNotice"}
-            actual["toggles"] = {k: v for k, v in actual["toggles"].items() if k != "players"}
+            assert actual["toggles"]["flight"] is True
+            actual["toggles"] = {k: v for k, v in actual["toggles"].items() if k not in {"players", "flight"}}
         assert actual == expected, f"gate off, {case} install: {part} differs from main's (fixtures/gate_off_main.json)"
 assert mine.keys() == main.keys()
 
