@@ -2,6 +2,21 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { armoryCharacter, armoryGuild } from "./armory.fixture";
 import { armoryStore, armoryStoreFrom, createCloudArmoryStore, createMemoryArmoryStore } from "./armory-store";
 
+test("guild queue fallback matches duplicate and recheck rules independently of character queue keys", async () => {
+  const now = () => new Date("2026-11-30T00:00:00Z");
+  const s = createMemoryArmoryStore(now);
+  s.putGuild(armoryGuild({ checkedAt: "2026-11-10T00:00:00.001Z" }), []);
+  expect(await s.enqueue("eu", "guild", "ember-wardens", "website")).toBe(false);
+  s.putGuild(armoryGuild({ checkedAt: "2026-11-10T00:00:00Z" }), []);
+  expect(await s.enqueue("eu", "guild", "ember-wardens", "website")).toBe(true);
+  expect(await s.enqueue("eu", "guild", "ember-wardens", "website")).toBe(false);
+  expect(await s.enqueue("us", "guild", "ember-wardens", "website")).toBe(true);
+  expect(s.queued()).toEqual([
+    { region: "eu", kind: "guild", slug: "ember-wardens", source: "website" },
+    { region: "us", kind: "guild", slug: "ember-wardens", source: "website" },
+  ]);
+});
+
 describe("the Supabase store", () => {
   const fake = (answer: unknown) => {
     const query = vi.fn(async (_path: string, _init?: RequestInit) => answer);
