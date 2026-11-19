@@ -1,3 +1,5 @@
+import GuildProgressionBoard from "@/components/progression/GuildProgressionBoard";
+import type { GuildProgressionRank } from "@/lib/progression";
 import Link from "next/link";
 import { Card, DataTable, LinkTabs, SectionHeading, Tooltip, type Column } from "@/components/ui";
 import { ARMORY_BOARDS, ARMORY_REGIONS, armoryBoardHref, armoryCharacterPath, armoryGuildPath, metricValue, regionLabel, type ArmoryRegion } from "@/lib/armory";
@@ -102,7 +104,7 @@ const raidColumns: Column<RankedRow>[] = [
 ];
 
 /** Guilds by gear (the armory) and by raid progress (members' uploads), side by side; either may be off. */
-export function GuildBoards({ gear, raids, region }: { gear: GuildGear | null; raids: RaidProgress | null; region: ArmoryRegion | null }) {
+export function GuildBoards({ gear, raids, region, progression }: { gear: GuildGear | null; raids: RaidProgress | null; region: ArmoryRegion | null; progression?: GuildProgressionRank[] }) {
   const note = [
     gear && "Gear is the average item level of the members the armory has read.",
     raids && "Raid progress counts the bosses two members' installs report killed, in the newest raid; the ladder is by realm, so every region is in it.",
@@ -131,6 +133,7 @@ export function GuildBoards({ gear, raids, region }: { gear: GuildGear | null; r
               )}
           </Card>
         )}
+        <GuildProgressionBoard rows={progression} />
         {raids && (
           <Card as="section" aria-labelledby="board-raids" padding="none">
             <h3 id="board-raids" className="sr-only">Guilds by raid progress</h3>

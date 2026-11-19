@@ -1,3 +1,6 @@
+import { guildProgression, guildProgressionScore } from "@kb/guild-progression";
+import { armoryGuildHidden, isDisbandedGuild } from "./armory-guilds";
+import { playerStore } from "./player-store";
 import { z } from "zod";
 import { characterProgression, progressionCatalogue, rosterProgression, type ProgressionKill } from "@kb/progression";
 import { armoryCharacterPath, isArmoryRegion, validArmorySlug } from "./armory";
@@ -73,4 +76,49 @@ export async function loadRosterProgression(members: readonly ProgressionMember[
   const [{ catalogue, links }, account] = await Promise.all([catalogueData(), owner()]);
   const roster = await Promise.all(members.map(async (member) => ({ member, kills: await history(member.region, member.characterSlug, account) })));
   return { instances: rosterProgression(catalogue, roster), links };
+}
+
+/** Deduplicate roster characters before counting; all reads remain scoped to this request's owner. */
+async function rosterHistories(members: readonly ProgressionMember[], account: Awaited<ReturnType<typeof owner>>) {
+  const unique = [...new Map(members.map((m) => [`${m.region}/${m.characterSlug}`, m])).values()];
+  return Promise.all(unique.map(async (member) => ({ kills: await history(member.region, member.characterSlug, account) })));
+}
+
+export async function loadGuildProgression(members: readonly ProgressionMember[]) {
+  const [{ catalogue, links }, account] = await Promise.all([catalogueData(), owner()]);
+  const roster = await rosterHistories(members, account);
+  return { instances: guildProgression(catalogue, roster), score: guildProgressionScore(catalogue, roster), links };
+}
+
+export interface GuildProgressionRank { region: string; slug: string; name: string; score: number }
+
+/**
+ * Request-only ranking. Under owner-only history, only guilds of linked characters can score.
+ * Recheck each guild, its hide status and its current roster; never infer membership from uploads.
+ */
+export async function loadGuildProgressionRanking(region: string | null): Promise<GuildProgressionRank[]> {
+  const account = await owner();
+  if (!account) return [];
+  try {
+    const store = armoryStore();
+    const hidden = await playerStore().hiddenGuilds();
+    const candidates = new Map<string, { region: string; slug: string }>();
+    for (const path of account.links.values()) {
+      const [, , r, slug] = path.split("/");
+      if (!r || !slug || (region !== null && region !== r)) continue;
+      const character = await store.character(r, decodeURIComponent(slug));
+      if (character?.guildSlug) candidates.set(`${r}/${character.guildSlug}`, { region: r, slug: character.guildSlug });
+    }
+    if (!candidates.size) return [];
+    const { catalogue } = await catalogueData();
+    const rows = await Promise.all([...candidates.values()].map(async (g) => {
+      const guild = await store.guild(g.region, g.slug);
+      if (!guild || isDisbandedGuild(guild.name) || armoryGuildHidden(hidden, guild.region, guild.name)) return null;
+      const members = (await store.roster(g.region, g.slug)).map((m) => ({ ...m, region: g.region }));
+      const score = guildProgressionScore(catalogue, await rosterHistories(members, account));
+      return score > 0 ? { region: g.region, slug: g.slug, name: guild.name, score } : null;
+    }));
+    return rows.filter((r): r is GuildProgressionRank => r !== null)
+      .sort((a, b) => b.score - a.score || a.region.localeCompare(b.region) || a.slug.localeCompare(b.slug));
+  } catch { return []; }
 }

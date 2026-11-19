@@ -9,6 +9,8 @@ import { playerStore } from "@/lib/player-store";
 import { StorageError } from "@/lib/supabase/server";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 
+vi.mock("@/components/progression/GuildProgression", () => ({ default: () => <section data-guild-progression-hook /> }));
+
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
 }));
@@ -217,4 +219,11 @@ describe("the guild page summary", () => {
 
 test("ranking rows carry the region chip", async () => {
   expect(await html(pages.board("item-level"))).toMatch(/data-region="eu"[^>]*>EU<\/span>Normal/);
+});
+
+test("guild progression hook follows the population summary", async () => {
+  vi.stubEnv("EVERLOOT_ARMORY", "1");
+  const result = await html(pages.guild("eu", "ember-wardens"));
+  expect(result.indexOf('aria-labelledby="armory-summary"')).toBeLessThan(result.indexOf("data-guild-progression-hook"));
+  expect(result).toContain("data-guild-progression-hook");
 });
