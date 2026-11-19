@@ -11,7 +11,7 @@ import {
 } from "@/lib/armory-guilds";
 import { dataAgeLabel } from "@/lib/data-age";
 import {
-  factionLabel, guildPath, guildSearchPrefix, guildsOn, ladderHref, loadGuildData, loadGuildRealms, loadGuildSearch, loadLadder, parseLadderQuery, raidsOpen, realmPath,
+  factionLabel, guildPath, guildSearchPrefix, guildsOn, LADDER_LINE, ladderHref, loadGuildData, loadGuildRealms, loadGuildSearch, loadLadder, parseLadderQuery, RAIDS_LINE, raidsOpen, realmPath, START_LINE,
   type BossFirst, type LadderQuery, type RankedRow,
 } from "@/lib/guilds";
 import { playerStore } from "@/lib/player-store";
@@ -25,11 +25,6 @@ import { BossStrip, day, FactionMark, guildRobots, link, number, Progress, rules
 export const dynamic = "force-dynamic";
 
 const DESCRIPTION = "WoW: Forever guilds: find one by name, filter by region and ruleset, see how many members were read, and follow progression from members' uploads.";
-const START_LINE = "The ladder starts with the first kill two members report.";
-/** Before raids open, said in place of a raid ranking. Nothing is estimated in its place. */
-const RAIDS_LINE = "Ranking starts when raids open on December 9.";
-/** Before any agreed kill and before raids open: one line where the ladder will go. */
-const LADDER_LINE = "Progression ladders start December 9.";
 
 type Search = Record<string, string | string[] | undefined>;
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
