@@ -92,7 +92,7 @@ const muted = (text: string) => <span className="text-muted">{text}</span>;
 
 function directoryColumns(counted: boolean): Column<ArmoryGuildRow>[] {
   const all: Column<ArmoryGuildRow>[] = [
-    { key: "name", header: "Guild", cell: (g) => <Link href={armoryGuildPath(g.region, g.slug)} className={`${link} font-medium`}>{g.name}</Link> },
+    { key: "name", header: "Guild", cell: (g) => <span className="inline-flex flex-wrap items-center gap-2"><Link href={armoryGuildPath(g.region, g.slug)} className={`${link} font-medium`}>{g.name}</Link>{g.recruiting && <span className="rounded-control border border-edge px-2 py-1 text-meta text-fg-2">Recruiting</span>}</span> },
     { key: "where", header: "Region", nowrap: true, cell: (g) => <RegionRuleset region={g.region} ruleset={g.ruleset} /> },
     { key: "faction", header: "Faction", nowrap: true, cell: (g) => g.faction },
     { key: "roster", header: "Roster", numeric: true, cell: (g) => number(g.memberCount) },

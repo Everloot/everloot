@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import GuildProfile from "@/components/guild-profile";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
@@ -121,6 +122,7 @@ export default async function ArmoryGuildPage(props: { params: Promise<Params>; 
           meta={created ? <span>Created <span className="font-mono tabular-nums">{created}</span></span> : undefined}
         />
 
+        <GuildProfile guild={g} />
         <Summary guild={g} members={members} summary={rosterSummary(members)} />
 
         <section aria-labelledby="armory-roster" className="space-y-3">

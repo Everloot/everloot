@@ -10,6 +10,12 @@ vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_
 vi.mock("next/cache", () => ({ unstable_cache: <T extends (...args: never[]) => unknown>(fn: T) => fn, revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 
 const AS_OF = "2026-10-24T10:00:00.000Z";
+const directory = vi.hoisted(() => ({ recruiting: false }));
+vi.mock("@/lib/armory-store", async (original) => ({
+  ...await original<typeof import("@/lib/armory-store")>(),
+  armoryStore: () => ({ guildDirectory: async () => directory.recruiting ? { total: 1, rows: [{ region: "us", slug: "star-watch", name: "Star Watch", faction: "Alliance", rulesetId: 2, ruleset: "Normal", memberCount: 12, membersRead: 1, averageItemLevel: 30, level60: 0, fetchedAt: "2026-11-19T00:00:00Z" }] } : null, searchGuilds: async () => [] }),
+}));
+vi.mock("@/lib/guild-profile-store", () => ({ guildProfileStore: () => ({ recruiting: async () => new Set(directory.recruiting ? ["us/star-watch"] : []) }) }));
 const holder = vi.hoisted(() => ({ store: null as PlayerStore | null, records: [] as unknown[], unreachable: false, reads: 0, stored: null as unknown }));
 vi.mock("@/lib/player-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/player-store")>()), playerStore: () => holder.store }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
@@ -249,6 +255,14 @@ test("with the armory on, the hub holds the guild directory under the same searc
   // Blizzard's data keeps the page out of search engines, as on every armory page.
   const { generateMetadata } = await import("./page");
   expect(await generateMetadata({ searchParams: Promise.resolve({}) })).toMatchObject({ robots: { index: false } });
+});
+
+test("a recruiting profile adds its badge in the guild directory's existing name column", async () => {
+  on(); vi.stubEnv("EVERLOOT_ARMORY", "1"); directory.recruiting = true;
+  try {
+    const html = await hub();
+    expect(html).toContain("Star Watch"); expect(html).toContain("Recruiting");
+  } finally { directory.recruiting = false; }
 });
 
 test("a players table that cannot be read leaves the hub's search as it was, and marks the answer partial", async () => {

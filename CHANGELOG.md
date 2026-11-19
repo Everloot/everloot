@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: Guild Masters can claim their guild through a linked armory character, appoint member editors, and publish a bio, raid days, links and recruiting needs. Claims are checked against the stored roster on every edit; in-game crests appear when Blizzard provides their images.
 - Site: character sheets gain a Progress tab with every instance and boss in the client files, observed availability and private, consented owner kill history; a shared progression model and roster loader prepare guild member progress.
 - Site: character boards filter by class and faction; /rankings shows the best Gear Score in each class, character and guild name searches, and links to add your character or guild.
 

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { gearNumbers } from "./gear.js";
+import { GuildCrest } from "./crest.js";
 
 const label = z
   .object({ id: z.number().int(), name: z.string() })
@@ -58,6 +59,7 @@ const guildSchema = z
     faction,
     ruleset: label,
     member_count: z.number().int(),
+    crest: GuildCrest.nullish().catch(null),
     created_timestamp: z.number().nullish(),
   })
   .passthrough();
@@ -191,6 +193,7 @@ export function parseGuild(
       ruleset_id: g.ruleset.id,
       ruleset: g.ruleset.name,
       member_count: g.member_count,
+      ...(g.crest ? { crest: g.crest } : {}),
       created_at:
         g.created_timestamp == null
           ? null

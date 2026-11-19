@@ -1,6 +1,7 @@
 import { ARMORY_RECHECK_DAYS, ARMORY_RULESETS, classTokenOfId, isArmoryRegion, SEARCH_RULE, validArmorySlug, type ArmoryRegion } from "./armory";
 import { LEVEL_BANDS as CENSUS_LEVEL_BANDS } from "@kb/census";
 import { armoryStore, type ArmoryGuildRow, type ArmoryGuildSort, type ArmoryMember } from "./armory-store";
+import { guildProfileStore } from "./guild-profile-store";
 
 /**
  * The guild directory on /guilds and the summary on an armory guild page, from Blizzard's API data.
@@ -148,7 +149,14 @@ export async function loadGuildDirectory(d: GuildDirectoryQuery, hidden: Readonl
     const page = await store.guildDirectory({
       prefix: d.prefix, region: d.region, rulesetId: d.ruleset, sort, limit: GUILD_DIRECTORY_PAGE, offset: (d.page - 1) * GUILD_DIRECTORY_PAGE,
     });
-    if (page) return { state: "ready", rows: shown(page.rows), total: page.total };
+    if (page) {
+      const rows = shown(page.rows);
+      // A profile migration still awaiting application must not take the directory down.
+      try {
+        const recruiting = await guildProfileStore().recruiting(rows);
+        return { state: "ready", rows: rows.map((r) => ({ ...r, recruiting: recruiting.has(`${r.region}/${r.slug}`) })), total: page.total };
+      } catch { return { state: "ready", rows, total: page.total }; }
+    }
     if (!d.prefix) return { state: "not-ready", rows: [] };
     // Before the migration: the name search the armory already has, filtered here, with no counts to sort by.
     const hits = await store.searchGuilds(d.prefix, GUILD_DIRECTORY_PAGE);
