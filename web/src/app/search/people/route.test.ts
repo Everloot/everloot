@@ -10,7 +10,10 @@ vi.mock("@opennextjs/cloudflare", () => ({
 vi.mock("next/cache", () => ({ unstable_cache: <T extends (...args: never[]) => unknown>(fn: T) => fn }));
 vi.mock("@/lib/player-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/player-store")>()), playerStore: () => held.store }));
 vi.mock("@/lib/names", () => ({ loadNames: async () => ({ items: new Map(), npcs: new Map(), quests: new Map(), objects: new Map() }) }));
-vi.mock("@/lib/shown-search-names", () => ({ loadShownSearchNames: async () => ({ items: new Map(), npcs: new Map(), quests: new Map(), objects: new Map() }) }));
+vi.mock("@/lib/shown-search-names", () => {
+  const names = { items: new Map(), npcs: new Map(), quests: new Map(), objects: new Map() };
+  return { loadShownSearchNames: async () => names, loadSearchShown: async () => ({ names, showsTip: () => false }) };
+});
 vi.mock("@/lib/shown-item-names", () => ({ loadShownNames: async () => ({}) }));
 vi.mock("@/lib/item-icons", () => ({ shownItemIcons: async () => ({ icons: new Map(), unknown: null }) }));
 vi.mock("@/lib/objects", () => ({ loadObjectFacts: async () => ({ rates: [], measuredZeros: [], names: [], unreachable: false }) }));

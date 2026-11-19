@@ -20,6 +20,8 @@ const view = vi.hoisted(() => ({ writeItemView: vi.fn(), buildItemView: vi.fn() 
 vi.mock("@/lib/item-view-store", () => view);
 const aggregates = vi.hoisted(() => ({ writeAggregates: vi.fn(), anonymousAggregates: vi.fn() }));
 vi.mock("@/lib/aggregate-store", () => aggregates);
+const searchNames = vi.hoisted(() => ({ writeSearchNames: vi.fn() }));
+vi.mock("@/lib/search-names-store", () => searchNames);
 const auctions = vi.hoisted(() => ({ writeAuctionHistory: vi.fn(), buildAuctionHistory: vi.fn() }));
 vi.mock("@/lib/auction-history-store", () => auctions);
 const professions = vi.hoisted(() => ({ writeProfessions: vi.fn(), buildProfessions: vi.fn() }));
@@ -35,6 +37,7 @@ import { GET } from "./route";
 beforeEach(() => {
   store.loadCorpus.mockReset();
   guilds.writeGuildLadder.mockReset().mockResolvedValue({ written: false });
+  searchNames.writeSearchNames.mockReset().mockResolvedValue({ written: false });
   activity.writeDatabaseActivity.mockReset().mockResolvedValue({ written: false });
   professions.writeProfessions.mockReset().mockResolvedValue({ written: false });
   mapPins.writeMapPins.mockReset().mockResolvedValue({ written: false });
@@ -294,9 +297,34 @@ test("the stored aggregates are written after the item view with what that run a
   expect(store.writeCronRun).toHaveBeenCalled();
 });
 
+test("the search names file is written after the aggregates from the same set, with what that run added; a failure is logged and the run succeeds", async () => {
+  const order: string[] = [];
+  store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-10-02T00:00:00.000Z" });
+  store.loadCorpus.mockResolvedValue({ uploads: 9, records: [], dataAsOf: "2026-10-02T00:00:00.000Z" });
+  const set = { key: "set" };
+  aggregates.anonymousAggregates.mockReturnValue(set);
+  const built: unknown[] = [];
+  aggregates.writeAggregates.mockImplementation(async (_o: unknown, deps: { build: () => Promise<unknown> }) => { order.push("aggregates"); built.push(await deps.build()); return { written: true }; });
+  searchNames.writeSearchNames.mockImplementation(async (_o: unknown, deps: { build: () => Promise<unknown> }) => { order.push("searchNames"); built.push(await deps.build()); return { written: true, bytes: 2048 }; });
+  expect(await (await GET(req())).json()).toMatchObject({ ok: true, aggregates: { written: true }, searchNames: { written: true, bytes: 2048 } });
+  expect(order).toEqual(["aggregates", "searchNames"]);
+  expect(searchNames.writeSearchNames).toHaveBeenCalledWith({ added: 2, rebuild: false, dataAsOf: "2026-10-02T00:00:00.000Z" }, expect.anything());
+  // One set serves both files: the corpus is read and the set worked out once per run.
+  expect(built).toEqual([set, set]);
+  expect(aggregates.anonymousAggregates).toHaveBeenCalledTimes(1);
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  searchNames.writeSearchNames.mockRejectedValue(new Error("r2 down"));
+  const res = await GET(req());
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ ok: true, searchNames: null });
+  expect(store.writeCronRun).toHaveBeenCalled();
+});
+
 test("an idle run still asks for the stored aggregates, so a missing file is written", async () => {
   store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: "2026-W43" });
   await GET(req());
+  // The names file never makes an idle run build the set for itself: it waits for a run that builds it anyway.
+  expect(searchNames.writeSearchNames).not.toHaveBeenCalled();
   expect(aggregates.writeAggregates).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-10-01" }, expect.anything());
 });
 

@@ -12,6 +12,8 @@ import { writeCoverage } from "@/lib/coverage-store";
 import { currentSettledWeek, writeSettled } from "@/lib/settled-store";
 import { buildItemView, writeItemView } from "@/lib/item-view-store";
 import { anonymousAggregates, writeAggregates } from "@/lib/aggregate-store";
+import type { AggregateSet } from "@/lib/aggregate-set";
+import { writeSearchNames } from "@/lib/search-names-store";
 import { buildAuctionHistory, writeAuctionHistory } from "@/lib/auction-history-store";
 import { buildProfessions, writeProfessions } from "@/lib/profession-store";
 import { buildDatabaseActivity } from "@/lib/database-activity";
@@ -137,11 +139,26 @@ export async function GET(req: Request) {
     // The tables the item, NPC, zone, instance, object, loot, edge and addon pages read (lib/aggregate-store.ts), stored so
     // a new server instance reads one file instead of replaying the corpus. Same rule as the item view: written only when
     // this run added uploads, rebuilt, or finds no file; a failure is logged and the pages work the tables out themselves.
+    // The set is worked out once per run: the aggregates file and the search names file are written from the same one.
+    let aggregatesRead: Promise<AggregateSet> | null = null;
+    const aggregateSet = () => (aggregatesRead ??= corpus().then(anonymousAggregates));
     let aggregates: { written: boolean; bytes?: number } | null = null;
     try {
-      aggregates = await writeAggregates({ added: result.added, rebuild, dataAsOf: result.dataAsOf }, { build: async () => anonymousAggregates(await corpus()) });
+      aggregates = await writeAggregates({ added: result.added, rebuild, dataAsOf: result.dataAsOf }, { build: aggregateSet });
     } catch (err) {
       console.error("aggregates failed", err);
+    }
+    // The names the site's own search matches (lib/search-names-store.ts), a few hundred KB from the same set, so a fresh
+    // instance never parses the aggregates for a keystroke. Written on the runs that build the set anyway (uploads added,
+    // a rebuild, or aggregates just written), never by an idle run for itself: the set is the cron's heaviest step
+    // (#1354). A failure is logged and the search reads the aggregates as before.
+    let searchNames: { written: boolean; bytes?: number } | null = null;
+    try {
+      searchNames = aggregates?.written || rebuild || result.added > 0
+        ? await writeSearchNames({ added: result.added, rebuild, dataAsOf: result.dataAsOf }, { build: aggregateSet })
+        : { written: false };
+    } catch (err) {
+      console.error("search names failed", err);
     }
     // Every realm and item's public auction days (lib/auction-history-store.ts), stored so the history page and the
     // auction_history tool never replay the corpus. Same rule as the item view; a failure is logged and they read the corpus.
@@ -192,7 +209,7 @@ export async function GET(req: Request) {
       result.dataAsOf,
       settled?.written ? week : work.settledWeek ?? null,
     );
-    return NextResponse.json({ ok: true, rebuild, ...result, market, completion, coverage, settled, census, itemView, aggregates, auctionHistory, auctionReports, marketBoards, professions, mapPins, databaseActivity, guildLadder });
+    return NextResponse.json({ ok: true, rebuild, ...result, market, completion, coverage, settled, census, itemView, aggregates, searchNames, auctionHistory, auctionReports, marketBoards, professions, mapPins, databaseActivity, guildLadder });
   } catch (err) {
     console.error("snapshot failed", err);
     return NextResponse.json({ ok: false, error: "snapshot failed" }, { status: 500 });
