@@ -68,8 +68,9 @@
         }
       ],
       "items": false,
-      "minItems": 10,
-      "maxItems": 10
+      "minItems": 7,
+      "maxItems": 10,
+      "description": "The row positions: seven, or ten when the request asked for fields=full."
     },
     "realm": {
       "type": [
@@ -156,10 +157,10 @@
           }
         ],
         "items": false,
-        "minItems": 10,
+        "minItems": 7,
         "maxItems": 10
       },
-      "description": "[itemId, market, min, historical, quantity, day, reporters, updatedAt, ageDays, change1d]; copper per unit. market is null for a thin item (no solid public day in the last 14). updatedAt: when the scans behind the newest open public day were taken; null once only closed days remain. ageDays: calendar days since day. change1d: the newest solid day's market value against the solid day one calendar day before it, (to - from) / from; null without such a pair."
+      "description": "[itemId, market, min, historical, quantity, day, reporters]; copper per unit. market is null for a thin item (no solid public day in the last 14). With fields=full three positions follow. updatedAt: when the scans behind the newest open public day were taken; null once only closed days remain. ageDays: calendar days since day. change1d: the newest solid day's market value against the solid day one calendar day before it, (to - from) / from; null without such a pair."
     },
     "attribution": {
       "type": "object",

@@ -755,31 +755,33 @@ export function busiestHouseMarket(state: MarketState, realm: string, itemId: nu
   return itemMarketByHouse(state, realm, itemId, now).sort((a, b) => b.value.quantity - a.value.quantity)[0] ?? null;
 }
 
-/** One row of the price file; the protocol's MARKET_PRICE_FIELDS name the positions. */
-export type PriceRow = readonly [
-  itemId: number, market: number | null, min: number, historical: number, quantity: number, day: string, reporters: number,
-  updatedAt: string | null, ageDays: number, change1d: number | null,
-];
+/** One row of the price file as every reader was given it; the protocol's MARKET_PRICE_FIELDS name the positions. */
+export type PriceRow = readonly [itemId: number, market: number | null, min: number, historical: number, quantity: number, day: string, reporters: number];
+/** A row asked for with `fields=full`: the seven, then when its scans were taken, the price age and the one-day change (MARKET_PRICE_FIELDS_FULL). */
+export type FullPriceRow = readonly [...PriceRow, updatedAt: string | null, ageDays: number, change1d: number | null];
 
 /**
  * The price file for one realm, the companion's and any script's: [itemId, market|null, min, historical, quantity,
- * day, reporters, updatedAt, ageDays, change1d]. Tuples keep the file small; at most `limit` rows, the items with
- * the most units listed. A thin item has no market value (null), only its minimum. `updatedAt` is when the scans
- * behind the newest open public day were taken (ISO), null once only closed days remain; `change1d` is the one-day
- * move of the market value, null without a solid day and the solid day before it. The first seven positions are
- * what older readers were given; new positions are only ever appended. Optional item ids narrow the public rows before the cap.
+ * day, reporters]. Tuples keep the file small; at most `limit` rows, the items with the most units listed. A thin
+ * item has no market value (null), only its minimum. Optional item ids narrow the public rows before the cap.
+ * With `full`, three positions follow: `updatedAt`, when the scans behind the newest open public day were taken
+ * (ISO), null once only closed days remain; `ageDays`; and `change1d`, the one-day move of the market value, null
+ * without a solid day and the solid day before it. The default row stays seven wide: readers that check its length
+ * (the Desktop App's did) keep working, and a reader asks for more.
  */
-export function marketPrices(state: MarketState, realm: string, now: Date, limit = MAX_PRICE_ROWS, house?: AuctionHouse | null, itemIds?: readonly number[]): { realm: string; house?: AuctionHouse; items: PriceRow[] } {
+export function marketPrices(state: MarketState, realm: string, now: Date, limit = MAX_PRICE_ROWS, house?: AuctionHouse | null, itemIds?: readonly number[], full = false): { realm: string; house?: AuctionHouse; items: PriceRow[] | FullPriceRow[] } {
   const selected = itemIds ? new Set(itemIds) : null;
+  const rows = realmRows(state, realm, now, house).filter((r) => !selected || selected.has(r.value.itemId)).slice(0, limit);
+  const row = (v: MarketValue): PriceRow => [v.itemId, v.market, v.min, v.historical, v.quantity, v.day, v.reporters];
   return {
     realm: realmName(state, realm),
     ...(house ? { house } : {}),
-    items: realmRows(state, realm, now, house)
-      .filter((r) => !selected || selected.has(r.value.itemId)).slice(0, limit)
-      .map(({ value: v, points, days }): PriceRow => {
+    items: full
+      ? rows.map(({ value, points, days }): FullPriceRow => {
         const updatedAt = marketUpdatedAt(days, now);
-        return [v.itemId, v.market, v.min, v.historical, v.quantity, v.day, v.reporters, updatedAt === null ? null : new Date(updatedAt).toISOString(), v.ageDays, change1d(points, now)];
-      }),
+        return [...row(value), updatedAt === null ? null : new Date(updatedAt).toISOString(), value.ageDays, change1d(points, now)];
+      })
+      : rows.map(({ value }) => row(value)),
   };
 }
 

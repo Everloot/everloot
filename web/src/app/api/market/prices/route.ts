@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { MARKET_PRICE_FIELDS } from "@everloot/protocol";
+import { MARKET_PRICE_FIELDS, MARKET_PRICE_FIELDS_FULL } from "@everloot/protocol";
 import { AUCTION_AGREEMENT } from "@kb/auction-history";
 import { MARKET_RULE, MAX_PRICE_ITEMS, MAX_PRICE_ROWS, marketHouses, marketPrices, marketRealms, parseHouse, validRealm } from "@kb/market";
 import { admit, attribution, attributionHeaders } from "@/lib/data-guard";
@@ -7,7 +7,7 @@ import { pendingRealms } from "@/lib/auction-house";
 import { uploadStore } from "@/lib/upload-store";
 export const dynamic = "force-dynamic";
 
-/** The positions of a row, from the protocol: the seven first given, then updatedAt, ageDays and change1d. Only ever appended to. */
+/** The positions of a row, from the protocol: seven, or ten with `fields=full`. Only ever appended to. */
 const FIELDS = MARKET_PRICE_FIELDS;
 // The rollup changes once per cron run (ten minutes); let the CDN answer repeat requests. On the Worker only
 // `CDN-Cache-Control` is honoured (lib/cf-edge-cache.ts keeps a response for its max-age); `s-maxage` is for
@@ -26,6 +26,9 @@ const NO_STORE = { "Cache-Control": "no-store" };
  * house's price ever comes from them, and every scan that names its house is left out of them.
  * `items=2589,2592` selects up to 100 positive item ids before the row cap, with a realm; unknown or
  * non-public items are omitted. Without it the most-listed items are returned as before.
+ * `fields=full` appends `updatedAt`, `ageDays` and `change1d` to every row and to `fields`; without it the row is
+ * the seven positions readers have always had, byte for byte, so an installed Desktop App (whose reader checks the
+ * row length) keeps working. The edge cache keys on the whole query string (lib/cf-edge-cache.ts), so each shape is cached apart.
  * Install ids and upload addresses stay on the site. Requests the CDN does not answer count against a
  * per-IP quota, or against the caller's key (lib/data-guard.ts).
  */
@@ -41,6 +44,11 @@ export async function GET(req: Request) {
   if (houseParam !== null && (!house || !realm)) {
     return NextResponse.json({ ok: false, error: "house is Alliance, Horde or Neutral, with a realm." }, { status: 400, headers: NO_STORE });
   }
+  const fieldsParam = new URL(req.url).searchParams.get("fields");
+  if (fieldsParam !== null && fieldsParam !== "full") {
+    return NextResponse.json({ ok: false, error: "fields is full, or absent for the seven-position rows." }, { status: 400, headers: NO_STORE });
+  }
+  const full = fieldsParam === "full";
   const itemParams = new URL(req.url).searchParams.getAll("items");
   let itemIds: number[] | undefined;
   if (itemParams.length) {
@@ -63,7 +71,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, dataAsOf: market.dataAsOf, realms: marketRealms(market.state), houses: marketHouses(market.state), pending, attribution: credit }, { headers: cache });
   }
   return NextResponse.json(
-    { ok: true, dataAsOf: market.dataAsOf, rule: MARKET_RULE, fields: FIELDS, ...marketPrices(market.state, realm, new Date(), MAX_PRICE_ROWS, house, itemIds), attribution: credit },
+    { ok: true, dataAsOf: market.dataAsOf, rule: MARKET_RULE, fields: full ? MARKET_PRICE_FIELDS_FULL : FIELDS, ...marketPrices(market.state, realm, new Date(), MAX_PRICE_ROWS, house, itemIds, full), attribution: credit },
     { headers: cache },
   );
 }

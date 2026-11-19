@@ -81,7 +81,7 @@ test("realms match case-insensitively and keep the first display name", () => {
   const rows = three("2026-10-20", [100, 300, 500]).map((r, i) => ({ ...r, realm: i ? "forever" : "Forever " }));
   const state = foldMarket(emptyMarket(), rows, NOW);
   expect(realmMarket(state, "FOREVER", NOW).map((v) => v.itemId)).toEqual([2589]);
-  expect(marketPrices(state, "forever", NOW)).toMatchObject({ realm: "Forever", items: [[2589, 310, 300, 310, 100, "2026-10-20", 3, "2026-10-20T10:00:00.000Z", 0, null]] });
+  expect(marketPrices(state, "forever", NOW)).toMatchObject({ realm: "Forever", items: [[2589, 310, 300, 310, 100, "2026-10-20", 3]] });
 });
 
 test("other kinds and malformed snapshots are ignored", () => {
@@ -448,7 +448,8 @@ test("scans that name their house make that house's own market and never a realm
   // The realm-wide view holds only scans whose house is unknown: none here, so nothing mixes the two houses.
   expect(itemMarket(state, "Forever", 2589, NOW).value).toBeNull();
   expect(state.realms).toEqual({});
-  expect(marketPrices(state, "Forever", NOW, MAX_PRICE_ROWS, "Horde")).toMatchObject({ realm: "Forever", house: "Horde", items: [[2589, 100, 100, 100, 100, day, 3, `${day}T10:00:00.000Z`, 0, null]] });
+  expect(marketPrices(state, "Forever", NOW, MAX_PRICE_ROWS, "Horde")).toMatchObject({ realm: "Forever", house: "Horde", items: [[2589, 100, 100, 100, 100, day, 3]] });
+  expect(marketPrices(state, "Forever", NOW, MAX_PRICE_ROWS, "Horde", undefined, true).items).toEqual([[2589, 100, 100, 100, 100, day, 3, `${day}T10:00:00.000Z`, 0, null]]);
   expect(marketPrices(state, "Forever", NOW)).toEqual({ realm: "Forever", items: [] });
   expect(marketHouses(state, NOW)).toEqual({ Forever: ["Alliance", "Horde"] });
   expect(marketRealms(state, NOW)).toEqual(["Forever"]);
@@ -546,17 +547,21 @@ test("a trusted install makes a day public on its own, labelled; strangers still
 
 // --- Price age, one-day change and coverage ---
 
-test("a price row ends with when its scans were taken, the price age and the one-day change; the first seven positions are unchanged", () => {
+/** The price file with `fields=full`: the seven positions, then updatedAt, ageDays and change1d. */
+const fullPrices = (state: MarketState) => marketPrices(state, "Forever", NOW, MAX_PRICE_ROWS, null, undefined, true).items;
+
+test("a full price row ends with when its scans were taken, the price age and the one-day change; the default row stays the seven", () => {
   const state = foldMarket(emptyMarket(), [...trio(dayBefore(1), 1000), ...trio(dayBefore(0), 1100)], NOW);
-  const [row] = marketPrices(state, "Forever", NOW).items;
   // Weighted mean of 1100 (today, weight 15) and 1000 (yesterday, weight 14); historical the median of the two.
-  expect(row).toEqual([2589, 1052, 1100, 1050, 100, dayBefore(0), 3, `${dayBefore(0)}T10:00:00.000Z`, 0, 0.1]);
+  const seven = [2589, 1052, 1100, 1050, 100, dayBefore(0), 3];
+  expect(marketPrices(state, "Forever", NOW).items).toEqual([seven]);
+  expect(fullPrices(state)).toEqual([[...seven, `${dayBefore(0)}T10:00:00.000Z`, 0, 0.1]]);
 });
 
 test("change1d is null without yesterday's solid day, zero when the value held, and updatedAt is null once only closed days remain", () => {
   const points = (rows: ReturnType<typeof trio>) => itemMarket(foldMarket(emptyMarket(), rows, NOW), "Forever", 2589, NOW).points;
   // Only today: nothing to compare with.
-  expect(marketPrices(foldMarket(emptyMarket(), trio(dayBefore(0), 1000), NOW), "Forever", NOW).items[0]!.slice(7)).toEqual([`${dayBefore(0)}T10:00:00.000Z`, 0, null]);
+  expect(fullPrices(foldMarket(emptyMarket(), trio(dayBefore(0), 1000), NOW))[0]!.slice(7)).toEqual([`${dayBefore(0)}T10:00:00.000Z`, 0, null]);
   // Yesterday is thin: no solid pair.
   expect(change1d(points([...trio(dayBefore(1), 1000, 2589, {}, THIN_UNITS), ...trio(dayBefore(0), 1100)]), NOW)).toBeNull();
   // The day before yesterday is not yesterday.
@@ -567,12 +572,12 @@ test("change1d is null without yesterday's solid day, zero when the value held, 
   expect(change1d(points([...trio(dayBefore(1), 1000), ...trio(dayBefore(0), 1000)]), NOW)).toBe(0);
   // A closed day keeps no capture time; its age still counts.
   const closed = foldMarket(emptyMarket(), trio(dayBefore(10), 1000), NOW);
-  expect(marketPrices(closed, "Forever", NOW).items[0]!.slice(7)).toEqual([null, 10, null]);
+  expect(fullPrices(closed)[0]!.slice(7)).toEqual([null, 10, null]);
   expect(marketUpdatedAt(closed.realms.forever!.items["2589"], NOW)).toBeNull();
   // An open day below 3 reporters is not public, so its scans do not date the price.
   const pending = foldMarket(closed, trio(dayBefore(0), 1000).slice(0, 2), NOW);
   expect(marketUpdatedAt(pending.realms.forever!.items["2589"], NOW)).toBeNull();
-  expect(marketPrices(pending, "Forever", NOW).items[0]!.slice(5)).toEqual([dayBefore(10), 3, null, 10, null]);
+  expect(fullPrices(pending)[0]!.slice(5)).toEqual([dayBefore(10), 3, null, 10, null]);
 });
 
 test("marketCoverage counts the public days behind the values, and whether only Everloot's own scans made them public", () => {

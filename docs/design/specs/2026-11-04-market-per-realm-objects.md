@@ -48,7 +48,7 @@ working on it unchanged.
   costs another's. Written with `If-Match`, as today.
 - `snapshots/market/summary.json`, the **cross-realm summary**: for every realm and house, every
   public item's current value as the compact tuple the price route already sends
-  (`[itemId, market, min, historical, quantity, day, reporters, updatedAt, ageDays, change1d]`) plus the one-day and seven-day
+  (`[itemId, market, min, historical, quantity, day, reporters]`, ten positions with `fields=full`) plus the one-day and seven-day
   moves the browse page shows. No history. About 40 bytes per item and realm: 10 realms × 5,000 items
   is 2 MB; the 40-realm cap × 20,000 items is 32 MB, so it is capped at `MARKET_MAX_BYTES` by keeping,
   per realm, the items with the most units listed, the same rule as the price file. The browse page

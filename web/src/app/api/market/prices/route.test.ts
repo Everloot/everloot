@@ -10,8 +10,6 @@ import { marketPricesResponse, marketRealmsResponse } from "@everloot/protocol";
 
 const NOW = new Date();
 const day = NOW.toISOString().slice(0, 10);
-/** The positions after the seven first given: when the scans were taken, the price age and the one-day change (none with one day). */
-const tail = [NOW.toISOString(), 0, null];
 const scans = ["install-secret-1", "install-secret-2", "install-secret-3"].map((installId, i) => ({
   kind: "auction_snapshot", installId, eventId: `e:${i}`, capturedAt: NOW.toISOString(), realm: "Forever",
   scanId: `s-${i}`, part: 1, parts: 1, items: [[2589, 2, 40, 100 * (i + 1), 100 * (i + 1) + 5]],
@@ -30,7 +28,7 @@ test("explicit price requests isolate region, ruleset and all three houses", asy
   store.loadMarket.mockResolvedValue({ state: foldMarket(emptyMarket(), rows, NOW), dataAsOf: NOW.toISOString() });
   for (const [r, realm] of realms.entries()) for (const [h, house] of houses.entries()) {
     const body = await (await GET(req(`?realm=${encodeURIComponent(realm)}&house=${house}`))).json();
-    expect(body).toMatchObject({ realm, house, items: [[2589, 100 + r * 10 + h, 100 + r * 10 + h, 100 + r * 10 + h, 40, day, 3, ...tail]] });
+    expect(body).toMatchObject({ realm, house, items: [[2589, 100 + r * 10 + h, 100 + r * 10 + h, 100 + r * 10 + h, 40, day, 3]] });
   }
 });
 
@@ -51,13 +49,16 @@ test("a realm's prices are compact tuples with the data age and the rule", async
   const body = await res.json();
   expect(body).toMatchObject({
     ok: true, realm: "Forever", dataAsOf: "2026-10-20T12:00:00.000Z",
-    fields: ["itemId", "market", "min", "historical", "quantity", "day", "reporters", "updatedAt", "ageDays", "change1d"],
-    items: [[2589, 205, 200, 205, 40, day, 3, ...tail]],
+    fields: ["itemId", "market", "min", "historical", "quantity", "day", "reporters"],
+    items: [[2589, 205, 200, 205, 40, day, 3]],
   });
   expect(body.rule).toContain("3 reporters");
+  // Exactly the seven: a reader that checks the row length (the Desktop App's did) keeps working.
+  expect(body.fields).toHaveLength(7);
+  expect(body.items[0]).toHaveLength(7);
 });
 
-test("a row ends with when its scans were taken, the price age and the one-day change, after the seven unchanged fields", async () => {
+test("fields=full appends when the scans were taken, the price age and the one-day change after the seven unchanged fields", async () => {
   const yesterday = new Date(NOW.getTime() - 86_400_000).toISOString();
   const tenDaysAgo = new Date(NOW.getTime() - 10 * 86_400_000).toISOString();
   const rows = [
@@ -66,18 +67,33 @@ test("a row ends with when its scans were taken, the price age and the one-day c
     ...scans.map((s) => ({ ...s, eventId: `o:${s.installId}`, capturedAt: tenDaysAgo, items: [[765, 2, 40, 50, 50]] })),
   ];
   store.loadMarket.mockResolvedValue({ state: foldMarket(emptyMarket(), rows, NOW), dataAsOf: NOW.toISOString() });
-  const body = await (await GET(req("?realm=Forever"))).json();
+  const plain = await (await GET(req("?realm=Forever"))).json();
+  const res = await GET(req("?realm=Forever&fields=full"));
+  const body = await res.json();
   expect(body.fields).toEqual(["itemId", "market", "min", "historical", "quantity", "day", "reporters", "updatedAt", "ageDays", "change1d"]);
+  // The seven first given are the default answer's, as before: weighted market value, today's minimum, the median, units, day, reporters.
   const linen = body.items.find((r: unknown[]) => r[0] === 2589);
-  // The seven first given are as before: the weighted market value, today's minimum, the median, units, day and reporters.
   expect(linen.slice(0, 7)).toEqual([2589, 105, 110, 105, 40, day, 3]);
+  expect(plain.items.find((r: unknown[]) => r[0] === 2589)).toEqual(linen.slice(0, 7));
+  expect(plain.rule).toBe(body.rule);
   // Then: the newest scans' time, no age, and a tenth up on yesterday's solid day.
   expect(linen.slice(7)).toEqual([NOW.toISOString(), 0, 0.1]);
   // A closed day keeps no scan time and has no yesterday to compare with; its age still counts.
   const closed = body.items.find((r: unknown[]) => r[0] === 765);
   expect(closed.slice(5)).toEqual([tenDaysAgo.slice(0, 10), 3, null, 10, null]);
-  expect(() => marketPricesResponse.parse(body)).not.toThrow();
+  for (const answer of [plain, body]) expect(() => marketPricesResponse.parse(answer)).not.toThrow();
   expect(JSON.stringify(body)).not.toContain("install-secret");
+  // Cached apart from the default answer: same headers, a different query string in the key.
+  expect(res.headers.get("cdn-cache-control")).toBe("max-age=300");
+});
+
+test("fields is full or absent; anything else is 400 and reads nothing", async () => {
+  for (const query of ["?realm=Forever&fields=", "?realm=Forever&fields=FULL", "?realm=Forever&fields=all", "?fields=x"]) {
+    const res = await GET(req(query));
+    expect(res.status, query).toBe(400);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+  }
+  expect(store.loadMarket).not.toHaveBeenCalled();
 });
 
 test("without a realm it lists the realms that have scans", async () => {
@@ -136,12 +152,15 @@ test("a realm's rows are capped at MAX_PRICE_ROWS, the items with the most units
   expect(body.items).toHaveLength(MAX_PRICE_ROWS);
   // Most units first: the highest item ids were given the most units.
   expect(body.items[0][0]).toBe(total);
-  // About 75 bytes a row: the seven values, a scan time, the age and the change.
-  expect(JSON.stringify(body).length).toBeLessThan(MAX_PRICE_ROWS * 90);
+  expect(JSON.stringify(body).length).toBeLessThan(MAX_PRICE_ROWS * 60);
+  // The full rows add a scan time, the age and the change: about 75 bytes a row.
+  const full = await (await GET(req("?realm=Forever&fields=full"))).json();
+  expect(full.items).toHaveLength(MAX_PRICE_ROWS);
+  expect(JSON.stringify(full).length).toBeLessThan(MAX_PRICE_ROWS * 90);
   // Item 1 ranks below the default cutoff but can be fetched explicitly.
   expect(body.items.some((row: number[]) => row[0] === 1)).toBe(false);
   const selected = await (await GET(req("?realm=Forever&items=1,1,999999"))).json();
-  expect(selected.items).toEqual([[1, 1000, 1000, 1000, 10000, day, 3, ...tail]]);
+  expect(selected.items).toEqual([[1, 1000, 1000, 1000, 10000, day, 3]]);
   expect(selected.fields).toEqual(body.fields);
   expect(() => marketPricesResponse.parse(selected)).not.toThrow();
 });
@@ -182,7 +201,7 @@ test("a house narrows a realm to the scans of that auction house; the realm list
   }));
   store.loadMarket.mockResolvedValue({ state: foldMarket(emptyMarket(), [...scans, ...hordeScans], NOW), dataAsOf: "2026-10-20T12:00:00.000Z" });
   const horde = await (await GET(req("?realm=Forever&house=horde"))).json();
-  expect(horde).toMatchObject({ ok: true, realm: "Forever", house: "Horde", items: [[2589, 900, 900, 900, 10, day, 3, ...tail]] });
+  expect(horde).toMatchObject({ ok: true, realm: "Forever", house: "Horde", items: [[2589, 900, 900, 900, 10, day, 3]] });
   expect(() => marketPricesResponse.parse(horde)).not.toThrow();
   expect((await (await GET(req("?realm=Forever&house=Alliance"))).json())).toMatchObject({ ok: true, house: "Alliance", items: [] });
   // Without a house only the scans that named none answer: the Horde scans never join them.
@@ -226,7 +245,7 @@ test("item selection requires a realm and at most 100 positive safe integer ids"
   }
   expect(store.loadMarket).not.toHaveBeenCalled();
   const selected = await (await GET(req(`?realm=Forever&items=${Array.from({ length: 100 }, (_, i) => i + 2589).join(",")}`))).json();
-  expect(selected.items).toEqual([[2589, 205, 200, 205, 40, day, 3, ...tail]]);
+  expect(selected.items).toEqual([[2589, 205, 200, 205, 40, day, 3]]);
 });
 
 test("item selection preserves house isolation and the public reporter threshold", async () => {
@@ -236,7 +255,7 @@ test("item selection preserves house isolation and the public reporter threshold
   ];
   store.loadMarket.mockResolvedValue({ state: foldMarket(emptyMarket(), rows, NOW), dataAsOf: NOW.toISOString() });
   const horde = await (await GET(req("?realm=Forever&house=Horde&items=2589,42"))).json();
-  expect(horde.items).toEqual([[2589, 900, 900, 900, 10, day, 3, ...tail]]);
+  expect(horde.items).toEqual([[2589, 900, 900, 900, 10, day, 3]]);
   for (const query of ["?realm=Forever&house=Alliance&items=2589,42", "?realm=Forever&items=2589,42"]) {
     expect((await (await GET(req(query))).json()).items).toEqual([]);
   }
