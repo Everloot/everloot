@@ -171,12 +171,13 @@ function E:DropLines(itemId)
     -- A source is named as this install's client showed it (its own rows, modules/openworld.lua), else by the name
     -- the site knows (the slot file's names). Chat keeps the id beside the name, the tooltip shows the name alone.
     local name = (E.SourceName and E:SourceName(s.kind, s.id)) or entry.names[(s.kind == "npc" and "n" or "o") .. s.id]
-    local said = name and (name .. " (" .. source .. ")") or source
+    local label = name or (s.kind == "npc" and "an unnamed NPC" or "an unnamed object")
+    local said = label .. " (" .. source .. ")"
     -- `text` is the plain sentence for chat and a tooltip without two columns. The game's tooltip shows `left` and
     -- `right` as a row, the rate and windows in the value column like a price.
     out[#out + 1] = { r = 0.9, g = 0.8, b = 0.5, wrap = true,
       text = "Everloot drop: " .. said .. " · " .. value,
-      left = "Drops from " .. (name or source), right = value }
+      left = "Drops from " .. label, right = value }
   end
   local day = E.StaleDay(entry.asOf)
   if day then

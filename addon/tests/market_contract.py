@@ -979,7 +979,7 @@ local file = Everloot:PriceFile(realm)
 assert(file.legacy and file.status == 'bad' and file.silent, 'the file says it holds an older realm-only block')
 local tip = tooltipFor(2589)
 assert(not tip:find('7s 0c') and tip:find('from before houses were kept apart', 1, true), 'the tooltip says why there is no price: ' .. tip)
-assert(tip:find('Everloot drop: NPC 116', 1, true), 'the rest of an older file still reads: ' .. tip)
+assert(tip:find('Everloot drop: an unnamed NPC (NPC 116)', 1, true), 'the rest of an older file still reads: ' .. tip)
 printed = {}
 Everloot.PriceCommand('2589')
 local said = table.concat(printed, '\\n')

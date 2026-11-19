@@ -3,7 +3,7 @@ import { measureDropRate } from "@kb/drop-rate-settling";
 import { NextResponse } from "next/server";
 import { admit, attribution, attributionHeaders, badPage, pageOf, pageRequest } from "@/lib/data-guard";
 import { computeRollups } from "@/lib/rollup-compute";
-import { loadNames } from "@/lib/names";
+import { loadDropSourceNames } from "@/lib/names";
 import { recordUsage } from "@/lib/usage-metrics";
 
 /**
@@ -20,9 +20,8 @@ export async function GET(req: Request) {
   const at = pageRequest(req, admitted.pageMax);
   if (!at) return badPage();
   // Names are extra: a failed name read leaves the rates unnamed instead of failing the answer.
-  const [{ rates, measuredZeros, stats }, names] = await Promise.all([computeRollups(), loadNames().catch(() => null)]);
-  // Each rate names its source when the site knows the name (3 installs agree on it), so the Desktop App's price
-  // file can name sources a player never met.
+  const [{ rates, measuredZeros, stats }, names] = await Promise.all([computeRollups(), loadDropSourceNames().catch(() => null)]);
+  // Public sources may use the two-install drop-name exception, so the price file can name sources a player never met.
   const sourceName = (r: { sourceNpcId?: number; sourceObjectId?: number }) =>
     r.sourceNpcId !== undefined ? names?.npcs.get(r.sourceNpcId) : r.sourceObjectId !== undefined ? names?.objects.get(r.sourceObjectId) : undefined;
   const publicRates = stats.unreachable ? [] : rates.filter((r) => r.public).map((r) => {

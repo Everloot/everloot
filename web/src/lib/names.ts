@@ -14,9 +14,10 @@ import { uploadStore } from "./upload-store";
  * completion entries (docs/DATA_POLICY.md has the rules this follows).
  *
  * AGREED names live here, in names.ts: the name 3 distinct installs report alike (the kb `agreed*` rules, with the
- * recheck cutoffs), and the completion catalog's agreed entries. Every surface may use them, and the API
- * (/api/suggest), the MCP server, the bulk export and the embeddable cards use only them. This file never imports
- * the private game-file store or the shown names.
+ * recheck cutoffs), and the completion catalog's agreed entries. `loadDropSourceNames` alone permits the named
+ * two-install exception for already-public drop sources (DROP_NAME_INSTALLS in kb/world-pages.ts).
+ * Every surface may use agreed names; /api/suggest, MCP, bulk exports and cards use only them.
+ * This file never imports the private game-file store or the shown names.
  *
  * SHOWN names live in shown-item-names.ts: what a database page prints. The agreed name first; else, for items, the
  * game files where the Warcraft Wiki agrees (or the files alone, unconfirmed); for NPCs, one or two installs'
@@ -44,9 +45,10 @@ export interface Names {
 
 const NO_OBJECTS: never[] = [];
 const memo = new WeakMap<object, Map<number, string>>();
-function once(key: object, build: () => Map<number, string>): Map<number, string> {
-  let known = memo.get(key);
-  if (!known) { known = build(); memo.set(key, known); }
+const dropMemo = new WeakMap<object, Map<number, string>>();
+function once(key: object, build: () => Map<number, string>, cache = memo): Map<number, string> {
+  let known = cache.get(key);
+  if (!known) { known = build(); cache.set(key, known); }
   return known;
 }
 
@@ -63,6 +65,15 @@ export async function loadNames(itemsRead: ReturnType<typeof loadItemFacts> = lo
     npcs: world.unreachable ? new Map() : npcNames(world),
     objects: items.unreachable ? new Map() : objectNames(items),
     quests: world.unreachable ? new Map() : questTitles(world),
+  };
+}
+
+/** Labels for already-public drop sources only; the two-install exception never changes page or export names. */
+export async function loadDropSourceNames(): Promise<Pick<Names, "npcs" | "objects">> {
+  const [items, world] = await Promise.all([loadItemFacts(), loadWorldFacts()]);
+  return {
+    npcs: world.unreachable ? new Map() : once(world.npcs, () => agreedNpcNames(world, true), dropMemo),
+    objects: items.unreachable ? new Map() : once(items.objects ?? NO_OBJECTS, () => agreedObjectNames(items.objects ?? [], RECHECK_SCOPES, true), dropMemo),
   };
 }
 

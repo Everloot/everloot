@@ -260,6 +260,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Addon: compact item tooltip market and scan metadata, show drop rates with windows on one row, and date drop and disenchant evidence only when stale.
 
 ### Fixed
+- Site: public drop sources can carry a name from two installs that report exactly the same name, when none disagree; rates still require three installs.
+- Addon: drop tooltips say "an unnamed object" or "an unnamed NPC" when no source name is known; chat keeps the source id for debugging.
 - Addon: the Everloot panel at the auction house sits above the house's own page controls, so the Auctions page's top tab, and the Sell page's item slot and Post button, no longer show through it; the house's dialogs still cover it.
 - Addon: at the auction house, the NPC portrait and the ring around it sit whole over the Everloot panel's corner, and the Everloot heading starts right of the portrait.
 - Addon: the auction tab's price lookup finds an item by name again. Forever has no global GetItemInfo, so a typed name never resolved and the hint came back; the lookup now asks C_Item and then the names the player's scans gave with their rows. Part of a name lists the matching scanned items with the scan's prices, and a name nothing matches says so instead of the hint.
