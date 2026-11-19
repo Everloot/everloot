@@ -16,6 +16,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Added
 - Site: each realm's Auction House page links a Market changes view (`/tools/auctions/<realm>/changes`): for one house, the week's risers and fallers by market value on solid days (up to 25 each, with from and to values, the days compared, units listed and reporters), then the items with no comparison and why (new, thin, trimmed, stale, no baseline); it reads the stored boards only and says so when they are unavailable.
+- Addon: crafting cost rows show scan price direction and tiny price bars; hover for listed-unit changes, elapsed scan time, the 60-day median comparison and price swing, never estimated sales.
 - Addon: while a scan runs, a bar across the top of the auction tab says what the scan is doing and how far it is: waiting for the house's listings, with the seconds and the most the scan allows, reading the listings, reading again the ones whose items had not loaded, or sampling search prices. It shows on the shopping page too and goes when the scan reports.
 - Site: /rankings leads with the leaderboards: characters by item level, Gear Score and honorable kills, guilds by average item level and by raid progress in the newest raid, each a top 10 with a link to its full list and an All, US or EU tab in the URL; the census rankings follow under Who plays. The hub stays out of search engines while it shows Blizzard's boards, as every armory page does.
 - Site: the scheduled jobs can run in a Worker of their own (`everloot-cron`, same build, no routes), so the snapshot job no longer shares memory with page and MCP traffic; off until the maintainer deploys it and sets `EVERLOOT_CRON_WORKER` on the site (docs/OPERATIONS.md, "The cron Worker").
@@ -248,6 +249,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the world map shows zone or continent coordinates on hover and shares pins in the address; Shift-click or use Pin map centre, and Clear pin removes it.
 - Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
 
+### Changed
+
+- Addon: compact item tooltip market and scan metadata, show drop rates with windows on one row, and date drop and disenchant evidence only when stale.
+
 ### Fixed
 - Addon: the Everloot panel at the auction house sits above the house's own page controls, so the Auctions page's top tab, and the Sell page's item slot and Post button, no longer show through it; the house's dialogs still cover it.
 - Addon: at the auction house, the NPC portrait and the ring around it sit whole over the Everloot panel's corner, and the Everloot heading starts right of the portrait.
@@ -416,6 +421,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the loot observations table sorts frequency by its 95% Wilson lower bound while still showing the observed share.
 
 ### Changed
+- Site: a search lists up to five results per type with a quest's level, side and category and an NPC's level, type, zone and drop count beside the name; the tab row opens each type's database list with the query applied (Characters and Guilds included), a scoped search lands on that list, and the lists find a name by its words in any order or past a small typo, exact names first; the empty search page lists all fifteen kinds a search covers, and an old lore-list link lands on the lore list's own address.
 - Site: the MCP page tools and GET /api/tools/{tool} (item, NPC, quest, vendor and object pages, entity relations) read the cron's stored aggregate set, the file the pages already keep, instead of replaying every upload on a fresh server instance (#1354).
 - Site: the search and the search box suggestions read the names they match from one small file the snapshot cron writes beside the aggregates (`snapshots/search-names.json`), so a fresh server instance no longer downloads and parses the whole aggregate set for a keystroke; without the file they read the aggregates as before.
 - Site: the phone menu's search box suggests pages as you type, the same field as the bar's, instead of a plain box with no suggestions.
