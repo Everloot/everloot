@@ -406,6 +406,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the loot observations table sorts frequency by its 95% Wilson lower bound while still showing the observed share.
 
 ### Changed
+- Site: cards, icons and copy buttons look and behave the same everywhere; small corners, captions and line lengths follow the site's sizes.
 - Site: the Auction House, a realm's prices, Bag upgrades and Disenchanting open faster: the price boards are worked out once each time new scans come in, not again for every visit.
 - Site: the armory crawl fails its hourly job only when 3 Blizzard rows or 1% of the rows it read fail (fewer are deferred for 7 days and shown as a warning), still fails at once when storage refuses a row, and names the response field that broke, never the character.
 - Site: item, NPC, quest and zone pages lead with what is known: a relation tab with no rows is left out (one line in place of the strip when none has rows), an item names up to three places to get it in its quick facts and shows auction prices after its relations, and a zone lists what players confirmed before its lore and a closed Terrain section.
