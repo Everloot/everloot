@@ -98,7 +98,7 @@ export default async function ZonesPage(props: { searchParams?: Promise<Search> 
           active={q.q ? 1 : 0}
           clearHref={META.path}
         />
-        {respelled && <Respelled q={respelled} />}
+        {respelled && rows.length > 0 && <Respelled q={respelled} />}
         <div className="mt-2">
           <DataTable
             dense

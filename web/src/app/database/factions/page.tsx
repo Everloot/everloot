@@ -95,7 +95,7 @@ export default async function FactionListPage(props: { searchParams?: Promise<Se
           active={filters(q)}
           clearHref="/database/factions"
         />
-        {respelled && <Respelled q={respelled} />}
+        {respelled && rows.length > 0 && <Respelled q={respelled} />}
         <div className="mt-2">
           <DataTable
             dense

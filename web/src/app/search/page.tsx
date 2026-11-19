@@ -64,11 +64,13 @@ const listHrefFor = (type: SearchType, q: string): string | undefined => {
   return q ? `${LIST_OF[type]}?q=${encodeURIComponent(q)}` : LIST_OF[type];
 };
 
-/** What the search covers, each with the list it opens; shown before a query, under the field. No count: a count would read a store on every request. */
+/**
+ * Everything the search covers, each with the page it opens, in the order the results come; shown before a query,
+ * under the field. No count: a count would read a store on every request.
+ */
 const KINDS: { type: SearchType; href: string }[] = [
-  { type: "item", href: "/database/items" }, { type: "npc", href: "/database/npcs" }, { type: "quest", href: "/database/quests" },
-  { type: "zone", href: "/database/zones" }, { type: "object", href: "/database/objects" }, { type: "lore", href: "/lore" },
-  { type: "tool", href: "/tools" }, { type: "doc", href: "/docs" },
+  ...(Object.keys(LIST_OF) as ResultScope[]).map((type) => ({ type, href: LIST_OF[type] })),
+  { type: "class", href: "/classes" }, { type: "guide", href: "/wiki" }, { type: "lore", href: "/lore" }, { type: "tool", href: "/tools" }, { type: "doc", href: "/docs" },
 ];
 /** Four queries to try: the lookup /chat opens with (ChatWelcome), then the field's own placeholder. */
 const EXAMPLES = ["Linen Cloth", "Thrall", "Elwynn Forest", "6948"];
@@ -120,9 +122,16 @@ async function overviewFacts(groups: SearchGroup[]): Promise<OverviewFacts> {
 export default async function SearchPage(props: { searchParams: Promise<Params> }) {
   const params = await props.searchParams;
   const q = (first(params.q) ?? "").trim().slice(0, MAX_QUERY);
-  // `in=lore` is the full lore list (with its type chips and pages) behind the lore group of the overview;
-  // the links this page gave out before it searched the whole site (`page=`, `type=`) still open it.
-  if (first(params.in) === "lore" || params.page !== undefined || params.type !== undefined) return LoreResults({ q, params });
+  // `in=lore` is the full lore list (with its type chips and pages) behind the lore group of the overview. The links
+  // this page gave out before it searched the whole site (`page=`, `type=` with no `in=`) go to that list's own address,
+  // so the address says what the page shows.
+  if (first(params.in) !== "lore" && (params.page !== undefined || params.type !== undefined)) {
+    const legacy = new URLSearchParams({ q, in: "lore" });
+    if (first(params.page) !== undefined) legacy.set("page", first(params.page)!);
+    if (first(params.type) !== undefined) legacy.set("type", first(params.type)!);
+    redirect(`/search?${legacy}`);
+  }
+  if (first(params.in) === "lore") return LoreResults({ q, params });
   // A search scoped to one type (the box's scope chips, the links this page gave out before) is that type's own
   // database list with the query applied: the full table, its sorts and its filters.
   const scope = first(params.in);

@@ -131,6 +131,10 @@ test("the lists match every word in any order, an exact name first, and read a t
   expect(rows(await html(NpcList(search({ q: "thomas guard" }))), "npcs")).toEqual([1]);
   expect(places(await html(ZoneList(search({ q: "forest elwynn" }))), "zones").length).toBeGreaterThan(0);
   expect(rows(await html(ObjectList(search({ q: "zzzz qqqq" }))), "objects")).toEqual([]);
+  // When a filter leaves none of the respelled matches, the line about the respelling would only confuse: it goes with them.
+  const none = await html(QuestList(search({ q: "wanted hoggr", side: "horde" })));
+  expect(none).toContain("No quests match these filters.");
+  expect(none).not.toContain("Showing results for");
 });
 
 test("vendors list the agreed vendor with its name and zone", async () => {

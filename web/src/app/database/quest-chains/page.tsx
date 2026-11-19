@@ -70,7 +70,7 @@ export default async function QuestChainListPage(props: { searchParams?: Promise
           active={q.q ? 1 : 0}
           clearHref="/database/quest-chains"
         />
-        {respelled && <Respelled q={respelled} />}
+        {respelled && rows.length > 0 && <Respelled q={respelled} />}
         <div className="mt-2">
           <DataTable
             dense

@@ -368,7 +368,7 @@ export async function CategoryPage({ classSlug, subclassKey, search }: { classSl
             )}
           </p>
         )}
-        {match.respelled && <Respelled q={match.respelled} />}
+        {match.respelled && rows.length > 0 && <Respelled q={match.respelled} />}
         <div className="mt-2">
           <DataTable
             dense

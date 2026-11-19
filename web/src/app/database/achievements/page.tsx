@@ -97,7 +97,7 @@ export default async function AchievementListPage(props: { searchParams?: Promis
           active={filters(q)}
           clearHref="/database/achievements"
         />
-        {respelled && <Respelled q={respelled} />}
+        {respelled && rows.length > 0 && <Respelled q={respelled} />}
         <div className="mt-2">
           <DataTable
             dense

@@ -118,7 +118,7 @@ export default async function InstancesPage(props: { searchParams?: Promise<Sear
           active={q.q ? 1 : 0}
           clearHref={META.path}
         />
-        {respelled && <Respelled q={respelled} />}
+        {respelled && rows.length > 0 && <Respelled q={respelled} />}
         <div className="mt-2">
           <DataTable
             dense

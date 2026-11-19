@@ -165,7 +165,7 @@ export default async function NpcListPage(props: { searchParams?: Promise<Search
           clearHref="/database/npcs"
         />}
         {/* With nothing to list at all, the one line says so without a row of column headers over it. */}
-        {respelled && <Respelled q={respelled} />}
+        {respelled && rows.length > 0 && <Respelled q={respelled} />}
         <div className="mt-2">{all.length === 0 ? empty : (
           <DataTable
             dense
