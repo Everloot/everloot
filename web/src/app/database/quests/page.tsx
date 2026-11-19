@@ -10,7 +10,7 @@ import { CLIENT_LAYER, shownItemName } from "@/lib/items";
 import { npcNames } from "@/lib/names";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { loadShownNames } from "@/lib/shown-item-names";
-import { bareQuestRow, publicQuests, type QuestRow } from "@/lib/world-lists";
+import { bareQuestRow, publicQuests, SIDE_LABEL, type QuestRow } from "@/lib/world-lists";
 import { LINK } from "../entity";
 import { byRank, nameMatches, Respelled,
   flag, LEVEL_BRACKETS, listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, range, rangeParam, sortParam, sortRows, Unreadable,
@@ -25,7 +25,6 @@ type Sort = (typeof SORTS)[number];
 const DEFAULT_SORT = { key: "id" as Sort, desc: false };
 
 const SIDES: Record<string, QuestSide> = { alliance: "alliance", horde: "horde", both: "both" };
-const SIDE_LABEL: Record<QuestSide, string> = { alliance: "Alliance", horde: "Horde", both: "Both" };
 const TAG_LABEL: Record<QuestTag, string> = { group: "Group", dungeon: "Dungeon", raid: "Raid", pvp: "PvP" };
 const groupLabel = (x: QuestRow) => [x.tag && TAG_LABEL[x.tag], x.suggestedGroup !== null && `${x.suggestedGroup} players`].filter(Boolean).join(", ");
 

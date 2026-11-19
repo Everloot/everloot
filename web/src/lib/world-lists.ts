@@ -62,6 +62,9 @@ export interface QuestRow extends QuestPage {
   tag: QuestTag | null;
 }
 
+/** The side a quest is offered to, as the lists and the search overview print it. */
+export const SIDE_LABEL: Record<QuestSide, string> = { alliance: "Alliance", horde: "Horde", both: "Both" };
+
 export function publicQuests(facts: WorldFacts): QuestRow[] {
   return [...byId(facts.quests, (r) => r.questId)].map(([id, quests]) => ({ ...questPage(id, { ...EMPTY, quests, npcs: facts.npcs, recheck: facts.recheck }), ...questTraits(quests, facts) }))
     .filter((p) => p.title !== null || p.level !== null || p.giverNpcId !== null || p.turnInNpcId !== null || p.rewards.length > 0);

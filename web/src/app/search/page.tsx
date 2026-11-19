@@ -1,15 +1,18 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import LoreSearchForm from "@/components/LoreSearchForm";
 import GameIcon from "@/components/game/GameIcon";
 import { Container, DataTable, DataTitle, Entry, EntryList, filledColumns, LinkTabs, Pager, QUALITY_TEXT, SearchBar, qualityOf, type SparseColumn } from "@/components/ui";
 import { CC_BY_SA } from "@/lib/jsonld";
 import { BROWSE_HEADINGS, BROWSE_TYPES, hasTypes, loreSlug, MAX_QUERY, searchLore, UNAVAILABLE, UNAVAILABLE_COPY, type BrowseSlug, type LoreType } from "@/lib/lore";
-import { HEADINGS, isScope, isResultScope, isPagedScope, siteSearch, type ResultScope, type SearchGroup, type SearchResult, type SearchType } from "@/lib/site-search";
+import { HEADINGS, isResultScope, siteSearch, type ResultScope, type SearchGroup, type SearchResult, type SearchType } from "@/lib/site-search";
 import { loadShownSearchNames } from "@/lib/shown-search-names";
 import { loadShownNames } from "@/lib/shown-item-names";
 import { shownItemIcons } from "@/lib/item-icons";
+import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
+import { npcRows, publicQuests, SIDE_LABEL, type NpcRow, type QuestRow } from "@/lib/world-lists";
 import { guildSearchPrefix, guildsOn } from "@/lib/guilds";
 import { playerPagesOn, searchPrefix } from "@/lib/player-pages";
 import PeopleResults from "./PeopleResults";
@@ -45,11 +48,21 @@ const link = "text-fg underline decoration-edge underline-offset-4 hover:decorat
 
 type Params = { q?: string | string[]; page?: string | string[]; type?: string | string[]; in?: string | string[]; p?: string | string[] };
 
-/** Rows a scoped search (`in=item`) lists; the overview lists 8 per type. */
-const SCOPED_LIMIT = 50;
+/** Rows the overview lists per type; the type's tab opens its list with every match. */
+const OVERVIEW_LIMIT = 5;
 
-/** The paginated database list that takes the same `?q=`, for each database scope. */
-const DATABASE_LIST = { item: "items", npc: "npcs", quest: "quests", object: "objects" } as const;
+/**
+ * The database list each result type opens, with the query applied: the full table, its sorts and its filters.
+ * Wiki, tools, docs and classes have no list that takes a query; the lore archive has its own list under `in=lore`.
+ */
+const LIST_OF: Record<ResultScope, string> = {
+  item: "/database/items", npc: "/database/npcs", quest: "/database/quests", object: "/database/objects", zone: "/database/zones", instance: "/database/instances",
+  achievement: "/database/achievements", faction: "/database/factions", title: "/database/titles", chain: "/database/quest-chains",
+};
+const listHrefFor = (type: SearchType, q: string): string | undefined => {
+  if (!isResultScope(type)) return undefined;
+  return q ? `${LIST_OF[type]}?q=${encodeURIComponent(q)}` : LIST_OF[type];
+};
 
 /** What the search covers, each with the list it opens; shown before a query, under the field. No count: a count would read a store on every request. */
 const KINDS: { type: SearchType; href: string }[] = [
@@ -82,34 +95,71 @@ function SearchStart() {
   );
 }
 
+/** The quest and NPC rows behind the overview's hits, as the lists draw them. */
+interface OverviewFacts { quests: Map<number, QuestRow>; npcs: Map<number, NpcRow> }
+const NO_FACTS: OverviewFacts = { quests: new Map(), npcs: new Map() };
+type FactsRead = Promise<[Awaited<ReturnType<typeof loadWorldFacts>>, Awaited<ReturnType<typeof computeRollups>>] | null>;
+
+/**
+ * The level, side and category of the quests the overview lists, and the level, type, zone and public drop count of
+ * its NPCs: the same rows /database/quests and /database/npcs build, from the same aggregate, narrowed to these ids
+ * so a row never says more than its page. Nothing when the aggregate is out of reach.
+ */
+async function overviewFacts(groups: SearchGroup[], read: FactsRead | null): Promise<OverviewFacts> {
+  const ids = (type: SearchType) => new Set(groups.find((g) => g.type === type)?.results.flatMap((r) => (r.id === undefined ? [] : [r.id])) ?? []);
+  const questIds = ids("quest"), npcIds = ids("npc");
+  if (!read || (questIds.size === 0 && npcIds.size === 0)) return NO_FACTS;
+  const got = await read;
+  if (!got || got[0].unreachable) return NO_FACTS;
+  const [facts, rollup] = got;
+  const quests = questIds.size ? publicQuests({ ...facts, quests: facts.quests.filter((r) => questIds.has(r.questId)) }) : [];
+  const npcs = npcIds.size ? npcRows({ ...facts, npcs: facts.npcs.filter((r) => npcIds.has(r.npcId)) }, rollup.rates.filter((r) => r.sourceNpcId !== undefined && npcIds.has(r.sourceNpcId))) : [];
+  return { quests: new Map(quests.map((x) => [x.questId, x])), npcs: new Map(npcs.map((n) => [n.npcId, n])) };
+}
+
 export default async function SearchPage(props: { searchParams: Promise<Params> }) {
   const params = await props.searchParams;
   const q = (first(params.q) ?? "").trim().slice(0, MAX_QUERY);
   // `in=lore` is the full lore list (with its type chips and pages) behind the lore group of the overview;
   // the links this page gave out before it searched the whole site (`page=`, `type=`) still open it.
   if (first(params.in) === "lore" || params.page !== undefined || params.type !== undefined) return LoreResults({ q, params });
-  const scope = isResultScope(first(params.in)) ? (first(params.in) as ResultScope) : undefined;
+  // A search scoped to one type (the box's scope chips, the links this page gave out before) is that type's own
+  // database list with the query applied: the full table, its sorts and its filters.
+  const scope = first(params.in);
+  if (isResultScope(scope)) redirect(listHrefFor(scope, q)!);
 
   // Reuse item facts only within this render; the next request rechecks publication.
   const shown = q ? loadShownNames() : undefined;
+  // The aggregate the quest and NPC facts come from starts now; the object group of the search reads the same one.
+  const factsRead: FactsRead | null = q ? Promise.all([loadWorldFacts(), computeRollups()]).catch(() => null) : null;
   // Matched on the names the database pages show, so a name a list prints is found here too.
-  const groups = q ? await siteSearch(q, { ...(scope ? { only: scope, limit: SCOPED_LIMIT, ...(isPagedScope(scope) ? { page: pageNumber(first(params.p)) } : {}) } : {}), names: loadShownSearchNames(shown) }) : null;
-  // The game icon beside each item hit, where its page shows one.
-  const { icons, unknown } = await shownItemIcons(groups?.find((g) => g.type === "item")?.results.flatMap((r) => (r.id === undefined ? [] : [r.id])) ?? [], shown);
+  const groups = q ? await siteSearch(q, { limit: OVERVIEW_LIMIT, names: loadShownSearchNames(shown) }) : null;
+  // The game icon beside each item hit, where its page shows one, and the facts beside each quest and NPC hit.
+  const [{ icons, unknown }, facts] = await Promise.all([
+    shownItemIcons(groups?.find((g) => g.type === "item")?.results.flatMap((r) => (r.id === undefined ? [] : [r.id])) ?? [], shown),
+    overviewFacts(groups ?? [], factsRead),
+  ]);
   const base = `/search?q=${encodeURIComponent(q)}`;
-  const tabs = groups && groups.length > 0 && [
-    { label: "All", href: base, current: !scope },
-    ...groups.map((g) => ({
-      label: g.heading,
-      count: g.total,
-      href: isResultScope(g.type) ? `${base}&in=${g.type}` : g.type === "lore" ? `${base}&in=lore` : `${base}#results-${g.type}`,
-      current: scope === g.type,
-    })),
-  ];
   // The overview also lists characters and guilds when their pages are on and the text could start a name. The
   // browser asks for them (see PeopleResults), so this page's cached HTML never holds a name a hide removed. Text with
   // no letter is an id, as in the type-ahead.
-  const people = Boolean(q && !scope && /\p{L}/u.test(q) && ((playerPagesOn() && searchPrefix(q)) || (guildsOn() && guildSearchPrefix(q))));
+  const named = Boolean(q && /\p{L}/u.test(q));
+  const characters = named && playerPagesOn() && Boolean(searchPrefix(q));
+  const guilds = named && guildsOn() && Boolean(guildSearchPrefix(q));
+  const people = characters || guilds;
+  // One tab per type with results, each opening that type's list (or the lore list, or its section here), then a
+  // Characters or Guilds tab where the text could start such a name: their counts arrive in the browser, so the tabs carry none.
+  const tabs = groups && groups.length > 0 ? [
+    { label: "All", href: base, current: true },
+    ...groups.map((g) => ({
+      label: g.heading,
+      count: g.total,
+      href: listHrefFor(g.type, q) ?? (g.type === "lore" ? `${base}&in=lore` : `${base}#results-${g.type}`),
+      current: false,
+    })),
+    ...(characters ? [{ label: "Characters", href: `/players?q=${encodeURIComponent(q)}`, current: false }] : []),
+    ...(guilds ? [{ label: "Guilds", href: `/guilds?q=${encodeURIComponent(q)}`, current: false }] : []),
+  ] : null;
   const archive = (g: SearchGroup) => g.type === "lore" || g.type === "tool" || g.type === "doc";
   let split = groups?.length ?? 0;
   while (split > 0 && archive(groups![split - 1])) split--;
@@ -120,17 +170,18 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
       <Link href="/database/npcs" className={link}>NPCs</Link>.
     </p>
   );
+  const table = (group: SearchGroup) => <ResultTable key={group.type} group={group} q={q} icons={icons} unknown={unknown} facts={facts} />;
   return (
     <Container width="data">
       <article>
-        {/* One row on a wide screen: the title, the field and the result tabs, so the first result is in view. */}
+        {/* The title and the field share a row on a wide screen; the result tabs take the next one, so the first result is in view. */}
         <div className="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2">
           <div className="[&>header]:mb-0"><DataTitle title="Search" /></div>
           <div className="w-full max-w-xl sm:flex-1">
-            <SearchBar action="/search" id="search-page" label="Search Everloot" placeholder={`A name or an id: ${EXAMPLES.slice(1).join(", ")}`} defaultValue={q} defaultScope={isScope(scope) ? scope : ""} compact />
+            <SearchBar action="/search" id="search-page" label="Search Everloot" placeholder={`A name or an id: ${EXAMPLES.slice(1).join(", ")}`} defaultValue={q} compact />
           </div>
-          {tabs && <LinkTabs label="Result types" tabs={tabs} />}
         </div>
+        {tabs && <div className="mb-4"><LinkTabs label="Result types" tabs={tabs} /></div>}
 
         {groups === null ? <SearchStart /> : groups.length === 0 ? (
           people ? <PeopleResults q={q} empty={nothing} /> : nothing
@@ -138,9 +189,9 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
           // Characters and guilds sit after the database groups, above the lore archive, tools and docs.
           <>
             {groups[0]?.respelled && <p className="mb-2 text-cell text-fg-2">Showing results for {groups[0].respelled}</p>}
-            {groups.slice(0, split).map((group) => <ResultTable key={group.type} group={group} q={q} scoped={Boolean(scope)} icons={icons} unknown={unknown} />)}
+            {groups.slice(0, split).map(table)}
             {people && <PeopleResults q={q} />}
-            {groups.slice(split).map((group) => <ResultTable key={group.type} group={group} q={q} scoped={Boolean(scope)} icons={icons} unknown={unknown} />)}
+            {groups.slice(split).map(table)}
           </>
         )}
       </article>
@@ -148,19 +199,16 @@ export default async function SearchPage(props: { searchParams: Promise<Params> 
   );
 }
 
-/** One type's results as a dense table; its heading is the first column's header. */
-function ResultTable({ group, q, scoped, icons, unknown }: { group: SearchGroup; q: string; scoped: boolean; icons: Map<number, string>; unknown: string | null }) {
+/**
+ * One type's results as a dense table; its heading is the first column's header. Quest and NPC rows carry the facts
+ * their lists show, so two of a name tell apart; a column no row here has a value for is left out.
+ */
+function ResultTable({ group, q, icons, unknown, facts }: { group: SearchGroup; q: string; icons: Map<number, string>; unknown: string | null; facts: OverviewFacts }) {
   const more = group.total > group.results.length;
-  const all = isResultScope(group.type) ? `/search?q=${encodeURIComponent(q)}&in=${group.type}` : group.type === "lore" ? `/search?q=${encodeURIComponent(q)}&in=lore` : null;
-  const list = more && scoped && group.type in DATABASE_LIST ? `/database/${DATABASE_LIST[group.type as keyof typeof DATABASE_LIST]}?q=${encodeURIComponent(q)}` : null;
-  const current = group.page ?? 1;
-  const pages = Math.ceil(group.total / SCOPED_LIMIT);
-  const pager = scoped && isPagedScope(group.type) && pages > 1 ? <Pager
-    label={`${group.heading} pages`}
-    page={current}
-    prevHref={current > 1 ? `${all}&p=${current - 1}` : null}
-    nextHref={current < pages ? `${all}&p=${current + 1}` : null}
-  /> : null;
+  const all = listHrefFor(group.type, q) ?? (group.type === "lore" ? `/search?q=${encodeURIComponent(q)}&in=lore` : null);
+  const dash = <span className="text-muted">—</span>;
+  const quest = (r: SearchResult) => (r.id === undefined ? undefined : facts.quests.get(r.id));
+  const npc = (r: SearchResult) => (r.id === undefined ? undefined : facts.npcs.get(r.id));
   const name = (r: SearchResult) => {
     // An item name takes its quality colour; any other hit is a plain link, never the accent an uncommon item resembles.
     const style = group.type === "item" && typeof r.quality === "number" && r.quality <= 5 ? `${QUALITY_TEXT[qualityOf(r.quality)]} hover:underline underline-offset-4` : "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
@@ -175,12 +223,31 @@ function ResultTable({ group, q, scoped, icons, unknown }: { group: SearchGroup;
       </span>
     );
   };
+  const about: SparseColumn<SearchResult>[] = group.type === "quest" ? [
+    { key: "level", header: "Level", numeric: true, cell: (r) => quest(r)?.level ?? dash, blank: (r) => quest(r)?.level == null },
+    { key: "side", header: "Side", cell: (r) => { const s = quest(r)?.side; return s ? SIDE_LABEL[s] : dash; }, blank: (r) => !quest(r)?.side },
+    { key: "category", header: "Category", cell: (r) => quest(r)?.category ?? dash, blank: (r) => !quest(r)?.category },
+  ] : group.type === "npc" ? [
+    { key: "level", header: "Level", numeric: true, cell: (r) => npc(r)?.level ?? dash, blank: (r) => npc(r)?.level == null },
+    { key: "type", header: "Type", cell: (r) => npc(r)?.creatureType ?? dash, blank: (r) => !npc(r)?.creatureType },
+    { key: "zone", header: "Zone", cell: (r) => npc(r)?.zone?.name ?? dash, blank: (r) => !npc(r)?.zone },
+    { key: "drops", header: "Drops", numeric: true, cell: (r) => npc(r)?.drops || dash, blank: (r) => !npc(r)?.drops },
+  ] : [
+    { key: "about", header: group.type === "item" ? "Type" : "", cell: (r) => <span className="line-clamp-1 text-fg-2">{group.type === "item" ? r.meta ?? "" : r.id !== undefined ? "" : r.note ?? ""}</span> },
+  ];
   const columns: SparseColumn<SearchResult>[] = [
     { key: "name", header: <>{group.heading} <span className="font-normal tabular-nums">({group.total})</span></>, cell: name },
-    { key: "about", header: group.type === "item" ? "Type" : "", cell: (r) => <span className="line-clamp-1 text-fg-2">{group.type === "item" ? r.meta ?? "" : r.id !== undefined ? "" : r.note ?? ""}</span> },
+    ...about,
     // Lore, zones, tools and docs have no id: the column is left out for them.
     { key: "id", header: "ID", numeric: true, cell: (r) => r.id ?? "", blank: (r) => r.id === undefined },
   ];
+  // The phone's one line under the name: the same facts the columns show.
+  const meta = (r: SearchResult): string => {
+    const id = r.id !== undefined && `ID ${r.id}`;
+    if (group.type === "quest") { const x = quest(r); return [x?.level != null && `Level ${x.level}`, x?.category, x?.side && SIDE_LABEL[x.side], id].filter(Boolean).join(" · "); }
+    if (group.type === "npc") { const n = npc(r); return [n?.level != null && `Level ${n.level}`, n?.creatureType, n?.zone?.name, n?.drops ? `${n.drops} drop${n.drops === 1 ? "" : "s"}` : false, id].filter(Boolean).join(" · "); }
+    return (group.type === "item" ? [r.meta, id] : [id || r.note]).filter(Boolean).join(" · ");
+  };
   return (
     <section id={`results-${group.type}`} aria-labelledby={`results-${group.type}-heading`} className="mb-6 scroll-mt-20">
       <h2 id={`results-${group.type}-heading`} className="sr-only">{group.heading}</h2>
@@ -190,13 +257,8 @@ function ResultTable({ group, q, scoped, icons, unknown }: { group: SearchGroup;
         columns={filledColumns(columns, group.results)}
         rows={group.results}
         rowKey={(r) => r.href}
-        meta={(r) => (group.type === "item" ? [r.meta, r.id !== undefined && `ID ${r.id}`] : [r.id !== undefined ? `ID ${r.id}` : r.note]).filter(Boolean).join(" · ")}
-        footer={
-          more && all && !scoped ? <Link href={all} className={link}>All {group.total} {group.type === "lore" ? "lore results" : group.heading.toLowerCase()}</Link>
-          : pager ? pager
-          : list ? <>{`Showing ${group.results.length} of ${group.total}. `}<Link href={list} className={link}>See every match in the database</Link></>
-          : undefined
-        }
+        meta={meta}
+        footer={more && all ? <Link href={all} className={link}>All {group.total} {group.type === "lore" ? "lore results" : group.heading.toLowerCase()}</Link> : undefined}
       />
     </section>
   );
