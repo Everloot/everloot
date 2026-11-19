@@ -74,3 +74,14 @@ test("forget drops the entry", async () => {
   expect(k.last()).toBeNull();
   expect(await k.get(undefined, 1)).toBe(2);
 });
+
+test("set keeps a value the caller already holds, for ttlMs or its own keepMs, without a read", async () => {
+  const load = counter();
+  const k = keep(load, { ttlMs: 1000 });
+  k.set({ value: 7 }, 0);
+  expect(await k.get(undefined, 999)).toBe(7);
+  expect(load).not.toHaveBeenCalled();
+  k.set({ value: 8, keepMs: 10 }, 1000);
+  expect(k.fresh(1009)?.value).toBe(8);
+  expect(await k.get(undefined, 1010)).toBe(1);
+});

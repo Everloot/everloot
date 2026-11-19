@@ -1,8 +1,8 @@
-import { computeCoverage, parseCoverageExpected, type CoverageExpected, type CoverageReport } from "@kb/coverage";
+import { parseCoverageExpected, type CoverageExpected, type CoverageInput } from "@kb/coverage";
 import { buildFolder, privateStoreFromEnv, type PrivateStore } from "./game-assets";
 import { CLIENT_LAYER } from "./items";
 import { assetsBaseUrl } from "./talents/assets";
-import { uploadStore, type Corpus } from "./upload-store";
+import type { Corpus } from "./upload-store";
 import { WORLD_MAP } from "./world-map";
 import { RECHECK_SCOPES } from "./recheck-scopes";
 import { placedEntrances, publicZones } from "./zones";
@@ -25,29 +25,15 @@ export async function loadCoverageExpected(base: string | null = assetsBaseUrl()
 }
 
 /**
- * The score for one corpus: the released zones, the entrances the game files place, the expected counts and the
- * recheck scopes. `asOf` is the time of the last real change (the snapshot's), never the time this ran.
+ * The score's input for one corpus: the released zones, the entrances the game files place, the expected counts and
+ * the recheck scopes. `asOf` is the time of the last real change (the snapshot's), never the time this ran.
  */
-export function coverageFor(corpus: Pick<Corpus, "records" | "dataAsOf">, expected: CoverageExpected | null, asOf: string | null = corpus.dataAsOf ?? null): CoverageReport {
+export function coverageInput(corpus: Pick<Corpus, "records" | "dataAsOf">, expected: CoverageExpected | null, asOf: string | null = corpus.dataAsOf ?? null): CoverageInput {
   const fileEntrances = placedEntrances(WORLD_MAP).flatMap((e) => (e.files && e.zone ? [{ instanceMapIds: e.instanceMapIds, zone: e.zone.mapId }] : []));
-  return computeCoverage({
+  return {
     records: corpus.records, asOf, build: COVERAGE_BUILD,
     zones: publicZones().map((z) => ({ mapId: z.mapId, name: z.name })),
     heldBack: WORLD_MAP.heldBackZones.map((z) => z.uiMapId),
     fileEntrances, expected, recheck: RECHECK_SCOPES,
-  });
-}
-
-let memo: { key: string; expected: CoverageExpected | null; report: CoverageReport } | null = null;
-
-/**
- * The score the coverage pages read, computed once per corpus version (the key rollup-compute.ts uses) and expected
- * file, so a page view pays nothing once it is warm. Null when storage is out of reach: unknown, never zero.
- */
-export async function loadCoverage(): Promise<CoverageReport | null> {
-  const [corpus, expected] = await Promise.all([uploadStore.loadCorpus(), loadCoverageExpected()]);
-  if (corpus.unreachable) return null;
-  const key = `${corpus.uploads}|${corpus.dataAsOf ?? ""}|${corpus.records.length}`;
-  if (!memo || memo.key !== key || memo.expected !== expected) memo = { key, expected, report: coverageFor(corpus, expected) };
-  return memo.report;
+  };
 }

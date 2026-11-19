@@ -9,7 +9,8 @@
  * names none), twice before they count as failures. Other data centres still fill on their first visit.
  * The lore pages open the knowledge release on the request path, which a cold isolate hashes whole, so they are
  * asked for first, one at a time, before the sample; a 500 there is the cold render outrunning the Worker's CPU
- * budget under load and is asked once more after a short wait before it counts.
+ * budget under load and is asked once more after a short wait before it counts. A 503 on any page is the Worker
+ * running out of memory on one isolate, often once: it too is asked once more after a short wait before it counts.
  * Run: node scripts/cf-warm.mjs <origin> <commit sha>
  */
 import { pathToFileURL } from "node:url";
@@ -21,6 +22,8 @@ export const MAX_MS = 120_000;
 const CONCURRENCY = 4;
 /** How long to wait before asking a release page that answered 500 once more. */
 const RELEASE_RETRY_MS = 5_000;
+/** How long to wait before asking a page that answered 503 once more. */
+const UNAVAILABLE_RETRY_MS = 5_000;
 
 /** The page addresses a sitemap lists, in order, without repeats. */
 export function sitemapUrls(xml) {
@@ -113,9 +116,11 @@ export async function warm(urls, { get: fetchOne = get, now = () => performance.
  * The whole post-deploy pass: wait for the commit, read the sitemap, warm a sample and retry what was rate
  * limited. It spends at most `maxMs` in total (the commit wait, the sitemap and the retries share one deadline)
  * and asks at most `maxPages` unique pages, however many retries a page takes. `get`, `now` and `sleep` are
- * injected so the limits are tested without a network or a clock. A page may be requested up to three times
- * (the pass and two retries), which is not a new page. The release pages go first, serially, and a 500 on that
+ * injected so the limits are tested without a network or a clock. A page may be requested up to four times
+ * (the pass, once more after a 503 and two rate-limit retries), which is not a new page. The release pages go
+ * first, serially, and a 500 on that
  * pass is asked once more after RELEASE_RETRY_MS before it counts; the sample follows with the rest of the page budget.
+ * A page that answered 503 is asked once more after UNAVAILABLE_RETRY_MS, before the rate-limit retries.
  * @param {{ origin?: string, sha?: string, get?: (url: string, timeoutMs?: number) => Promise<{ url: string, status: number, body?: string, ms?: number, retryAfter?: string | null, error?: string }>, now?: () => number, sleep?: (ms: number) => Promise<unknown>, log?: (line: string) => void, maxMs?: number, maxPages?: number, concurrency?: number }} [options]
  */
 export async function warmDeploy({
@@ -163,6 +168,14 @@ export async function warmDeploy({
   const sample = await warm(rest, { get: fetchOne, now, maxMs: remaining(), maxPages: Math.max(0, maxPages - first.results.length), concurrency });
   let results = [...first.results, ...sample.results];
   const skipped = [...first.skipped, ...sample.skipped];
+  const unavailable = results.filter((r) => r.status === 503).map((r) => r.url);
+  if (unavailable.length > 0 && UNAVAILABLE_RETRY_MS < remaining()) {
+    log(`${unavailable.length} pages answered 503; asking again in ${Math.round(UNAVAILABLE_RETRY_MS / 1000)} s`);
+    await sleep(UNAVAILABLE_RETRY_MS);
+    const retried = await warm(unavailable, { get: fetchOne, now, maxMs: remaining(), maxPages: unavailable.length, concurrency });
+    const byUrl = new Map(retried.results.map((r) => [r.url, r]));
+    results = results.map((r) => byUrl.get(r.url) ?? r);
+  }
   // Twice, not five times: a rate-limited page that survives two waits is not made better by a longer crawl.
   for (let round = 0; round < 2; round++) {
     const { urls: again, waitMs } = rateLimited(results);

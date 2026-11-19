@@ -7,6 +7,7 @@ import { HISTORY_DAYS, MARKET_MAX_BYTES, emptyMarket, foldMarket, marketBytes, t
 import { mergeCensusRows } from "@kb/census-rows";
 import { TRUSTED_REPORTER, trustedInstalls } from "@kb/trusted-source";
 import { createSharingStore } from "./sharing-store";
+import { keep } from "./kept";
 import {
   COMPLETION_MAX_BYTES, authorizedOwners, emptyCompletion, foldCompletion, isCompletionState, normalizeCompletion, trimCompletion, type CompletionState, type CompletionUpload,
 } from "@kb/completion-rollup";
@@ -46,7 +47,8 @@ export interface Corpus {
   dataAsOf?: string | null;
 }
 
-interface RawCorpus { uploads: number; state: CorpusState; unreachable?: boolean; dataAsOf: string | null }
+/** `etag` is the snapshot object's, so a later read asks R2 whether it changed instead of downloading it again. */
+interface RawCorpus { uploads: number; state: CorpusState; unreachable?: boolean; dataAsOf: string | null; etag?: string }
 
 function validTime(value: string): string | null {
   return value && Number.isFinite(Date.parse(value)) ? value : null;
@@ -197,6 +199,12 @@ const MARKET_PAGE_READ_MS = 12_000;
 const MARKET_STALE_MS = 60 * 60_000;
 const MARKET_RETRY_MS = 30_000;
 const SNAPSHOT_KEY = "snapshots/corpus.json";
+/**
+ * While one request of an instance reads a newer corpus, the others answer from the copy it already holds instead of
+ * parsing a second one beside it (#1354). Past this long the read is taken for lost (a cancelled request) and the next
+ * caller reads again.
+ */
+const CORPUS_REFRESH_HOLD_MS = 60_000;
 const MARKET_KEY = "snapshots/market.json";
 const COMPLETION_KEY = "snapshots/completion.json";
 const CENSUS_KEY = "snapshots/census.json";
@@ -242,7 +250,6 @@ export function createUploadStore(opts: {
   const doFetch = opts.fetch ?? fetch;
   const now = opts.now ?? (() => new Date());
   const cacheMs = opts.cacheMs ?? 5 * 60 * 1000;
-  let cached: { at: number; corpus: RawCorpus } | null = null;
   let marketCached: { at: number; market: Market } | null = null;
   let marketRead: { at: number; promise: Promise<Market | null> } | null = null;
   let marketRetryAt = 0;
@@ -290,7 +297,7 @@ export function createUploadStore(opts: {
         const dir = join(opts.localDir, "uploads");
         await mkdir(dir, { recursive: true });
         await writeFile(join(dir, `${uploadId}.json`), body);
-        cached = null; completionCached = null; censusCached = null;
+        corpusKept.forget(); completionCached = null; censusCached = null;
         return true;
       } catch {
         return false;
@@ -320,7 +327,7 @@ export function createUploadStore(opts: {
         object_key: key,
       });
       if (!(await insertIndex(uploadId, row))) return false;
-      cached = null; completionCached = null; censusCached = null;
+      corpusKept.forget(); completionCached = null; censusCached = null;
       return true;
     } catch (err) {
       console.error(`upload ${uploadId}: store failed`, err);
@@ -876,8 +883,15 @@ export function createUploadStore(opts: {
   }
 
   async function readSnapshot(): Promise<Snapshot | null> {
+    const read = await readSnapshotIfChanged();
+    return read === "unchanged" ? null : read;
+  }
+
+  /** The snapshot, or "unchanged" when `etag` is given and still the object's: nothing is downloaded or parsed then. */
+  async function readSnapshotIfChanged(etag?: string): Promise<Snapshot | null | "unchanged"> {
     // Compression can turn the object's strong ETag into a weak response validator.
-    const res = await r2Fetch(SNAPSHOT_KEY, { method: "GET", headers: { "accept-encoding": "identity" } });
+    const res = await r2Fetch(SNAPSHOT_KEY, { method: "GET", headers: { "accept-encoding": "identity", ...(etag ? { "if-none-match": etag } : {}) } });
+    if (etag && res.status === 304) return "unchanged";
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`snapshot read failed (${res.status})`);
     let parsed: Partial<Snapshot>;
@@ -966,9 +980,11 @@ export function createUploadStore(opts: {
     return mergeCorpusBatches(start, batches);
   }
 
-  async function readCloud(): Promise<RawCorpus> {
-    const snapshot = await readSnapshot();
-    if (snapshot) return { uploads: snapshot.uploads, state: stateOf(snapshot), dataAsOf: validTime(snapshot.generatedAt) };
+  async function readCloud(last: RawCorpus | null): Promise<RawCorpus> {
+    const snapshot = await readSnapshotIfChanged(last?.etag);
+    // Unchanged: the same state object, so the public records and every rollup kept for it stay valid.
+    if (snapshot === "unchanged") return last!;
+    if (snapshot) return { uploads: snapshot.uploads, state: stateOf(snapshot), dataAsOf: validTime(snapshot.generatedAt), etag: snapshot.etag };
     const readAt = now().toISOString();
     const keys = (await listIndex()).map((r) => r.object_key);
     const read = await readObjects(keys);
@@ -1026,19 +1042,49 @@ export function createUploadStore(opts: {
     if (!put.ok) throw new Error(`snapshot write failed (${put.status})`);
     // The state just written is what a read of the file would replay, so the corpus the rollups read next is this one,
     // not the file downloaded and parsed again (a second whole copy, and another read of the same R2 object).
-    cached = { at: Date.now(), corpus: { uploads, state: read.state, dataAsOf: validTime(generatedAt) } };
+    corpusKept.set({ value: { uploads, state: read.state, dataAsOf: validTime(generatedAt), etag: put.headers.get("etag") ?? undefined } });
     completionCached = null; censusCached = null;
     return { uploads, added: fresh.length, dataAsOf: generatedAt };
   }
 
+  /**
+   * One corpus per instance, kept `cacheMs`. Each request reads on its own (`share: false`, release.ts says why), but
+   * an expired copy is re-read with its ETag, so an unchanged snapshot is neither downloaded nor parsed again.
+   */
+  const corpusKept = keep<RawCorpus>(async (_, last) => {
+    const corpus = cloud ? await readCloud(last?.value ?? null) : await readLocal();
+    if (corpus.unreachable) throw new Error("corpus unreachable");
+    return { value: corpus };
+  }, { ttlMs: cacheMs, share: false });
+  let refreshing: { since: number } | null = null;
+
+  async function rawCorpus(): Promise<RawCorpus> {
+    const fresh = corpusKept.fresh();
+    if (fresh) return fresh.value;
+    const last = corpusKept.last();
+    if (last && refreshing && Date.now() - refreshing.since < CORPUS_REFRESH_HOLD_MS) return last.value;
+    const mine = { since: Date.now() };
+    refreshing = mine;
+    try {
+      return await corpusKept.get();
+    } finally {
+      if (refreshing === mine) refreshing = null;
+    }
+  }
+
+  /** The public records of one state, built once for it; the publication hook decides its own reuse. */
+  let publicOf: { state: CorpusState; records: IntakeRecord[] } | null = null;
+
   async function loadCorpus(): Promise<Corpus> {
     try {
       if (unavailable) throw new Error("Production storage is not configured");
-      const corpus = cached && Date.now() - cached.at < cacheMs
-        ? cached.corpus : cloud ? await readCloud() : await readLocal();
-      if (corpus.unreachable) throw new Error("corpus unreachable");
-      cached = { at: Date.now(), corpus };
-      const records = opts.publication ? await opts.publication(corpus.state) : publicRecords(corpus.state);
+      const corpus = await rawCorpus();
+      let records: IntakeRecord[];
+      if (opts.publication) records = await opts.publication(corpus.state);
+      else {
+        if (publicOf?.state !== corpus.state) publicOf = { state: corpus.state, records: publicRecords(corpus.state) };
+        records = publicOf.records;
+      }
       return {
         uploads: corpus.uploads,
         records,
