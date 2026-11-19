@@ -55,7 +55,7 @@ function YourCharacters({ shell, builds }: { shell: AccountShell; builds: Accoun
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href={GET_THE_ADDON.href} className="btn btn-primary min-h-11 px-4 text-sm">{GET_THE_ADDON.label}</Link>
-          <Link href="/account#integrations" className="btn min-h-11 px-4 text-sm">Connect Battle.net</Link>
+          <Link href="/settings#integrations" className="btn min-h-11 px-4 text-sm">Connect Battle.net</Link>
         </div>
         <p className="text-meta text-muted">
           Or <Link href="/me" className={textLink}>add a character by name</Link>, or <Link href="/upload" className={textLink}>upload a save file</Link>.

@@ -88,6 +88,6 @@ test("a sign-in error sits in its own box above the buttons", async () => {
 test("a signed-in visitor is sent on before the decorative art is looked up", async () => {
   auth.getUser.mockResolvedValue({ id: "u1" });
   await expect(SignInPage(page({ returnTo: "/me" }))).rejects.toThrow("NEXT_REDIRECT /me");
-  await expect(SignUpPage(page())).rejects.toThrow("NEXT_REDIRECT /account");
+  await expect(SignUpPage(page())).rejects.toThrow("NEXT_REDIRECT /settings");
   expect(auth.assets).not.toHaveBeenCalled();
 });

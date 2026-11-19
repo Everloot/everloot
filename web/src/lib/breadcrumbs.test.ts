@@ -16,7 +16,7 @@ const paths = [
   ["/classes/group", "/classes"], ["/players"], ["/players/opt-out", "/players"],
   ["/guilds/hide", "/guilds"], ["/chat"], ["/addon"], ["/methodology"],
   ["/account"], ["/settings"], ["/me"],
-  ["/tools/builds", "/account"], ["/tools/alts", "/account"],
+  ["/tools/builds", "/settings"], ["/tools/alts", "/settings"],
 ];
 
 test.each(paths)("%s has a named trail through its parent", (path, parent) => {

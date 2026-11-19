@@ -23,7 +23,7 @@ const link = "text-fg underline decoration-edge underline-offset-4 hover:decorat
 // `?returnTo=/path` (from the sign-in page) is where the confirmation link brings a new player back to.
 export default async function SignUpPage({ searchParams }: { searchParams?: Promise<{ returnTo?: string | string[] }> }) {
   const returnTo = safeReturnTo((await searchParams)?.returnTo);
-  if (await getUser().catch(() => null)) redirect(returnTo ?? "/account");
+  if (await getUser().catch(() => null)) redirect(returnTo ?? "/settings");
   const methods = signInMethods();
   const social = configuredSocialProviders();
   const art = launchArt(await loadSiteAssets())?.background ?? null;
