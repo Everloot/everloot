@@ -166,6 +166,9 @@ const SHOWS_ART = new Set([
   // The daily market report's stored view: one icon for the report's featured good, which has a public auction value,
   // under the same rule as the Auction House pages (tools/auctions/art.ts).
   "web/src/lib/auction-report-store.ts",
+  // The Auction House boards' stored view: the shown name of each item with a public auction value, under the same rule
+  // as the Auction House pages (tools/auctions/art.ts), read from the tooltips in the cron instead of on each page.
+  "web/src/lib/market-boards.ts",
 ]);
 
 test("nothing outside the pages that show the art can read the asset URL or the manifest modules", () => {
