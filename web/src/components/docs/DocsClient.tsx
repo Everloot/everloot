@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Card from "@/components/ui/Card";
 import CopyButton from "@/components/ui/CopyButton";
+import Icon from "@/components/ui/Icon";
 import { articleMarkdown } from "@/lib/docs/markdown";
 
 /** Copies the page as Markdown, for pasting into an assistant or an issue. Says when it worked. */
@@ -16,7 +17,7 @@ export function CopyPage() {
       text={markdown}
       label="Copy page"
       failedLabel="Copy failed"
-      icon={<svg aria-hidden="true" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinejoin="round"><path d="M8 8h11v12H8zM5 16V4h11" /></svg>}
+      icon={<Icon name="copy" />}
       data-md-skip
       className="btn min-h-9 px-3 text-sm"
       aria-live="polite"
@@ -125,7 +126,7 @@ export function CodeGroup({ tabs, title, className = "" }: { tabs: CodeTab[]; ti
         <CopyButton
           text={tabs[active]!.code}
           label="Copy"
-          icon={<svg aria-hidden="true" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinejoin="round"><path d="M8 8h11v12H8zM5 16V4h11" /></svg>}
+          icon={<Icon name="copy" size={13} />}
           aria-label={`Copy ${tabs[active]?.label ?? "code"}`}
           className="inline-flex min-h-9 shrink-0 items-center gap-1.5 px-2 text-xs text-muted hover:text-fg"
         />

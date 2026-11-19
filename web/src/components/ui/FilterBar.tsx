@@ -1,4 +1,5 @@
 import FilterMenus from "./FilterMenus";
+import Icon from "./Icon";
 import Link from "./PendingLink";
 import type { CSSProperties, ReactNode } from "react";
 
@@ -34,7 +35,7 @@ const lit = "border-accent text-fg";
 
 // Points up while its own <details> is open (a menu inside the phone sheet does not follow the sheet).
 function Chevron() {
-  return <svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" className="text-muted [[open]>summary>&]:rotate-180"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>;
+  return <Icon name="chevron" className="text-muted [[open]>summary>&]:rotate-180" />;
 }
 
 function Menu({ c: given, phone }: { c: Extract<FilterControl, { type: "menu" }>; phone: boolean }) {

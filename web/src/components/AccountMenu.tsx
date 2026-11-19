@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { AccountShell, AccountStatus, DeviceAccount } from "@/lib/account-shell-types";
 import { SHELL_CHANGED_EVENT } from "@/lib/profiles";
+import Icon from "@/components/ui/Icon";
 
 // The signed-in side of the header (docs/design/specs/2026-10-20-account-shell-design.md): the "+" menu, the
 // avatar bubble and its menu (the name there links to the account page), and the account switcher. Both menus are disclosures like Tools and the version
@@ -99,7 +100,7 @@ function PlusIcon() {
   return <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16"><path d="M8 2v12M2 8h12" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" /></svg>;
 }
 function Caret({ open }: { open: boolean }) {
-  return <svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" className={open ? "rotate-180" : undefined}><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>;
+  return <Icon name="chevron" className={open ? "rotate-180" : undefined} />;
 }
 
 /** "+": Plan a build, Upload addon data, and New character while saved builds are on (it is on /me). */

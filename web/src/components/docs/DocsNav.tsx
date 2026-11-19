@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import LinkTabs from "@/components/ui/LinkTabs";
+import Icon from "@/components/ui/Icon";
 import { DOCS_TABS, tabFor, type DocsTab } from "@/lib/docs/nav";
 import DocsIcon from "./DocsIcon";
 
@@ -91,7 +92,7 @@ export function DocsSidebar() {
           className="btn mb-6 min-h-10 w-full justify-between px-4 text-sm"
         >
           <span>{tab.label} menu</span>
-          <svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" className={open ? "rotate-180" : ""}><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
+          <Icon name="chevron" className={open ? "rotate-180" : undefined} />
         </button>
         {open && (
           <nav id="docs-menu" aria-label={`${tab.label} pages`} className="mb-8 rounded-card border border-line bg-panel p-3">

@@ -7,6 +7,7 @@ import { hasLaunched } from "@/data/wow-forever-launch";
 import { CookiePreferencesButton } from "./CookieConsent";
 import FooterGlint from "./glint/FooterGlint";
 import LaunchTense from "./LaunchTense";
+import Icon from "./ui/Icon";
 
 /** `plain` marks a same-origin file the router should not prefetch, such as a feed. */
 type Item = { label: string; href: string; external?: boolean; plain?: boolean };
@@ -98,9 +99,7 @@ export default function Footer() {
             <div className="flex items-start justify-between gap-4 md:block md:w-56 md:shrink-0">
               <div>
                 <Link href="/" className="inline-flex min-h-8 items-center gap-2 font-bold tracking-tight text-fg">
-                  <svg aria-hidden="true" viewBox="8 8 48 48" width="14" height="14" className="text-accent">
-                    <path d="M32 12 52 32 32 52 12 32Z" fill="none" stroke="currentColor" strokeWidth="5" strokeLinejoin="round" />
-                  </svg>
+                  <Icon name="diamond" size={14} className="text-accent" />
                   everloot
                 </Link>
                 <p className="text-meta text-fg-2">{SITE_BLURB}</p>

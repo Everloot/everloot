@@ -8,6 +8,7 @@ import { guardOn } from "@/lib/data-guard";
 import { DESKTOP_KEY_LABEL } from "@/lib/desktop-connect";
 import ProviderLogo, { hasProviderLogo } from "@/components/ProviderLogo";
 import SocialSignIn from "@/components/SocialSignIn";
+import Icon from "@/components/ui/Icon";
 import { PROVIDER_NAMES, type SocialProvider } from "@/lib/auth/social";
 
 const subheading = "text-meta font-semibold text-fg-2";
@@ -21,9 +22,7 @@ function Mark({ letters, provider }: { letters?: string; provider?: string }) {
   return (
     <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-control border border-line bg-canvas text-xs font-bold tracking-tight text-fg-2">
       {provider && hasProviderLogo(provider) ? <ProviderLogo provider={provider} size={20} /> : letters ?? (
-        <svg viewBox="8 8 48 48" width="18" height="18" className="text-accent">
-          <path d="M32 12 52 32 32 52 12 32Z" fill="none" stroke="currentColor" strokeWidth="5" strokeLinejoin="round" />
-        </svg>
+        <Icon name="diamond" size={18} className="text-accent" />
       )}
     </span>
   );
