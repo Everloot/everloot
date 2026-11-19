@@ -138,6 +138,9 @@ function openHouse()
   blizzardTabs = { CreateFrame('Button', 'Buy'), CreateFrame('Button', 'Sell'), CreateFrame('Button', 'Auctions') }
   AuctionHouseFrame = CreateFrame('Frame', 'AuctionHouseFrame')
   AuctionHouseFrame.Tabs = blizzardTabs
+  -- The house's border and portrait, at the levels PortraitFrameTemplate gives them (build 70959).
+  AuctionHouseFrame.NineSlice = CreateFrame('Frame'); AuctionHouseFrame.NineSlice.level = 2
+  AuctionHouseFrame.PortraitContainer = CreateFrame('Frame'); AuctionHouseFrame.PortraitContainer.level = 400
   blizzardTabs[3]:SetHeight(32)
   fire('AUCTION_HOUSE_SHOW')
 end
@@ -336,6 +339,8 @@ assert(EverlootDB.toggles.auctions == true, 'a new install starts with auction s
 blizzardTabs = { CreateFrame('Button', 'Buy'), CreateFrame('Button', 'Sell'), CreateFrame('Button', 'Auctions') }
 AuctionHouseFrame = CreateFrame('Frame', 'AuctionHouseFrame')
 AuctionHouseFrame.Tabs = blizzardTabs
+AuctionHouseFrame.NineSlice = CreateFrame('Frame'); AuctionHouseFrame.NineSlice.level = 2
+AuctionHouseFrame.PortraitContainer = CreateFrame('Frame'); AuctionHouseFrame.PortraitContainer.level = 400
 printed = {}
 Everloot.auctionHintFrame.onEvent(nil, 'AUCTION_HOUSE_SHOW')
 assert(said('Everloot tab') and said('never sellers') and said('/everloot auctions off'), table.concat(printed, ' | '))
@@ -357,6 +362,14 @@ assert(T.panel.level > 350 and T.panel.level < 1000, 'the panel sits above the h
 local p = T.panel
 assert(p.helpButton.scripts.OnEnter and p.helpButton.scripts.OnLeave, 'scan instructions are available on hover')
 assert(p.title.text == 'Everloot' and p.title.template == 'GameFontNormalLarge', 'native gold heading')
+-- The house's portrait hangs 57 into the panel's top left corner: the heading starts past it, and the border and the
+-- portrait sit above the panel while it shows (the ring whole, the portrait's lower half there), back after.
+assert(p.title.points.TOPLEFT[1] == p and p.title.points.TOPLEFT[3] >= 50, 'the heading starts right of the portrait: ' .. tostring(p.title.points.TOPLEFT[3]))
+assert(p.scanButton.points.TOPLEFT[4] <= -46, 'the scan row sits below the portrait')
+showPanel()
+assert(T.house.PortraitContainer.level == p.level + 1 and T.house.NineSlice.level == p.level + 1, 'the portrait and the border are lifted above the shown panel')
+T.Hide()
+assert(T.house.PortraitContainer.level == 400 and T.house.NineSlice.level == 2, 'hidden, the panel gives the house its levels back')
 assert(rawget(p, 'crest') == nil and rawget(p.status, 'font') == nil, 'native fonts rather than the main window style')
 assert(Everloot.Window.frame == nil, 'opening the auction house does not build the main window')
 assert(Everloot.scanPrompt == nil, 'no floating reminder alongside the tab')

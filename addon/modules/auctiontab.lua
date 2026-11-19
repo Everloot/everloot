@@ -27,6 +27,9 @@ local TAB_GAP, TAB_PADDING, TAB_MIN_WIDTH = 3, 20, 70
 -- panel 20 above the house sat under the Auctions tab, which showed through it. The panel sits above every control
 -- of a page and under the dialogs, which must still cover it.
 local PANEL_LEVEL = 600
+-- The house's portrait (PortraitFrameTemplate: 62 wide, from 5 left of the house's top left corner to 57 in and 55
+-- down) hangs over the panel's top left corner. The heading starts to its right; the scan row is below it.
+local TITLE_X = 52
 local HINT = "Type an item's name or id, or shift-click an item here."
 local MATCHES = 20  -- the most items a part of a name lists
 local NONE = "No Everloot price for that item on this realm yet."
@@ -261,7 +264,7 @@ local function layout(panel, width)
     panel.lookupLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -90)
   end
   -- The scan's bar runs from the help button to the page button, or to the panel's edge without one.
-  local used = 16 + (tonumber(panel.title:GetStringWidth()) or 80) + 8 + 22 + 16
+  local used = TITLE_X + (tonumber(panel.title:GetStringWidth()) or 80) + 8 + 22 + 16
   local right = 16 + (panel.modeButton and (120 + 16) or 0)
   panel.progress:SetWidth(math.max(60, width - used - right))
   panel.shareButton:SetWidth(math.min(120, column / 2))
@@ -552,6 +555,17 @@ function T.Show()
   end
   if native and not native.isDisabled and PanelTemplates_DeselectTab then pcall(PanelTemplates_DeselectTab, native) end
   if T.tab and PanelTemplates_SelectTab then pcall(PanelTemplates_SelectTab, T.tab); T.tab:Enable() end
+  -- The house's border (NineSlice, at the house's own level) and portrait (PortraitContainer, 400) reach into the
+  -- panel's top left corner: under the panel, the ring is cut flat and the portrait's lower half is gone. Both are
+  -- lifted one above the panel while it shows and put back when it hides; the house's dialogs stay above all of it.
+  T.lifted = T.lifted or {}
+  local function lift(frame)
+    if type(frame) ~= "table" or not (frame.GetFrameLevel and frame.SetFrameLevel) then return end
+    if T.lifted[frame] == nil then T.lifted[frame] = tonumber(frame:GetFrameLevel()) or 0 end
+    frame:SetFrameLevel((tonumber(T.panel:GetFrameLevel()) or PANEL_LEVEL) + 1)
+  end
+  lift(T.house and T.house.NineSlice)
+  lift(T.house and T.house.PortraitContainer)
   T.panel:Show()
   layout(T.panel)
   T.Refresh()
@@ -560,6 +574,8 @@ end
 function T.Hide()
   local shown = T.panel and T.panel:IsShown()
   if T.panel then T.panel:Hide() end
+  for frame, level in pairs(T.lifted or {}) do frame:SetFrameLevel(level) end
+  T.lifted = nil
   if shown and PanelTemplates_DeselectTab then pcall(PanelTemplates_DeselectTab, T.tab) end
   local tabs = T.house and T.house.Tabs
   local selected = type(tabs) == "table" and tabs[T.house.selectedTab]
@@ -586,7 +602,7 @@ local function buildPanel(house)
     panel:SetBackdropColor(0.08, 0.075, 0.065, 1)
   end
   panel.title = words(panel, "GameFontNormalLarge")
-  panel.title:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -14)
+  panel.title:SetPoint("TOPLEFT", panel, "TOPLEFT", TITLE_X, -14)
   panel.title:SetText("Everloot")
   local help = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
   help:SetSize(22, 22)

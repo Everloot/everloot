@@ -246,6 +246,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Fixed
 - Addon: the Everloot panel at the auction house sits above the house's own page controls, so the Auctions page's top tab, and the Sell page's item slot and Post button, no longer show through it; the house's dialogs still cover it.
+- Addon: at the auction house, the NPC portrait and the ring around it sit whole over the Everloot panel's corner, and the Everloot heading starts right of the portrait.
 - Addon: the auction tab's price lookup finds an item by name again. Forever has no global GetItemInfo, so a typed name never resolved and the hint came back; the lookup now asks C_Item and then the names the player's scans gave with their rows. Part of a name lists the matching scanned items with the scan's prices, and a name nothing matches says so instead of the hint.
 - Site: empty NPC, vendor, quest and object tabs all say what would fill them (3 installs agreeing), in one shared set of sentences, and the vendors list says a vendor is listed once 3 installs agree on an item and its price.
 - Site: the public MCP, /api/tools and the changes pages hold one copy of the uploads and the patch-notes timeline per server instance instead of one per request, which ran the site out of memory and answered 503; the MCP coverage tool says "not measured yet" when no stored score can be read instead of working it out from every report.
