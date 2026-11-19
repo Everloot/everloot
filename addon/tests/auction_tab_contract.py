@@ -291,6 +291,26 @@ assert(tab.points.BOTTOMLEFT and tab.points.BOTTOMLEFT[2] == 'BOTTOMRIGHT' and t
 assert(tab.selected, 'Everloot is styled as the active tab')
 """)
 
+# Blizzard re-anchors its own auction tabs 3 apart at load (PanelTemplates_AnchorTabs) and sizes them with 20 padding
+# and a 70 minimum (AuctionHouseFrameTabMixin, build 70959). The Everloot tab does the same, so it sits beside
+# Auctions instead of over it; the template's OnShow resizes with no padding, so it is sized again after.
+lua = fresh(STYLED, """
+resized = {}
+PanelTemplates_TabResize = function(tab, padding, absolute, minWidth) resized[#resized + 1] = { tab = tab, padding = padding, absolute = absolute, minWidth = minWidth } end
+""")
+lua.execute("""
+openHouse()
+local tab = Everloot.AuctionTab.tab
+local at = tab.points.BOTTOMLEFT
+assert(at[1] == blizzardTabs[3] and at[2] == 'BOTTOMRIGHT' and at[3] == 3 and at[4] == 0, 'beside Auctions with the native gap of 3, not over it')
+local last = resized[#resized]
+assert(last.tab == tab and last.padding == 20 and last.absolute == nil and last.minWidth == 70, 'sized like the native tabs')
+local n = #resized
+assert(tab.hooked.OnShow, 'sized again when shown')
+tab.hooked.OnShow(tab)
+assert(#resized == n + 1 and resized[n + 1].padding == 20 and resized[n + 1].minWidth == 70, 'the native sizing after the template resizes it')
+""")
+
 lua = fresh(STYLED, """
 PanelTemplates_SelectTab = function() error('tab textures unavailable') end
 PanelTemplates_DeselectTab = function() error('tab textures unavailable') end
@@ -427,12 +447,20 @@ sameAsLines(STUB)
 checkLayout()
 p.hooked.OnSizeChanged(p, 784, 450)
 checkLayout()
+assert(p.results.width == 784 - 32 - 26, 'the results span the page, the scroll bar at its right edge: ' .. p.results.width)
 
 -- Long results scroll inside their area above the footer; a new lookup starts at the top.
 local bottom = p.results.points.BOTTOMLEFT
 assert(bottom[1] == p.footer and bottom[2] == 'TOPLEFT' and bottom[4] >= 4, 'the results end above the footer, however many lines it wraps to')
 assert(p.footer.points.BOTTOMLEFT[1] == p and p.footer.width + p.shareButton.width <= p.width - 32, 'the footer leaves room for Save scan')
+p.results.ScrollBar = CreateFrame('Slider')
+function p.results.ScrollBar.SetShown(self, shown) self.shown = shown end
+lookup('2589')
+assert(p.results.ScrollBar.shown == false, 'no scroll bar when the result fits')
 p.results.height = 60
+lookup('2589')
+assert(p.results.ScrollBar.shown == true, 'a scroll bar when the result is longer than its area')
+assert(p.results.scrollBarHideable == true, "Blizzard's scroll frame hides its own bar with no range")
 checkScroll()
 p.results.scripts.OnMouseWheel(p.results, -1000)
 assert(p.results.offset > 0)

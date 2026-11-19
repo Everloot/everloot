@@ -15,8 +15,12 @@ E.AuctionTab = T
 T.SITE = "everloot.app/tools/auctions"
 local TEMPLATES = { "PanelTabButtonTemplate", "CharacterFrameTabButtonTemplate", "UIPanelButtonTemplate" }
 local sessionStart = time()   -- a scan before this load is already in the saved file
--- The text column: wide enough for a label and its value, narrow enough that the eye finds one from the other.
+-- The text column until the panel has a size; once shown it spans the panel, the scroll bar at its right edge.
 local COLUMN, SCROLLBAR, PAD, GAP = 686, 26, 8, 12
+-- Blizzard's auction house tabs (build 70959): PanelTemplates_SetNumTabs re-anchors each one 3 to the right of the
+-- one before (PanelTemplates_AnchorTabs; the -15 in their XML is replaced at load), and AuctionHouseFrameTabMixin
+-- sizes them with 20 padding and a 70 minimum. The Everloot tab follows both, so it sits beside Auctions as they do.
+local TAB_GAP, TAB_PADDING, TAB_MIN_WIDTH = 3, 20, 70
 local HINT = "Type an item's name or id, or shift-click an item here."
 local NONE = "No Everloot price for that item on this realm yet."
 -- The shopping page: rows on screen at once, their height, and each column's left edge and width.
@@ -162,6 +166,9 @@ local function layoutResults(panel)
   local scroll = panel.results
   local limit = math.max(0, y - (tonumber(scroll:GetHeight()) or 0))
   scroll:SetVerticalScroll(math.min(tonumber(scroll:GetVerticalScroll()) or 0, limit))
+  -- The scroll bar only when there is something to scroll: an empty one floats in the page.
+  local bar = scroll.ScrollBar
+  if type(bar) == "table" and bar.SetShown then bar:SetShown(limit > 0) end
 end
 
 -- Shows one result. A line with a label and an amount is one row, the label in the line's colour and the amount
@@ -206,7 +213,7 @@ end
 local function layout(panel, width)
   width = tonumber(width) or tonumber(panel:GetWidth())
   if not width or width <= 0 then return end
-  local column = math.floor(math.max(160, math.min(COLUMN, width - 32 - SCROLLBAR)))
+  local column = math.floor(math.max(160, width - 32 - SCROLLBAR))
   panel.column = column
   local buttonWidth = math.min(140, math.floor((column - 12) / 2))
   panel.scanButton:SetWidth(buttonWidth)
@@ -601,6 +608,7 @@ local function buildPanel(house)
   -- without the scroll frame template gets a plain scroll frame, still moved by the mouse wheel.
   local made, scroll = pcall(CreateFrame, "ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
   if not made or not scroll then scroll = CreateFrame("ScrollFrame", nil, panel) end
+  scroll.scrollBarHideable = true
   scroll:SetPoint("TOPLEFT", box, "BOTTOMLEFT", -6, -10)
   scroll:SetPoint("BOTTOMLEFT", footer, "TOPLEFT", 0, 8)
   scroll:SetWidth(COLUMN)
@@ -679,14 +687,19 @@ function T.Attach(house)
   local built, why = pcall(function()
     local tabs = type(house.Tabs) == "table" and house.Tabs or {}
     local last = tabs[#tabs]
-    if last then tab:SetPoint("BOTTOMLEFT", last, "BOTTOMRIGHT", -15, 0)
+    if last then tab:SetPoint("BOTTOMLEFT", last, "BOTTOMRIGHT", TAB_GAP, 0)
     else tab:SetPoint("TOPLEFT", house, "BOTTOMLEFT", 20, 2) end
     local width = tab.GetWidth and tab:GetWidth()
     if type(width) ~= "number" or width < 60 then tab:SetSize(100, 24) end
     local height = last and last:GetHeight()
     if type(height) == "number" and height > 0 then tab:SetHeight(height) end
     tab:SetText("Everloot")
-    if PanelTemplates_TabResize then pcall(PanelTemplates_TabResize, tab, 0) end
+    local function size()
+      if PanelTemplates_TabResize then pcall(PanelTemplates_TabResize, tab, TAB_PADDING, nil, TAB_MIN_WIDTH) end
+    end
+    size()
+    -- The template's own OnShow resizes with the house's padding, which is none; size it again after, as theirs are.
+    if tab.HookScript then tab:HookScript("OnShow", size) end
     if PanelTemplates_DeselectTab then pcall(PanelTemplates_DeselectTab, tab) end
     T.panel = buildPanel(house)
     tab:SetScript("OnClick", function() if T.panel:IsShown() then T.Hide() else T.Show() end end)
