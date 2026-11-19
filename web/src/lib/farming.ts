@@ -1,5 +1,5 @@
 import { CLIENT_TAXONOMY } from "./items";
-import { agreedGatherKinds, objectSpawns, type ObjectSpawnRow } from "../../../kb/src/object-spawns";
+import { agreedGatherKinds, objectSpawns, skillRange, type ObjectSpawnRow, type SkillRange } from "../../../kb/src/object-spawns";
 import { INDEPENDENT_INSTALLS } from "../../../kb/src/drop-rollup";
 import type { NpcRow } from "./world-lists";
 import type { ZoneSummary } from "./zones";
@@ -44,6 +44,11 @@ export interface FarmArea {
   mobs: number;
   /** Gathering spots 3 installs placed here; 0 for a mob area. */
   nodes: number;
+  /**
+   * A gathering area only, once 3 installs reported it: the Herbalism or Mining rank players had when they gathered
+   * the area's spots (`skillRange`). Absent otherwise.
+   */
+  skill?: SkillRange;
 }
 
 const itemSubclass = new Map(CLIENT_TAXONOMY.items.filter((r) => r[1] === TRADE_GOODS).map((r) => [r[0], r[2]]));
@@ -92,16 +97,30 @@ export function farmingAreas(
  * object source, `objectSpawnRowsFromRecords`), grouped into spots the way the object pins are, a spot counting once
  * 3 installs placed it. An object counts as an herb or ore node when 3 installs agree it was opened that way. The
  * place is where the player stood, a few yards from the node, so an area is a zone and a count, never a pin here.
+ * An area also says what skill players had there (`skill`), from the rows on that map of the objects it counts, opened
+ * as that kind, once 3 installs reported a rank.
  */
 export function gatherAreas(rows: readonly ObjectSpawnRow[], kind: "herb" | "ore", zones: readonly ZoneSummary[]): FarmArea[] {
   const kinds = agreedGatherKinds([...rows]);
   const byMap = new Map(zones.map((z) => [z.mapId, z]));
   const count = new Map<number, number>();
+  const counted = new Set<string>();
   for (const pin of objectSpawns([...rows]).pins) {
     if (kinds.get(pin.objectId) !== kind || !byMap.has(pin.mapId)) continue;
     count.set(pin.mapId, (count.get(pin.mapId) ?? 0) + 1);
+    counted.add(`${pin.objectId}|${pin.mapId}`);
   }
-  return order([...count].map(([mapId, nodes]) => ({ key: String(mapId), zone: byMap.get(mapId)!, levels: null, mobs: 0, nodes })))
+  const skillRows = new Map<number, ObjectSpawnRow[]>();
+  for (const r of rows) {
+    if (r.gatherSkill === undefined || r.gatherKind !== kind || r.mapId === undefined || !counted.has(`${r.objectId}|${r.mapId}`)) continue;
+    const list = skillRows.get(r.mapId) ?? [];
+    list.push(r);
+    skillRows.set(r.mapId, list);
+  }
+  return order([...count].map(([mapId, nodes]) => {
+    const skill = skillRange(skillRows.get(mapId) ?? []);
+    return { key: String(mapId), zone: byMap.get(mapId)!, levels: null, mobs: 0, nodes, ...(skill ? { skill } : {}) };
+  }))
     .sort((a, b) => b.nodes - a.nodes || a.zone.name.localeCompare(b.zone.name));
 }
 

@@ -4,35 +4,43 @@ import { notFound } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Card, Container, DataTable, EmptyState, FilterBar, Input, PageHeader, ResultStrip, SectionHeading, type Column, type FilterControl } from "@/components/ui";
 import { FAMILIES } from "@/data/families";
-import { armoryOn } from "@/lib/armory";
-import { directoryPrefix, guildDirectoryHref } from "@/lib/armory-guilds";
+import { ARMORY_REGIONS, ARMORY_RULESETS, armoryGuildPath, armoryOn, metricValue, regionLabel } from "@/lib/armory";
+import type { ArmoryGuildRow } from "@/lib/armory-store";
+import {
+  GUILD_DIRECTORY_PAGE, GUILD_SORTS, guildDirectoryHref, guildDirectoryQuery, loadGuildDirectory, rulesetSlug, type GuildDirectoryQuery,
+} from "@/lib/armory-guilds";
 import { dataAgeLabel } from "@/lib/data-age";
 import {
   factionLabel, guildPath, guildSearchPrefix, guildsOn, ladderHref, loadGuildData, loadGuildRealms, loadGuildSearch, loadLadder, parseLadderQuery, raidsOpen, realmPath,
   type BossFirst, type LadderQuery, type RankedRow,
 } from "@/lib/guilds";
+import { playerStore } from "@/lib/player-store";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import type { GuildSummary } from "../../../../kb/src/guilds";
 import { LADDER_PAGE } from "../../../../kb/src/guilds";
+import { ArmoryCredit, newest, NOINDEX, RegionRuleset, Unreachable } from "../armory/parts";
 import { BossStrip, day, FactionMark, guildRobots, link, number, Progress, rulesetLabel } from "./parts";
 
 export const dynamic = "force-dynamic";
 
-const DESCRIPTION = "WoW: Forever guilds by progression: a ladder per raid from the kills two members' uploads agree on, each guild's bosses, roster sightings and activity.";
+const DESCRIPTION = "WoW: Forever guilds: find one by name, filter by region and ruleset, see how many members were read, and follow progression from members' uploads.";
 const START_LINE = "The ladder starts with the first kill two members report.";
 /** Before raids open, said in place of a raid ranking. Nothing is estimated in its place. */
 const RAIDS_LINE = "Ranking starts when raids open on December 9.";
+/** Before any agreed kill and before raids open: one line where the ladder will go. */
+const LADDER_LINE = "Progression ladders start December 9.";
 
 type Search = Record<string, string | string[] | undefined>;
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 export async function generateMetadata(props: { searchParams: Promise<Search> }): Promise<Metadata> {
-  if (!guildsOn()) return {};
+  if (!guildsOn() && !armoryOn()) return {};
   const params = await props.searchParams;
   return {
-    ...pageMetadata({ title: "WoW Forever Guilds by Progression", description: DESCRIPTION, path: "/guilds" }),
-    robots: guildRobots(Object.keys(params).length > 0),
+    ...pageMetadata({ title: "WoW Forever Guilds", description: DESCRIPTION, path: "/guilds" }),
+    // The directory is Blizzard's API data, which stays out of search engines as every armory page does.
+    robots: armoryOn() ? NOINDEX : guildRobots(Object.keys(params).length > 0),
   };
 }
 
@@ -85,20 +93,74 @@ const searchColumns: Column<GuildSummary>[] = [
   { key: "seen", header: "Members seen", numeric: true, cell: (g) => (g.membersSeen === null ? <span className="text-muted">Not counted</span> : number(g.membersSeen)) },
 ];
 
+const muted = (text: string) => <span className="text-muted">{text}</span>;
+
+function directoryColumns(counted: boolean): Column<ArmoryGuildRow>[] {
+  const all: Column<ArmoryGuildRow>[] = [
+    { key: "name", header: "Guild", cell: (g) => <Link href={armoryGuildPath(g.region, g.slug)} className={`${link} font-medium`}>{g.name}</Link> },
+    { key: "where", header: "Region", nowrap: true, cell: (g) => <RegionRuleset region={g.region} ruleset={g.ruleset} /> },
+    { key: "faction", header: "Faction", nowrap: true, cell: (g) => g.faction },
+    { key: "roster", header: "Roster", numeric: true, cell: (g) => number(g.memberCount) },
+    { key: "read", header: "Members read", numeric: true, cell: (g) => number(g.membersRead) },
+    { key: "il", header: "Avg item level", numeric: true, cell: (g) => (g.averageItemLevel === null ? muted("Not read") : metricValue("item-level", g.averageItemLevel)) },
+    { key: "l60", header: "Level 60", numeric: true, cell: (g) => number(g.level60) },
+    { key: "at", header: "Last read", numeric: true, cell: (g) => <span className="font-mono tabular-nums">{day(g.fetchedAt)}</span> },
+  ];
+  // Before the directory's migration only the name, region, faction and roster size are known.
+  return counted ? all : all.filter((c) => ["name", "where", "faction", "roster"].includes(c.key));
+}
+
+function directoryControls(d: GuildDirectoryQuery): FilterControl[] {
+  const href = (over: Partial<GuildDirectoryQuery>) => guildDirectoryHref({ ...d, page: 1, ...over });
+  return [
+    {
+      type: "menu", key: "sort", label: `Sort: ${GUILD_SORTS.find((s) => s.slug === d.sort)!.label}`,
+      options: GUILD_SORTS.map((s) => ({ label: s.label, href: href({ sort: s.slug }), on: d.sort === s.slug, reset: s.slug === "members" })),
+    },
+    {
+      type: "menu", key: "region", label: d.region ? regionLabel(d.region) : "Region",
+      options: [
+        { label: "All regions", href: href({ region: null }), on: d.region === null, reset: true },
+        ...ARMORY_REGIONS.map((r) => ({ label: regionLabel(r), href: href({ region: r }), on: d.region === r })),
+      ],
+    },
+    {
+      type: "menu", key: "rules", label: ARMORY_RULESETS.find((r) => r.id === d.ruleset)?.label ?? "Ruleset",
+      options: [
+        { label: "All rulesets", href: href({ ruleset: null }), on: d.ruleset === null, reset: true },
+        ...ARMORY_RULESETS.map((r) => ({ label: r.label, href: href({ ruleset: r.id }), on: d.ruleset === r.id })),
+      ],
+    },
+  ];
+}
+
+/** The guild hide list, or null when it could not be read (then the directory lists no guild). */
+async function hiddenGuilds(): Promise<Set<string> | null> {
+  try { return await playerStore().hiddenGuilds(); } catch { return null; }
+}
+
 export default async function GuildsPage(props: { searchParams: Promise<Search> }) {
-  if (!guildsOn()) notFound();
+  const progression = guildsOn();
+  const armory = armoryOn();
+  if (!progression && !armory) notFound();
   const params = await props.searchParams;
   const q = (first(params.q) ?? "").trim().slice(0, 40);
-  const prefix = q ? guildSearchPrefix(q) : null;
+  const prefix = progression && q ? guildSearchPrefix(q) : null;
   const query = parseLadderQuery(params);
   const open = raidsOpen();
-  const data = await loadGuildData();
-  const [ladder, found, realms] = await Promise.all([
-    data.unreachable ? null : loadLadder(data, query),
+  // The directory matches one word from the start of the name, so a name of several words searches it by the first.
+  const d = guildDirectoryQuery({ ...params, q: q.split(/\s+/)[0] });
+  const data = progression ? await loadGuildData() : null;
+  const [ladder, found, realms, dir] = await Promise.all([
+    !data || data.unreachable ? null : loadLadder(data, query),
     prefix ? loadGuildSearch(prefix) : null,
     // Without a readable hide list no guild is counted, as no guild is listed.
-    data.unreachable ? null : loadGuildRealms(),
+    !data || data.unreachable ? null : loadGuildRealms(),
+    armory ? hiddenGuilds().then((hidden) => loadGuildDirectory(d, hidden)) : null,
   ]);
+  // The one box feeds both searches; it says the rule only when neither could take the text.
+  const refused = Boolean(q) && !prefix && (!armory || d.prefix === null);
+  const ruleset = ARMORY_RULESETS.find((r) => r.id === d.ruleset);
   const href = (change: Partial<LadderQuery>) => ladderHref({ ...query, page: undefined, ...change });
   const controls: FilterControl[] = ladder?.instance ? [
     {
@@ -137,17 +199,59 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
         <PageHeader
           trail={trailFor("/guilds")!}
           title="Guilds"
-          lede="WoW: Forever guilds by progression, from their members' uploads."
-          meta={!data.unreachable && <span>{dataAgeLabel(data.dataAsOf)}</span>}
+          lede={armory
+            ? "WoW: Forever guilds read from Blizzard's API, with the characters read in each, and progression from members' uploads."
+            : "WoW: Forever guilds by progression, from their members' uploads."}
+          meta={armory
+            ? <ArmoryCredit at={!dir || dir.state === "unreachable" ? null : newest(dir.rows.map((r) => r.fetchedAt))} />
+            : data && !data.unreachable && <span>{dataAgeLabel(data.dataAsOf)}</span>}
         />
         <div className="space-y-6">
-          {armoryOn() && <ArmoryDirectoryLine q={q} />}
           <form action="/guilds" method="get" role="search" className="flex max-w-xl flex-col gap-2 sm:flex-row">
             <label htmlFor="guild-q" className="sr-only">Guild name</label>
             <Input id="guild-q" name="q" type="search" defaultValue={q} maxLength={40} autoComplete="off" placeholder="Start of a guild name, 2 letters or more" className="flex-1" />
+            {armory && d.region && <input type="hidden" name="region" value={d.region} />}
+            {armory && ruleset && <input type="hidden" name="rules" value={rulesetSlug(ruleset.label)} />}
+            {armory && d.sort !== "members" && <input type="hidden" name="sort" value={d.sort} />}
             <button type="submit" className="btn btn-primary min-h-11">Find a guild</button>
           </form>
-          {q && !prefix && <p className="text-sm text-fg-2">Type 2 to 24 letters of the guild&apos;s name.</p>}
+          {refused && <p className="text-sm text-fg-2">Type 2 to 24 letters of the guild&apos;s name.</p>}
+          {dir && (dir.state === "unreachable" ? <Unreachable /> : (
+            <section aria-labelledby="directory" className="space-y-3">
+              <SectionHeading id="directory" note="Members read counts the characters the armory has read whose guild this is; the roster is Blizzard's own count. A character who asked to be hidden is not counted.">
+                Read from Blizzard&apos;s API
+              </SectionHeading>
+              <FilterBar
+                label="Directory filters"
+                controls={directoryControls(d)}
+                active={[d.region, d.ruleset, d.prefix].filter((v) => v !== null).length + (d.sort === "members" ? 0 : 1)}
+                clearHref={guildDirectoryHref({})}
+                aside={dir.state === "ready" && dir.total > 0 && (
+                  <ResultStrip total={dir.total} noun="guilds" page={d.page} perPage={GUILD_DIRECTORY_PAGE} href={(page) => guildDirectoryHref({ ...d, page })} />
+                )}
+              />
+              {dir.state === "not-ready" && (
+                <p role="status" className="text-sm text-fg-2">
+                  Counts and sorting start once the directory&apos;s database update is applied.
+                  {d.prefix ? " Until then a search finds guilds by name." : " Until then, search a guild by name."}
+                </p>
+              )}
+              {dir.rows.length === 0
+                ? <EmptyState message={
+                    dir.state === "ready" && d.page > 1 && dir.total > 0 ? "No guilds on this page."
+                    : d.prefix ? `No guild read yet starts with “${d.prefix}”.`
+                    : dir.state === "ready" ? "No guild matches these filters yet." : "No guild to list yet."
+                  } />
+                : <DataTable
+                    dense
+                    caption={d.prefix ? `Guilds whose name starts with ${d.prefix}` : "Guilds read from Blizzard's API"}
+                    columns={directoryColumns(dir.state === "ready")}
+                    rows={dir.rows}
+                    rowKey={(g) => `${g.region}/${g.slug}`}
+                    meta={(g) => `${regionLabel(g.region)} ${g.ruleset} · ${number(g.memberCount)} on the roster`}
+                  />}
+            </section>
+          ))}
           {found && (
             <section aria-labelledby="guild-results" className="space-y-3">
               <SectionHeading id="guild-results">
@@ -171,10 +275,10 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
             </section>
           )}
 
-          {data.unreachable || !ladder ? (
+          {!data ? null : data.unreachable || !ladder ? (
             <Card><p className="text-fg-2">{STORAGE_UNREACHABLE}</p></Card>
           ) : !ladder.instance ? (
-            <StartState line={open ? START_LINE : RAIDS_LINE} />
+            <p className="text-cell text-fg-2">{open ? START_LINE : LADDER_LINE}</p>
           ) : (
             <>
               {!ladder.instances.some((i) => i.instanceType === "raid") && <p className="text-cell text-fg-2">{open ? START_LINE : RAIDS_LINE}</p>}
@@ -231,38 +335,5 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
         </div>
       </article>
     </Container>
-  );
-}
-
-/**
- * The armory's guild directory, linked rather than shown here: it is Blizzard's API data, which may only appear on
- * an ad-free page, and /guilds is not one. A search typed here carries over when the armory's search rule takes it.
- */
-function ArmoryDirectoryLine({ q }: { q: string }) {
-  const prefix = directoryPrefix(q);
-  const searched = typeof prefix === "string" && prefix !== "invalid" ? prefix : null;
-  return (
-    <p className="text-sm text-fg-2">
-      Every guild read from Blizzard&apos;s API, with its members, class mix and item level, is in the{" "}
-      <Link href={guildDirectoryHref({})} className={link}>guild directory</Link>.
-      {searched && <> <Link href={guildDirectoryHref({ prefix: searched })} className={link}>Search it for &ldquo;{searched}&rdquo;</Link>.</>}
-    </p>
-  );
-}
-
-/** Before the first agreed kill: the start line, then what the ladder will hold. */
-function StartState({ line }: { line: string }) {
-  return (
-    <div className="space-y-4">
-      <EmptyState message={line} />
-      <Card as="section" aria-labelledby="what-will-be-here">
-        <h2 id="what-will-be-here" className="text-h2-sm text-fg sm:text-h2">What will be here</h2>
-        <ol className="mt-3 grid gap-3 text-cell text-fg-2 sm:grid-cols-3">
-          <li className="flex gap-3"><span className="w-5 shrink-0 font-mono text-muted">1</span><span>A ladder per raid: bosses killed, then who got there first.</span></li>
-          <li className="flex gap-3"><span className="w-5 shrink-0 font-mono text-muted">2</span><span>A page per guild with each boss and the day it fell.</span></li>
-          <li className="flex gap-3"><span className="w-5 shrink-0 font-mono text-muted">3</span><span>Filters by ruleset, realm and faction.</span></li>
-        </ol>
-      </Card>
-    </div>
   );
 }

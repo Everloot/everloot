@@ -137,15 +137,13 @@ test("unreadable storage says so, never a collecting page or a zero", async () =
   expect(page).not.toContain("<table");
 });
 
-test("with player pages on, the census offers the player lookup: a form to /players and the hide link", async () => {
+test("with player pages on, the census offers the player lookup: a link to /players, which holds the one search box, and the hide link", async () => {
   vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
   store.loadCensus.mockResolvedValue(corpus(RECORDS));
   const page = await html();
   expect(page).toContain("Look up a player");
-  expect(page).toMatch(/<form [^>]*action="\/players"[^>]*method="get"/);
-  expect(page).toMatch(/<form [^>]*role="search"/);
-  expect(page).toMatch(/<input [^>]*maxlength="40"/i);
-  expect(page).toMatch(/<input [^>]*name="q"/);
+  expect(page).toContain('href="/players"');
+  expect(page).not.toMatch(/<form [^>]*action="\/players"/);
   expect(page).toContain('href="/players/opt-out"');
   expect(text(page)).toContain("Race, class, level, guild and the day the addon last saw them. Nothing else.");
   // The lookup comes before the window tabs.

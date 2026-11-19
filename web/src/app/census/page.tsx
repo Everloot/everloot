@@ -10,7 +10,7 @@ import { playerPagesOn } from "@/lib/player-pages";
 import { guildsOn } from "@/lib/guild-switch";
 import { PLAYER_PAGE_SHOWS } from "../players/player-view";
 import {
-  Card, Container, DataTable, EmptyState, Explainer, FilterBar, Input, LinkTabs, PageHeader, SectionHeading, type Column, type FilterControl,
+  Card, Container, DataTable, EmptyState, Explainer, FilterBar, LinkTabs, PageHeader, SectionHeading, type Column, type FilterControl,
 } from "@/components/ui";
 import {
   activeDims, censusHref, filterCensus, parseCensusFilter, type CensusDim, type CensusFilter, type FilteredCensus,
@@ -110,25 +110,19 @@ function TakePart() {
   );
 }
 
-/** The way into the player pages and the guild pages, each shown only while the owner's switch has it on. */
+/**
+ * The way into the player pages and the guild pages, each shown only while the owner's switch has it on. Links, not
+ * forms: /players and /guilds hold the one search box each.
+ */
 function LookUpPlayer({ players, guilds }: { players: boolean; guilds: boolean }) {
   return (
     <Card as="section" aria-labelledby="look-up" className="space-y-3">
       <SectionHeading id="look-up">{players ? "Look up a player" : "Look up a guild"}</SectionHeading>
-      {players && (
-        <form action="/players" method="get" role="search" className="flex max-w-xl flex-col gap-2 sm:flex-row">
-          <label htmlFor="census-player-q" className="sr-only">Character name</label>
-          <Input id="census-player-q" name="q" type="search" maxLength={40} autoComplete="off" placeholder="Start of a character's name" className="flex-1" />
-          <button type="submit" className="btn btn-primary min-h-11">Find</button>
-        </form>
-      )}
-      {guilds && (
-        <form action="/guilds" method="get" role="search" className="flex max-w-xl flex-col gap-2 sm:flex-row">
-          <label htmlFor="census-guild-q" className="sr-only">Guild name</label>
-          <Input id="census-guild-q" name="q" type="search" maxLength={40} autoComplete="off" placeholder={players ? "or the start of a guild's name" : "Start of a guild's name"} className="flex-1" />
-          <button type="submit" className="btn min-h-11">Find a guild</button>
-        </form>
-      )}
+      <p className="text-sm">
+        {players && <Link href="/players" className={link}>Find a player</Link>}
+        {players && guilds && " · "}
+        {guilds && <Link href="/guilds" className={link}>Find a guild</Link>}
+      </p>
       {players && <p className="text-sm text-fg-2">{PLAYER_PAGE_SHOWS}</p>}
       <p className="text-sm">
         {players && <Link href="/players/opt-out" className={link}>Hide your character</Link>}

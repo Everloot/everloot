@@ -308,6 +308,32 @@ test("the item database page gets a small Auction House box only when a price is
   expect(await loadMarketBox(2589, today)).toEqual([]);
 });
 
+test("the browse page's realm and house picker: realms keep the filters, houses keep the realm, and ?realm= still lands on the realm", async () => {
+  // The old form's parameter on the all-realms page still goes to the realm's page, keeping the house.
+  await expect(hub({ realm: "forever", house: "horde" })).rejects.toThrow("REDIRECT /tools/auctions/forever?house=horde");
+  await expect(hub({ realm: "forever", house: "nowhere" })).rejects.toThrow(/REDIRECT \/tools\/auctions\/forever$/);
+  const all = await hub({ house: "horde", moved: "1" });
+  expect(all).toContain("data-realm-house-picker");
+  expect(all).toContain('href="/tools/auctions/forever?house=horde&amp;moved=1"');
+  expect(all).toContain('href="/tools/auctions/malganis?house=horde&amp;moved=1"');
+  expect(all).toContain('href="/tools/auctions?moved=1"');
+  const page = await realmHtml("forever", { house: "horde" });
+  expect(page).toContain('href="/tools/auctions?house=horde"');
+  expect(page).toContain('href="/tools/auctions/forever?house=alliance"');
+  expect(page).toContain('href="/tools/auctions/forever"');
+  // The realm menu sits in the picker, not in the filter bar.
+  expect(page.match(/data-filter="realm"/g)).toHaveLength(1);
+});
+
+test("the item database page reads its one item for the Auction House box: no realm board is built", async () => {
+  const spies = [auctionHouse.realmBoards, auctionHouse.itemAcrossRealms].map((f) => vi.mocked(f));
+  for (const spy of spies) spy.mockClear();
+  const html = renderToStaticMarkup(await DatabaseItemPage({ params: Promise.resolve({ id: "2589" }) }));
+  expect(html).toContain("data-market-box");
+  expect(html).toContain('href="/tools/auctions/forever/2589"');
+  for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+});
+
 test("every price names its house: All houses lists each house's price apart, and nothing blends them", async () => {
   const rows = [
     ...scans(dayAgo(0), [[2589, 100, 100]], "Forever", undefined, { house: "Alliance" }),

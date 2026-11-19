@@ -30,7 +30,7 @@ beforeEach(() => {
 afterEach(() => { delete held.__everlootArmory; delete held.__everlootArmoryLogged; vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.resetModules(); });
 
 test("with no store the hub, a board and both forms render the unreachable line, the credit and the forms", async () => {
-  const hub = renderToStaticMarkup(await (await import("./page")).default({ searchParams: Promise.resolve({ q: "vel" }) }));
+  const hub = renderToStaticMarkup(await (await import("./page")).default({ searchParams: Promise.resolve({}) }));
   const board = renderToStaticMarkup(await (await import("./rankings/[metric]/page")).default({ params: Promise.resolve({ metric: "item-level" }), searchParams: Promise.resolve({}) }));
   const hide = renderToStaticMarkup(await (await import("./hide/page")).default({ searchParams: Promise.resolve({}) }));
   const submit = renderToStaticMarkup(await (await import("./submit/page")).default({ searchParams: Promise.resolve({}) }));

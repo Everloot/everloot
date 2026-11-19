@@ -8,6 +8,7 @@ import { PREFIXES, SERVED } from "./lib/build-versions";
 import { CHAT_PROVIDERS } from "./lib/chat/providers";
 import { isProtectedPath } from "./lib/document-boundary";
 import { isPrivatePath } from "./lib/cf-edge-cache";
+import { loadGuides, publishedGuides } from "./lib/guides";
 
 test("download shortcuts are exact permanent redirects, leaving files and desktop connect alone", async () => {
   const redirects = await nextConfig.redirects!();
@@ -77,6 +78,10 @@ test("every route that reads the wiki pages carries them in its bundle", () => {
     expect(includes[key!], route).toContain("../kb/wiki/*.md");
     expect(includes[key!], route).toContain("../kb/wiki/categories.yaml");
   }
+});
+
+test("the header's guides switch is the guide reader's gate: on only once kb/guides holds a reviewed guide", () => {
+  expect(nextConfig.env!.EVERLOOT_REVIEWED_GUIDES).toBe(publishedGuides(loadGuides()).length > 0 ? "1" : "");
 });
 
 test("every route that reads the guides carries them in its bundle", () => {

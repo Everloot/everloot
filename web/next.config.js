@@ -74,10 +74,17 @@ const downloads = Object.fromEntries(readdirSync(downloadsDir).filter((name) => 
   return [`/downloads/${name}`, { size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") }];
 }));
 
+// Whether kb/guides holds a reviewed guide (status: published; the guide check fails a published guide with no review).
+// The header's Guides menu lists the guides index only then. Every page draws the header and the Worker has no copy of
+// kb/guides to read, so the build decides; next-config.test.ts pins it to the guide reader's gate (lib/guides.ts).
+const guidesDir = path.join(__dirname, "..", "kb", "guides");
+const reviewedGuides = readdirSync(guidesDir).some((name) => name.endsWith(".md") && name !== "README.md"
+  && /^status:\s*published\s*$/m.test(readFileSync(path.join(guidesDir, name), "utf8").split(/^---\s*$/m)[1] ?? ""));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  env: { EVERLOOT_DOWNLOADS: JSON.stringify(downloads) },
+  env: { EVERLOOT_DOWNLOADS: JSON.stringify(downloads), EVERLOOT_REVIEWED_GUIDES: reviewedGuides ? "1" : "" },
   // Native module: required at runtime from web/node_modules, never bundled.
   serverExternalPackages: ["better-sqlite3"],
   // The approved knowledge release ships inside the /mcp function only (copied to web/.release, never committed).

@@ -2,18 +2,19 @@ import { ARMORY_RULESETS, classTokenOfId, isArmoryRegion, SEARCH_RULE, type Armo
 import { armoryStore, type ArmoryGuildRow, type ArmoryGuildSort, type ArmoryMember } from "./armory-store";
 
 /**
- * The armory's guild directory (/armory/guilds) and the summary on an armory guild page, from Blizzard's API data.
+ * The guild directory on /guilds and the summary on an armory guild page, from Blizzard's API data.
  *
- * It is an armory page, not a section of /guilds: Blizzard's Developer API Terms allow no ad on a page that shows
- * this data, and /armory is on the ad-free list while /guilds is not. /guilds keeps its ladder and its search over
- * members' uploads and the players table, and links here, its search carrying over. The two lists are not merged row
- * by row either: uploads name a guild by realm and name, the armory by region and slug, and nothing joins the two
- * reliably yet, so one table holding both would double a guild or fold two different guilds into one.
+ * Blizzard's Developer API Terms allow no ad on a page that shows this data, so /guilds is on the ad-free list
+ * (data/ad-free-paths.json) with the armory. The old address, /armory/guilds, redirects there. /guilds also keeps its
+ * ladder and its search over members' uploads and the players table. The two lists are not merged row by row: uploads
+ * name a guild by realm and name, the armory by region and slug, and nothing joins the two reliably yet, so one table
+ * holding both would double a guild or fold two different guilds into one.
  *
- * The filters live in the address: `q`, `region`, `ruleset`, `sort` and `page`.
+ * The filters live in the address: `q`, `region`, `rules`, `sort` and `p`. The ruleset and the page are `rules` and
+ * `p`, not `ruleset` and `page`, because the ladder on the same page already reads those two.
  */
 
-export const GUILD_DIRECTORY_PATH = "/armory/guilds";
+export const GUILD_DIRECTORY_PATH = "/guilds";
 
 export const GUILD_DIRECTORY_PAGE = 50;
 
@@ -53,9 +54,9 @@ export function directoryPrefix(raw: string | undefined): string | null | "inval
 export function guildDirectoryQuery(search: Search): GuildDirectoryQuery {
   const prefix = directoryPrefix(one(search.q));
   const region = one(search.region)?.toLowerCase();
-  const rules = one(search.ruleset)?.toLowerCase();
+  const rules = one(search.rules)?.toLowerCase();
   const sort = one(search.sort)?.toLowerCase();
-  const page = Number(one(search.page));
+  const page = Number(one(search.p));
   return {
     prefix: prefix === "invalid" ? null : prefix,
     region: isArmoryRegion(region) ? region : null,
@@ -71,9 +72,22 @@ export function guildDirectoryHref(d: Partial<GuildDirectoryQuery>): string {
   if (d.prefix) params.set("q", d.prefix);
   if (d.region) params.set("region", d.region);
   const rules = ARMORY_RULESETS.find((r) => r.id === d.ruleset);
-  if (rules) params.set("ruleset", rulesetSlug(rules.label));
+  if (rules) params.set("rules", rulesetSlug(rules.label));
   if (d.sort && d.sort !== "members") params.set("sort", d.sort);
-  if (d.page && d.page > 1) params.set("page", String(d.page));
+  if (d.page && d.page > 1) params.set("p", String(d.page));
+  const s = params.toString();
+  return s ? `${GUILD_DIRECTORY_PATH}?${s}` : GUILD_DIRECTORY_PATH;
+}
+
+/** The old /armory/guilds names for the ruleset and the page. */
+const MOVED_PARAMS: Record<string, string> = { ruleset: "rules", page: "p" };
+
+/** The directory's address on /guilds for an old /armory/guilds one: every parameter carried over, two renamed. */
+export function movedDirectoryHref(search: Search): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(search)) {
+    for (const v of Array.isArray(value) ? value : value === undefined ? [] : [value]) params.append(MOVED_PARAMS[key] ?? key, v);
+  }
   const s = params.toString();
   return s ? `${GUILD_DIRECTORY_PATH}?${s}` : GUILD_DIRECTORY_PATH;
 }

@@ -594,6 +594,7 @@ export declare const intakeRequest: z.ZodObject<{
             other: "other";
         }>>;
         sourceObjectName: z.ZodOptional<z.ZodString>;
+        gatherSkill: z.ZodOptional<z.ZodNumber>;
     }, z.core.$strip>, z.ZodObject<{
         installId: z.ZodString;
         eventId: z.ZodOptional<z.ZodString>;
@@ -1978,6 +1979,7 @@ export declare const API_SCHEMAS: {
                 other: "other";
             }>>;
             sourceObjectName: z.ZodOptional<z.ZodString>;
+            gatherSkill: z.ZodOptional<z.ZodNumber>;
         }, z.core.$strip>, z.ZodObject<{
             installId: z.ZodString;
             eventId: z.ZodOptional<z.ZodString>;
