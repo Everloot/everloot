@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vitest";
-import DarkmoonItemNote from "./DarkmoonItemNote";
+import DarkmoonItemNote from "@/app/database/items/[id]/DarkmoonItemNote";
 import DarkmoonGuide from "@/app/guides/darkmoon-faire/page";
 
 test("a turn-in item explains its use with its source and uncertainty", () => {

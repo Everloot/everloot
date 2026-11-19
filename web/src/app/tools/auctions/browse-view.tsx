@@ -25,6 +25,7 @@ import {
 import { Contribute, Facts, ItemLink, PendingRealms, RealmName, RulesetSummaryTable, Sparkline, count } from "./parts";
 import { RealmHousePicker } from "./RealmHousePicker";
 import TimeAgo from "./TimeAgo";
+import Icon from "@/components/ui/Icon";
 
 type Search = Record<string, string | string[] | undefined>;
 
@@ -314,7 +315,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
             <details data-category-control className="lg:hidden">
               <summary className={`ctl flex cursor-pointer list-none items-center gap-1.5 border px-3 [&::-webkit-details-marker]:hidden ${q.cls ? "border-accent text-fg" : "border-edge text-fg-2"}`}>
                 <span className="min-w-0 flex-1 truncate">Category: <span className="text-fg">{categoryLabel}</span></span>
-                <svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" className="shrink-0 text-muted"><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
+                <Icon name="chevron" className="shrink-0 text-muted" />
               </summary>
               <div className="mt-1 rounded-control border border-line bg-panel p-1">{categoryNav}</div>
             </details>

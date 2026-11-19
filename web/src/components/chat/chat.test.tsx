@@ -269,7 +269,7 @@ describe("the chat page", () => {
   });
 
   test("an answer the tools did not back is labelled From the model", async () => {
-    await render(<AssistantMessage m={{ role: "assistant", text: "Tailors make it.", at: "", model: "m", sources: [], pages: [], steps: [] }} copied={false} onCopy={() => {}} />);
+    await render(<AssistantMessage m={{ role: "assistant", text: "Tailors make it.", at: "", model: "m", sources: [], pages: [], steps: [] }} />);
     expect(text()).toContain("From the model");
     expect(text()).not.toContain("From Everloot");
   });

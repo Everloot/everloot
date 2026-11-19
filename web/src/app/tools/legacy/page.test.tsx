@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test, vi } from "vitest";
-import LegacyPerks from "@/components/LegacyPerks";
+import LegacyPerks from "./LegacyPerks";
 import { LEGACY_PERKS } from "@/data/game-data/legacy-perks";
 import { TOOL_GROUPS } from "@/data/tools";
 import { LegacyPerkCatalog } from "../../../../../kb/src/legacy-perks/catalog";

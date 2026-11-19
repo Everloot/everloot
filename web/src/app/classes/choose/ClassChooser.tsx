@@ -108,7 +108,7 @@ export default function ClassChooser({ data }: { data: ClassChooserData }) {
         <SectionHeading id="answers">Your answers</SectionHeading>
         {error && <p role="alert" className="mb-4 text-sm text-fg">{`${error} The chooser shows no answers instead.`}</p>}
         {/* A new set of answers draws the form afresh, so its choices are always the address's. */}
-        <form key={answersHash(answers, data)} ref={form} onSubmit={submit} className="max-w-[75ch] space-y-6">
+        <form key={answersHash(answers, data)} ref={form} onSubmit={submit} className="max-w-lede space-y-6">
           <label className="block max-w-sm space-y-1 text-sm">
             <span className="block font-semibold text-fg">Is there a race you want to play?</span>
             <select name={RACE} defaultValue={answers[RACE] ?? ""} className={control}>
@@ -155,7 +155,7 @@ export default function ClassChooser({ data }: { data: ClassChooserData }) {
         </form>
       </section>
 
-      <section aria-labelledby="result" className="max-w-[75ch]">
+      <section aria-labelledby="result" className="max-w-lede">
         <h2 id="result" ref={result} tabIndex={-1} className="mb-4 scroll-mt-24 text-xl font-semibold tracking-tight text-fg">{headline(fit, answers, races)}</h2>
         {!fit ? (
           <p className="text-sm text-muted">Answer at least one question, then choose Show the classes that fit.</p>

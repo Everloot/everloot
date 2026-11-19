@@ -12,7 +12,7 @@ export default function Explainer({ summary, children, open = false }: { summary
         <span aria-hidden="true" className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-edge font-mono text-xs text-muted group-open:border-accent group-open:text-accent">?</span>
         {summary}
       </summary>
-      <div className="mt-2 max-w-[65ch] space-y-2 border-l border-line pl-4 text-fg-2">{children}</div>
+      <div className="mt-2 max-w-prose space-y-2 border-l border-line pl-4 text-fg-2">{children}</div>
     </details>
   );
 }

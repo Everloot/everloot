@@ -407,6 +407,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the loot observations table sorts frequency by its 95% Wilson lower bound while still showing the observed share.
 
 ### Changed
+- Site: cards, icons and copy buttons look and behave the same everywhere; small corners, captions and line lengths follow the site's sizes.
 - Site: the Auction House, a realm's prices, Bag upgrades and Disenchanting open faster: the price boards are worked out once each time new scans come in, not again for every visit.
 - Site: the armory crawl fails its hourly job only when 3 Blizzard rows or 1% of the rows it read fail (fewer are deferred for 7 days and shown as a warning), still fails at once when storage refuses a row, and names the response field that broke, never the character.
 - Site: the open data download page (/database/download) is now built ahead and refreshed every five minutes, so it opens without waiting on the export's manifest; every other page keeps the freshness it had.

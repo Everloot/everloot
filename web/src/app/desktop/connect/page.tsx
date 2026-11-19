@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import DesktopConnect from "@/components/DesktopConnect";
+import DesktopConnect from "./DesktopConnect";
 import { signInPath } from "@/lib/auth/return-to";
 import { characterLinksOn } from "@/lib/character-links";
 import { connectPath, parseConnectRequest } from "@/lib/desktop-connect";

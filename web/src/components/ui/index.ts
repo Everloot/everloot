@@ -16,6 +16,7 @@ export { EntryList, Entry, type EntryProps } from "./EntryList";
 export { default as Explainer } from "./Explainer";
 export { default as EvidenceLine } from "./EvidenceLine";
 export { default as Facts, type Fact } from "./Facts";
+export { default as Icon, type IconName } from "./Icon";
 export { default as InShort } from "./InShort";
 export { default as OpenData } from "./OpenData";
 export { default as Field, Input } from "./Field";

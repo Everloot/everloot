@@ -34,8 +34,8 @@ export default async function HideGuildPage(props: { searchParams: Promise<{ gui
           meta={<span>The characters keep their own pages; each can be hidden with the <Link href="/players/opt-out" className={link}>character hide form</Link>. To undo a guild hide, email <a className={link} href="mailto:hello@everloot.app">hello@everloot.app</a>.</span>}
         />
 
-        {done && <p role="status" className="rounded-xl border border-line bg-panel p-4 text-fg">Done. That guild is hidden.</p>}
-        {error && <p role="alert" className="rounded-xl border border-line bg-panel p-4 text-fg">
+        {done && <p role="status" className="rounded-card border border-line bg-panel p-4 text-fg">Done. That guild is hidden.</p>}
+        {error && <p role="alert" className="rounded-card border border-line bg-panel p-4 text-fg">
           {error === "limit" ? "Too many requests from this connection. Try again in an hour." : error === "storage" ? "We could not save that. Try again in a moment." : "Check the guild name (2 to 24 characters) and the realm, and send it again."}
         </p>}
 

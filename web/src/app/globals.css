@@ -133,7 +133,7 @@ body:has([data-banner]) {
   }
 }
 
-/* The map fills the screen under the header (components/WorldMapView.tsx), like chat: the page does not scroll and
+/* The map fills the screen under the header (app/map/WorldMapView.tsx), like chat: the page does not scroll and
    the footer stays off it. Its sidebar carries the footer's credit line instead. */
 body:has([data-map-shell]) {
   overflow: hidden;

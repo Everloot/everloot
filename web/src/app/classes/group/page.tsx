@@ -40,7 +40,7 @@ export default function GroupPage() {
       />
       <GroupPlanner roles={roles} />
 
-      <section aria-labelledby="about" className="mt-12 max-w-[75ch] space-y-3 text-sm text-fg-2">
+      <section aria-labelledby="about" className="mt-12 max-w-lede space-y-3 text-sm text-fg-2">
         <SectionHeading id="about">How the planner works</SectionHeading>
         <p>
           What a class brings is the raid builder&apos;s coverage, read from the game files of build {CURRENT_BUILD} and

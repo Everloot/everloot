@@ -31,7 +31,7 @@ export default function Segmented<T extends string | number>({ label, options, v
             aria-pressed={on}
             aria-disabled={!!o.disabled}
             onClick={() => { if (!o.disabled) onChange(o.value); }}
-            className={`inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[4px] border px-3 text-sm font-medium transition-colors aria-disabled:cursor-not-allowed aria-disabled:opacity-50 ${stretch ? "flex-1" : ""} ${on ? "border-edge bg-panel text-fg" : "border-transparent text-fg-2 hover:text-fg"}`}
+            className={`inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-control border px-3 text-sm font-medium transition-colors aria-disabled:cursor-not-allowed aria-disabled:opacity-50 ${stretch ? "flex-1" : ""} ${on ? "border-edge bg-panel text-fg" : "border-transparent text-fg-2 hover:text-fg"}`}
           >
             {o.label}
           </button>

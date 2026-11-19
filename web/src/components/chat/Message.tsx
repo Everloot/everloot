@@ -1,4 +1,6 @@
 import { useRef } from "react";
+import Card from "@/components/ui/Card";
+import CopyButton from "@/components/ui/CopyButton";
 import { answerOrigin, NO_SOURCED_ANSWER, sourceLink } from "@/lib/chat/agent";
 import type { ChatMessage } from "@/lib/chat/store";
 import AnswerText, { pageKind, pagePath } from "./AnswerText";
@@ -16,10 +18,10 @@ function shownText(m: ChatMessage): string {
 
 export function UserMessage({ m }: { m: ChatMessage }) {
   return (
-    <div className="ml-auto w-fit max-w-[85%] rounded-card border border-line bg-panel px-4 py-2">
+    <Card padding="custom" className="ml-auto w-fit max-w-[85%] px-4 py-2">
       <p className="whitespace-pre-wrap break-words text-fg">{m.text}</p>
       {m.context && <p className="mt-1 text-xs text-muted">{m.context}</p>}
-    </div>
+    </Card>
   );
 }
 
@@ -27,8 +29,8 @@ export function UserMessage({ m }: { m: ChatMessage }) {
  * An answer, its item, its origin (From Everloot with the pages, From the model), the model and a copy button. With
  * the workspace on, `onSave` gets the text selected inside the answer (or all of it) and `onSaveItem` its item.
  */
-export function AssistantMessage({ m, copied, onCopy, onChoose = () => {}, onSave, onSaveItem }: {
-  m: ChatMessage; copied: boolean; onCopy: () => void; onChoose?: (id: number) => void;
+export function AssistantMessage({ m, onChoose = () => {}, onSave, onSaveItem }: {
+  m: ChatMessage; onChoose?: (id: number) => void;
   onSave?: (text: string) => void; onSaveItem?: (id: number) => void;
 }) {
   const body = useRef<HTMLDivElement>(null);
@@ -86,7 +88,7 @@ export function AssistantMessage({ m, copied, onCopy, onChoose = () => {}, onSav
         <span>{m.model ?? "Everloot search"}</span>
         {m.steps.length > 0 && <span>{m.steps.length} lookup{m.steps.length === 1 ? "" : "s"}</span>}
         {m.text !== NO_SOURCED_ANSWER && (
-          <button type="button" className="min-h-9 underline underline-offset-4 hover:text-accent" onClick={onCopy}>{copied ? "Copied" : "Copy"}</button>
+          <CopyButton text={m.text} label="Copy" className="min-h-9 underline underline-offset-4 hover:text-accent" />
         )}
         {onSave && m.text !== NO_SOURCED_ANSWER && (
           // The selection is read as the pointer goes down, before the click can move it.

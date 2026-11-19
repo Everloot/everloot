@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Badge, Card, LinkTabs, Segmented } from "@/components/ui";
+import { Badge, Card, CopyButton, LinkTabs, Segmented } from "@/components/ui";
 import {
   allCategories, candidateCounts, categoryCounts, CATEGORY_GROUPS, CATEGORY_IDS, continentPath, initialView, mapUrlSearch, openPageLink,
   mapHref, parseDeepLink, parseZoneLink, pinHref, readPinSet, searchMap, spotBox, viewSearch, visibleItems, wayCommand, zoneSearch, zoneSpot,
@@ -12,15 +12,15 @@ import {
 import type { PoiIcons } from "@/lib/map-marks";
 import { mapCoordinates, mapPoint, parseCoordinatePin, serialiseCoordinatePin } from "@/lib/map-coordinate-pin";
 import { confirmedLine } from "@/lib/report-labels";
-import MapList, { HELD_LABEL } from "./map/MapList";
-import type { FitRequest, MapMarker, MapViewChange } from "./map/LeafletMap";
-import "./map/world-map.css";
+import MapList, { HELD_LABEL } from "@/components/map/MapList";
+import type { FitRequest, MapMarker, MapViewChange } from "@/components/map/LeafletMap";
+import "@/components/map/world-map.css";
 
 export type { MapMarker };
 
 // Leaflet is loaded here and nowhere else: the rest of the site never downloads it, and the List tab is rendered
 // on the server, so the page reads without it.
-const LeafletMap = dynamic(() => import("./map/LeafletMap"), {
+const LeafletMap = dynamic(() => import("@/components/map/LeafletMap"), {
   ssr: false,
   loading: () => <p className="grid h-full place-items-center px-4 text-center text-sm text-muted">Loading the map. The same places are in the List tab.</p>,
 });
@@ -184,7 +184,7 @@ export default function WorldMapView(props: WorldMapViewProps) {
   const [spot, setSpot] = useState<{ x: number; y: number } | null>(sharedPoint);
   const coordinates = useRef<CoordinatesHandle>(null);
   const onHover = useCallback((point: HoverPoint) => coordinates.current?.setPoint(point), []);
-  const [copied, setCopied] = useState("");
+  const [copyStatus, setCopied] = useState("");
   const [request, setRequest] = useState<FitRequest | null>(null);
   const [view, setView] = useState<View>(props.url.tab);
   const [collapsed, setCollapsed] = useState(false);
@@ -443,14 +443,9 @@ export default function WorldMapView(props: WorldMapViewProps) {
   const page = selected
     ? openPageLink({ kind: selected.kind, npcId: selected.npcId, objectId: selected.objectId, instanceMapIds: selected.instanceMapIds, x: selected.x, y: selected.y }, zones, props.zonePages, props.instancePages)
     : spot ? openPageLink({ kind: "spot", x: spot.x, y: spot.y }, zones, props.zonePages) : null;
-  const copy = async (text: string, failed: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(`Copied: ${text}`);
-    } catch {
-      setCopied(failed);
-    }
-  };
+  // The card's link is absolute, read from the address bar at the click.
+  const linkTo = (path: string) => () => new URL(path, window.location.origin).toString();
+  const copied = (text: () => string, failed: string) => (ok: boolean) => setCopied(ok ? `Copied: ${text()}` : failed);
   useEffect(() => { setCopied(""); }, [command]);
 
   // The continent tabs keep the spoiler switch, the categories and the tab.
@@ -693,17 +688,20 @@ export default function WorldMapView(props: WorldMapViewProps) {
                 {selected?.reporters ? <Badge tone="confirmed">Seen by {selected.reporters} installs</Badge> : null}
               </div>
               <div className="flex flex-wrap gap-2">
-                {command && <button type="button" onClick={() => copy(command, "Could not copy. Select the line and copy it.")} className="btn min-h-11 px-4 text-sm">Copy /way</button>}
+                {command && <CopyButton text={command} label="Copy /way" onResult={copied(() => command, "Could not copy. Select the line and copy it.")} className="btn min-h-11 px-4 text-sm" />}
                 {permalink && (
-                  <button type="button" onClick={() => copy(new URL(permalink, window.location.origin).toString(), "Could not copy. The link is in the address bar.")} className="btn min-h-11 px-4 text-sm">
-                    Copy link
-                  </button>
+                  <CopyButton
+                    text={linkTo(permalink)}
+                    label="Copy link"
+                    onResult={copied(linkTo(permalink), "Could not copy. The link is in the address bar.")}
+                    className="btn min-h-11 px-4 text-sm"
+                  />
                 )}
                 {page && <Link href={page.href} className="btn min-h-11 px-4 text-sm">{page.label}</Link>}
                 {gatherLink && <Link href={gatherLink} className="btn min-h-11 px-4 text-sm">Herbalism gathering</Link>}
               </div>
               {command && <p className="font-mono text-xs text-muted" data-way>{command}</p>}
-              <p role="status" className="text-xs text-fg-2">{copied}</p>
+              <p role="status" className="text-xs text-fg-2">{copyStatus}</p>
             </Card>
           </div>
         )}

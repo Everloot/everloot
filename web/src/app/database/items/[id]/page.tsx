@@ -30,7 +30,7 @@ import { loadNames, nameOf } from "@/lib/names";
 import { loreForShownItem } from "@/lib/lore-links";
 import EntityLink from "@/components/EntityLink";
 import LoreSection from "@/components/LoreSection";
-import DarkmoonItemNote from "@/components/DarkmoonItemNote";
+import DarkmoonItemNote from "./DarkmoonItemNote";
 import { CategoryPage, categoryMetadata } from "../category-page";
 import { itemIndexable } from "@/lib/indexable";
 import { entityTitle, itemDescription } from "@/lib/entity-meta";
@@ -38,7 +38,8 @@ import { MarketBox, loadMarketBox } from "@/app/tools/auctions/MarketBox";
 import { pendingLine } from "../../../../../../kb/src/pending-loot";
 import { itemDropSources } from "../../../../../../kb/src/loot-tables";
 import { loadLootTables, loadReportedItemFacts } from "@/lib/rollup-compute";
-import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityIcon, EntityTop, known, LINK, PinTable, Unreachable } from "../../entity";
+import { EntityLayout, EntitySidebar, EmptyTab, EntityHeader, EntityTop, known, LINK, PinTable, Unreachable } from "../../entity";
+import { EntityIcon } from "@/components/game/EntityIcon";
 import { ItemSourcesPanel } from "../../loot-tables";
 import { unknownItem } from "../../unknown";
 import { itemSummary } from "@/lib/evidence";
@@ -304,7 +305,7 @@ export default async function ItemPage(props: Props) {
                 <TooltipLines lines={boxLines} />
               </TooltipFrame>
               {boxNotes.length > 0 && (
-                <div data-card-notes className="mt-1 space-y-0.5 rounded-[4px] border border-line bg-panel px-2 py-1 text-xs text-muted">
+                <div data-card-notes className="mt-1 space-y-0.5 rounded-control border border-line bg-panel px-2 py-1 text-xs text-muted">
                   {boxNotes.map((note) => <p key={note}>{note}</p>)}
                 </div>
               )}

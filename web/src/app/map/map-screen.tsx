@@ -16,7 +16,7 @@ import {
 import { CONTINENTS, continentCandidates, continentMapFromBounds, continentPinSet, continentTreasureCandidates, WORLD_MAP } from "@/lib/world-map";
 import { instanceHref, instanceRows, loadSightings } from "@/lib/instances";
 import { publicZones, zoneHref } from "@/lib/zones";
-import WorldMapView from "@/components/WorldMapView";
+import WorldMapView from "./WorldMapView";
 import { LIST_LIMIT } from "@/components/map/MapList";
 import { continentArt, instanceThumbs, loadSiteAssets, poiIcons } from "@/lib/game-assets";
 import { SiteCredit } from "@/components/Footer";

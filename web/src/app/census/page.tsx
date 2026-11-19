@@ -181,13 +181,13 @@ function Filtered({ view: v, window: w }: { view: FilteredCensus; window: Census
       <section aria-labelledby="filtered" className="space-y-3">
         <SectionHeading id="filtered">{v.label}</SectionHeading>
         {v.headline && (
-          <p className="max-w-[65ch] text-lg text-fg-2">
+          <p className="max-w-prose text-lg text-fg-2">
             {total === null
               ? <>{v.label}: {HIDDEN_LABEL}.</>
               : <>About {number(total)} characters{w.characters ? <>, {percent(total, w.characters)} of all characters counted</> : null}.</>}
           </p>
         )}
-        {v.note && <p className="max-w-[65ch] text-fg-2">{NOTE[v.note]}</p>}
+        {v.note && <p className="max-w-prose text-fg-2">{NOTE[v.note]}</p>}
       </section>
       {v.breakdowns.map((b) => (
         <CountTable
@@ -231,7 +231,7 @@ function Headline({ view, window: w }: { view: CensusView; window: CensusWindow 
     );
   }
   return (
-    <p className="max-w-[65ch] text-lg text-fg-2">
+    <p className="max-w-prose text-lg text-fg-2">
       About {number(w.characters!)} characters were {w.id === "week" ? "active in the last 7 days" : "seen since launch"} {span},
       counted from {plural(w.installs, "install", "installs")} that turned the census on{view.trusted ? ", including Everloot's own" : ""}.
     </p>

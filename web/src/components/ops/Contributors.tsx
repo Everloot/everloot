@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { OpsContributor } from "@/lib/ops/types";
+import Card from "@/components/ui/Card";
 import RealmControl from "./RealmControl";
 import ContributorIdentity from "./ContributorIdentity";
 
@@ -43,11 +44,11 @@ export default function Contributors({ rows, asOf }: { rows: OpsContributor[]; a
       </table>
       {!visible.length && <p className="px-3 py-4 text-cell text-muted">No installations match these filters.</p>}
     </div>
-    {contributor && <section aria-label={`Activity for ${contributor.alias}`} className="rounded-card border border-line bg-panel p-4">
+    {contributor && <Card as="section" padding="sm" aria-label={`Activity for ${contributor.alias}`}>
       <h3 className="font-semibold text-fg">{contributor.alias}</h3>
       <p className="mt-1 text-meta text-muted">Active UTC dates · {contributor.series === "receipts" ? "Successful receipt activity" : "Stored uploads only; receipt coverage unavailable"}</p>
       <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-meta text-fg-2">{contributor.daysActive.slice().sort().reverse().map(day => <li key={day}>{day}</li>)}</ul>
       <ContributorIdentity key={`${contributor.id}:${asOf}`} id={contributor.id} />
-    </section>}
+    </Card>}
   </section>;
 }

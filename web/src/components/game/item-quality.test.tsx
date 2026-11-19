@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vitest";
 import GameIcon from "./GameIcon";
-import { EntityIcon } from "@/app/database/entity";
+import { EntityIcon } from "./EntityIcon";
 import { QUALITIES } from "@/design/tokens";
 import { unknownItemIcon } from "@/lib/game-assets";
 

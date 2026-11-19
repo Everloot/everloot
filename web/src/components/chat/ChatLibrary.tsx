@@ -5,6 +5,7 @@ import {
   clip, deleteConversation, deleteWorkspace, exportWorkspace, listConversations, type Scoped,
 } from "@/lib/chat/workspace-api";
 import { WORKSPACE_LIMITS, type WorkspaceConversationSummary, type WorkspaceProject } from "@/lib/chat/workspace-types";
+import Container from "@/components/ui/Container";
 import type { LocalChat } from "./WorkspaceRail";
 
 const link = "underline underline-offset-4 hover:text-accent";
@@ -117,7 +118,7 @@ export default function ChatLibrary({ projects, local, opts, failed, busy, onBac
   const projectName = (id: string | null) => projects.find((p) => p.id === id)?.name ?? "Unfiled";
 
   return (
-    <div className="mx-auto w-full max-w-reading space-y-6 px-4 py-6">
+    <Container width="reading" className="mx-auto space-y-6 px-4 py-6">
       <div className="space-y-2">
         <button type="button" className={`min-h-9 text-sm text-fg-2 ${link}`} onClick={onBack}>Back to chat</button>
         <h2 className="text-2xl font-semibold text-fg">All chats</h2>
@@ -215,6 +216,6 @@ export default function ChatLibrary({ projects, local, opts, failed, busy, onBac
           </div>
         )}
       </section>
-    </div>
+    </Container>
   );
 }

@@ -139,7 +139,7 @@ export default function GameTree({ catalog, tree, ranks, available, spent, selec
                 />
                 <span aria-hidden="true" className="absolute inset-0 bg-contain bg-center bg-no-repeat" style={{ backgroundImage: frame ? `url(${frame})` : undefined }} />
                 {node.maxRanks > 1 && (
-                  <span aria-hidden="true" className="absolute -bottom-1 -right-1 rounded border px-1 font-mono text-[11px] leading-4 tabular-nums" style={{ color: counter, backgroundColor: "rgba(0,0,0,0.85)", borderColor: "#000" }}>
+                  <span aria-hidden="true" className="absolute -bottom-1 -right-1 rounded border px-1 font-mono text-caption leading-4 tabular-nums" style={{ color: counter, backgroundColor: "rgba(0,0,0,0.85)", borderColor: "#000" }}>
                     {rank}/{node.maxRanks}
                   </span>
                 )}

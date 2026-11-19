@@ -5,7 +5,7 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { categoryCounts, CATEGORY_IDS, DEFAULT_URL_STATE, spotBox, type MapItems } from "@/lib/map-view";
-import type { LeafletMapProps } from "./map/LeafletMap";
+import type { LeafletMapProps } from "@/components/map/LeafletMap";
 
 // The map itself needs a real browser; a stand-in records what the view hands it.
 const leaflet = vi.hoisted(() => ({ props: null as unknown as LeafletMapProps }));
@@ -85,7 +85,7 @@ const source = (path: string) => resolve(process.cwd(), "src", path);
 
 const $ = <T extends Element = HTMLElement>(sel: string) => container.querySelector<T>(sel)!;
 const button = (label: string, scope: ParentNode = container) =>
-  Array.from(scope.querySelectorAll("button")).find((b) => b.getAttribute("aria-label") === label || b.textContent?.trim() === label)!;
+  Array.from(scope.querySelectorAll("button")).find((b) => b.getAttribute("aria-label") === label || (b.querySelector("[data-copy-labels] > span") ?? b).textContent?.trim() === label)!;
 const click = (el: Element) => act(async () => (el as HTMLElement).click());
 const shell = () => $("[data-map-shell]");
 const panel = () => $("#map-panel");

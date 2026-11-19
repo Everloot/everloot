@@ -8,6 +8,7 @@ import AccountControls from "./AccountControls";
 import { REPORT_BUG_EVENT } from "./BugReport";
 import GameVersionLabel from "./GameVersionLabel";
 import { SuggestField } from "./ui/SearchBar";
+import Icon from "./ui/Icon";
 import { TOOL_GROUPS, toolGroups, type ToolGroup } from "@/data/tools";
 
 type NavLink = { label: string; href: string };
@@ -109,9 +110,7 @@ export function phoneGroups(items: NavItem[]): { label: string; links: NavLink[]
 
 function SearchIcon() {
   return (
-    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
-    </svg>
+    <Icon name="search" />
   );
 }
 
@@ -189,9 +188,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
       <div className="mx-auto flex h-header max-w-data items-center gap-1 px-2 sm:gap-3 sm:px-4 lg:gap-4 lg:px-6">
         <Link href="/" className="inline-flex min-h-11 shrink-0 items-center gap-2 text-lg font-bold tracking-tight text-fg focus-visible:outline-offset-[-2px]" onClick={closeAll}>
           {/* The favicon's diamond, outlined in the accent green. */}
-          <svg aria-hidden="true" viewBox="8 8 48 48" width="16" height="16" className="text-accent">
-            <path d="M32 12 52 32 32 52 12 32Z" fill="none" stroke="currentColor" strokeWidth="5" strokeLinejoin="round" />
-          </svg>
+          <Icon name="diamond" className="text-accent" />
           everloot
         </Link>
 
@@ -212,7 +209,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
                   className={`${navItem} gap-1.5 ${navState(on || expanded)}`}
                 >
                   {item.label}
-                  <svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" className={expanded ? "rotate-180" : undefined}><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
+                  <Icon name="chevron" className={expanded ? "rotate-180" : undefined} />
                 </button>
                 {/* Always in the page, so the links are in the HTML for crawlers; hidden until opened. */}
                 <div id={id} hidden={!expanded} className={`pop absolute left-0 top-full mt-2 w-60 rounded-card border border-edge bg-panel p-2 ${expanded ? "block" : "hidden"}`}>
@@ -242,7 +239,7 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
               listClassName="-left-9 -right-3 mt-2"
               className="h-7 w-full min-w-0 bg-transparent text-sm text-fg placeholder:text-muted focus:outline-none"
             />
-            <kbd aria-hidden="true" className="rounded-[4px] border border-line px-1.5 font-mono text-xs text-muted">/</kbd>
+            <kbd aria-hidden="true" className="rounded-control border border-line px-1.5 font-mono text-xs text-muted">/</kbd>
           </form>
         </div>
 

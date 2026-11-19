@@ -1,4 +1,4 @@
-import { CopyButton, SectionHeading } from "@/components/ui";
+import { Card, CopyButton, SectionHeading } from "@/components/ui";
 import type { GuideSet } from "@/lib/guide-freshness";
 import { absoluteUrl } from "@/lib/seo";
 import { planHash } from "@/lib/talents/import";
@@ -57,7 +57,7 @@ function SetPlan({ catalog, set, copy }: { catalog: TalentCatalog; set: GuideSet
   const [label, about] = orderLabel(set);
   const [lead, ...rest] = set.stale ? [] : set.changes;
   return (
-    <div data-guide-set={set.set} className="space-y-2 rounded-card border border-line bg-panel p-4 text-sm text-fg-2">
+    <Card padding="sm" data-guide-set={set.set} className="space-y-2 text-sm text-fg-2">
       <h3 className="text-base font-semibold text-fg">Set {set.set}{summary ? `: ${buildTitle(catalog, summary)}` : ""}</h3>
       {plan
         ? <p>{set.set === 1 ? `${points} talent points, the last at level ${levelFor(schedule, points)}.` : `${points} talent points. The second set opens at level ${levelFor(schedule, 1)}.`}</p>
@@ -81,7 +81,7 @@ function SetPlan({ catalog, set, copy }: { catalog: TalentCatalog; set: GuideSet
       {copy
         ? <CopyButton className="btn text-sm" text={copy} label={`Copy set ${set.set} for addon`} failedLabel="Copy failed" />
         : <p>Copy for addon is off for set {set.set} until the guide is reviewed again; the note above says why.</p>}
-    </div>
+    </Card>
   );
 }
 

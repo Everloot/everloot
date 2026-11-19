@@ -27,6 +27,7 @@ import { AssistantMessage, UserMessage } from "./Message";
 import ProjectView, { type AttachedNote } from "./ProjectView";
 import SaveToProject, { type SaveRequest } from "./SaveToProject";
 import { useWorkspace } from "./useWorkspace";
+import Container from "@/components/ui/Container";
 import WorkspaceRail, { type LocalChat } from "./WorkspaceRail";
 
 export const SUGGESTIONS = WELCOME.map((s) => s.text);
@@ -97,7 +98,6 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
   const [live, setLive] = useState<ChatProgress | null>(null);
   const [error, setError] = useState("");
   const [signed, setSigned] = useState<boolean | null>(null);
-  const [copied, setCopied] = useState<number | null>(null);
   const [railOpen, setRailOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [own, setOwn] = useState<Characters>({ characters: [], builds: [] });
@@ -578,10 +578,6 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
     if (c.id === currentId) newChat();
   }
 
-  async function copy(i: number, text: string) {
-    try { await navigator.clipboard.writeText(text); setCopied(i); setTimeout(() => setCopied(null), 1500); } catch { /* the browser refused; nothing to undo */ }
-  }
-
   async function createProject(name: string): Promise<string | null> {
     const o = ws.opts();
     if (!o) return "Sign in to create projects.";
@@ -744,7 +740,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
         )}
 
         {workspace && (pending || notice) && (
-          <div className="mx-auto w-full max-w-reading px-4">
+          <Container width="reading" className="mx-auto px-4">
             {pending?.kind === "import" && ws.account && (
               <div role="alertdialog" aria-label="Import browser chats" className="space-y-2 rounded-card border border-edge bg-panel p-3 text-sm">
                 <p className="text-fg">Copy {local.unbound.length} chat{local.unbound.length === 1 ? "" : "s"} from this browser into {ws.account.name}? The copies here stay as a backup, and nobody else signed in on this browser will see them.</p>
@@ -764,7 +760,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
               </div>
             )}
             {notice && !pending && <p role="status" className="text-sm text-fg-2">{notice}</p>}
-          </div>
+          </Container>
         )}
 
         {workspace && view?.kind === "all" && ws.account ? (
@@ -789,7 +785,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
             {providers.length > 0 && <p className="px-4 text-xs text-muted">Keys last only in this tab. Closing it forgets them.</p>}
             <div ref={thread} className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
               onScroll={(e) => { const t = e.currentTarget; stick.current = t.scrollHeight - t.scrollTop - t.clientHeight < 80; }}>
-              <div className="mx-auto w-full max-w-reading px-4 py-6">
+              <Container width="reading" className="mx-auto px-4 py-6">
                 {empty ? (
                   <ChatWelcome icons={icons} disabled={unknown} onAsk={(s) => void ask(s)}>
                     {inAccount && !meta.projectId && meta.revision === 0 && (
@@ -808,7 +804,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
                   <div role="log" aria-label="Conversation" aria-relevant="additions" className="space-y-6">
                     {messages.map((m, i) => m.role === "user"
                       ? <UserMessage key={i} m={m} />
-                      : <AssistantMessage key={i} m={m} copied={copied === i} onCopy={() => void copy(i, m.text)} onChoose={(item) => choose(i, item)}
+                      : <AssistantMessage key={i} m={m} onChoose={(item) => choose(i, item)}
                           {...(inAccount && !busy ? {
                             onSave: (text: string) => setSaving({ kind: "answer", title: messages[i - 1]?.text ?? "Saved answer", text, sources: m.sources }),
                             onSaveItem: (id: number) => setSaving({ kind: "page", href: `/database/items/${id}`, title: `/database/items/${id}` }),
@@ -841,7 +837,7 @@ export default function ChatClient({ savedBuilds = false, profiles = false, work
                   <button type="button" className="btn mt-2 min-h-9 px-3 text-sm" disabled={unknown} onClick={() => void ask(unanswered)}>Retry</button>
                 )}
                 {full && <button type="button" className="btn mt-2 min-h-9 px-3 text-sm" disabled={busy} onClick={() => newChat()}>Start a new chat</button>}
-              </div>
+              </Container>
             </div>
 
             {saving && inAccount && (

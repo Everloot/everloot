@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import ApiKeys from "@/components/ApiKeys";
 import { className } from "@/components/builds/describe";
 import ChatKeys from "@/components/chat/ChatKeys";
-import LinkedCharacters from "@/components/LinkedCharacters";
+import LinkedCharacters from "./LinkedCharacters";
 import MainCharacterButton from "@/components/settings/MainCharacterButton";
 import ProfileForm from "@/components/settings/ProfileForm";
 import StatusForm from "@/components/settings/StatusForm";

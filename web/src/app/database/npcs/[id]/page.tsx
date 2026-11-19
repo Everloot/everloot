@@ -62,7 +62,7 @@ function MapThumb({ pin, zone, art }: { pin: NpcPin; zone: string; art: string |
   const ratio = `${Math.abs(shape.bounds.left - shape.bounds.right)} / ${Math.abs(shape.bounds.top - shape.bounds.bottom)}`;
   return (
     <figure data-map-thumb className="w-full sm:max-w-tip">
-      <Link href={href} aria-label={`${zone} at ${pin.x}, ${pin.y}, on the map`} className="relative block overflow-hidden rounded-[4px] border border-line bg-panel" style={{ aspectRatio: ratio }}>
+      <Link href={href} aria-label={`${zone} at ${pin.x}, ${pin.y}, on the map`} className="relative block overflow-hidden rounded-control border border-line bg-panel" style={{ aspectRatio: ratio }}>
         {/* The zone's picture from the asset bucket as it is; next/image would only proxy it. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {art && <img src={art} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />}

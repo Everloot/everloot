@@ -21,6 +21,14 @@ export const RADIUS = { control: 6, card: 12 } as const;
  *  24 px sides, 16 px under 1024 px), and every page's column starts at its left edge. */
 export const WIDTH = { reading: 768, wide: 1152, data: 1440 } as const;
 
+/** Line lengths for running text, in ch: `max-w-prose` for explanations and notes, `max-w-lede` for a page's
+ *  opening line under its title. */
+export const MEASURE = { prose: 65, lede: 75 } as const;
+
+/** The caption step, in px: chart labels, rank changes and other small print beside a figure. Line height is the
+ *  surrounding text's. */
+export const CAPTION_SIZE = 11;
+
 /**
  * The data-page scale (density spec, 2026-10-20): `/database/*`, `/search` and the item, NPC and
  * quest pages. Prose pages keep Tailwind's own scale. Each step is [font-size, line-height] in px;

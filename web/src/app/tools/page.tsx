@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import GameIcon from "@/components/game/GameIcon";
-import { Container, PageHeader, SectionHeading } from "@/components/ui";
+import { Card, Container, PageHeader, SectionHeading } from "@/components/ui";
 import { TOOL_LINES, toolGroups } from "@/data/tools";
 import { classAndProfessionIcons, emblems, loadSiteAssets, poiIcons, type SiteAssets } from "@/lib/game-assets";
 import { trailFor } from "@/lib/breadcrumbs";
@@ -44,7 +44,7 @@ function toolIcons(assets: SiteAssets | null): Map<string, string> {
 function ToolCard({ label, href, icon }: { label: string; href: string; icon: string | undefined }) {
   return (
     // The link's area covers the card, so the whole card opens the tool; the name is the link's text.
-    <li className="relative flex items-start gap-3 rounded-card border border-line bg-panel p-4 transition-colors focus-within:border-accent hover:border-accent">
+    <Card as="li" padding="sm" className="relative flex items-start gap-3 transition-colors focus-within:border-accent hover:border-accent">
       {icon
         ? <GameIcon src={icon} size={36} />
         : <span aria-hidden="true" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-line bg-canvas font-semibold text-muted">{label.charAt(0)}</span>}
@@ -52,7 +52,7 @@ function ToolCard({ label, href, icon }: { label: string; href: string; icon: st
         <Link href={href} className="font-semibold text-fg after:absolute after:inset-0 after:content-['']">{label}</Link>
         <p className="text-sm text-muted">{TOOL_LINES[href]}</p>
       </div>
-    </li>
+    </Card>
   );
 }
 

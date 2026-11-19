@@ -18,8 +18,8 @@ vi.mock("next/link", () => ({
 }));
 
 // The map's pictures are drawn in the browser, so the page hands them to the map as props: this puts them in the markup to read.
-vi.mock("@/components/WorldMapView", async (importOriginal) => {
-  const real = await importOriginal<typeof import("@/components/WorldMapView")>();
+vi.mock("@/app/map/WorldMapView", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/app/map/WorldMapView")>();
   return { default: (props: Parameters<typeof real.default>[0]) => <><i data-map-art={JSON.stringify(props.art ?? null)} />{real.default(props)}</> };
 });
 

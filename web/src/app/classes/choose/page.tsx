@@ -55,7 +55,7 @@ export default function ChooserPage() {
         lede="Say what you like about playing, and the chooser names the classes that fit your answers, with the reasons and a link to each class."
       />
       {!reviewed && (
-        <div role="note" className="mb-8 max-w-[75ch] rounded-control border border-line bg-panel p-4 text-sm">
+        <div role="note" className="mb-8 max-w-lede rounded-control border border-line bg-panel p-4 text-sm">
           <p className="font-semibold text-warning">Draft for review: not reviewed yet</p>
           <p className="mt-1 text-fg-2">
             The questions, weights and facts on this page are Everloot&apos;s draft. No one has reviewed them yet, so the page
@@ -81,7 +81,7 @@ export default function ChooserPage() {
 function Weights({ data }: { data: ClassChooserData }) {
   const { source } = data.roles;
   return (
-    <section aria-labelledby="weights" className="mt-12 max-w-[75ch] space-y-6 text-sm text-fg-2">
+    <section aria-labelledby="weights" className="mt-12 max-w-lede space-y-6 text-sm text-fg-2">
       <SectionHeading id="weights">How each answer counts</SectionHeading>
       <p>
         Each answer adds a weight of 1, 2 or 3 to the classes it names: how far it leans toward a class, not a measure of
@@ -145,7 +145,7 @@ function Limits({ data }: { data: ClassChooserData }) {
     .map((o) => ({ answer: o.text, classes: o.readings!.map((r) => r.class).sort(byName) }));
   const unread = roleless.filter((c) => !reads.some((r) => r.classes.includes(c)));
   return (
-    <section aria-labelledby="limits" className="mt-12 max-w-[75ch] text-sm text-fg-2">
+    <section aria-labelledby="limits" className="mt-12 max-w-lede text-sm text-fg-2">
       <SectionHeading id="limits">What the chooser does not know</SectionHeading>
       <ul className="list-disc space-y-2 pl-5">
         <li>
