@@ -146,7 +146,7 @@ test("the stored-views run reads the corpus time and the heartbeat's pending fla
   };
   const done = run(() => Response.json({ dataAsOf: "2026-09-27", completionPending: false }));
   expect(await done.work).toEqual({ dataAsOf: "2026-09-27", rollupsPending: false });
-  expect(done.calls.every(c => c.method === "GET" && !c.url.startsWith("https://sb.example"))).toBe(true);
+  expect(done.calls.every(c => c.method === "GET" && new URL(c.url).origin !== "https://sb.example")).toBe(true);
   expect(await run(() => Response.json({ dataAsOf: "2026-09-27", completionPending: true })).work).toEqual({ dataAsOf: "2026-09-27", rollupsPending: true });
   // No heartbeat, or one that cannot be read: the reports wait.
   expect((await run(() => new Response(null, { status: 404 })).work).rollupsPending).toBe(true);
