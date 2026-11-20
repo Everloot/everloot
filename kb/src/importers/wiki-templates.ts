@@ -193,6 +193,12 @@ const LITERAL_TAGS = new Set(["nowiki", "pre", "poem", "syntaxhighlight", "sourc
 /** The closing tag of each tag the pass reads, matched exactly at a position: `</references>` is not `</ref>`. */
 const CLOSERS = new Map([...LITERAL_TAGS, "code", "ref"].map((name) => [name, new RegExp(`</${name}\\s*>`, "y")]));
 
+/**
+ * Drops `<code>` tags inside a literal span (`<nowiki><code>KEEP</code></nowiki>`): the converter drops everything
+ * inside `<code>` wherever it sits, and the wiki shows that text.
+ */
+const unwrapCode = (s: string) => s.replace(/<\/?code\b[^>]*>/gi, "");
+
 /** Holds a verbatim span's place while the spaces around it are collapsed. */
 const HELD = (n: number) => `\u0002${n}\u0003`;
 
@@ -213,7 +219,7 @@ function readTag(text: string, start: number, nameLength: number, nextLt: number
   let afterEquals = false;
   for (let i = start + 1 + nameLength; i < stop; i++) {
     const ch = text[i];
-    if (ch === ">") return { end: i + 1, selfClosing: text[i - 1] === "/" };
+    if (ch === ">") return { end: i + 1, selfClosing: slashBefore(text, i, start) };
     if (ch === "=") { afterEquals = true; continue; }
     if (afterEquals && (ch === '"' || ch === "'")) {
       if (lineEnd < i) { lineEnd = i; while (lineEnd < stop && text[lineEnd] !== "\n") lineEnd++; }
@@ -225,7 +231,14 @@ function readTag(text: string, start: number, nameLength: number, nextLt: number
     if (ch !== " " && ch !== "\t" && ch !== "\n") afterEquals = false;
   }
   if (nextLt === -1 || nextGt === -1) return null;
-  return { end: nextGt + 1, selfClosing: text[nextGt - 1] === "/" };
+  return { end: nextGt + 1, selfClosing: slashBefore(text, nextGt, start) };
+}
+
+/** Whether the ">" at `gt` closes a self-closing tag: a "/" right before it, or before only spaces (`<ref name="x" / >`). */
+function slashBefore(text: string, gt: number, start: number): boolean {
+  let j = gt - 1;
+  while (j > start && (text[j] === " " || text[j] === "\t" || text[j] === "\n")) j--;
+  return text[j] === "/";
 }
 
 /** The first ">" at or after a position; asked in increasing order, so the page is read once. */
@@ -361,11 +374,11 @@ function prepare(wikitext: string): string {
     const close = tag.name === "ref" ? refClose(tag.end) : tag.name === "code" ? codeClose(tag.end) : literalClose(tag.name, tag.end);
     if (!close) {
       if (tag.name === "ref") { out += "<"; i = lt + 1; continue; }
-      out += hold(wikitext.slice(lt)); // never closes: the rest of the page stays as written
+      out += hold(unwrapCode(wikitext.slice(lt))); // never closes: the rest of the page stays as written
       break;
     }
     if (tag.name === "code") out += hold(wikitext.slice(tag.end, close.start).replace(/<\/?nowiki\s*>/gi, ""));
-    else if (tag.name !== "ref") out += hold(wikitext.slice(lt, close.end));
+    else if (tag.name !== "ref") out += hold(unwrapCode(wikitext.slice(lt, close.end)));
     i = close.end;
   }
   return out

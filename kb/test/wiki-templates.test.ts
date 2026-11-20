@@ -314,6 +314,13 @@ test("comments, literal tags and code are read in context, by their exact names"
   expect(wtf(repairTemplates("<prex>x <code>KEEP</code> and <codex>y</codex>")).text()).toBe("x KEEP and y");
   // A </code> inside a comment does not close the code.
   expect(repairTemplates("<code>a<!-- </code> -->b</code>c")).toBe("a<!-- </code> -->bc");
+  // Code inside a literal span keeps its text: the converter would drop it with the tags around it.
+  expect(wtf(repairTemplates("<nowiki><code>KEEP</code></nowiki>TAIL")).text()).toBe("KEEP TAIL");
+  expect(wtf(repairTemplates("<pre><code class=\"x\">KEEP</code></pre>TAIL")).text()).toBe("KEEP TAIL");
+  expect(wtf(repairTemplates("<pre><code>KEEP")).text()).toBe("KEEP");
+  // A self-closing tag may have spaces between its slash and ">".
+  expect(wtf(repairTemplates('A<ref name="x" / >KEEP<ref>citation</ref>TAIL')).text()).toBe("AKEEPTAIL");
+  expect(repairTemplates("<nowiki / >x  y")).toBe("<nowiki / >x y");
 });
 
 test("letters that grow when lower-cased do not shift where tags are found", () => {
