@@ -118,10 +118,5 @@ export async function GET(req: Request) {
   } catch (err) {
     console.error("snapshot failed", err);
     return NextResponse.json({ ok: false, error: "snapshot failed" }, { status: 500 });
-  } finally {
-    // The settled list reads the corpus and the stores keep it. The Worker reuses its isolate for the next request, so
-    // kept past the run it sat under the stored-views run five minutes later, which ran out of memory on its first view
-    // (2026-11-20 18:45 and 18:55, #1354).
-    release();
   }
 }

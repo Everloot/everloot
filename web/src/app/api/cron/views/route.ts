@@ -33,8 +33,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
   const rebuild = new URL(req.url).searchParams.get("rebuild") === "1";
-  // The isolate may still hold what an earlier request read and kept; this run needs the room (#1354).
-  release();
   let work: { dataAsOf: string | null; rollupsPending: boolean };
   try {
     work = await uploadStore.viewsWork();
