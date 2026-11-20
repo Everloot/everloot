@@ -266,6 +266,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Addon: the completion tracker is on in a new install, so dungeon and raid kills reach your character page through the Desktop App; an older install keeps its choice.
 
 ### Fixed
+- Site: while no guide is reviewed, `/guides`, `/classes` and each class page share one empty state that says what a reviewed guide is and how to offer one, linking the guide contract, the Talent calculator and the Guide submission form (#971).
 - Site: the scheduled jobs run on the cron Worker (`everloot-cron`); the site Worker keeps only the operations summary (`EVERLOOT_CRON_WORKER` is "1" in `web/wrangler.jsonc`).
 - Site: the snapshot cron lets go of each file it read before the next step (the stores kept every one for pages, and together they outgrew the Worker), and writes its heartbeat before the auction reports and Auction House boards, its two largest steps (#1354).
 - Site: the corpus snapshot is stored in parts under `snapshots/corpus/` with `snapshots/corpus.json` listing them, and the cron's work check reads only that list. Read whole, the 31 MB file needed about 107 MB of the Worker's 128 MB before any work began, so every snapshot run since 13:20 UTC on 2026-11-19 ran out of memory and `/api/health` answered stale (#1354).

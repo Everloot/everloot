@@ -48,11 +48,14 @@ test("the hub is titled with its class and links the calculator, the census, the
   expect(html).toContain('href="/wow-forever#races"');
 });
 
-test("with no reviewed guide the hub says so; with one it links the guide", async () => {
-  expect(await render()).toContain(`No ${name} guide is reviewed yet.`);
+test("with no reviewed guide the hub shows the shared empty state for its class; with one it links the guide", async () => {
+  // The words are guides-empty.test.tsx's; here, that the hub renders it for this class.
+  const empty = await render();
+  expect(empty).toContain("data-guides-empty");
+  expect(empty).toContain(`No ${name} guide is reviewed yet.`);
   hubData.guides = [GUIDE];
   const html = await render();
-  expect(html).not.toContain(`No ${name} guide is reviewed yet.`);
+  expect(html).not.toContain("data-guides-empty");
   expect(html).toContain(`href="${guideHref(GUIDE.slug)}"`);
   expect(html).toContain("A made-up plan");
   expect(html).toContain("Levels 10–20");
