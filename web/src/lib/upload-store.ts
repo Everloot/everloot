@@ -118,6 +118,47 @@ interface CensusSnapshot {
 /** Uploads one census run folds at most; the next run continues from where it stopped. */
 const CENSUS_UPLOADS_PER_RUN = 2000;
 
+/**
+ * The census by UTC day (#1354): `snapshots/census/<day>.json` holds the rows whose `eventId` falls on that day, and
+ * `snapshots/census/index.json` the fold watermark and each day's row count. Rows merge by install and event, and the
+ * daily caps count per install, kind and day, so each day folds on its own and the days together equal one fold. A run
+ * reads and rewrites only the days its new uploads hold, about 1.5 MB, where the single file it replaces (version 1,
+ * `snapshots/census.json`, 17.9 MB on 2026-11-20) ran the cron Worker out of memory.
+ */
+interface CensusIndex {
+  version: 2;
+  generatedAt: string;
+  /** Rows stored per day; a day has a file once it has rows. */
+  days: Record<string, number>;
+  /** received_at of the newest upload folded in, and the ids sharing it, so ties are not read twice. */
+  lastReceivedAt: string | null;
+  lastIds: string[];
+}
+const CENSUS_DAYS = "snapshots/census/";
+const CENSUS_INDEX_KEY = `${CENSUS_DAYS}index.json`;
+const CENSUS_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The UTC day of a census row, from its event id (`<kind>:<day>:<key>`, records.ts); null for a row that is not one. */
+function censusDayOf(row: unknown): string | null {
+  const id = (row as { eventId?: unknown } | null)?.eventId;
+  const day = typeof id === "string" ? id.split(":")[1] : undefined;
+  return day !== undefined && CENSUS_DAY.test(day) ? day : null;
+}
+
+/** Rows grouped by their census day, days in order; a row without one is dropped (the stored schemas refuse it too). */
+function byCensusDay<T>(rows: readonly T[]): [string, T[]][] {
+  const days = new Map<string, T[]>();
+  for (const row of rows) {
+    const day = censusDayOf(row);
+    if (day === null) continue;
+    const list = days.get(day);
+    if (list) list.push(row); else days.set(day, [row]);
+  }
+  return [...days].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+}
+
+const censusRowCount = (index: CensusIndex) => Object.values(index.days).reduce((sum, n) => sum + n, 0);
+
 interface CompletionSnapshot {
   version: 2;
   generatedAt: string;
@@ -670,63 +711,137 @@ export function createUploadStore(opts: {
     return { snapshot: { ...(parsed as CensusSnapshot), rows: mergeCensusRows([], parsed.rows) }, etag };
   }
 
+  /** The census index and its ETag; `index` is null for one this code cannot read (a rebuild replaces it). */
+  async function readCensusIndex(): Promise<{ index: CensusIndex | null; etag?: string } | null> {
+    const res = await r2Fetch(CENSUS_INDEX_KEY, { method: "GET", headers: { "accept-encoding": "identity" } });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`census index read failed (${res.status})`);
+    const etag = res.headers.get("etag") ?? undefined;
+    let parsed: Partial<CensusIndex>;
+    try { parsed = JSON.parse(await res.text()) as Partial<CensusIndex>; } catch { return { index: null, etag }; }
+    const days = parsed.days as unknown;
+    const valid = parsed.version === 2 && typeof parsed.generatedAt === "string" && Array.isArray(parsed.lastIds)
+      && (typeof parsed.lastReceivedAt === "string" || parsed.lastReceivedAt === null)
+      && typeof days === "object" && days !== null && !Array.isArray(days)
+      && Object.entries(days).every(([day, n]) => CENSUS_DAY.test(day) && Number.isInteger(n) && (n as number) >= 0);
+    return { index: valid ? parsed as CensusIndex : null, etag };
+  }
+
   /**
-   * Fold the census rows of uploads received since the last run into the census snapshot (cron), like the market
-   * rollup: a watermark, at most CENSUS_UPLOADS_PER_RUN uploads a run, `remaining` for the next. An idle run with a
-   * snapshot reads nothing more. With no snapshot, or `rebuild`, it folds every upload from empty in one run. A missed
-   * object writes nothing, so the next run reads it again.
+   * One day's stored rows, through the stored schemas again, and its ETag. A day the index lists must have its file: read
+   * as empty, its rows would be missing from a page, and a run would write the day back without them. Only a day the
+   * index does not list yet may have none.
+   */
+  async function readCensusDay(day: string, listed: boolean): Promise<{ rows: StoredCensusRecord[]; etag?: string }> {
+    const res = await r2Fetch(`${CENSUS_DAYS}${day}.json`, { method: "GET", headers: { "accept-encoding": "identity" } });
+    if (res.status === 404 && !listed) return { rows: [] };
+    if (!res.ok) throw new Error(`census day ${day} read failed (${res.status})`);
+    const etag = res.headers.get("etag") ?? undefined;
+    let parsed: { version?: unknown; day?: unknown; rows?: unknown };
+    try { parsed = JSON.parse(await res.text()) as typeof parsed; } catch { parsed = {}; }
+    if (parsed.version !== 2 || parsed.day !== day || !Array.isArray(parsed.rows)) throw new Error(`census day ${day} is invalid: rebuild it with ?rebuild=1`);
+    return { rows: mergeCensusRows([], parsed.rows), etag };
+  }
+
+  /** Write one day's rows: over the ETag it read, as a new file when it read none, or over anything for a move or rebuild. */
+  async function writeCensusDay(day: string, rows: StoredCensusRecord[], over: { etag?: string } | "any"): Promise<void> {
+    const guard: Record<string, string> = over === "any" ? {} : over.etag ? { "if-match": over.etag } : { "if-none-match": "*" };
+    const put = await r2Fetch(`${CENSUS_DAYS}${day}.json`, {
+      method: "PUT", body: JSON.stringify({ version: 2, day, rows }), headers: { "content-type": "application/json", ...guard },
+    });
+    if (!put.ok) throw new Error(`census day ${day} write failed (${put.status})`);
+  }
+
+  /** The index, written last: a run that stops before it leaves the watermark, and the next run folds the same uploads again. */
+  async function writeCensusIndex(index: CensusIndex, etag: string | undefined): Promise<void> {
+    const put = await r2Fetch(CENSUS_INDEX_KEY, {
+      method: "PUT", body: JSON.stringify(index), headers: { "content-type": "application/json", ...(etag ? { "if-match": etag } : { "if-none-match": "*" }) },
+    });
+    if (!put.ok) throw new Error(`census index write failed (${put.status})`);
+  }
+
+  /** Every row from scratch, as day files: the first census, a rebuild, and the move from the single file. */
+  async function writeCensusDays(rows: StoredCensusRecord[]): Promise<Record<string, number>> {
+    const days: Record<string, number> = {};
+    for (const [day, list] of byCensusDay(rows)) {
+      await writeCensusDay(day, list, "any");
+      days[day] = list.length;
+    }
+    return days;
+  }
+
+  /**
+   * Fold the census rows of uploads received since the last run into the census day files (cron), like the market
+   * rollup: a watermark, at most CENSUS_UPLOADS_PER_RUN uploads a run, `remaining` for the next. Only the days the new
+   * rows fall on are read and rewritten. An idle run reads only the index. With no census, or `rebuild`, it folds every
+   * upload from empty in one run. The first run after the single file (version 1) moves its rows to day files with its
+   * watermark, and leaves that file in place. A missed object writes nothing, so the next run reads it again.
    */
   async function writeCensus(opts: { rebuild?: boolean; idle?: boolean } = {}): Promise<{ added: number; rows: number; remaining: number; skipped?: boolean }> {
     if (!cloud) throw new Error("the census snapshot needs the cloud store");
-    const current = await readCensusSnapshot();
-    if (current && (!current.etag || current.etag.startsWith("W/"))) throw new Error("census snapshot has no strong ETag: cannot safely update it");
-    if (current && !current.snapshot && !opts.rebuild) throw new Error("census snapshot is invalid: rebuild it with ?rebuild=1");
-    const prev = opts.rebuild ? null : current?.snapshot ?? null;
-    if (opts.idle && prev) return { added: 0, rows: prev.rows.length, remaining: 0, skipped: true };
-    let rows: StoredCensusRecord[];
+    let current = await readCensusIndex();
+    if (current && (!current.etag || current.etag.startsWith("W/"))) throw new Error("census index has no strong ETag: cannot safely update it");
+    if (current && !current.index && !opts.rebuild) throw new Error("census index is invalid: rebuild it with ?rebuild=1");
+    if (!current && !opts.rebuild) {
+      const single = await readCensusSnapshot();
+      if (single && !single.snapshot) throw new Error("census snapshot is invalid: rebuild it with ?rebuild=1");
+      if (single?.snapshot) {
+        const { rows, lastReceivedAt, lastIds } = single.snapshot;
+        await writeCensusIndex({ version: 2, generatedAt: now().toISOString(), days: await writeCensusDays(rows), lastReceivedAt, lastIds }, undefined);
+        current = await readCensusIndex();
+        if (!current?.index || !current.etag || current.etag.startsWith("W/")) throw new Error("census index unreadable after the move");
+      }
+    }
+    const prev = opts.rebuild ? null : current?.index ?? null;
+    if (opts.idle && prev) return { added: 0, rows: censusRowCount(prev), remaining: 0, skipped: true };
+    let days: Record<string, number>;
     let fresh: IndexRow[];
     let remaining = 0;
     if (!prev) {
       const all = await foldAllCensus();
-      rows = all.rows;
+      days = await writeCensusDays(all.rows);
       fresh = all.last;
     } else {
       const listed = await listIndex(prev.lastReceivedAt ?? undefined);
       const unseen = listed.filter((r) => !(prev.lastReceivedAt && r.received_at === prev.lastReceivedAt && prev.lastIds.includes(r.id)));
       fresh = unseen.slice(0, CENSUS_UPLOADS_PER_RUN);
       remaining = unseen.length - fresh.length;
-      rows = prev.rows;
+      const raw: unknown[] = [];
       for (let i = 0; i < fresh.length; i += MARKET_FOLD_BATCH) {
         const read = await readPayloads(fresh.slice(i, i + MARKET_FOLD_BATCH).map((r) => r.object_key));
         if (read.missed) throw new Error("upload object unreadable");
-        rows = foldCensus(rows, read.payloads);
+        for (const payload of read.payloads) for (const record of rawRecordsOf(payload)) {
+          if (CENSUS_KINDS.includes(String((record as { kind?: unknown } | null)?.kind))) raw.push(record);
+        }
+      }
+      days = { ...prev.days };
+      for (const [day, rows] of byCensusDay(raw)) {
+        const stored = await readCensusDay(day, day in prev.days);
+        const merged = mergeCensusRows(stored.rows, rows);
+        await writeCensusDay(day, merged, { etag: stored.etag });
+        days[day] = merged.length;
       }
     }
     const last = fresh.length > 0 ? fresh[fresh.length - 1].received_at : null;
     const atLast = fresh.filter((r) => r.received_at === last).map((r) => r.id);
-    const snapshot: CensusSnapshot = {
-      version: 1,
+    const index: CensusIndex = {
+      version: 2,
       generatedAt: now().toISOString(),
-      rows,
+      days,
       lastReceivedAt: last ?? prev?.lastReceivedAt ?? null,
       lastIds: last === null ? prev?.lastIds ?? [] : prev?.lastReceivedAt === last ? [...new Set([...prev.lastIds, ...atLast])] : atLast,
     };
-    const put = await r2Fetch(CENSUS_KEY, {
-      method: "PUT",
-      body: JSON.stringify(snapshot),
-      headers: { "content-type": "application/json", ...(current ? { "if-match": current.etag! } : { "if-none-match": "*" }) },
-    });
-    if (!put.ok) throw new Error(`census snapshot write failed (${put.status})`);
+    await writeCensusIndex(index, current?.etag);
     censusCached = null;
-    return { added: fresh.length, rows: rows.length, remaining };
+    return { added: fresh.length, rows: censusRowCount(index), remaining };
   }
 
   /**
    * Every stored census row, folded. This is the reader the census summary uses: census rows are never in the
    * public corpus, so they come from the private upload objects, through the stored schemas only. A row still
-   * carrying a GUID and no key is skipped, so no GUID can come out of here. In the cloud it reads the cron's census
-   * snapshot (one object, cached for `cacheMs`); only before the first snapshot exists does it fold every upload.
-   * Dated by the snapshot, so the census says when its rows were last folded.
+   * carrying a GUID and no key is skipped, so no GUID can come out of here. In the cloud it reads the cron's census day
+   * files (cached for `cacheMs`), or the single file before the cron has moved it; only before the first census exists
+   * does it fold every upload. Dated by the census index, so the census says when its rows were last folded.
    */
   async function loadCensus(): Promise<CensusRead> {
     try {
@@ -735,8 +850,15 @@ export function createUploadStore(opts: {
       let rows: StoredCensusRecord[] = [];
       let dataAsOf = now().toISOString();
       if (cloud) {
-        const stored = await readCensusSnapshot();
-        if (stored?.snapshot) {
+        const days = await readCensusIndex();
+        const stored = days ? null : await readCensusSnapshot();
+        if (days?.index) {
+          // Every day file at once, in the order one fold gives (install, then event), as the single file held them.
+          const read = await Promise.all(Object.keys(days.index.days).map((day) => readCensusDay(day, true)));
+          rows = read.flatMap((d) => d.rows).map((r) => [JSON.stringify([r.installId, r.eventId]), r] as const)
+            .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([, r]) => r);
+          dataAsOf = days.index.generatedAt;
+        } else if (stored?.snapshot) {
           rows = stored.snapshot.rows;
           dataAsOf = stored.snapshot.generatedAt;
         } else {
