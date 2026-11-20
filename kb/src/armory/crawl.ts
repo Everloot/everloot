@@ -61,7 +61,7 @@ const missingFunction = (error: unknown) => error instanceof StoreError && error
 /** Each stored details section and the endpoint that fills it. */
 const SECTIONS = [
   ["statistics", "statistics"], ["talents", "specializations"], ["professions", "professions"], ["avatar", "media"],
-  ["achievements", "achievements"], ["reputations", "reputations"], ["quests", "quests"],
+  ["achievements", "achievements"], ["reputations", "reputations"], ["quests", "quests"], ["playHistory", "achievement-statistics"],
 ] as const;
 const transient = (error: unknown) =>
   (error instanceof ApiError || error instanceof StoreError) && error.transient;
@@ -270,7 +270,9 @@ export async function runCrawl(cfg: {
         .some((section) => section && now() - Date.parse(section.asOf) >= 20 * 86_400_000);
       // Rows read before progress was crawled get it on their next turn instead of after a 304.
       const noProgress = oldDetails?.success && !oldDetails.data.achievements && !oldDetails.data.reputations && !oldDetails.data.quests;
-      const backfill = cfg.details && kind === "character" && (!oldDetails?.success || oldDetails.data.retry || agedDetails || noProgress);
+      // Rows read before play history was crawled get it the same way (20261121100000).
+      const noPlayHistory = oldDetails?.success && !oldDetails.data.playHistory;
+      const backfill = cfg.details && kind === "character" && (!oldDetails?.success || oldDetails.data.retry || agedDetails || noProgress || noPlayHistory);
       const modified = backfill ? null : stored[0]?.last_modified;
       const result = await read(
         kind === "guild" ? `${base}/roster` : base,

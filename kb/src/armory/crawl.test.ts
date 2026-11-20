@@ -11,6 +11,7 @@ import roster from "./fixtures/roster.json";
 import achievements from "./fixtures/achievements.json";
 import reputations from "./fixtures/reputations.json";
 import completed from "./fixtures/quests-completed.json";
+import playHistory from "./fixtures/play-history.json";
 function bodyFor(path: string): unknown {
   if (path.endsWith("equipment")) return equipment;
   if (path.endsWith("pvp-summary")) return pvp;
@@ -101,7 +102,7 @@ it("a stored character without progress is read in full, not answered with a 304
   progressApi(api);
   await runCrawl({ region: "eu", budget: 11, store, api, details: true });
   expect(api.get.mock.calls[0]?.[2]).toBeUndefined();
-  store.character.mockResolvedValue([{ last_modified: "date", details: { revision: 1, quests: { asOf, completed: [1] } } }]);
+  store.character.mockResolvedValue([{ last_modified: "date", details: { revision: 1, quests: { asOf, completed: [1] }, playHistory: { asOf, groups: [], ranked: {} } } }]);
   api.get.mockClear();
   await runCrawl({ region: "eu", budget: 11, store, api, details: true });
   expect(api.get.mock.calls[0]?.[2]).toEqual({ ifModifiedSince: "date" });
@@ -781,4 +782,51 @@ it("still crawls without the discovery migration, then fails naming it", async (
   await expect(runCrawl({ region: "eu", budget: 3, store, api })).rejects.toThrow(/20261117160000_armory_discovery\.sql/);
   expect(store.upsertCharacters).toHaveBeenCalledTimes(1);
   expect(store.recordRun).not.toHaveBeenCalled();
+});
+const fresh = () => new Date().toISOString();
+const storedHistory = (asOf: string) => ({ asOf, groups: [], ranked: { quests: 1 } });
+function historyApi(api: ReturnType<typeof setup>["api"], failing?: number) {
+  api.get.mockImplementation(async (path) => {
+    if (failing && path.endsWith("/achievements/statistics")) throw new ApiError(failing, "api");
+    const body = path.endsWith("/achievements/statistics") ? playHistory : path.endsWith("/achievements") ? achievements
+      : path.endsWith("ember-vale-0") ? { ...bodyFor(path) as object, ...progressLinks("ember-vale-0") } : bodyFor(path);
+    return { status: 200, lastModified: "new", body };
+  });
+}
+it("reads play history from the achievements link and stores its ranked counts", async () => {
+  const { store, api } = setup();
+  historyApi(api);
+  await runCrawl({ region: "eu", budget: 11, store, api, details: true });
+  expect(api.get.mock.calls.map((c) => c[0])).toContain("/profile/wow/character/ember-vale-0/achievements/statistics");
+  const details = (store.upsertCharacters.mock.calls[0]?.[1][0] as { details: ProfileDetails }).details;
+  expect(details.playHistory?.ranked.quests).toBe(791);
+});
+it("a stored character without play history is read in full; one with recent play history may get a 304", async () => {
+  const { store, api } = setup();
+  const asOf = fresh();
+  store.character.mockResolvedValue([{ last_modified: "date", details: { revision: 1, quests: { asOf, completed: [1] } } }]);
+  historyApi(api);
+  await runCrawl({ region: "eu", budget: 11, store, api, details: true });
+  expect(api.get.mock.calls[0]?.[2]).toBeUndefined();
+  const fiveDays = new Date(Date.now() - 5 * 86_400_000).toISOString();
+  store.character.mockResolvedValue([{ last_modified: "date", details: { revision: 1, quests: { asOf, completed: [1] }, playHistory: storedHistory(fiveDays) } }]);
+  api.get.mockClear();
+  await runCrawl({ region: "eu", budget: 11, store, api, details: true });
+  expect(api.get.mock.calls[0]?.[2]).toEqual({ ifModifiedSince: "date" });
+});
+it("a failed play history read keeps a recent copy and asks for a retry; a 403 stores none and does not", async () => {
+  const { store, api } = setup();
+  const asOf = new Date(Date.now() - 2 * 86_400_000).toISOString();
+  store.character.mockResolvedValue([{ last_modified: "date", details: { revision: 1, retry: true, playHistory: storedHistory(asOf) } }]);
+  historyApi(api, 500);
+  await runCrawl({ region: "eu", budget: 11, store, api, details: true });
+  const kept = (store.upsertCharacters.mock.calls[0]?.[1][0] as { details: ProfileDetails }).details;
+  expect(kept.playHistory).toEqual(storedHistory(asOf));
+  expect(kept.retry).toBe(true);
+  const denied = setup();
+  historyApi(denied.api, 403);
+  await runCrawl({ region: "eu", budget: 11, store: denied.store, api: denied.api, details: true });
+  const none = (denied.store.upsertCharacters.mock.calls[0]?.[1][0] as { details: ProfileDetails }).details;
+  expect(none.playHistory).toBeUndefined();
+  expect(none.retry).toBeUndefined();
 });
