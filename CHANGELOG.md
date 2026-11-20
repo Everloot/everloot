@@ -264,6 +264,8 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Addon: compact item tooltip market and scan metadata, show drop rates with windows on one row, and date drop and disenchant evidence only when stale.
 - Site: drop rates, measured zeros and source names show from one player's reports, marked reported, verified or confirmed by how many players agree.
 - Addon: drop tooltips say whether a rate is reported, verified or confirmed.
+- Site: character and guild progression are public: every synced kill counts, the guild boards on Rankings rank every guild, and a guild's kills count once enough members hold them.
+- Addon: the completion tracker is on in a new install, so dungeon and raid kills reach your character page through the Desktop App; an older install keeps its choice.
 
 ### Fixed
 - Site: the scheduled jobs run on the cron Worker (`everloot-cron`); the site Worker keeps only the operations summary (`EVERLOOT_CRON_WORKER` is "1" in `web/wrangler.jsonc`).

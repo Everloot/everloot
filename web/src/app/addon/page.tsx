@@ -236,7 +236,7 @@ export default async function AddonPage() {
                 <li>Gold in and out: shared only if you tick it on the upload page. The window&apos;s gold ledger, character roster and gold per hour sessions stay local and are never uploaded.</li>
                 <li>Your equipped gear is not recorded or uploaded by the addon.</li>
                 <li>Your guild&apos;s roster, lockouts, attendance and loot: kept locally and published only through an officer&apos;s upload.</li>
-                <li>Completion, when enabled: game catalogs, your titles, raid lockouts and boss kills. Catalogs and titles can be uploaded; lockouts leave only through private sync, and boss kills stay local. Your achievements, reputation and completed quests are read live, never recorded.</li>
+                <li>Completion, on in a new install: game catalogs, your titles, raid lockouts and boss kills. An older install keeps its choice. Catalogs and titles can be uploaded; lockouts leave only through private sync, and your boss kills sync with a linked character and are public on character and guild pages and rankings. Your achievements, reputation and completed quests are read live, never recorded.</li>
               </ul>
             </Card>
             <Card as="section" aria-labelledby="why-gives" className="space-y-3">

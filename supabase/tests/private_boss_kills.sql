@@ -36,9 +36,9 @@ begin
  perform pg_temp.check_it(public.own_boss_kills(b,l) is null,'other account reads nothing');
  perform pg_temp.check_it(public.set_boss_kill_consent(b,l,true)='not_found','other account cannot opt in');
  perform pg_temp.check_it(public.sync_boss_kills(b,'forever','forever pioneer','Thrallina',repeat('a',64),'2026-11-02T10:00:00Z',kills)='not_linked','other account cannot write');
- perform pg_temp.check_it(public.sync_boss_kills(a,'forever','forever pioneer','Thrallina',repeat('a',64),'2026-11-02T10:00:00Z',kills)='no_consent','opt in required');
+ perform pg_temp.check_it(public.sync_boss_kills(a,'forever','forever pioneer','Thrallina',repeat('a',64),'2026-11-02T10:00:00Z',kills)='stored','linked sync needs no separate consent');
  perform pg_temp.check_it(public.set_boss_kill_consent(a,l,true) is null,'owner opts in');
- perform pg_temp.check_it(public.sync_boss_kills(a,'forever','forever pioneer','Thrallina',repeat('a',64),'2026-11-02T10:00:00Z',kills)='stored','owner stores');
+ perform pg_temp.check_it(public.sync_boss_kills(a,'forever','forever pioneer','Thrallina',repeat('a',64),'2026-11-02T10:00:00Z',kills)='duplicate','owner already stored');
  perform pg_temp.check_it(public.sync_boss_kills(a,'forever','forever pioneer','Thrallina',repeat('a',64),'2026-11-02T10:00:00Z',kills)='duplicate','duplicate');
  perform pg_temp.check_it(public.sync_boss_kills(a,'forever','forever pioneer','Thrallina',repeat('a',64),'2026-11-03T10:00:00Z',kills)='stored','newer');
  perform pg_temp.check_it(public.sync_boss_kills(a,'forever','forever pioneer','Thrallina',repeat('a',64),'2026-11-02T10:00:00Z',kills)='older','older');

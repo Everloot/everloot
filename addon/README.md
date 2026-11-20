@@ -157,7 +157,7 @@ guide at everloot.app/docs/guides/addon; `addon/tests/commands_contract.py` fail
 | `/everloot price [item]` | Prints the price of an item from the files already in the game: shift-click the item into the command, or give its id. |
 | `/everloot gph [start\|pause\|stop\|reset\|show\|hide\|cut on\|off\|history]` | Gold per hour: start, pause or stop a session, reset it, show or hide its window, take the 5% auction cut or not, or list the last five. The sessions stay in your file. |
 | `/everloot addons on\|off` | The installed addon list, off until enabled; off deletes every recorded addon row. |
-| `/everloot completion [on\|off]` | The completion tracker, off until enabled; bare reads now, off deletes every row it wrote. |
+| `/everloot completion [on\|off]` | The completion tracker, on in a new install; older installs keep their choice; bare reads now, off deletes every row it wrote. |
 | `/everloot census [on\|off]` | The census, on in a new install; bare says whether it is on and how many rows it holds, off deletes them. |
 | `/everloot players [on\|off]` | The players module, on in a new install; bare says whether it is on and how many characters it holds, off deletes them. |
 | `/everloot pulls [on\|off]` | Boss pull summaries, in the builds that carry them; bare says whether it is on, off deletes every pull. |
@@ -253,7 +253,7 @@ holds the cut setting.
 
 ## Completion tracker
 
-Off until `/everloot completion on` (then `/reload`). It reads the game's achievement, reputation, title and quest
+On in a new install; an older install keeps its choice. `/everloot completion on` (then `/reload`) enables it when off. It reads the game's achievement, reputation, title and quest
 chain lists with the calls Forever's own windows use, in chunks across frames, and waits out combat.
 `/everloot completion` reads now; `/everloot completion off` deletes every row it wrote. It never tracks,
 expands, clicks or changes anything.
@@ -275,7 +275,8 @@ kinds an older version left in the saved file (`gear_snapshot`, `talent_snapshot
   returns no encounters. They are never part of an upload file. The Everloot Desktop App's private sync sends them
   only for a character you linked, and everloot.app keeps only the categories you switched on. Each read replaces this
   character's rows, and `/everloot completion off` deletes them with the rest. Your boss kills (`boss_kill_owned`,
-  boss_kills.lua) stay on this computer too, and are deleted the same way.
+  boss_kills.lua) sync through the Desktop App for a linked character and are public on character and guild pages
+  and rankings. Hidden characters and guilds stay out. Turning completion off deletes local kill rows.
 - A changed catalog entry replaces its earlier row. Titles are additions.
 - The file stays bounded: at most 1500 achievements read and about 3 MB of completion rows and remembered ids in
   all. A limit reached stops recording, says so once in chat that session, and `/everloot status` says which one.
@@ -659,7 +660,7 @@ addon/
 │   ├── addons.lua      your installed addons' names, titles and versions; off until enabled
 │   ├── mapbounds.lua   each zone's corners in world coordinates, once per zone per build
 │   ├── talents.lua     your talent build per spec group, read live, plus the game's own loadout string
-│   ├── completion.lua  achievements, reputation, titles, quest chains: catalogs and your titles; off until enabled
+│   ├── completion.lua  achievements, reputation, titles, quest chains: catalogs and your titles; on in a new install, older installs keep their choice
 │   ├── owned.lua       this character's raid lockouts; runs with the completion tracker
 │   ├── census.lua      race, class, level and faction of your characters and players you see; on in a new install
 │   ├── players.lua     name, realm, race, class, level and guild of your characters and players you see; on in a new install

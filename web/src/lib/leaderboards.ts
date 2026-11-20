@@ -87,6 +87,6 @@ export async function loadLeaderboards(region: ArmoryRegion | null): Promise<Lea
     guildsOn() ? raidProgress().catch((): RaidProgress => ({ rows: [], instance: null, open: raidsOpen(), unreachable: true })) : null,
     armory ? bestOfClass(region).catch(() => null) : null,
   ]);
-  const progression = armory && raids ? await loadGuildProgressionRanking(region) : [];
+  const progression = armory ? await loadGuildProgressionRanking(region) : [];
   return { region, characters, guildGear: gear, raids, bestOfClass: best, ...(progression.length ? { progression } : {}) };
 }

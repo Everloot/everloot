@@ -17,17 +17,17 @@ test("section renders score tile, privacy, threshold, availability and every gui
     { ...rows[0], id: 36, state: "none", killed: 0, threshold: null, availability: "not seen open yet" },
   ] });
   const html = renderToStaticMarkup(await GuildProgression({ members: [], region: "eu" }));
-  for (const text of ["Progression", "Guild progression score", "60", "cleared", "partial", "none", "5 of the roster", "40 of the roster", "size unknown", "not seen open yet", "Counts members who linked their character and allowed their kills to be shown; others count as not having the kill"]) expect(html).toContain(text);
+  for (const text of ["Progression", "Guild progression score", "60", "cleared", "partial", "none", "5 of the roster", "40 of the roster", "size unknown", "not seen open yet", "Counts synced kills from every linked character in the armory roster"]) expect(html).toContain(text);
   expect(html).toContain("2 / 2 bosses");
   expect(html).not.toContain("no data from this character");
 });
 
-test("hub hook adds a private score board alongside the raid board only for positive readable scores", () => {
+test("hub hook adds a public score board alongside the raid board only for positive readable scores", () => {
   expect(renderToStaticMarkup(<GuildProgressionBoard rows={[]} />)).toBe("");
   const html = renderToStaticMarkup(<GuildBoards gear={null} raids={{ rows: [], instance: null, open: false, unreachable: false }} region={null} progression={[{ region: "eu", slug: "invented-watch", name: "Invented Watch", score: 5 }]} />);
   expect(html).toContain("Guild progression");
-  expect(html).toContain("readable kills");
-  expect(html).toContain("not a public guild ranking");
+  expect(html).toContain("synced kills");
+  expect(html).toContain("Public guild progression");
   expect(html).toContain('href="/armory/eu/guilds/invented-watch"');
   expect(html).toContain('aria-labelledby="board-raids"');
 });

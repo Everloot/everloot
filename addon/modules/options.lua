@@ -46,7 +46,7 @@ O.ROWS = {
   { key = "guild", group = "data", label = "Guild",
     text = "Your guild's roster, lockouts and loot. Published only through an officer's upload." },
   { key = "completion", group = "data", command = "completion", label = "Completion tracker",
-    text = "The game's achievement, reputation, title and quest chain lists, read only, and your titles, dungeon and raid lockouts and boss kills. Your achievements, reputation and quests are read from the game for the window, not recorded. The lists and titles leave from the upload page; titles and lockouts also through the Desktop App's private sync, for a character you linked. Lockouts never go in an upload. Your boss kills stay on this computer. Off deletes its rows." },
+    text = "The game's achievement, reputation, title and quest chain lists, read only, and your titles, dungeon and raid lockouts and boss kills. Your achievements, reputation and quests are read from the game for the window, not recorded. The lists and titles leave from the upload page; titles and lockouts also through the Desktop App's private sync, for a character you linked. Lockouts never go in an upload. Your boss kills sync through the Everloot Desktop App's private sync for a linked character and are public on the character page, guild page and rankings. Hiding a character or guild removes it from those views. No other player's name is recorded for your kill history. Off deletes its rows." },
   { key = "addons", group = "data", command = "addons", label = "Installed addon list",
     text = "Each installed addon's name and version. Sent only from the upload page. Off deletes its rows." },
   { key = "players", group = "data", command = "players", label = "Player pages",
@@ -588,7 +588,9 @@ O.SETUP_UPLOAD = "The Everloot Desktop App sends what you collect after you log 
   .. "files by hand. Download it at everloot.app/addon."
 O.SETUP_PLAYERS = "Player names are on in a new install: the name, realm, race, class, level and guild of characters you "
   .. "see, for everloot.app's player pages. /everloot players off turns them off and deletes the rows; anyone can hide "
-  .. "a character at everloot.app/players/opt-out."
+  .. "a character at everloot.app/players/opt-out. The completion tracker is also on in a new install: your own boss kills "
+  .. "sync through the Desktop App for a linked character and show publicly on character and guild pages and rankings. "
+  .. "/everloot completion off stops tracking and deletes its local rows. An older install keeps its choice."
 O.SETUP_CHOICES = {
   { key = "everything", label = "Everything",
     text = "Item tooltips with prices and sources, the auction house tab, the Everloot window and minimap button, and your characters' gold." },

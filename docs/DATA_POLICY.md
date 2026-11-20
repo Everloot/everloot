@@ -118,7 +118,7 @@ the game's member list. A character's page shows the guild the addon last saw it
 what the guild's officers published about that one character: its rank on their roster, the loot they gave it and
 whether it was at their last raid. A hidden character is left out of all of it. Anyone can hide a guild with the guild hide form, without an account or proof of office:
 the guild leaves the pages, the ladder, the search and the export at once, and its kill rows are dropped at
-intake from then on. Its characters keep their own pages, which the character hide form governs.
+intake from then on. Its characters keep their own pages, which the character hide form governs. This upload-based guild board is separate from armory progression, whose roster thresholds follow the 2026-11-19 owner decision below.
 
 **Boss pulls and runs.** Inside dungeons and raids the addon records how long each boss pull took, kill or wipe
 (`startedAt`, `durationSeconds` and `runId` on the `encounter` row), and each run (`instance_run`): when you
@@ -243,7 +243,7 @@ between the player's own characters, the addon reads the trade partner's name, t
 sender of a letter with money, compares each with the player's own characters on the same realm, and drops it: none of
 these names is ever kept. The completion tracker's rows are unchanged.
 
-Completion tracking (addon 0.3.3, off until `/everloot completion on`) follows the same split.
+Completion tracking (addon 0.3.3) is on in a new install as of the 2026-11-19 owner decision; an older install keeps its choice. `/everloot completion off` stops it and deletes its local rows. It follows the same split.
 Four catalog kinds (`achievement_catalog`, `reputation_catalog`, `title_catalog`,
 `quest_chain_catalog`) hold only game facts the addon read from the game's own calls: ids, names,
 criteria text, standing headers and quest ids, with no player data. They reflect what one character's
@@ -288,8 +288,9 @@ The Completion tracker also keeps `boss_kill_owned`: encounter id, instance map 
 kill time and kill count, under the same opaque character key. It records successful `ENCOUNTER_END` events only
 while Completion is on. Outside an instance it accepts only encounter ids of the shipped world-boss catalog;
 whether Forever emits that event outdoors is unconfirmed, and `/everloot status` counts the world-boss kills seen.
-These rows stay on this computer: the upload page holds them back and public intake has no schema for them.
-Turning Completion off deletes them. Draft amendment for maintainer review: once enabled, the Desktop App may sync these kills to the signed-in owner only with that character's separate boss-kill consent; they remain private, revoking consent deletes the synced history, and public uploads still refuse them. No public kill data is inferred from this local history.
+The upload page holds these rows back and public intake has no schema for them. Turning Completion off deletes the local rows.
+
+**Owner decision, 2026-11-19:** Your own boss kills sync through the Desktop App with a linked character, with no separate boss-kill consent. They are public on the character page, the guild page and the rankings. Guild progression uses the armory roster: a dungeon boss counts when five different members have killed it, a raid boss when the raid size have killed it, and a world boss when forty members have killed it. Repeated kills count once per member. Only instances observed open contribute to the guild score. Hiding a character removes its kills from these views and counts; hiding a guild removes the guild from its page and rankings. No other player's name is recorded in your boss-kill history.
 
 The census counts who plays what. It is on in a new install of the addon, which says so once in chat; an
 install from before the census keeps it off until `/everloot census on`. It leaves the player's computer
