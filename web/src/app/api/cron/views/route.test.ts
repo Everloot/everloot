@@ -149,7 +149,9 @@ test("each step's failure is logged and the next still runs, in order, with memo
   expect(res.status).toBe(200);
   expect(await res.json()).toMatchObject({ ok: true, itemView: null, aggregates: null, guildLadder: null, marketBoards: null, coverage: null, auctionReports: null });
   expect(order).toEqual(["item view", "aggregates", "auction history", "professions", "map pins", "database activity", "ladder", "boards", "coverage", "reports"]);
-  // After the item view, the aggregates and names, each later view and each step after them.
-  expect(store.forgetReads).toHaveBeenCalledTimes(10);
-  expect(store.forgetPublished).toHaveBeenCalledTimes(10);
+  // Before the first view (an earlier request's reads), after the item view, the aggregates and names, each later view
+  // and each step after them.
+  expect(store.forgetReads).toHaveBeenCalledTimes(11);
+  expect(store.forgetPublished).toHaveBeenCalledTimes(11);
+  expect(store.forgetReads.mock.invocationCallOrder[0]).toBeLessThan(store.viewsWork.mock.invocationCallOrder[0]);
 });

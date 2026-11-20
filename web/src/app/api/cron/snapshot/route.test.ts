@@ -232,7 +232,13 @@ test("the run ends at its heartbeat: the stored views are api/cron/views's, and 
   const body = await (await GET(req())).json();
   expect(order).toEqual(["corpus", "census", "settled", "heartbeat"]);
   expect(Object.keys(body).sort()).toEqual(["added", "census", "completion", "dataAsOf", "market", "ok", "rebuild", "settled", "uploads"]);
-  // Released after the corpus write and after the rollups.
-  expect(store.forgetReads).toHaveBeenCalledTimes(2);
-  expect(store.forgetPublished).toHaveBeenCalledTimes(2);
+  // Released after the corpus write, after the rollups, and at the end: the isolate serves the views run next.
+  expect(store.forgetReads).toHaveBeenCalledTimes(3);
+  expect(store.forgetPublished).toHaveBeenCalledTimes(3);
+  // A failed run lets go of what it read too.
+  store.forgetReads.mockReset();
+  store.writeCronRun.mockRejectedValue(new Error("r2 down"));
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  expect((await GET(req())).status).toBe(500);
+  expect(store.forgetReads).toHaveBeenCalledTimes(3);
 });
