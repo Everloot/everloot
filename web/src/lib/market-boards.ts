@@ -180,14 +180,28 @@ const r2 = (cloud: R2Config) => new AwsClient({ accessKeyId: cloud.r2AccessKeyId
 
 /** The Auction House pages' names for the ids, with each tooltip's quality: the rule of `auctionNames` (app/tools/auctions/art.ts). */
 async function shownNames(ids: number[]): Promise<Map<number, { name: string | null; quality: string | null }>> {
-  const [{ loadShownNames }, { shownItemName }, { loadSiteAssets, loadItemTips }] = await Promise.all([
-    import("./shown-item-names"), import("./items"), import("./game-assets"),
+  const [{ loadShownNames }, { loadStoredSearchNames }, { CLIENT_LAYER, shownItemName }, { loadItemNames, loadSiteAssets, loadItemTips, PRIVATE_UNREACHABLE }] = await Promise.all([
+    import("./shown-item-names"), import("./search-names-store"), import("./items"), import("./game-assets"),
   ]);
-  const shown = await loadShownNames();
+  // The agreed names come from the stored search names file (the same agreedItemNames, a few hundred KB) when the cron
+  // has written one, not from the 14 MB aggregates: on the cron Worker that read was this step's largest (#1354).
+  const stored = await loadStoredSearchNames();
+  let agreed: Map<number, string>;
+  let matched: Awaited<ReturnType<typeof loadShownNames>>["matched"];
   // A degraded read would store "Item N" for names the pages can show; the pages build live until the next run.
-  if (shown.degraded) throw new Error("item names unreachable");
+  if (stored) {
+    const read = await loadItemNames(CLIENT_LAYER.build.version);
+    if (read === PRIVATE_UNREACHABLE) throw new Error("item names unreachable");
+    agreed = stored.names.items;
+    matched = read as typeof matched;
+  } else {
+    const shown = await loadShownNames();
+    if (shown.degraded) throw new Error("item names unreachable");
+    agreed = shown.agreed;
+    matched = shown.matched;
+  }
   const tips = ids.length ? await loadItemTips(await loadSiteAssets(), ids) : new Map();
-  return new Map(ids.map((id) => [id, { name: shownItemName(id, shown.agreed, shown.matched?.names, tips.get(id))?.name ?? null, quality: tips.get(id)?.quality ?? null }]));
+  return new Map(ids.map((id) => [id, { name: shownItemName(id, agreed, matched?.names, tips.get(id))?.name ?? null, quality: tips.get(id)?.quality ?? null }]));
 }
 
 /**
