@@ -264,6 +264,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 ### Fixed
 - Site: the scheduled jobs run on the cron Worker (`everloot-cron`); the site Worker keeps only the operations summary (`EVERLOOT_CRON_WORKER` is "1" in `web/wrangler.jsonc`).
 - Site: the snapshot cron lets go of each file it read before the next step (the stores kept every one for pages, and together they outgrew the Worker), and writes its heartbeat before the auction reports and Auction House boards, its two largest steps (#1354).
+- Site: the snapshot cron also lets go of the corpus copies kept outside the stores: the last public copy of the corpus, the shared aggregate set and the item and guild memos. One run kept the corpus to its end, and a run with new uploads outgrew the Worker before its heartbeat (#1354).
 - Site: the corpus snapshot is stored in parts under `snapshots/corpus/` with `snapshots/corpus.json` listing them, and the cron's work check reads only that list. Read whole, the 31 MB file needed about 107 MB of the Worker's 128 MB before any work began, so every snapshot run since 13:20 UTC on 2026-11-19 ran out of memory and `/api/health` answered stale (#1354).
 - Site: public drop sources can carry a name from two installs that report exactly the same name, when none disagree; rates still require three installs.
 - Site: empty NPC, vendor, quest and object tabs all say what would fill them (3 installs agreeing), in one shared set of sentences, and the vendors list says a vendor is listed once 3 installs agree on an item and its price.

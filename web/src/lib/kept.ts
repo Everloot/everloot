@@ -58,6 +58,11 @@ export function forgetAllKept(): void {
   for (const keeper of keepers) keeper.forget();
 }
 
+/** A memo kept outside `keep` (one per corpus version, say) that forgetAllKept empties too. */
+export function forgetWithKept(forget: () => void): void {
+  keepers.add({ forget });
+}
+
 export function keep<T, A = void>(load: (arg: A, last: Kept<T> | null, now: number) => Promise<Fresh<T>>, opts: KeepOptions): Keeper<T, A> {
   const share = opts.share ?? true;
   let kept: Kept<T> | null = null;
