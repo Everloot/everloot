@@ -263,6 +263,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: character and guild progression are public: every synced kill counts, the guild boards on Rankings rank every guild, and a guild's kills count once enough members hold them.
 
 ### Fixed
+- Site: while no guide is reviewed, `/guides`, `/classes` and each class page share one empty state that says what a reviewed guide is and how to offer one, linking the guide contract, the Talent calculator and the Guide submission form (#971).
 - Site: the scheduled jobs run on the cron Worker (`everloot-cron`); the site Worker keeps only the operations summary (`EVERLOOT_CRON_WORKER` is "1" in `web/wrangler.jsonc`).
 - Site: the snapshot cron lets go of each file it read before the next step (the stores kept every one for pages, and together they outgrew the Worker), and writes its heartbeat before the auction reports and Auction House boards, its two largest steps (#1354).
 - Site: the snapshot cron also lets go of the corpus copies kept outside the stores: the last public copy of the corpus, the shared aggregate set and the item and guild memos. One run kept the corpus to its end, and a run with new uploads outgrew the Worker before its heartbeat (#1354).

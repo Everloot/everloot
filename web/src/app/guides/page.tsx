@@ -10,6 +10,7 @@ import { pageMetadata } from "@/lib/seo";
 import { TALENT_CLASSES, isTalentClass, loadCatalog, type TalentClassSlug } from "@/lib/talents/catalogs";
 import { PUBLISHED_CHANGES, classTalentChanges } from "@/lib/talents/freshness-records";
 import { GUIDE_ACTIVITIES, type GuideActivity, type GuideRole } from "@kb/guides/guide";
+import GuidesEmpty from "./GuidesEmpty";
 
 // The published guides by class, each marked when it is not current. A link's class, activity, role and level narrow
 // the list through the guide reader (guidesFor); a narrowed list stays out of search, canonical to the plain one. The
@@ -134,7 +135,7 @@ export default async function GuidesIndex({ searchParams }: Props) {
       {error && <p className="mt-4 text-sm text-muted">{error} This page shows every guide instead.</p>}
       <div className="mt-8 space-y-10">
         {!any ? (
-          <p className="text-sm text-muted">No guide is reviewed yet.</p>
+          <GuidesEmpty classes />
         ) : shown.length === 0 ? (
           <p className="text-sm text-muted">No reviewed guide matches these filters. <Link href="/guides" className={LINK}>Show every guide</Link></p>
         ) : byClass.map(({ c, rows }) => (
