@@ -43,14 +43,26 @@ export interface Keeper<T, A> {
   last(): Kept<T> | null;
   /** Keep a value the caller already holds (a store that just wrote it), as if a read starting at `now` had returned it. */
   set(fresh: Fresh<T>, now?: number): void;
-  /** For tests: forget the entry and any read in flight. */
+  /** Forget the entry and any read in flight (tests, and forgetAllKept). */
   forget(): void;
+}
+
+/** Every keeper made, so forgetAllKept can empty them. */
+const keepers = new Set<{ forget(): void }>();
+
+/**
+ * Forget every kept value in this instance. The snapshot cron calls it between its steps: on the cron Worker no page
+ * reads them, and each kept file is megabytes that would otherwise stay beside the next step's work (#1354).
+ */
+export function forgetAllKept(): void {
+  for (const keeper of keepers) keeper.forget();
 }
 
 export function keep<T, A = void>(load: (arg: A, last: Kept<T> | null, now: number) => Promise<Fresh<T>>, opts: KeepOptions): Keeper<T, A> {
   const share = opts.share ?? true;
   let kept: Kept<T> | null = null;
   let pending: Promise<T> | null = null;
+  keepers.add({ forget: () => { kept = null; pending = null; } });
 
   const read = (arg: A, now: number): Promise<T> => {
     const run = load(arg, kept, now).then((fresh) => {

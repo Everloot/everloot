@@ -1234,7 +1234,17 @@ export function createUploadStore(opts: {
     } catch { return { status: "unavailable", ...unknown }; }
   }
 
-  return { putUpload, loadCorpus, putWaitlist, snapshotWork, writeCronRun, writeSnapshot, snapshotHealth, writeMarket, loadMarket, writeCompletion, loadCompletion, writeCensus, loadCensus, installCensus };
+  /**
+   * Drop every read this instance keeps: the corpus, the market, the completion and census rollups. The snapshot cron
+   * calls it between its steps; each kept copy is tens of MB that would otherwise sit beside the next step (#1354).
+   */
+  function forgetReads(): void {
+    corpusKept.forget(); refreshing = null;
+    marketCached = null; marketRead = null;
+    completionCached = null; censusCached = null;
+  }
+
+  return { putUpload, loadCorpus, putWaitlist, snapshotWork, writeCronRun, writeSnapshot, snapshotHealth, writeMarket, loadMarket, writeCompletion, loadCompletion, writeCensus, loadCensus, installCensus, forgetReads };
 }
 
 /** The store the routes and pages use. */
