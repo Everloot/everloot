@@ -264,6 +264,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Fixed
 - Site: lore pages drop the doubled spaces the wiki's source had but never showed, leave no gap where footnotes or race icons sat side by side, show `{{-}}` as its dash and `{{Race|…|notext}}` as only its icon, so far fewer pages are marked damaged.
+- Site: the Privacy Policy points to Settings, where API keys, linked characters and synced data now live, instead of the old account page.
 - Site: while no guide is reviewed, `/guides`, `/classes` and each class page share one empty state that says what a reviewed guide is and how to offer one, linking the guide contract, the Talent calculator and the Guide submission form (#971).
 - Site: the scheduled jobs run on the cron Worker (`everloot-cron`); the site Worker keeps only the operations summary (`EVERLOOT_CRON_WORKER` is "1" in `web/wrangler.jsonc`).
 - Site: the snapshot cron lets go of each file it read before the next step (the stores kept every one for pages, and together they outgrew the Worker), and writes its heartbeat before the auction reports and Auction House boards, its two largest steps (#1354).
@@ -628,6 +629,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and report separate answerability rates.
 - Site: describe the in-game Everloot window, feature chooser, local data and how to reopen it or report a window error.
 - Site: the census adds headline tiles, faction and class colours, race and level bars, a race-by-class heatmap, and a daily chart with hover counts; every table stays, hidden counts stay hidden, and class and race icons load from Blizzard when available.
+
+## [0.3.27] - 2026-11-20
+
+### Fixed
+
+- Addon: **Open in Buy** on an Auction House shopping-list row searches Blizzard's Buy screen for that exact item name and keeps your wanted count, price cap and available market estimate in view. Live-client verification of this handoff is pending.
 
 ## [0.3.26] - 2026-11-20
 
