@@ -15,7 +15,7 @@ test("every instance is drawn in three groups with honest availability, no inven
   expect(html).not.toContain('role="progressbar"');
   expect(html).toContain("not a Blizzard release announcement");
   expect(html).toContain("Blizzard&#x27;s API gives no encounter data");
-  expect(html).toContain("linked and consented");
+  expect(html).toContain("Synced boss history is public");
 });
 
 test("states, boss counts, latest UTC day and neutral bars convey actual history", () => {

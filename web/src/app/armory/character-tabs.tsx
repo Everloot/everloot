@@ -9,8 +9,7 @@ import { Achievements, Equipment, NO_ACHIEVEMENTS, ProfessionList, QuestCount, R
 /**
  * The character sheet's tabs: one per part of a Blizzard profile the armory stores. Every tab is drawn, so the strip is
  * the same on every sheet; a part the last read did not bring says so in one sentence rather than leaving a gap.
- * Gold, Completionist and Alts wait on #1275. Progress lists the files for everyone, with private kills only for
- * the linked, consented owner. Legacy perks waits on a stored field.
+ * Gold, Completionist and Alts wait on #1275. Progress lists the files and synced boss kills publicly for everyone. Legacy perks waits on a stored field.
  */
 export const CHARACTER_TABS = [
   ["gear", "Gear"], ["talents", "Talents"], ["stats", "Stats"], ["pvp", "PvP"],
@@ -31,7 +30,7 @@ export const EMPTY_TAB: Record<CharacterTabId, string> = {
   professions: notRead("professions"),
   reputations: notRead("reputations"),
   quests: notRead("completed quests"),
-  progress: "No data from this character is available through linked and consented addon uploads.",
+  progress: "No synced boss kills are available for this character yet.",
 };
 
 const Empty = ({ id }: { id: CharacterTabId }) => <p data-empty-tab={id} className="py-3 text-sm text-fg-2">{EMPTY_TAB[id]}</p>;

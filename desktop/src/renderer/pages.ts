@@ -419,7 +419,7 @@ function linkedCharacters(s: AppState): string {
   const synced = last ? `<p class="fg2">Last synced ${esc(when(last.syncedAt))}: ${esc(last.synced.join(", "))}${last.categories.length ? ` (${esc(last.categories.map((x) => SYNC_CATEGORY[x] ?? x).join(", "))})` : ""}</p>` : "";
   const line = errors.length ? `<p class="error small" role="status">${esc(errors.join("; "))}</p>` : "";
   return `<section class="panel" id="linked"><h2>Linked characters</h2>
-      <p class="fg2">Characters you linked to your everloot.app account with a code from the site. After each upload their titles, raid lockouts and boss kills go to your account's private sync, only for the categories you switched on there.</p>
+      <p class="fg2">Characters you linked to your everloot.app account with a code from the site. After each upload their titles and raid lockouts go to your account's private sync for the categories you switched on there. Boss kills sync with a linked character and are public on character and guild pages and rankings.</p>
       ${names}${froze}${synced}${line}
     </section>`;
 }
@@ -470,7 +470,7 @@ export function characters(v: View): string {
     </section>` : c ? `${emptyState(emptyCause("characters", state!), icon("characters"))}${ghostProfile()}` : `<section class="panel"><p class="muted">Loading…</p></section>`}
     <section class="panel" id="keyed" tabindex="-1"><h2>Progress · keyed</h2>
       ${prog ? `<div class="tablewrap"><table><thead><tr><th>Key</th><th>Class</th><th class="num">Titles</th><th class="num">Missing</th><th>Raid lockouts</th><th>On everloot.app</th></tr></thead><tbody>${prog}</tbody></table></div>
-        <p class="muted small">Raid lockouts never go in an upload, and Chat does not read them. Private sync sends them only for a character you linked, and everloot.app keeps only the categories you switched on.</p>` : `<p class="muted">${c ? "Nothing yet. The completion tracker is off until <code>/everloot completion on</code> in game." : "Loading…"}</p>`}
+        <p class="muted small">Raid lockouts never go in an upload, and Chat does not read them. Private sync sends them only for a character you linked, and everloot.app keeps only the categories you switched on.</p>` : `<p class="muted">${c ? "Nothing yet. The completion tracker is on in a new install. Use <code>/everloot completion on</code> in game if it is off." : "Loading…"}</p>`}
     </section>
     ${state ? linkedCharacters(state) : ""}
   </div>

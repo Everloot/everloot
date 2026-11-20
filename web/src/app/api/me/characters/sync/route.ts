@@ -20,7 +20,7 @@ import { syncAccount, syncCharacterFacts, unavailable, type CharacterOutcome } f
  * other kind are dropped and counted in `skipped`, never refused. Each fact is kept only when the key's account holds that character's live link with sync on for the
  * category, and only when it is newer than the stored one. A character the account has no live link for is
  * `not_linked` in the receipt, whoever else may hold it. The install id becomes a keyed hash here and goes no further.
- * Own boss_kill_owned rows use a separate, always-private consent and table, only with EVERLOOT_BOSS_KILL_SYNC=1.
+ * Own boss_kill_owned rows sync for linked characters and are public on progression pages with EVERLOOT_BOSS_KILL_SYNC=1.
  * 404 until EVERLOOT_PRIVATE_SYNC=1.
  *
  * Each key may send SYNC_PER_KEY_HOUR requests an hour (intakeQuota.syncKey); past that, 429 with Retry-After. Only

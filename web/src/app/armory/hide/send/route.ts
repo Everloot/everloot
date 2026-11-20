@@ -1,4 +1,4 @@
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { ARMORY_HIDE_PATH, armoryOn } from "@/lib/armory";
 import { armoryStore } from "@/lib/armory-store";
 import { intakeQuota } from "@/lib/intake-quota";
@@ -24,6 +24,7 @@ export async function POST(req: Request) {
     console.error("armory hide failed", err);
     return back(req, ARMORY_HIDE_PATH, { error: "storage", ...kept });
   }
+  revalidateTag("players");
   revalidatePath("/armory", "layout");
   return back(req, ARMORY_HIDE_PATH, { done: "1" });
 }

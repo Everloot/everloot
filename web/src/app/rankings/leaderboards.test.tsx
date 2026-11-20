@@ -9,8 +9,8 @@ import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import adFree from "@/data/ad-free-paths.json";
 
 // The hub reads the census for its week-by-week rankings; here it has no weeks, so only the leaderboards are under test.
-const privateProgression = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/progression", () => ({ loadGuildProgressionRanking: privateProgression }));
+const publicProgression = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/progression", () => ({ loadGuildProgressionRanking: publicProgression }));
 const census = vi.hoisted(() => ({ loadCensus: vi.fn() }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
@@ -53,7 +53,7 @@ const kill = (guildName: string, realm: string, killed: number) => ({
 });
 
 beforeEach(() => {
-  privateProgression.mockReset().mockResolvedValue([]);
+  publicProgression.mockReset().mockResolvedValue([]);
   census.loadCensus.mockReset().mockResolvedValue({ rows: [], dataAsOf: "2026-11-18T10:00:00.000Z" });
   const mem = createMemoryArmoryStore(() => new Date("2026-11-18T00:00:00Z"));
   mem.putCharacter(armoryCharacter());
@@ -171,15 +171,15 @@ test("the hub has labelled directory searches, class winners, guild links and ad
   expect(out).toContain('href="/armory/guilds/submit"');
 });
 
-test("hub passes request-scoped positive progression scores through the minimal guild-board hook", async () => {
+test("hub shows public progression while the armory is on even when legacy guild boards are off", async () => {
   vi.stubEnv("EVERLOOT_ARMORY", "1");
-  vi.stubEnv("EVERLOOT_GUILDS", "1");
-  privateProgression.mockResolvedValue([{ region: "eu", slug: "invented-watch", name: "Invented Watch", score: 60 }]);
+  vi.stubEnv("EVERLOOT_GUILDS", "");
+  publicProgression.mockResolvedValue([{ region: "eu", slug: "invented-watch", name: "Invented Watch", score: 60 }]);
   const result = await hub({ region: "eu" });
-  expect(privateProgression).toHaveBeenCalledWith("eu");
+  expect(publicProgression).toHaveBeenCalledWith("eu");
   expect(result).toContain('aria-labelledby="board-guild-progression"');
   expect(result).toContain("Invented Watch");
-  expect(result).toContain("not a public guild ranking");
-  privateProgression.mockResolvedValue([]);
+  expect(result).toContain("Public guild progression");
+  publicProgression.mockResolvedValue([]);
   expect(await hub()).not.toContain('aria-labelledby="board-guild-progression"');
 });

@@ -14,9 +14,9 @@ export interface ProgressionMatrixProps {
 export default function ProgressionMatrix({ instances, links = {}, guild = false }: ProgressionMatrixProps) {
   return <div className="space-y-6">
     <div className="space-y-2 text-sm text-fg-2">
-      {guild ? <p>Counts members who linked their character and allowed their kills to be shown; others count as not having the kill.</p> : <>
-      <p>Kills come from the Everloot addon&apos;s own uploads, linked and consented. Only the signed-in owner can see this private history. Blizzard&apos;s API gives no encounter data for this game.</p>
-      <p>Lifetime progress counts each boss once across difficulties. No data from this character means no permitted history is available, rather than no kills.</p>
+      {guild ? <p>Counts synced kills from every linked character in the armory roster; members without synced history count as not having the kill.</p> : <>
+      <p>Kills come from linked characters through the Everloot Desktop App. Synced boss history is public; hidden characters are excluded. Blizzard&apos;s API gives no encounter data for this game.</p>
+      <p>Lifetime progress counts each boss once across difficulties. No data from this character means no synced history is available, rather than no kills.</p>
       </>}
       <p>Not seen open yet means no upload has seen an entrance or a boss kill here; it is not a Blizzard release announcement. The files can include test and unused content.</p>
       <p>Found in game files, build {PROGRESSION_BUILD}; game data copyright Blizzard Entertainment, Inc. Unconfirmed means players have not agreed on the entry.</p>

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { CHARACTER_KEY, INSTALL_ID } from "@everloot/protocol";
 import { privateSyncOn } from "./private-sync";
 
-/** Separate from public recordSchemas and public character facts: these kills are always private. */
+/** Separate from public recordSchemas and public character facts: these kills use the linked-character sync endpoint and are public on progression pages. */
 export const bossKillOwned = z.object({
   kind: z.literal("boss_kill_owned"), installId: INSTALL_ID, characterKey: CHARACTER_KEY,
   capturedAt: z.string().datetime({ offset: true }).optional(),
