@@ -60,7 +60,7 @@ test("every view, the ladder and the coverage score are asked with the stored co
   expect(await (await GET(req())).json()).toMatchObject({ ok: true, rebuild: false, dataAsOf: AS_OF });
   for (const write of views) expect(write).toHaveBeenCalledWith(opts, expect.anything());
   expect(guilds.writeGuildLadder).toHaveBeenCalledWith(opts);
-  expect(coverage.writeCoverage).toHaveBeenCalledWith(opts);
+  expect(coverage.writeCoverage).toHaveBeenCalledWith(opts, { corpus: expect.any(Function) });
   expect(writeMarketBoards).toHaveBeenCalledOnce();
   // Nothing needed writing, so no corpus was read.
   expect(store.loadCorpus).not.toHaveBeenCalled();
@@ -70,7 +70,7 @@ test("?rebuild=1 asks every writer to rewrite, whatever its stamp", async () => 
   await GET(req(undefined, "?rebuild=1"));
   for (const write of views) expect(write).toHaveBeenCalledWith({ ...opts, rebuild: true }, expect.anything());
   expect(searchNames.writeSearchNames).toHaveBeenCalledWith({ ...opts, rebuild: true }, expect.anything());
-  expect(coverage.writeCoverage).toHaveBeenCalledWith({ ...opts, rebuild: true });
+  expect(coverage.writeCoverage).toHaveBeenCalledWith({ ...opts, rebuild: true }, expect.anything());
 });
 
 test("with no stored corpus there is nothing to build", async () => {
@@ -96,6 +96,11 @@ test("the views share one corpus read, and an unreachable corpus fails each view
   expect(view.buildItemView).toHaveBeenCalledWith(AS_OF, expect.any(Date), corpus);
   for (const build of [aggregates.anonymousAggregates, auctions.buildAuctionHistory, professions.buildProfessions, mapPins.buildMapPins]) expect(build).toHaveBeenCalledWith(corpus);
   expect(activity.buildDatabaseActivity).toHaveBeenCalledWith(corpus, expect.any(Date), null);
+  // The coverage score is handed the same corpus.
+  coverage.writeCoverage.mockImplementation(async (_opts: unknown, deps: { corpus: () => Promise<unknown> }) => ({ written: (await deps.corpus()) === corpus }));
+  store.loadCorpus.mockClear();
+  expect(await (await GET(req())).json()).toMatchObject({ coverage: { written: true } });
+  expect(store.loadCorpus).toHaveBeenCalledOnce();
   vi.spyOn(console, "error").mockImplementation(() => {});
   store.loadCorpus.mockClear().mockResolvedValue({ uploads: 0, records: [], unreachable: true });
   const res = await GET(req());
@@ -148,7 +153,7 @@ test("each step's failure is logged and the next still runs, in order, with memo
   const res = await GET(req());
   expect(res.status).toBe(200);
   expect(await res.json()).toMatchObject({ ok: true, itemView: null, aggregates: null, guildLadder: null, marketBoards: null, coverage: null, auctionReports: null });
-  expect(order).toEqual(["item view", "aggregates", "auction history", "professions", "map pins", "database activity", "ladder", "boards", "coverage", "reports"]);
+  expect(order).toEqual(["item view", "aggregates", "auction history", "professions", "map pins", "database activity", "coverage", "ladder", "boards", "reports"]);
   // Before the first view (an earlier request's reads), after the item view, the aggregates and names, each later view
   // and each step after them.
   expect(store.forgetReads).toHaveBeenCalledTimes(11);
