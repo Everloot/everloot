@@ -319,7 +319,7 @@ describe("the owner's list", () => {
     auth.authQuery.mockImplementation(async (path: string) => {
       if (path.startsWith("character_links?")) {
         return [
-          { ...own, ruleset: "forever", character_visibility: { page_public: true, show_gear: true, show_stats: false, show_talents: true, show_pvp: false, show_professions: false, show_reputations: false, show_collections: true } },
+          { ...own, ruleset: "forever", character_visibility: { page_public: true, show_gear: true, show_stats: false, show_talents: true, show_pvp: false, show_professions: false, show_reputations: false, show_collections: true, show_history: true } },
           { ...own, id: OTHER_ID, name: "Jainara", ruleset: "forever", character_visibility: null },
         ];
       }
@@ -327,9 +327,9 @@ describe("the owner's list", () => {
       throw new Error(`unexpected ${path}`);
     });
     const body = await (await list()).json();
-    expect(auth.authQuery.mock.calls[0][0]).toContain("character_visibility(page_public,show_gear,show_stats,show_talents,show_pvp,show_professions,show_reputations,show_collections)");
+    expect(auth.authQuery.mock.calls[0][0]).toContain("character_visibility(page_public,show_gear,show_stats,show_talents,show_pvp,show_professions,show_reputations,show_collections,show_history)");
     expect(body.links[0].armory).toEqual({ path: "/armory/eu/thrallina-vale" });
-    expect(body.links[0].page.blizzard).toEqual({ gear: true, stats: false, talents: true, pvp: false, professions: false, reputations: false, collections: true });
+    expect(body.links[0].page.blizzard).toEqual({ gear: true, stats: false, talents: true, pvp: false, professions: false, reputations: false, collections: true, history: true });
     expect(body.links[1].armory).toEqual({ path: null });
     expect(Object.values(body.links[1].page.blizzard).every((v) => v === false)).toBe(true);
     expect(body.links[0].sync).toBeUndefined();
