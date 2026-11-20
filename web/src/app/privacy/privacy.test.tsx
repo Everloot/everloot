@@ -55,7 +55,7 @@ test("nameplates are named for the census only: the player pages item never read
   const item = playerPages.slice(0, playerPages.indexOf("</li>"));
   expect(item).toContain("target, mouse over or group with");
   expect(item).not.toMatch(/nameplate/i);
-  expect(text).toContain("Last updated: November 17, 2026");
+  expect(text).toContain("Last updated: November 18, 2026");
 });
 
 test("contribution identity requires explicit receipt opt-in and explains scope, audience and withdrawal", () => {
@@ -123,7 +123,7 @@ test("linked characters: private until a page is turned on, how a dispute is set
     "It never shows your BattleTag, your email, your account, your handle or the hashes.",
     "Search engines are asked not to index it.",
     "Anyone can hide a character on the hide form, without an account",
-    "Linked characters are unlinked, and their public pages turned on or off, on your account page.",
+    "Linked characters are unlinked, and their public pages turned on or off, on your Settings page.",
     "Linked characters and their page settings: until you unlink the character or delete your account.",
   ]) expect(text).toContain(claim);
   for (const claim of [
@@ -144,7 +144,7 @@ test("private sync: what the app sends, that the link decides, private by defaul
     "only the newest capture of each category",
     "Nothing synced is public until you turn your page on and that section on.",
     "Turning a category's sync off deletes what was synced for it at once; unlinking the character or deleting your account deletes all of it.",
-    "Synced data is turned on and off, and each section shown or hidden, on your account page.",
+    "Synced data is turned on and off, and each section shown or hidden, on your Settings page.",
     "Synced character data: the newest capture of each category, until you turn that category off, unlink the character or delete your account.",
   ]) expect(text).toContain(claim);
   for (const claim of [

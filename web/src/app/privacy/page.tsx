@@ -44,7 +44,7 @@ export default function PrivacyPage() {
   // Linked characters, public character pages, the guild item's character page and private sync: 6 November.
   // The census paragraph gained nameplates on 9 November, which dates the page.
   // Private sync narrowed to raids and titles, and Blizzard's data on character pages: 17 November.
-  const updated = "2026-11-17";
+  const updated = "2026-11-18";
   return (
     <article>
       <Container width="reading">
@@ -130,14 +130,14 @@ export default function PrivacyPage() {
               </li>
               <li>
                 <strong>API keys (optional):</strong> if you make a free API key on your
-                account page, we store a one-way hash of it, the last four characters,
+                Settings page, we store a one-way hash of it, the last four characters,
                 its name, what you say it is for, its permissions, which account it
                 belongs to, when it was made, when it expires, when it was last used and
                 revoked, and a daily count of its requests per endpoint. Not what was
                 asked. Revoking a key stops it at once, and so does its end date. Daily
                 counts are kept {USAGE_KEPT_DAYS} days. A revoked key and its counts are deleted{" "}
                 {REVOKED_KEPT_DAYS} days after it was revoked, or at once when you delete it on your
-                account page. To delete
+                Settings page. To delete
                 your account and everything tied to it, email us (below).
               </li>
               <li id="saved-builds">
@@ -164,7 +164,7 @@ export default function PrivacyPage() {
                 Deleting your account deletes your profile with it.
               </li>
               <li id="linked-characters">
-                <strong>Linked characters (optional):</strong> on your account page you can link a character
+                <strong>Linked characters (optional):</strong> on Settings you can link a character
                 you play to your account. The site gives you a short code; you type it on the character with{" "}
                 <code>/everloot link &lt;code&gt;</code>, and the Everloot Desktop App, signed in to your account,
                 sends the row it writes. Link rows never go in an upload. We store the character&apos;s name,
@@ -444,11 +444,11 @@ export default function PrivacyPage() {
               </li>
               <li>
                 <strong>Linked characters</strong> are unlinked, and their public pages turned on or off, on
-                your account page.
+                your Settings page.
               </li>
               <li>
                 <strong>Synced data</strong> is turned on and off, and each section shown or hidden, on your
-                account page.
+                Settings page.
               </li>
               <li>
                 <strong>Chat projects and account chats</strong> are downloaded or deleted in
