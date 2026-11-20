@@ -1,8 +1,8 @@
 vi.mock("@/lib/auction-report-store", () => ({ writeAuctionReports: vi.fn().mockResolvedValue({ written: false }) }));
 vi.mock("@/lib/market-boards", () => ({ writeMarketBoards: vi.fn().mockResolvedValue({ written: false }) }));
 import { beforeEach, expect, test, vi } from "vitest";
-const store = vi.hoisted(() => ({ loadCorpus: vi.fn(), snapshotWork: vi.fn(), writeCronRun: vi.fn(), writeSnapshot: vi.fn(), writeMarket: vi.fn(), writeCompletion: vi.fn(), writeCensus: vi.fn(), prune: vi.fn() }));
-vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: store.loadCorpus, snapshotWork: store.snapshotWork, writeCronRun: store.writeCronRun, writeSnapshot: store.writeSnapshot, writeMarket: store.writeMarket, writeCompletion: store.writeCompletion, writeCensus: store.writeCensus },
+const store = vi.hoisted(() => ({ loadCorpus: vi.fn(), snapshotWork: vi.fn(), writeCronRun: vi.fn(), writeSnapshot: vi.fn(), writeMarket: vi.fn(), writeCompletion: vi.fn(), writeCensus: vi.fn(), prune: vi.fn(), forgetReads: vi.fn() }));
+vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: store.loadCorpus, snapshotWork: store.snapshotWork, writeCronRun: store.writeCronRun, writeSnapshot: store.writeSnapshot, writeMarket: store.writeMarket, writeCompletion: store.writeCompletion, writeCensus: store.writeCensus, forgetReads: store.forgetReads },
   sharingStore: { loadState: async () => ({ grants: [], suppressions: [] }) },
 }));
 vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { prune: store.prune } }));
@@ -34,6 +34,8 @@ vi.mock("@/lib/database-activity", () => ({ buildDatabaseActivity: activity.buil
 const guilds = vi.hoisted(() => ({ writeGuildLadder: vi.fn() }));
 vi.mock("@/lib/guild-ladder-store", () => guilds);
 import { GET } from "./route";
+import { writeAuctionReports } from "@/lib/auction-report-store";
+import { writeMarketBoards } from "@/lib/market-boards";
 beforeEach(() => {
   store.loadCorpus.mockReset();
   guilds.writeGuildLadder.mockReset().mockResolvedValue({ written: false });
@@ -415,4 +417,19 @@ test("the snapshot refreshes the guild ladder even when no new uploads arrive an
   expect(guilds.writeGuildLadder).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-11-12" });
   guilds.writeGuildLadder.mockRejectedValueOnce(new Error("publication unavailable"));
   expect((await GET(req())).status).toBe(200);
+});
+
+test("the heartbeat is written before the auction reports and boards, and their memory is let go between steps (#1354)", async () => {
+  const order: string[] = [];
+  store.writeCronRun.mockImplementation(async () => { order.push("heartbeat"); });
+  vi.mocked(writeAuctionReports).mockImplementationOnce(async () => { order.push("reports"); return { written: false }; });
+  vi.mocked(writeMarketBoards).mockImplementationOnce(async () => { order.push("boards"); throw new Error("out of memory"); });
+  store.forgetReads.mockReset();
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const res = await GET(req());
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ ok: true, marketBoards: null });
+  expect(order).toEqual(["heartbeat", "reports", "boards"]);
+  // Released after the rollups, after each corpus view and around the two market steps.
+  expect(store.forgetReads.mock.calls.length).toBeGreaterThanOrEqual(8);
 });

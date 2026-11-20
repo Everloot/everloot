@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { keep } from "./kept";
+import { forgetAllKept, keep } from "./kept";
 
 const counter = () => {
   let n = 0;
@@ -84,4 +84,17 @@ test("set keeps a value the caller already holds, for ttlMs or its own keepMs, w
   k.set({ value: 8, keepMs: 10 }, 1000);
   expect(k.fresh(1009)?.value).toBe(8);
   expect(await k.get(undefined, 1010)).toBe(1);
+});
+
+test("forgetAllKept empties every keeper, so the next get reads again", async () => {
+  let reads = 0;
+  const a = keep(async () => ({ value: ++reads }), { ttlMs: 60_000 });
+  const b = keep(async () => ({ value: "b" }), { ttlMs: 60_000 });
+  expect(await a.get(undefined, 0)).toBe(1);
+  await b.get(undefined, 0);
+  expect(a.fresh(1)?.value).toBe(1);
+  forgetAllKept();
+  expect(a.last()).toBeNull();
+  expect(b.last()).toBeNull();
+  expect(await a.get(undefined, 2)).toBe(2);
 });

@@ -20,6 +20,16 @@ import { buildDatabaseActivity } from "@/lib/database-activity";
 import { writeDatabaseActivity } from "@/lib/database-activity-store";
 import { buildMapPins, writeMapPins } from "@/lib/map-pins-store";
 import { writeGuildLadder } from "@/lib/guild-ladder-store";
+import { forgetAllKept } from "@/lib/kept";
+
+/**
+ * Let go of what the steps so far read and kept for pages: the stores keep each file they read or write, tens of MB
+ * apiece, and one run reads them all. Kept to the end of the run they added up past the Worker's 128 MB (#1354).
+ */
+function release(): void {
+  uploadStore.forgetReads();
+  forgetAllKept();
+}
 
 /**
  * GET /api/cron/snapshot — the Worker's Cron Trigger (src/lib/cf-crons.ts, every 10 minutes) extends the corpus snapshot with new uploads,
@@ -94,6 +104,7 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("census snapshot failed", err);
     }
+    release();
     if (!result) return NextResponse.json({ ok: false, error: "snapshot failed", rebuild, market, completion }, { status: 500 });
     if (!market) return NextResponse.json({ ok: false, error: "market rollup failed", rebuild, ...result, completion }, { status: 500 });
     if (!completion) return NextResponse.json({ ok: false, error: "completion rollup failed", rebuild, ...result, market }, { status: 500 });
@@ -136,6 +147,7 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("item view failed", err);
     }
+    release();
     // The tables the item, NPC, zone, instance, object, loot, edge and addon pages read (lib/aggregate-store.ts), stored so
     // a new server instance reads one file instead of replaying the corpus. Same rule as the item view: written only when
     // this run added uploads, rebuilt, or finds no file; a failure is logged and the pages work the tables out themselves.
@@ -160,6 +172,9 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("search names failed", err);
     }
+    // Nothing after this reads the set; the corpus stays for the views below.
+    aggregatesRead = null;
+    release();
     // Every realm and item's public auction days (lib/auction-history-store.ts), stored so the history page and the
     // auction_history tool never replay the corpus. Same rule as the item view; a failure is logged and they read the corpus.
     let auctionHistory: { written: boolean; items?: number } | null = null;
@@ -168,12 +183,7 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("auction history failed", err);
     }
-    let auctionReports: { written: boolean; reports?: number } | null = null;
-    try { if (!(market.remaining ?? 0)) auctionReports = await writeAuctionReports(); } catch (err) { console.error("auction reports failed", err); }
-    // The Auction House boards (lib/market-boards.ts), built once here instead of on every browse, realm, bags and
-    // disenchanting request: rewritten when the rollup or the UTC day changed. A failure is logged and the pages build them.
-    let marketBoards: { written: boolean; bytes?: number; ms?: number } | null = null;
-    try { marketBoards = await writeMarketBoards(); } catch (err) { console.error("market boards failed", err); }
+    release();
     // The profession and map views follow the auction history's rule: an idle run also rewrites a file built from
     // another snapshot, so a failed write catches up on the next run.
     let professions: { written: boolean; bytes?: number } | null = null;
@@ -183,11 +193,13 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("profession view failed", err);
     }
+    release();
     try {
       mapPins = await writeMapPins({ added: result.added, rebuild, dataAsOf: result.dataAsOf }, { build: async () => buildMapPins(await corpus()) });
     } catch (err) {
       console.error("map pins view failed", err);
     }
+    release();
     let databaseActivity: { written: boolean; entries?: number } | null = null;
     try {
       databaseActivity = await writeDatabaseActivity({ added: result.added, rebuild, dataAsOf: result.dataAsOf }, {
@@ -196,6 +208,9 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("database activity failed", err);
     }
+    // The last view that reads the corpus is done.
+    corpusRead = null;
+    release();
     // Guild authority is checked even on idle runs; hides stay live in the page/tool reader.
     let guildLadder: { written: boolean; bytes?: number } | null = null;
     try {
@@ -209,6 +224,19 @@ export async function GET(req: Request) {
       result.dataAsOf,
       settled?.written ? week : work.settledWeek ?? null,
     );
+    // The auction reports and the Auction House boards come after the heartbeat. Each reads the market rollup, the
+    // aggregates and the client's item tables to name items, the run's largest working sets (#1354): if one outgrows the
+    // Worker, the corpus, the rollups and every view above are already written and the heartbeat says so. A failure is
+    // logged; the pages build the boards themselves and keep the last reports.
+    release();
+    let auctionReports: { written: boolean; reports?: number } | null = null;
+    try { if (!(market.remaining ?? 0)) auctionReports = await writeAuctionReports(); } catch (err) { console.error("auction reports failed", err); }
+    release();
+    // The Auction House boards (lib/market-boards.ts), built once here instead of on every browse, realm, bags and
+    // disenchanting request: rewritten when the rollup or the UTC day changed.
+    let marketBoards: { written: boolean; bytes?: number; ms?: number } | null = null;
+    try { marketBoards = await writeMarketBoards(); } catch (err) { console.error("market boards failed", err); }
+    release();
     return NextResponse.json({ ok: true, rebuild, ...result, market, completion, coverage, settled, census, itemView, aggregates, searchNames, auctionHistory, auctionReports, marketBoards, professions, mapPins, databaseActivity, guildLadder });
   } catch (err) {
     console.error("snapshot failed", err);
