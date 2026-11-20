@@ -228,14 +228,17 @@ export async function GET(req: Request) {
     // aggregates and the client's item tables to name items, the run's largest working sets (#1354): if one outgrows the
     // Worker, the corpus, the rollups and every view above are already written and the heartbeat says so. A failure is
     // logged; the pages build the boards themselves and keep the last reports.
-    release();
-    let auctionReports: { written: boolean; reports?: number } | null = null;
-    try { if (!(market.remaining ?? 0)) auctionReports = await writeAuctionReports(); } catch (err) { console.error("auction reports failed", err); }
+    // The boards go first: without a current file every Auction House page builds them on the site Worker, while a
+    // missing day of reports only waits. The reports, the largest step (about 110 MB more than the boards in a local
+    // replay, 2026-11-20), are written once a day and go last.
     release();
     // The Auction House boards (lib/market-boards.ts), built once here instead of on every browse, realm, bags and
     // disenchanting request: rewritten when the rollup or the UTC day changed.
     let marketBoards: { written: boolean; bytes?: number; ms?: number } | null = null;
     try { marketBoards = await writeMarketBoards(); } catch (err) { console.error("market boards failed", err); }
+    release();
+    let auctionReports: { written: boolean; reports?: number } | null = null;
+    try { if (!(market.remaining ?? 0)) auctionReports = await writeAuctionReports(); } catch (err) { console.error("auction reports failed", err); }
     release();
     return NextResponse.json({ ok: true, rebuild, ...result, market, completion, coverage, settled, census, itemView, aggregates, searchNames, auctionHistory, auctionReports, marketBoards, professions, mapPins, databaseActivity, guildLadder });
   } catch (err) {
