@@ -628,6 +628,12 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: describe the in-game Everloot window, feature chooser, local data and how to reopen it or report a window error.
 - Site: the census adds headline tiles, faction and class colours, race and level bars, a race-by-class heatmap, and a daily chart with hover counts; every table stays, hidden counts stay hidden, and class and race icons load from Blizzard when available.
 
+## [0.3.27] - 2026-11-20
+
+### Fixed
+
+- Addon: **Open in Buy** on an Auction House shopping-list row searches Blizzard's Buy screen for that exact item name and keeps your wanted count, price cap and available market estimate in view. Live-client verification of this handoff is pending.
+
 ## [0.3.26] - 2026-11-20
 
 At the auction house a bar across the top of the Everloot tab says what a scan is doing and how far along it is, the price lookup finds items by name again, and the panel sits cleanly over the house's own controls and portrait. Crafting cost rows show which way scan prices moved. A flight path bar traces each trip with your portrait and the Everloot crest. Drop tooltips are shorter, name the source when players agree on it, and say whether a rate is reported, verified or confirmed. The completion tracker is on in a new install so dungeon and raid kills reach your character page through the Desktop App; an install from before keeps its choice.

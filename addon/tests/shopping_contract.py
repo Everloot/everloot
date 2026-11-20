@@ -141,6 +141,51 @@ def fresh(files, saved="nil", api=""):
     return lua
 
 
+# On Forever the row opens Blizzard's exact-name Buy search without a separate Everloot query.
+lua = fresh(FILES)
+lua.execute("""
+openHouse()
+local T, S, house = Everloot.AuctionTab, Everloot.Shopping, AuctionHouseFrame
+local buy = {}
+AuctionHouseFrameDisplayMode = { Buy = buy }
+Enum.AuctionHouseFilter = { ExactMatch = 5 }
+local category = 4
+function house:GetCategoriesList()
+  return { SetSelectedCategory = function(_, value) category = value end }
+end
+function house:SetDisplayMode(mode) self.displayMode = mode end
+function house:SetSearchText(name)
+  assert(self.displayMode == buy)
+  self.searchText = name
+  return true
+end
+function house:SendBrowseQuery(name, minLevel, maxLevel, filters)
+  assert(self.displayMode == buy and self.searchText == name and category == nil)
+  queries[#queries + 1] = { searchString = name, filters = filters }
+end
+S.Set(2589, 20, 250)
+S.Set(765, 2)
+click(T.panel.modeButton)
+local row = T.panel.shop.rows[1]
+assert(row.search.text == 'Open in Buy', 'the row offers the native handoff')
+ready = false
+click(row.search)
+assert(#queries == 0 and T.panel.shown, 'a busy house keeps the list open')
+ready = true
+click(row.search)
+assert(#queries == 1 and queries[1].searchString == 'Linen Cloth' and queries[1].filters[1] == 5)
+assert(not T.panel.shown and house.displayMode == buy, 'native results are visible')
+assert(T.buyContext.shown and T.buyContext.text:find('Linen Cloth', 1, true)
+  and T.buyContext.text:find('Want 20', 1, true) and T.buyContext.text:find('2s 50c', 1, true))
+T.Show()
+assert(not T.buyContext.shown, 'the native context clears on return to the list')
+click(T.panel.shop.rows[2].search)
+assert(#queries == 2 and queries[2].searchString == 'Silverleaf')
+assert(T.buyContext.text:find('Want 2', 1, true) and T.buyContext.text:find('no price cap', 1, true))
+T.Hide()
+assert(not T.buyContext.shown, 'leaving the flow clears the context')
+""")
+
 # --- Lists: create, rename, choose, delete; caps said in words; a hand-edited file trimmed to the caps ---
 lua = fresh(FILES)
 lua.execute("""
