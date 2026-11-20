@@ -16,7 +16,7 @@
   "workers_dev": false,
   "preview_urls": false,
   // The schedules in src/lib/cf-crons.ts (cf-crons.test.ts holds this list, wrangler.jsonc's and that file's equal).
-  "triggers": { "crons": ["*/10 * * * *", "5,15,25,35,45,55 * * * *", "23 * * * *", "7,37 * * * *"] },
+  "triggers": { "crons": ["*/10 * * * *", "23 * * * *", "7,37 * * * *"] },
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {

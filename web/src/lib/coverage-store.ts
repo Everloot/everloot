@@ -4,7 +4,7 @@ import { computePlateau } from "@kb/plateau";
 import { COVERAGE_BUILD, coverageInput, loadCoverageExpected } from "./coverage-compute";
 import { COVERAGE_STORED_VERSION, coverageKey } from "./coverage-summary";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
-import { cloudConfig, uploadStore, type CloudConfig, type Corpus } from "./upload-store";
+import { cloudConfig, uploadStore, type CloudConfig } from "./upload-store";
 
 // The key lives in coverage-summary.ts, which the home page reads without this file's corpus code.
 export { coverageKey };
@@ -22,8 +22,6 @@ export { coverageKey };
  */
 export async function writeCoverage(opts: { added: number; rebuild?: boolean; dataAsOf: string | null }, deps: {
   cloud?: CloudConfig | null; fetch?: typeof fetch; build?: string;
-  /** The corpus a caller has already read (the stored-views run's), so the score does not read and parse it again. */
-  corpus?: () => Promise<Corpus>;
 } = {}): Promise<{ written: boolean; key?: string; zones?: number; bytes?: number }> {
   const cloud = deps.cloud === undefined ? cloudConfig() : deps.cloud;
   if (!cloud) throw new Error("coverage needs the cloud store");
@@ -33,7 +31,7 @@ export async function writeCoverage(opts: { added: number; rebuild?: boolean; da
   const key = coverageKey(build);
   const url = `https://${cloud.r2AccountId}.r2.cloudflarestorage.com/${cloud.r2Bucket}/${key}`;
   if (opts.added <= 0 && !opts.rebuild && !await storedViewNeedsWrite(r2, url, opts.dataAsOf, doFetch)) return { written: false };
-  const corpus = deps.corpus ? await deps.corpus() : await uploadStore.loadCorpus();
+  const corpus = await uploadStore.loadCorpus();
   if (corpus.unreachable) throw new Error("corpus unreachable");
   const input = coverageInput(corpus, await loadCoverageExpected(), opts.dataAsOf ?? corpus.dataAsOf ?? null);
   const report = computeCoverage(input);
