@@ -29,7 +29,7 @@ test("the top bar is Lookup, Database, Tools, Guides, Chat and Profile; Chat is 
   expect(navItems().map((i) => i.label)).toEqual(["Lookup", "Database", "Tools", "Guides", "Chat", "Profile"]);
   expect(primary).toMatch(/<a href="\/chat"[^>]*>Chat<\/a>/);
   for (const id of ["lookup", "database", "tools", "guides", "profile"]) {
-    expect(primary).toMatch(new RegExp(`<button id="${id}-menu-button" type="button" aria-expanded="false" aria-controls="${id}-menu"`));
+    expect(primary).toMatch(new RegExp(`<button id="${id}-menu-button" type="button" aria-expanded="false" aria-controls="${id}-menu" aria-haspopup="true"`));
   }
 });
 
