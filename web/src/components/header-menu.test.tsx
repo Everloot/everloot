@@ -35,10 +35,10 @@ const menu = () => container.querySelector("#tools-menu:not([hidden])");
 
 test("the menu keeps both build links reachable below the desktop build chip breakpoint", async () => {
   const toggle = container.querySelector<HTMLButtonElement>('button[aria-controls="site-navigation"]')!;
-  expect(toggle.className).toContain("xl:hidden");
+  expect(toggle.className).toContain("2xl:hidden");
   await act(async () => toggle.click());
   const nav = container.querySelector("#site-navigation")!;
-  expect(nav.className).toContain("xl:hidden");
+  expect(nav.className).toContain("2xl:hidden");
   expect(nav.querySelector('a[href^="/changes?show=builds"]')).not.toBeNull();
   expect(nav.querySelector('a[title^="The newest WoW"]')).not.toBeNull();
 });
@@ -146,8 +146,8 @@ test("ArrowRight and ArrowLeft move along the bar's items, wrapping, and close t
   expect(menu()).toBeNull();
   await key(top("Guides"), "ArrowRight");
   expect(document.activeElement).toBe(top("Chat"));
-  top("Lookup").focus();
-  await key(top("Lookup"), "ArrowLeft");
+  top("Rankings").focus();
+  await key(top("Rankings"), "ArrowLeft");
   expect(document.activeElement).toBe(top("Profile"));
   // Inside a panel the keys leave the links alone.
   await act(async () => toolsButton().click());
@@ -178,7 +178,7 @@ test("the phone menu lists the same places", async () => {
   expect(panel.querySelector('form[action="/search"]')).not.toBeNull();
 });
 
-test("the phone menu shows both builds, which the bar only has room for from 1280 px", async () => {
+test("the phone menu shows both builds, which the bar shows inline from 1536 px", async () => {
   const toggle = Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "Menu")!;
   await act(async () => toggle.click());
   const links = Array.from(container.querySelector("#site-navigation")!.querySelectorAll("a")).map((a) => a.textContent ?? "");

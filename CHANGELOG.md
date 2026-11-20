@@ -256,6 +256,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
 
 ### Changed
+- Site: the header links Players, Guilds and Rankings directly, ahead of its menus, and Lookup no longer repeats them; the phone menu opens with them as Community. The bar's items show from 1280 px (the Menu button carries them below that) and the build label from 1536 px.
 - Site: the header's menus take the keyboard: each trigger says it opens a panel, ArrowDown opens it onto the first link, ArrowUp/ArrowDown walk the links and wrap, Home/End jump to the ends, Tab out closes it, and ArrowLeft/ArrowRight move along the bar; below md the docs' section tabs become one select.
 - Site: the rankings boards' faction dots use the faction colours the census introduced, the same blue and red on both pages.
 
