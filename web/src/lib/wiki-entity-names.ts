@@ -2,7 +2,7 @@ import { z } from "zod";
 import { privateStoreFromEnv, readNamesFile, PRIVATE_MALFORMED, PRIVATE_UNREACHABLE } from "./game-assets";
 import { assetsBaseUrl } from "./talents/assets";
 import { CLIENT_LAYER } from "./items";
-import { npcPage, npcReportedName, type WorldFacts } from "../../../kb/src/world-pages";
+import { npcPage, npcReportedName, type WorldFacts } from "@kb/world-pages";
 
 export interface WikiEntityNames { version: string; names: Map<number | string, { name: string; wikiPage: string }> }
 

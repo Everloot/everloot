@@ -1,6 +1,6 @@
 import { SectionHeading } from "@/components/ui";
-import { CLOCK_SKEW_MINUTES, CONFIRMATION, KILL_DAYS_BACK, LEVEL_SLACK, SCORE_VERSION, WEIGHTS, type ComponentScore, type PartKey } from "../../../../kb/src/everloot-score";
-import { EXAMPLE_ACCOUNT, EXAMPLE_CHARACTERS, EXAMPLE_SCORES } from "../../../../kb/src/everloot-score-example";
+import { CLOCK_SKEW_MINUTES, CONFIRMATION, KILL_DAYS_BACK, LEVEL_SLACK, SCORE_VERSION, WEIGHTS, type ComponentScore, type PartKey } from "@kb/everloot-score";
+import { EXAMPLE_ACCOUNT, EXAMPLE_CHARACTERS, EXAMPLE_SCORES } from "@kb/everloot-score-example";
 
 /**
  * The Everloot Score's formula and a worked example on made-up data. The score itself is not shown anywhere: this
@@ -29,7 +29,7 @@ function Example() {
   const both = (s: (typeof EXAMPLE_SCORES)[number], i: number) =>
     `${EXAMPLE_CHARACTERS[i + 1].name} has Progress ${scored(s.progress)?.points} and Completion ${scored(s.completion)?.points}`;
   return (
-    <div className="space-y-3 rounded-lg border border-edge p-4">
+    <div className="space-y-3 rounded-card border border-edge p-4">
       <p className="text-fg"><strong>Made-up example.</strong> No boss, list or character below is real.</p>
       <p className="text-fg-2">
         Every kill of Character A&apos;s is in a pull summary another player uploaded, from another install and another address, in

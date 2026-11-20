@@ -18,13 +18,19 @@ export async function itemArt(ids: readonly number[]): Promise<{ assets: SiteAss
 /**
  * The names the item pages show, for items with a public value: players' agreed name, then the game files and
  * wiki match, then the tooltip's name (a public auction value is a player report, as the tooltip rule counts
- * them). Items with none are left out and read "Item N".
+ * them). Items with none are left out and read "Item N". `stored` is the names the cron worked out by the same rule
+ * (lib/market-boards.ts; null without them): an id it holds is taken from it, and the names are read only for the rest.
  */
-export async function auctionNames(ids: readonly number[], tips: Map<number, ItemTip>): Promise<Map<number, string>> {
-  if (!ids.length) return new Map();
-  const { agreed, matched } = await loadShownNames();
+export async function auctionNames(ids: readonly number[], tips: Map<number, ItemTip>, stored?: ReadonlyMap<number, string | null> | null): Promise<Map<number, string>> {
   const out = new Map<number, string>();
+  const rest: number[] = [];
   for (const id of new Set(ids)) {
+    if (!stored?.has(id)) rest.push(id);
+    else if (stored.get(id)) out.set(id, stored.get(id)!);
+  }
+  if (!rest.length) return out;
+  const { agreed, matched } = await loadShownNames();
+  for (const id of rest) {
     const shown = shownItemName(id, agreed, matched?.names, tips.get(id));
     if (shown) out.set(id, shown.name);
   }

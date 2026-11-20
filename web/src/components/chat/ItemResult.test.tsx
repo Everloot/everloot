@@ -2,7 +2,7 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import ItemResult from "./ItemResult";
+import ItemResult, { LOAD_MS } from "./ItemResult";
 
 const CARD = {
   type: "item", id: 2589, title: "Linen Cloth", quality: 1, color: null, icon: "https://assets.everloot.app/icons/132889.webp",
@@ -110,6 +110,26 @@ test("a missing card still links the database page; a failed one says so", async
   site({ "/database/card/item/2589": () => Response.json({ ok: false }, { status: 503 }), "/api/tools/item_page": () => tool({ connected: true, dataAsOf: AS_OF, page: page() }) });
   await render(<ItemResult key="again" item={{ id: 2589 }} onChoose={() => {}} />);
   expect(text()).toContain("The item card is unavailable right now");
+  expect(Array.from(container.querySelectorAll('a[href="/database/items/2589"]')).map((a) => a.textContent)).toContain("Open the item page");
+});
+
+test("a card or drops request that never answers (a challenge page) is given up as unavailable, with the item page linked", async () => {
+  vi.useFakeTimers();
+  try {
+    // Like fetch: open until its signal aborts.
+    const hang = () => new Promise<Response>((_, reject) => { signals.at(-1)!.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError"))); });
+    site({ "/database/card/item/2589": hang, "/api/tools/item_page": hang });
+    await act(async () => root.render(<ItemResult item={{ id: 2589 }} onChoose={() => {}} />));
+    expect(text()).toContain("Loading drops");
+    await act(async () => { await vi.advanceTimersByTimeAsync(LOAD_MS); });
+    expect(text()).not.toContain("Loading");
+    expect(text()).toContain("The item card is unavailable right now");
+    expect(text()).toContain("Drop data is unavailable right now");
+    expect(container.querySelector("[aria-busy]")?.getAttribute("aria-busy")).toBe("false");
+    expect(Array.from(container.querySelectorAll('a[href="/database/items/2589"]')).map((a) => a.textContent)).toContain("Open the item page");
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test("several matches are offered as buttons; choosing one hands back its id", async () => {

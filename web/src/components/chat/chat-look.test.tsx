@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vitest";
 import ChatWelcome, { WELCOME } from "./ChatWelcome";
 import { AssistantMessage, pageKind } from "./Message";
+import { itemQuery } from "@/lib/chat/items";
 
 const ICON = "https://assets.everloot.app/b/icons/warrior.webp";
 
@@ -19,6 +20,14 @@ test("the empty chat welcomes with a heading, a decorative Glint and four questi
   }
 });
 
+test("no starting question asks where an item drops, which the public data cannot answer yet, or opens an item card", () => {
+  for (const { text } of WELCOME) {
+    expect(text).not.toMatch(/drops?/i);
+    expect(itemQuery(text), text).toBeNull();
+  }
+  expect(WELCOME.map((s) => s.text)).toContain("Where is Hogger?");
+});
+
 test("a card shows the game icon when the page has one, and the drawn glyph without it", () => {
   const withIcon = renderToStaticMarkup(<ChatWelcome icons={{ warrior: ICON }} disabled={false} onAsk={() => {}} />);
   expect(withIcon).toContain(`src="${ICON}"`);
@@ -29,7 +38,7 @@ test("a card shows the game icon when the page has one, and the drawn glyph with
 
 test("an answer's pages are source cards that say what each page is; cited sources say they open a new tab", () => {
   const html = renderToStaticMarkup(
-    <AssistantMessage copied={false} onCopy={() => {}} m={{
+    <AssistantMessage m={{
       role: "assistant", text: "Humanoids drop it.", at: "", model: "m", steps: [],
       pages: ["https://everloot.app/database/item/2589", "https://everloot.app/database/npcs/1"],
       sources: ["https://warcraft.wiki.gg/wiki/Linen_Cloth (CC-BY-SA-4.0, retrieved 2023-11-13)"],

@@ -56,7 +56,8 @@ local first = printed[1]
 assert(first == 'Everloot ' .. Everloot.VERSION .. ': 2 modules on, 1 off; could not start: plan. /everloot status for details.', first)
 assert(not string.find(first, '\\n') and not string.find(first, 'rows'), 'one line, no row counts')
 assert(string.find(printed[2], 'census on', 1, true), 'the census notice still follows once: ' .. table.concat(printed, ' | '))
-assert(string.find(printed[3], 'player names on', 1, true) and #printed == 3, 'then the player names notice, once: ' .. table.concat(printed, ' | '))
+assert(string.find(printed[3], 'player names on', 1, true) and #printed == 4, 'then the player names notice, once: ' .. table.concat(printed, ' | '))
+assert(string.find(printed[4], 'completion tracker on', 1, true), 'then the completion notice')
 printed = {}
 Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')
 assert(#printed == 1, 'a reload says the one line only: ' .. table.concat(printed, ' | '))

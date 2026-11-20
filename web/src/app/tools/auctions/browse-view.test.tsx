@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
-import { emptyMarket, foldMarket } from "../../../../../kb/src/market";
+import { emptyMarket, foldMarket } from "@kb/market";
 
 const store = vi.hoisted(() => ({ loadMarket: vi.fn(), loadCorpus: vi.fn() }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
@@ -9,7 +9,7 @@ vi.mock("@/lib/upload-store", async (importOriginal) => ({
   uploadStore: { loadMarket: store.loadMarket, loadCorpus: store.loadCorpus },
 }));
 vi.mock("next/link", () => ({
-  default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a>,
+  default: ({ href, children, prefetch }: { href: string; children: ReactNode; prefetch?: boolean }) => <a href={href} data-prefetch={prefetch === undefined ? undefined : String(prefetch)}>{children}</a>,
 }));
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => { throw new Error(`REDIRECT ${url}`); },
@@ -115,4 +115,10 @@ test("with the movers filter on and an explicit sort, the change default is not 
   const html = await hub({ moved: "1", sort: "-units" });
   // The change column is now the one to ask for: change, most first, is the moved default and needs no parameter.
   expect(headerQuery(html, "7 days").has("sort")).toBe(false);
+});
+
+test("a result row's item link loads on click, not all at once as the page opens", async () => {
+  const { ItemLink } = await import("./parts");
+  const html = renderToStaticMarkup(<ItemLink id={2589} href="/tools/auctions/forever/2589" tip={undefined} names={new Map()} />);
+  expect(html).toContain('<a href="/tools/auctions/forever/2589" data-prefetch="false">');
 });

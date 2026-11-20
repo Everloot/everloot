@@ -9,15 +9,17 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { playerPagesOn } from "@/lib/player-pages";
 import { guildsOn } from "@/lib/guild-switch";
 import { PLAYER_PAGE_SHOWS } from "../players/player-view";
+import { censusIcons, type CensusIcons } from "@/lib/census-media";
+import { Bars, DailyChart, Factions, HeatCell, IconName } from "./charts";
 import {
-  Card, Container, DataTable, EmptyState, Explainer, FilterBar, Input, LinkTabs, PageHeader, SectionHeading, type Column, type FilterControl,
+  Card, Container, DataTable, EmptyState, Explainer, FilterBar, LinkTabs, PageHeader, SectionHeading, type Column, type FilterControl,
 } from "@/components/ui";
 import {
   activeDims, censusHref, filterCensus, parseCensusFilter, type CensusDim, type CensusFilter, type FilteredCensus,
 } from "@/lib/census-filter";
 import {
   CENSUS_CLASSES, CENSUS_RACES, FACTIONS, HIDDEN_LABEL, HIDDEN_MEANING, LEVEL_BANDS, type CensusCount, type CensusView, type CensusWindow,
-} from "../../../../kb/src/census";
+} from "@kb/census";
 
 const description =
   "Who plays what on WoW Forever: factions, races, classes and levels from Everloot uploads. Each character counts once; a count shows from 10 characters.";
@@ -38,17 +40,22 @@ function Count({ count }: { count: CensusCount }) {
   return count === null ? <span className="text-muted">{HIDDEN_LABEL}</span> : <>{number(count)}</>;
 }
 
-type Row = { key: string; label: string; count: CensusCount; href?: string };
+type Row = { key: string; label: string; count: CensusCount; href?: string; faction?: string; icon?: string };
 
 /**
  * One slice: a row per group with its count and its share of `total` (the window's characters, or the filter's
- * count; no share column when that is hidden). A row with an `href` links to the census filtered to it.
+ * count; no share column when that is hidden). A row with an `href` links to the census filtered to it. `byClass`: the rows are
+ * classes, and each chart bar takes its class colour. The table keeps every published count and share.
  */
-function CountTable({ id, title, item, rows, total }: { id: string; title: string; item: string; rows: Row[]; total: number | null }) {
+function CountTable({ id, title, item, rows, total, byClass = false, icons = {} }: { id: string; title: string; item: string; rows: Row[]; total: number | null; byClass?: boolean; icons?: CensusIcons }) {
+  rows = [...rows].sort((a, b) => {
+    if (item === "Race" && a.faction !== b.faction) return (a.faction ?? "").localeCompare(b.faction ?? "");
+    return item === "Class" || item === "Race" ? (b.count ?? -1) - (a.count ?? -1) : 0;
+  });
   const columns: Column<Row>[] = [
     {
       key: "label", header: item,
-      cell: (row) => row.href ? <Link href={row.href} className={`${link} font-medium`}>{row.label}</Link> : <span className="font-medium">{row.label}</span>,
+      cell: (row) => row.href ? <Link href={row.href} className={`${link} font-medium`}><IconName label={row.label} url={icons[row.icon ?? ""]} /></Link> : <IconName label={row.label} url={icons[row.icon ?? ""]} />,
     },
     { key: "count", header: "Characters", numeric: true, cell: (row) => <Count count={row.count} /> },
   ];
@@ -57,38 +64,35 @@ function CountTable({ id, title, item, rows, total }: { id: string; title: strin
       key: "share",
       header: "Share",
       cell: (row) => row.count !== null && (
-        <div className="flex min-w-32 items-center gap-3">
-          <span className="w-10 text-right font-mono tabular-nums">{percent(row.count, total)}</span>
-          <div aria-hidden="true" className="h-1 flex-1 rounded-full bg-line">
-            <div className="h-1 rounded-full bg-fg-2" style={{ width: percent(row.count, total) }} />
-          </div>
-        </div>
+        <span className="font-mono tabular-nums">{percent(row.count, total)}</span>
       ),
     });
   }
   return (
-    <section aria-labelledby={id}>
+    <Card as="section" aria-labelledby={id}>
       <SectionHeading id={id}>{title}</SectionHeading>
+      {item === "Faction" ? <Factions rows={rows} total={total} /> : <Bars title={title} rows={rows} byClass={byClass} icons={icons} />}
       <DataTable caption={`${title}: characters and share of all characters in the window`} columns={columns} rows={rows} rowKey={(row) => row.key} />
-    </section>
+    </Card>
   );
 }
 
 /** Blizzard's race and class table for one faction (as on /wow-forever), with the census count in each playable cell. */
-function RaceClassGrid({ faction, window: w }: { faction: string; window: CensusWindow }) {
+function RaceClassGrid({ faction, window: w, icons }: { faction: string; window: CensusWindow; icons: CensusIcons }) {
   const races = CENSUS_RACES.filter((r) => r.faction === faction);
   const count = (race: string, cls: string) => w.raceClass.find((c) => c.faction === faction && c.race === race && c.class === cls);
+  const max = Math.max(1, ...w.raceClass.flatMap((c) => c.count === null ? [] : [c.count]));
   const columns: Column<(typeof races)[number]>[] = [
-    { key: "race", header: "Race", nowrap: true, cell: (race) => <span className="font-medium">{race.name}</span> },
+    { key: "race", header: "Race", nowrap: true, cell: (race) => <span className="inline-flex items-center gap-2 font-medium"><span aria-hidden="true" className={`h-2 w-2 ${faction === "Alliance" ? "bg-faction-alliance" : "bg-faction-horde"}`} /><IconName label={race.name} url={icons[race.token]} /></span> },
     ...CENSUS_CLASSES.map((c): Column<(typeof races)[number]> => ({
       key: c.token,
-      header: c.name,
+      header: <IconName label={c.name} url={icons[c.token]} />,
       numeric: true,
       cell: (race) => {
         const cell = count(race.token, c.token);
         return !cell ? <span className="sr-only">Not playable</span>
-          : cell.count === null ? <><span aria-hidden="true" className="text-muted">&mdash;</span><span className="sr-only">{HIDDEN_LABEL}</span></>
-          : number(cell.count);
+          : cell.count === null ? <span tabIndex={0} title={`${race.name}, ${c.name}: ${HIDDEN_LABEL}`}><span aria-hidden="true" className="text-muted">&mdash;</span><span className="sr-only">{HIDDEN_LABEL}</span></span>
+          : <HeatCell label={`${race.name}, ${c.name}`} count={cell.count} max={max} />;
       },
     })),
   ];
@@ -110,25 +114,19 @@ function TakePart() {
   );
 }
 
-/** The way into the player pages and the guild pages, each shown only while the owner's switch has it on. */
+/**
+ * The way into the player pages and the guild pages, each shown only while the owner's switch has it on. Links, not
+ * forms: /players and /guilds hold the one search box each.
+ */
 function LookUpPlayer({ players, guilds }: { players: boolean; guilds: boolean }) {
   return (
     <Card as="section" aria-labelledby="look-up" className="space-y-3">
       <SectionHeading id="look-up">{players ? "Look up a player" : "Look up a guild"}</SectionHeading>
-      {players && (
-        <form action="/players" method="get" role="search" className="flex max-w-xl flex-col gap-2 sm:flex-row">
-          <label htmlFor="census-player-q" className="sr-only">Character name</label>
-          <Input id="census-player-q" name="q" type="search" maxLength={40} autoComplete="off" placeholder="Start of a character's name" className="flex-1" />
-          <button type="submit" className="btn btn-primary min-h-11">Find</button>
-        </form>
-      )}
-      {guilds && (
-        <form action="/guilds" method="get" role="search" className="flex max-w-xl flex-col gap-2 sm:flex-row">
-          <label htmlFor="census-guild-q" className="sr-only">Guild name</label>
-          <Input id="census-guild-q" name="q" type="search" maxLength={40} autoComplete="off" placeholder={players ? "or the start of a guild's name" : "Start of a guild's name"} className="flex-1" />
-          <button type="submit" className="btn min-h-11">Find a guild</button>
-        </form>
-      )}
+      <p className="text-sm">
+        {players && <Link href="/players" className={link}>Find a player</Link>}
+        {players && guilds && " · "}
+        {guilds && <Link href="/guilds" className={link}>Find a guild</Link>}
+      </p>
       {players && <p className="text-sm text-fg-2">{PLAYER_PAGE_SHOWS}</p>}
       <p className="text-sm">
         {players && <Link href="/players/opt-out" className={link}>Hide your character</Link>}
@@ -178,20 +176,20 @@ const NOTE: Record<NonNullable<FilteredCensus["note"]>, string> = {
 };
 
 /** The census under filters: the one published count for the whole filter, then each split it leaves open. */
-function Filtered({ view: v, window: w }: { view: FilteredCensus; window: CensusWindow }) {
+function Filtered({ view: v, window: w, icons }: { view: FilteredCensus; window: CensusWindow; icons: CensusIcons }) {
   const total = v.headline?.count ?? null;
   return (
     <div className="space-y-12">
       <section aria-labelledby="filtered" className="space-y-3">
         <SectionHeading id="filtered">{v.label}</SectionHeading>
         {v.headline && (
-          <p className="max-w-[65ch] text-lg text-fg-2">
+          <p className="max-w-prose text-lg text-fg-2">
             {total === null
               ? <>{v.label}: {HIDDEN_LABEL}.</>
               : <>About {number(total)} characters{w.characters ? <>, {percent(total, w.characters)} of all characters counted</> : null}.</>}
           </p>
         )}
-        {v.note && <p className="max-w-[65ch] text-fg-2">{NOTE[v.note]}</p>}
+        {v.note && <p className="max-w-prose text-fg-2">{NOTE[v.note]}</p>}
       </section>
       {v.breakdowns.map((b) => (
         <CountTable
@@ -200,7 +198,14 @@ function Filtered({ view: v, window: w }: { view: FilteredCensus; window: Census
           title={`${v.label}: ${BY_TITLE[b.by][0].toLowerCase()}`}
           item={BY_TITLE[b.by][1]}
           total={total}
-          rows={b.rows}
+          icons={icons}
+          rows={b.rows.map((r) => ({
+            ...r,
+            icon: b.by === "class" ? CENSUS_CLASSES.find((c) => c.name === r.label)?.token
+              : b.by === "race" ? CENSUS_RACES.find((c) => r.label === c.name || r.label.startsWith(`${c.name} (`))?.token : undefined,
+            faction: b.by === "race" ? FACTIONS.find((f) => r.label.endsWith(`(${f})`)) ?? v.filter.faction : undefined,
+          }))}
+          byClass={b.by === "class"}
         />
       ))}
     </div>
@@ -234,11 +239,29 @@ function Headline({ view, window: w }: { view: CensusView; window: CensusWindow 
     );
   }
   return (
-    <p className="max-w-[65ch] text-lg text-fg-2">
+    <p className="max-w-prose text-lg text-fg-2">
       About {number(w.characters!)} characters were {w.id === "week" ? "active in the last 7 days" : "seen since launch"} {span},
       counted from {plural(w.installs, "install", "installs")} that turned the census on{view.trusted ? ", including Everloot's own" : ""}.
     </p>
   );
+}
+
+function HeadlineTiles({ window: w, age }: { window: CensusWindow; age: string }) {
+  // Compare published counts only; a hidden contender is never treated as zero.
+  const top = (rows: { label: string; count: CensusCount }[]) => {
+    const first = rows.filter((r) => r.count !== null).sort((a, b) => b.count! - a.count!)[0];
+    return first ? `${number(first.count!)} · ${first.label}` : HIDDEN_LABEL;
+  };
+  const stats = [
+    ["Characters in the window", w.characters === null ? HIDDEN_LABEL : number(w.characters)],
+    ["Faction split", w.factions.map((f) => `${f.faction}: ${f.count === null || !w.characters ? HIDDEN_LABEL : percent(f.count, w.characters)}`).join(" · ")],
+    ["Top class shown", top(w.classes.map((c) => ({ label: CLASS_NAME.get(c.class)!, count: c.count })))],
+    ["Top race shown", top(w.races.map((r) => ({ label: `${RACE_NAME.get(r.race)} (${r.faction})`, count: r.count })))],
+    ["Data age", age],
+  ];
+  return <dl aria-label="Census headlines" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+    {stats.map(([label, value]) => <Card key={label} padding="sm"><dt className="text-sm text-fg-2">{label}</dt><dd className="mt-2 text-xl font-semibold tabular-nums text-fg">{value}</dd></Card>)}
+  </dl>;
 }
 
 export default async function CensusPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
@@ -249,6 +272,7 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
   const { view, unreachable, dataAsOf } = await loadCensus();
   const w = view?.windows[chosen];
   const ready = !unreachable && view && w;
+  const icons = ready && !w.collecting ? await censusIcons() : {};
   return (
     <Container width="data">
       <article>
@@ -280,6 +304,7 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
                 />
               )}
               <Headline view={view} window={w} />
+              {!w.collecting && <HeadlineTiles window={w} age={dataAgeLabel(dataAsOf)} />}
               {!w.collecting && (
                 <FilterBar
                   label="Census filters"
@@ -293,30 +318,32 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
               )}
             </div>
 
-            {!w.collecting && filtering && <Filtered view={filterCensus(w, filter, chosen)} window={w} />}
+            {!w.collecting && filtering && <Filtered view={filterCensus(w, filter, chosen)} window={w} icons={icons} />}
 
             {!w.collecting && !filtering && (
               <>
                 <CountTable id="factions" title="Factions" item="Faction" total={w.characters!} rows={FACTIONS.map((f) => ({ key: f, label: f, count: w.factions.find((x) => x.faction === f)!.count, href: censusHref({ ...filter, faction: f }, chosen) }))} />
-                <CountTable id="classes" title="Classes" item="Class" total={w.characters!} rows={w.classes.map((c) => ({ key: c.class, label: CLASS_NAME.get(c.class)!, count: c.count, href: censusHref({ ...filter, class: c.class }, chosen) }))} />
-                <CountTable id="races" title="Races" item="Race" total={w.characters!} rows={w.races.map((r) => ({ key: `${r.faction}/${r.race}`, label: `${RACE_NAME.get(r.race)} (${r.faction})`, count: r.count, href: censusHref({ ...filter, race: r.race, faction: r.race === "Skyborne" ? r.faction : undefined }, chosen) }))} />
-                <section aria-labelledby="grid" className="space-y-6">
+                <CountTable id="classes" title="Classes" item="Class" byClass icons={icons} total={w.characters!} rows={w.classes.map((c) => ({ key: c.class, label: CLASS_NAME.get(c.class)!, icon: c.class, count: c.count, href: censusHref({ ...filter, class: c.class }, chosen) }))} />
+                <CountTable id="races" title="Races" item="Race" icons={icons} total={w.characters!} rows={w.races.map((r) => ({ key: `${r.faction}/${r.race}`, label: `${RACE_NAME.get(r.race)} (${r.faction})`, icon: r.race, faction: r.faction, count: r.count, href: censusHref({ ...filter, race: r.race, faction: r.race === "Skyborne" ? r.faction : undefined }, chosen) }))} />
+                <Card as="section" aria-labelledby="grid" className="space-y-6">
                   <SectionHeading
                     id="grid"
                     note={<>Blizzard&apos;s race and class tables from <Link href="/wow-forever" className={link}>What is WoW: Forever</Link>, with the characters in each playable combination. A dash is a hidden count.</>}
                   >
                     Race and class
                   </SectionHeading>
-                  {FACTIONS.slice().reverse().map((f) => <RaceClassGrid key={f} faction={f} window={w} />)}
-                </section>
+                  <p className="text-sm text-fg-2">Darker cells mean more characters. Counts are rounded; hidden cells have no shade.</p>
+                  {FACTIONS.slice().reverse().map((f) => <RaceClassGrid key={f} faction={f} window={w} icons={icons} />)}
+                </Card>
                 <CountTable id="levels" title="Level bands" item="Level band" total={w.characters!} rows={LEVEL_BANDS.map((b) => ({ key: b.id, label: b.label, count: w.levels.find((l) => l.band === b.id)!.count, href: censusHref({ ...filter, level: b.id }, chosen) }))} />
               </>
             )}
 
             {/* The trend comes from the 7-day window, so it shows once that window has numbers, whichever window is chosen. */}
             {!view.windows.week.collecting && !filtering && (
-              <section aria-labelledby="trend">
+              <Card as="section" aria-labelledby="trend">
                 <SectionHeading id="trend" note="Characters active each UTC day, under the same rule.">The last 7 days, day by day</SectionHeading>
+                <DailyChart days={view.trend} />
                 <DataTable
                   caption="Characters active each day of the last 7 days"
                   columns={[
@@ -326,7 +353,7 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
                   rows={view.trend}
                   rowKey={(d) => d.day}
                 />
-              </section>
+              </Card>
             )}
           </div>
         )}
@@ -344,6 +371,7 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
             </>
           )}
           <TakePart />
+          {Object.keys(icons).length > 0 && <p>Class and race icons from Blizzard Entertainment.</p>}
           <p>
             Census rows are never published one by one, only these counts. How Everloot collects and publishes data is in the{" "}
             <a href={`${REPO_URL}/blob/main/docs/DATA_POLICY.md`} rel="noopener" className={link}>data policy</a>.

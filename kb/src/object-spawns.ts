@@ -19,7 +19,7 @@ import type { RecheckScope } from "./coverage.js";
 import { recheckRows } from "./fact-states.js";
 import { latest } from "./instances.js";
 import { busiestMap, scopeSince } from "./recheck-scopes.js";
-import { agreedLabelsById, WORLD_AGREEMENT } from "./world-pages.js";
+import { agreedLabelsById, WORLD_AGREEMENT, type DropSourceName } from "./world-pages.js";
 
 export type GatherKind = (typeof GATHER_KINDS)[number];
 
@@ -35,6 +35,8 @@ export interface ObjectSpawnRow {
   y?: number;
   gatherKind?: GatherKind;
   name?: string;
+  /** The player's own rank in the skill the cast used (Herbalism or Mining), on loot rows from newer addons. */
+  gatherSkill?: number;
   /** When the client recorded it; kept on minimap sightings only. */
   capturedAt?: string;
 }
@@ -198,9 +200,11 @@ function placed(row: ObjectSpawnRow): row is PlacedRow {
 
 /**
  * Object names 3 installs agree on, by object id. Ids without one are left out: show "Object <id>". Under `recheck`,
- * an object is placed on the map most installs saw it on.
+ * an object is placed on the map most installs saw it on. `publicDrops` returns unanimous source names from one install, with their tier.
  */
-export function agreedObjectNames(rows: ObjectSpawnRow[], recheck: readonly RecheckScope[] = []): Map<number, string> {
+export function agreedObjectNames(rows: ObjectSpawnRow[], recheck: readonly RecheckScope[], publicDrops: true): Map<number, DropSourceName>;
+export function agreedObjectNames(rows: ObjectSpawnRow[], recheck?: readonly RecheckScope[], publicDrops?: false): Map<number, string>;
+export function agreedObjectNames(rows: ObjectSpawnRow[], recheck: readonly RecheckScope[] = [], publicDrops = false): Map<number, string> | Map<number, DropSourceName> {
   let sinceOf: ((id: number) => string | null) | undefined;
   if (recheck.length) {
     const maps = new Map<number, Map<number, Set<string>>>();
@@ -212,12 +216,55 @@ export function agreedObjectNames(rows: ObjectSpawnRow[], recheck: readonly Rech
     }
     sinceOf = (id) => scopeSince(recheck, { types: ["treasures"], zones: [busiestMap(maps.get(id) ?? new Map())], ids: [id] });
   }
-  return agreedLabelsById(rows.filter((r) => r.name !== undefined).map((r) => ({ id: r.objectId, installId: r.installId, label: r.name!, ...(r.capturedAt ? { capturedAt: r.capturedAt } : {}) })), sinceOf);
+  const named = rows.filter((r) => r.name !== undefined).map((r) => ({ id: r.objectId, installId: r.installId, label: r.name!, ...(r.capturedAt ? { capturedAt: r.capturedAt } : {}) }));
+  return publicDrops ? agreedLabelsById(named, sinceOf, true) : agreedLabelsById(named, sinceOf);
 }
 
 /** How each object is opened, by object id, when 3 installs agree on one kind. */
 export function agreedGatherKinds(rows: ObjectSpawnRow[]): Map<number, GatherKind> {
   return agreedLabelsById(rows.filter((r) => r.gatherKind !== undefined).map((r) => ({ id: r.objectId, installId: r.installId, label: r.gatherKind! }))) as Map<number, GatherKind>;
+}
+
+/** The gathering skill installs had: `installs` counts those that reported one. */
+export interface SkillRange { min: number; median: number; installs: number }
+
+/**
+ * The skill players had on these rows: each install's lowest `gatherSkill` among them, then the lowest of those and
+ * their median (the lower middle one when the count is even, so it is always a rank someone had). Null until 3
+ * installs reported a skill, the same agreement a spot or a kind needs.
+ */
+export function skillRange(rows: readonly ObjectSpawnRow[]): SkillRange | null {
+  const lowest = new Map<string, number>();
+  for (const r of rows) {
+    const id = r.installId.trim();
+    if (r.gatherSkill === undefined || !id) continue;
+    lowest.set(id, Math.min(lowest.get(id) ?? Infinity, r.gatherSkill));
+  }
+  if (lowest.size < WORLD_AGREEMENT) return null;
+  const sorted = [...lowest.values()].sort((a, b) => a - b);
+  return { min: sorted[0]!, median: sorted[Math.floor((sorted.length - 1) / 2)]!, installs: sorted.length };
+}
+
+/**
+ * The skill players had when they gathered each herb or ore, by object id: only objects 3 installs agree are of
+ * `kind`, and only the rows of installs that opened them that way. An object with fewer than 3 such installs
+ * reporting a skill is left out.
+ */
+export function gatherSkillRanges(rows: readonly ObjectSpawnRow[], kind: "herb" | "ore"): Map<number, SkillRange> {
+  const kinds = agreedGatherKinds([...rows]);
+  const byObject = new Map<number, ObjectSpawnRow[]>();
+  for (const r of rows) {
+    if (r.gatherKind !== kind || kinds.get(r.objectId) !== kind) continue;
+    const list = byObject.get(r.objectId) ?? [];
+    list.push(r);
+    byObject.set(r.objectId, list);
+  }
+  const out = new Map<number, SkillRange>();
+  for (const [objectId, list] of [...byObject].sort((a, b) => a[0] - b[0])) {
+    const range = skillRange(list);
+    if (range) out.set(objectId, range);
+  }
+  return out;
 }
 
 /**
@@ -254,7 +301,8 @@ export function objectSpawnRowsFromRecords(records: unknown[]): ObjectSpawnRow[]
     const name = typeof r.sourceObjectName === "string" && r.sourceObjectName.trim() ? r.sourceObjectName.trim() : undefined;
     const gatherKind = GATHER_KINDS.includes(r.gatherKind as GatherKind) ? (r.gatherKind as GatherKind) : undefined;
     const place = typeof r.mapId === "number" && typeof r.x === "number" && typeof r.y === "number" ? { mapId: r.mapId, x: r.x, y: r.y } : {};
-    out.push({ installId: r.installId, objectId: r.sourceObjectId, ...place, ...(gatherKind ? { gatherKind } : {}), ...(name ? { name } : {}) });
+    const skill = typeof r.gatherSkill === "number" && Number.isInteger(r.gatherSkill) && r.gatherSkill >= 1 && r.gatherSkill <= 500 ? { gatherSkill: r.gatherSkill } : {};
+    out.push({ installId: r.installId, objectId: r.sourceObjectId, ...place, ...(gatherKind ? { gatherKind } : {}), ...(name ? { name } : {}), ...skill });
   }
   return out;
 }

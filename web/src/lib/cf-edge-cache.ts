@@ -51,10 +51,27 @@ export function isPrivatePath(pathname: string): boolean {
  */
 const CREDENTIAL_FREE_PATH = /^\/database\/card\/(?:item|npc|quest|object|spell|vendor)\/[1-9]\d{0,9}$/;
 
+/**
+ * The public Auction House pages read only the market rollup, its stored history and item names: no cookie, no
+ * header and no install id. The browse page (`/tools/auctions`), a realm's page and an item's price page (on one
+ * realm, or `item/<id>` across realms) drop credentials like the hover cards. The realm must already be the
+ * lower-case slug the page serves, so a spelling the page redirects keeps its credentials. The market report
+ * (`report`, a static folder beside the realms) is left out, as is every other tool: the collections page shows one
+ * install's progress, and the Blizzard auction page is private.
+ */
+function credentialFreeAuctionPath(pathname: string): boolean {
+  if (pathname === "/tools/auctions") return true;
+  const item = AUCTION_ITEM_PATH.exec(pathname) ?? AUCTION_CHANGES_PATH.exec(pathname);
+  if (item) return plainRealm(item[1]);
+  const list = AUCTION_LIST_PATH.exec(pathname);
+  return list?.[1] !== undefined && plainRealm(list[1]);
+}
+
 /** The request without its Cookie and Authorization headers on a route that reads neither; any other request as it is. */
 export function withoutCredentials(req: Request): Request {
   if (req.method !== "GET" || !(req.headers.has("cookie") || req.headers.has("authorization"))) return req;
-  if (!CREDENTIAL_FREE_PATH.test(new URL(req.url).pathname)) return req;
+  const pathname = new URL(req.url).pathname;
+  if (!CREDENTIAL_FREE_PATH.test(pathname) && !credentialFreeAuctionPath(pathname)) return req;
   const headers = new Headers(req.headers);
   headers.delete("cookie");
   headers.delete("authorization");
@@ -148,6 +165,9 @@ export function cacheVersionFor(pathname: string, versions: EdgeCacheVersions): 
   return `t.${t}`;
 }
 
+/** Routes that match their text in lower case: one key for every case and outer spacing of `q`. */
+const CASELESS_Q: ReadonlySet<string> = new Set(["/api/suggest", "/search", "/search/suggest"]);
+
 /**
  * The cache key: the URL plus the route's content version, so a deploy only starts an empty cache for the pages
  * whose content changed. Parameters the page never reads (tracking tags, cache busters bots add, this cache's own
@@ -163,8 +183,8 @@ export function edgeCacheKey(req: Request, version: string): Request {
     : [...url.searchParams].filter(([k]) => !isTracking(k));
   // Array.prototype.sort is stable: equal names stay in request order.
   kept.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  // The suggest box answers `Thunder` and `thunder ` alike (app/api/suggest/route.ts), so they share a key.
-  if (url.pathname === "/api/suggest") for (const pair of kept) if (pair[0] === "q") pair[1] = pair[1].trim().toLowerCase();
+  // Search and the suggest boxes answer `Thunder` and `thunder ` alike (they match in lower case), so they share a key.
+  if (CASELESS_Q.has(url.pathname)) for (const pair of kept) if (pair[0] === "q") pair[1] = pair[1].trim().toLowerCase();
   url.search = new URLSearchParams(kept).toString();
   url.searchParams.set("__edge_version", version || "unknown");
   return new Request(url.toString(), { method: "GET" });
@@ -290,6 +310,8 @@ export async function cachedResponse(
  */
 const AUCTION_LIST_PATH = /^\/tools\/auctions(?:\/([^/]+))?$/;
 const AUCTION_ITEM_PATH = /^\/tools\/auctions\/([^/]+)\/[1-9]\d{0,9}$/;
+// A realm's Market changes view reads the stored boards only, like the realm page; its house is a query parameter.
+const AUCTION_CHANGES_PATH = /^\/tools\/auctions\/([^/]+)\/changes$/;
 const AUCTION_REALM_SLUG = /^[\p{L}\p{N}][\p{L}\p{N}-]*$/u;
 const REVALIDATION_HEADERS = ["x-prerender-revalidate", "x-isr"];
 // Static folders beside [realm] in app/tools/auctions: not realms, and the market reports answer 404 with no report stored.

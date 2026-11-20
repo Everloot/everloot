@@ -1,4 +1,4 @@
-import { rowsOf, type CompletionFacts, type CompletionRows, type OverviewCategory, type OwnedCharacter } from "../../../../../kb/src/completion";
+import { rowsOf, type CompletionFacts, type CompletionRows, type OverviewCategory, type OwnedCharacter } from "@kb/completion";
 
 // The URL and the filters of the completionist overview. Every view and filter is a GET link, so it works without JavaScript.
 

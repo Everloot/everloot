@@ -1,5 +1,5 @@
-import { ChangeEntry } from "../../../kb/src/build-watch/changes";
-import { GuideFrontMatter } from "../../../kb/src/guides/guide";
+import { ChangeEntry } from "@kb/build-watch/changes";
+import { GuideFrontMatter } from "@kb/guides/guide";
 import { escapeXml } from "./sitemap-xml";
 import { decodeBuild } from "./talents/share";
 

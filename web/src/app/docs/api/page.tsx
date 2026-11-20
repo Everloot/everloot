@@ -79,7 +79,7 @@ export default function ApiOverview() {
       />
       <List>
         <li>
-          <strong>A record is one install&apos;s word.</strong> The site states a fact only when 3 installs agree. For a Recorder
+          <strong>A record is one install&apos;s word.</strong> Three installs confirm a fact; drop rates and measured zeros show from one install with their tier. For a Recorder
           file that means 3 different characters uploading from 3 different addresses, so one player&apos;s alts never confirm
           each other.
         </li>
@@ -123,8 +123,8 @@ export default function ApiOverview() {
           measured as none.
         </li>
         <li>
-          <strong>Single reports are not facts.</strong> The corpus feed holds single reports. The site states a fact only
-          once 3 installs agree; do the same if you publish numbers. <Link href="/docs/how-it-works" className={docLink}>How Everloot works</Link>{" "}
+          <strong>Single reports are not facts.</strong> The corpus feed holds single reports. Drop rates and measured zeros carry reported, verified or confirmed tiers;
+          other facts keep their agreement rules. Keep these labels if you publish numbers. <Link href="/docs/how-it-works" className={docLink}>How Everloot works</Link>{" "}
           explains the rule.
         </li>
       </List>

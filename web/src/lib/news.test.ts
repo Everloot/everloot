@@ -42,7 +42,7 @@ test("the feed escapes what it prints and dates the channel by the newest change
 
 test("the page body drops its own Sources and Related lists and keeps the call to action under them", async () => {
   const { bodyForPage, relatedPosts, sourceNames, readingMinutes } = await import("./news");
-  const { parsePage } = await import("../../../kb/src/wiki/page");
+  const { parsePage } = await import("@kb/wiki/page");
   const blocks = parsePage(["---", "slug: x", "---", "Intro.", "## Facts", "- one", "## Related", "- [A](/news/older-post)", "- [Changes](/changes)", "", "**Try:** the [calculator](/tools/talents).", "## Sources", "- [Blizzard: B](https://example.com)"].join("\n")).blocks;
   const sources = [{ title: "Blizzard: B", url: "https://example.com" }, { title: "Wowhead: C", url: "https://www.wowhead.com/x" }];
   const body = bodyForPage({ blocks, sources });
@@ -68,7 +68,7 @@ test("the page body drops its own Sources and Related lists and keeps the call t
 
 test("Related retains mixed items and non-news destinations while pure news links become card candidates", async () => {
   const { bodyForPage, relatedPosts } = await import("./news");
-  const { parsePage } = await import("../../../kb/src/wiki/page");
+  const { parsePage } = await import("@kb/wiki/page");
   const blocks = parsePage("---\nslug: x\n---\n## Related\n- [Older](/news/older-post)\n- [Older](/news/older-post) and [Changes](/changes), then {zone:12}.\n- [Draft](/news/test-draft)\n- [Unknown](/news/missing)\n- [Self](/news/test-post)\n\n**Try:** [calculator](/tools/talents).\n").blocks;
   const body = bodyForPage({ blocks, sources: [] });
   expect(body.relatedSlugs).toEqual(["older-post", "test-draft", "missing", "test-post"]);
@@ -80,7 +80,7 @@ test("Related retains mixed items and non-news destinations while pure news link
 });
 
 test("a hero is optional and checked", async () => {
-  const { PostFrontMatter } = await import("../../../kb/src/news/post");
+  const { PostFrontMatter } = await import("@kb/news/post");
   const base = { slug: "x", title: "T", summary: "S", author: "A", published: "2026-10-25", status: "published" };
   expect(PostFrontMatter.safeParse(base).success).toBe(true);
   expect(PostFrontMatter.safeParse({ ...base, hero: { src: "/news/heroes/x.webp", alt: "A hero" } }).success).toBe(true);
@@ -91,8 +91,8 @@ test("a hero is optional and checked", async () => {
 });
 
 test("a figure needs alt text and an image in the post's own figures folder; its caption is optional", async () => {
-  const { postFigure } = await import("../../../kb/src/news/post");
-  const { parsePage } = await import("../../../kb/src/wiki/page");
+  const { postFigure } = await import("@kb/news/post");
+  const { parsePage } = await import("@kb/wiki/page");
   const block = (line: string) => parsePage(`---\nslug: x\n---\n${line}\n`).blocks[0];
   const src = "/news/figures/test-post/map.webp";
   expect(postFigure(block(`![The map](${src} "Where the camps are")`), "test-post")).toEqual({ figure: { src, alt: "The map", caption: "Where the camps are" } });
@@ -106,7 +106,7 @@ test("a figure needs alt text and an image in the post's own figures folder; its
 });
 
 test("the text reads a figure as its caption or alt text, and the feed carries the summary, not the body's figures", async () => {
-  const { parsePage } = await import("../../../kb/src/wiki/page");
+  const { parsePage } = await import("@kb/wiki/page");
   const blocks = parsePage(["---", "slug: x", "---", "Intro.", "", '![The map](/news/figures/x/map.webp "Where the camps are")', "", "![The camp](/news/figures/x/camp.webp)", "", "![Bad](https://example.com/a.webp)"].join("\n")).blocks;
   expect(postText(blocks)).toBe("Intro. Where the camps are The camp");
   const post = publishedPost(loadNews(FIXTURES), "test-post")!;

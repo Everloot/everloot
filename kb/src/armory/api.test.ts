@@ -17,8 +17,10 @@ it("shares a token and sends conditional headers only when given", async () => {
   await Promise.all([
     api.get("/one", "profile", { ifModifiedSince: "date" }),
     api.get("/two", "dynamic"),
+    api.get("/data/wow/media/playable-class/3", "static"),
   ]);
-  expect(f).toHaveBeenCalledTimes(3);
+  expect(f).toHaveBeenCalledTimes(4);
+  expect(f.mock.calls[3][0]).toContain("namespace=static-forever-eu");
   expect(f.mock.calls[1][0]).toContain("namespace=profile-forever-eu");
   expect(new Headers(f.mock.calls[1][1].headers).get("If-Modified-Since")).toBe(
     "date",

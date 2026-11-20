@@ -60,7 +60,7 @@ import ChainPage, { generateMetadata as chainMetadata } from "./quest-chains/[id
 import sitemap from "@/lib/site-sitemap";
 import { loadCatalog } from "@/lib/completion-lists";
 import { siteSearch } from "@/lib/site-search";
-import { emptyCompletion, foldCompletion } from "../../../../kb/src/completion-rollup";
+import { emptyCompletion, foldCompletion } from "@kb/completion-rollup";
 
 const at = "2026-10-19T00:00:00Z";
 let seq = 0;
@@ -211,6 +211,7 @@ test("the faction list shows the standing header, and a faction with no header s
 test("filters, sort and the name box work from the URL; a bad value is a 404", async () => {
   expect(linked(await html(AchievementList(search({ category: "Quests" }))), "achievements")).toEqual(["4-ten-quests"]);
   expect(linked(await html(AchievementList(search({ q: "elwynn" }))), "achievements")).toEqual(["9-explore-elwynn-forest"]);
+  expect(linked(await html(AchievementList(search({ q: "forest elwynn" }))), "achievements")).toEqual(["9-explore-elwynn-forest"]);
   expect(linked(await html(AchievementList(search({ q: "#2" }))), "achievements")).toEqual(["2-level-10"]);
   expect(linked(await html(AchievementList(search({ sort: "-points" }))), "achievements")).toEqual(["2-level-10", "9-explore-elwynn-forest", "4-ten-quests"]);
   expect(linked(await html(FactionList(search({ header: "Horde" }))), "factions")).toEqual(["76-orgrimmar"]);

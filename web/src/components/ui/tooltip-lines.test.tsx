@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
-import type { ItemRecord } from "../../../../kb/src/assets/items";
+import type { ItemRecord } from "@kb/assets/items";
 import { GameCard } from "@/components/game/GameCard";
 import { itemTipText } from "@/lib/item-names";
 import { itemFactLines, NO_ITEM_FACTS } from "@/lib/tooltip";

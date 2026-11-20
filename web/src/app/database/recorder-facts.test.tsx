@@ -56,7 +56,7 @@ test("an NPC page shows the agreed rank and level, a vignette pin, and the repor
   expect(page).toMatch(/Level[\s\S]*?11/);
   expect(page).toContain("70.1, 79.2");
   expect(page).toContain("3 more loot windows reported, not yet in the rates.");
-  expect(page).toContain("Nobody has looted this NPC in Forever yet. It shows once 3 installs report it.");
+  expect(page).toContain("Nobody has looted this NPC in Forever yet. Rates show from one install, with reported, verified or confirmed labels.");
   expect(page).not.toContain("Polestar");
 });
 
@@ -82,8 +82,8 @@ test("a zone page confirms the game files' entrance, lists its boss and the trea
   expect(page).toContain('href="/database/objects/2843"');
   expect(page).toContain("Battered Chest");
   // The game files place the Deadmines: the players' entrance confirms it, it adds no second row. (The Terrain
-  // section above may link it too, as a place a zone-bound item works.)
-  expect(page.slice(page.indexOf('aria-labelledby="known"')).match(/>Deadmines</g) ?? []).toHaveLength(1);
+  // section below may link it too, as a place a zone-bound item works.)
+  expect(page.slice(page.indexOf('aria-labelledby="known"')).split('aria-label="Terrain"')[0].match(/>Deadmines</g) ?? []).toHaveLength(1);
 });
 
 test("two voters leave every one of these out", async () => {
@@ -97,5 +97,7 @@ test("two voters leave every one of these out", async () => {
   const westfall = await html(Zone(zone("1436-westfall")));
   expect(westfall).not.toContain("Confirmed by");
   expect(westfall).not.toContain("Edwin VanCleef");
-  expect(westfall).toContain("No treasure has a confirmed position here yet.");
+  // Nothing confirmed: the page says so once, and the strip has no empty Objects tab.
+  expect(westfall).toContain("Players have not confirmed anything in Westfall yet.");
+  expect(westfall).not.toContain('data-tab-panel="objects"');
 });

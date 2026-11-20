@@ -1,5 +1,6 @@
-import { createMcpHttpHandler } from "../../../kb/src/mcp-http-server";
-import type { ToolOptions } from "../../../kb/src/mcp-server";
+import { createMcpHttpHandler } from "@kb/mcp-http-server";
+import type { ToolName, ToolOptions } from "@kb/mcp-server";
+import type { AggregateSet } from "./aggregate-set";
 import { loadStoredAggregates } from "./aggregate-store";
 import { catalogIndex } from "./catalog-index";
 import { loadTimeline } from "./changes";
@@ -16,8 +17,8 @@ import { publicMcpCache } from "./mcp-response-cache";
 import { RECHECK_SCOPES } from "./recheck-scopes";
 import { loadCensus } from "./rollup-compute";
 import { readSettledList } from "./settled-store";
-import { settledKeys } from "../../../kb/src/settled-list";
-import { trustedInstalls } from "../../../kb/src/trusted-source";
+import { settledKeys } from "@kb/settled-list";
+import { trustedInstalls } from "@kb/trusted-source";
 import { uploadStore } from "./upload-store";
 import { mcpLedgerMetrics } from "./question-ledger";
 import { mcpToolMetrics, recordUsage } from "./usage-metrics";
@@ -35,6 +36,33 @@ export function unavailable(error: string, status = 503): Response {
   return Response.json({ error }, { status, headers: { "Cache-Control": "no-store" } });
 }
 
+/** The cron's stored set, only when its tables apply the scopes this build counts: stored rates and names never count rows made under an older ruling. */
+async function storedSet(): Promise<AggregateSet | null> {
+  const set = await loadStoredAggregates({ strict: true });
+  return set && JSON.stringify(set.world.recheck ?? []) === JSON.stringify(RECHECK_SCOPES) ? set : null;
+}
+
+/**
+ * A page tool's facts as the stored set already holds them: the value its fact builder (kb mcp-server.ts
+ * TOOL_FACT_BUILDERS) makes from the corpus, assembled from the set's tables, which the cron built from the same
+ * anonymous rows with the same scopes (aggregate-set.ts). Null for a tool whose facts are not in the set
+ * (world_map_near, collection_gap, profession_path, recipe_thresholds, auction_history, gold_ledger, guild_board, answer_sources):
+ * those read the corpus as before. mcp-stored-facts.test.ts holds each one equal to the corpus build.
+ */
+export function storedToolFacts(set: AggregateSet, tool: ToolName): unknown {
+  switch (tool) {
+    case "entity_relations": return set.edges;
+    case "item_page": return { ...set.items, numbers: set.itemFacts };
+    // npc_page reads the world facts with the pending loot count; the quest and vendor pages read the same facts and never look at it.
+    case "npc_page": case "quest_page": case "vendor_page": return set.world;
+    case "object_page": return {
+      rates: set.drops.rates, measuredZeros: set.drops.measuredZeros, names: set.items.names, objects: set.items.objects,
+      sightings: set.sightings, pending: set.items.pending, ...(set.world.recheck?.length ? { recheck: set.world.recheck } : {}),
+    };
+    default: return null;
+  }
+}
+
 /** The site's readers the tools answer from, the same for the MCP mounts and GET /api/tools/{tool}. */
 export function toolLoaders(): ToolOptions {
   return {
@@ -42,12 +70,17 @@ export function toolLoaders(): ToolOptions {
     recheck: RECHECK_SCOPES,
     // The cron stores anonymous facts only. Never replay or republish the corpus for an answer.
     answerSources: async () => {
-      const set = await loadStoredAggregates({ strict: true });
-      // Stored item rates already apply these scopes; never count rates made under an older ruling.
-      if (!set || JSON.stringify(set.world.recheck ?? []) !== JSON.stringify(RECHECK_SCOPES)) return null;
-      return { facts: { items: set.items, world: set.world }, dataAsOf: set.dataAsOf };
+      const set = await storedSet();
+      return set ? { facts: { items: set.items, world: set.world }, dataAsOf: set.dataAsOf } : null;
     },
-    // The stored report the home page counts; the live computation only when it is missing or for another build.
+    // The page tools' facts from the same stored set, so a tool call on a fresh instance reads the file the pages
+    // already keep instead of replaying the corpus (#1354). A tool the set has no table for reads the corpus below.
+    storedFacts: async (tool) => {
+      const set = await storedSet();
+      const facts = set ? storedToolFacts(set, tool) : null;
+      return facts === null ? null : { facts, dataAsOf: set!.dataAsOf };
+    },
+    // The stored report the home page counts; "not measured yet" when it is missing or for another build, never a replay.
     coverage: () => loadCoverageForTool(),
     settledSummary: async (build) => {
       const list = await readSettledList(build);

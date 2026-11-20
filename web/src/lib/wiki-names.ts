@@ -1,11 +1,10 @@
-import type { TokenKind } from "../../../kb/src/wiki/page";
+import type { TokenKind } from "@kb/wiki/page";
 import { entityHref } from "@/components/EntityLink";
 import { factionHref, loadCatalog } from "@/lib/completion-lists";
 import { loadQuestNames } from "@/lib/game-assets";
-import { CLIENT_LAYER, shownItemName } from "@/lib/items";
-import { npcNames, questTitles } from "@/lib/names";
+import { CLIENT_LAYER } from "@/lib/items";
 import { loadWorldFacts } from "@/lib/rollup-compute";
-import { loadShownNames } from "@/lib/shown-item-names";
+import { loadShownNames, tokenNamer } from "@/lib/shown-item-names";
 import { inlinesOf, type WikiPage } from "@/lib/wiki";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
 
@@ -17,9 +16,8 @@ const WORD: Record<TokenKind, string> = { item: "Item", npc: "NPC", quest: "Ques
 export const tokenKey = (kind: TokenKind, id: number) => `${kind}:${id}`;
 
 /**
- * The name and link of every entity token on a page, by the rules the database pages use: an item's shown name
- * (players' agreed name, else the game files where the Warcraft Wiki agrees), an NPC's agreed name, a quest's
- * agreed title else the wiki's, a released zone's name, an agreed faction. Anything without one reads "Item N".
+ * The name and link of every entity token on a page: item, NPC and quest names by `tokenNamer` (shown-item-names.ts,
+ * under the policy at the top of names.ts), a released zone's name, an agreed faction. Anything without one reads "Item N".
  * Only the sources a page's tokens need are read.
  */
 export async function resolveTokens(page: Pick<WikiPage, "blocks">): Promise<Map<string, TokenTarget>> {
@@ -32,19 +30,12 @@ export async function resolveTokens(page: Pick<WikiPage, "blocks">): Promise<Map
     ids.quest.size ? loadQuestNames(CLIENT_LAYER.build.version) : null,
     ids.faction.size ? loadCatalog() : null,
   ]);
-  const npcs = world && !world.unreachable ? npcNames(world) : new Map<number, string>();
-  const quests = world && !world.unreachable ? questTitles(world) : new Map<number, string>();
+  const nameOf = tokenNamer({ shown, world, questWiki });
 
   const out = new Map<string, TokenTarget>();
   const fallback = (kind: TokenKind, id: number) => `${WORD[kind]} ${id}`;
-  for (const id of ids.item) {
-    const name = shown ? shownItemName(id, shown.agreed, shown.matched?.names)?.name : undefined;
-    out.set(tokenKey("item", id), { name: name ?? fallback("item", id), href: entityHref("item", id) });
-  }
-  for (const id of ids.npc) out.set(tokenKey("npc", id), { name: npcs.get(id) ?? fallback("npc", id), href: entityHref("npc", id) });
-  for (const id of ids.quest) {
-    const name = quests.get(id) ?? questWiki?.names.get(id)?.name;
-    out.set(tokenKey("quest", id), { name: name ?? fallback("quest", id), href: entityHref("quest", id) });
+  for (const kind of ["item", "npc", "quest"] as const) {
+    for (const id of ids[kind]) out.set(tokenKey(kind, id), { name: nameOf(kind, id) ?? fallback(kind, id), href: entityHref(kind, id) });
   }
   for (const id of ids.zone) {
     const zone = zoneByMapId(id);

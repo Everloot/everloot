@@ -1,7 +1,7 @@
-import { CLIENT_EDGES, CLIENT_LAYER, CLIENT_SKILLS, CLIENT_TAXONOMY } from "../../../kb/src/client-layer-file";
-import { isDevelopmentItemName } from "../../../kb/src/dev-item-names";
-import { describe, filterItems, QUALITIES, slotOf, slugify, type ItemRow } from "../../../kb/src/item-taxonomy";
-import { PER_PAGE } from "@/app/database/list-parts";
+import { CLIENT_EDGES, CLIENT_LAYER, CLIENT_SKILLS, CLIENT_TAXONOMY } from "@kb/client-layer-file";
+import { isDevelopmentItemName } from "@kb/dev-item-names";
+import { describe, filterItems, QUALITIES, slotOf, slugify, type ItemRow } from "@kb/item-taxonomy";
+import { byRank, nameMatches, PER_PAGE } from "@/app/database/list-parts";
 
 export { CLIENT_LAYER, CLIENT_TAXONOMY };
 
@@ -58,7 +58,7 @@ export function developmentLeftovers(rows: readonly ItemRow[], name: (id: number
 
 /**
  * Whether a page of a category's plain list has enough names to be indexed. It reads the plain list's own
- * order (sortItems with no sort: named rows first, each part by id), so page `page` holds the named rows left
+ * order (sortItems with no sort: named rows first), so page `page` holds the named rows left
  * after the earlier pages, then unnamed ones. No row gets a name it does not have. `hidden` rows (the
  * development leftovers) are not in the plain list, so they are not counted.
  */
@@ -153,7 +153,7 @@ export interface CategoryQuery {
   dev?: boolean;
   /** List the items no source names ("Item N") too; a list folds them into one line unless asked. Also a view, not a filter. */
   unnamed?: boolean;
-  /** Absent: named items first, each part by id (sortItems). */
+  /** Absent: named items first, those players have seen leading, A to Z by name (sortItems). */
   sort?: { key: ItemSort; desc: boolean };
   page: number;
 }
@@ -274,12 +274,22 @@ export function matchesFacets(id: number, f: Pick<CategoryQuery, "crafted" | "re
   return true;
 }
 
-/** Rows of a category (`base`) that pass every filter, in the query's order. */
-export function listItems(base: readonly ItemRow[], q: CategoryQuery, ctx: ItemListContext = {}): ItemRow[] {
+/** The text of `q` as an id, or null. */
+const idOf = (text: string | undefined) => (text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null);
+
+/** The rows of `base` the query's text names (list-parts nameMatches), computed once for the list and its counts. */
+export function matchItemNames(base: readonly ItemRow[], q: CategoryQuery, ctx: ItemListContext = {}): ReturnType<typeof nameMatches<ItemRow>> {
   const text = q.q?.toLowerCase();
-  const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
-  const rows = base.filter(([itemId, , , inv, quality]) => {
-    if (text && !(id !== null ? itemId === id : ctx.name?.(itemId)?.toLowerCase().includes(text))) return false;
+  return nameMatches(base, text, idOf(text), (row) => ctx.name?.(row[0]));
+}
+
+/** Rows of a category (`base`) that pass every filter, in the query's order: a text's best matches first unless a sort was asked for. */
+export function listItems(base: readonly ItemRow[], q: CategoryQuery, ctx: ItemListContext = {}, match = matchItemNames(base, q, ctx)): ItemRow[] {
+  const text = q.q?.toLowerCase();
+  const id = idOf(text);
+  const rows = base.filter((row) => {
+    const [itemId, , , inv, quality] = row;
+    if (text && !(id !== null ? itemId === id : match.ranked!.has(row))) return false;
     // A development leftover stays out unless asked for, or looked up by its id.
     if (!q.dev && id === null && isDevelopmentItemName(ctx.name?.(itemId))) return false;
     if (q.slot?.length && !q.slot.includes(slotOf(inv)?.slug ?? "")) return false;
@@ -293,16 +303,25 @@ export function listItems(base: readonly ItemRow[], q: CategoryQuery, ctx: ItemL
     if (q.bind && (!tip || BINDINGS.find((b) => b.slug === q.bind)?.value !== tip.binding)) return false;
     return matchesFacets(itemId, q);
   });
-  return sortItems(rows, q.sort, ctx);
+  return byRank(sortItems(rows, q.sort, ctx), match.ranked, Boolean(q.sort));
 }
 
 /**
  * Text keys sort A to Z and levels low to high, with the rows that have none last, whichever way; ties go by id.
- * With no sort, items with a name the page shows come first, each part by id, so a list opens on real items
- * rather than "Item N"; `sort=id` is the plain id order. categoryNamedEnough reads this order.
+ * With no sort, items with a name the page shows come first, so a list opens on real items rather than "Item N":
+ * the named items players have seen, then the other named items, each A to Z by name; then the unnamed ones, seen
+ * first, by id. `sort=id` is the plain id order. categoryNamedEnough reads this order (only whether a row is named).
  */
 export function sortItems(rows: ItemRow[], sort: CategoryQuery["sort"], ctx: ItemListContext = {}): ItemRow[] {
-  if (!sort && ctx.name) return [...rows.filter((row) => ctx.name!(row[0]) !== undefined), ...rows.filter((row) => ctx.name!(row[0]) === undefined)];
+  if (!sort && ctx.name) {
+    const keyed = rows.map((row) => {
+      const name = ctx.name!(row[0]);
+      const seen = ctx.seen?.has(row[0]) ?? false;
+      return { row, name: name?.toLowerCase(), tier: (name === undefined ? 2 : 0) + (seen ? 0 : 1) };
+    });
+    keyed.sort((a, b) => a.tier - b.tier || (a.name !== undefined && b.name !== undefined ? a.name.localeCompare(b.name) : 0) || a.row[0] - b.row[0]);
+    return keyed.map((x) => x.row);
+  }
   if (!sort || sort.key === "id") return sort?.desc ? [...rows].sort((a, b) => b[0] - a[0]) : rows;
   const dir = sort.desc ? -1 : 1;
   const key = (row: ItemRow): string | number | null => {

@@ -44,7 +44,7 @@ const read = (rows: unknown[], asOf: string) => {
   const at = new Date(Date.parse(asOf) + minute++ * 1000).toISOString();
   return { rows, dataAsOf: at };
 };
-const hub = async () => renderToStaticMarkup(await RankingsHub());
+const hub = async () => renderToStaticMarkup(await RankingsHub({}));
 const ranking = async (slug: string, search: Record<string, string> = {}) =>
   renderToStaticMarkup(await RankingPage({ params: Promise.resolve({ slug }), searchParams: Promise.resolve(search) }));
 const meta = (slug: string, search: Record<string, string> = {}) => rankingMetadata({ params: Promise.resolve({ slug }), searchParams: Promise.resolve(search) });
@@ -107,7 +107,8 @@ test("the hub's headline tiles, weekly totals and top movers, each row linking t
   // 149 characters last week round to 150; 201 this week round to 200.
   expect(page).toContain("data-metric-tiles");
   expect(words).toContain("Characters counted 200 This week so far (from 2026-11-16)");
-  expect(words).toContain("Against last week +50 +33% characters");
+  // The week is still running: it is compared with the same days of last week.
+  expect(words).toContain("Against the same days last week +50 +33% characters");
   // Mage and Warlock are hidden this week, so the tile names the leader among published classes and says why.
   expect(words).toContain("Leading published class Warrior 40% of characters. Hidden classes are not ranked and could be larger.");
   expect(words).not.toContain("Most played class");

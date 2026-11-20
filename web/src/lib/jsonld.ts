@@ -1,4 +1,4 @@
-import { postPath } from "../../../kb/src/blue-pages";
+import { postPath } from "@kb/blue-pages";
 import type { ChangeEntry } from "./changes";
 import { REPO_URL } from "./source";
 import { SOCIAL_PROFILES } from "./social";

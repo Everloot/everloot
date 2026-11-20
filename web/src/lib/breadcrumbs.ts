@@ -14,7 +14,7 @@ const NAMES: Record<string, string> = {
   "/classes": "Classes",
   "/classes/choose": "Class chooser",
   "/classes/group": "Group",
-  "/players": "Characters",
+  "/players": "Players",
   "/players/opt-out": "Hide a character",
   "/guilds/hide": "Hide a guild",
   "/chat": "Ask Everloot",
@@ -26,7 +26,6 @@ const NAMES: Record<string, string> = {
   "/armory": "Armory",
   "/armory/hide": "Hide a character",
   "/armory/submit": "Add a character",
-  "/armory/guilds": "Guild directory",
   "/showcase/character": "Sample character",
   "/about": "About",
   "/tools": "Tools",
@@ -95,8 +94,8 @@ const NAMES: Record<string, string> = {
 /** The parent of a page, when it is not Home. */
 const PARENT: Record<string, string> = {
   // The lists kept in this browser are part of Profile, beside the account pages.
-  "/tools/builds": "/account",
-  "/tools/alts": "/account",
+  "/tools/builds": "/settings",
+  "/tools/alts": "/settings",
   "/tools/professions/herbalism": "/tools/professions",
   "/tools/professions/herbalism/gathering": "/tools/professions/herbalism",
   "/database/objects": "/database",
@@ -107,7 +106,6 @@ const PARENT: Record<string, string> = {
   "/guilds/hide": "/guilds",
   "/armory/hide": "/armory",
   "/armory/submit": "/armory",
-  "/armory/guilds": "/armory",
   "/lore/coverage": "/lore",
   "/lore/npcs": "/lore",
   "/lore/items": "/lore",
@@ -150,6 +148,12 @@ export function trailFor(pathname: string): Crumb[] | null {
   const profession = path.match(/^\/tools\/professions\/([a-z-]+)$/);
   if (profession && PROFESSIONS.includes(profession[1])) {
     return [...trailFor("/tools/professions")!, { name: profession[1].split("-").map(titleCase).join(" "), path }];
+  }
+  // A realm's Market changes view: the realm page (named from its slug, as that page does without a board) sits between.
+  const changes = path.match(/^\/tools\/auctions\/([\p{L}\p{N}][\p{L}\p{N}-]*)\/changes$/u);
+  if (changes) {
+    const realm = `/tools/auctions/${changes[1]}`;
+    return [...trailFor("/tools/auctions")!, { name: changes[1].split("-").map(titleCase).join(" "), path: realm }, { name: "Market changes", path }];
   }
   if (!NAMES[path]) return null;
   const trail: Crumb[] = [];

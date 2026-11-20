@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import { AwsClient } from "aws4fetch";
-import { isoWeek } from "../../../kb/src/spot-check";
-import { computeSettled, emptySettledList, listOf, parseSettledFile, type SettledFile, type SettledList } from "../../../kb/src/settled-list";
+import { isoWeek } from "@kb/spot-check";
+import { computeSettled, emptySettledList, listOf, parseSettledFile, type SettledFile, type SettledList } from "@kb/settled-list";
 import { BUILD_PATTERN } from "./settled-cache";
 import { cloudConfig, uploadStore, type CloudConfig } from "./upload-store";
 

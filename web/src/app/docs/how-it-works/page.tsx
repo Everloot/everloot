@@ -47,7 +47,7 @@ export default function Page() {
 
       <H2 id="three-installs">Three installs have to agree</H2>
       <P>
-        A drop, a vendor item, a spawn point, a recipe range or a market price appears as a fact only once at least{" "}
+        A vendor item, a spawn point, a recipe range or a market price appears as a confirmed fact once at least{" "}
         {AGREEMENT_NEEDED} different installs have reported it the same way. For prices and catalog entries, different means
         different upload addresses, with an IPv6 address counted by its /64 block. One household cannot make a fact true on its own.
       </P>
@@ -66,18 +66,19 @@ export default function Page() {
           [3, <AgreementMeter key="3" count={3} size="lg" />, "Three agree. The fact is public."],
         ]}
       />
-      <P>Until three agree, the page says so instead of guessing.</P>
+      <P>Drop rates, measured zeros and unanimous source names use their own labels: reported at one install, verified at two, confirmed at three or more.</P>
 
       <H2 id="zeros">Unrecorded is not zero</H2>
       <P>
         If nobody has recorded something, the page says <em>unrecorded</em>. A zero appears only when it was measured: for
-        example, &quot;0 drops in 40 loot windows&quot; once three installs looted that creature and none of them saw the item.
+        example, &quot;0 drops in 40 loot windows&quot; when a player reported empty windows from that creature, with the same drop tier label.
         A storage outage or a missing source is never shown as zero.
       </P>
       <P>
         A drop rate is the share of recorded loot windows on a creature or object that held the item. A kill nobody looted
         is not counted, because the addon never saw it. The API field for that count is named <C>kills</C>, but it counts
-        loot windows.
+        loot windows. Rates and measured zeros show from one install: reported by 1 player, verified by 2 players,
+        confirmed by 3 or more players. Source names use the same tiers when every counted name report agrees.
       </P>
 
       <H2 id="unconfirmed">Found in game files, unconfirmed</H2>

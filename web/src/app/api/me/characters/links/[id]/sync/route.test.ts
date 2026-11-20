@@ -128,19 +128,13 @@ describe("consent", () => {
   });
 });
 
-test("boss-kill consent is separate, session-only, and off until its migration is approved", async () => {
-  vi.stubEnv("EVERLOOT_BOSS_KILL_SYNC", "");
-  expect((await send({ bossKills: true })).status).toBe(400);
+test("boss kills follow linked sync and have no separate consent toggle", async () => {
+  for (const gate of ["", "1"]) {
+    vi.stubEnv("EVERLOOT_BOSS_KILL_SYNC", gate);
+    expect((await send({ bossKills: true })).status).toBe(400);
+    expect((await send({ bossKills: false })).status).toBe(400);
+  }
   expect(auth.authQuery).not.toHaveBeenCalled();
-  vi.stubEnv("EVERLOOT_BOSS_KILL_SYNC", "1");
-  owned(null);
-  expect((await send({ bossKills: true })).status).toBe(200);
-  const call = auth.authQuery.mock.calls.find((c) => c[0] === "rpc/set_boss_kill_consent");
-  expect(JSON.parse(call![1].body)).toEqual({ p_user_id: USER.id, p_link_id: LINK_ID, p_granted: true });
-  auth.authQuery.mockReset();
-  auth.authQuery.mockResolvedValueOnce([]);
-  expect((await send({ bossKills: true })).status).toBe(404);
-  expect(auth.authQuery).toHaveBeenCalledTimes(1);
 });
 
 test("boss-kill reads are owner-only and no-store, and an absent table returns a retryable 503", async () => {

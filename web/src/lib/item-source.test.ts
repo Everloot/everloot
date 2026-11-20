@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { craftedItemsFromRecords } from "../../../kb/src/item-source";
+import { craftedItemsFromRecords } from "@kb/item-source";
 import { buildItemSources } from "./item-seen";
 import { activeFilters, categoryQuery, CLIENT_TAXONOMY, itemsHref, listItems, subclassLabel, toggled, type CategoryQuery, type SourceSlug } from "./items";
 
@@ -43,11 +43,16 @@ test("sorting by source puts the reported items first, A to Z", () => {
   expect(ids({ sort: { key: "seen", desc: false } }).slice(0, 3)).toEqual([rows[0][0], rows[2][0], rows[1][0]]);
 });
 
-test("with no sort the named items come first, each part in id order; sort=id is the plain id order", () => {
-  const named = new Map([[rows[30][0], "Linen Cloth"], [rows[5][0], "Worn Shortsword"]]);
-  const list = (q: Partial<CategoryQuery>) => listItems(rows, { page: 1, ...q }, { name: (id) => named.get(id) }).map((r) => r[0]);
-  expect(list({})).toEqual([rows[5][0], rows[30][0], ...rows.map((r) => r[0]).filter((id) => !named.has(id))]);
+test("with no sort the named items come first, seen by players first and then A to Z; sort=id is the plain id order", () => {
+  const named = new Map([[rows[30][0], "Linen Cloth"], [rows[5][0], "Worn Shortsword"], [rows[20][0], "Zesty Wrap"]]);
+  const seen = new Set([rows[20][0], rows[35][0]]);
+  const list = (q: Partial<CategoryQuery>) => listItems(rows, { page: 1, ...q }, { name: (id) => named.get(id), seen }).map((r) => r[0]);
+  // Seen and named, then named A to Z, then the unnamed ones with the seen one first, then by id.
+  expect(list({})).toEqual([rows[20][0], rows[30][0], rows[5][0], rows[35][0], ...rows.map((r) => r[0]).filter((id) => !named.has(id) && !seen.has(id))]);
   expect(list({ sort: { key: "id", desc: false } })).toEqual(rows.map((r) => r[0]));
+  // A text finds a name by its words in any order, and past a typo when nothing matches as typed.
+  expect(list({ q: "cloth linen" })).toEqual([rows[30][0]]);
+  expect(list({ q: "lnen cloth" })).toEqual([rows[30][0]]);
   // Without names (the API's case) the order stays by id.
   expect(ids({})).toEqual(rows.map((r) => r[0]));
 });

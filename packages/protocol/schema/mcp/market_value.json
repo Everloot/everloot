@@ -145,6 +145,55 @@
                   },
                   "thin": {
                     "type": "boolean"
+                  },
+                  "coverage": {
+                    "description": "The public days behind the values, counted. Older servers omit it.",
+                    "type": "object",
+                    "properties": {
+                      "solidDays14": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "Solid public days (not thin, not trimmed) up to 14 calendar days old: the days the market value is a weighted mean of. Zero when market is null."
+                      },
+                      "days60": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "Public days in the last 60 calendar days: the days historical is the median of, thin days left out when a solid day exists."
+                      },
+                      "thinDays": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "Of days60, the days with 5 units listed or fewer."
+                      },
+                      "trimmedDays": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "Of days60, the solid days trimmed as outliers (further than 3x from historical, with 5 or more solid days)."
+                      },
+                      "newestDay": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "trustedOnly": {
+                        "type": "boolean",
+                        "description": "True when the newest day is public under 3 reporters: through Everloot's own installs only."
+                      }
+                    },
+                    "required": [
+                      "solidDays14",
+                      "days60",
+                      "thinDays",
+                      "trimmedDays",
+                      "newestDay",
+                      "trustedOnly"
+                    ],
+                    "additionalProperties": false
                   }
                 },
                 "required": [

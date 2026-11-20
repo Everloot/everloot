@@ -4,6 +4,8 @@ name: Deploy the site to Cloudflare Workers
 # whose checks a newer merge cancelled is deployed by the newer merge's run. A commit that changes nothing the site
 # reads since the live one is skipped. Runs only while the repository variable WORKER_DEPLOY is "1". A manual run
 # deploys the commit it is run on, without waiting for checks.
+# With the repository variable DEPLOY_CRON_WORKER at "true", the same build is also deployed as the cron Worker
+# (web/wrangler.cron.jsonc) right after the site.
 on:
   workflow_run:
     workflows: ["Release checks"]
@@ -88,6 +90,19 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
         run: npm run cf:deploy
+      # The cron Worker (web/wrangler.cron.jsonc, everloot-cron): the same .open-next build, deployed a second time with only
+      # the scheduled jobs, so they never share an isolate with page traffic (#1354). Runs only while the repository
+      # variable DEPLOY_CRON_WORKER is "true"; its first deploy and secrets are in docs/OPERATIONS.md, "The cron Worker".
+      # OPEN_NEXT_DEPLOY stops wrangler handing the deploy to `opennextjs-cloudflare deploy`, which would upload the page
+      # cache again: the step above already did, and both Workers read the same bucket.
+      - name: Deploy the cron Worker from the same build
+        if: steps.site.outputs.deploy == 'true' && vars.DEPLOY_CRON_WORKER == 'true'
+        working-directory: web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          OPEN_NEXT_DEPLOY: 'true'
+        run: npx wrangler deploy --config wrangler.cron.jsonc --var "EVERLOOT_COMMIT_SHA:$SHA"
       # Fills the edge cache for the new version and fails the run if any page in the sitemap does not answer 200.
       - name: Warm and check the pages
         if: steps.site.outputs.deploy == 'true'

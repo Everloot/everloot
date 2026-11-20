@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import { LAUNCH, LAUNCH_AT, longDate } from "@/data/wow-forever";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { NPC_CREATURE_TYPES, NPC_RANKS, type NpcRank, type NpcReaction } from "../../../../../kb/src/world-pages";
+import { NPC_CREATURE_TYPES, NPC_RANKS, type NpcRank, type NpcReaction } from "@kb/world-pages";
 import { Container, DataTable, DataTitle, filledColumns, FilterBar, ResultStrip, type FilterControl, type SparseColumn } from "@/components/ui";
 import { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
 import { bareNpcRow, npcRows, publicQuests, publicVendors, type NpcRow } from "@/lib/world-lists";
 import { parseZoneSegment, publicZones, zoneSlug } from "@/lib/zones";
 import { LINK } from "../entity";
-import {
+import { byRank, nameMatches, Respelled,
   flag, LEVEL_BRACKETS, listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, range, rangeParam, sortParam, sortRows, Unreadable,
   type ListQuery, type Search,
 } from "../list-parts";
@@ -71,8 +71,9 @@ export default async function NpcListPage(props: { searchParams?: Promise<Search
   const all = [...reported, ...[...new Set(linked)].filter((n): n is number => n !== null && !known.has(n)).map(bareNpcRow)];
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
+  const { ranked, respelled } = nameMatches(all, text, id, (n) => n.name);
   const matched = all.filter((n) =>
-    (!text || (id !== null ? n.npcId === id : Boolean(n.name?.toLowerCase().includes(text))))
+    (!text || (id !== null ? n.npcId === id : ranked!.has(n)))
     && (!q.zone || n.zone?.mapId === q.zone) && (!q.drops || n.drops > 0)
     && (!q.level || (n.level !== null && n.level >= q.level.min && n.level <= q.level.max))
     && (!q.react || n.reaction === REACTIONS[q.react])
@@ -81,7 +82,7 @@ export default async function NpcListPage(props: { searchParams?: Promise<Search
   const key = (n: NpcRow): string | number | null => sort.key === "name" ? n.name?.toLowerCase() ?? null : sort.key === "level" ? n.level
     : sort.key === "type" ? n.creatureType?.toLowerCase() ?? null : sort.key === "rank" ? (n.rank ? NPC_RANKS.indexOf(n.rank) : null)
     : sort.key === "react" ? n.reaction : sort.key === "zone" ? n.zone?.name ?? null : sort.key === "drops" ? n.drops : n.npcId;
-  const rows = sortRows(matched, key, sort.desc, (n) => n.npcId);
+  const rows = byRank(sortRows(matched, key, sort.desc, (n) => n.npcId), ranked, Boolean(q.sort));
   const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
   if (q.page > pages) notFound();
   const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
@@ -164,6 +165,7 @@ export default async function NpcListPage(props: { searchParams?: Promise<Search
           clearHref="/database/npcs"
         />}
         {/* With nothing to list at all, the one line says so without a row of column headers over it. */}
+        {respelled && rows.length > 0 && <Respelled q={respelled} />}
         <div className="mt-2">{all.length === 0 ? empty : (
           <DataTable
             dense

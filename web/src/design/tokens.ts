@@ -21,6 +21,14 @@ export const RADIUS = { control: 6, card: 12 } as const;
  *  24 px sides, 16 px under 1024 px), and every page's column starts at its left edge. */
 export const WIDTH = { reading: 768, wide: 1152, data: 1440 } as const;
 
+/** Line lengths for running text, in ch: `max-w-prose` for explanations and notes, `max-w-lede` for a page's
+ *  opening line under its title. */
+export const MEASURE = { prose: 65, lede: 75 } as const;
+
+/** The caption step, in px: chart labels, rank changes and other small print beside a figure. Line height is the
+ *  surrounding text's. */
+export const CAPTION_SIZE = 11;
+
 /**
  * The data-page scale (density spec, 2026-10-20): `/database/*`, `/search` and the item, NPC and
  * quest pages. Prose pages keep Tailwind's own scale. Each step is [font-size, line-height] in px;
@@ -166,7 +174,8 @@ export type TokenName =
   | "canvas" | "panel" | "line" | "edge" | "fg" | "fg-2" | "muted" | "accent" | "danger" | "warning"
   | "tooltip" | "tooltip-border" | "tooltip-inner" | "accent-hover" | "blue-post"
   | `q-${(typeof QUALITIES)[number]}` | `class-${(typeof CLASSES)[number]}` | "chat-whisper" | "chat-guild"
-  | `realm-${(typeof REALM_RULESETS)[number]}` | "region-us" | "region-eu" | "tip-yellow" | "coin-gold" | "coin-silver" | "coin-copper";
+  | `realm-${(typeof REALM_RULESETS)[number]}` | "region-us" | "region-eu" | "tip-yellow" | "coin-gold" | "coin-silver" | "coin-copper"
+  | "faction-alliance" | "faction-horde" | `census-${1 | 2 | 3 | 4 | 5}`;
 
 // Tooltip frames stay dark in both modes, as in the game.
 const tooltip = { tooltip: "#080C18", "tooltip-border": "#5B6B8C", "tooltip-inner": "#26324F" } as const;
@@ -204,6 +213,15 @@ export const tokens: Record<Mode, Record<TokenName, string>> = {
     "class-mage": "#3FC7EB",
     "class-warlock": "#8788EE",
     "class-druid": "#FF7C0A",
+    // Census faction series: Alliance blue and Horde red, at least 3:1 on both page surfaces.
+    "faction-alliance": "#579CF0",
+    "faction-horde": "#EB7373",
+    // Census heatmap: five flat accent-hue fills, light to dark with increasing count. Use fg ink.
+    "census-1": "#485C35",
+    "census-2": "#3B4E2A",
+    "census-3": "#2F4020",
+    "census-4": "#243218",
+    "census-5": "#192410",
     "chat-whisper": "#FF80FF",
     "chat-guild": "#40FF40",
     // A realm's ruleset beside its name (tools/auctions/RealmName.tsx): red PvP, green PvE, blue RP, orange RP-PvP, gold Hardcore.
@@ -251,6 +269,13 @@ export const tokens: Record<Mode, Record<TokenName, string>> = {
     "class-mage": "#0B6E87",
     "class-warlock": "#4A4BC0",
     "class-druid": "#A84B00",
+    "faction-alliance": "#2367B5",
+    "faction-horde": "#BA3838",
+    "census-1": "#EDF5E5",
+    "census-2": "#D8E8C7",
+    "census-3": "#C3D9A9",
+    "census-4": "#AEC98F",
+    "census-5": "#99BB78",
     "chat-whisper": "#A3218F",
     "chat-guild": "#1A7A12",
     "realm-normal": "#1A7A12",

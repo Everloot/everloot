@@ -8,11 +8,13 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { webApplicationJsonLd } from "@/lib/jsonld";
 import { pageMetadata } from "@/lib/seo";
 import { uploadStore } from "@/lib/upload-store";
-import { AH_PATH, HOUSES, agreementSoFar, busiestHouse, findBoard, houseParam, houseSlug, itemHref, money, realmBoards, slugParam, type MarketRow } from "@/lib/auction-house";
+import { AH_PATH, busiestHouse, findBoard, houseSlug, itemHref, money, type MarketRow } from "@/lib/auction-house";
+import { loadMarketBoards } from "@/lib/market-boards";
 import { BAGS_BUILD, BAG_SLOTS, bagsParam, cheapestBySize, pricedSizes, upgrades, type Upgrade } from "@/lib/bags";
-import { MARKET_RULE, formatCopper } from "../../../../../kb/src/market";
+import { MARKET_RULE, formatCopper } from "@kb/market";
 import { auctionNames, itemArt, type ItemTip } from "../auctions/art";
 import { Contribute, ItemLink, RealmName } from "../auctions/parts";
+import { RealmHousePicker, realmHouseHref, realmHouseParams } from "../auctions/RealmHousePicker";
 
 // The choices live in the query string, so the page is rendered for each request (the rollup is cached by the store).
 export const dynamic = "force-dynamic";
@@ -31,7 +33,6 @@ export const metadata: Metadata = {
 
 type Search = Record<string, string | string[] | undefined>;
 
-const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] ?? "" : value ?? "");
 const days = (n: number) => (n <= 0 ? "today" : n === 1 ? "1 day ago" : `${n} days ago`);
 const field = "ctl w-full min-w-0 border border-edge bg-panel px-3 text-fg focus:border-accent";
 const NO_PRICE = "No public price on this house yet";
@@ -41,17 +42,16 @@ interface SizeRow { slots: number; row: MarketRow | null }
 
 export default async function BagsPage(props: { searchParams: Promise<Search> }) {
   const search = await props.searchParams;
-  const slug = slugParam(one(search.realm)) ?? null;
-  const asked = houseParam(one(search.house) || undefined);
+  const { realm: slug, house: asked } = realmHouseParams(search);
   const current = bagsParam(search);
   const now = new Date();
   const market = await uploadStore.loadMarket();
-  const state = market.state;
-  const realms = state ? realmBoards(state, now) : [];
+  const stored = await loadMarketBoards(market, now);
+  const realms = stored ? stored.boards(null) : [];
   const realm = slug ? findBoard(realms, slug) : null;
   // A house is its own market: with none asked for, the realm's busiest house, named on the page; never a blend.
   const house: AuctionHouse | null = asked ?? (realm ? busiestHouse(realm.rows)?.house ?? null : null);
-  const board = state && slug && house ? findBoard(realmBoards(state, now, house), slug) : null;
+  const board = stored && slug && house ? findBoard(stored.boards(house), slug) : null;
   const cheapest = board ? cheapestBySize(board.rows) : new Map<number, MarketRow>();
   // Sizes some house prices, so a size only bags that bind when picked up come in never lists.
   const sizes = [...new Set([...pricedSizes(realms), ...cheapest.keys()])].sort((a, b) => a - b);
@@ -61,7 +61,7 @@ export default async function BagsPage(props: { searchParams: Promise<Search> })
 
   const ids = [...cheapest.values()].map((r) => r.value.itemId);
   const tips: Map<number, ItemTip> = ids.length ? (await itemArt(ids)).tips : new Map();
-  const names = await auctionNames(ids, tips);
+  const names = await auctionNames(ids, tips, stored?.names);
   const realmName = realm?.realm.name ?? null;
   const where = house && realmName ? `the ${house} auction house on ${realmName}` : null;
 
@@ -83,12 +83,12 @@ export default async function BagsPage(props: { searchParams: Promise<Search> })
   const smallest = Math.min(...current);
 
   let body;
-  if (!state) {
+  if (!stored) {
     body = <Card><p className="text-fg-2" role="status">Market values are unavailable right now. They are unrecorded, not zero.</p></Card>;
   } else if (!slug || !house) {
     body = <EmptyState message={realms.length ? "Pick a realm and an auction house to see what bags cost there." : "No realm has public prices yet: a realm shows here once 3 reporters scan the same item there."} />;
   } else if (!board) {
-    body = <EmptyState count={agreementSoFar(state, slug, undefined, house)} message={`No public prices in the ${house} auction house on ${realmName ?? "this realm"} yet: a price shows once 3 reporters scan the same item there.`} />;
+    body = <EmptyState count={stored.agreement(slug, house)} message={`No public prices in the ${house} auction house on ${realmName ?? "this realm"} yet: a price shows once 3 reporters scan the same item there.`} />;
   } else {
     body = (
       <div className="space-y-8">
@@ -131,21 +131,17 @@ export default async function BagsPage(props: { searchParams: Promise<Search> })
         actions={<Link href={AH_PATH} className="btn">Auction House</Link>}
       />
       <div className="space-y-8">
+        <RealmHousePicker
+          realms={realms.map((b) => ({ slug: b.realm.slug, name: b.realm.name }))}
+          realm={slug}
+          house={house}
+          href={(r, h) => realmHouseHref(PATH, search, r, h)}
+          remember="redirect"
+        />
         <Card>
           <form action={PATH} method="get" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <label className="block min-w-0 space-y-1 text-sm">
-              <span className="block text-muted">Realm</span>
-              <select name="realm" defaultValue={realm?.realm.slug ?? ""} className={field}>
-                <option value="">Choose a realm</option>
-                {realms.map((b) => <option key={b.realm.slug} value={b.realm.slug}>{b.realm.name}</option>)}
-              </select>
-            </label>
-            <label className="block min-w-0 space-y-1 text-sm">
-              <span className="block text-muted">Auction house</span>
-              <select name="house" defaultValue={house ? houseSlug(house) : houseSlug(HOUSES[0]!)} className={field}>
-                {HOUSES.map((h) => <option key={h} value={houseSlug(h)}>{h}</option>)}
-              </select>
-            </label>
+            {slug && <input type="hidden" name="realm" value={slug} />}
+            {house && <input type="hidden" name="house" value={houseSlug(house)} />}
             <fieldset className="min-w-0 space-y-1 text-sm sm:col-span-2 lg:col-span-3">
               <legend className="text-muted">Your {BAG_SLOTS} bags (the backpack is fixed)</legend>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

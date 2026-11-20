@@ -10,7 +10,7 @@ import { MCP_PROMPTS, MCP_RESOURCE_TEMPLATES, MCP_RESOURCES } from "@/lib/docs/c
 import { sample, TOOL_ARGS } from "@/lib/docs/examples";
 import { toolHref } from "@/lib/docs/nav";
 import { pageMetadata } from "@/lib/seo";
-import { promptText } from "../../../../../../kb/src/prompts";
+import { promptText } from "@kb/prompts";
 
 export const metadata: Metadata = pageMetadata({
   title: "Resources and prompts",

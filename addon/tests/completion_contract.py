@@ -171,10 +171,30 @@ def fresh(saved="{ toggles = { completion = true } }", after_world="", core_twea
     return lua
 
 
-# --- opt-in: off by default, and nothing is read or written while off ------------------------------
+# --- New installs track completion and announce its public boss-history boundary once. ---
 lua = fresh(saved="nil")
 lua.execute("""
-assert(EverlootDB.toggles.completion == false, 'the module is opt-in')
+assert(EverlootDB.toggles.completion == true, 'on in a new install')
+assert(EverlootDB.completionNotice == true, 'notice remembered')
+local said = 0
+for _, line in ipairs(printed) do
+ if line:find('completion tracker on', 1, true) then
+  said = said + 1
+  assert(line:find('public on the character page, guild page and rankings', 1, true), line)
+  assert(line:find('/everloot completion off', 1, true), line)
+ end
+end
+assert(said == 1)
+printed = {}
+Everloot.frame.onEvent(nil,'ADDON_LOADED','Everloot')
+for _, line in ipairs(printed) do assert(not line:find('completion tracker on',1,true), 'notice not repeated') end
+""")
+
+# --- An older install without the switch keeps it off; off reads and writes nothing. ---
+assert fresh(saved="{}").eval("EverlootDB.toggles.completion") is False
+lua = fresh(saved="{ toggles = {} }")
+lua.execute("""
+assert(EverlootDB.toggles.completion == false, 'an older install keeps completion off')
 assert(status():find('completion: off by toggle', 1, true), status())
 event('PLAYER_ENTERING_WORLD'); event('ACHIEVEMENT_EARNED')
 assert(drain() == 0, 'an off module schedules nothing')
@@ -453,7 +473,7 @@ end
 """)
 
 # --- turned on in this session: /everloot completion says to /reload, not that the client lacks a call ----
-lua = fresh(saved="nil")
+lua = fresh(saved="{ toggles = { completion = false } }")
 lua.execute("""
 SlashCmdList.EVERLOOT('completion on')
 SlashCmdList.EVERLOOT('completion')

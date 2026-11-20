@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { TAB_SCROLL, TabCount, tabClass } from "./tab-style";
+import { TAB_SCROLL, TabCount, filledTabs, tabClass } from "./tab-style";
 
 export interface TabItem {
   /** Also the URL hash that opens this tab: `#dropped-by`. Lowercase letters, digits and dashes. */
   id: string;
   label: ReactNode;
-  /** Rows behind the tab. Zero is drawn quieter, not hidden. */
+  /** Rows behind the tab. A tab with none (0) is left out while another tab has rows; no count is never empty. */
   count?: number;
   panel: ReactNode;
 }
@@ -23,20 +23,17 @@ export function tabFromHash(hash: string, ids: string[]): string | null {
   return ids.includes(id) ? id : null;
 }
 
-/** The tab that opens first: the first one with rows (or no count), else the first one. */
-export function firstFilled(tabs: Pick<TabItem, "id" | "count">[]): string | undefined {
-  return (tabs.find((t) => t.count !== 0) ?? tabs[0])?.id;
-}
-
 /**
  * Tabs whose state is in the URL hash, so `/database/items/7960#sold-by` opens on that tab and the
  * address can be shared. Arrow keys, Home and End move between tabs (WAI-ARIA tabs pattern, automatic
- * activation). The first tab with rows is open on the server and without JavaScript.
+ * activation). Only the tabs with rows are drawn, so the strip starts with one and it is open on the server and
+ * without JavaScript. When no tab has rows there is no strip: `empty`, or else the first tab's panel (its one line).
  */
-export default function Tabs({ label, tabs, inFrame = false, className = "" }: { label: string; tabs: TabItem[]; inFrame?: boolean; className?: string }) {
+export default function Tabs({ label, tabs: all, empty, inFrame = false, className = "" }: { label: string; tabs: TabItem[]; empty?: ReactNode; inFrame?: boolean; className?: string }) {
   const uid = useId();
+  const tabs = filledTabs(all);
   const ids = tabs.map((t) => t.id);
-  const [selected, setSelected] = useState(() => firstFilled(tabs) ?? ids[0]);
+  const [selected, setSelected] = useState(() => ids[0]);
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
   const idsKey = ids.join(" ");
 
@@ -77,6 +74,10 @@ export default function Tabs({ label, tabs, inFrame = false, className = "" }: {
     if (to < 0) return;
     event.preventDefault();
     choose(ids[to], true);
+  }
+
+  if (!tabs.length) {
+    return all.length ? <div data-tabs-empty className={`${inFrame ? "" : "min-w-0"} ${className}`.trim() || undefined}>{empty ?? all[0].panel}</div> : null;
   }
 
   const tabId = (id: string) => `${uid}-tab-${id}`;

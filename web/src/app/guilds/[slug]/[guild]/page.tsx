@@ -7,7 +7,7 @@ import { dataAgeLabel } from "@/lib/data-age";
 import { factionLabel, guildPath, guildsOn, hideGuildPath, loadGuildPage, realmPath, type GuildMember } from "@/lib/guilds";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
-import type { AgreedKill } from "../../../../../../kb/src/guilds";
+import type { AgreedKill } from "@kb/guilds";
 import { className, classText } from "../../../players/player-view";
 import { day, decodeSlug, guildRobots, InstanceCard, link, memberCountLine, number, Progress, sourceLabel } from "../../parts";
 

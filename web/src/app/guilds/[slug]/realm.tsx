@@ -8,7 +8,7 @@ import { guildPath, loadRealmPage, REALM_PAGE, realmPath } from "@/lib/guilds";
 import { REALM_GUILD_LIMIT } from "@/lib/player-store";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
-import type { GuildSummary } from "../../../../../kb/src/guilds";
+import type { GuildSummary } from "@kb/guilds";
 import { day, FactionMark, guildRobots, link, number } from "../parts";
 
 /** A realm's guild list (/guilds/<realm>): every guild seen on it, behind EVERLOOT_GUILDS like the other guild pages. */

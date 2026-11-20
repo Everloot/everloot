@@ -16,6 +16,7 @@
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./src/*"],
+      "@kb/*": ["../kb/src/*"],
       "better-sqlite3": ["./node_modules/@types/better-sqlite3"],
       "zod": ["./node_modules/zod"],
       "yaml": ["./node_modules/yaml"],

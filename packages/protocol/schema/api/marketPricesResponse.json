@@ -53,11 +53,24 @@
         {
           "type": "string",
           "const": "reporters"
+        },
+        {
+          "type": "string",
+          "const": "updatedAt"
+        },
+        {
+          "type": "string",
+          "const": "ageDays"
+        },
+        {
+          "type": "string",
+          "const": "change1d"
         }
       ],
       "items": false,
       "minItems": 7,
-      "maxItems": 7
+      "maxItems": 10,
+      "description": "The row positions: seven, or ten when the request asked for fields=full."
     },
     "realm": {
       "type": [
@@ -85,9 +98,16 @@
             "maximum": 9007199254740991
           },
           {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9007199254740991
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           {
             "type": "integer",
@@ -111,13 +131,36 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          {
+            "type": [
+              "number",
+              "null"
+            ]
           }
         ],
         "items": false,
         "minItems": 7,
-        "maxItems": 7
+        "maxItems": 10
       },
-      "description": "[itemId, market, min, historical, quantity, day, reporters]; copper per unit."
+      "description": "[itemId, market, min, historical, quantity, day, reporters]; copper per unit. market is null for a thin item (no solid public day in the last 14). With fields=full three positions follow. updatedAt: when the scans behind the newest open public day were taken; null once only closed days remain. ageDays: calendar days since day. change1d: the newest solid day's market value against the solid day one calendar day before it, (to - from) / from; null without such a pair."
     },
     "attribution": {
       "type": "object",

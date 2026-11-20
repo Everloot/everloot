@@ -1,6 +1,6 @@
 import { expect, test, vi } from "vitest";
 import { loadWikiEntityNames, shownNpcName } from "./wiki-entity-names";
-import type { WorldFacts } from "../../../kb/src/world-pages";
+import type { WorldFacts } from "@kb/world-pages";
 
 const catalog = vi.hoisted(() => ({ raw: null as unknown }));
 vi.mock("./talents/assets", () => ({ assetsBaseUrl: () => "https://assets.example.test/build" }));

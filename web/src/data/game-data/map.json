@@ -9,8 +9,8 @@
     "buildId": 70959,
     "version": "1.60.1.70959",
     "buildConfig": "ad887adcf63b8746155dd40e1930b80f",
-    "definitions": "5ebf2124996b",
-    "extractedAt": "2026-11-17T20:46:15.377Z",
+    "definitions": "ae1b35fdd977",
+    "extractedAt": "2026-11-18T23:48:24.798Z",
     "tables": [
       {
         "table": "Map",
@@ -1144,7 +1144,8 @@
       "continentId": 0,
       "worldX": -8832.8,
       "worldY": 478.6,
-      "uiMapId": 1453
+      "uiMapId": 1453,
+      "faction": "alliance"
     },
     {
       "id": 4,
@@ -1152,7 +1153,8 @@
       "continentId": 0,
       "worldX": -10628.9,
       "worldY": 1036.7,
-      "uiMapId": 1436
+      "uiMapId": 1436,
+      "faction": "alliance"
     },
     {
       "id": 5,
@@ -1160,7 +1162,8 @@
       "continentId": 0,
       "worldX": -9429.1,
       "worldY": -2231.4,
-      "uiMapId": 1433
+      "uiMapId": 1433,
+      "faction": "alliance"
     },
     {
       "id": 6,
@@ -1168,7 +1171,8 @@
       "continentId": 0,
       "worldX": -4821.8,
       "worldY": -1155.4,
-      "uiMapId": 1426
+      "uiMapId": 1426,
+      "faction": "alliance"
     },
     {
       "id": 7,
@@ -1176,7 +1180,8 @@
       "continentId": 0,
       "worldX": -3792.3,
       "worldY": -783.3,
-      "uiMapId": 1437
+      "uiMapId": 1437,
+      "faction": "alliance"
     },
     {
       "id": 8,
@@ -1184,7 +1189,8 @@
       "continentId": 0,
       "worldX": -5421.9,
       "worldY": -2930,
-      "uiMapId": 1432
+      "uiMapId": 1432,
+      "faction": "alliance"
     },
     {
       "id": 10,
@@ -1192,7 +1198,8 @@
       "continentId": 0,
       "worldX": 478.9,
       "worldY": 1536.6,
-      "uiMapId": 1421
+      "uiMapId": 1421,
+      "faction": "horde"
     },
     {
       "id": 11,
@@ -1200,7 +1207,8 @@
       "continentId": 0,
       "worldX": 1568.6,
       "worldY": 268,
-      "uiMapId": 1420
+      "uiMapId": 1420,
+      "faction": "horde"
     },
     {
       "id": 12,
@@ -1208,7 +1216,8 @@
       "continentId": 0,
       "worldX": -10515.5,
       "worldY": -1261.7,
-      "uiMapId": 1431
+      "uiMapId": 1431,
+      "faction": "alliance"
     },
     {
       "id": 13,
@@ -1216,7 +1225,8 @@
       "continentId": 0,
       "worldX": -0.1,
       "worldY": -859.9,
-      "uiMapId": 1424
+      "uiMapId": 1424,
+      "faction": "horde"
     },
     {
       "id": 14,
@@ -1224,7 +1234,8 @@
       "continentId": 0,
       "worldX": -711.5,
       "worldY": -515.5,
-      "uiMapId": 1424
+      "uiMapId": 1424,
+      "faction": "alliance"
     },
     {
       "id": 16,
@@ -1232,7 +1243,8 @@
       "continentId": 0,
       "worldX": -1240.5,
       "worldY": -2515.1,
-      "uiMapId": 1417
+      "uiMapId": 1417,
+      "faction": "alliance"
     },
     {
       "id": 17,
@@ -1240,7 +1252,8 @@
       "continentId": 0,
       "worldX": -916.3,
       "worldY": -3496.9,
-      "uiMapId": 1417
+      "uiMapId": 1417,
+      "faction": "horde"
     },
     {
       "id": 18,
@@ -1248,7 +1261,8 @@
       "continentId": 0,
       "worldX": -14444.3,
       "worldY": 509.6,
-      "uiMapId": 1434
+      "uiMapId": 1434,
+      "faction": "horde"
     },
     {
       "id": 19,
@@ -1256,7 +1270,8 @@
       "continentId": 0,
       "worldX": -14473,
       "worldY": 464.1,
-      "uiMapId": 1434
+      "uiMapId": 1434,
+      "faction": "alliance"
     },
     {
       "id": 20,
@@ -1264,7 +1279,8 @@
       "continentId": 0,
       "worldX": -12414.2,
       "worldY": 146.3,
-      "uiMapId": 1434
+      "uiMapId": 1434,
+      "faction": "horde"
     },
     {
       "id": 21,
@@ -1272,7 +1288,8 @@
       "continentId": 0,
       "worldX": -6634,
       "worldY": -2180.1,
-      "uiMapId": 1418
+      "uiMapId": 1418,
+      "faction": "horde"
     },
     {
       "id": 22,
@@ -1280,7 +1297,8 @@
       "continentId": 1,
       "worldX": -1197.2,
       "worldY": 29.7,
-      "uiMapId": 1456
+      "uiMapId": 1456,
+      "faction": "horde"
     },
     {
       "id": 23,
@@ -1288,7 +1306,8 @@
       "continentId": 1,
       "worldX": 1677.6,
       "worldY": -4315.7,
-      "uiMapId": 1454
+      "uiMapId": 1454,
+      "faction": "horde"
     },
     {
       "id": 25,
@@ -1296,7 +1315,8 @@
       "continentId": 1,
       "worldX": -441.8,
       "worldY": -2596.1,
-      "uiMapId": 1413
+      "uiMapId": 1413,
+      "faction": "horde"
     },
     {
       "id": 26,
@@ -1304,7 +1324,8 @@
       "continentId": 1,
       "worldX": 6341.4,
       "worldY": 557.7,
-      "uiMapId": 1439
+      "uiMapId": 1439,
+      "faction": "alliance"
     },
     {
       "id": 27,
@@ -1312,7 +1333,8 @@
       "continentId": 1,
       "worldX": 8643.6,
       "worldY": 841,
-      "uiMapId": 1438
+      "uiMapId": 1438,
+      "faction": "alliance"
     },
     {
       "id": 28,
@@ -1320,7 +1342,8 @@
       "continentId": 1,
       "worldX": 2827.3,
       "worldY": -289.2,
-      "uiMapId": 1440
+      "uiMapId": 1440,
+      "faction": "alliance"
     },
     {
       "id": 29,
@@ -1328,7 +1351,8 @@
       "continentId": 1,
       "worldX": 966.6,
       "worldY": 1040.3,
-      "uiMapId": 1442
+      "uiMapId": 1442,
+      "faction": "horde"
     },
     {
       "id": 30,
@@ -1336,7 +1360,8 @@
       "continentId": 1,
       "worldX": -5407.7,
       "worldY": -2414.3,
-      "uiMapId": 1441
+      "uiMapId": 1441,
+      "faction": "horde"
     },
     {
       "id": 31,
@@ -1344,7 +1369,8 @@
       "continentId": 1,
       "worldX": -4491.9,
       "worldY": -775.9,
-      "uiMapId": 1444
+      "uiMapId": 1444,
+      "faction": "alliance"
     },
     {
       "id": 32,
@@ -1352,7 +1378,8 @@
       "continentId": 1,
       "worldX": -3825.4,
       "worldY": -4516.6,
-      "uiMapId": 1445
+      "uiMapId": 1445,
+      "faction": "alliance"
     },
     {
       "id": 33,
@@ -1360,7 +1387,8 @@
       "continentId": 1,
       "worldX": 2681.1,
       "worldY": 1461.7,
-      "uiMapId": 1442
+      "uiMapId": 1442,
+      "faction": "alliance"
     },
     {
       "id": 37,
@@ -1368,7 +1396,8 @@
       "continentId": 1,
       "worldX": 139.2,
       "worldY": 1325.8,
-      "uiMapId": 1443
+      "uiMapId": 1443,
+      "faction": "alliance"
     },
     {
       "id": 38,
@@ -1376,7 +1405,8 @@
       "continentId": 1,
       "worldX": -1767.6,
       "worldY": 3263.9,
-      "uiMapId": 1443
+      "uiMapId": 1443,
+      "faction": "horde"
     },
     {
       "id": 39,
@@ -1384,7 +1414,8 @@
       "continentId": 1,
       "worldX": -7224,
       "worldY": -3734.6,
-      "uiMapId": 1446
+      "uiMapId": 1446,
+      "faction": "alliance"
     },
     {
       "id": 40,
@@ -1392,7 +1423,8 @@
       "continentId": 1,
       "worldX": -7048.9,
       "worldY": -3780.4,
-      "uiMapId": 1446
+      "uiMapId": 1446,
+      "faction": "horde"
     },
     {
       "id": 41,
@@ -1400,7 +1432,8 @@
       "continentId": 1,
       "worldX": -4373.8,
       "worldY": 3338.6,
-      "uiMapId": 1444
+      "uiMapId": 1444,
+      "faction": "alliance"
     },
     {
       "id": 42,
@@ -1408,7 +1441,8 @@
       "continentId": 1,
       "worldX": -4419.9,
       "worldY": 199.3,
-      "uiMapId": 1444
+      "uiMapId": 1444,
+      "faction": "horde"
     },
     {
       "id": 43,
@@ -1416,7 +1450,8 @@
       "continentId": 0,
       "worldX": 283.7,
       "worldY": -2002.8,
-      "uiMapId": 1425
+      "uiMapId": 1425,
+      "faction": "alliance"
     },
     {
       "id": 44,
@@ -1424,7 +1459,8 @@
       "continentId": 1,
       "worldX": 3661.5,
       "worldY": -4390.4,
-      "uiMapId": 1447
+      "uiMapId": 1447,
+      "faction": "horde"
     },
     {
       "id": 45,
@@ -1432,7 +1468,8 @@
       "continentId": 0,
       "worldX": -11112.2,
       "worldY": -3435.7,
-      "uiMapId": 1419
+      "uiMapId": 1419,
+      "faction": "alliance"
     },
     {
       "id": 48,
@@ -1440,7 +1477,8 @@
       "continentId": 1,
       "worldX": 5068.4,
       "worldY": -337.2,
-      "uiMapId": 1448
+      "uiMapId": 1448,
+      "faction": "horde"
     },
     {
       "id": 49,
@@ -1448,7 +1486,8 @@
       "continentId": 1,
       "worldX": 7458.5,
       "worldY": -2487.2,
-      "uiMapId": 1450
+      "uiMapId": 1450,
+      "faction": "alliance"
     },
     {
       "id": 52,
@@ -1456,7 +1495,8 @@
       "continentId": 1,
       "worldX": 6799.2,
       "worldY": -4742.4,
-      "uiMapId": 1452
+      "uiMapId": 1452,
+      "faction": "alliance"
     },
     {
       "id": 53,
@@ -1464,7 +1504,8 @@
       "continentId": 1,
       "worldX": 6813.1,
       "worldY": -4611.1,
-      "uiMapId": 1452
+      "uiMapId": 1452,
+      "faction": "horde"
     },
     {
       "id": 55,
@@ -1472,7 +1513,8 @@
       "continentId": 1,
       "worldX": -3147.4,
       "worldY": -2842.2,
-      "uiMapId": 1445
+      "uiMapId": 1445,
+      "faction": "horde"
     },
     {
       "id": 56,
@@ -1480,7 +1522,8 @@
       "continentId": 0,
       "worldX": -10457,
       "worldY": -3279.2,
-      "uiMapId": 1435
+      "uiMapId": 1435,
+      "faction": "horde"
     },
     {
       "id": 58,
@@ -1488,7 +1531,8 @@
       "continentId": 1,
       "worldX": 3374.7,
       "worldY": 997,
-      "uiMapId": 1440
+      "uiMapId": 1440,
+      "faction": "horde"
     },
     {
       "id": 61,
@@ -1496,7 +1540,8 @@
       "continentId": 1,
       "worldX": 2302.4,
       "worldY": -2524.6,
-      "uiMapId": 1440
+      "uiMapId": 1440,
+      "faction": "horde"
     },
     {
       "id": 62,
@@ -1504,7 +1549,8 @@
       "continentId": 1,
       "worldX": 7793.6,
       "worldY": -2403.5,
-      "uiMapId": 1450
+      "uiMapId": 1450,
+      "faction": "alliance"
     },
     {
       "id": 63,
@@ -1512,7 +1558,8 @@
       "continentId": 1,
       "worldX": 7787.7,
       "worldY": -2404.1,
-      "uiMapId": 1450
+      "uiMapId": 1450,
+      "faction": "horde"
     },
     {
       "id": 64,
@@ -1520,7 +1567,8 @@
       "continentId": 1,
       "worldX": 2722,
       "worldY": -3880.6,
-      "uiMapId": 1447
+      "uiMapId": 1447,
+      "faction": "alliance"
     },
     {
       "id": 65,
@@ -1528,7 +1576,8 @@
       "continentId": 1,
       "worldX": 6205.9,
       "worldY": -1949.6,
-      "uiMapId": 1448
+      "uiMapId": 1448,
+      "faction": "alliance"
     },
     {
       "id": 66,
@@ -1536,7 +1585,8 @@
       "continentId": 0,
       "worldX": 931.3,
       "worldY": -1430.1,
-      "uiMapId": 1422
+      "uiMapId": 1422,
+      "faction": "alliance"
     },
     {
       "id": 67,
@@ -1544,7 +1594,8 @@
       "continentId": 0,
       "worldX": 2271.1,
       "worldY": -5340.8,
-      "uiMapId": 1423
+      "uiMapId": 1423,
+      "faction": "alliance"
     },
     {
       "id": 68,
@@ -1552,7 +1603,8 @@
       "continentId": 0,
       "worldX": 2327.4,
       "worldY": -5286.9,
-      "uiMapId": 1423
+      "uiMapId": 1423,
+      "faction": "horde"
     },
     {
       "id": 69,
@@ -1560,7 +1612,8 @@
       "continentId": 1,
       "worldX": 7470.4,
       "worldY": -2123.4,
-      "uiMapId": 1450
+      "uiMapId": 1450,
+      "faction": "horde"
     },
     {
       "id": 70,
@@ -1568,7 +1621,8 @@
       "continentId": 0,
       "worldX": -7504,
       "worldY": -2187.5,
-      "uiMapId": 1428
+      "uiMapId": 1428,
+      "faction": "horde"
     },
     {
       "id": 71,
@@ -1576,7 +1630,8 @@
       "continentId": 0,
       "worldX": -8364.6,
       "worldY": -2738.4,
-      "uiMapId": 1428
+      "uiMapId": 1428,
+      "faction": "alliance"
     },
     {
       "id": 72,
@@ -1584,7 +1639,8 @@
       "continentId": 1,
       "worldX": -6811.4,
       "worldY": 836.7,
-      "uiMapId": 1451
+      "uiMapId": 1451,
+      "faction": "horde"
     },
     {
       "id": 73,
@@ -1592,7 +1648,8 @@
       "continentId": 1,
       "worldX": -6761.8,
       "worldY": 772,
-      "uiMapId": 1451
+      "uiMapId": 1451,
+      "faction": "alliance"
     },
     {
       "id": 74,
@@ -1600,7 +1657,8 @@
       "continentId": 0,
       "worldX": -6552.6,
       "worldY": -1168.3,
-      "uiMapId": 1427
+      "uiMapId": 1427,
+      "faction": "alliance"
     },
     {
       "id": 75,
@@ -1608,7 +1666,8 @@
       "continentId": 0,
       "worldX": -6554.9,
       "worldY": -1100.1,
-      "uiMapId": 1427
+      "uiMapId": 1427,
+      "faction": "horde"
     },
     {
       "id": 76,
@@ -1616,7 +1675,8 @@
       "continentId": 0,
       "worldX": -635.3,
       "worldY": -4720.5,
-      "uiMapId": 1425
+      "uiMapId": 1425,
+      "faction": "horde"
     },
     {
       "id": 77,
@@ -1624,7 +1684,8 @@
       "continentId": 1,
       "worldX": -2380.7,
       "worldY": -1882.7,
-      "uiMapId": 1413
+      "uiMapId": 1413,
+      "faction": "horde"
     },
     {
       "id": 79,
@@ -1632,7 +1693,8 @@
       "continentId": 1,
       "worldX": -6113.8,
       "worldY": -1142.7,
-      "uiMapId": 1449
+      "uiMapId": 1449,
+      "faction": "both"
     },
     {
       "id": 80,
@@ -1640,7 +1702,8 @@
       "continentId": 1,
       "worldX": -894.6,
       "worldY": -3773,
-      "uiMapId": 1413
+      "uiMapId": 1413,
+      "faction": "both"
     },
     {
       "id": 84,
@@ -1648,7 +1711,8 @@
       "continentId": 0,
       "worldX": 2998.7,
       "worldY": -3050.1,
-      "uiMapId": 1423
+      "uiMapId": 1423,
+      "faction": "both"
     },
     {
       "id": 85,
@@ -1656,7 +1720,8 @@
       "continentId": 0,
       "worldX": 3109.3,
       "worldY": -4285.1,
-      "uiMapId": 1423
+      "uiMapId": 1423,
+      "faction": "both"
     },
     {
       "id": 86,
@@ -1664,7 +1729,8 @@
       "continentId": 0,
       "worldX": 2499.2,
       "worldY": -4742.9,
-      "uiMapId": 1423
+      "uiMapId": 1423,
+      "faction": "both"
     },
     {
       "id": 87,
@@ -1672,7 +1738,8 @@
       "continentId": 0,
       "worldX": 1857.6,
       "worldY": -3658.5,
-      "uiMapId": 1423
+      "uiMapId": 1423,
+      "faction": "both"
     },
     {
       "id": 559,
@@ -1680,7 +1747,8 @@
       "continentId": 1,
       "worldX": 5283.2,
       "worldY": -3306.7,
-      "uiMapId": 2482
+      "uiMapId": 2482,
+      "faction": "both"
     },
     {
       "id": 3203,
@@ -1688,7 +1756,8 @@
       "continentId": 0,
       "worldX": -7923.7,
       "worldY": -4783,
-      "uiMapId": 2548
+      "uiMapId": 2548,
+      "faction": "horde"
     },
     {
       "id": 3242,
@@ -1696,7 +1765,8 @@
       "continentId": 1,
       "worldX": 4393.5,
       "worldY": -2836.4,
-      "uiMapId": 2482
+      "uiMapId": 2482,
+      "faction": "both"
     },
     {
       "id": 3276,
@@ -1704,7 +1774,8 @@
       "continentId": 0,
       "worldX": -9104.1,
       "worldY": -4830.5,
-      "uiMapId": 2548
+      "uiMapId": 2548,
+      "faction": "alliance"
     }
   ],
   "flightPaths": [

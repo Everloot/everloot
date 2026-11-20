@@ -11,6 +11,12 @@ import {
   parseGuild,
 } from "./parse.js";
 import { gearNumbers } from "./gear.js";
+it("preserves a valid in-game crest and ignores malformed optional crest data", () => {
+  const color = { rgba: { r: 10, g: 20, b: 30, a: 1 } };
+  const crest = { emblem: { id: 1, color }, border: { id: 2, color }, background: { color } };
+  expect(parseGuild({ ...guild, crest }, roster, null).guild.crest).toEqual(crest);
+  expect(parseGuild({ ...guild, crest: { emblem: { id: -1 } } }, roster, null).guild.crest).toBeUndefined();
+});
 it("slug helpers", () => {
   expect(characterSlug("Ember", "Vale")).toBe("ember-vale");
   expect(guildSlugFromHref(profile.guild.key.href)).toBe("copper-owls");

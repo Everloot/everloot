@@ -1,6 +1,6 @@
 import { Badge, Card, DataTable, SectionHeading, type Column } from "@/components/ui";
 import { CLIENT_MOUNTS } from "@/data/game-data/client-mounts";
-import type { ClientMount } from "../../../../../kb/src/client-mounts";
+import type { ClientMount } from "@kb/client-mounts";
 
 export interface MountRow extends ClientMount { id: number; /** True when 3 installs list this mount's spell in their mount collection. */ reported: boolean }
 

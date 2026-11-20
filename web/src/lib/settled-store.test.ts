@@ -1,5 +1,5 @@
 import { beforeEach, expect, test, vi } from "vitest";
-import { computeSettled, emptySettledList } from "../../../kb/src/settled-list";
+import { computeSettled, emptySettledList } from "@kb/settled-list";
 
 const corpus = vi.hoisted(() => ({ load: vi.fn() }));
 vi.mock("./upload-store", () => ({ cloudConfig: () => null, uploadStore: { loadCorpus: corpus.load } }));

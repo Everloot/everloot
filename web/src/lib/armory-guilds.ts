@@ -1,19 +1,35 @@
-import { ARMORY_RULESETS, classTokenOfId, isArmoryRegion, SEARCH_RULE, type ArmoryRegion } from "./armory";
+import { ARMORY_RECHECK_DAYS, ARMORY_RULESETS, classTokenOfId, isArmoryRegion, SEARCH_RULE, validArmorySlug, type ArmoryRegion } from "./armory";
+import { LEVEL_BANDS as CENSUS_LEVEL_BANDS } from "@kb/census";
 import { armoryStore, type ArmoryGuildRow, type ArmoryGuildSort, type ArmoryMember } from "./armory-store";
+import { guildProfileStore } from "./guild-profile-store";
 
 /**
- * The armory's guild directory (/armory/guilds) and the summary on an armory guild page, from Blizzard's API data.
+ * The guild directory on /guilds and the summary on an armory guild page, from Blizzard's API data.
  *
- * It is an armory page, not a section of /guilds: Blizzard's Developer API Terms allow no ad on a page that shows
- * this data, and /armory is on the ad-free list while /guilds is not. /guilds keeps its ladder and its search over
- * members' uploads and the players table, and links here, its search carrying over. The two lists are not merged row
- * by row either: uploads name a guild by realm and name, the armory by region and slug, and nothing joins the two
- * reliably yet, so one table holding both would double a guild or fold two different guilds into one.
+ * Blizzard's Developer API Terms allow no ad on a page that shows this data, so /guilds is on the ad-free list
+ * (data/ad-free-paths.json) with the armory. The old address, /armory/guilds, redirects there. /guilds also keeps its
+ * ladder and its search over members' uploads and the players table. The two lists are not merged row by row: uploads
+ * name a guild by realm and name, the armory by region and slug, and nothing joins the two reliably yet, so one table
+ * holding both would double a guild or fold two different guilds into one.
  *
- * The filters live in the address: `q`, `region`, `ruleset`, `sort` and `page`.
+ * The filters live in the address: `q`, `region`, `rules`, `sort` and `p`. The ruleset and the page are `rules` and
+ * `p`, not `ruleset` and `page`, because the ladder on the same page already reads those two.
  */
 
-export const GUILD_DIRECTORY_PATH = "/armory/guilds";
+export const GUILD_DIRECTORY_PATH = "/guilds";
+export const GUILD_SUBMIT_PATH = "/armory/guilds/submit";
+
+/** The queue and Forever API identify a guild by region and slug, without a realm or ruleset. */
+export function guildSlugOf(name: string): string | null {
+  const slug = name.normalize("NFC").trim().toLowerCase().replace(/\s+/g, "-");
+  return validArmorySlug(slug) ? slug : null;
+}
+
+export const guildReadDue = (checkedAt: string, now = Date.now()) =>
+  now - Date.parse(checkedAt) >= ARMORY_RECHECK_DAYS * 86_400_000;
+
+export const guildSubmitHref = (g: { region: string; name: string }) =>
+  `${GUILD_SUBMIT_PATH}?${new URLSearchParams({ region: g.region, name: g.name })}`;
 
 export const GUILD_DIRECTORY_PAGE = 50;
 
@@ -53,9 +69,9 @@ export function directoryPrefix(raw: string | undefined): string | null | "inval
 export function guildDirectoryQuery(search: Search): GuildDirectoryQuery {
   const prefix = directoryPrefix(one(search.q));
   const region = one(search.region)?.toLowerCase();
-  const rules = one(search.ruleset)?.toLowerCase();
+  const rules = one(search.rules)?.toLowerCase();
   const sort = one(search.sort)?.toLowerCase();
-  const page = Number(one(search.page));
+  const page = Number(one(search.p));
   return {
     prefix: prefix === "invalid" ? null : prefix,
     region: isArmoryRegion(region) ? region : null,
@@ -71,9 +87,22 @@ export function guildDirectoryHref(d: Partial<GuildDirectoryQuery>): string {
   if (d.prefix) params.set("q", d.prefix);
   if (d.region) params.set("region", d.region);
   const rules = ARMORY_RULESETS.find((r) => r.id === d.ruleset);
-  if (rules) params.set("ruleset", rulesetSlug(rules.label));
+  if (rules) params.set("rules", rulesetSlug(rules.label));
   if (d.sort && d.sort !== "members") params.set("sort", d.sort);
-  if (d.page && d.page > 1) params.set("page", String(d.page));
+  if (d.page && d.page > 1) params.set("p", String(d.page));
+  const s = params.toString();
+  return s ? `${GUILD_DIRECTORY_PATH}?${s}` : GUILD_DIRECTORY_PATH;
+}
+
+/** The old /armory/guilds names for the ruleset and the page. */
+const MOVED_PARAMS: Record<string, string> = { ruleset: "rules", page: "p" };
+
+/** The directory's address on /guilds for an old /armory/guilds one: every parameter carried over, two renamed. */
+export function movedDirectoryHref(search: Search): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(search)) {
+    for (const v of Array.isArray(value) ? value : value === undefined ? [] : [value]) params.append(MOVED_PARAMS[key] ?? key, v);
+  }
   const s = params.toString();
   return s ? `${GUILD_DIRECTORY_PATH}?${s}` : GUILD_DIRECTORY_PATH;
 }
@@ -93,6 +122,13 @@ export function armoryGuildHidden(hidden: ReadonlySet<string>, region: string, n
   return false;
 }
 
+/**
+ * Blizzard answers a disbanded guild with a record named "DELETED", which the crawler stores as it comes. Such a row is
+ * left out of the directory and of every guild count, as 20261118120000_armory_disbanded_guilds.sql does in SQL.
+ */
+export const DISBANDED_GUILD_NAME = "DELETED";
+export const isDisbandedGuild = (name: string) => name === DISBANDED_GUILD_NAME;
+
 export type GuildDirectory =
   | { state: "ready"; rows: ArmoryGuildRow[]; total: number }
   /** The migration is not applied: the guilds whose name starts with the search, without counts. */
@@ -106,14 +142,21 @@ export type GuildDirectory =
  */
 export async function loadGuildDirectory(d: GuildDirectoryQuery, hidden: ReadonlySet<string> | null): Promise<GuildDirectory> {
   if (hidden === null) return { state: "unreachable" };
-  const shown = (rows: ArmoryGuildRow[]) => rows.filter((r) => !armoryGuildHidden(hidden, r.region, r.name));
+  const shown = (rows: ArmoryGuildRow[]) => rows.filter((r) => !isDisbandedGuild(r.name) && !armoryGuildHidden(hidden, r.region, r.name));
   const store = armoryStore();
   try {
     const sort = GUILD_SORTS.find((s) => s.slug === d.sort)!.key;
     const page = await store.guildDirectory({
       prefix: d.prefix, region: d.region, rulesetId: d.ruleset, sort, limit: GUILD_DIRECTORY_PAGE, offset: (d.page - 1) * GUILD_DIRECTORY_PAGE,
     });
-    if (page) return { state: "ready", rows: shown(page.rows), total: page.total };
+    if (page) {
+      const rows = shown(page.rows);
+      // A profile migration still awaiting application must not take the directory down.
+      try {
+        const recruiting = await guildProfileStore().recruiting(rows);
+        return { state: "ready", rows: rows.map((r) => ({ ...r, recruiting: recruiting.has(`${r.region}/${r.slug}`) })), total: page.total };
+      } catch { return { state: "ready", rows, total: page.total }; }
+    }
     if (!d.prefix) return { state: "not-ready", rows: [] };
     // Before the migration: the name search the armory already has, filtered here, with no counts to sort by.
     const hits = await store.searchGuilds(d.prefix, GUILD_DIRECTORY_PAGE);
@@ -131,14 +174,7 @@ export async function loadGuildDirectory(d: GuildDirectoryQuery, hidden: Readonl
 }
 
 /** Level bands on a guild page, highest first. */
-export const LEVEL_BANDS = [
-  { label: "60", min: 60, max: 60 },
-  { label: "50–59", min: 50, max: 59 },
-  { label: "40–49", min: 40, max: 49 },
-  { label: "30–39", min: 30, max: 39 },
-  { label: "20–29", min: 20, max: 29 },
-  { label: "1–19", min: 1, max: 19 },
-] as const;
+export const LEVEL_BANDS = [...CENSUS_LEVEL_BANDS].reverse();
 
 export interface RosterSummary {
   /** Class token ("MAGE") and count, most first; members whose class Blizzard did not give are left out. */
@@ -149,6 +185,7 @@ export interface RosterSummary {
   /** The average over members whose character has been read; null when none has. */
   averageItemLevel: number | null;
   itemLevelsRead: number;
+  itemLevels: { label: string; count: number }[];
 }
 
 /** The class mix, level spread and average item level of the roster as shown (hidden members are already out). */
@@ -160,11 +197,17 @@ export function rosterSummary(members: readonly ArmoryMember[]): RosterSummary {
   }
   const levels = LEVEL_BANDS.map((b) => ({ label: b.label, count: members.filter((m) => m.level !== null && m.level >= b.min && m.level <= b.max).length }));
   const read = members.map((m) => m.itemLevel).filter((v): v is number => v !== null);
+  const itemBands = new Map<number, number>();
+  for (const value of read) {
+    const band = Math.floor(value / 10) * 10;
+    itemBands.set(band, (itemBands.get(band) ?? 0) + 1);
+  }
   return {
     classes: [...classes].map(([token, count]) => ({ token, count })).sort((a, b) => b.count - a.count || a.token.localeCompare(b.token)),
     levels,
     levelUnknown: members.filter((m) => m.level === null || m.level < 1 || m.level > 60).length,
     averageItemLevel: read.length ? Math.round((read.reduce((a, b) => a + b, 0) / read.length) * 10) / 10 : null,
     itemLevelsRead: read.length,
+    itemLevels: [...itemBands].sort(([a], [b]) => a - b).map(([band, count]) => ({ label: `${band}–${band + 9}`, count })),
   };
 }

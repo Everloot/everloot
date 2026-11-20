@@ -5,12 +5,16 @@ import { BLIZZARD_CREDIT } from "@/lib/armory";
 import { armoryCharacter, armoryGuild } from "@/lib/armory.fixture";
 import { createCloudArmoryStore, createMemoryArmoryStore, type ArmoryStore, type MemoryArmoryStore } from "@/lib/armory-store";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
+vi.mock("@/components/guild-profile", () => ({ default: () => <section aria-label="Guild profile">Claim or edit this guild</section> }));
+
+vi.mock("@/components/progression/GuildProgression", () => ({ default: () => <section data-guild-progression-hook /> }));
 
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
 }));
 vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
+  permanentRedirect: (to: string) => { throw new Error(`NEXT_REDIRECT 308 ${to}`); },
   usePathname: () => "/armory", useRouter: () => ({ push: () => {} }), useSearchParams: () => new URLSearchParams(),
 }));
 
@@ -87,6 +91,9 @@ describe("the character page", () => {
     expect(out).toContain("Level 60 Troll Hunter");
     expect(out).toContain('href="/armory/eu/guilds/ember-wardens"');
     expect(out).toContain("Last login");
+    expect(out).toMatch(/Last read <time dateTime="2026-11-09T10:00:00.000Z"[^>]*>2026-11-09<\/time>/);
+    expect(out).toContain('role="tablist"');
+    expect(out).toContain('data-tab-panel="pvp"');
     expect(out).toContain("57.41");
     expect(out).toContain("61.2");
     expect(out).toContain("1,234");
@@ -171,10 +178,9 @@ describe("the guild page", () => {
     expect(out).toContain(">Velkara Duskmantle<");
   });
 
-  test("a single-word guild slug has a page, and the hub finds it", async () => {
+  test("a single-word guild slug has a page", async () => {
     mem.putGuild(armoryGuild({ slug: "wardens", name: "Wardens" }), []);
     expect(await html(pages.guild("eu", "wardens"))).toContain("Wardens");
-    expect(await html(pages.hub({ guild: "war" }))).toContain('href="/armory/eu/guilds/wardens"');
   });
 });
 
@@ -196,23 +202,25 @@ describe("the boards", () => {
 });
 
 describe("the hub", () => {
-  test("counts by region and ruleset, links the boards, the forms and searches characters and guilds", async () => {
-    const out = await html(pages.hub({ q: "vel", guild: "emb" }));
+  test("counts by region and ruleset, links the boards and the forms, and sends searches to Players and Guilds", async () => {
+    const out = await html(pages.hub());
     expect(out).toContain('href="/armory/rankings/item-level"');
     expect(out).toContain('href="/armory/rankings/gear-score"');
     expect(out).toContain('href="/armory/rankings/honorable-kills"');
     expect(out).toContain('href="/armory/hide"');
     expect(out).toContain('href="/armory/submit"');
-    expect(out).toContain('href="/armory/eu/velkara-duskmantle"');
-    expect(out).toContain('href="/armory/eu/guilds/ember-wardens"');
+    expect(out).toContain('href="/players"');
+    expect(out).toContain('href="/guilds"');
+    expect(out).not.toContain('role="search"');
     expect(out).toContain("Read 2026-11-09 11:30 UTC");
-    expect(await html(pages.hub({ q: "v1" }))).toContain("Type 2 to 24 letters");
-    // A surname, or the full "First Surname", finds the character too.
-    for (const q of ["dusk", "Velkara Duskmantle", " velkara  dusk "]) expect(await html(pages.hub({ q }))).toContain('href="/armory/eu/velkara-duskmantle"');
-    mem.putCharacter(armoryCharacter({ slug: "élodie-brún", name: "Élodie", surname: "Brún" }));
-    expect(await html(pages.hub({ q: "Élo" }))).toContain('href="/armory/eu/%C3%A9lodie-br%C3%BAn"');
     holder.store = broken();
     expect(await html(pages.hub())).toContain(STORAGE_UNREACHABLE);
+  });
+
+  test("an old search address redirects to the one search box: characters to /players, guilds to /guilds", async () => {
+    await expect(pages.hub({ q: " Velkara Dusk " })).rejects.toThrow("NEXT_REDIRECT 308 /players?q=Velkara%20Dusk");
+    await expect(pages.hub({ guild: "emb" })).rejects.toThrow("NEXT_REDIRECT 308 /guilds?q=emb");
+    await expect(pages.hub({ q: "Élo" })).rejects.toThrow("NEXT_REDIRECT 308 /players?q=%C3%89lo");
   });
 });
 
@@ -231,4 +239,19 @@ test("the forms keep their fields, confirm, and say what went wrong", async () =
   // Storage out of reach still draws the forms, with the read time unrecorded.
   holder.store = broken();
   expect(await html(pages.hide())).toContain("Read time unrecorded");
+});
+
+test("classification filters reach storage, preserve each other in links and link guilds", async () => {
+  const spy = vi.spyOn(mem, "boardFiltered");
+  const out = await html(pages.board("gear-score", { region: "eu", ruleset: "2", class: "hunter", faction: "horde" }));
+  expect(spy).toHaveBeenCalledWith("gear_score", "eu", 2, "Hunter", "Horde", 100);
+  expect(out).toContain('href="/armory/eu/guilds/ember-wardens"');
+  expect(out).toContain('class=hunter&amp;faction=horde');
+  expect(out).toContain('class=mage&amp;faction=horde');
+  expect(out).toContain('aria-label="Gear Score: 61.2.');
+  expect(out).toContain('Read Nov 9, 2026');
+  expect(out).toContain('aria-describedby=');
+  expect(out).toContain('text-class-hunter');
+  await expect(pages.board("gear-score", { class: "invented" })).rejects.toThrow("NEXT_NOT_FOUND");
+  await expect(pages.board("gear-score", { faction: "invented" })).rejects.toThrow("NEXT_NOT_FOUND");
 });

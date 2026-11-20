@@ -3,13 +3,15 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import Tabs, { firstFilled, tabFromHash, type TabItem } from "./Tabs";
+import Tabs, { tabFromHash, type TabItem } from "./Tabs";
+import { filledTabs } from "./tab-style";
 
 const TABS: TabItem[] = [
   { id: "created-by", label: "Created by", count: 1, panel: <p>Blacksmithing</p> },
-  { id: "dropped-by", label: "Dropped by", count: 0, panel: <p>Nobody yet</p> },
+  { id: "dropped-by", label: "Dropped by", count: 2, panel: <p>Two sources</p> },
   { id: "sources", label: "Sources", panel: <p>Game files</p> },
 ];
+const EMPTY: TabItem = { id: "sold-by", label: "Sold by", count: 0, panel: <p>No vendor yet</p> };
 
 let container: HTMLDivElement;
 let root: Root;
@@ -37,18 +39,38 @@ test("the server opens the first tab, and the others are hidden panels", () => {
   expect(html.match(/hidden=""/g)).toHaveLength(2);
 });
 
-test("the first tab with rows opens, not an empty one before it", () => {
-  const html = renderToStaticMarkup(<Tabs label="Item relations" tabs={[TABS[1], TABS[0], TABS[2]]} />);
-  expect(html).toMatch(/aria-selected="true"[^>]*>Created by/);
-  expect(firstFilled([{ id: "a", count: 0 }, { id: "b", count: 0 }])).toBe("a");
-  expect(firstFilled([{ id: "a", count: 0 }, { id: "b" }])).toBe("b");
+test("a tab with no rows is left out, so the strip starts with, and opens, a tab that has rows", () => {
+  const html = renderToStaticMarkup(<Tabs label="Item relations" tabs={[EMPTY, TABS[0], TABS[2]]} />);
+  expect(html).not.toContain("Sold by");
+  expect(html).not.toContain("No vendor yet");
+  expect(html).toMatch(/role="tablist"[^>]*><button[^>]*aria-selected="true"[^>]*>Created by/);
+  expect(html.match(/role="tab"/g)).toHaveLength(2);
+  expect(filledTabs([{ id: "a", count: 0 }, { id: "b" }, { id: "c", count: 3 }]).map((t) => t.id)).toEqual(["b", "c"]);
+});
+
+test("with no tab that has rows there is no strip: the empty line, else the first tab's own line", () => {
+  const second = { ...EMPTY, id: "map", label: "Map", panel: <p>No position yet</p> };
+  const html = renderToStaticMarkup(<Tabs label="Item relations" tabs={[EMPTY, second]} empty={<p>Nothing agreed yet.</p>} />);
+  expect(html).not.toContain('role="tab');
+  expect(html).toContain("Nothing agreed yet.");
+  expect(html).not.toContain("No vendor yet");
+  const fallback = renderToStaticMarkup(<Tabs label="Item relations" tabs={[EMPTY, second]} />);
+  expect(fallback).not.toContain('role="tab');
+  expect(fallback).toContain("No vendor yet");
+  expect(fallback).not.toContain("No position yet");
+});
+
+test("a hash naming a left-out tab opens the first tab with rows", async () => {
+  window.history.replaceState(null, "", "/database/items/7960#sold-by");
+  await act(async () => root.render(<Tabs label="Item relations" tabs={[EMPTY, ...TABS]} />));
+  expect(selected()).toBe("Created by (1)");
 });
 
 test("a hash in the address opens its tab", async () => {
   window.history.replaceState(null, "", "/database/items/7960#dropped-by");
   await act(async () => root.render(<Tabs label="Item relations" tabs={TABS} />));
-  expect(selected()).toBe("Dropped by (0)");
-  expect(visiblePanel()).toBe("Nobody yet");
+  expect(selected()).toBe("Dropped by (2)");
+  expect(visiblePanel()).toBe("Two sources");
 });
 
 test("an unknown hash leaves the first tab open", async () => {
@@ -70,7 +92,7 @@ test("arrow keys, Home and End move between tabs and focus follows", async () =>
   const key = (k: string) => act(async () => { document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })); });
   tabs()[0].focus();
   await key("ArrowRight");
-  expect(selected()).toBe("Dropped by (0)");
+  expect(selected()).toBe("Dropped by (2)");
   expect(document.activeElement).toBe(tabs()[1]);
   await key("End");
   expect(selected()).toBe("Sources");
@@ -102,12 +124,9 @@ test("tabFromHash", () => {
   expect(tabFromHash("#x", ["a"])).toBeNull();
 });
 
-test("an empty tab is drawn quieter: muted, regular weight, no hover; the strip scrolls without a scrollbar", () => {
+test("a closed tab has a hover; the strip scrolls without a scrollbar", () => {
   const html = renderToStaticMarkup(<Tabs label="Item relations" tabs={TABS} />);
   const tab = (name: string) => html.match(new RegExp(`<button[^>]*class="([^"]*)"[^>]*>${name}`))![1];
-  expect(tab("Dropped by")).toContain("text-muted");
-  expect(tab("Dropped by")).toContain("font-normal");
-  expect(tab("Dropped by")).not.toContain("hover:");
   expect(tab("Sources")).toContain("hover:text-fg");
   expect(html).toContain("[scrollbar-width:none]");
 });
@@ -136,7 +155,7 @@ test.each(["#%", "#%E0%A4%A"])("a malformed fragment %s on hashchange keeps the 
   expect(selected()).toBe("Sources");
   expect(visiblePanel()).toBe("Game files");
   await act(async () => tabs()[2].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true })));
-  expect(visiblePanel()).toBe("Nobody yet");
+  expect(visiblePanel()).toBe("Two sources");
   expect(document.activeElement).toBe(tabs()[1]);
   expect(window.location.hash).toBe("#dropped-by");
   await act(async () => tabs()[0].click());

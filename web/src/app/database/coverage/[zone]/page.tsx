@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { fieldLabel, type CoverageNeed, type FieldCell } from "../../../../../../kb/src/coverage";
+import { fieldLabel, type CoverageNeed, type FieldCell } from "@kb/coverage";
 import { Container, DataTable, DataTitle, agreementLabel, type SparseColumn } from "@/components/ui";
-import { loadCoverage } from "@/lib/coverage-compute";
+import { loadCoverageForPages } from "@/lib/coverage-summary";
 import { loadSightings } from "@/lib/instances";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { cellDetail, measuredLine, shareText, TYPE_LABEL, zoneCoverageHref } from "@/lib/coverage-view";
@@ -49,7 +49,8 @@ export default async function ZoneCoveragePage(props: Props) {
   const { zone, segment } = await zoneOf(props);
   const canonical = zoneCoverageHref(zone);
   if (canonical !== `/database/coverage/${segment}`) permanentRedirect(canonical);
-  const report = await loadCoverage();
+  // The stored score the cron writes; the page never works it out from the corpus.
+  const report = (await loadCoverageForPages())?.report ?? null;
   const here = report?.zones.find((z) => z.mapId === zone.mapId) ?? null;
 
   const fieldColumns: SparseColumn<FieldCell>[] = [

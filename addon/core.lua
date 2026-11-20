@@ -7,7 +7,7 @@ local E = Everloot
 -- The game passes the folder name as the first argument of each file; a folder extracted as Everloot-0.3.20 is still this addon.
 local addonName = ... or "Everloot"
 
-E.VERSION = "0.3.24"
+E.VERSION = "0.3.26"
 E.MAX_ROWS_PER_KIND = 2000
 -- Boss pull timing, dungeon and raid runs, and pull summaries (docs/design/specs/2026-11-02-pull-and-run-records-design.md).
 -- Off in every build made from this file, nightlies included: openworld.lua then writes encounter rows as before,
@@ -105,7 +105,7 @@ end
 local defaults = {
   version = E.VERSION,
   installId = nil,
-  toggles = { openworld = true, guild = true, auctions = true, gold = true, roster = true, addons = false, completion = false, census = true, players = true, professions = true },
+  toggles = { flight = true, openworld = true, guild = true, auctions = true, gold = true, roster = true, addons = false, completion = true, census = true, players = true, professions = true },
   records = {},
 }
 
@@ -287,6 +287,9 @@ end
 -- What the players module records and where it goes, said once per install and again on /everloot players on.
 local PLAYERS_TEXT = "It records the name, realm, race, class, level and guild of your characters and of players you target, mouse over or group with, one row per character and the day you saw it, and the bosses your guild kills (the guild, the boss and the time, no names). Never where they are, their gear or what they do. The everloot.app upload page, after its preview, sends it, and so does the Everloot Desktop App while its \"Send the player pages with the uploads\" setting is on. If the site has player pages on, these characters can appear there, and anyone can hide a character at everloot.app/players/opt-out."
 
+-- Completion is announced once on a new install, including the public boss-history boundary.
+local COMPLETION_TEXT = "The completion tracker records your titles, raid lockouts and own boss kills. Your boss kills sync through the Everloot Desktop App's private sync for a linked character and are public on the character page, guild page and rankings. No other player's name is recorded for your kill history. /everloot completion off stops tracking and deletes the local rows; hide your character at everloot.app/players/opt-out to remove public history."
+
 -- What pull summaries hold and where they go, said once per install and again on /everloot pulls on.
 local PULLS_TEXT = "After each boss pull in a dungeon or raid it records your group: each member's name, class and role, and the damage, healing, damage taken and deaths the game's own damage meter shows, with the boss, kill or wipe and how long it took. Never their gear, guild, position or chat. The everloot.app upload page, after its preview, or the Everloot Desktop App sends it; the site keeps it privately for a year, shows it nowhere yet, and anyone can have a character hidden."
 
@@ -294,6 +297,7 @@ frame:RegisterEvent("ADDON_LOADED")
 frame:SetScript("OnEvent", function(_, event, arg1)
   if event == "ADDON_LOADED" and arg1 == addonName then
     local upgraded = EverlootDB ~= nil
+    local previousCompletion = EverlootDB and EverlootDB.toggles and EverlootDB.toggles.completion
     EverlootDB = EverlootDB or {}
     for k, v in pairs(defaults) do if EverlootDB[k] == nil then EverlootDB[k] = v end end
     -- New installs leave other addons' buttons alone; existing installs keep their drawer choice.
@@ -302,6 +306,8 @@ frame:SetScript("OnEvent", function(_, event, arg1)
     if upgraded and EverlootDB.toggles.census == nil then EverlootDB.toggles.census = false end
     -- Player names likewise: on for a new install, and an install from before keeps its choice (off unless turned on).
     if upgraded and EverlootDB.toggles.players == nil then EverlootDB.toggles.players = false end
+    -- Completion likewise: a new install starts on; an older install keeps its own choice.
+    if upgraded and previousCompletion == nil then EverlootDB.toggles.completion = false end
     -- A toggle added after this file was created takes its default: off-by-default stays off.
     for k, v in pairs(defaults.toggles) do if EverlootDB.toggles[k] == nil then EverlootDB.toggles[k] = v end end
     -- Pull summaries are on by default, in the builds that carry them; the others write no switch for them.
@@ -321,6 +327,10 @@ frame:SetScript("OnEvent", function(_, event, arg1)
     if EverlootDB.toggles.players and not EverlootDB.playersNotice then
       print("Everloot: player names on. " .. PLAYERS_TEXT .. " /everloot players off stops it and deletes the rows.")
       EverlootDB.playersNotice = true
+    end
+    if EverlootDB.toggles.completion and not EverlootDB.completionNotice then
+      print("Everloot: completion tracker on. " .. COMPLETION_TEXT)
+      EverlootDB.completionNotice = true
     end
     -- Pull summaries name the group, so they are announced once per install too, in the builds that carry them.
     if E.Pulls and EverlootDB.toggles.pulls and not EverlootDB.pullsNotice then
@@ -498,13 +508,18 @@ SlashCmdList["EVERLOOT"] = function(msg)
     E.PrintTalents()
   elseif (msg == "raid" or msg == "raid code") and E.RaidCommand then
     E.RaidCommand(msg == "raid code" and "code" or nil)
+  elseif msg == "flight on" or msg == "flight off" then
+    EverlootDB.toggles.flight = (msg == "flight on")
+    if not EverlootDB.toggles.flight and E.Flight then E.Flight.Clear() end
+    print("Everloot: flight bar " .. (EverlootDB.toggles.flight and "on" or "off") .. ". /reload to apply.")
   elseif msg == "auctions on" or msg == "auctions off" then
     EverlootDB.toggles.auctions = (msg == "auctions on")
     print("Everloot: auction scans " .. (EverlootDB.toggles.auctions and "on" or "off") .. ". /reload to apply.")
   elseif msg == "completion on" or msg == "completion off" then
     EverlootDB.toggles.completion = (msg == "completion on")
     if EverlootDB.toggles.completion then
-      print("Everloot: completion tracker on. It reads the game's achievement, reputation, title and quest chain lists, and never changes them. It records the titles you hold, this week's raid lockouts and your boss kills. Your own achievements, reputation and completed quests are not recorded: the Everloot window reads them from the game, and everloot.app gets them from Blizzard's API. The lists and your titles leave this computer from the everloot.app upload page; titles also go through the Everloot Desktop App's private sync for a character you linked. Raid lockouts never go in an upload; they leave only through private sync. Your boss kills stay on this computer. everloot.app keeps only the categories you switched on there. /reload to apply.")
+      EverlootDB.completionNotice = true
+      print("Everloot: completion tracker on. It reads the game's achievement, reputation, title and quest chain lists, and never changes them. It records the titles you hold, this week's raid lockouts and your boss kills. Your own achievements, reputation and completed quests are not recorded: the Everloot window reads them from the game, and everloot.app gets them from Blizzard's API. The lists and your titles leave this computer from the everloot.app upload page; titles also go through the Everloot Desktop App's private sync for a character you linked. Raid lockouts never go in an upload; they leave only through private sync. Your boss kills sync through the Everloot Desktop App's private sync for a linked character and are public on the character page, guild page and rankings. Hiding a character or guild removes it from those views. No other player's name is recorded for your kill history. everloot.app keeps only the categories you switched on there. /reload to apply.")
     else
       -- Turning it off withdraws what it wrote: every completion row is deleted from this file.
       if E.Completion then E.Completion.Withdraw() end
@@ -575,6 +590,6 @@ SlashCmdList["EVERLOOT"] = function(msg)
       print("Everloot: installed addon list off; all recorded addon rows were deleted from this file. /reload to apply.")
     end
   else
-    print("Everloot commands: /everloot window, /everloot options, /everloot setup, /everloot planner [talents|raid], /everloot buttons on|off, /everloot status, /everloot version, /everloot auctions on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot where [item link|item id|NPC name], /everloot gph [start|pause|stop|reset|show|hide|cut on|off|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], " .. (E.Pulls and "/everloot pulls [on|off], " or "") .. "/everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number|hide|clear], /everloot raid [code], /ask <question>")
+    print("Everloot commands: /everloot window, /everloot options, /everloot setup, /everloot planner [talents|raid], /everloot buttons on|off, /everloot status, /everloot version, /everloot auctions on|off, /everloot flight on|off, /everloot scan, /everloot scanprompt on|off, /everloot vendor on|off, /everloot mail on|off, /everloot price [item], /everloot where [item link|item id|NPC name], /everloot gph [start|pause|stop|reset|show|hide|cut on|off|history], /everloot addons on|off, /everloot completion [on|off], /everloot census [on|off], /everloot players [on|off], " .. (E.Pulls and "/everloot pulls [on|off], " or "") .. "/everloot link [code|clear], /everloot selftest, /everloot talents, /everloot plan [share code|number|hide|clear], /everloot raid [code], /ask <question>")
   end
 end

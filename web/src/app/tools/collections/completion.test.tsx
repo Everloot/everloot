@@ -13,8 +13,8 @@ vi.mock("next/link", () => ({
 }));
 
 import CollectionsPage from "./page";
-import { emptyCompletion, foldCompletion } from "../../../../../kb/src/completion-rollup";
-import type { PublicationGrant } from "../../../../../kb/src/publication";
+import { emptyCompletion, foldCompletion } from "@kb/completion-rollup";
+import type { PublicationGrant } from "@kb/publication";
 
 const at = "2026-10-19T00:00:00Z";
 let seq = 0;

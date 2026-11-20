@@ -1,15 +1,17 @@
-import type { AddonRollup, AddonTrend } from "../../../kb/src/addon-rollup";
-import { censusFromRows, type CensusView } from "../../../kb/src/census";
-import type { Edge } from "../../../kb/src/edges";
-import { itemFactProgress, siteItemFacts, type ItemFactProgress, type ItemFactState } from "../../../kb/src/item-facts";
-import type { ItemFacts } from "../../../kb/src/item-page";
-import type { InstanceFacts } from "../../../kb/src/instances";
-import type { LootTables } from "../../../kb/src/loot-tables";
-import type { DisenchantTables } from "../../../kb/src/disenchant";
-import type { ObjectSpawnRow } from "../../../kb/src/object-spawns";
-import type { WorldFacts } from "../../../kb/src/world-pages";
+import { cache } from "react";
+import type { AddonRollup, AddonTrend } from "@kb/addon-rollup";
+import { censusFromRows, type CensusView } from "@kb/census";
+import type { Edge } from "@kb/edges";
+import { itemFactProgress, siteItemFacts, type ItemFactProgress, type ItemFactState } from "@kb/item-facts";
+import type { ItemFacts } from "@kb/item-page";
+import type { InstanceFacts } from "@kb/instances";
+import type { LootTables } from "@kb/loot-tables";
+import type { DisenchantTables } from "@kb/disenchant";
+import type { ObjectSpawnRow } from "@kb/object-spawns";
+import type { WorldFacts } from "@kb/world-pages";
 import { buildAggregates, corpusKey, type AggregateSet } from "./aggregate-set";
 import { loadStoredAggregates } from "./aggregate-store";
+import { forgetWithKept } from "./kept";
 import type { RollupResult } from "./rollups";
 import { uploadStore, type CensusRead, type Corpus } from "./upload-store";
 
@@ -32,14 +34,16 @@ const UNREAD: CorpusStats = { uploads: 0, lootWindows: 0, records: 0, unreachabl
  * filter and find over them, never sort or push in place.
  */
 let memoized: AggregateSet | null = null;
+forgetWithKept(() => { memoized = null; censusMemo = null; });
 
 /**
  * The aggregates the answers below read. With no `read`, the set the snapshot cron stored (aggregate-store.ts), so a new
  * server instance reads one file instead of downloading and replaying the whole corpus; when there is no stored set
  * yet, or it cannot be read, the same set is worked out from the corpus as before. `read` is a corpus the caller
  * already loaded, so a page that needs the records too reads the store once: that set is always worked out from it.
+ * Read once per request and `read` (React `cache`), however many of the answers below one page asks for.
  */
-async function loadAggregates(read?: Corpus): Promise<AggregateSet | null> {
+const aggregatesFor = cache(async (read: Corpus | undefined): Promise<AggregateSet | null> => {
   if (!read) {
     const stored = await loadStoredAggregates();
     if (stored) return stored;
@@ -48,7 +52,9 @@ async function loadAggregates(read?: Corpus): Promise<AggregateSet | null> {
   if (corpus.unreachable) return null;
   if (memoized === null || memoized.key !== corpusKey(corpus)) memoized = buildAggregates(corpus);
   return memoized;
-}
+});
+/** Always one argument, so `loadAggregates()` and `loadAggregates(undefined)` share the request's read. */
+const loadAggregates = (read?: Corpus) => aggregatesFor(read);
 
 /** Every stored upload, loot windows pulled out, rolled up. */
 export async function computeRollups(read?: Corpus): Promise<Omit<RollupResult, "sources"> & { stats: CorpusStats }> {

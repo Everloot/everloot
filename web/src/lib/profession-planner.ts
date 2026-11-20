@@ -1,4 +1,4 @@
-import { professionPath, type AgreedRecipe } from "../../../kb/src/profession-path";
+import { professionPath, type AgreedRecipe } from "@kb/profession-path";
 export type PlannerRecipe = AgreedRecipe & { profession: string };
 export type RecipeItem = { itemId: number; name: string; unconfirmed?: boolean; sources: string[]; sourceLinks?: {label:string;href:string}[] };
 export interface SearchRecipe {

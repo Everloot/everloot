@@ -9,7 +9,7 @@ import wowf70862 from "@/data/game-data/changes/wowf-70862.json";
 import wowf70888 from "@/data/game-data/changes/wowf-70888.json";
 import wowf70938 from "@/data/game-data/changes/wowf-70938.json";
 import wowf70959 from "@/data/game-data/changes/wowf-70959.json";
-import { ChangeEntry } from "../../../../kb/src/build-watch/changes";
+import { ChangeEntry } from "@kb/build-watch/changes";
 import { compareGameBuilds, type BuildStep, type ClassTalentChanges, type Limit, type Place, type TalentChange } from "./freshness";
 
 // The build watch's change records (web/src/data/game-data/changes/), loaded and checked against their schema

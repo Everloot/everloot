@@ -3,13 +3,15 @@ import { fitAnswer } from "./answer-budget.js";
 import { COVERAGE_TYPES, coverageShares, type CoverageCell, type CoverageReport, type CoverageType } from "./coverage.js";
 
 /**
- * Where a lent score came from: the report the snapshot cron stored for the build, or one computed from the corpus
- * because no stored report was usable. A host that does not say leaves the answer's date line as it was.
+ * Where a lent score came from: the report the snapshot cron stored for the build. A host that does not say leaves the
+ * answer's date line as it was.
  */
-export type CoverageSource = "stored" | "live";
+export type CoverageSource = "stored";
 export type LoadedCoverage = CoverageReport & { source?: CoverageSource };
+/** The host has no stored score for this build to lend: the answer says not measured yet, and nothing is computed. */
+export const COVERAGE_NOT_MEASURED = { notMeasured: true } as const;
 /** The host lends the score the home page and coverage pages read. No raw records or baseline are read here. */
-export type CoverageLoader = () => Promise<LoadedCoverage | null>;
+export type CoverageLoader = () => Promise<LoadedCoverage | typeof COVERAGE_NOT_MEASURED | null>;
 /** Counts only from the persisted list; never lend its ids or settled values to the tool. */
 export type SettledSummaryLoader = (build: string) => Promise<{ build: string; dataAsOf: string | null; facts: number } | null>;
 
@@ -26,7 +28,6 @@ const unknown = "[?]";
 const page = "https://everloot.app/database/coverage";
 const sourceText: Record<CoverageSource, string> = {
   stored: " (stored report, written by the snapshot cron for this build)",
-  live: " (computed from the corpus now: no stored report for this build was usable)",
 };
 const pct = (value: number | null) => value === null ? unknown : `${Math.floor(value * 100)}%`;
 
@@ -73,9 +74,10 @@ export async function answerCoverage(args: McpToolArgs<"coverage">, loader?: Cov
     structured: { connected: false, dataAsOf: null, reason: `Coverage ${reason}; counts are unknown, not zero.`, scope: scopeOut },
   });
   if (!loader) return unavailable("not connected");
-  let report: LoadedCoverage | null;
+  let report: LoadedCoverage | typeof COVERAGE_NOT_MEASURED | null;
   try { report = await loader(); } catch { return unavailable("unavailable"); }
   if (!report) return unavailable("unavailable");
+  if ("notMeasured" in report) return unavailable("not measured yet: no stored score for this build could be read, and the snapshot cron stores it with its next data update");
   const zones = report.zones.filter((z) => args.zone === undefined || z.mapId === args.zone);
   const types = args.type === undefined ? COVERAGE_TYPES : [args.type];
   // A summary unless one zone is asked for: every zone's fields and entries is too long for one answer.

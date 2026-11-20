@@ -27,7 +27,7 @@ vi.mock("@/components/ui/OpenData", () => ({
 }));
 
 import TitlePage, { generateMetadata } from "./page";
-import { emptyCompletion, foldCompletion } from "../../../../../../kb/src/completion-rollup";
+import { emptyCompletion, foldCompletion } from "@kb/completion-rollup";
 
 const at = "2026-11-08T00:00:00Z";
 let seq = 0;
@@ -73,12 +73,13 @@ test("a confirmed title page has the header meta, the facts, In short, Open data
     "Source: https://everloot.app/database/titles/144-bloodsail-admiral",
   ]);
   expect(out).not.toContain("Raw JSON");
-  // The relation tab is there, empty, and names the 3-install rule without sending anyone to the addon for a fact it cannot change.
-  expect(out).toContain("Earned by");
+  // The empty relation is one line in place of a lone "(0)" tab, and names the 3-install rule without sending anyone
+  // to the addon for a fact it cannot change.
+  expect(out).not.toContain('role="tablist"');
   expect(out).toContain("data-empty-state");
   expect(out).toContain("No achievement is linked to this title yet. The game files read so far name no title rewards; an achievement shows once 3 installs report it.");
   // No meter on this tab: no report carries the link, so nothing counts towards it.
-  expect(/data-tab-panel="earned-by"[\s\S]*?<\/div>/.exec(out)?.[0]).not.toContain("data-agreement");
+  expect(/data-tabs-empty[\s\S]*?<\/div>/.exec(out)?.[0]).not.toContain("data-agreement");
   expect(out).not.toContain("Get the addon");
   expect(out).not.toContain("Not reported");
 });
@@ -92,7 +93,7 @@ test("a title only the game files know keeps an empty meter for player reports a
   expect(out).toContain("The name is shown from the game files; players have not reported it yet.");
   expect(out).not.toContain("It has no agreed name yet");
   expect(out).toContain("found in game files, unconfirmed");
-  expect(out).toContain("Earned by");
+  expect(out).toContain("No achievement is linked to this title yet.");
   expect((await meta("8-champion")).description).toContain("Found in game files, unconfirmed");
 });
 

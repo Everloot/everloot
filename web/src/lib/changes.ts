@@ -2,16 +2,17 @@ import postsFile from "../../../kb/changes/blue-posts.json";
 import buildsFile from "../../../kb/changes/builds.json";
 import manualFile from "../../../kb/curated/manual-changes.json";
 import writeupsFile from "../../../kb/curated/blue-writeups.json";
-import type { BlueStore } from "../../../kb/src/blue-posts";
-import { writeupsById, type BlueWriteup } from "../../../kb/src/blue-writeups";
-import { buildTimeline, groupAnnouncements, manualEntries, postPath, type BuildLike, type ChangeEntry } from "../../../kb/src/changes";
+import type { BlueStore } from "@kb/blue-posts";
+import { writeupsById, type BlueWriteup } from "@kb/blue-writeups";
+import { buildTimeline, groupAnnouncements, manualEntries, postPath, type BuildLike, type ChangeEntry } from "@kb/changes";
 import { BLUE_POSTS_KEY, bluePosts, blueStorage } from "./blue-store";
+import { keep } from "./kept";
 
 export {
   CHANGE_FILTERS, GAME_LABEL, TYPE_LABEL, blueThreads, buildTimeline, filterTimeline, forumRegions, groupAnnouncements, manualEntries, parseFilter, postIdOfSegment,
   postPath, renderFeed, type BlueThread, type ChangeEntry, type ChangeGame, type ChangeFilter,
-} from "../../../kb/src/changes";
-export type { BlueWriteup } from "../../../kb/src/blue-writeups";
+} from "@kb/changes";
+export type { BlueWriteup } from "@kb/blue-writeups";
 
 /**
  * Builds stay bundled. The blue cron updates posts in R2; the bundled posts cover an unavailable store.
@@ -19,8 +20,28 @@ export type { BlueWriteup } from "../../../kb/src/blue-writeups";
 const store = postsFile as unknown as BlueStore;
 const builds = (buildsFile as unknown as { builds: BuildLike[] }).builds;
 
-/** One entry per announcement: a post Blizzard made on both forums is one entry, the other copies under `copies`. */
+/**
+ * How long one instance keeps the timeline. Every page, feed and MCP call that lists changes used to read and parse the
+ * whole posts file and build the timeline again, so several at once held several copies (#1354). A post the blue cron
+ * adds shows within this long of its "blue" tag.
+ */
+const TIMELINE_KEEP_MS = 60_000;
+
+/** One read per caller (`share: false`): a Worker cancels work one request awaits on another's behalf (release.ts). */
+const timeline = keep<ChangeEntry[]>(async () => ({ value: await readTimeline() }), { ttlMs: TIMELINE_KEEP_MS, share: false });
+
+/**
+ * One entry per announcement: a post Blizzard made on both forums is one entry, the other copies under `copies`.
+ * Shared by every caller of the instance while it is kept: read it, never sort or change it in place.
+ */
 export async function loadTimeline(): Promise<ChangeEntry[]> {
+  return timeline.get();
+}
+
+/** For tests: forget the kept timeline. */
+export const forgetTimeline = () => timeline.forget();
+
+async function readTimeline(): Promise<ChangeEntry[]> {
   let posts = store.posts;
   try {
     const storage = blueStorage();

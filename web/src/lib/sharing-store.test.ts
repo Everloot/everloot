@@ -5,7 +5,7 @@ import { expect, test } from "vitest";
 import { createSharingStore } from "./sharing-store";
 import { createUploadStore } from "./upload-store";
 import type { CloudConfig } from "./upload-store";
-import { authorizeRecord } from "../../../kb/src/publication";
+import { authorizeRecord } from "@kb/publication";
 import { goldSnapshot } from "@everloot/protocol";
 const now = () => new Date("2026-10-07T00:00:00Z");
 const grantInput = { installId: "install-one", realm: "Moon Guard", subjectType: "character" as const,
@@ -80,4 +80,44 @@ test("revocation and global character opt-out apply to cached corpus and later r
   expect((await store.loadCorpus()).records).toEqual([]);
   await store.putUpload("three", "install-one", { addonVersion: "0.2.0", records: [row] }, [second.tokenHash]);
   expect((await store.loadCorpus()).records).toEqual([]);
+});
+test("one public copy per corpus state and authority: reused while both hold, rebuilt on a revoke or a grant's expiry", async () => {
+  const localDir = mkdtempSync(join(tmpdir(), "sharing-memo-"));
+  let at = new Date("2026-10-07T00:00:00Z");
+  const grants = createSharingStore({ cloud: null, localDir, now: () => at });
+  const issued = await grants.issue({ ...grantInput, expiresAt: "2026-10-08T00:00:00Z" });
+  const store = createUploadStore({ cloud: null, localDir, cacheMs: 60_000, publication: (state) => grants.publish(state) });
+  await store.putUpload("one", "install-one", { addonVersion: "0.2.0", records: [row] }, [issued.tokenHash]);
+  const first = (await store.loadCorpus()).records;
+  expect(first).toHaveLength(1);
+  expect((await store.loadCorpus()).records).toBe(first);
+
+  at = new Date("2026-10-08T00:00:00Z");
+  expect((await store.loadCorpus()).records).toEqual([]);
+
+  const renewed = await grants.issue({ ...grantInput, expiresAt: "2026-10-09T00:00:00Z" });
+  await store.putUpload("two", "install-one", { addonVersion: "0.2.0", records: [row] }, [renewed.tokenHash]);
+  const second = (await store.loadCorpus()).records;
+  expect(second).toHaveLength(1);
+  expect((await store.loadCorpus()).records).toBe(second);
+  await grants.revoke(renewed.token);
+  expect((await store.loadCorpus()).records).toEqual([]);
+});
+test("a corpus that names nobody is published once per state, without reading authority", async () => {
+  const localDir = mkdtempSync(join(tmpdir(), "sharing-anon-"));
+  const grants = createSharingStore({ cloud: null, localDir, now });
+  let reads = 0;
+  const loadState = grants.loadState;
+  const counted = { ...grants, loadState: async () => { reads++; return loadState(); } };
+  const store = createUploadStore({ cloud: null, localDir, cacheMs: 60_000, publication: (state) => counted.publish(state) });
+  await store.putUpload("one", "install-one", { addonVersion: "0.2.0", records: [{ kind: "loot", eventId: "event:1", installId: "install-one", capturedAt: now().toISOString(), sourceNpcId: 1, items: [{ itemId: 2, count: 1 }] }] });
+  const first = (await store.loadCorpus()).records;
+  expect(first).toHaveLength(1);
+  expect((await store.loadCorpus()).records).toBe(first);
+  expect(reads).toBe(0);
+  // The snapshot cron drops the copy between its steps; the next read builds the same records anew.
+  grants.forgetPublished();
+  const again = (await store.loadCorpus()).records;
+  expect(again).not.toBe(first);
+  expect(again).toEqual(first);
 });

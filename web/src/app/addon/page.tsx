@@ -217,14 +217,14 @@ export default async function AddonPage() {
         </div>
 
         <section id="why" aria-labelledby="why-title" className="scroll-mt-20 space-y-6">
-          <div className="max-w-reading">
+          <Container width="reading">
             <SectionHeading id="why-title">Why run the addon</SectionHeading>
             <p className="text-fg-2">
               Blizzard hides some WoW: Forever details until an item drops, and runs no public test realm. What players
               saw in play is how this site learns what is real. You play as you always do, and the addon writes down what
               the game showed you.
             </p>
-          </div>
+          </Container>
           <div className="grid items-start gap-6 md:grid-cols-3">
             <Card as="section" aria-labelledby="why-records" className="space-y-3">
               <SectionHeading id="why-records" as="h3">What it records</SectionHeading>
@@ -236,7 +236,7 @@ export default async function AddonPage() {
                 <li>Gold in and out: shared only if you tick it on the upload page. The window&apos;s gold ledger, character roster and gold per hour sessions stay local and are never uploaded.</li>
                 <li>Your equipped gear is not recorded or uploaded by the addon.</li>
                 <li>Your guild&apos;s roster, lockouts, attendance and loot: kept locally and published only through an officer&apos;s upload.</li>
-                <li>Completion, when enabled: game catalogs, your titles, raid lockouts and boss kills. Catalogs and titles can be uploaded; lockouts leave only through private sync, and boss kills stay local. Your achievements, reputation and completed quests are read live, never recorded.</li>
+                <li>Completion, on in a new install: game catalogs, your titles, raid lockouts and boss kills. An older install keeps its choice. Catalogs and titles can be uploaded; lockouts leave only through private sync, and your boss kills sync with a linked character and are public on character and guild pages and rankings. Your achievements, reputation and completed quests are read live, never recorded.</li>
               </ul>
             </Card>
             <Card as="section" aria-labelledby="why-gives" className="space-y-3">

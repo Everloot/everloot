@@ -49,13 +49,25 @@ test("three installs: the NPC and item tables give the rate with its denominator
   expect(npc).toContain("50.0%");
   expect(npc).toContain("Out of 4 loot windows from 3 installs, dated 2026-10-10 to 2026-10-14.");
   expect(npc).toContain("Data as of 2026-10-21.");
-  const item = text(await html(Item(props("750"))));
+  const markup = await html(Item(props("750")));
+  const item = text(markup);
   expect(item).toContain("50.0%");
   expect(item).toContain("2026-10-10 to 2026-10-14");
   expect(item).toContain("out of the loot windows opened on the source");
+  // Where to get it is in the quick facts, above the tabs: the NPC it drops from, linked.
+  const getFrom = markup.split(">Get it from</dt>")[1]?.split("</dd>")[0] ?? "";
+  expect(getFrom).toContain('href="/database/npcs/40"');
 });
 
-test("short of 3 installs, the quick facts count the installs that reported so far, and show no name or rate", async () => {
+test("no source: the quick facts have no Get it from row, and In short says nobody reported one", async () => {
+  store.loadCorpus.mockResolvedValue(corpus([]));
+  const { Item } = await pages();
+  const markup = await html(Item(props("750")));
+  expect(markup).not.toContain("Get it from");
+  expect(text(markup)).toContain("No player has reported a drop source");
+});
+
+test("partial drops show their tier while heading names keep their threshold", async () => {
   store.loadCorpus.mockResolvedValue(corpus([
     loot("install-aaaa", 40, [750], "2026-10-10T08:00:00.000Z"),
     loot("install-bbbb", 40, [750], "2026-10-11T08:00:00.000Z"),
@@ -65,14 +77,14 @@ test("short of 3 installs, the quick facts count the installs that reported so f
   const { Npc, Item } = await pages();
   const npc = text(await html(Npc(props("40"))));
   expect(npc).toMatch(/Reported name 1 of 3 /);
-  expect(npc).toMatch(/Drops 2 of 3 /);
+  expect(npc).toContain("verified by 2 players");
   expect(npc).not.toContain("Synthetic Boar");
   const item = text(await html(Item(props("750"))));
   expect(item).toMatch(/Reported name 1 of 3 /);
   expect(item).not.toContain("Synthetic Tusk");
 });
 
-test("two installs: the pages say what is missing, and no rate or source is shown", async () => {
+test("two installs: the pages show the rate and source with a verified label", async () => {
   store.loadCorpus.mockResolvedValue(corpus([
     loot("install-aaaa", 40, [750], "2026-10-10T08:00:00.000Z"),
     loot("install-bbbb", 40, [750], "2026-10-11T08:00:00.000Z"),
@@ -80,12 +92,12 @@ test("two installs: the pages say what is missing, and no rate or source is show
   ]));
   const { Npc, Item } = await pages();
   const npc = text(await html(Npc(props("40"))));
-  expect(npc).toContain("3 loot windows from 2 installs, dated 2026-10-10 to 2026-10-11. A rate needs windows from 3 installs: 1 more.");
-  expect(npc).not.toContain("%");
+  expect(npc).toContain("verified by 2 players");
+  expect(npc).toContain("66.7%");
   const item = await html(Item(props("750")));
-  expect(text(item)).toContain("2 loot windows with this item from 2 installs, on sources fewer than 3 installs have looted.");
-  expect(item).not.toContain("/database/npcs/40");
-  expect(item).not.toContain("%");
+  expect(text(item)).toContain("verified by 2 players");
+  expect(item).toContain("/database/npcs/40");
+  expect(item).toContain("66.7%");
 });
 
 test("NPC and item-source rows show a 95% range and mark only samples with few windows", async () => {

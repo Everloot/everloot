@@ -267,7 +267,7 @@ test("the list reads the keys again when something else on the page changes them
   expect(buttonNamed("Revoke bot")).toBeUndefined();
 });
 
-/** Where focus goes once Remove access has revoked the key and its card is about to leave the page. afterEach removes it. */
+/** Where focus goes once Disconnect has revoked the key and its card is about to leave the page. afterEach removes it. */
 function focusTarget() {
   const target = document.createElement("h3");
   target.id = "after";
@@ -276,35 +276,35 @@ function focusTarget() {
   return target;
 }
 
-test("Remove access asks the list's own question first; Cancel sends nothing and returns focus to it", async () => {
+test("Disconnect asks the list's own question first; Cancel sends nothing and returns focus to it", async () => {
   const calls = api(ready());
   await act(async () => root.render(<RemoveAccess id={KEY.id} name="bot" hint="beef" focusAfter="after" />));
-  buttonNamed("Remove access for bot (evl_…beef)")!.focus();
-  await click("Remove access for bot (evl_…beef)");
+  buttonNamed("Disconnect bot (evl_…beef)")!.focus();
+  await click("Disconnect bot (evl_…beef)");
   expect(container.querySelector('[role="group"]')?.getAttribute("aria-label")).toBe("Confirm revoke bot");
   expect(container.textContent).toContain("Revoke bot? Anything using evl_…beef stops working at once.");
   expect(document.activeElement).toBe(buttonNamed("Revoke key"));
   await click("Cancel");
   expect(calls).toEqual([]);
-  expect(document.activeElement).toBe(buttonNamed("Remove access for bot (evl_…beef)"));
+  expect(document.activeElement).toBe(buttonNamed("Disconnect bot (evl_…beef)"));
 });
 
-test("Remove access revokes with the list's own request, moves focus on and tells the page its keys changed", async () => {
+test("Disconnect revokes with the list's own request, moves focus on and tells the page its keys changed", async () => {
   const calls = api(ready());
   const target = focusTarget();
   await act(async () => root.render(<><RemoveAccess id={KEY.id} name="bot" hint="beef" focusAfter="after" /><KeysRefresh /></>));
-  await click("Remove access for bot (evl_…beef)");
+  await click("Disconnect bot (evl_…beef)");
   await click("Revoke key");
   expect(calls).toEqual([{ url: `/api/keys?id=${KEY.id}`, method: "DELETE", body: null }]);
   expect(heard).toHaveBeenCalledTimes(1);
   expect(document.activeElement).toBe(target);
-  expect(Array.from(container.querySelectorAll('[role="status"]'), (s) => s.textContent)).toEqual(["Access removed for bot (evl_…beef)."]);
+  expect(Array.from(container.querySelectorAll('[role="status"]'), (s) => s.textContent)).toEqual(["Disconnected bot (evl_…beef)."]);
 });
 
-test("a refused Remove access says why, keeps the question open and announces nothing", async () => {
+test("a refused Disconnect says why, keeps the question open and announces nothing", async () => {
   vi.stubGlobal("fetch", async () => Response.json({ ok: false, error: "Keys are temporarily unavailable." }, { status: 503 }));
   await act(async () => root.render(<RemoveAccess id={KEY.id} name="bot" hint="beef" focusAfter="after" />));
-  await click("Remove access for bot (evl_…beef)");
+  await click("Disconnect bot (evl_…beef)");
   await click("Revoke key");
   expect(container.querySelector('[role="alert"]')?.textContent).toBe("Keys are temporarily unavailable.");
   expect(buttonNamed("Revoke key")).toBeDefined();
@@ -329,12 +329,12 @@ function oneKey({ hold = false } = {}) {
 const both = <><ApiKeys /><RemoveAccess id={KEY.id} name="bot" hint="beef" focusAfter="after" /></>;
 const row = () => container.querySelector<HTMLElement>(`li[data-key="${KEY.id}"]`)!;
 
-test("a question left open in the list closes once Remove access revokes its key, and focus stays where Remove access put it", async () => {
+test("a question left open in the list closes once Disconnect revokes its key, and focus stays where Disconnect put it", async () => {
   const { deletes } = oneKey();
   const target = focusTarget();
   await act(async () => root.render(both));
   await click("Revoke bot");
-  await click("Remove access for bot (evl_…beef)");
+  await click("Disconnect bot (evl_…beef)");
   const [, card] = buttonsNamed("Revoke key");
   await act(async () => card.click());
   expect(row().textContent).toContain("Revoked 2026-10-27");
@@ -344,11 +344,11 @@ test("a question left open in the list closes once Remove access revokes its key
   expect(document.activeElement).toBe(target);
 });
 
-test("the list and Remove access revoking one key at the same time send one request, and neither asks to retry", async () => {
+test("the list and Disconnect revoking one key at the same time send one request, and neither asks to retry", async () => {
   const { deletes, release } = oneKey({ hold: true });
   await act(async () => root.render(both));
   await click("Revoke bot");
-  await click("Remove access for bot (evl_…beef)");
+  await click("Disconnect bot (evl_…beef)");
   const [list, card] = buttonsNamed("Revoke key");
   await act(async () => { card.click(); list.click(); });
   await act(async () => release());
@@ -358,11 +358,11 @@ test("the list and Remove access revoking one key at the same time send one requ
   expect(row().textContent).toContain("Revoked 2026-10-27");
 });
 
-test("Remove access asks with the card's pill buttons, and the list's question keeps the list's own buttons", async () => {
+test("Disconnect asks with the card's pill buttons, and the list's question keeps the list's own buttons", async () => {
   api(ready());
   await act(async () => root.render(both));
   await click("Revoke bot");
-  await click("Remove access for bot (evl_…beef)");
+  await click("Disconnect bot (evl_…beef)");
   const classes = (b: HTMLButtonElement) => b.className.split(" ");
   const [listRevoke, cardRevoke] = buttonsNamed("Revoke key");
   const [listCancel, cardCancel] = buttonsNamed("Cancel");
@@ -370,7 +370,7 @@ test("Remove access asks with the card's pill buttons, and the list's question k
   expect(classes(cardCancel)).toContain("btn");
   expect(classes(cardCancel)).not.toContain("btn-primary");
   for (const b of [listRevoke, listCancel]) {
-    expect(classes(b)).toContain("rounded-lg");
+    expect(classes(b)).toContain("rounded-control");
     expect(classes(b)).not.toContain("btn");
   }
 });
@@ -391,10 +391,10 @@ test("revoking a key that is already revoked (404) reads the keys again instead 
   expect(row().textContent).toContain("Revoked 2026-10-27");
 });
 
-test("Remove access on a key that is already revoked (404) has the page read its keys again instead of asking to retry", async () => {
+test("Disconnect on a key that is already revoked (404) has the page read its keys again instead of asking to retry", async () => {
   vi.stubGlobal("fetch", async () => Response.json({ ok: false, error: NO_LIVE_KEY }, { status: 404 }));
   await act(async () => root.render(<RemoveAccess id={KEY.id} name="bot" hint="beef" focusAfter="after" />));
-  await click("Remove access for bot (evl_…beef)");
+  await click("Disconnect bot (evl_…beef)");
   await click("Revoke key");
   expect(container.querySelector('[role="alert"]')).toBeNull();
   expect(buttonNamed("Revoke key")).toBeUndefined();
@@ -414,7 +414,7 @@ const said = () => container.querySelector('[role="status"]')?.textContent;
 test("a 404 that is the route's own no-live-key answer reads the keys again and says so plainly, never that access was removed", async () => {
   vi.stubGlobal("fetch", async () => Response.json({ ok: false, error: NO_LIVE_KEY }, { status: 404 }));
   await act(async () => root.render(card));
-  await click("Remove access for bot (evl_…beef)");
+  await click("Disconnect bot (evl_…beef)");
   await click("Revoke key");
   expect(said()).toBe("bot (evl_…beef) is no longer on this account's list.");
   expect(container.querySelector('[role="alert"]')).toBeNull();
@@ -428,7 +428,7 @@ test.each([
 ])("a 404 the route did not send (%s) stays an error: nothing is said, the question stays open and nothing is read again", async (_kind, answer, error) => {
   vi.stubGlobal("fetch", async () => answer());
   await act(async () => root.render(card));
-  await click("Remove access for bot (evl_…beef)");
+  await click("Disconnect bot (evl_…beef)");
   await click("Revoke key");
   expect(said()).toBe("");
   expect(container.querySelector('[role="alert"]')?.textContent).toBe(error);
@@ -456,7 +456,7 @@ test("a refused revoke lets go of its key, so a retry sends a new request and ca
     ? Response.json({ ok: false, error: "Keys are temporarily unavailable." }, { status: 503 })
     : Response.json({ ok: true })));
   await act(async () => root.render(card));
-  await click("Remove access for bot (evl_…beef)");
+  await click("Disconnect bot (evl_…beef)");
   await click("Revoke key");
   expect(container.querySelector('[role="alert"]')?.textContent).toBe("Keys are temporarily unavailable.");
   expect(router.refresh).not.toHaveBeenCalled();
@@ -464,7 +464,7 @@ test("a refused revoke lets go of its key, so a retry sends a new request and ca
   expect(deletes).toBe(2);
   expect(container.querySelector('[role="alert"]')).toBeNull();
   expect(router.refresh).toHaveBeenCalledTimes(1);
-  expect(said()).toBe("Access removed for bot (evl_…beef).");
+  expect(said()).toBe("Disconnected bot (evl_…beef).");
 });
 
 test("removing a second key with the same name is said again: each line names the key by its last four characters", async () => {
@@ -479,18 +479,18 @@ test("removing a second key with the same name is said again: each line names th
     </>,
   ));
   const status = container.querySelector('[role="status"]')!;
-  await click("Remove access for Desktop App key (evl_…beef)");
+  await click("Disconnect Desktop App key (evl_…beef)");
   await click("Revoke key");
-  expect(status.textContent).toBe("Access removed for Desktop App key (evl_…beef).");
+  expect(status.textContent).toBe("Disconnected Desktop App key (evl_…beef).");
   const updates = vi.fn();
   const observer = new MutationObserver(updates);
   observer.observe(status, { childList: true, characterData: true, subtree: true });
   try {
-    await click("Remove access for Desktop App key (evl_…d00d)");
+    await click("Disconnect Desktop App key (evl_…d00d)");
     await click("Revoke key");
     await Promise.resolve();
     expect(deletes).toEqual([`/api/keys?id=${KEY.id}`, `/api/keys?id=${OTHER}`]);
-    expect(status.textContent).toBe("Access removed for Desktop App key (evl_…d00d).");
+    expect(status.textContent).toBe("Disconnected Desktop App key (evl_…d00d).");
     expect(updates).toHaveBeenCalled();
   } finally {
     observer.disconnect();
@@ -512,7 +512,7 @@ test("a shared revoke that fails is let go for both controls, and a later retry 
   });
   await act(async () => root.render(<>{both}<KeysRefresh /></>));
   await click("Revoke bot");
-  await click("Remove access for bot (evl_…beef)");
+  await click("Disconnect bot (evl_…beef)");
   const [list, inCard] = buttonsNamed("Revoke key");
   await act(async () => { inCard.click(); list.click(); });
   expect(deletes).toBe(1);
@@ -524,7 +524,7 @@ test("a shared revoke that fails is let go for both controls, and a later retry 
   expect(router.refresh).toHaveBeenCalledTimes(1);
 });
 
-test("finishing Remove access leaves focus where the user moved it meanwhile", async () => {
+test("finishing Disconnect leaves focus where the user moved it meanwhile", async () => {
   let release = () => {};
   vi.stubGlobal("fetch", async () => {
     await new Promise<void>((resolve) => { release = resolve; });
@@ -532,7 +532,7 @@ test("finishing Remove access leaves focus where the user moved it meanwhile", a
   });
   focusTarget();
   await act(async () => root.render(<>{card}<button id="other">Other</button></>));
-  await click("Remove access for bot (evl_…beef)");
+  await click("Disconnect bot (evl_…beef)");
   await click("Revoke key");
   const other = document.getElementById("other")!;
   other.focus();
@@ -553,11 +553,11 @@ test("a revoke that succeeds elsewhere clears the error the list kept from its o
   await click("Revoke bot");
   await click("Revoke key");
   expect(container.querySelector('[role="alert"]')?.textContent).toBe("Keys are temporarily unavailable.");
-  await click("Remove access for bot (evl_…beef)");
+  await click("Disconnect bot (evl_…beef)");
   await act(async () => buttonsNamed("Revoke key")[1]!.click());
   expect(deletes).toBe(2);
   expect(row().textContent).toContain("Revoked 2026-10-27");
-  expect(said()).toBe("Access removed for bot (evl_…beef).");
+  expect(said()).toBe("Disconnected bot (evl_…beef).");
   expect(container.querySelector('[role="alert"]')).toBeNull();
 });
 
@@ -586,10 +586,10 @@ test("a failed revoke keeps its error and its open question while another key's 
   await click("Revoke bot");
   await click("Revoke key");
   expect(row().querySelector('[role="alert"]')?.textContent).toBe("Keys are temporarily unavailable.");
-  await click("Remove access for other (evl_…d00d)");
+  await click("Disconnect other (evl_…d00d)");
   await act(async () => buttonsNamed("Revoke key")[1]!.click());
   expect(reads.count).toBe(2);
-  expect(said()).toBe("Access removed for other (evl_…d00d).");
+  expect(said()).toBe("Disconnected other (evl_…d00d).");
   expect(otherRow().textContent).toContain("Revoked 2026-10-27");
   expect(row().textContent).toContain("Active");
   expect(row().querySelector('[role="group"]')).not.toBeNull();
@@ -639,7 +639,7 @@ test("a 404 after an account switch reads the new account's keys and never says 
     return Response.json(ready({ keys: switched ? [] : [KEY] }));
   });
   await act(async () => root.render(<><ApiKeys />{card}</>));
-  await click("Remove access for bot (evl_…beef)");
+  await click("Disconnect bot (evl_…beef)");
   await click("Revoke key");
   expect(reads).toBe(2);
   expect(router.refresh).toHaveBeenCalledTimes(1);
@@ -648,7 +648,7 @@ test("a 404 after an account switch reads the new account's keys and never says 
   expect(container.querySelector('[role="alert"]')).toBeNull();
 });
 
-test("two keys with one name get Remove access buttons with distinct names, each ending in the key's last four characters", async () => {
+test("two keys with one name get Disconnect buttons with distinct names, each ending in the key's last four characters", async () => {
   await act(async () => root.render(
     <>
       <RemoveAccess key="first" id={KEY.id} name="Desktop App key" hint="beef" focusAfter="after" />
@@ -656,8 +656,8 @@ test("two keys with one name get Remove access buttons with distinct names, each
     </>,
   ));
   const names = Array.from(container.querySelectorAll("button"), (b) => b.getAttribute("aria-label"));
-  expect(names).toEqual(["Remove access for Desktop App key (evl_…beef)", "Remove access for Desktop App key (evl_…d00d)"]);
-  // The visible label stays inside the name, so speech input can still say "Remove access".
+  expect(names).toEqual(["Disconnect Desktop App key (evl_…beef)", "Disconnect Desktop App key (evl_…d00d)"]);
+  // The visible label stays inside the name, so speech input can still say "Disconnect".
   for (const b of container.querySelectorAll("button")) expect(b.getAttribute("aria-label")).toContain(b.textContent!);
 });
 

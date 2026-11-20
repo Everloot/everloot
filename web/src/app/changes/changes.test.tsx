@@ -35,7 +35,6 @@ timeline.entries = entries;
 const page = async (params: Record<string, string> = {}) =>
   renderToStaticMarkup(await ChangesPage({ searchParams: Promise.resolve(params) }));
 const rows = (html: string) => (html.match(/data-change-row/g) ?? []).length;
-const phoneLines = (html: string) => [...html.matchAll(/<div class="text-cell-2 text-muted sm:hidden">(.*?)<\/div>/g)].map((m) => m[1]);
 
 const manualRow: ChangeEntry = { id: "manual:fixture", source: "manual", type: "post", game: "retail", at: "2026-10-23T00:00:00.000Z", title: "Retail source fixture", summary: "Everloot summary fixture.", url: "https://us.forums.blizzard.com/en/wow/t/example/123/4" };
 test("compact ChangeList manual rows show Everloot summary and clickable original with a plain Post label", () => {
@@ -48,17 +47,12 @@ test("compact ChangeList manual rows show Everloot summary and clickable origina
   expect(html).not.toContain("/changes/manual");
   expect(html).toContain('dateTime="2026-10-23"');
 });
-test("manual retail rows expose original source and authorship on mobile and desktop with day precision", async () => {
+test("manual retail rows link the original from the title, say Everloot wrote the summary, and keep day precision", async () => {
   timeline.entries = [...entries, manualRow];
   const html = await page({ game: "retail" });
-  const phone = /<div data-phone-title[^>]*>(.*?)<\/div>/.exec(html)![1];
-  for (const content of [phone, html]) {
-    expect(content).toContain(`href="${manualRow.url}"`);
-    expect(content).toContain("Summary by Everloot");
-    expect(content).toContain("Original source");
-    expect(content).toContain("Everloot summary fixture.");
-  }
-  expect(html).toContain("Everloot summary fixture.");
+  const original = /<a href="([^"]+)"[^>]*>Retail source fixture<\/a>/.exec(html);
+  expect(original?.[1]).toBe(manualRow.url);
+  expect(html).toContain("Summary by Everloot; the title links the original source. Everloot summary fixture.");
   expect(html).toContain('dateTime="2026-10-23"');
   expect(html).toContain('"datePublished":"2026-10-23"');
   expect(html).not.toContain("2026-10-23T00:00");
@@ -93,109 +87,57 @@ test("one compact title row: the name Changes, one intro line, the latest build 
   for (const word of ["sponsor", "advert", "premium", "subscribe", "buy now"]) expect(lower).not.toContain(word);
 });
 
-test("dense rows: date, type, title linked to the post's page on Everloot, author, region and a short excerpt, newest first", async () => {
+const cards = (html: string) => [...html.matchAll(/<li [^>]*data-card[^>]*>[\s\S]*?<\/li>/g)].map((m) => m[0]);
+
+test("one column of cards: date, type chip, title linked to the post's page on Everloot, author · where and the excerpt, newest first", async () => {
   const html = await page();
-  expect(html).toContain("data-dense");
+  expect(html).toContain("data-change-feed");
+  expect(html).not.toContain("<table");
   expect(rows(html)).toBe(4);
   expect(html.indexOf("1.60.1.70460")).toBeLessThan(html.indexOf("Synthetic beta notice"));
   expect(html).toMatch(/<time dateTime="2026-10-16T22:00:00.000Z"[^>]*>2026-10-16<\/time>/);
-  // The type is plain mono text, as on the home page: no pill on every row.
-  expect(html).toContain('<span data-type="true" class="font-mono text-xs text-muted">Blue post</span>');
-  expect(html).toContain('<span data-type="true" class="font-mono text-xs text-muted">Hotfix</span>');
-  expect(html).toContain("data-blue-card");
+  expect(html).toMatch(/<span data-type="true"><span data-badge="neutral"[^>]*>Blue post<\/span><\/span>/);
+  expect(html).toMatch(/<span data-type="true"><span data-badge="neutral"[^>]*>Hotfix<\/span><\/span>/);
   expect(html).toMatch(/<a href="\/changes\/us-1-synthetic-beta-notice-b"[^>]*>Synthetic beta notice &lt;b&gt;<\/a>/);
   expect(html).toContain('href="/changes/eu-2-wow-forever-hotfixes"');
   // The original is one click further, on the post's page.
   expect(html).not.toContain("forums.blizzard.com");
-  expect(html).toContain("A short excerpt. Second sentence.");
-  expect(html).toMatch(/title="Community Manager"[^>]*>Linxy</);
-  expect(html).toContain("US forum");
-  expect(html).toContain("EU forum");
+  // The excerpt is in the body colour, not the blue of the title.
+  expect(html).toContain('<p data-excerpt="true" class="text-cell text-fg">A short excerpt. Second sentence.</p>');
+  expect(html).toContain(">Linxy (Community Manager) · US forum</p>");
+  expect(html).toContain(">Kaivax (Community Manager) · EU forum</p>");
   expect(html).not.toContain("Classic realm move");
+  // The title is each card's only link.
+  for (const card of cards(html)) expect(card.match(/<a /g)?.length ?? 0).toBeLessThanOrEqual(1);
 });
-
-test("on a phone the first column carries the title once, and the date sits in the muted line, not as the heading", async () => {
-  const html = await page();
-  const phone = [...html.matchAll(/<div data-phone-title[^>]*>(.*?)<\/div>(<div class="[^"]*sm:hidden">.*?<\/div>)/g)];
-  expect(phone).toHaveLength(4);
-  expect(phone[0][1]).toContain("WoW: Forever build 1.60.1.70460");
-  expect(phone[0][2]).toContain("2026-10-17 · Build");
-  expect(phone[1][1]).toContain('href="/changes/us-1-synthetic-beta-notice-b"');
-  expect(phone[1][1]).toContain("Synthetic beta notice &lt;b&gt;");
-  expect(phone[1][1]).not.toContain("2026-10-16");
-  // The date is a table-cell time hidden on phones, so only the muted line shows it there.
-  expect(html).toMatch(/<time dateTime="2026-10-16T22:00:00.000Z"[^>]*class="hidden [^"]*sm:inline"/);
+test("every card carries its own date, whatever the sort", async () => {
+  for (const sort of [undefined, "date", "type", "-type", "title", "-title", "author", "source"]) {
+    const html = await page(sort ? { sort } : {});
+    expect(html.match(/<time dateTime="[^"]+"[^>]*>\d{4}-\d{2}-\d{2}<\/time>/g), sort).toHaveLength(4);
+  }
 });
-
-test("sorted by date, a day's date shows on its first row only; the rows under it keep it for screen readers", async () => {
-  const html = await page();
-  // October 16 has two rows: the first shows the date, the second carries it for screen readers only.
-  expect(html).toMatch(/<time dateTime="2026-10-16T22:00:00.000Z"[^>]*class="hidden font-mono tabular-nums text-fg-2 sm:inline">2026-10-16<\/time>/);
-  expect(html).toMatch(/<time dateTime="2026-10-16T18:00:00.000Z"[^>]*class="sr-only">2026-10-16<\/time>/);
-  expect(html.match(/<time [^>]*class="sr-only"/g)).toHaveLength(1);
-  // The same on a phone: the muted line under the title leaves the repeated date out.
-  const phone = [...html.matchAll(/<div data-phone-title[^>]*>.*?<\/div><div class="[^"]*sm:hidden">(.*?)<\/div>/g)].map((m) => m[1]);
-  expect(phone[1]).toBe("2026-10-16 · Blue post · Linxy · US forum");
-  expect(phone[2]).toBe("Hotfix · Kaivax · EU forum");
-  // Sorted by anything else, every row shows its own date.
-  const byTitle = await page({ sort: "title" });
-  expect(byTitle).not.toMatch(/<time [^>]*class="sr-only"/);
-  const lines = [...byTitle.matchAll(/<div class="text-cell-2 text-muted sm:hidden">(.*?)<\/div>/g)].map((m) => m[1]);
-  expect(lines).toHaveLength(4);
-  expect(lines.every((line) => /^\d{4}-\d{2}-\d{2} · /.test(line))).toBe(true);
-  // Oldest first, the repeat is the later row of the day.
-  const oldest = await page({ sort: "date" });
-  expect(oldest).toMatch(/<time dateTime="2026-10-16T22:00:00.000Z"[^>]*class="sr-only">/);
-});
-
-test("the once-a-day date holds at a page break and a filtered start, either way round, and only for the date sort", async () => {
-  const SHOWN = "hidden font-mono tabular-nums text-fg-2 sm:inline";
-  const dateClasses = (html: string) => [...html.matchAll(/<time dateTime="[^"]+"[^>]*class="([^"]+)">/g)].map((m) => m[1]);
-  const firstTitle = (html: string) => /<div data-phone-title[^>]*>.*?<a href="\/changes\/[^\"]+"[^>]*>([^<]+)<\/a>/.exec(html)![1];
-  // 120 posts on one day: every page after the first starts in the middle of that day.
+test("pages keep the sort: newest first by default, oldest first on request", async () => {
+  const firstTitle = (html: string) => /<h2[^>]*><a href="\/changes\/[^"]+"[^>]*>([^<]+)<\/a>/.exec(html)![1];
   timeline.entries = Array.from({ length: 120 }, (_, i) => ({ ...entries[1], id: `forum:${5000 + i}`, title: `Post ${i}`, at: new Date(Date.UTC(2026, 9, 1, 0, i)).toISOString() }));
   for (const [params, first] of [[{}, "Post 119"], [{ page: "2" }, "Post 69"], [{ sort: "-date", page: "2" }, "Post 69"], [{ sort: "date" }, "Post 0"], [{ sort: "date", page: "2" }, "Post 50"]] as const) {
-    const html = await page(params);
-    expect(firstTitle(html)).toBe(first);
-    // The page's first row shows the day, in the date column and in the phone line; the other 49 keep it for screen readers.
-    expect(dateClasses(html)).toEqual([SHOWN, ...Array(49).fill("sr-only")]);
-    const lines = phoneLines(html);
-    expect(lines[0]).toBe("2026-10-01 · Blue post · Linxy · US forum");
-    expect(lines.slice(1).every((line) => line === "Blue post · Linxy · US forum")).toBe(true);
-  }
-  // A filter that starts the list on a day's second row: the hotfix follows the 22:00 post on October 16 unfiltered,
-  // and is the first row once filtered, so it shows the date.
-  timeline.entries = entries;
-  const filters: Record<string, string>[] = [{ show: "hotfixes" }, { author: "Kaivax" }, { show: "hotfixes", sort: "date" }];
-  for (const filter of filters) {
-    const html = await page(filter);
-    expect(dateClasses(html)).toEqual([SHOWN]);
-    expect(phoneLines(html)).toEqual(["2026-10-16 · Hotfix · Kaivax · EU forum"]);
-  }
-  // Any other sort, either way round, shows every row's date.
-  for (const sort of ["type", "-type", "title", "-title", "author", "-author", "source", "-source"]) {
-    const html = await page({ sort });
-    expect(dateClasses(html)).toEqual(Array(4).fill(SHOWN));
-    expect(phoneLines(html).every((line) => /^\d{4}-\d{2}-\d{2} · /.test(line))).toBe(true);
+    expect(firstTitle(await page(params))).toBe(first);
   }
 });
-
 test("markup in a title is escaped, not rendered", async () => {
   const html = await page();
   expect(html).toContain("Synthetic beta notice &lt;b&gt;");
   expect(html).not.toContain("<b>");
 });
 
-test("builds say they were first seen by Everloot, link the diff when there is one, and print no empty field when there is not", async () => {
+test("builds say they were first seen by Everloot, link the diff from the title when there is one, and print no empty field when there is not", async () => {
   const html = await page({ show: "builds" });
   expect(rows(html)).toBe(2);
   expect(html).toContain("First seen by Everloot.");
   expect(html).not.toContain("not published yet");
-  expect(html).toMatch(/70460<\/span><p[^>]*>First seen by Everloot\.<\/p>/);
-  expect(html).toContain('href="https://everloot.app/changes/diff/70450"');
+  expect(html).toMatch(/<a href="https:\/\/everloot.app\/changes\/diff\/70450"[^>]*>WoW: Forever build 1.60.1.70450<\/a>/);
   expect(html).not.toContain("Synthetic beta notice");
+  expect(html).not.toContain("data-byline");
 });
-
 test("the type filter narrows the list, is lit, and unknown values fall back to everything", async () => {
   const hotfixes = await page({ show: "hotfixes" });
   expect(rows(hotfixes)).toBe(1);
@@ -244,16 +186,20 @@ test("the search box matches title, excerpt and author, and keeps the other filt
   expect(html).toContain('value="1.60.1"');
 });
 
-test("sorting is a link, and a malformed sort or page is a 404", async () => {
+test("sorting is a menu of links above the feed, and a malformed sort or page is a 404", async () => {
+  const plain = await page();
+  expect(plain).toContain('data-filter="sort"');
+  expect(plain).toContain('href="/changes?sort=title"');
+  expect(plain).toContain('href="/changes?sort=date"');
   const html = await page({ sort: "title" });
-  expect(html).toContain('aria-sort="ascending"');
+  expect(html).toContain("Sort: <span");
   expect(html.indexOf("Synthetic beta notice")).toBeLessThan(html.indexOf("WoW: Forever build 1.60.1.70460"));
-  expect(html).toContain('href="/changes?sort=-title"');
+  // Newest first is the reset choice: the plain address.
+  expect(html).toContain('href="/changes"');
   await expect(page({ sort: "nope" })).rejects.toThrow("NEXT_NOT_FOUND");
   await expect(page({ page: "0" })).rejects.toThrow("NEXT_NOT_FOUND");
   await expect(page({ page: "2" })).rejects.toThrow("NEXT_NOT_FOUND");
 });
-
 test("more than a page of entries pages at 50 with a numbered pager", async () => {
   timeline.entries = Array.from({ length: 120 }, (_, i) => ({ ...entries[1], id: `forum:p${i}`, title: `Post ${i}`, at: new Date(Date.UTC(2026, 9, 1, 0, i)).toISOString() }));
   const first = await page();
@@ -288,28 +234,24 @@ test("the RSS feed is Forever only, is RSS, and links each post's page on Everlo
   expect((xml.match(/<item>/g) ?? []).length).toBe(4);
 });
 
-test("posts and hotfixes are blue (title and author); builds keep the plain style", async () => {
+test("posts and hotfixes have a blue title and edge; builds keep the plain style", async () => {
   const html = await page();
-  const rowsHtml = html.split("<tr").slice(1);
-  const row = (text: string) => rowsHtml.find((r) => r.includes(text))!;
+  const card = (text: string) => cards(html).find((c) => c.includes(text))!;
   for (const text of ["Synthetic beta notice", "WoW: Forever Hotfixes"]) {
-    expect(row(text)).toContain('data-blue-post=""');
-    expect(row(text)).toMatch(/<a href="\/changes\/[^"]+" class="text-blue-post[^"]*font-medium">/);
-    expect(row(text)).toMatch(/class="text-blue-post[^"]*"[^>]*>(Linxy|Kaivax)</);
+    expect(card(text)).toContain('data-blue-post=""');
+    expect(card(text)).toContain("border-l-blue-post");
+    expect(card(text)).toMatch(/<a href="\/changes\/[^"]+" class="[^"]*text-blue-post[^"]*">/);
   }
   for (const text of ["1.60.1.70460", "1.60.1.70450"]) {
-    expect(row(text)).not.toContain("data-blue-post");
-    expect(row(text)).not.toContain("text-blue-post");
-    expect(row(text)).toContain('<span class="font-medium">WoW: Forever build');
+    expect(card(text)).not.toContain("data-blue-post");
+    expect(card(text)).not.toContain("text-blue-post");
   }
 });
-
-test("a build has no page of its own: its title is plain text", async () => {
+test("a build has no page of its own: without a diff its title is plain text", async () => {
   const html = await page({ show: "builds" });
   expect(html).not.toMatch(/href="\/changes\/build/);
-  expect(html).toContain('<span class="font-medium">WoW: Forever build 1.60.1.70460</span>');
+  expect(html).toMatch(/<span class="font-semibold text-fg[^"]*">WoW: Forever build 1.60.1.70460<\/span>/);
 });
-
 // One announcement on both forums, and twice on the US forum (two threads), as on 2026-10-20.
 const raid = "World of Warcraft: Forever Raid Overview—Locations, Raid Sizes, and Attunement";
 const copy = (id: string, region: "us" | "eu", topicId: number, at: string, over: Partial<ChangeEntry> = {}): ChangeEntry => ({
@@ -328,15 +270,15 @@ test("an announcement posted on both forums is one row, linking the US copy, wit
   timeline.entries = [...entries, ...announcement];
   const html = await page();
   expect(rows(html)).toBe(4 + 2);
-  const tableRows = html.split("<tr").slice(1);
+  const tableRows = cards(html);
   expect(tableRows.filter((r) => r.includes("Raid Overview—Locations"))).toHaveLength(1);
   expect(tableRows.filter((r) => /Stress Test on (21 October|October 21)/.test(r)).map((r) => /Stress Test on (21 October|October 21)/.exec(r)![1])).toEqual(["October 21"]);
   expect(html).toContain('href="/changes/us-30552118-world-of-warcraft-forever-raid-overview-locations-raid-sizes-and-attunement"');
   expect(html).not.toContain("us-30552119");
   expect(html).not.toContain("eu-6443510");
-  expect(tableRows.find((r) => r.includes("Raid Overview"))).toContain(">US · EU forum</span>");
+  expect(tableRows.find((r) => r.includes("Raid Overview"))).toContain(" · US · EU forum</p>");
   // A post on one forum still says just that forum.
-  expect(tableRows.find((r) => r.includes("Synthetic beta notice"))).toContain(">US forum</span>");
+  expect(tableRows.find((r) => r.includes("Synthetic beta notice"))).toContain(" · US forum</p>");
 });
 
 test("filters and counts count announcements; the region filter finds one posted in that region", async () => {
@@ -389,58 +331,22 @@ test("with the game art, a spell a post names gets its icon, its tooltip and a l
   expect(await page()).toContain(">Battle Shout now reaches the whole raid.</p>");
 });
 
-test("news announcements link to Blizzard and show the news source on desktop and mobile", async () => {
+test("news announcements link to Blizzard from the title and name the news source", async () => {
   timeline.entries = [{ id: "news:24315281", source: "news", type: "hotfix", game: "forever",
     at: "2026-11-17T02:17:13.000Z", title: "Synthetic Forever hotfix announcement", author: "Blizzard Entertainment",
     url: "https://news.blizzard.com/en-us/article/24315281/wow-forever-hotfixes-november-16-2026" }];
   const html = await page();
-  expect(html).toContain('href="https://news.blizzard.com/en-us/article/24315281/wow-forever-hotfixes-november-16-2026"');
-  expect(phoneLines(html)).toEqual(["2026-11-17 · Hotfix · Blizzard Entertainment · Blizzard News"]);
-  expect(html).toContain(">Blizzard News</span>");
+  expect(html).toMatch(/<a href="https:\/\/news.blizzard.com\/en-us\/article\/24315281\/wow-forever-hotfixes-november-16-2026"[^>]*>Synthetic Forever hotfix announcement<\/a>/);
+  expect(html).toContain(">Blizzard Entertainment · Blizzard News</p>");
+  // No body: no empty excerpt.
+  expect(html).not.toContain("data-excerpt");
   expect(await page({ region: "us" })).not.toContain("Synthetic Forever hotfix announcement");
 });
-
-const blueCards = (html: string) => [...html.matchAll(/<blockquote data-blue-card[^>]*>[\s\S]*?<\/blockquote>/g)].map((m) => m[0]);
-
-test("forum cards show the blue poster and body, Blizzard role badge and source chip on desktop and mobile", async () => {
-  timeline.entries = [entries[1]];
-  const cards = blueCards(await page());
-  expect(cards).toHaveLength(2);
-  for (const card of cards) {
-    expect(card).toContain("border-l-blue-post");
-    expect(card).toContain("bg-panel");
-    expect(card).toMatch(/<a [^>]*class="[^"]*text-blue-post[^"]*"[^>]*>Linxy<\/a>/);
-    expect(card).toContain(">Blizzard</span>");
-    expect(card).toContain(">Community Manager</span>");
-    expect(card).toMatch(/data-source-chip[^>]*>US forum<\/span>/);
-    expect(card).toMatch(/<p class="[^"]*text-blue-post[^"]*">A short excerpt\. Second sentence\.<\/p>/);
-    expect(card).not.toContain("line-clamp");
-  }
-});
-
-test("news cards link the original, show the source chip and omit an unknown role and body", async () => {
-  timeline.entries = [{ id: "news:fixture", source: "news", type: "hotfix", game: "forever",
-    at: "2026-11-17T02:17:13.000Z", title: "Synthetic news notice", author: "Blizzard Entertainment",
-    url: "https://news.blizzard.com/en-us/article/123/fixture" }];
-  const cards = blueCards(await page());
-  expect(cards).toHaveLength(2);
-  for (const card of cards) {
-    expect(card).toContain('href="https://news.blizzard.com/en-us/article/123/fixture"');
-    expect(card).toContain(">Blizzard Entertainment</a>");
-    expect(card).toContain(">Blizzard</span>");
-    expect(card).toMatch(/data-source-chip[^>]*>Blizzard News<\/span>/);
-    expect(card).not.toContain("Community Manager");
-    expect(card).not.toContain("<p");
-  }
-});
-
-test("builds remain compact rows without Blizzard card styling", async () => {
+test("builds are plain cards without the blue edge", async () => {
   timeline.entries = [entries[0]];
   const html = await page();
   expect(rows(html)).toBe(1);
-  expect(html).toContain('data-change-row="true" class="min-w-0 py-1"');
   expect(html).toContain("First seen by Everloot.");
-  expect(blueCards(html)).toHaveLength(0);
-  expect(html).not.toContain("data-source-chip");
   expect(html).not.toContain("border-l-blue-post");
+  expect(html).not.toContain("data-blue-post");
 });

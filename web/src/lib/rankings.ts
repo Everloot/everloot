@@ -1,7 +1,7 @@
 import {
   CENSUS_CLASSES, CENSUS_LAUNCH, CENSUS_MIN_CHARACTERS, CENSUS_MIN_INSTALLS, CENSUS_MIN_REPORTERS, CENSUS_RACES, FACTIONS, rollupCensus,
   type CensusCount, type CensusRow, type CensusWindow, type Faction,
-} from "../../../kb/src/census";
+} from "@kb/census";
 import { longDate } from "@/data/wow-forever";
 import { censusHref } from "./census-filter";
 import type { JsonLd } from "./jsonld";
@@ -97,6 +97,12 @@ export interface RankingWeek {
   /** The week still running ("so far"). */
   current: boolean;
   window: CensusWindow;
+  /**
+   * For the week still running: last week cut to the same days and hours (Monday 00:00 UTC to the same point in its
+   * week), so a part week is compared with the same part of the week before. Null when last week is before the first
+   * ranked week; absent on a frozen week.
+   */
+  sameDaysBefore?: CensusWindow | null;
 }
 
 /**
@@ -107,14 +113,18 @@ export function rankingWeeks(rows: readonly CensusRow[], asOf: string | Date, la
   const now = new Date(asOf).getTime();
   const current = weekStart(now);
   const weeks: RankingWeek[] = [];
+  const windowOf = (start: number, end: number) => rollupCensus(rows.filter((r) => {
+    const at = Date.parse(r.capturedAt);
+    return at >= start && at <= end;
+  }), { asOf: new Date(end), launch }).windows.week;
   for (let start = Math.max(firstWeek(launch), current - CHART_WEEKS * WEEK_MS); start <= current; start += WEEK_MS) {
     const end = Math.min(start + WEEK_MS - 1, now);
-    const inWeek = rows.filter((r) => {
-      const at = Date.parse(r.capturedAt);
-      return at >= start && at <= end;
-    });
-    const view = rollupCensus(inWeek, { asOf: new Date(end), launch });
-    weeks.push({ start: isoDay(start), to: new Date(end).toISOString(), current: start === current, window: view.windows.week });
+    const week: RankingWeek = { start: isoDay(start), to: new Date(end).toISOString(), current: start === current, window: windowOf(start, end) };
+    if (week.current) {
+      const before = start - WEEK_MS;
+      week.sameDaysBefore = before >= firstWeek(launch) ? windowOf(before, end - WEEK_MS) : null;
+    }
+    weeks.push(week);
   }
   return weeks;
 }
@@ -270,8 +280,11 @@ export function censusHrefOf(slug: RankingSlug, row: RankRow, q: RankingQuery = 
 export interface HubMetrics {
   week: RankingWeek;
   characters: CensusCount;
-  /** Characters against the week before, from the two rounded counts; null without a week before with numbers. */
-  change: { by: number; share: number | null } | null;
+  /**
+   * Characters against the week before, from the two rounded counts; null without a week before with numbers. A week
+   * still running is compared with the same days of last week (`sameDays`), never with the whole of it.
+   */
+  change: { by: number; share: number | null; sameDays: boolean } | null;
   installs: number;
   /**
    * The class or classes ranked first among those with a published count (more than one on a tie). A hidden class
@@ -287,11 +300,15 @@ export function hubMetrics(views: readonly RankingView[]): HubMetrics | null {
   const week = classes?.week;
   if (!classes || !week) return null;
   const now = week.window.characters;
-  const before = classes.previous?.window.characters ?? null;
+  // A running week only against the same days of last week, and only when those days have numbers.
+  const sameDays = week.current ? week.sameDaysBefore ?? null : null;
+  const before = week.current
+    ? (classes.previous && sameDays && !sameDays.collecting ? sameDays.characters : null)
+    : classes.previous?.window.characters ?? null;
   return {
     week,
     characters: now,
-    change: now !== null && before !== null ? { by: now - before, share: before ? (now - before) / before : null } : null,
+    change: now !== null && before !== null ? { by: now - before, share: before ? (now - before) / before : null, sameDays: week.current } : null,
     installs: week.window.installs,
     leadingClasses: classes.rows.filter((r) => r.rank === 1),
     classHidden: classes.rows.some((r) => r.rank === null),

@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 import type { ZoneBounds } from "../src/map-bounds.js";
 import {
-  checkReportedBounds, mapToWorld, placeEntrances, placeFlights, worldToMap, worldToZone, zoneAt, zoneTable, zoneToMap, zoneToWorld,
+  checkReportedBounds, lineSide, mapToWorld, placeEntrances, placeFlights, worldToMap, worldToZone, zoneAt, zoneTable, zoneToMap, zoneToWorld,
+  type FlightSide,
 } from "../src/world-coords.js";
 import type { WorldMapData } from "../src/world-map-data.js";
 
@@ -148,6 +149,19 @@ describe("flight masters and lines", () => {
       flightPaths: [],
     });
     expect(masters.map((m) => [m.id, m.heldBack])).toEqual([[4, false], [2, true]]);
+  });
+
+  test("a master keeps its side, and a line serves the side both ends serve", () => {
+    const node = (id: number, faction?: FlightSide) => ({ id, name: `Post ${id}`, continentId: 0, worldX: -8840.6, worldY: 489.7, ...(faction ? { faction } : {}) });
+    const line = (from: number, to: number) => ({ from, to, continentId: 0, points: [[-8840, 489], [-8850, 500]] as [number, number][] });
+    const { masters, lines } = placeFlights({
+      zones: data.zones, heldBackZones: [],
+      flightNodes: [node(1, "alliance"), node(2, "horde"), node(3, "both"), node(4)],
+      flightPaths: [line(1, 3), line(3, 2), line(3, 3), line(1, 2), line(1, 4)],
+    });
+    expect(masters.map((m) => m.faction)).toEqual(["alliance", "horde", "both", undefined]);
+    expect(lines.map((l) => l.faction)).toEqual(["alliance", "horde", "both", undefined, undefined]);
+    expect(lineSide("both", "both")).toBe("both");
   });
 });
 

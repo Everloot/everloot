@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Badge, Card, Input, SectionHeading } from "@/components/ui";
-import { formatCopper } from "../../../../../kb/src/profession-path";
+import { Badge, Card, CopyButton, Input, SectionHeading } from "@/components/ui";
+import { formatCopper } from "@kb/profession-path";
 import { cheapestPrices, planShopping, type ListedPrice, type PlannerRecipe, type SearchRecipe } from "@/lib/profession-planner";
 import { SELECT_CLASS } from "./controls";
 import { realmRuleset, RULESET_LABEL } from "@/lib/realms";
@@ -127,7 +127,7 @@ export default function ShoppingList({ profession, recipes, catalog = [], from =
         </li>)}</ul>
         {plan.gaps.map(g=><p key={g.fromSkill}>No alternative agreed recipe for {g.fromSkill}–{g.toSkill}. This range is not included in the materials.</p>)}
         {skipped.length>0 && <button type="button" className="btn" onClick={()=>setSkipped([])}>Restore skipped recipes ({skipped.length})</button>}
-        <button type="button" className="btn" onClick={async()=>{try {await navigator.clipboard.writeText(copy);setCopied("Shopping list copied.");} catch {setCopied("Copy unavailable. Select the text below.");}}}>Copy shopping list</button>
+        <CopyButton text={copy} label="Copy shopping list" onResult={(ok)=>setCopied(ok ? "Shopping list copied." : "Copy unavailable. Select the text below.")} />
         <p role="status" className="text-sm text-muted">{copied}</p>
         <details><summary className="cursor-pointer">Shopping list as text</summary><pre className="mt-2 whitespace-pre-wrap text-sm">{copy}</pre></details>
       </>}

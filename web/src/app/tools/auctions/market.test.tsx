@@ -2,13 +2,18 @@ import { createRequire } from "node:module";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
-import { emptyMarket, foldMarket } from "../../../../../kb/src/market";
+import { emptyMarket, foldMarket } from "@kb/market";
 
 const store = vi.hoisted(() => ({ loadMarket: vi.fn(), loadCorpus: vi.fn() }));
 vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
   uploadStore: { loadMarket: store.loadMarket, loadCorpus: store.loadCorpus },
 }));
+// The item pages read their one item; these spies say whether anything built a realm's whole board instead.
+vi.mock("@/lib/auction-house", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/auction-house")>();
+  return { ...real, realmBoards: vi.fn(real.realmBoards), itemAcrossRealms: vi.fn(real.itemAcrossRealms), itemByHouse: vi.fn(real.itemByHouse), findBoard: vi.fn(real.findBoard) };
+});
 vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a>,
 }));
@@ -29,6 +34,7 @@ import { UNNAMED_REASON } from "./parts";
 import DatabaseItemPage from "../../database/items/[id]/page";
 import { GET as sitemapIndex } from "../../auctions-sitemap.xml/route";
 import { GET as sitemapChunk } from "../../auctions-sitemap/[n]/route";
+import * as auctionHouse from "@/lib/auction-house";
 
 const today = new Date();
 const dayAgo = (n: number) => new Date(today.getTime() - n * 86_400_000).toISOString();
@@ -158,7 +164,11 @@ test("a realm page sorts, filters and switches house in the URL; only its plain 
   expect((await realmMetadata(realm("forever", { sort: "market" }))).robots).toMatchObject({ index: false });
   expect((await realmMetadata(realm("forever", { house: "horde" }))).robots).toMatchObject({ index: false });
 
-  const horde = text(await realmHtml("forever", { house: "horde" }));
+  // The realm page links its Market changes view, keeping the house.
+  expect(html).toContain('href="/tools/auctions/forever/changes"');
+  const hordeHtml = await realmHtml("forever", { house: "horde" });
+  expect(hordeHtml).toContain('href="/tools/auctions/forever/changes?house=horde"');
+  const horde = text(hordeHtml);
   expect(horde).toContain("Linen Cloth");
   expect(horde).toContain("Forever, Horde auction house: 3 items");
   const cloth = text(await realmHtml("forever", { class: "trade-goods", sub: "cloth" }));
@@ -241,6 +251,23 @@ test("an item with no market value in 14 days, or none at all, is not indexed, a
   await expect(RealmItemPage(item("forever", "02589"))).rejects.toThrow("NOT_FOUND");
 });
 
+test("the item pages read only their item: no realm board is built for them", async () => {
+  const spies = [auctionHouse.realmBoards, auctionHouse.itemAcrossRealms, auctionHouse.itemByHouse, auctionHouse.findBoard].map((f) => vi.mocked(f));
+  for (const spy of spies) spy.mockClear();
+  const realmPage = text(renderToStaticMarkup(await RealmItemPage(item("forever", "2589"))));
+  await itemMetadata(item("forever", "2589"));
+  const crossPage = text(renderToStaticMarkup(await CrossRealmItemPage({ params: Promise.resolve({ itemId: "2589" }) })));
+  await crossMetadata({ params: Promise.resolve({ itemId: "2589" }) });
+  for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+  // The same answer as the boards give: Forever's Horde price leads, Mal'Ganis is the other realm.
+  expect(realmPage).toContain("Market value1s 98c");
+  expect(realmPage).toMatch(/Houses \(1\)/);
+  expect(realmPage).toMatch(/Other realms \(1\)/);
+  expect(crossPage).toContain("Lowest market value1s 98cForever, Horde");
+  // A realm whose scans are all below the gate is named from its slug, not from an upload.
+  expect(text(renderToStaticMarkup(await RealmItemPage(item("nightfall", "2589"))))).toContain(" on Nightfall yet: it needs scans from 3 players in one auction house.");
+});
+
 test("the cross-realm page compares every realm with a price", async () => {
   const props = { params: Promise.resolve({ itemId: "2589" }) };
   const html = text(renderToStaticMarkup(await CrossRealmItemPage(props)));
@@ -285,6 +312,32 @@ test("the item database page gets a small Auction House box only when a price is
   expect(await loadMarketBox(2589, today)).toEqual([]);
 });
 
+test("the browse page's realm and house picker: realms keep the filters, houses keep the realm, and ?realm= still lands on the realm", async () => {
+  // The old form's parameter on the all-realms page still goes to the realm's page, keeping the house.
+  await expect(hub({ realm: "forever", house: "horde" })).rejects.toThrow("REDIRECT /tools/auctions/forever?house=horde");
+  await expect(hub({ realm: "forever", house: "nowhere" })).rejects.toThrow(/REDIRECT \/tools\/auctions\/forever$/);
+  const all = await hub({ house: "horde", moved: "1" });
+  expect(all).toContain("data-realm-house-picker");
+  expect(all).toContain('href="/tools/auctions/forever?house=horde&amp;moved=1"');
+  expect(all).toContain('href="/tools/auctions/malganis?house=horde&amp;moved=1"');
+  expect(all).toContain('href="/tools/auctions?moved=1"');
+  const page = await realmHtml("forever", { house: "horde" });
+  expect(page).toContain('href="/tools/auctions?house=horde"');
+  expect(page).toContain('href="/tools/auctions/forever?house=alliance"');
+  expect(page).toContain('href="/tools/auctions/forever"');
+  // The realm menu sits in the picker, not in the filter bar.
+  expect(page.match(/data-filter="realm"/g)).toHaveLength(1);
+});
+
+test("the item database page reads its one item for the Auction House box: no realm board is built", async () => {
+  const spies = [auctionHouse.realmBoards, auctionHouse.itemAcrossRealms].map((f) => vi.mocked(f));
+  for (const spy of spies) spy.mockClear();
+  const html = renderToStaticMarkup(await DatabaseItemPage({ params: Promise.resolve({ id: "2589" }) }));
+  expect(html).toContain("data-market-box");
+  expect(html).toContain('href="/tools/auctions/forever/2589"');
+  for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+});
+
 test("every price names its house: All houses lists each house's price apart, and nothing blends them", async () => {
   const rows = [
     ...scans(dayAgo(0), [[2589, 100, 100]], "Forever", undefined, { house: "Alliance" }),
@@ -327,6 +380,16 @@ test("an unreadable rollup is unavailable, not zero", async () => {
     expect(html).toContain("unavailable");
     expect(html).not.toContain("0c");
   }
+});
+
+test("an item page says what its values rest on: the public days counted, never a 60-day history", async () => {
+  // Forever's Horde house holds 2589 on two days, today and three days ago, both solid.
+  const html = text(renderToStaticMarkup(await RealmItemPage(item("forever", "2589"))));
+  expect(html).toContain("Historical is the median of 2 public days in the last 60; market value from 2 solid days in the last 14.");
+  expect(html).not.toContain("Everloot's own scans only");
+  // An item whose only day is past the market window: a historical with no solid day in 14.
+  const old = text(renderToStaticMarkup(await RealmItemPage(item("forever", "4306"))));
+  expect(old).toContain("Historical is the median of 1 public day in the last 60; market value unrecorded (no solid public day in the last 14).");
 });
 
 test("item prices show one-day and seven-day moves from solid days", async () => {

@@ -1,10 +1,10 @@
-import { placeEntrances, worldToZone, zoneAt, zoneTable, zoneToWorld, type WorldPoint } from "../../../kb/src/world-coords";
-import type { WorldMapData } from "../../../kb/src/world-map-data";
-import { observedPins } from "../../../kb/src/world-map-near";
-import { questPage, type WorldFacts } from "../../../kb/src/world-pages";
-import { confirmedEntrances, instanceBosses, type InstanceBoss, type InstanceFacts } from "../../../kb/src/instances";
-import { objectSpawns, type ObjectSpawnPin, type ObjectSpawnRow } from "../../../kb/src/object-spawns";
-import { slugify } from "../../../kb/src/lore-slug";
+import { placeEntrances, worldToZone, zoneAt, zoneTable, zoneToWorld, type WorldPoint } from "@kb/world-coords";
+import type { WorldMapData } from "@kb/world-map-data";
+import { observedPins } from "@kb/world-map-near";
+import { questPage, type WorldFacts } from "@kb/world-pages";
+import { confirmedEntrances, instanceBosses, type InstanceBoss, type InstanceFacts } from "@kb/instances";
+import { objectSpawns, type ObjectSpawnPin, type ObjectSpawnRow } from "@kb/object-spawns";
+import { slugify } from "@kb/lore-slug";
 import { RECHECK_SCOPES } from "./recheck-scopes";
 import { WORLD_MAP } from "./world-map";
 

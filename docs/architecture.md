@@ -17,6 +17,7 @@ bridge on the player's computer.
 | Raw uploads | `web/src/lib/upload-store.ts` | Cloudflare R2 (`uploads/<date>/<id>.json`), indexed in Supabase |
 | Public corpus | `web/src/app/api/cron/snapshot` | A Cloudflare Cron Trigger every 10 minutes extends `snapshots/corpus.json` in R2; pages read that one object |
 | Aggregates snapshot | `web/src/lib/aggregate-store.ts` | `snapshots/aggregates.json` in R2, written by the same cron after a run that added uploads: the item lists' agreed names, public drops and the items players have seen, built from anonymous rows only. Pages read it once per instance and again after five minutes instead of replaying every upload; with no file yet they build the set from the corpus |
+| Auction House boards | `web/src/lib/market-boards.ts` | `snapshots/market-boards.json` in R2, written by the same cron when the market rollup or the UTC day changed: every realm and house's rows, the realms below the gate and the item names the Auction House, bags and disenchanting pages show. Pages read it once a minute per instance (ETag) and build the boards from the rollup themselves when the file is missing, unreadable, or older than the rollup they hold |
 | Edge page cache | `web/src/lib/cf-edge-cache.ts`, used by `web/scripts/cf-entry.mjs` | The Worker's Cache API, holding public pages that read no cookies for the lifetime their `CDN-Cache-Control` header names. Its versions are computed from the build itself (the rendering source, the dependencies, the files a page names under `_next/static`, the Worker's switches) and ship inside the Worker bundle, so a deploy that changes nothing a page shows keeps the cache. Sign-in, sign-up, password-reset, `/me` and auth routes are never cached |
 | Sessions, grants, quotas, waitlist | `supabase/` | Supabase Postgres, server-side only, row-level security on every table |
 | Knowledge release (lore) | `kb/` | Built offline into a SQLite file plus a hashed manifest, kept in R2, imported into the D1 database `KNOWLEDGE_D1`, served only when it matches the SHA-256 pinned in `web/wrangler.jsonc` |
@@ -33,7 +34,7 @@ Player plays
   -> cron snapshot merges new events into the corpus
   -> public read: named records only with a grant (kb/src/corpus.ts)
   -> anonymous observations are public as records, a per-install pseudonym in place of the install id (/api/corpus/public)
-  -> rollups: the site states a fact once at least three installs reported it (kb/src/drop-rollup.ts)
+  -> rollups: drop rates show from one install with reported, verified or confirmed tiers (kb/src/drop-rollup.ts)
   -> site pages and MCP gameplay tools
 
 Warcraft Wiki dump (CC BY-SA 4.0) + curated entries
@@ -69,8 +70,8 @@ Where each kind of data goes, who may write it and how each tier is protected is
 - **A file bridge, never the game's memory or screen.** The addon writes its save file, and the
   companion reads it and writes answers back as an addon file. That stays inside what Blizzard
   tolerates for addons, and it is why answers appear only after `/reload`.
-- **The site states a fact only once three installs reported it.** Each one carries how many
-  installs reported it and when. One wrong upload cannot make the site state a fact; the anonymous
+- **Three installs confirm a fact.** Drop rates and measured zeros show from one install, marked
+  reported, verified at two, confirmed at three or more, with counts and dates. The anonymous
   observations behind it stay public so anyone can check the count.
 
 ## Known limits
@@ -78,8 +79,8 @@ Where each kind of data goes, who may write it and how each tier is protected is
 - Three installs are not proof of three people. An install ID cannot show that two installs
   belong to different players.
 - Drop figures are shares of the loot windows players opened, not kill-based drop chances. A drop
-  rate goes public once three installs have looted its source, even if only one of them saw the
-  item drop.
+  rate shows from one install, labelled reported, verified at two, confirmed at three or more
+  installs that looted its source, even if only one saw the item drop.
 - The lore archive is the Warcraft Wiki as of 2023-11-13, with no Forever-specific lore until a
   newer dump is allowed.
 - Blizzard's API answers for WoW: Forever since launch (`*-forever-{region}` namespaces, checked

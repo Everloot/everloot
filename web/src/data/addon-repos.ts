@@ -5,7 +5,7 @@
 // Reading `## X-Website` from the .toc through the addon-list opt-in would replace this map, but it
 // needs an addon release first.
 import registryFile from "../../../kb/curated/ecosystem.json";
-import { parseRegistry } from "../../../kb/src/ecosystem";
+import { parseRegistry } from "@kb/ecosystem";
 
 export interface AddonSource {
   /** GitHub "owner/name". */

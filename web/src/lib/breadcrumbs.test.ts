@@ -16,7 +16,7 @@ const paths = [
   ["/classes/group", "/classes"], ["/players"], ["/players/opt-out", "/players"],
   ["/guilds/hide", "/guilds"], ["/chat"], ["/addon"], ["/methodology"],
   ["/account"], ["/settings"], ["/me"],
-  ["/tools/builds", "/account"], ["/tools/alts", "/account"],
+  ["/tools/builds", "/settings"], ["/tools/alts", "/settings"],
 ];
 
 test.each(paths)("%s has a named trail through its parent", (path, parent) => {
@@ -37,6 +37,17 @@ test("profession slugs have their own name and the profession hub as parent", ()
     expect(trailFor(path)).toEqual([...trailFor("/tools/professions")!, { name: profession.name, path }]);
   }
   expect(trailFor("/tools/professions/not-a-profession")).toBeNull();
+});
+
+test("a realm's Market changes view trails through the Auction House and the realm page", () => {
+  expect(trailFor("/tools/auctions/camwow-us1-realm-4-pvp/changes")).toEqual([
+    ...trailFor("/tools/auctions")!,
+    { name: "Camwow Us1 Realm 4 Pvp", path: "/tools/auctions/camwow-us1-realm-4-pvp" },
+    { name: "Market changes", path: "/tools/auctions/camwow-us1-realm-4-pvp/changes" },
+  ]);
+  expect(trailFor("/tools/auctions/forever/changes/")).toEqual(trailFor("/tools/auctions/forever/changes"));
+  expect(trailFor("/tools/auctions/forever")).toBeNull();
+  expect(trailFor("/tools/auctions/a/b/changes")).toBeNull();
 });
 
 test("pages use the shared Home crumb", () => {

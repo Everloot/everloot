@@ -19,7 +19,7 @@ import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import EdgeDegraded from "@/components/EdgeDegraded";
 import { wikiHref } from "@/lib/wiki";
 import { prepPage } from "@/lib/wiki-dungeon";
-import { npcLootTable } from "../../../../../../kb/src/loot-tables";
+import { npcLootTable } from "@kb/loot-tables";
 import EntityLink from "@/components/EntityLink";
 import { loadItemSetNames, loadItemTips, loadSiteAssets, loadSpellNames } from "@/lib/game-assets";
 import { CLIENT_LAYER } from "@/lib/items";
@@ -220,7 +220,7 @@ export default async function InstancePage(props: Props) {
             <p>Facts: the type is from the game files where they place the entrance, else as 3 installs agree. The level is from the game files, which give one level for most instances rather than a range. The difficulty is the id 3 installs agree on; the game files' own list of the instance's difficulties shows beside it when they give one.</p>
             <p>Entrance: confirmed by the instance id, the last place outside where 3 installs stood before zoning in, at the median of their positions.</p>
             <p>Bosses: a boss is listed once 3 installs report its encounter ending here. Kills count every install's kills together; wipes are not kills. The encounters the game files list for this instance follow, marked unconfirmed until 3 installs report them.</p>
-            <p>Loot: each boss's loot is the loot table of the creature 3 installs tie to its encounter, the same rows its NPC page shows. A rate needs loot windows from 3 installs; short of that, the count so far shows and no rate.</p>
+            <p>Loot: each boss's loot is the loot table of the creature 3 installs tie to its encounter, the same rows its NPC page shows. Rates show from one install, marked reported at one, verified at two, confirmed at three or more.</p>
             <p>Quests: a quest is listed once 3 installs file it under this instance's name in the quest log, where the game files a dungeon's quests. This matches the quest log's header, not the quest's giver or turn-in, so a quest filed under another header is not here. Installs counts the installs that agreed on the header.</p>
           </Disclosure>
 

@@ -39,7 +39,7 @@ test("a public drop, an agreed name, and a median pin become the page", () => {
 
 test("two installs, a second name, or a private rate stay off the page", () => {
   const page = itemPage(1234, facts({
-    rates: [rate({ public: false })],
+    rates: [rate({ reporters: 0, public: false })],
     names: [
       ...["a", "b", "c"].map((installId) => ({ installId, itemId: 1234, name: "Peacebloom" })),
       ...["d", "e", "f"].map((installId) => ({ installId, itemId: 1234, name: "Silverleaf" })),

@@ -15,8 +15,9 @@ import { guideHref } from "@/lib/guides";
 import { RACE_TABLE, RACIAL_NOTES, traitsFor } from "@/lib/race-traits";
 import { pageMetadata } from "@/lib/seo";
 import { TALENT_CLASSES, isTalentClass } from "@/lib/talents/catalogs";
-import { CENSUS_CLASSES } from "../../../../../kb/src/census";
-import type { GuideActivity, GuideRole } from "../../../../../kb/src/guides/guide";
+import { CENSUS_CLASSES } from "@kb/census";
+import type { GuideActivity, GuideRole } from "@kb/guides/guide";
+import GuidesEmpty from "../../guides/GuidesEmpty";
 
 // Built once per deploy, one page per class; `dynamic = "error"` fails the build if the page ever reads the request.
 // The guides are read from kb/guides while the site builds: the function bundles do not carry that folder, so a page
@@ -99,7 +100,7 @@ export default async function ClassHubPage({ params }: Params) {
         <section aria-labelledby="guides">
           <SectionHeading id="guides">Reviewed guides</SectionHeading>
           {guides.length === 0 ? (
-            <p className="text-sm text-muted">{`No ${name} guide is reviewed yet.`}</p>
+            <GuidesEmpty classSlug={slug} />
           ) : (
             <ul className="space-y-4">
               {guides.map((g) => (

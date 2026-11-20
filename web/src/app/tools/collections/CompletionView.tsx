@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Card, EmptyState } from "@/components/ui";
-import { ANOTHER_CHARACTER_NOTE, COMPLETION_AGREEMENT, completionEmptyState, droppedCharactersNote, type CharacterProgress, type CompletionProgress } from "../../../../../kb/src/completion";
+import { ANOTHER_CHARACTER_NOTE, COMPLETION_AGREEMENT, completionEmptyState, droppedCharactersNote, type CharacterProgress, type CompletionProgress } from "@kb/completion";
 
 const pct = (done: number, total: number) => (total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0);
 

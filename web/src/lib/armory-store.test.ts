@@ -2,6 +2,21 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { armoryCharacter, armoryGuild } from "./armory.fixture";
 import { armoryStore, armoryStoreFrom, createCloudArmoryStore, createMemoryArmoryStore } from "./armory-store";
 
+test("guild queue fallback matches duplicate and recheck rules independently of character queue keys", async () => {
+  const now = () => new Date("2026-11-30T00:00:00Z");
+  const s = createMemoryArmoryStore(now);
+  s.putGuild(armoryGuild({ checkedAt: "2026-11-10T00:00:00.001Z" }), []);
+  expect(await s.enqueue("eu", "guild", "ember-wardens", "website")).toBe(false);
+  s.putGuild(armoryGuild({ checkedAt: "2026-11-10T00:00:00Z" }), []);
+  expect(await s.enqueue("eu", "guild", "ember-wardens", "website")).toBe(true);
+  expect(await s.enqueue("eu", "guild", "ember-wardens", "website")).toBe(false);
+  expect(await s.enqueue("us", "guild", "ember-wardens", "website")).toBe(true);
+  expect(s.queued()).toEqual([
+    { region: "eu", kind: "guild", slug: "ember-wardens", source: "website" },
+    { region: "us", kind: "guild", slug: "ember-wardens", source: "website" },
+  ]);
+});
+
 describe("the Supabase store", () => {
   const fake = (answer: unknown) => {
     const query = vi.fn(async (_path: string, _init?: RequestInit) => answer);
@@ -20,6 +35,8 @@ describe("the Supabase store", () => {
       [(s) => s.search("vel", 25), "armory_search", { p_prefix: "vel", p_limit: 25 }],
       [(s) => s.searchGuilds("emb", 25), "armory_search_guilds", { p_prefix: "emb", p_limit: 25 }],
       [(s) => s.board("gear_score", null, 15, 100), "armory_board", { p_metric: "gear_score", p_region: null, p_ruleset_id: 15, p_limit: 100 }],
+      [(s) => s.boardFiltered("gear_score", "eu", 2, "Mage", "Alliance", 100), "armory_board_filtered", { p_metric: "gear_score", p_region: "eu", p_ruleset_id: 2, p_class: "Mage", p_faction: "Alliance", p_limit: 100 }],
+      [(s) => s.topPerClass("gear_score", "eu", 2), "armory_board_top_per_class", { p_metric: "gear_score", p_region: "eu", p_ruleset_id: 2 }],
       [(s) => s.rank("eu", "velkara-duskmantle"), "armory_rank", { p_region: "eu", p_slug: "velkara-duskmantle" }],
       [(s) => s.counts(), "armory_counts", {}],
       [(s) => s.hide("eu", "velkara-duskmantle"), "armory_hide", { p_region: "eu", p_slug: "velkara-duskmantle" }],

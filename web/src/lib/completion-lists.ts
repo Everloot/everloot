@@ -1,6 +1,7 @@
-import { agreedCatalog } from "../../../kb/src/completion-rollup";
-import type { AchievementEntry, ChainEntry, FactionEntry, TitleEntry } from "../../../kb/src/completion";
-import { slugify } from "../../../kb/src/lore-slug";
+import { cache } from "react";
+import { agreedCatalog } from "@kb/completion-rollup";
+import type { AchievementEntry, ChainEntry, FactionEntry, TitleEntry } from "@kb/completion";
+import { slugify } from "@kb/lore-slug";
 import { CLIENT_ACHIEVEMENTS } from "@/data/game-data/client-achievements";
 import { CLIENT_FACTIONS } from "@/data/game-data/client-factions";
 import { CLIENT_QUEST_LINES } from "@/data/game-data/client-quest-lines";
@@ -79,8 +80,9 @@ const idOf = (e: object): number => (e as { achievementId?: number }).achievemen
 /**
  * The lists the database shows: the game files' entries, unconfirmed, with the agreed rollup entries confirmed on top.
  * Null only when there is no game-file base and the rollup could not be read (unrecorded, not empty).
+ * Read once per request (React `cache`): a page and its metadata share one read.
  */
-export async function loadCatalog(): Promise<CompletionCatalog | null> {
+export const loadCatalog = cache(async (): Promise<CompletionCatalog | null> => {
   const base = baseEntries();
   const read = await uploadStore.loadCompletion();
   if (!read.state && !base.available) return null;
@@ -94,7 +96,7 @@ export async function loadCatalog(): Promise<CompletionCatalog | null> {
     base: base.available,
     confirmations: read.state !== null,
   };
-}
+});
 
 /** `4-ten-quests`: the id, then the name's words. A name with no letters or digits leaves the bare id. */
 function segment(id: number, name: string): string {
@@ -112,7 +114,7 @@ export const titleHref = (id: number, name: string) => `/database/titles/${segme
 export const chainHref = (id: number, name: string) => `/database/quest-chains/${segment(id, name)}`;
 
 /** What the collections tool needs before it can show a character's progress; the tool and the entry pages say it alike. */
-export const TRACKER_NEEDS = "Progress needs the addon's completion tracker (off until you turn it on) and an upload that shares your collection ownership.";
+export const TRACKER_NEEDS = "Progress needs the addon's completion tracker (on in a new install; older installs keep their choice) and an upload that shares your collection ownership.";
 
 /**
  * What the game files say of a faction beyond its name: the parent they name for it, and whether they name it as

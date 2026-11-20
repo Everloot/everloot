@@ -1,7 +1,7 @@
 import { loadWikiEntityNames, shownNpcName } from "./wiki-entity-names";
-import { itemPage } from "../../../kb/src/item-page";
-import { objectPage } from "../../../kb/src/object-page";
-import { npcPage, questPage, vendorPage } from "../../../kb/src/world-pages";
+import { itemPage } from "@kb/item-page";
+import { objectPage } from "@kb/object-page";
+import { npcPage, questPage, vendorPage } from "@kb/world-pages";
 import { loadEdges } from "./edges";
 import { loadSpellNames } from "./game-assets";
 import { itemIndexable, npcIndexable, objectIndexable, questIndexable, spellIndexable, vendorIndexable } from "./indexable";

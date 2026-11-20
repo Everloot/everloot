@@ -19,7 +19,11 @@ export const FIXTURE_STRUCTURED = {
   page: {
     realm: FIXTURE_REALM,
     itemId: FIXTURE_ITEM,
-    value: { itemId: FIXTURE_ITEM, market: 310, min: 300, historical: 310, quantity: 100, day: "2026-10-20", ageDays: 0, reporters: 3, thin: false },
+    value: {
+      itemId: FIXTURE_ITEM, market: 310, min: 300, historical: 310, quantity: 100, day: "2026-10-20", ageDays: 0, reporters: 3, thin: false,
+      // What the values rest on: that one public day, solid, from 3 reporters.
+      coverage: { solidDays14: 1, days60: 1, thinDays: 0, trimmedDays: 0, newestDay: "2026-10-20", trustedOnly: false },
+    },
     history: [{ day: "2026-10-20", min: 300, market: 310, quantity: 100, reporters: 3, thin: false }],
   },
 };

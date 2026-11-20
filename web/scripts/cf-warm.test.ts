@@ -204,6 +204,34 @@ test("a 500 on a sampled page that is not a lore page is still a failure on the 
   expect(asked.filter((u) => u === `${ORIGIN}/map`)).toHaveLength(1);
 });
 
+test("a page that answers 503 once is asked again after a short wait, and passes when it answers 200", async () => {
+  let cold = true;
+  const { asked, get } = fakeDeploy({
+    sitemapBody: sitemap("/", "/database/coverage", "/map"),
+    page: (url) => {
+      if (url.endsWith("/database/coverage") && cold) { cold = false; return { status: 503 }; }
+      return { status: 200 };
+    },
+  });
+  const slept: number[] = [];
+  const logged: string[] = [];
+  const out = await warmDeploy({ origin: ORIGIN, sha: SHA, get, now: () => 0, sleep: async (ms: number) => { slept.push(ms); }, log: (l: string) => { logged.push(l); } });
+  expect(out.ok).toBe(true);
+  expect(out.lines).toEqual(["3 pages, 3 answered 200, p95 1 ms"]);
+  expect(out.pagesAsked).toBe(3);
+  expect(asked.filter((u) => u === `${ORIGIN}/database/coverage`)).toHaveLength(2);
+  expect(slept).toEqual([5_000]);
+  expect(logged).toEqual(["1 pages answered 503; asking again in 5 s"]);
+});
+
+test("a page that answers 503 twice fails the run, named as before, and is not asked a third time", async () => {
+  const { asked, get } = fakeDeploy({ sitemapBody: sitemap("/", "/database/coverage", "/map"), page: (url) => ({ status: url.endsWith("/database/coverage") ? 503 : 200 }) });
+  const out = await warmDeploy({ origin: ORIGIN, sha: SHA, get, now: () => 0, sleep: async () => {}, log: () => {} });
+  expect(out.ok).toBe(false);
+  expect(out.lines).toEqual(["3 pages, 2 answered 200, p95 1 ms", `  503 ${ORIGIN}/database/coverage`]);
+  expect(asked.filter((u) => u === `${ORIGIN}/database/coverage`)).toHaveLength(2);
+});
+
 test("the lore pages count against the page limit: the sample gets what is left", async () => {
   const { asked, get } = fakeDeploy({ sitemapBody: sitemap("/", "/lore", "/map", "/lore/zones/elwynn", "/database") });
   const out = await warmDeploy({ origin: ORIGIN, sha: SHA, get, maxPages: 3, now: () => 0, sleep: async () => {}, log: () => {} });

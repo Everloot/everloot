@@ -87,7 +87,7 @@ export default async function GuildFamilyPage(props: Props) {
                 { label: "Forever, guessed names", value: answer(api.foreverGuessed) },
               ]}
             />
-            <p className="max-w-[65ch] text-sm text-fg-2">
+            <p className="max-w-prose text-sm text-fg-2">
               Checked {api.checked}: the retail guild profile and Classic Era both answered our
               requests. Guessed Forever namespaces were refused. The open question is
               on <a href={api.forumUrl} className={link}>Blizzard&apos;s API forum</a>. Once Blizzard publishes one,

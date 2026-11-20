@@ -17,17 +17,16 @@ export const metadata: Metadata = pageMetadata({ title: TITLE, description, path
 const allowed = (url: string | undefined) => (url && /^https:\/\/assets\.everloot\.app\//.test(url) ? url : undefined);
 
 // No ad slot here: the page is a conversation. It fills the screen under the header (ChatClient is fixed there),
-// with no footer; the optional model is set up on /account#chat-keys. The workspace switch and the free model's providers
+// with no footer; the optional model is set up on /settings#chat-keys. The workspace switch and the free model's providers
 // (only their names, never a key) are read at build time, so the page stays static; private projects and chats are fetched by the browser.
 export default async function ChatPage() {
   const icons = classAndProfessionIcons(await loadSiteAssets());
   const warrior = allowed(icons.classes.find((c) => c.key === "warrior")?.icon);
-  const tailoring = allowed(icons.professions.find((p) => p.key === "Tailoring")?.icon);
   return (
     <>
       <JsonLd data={{ "@context": "https://schema.org", "@type": "WebPage", name: "Ask Everloot", url: absoluteUrl("/chat") }} />
       <h1 className="sr-only">{TITLE}</h1>
-      <ChatClient savedBuilds={savedBuildsOn()} profiles={profilesOn()} workspace={chatWorkspaceOn()} freeChat={freeChatNames()} icons={{ warrior, tailoring }} />
+      <ChatClient savedBuilds={savedBuildsOn()} profiles={profilesOn()} workspace={chatWorkspaceOn()} freeChat={freeChatNames()} icons={{ warrior }} />
     </>
   );
 }

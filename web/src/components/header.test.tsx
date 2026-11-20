@@ -29,7 +29,7 @@ test("the top bar is Lookup, Database, Tools, Guides, Chat and Profile; Chat is 
   expect(navItems().map((i) => i.label)).toEqual(["Lookup", "Database", "Tools", "Guides", "Chat", "Profile"]);
   expect(primary).toMatch(/<a href="\/chat"[^>]*>Chat<\/a>/);
   for (const id of ["lookup", "database", "tools", "guides", "profile"]) {
-    expect(primary).toMatch(new RegExp(`<button id="${id}-menu-button" type="button" aria-expanded="false" aria-controls="${id}-menu"`));
+    expect(primary).toMatch(new RegExp(`<button id="${id}-menu-button" type="button" aria-expanded="false" aria-controls="${id}-menu" aria-haspopup="true"`));
   }
 });
 
@@ -47,13 +47,15 @@ test("Tools holds the planners, most used first, then the card page", () => {
   expect(menuHrefs("Tools")).toEqual(["/tools/raid", "/tools/talents", "/tools/professions", "/tools"]);
 });
 
-test("Guides holds the guides, Legacy perks, lore and changes", () => {
-  expect(menuHrefs("Guides")).toEqual(["/guides", "/tools/legacy", "/lore", "/changes"]);
+test("Guides holds the guides that exist: dungeons and raids, Herbalism gathering, two docs guides, Legacy perks, lore and changes; the guides list only once one is reviewed", () => {
+  const today = ["/database/instances", "/tools/professions/herbalism/gathering", "/docs/guides/addon-directory", "/docs/guides/wiki", "/tools/legacy", "/lore", "/changes"];
+  expect(menuHrefs("Guides")).toEqual(today);
+  expect(menuHrefs("Guides", navItems({ reviewedGuides: true }))).toEqual(["/guides", ...today]);
 });
 
-test("Profile holds the account pages and the lists kept on this device; Settings and My builds follow their switches", () => {
-  expect(menuHrefs("Profile")).toEqual(["/account", "/tools/gold-ledger", "/tools/builds", "/tools/alts"]);
-  expect(menuHrefs("Profile", navItems({ profiles: true, savedBuilds: true }))).toEqual(["/account", "/settings", "/me", "/tools/gold-ledger", "/tools/builds", "/tools/alts"]);
+test("Profile holds Settings (the account since #1278) and the lists kept on this device; My builds follows its switch", () => {
+  expect(menuHrefs("Profile")).toEqual(["/settings", "/tools/gold-ledger", "/tools/builds", "/tools/alts"]);
+  expect(menuHrefs("Profile", navItems({ profiles: true, savedBuilds: true }))).toEqual(["/settings", "/me", "/tools/gold-ledger", "/tools/builds", "/tools/alts"]);
 });
 
 test("Farming, Collections and Upload are hidden until polished: no menu, phone menu or footer links them", () => {

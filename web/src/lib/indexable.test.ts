@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { ItemPage } from "../../../kb/src/item-page";
+import type { ItemPage } from "@kb/item-page";
 import { itemIndexable } from "./indexable";
 
 // With storage out of reach only the name decides, so the page itself is never read.

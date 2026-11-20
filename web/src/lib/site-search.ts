@@ -1,20 +1,23 @@
 import { tools, toolHref } from "@/data/tools";
 import { allDocsPages } from "@/lib/docs/nav";
 import { entityHref } from "@/components/EntityLink";
-import { describe } from "../../../kb/src/item-taxonomy";
-import { objectList } from "../../../kb/src/object-page";
+import { describe } from "@kb/item-taxonomy";
+import { objectList } from "@kb/object-page";
 import { achievementHref, chainHref, factionHref, loadCatalog, titleDisplayName, titleHref } from "./completion-lists";
 import { CLIENT_TAXONOMY } from "./items";
-import type { SearchHit } from "../../../kb/src/search";
+import type { SearchHit } from "@kb/search";
 import { classLabel } from "./class-context";
 import { CLASSES } from "@/design/tokens";
 import { instanceHref, instanceRows, instanceTitle, levelLabel, type InstanceRow } from "./instances";
-import { loreSlug, MAX_QUERY, searchLore, searchLoreSomeWords, UNAVAILABLE } from "./lore";
+import { laterExpansionPages, loreSlug, MAX_QUERY, searchLore, searchLoreSomeWords, UNAVAILABLE } from "./lore";
+import { byPhrase, byTypo, byWords, rank, respelling, type Match } from "./name-match";
 import { loadNames, type Names } from "./names";
 import { loadObjectFacts } from "./objects";
 import { loadWiki, publishedPages, wikiHref } from "./wiki";
 import { WORLD_MAP } from "./world-map";
 import { zoneHref } from "./zones";
+
+export { byTypo, editDistance } from "./name-match";
 
 /**
  * One page the search found. `exact` is an exact id or an exact name: those lead their group, and the page.
@@ -23,8 +26,11 @@ import { zoneHref } from "./zones";
  */
 export interface SearchResult { label: string; href: string; note?: string; exact: boolean; id?: number; quality?: number | null; meta?: string }
 export type SearchType = "class" | "item" | "npc" | "quest" | "object" | "achievement" | "faction" | "title" | "chain" | "zone" | "instance" | "guide" | "lore" | "tool" | "doc";
-/** `total` counts every match; `results` holds the first `limit` of them. */
-export interface SearchGroup { type: SearchType; heading: string; results: SearchResult[]; total: number; page?: number }
+/**
+ * `total` counts every match; `results` holds the first `limit` of them. `respelled` is how the typo fallback read the
+ * query ("linen cloth" for "lnen clth"), on every group when it fired.
+ */
+export interface SearchGroup { type: SearchType; heading: string; results: SearchResult[]; total: number; page?: number; respelled?: string }
 export const GROUP_LIMIT = 8;
 export const LORE_LIMIT = 5;
 
@@ -43,19 +49,13 @@ export const PAGED_SCOPES = ["achievement", "faction", "title", "chain", "zone",
 export type ResultScope = Scope | (typeof PAGED_SCOPES)[number];
 export const isPagedScope = (v: unknown): v is (typeof PAGED_SCOPES)[number] => (PAGED_SCOPES as readonly unknown[]).includes(v);
 export const isResultScope = (v: unknown): v is ResultScope => isScope(v) || isPagedScope(v);
-/** 0 exact, 1 starts with, 2 contains, null no match; both sides lowercase. */
-function rank(name: string, q: string): number | null {
-  if (name === q) return 0;
-  if (name.startsWith(q)) return 1;
-  return name.includes(q) ? 2 : null;
-}
 
 /** Every match of `entries`, best first (exact name, then prefix, then contains, then alphabetical). */
-function byName<T extends { name: string }>(entries: Iterable<T>, q: string): { entry: T; exact: boolean; r: number }[] {
+function byName<T extends { name: string }>(entries: Iterable<T>, match: Match): { entry: T; exact: boolean; r: number }[] {
   const hits: { entry: T; r: number; n: string }[] = [];
   for (const entry of entries) {
     const n = entry.name.toLowerCase();
-    const r = rank(n, q);
+    const r = match(n);
     if (r !== null) hits.push({ entry, r, n });
   }
   return hits.sort((a, b) => a.r - b.r || a.n.localeCompare(b.n)).map((h) => ({ entry: h.entry, exact: h.r === 0, r: h.r }));
@@ -79,12 +79,38 @@ function itemFacts(id: number): Pick<SearchResult, "quality" | "meta"> {
 
 const WORD = { item: "Item", npc: "NPC", quest: "Quest" } as const;
 
+/** One name of a name map, with its lowercase form for matching. */
+export interface NamedRow { id: number; name: string; n: string }
+const sortedRows = new WeakMap<Map<number, string>, NamedRow[]>();
+/**
+ * A name map's rows in name order, built once per map: the maps are replaced when the corpus or a names file
+ * reloads, so each keystroke matches against the same array instead of copying and sorting the whole map.
+ */
+export function sortedNames(names: Map<number, string>): NamedRow[] {
+  let rows = sortedRows.get(names);
+  if (!rows) {
+    rows = [...names].map(([id, name]) => ({ id, name, n: name.toLowerCase() })).sort((a, b) => a.n.localeCompare(b.n));
+    sortedRows.set(names, rows);
+  }
+  return rows;
+}
+
+/** `byName` over rows already in name order: a stable sort by rank keeps the name order within a rank. */
+function bySortedName(rows: readonly NamedRow[], match: Match): { entry: NamedRow; exact: boolean; r: number }[] {
+  const hits: { entry: NamedRow; exact: boolean; r: number }[] = [];
+  for (const entry of rows) {
+    const r = match(entry.n);
+    if (r !== null) hits.push({ entry, exact: r === 0, r });
+  }
+  return hits.sort((a, b) => a.r - b.r);
+}
+
 /** Exact id first (any id opens its page), then the agreed names that match, best first. */
-function agreed(kind: "item" | "npc" | "quest", names: Map<number, string>, q: string, id: number | null): { results: (SearchResult & { r: number })[]; total: number } {
+function agreed(kind: "item" | "npc" | "quest", names: Map<number, string>, match: Match, id: number | null): { results: (SearchResult & { r: number })[]; total: number } {
   const out: (SearchResult & { r: number })[] = [];
   const extra = (n: number) => (kind === "item" ? itemFacts(n) : {});
   if (id !== null) out.push({ label: names.get(id) ?? `${WORD[kind]} ${id}`, href: entityHref(kind, id), note: `id ${id}`, exact: true, id, r: -1, ...extra(id) });
-  const rows = byName([...names].map(([n, name]) => ({ id: n, name })), q).filter(({ entry }) => entry.id !== id);
+  const rows = bySortedName(sortedNames(names), match).filter(({ entry }) => entry.id !== id);
   for (const { entry, exact, r } of rows) out.push({ label: entry.name, href: entityHref(kind, entry.id), note: `id ${entry.id}`, exact, id: entry.id, r, ...extra(entry.id) });
   return { results: out, total: out.length };
 }
@@ -94,11 +120,11 @@ let instanceList: InstanceRow[] | null = null;
  * Dungeons and raids, the rows /database/instances lists from the game files (an entrance in a held-back zone is
  * left out, as there), by name with or without a leading "The": best first, then by name. Read once per process.
  */
-function instanceHits(q: string): (SearchResult & { id: number; r: number })[] {
+function instanceHits(match: Match): (SearchResult & { id: number; r: number })[] {
   instanceList ??= [...instanceRows().values()];
   return instanceList.flatMap((row) => {
     const t = instanceTitle(row).toLowerCase();
-    const r = Math.min(rank(t, q) ?? 9, rank(t.replace(/^the /, ""), q) ?? 9, rank(`the ${t}`, q) ?? 9);
+    const r = Math.min(match(t) ?? 9, match(t.replace(/^the /, "")) ?? 9, match(`the ${t}`) ?? 9);
     if (r === 9) return [];
     const level = levelLabel(row.level);
     const note = [row.raid === null ? "Instance" : row.raid ? "Raid" : "Dungeon", level && `level ${level}`].filter(Boolean).join(", ");
@@ -106,16 +132,60 @@ function instanceHits(q: string): (SearchResult & { id: number; r: number })[] {
   }).sort((a, b) => a.r - b.r || a.label.localeCompare(b.label));
 }
 
-/** Names and ids from the same public object list as /database/objects; unavailable facts yield no hits. */
-async function objectHits(q: string, id: number | null, names: Map<number, string>): Promise<(SearchResult & { r: number })[]> {
-  const facts = await loadObjectFacts();
-  if (facts.unreachable) return [];
-  const publicIds = new Set(objectList(facts).map((o) => o.objectId));
+/** Released zones on the map by name, best first, as the zone group of /search lists them. */
+function zoneHits(match: Match): { id: number; label: string; href: string; exact: boolean; r: number }[] {
+  return byName(WORLD_MAP.zones.map((z) => ({ id: z.uiMapId, name: z.name })), match)
+    .map(({ entry, exact, r }) => ({ id: entry.id, label: entry.name, href: zoneHref(entry.id, entry.name), exact, r }));
+}
+
+type ObjectFacts = Awaited<ReturnType<typeof loadObjectFacts>>;
+const publicObjects = new WeakMap<object, WeakMap<object, Set<number>>>();
+const namedObjects = new WeakMap<Map<number, string>, WeakMap<Set<number>, NamedRow[]>>();
+/**
+ * The ids /database/objects lists, and the named ones in name order. The rate arrays stay the same object while the
+ * rollup does, so the list and the rows are built once per rollup and names version, not per keystroke.
+ */
+function objectRows(facts: ObjectFacts, names: Map<number, string>): { ids: Set<number>; rows: NamedRow[] } {
+  let byZeros = publicObjects.get(facts.rates);
+  if (!byZeros) { byZeros = new WeakMap(); publicObjects.set(facts.rates, byZeros); }
+  let ids = byZeros.get(facts.measuredZeros);
+  if (!ids) { ids = new Set(objectList(facts).map((o) => o.objectId)); byZeros.set(facts.measuredZeros, ids); }
+  return { ids, rows: objectRowsOf(ids, names) };
+}
+
+/** The named objects among `ids`, in name order, built once per id set and names version. */
+function objectRowsOf(ids: Set<number>, names: Map<number, string>): NamedRow[] {
+  let byIds = namedObjects.get(names);
+  if (!byIds) { byIds = new WeakMap(); namedObjects.set(names, byIds); }
+  let rows = byIds.get(ids);
+  if (!rows) { rows = sortedNames(names).filter((row) => ids.has(row.id)); byIds.set(ids, rows); }
+  return rows;
+}
+
+/**
+ * Names and ids from the same public object list as /database/objects: the list's ids when the caller holds them (the
+ * stored search names file), else from the object facts; unavailable facts yield no hits.
+ */
+async function objectHits(match: Match, id: number | null, names: Map<number, string>, read: Promise<ObjectFacts> | Set<number> = loadObjectFacts()): Promise<(SearchResult & { r: number })[]> {
+  let ids: Set<number>, rows: NamedRow[];
+  if (read instanceof Set) { ids = read; rows = objectRowsOf(ids, names); } else {
+    const facts = await read;
+    if (facts.unreachable) return [];
+    ({ ids, rows } = objectRows(facts, names));
+  }
   const out: (SearchResult & { r: number })[] = [];
-  if (id !== null && publicIds.has(id)) out.push({ label: names.get(id) ?? `Object ${id}`, href: entityHref("object", id), note: `id ${id}`, exact: true, id, r: -1 });
-  const named = [...names].filter(([n]) => publicIds.has(n) && n !== id).map(([n, name]) => ({ id: n, name }));
-  for (const { entry, exact, r } of byName(named, q)) out.push({ label: entry.name, href: entityHref("object", entry.id), note: `id ${entry.id}`, exact, id: entry.id, r });
+  if (id !== null && ids.has(id)) out.push({ label: names.get(id) ?? `Object ${id}`, href: entityHref("object", id), note: `id ${id}`, exact: true, id, r: -1 });
+  for (const { entry, exact, r } of bySortedName(rows, match)) if (entry.id !== id) out.push({ label: entry.name, href: entityHref("object", entry.id), note: `id ${entry.id}`, exact, id: entry.id, r });
   return out;
+}
+
+/** The lore archive's hits, and its some-words hits when no page has every word; null when the archive is out of reach. */
+async function loreHits(text: string): Promise<{ hits: SearchHit[]; some: SearchHit[] | null } | null> {
+  const lore = await searchLore(text, 1);
+  if (lore === UNAVAILABLE) return null;
+  if (lore.hits.length) return { hits: lore.hits, some: null };
+  const some = await searchLoreSomeWords(text, LORE_LIMIT);
+  return { hits: lore.hits, some: some === UNAVAILABLE ? null : some };
 }
 
 /**
@@ -123,8 +193,10 @@ async function objectHits(q: string, id: number | null, names: Map<number, strin
  * `names` when a page passes the ones it shows (never the API's caller); zones are the released ones on the map,
  * lore comes from the archive, tools from the tool list. A group with an exact id or name match comes first; an
  * empty group is left out. `only` keeps one result type; `limit` is the rows per group. Paged scopes clamp the page to the last match and return at most 50 rows.
+ * `objects` is the ids /database/objects lists when the caller already holds them (the stored search names file): the
+ * object group then reads no facts.
  */
-export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page = 1, names: given }: { only?: ResultScope; limit?: number; page?: number; names?: Names | Promise<Names> } = {}): Promise<SearchGroup[]> {
+export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page = 1, names: given, objects }: { only?: ResultScope; limit?: number; page?: number; names?: Names | Promise<Names>; objects?: Set<number> | Promise<Set<number> | undefined> } = {}): Promise<SearchGroup[]> {
   const text = raw.trim().slice(0, MAX_QUERY);
   const q = text.toLowerCase();
   if (!q) return [];
@@ -134,17 +206,47 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
 
   const paged = isPagedScope(only);
   if (paged) limit = Number.isFinite(limit) ? Math.max(1, Math.min(50, Math.floor(limit))) : 50;
-  // Neither read depends on the other. Item, NPC, quest and object scopes do not need the completion catalogue.
+  // No read depends on another, so they all start now. Item, NPC, quest and object scopes do not need the completion
+  // catalogue; only the unscoped page asks the lore archive.
+  // The object ids the caller holds, else the facts, both started now; a caller's promise that settles to no ids
+  // (the aggregate path) reads the facts once the names are in, which that path has loaded by then.
+  const objectsRead: Promise<ObjectFacts> | Promise<Set<number> | undefined> | Set<number> | null = want("object") ? (objects === undefined ? loadObjectFacts() : objects) : null;
+  const loreRead = only ? null : loreHits(text);
+  // A failed name read rejects the search before these are awaited; their own failure must not go unhandled then.
+  if (objectsRead instanceof Promise) objectsRead.catch(() => {});
+  loreRead?.catch(() => {});
   const [names, catalog] = await Promise.all([given ?? loadNames(), only && !paged ? null : loadCatalog()]);
-  for (const kind of ["item", "npc", "quest"] as const) if (want(kind)) found.set(kind, agreed(kind, names[`${kind}s`], q, id));
-  if (want("object")) { const objects = await objectHits(q, id, names.objects); found.set("object", { results: objects, total: objects.length }); }
+  // The things a player meets in the game, by every typed word in any order; when none matches and no id was typed, by
+  // the same words within a typo or two, and the groups say how the fallback read the query.
+  const game = async (match: Match) => {
+    const hits = new Map<SearchType, (SearchResult & { r: number })[]>();
+    for (const kind of ["item", "npc", "quest"] as const) if (want(kind)) hits.set(kind, agreed(kind, names[`${kind}s`], match, id).results);
+    if (objectsRead) {
+      const held = await objectsRead;
+      hits.set("object", await objectHits(match, id, names.objects, held instanceof Set ? held : held === undefined ? loadObjectFacts() : Promise.resolve(held)));
+    }
+    if (!only || paged) {
+      if (want("zone")) hits.set("zone", zoneHits(match).map(({ label, href, exact, r }) => ({ label, href, note: "zone", exact, r })));
+      if (want("instance")) hits.set("instance", instanceHits(match));
+    }
+    return hits;
+  };
+  let hits = await game(byWords(q));
+  let respelled: string | undefined;
+  const typo = id === null && [...hits.values()].every((h) => h.length === 0) ? byTypo(q) : null;
+  if (typo) {
+    const near = await game(typo);
+    const best = [...near.values()].flat().sort((a, b) => a.r - b.r)[0];
+    if (best) { hits = near; respelled = respelling(q, best.label); }
+  }
+  for (const [type, results] of hits) found.set(type, { results, total: results.length });
 
   if (!only || paged) {
     // Achievements, factions, titles and quest chains three players reported, by name or id; none when the rollup cannot be read.
     if (catalog) {
       const hit = (label: string, href: string, n: number, exact: boolean): SearchResult => ({ label, href, note: `id ${n}`, exact, id: n });
-      const achievements = byName(catalog.achievements, q).map(({ entry, exact }) => hit(entry.name, achievementHref(entry.achievementId, entry.name), entry.achievementId, exact));
-      const factions = byName(catalog.factions, q).map(({ entry, exact }) => hit(entry.name, factionHref(entry.factionId, entry.name), entry.factionId, exact));
+      const achievements = byName(catalog.achievements, byWords(q)).map(({ entry, exact }) => hit(entry.name, achievementHref(entry.achievementId, entry.name), entry.achievementId, exact));
+      const factions = byName(catalog.factions, byWords(q)).map(({ entry, exact }) => hit(entry.name, factionHref(entry.factionId, entry.name), entry.factionId, exact));
       if (id !== null) {
         const a = catalog.achievements.find((x) => x.achievementId === id), f = catalog.factions.find((x) => x.factionId === id);
         if (a && !achievements.some((r) => r.id === id)) achievements.unshift(hit(a.name, achievementHref(id, a.name), id, true));
@@ -152,8 +254,8 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
       }
       found.set("achievement", { results: achievements, total: achievements.length });
       found.set("faction", { results: factions, total: factions.length });
-      const titles = byName(catalog.titles, q).map(({ entry, exact }) => hit(titleDisplayName(entry.name), titleHref(entry.titleId, entry.name), entry.titleId, exact));
-      const chains = byName(catalog.chains, q).map(({ entry, exact }) => hit(entry.name, chainHref(entry.questLineId, entry.name), entry.questLineId, exact));
+      const titles = byName(catalog.titles, byWords(q)).map(({ entry, exact }) => hit(titleDisplayName(entry.name), titleHref(entry.titleId, entry.name), entry.titleId, exact));
+      const chains = byName(catalog.chains, byWords(q)).map(({ entry, exact }) => hit(entry.name, chainHref(entry.questLineId, entry.name), entry.questLineId, exact));
       if (id !== null) {
         const t = catalog.titles.find((x) => x.titleId === id), c = catalog.chains.find((x) => x.questLineId === id);
         if (t && !titles.some((r) => r.id === id)) titles.unshift(hit(titleDisplayName(t.name), titleHref(id, t.name), id, true));
@@ -162,14 +264,6 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
       found.set("title", { results: titles, total: titles.length });
       found.set("chain", { results: chains, total: chains.length });
     }
-
-    const zones = byName(WORLD_MAP.zones.map((z) => ({ id: z.uiMapId, name: z.name })), q)
-      .map(({ entry, exact }) => ({ label: entry.name, href: zoneHref(entry.id, entry.name), note: "zone", exact }));
-    found.set("zone", { results: zones, total: zones.length });
-
-    const instances = instanceHits(q).map(({ r: _r, ...hit }) => hit);
-    found.set("instance", { results: instances, total: instances.length });
-
   }
 
   if (!only) {
@@ -189,15 +283,20 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
     }).sort((a, b) => a.r - b.r).map(({ r: _r, ...hit }) => hit);
     found.set("guide", { results: guides, total: guides.length });
 
-    const lore = await searchLore(text, 1);
-    if (lore !== UNAVAILABLE) {
+    const lore = await loreRead;
+    if (lore) {
+      // When the words also name something in WoW: Forever, the lore pages about later expansions (their wiki
+      // categories name only expansions after the original game: Mechagon, the Argent Tournament) are left out.
+      const forever = [...GAME].some((t) => (found.get(t)?.total ?? 0) > 0);
+      const later = forever ? await laterExpansionPages([...lore.hits, ...(lore.some ?? [])].map((h) => h.id)) : new Set<number>();
+      const kept = (hits: SearchHit[]) => hits.filter((h) => !later.has(h.id));
       const loreHit = (h: SearchHit) => ({ label: h.name, href: `/lore/${loreSlug(h)}`, note: h.snippet, exact: h.name.toLowerCase() === q });
-      const some = lore.hits.length ? [] : await searchLoreSomeWords(text, LORE_LIMIT);
-      if (lore.hits.length || some === UNAVAILABLE) {
-        const hits = lore.hits.map(loreHit);
+      if (lore.hits.length || !lore.some) {
+        const hits = kept(lore.hits).map(loreHit);
         found.set("lore", { results: hits.slice(0, LORE_LIMIT), total: hits.length });
       } else {
-        found.set("lore", { results: some.map(loreHit), total: some.length, heading: LORE_SOME_WORDS });
+        const some = kept(lore.some).map(loreHit);
+        found.set("lore", { results: some, total: some.length, heading: LORE_SOME_WORDS });
       }
     }
 
@@ -221,7 +320,7 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
       const f = found.get(type) ?? { results: [], total: 0 };
       const current = paged ? Math.min(Math.max(1, Math.floor(page) || 1), Math.max(1, Math.ceil(f.total / limit))) : 1;
       const start = (current - 1) * limit;
-      return { type, heading: f.heading ?? HEADINGS[type], results: f.results.slice(start, start + limit).map(strip), total: f.total, ...(paged ? { page: current } : {}) };
+      return { type, heading: f.heading ?? HEADINGS[type], results: f.results.slice(start, start + limit).map(strip), total: f.total, ...(paged ? { page: current } : {}), ...(respelled ? { respelled } : {}) };
     })
     .filter((g) => want(g.type) && g.results.length > 0)
     .map((g, i) => ({ g, i, tier: tier(g) }))
@@ -235,12 +334,12 @@ const DATABASE: ReadonlySet<SearchType> = new Set([...GAME, "class", "achievemen
 
 /**
  * Where a group sits, lowest first; the order above within a tier. An exact name or id on a game entry leads,
- * then any other exact hit, then the game entries, then the rest of the database. The lore archive (Warcraft
- * Wiki copies) comes after every database group, even on an exact name: the Forever record comes first.
+ * then any other exact hit, then the game entries, then the rest of the database, tools and docs. The lore archive
+ * (Warcraft Wiki copies) comes after every other group, even on an exact name: the Forever record comes first.
  */
 function tier(g: SearchGroup): number {
   const exact = g.results.some((r) => r.exact);
-  if (g.type === "lore") return 4;
+  if (g.type === "lore") return 6;
   if (exact) return GAME.has(g.type) ? 0 : 1;
   return GAME.has(g.type) ? 2 : DATABASE.has(g.type) ? 3 : 5;
 }
@@ -253,38 +352,49 @@ function strip(result: SearchResult & { r?: number }): SearchResult {
 }
 
 /**
- * One instant suggestion under a search box: an item, NPC, quest or object page, or (unscoped only) a dungeon or
- * raid page, whose `note` says which and its level ("Dungeon, level 16").
+ * One instant suggestion under a search box: an item, NPC, quest or object page, or (unscoped only) a zone page, or
+ * a dungeon or raid page whose `note` says which and its level ("Dungeon, level 16").
  */
-export interface Suggestion { type: Scope | "instance"; id: number; label: string; href: string; quality?: number | null; note?: string }
+export interface Suggestion { type: Scope | "zone" | "instance"; id: number; label: string; href: string; quality?: number | null; note?: string }
 export const SUGGEST_LIMIT = 8;
 
 /**
  * Up to 8 pages for a search box as the visitor types: an exact id first, then exact names, then names that
- * start with the text, then names that contain it, across items, NPCs, quests, objects and, unscoped, dungeons and
- * raids (or one of the first four). Names only where players agree on them, as on /search; instances from the
- * same rows as /search; no lore or tools, so it stays cheap per keystroke.
+ * start with the text, then names that contain it, across items, NPCs, quests, objects and, unscoped, zones, dungeons
+ * and raids (or one of the first four). Names only where players agree on them, as on /search; instances from the
+ * same rows as /search; no lore or tools, so it stays cheap per keystroke. `tolerant` (the site's own boxes) also
+ * matches the words in any order and, when nothing matches and no id was typed, within a typo or two, as /search
+ * does; without it (/api/suggest) the text matches as one phrase, as it always has. `objects` as for siteSearch.
  */
-export async function suggest(raw: string, scope?: Scope, names?: Names): Promise<Suggestion[]> {
+export async function suggest(raw: string, scope?: Scope, names?: Names, { tolerant = false, objects }: { tolerant?: boolean; objects?: Set<number> } = {}): Promise<Suggestion[]> {
   const q = raw.trim().slice(0, MAX_QUERY).toLowerCase();
   if (!q) return [];
   const id = exactId(q);
   const all = names ?? await loadNames();
   const order: Scope[] = scope ? [scope] : [...SCOPES];
-  const ranked: { s: Suggestion; r: number; t: number }[] = [];
-  for (const [t, type] of order.entries()) {
-    if (type === "object") {
-      for (const o of (await objectHits(q, id, all.objects)).slice(0, SUGGEST_LIMIT)) ranked.push({ s: { type, id: o.id!, label: o.label, href: o.href }, r: o.r, t });
-      continue;
+  const rows = async (match: Match) => {
+    const ranked: { s: Suggestion; r: number; t: number }[] = [];
+    for (const [t, type] of order.entries()) {
+      if (type === "object") {
+        for (const o of (await objectHits(match, id, all.objects, objects)).slice(0, SUGGEST_LIMIT)) ranked.push({ s: { type, id: o.id!, label: o.label, href: o.href }, r: o.r, t });
+        continue;
+      }
+      for (const x of agreed(type, all[`${type}s`], match, id).results.slice(0, SUGGEST_LIMIT)) {
+        ranked.push({ s: { type, id: x.id!, label: x.label, href: x.href, ...(type === "item" ? { quality: x.quality ?? null } : {}) }, r: x.r, t });
+      }
     }
-    for (const x of agreed(type, all[`${type}s`], q, id).results.slice(0, SUGGEST_LIMIT)) {
-      ranked.push({ s: { type, id: x.id!, label: x.label, href: x.href, ...(type === "item" ? { quality: x.quality ?? null } : {}) }, r: x.r, t });
+    if (!scope) {
+      for (const x of zoneHits(match).slice(0, SUGGEST_LIMIT)) {
+        ranked.push({ s: { type: "zone", id: x.id, label: x.label, href: x.href, note: "Zone" }, r: x.r, t: order.length });
+      }
+      for (const x of instanceHits(match).slice(0, SUGGEST_LIMIT)) {
+        ranked.push({ s: { type: "instance", id: x.id, label: x.label, href: x.href, note: x.note }, r: x.r, t: order.length + 1 });
+      }
     }
-  }
-  if (!scope) {
-    for (const x of instanceHits(q).slice(0, SUGGEST_LIMIT)) {
-      ranked.push({ s: { type: "instance", id: x.id, label: x.label, href: x.href, note: x.note }, r: x.r, t: order.length });
-    }
-  }
-  return ranked.sort((a, b) => a.r - b.r || a.t - b.t).slice(0, SUGGEST_LIMIT).map((x) => x.s);
+    return ranked.sort((a, b) => a.r - b.r || a.t - b.t).slice(0, SUGGEST_LIMIT).map((x) => x.s);
+  };
+  if (!tolerant) return rows(byPhrase(q));
+  const found = await rows(byWords(q));
+  const typo = found.length === 0 && id === null ? byTypo(q) : null;
+  return typo ? rows(typo) : found;
 }

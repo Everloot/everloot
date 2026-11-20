@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
-import { objectList } from "../../../../../kb/src/object-page";
+import { objectList } from "@kb/object-page";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
 import { loadObjectFacts } from "@/lib/objects";
 import { objectNames } from "@/lib/names";
 import { MAX_QUERY } from "@/lib/lore";
 import { LINK } from "../entity";
-import { listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, sortParam, sortRows, Unreadable, type ListQuery, type Search } from "../list-parts";
+import { byRank, nameMatches, Respelled, listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, sortParam, sortRows, Unreadable, type ListQuery, type Search } from "../list-parts";
 
 const META = {
   title: "WoW Forever objects: chests, herbs and ore",
@@ -49,11 +49,12 @@ export default async function ObjectsPage(props: { searchParams?: Promise<Search
   // Numbers still find unnamed objects; text matches only names players agree on.
   const id = q.q && /^#?\d+$/.test(q.q) ? Number(q.q.replace("#", "")) : null;
   const text = q.q?.toLowerCase();
-  const matched = text ? all.filter((o) => o.objectId === id || names.get(o.objectId)?.toLowerCase().includes(text)) : all;
+  const { ranked, respelled } = nameMatches(all, text, id, (o) => names.get(o.objectId));
+  const matched = text ? all.filter((o) => o.objectId === id || ranked!.has(o)) : all;
   const sort = q.sort ?? DEFAULT_SORT;
   const key = (o: Row): string | number | null => sort.key === "name" ? names.get(o.objectId)?.toLowerCase() ?? null
     : sort.key === "windows" ? o.windows : sort.key === "items" ? o.items : sort.key === "installs" ? o.reporters : o.objectId;
-  const rows = sortRows(matched, key, sort.desc, (o) => o.objectId);
+  const rows = byRank(sortRows(matched, key, sort.desc, (o) => o.objectId), ranked, Boolean(q.sort));
   const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
   if (q.page > pages) notFound();
   const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
@@ -90,6 +91,7 @@ export default async function ObjectsPage(props: { searchParams?: Promise<Search
           active={q.q ? 1 : 0}
           clearHref="/database/objects"
         />
+        {respelled && rows.length > 0 && <Respelled q={respelled} />}
         <div className="mt-2">
           <DataTable
             dense

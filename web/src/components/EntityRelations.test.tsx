@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test, vi } from "vitest";
-import type { Edge } from "../../../kb/src/edges";
+import type { Edge } from "@kb/edges";
 
+const links = vi.hoisted(() => [] as { href: string; prefetch?: boolean }[]);
 vi.mock("next/link", () => ({
-  default: ({ href, title, children }: { href: string; title?: string; children: ReactNode }) => <a href={href} title={title}>{children}</a>,
+  default: ({ href, title, children, prefetch }: { href: string; title?: string; children: ReactNode; prefetch?: boolean }) => { links.push({ href, prefetch }); return <a href={href} title={title}>{children}</a>; },
 }));
 
 import { EntityRelations, RelationTarget, SameIcon } from "./EntityRelations";
@@ -86,4 +87,11 @@ test("items sharing an icon: named ones are links with their icon, nameless ones
   const bare = renderToStaticMarkup(<SameIcon edge={icon[0]} self={10} client={icon} />);
   expect(bare).toContain("4 items with no name yet");
   expect(bare).not.toContain("<a ");
+});
+
+test("relation rows (Sold by, Created by, Used in) load their pages on click, not all at once as the tab renders", () => {
+  links.length = 0;
+  renderToStaticMarkup(<EntityRelations kind="item" id={2862} observed={observed} client={edges} skip={["dropped_by"]} />);
+  expect(links.map((l) => l.href)).toContain("/database/vendors/1250");
+  expect(links.filter((l) => l.prefetch !== false)).toEqual([]);
 });

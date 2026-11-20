@@ -392,11 +392,15 @@ test("a missing content version disables the cache instead of sharing a made-up 
   expect(store.entries.size).toBe(0);
 });
 
-test("the suggest box shares one cache key for a query however it is cased or padded", () => {
+test("search and the suggest boxes share one cache key for a query however it is cased or padded", () => {
   const key = (u: string) => edgeCacheKey(new Request(u), "v1").url;
-  expect(key("https://everloot.app/api/suggest?q=Thunder")).toBe(key("https://everloot.app/api/suggest?q=thunder%20"));
-  expect(key("https://everloot.app/api/suggest?q=thunder")).not.toBe(key("https://everloot.app/api/suggest?q=thunderfury"));
-  expect(key("https://everloot.app/search?q=Thunder")).not.toBe(key("https://everloot.app/search?q=thunder"));
+  for (const path of ["/api/suggest", "/search/suggest", "/search"]) {
+    expect(key(`https://everloot.app${path}?q=Thunder`), path).toBe(key(`https://everloot.app${path}?q=thunder%20`));
+    expect(key(`https://everloot.app${path}?q=thunder`), path).not.toBe(key(`https://everloot.app${path}?q=thunderfury`));
+  }
+  expect(key("https://everloot.app/search?q=%20Thrall&in=npc")).toBe("https://everloot.app/search?in=npc&q=thrall&__edge_version=v1");
+  // Other pages keep their text as sent.
+  expect(key("https://everloot.app/database/npcs?q=Thunder")).not.toBe(key("https://everloot.app/database/npcs?q=thunder"));
 });
 
 test.each(["item/2589", "spell/10", "vendor/3934"])("a %s hover card is cached for every visitor: its credentials never reach the handler or key", async (cardPath) => {
@@ -445,6 +449,35 @@ test("only the card route drops credentials: a page, a card spelled another way 
   expect(card.headers.get("accept")).toBe("application/json");
   expect(card.url).toBe("https://everloot.app/database/card/npc/448?utm_source=x");
   expect(edgeCacheable(card)).toBe(true);
+});
+
+test.each([
+  "/tools/auctions",
+  "/tools/auctions/camwow-us1-realm-4-pvp",
+  "/tools/auctions/camwow-us1-realm-4-pvp/2589",
+  "/tools/auctions/item/2589",
+  "/tools/auctions/camwow-us1-realm-4-pvp/changes",
+])("the public auction page %s drops credentials: a signed-in visitor reads the shared copy", (path) => {
+  const req = new Request(`https://everloot.app${path}?house=horde`, { headers: { cookie: "__Secure-everloot.session_token=abc; cf_clearance=x", authorization: "Bearer t" } });
+  const prepared = withoutCredentials(req);
+  expect(prepared.headers.has("cookie")).toBe(false);
+  expect(prepared.headers.has("authorization")).toBe(false);
+  expect(prepared.url).toBe(req.url);
+  expect(edgeCacheable(prepared)).toBe(true);
+});
+
+test.each([
+  // Pages that read a cookie, a session or one install's data, or are private.
+  "/tools/collections", "/tools/gold-ledger", "/tools/alts", "/blizzard-auctions", "/me",
+  // The market report is not a browse, realm or item page.
+  "/tools/auctions/report", "/tools/auctions/report/2026-11-17",
+  // Spellings the auction pages redirect or refuse: they keep their credentials and bypass the cache.
+  "/tools/auctions/", "/tools/auctions/CamWow-US1", "/tools/auctions/realm/02589", "/tools/auctions/realm/2589/extra", "/tools/auctionsx",
+  "/tools/auctions/CamWow-US1/changes", "/tools/auctions/realm/changes/extra", "/tools/auctions/report/changes",
+])("%s keeps its credentials and bypasses the shared cache", (path) => {
+  const req = new Request(`https://everloot.app${path}`, { headers: { cookie: "session=private" } });
+  expect(withoutCredentials(req)).toBe(req);
+  expect(edgeCacheable(withoutCredentials(req))).toBe(false);
 });
 
 test("the edge-check header the deploy warm-up and audits send changes neither whether a page is cached nor its key", () => {

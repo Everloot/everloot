@@ -56,7 +56,7 @@ test("every kind the protocol declares has a page, and its fields come from its 
   for (const kind of ALL_RECORD_KINDS) {
     const html = decode(await render(kind));
     expect(html, kind).toContain(`>${kind}</span>`);
-    expect(html, kind).toContain('>kind</code><span class="rounded-[4px] bg-panel px-1.5 font-mono text-xs text-fg-2">exactly ' + kind);
+    expect(html, kind).toContain('>kind</code><span class="rounded-control bg-panel px-1.5 font-mono text-xs text-fg-2">exactly ' + kind);
     expect(recordFields(kind).length, kind).toBeGreaterThan(3);
   }
 });

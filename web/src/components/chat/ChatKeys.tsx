@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import Card from "@/components/ui/Card";
 import { testKey } from "@/lib/chat/agent";
 import { providerStorage } from "@/lib/chat/provider-session";
 import { inkOn, listModels } from "@/lib/chat/catalogue";
@@ -111,7 +112,7 @@ function ProviderCard({ preset, saved, isDefault, busy, onSave, onTest, onRemove
   const close = () => { setEditing(false); setTimeout(() => opener.current?.focus(), 0); };
 
   return (
-    <section aria-labelledby={`${id}-name`} className="space-y-3 rounded-card border border-line bg-panel p-4">
+    <Card as="section" padding="sm" aria-labelledby={`${id}-name`} className="space-y-3">
       <div className="flex items-start gap-3">
         <ProviderTile preset={preset} />
         <div className="min-w-0 flex-1">
@@ -164,12 +165,12 @@ function ProviderCard({ preset, saved, isDefault, busy, onSave, onTest, onRemove
         </a>
         {" · "}{preset.dataNote}
       </p>
-    </section>
+    </Card>
   );
 }
 
 /**
- * The Chat keys section of /account: one card per provider Chat supports, each with its key's status, its model and
+ * The Chat keys part of /settings: one card per provider Chat supports, each with its key's status, its model and
  * Add, Replace, Test and Remove, and the default provider Chat uses. Everything is read from and written to this
  * tab's sessionStorage (lib/chat/store.ts); nothing here talks to Everloot. Test sends the key to its own
  * provider only.

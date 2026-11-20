@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AgreementMeter, type SortDirection } from "@/components/ui";
 import { pageMetadata } from "@/lib/seo";
+import { matchNames } from "@/lib/name-match";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 
 // What the database lists other than items share: their query strings, their indexing rule and their empty
@@ -24,6 +25,29 @@ export function listQuery<K extends string>(search: Search, sorts: readonly K[])
   if (page !== undefined && !/^[1-9]\d{0,4}$/.test(page)) return null;
   const q = one(search, "q")?.trim().slice(0, 60);
   return { ...(q ? { q } : {}), ...(sorted ? { sort: { key: sorted[2] as K, desc: sorted[1] === "-" } } : {}), page: page === undefined ? 1 : Number(page) };
+}
+
+/**
+ * A list's text matches, as /search matches them (lib/name-match.ts): each row keyed to its rank, lowest best, or
+ * null without text. An id keeps each list's own rule, so with one typed no typo is read.
+ */
+export function nameMatches<T>(rows: readonly T[], text: string | undefined, id: number | null, name: (row: T) => string | null | undefined): { ranked: Map<T, number> | null; respelled?: string } {
+  if (!text) return { ranked: null };
+  const found = matchNames(rows, text, name, { typo: id === null });
+  return { ranked: new Map(found.hits.map((h) => [h.row, h.r])), ...(found.respelled ? { respelled: found.respelled } : {}) };
+}
+
+/**
+ * Text matches best first (an exact name leads) unless a sort was asked for; the list's own order holds within a rank.
+ * A row the text never ranked is one the list kept by its id (the objects list keeps both): it leads, as on /search.
+ */
+export function byRank<T>(rows: T[], ranked: Map<T, number> | null, sorted: boolean): T[] {
+  return ranked && !sorted ? [...rows].sort((a, b) => (ranked.get(a) ?? -1) - (ranked.get(b) ?? -1)) : rows;
+}
+
+/** The one line above a list when the typo fallback read the query, as /search says it. */
+export function Respelled({ q }: { q: string }) {
+  return <p data-respelled className="mb-2 text-cell text-fg-2">Showing results for {q}</p>;
 }
 
 /** `?drops=1`: true, absent: undefined, anything else: null. */

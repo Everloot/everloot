@@ -2,7 +2,7 @@ import { createRequire } from "node:module";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
-import { emptyMarket, foldMarket, formatCopper } from "../../../../../kb/src/market";
+import { emptyMarket, foldMarket, formatCopper } from "@kb/market";
 import { DISENCHANT_BUILD } from "@/lib/disenchant";
 
 const store = vi.hoisted(() => ({ loadMarket: vi.fn(), loadCorpus: vi.fn() }));
@@ -105,4 +105,14 @@ test("the page names its sources and its method, and an unreadable store is unre
   expect(html).toContain("5% on the faction houses, 15% on the neutral one");
   store.loadMarket.mockResolvedValue({ state: null, dataAsOf: null });
   expect(text(await page({ realm: "forever", house: "horde" }))).toContain("Market values are unavailable right now. They are unrecorded, not zero.");
+});
+
+test("the realm and house picker reads ?realm= and ?house= as the old form did and replaces its selects", async () => {
+  // A link saved from the old form (realm and house as select values) shows the same house.
+  const html = await page({ realm: "forever", house: "horde" });
+  expect(text(html)).toContain("Horde auction house on Forever");
+  expect(html).toContain("data-realm-house-picker");
+  expect(html).not.toMatch(/<select[^>]*name="(?:realm|house)"/);
+  expect(html).toContain('href="/tools/disenchanting?realm=forever&amp;house=alliance"');
+  expect(html).toContain('href="/tools/disenchanting?realm=forever&amp;house=neutral"');
 });

@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-const field = "w-full min-h-11 rounded-lg border border-edge bg-canvas px-3 text-fg placeholder:text-muted";
+const field = "w-full min-h-11 rounded-control border border-edge bg-canvas px-3 text-fg placeholder:text-muted";
 
 export default async function OptOutPage(props: { searchParams: Promise<{ name?: string | string[]; realm?: string | string[]; done?: string | string[]; error?: string | string[] }> }) {
   if (!playerPagesOn() && !pullSummariesOn()) notFound();
@@ -37,8 +37,8 @@ export default async function OptOutPage(props: { searchParams: Promise<{ name?:
         </p>
       </header>
 
-      {done && <p role="status" className="rounded-xl border border-line bg-panel p-4 text-fg">Done. That character is hidden.</p>}
-      {error && <p role="alert" className="rounded-xl border border-line bg-panel p-4 text-fg">
+      {done && <p role="status" className="rounded-card border border-line bg-panel p-4 text-fg">Done. That character is hidden.</p>}
+      {error && <p role="alert" className="rounded-card border border-line bg-panel p-4 text-fg">
         {error === "limit" ? "Too many requests from this connection. Try again in an hour." : error === "storage" ? "We could not save that. Try again in a moment." : "Check the name (2 to 12 letters) and the realm, and send it again."}
       </p>}
 

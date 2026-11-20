@@ -1,8 +1,9 @@
 vi.mock("@/lib/auction-report-store", () => ({ writeAuctionReports: vi.fn().mockResolvedValue({ written: false }) }));
+vi.mock("@/lib/market-boards", () => ({ writeMarketBoards: vi.fn().mockResolvedValue({ written: false }) }));
 import { beforeEach, expect, test, vi } from "vitest";
-const store = vi.hoisted(() => ({ loadCorpus: vi.fn(), snapshotWork: vi.fn(), writeCronRun: vi.fn(), writeSnapshot: vi.fn(), writeMarket: vi.fn(), writeCompletion: vi.fn(), writeCensus: vi.fn(), prune: vi.fn() }));
-vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: store.loadCorpus, snapshotWork: store.snapshotWork, writeCronRun: store.writeCronRun, writeSnapshot: store.writeSnapshot, writeMarket: store.writeMarket, writeCompletion: store.writeCompletion, writeCensus: store.writeCensus },
-  sharingStore: { loadState: async () => ({ grants: [], suppressions: [] }) },
+const store = vi.hoisted(() => ({ loadCorpus: vi.fn(), snapshotWork: vi.fn(), writeCronRun: vi.fn(), writeSnapshot: vi.fn(), writeMarket: vi.fn(), writeCompletion: vi.fn(), writeCensus: vi.fn(), prune: vi.fn(), forgetReads: vi.fn(), forgetPublished: vi.fn() }));
+vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: store.loadCorpus, snapshotWork: store.snapshotWork, writeCronRun: store.writeCronRun, writeSnapshot: store.writeSnapshot, writeMarket: store.writeMarket, writeCompletion: store.writeCompletion, writeCensus: store.writeCensus, forgetReads: store.forgetReads },
+  sharingStore: { loadState: async () => ({ grants: [], suppressions: [] }), forgetPublished: store.forgetPublished },
 }));
 vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { prune: store.prune } }));
 const keys = vi.hoisted(() => ({ pruneKeys: vi.fn() }));
@@ -19,6 +20,8 @@ const view = vi.hoisted(() => ({ writeItemView: vi.fn(), buildItemView: vi.fn() 
 vi.mock("@/lib/item-view-store", () => view);
 const aggregates = vi.hoisted(() => ({ writeAggregates: vi.fn(), anonymousAggregates: vi.fn() }));
 vi.mock("@/lib/aggregate-store", () => aggregates);
+const searchNames = vi.hoisted(() => ({ writeSearchNames: vi.fn() }));
+vi.mock("@/lib/search-names-store", () => searchNames);
 const auctions = vi.hoisted(() => ({ writeAuctionHistory: vi.fn(), buildAuctionHistory: vi.fn() }));
 vi.mock("@/lib/auction-history-store", () => auctions);
 const professions = vi.hoisted(() => ({ writeProfessions: vi.fn(), buildProfessions: vi.fn() }));
@@ -31,9 +34,12 @@ vi.mock("@/lib/database-activity", () => ({ buildDatabaseActivity: activity.buil
 const guilds = vi.hoisted(() => ({ writeGuildLadder: vi.fn() }));
 vi.mock("@/lib/guild-ladder-store", () => guilds);
 import { GET } from "./route";
+import { writeAuctionReports } from "@/lib/auction-report-store";
+import { writeMarketBoards } from "@/lib/market-boards";
 beforeEach(() => {
   store.loadCorpus.mockReset();
   guilds.writeGuildLadder.mockReset().mockResolvedValue({ written: false });
+  searchNames.writeSearchNames.mockReset().mockResolvedValue({ written: false });
   activity.writeDatabaseActivity.mockReset().mockResolvedValue({ written: false });
   professions.writeProfessions.mockReset().mockResolvedValue({ written: false });
   mapPins.writeMapPins.mockReset().mockResolvedValue({ written: false });
@@ -77,10 +83,10 @@ test("an idle run skips corpus and completion, day-gates market, and heartbeats"
   expect(store.prune).toHaveBeenCalledOnce();
 });
 
-test("the coverage score is written after a snapshot that changed, dated by the snapshot, and never on an idle run", async () => {
+test("the coverage step runs on every run, dated by the snapshot; the writer decides from its stamp whether an idle run writes", async () => {
   store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: "2026-W43" });
   expect(await (await GET(req())).json()).toMatchObject({ ok: true, coverage: { written: false } });
-  expect(coverage.writeCoverage).not.toHaveBeenCalled();
+  expect(coverage.writeCoverage).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-10-01" });
   store.snapshotWork.mockResolvedValue({ idle: false, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: null });
   store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-10-02T00:00:00.000Z" });
   coverage.writeCoverage.mockResolvedValue({ written: true });
@@ -293,9 +299,34 @@ test("the stored aggregates are written after the item view with what that run a
   expect(store.writeCronRun).toHaveBeenCalled();
 });
 
+test("the search names file is written after the aggregates from the same set, with what that run added; a failure is logged and the run succeeds", async () => {
+  const order: string[] = [];
+  store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-10-02T00:00:00.000Z" });
+  store.loadCorpus.mockResolvedValue({ uploads: 9, records: [], dataAsOf: "2026-10-02T00:00:00.000Z" });
+  const set = { key: "set" };
+  aggregates.anonymousAggregates.mockReturnValue(set);
+  const built: unknown[] = [];
+  aggregates.writeAggregates.mockImplementation(async (_o: unknown, deps: { build: () => Promise<unknown> }) => { order.push("aggregates"); built.push(await deps.build()); return { written: true }; });
+  searchNames.writeSearchNames.mockImplementation(async (_o: unknown, deps: { build: () => Promise<unknown> }) => { order.push("searchNames"); built.push(await deps.build()); return { written: true, bytes: 2048 }; });
+  expect(await (await GET(req())).json()).toMatchObject({ ok: true, aggregates: { written: true }, searchNames: { written: true, bytes: 2048 } });
+  expect(order).toEqual(["aggregates", "searchNames"]);
+  expect(searchNames.writeSearchNames).toHaveBeenCalledWith({ added: 2, rebuild: false, dataAsOf: "2026-10-02T00:00:00.000Z" }, expect.anything());
+  // One set serves both files: the corpus is read and the set worked out once per run.
+  expect(built).toEqual([set, set]);
+  expect(aggregates.anonymousAggregates).toHaveBeenCalledTimes(1);
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  searchNames.writeSearchNames.mockRejectedValue(new Error("r2 down"));
+  const res = await GET(req());
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ ok: true, searchNames: null });
+  expect(store.writeCronRun).toHaveBeenCalled();
+});
+
 test("an idle run still asks for the stored aggregates, so a missing file is written", async () => {
   store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: "2026-W43" });
   await GET(req());
+  // The names file never makes an idle run build the set for itself: it waits for a run that builds it anyway.
+  expect(searchNames.writeSearchNames).not.toHaveBeenCalled();
   expect(aggregates.writeAggregates).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-10-01" }, expect.anything());
 });
 
@@ -386,4 +417,24 @@ test("the snapshot refreshes the guild ladder even when no new uploads arrive an
   expect(guilds.writeGuildLadder).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-11-12" });
   guilds.writeGuildLadder.mockRejectedValueOnce(new Error("publication unavailable"));
   expect((await GET(req())).status).toBe(200);
+});
+
+test("the heartbeat is written before the stored views, the guild ladder, the boards, the coverage score and then the auction reports, and their memory is let go between steps (#1354)", async () => {
+  const order: string[] = [];
+  store.writeCronRun.mockImplementation(async () => { order.push("heartbeat"); });
+  view.writeItemView.mockImplementationOnce(async () => { order.push("item view"); throw new Error("out of memory"); });
+  guilds.writeGuildLadder.mockImplementationOnce(async () => { order.push("ladder"); throw new Error("out of memory"); });
+  coverage.writeCoverage.mockImplementationOnce(async () => { order.push("coverage"); throw new Error("out of memory"); });
+  vi.mocked(writeMarketBoards).mockImplementationOnce(async () => { order.push("boards"); throw new Error("out of memory"); });
+  vi.mocked(writeAuctionReports).mockImplementationOnce(async () => { order.push("reports"); return { written: false }; });
+  store.forgetReads.mockReset();
+  store.forgetPublished.mockReset();
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const res = await GET(req());
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ ok: true, guildLadder: null, marketBoards: null, coverage: null });
+  expect(order).toEqual(["heartbeat", "item view", "ladder", "boards", "coverage", "reports"]);
+  // Released after the corpus write, after the rollups, after each corpus view and around the steps after the heartbeat.
+  expect(store.forgetReads.mock.calls.length).toBeGreaterThanOrEqual(11);
+  expect(store.forgetPublished.mock.calls.length).toBe(store.forgetReads.mock.calls.length);
 });

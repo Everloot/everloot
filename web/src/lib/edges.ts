@@ -1,6 +1,6 @@
-import { CLIENT_EDGES, CLIENT_LAYER } from "../../../kb/src/client-layer-file";
+import { CLIENT_EDGES, CLIENT_LAYER } from "@kb/client-layer-file";
 import { GAME_DATA_CREDIT } from "@everloot/protocol";
-import { CLIENT_LABEL, type Edge, type EdgeKind, type Evidence, type Rel } from "../../../kb/src/edges";
+import { CLIENT_LABEL, type Edge, type EdgeKind, type Evidence, type Rel } from "@kb/edges";
 import { loadObservedEdges } from "./rollup-compute";
 
 export { CLIENT_EDGES, CLIENT_LAYER };

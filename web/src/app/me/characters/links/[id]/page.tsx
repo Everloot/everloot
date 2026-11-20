@@ -73,7 +73,7 @@ export default async function LinkPreviewPage({ params }: Params) {
   } catch {
     return (
       <Container width="reading">
-        <PageHeader trail={trailFor("/account")!.slice(0, 1)} title="Character preview" />
+        <PageHeader trail={trailFor("/settings")!.slice(0, 1)} title="Character preview" />
         <p role="alert" className="text-fg-2">Your character is unavailable right now. Try again in a minute.</p>
       </Container>
     );
@@ -97,7 +97,7 @@ export default async function LinkPreviewPage({ params }: Params) {
   return (
     <Container width="reading">
       <article className="space-y-8">
-        <ShowcaseHeader showcase={showcase} trail={[...trailFor("/account")!, { name: c.name, path: `/me/characters/links/${id}` }]} />
+        <ShowcaseHeader showcase={showcase} trail={[...trailFor("/settings")!, { name: c.name, path: `/me/characters/links/${id}` }]} />
         <Card className="space-y-2 text-sm text-fg-2">
           <p>
             Only you see this preview. It shows everything synced for this character. The public page,{" "}

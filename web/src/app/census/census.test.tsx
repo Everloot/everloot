@@ -16,9 +16,10 @@ vi.mock("next/link", () => ({
 }));
 
 import CensusPage, { metadata } from "./page";
+import { Bars, DailyChart, Factions, HeatCell } from "./charts";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
 import { CLASSES, LAUNCH_AT, RACES } from "@/data/wow-forever";
-import { CENSUS_CLASSES, CENSUS_LAUNCH, CENSUS_RACES } from "../../../../kb/src/census";
+import { CENSUS_CLASSES, CENSUS_LAUNCH, CENSUS_RACES } from "@kb/census";
 
 let n = 0;
 /** `count` characters of one race and class, reported by three installs in turn. */
@@ -79,6 +80,12 @@ test("factions, classes, races and level bands show rounded counts; a hidden cou
   expect(page).toMatch(/<th scope="col"[^>]*>Class<\/th>/);
   expect(page).toContain("Factions");
   expect(page).toContain("Level bands");
+  // Class share bars take the class colour; other tables keep the plain bar.
+  const classes = page.slice(page.indexOf('id="classes"'), page.indexOf('id="races"'));
+  expect(classes).toContain("bg-class-hunter");
+  expect(classes).not.toMatch(/h-1 rounded-full bg-fg-2"/);
+  const factions = page.slice(page.indexOf('id="factions"'), page.indexOf('id="classes"'));
+  expect(factions).not.toContain("bg-class-");
 });
 
 test("the race and class grid is Blizzard's table per faction, with counts in the playable cells", async () => {
@@ -137,15 +144,13 @@ test("unreadable storage says so, never a collecting page or a zero", async () =
   expect(page).not.toContain("<table");
 });
 
-test("with player pages on, the census offers the player lookup: a form to /players and the hide link", async () => {
+test("with player pages on, the census offers the player lookup: a link to /players, which holds the one search box, and the hide link", async () => {
   vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
   store.loadCensus.mockResolvedValue(corpus(RECORDS));
   const page = await html();
   expect(page).toContain("Look up a player");
-  expect(page).toMatch(/<form [^>]*action="\/players"[^>]*method="get"/);
-  expect(page).toMatch(/<form [^>]*role="search"/);
-  expect(page).toMatch(/<input [^>]*maxlength="40"/i);
-  expect(page).toMatch(/<input [^>]*name="q"/);
+  expect(page).toContain('href="/players"');
+  expect(page).not.toMatch(/<form [^>]*action="\/players"/);
   expect(page).toContain('href="/players/opt-out"');
   expect(text(page)).toContain("Race, class, level, guild and the day the addon last saw them. Nothing else.");
   // The lookup comes before the window tabs.
@@ -236,4 +241,79 @@ test("the rollup's race and class table and launch time are the ones /wow-foreve
   const fromRollup = CENSUS_RACES.map((r) => [r.faction, r.name, r.classes.map((c) => CENSUS_CLASSES.find((x) => x.token === c)!.name)]);
   const fromPage = Object.entries(RACES.factions).flatMap(([faction, rows]) => Object.entries(rows).map(([race, classes]) => [faction, race, [...classes]]));
   expect(fromRollup).toEqual(fromPage);
+});
+
+test("visual census keeps tiles, labelled charts and all of the tables without credentials", async () => {
+  vi.stubEnv("BNET_CLIENT_ID", "");
+  vi.stubEnv("BNET_CLIENT_SECRET", "");
+  store.loadCensus.mockResolvedValue(corpus(RECORDS));
+  const page = await html();
+  expect(page).toContain('aria-label="Census headlines"');
+  expect(text(page)).toContain("Characters in the window 110");
+  expect(text(page)).toContain("Top class shown 65 · Hunter");
+  expect(text(page)).toContain("Top race shown 70 · Human (Alliance)");
+  expect(page).toContain('aria-label="Faction legend"');
+  expect(page).toContain('aria-label="Classes bar chart"');
+  expect(page).toContain('data-bar="Hunter"');
+  expect(page).not.toContain('data-bar="Mage"');
+  expect(page).toContain('aria-label="Races bar chart"');
+  expect(page).toContain('aria-label="Level bands bar chart"');
+  expect(page).toContain('aria-label="Daily characters line chart"');
+  expect(page).toContain('data-point="2026-11-15"');
+  expect(page).not.toContain('data-point="2026-11-10"');
+  expect(page.match(/<table/g)).toHaveLength(7);
+  expect(page).not.toContain('<img');
+  const classes = page.slice(page.indexOf('aria-label="Classes bar chart"'), page.indexOf('aria-label="Races bar chart"'));
+  expect(classes).toMatch(/data-bar="Hunter"[^>]*bg-class-hunter[^>]*width:100%/);
+  expect(classes).toMatch(/data-bar="Warrior"[^>]*bg-class-warrior/);
+  expect(classes.indexOf('data-bar="Hunter"')).toBeLessThan(classes.indexOf('data-bar="Warrior"'));
+  expect(page).toContain('title="Human, Hunter: 40"');
+  expect(page).toContain('title="Alliance: 90');
+  const races = page.slice(page.indexOf('aria-label="Races bar chart"'), page.indexOf('aria-labelledby="grid"'));
+  expect(text(races)).toContain("Human (Alliance) 70");
+  const levels = page.slice(page.indexOf('aria-label="Level bands bar chart"'), page.indexOf('aria-labelledby="trend"'));
+  expect(text(levels)).toContain("20–29 85");
+  expect(levels).not.toContain('data-bar="At 60"');
+});
+
+test("class colour follows each class when other classes are removed; hidden counts have no mark", () => {
+  const rows = [{ key: "MAGE", label: "Mage", count: null }, { key: "HUNTER", label: "Hunter", count: 65 }, { key: "WARRIOR", label: "Warrior", count: 30 }];
+  const all = renderToStaticMarkup(<Bars title="Classes" rows={rows} byClass />);
+  const some = renderToStaticMarkup(<Bars title="Classes" rows={rows.slice(1)} byClass />);
+  for (const page of [all, some]) {
+    expect(page).toMatch(/data-bar="Hunter"[^>]*bg-class-hunter/);
+    expect(page).toMatch(/data-bar="Warrior"[^>]*bg-class-warrior/);
+    expect(page).not.toContain('data-bar="Mage"');
+    expect(text(page)).toContain("Hunter 65");
+    expect(text(page)).toContain("Warrior 30");
+  }
+  expect(text(all)).toContain("Mage not enough reports");
+});
+
+test("a hidden faction never becomes a segment or an inferred share", () => {
+  const page = renderToStaticMarkup(<Factions total={110} rows={[{ key: "Alliance", label: "Alliance", count: 90 }, { key: "Horde", label: "Horde", count: null }]} />);
+  expect(page).not.toContain('aria-label="Faction split"');
+  expect(text(page)).toContain("Horde: not enough reports");
+  expect(text(page)).not.toContain("0%");
+});
+
+test("heatmap magnitudes use different flat shades with counts in ink", () => {
+  const low = renderToStaticMarkup(<HeatCell label="Human, Hunter" count={10} max={100} />);
+  const high = renderToStaticMarkup(<HeatCell label="Human, Hunter" count={100} max={100} />);
+  expect(low).toContain("bg-census-1");
+  expect(high).toContain("bg-census-5");
+  expect(text(low)).toBe(" 10 ");
+  expect(text(high)).toBe(" 100 ");
+  expect(high).toContain("text-fg");
+});
+
+test("the daily line breaks at hidden days and never draws an empty chart as zero", () => {
+  const days = [{ day: "2026-11-13", count: 10 }, { day: "2026-11-14", count: null }, { day: "2026-11-15", count: 20 }];
+  const page = renderToStaticMarkup(<DailyChart days={days} />);
+  const path = /<path d="([^"]*)"/.exec(page)![1];
+  expect(path.match(/M/g)).toHaveLength(2);
+  expect(path).not.toContain("L");
+  const hidden = renderToStaticMarkup(<DailyChart days={[days[1]]} />);
+  expect(text(hidden)).toContain("not enough reports");
+  expect(hidden).not.toContain("<svg");
 });

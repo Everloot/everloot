@@ -1,4 +1,4 @@
-import type { TalentChanges } from "../../../../kb/src/build-watch/changes";
+import type { TalentChanges } from "@kb/build-watch/changes";
 import { decodeBuild } from "./share";
 import type { Ranks, TalentCatalog } from "./types";
 

@@ -1,6 +1,6 @@
-import type { Edge } from "../../../../kb/src/edges";
-import { categoryOf } from "../../../../kb/src/item-taxonomy";
-import { pendingForNpc } from "../../../../kb/src/pending-loot";
+import type { Edge } from "@kb/edges";
+import { categoryOf } from "@kb/item-taxonomy";
+import { pendingForNpc } from "@kb/pending-loot";
 import { CLIENT_TAXONOMY } from "@/lib/items";
 import type { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
 import type { ShownNames } from "@/lib/shown-item-names";

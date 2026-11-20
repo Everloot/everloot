@@ -1,4 +1,5 @@
 import { itemNames } from "./names";
+import { forgetWithKept } from "./kept";
 import { loadCraftedItems, loadItemFacts, loadWorldFacts } from "./rollup-compute";
 import type { Corpus } from "./upload-store";
 import { publicQuests, publicVendors } from "./world-lists";
@@ -39,6 +40,7 @@ export function buildItemSources(f: SourceFacts): Map<number, SourceSlug[]> {
 
 // The fact arrays are replaced whenever the corpus reloads, so they are the memo's key.
 let memo: { keys: unknown[]; value: ItemSeen } | null = null;
+forgetWithKept(() => { memo = null; });
 
 /** For the item lists' Source column and filter, and "Seen by players". Built once per corpus version. `read` as in rollup-compute.ts. */
 export async function loadItemSeen(read?: Corpus): Promise<ItemSeen> {

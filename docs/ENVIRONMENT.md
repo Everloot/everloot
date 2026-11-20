@@ -16,7 +16,9 @@ A switch is on when set to `1` and off otherwise, unless a row says more.
 ## Worker `vars` (`web/wrangler.jsonc`)
 
 Plain settings deployed with the Worker. Pages built ahead of time read them during the build too,
-so `web/scripts/cf-deploy.mjs` passes every var except the `*_DIR` paths to the build.
+so `web/scripts/cf-deploy.mjs` passes every var except the `*_DIR` paths to the build. The cron Worker
+(`web/wrangler.cron.jsonc`) carries the same vars and bindings, without `EVERLOOT_CRON_WORKER`
+(`web/src/lib/cf-crons.test.ts` holds them equal).
 
 | Name | Read in | What it is for | Required |
 |---|---|---|---|
@@ -37,7 +39,7 @@ so `web/scripts/cf-deploy.mjs` passes every var except the `*_DIR` paths to the 
 | `EVERLOOT_CHAT_WORKSPACE` | `web/src/lib/chat/workspace.ts` | The signed-in chat workspace | Switch |
 | `EVERLOOT_CHARACTER_LINKS` | `web/src/lib/character-links.ts` | Linking an in-game character to an account | Switch |
 | `EVERLOOT_SHOWCASE` | `web/src/lib/character-showcase.ts` | The character showcase pages and share cards | Switch |
-| `EVERLOOT_BOSS_KILL_SYNC` | `web/src/lib/boss-kill-sync.ts` | Private owner-only boss kills; unset/off until migration `20261114120000_private_boss_kills.sql` is approved and applied; also needs private sync | Switch |
+| `EVERLOOT_BOSS_KILL_SYNC` | `web/src/lib/boss-kill-sync.ts` | Linked-character boss-kill sync, enabled in production vars; kills are public on progression pages. Requires `20261114120000_private_boss_kills.sql` and `20261120100000_public_boss_kills.sql` (the new migration has NOT been applied by this change); also needs private sync | Switch |
 | `EVERLOOT_PRIVATE_SYNC` | `web/src/lib/private-sync.ts` | Private sync of a linked character's data | Switch |
 | `EVERLOOT_LEADERBOARDS` | `web/src/lib/leaderboard-switch.ts` | The item level and gear score rankings | Switch |
 | `NEWS_DIR` | `web/src/lib/news.ts` | Where the bundled news posts are inside the Worker | Yes |
@@ -45,10 +47,13 @@ so `web/scripts/cf-deploy.mjs` passes every var except the `*_DIR` paths to the 
 | `WIKI_DIR` | `web/src/lib/wiki.ts` | Where the bundled wiki pages are inside the Worker | Yes |
 | `PROTOCOL_SCHEMA_DIR` | `web/src/app/schema/[...path]/route.ts` | Where the bundled protocol schemas are inside the Worker | Yes |
 | `KNOWLEDGE_RELEASE_SHA256` | `web/src/lib/release.ts` | The knowledge release the `KNOWLEDGE_D1` database must match before it is served | Yes |
+| `EVERLOOT_CRON_WORKER` | `web/src/lib/cf-crons.ts` | `1` on the site Worker once the cron Worker runs the scheduled jobs: the site's triggers then run nothing ([OPERATIONS.md](OPERATIONS.md), "The cron Worker"). Never set on the cron Worker | No, unset until the switch |
 
 Bindings declared next to the vars and read like them: `KNOWLEDGE_D1` (the knowledge release
 database, `web/src/lib/release.ts`) and `AUTH_DB_HYPERDRIVE` (the accounts database,
-`web/src/lib/auth/db.ts`). Both are required on the Worker.
+`web/src/lib/auth/db.ts`). Both are required on the Worker. `WORKER_SELF_REFERENCE` is the service binding
+the scheduled jobs call their routes through (`web/src/lib/cf-crons.ts`): the site's points at `everloot-web`,
+the cron Worker's at `everloot-cron`.
 
 ## Worker secrets (`wrangler secret put`)
 
@@ -140,6 +145,7 @@ the Worker. The browser bundle keeps the `NEXT_PUBLIC_*` values.
 | `GITHUB_TOKEN` | `web/src/lib/addon-github.ts`, `web/src/lib/polestar-github.ts`, `web/src/lib/everloot-releases.ts`, `kb/src/cli.ts` | Signed-in release reads from GitHub, past the anonymous rate limit | The workflow's own token | No |
 | `EVERLOOT_COMMIT_SHA` | `web/src/lib/platform.ts` | The deployed commit, for the footer and the source link | `web/scripts/cf-deploy.mjs` | No |
 | `EVERLOOT_DOWNLOADS` | `web/src/lib/addon-release.ts` | The addon zips' sizes and hashes, worked out at build time | `web/next.config.js` | Build only |
+| `EVERLOOT_REVIEWED_GUIDES` | `web/src/app/layout.tsx` | "1" when kb/guides holds a reviewed guide, so the header's Guides menu lists the guides index; empty otherwise | `web/next.config.js` | Build only |
 | `NEXT_PHASE` | `web/src/app/addon/page.tsx`, `web/src/app/addons/polestar/page.tsx` | Tells a build from a request, so a build without GitHub does not fail | Next.js | Framework |
 
 ## Actions secrets (repository settings, Secrets)
@@ -159,6 +165,7 @@ the Worker. The browser bundle keeps the `NEXT_PUBLIC_*` values.
 |---|---|---|---|
 | `WORKER_DEPLOY` | `.github/workflows/deploy-worker.yml` | The deploy job runs only while this is `1` | For deploys |
 | `CLOUDFLARE_ACCOUNT_ID` | `.github/workflows/deploy-worker.yml` | The account the Worker deploys to | For deploys |
+| `DEPLOY_CRON_WORKER` | `.github/workflows/deploy-worker.yml` | `true` also deploys the cron Worker (`web/wrangler.cron.jsonc`) from the same build, after the site | No |
 | `ANSWER_EVAL_MODEL` | `.github/workflows/build-watch.yml` | The model the answer evaluation runs against; the job is skipped while empty | No |
 | `ANSWER_EVAL_BASE_URL` | `.github/workflows/build-watch.yml` | That provider's endpoint; has a default | No |
 | `BLIZZARD_AUCTIONS` | `.github/workflows/blizzard-auctions.yml` | The hourly Blizzard auction house pull runs only while this is `on` (and the Battle.net and Supabase secrets exist). GitHub starts scheduled runs late or drops them under load (every 4 to 7 hours in November 2026), so the maintainer also starts it each hour with `workflow_dispatch` from a machine of their own; a second pass in the hour writes nothing for an unchanged house | No |

@@ -1,6 +1,6 @@
 import { expect, test, vi } from "vitest";
-import type { AddonPopularity } from "../../../kb/src/addon-rollup";
-import type { ProjectView } from "../../../kb/src/ecosystem";
+import type { AddonPopularity } from "@kb/addon-rollup";
+import type { ProjectView } from "@kb/ecosystem";
 
 vi.mock("@/data/addon-repos", () => {
   const sources: Record<string, { repo: string; curseforge?: string; wago?: string }> = {

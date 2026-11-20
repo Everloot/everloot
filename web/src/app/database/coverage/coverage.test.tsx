@@ -8,6 +8,18 @@ vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
   uploadStore: { loadCorpus: store.loadCorpus },
 }));
+// The pages read the stored score; the bucket holds what the cron's writer last put there (null: nothing stored).
+const bucket = vi.hoisted(() => ({ body: null as string | null, cloud: { r2AccountId: "acct", r2AccessKeyId: "k", r2SecretAccessKey: "s", r2Bucket: "b" } }));
+vi.mock("@/lib/coverage-summary", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/coverage-summary")>();
+  return {
+    ...real,
+    loadCoverageForPages: () => real.loadCoverageForPages({
+      cloud: bucket.cloud,
+      fetch: async () => (bucket.body === null ? new Response("", { status: 404 }) : new Response(bucket.body, { status: 200 })),
+    }),
+  };
+});
 vi.mock("next/link", () => ({ default: ({ href, children, prefetch }: { href: string; children: ReactNode; prefetch?: boolean }) => { links.push({ href, prefetch }); return <a href={href}>{children}</a>; } }));
 vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NEXT_NOT_FOUND"); },
@@ -18,6 +30,8 @@ import CoveragePage from "./page";
 import ZoneCoveragePage from "./[zone]/page";
 import { COVERAGE_BUILD, loadCoverageExpected } from "@/lib/coverage-compute";
 import { writeCoverage } from "@/lib/coverage-store";
+import { STAMP } from "@/lib/stored-view-freshness";
+import { forgetCoverageSummary } from "@/lib/coverage-summary";
 import { plateauDetail, plateauMeasured, plateauShare, plateauVerdict } from "./plateau";
 import { cellDetail, shareText } from "@/lib/coverage-view";
 
@@ -31,10 +45,20 @@ const search = (q: Record<string, string>) => ({ searchParams: Promise.resolve(q
 const westfall = [0, 1, 2].map((i) => sighting(i, 100, "Guard Orin", 1436));
 const durotar = [3].map((i) => sighting(i, 200, "Unagreed Name", 1411));
 
-beforeEach(() => store.loadCorpus.mockReset());
+beforeEach(() => { store.loadCorpus.mockReset(); bucket.body = null; forgetCoverageSummary(); });
+
+/** Runs the cron's writer over `records` and keeps what it put; the pages then read that, never the corpus. */
+async function stored(c: ReturnType<typeof corpus>) {
+  store.loadCorpus.mockResolvedValue(c);
+  const put = vi.fn<typeof fetch>(async () => new Response(null, { status: 200 }));
+  await writeCoverage({ added: 1, dataAsOf: c.dataAsOf }, { cloud: { ...bucket.cloud, supabaseUrl: "https://x", supabaseServiceKey: "y" }, fetch: put });
+  bucket.body = await (put.mock.calls[0]![0] as Request).text();
+  store.loadCorpus.mockReset();
+  forgetCoverageSummary();
+}
 
 test("the index is a search box, then one row per zone with settled / confirmed shares, lowest first", async () => {
-  store.loadCorpus.mockResolvedValue(corpus([...westfall, ...durotar]));
+  await stored(corpus([...westfall, ...durotar]));
   const page = await html(CoveragePage(search({})));
   expect(page).toContain('data-container="data"');
   expect(page.indexOf('type="search"') === -1 ? page.indexOf('name="q"') : page.indexOf('type="search"')).toBeLessThan(page.indexOf("<table"));
@@ -60,7 +84,7 @@ test("a zone expecting none of a type reads as a dash, not a share of nothing", 
   expect(shareText({ ...none, expected: null, denominator: null })).toBe("[?] / [?]");
   expect(cellDetail({ ...none, expected: null, denominator: null, observed: 2, reported: 2 })).toBe("0 settled, 0 confirmed, 2 reported, no expected count (2 reported)");
   // Westfall has no dungeon entrance in the game files: the index cell is the dash with its reason, never "0 settled ... of 0".
-  store.loadCorpus.mockResolvedValue(corpus(westfall));
+  await stored(corpus(westfall));
   const page = await html(CoveragePage(search({})));
   expect(page).toContain('<span title="none expected in this zone" class="tabular-nums">–<span class="sr-only">: none expected in this zone</span></span>');
   expect(page).not.toContain(", of 0<");
@@ -68,7 +92,7 @@ test("a zone expecting none of a type reads as a dash, not a share of nothing", 
 });
 
 test("sorting by a column keeps the lowest first and the header links flip it", async () => {
-  store.loadCorpus.mockResolvedValue(corpus(westfall));
+  await stored(corpus(westfall));
   const page = await html(CoveragePage(search({ sort: "-entrances" })));
   expect(page).toContain('aria-sort="descending"');
   await expect(CoveragePage(search({ sort: "bogus" }))).rejects.toThrow("NEXT_NOT_FOUND");
@@ -77,7 +101,7 @@ test("sorting by a column keeps the lowest first and the header links flip it", 
 });
 
 test("the search finds the zone an NPC id is counted in", async () => {
-  store.loadCorpus.mockResolvedValue(corpus([...westfall, ...durotar]));
+  await stored(corpus([...westfall, ...durotar]));
   const page = await html(CoveragePage(search({ q: "100" })));
   expect(page).toContain("NPC 100: counted in");
   expect(page).toContain('href="/database/coverage/1436-westfall"');
@@ -86,7 +110,7 @@ test("the search finds the zone an NPC id is counted in", async () => {
 });
 
 test("a zone page lists its fields and the facts one or two installs short, linked, by id only", async () => {
-  store.loadCorpus.mockResolvedValue(corpus([...westfall, ...durotar]));
+  await stored(corpus([...westfall, ...durotar]));
   const page = await html(ZoneCoveragePage({ params: Promise.resolve({ zone: "1411-durotar" }) }));
   expect(page).toContain("Durotar coverage");
   expect(page).toContain(">By field<");
@@ -98,11 +122,36 @@ test("a zone page lists its fields and the facts one or two installs short, link
   await expect(ZoneCoveragePage({ params: Promise.resolve({ zone: "99999-nowhere" }) })).rejects.toThrow("NEXT_NOT_FOUND");
 });
 
-test("unreachable storage says so, never a table of zeros", async () => {
-  store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], unreachable: true });
+test("with no stored score the pages say storage is unreachable, never a table of zeros, and never compute it", async () => {
+  store.loadCorpus.mockResolvedValue(corpus(westfall));
+  for (const page of [await html(CoveragePage(search({}))), await html(ZoneCoveragePage({ params: Promise.resolve({ zone: "1436-westfall" }) }))]) {
+    expect(page).toContain("Storage unreachable");
+    expect(page).not.toContain("<table");
+  }
+  // An unreadable file is the same.
+  bucket.body = "not json";
+  forgetCoverageSummary();
+  expect(await html(CoveragePage(search({})))).toContain("Storage unreachable");
+  expect(store.loadCorpus).not.toHaveBeenCalled();
+});
+
+test("the pages render the stored score without reading the corpus", async () => {
+  await stored(corpus([...westfall, ...durotar]));
+  expect(await html(CoveragePage(search({})))).toContain('href="/database/coverage/1436-westfall"');
+  expect(await html(ZoneCoveragePage({ params: Promise.resolve({ zone: "1411-durotar" }) }))).toContain(">By field<");
+  expect(store.loadCorpus).not.toHaveBeenCalled();
+});
+
+test("a score stored before the plateau was (version 1) still renders, and the plateau reads as not measured yet", async () => {
+  await stored(corpus([...westfall, ...durotar]));
+  const { version: _version, plateau: _plateau, ...v1 } = JSON.parse(bucket.body!);
+  bucket.body = JSON.stringify(v1);
+  forgetCoverageSummary();
   const page = await html(CoveragePage(search({})));
-  expect(page).toContain("Storage unreachable");
-  expect(page).not.toContain("<table");
+  expect(page).toContain('href="/database/coverage/1436-westfall"');
+  expect(page).toContain("Plateau: not measured yet.");
+  expect(page).not.toContain('id="plateau"');
+  expect(store.loadCorpus).not.toHaveBeenCalled();
 });
 
 test("the expected file is the maintainer report's counts, read from the private bucket's build folder, and refused if it holds more", async () => {
@@ -114,26 +163,38 @@ test("the expected file is the maintainer report's counts, read from the private
   expect(await loadCoverageExpected(base, { read: async () => ({ ...file, rows: [{ name: "Hogger" }] }) })).toBeNull();
   expect(await loadCoverageExpected(null, { read })).toBeNull();
 });
-test("the cron writer skips a run that added nothing and writes coverage/<build>.json otherwise", async () => {
-  const fetcher = vi.fn<typeof fetch>(async () => new Response(null, { status: 200 }));
+test("the cron writer reads only a HEAD when the stored score is the snapshot's, and writes a stamped coverage/<build>.json otherwise", async () => {
+  // HEAD answers with the stored stamp; every other call succeeds.
+  const stamped = (stamp: string | null) => vi.fn<typeof fetch>(async (input) =>
+    (input as Request).method === "HEAD" ? new Response(null, { status: 200, headers: stamp ? { [STAMP]: stamp } : {} }) : new Response(null, { status: 200 }));
   const cloud = { r2AccountId: "acct", r2AccessKeyId: "k", r2SecretAccessKey: "s", r2Bucket: "b", supabaseUrl: "https://x", supabaseServiceKey: "y" };
-  expect(await writeCoverage({ added: 0, dataAsOf: null }, { cloud, fetch: fetcher })).toEqual({ written: false });
-  expect(fetcher).not.toHaveBeenCalled();
+  const current = stamped("2026-10-18T00:00:00.000Z");
+  expect(await writeCoverage({ added: 0, dataAsOf: "2026-10-18T00:00:00.000Z" }, { cloud, fetch: current })).toEqual({ written: false });
+  expect(current).toHaveBeenCalledOnce();
+  expect((current.mock.calls[0]![0] as Request).method).toBe("HEAD");
   expect(store.loadCorpus).not.toHaveBeenCalled();
   store.loadCorpus.mockResolvedValue(corpus(westfall));
+  const fetcher = stamped(null);
   const result = await writeCoverage({ added: 2, dataAsOf: "2026-10-19T00:00:00.000Z" }, { cloud, fetch: fetcher });
   expect(result).toMatchObject({ written: true, key: `coverage/${COVERAGE_BUILD}.json` });
   const sent = fetcher.mock.calls[0]![0] as Request;
   expect(sent.method).toBe("PUT");
+  expect(sent.headers.get(STAMP)).toBe("2026-10-19T00:00:00.000Z");
   expect(sent.url).toBe(`https://acct.r2.cloudflarestorage.com/b/coverage/${COVERAGE_BUILD}.json`);
   const body = JSON.parse(await sent.text());
-  expect(body).toMatchObject({ schema: "everloot.coverage/1", build: COVERAGE_BUILD, dataAsOf: "2026-10-19T00:00:00.000Z" });
+  expect(body).toMatchObject({ schema: "everloot.coverage/1", build: COVERAGE_BUILD, dataAsOf: "2026-10-19T00:00:00.000Z", version: 2 });
+  // The plateau is measured from the same records, on the same data date, and stored beside the score.
+  expect(body.plateau).toMatchObject({ dataAsOf: "2026-10-19T00:00:00.000Z", windowStart: "2026-09-21T00:00:00.000Z", installs: 3, windowInstalls: 3, build: COVERAGE_BUILD });
+  expect(store.loadCorpus).toHaveBeenCalledTimes(1);
+  expect(result.bytes).toBe(new TextEncoder().encode(JSON.stringify(body)).length);
   expect(JSON.stringify(body)).not.toContain("Guard Orin");
   expect(await writeCoverage({ added: 0, rebuild: true, dataAsOf: null }, { cloud, fetch: fetcher })).toMatchObject({ written: true });
+  // A run that added nothing still catches up on a score stamped by an older snapshot (a run that failed here).
+  expect(await writeCoverage({ added: 0, dataAsOf: "2026-10-20T00:00:00.000Z" }, { cloud, fetch: stamped("2026-10-19T00:00:00.000Z") })).toMatchObject({ written: true });
 });
 
 test("the index states the plateau for quests, pins, vendors and drops, with how and when it was measured", async () => {
-  store.loadCorpus.mockResolvedValue(corpus([...westfall, ...durotar]));
+  await stored(corpus([...westfall, ...durotar]));
   const page = await html(CoveragePage(search({})));
   // Without the expected file nothing is claimed: [?], never "not yet" or "reached".
   expect(page).toContain("Plateau: [?].");
@@ -160,7 +221,7 @@ test("the plateau's shares round down, so 90% is never shown before it is met", 
 beforeEach(() => { links.length = 0; });
 
 test("coverage zone links navigate on click without prefetching", async () => {
-  store.loadCorpus.mockResolvedValue(corpus(westfall));
+  await stored(corpus(westfall));
   for (const q of [{}, { q: "100" }] as Record<string, string>[]) {
     links.length = 0;
     await html(CoveragePage(search(q)));

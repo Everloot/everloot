@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { createUploadStore, type CloudConfig } from "./upload-store";
+import { createUploadStore, snapshotParts, type CloudConfig } from "./upload-store";
 
 const cloud: CloudConfig = { r2AccountId: "acct", r2AccessKeyId: "key", r2SecretAccessKey: "secret", r2Bucket: "bucket", supabaseUrl: "https://db.test", supabaseServiceKey: "service" };
 const loot = (i: number) => ({ kind: "loot", installId: `install-${i % 3}`, eventId: `event-${i}`, capturedAt: "2026-10-07T00:00:00.000Z", sourceNpcId: i, items: [{ itemId: 2, count: 1 }] });
@@ -8,9 +8,15 @@ const index = (ids: string[]) => ids.map((id, i) => ({ id, object_key: `uploads/
 /** An R2 and index that keep what the store writes: the snapshot as stored bytes, the uploads as they are. */
 function fakeStorage(ids: string[], persisted: { snapshot?: string; probe?: string[] } = {}) {
   const uploads = new Map(ids.map((id, i) => [id, { records: [loot(i)] }]));
-  const state = { snapshot: persisted.snapshot, puts: 0 };
+  const state = { snapshot: persisted.snapshot, puts: 0, parts: new Map<string, string>() };
   const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const req = new Request(input, init);
+    const part = /snapshots\/corpus\/.+\.json/.exec(req.url)?.[0];
+    if (part) {
+      if (req.method === "PUT") { state.parts.set(part, await req.text()); return new Response(null); }
+      if (req.method === "DELETE") { state.parts.delete(part); return new Response(null, { status: 204 }); }
+      return state.parts.has(part) ? new Response(state.parts.get(part)) : new Response("missing", { status: 404 });
+    }
     if (req.url.includes("snapshots/corpus.json")) {
       if (req.method === "PUT") { state.snapshot = await req.text(); state.puts++; return new Response(null); }
       if (state.snapshot === undefined) return new Response("missing", { status: 404 });
@@ -64,5 +70,73 @@ describe("writeSnapshot keeps one copy of the corpus", () => {
     expect(JSON.parse(JSON.stringify(await createUploadStore({ cloud, localDir: "unused", fetch }).loadCorpus()))).toEqual(once);
     await store.writeSnapshot();
     expect(JSON.parse(JSON.stringify((await store.loadCorpus()).records))).toEqual(once.records);
+  });
+});
+
+describe("the snapshot is stored in parts (#1354)", () => {
+  test("each part is a JSON array within the size limit, and the parts together are every event in order", () => {
+    const events = Array.from({ length: 40 }, (_, i) => ({ i, pad: "x".repeat(i % 7 * 5) }));
+    const parts = [...snapshotParts(events, 120)];
+    expect(parts.length).toBeGreaterThan(5);
+    for (const part of parts) expect(part.length).toBeLessThanOrEqual(120);
+    expect(parts.flatMap((part) => JSON.parse(part))).toEqual(events);
+    // One event larger than the limit gets a part of its own rather than being split or dropped.
+    const big = { pad: "y".repeat(300) };
+    expect([...snapshotParts([{ a: 1 }, big, { b: 2 }], 120)].map((part) => JSON.parse(part))).toEqual([[{ a: 1 }], [big], [{ b: 2 }]]);
+    expect([...snapshotParts([])]).toEqual([]);
+  });
+
+  test("a write keeps its own parts and the previous write's, and deletes the ones before", async () => {
+    const { fetch, state } = fakeStorage(["a", "b", "c"]);
+    const store = () => createUploadStore({ cloud, localDir: "unused", fetch });
+    const folders = () => [...new Set([...state.parts.keys()].map((key) => key.split("/")[2]))];
+    await store().writeSnapshot();
+    const first = folders();
+    await store().writeSnapshot();
+    expect(folders()).toHaveLength(2);
+    await store().writeSnapshot();
+    const left = folders();
+    expect(left).toHaveLength(2);
+    expect(left).not.toContain(first[0]);
+    const list = JSON.parse(state.snapshot!);
+    expect(list.parts.every((key: string) => state.parts.has(key))).toBe(true);
+    expect(list.retired.every((key: string) => state.parts.has(key))).toBe(true);
+    const corpus = await store().loadCorpus();
+    expect(corpus.unreachable).toBeUndefined();
+    expect(corpus.records.length).toBeGreaterThan(0);
+  });
+
+  test("a write that loses the race deletes the parts it wrote", async () => {
+    const { fetch, state } = fakeStorage(["a", "b"]);
+    const racing = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = input instanceof Request ? input : new Request(input, init);
+      if (req.method === "PUT" && req.url.includes("snapshots/corpus.json")) return new Response(null, { status: 412 });
+      return fetch(input, init);
+    }) as typeof globalThis.fetch;
+    await expect(createUploadStore({ cloud, localDir: "unused", fetch: racing }).writeSnapshot()).rejects.toThrow("snapshot write failed (412)");
+    expect(state.parts.size).toBe(0);
+  });
+
+  test("a snapshot in the single-file format is still read, and the next write stores it in parts", async () => {
+    const { fetch, state } = fakeStorage(["a", "b", "c"]);
+    await createUploadStore({ cloud, localDir: "unused", fetch }).writeSnapshot();
+    const list = JSON.parse(state.snapshot!);
+    const events = list.parts.flatMap((key: string) => JSON.parse(state.parts.get(key)!));
+    state.snapshot = JSON.stringify({ generatedAt: list.generatedAt, uploads: list.uploads, records: [], corpusState: { ...list.state, events }, seenUploadIds: list.seenUploadIds, lastReceivedAt: list.lastReceivedAt, lastIds: list.lastIds });
+    state.parts.clear();
+    const before = JSON.parse(JSON.stringify(await createUploadStore({ cloud, localDir: "unused", fetch }).loadCorpus()));
+    expect(before.records.length).toBeGreaterThan(0);
+    expect(await createUploadStore({ cloud, localDir: "unused", fetch }).writeSnapshot()).toMatchObject({ uploads: 3, added: 0 });
+    expect(JSON.parse(state.snapshot!).format).toBe(2);
+    // The same records and upload count; only the write's time moves on.
+    const after = JSON.parse(JSON.stringify(await createUploadStore({ cloud, localDir: "unused", fetch }).loadCorpus()));
+    expect({ ...after, dataAsOf: undefined }).toEqual({ ...before, dataAsOf: undefined });
+  });
+
+  test("a missing part makes the corpus unreachable, never a smaller one", async () => {
+    const { fetch, state } = fakeStorage(["a", "b", "c"]);
+    await createUploadStore({ cloud, localDir: "unused", fetch }).writeSnapshot();
+    state.parts.delete(JSON.parse(state.snapshot!).parts[0]);
+    expect(await createUploadStore({ cloud, localDir: "unused", fetch }).loadCorpus()).toMatchObject({ records: [], unreachable: true });
   });
 });

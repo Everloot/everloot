@@ -1,6 +1,6 @@
 import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
 import { describe, expect, test } from "vitest";
-import { withoutVersionPrefix as kbWithoutVersionPrefix } from "../../../kb/src/wiki/page";
+import { withoutVersionPrefix as kbWithoutVersionPrefix } from "@kb/wiki/page";
 import nextConfig from "../../next.config.js";
 import { PREFIXES, SERVED, WITHOUT_SNAPSHOT, hasSnapshot, versionHref, withoutVersionPrefix } from "./build-versions";
 import { CURRENT_VERSION, GAME_VERSIONS } from "./game-version";

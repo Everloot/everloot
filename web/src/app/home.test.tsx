@@ -11,7 +11,6 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {} }) }));
 
 import Home from "./page";
 import { loadTimeline } from "@/lib/changes";
-import { toolHref, tools } from "@/data/tools";
 
 const html = renderToStaticMarkup(await Home());
 
@@ -19,16 +18,11 @@ test("no ticker, aurora, scroll reveal or glow", () => {
   expect(html).not.toMatch(/ticker|aurora|reveal|cta-glow/);
 });
 
-test("tool status keeps its meaning: a tool still collecting shows the 0-of-3 meter, a live one carries no label, and only a coming-soon tool says Planned", () => {
-  const list = html.slice(html.indexOf('id="tools-title"'), html.indexOf('id="agree"'));
-  const row = (href: string) => list.slice(list.indexOf(`href="${href}"`), list.indexOf("</a>", list.indexOf(`href="${href}"`)));
-  expect(row("/tools/guild-board")).toContain('aria-label="0 of 3 installs agree"');
-  // Farming is hidden until polished: the home page does not list it.
-  expect(list).not.toContain('href="/tools/farming-routes"');
-  expect(row("/tools/raid")).not.toMatch(/installs agree|Planned/);
-  const planned = tools.filter((t) => t.status === "coming-soon").map(toolHref);
-  for (const href of planned) expect(row(href), href).toMatch(/text-muted[^"]*"[^>]*>Planned</);
-  expect((list.match(/>Planned</g) ?? []).length).toBe(planned.length);
+test("one job per screen: no tool grid, no database card, no agreement steps, MCP block or lore search repeat the header or the trust band", () => {
+  for (const id of ['id="tools-title"', 'id="database"', 'id="agree"', 'id="ask"', 'id="lore-search"']) expect(html, id).not.toContain(id);
+  // The hero's box is the page's only search; the header has its own.
+  expect(html.match(/role="search"/g)).toHaveLength(1);
+  expect(html).not.toContain('name="ask"');
 });
 
 test("no emoji or pictographs", () => {
@@ -82,15 +76,17 @@ test("the home page states the promise with its numbers; with no stored score ev
   expect(block).toContain('href="/addon"');
 });
 
-test("the hero asks: a GET form to /chat whose question goes in ask (prefilled there, never sent), the one primary button there", () => {
-  const hero = html.slice(html.indexOf('id="hero-title"'), html.indexOf('id="whats-new"'));
+test("the hero searches with the header's field, a GET form to /search, the one primary button there, with three example chips", () => {
+  const hero = html.slice(html.indexOf('id="hero-title"'), html.indexOf('aria-labelledby="start-here"'));
   const form = hero.match(/<form [^>]*>/)?.[0] ?? "";
-  for (const attr of ['action="/chat"', 'method="get"', 'role="search"', 'aria-label="Ask Everloot"']) expect(form).toContain(attr);
-  const input = hero.match(/<input id="home-ask"[^>]*>/)?.[0] ?? "";
-  expect(input).toContain('name="ask"');
-  expect(input).toContain('required=""');
-  expect(hero).toMatch(/<label for="home-ask" class="sr-only">/);
+  for (const attr of ['action="/search"', 'method="get"', 'role="search"']) expect(form).toContain(attr);
+  const input = hero.match(/<input [^>]*id="home-search"[^>]*>/)?.[0] ?? "";
+  expect(input).toContain('name="q"');
+  expect(input).toContain('role="combobox"');
+  expect(hero).toMatch(/<label for="home-search" class="sr-only">/);
   expect(hero.match(/btn-primary/g)).toHaveLength(1);
+  const chips = hero.slice(hero.indexOf('aria-label="Examples"'));
+  expect([...chips.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(["/database/items", "/database/quests", "/chat"]);
 });
 
 

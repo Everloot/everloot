@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { readBlueStore, writeBlueStore } from "@/lib/blue-store";
-import { ingestBluePosts } from "../../../../../../kb/src/blue-posts";
-import { parseOverrides } from "../../../../../../kb/src/blue-forum";
+import { ingestBluePosts } from "@kb/blue-posts";
+import { parseOverrides } from "@kb/blue-forum";
 import accounts from "../../../../../../kb/curated/blue-accounts.json";
 import { REQUEST_TIMEOUT_MS, RUN_BUDGET_MS, WORK_ENDS_MS } from "./budget";
 

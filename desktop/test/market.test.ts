@@ -153,7 +153,16 @@ const rate = (itemId: number, source: Record<string, number>, drops: number, kil
 const dropsPage = (rates: unknown[], next: string | null = null) =>
   new Response(JSON.stringify({ unreachable: false, dataAsOf: "2026-10-20T06:00:00.000Z", rates, measuredZeros: [{ sourceNpcId: 9, kills: 40, reporters: 3, public: true }], next }));
 
-test("drop rates come from the public rollup, every page on the same site, three installs and one source each", async () => {
+test("all three drop tiers survive the price file and its daily carry-over", async () => {
+  const addons = join(dir(), "AddOns");
+  const send = vi.fn(async (url: string) => url.includes("/api/rollups/drops")
+    ? dropsPage([1, 2, 3].map((reporters) => ({ ...rate(8001, { sourceNpcId: 7000 + reporters }, 1, 4, reporters), public: reporters >= 3 })))
+    : new Response(JSON.stringify({ ok: true, dataAsOf: null, realm: "Fixture Realm", house: houseOf(url), fields: [], items: [] })));
+  await refreshMarket({ svFiles: [], followed: ["Fixture Realm"], addonsDir: addons, endpoint: "https://everloot.app", send: send as unknown as typeof fetch });
+  expect(readDropsBlock(addons)?.rows.map((r) => [r[5], r[6]])).toEqual([[1, "reported"], [2, "verified"], [3, "confirmed"]]);
+});
+
+test("drop rates come from the public rollup, every page on the same site, tiered installs and one source each", async () => {
   const asked: string[] = [];
   const send = vi.fn(async (url: string) => {
     asked.push(url);
@@ -168,7 +177,7 @@ test("drop rates come from the public rollup, every page on the same site, three
   expect(asked).toEqual(["https://everloot.app/api/rollups/drops", "https://everloot.app/api/rollups/drops?offset=500&limit=500"]);
   expect(drops).toEqual({
     dataAsOf: "2026-10-20T06:00:00.000Z", fetchedAt: "2026-10-21T10:00:00.000Z",
-    rows: [[2589, "n", 116, 42, 340, 5], [2770, "o", 1731, 300, 310, 6], [12345, "n", 61, 1, 80, 3]].sort((a, b) => (b[4] as number) - (a[4] as number)),
+    rows: [[2589, "n", 116, 42, 340, 5, "confirmed"], [2770, "o", 1731, 300, 310, 6, "confirmed"], [12345, "n", 61, 1, 80, 3, "confirmed"], [1, "n", 2, 1, 9, 2, "verified"]].sort((a, b) => (b[4] as number) - (a[4] as number)),
   });
   const down = vi.fn(async () => new Response(JSON.stringify({ unreachable: true, rates: [] })));
   await expect(fetchDropSources("https://everloot.app", down as unknown as typeof fetch)).rejects.toThrow(/unreachable/);
@@ -179,7 +188,7 @@ test("a rate's source name is kept for the file, keyed by kind and id; a rate le
   const send = vi.fn(async () => dropsPage([
     named(rate(2589, { sourceNpcId: 116 }, 42, 340, 5), "Defias Bandit"),
     named(rate(2770, { sourceObjectId: 1731 }, 300, 310, 6), "Copper Vein"),
-    named(rate(1, { sourceNpcId: 2 }, 1, 9, 2), "Too Few Installs"),
+    named(rate(1, { sourceNpcId: 2 }, 1, 9, 0), "No Reports"),
     named(rate(3, { sourceNpcId: 4 }, 1, 9, 3), 42),
   ]));
   const drops = await fetchDropSources("https://everloot.app", send as unknown as typeof fetch, new Date("2026-10-21T10:00:00Z"));
@@ -194,7 +203,7 @@ test("names written beside the rates are read back with them, so the daily carry
     : new Response(JSON.stringify({ ok: true, dataAsOf: "2026-10-18", realm: "Doomhowl", house: houseOf(url), fields: [], items: [] }))));
   await refreshMarket({ svFiles: [], followed: ["Doomhowl"], addonsDir: addons, endpoint: "https://everloot.app", send: send as unknown as typeof fetch, now: new Date("2026-10-21T10:00:00Z") });
   expect(readDropsBlock(addons)).toEqual({ dataAsOf: "2026-10-20T06:00:00.000Z", fetchedAt: "2026-10-21T10:00:00.000Z",
-    rows: [[2589, "n", 116, 42, 340, 5]], names: { n116: 'Defias "Bandit" Two' } });
+    rows: [[2589, "n", 116, 42, 340, 5, "confirmed"]], names: { n116: 'Defias "Bandit" Two' } });
 });
 
 test("drop rates are fetched once a day; between fetches and after a failure the last good block is kept", async () => {
@@ -216,7 +225,7 @@ test("drop rates are fetched once a day; between fetches and after a failure the
   dropsUp = false;
   expect((await run("2026-10-22T11:00:00Z")).drops).toBe(1);
   expect(dropCalls).toBe(2);
-  expect(readDropsBlock(addons)).toEqual({ dataAsOf: "2026-10-20T06:00:00.000Z", fetchedAt: "2026-10-21T10:00:00.000Z", rows: [[2589, "n", 116, 42, 340, 5]] });
+  expect(readDropsBlock(addons)).toEqual({ dataAsOf: "2026-10-20T06:00:00.000Z", fetchedAt: "2026-10-21T10:00:00.000Z", rows: [[2589, "n", 116, 42, 340, 5, "confirmed"]] });
   // The drops block is never read back as a realm.
   expect(readPricesFile(addons)!.realms.map((r) => [r.realm, r.house])).toEqual([["doomhowl", "Alliance"], ["doomhowl", "Horde"]]);
 });

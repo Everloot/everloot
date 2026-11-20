@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createIntakeQuota } from "@/lib/intake-quota";
-import { RECORDER_INSTALL } from "../../../../../kb/src/recorder-installs";
+import { RECORDER_INSTALL } from "@kb/recorder-installs";
 
 /** Polestar Recorder uploads: the server gives the install id, keeps the reporter, and takes only three kinds. */
 

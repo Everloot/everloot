@@ -1,6 +1,6 @@
-import { questPage, questScope, zonesFor, type QuestSighting, type VendorOffer, type WorldFacts } from "../../../../../kb/src/world-pages";
-import { recheckRows } from "../../../../../kb/src/fact-states";
-import { scopeSince } from "../../../../../kb/src/recheck-scopes";
+import { questPage, questScope, zonesFor, type QuestSighting, type VendorOffer, type WorldFacts } from "@kb/world-pages";
+import { recheckRows } from "@kb/fact-states";
+import { scopeSince } from "@kb/recheck-scopes";
 
 import { agreementLabel } from "@/components/ui/AgreementMeter";
 import { timeAgo } from "@/lib/time";

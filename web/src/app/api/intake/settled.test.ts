@@ -1,5 +1,5 @@
 import { beforeEach, expect, test, vi } from "vitest";
-import { computeSettled } from "../../../../../kb/src/settled-list";
+import { computeSettled } from "@kb/settled-list";
 
 /**
  * Past settling (docs/design/specs/2026-10-21-coverage-plateau-design.md, section 4): with EVERLOOT_SETTLED_TALLY=1 a

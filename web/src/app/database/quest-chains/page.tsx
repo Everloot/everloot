@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { ChainEntry } from "../../../../../kb/src/completion";
+import type { ChainEntry } from "@kb/completion";
 import { Container, DataTable, DataTitle, FilterBar, ResultStrip, type Column } from "@/components/ui";
 import { chainHref, loadCatalog, type Listed } from "@/lib/completion-lists";
 import { LINK } from "../entity";
-import {
+import { byRank, nameMatches, Respelled,
   confirmedCell, ConfirmationsUnread, listCaption, listHref, listMetadata, listQuery, nextSort, NoMatches, noneListed, NoObservations, PER_PAGE,
   sortParam, sortRows, Unreadable, type ListQuery, type Search,
 } from "../list-parts";
@@ -34,9 +34,10 @@ export default async function QuestChainListPage(props: { searchParams?: Promise
   const all = catalog?.chains ?? [];
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
-  const matched = all.filter((x) => !text || (id !== null ? x.questLineId === id : x.name.toLowerCase().includes(text)));
+  const { ranked, respelled } = nameMatches(all, text, id, (x) => x.name);
+  const matched = all.filter((x) => !text || (id !== null ? x.questLineId === id : ranked!.has(x)));
   const sort = q.sort ?? DEFAULT_SORT;
-  const rows = sortRows(matched, (x) => (sort.key === "name" ? x.name.toLowerCase() : sort.key === "quests" ? x.questIds.length : x.questLineId), sort.desc, (x) => x.questLineId);
+  const rows = byRank(sortRows(matched, (x) => (sort.key === "name" ? x.name.toLowerCase() : sort.key === "quests" ? x.questIds.length : x.questLineId), sort.desc, (x) => x.questLineId), ranked, Boolean(q.sort));
   const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
   if (q.page > pages) notFound();
   const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
@@ -69,6 +70,7 @@ export default async function QuestChainListPage(props: { searchParams?: Promise
           active={q.q ? 1 : 0}
           clearHref="/database/quest-chains"
         />
+        {respelled && rows.length > 0 && <Respelled q={respelled} />}
         <div className="mt-2">
           <DataTable
             dense

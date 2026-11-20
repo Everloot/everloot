@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { AccountShell, AccountStatus, DeviceAccount } from "@/lib/account-shell-types";
 import { SHELL_CHANGED_EVENT } from "@/lib/profiles";
+import Icon from "@/components/ui/Icon";
 
 // The signed-in side of the header (docs/design/specs/2026-10-20-account-shell-design.md): the "+" menu, the
 // avatar bubble and its menu (the name there links to the account page), and the account switcher. Both menus are disclosures like Tools and the version
@@ -44,13 +45,13 @@ export function currentStatus(status: AccountStatus | null | undefined, now = Da
 }
 
 /**
- * The middle sections of the avatar menu. Every variant links to the account page by name, with API keys as a
- * second entry into it. Without a shell (EVERLOOT_PROFILES off), the links there are today.
+ * The middle sections of the avatar menu. Every variant links to Settings, which holds the account (#1278), with API
+ * keys as a second entry into it. Without a shell (EVERLOOT_PROFILES off), the links there are today.
  */
 export function accountMenuSections(shell: AccountShell | null | undefined, savedBuilds: boolean): MenuLink[][] {
   const builds = savedBuilds ? [{ label: "Your builds", href: "/me" }] : [];
-  const account = { label: "Your account", href: "/account" };
-  const apiKeys = { label: "API keys", href: "/account#keys" };
+  const account = { label: "Settings", href: "/settings" };
+  const apiKeys = { label: "API keys", href: "/settings#keys" };
   const desktop = { label: "Desktop App and addon", href: "/addon" };
   if (!shell) return [[...builds, account, apiKeys, desktop]];
   return [
@@ -60,7 +61,7 @@ export function accountMenuSections(shell: AccountShell | null | undefined, save
       ...(savedBuilds ? [{ label: "Your characters", href: "/me" }] : []),
       ...builds,
     ],
-    [account, apiKeys, desktop, { label: "Settings", href: "/settings" }],
+    [account, apiKeys, desktop],
   ];
 }
 
@@ -99,7 +100,7 @@ function PlusIcon() {
   return <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16"><path d="M8 2v12M2 8h12" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" /></svg>;
 }
 function Caret({ open }: { open: boolean }) {
-  return <svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" className={open ? "rotate-180" : undefined}><path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>;
+  return <Icon name="chevron" className={open ? "rotate-180" : undefined} />;
 }
 
 /** "+": Plan a build, Upload addon data, and New character while saved builds are on (it is on /me). */
@@ -276,7 +277,7 @@ export function AvatarMenu({ name, initialShell = null, profiles = false, savedB
         <div className="flex items-center gap-3 px-3 py-2">
           <Avatar name={shown} fill={fill} size="md" />
           <div className="min-w-0 flex-1">
-            <a href="/account" className="block truncate font-semibold text-fg hover:underline underline-offset-4">{shown}</a>
+            <a href="/settings" className="block truncate font-semibold text-fg hover:underline underline-offset-4">{shown}</a>
             {shell && (shell.handle
               ? <p className="truncate text-sm text-muted">@{shell.handle}</p>
               : <a href="/settings" className="text-sm text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Choose a handle</a>)}

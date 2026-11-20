@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ hide: vi.fn(), enqueue: vi.fn(), quota: vi.fn(), revalidatePath: vi.fn() }));
+const mocks = vi.hoisted(() => ({ hide: vi.fn(), enqueue: vi.fn(), quota: vi.fn(), revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 vi.mock("@/lib/armory-store", () => ({ armoryStore: () => ({ hide: mocks.hide, enqueue: mocks.enqueue }) }));
 vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { form: mocks.quota } }));
-vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
+vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath, revalidateTag: mocks.revalidateTag }));
 
 import { POST as hide } from "./hide/send/route";
 import { POST as submit } from "./submit/send/route";
@@ -20,6 +20,7 @@ beforeEach(() => {
   mocks.enqueue.mockReset().mockResolvedValue(true);
   mocks.quota.mockReset().mockResolvedValue({ allowed: true, retryAfter: 0 });
   mocks.revalidatePath.mockReset();
+  mocks.revalidateTag.mockReset();
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
@@ -64,6 +65,7 @@ test("a hide deletes by region and slug, clears the cached armory pages and conf
   expect(where(r).pathname + where(r).search).toBe("/armory/hide?done=1");
   expect(mocks.hide).toHaveBeenCalledWith("eu", "velkara-duskmantle");
   expect(mocks.revalidatePath).toHaveBeenCalledWith("/armory", "layout");
+  expect(mocks.revalidateTag).toHaveBeenCalledWith("players");
 });
 
 test("a name with accents is accepted and its slug is composed and in lower case", async () => {

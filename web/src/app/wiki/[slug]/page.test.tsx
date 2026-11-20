@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { loadPrivatePathPattern } from "../../../../../kb/src/wiki/data";
+import { loadPrivatePathPattern } from "@kb/wiki/data";
 
 vi.mock("next/link", () => ({
   default: ({ href, children, className, ...rest }: { href: string; children: ReactNode; className?: string }) => (

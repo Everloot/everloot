@@ -1,8 +1,8 @@
-import { isDevelopmentItemName } from "../../../kb/src/dev-item-names";
-import { itemHasFacts, npcHasFacts, objectHasFacts, questHasFacts, vendorHasFacts } from "../../../kb/src/page-urls";
-import type { ItemPage } from "../../../kb/src/item-page";
-import type { ObjectPage } from "../../../kb/src/object-page";
-import type { NpcPage, QuestPage, VendorPage } from "../../../kb/src/world-pages";
+import { isDevelopmentItemName } from "@kb/dev-item-names";
+import { itemHasFacts, npcHasFacts, objectHasFacts, questHasFacts, vendorHasFacts } from "@kb/page-urls";
+import type { ItemPage } from "@kb/item-page";
+import type { ObjectPage } from "@kb/object-page";
+import type { NpcPage, QuestPage, VendorPage } from "@kb/world-pages";
 import type { ShownItemName } from "./items";
 
 /**
@@ -16,13 +16,15 @@ import type { ShownItemName } from "./items";
  * Never a development leftover: its page stays reachable by id, but search has no use for it.
  */
 export const itemIndexable = (page: ItemPage, unreachable: boolean, name: ShownItemName | null): boolean =>
-  !isDevelopmentItemName(name?.name) && ((!unreachable && itemHasFacts(page)) || name?.source === "wiki" || name?.source === "files");
+  !isDevelopmentItemName(name?.name) && ((!unreachable && itemHasFacts({ ...page, drops: page.drops.filter((r) => r.reporters >= 3) })) || name?.source === "wiki" || name?.source === "files");
 
 export const npcIndexable = (page: NpcPage, unreachable: boolean): boolean => !unreachable && npcHasFacts(page);
 
 export const questIndexable = (page: QuestPage, unreachable: boolean): boolean => !unreachable && questHasFacts(page);
 
-export const objectIndexable = (page: ObjectPage, unreachable: boolean): boolean => !unreachable && objectHasFacts(page);
+export const objectIndexable = (page: ObjectPage, unreachable: boolean): boolean => !unreachable && objectHasFacts({
+  ...page, drops: page.drops.filter((r) => r.reporters >= 3), zero: page.zero && page.zero.reporters >= 3 ? page.zero : null,
+});
 
 export const vendorIndexable = (page: VendorPage, unreachable: boolean): boolean => !unreachable && vendorHasFacts(page);
 

@@ -1,4 +1,4 @@
-import { OpenDataManifest } from "../../../kb/src/open-data/manifest";
+import { OpenDataManifest } from "@kb/open-data/manifest";
 import { BULK_URL } from "@/lib/docs/connect-data";
 
 /**

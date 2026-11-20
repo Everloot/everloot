@@ -7,8 +7,8 @@
  */
 import racesJson from "@/data/game-data/races.json";
 import { CLASSES, type ClassName } from "@/data/wow-forever";
-import type { RaceTable } from "../../../kb/src/client-races";
-import { RACIAL_NOTES, withRacialNotes, type NotedTrait } from "../../../kb/src/racial-notes";
+import type { RaceTable } from "@kb/client-races";
+import { RACIAL_NOTES, withRacialNotes, type NotedTrait } from "@kb/racial-notes";
 
 export const RACE_TABLE = racesJson as RaceTable;
 export type RaceTrait = NotedTrait;

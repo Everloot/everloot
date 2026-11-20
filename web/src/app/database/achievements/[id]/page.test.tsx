@@ -27,7 +27,7 @@ vi.mock("@/components/ui/OpenData", () => ({
 }));
 
 import AchievementPage from "./page";
-import { emptyCompletion, foldCompletion } from "../../../../../../kb/src/completion-rollup";
+import { emptyCompletion, foldCompletion } from "@kb/completion-rollup";
 
 const at = "2026-11-08T00:00:00Z";
 let seq = 0;
@@ -43,7 +43,7 @@ const html = async (id: string) => renderToStaticMarkup(await AchievementPage({ 
 const openData = (out: string) => (/<pre data-open-data="true">([\s\S]*?)<\/pre>/.exec(out)?.[1] ?? "").split("\n");
 const confirmedLine = (out: string) => /<p data-confirmed-line="true"[^>]*>(.*?)<\/p>/.exec(out)?.[1] ?? "";
 const factOf = (out: string, label: string) => new RegExp(`>${label}</dt><dd[^>]*>(.*?)</dd>`).exec(out)?.[1] ?? "";
-const TRACK = "Track it in the Collections tool. Progress needs the addon&#x27;s completion tracker (off until you turn it on) and an upload that shares your collection ownership.";
+const TRACK = "Track it in the Collections tool. Progress needs the addon&#x27;s completion tracker (on in a new install; older installs keep their choice) and an upload that shares your collection ownership.";
 
 beforeEach(() => {
   seq = 0;

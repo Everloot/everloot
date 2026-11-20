@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { censusFromRows, type CensusRow, type CensusWindow, type Faction } from "../../../kb/src/census";
+import { censusFromRows, type CensusRow, type CensusWindow, type Faction } from "@kb/census";
 import {
   RANKINGS, START_LINE, censusHrefOf, firstWeek, hubIndexable, hubMetrics, parseRankingQuery, rankRows, rankedCount, rankingDef, rankingHref,
   rankingIndexable, rankingView, rankingWeeks, topMovers, weekStart, weeklyCharacters, type RankRow,
@@ -212,6 +212,23 @@ test("hub numbers: this week's characters against last week's, both rounded; mov
   expect(movers.every((x) => x.href.startsWith("/census"))).toBe(true);
   // Before the first week there is nothing to headline.
   expect(hubMetrics(RANKINGS.map((def) => rankingView(def, [])))).toBeNull();
+});
+test("a week still running is compared with the same days of last week, never the whole of it", () => {
+  // Last week: 128 characters by Wednesday, 120 more on Saturday. This week, by Wednesday noon: 128 again.
+  const rows = [...mixed(WEEK1, "w"), ...crowd(120, "s", "2026-11-14T10:00:00.000Z", { class: "WARRIOR" }), ...mixed(WEEK2, "v")];
+  const weeks = rankingWeeks(rows, "2026-11-18T12:00:00.000Z");
+  expect(weeks[1].current).toBe(true);
+  expect(weeks[0].window.characters).toBeGreaterThan(weeks[1].window.characters!);
+  expect(weeks[1].sameDaysBefore!.characters).toBe(weeks[1].window.characters);
+  expect(weeks[0].sameDaysBefore).toBeUndefined();
+  const m = hubMetrics(RANKINGS.map((def) => rankingView(def, weeks)))!;
+  expect(m.week.current).toBe(true);
+  expect(m.change).toEqual({ by: 0, share: 0, sameDays: true });
+  // A finished week against the whole week before.
+  const frozen = hubMetrics(RANKINGS.map((def) => rankingView(def, weeks, { week: "2026-11-09" })));
+  expect(frozen!.week.current).toBe(false);
+  // The first ranked week has no week before it, running or not.
+  expect(rankingWeeks(mixed(WEEK1, "w"), "2026-11-11T12:00:00.000Z")[0].sameDaysBefore).toBeNull();
 });
 test("the leading published class is not the most played when a larger class is hidden; a tie names every leader", () => {
   // 200 Warlocks reported by one install: under the install threshold, so the Warlock count is hidden though it is the largest.

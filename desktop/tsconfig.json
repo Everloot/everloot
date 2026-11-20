@@ -10,7 +10,8 @@
     "esModuleInterop": true,
     "types": ["node"],
     "paths": {
-      "zod": ["../web/node_modules/zod"]
+      "zod": ["../web/node_modules/zod"],
+      "@kb/*": ["../kb/src/*"]
     }
   },
   "include": ["src/**/*.ts", "test/**/*.ts", "bench/**/*.ts"]

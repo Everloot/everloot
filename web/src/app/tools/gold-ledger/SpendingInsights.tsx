@@ -4,7 +4,7 @@ import {
   categoryLabel, change, characterKey,
   type PeriodCategory, type PeriodStats, type Receipt, type ResaleItem, type SaleItem, type SalesSummary,
 } from "@/lib/money-ledger";
-import { formatCopper } from "../../../../../kb/src/gold-ledger";
+import { formatCopper } from "@kb/gold-ledger";
 
 /**
  * Each spending category keeps one colour wherever it appears (a colour follows the category, never its rank). The

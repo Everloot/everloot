@@ -4,6 +4,7 @@ const path = require("node:path");
 const versions = require("./src/data/build-versions.json");
 const protectedPaths = require("./src/data/protected-paths.json");
 const corsPrerenderedPaths = require("./src/data/cors-prerendered-paths.json");
+const { CACHE_POLICY, cdnCacheControl } = require("./src/lib/cache-policy.js");
 
 const reportOnlyCsp = [
   "default-src 'self'",
@@ -74,10 +75,17 @@ const downloads = Object.fromEntries(readdirSync(downloadsDir).filter((name) => 
   return [`/downloads/${name}`, { size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex") }];
 }));
 
+// Whether kb/guides holds a reviewed guide (status: published; the guide check fails a published guide with no review).
+// The header's Guides menu lists the guides index only then. Every page draws the header and the Worker has no copy of
+// kb/guides to read, so the build decides; next-config.test.ts pins it to the guide reader's gate (lib/guides.ts).
+const guidesDir = path.join(__dirname, "..", "kb", "guides");
+const reviewedGuides = readdirSync(guidesDir).some((name) => name.endsWith(".md") && name !== "README.md"
+  && /^status:\s*published\s*$/m.test(readFileSync(path.join(guidesDir, name), "utf8").split(/^---\s*$/m)[1] ?? ""));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  env: { EVERLOOT_DOWNLOADS: JSON.stringify(downloads) },
+  env: { EVERLOOT_DOWNLOADS: JSON.stringify(downloads), EVERLOOT_REVIEWED_GUIDES: reviewedGuides ? "1" : "" },
   // Native module: required at runtime from web/node_modules, never bundled.
   serverExternalPackages: ["better-sqlite3"],
   // The approved knowledge release ships inside the /mcp function only (copied to web/.release, never committed).
@@ -159,57 +167,25 @@ const nextConfig = {
   // enforced CSP holds only the plugin, base-tag and framing rules. Access-Control-Allow-Origin is set here only
   // for the public API routes below that are prerendered; the others set it themselves.
   async headers() {
-    const databaseItemsCdnHeaders = [
-      { key: "CDN-Cache-Control", value: "max-age=3600, stale-while-revalidate=86400" },
-    ];
-    const briefCdnHeaders = [
-      { key: "CDN-Cache-Control", value: "max-age=300, stale-while-revalidate=3600" },
-    ];
+    // How long the CDN keeps each public page: src/lib/cache-policy.js, one row per route group with its reason.
+    // These pages read no cookies, so the CDN can serve them. Next overwrites Cache-Control on dynamic pages, so the
+    // CDN-specific header is used. The private row is the Blizzard auction page (app/blizzard-auctions), also under
+    // the served version's prefix: the edge cache skips it by route as well (lib/cf-edge-cache.ts), and robots.txt
+    // keeps crawlers off it. The entity row comes last, so its detail pages win over the lists' `:path*` sources.
+    const cacheRules = Object.values(CACHE_POLICY).flatMap((row) => row.noStore
+      ? row.sources.flatMap((source) => [source, ...(servedPrefix ? [`${servedPrefix}${source}`] : [])]).map((source) => ({ source, headers: [
+        { key: "Cache-Control", value: "private, no-store" },
+        { key: "CDN-Cache-Control", value: cdnCacheControl(row) },
+        { key: "X-Robots-Tag", value: "noindex, nofollow" },
+      ] }))
+      : row.sources.map((source) => ({ source, headers: [{ key: "CDN-Cache-Control", value: cdnCacheControl(row) }] })));
     return [
       { source: "/:path*", headers: securityHeaders },
       // After the rule above: the later rule's value for the same header is the one sent.
       ...protectedSources.map((source) => ({ source, headers: [{ key: "Content-Security-Policy", value: protectedCsp }] })),
       // The same key's spelling, so it replaces the site's value rather than adding a second header.
       ...microphoneSources.map((source) => ({ source, headers: [{ key: "Permissions-Policy", value: permissionsPolicy("(self)") }] })),
-      // The Blizzard auction page (app/blizzard-auctions): no shared cache may keep it, since Blizzard data may not
-      // outlive 30 days and a failed read must not be served as the page; the edge cache skips it by route as well
-      // (lib/cf-edge-cache.ts). Not for search either: robots.txt keeps crawlers off it.
-      ...servedSources("/blizzard-auctions").map((source) => ({ source, headers: [
-        { key: "Cache-Control", value: "private, no-store" },
-        { key: "CDN-Cache-Control", value: "private, no-store" },
-        { key: "X-Robots-Tag", value: "noindex, nofollow" },
-      ] })),
-      // These pages read no cookies, so the CDN can serve them. Next overwrites Cache-Control on
-      // dynamic pages, so the CDN-specific headers are used.
-      { source: "/database/items", headers: databaseItemsCdnHeaders },
-      { source: "/database/items/:path*", headers: databaseItemsCdnHeaders },
-      // The map reads no cookies either, and renders from the build's map on every request.
-      { source: "/map", headers: databaseItemsCdnHeaders },
-      { source: "/map/:path*", headers: databaseItemsCdnHeaders },
-      // Changes and search read no cookies, but new blue posts and newly agreed names should show within minutes.
-      { source: "/changes", headers: briefCdnHeaders },
-      { source: "/search", headers: briefCdnHeaders },
-      // Public market browse and item pages read no session. Item pages (`/tools/auctions/:realm/:itemId`, which
-      // also covers `/tools/auctions/item/:itemId`) were the costliest uncached render (about 5 s of CPU each), so
-      // they share the browse pages' five minutes, the same as their `revalidate`.
-      ...["/tools/auctions", "/tools/auctions/:realm", "/tools/auctions/:realm/:itemId"].map((source) => ({
-        source, headers: [{ key: "CDN-Cache-Control", value: "max-age=300" }],
-      })),
-      // The profession hub and pages read no cookies; a page renders every recipe with the corpus's gathering areas on each request
-      // (2 to 5 s). Five minutes, so a page drawn while storage was unreachable does not stay long.
-      { source: "/tools/professions/:path*", headers: briefCdnHeaders },
-      // The database index, the other list and detail pages (a type's source matches its list too), the census and the
-      // rankings read no cookies either, and each renders from the whole corpus on every request. Five minutes for the
-      // same reason: zones, instances and the index were kept an hour, which kept a page drawn while storage was unreachable.
-      { source: "/database", headers: briefCdnHeaders },
-      ...["npcs", "quests", "objects", "vendors", "spells", "achievements", "titles", "factions", "quest-chains", "drops", "zones", "instances", "coverage"]
-        .map((type) => ({ source: `/database/${type}/:path*`, headers: briefCdnHeaders })),
-      // Complete public detail pages may be an hour old (approved freshness trade-off).
-      // The Worker still caps degraded HTML at 60 seconds; lists keep their shorter policy.
-      ...["npcs", "quests", "objects", "vendors", "spells", "achievements", "titles", "factions", "quest-chains", "zones", "instances", "coverage"]
-        .map((type) => ({ source: `/database/${type}/:detail`, headers: databaseItemsCdnHeaders })),
-      { source: "/census", headers: briefCdnHeaders },
-      { source: "/rankings/:path*", headers: briefCdnHeaders },
+      ...cacheRules,
       // The sitemaps set these on their own successful responses (lib/database-sitemap.ts), so their 503s stay uncached.
       // Two public API routes are prerendered, so no handler of theirs runs to set it.
       // The list is data/cors-prerendered-paths.json, which the API docs page reads for its CORS paragraph.

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { handleNpcPage, handleQuestPage, handleVendorPage, npcNameReporters, npcTraits, questTraits, worldFactsFromRecords } from "../src/world-pages.js";
+import { agreedLabelsById, handleNpcPage, handleQuestPage, handleVendorPage, npcNameReporters, npcTraits, questTraits, worldFactsFromRecords } from "../src/world-pages.js";
 
 test("an NPC's level and reaction are kept from sightings and public once 3 installs agree", () => {
   const sight = (installId: string, level: unknown, reaction: unknown) =>
@@ -150,4 +150,16 @@ test("a stock only some installs reported is unrecorded, not unlimited", () => {
   const text = handleVendorPage({ vendorNpcId: 81 }, worldFactsFromRecords([vendor("a", 5), vendor("b", 5), vendor("c")]));
   expect(text).toContain("Item 6  50c  stock unrecorded  3 reporters");
   expect(text).not.toContain("not limited");
+});
+
+
+test("tiered drop names respect recheck and leave other name readers at three installs", () => {
+  const old = ["fixture-a", "fixture-b", "fixture-c"].map((installId) =>
+    ({ id: 7001, installId, label: "Fixture Old", capturedAt: "2026-10-01T00:00:00Z" }));
+  const fresh = ["fixture-d", "fixture-e"].map((installId) =>
+    ({ id: 7001, installId, label: "Fixture New", capturedAt: "2026-11-01T00:00:00Z" }));
+  const since = () => "2026-10-15T00:00:00Z";
+  expect(agreedLabelsById([...old, fresh[0]!], since, true).get(7001)).toEqual({ name: "Fixture New", tier: "reported" });
+  expect(agreedLabelsById([...old, ...fresh], since, true).get(7001)).toEqual({ name: "Fixture New", tier: "verified" });
+  expect(agreedLabelsById([...old, ...fresh], since).size).toBe(0);
 });

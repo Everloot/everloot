@@ -1,4 +1,4 @@
-import { npcPage, npcTraits, questPage, questTraits, vendorPage, type NpcPage, type NpcRank, type NpcReaction, type QuestPage, type QuestSide, type QuestTag, type VendorPage, type WorldFacts } from "../../../kb/src/world-pages";
+import { npcPage, npcTraits, questPage, questTraits, vendorPage, type NpcPage, type NpcRank, type NpcReaction, type QuestPage, type QuestSide, type QuestTag, type VendorPage, type WorldFacts } from "@kb/world-pages";
 import { publicZones, type ZoneSummary } from "./zones";
 
 // The NPCs, quests and vendors that have at least one public fact (3 installs agree), for the list pages
@@ -61,6 +61,9 @@ export interface QuestRow extends QuestPage {
   suggestedGroup: number | null;
   tag: QuestTag | null;
 }
+
+/** The side a quest is offered to, as the lists and the search overview print it. */
+export const SIDE_LABEL: Record<QuestSide, string> = { alliance: "Alliance", horde: "Horde", both: "Both" };
 
 export function publicQuests(facts: WorldFacts): QuestRow[] {
   return [...byId(facts.quests, (r) => r.questId)].map(([id, quests]) => ({ ...questPage(id, { ...EMPTY, quests, npcs: facts.npcs, recheck: facts.recheck }), ...questTraits(quests, facts) }))

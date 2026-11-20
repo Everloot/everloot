@@ -1,16 +1,18 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { MCP_TOOL_NAMES, MCP_TOOLS, toolAnswerResponse } from "@everloot/protocol";
 import { z } from "zod";
-import { openDb } from "../../../../../../kb/src/db";
-import { replaceSourceRows } from "../../../../../../kb/src/entities";
+import { openDb } from "@kb/db";
+import { replaceSourceRows } from "@kb/entities";
 
 const store = vi.hoisted(() => ({ fail: null as Error | null, api: vi.fn(), mcp: vi.fn(), loadCorpus: vi.fn(), loadMarket: vi.fn(), release: { db: null as unknown } }));
 vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { api: store.api, mcp: store.mcp } }));
 vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: store.loadCorpus, loadMarket: store.loadMarket } }));
+const stored = vi.hoisted(() => ({ set: vi.fn() }));
+vi.mock("@/lib/aggregate-store", async (actual) => ({ ...(await actual<typeof import("@/lib/aggregate-store")>()), loadStoredAggregates: stored.set }));
 vi.mock("@/lib/release", () => ({ getRelease: () => (store.release.db ? store.release : null) }));
 // A handler whose store read throws (the real handlers degrade most of those to "unrecorded"), set per test.
-vi.mock("../../../../../../kb/src/mcp-server", async (importOriginal) => {
-  const real = await importOriginal<typeof import("../../../../../../kb/src/mcp-server")>();
+vi.mock("@kb/mcp-server", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@kb/mcp-server")>();
   return {
     ...real,
     createToolHandlers: (...args: Parameters<typeof real.createToolHandlers>) => {
@@ -23,6 +25,8 @@ const auth = vi.hoisted(() => ({ getUser: vi.fn(), authQuery: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ getUser: auth.getUser, authQuery: auth.authQuery, siteUrl: () => "https://everloot.app" }));
 
 import { GET } from "./route";
+import type { IntakeRecord } from "@everloot/protocol";
+import { anonymousAggregates } from "@/lib/aggregate-store";
 import { MY_BUILDS_REFUSAL } from "@/lib/saved-builds";
 import { argumentsFromQuery } from "@/lib/tool-query";
 
@@ -38,6 +42,7 @@ const get = (tool: string, query = "") => GET(new Request(`https://everloot.app/
 
 beforeEach(async () => {
   store.fail = null;
+  stored.set.mockReset().mockResolvedValue(null);
   store.api.mockReset().mockResolvedValue({ allowed: true, retryAfter: 0 });
   store.mcp.mockReset().mockResolvedValue({ allowed: true, retryAfter: 0 });
   store.loadCorpus.mockResolvedValue({ uploads: 3, records, dataAsOf: AS_OF, unreachable: false });
@@ -67,6 +72,18 @@ test("an upload tool reads the site's store in process and answers under the upl
   expect(answer).toMatchObject({ connected: true, dataAsOf: AS_OF });
   expect(answer.page!.name).toBe("Peacebloom");
   expect(body.text).toContain("Data as of 2026-10-18");
+});
+
+test("with the cron's stored set, a page tool over HTTP never opens the corpus and answers the same", async () => {
+  const viaCorpus = toolAnswerResponse.parse(await (await get("entity_relations", "?kind=item&id=1234&direction=from")).json());
+  expect(viaCorpus.answer).toMatchObject({ connected: true, dataAsOf: AS_OF });
+  expect(store.loadCorpus).toHaveBeenCalled();
+  stored.set.mockResolvedValue(anonymousAggregates({ uploads: 3, records: records as IntakeRecord[], dataAsOf: AS_OF }));
+  store.loadCorpus.mockReset().mockRejectedValue(new Error("the corpus must not be read"));
+  const viaStore = toolAnswerResponse.parse(await (await get("entity_relations", "?kind=item&id=1234&direction=from")).json());
+  expect(viaStore).toEqual(viaCorpus);
+  expect(viaStore.text).toContain("456");
+  expect(store.loadCorpus).not.toHaveBeenCalled();
 });
 
 test("numbers and booleans are read from their text; strings stay strings", () => {

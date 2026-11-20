@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { GAME_DATA_CREDIT } from "@everloot/protocol";
-import { CLIENT_SKILLS } from "../../../kb/src/client-layer-file";
-import { CLIENT_LABEL, edgesFrom, entityLabel, evidenceLabel, groupByRel, type Edge, type EdgeKind, type Rel } from "../../../kb/src/edges";
+import { CLIENT_SKILLS } from "@kb/client-layer-file";
+import { CLIENT_LABEL, edgesFrom, entityLabel, evidenceLabel, groupByRel, type Edge, type EdgeKind, type Rel } from "@kb/edges";
 import { professionHrefById } from "@/lib/professions";
 import { zoneByMapId, zoneHref } from "@/lib/zones";
 import GameIcon from "./game/GameIcon";
@@ -61,7 +61,7 @@ export function RelationTarget({ edge, rel, client, spellIcon, nameOf, gameName 
     <>
       {icon ? <><GameIcon src={icon} size={18} />{" "}</> : null}
       {/* A link's hover card says where its name comes from; a name without a page keeps the plain tooltip. */}
-      {href ? <Link href={href} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{text}</Link> : title ? <span title={title}>{text}</span> : text}
+      {href ? <Link prefetch={false} href={href} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">{text}</Link> : title ? <span title={title}>{text}</span> : text}
       {fromFiles?.source === "wiki" ? <span className="sr-only"> ({GAME_NAME_TITLE.wiki.toLowerCase()})</span> : null}
       {/* A name only the game files give carries the quiet unconfirmed marker, as on the item lists. */}
       {fromFiles?.source === "files" ? <>{" "}<Badge tone="files" /></> : null}

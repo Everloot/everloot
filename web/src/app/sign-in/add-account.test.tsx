@@ -68,12 +68,12 @@ test("signed out, add=1 is the plain sign-in", async () => {
 
 test("without Better Auth or the profiles switch, a signed-in visitor is sent on as before", async () => {
   vi.stubEnv("EVERLOOT_AUTH_V2", "0");
-  await expect(SignInPage(add())).rejects.toThrow("NEXT_REDIRECT /account");
+  await expect(SignInPage(add())).rejects.toThrow("NEXT_REDIRECT /settings");
   vi.stubEnv("EVERLOOT_AUTH_V2", "1");
   vi.stubEnv("EVERLOOT_PROFILES", "0");
-  await expect(SignInPage(add())).rejects.toThrow("NEXT_REDIRECT /account");
+  await expect(SignInPage(add())).rejects.toThrow("NEXT_REDIRECT /settings");
   // add is exactly "1".
   vi.stubEnv("EVERLOOT_PROFILES", "1");
-  await expect(SignInPage({ searchParams: Promise.resolve({ add: "yes" }) })).rejects.toThrow("NEXT_REDIRECT /account");
+  await expect(SignInPage({ searchParams: Promise.resolve({ add: "yes" }) })).rejects.toThrow("NEXT_REDIRECT /settings");
   expect(auth.state).not.toHaveBeenCalled();
 });

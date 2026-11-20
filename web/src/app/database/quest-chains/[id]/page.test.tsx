@@ -24,7 +24,7 @@ vi.mock("@/components/ui/OpenData", () => ({
 }));
 
 import ChainPage from "./page";
-import { emptyCompletion, foldCompletion } from "../../../../../../kb/src/completion-rollup";
+import { emptyCompletion, foldCompletion } from "@kb/completion-rollup";
 
 const at = "2026-11-08T00:00:00Z";
 let seq = 0;

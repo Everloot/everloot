@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { QuestSide, QuestTag } from "../../../../../kb/src/world-pages";
+import type { QuestSide, QuestTag } from "@kb/world-pages";
 import { GAME_NAME_TITLE } from "@/components/EntityRelations";
 import GameIcon from "@/components/game/GameIcon";
 import { Container, DataTable, DataTitle, filledColumns, FilterBar, ResultStrip, type FilterControl, type SparseColumn } from "@/components/ui";
@@ -10,9 +10,9 @@ import { CLIENT_LAYER, shownItemName } from "@/lib/items";
 import { npcNames } from "@/lib/names";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { loadShownNames } from "@/lib/shown-item-names";
-import { bareQuestRow, publicQuests, type QuestRow } from "@/lib/world-lists";
+import { bareQuestRow, publicQuests, SIDE_LABEL, type QuestRow } from "@/lib/world-lists";
 import { LINK } from "../entity";
-import {
+import { byRank, nameMatches, Respelled,
   flag, LEVEL_BRACKETS, listHref, listMetadata, listQuery, nextSort, NoMatches, NoObservations, PER_PAGE, range, rangeParam, sortParam, sortRows, Unreadable,
   type ListQuery, type Search,
 } from "../list-parts";
@@ -25,7 +25,6 @@ type Sort = (typeof SORTS)[number];
 const DEFAULT_SORT = { key: "id" as Sort, desc: false };
 
 const SIDES: Record<string, QuestSide> = { alliance: "alliance", horde: "horde", both: "both" };
-const SIDE_LABEL: Record<QuestSide, string> = { alliance: "Alliance", horde: "Horde", both: "Both" };
 const TAG_LABEL: Record<QuestTag, string> = { group: "Group", dungeon: "Dungeon", raid: "Raid", pvp: "PvP" };
 const groupLabel = (x: QuestRow) => [x.tag && TAG_LABEL[x.tag], x.suggestedGroup !== null && `${x.suggestedGroup} players`].filter(Boolean).join(", ");
 
@@ -66,8 +65,9 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
   const titleOf = (x: QuestRow) => x.title ?? wikiTitles?.names.get(x.questId)?.name ?? null;
   const text = q.q?.toLowerCase();
   const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
+  const { ranked, respelled } = nameMatches(all, text, id, titleOf);
   const matched = all.filter((x) =>
-    (!text || (id !== null ? x.questId === id : Boolean(titleOf(x)?.toLowerCase().includes(text))))
+    (!text || (id !== null ? x.questId === id : ranked!.has(x)))
     && (!q.level || (x.level !== null && x.level >= q.level.min && x.level <= q.level.max)) && (!q.rewards || x.rewards.length > 0)
     && (!q.category || x.category === q.category) && (!q.side || x.side === SIDES[q.side]));
   const sort = q.sort ?? DEFAULT_SORT;
@@ -75,7 +75,7 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
   const key = (x: QuestRow): string | number | null => sort.key === "name" ? titleOf(x)?.toLowerCase() ?? null : sort.key === "level" ? x.level
     : sort.key === "category" ? x.category?.toLowerCase() ?? null : sort.key === "side" ? x.side : sort.key === "group" ? x.suggestedGroup
     : sort.key === "giver" ? npcKey(x.giverNpcId) : sort.key === "turnin" ? npcKey(x.turnInNpcId) : sort.key === "rewards" ? x.rewards.length : x.questId;
-  const rows = sortRows(matched, key, sort.desc, (x) => x.questId);
+  const rows = byRank(sortRows(matched, key, sort.desc, (x) => x.questId), ranked, Boolean(q.sort));
   const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
   if (q.page > pages) notFound();
   const shown = rows.slice((q.page - 1) * PER_PAGE, q.page * PER_PAGE);
@@ -171,6 +171,7 @@ export default async function QuestListPage(props: { searchParams?: Promise<Sear
           clearHref="/database/quests"
         />
         {/* With nothing to list at all, the one line says so without a row of column headers over it. */}
+        {respelled && rows.length > 0 && <Respelled q={respelled} />}
         <div className="mt-2">{all.length === 0 ? empty : (
           <DataTable
             dense

@@ -75,5 +75,7 @@ export const config = {
     "/", "/ops/:path*", "/api/ops/:path*",
     "/blizzard-auctions/:path*", "/beta/blizzard-auctions/:path*", "/ptr/blizzard-auctions/:path*",
     "/armory/:path*", "/beta/armory/:path*", "/ptr/armory/:path*",
+    "/players/:path*", "/beta/players/:path*", "/ptr/players/:path*",
+    "/guilds/:path*", "/beta/guilds/:path*", "/ptr/guilds/:path*",
   ],
 };

@@ -12,7 +12,7 @@ import { asOfLine } from "@/lib/evidence";
 import { loreFor } from "@/lib/lore-links";
 import LoreSection from "@/components/LoreSection";
 import { pageMetadata } from "@/lib/seo";
-import { CLIENT_LABEL } from "../../../../../../kb/src/edges";
+import { CLIENT_LABEL } from "@kb/edges";
 import { CLIENT_ACHIEVEMENTS } from "@/data/game-data/client-achievements";
 import { EmptyTab, EntityHeader, EntityTop, LINK, Unreachable } from "../../entity";
 import { confirmedCell } from "../../list-parts";
