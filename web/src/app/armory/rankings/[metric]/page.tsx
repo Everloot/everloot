@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
 import { Container, DataTable, FilterBar, LinkTabs, PageHeader, type Column, type FilterControl } from "@/components/ui";
 import {
-  ARMORY_CLASSES, ARMORY_FACTIONS, ARMORY_BOARDS, ARMORY_METRICS, ARMORY_REGIONS, ARMORY_RULESETS, armoryBoardHref, armoryBoardPath, armoryBoardQuery,
+  ARMORY_CLASSES, ARMORY_FACTIONS, ARMORY_BOARDS, ARMORY_METRICS, PLAY_HISTORY_METRICS, ARMORY_REGIONS, ARMORY_RULESETS, armoryBoardHref, armoryBoardPath, armoryBoardQuery,
   armoryCharacterPath, armoryOn, isArmoryMetric, regionLabel, type ArmoryBoardQuery, type ArmoryMetric,
 } from "@/lib/armory";
 import { armoryStore, type ArmoryBoardRow } from "@/lib/armory-store";
@@ -89,6 +89,9 @@ export default async function ArmoryBoardPage(props: { params: Promise<{ metric:
           lede={def.lede}
           meta={<ArmoryCredit at={rows ? newest(rows.map((r) => r.fetchedAt)) : null} />}
         />
+        {PLAY_HISTORY_METRICS.includes(metric) && <p className="text-sm text-fg-2">
+          Characters are ranked once their play history has been read; the armory reads each character at least every 20 days.
+        </p>}
         <LinkTabs label="Armory rankings" tabs={ARMORY_METRICS.map((m) => ({ href: armoryBoardHref(m, q), label: ARMORY_BOARDS[m].title, current: m === metric }))} />
         {rows === null ? <Unreachable /> : (
           <>

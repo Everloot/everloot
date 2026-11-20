@@ -4,9 +4,10 @@ import ItemTip from "@/components/game/ItemTip";
 import { Disclosure, SectionHeading } from "@/components/ui";
 import { QUALITY_TEXT, type Quality } from "@/components/ui/quality";
 import { QUALITIES } from "@/design/tokens";
-import { classTokenOfName, slotLabel } from "@/lib/armory";
+import { ARMORY_BOARDS, classTokenOfName, metricValue, PLAY_HISTORY_METRICS, slotLabel, type ArmoryMetric } from "@/lib/armory";
 import type { ArmoryCharacter } from "@/lib/armory-store";
 import type { ItemTip as Tip } from "@/lib/game-assets";
+import type { PlayHistoryRankedKey } from "@kb/armory/details";
 import { link } from "./parts";
 
 // The game's paper doll: armour down the left, jewellery and the rest down the right, weapons below, the model's place left empty.
@@ -87,7 +88,7 @@ export function Achievements({ rows, categories }: { rows: Achievement[]; catego
 /** The read times of a character's Blizzard data: the profile and each detail section, for one credit line. */
 export function readTimes(c: ArmoryCharacter): string[] {
   const d = c.details;
-  return [c.fetchedAt, d?.statistics?.asOf, d?.talents?.asOf, d?.professions?.asOf, d?.achievements?.asOf, d?.reputations?.asOf, d?.quests?.asOf]
+  return [c.fetchedAt, d?.statistics?.asOf, d?.talents?.asOf, d?.professions?.asOf, d?.achievements?.asOf, d?.reputations?.asOf, d?.quests?.asOf, d?.playHistory?.asOf]
     .filter((t): t is string => typeof t === "string");
 }
 
@@ -137,6 +138,40 @@ export function QuestCount({ completed }: { completed: readonly number[] }) {
   return <p className="text-sm text-fg"><span className="font-mono tabular-nums">{completed.length.toLocaleString("en-US")}</span> completed quests</p>;
 }
 
+/** Each play-history board and the ranked count it reads. */
+const HISTORY_COUNT: Record<string, PlayHistoryRankedKey> = {
+  "quests-completed": "quests", "creatures-killed": "creatures", "fish-caught": "fish", "flight-paths": "flights", "dungeons-entered": "dungeons", deaths: "deaths",
+};
+/** A board rank shown beside its count: the character's place within its region and ruleset, linking to that board. */
+export interface HistoryRank { metric: ArmoryMetric; rank: number; of: number; href: string }
+
+/**
+ * Blizzard's play history: the six ranked counts first, each with its rank when the character has one, then every
+ * category as Blizzard groups it. A count the read did not bring says "Not read", never 0.
+ */
+export function PlayHistoryView({ history, ranks = [] }: { history: NonNullable<Details["playHistory"]>; ranks?: readonly HistoryRank[] }) {
+  return <div className="space-y-6">
+    <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
+      {PLAY_HISTORY_METRICS.map((m) => {
+        const value = history.ranked[HISTORY_COUNT[m]];
+        const rank = ranks.find((r) => r.metric === m);
+        return <div key={m}>
+          <dt className="text-meta text-muted">{ARMORY_BOARDS[m].title}</dt>
+          <dd className="font-mono text-lg tabular-nums text-fg">{value === undefined ? <span className="text-fg-2">Not read</span> : metricValue(m, value)}</dd>
+          {rank && <dd className="text-sm"><Link href={rank.href} className={link}>#{rank.rank} of {rank.of.toLocaleString("en-US")}</Link></dd>}
+        </div>;
+      })}
+    </dl>
+    {history.groups.map((group) => <div key={group.name} className="space-y-1">
+      <p className="text-meta text-muted">{group.name}</p>
+      <ul className="divide-y divide-line">{group.rows.map((row) => <li key={row.id} className="flex min-h-11 items-center justify-between gap-3 py-2 text-sm">
+        <span className="text-fg">{row.name}</span>
+        <span className="shrink-0 font-mono tabular-nums text-fg-2">{row.value.toLocaleString("en-US")}{row.note ? ` (${row.note})` : ""}</span>
+      </li>)}</ul>
+    </div>)}
+  </div>;
+}
+
 /** A read that asked for achievements and found none completed. */
 export const NO_ACHIEVEMENTS = "None completed when it was read.";
 
@@ -168,6 +203,10 @@ export function ProfileDetailsView({ character: c, categories = new Map() }: { c
     {details.quests && <section aria-labelledby="armory-quests" className="space-y-3">
       <SectionHeading id="armory-quests">Quests</SectionHeading>
       <QuestCount completed={details.quests.completed} />
+    </section>}
+    {details.playHistory && <section aria-labelledby="armory-play-history" className="space-y-3">
+      <SectionHeading id="armory-play-history">Play history</SectionHeading>
+      <PlayHistoryView history={details.playHistory} />
     </section>}
   </>;
 }

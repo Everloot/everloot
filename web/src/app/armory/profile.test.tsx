@@ -94,3 +94,12 @@ test("the newest five achievements stay open; the rest close under a disclosure,
   expect(closed.indexOf('data-achievement-category="Quests"')).toBeLessThan(closed.indexOf('data-achievement-category="Exploration"'));
   expect(closed).not.toContain('data-achievement-category="Other"');
 });
+
+test("a linked page's details show play history as its own section, and its read time counts", () => {
+  const at = "2026-11-20T08:00:00.000Z";
+  const c = armoryCharacter({ details: { revision: 1, playHistory: { asOf: at, ranked: { quests: 791 }, groups: [{ name: "Quests", rows: [{ id: 98, name: "Quests completed", value: 791 }] }] } } });
+  const html = renderToStaticMarkup(<ProfileDetailsView character={c} />);
+  expect(html).toContain('aria-labelledby="armory-play-history"');
+  expect(html).toContain("791");
+  expect(readTimes(c)).toContain(at);
+});

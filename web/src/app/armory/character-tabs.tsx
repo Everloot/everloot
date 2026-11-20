@@ -4,7 +4,7 @@ import { metricValue } from "@/lib/armory";
 import type { ArmoryCharacter } from "@/lib/armory-store";
 import ProgressionMatrix, { type ProgressionMatrixProps } from "@/components/progression/ProgressionMatrix";
 import { characterProgression, progressionCatalogue } from "@kb/progression";
-import { Achievements, Equipment, NO_ACHIEVEMENTS, ProfessionList, QuestCount, ReputationList, StatList, TalentTrees } from "./profile";
+import { Achievements, Equipment, NO_ACHIEVEMENTS, PlayHistoryView, ProfessionList, QuestCount, ReputationList, StatList, TalentTrees, type HistoryRank } from "./profile";
 
 /**
  * The character sheet's tabs: one per part of a Blizzard profile the armory stores. Every tab is drawn, so the strip is
@@ -14,7 +14,7 @@ import { Achievements, Equipment, NO_ACHIEVEMENTS, ProfessionList, QuestCount, R
 export const CHARACTER_TABS = [
   ["gear", "Gear"], ["talents", "Talents"], ["stats", "Stats"], ["pvp", "PvP"],
   ["achievements", "Achievements"], ["professions", "Professions"], ["reputations", "Reputations"], ["quests", "Quests"],
-  ["progress", "Progress"],
+  ["history", "Play history"], ["progress", "Progress"],
 ] as const;
 export type CharacterTabId = typeof CHARACTER_TABS[number][0];
 
@@ -30,6 +30,7 @@ export const EMPTY_TAB: Record<CharacterTabId, string> = {
   professions: notRead("professions"),
   reputations: notRead("reputations"),
   quests: notRead("completed quests"),
+  history: notRead("play history"),
   progress: "No synced boss kills are available for this character yet.",
 };
 
@@ -42,6 +43,8 @@ export interface SheetParts {
   categories?: ReadonlyMap<number, string>;
   /** Facts for the PvP tab beyond the two numbers, such as the honorable-kills board rank. */
   pvpFacts?: Fact[];
+  /** The character's places on the play-history boards, shown beside each count. */
+  historyRanks?: readonly HistoryRank[];
   progression?: ProgressionMatrixProps;
 }
 
@@ -62,6 +65,7 @@ export function characterTabs(c: ArmoryCharacter, parts: SheetParts): TabItem[] 
     professions: d?.professions?.rows.length ? <ProfessionList rows={d.professions.rows} /> : null,
     reputations: d?.reputations?.rows.length ? <ReputationList rows={d.reputations.rows} /> : null,
     quests: d?.quests ? <QuestCount completed={d.quests.completed} /> : null,
+    history: d?.playHistory ? <PlayHistoryView history={d.playHistory} ranks={parts.historyRanks} /> : null,
     progress: <>
       {(!parts.progression || parts.progression.instances.every((r) => r.state === "no data")) && <p className="py-3 text-sm text-fg-2">{EMPTY_TAB.progress}</p>}
       <ProgressionMatrix {...(parts.progression ?? { instances: characterProgression(progressionCatalogue(null), null) })} />
