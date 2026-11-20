@@ -3,8 +3,7 @@
  * One reading of the addon's loot windows, the ones the loot API attributed (`sourceEvidence: "loot-api"`) and the
  * empty ones the addon tied to their corpse (`empty-window`, which only add to a source's windows), with
  * every number's denominator and dates beside it. A rate is windows holding the item over the source's windows,
- * shown once 3 installs looted the source: the public rows are `rollupDrops`' public rates. Below that, a page says
- * how many windows from how many installs it has, and no item is tied to a source. Recorder windows never enter
+ * shown from one install with its agreement tier. Confirmation still needs three installs. Recorder windows never enter
  * here; `pending-loot.ts` counts them apart.
  */
 import recheckFile from "../curated/recheck.json";
@@ -38,11 +37,11 @@ export interface LootTables {
 
 export interface NpcLootTable {
   npcId: number;
-  /** none: no windows; short: windows from fewer than 3 installs; rated: 3 or more, rows public. */
+  /** none: no windows; short: no reporters; rated: at least one reporter. */
   state: "none" | "short" | "rated";
   span: WindowSpan;
   rows: LootTableRow[];
-  /** Installs still needed before a rate shows. */
+  /** Installs still needed to confirm the source. */
   missingInstalls: number;
 }
 
@@ -114,28 +113,28 @@ function rowOf(key: string, source: SourceTally, itemId: number, withItem: numbe
   };
 }
 
-/** Every item from one NPC, once 3 installs looted it; before that, only its windows and installs. */
+/** Every item from one NPC, from one install; the row label states its tier. */
 export function npcLootTable(tables: LootTables, npcId: number): NpcLootTable {
   const source = tables.sources.get(`npc:${npcId}`);
   const span = spanOf(source);
   const missingInstalls = Math.max(0, INDEPENDENT_INSTALLS - span.installs);
   if (!source) return { npcId, state: "none", span, rows: [], missingInstalls };
-  if (missingInstalls > 0) return { npcId, state: "short", span, rows: [], missingInstalls };
+  if (span.installs === 0) return { npcId, state: "short", span, rows: [], missingInstalls };
   const rows = [...source.items].map(([itemId, item]) => rowOf(`npc:${npcId}`, source, itemId, item.windows));
   rows.sort((a, b) => b.rate - a.rate || a.itemId - b.itemId);
   return { npcId, state: "rated", span, rows, missingInstalls };
 }
 
-/** Every item from one object (a chest, herb or vein), once 3 installs looted it; none before that. */
+/** Every item from one object (a chest, herb or vein), from one install, labelled with its tier. */
 export function objectLootRows(tables: LootTables, objectId: number): LootTableRow[] {
   const key = `obj:${objectId}`;
   const source = tables.sources.get(key);
-  if (!source || source.installs.size < INDEPENDENT_INSTALLS) return [];
+  if (!source || source.installs.size < 1) return [];
   return [...source.items].map(([itemId, item]) => rowOf(key, source, itemId, item.windows))
     .sort((a, b) => b.rate - a.rate || a.itemId - b.itemId);
 }
 
-/** Every source 3 installs looted whose windows held the item, and one count for the sources short of that. */
+/** Every source with a reporter whose windows held the item, and one count for the sources short of that. */
 export function itemDropSources(tables: LootTables, itemId: number): ItemDropSources {
   const rows: LootTableRow[] = [];
   let shortWindows = 0;
@@ -143,7 +142,7 @@ export function itemDropSources(tables: LootTables, itemId: number): ItemDropSou
   for (const [key, source] of tables.sources) {
     const item = source.items.get(itemId);
     if (!item) continue;
-    if (source.installs.size >= INDEPENDENT_INSTALLS) {
+    if (source.installs.size >= 1) {
       rows.push(rowOf(key, source, itemId, item.windows));
     } else {
       shortWindows += item.windows;

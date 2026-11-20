@@ -169,9 +169,20 @@ test("bulk drop files keep exactly the existing public keys", async () => {
   ]);
   store.loadCorpus.mockResolvedValue({ uploads: 3, records: loot, dataAsOf: AS_OF, unreachable: false });
   await exportBulk(dir);
-  expect(Object.keys(lines("drops.ndjson")[0]).sort()).toEqual(["drops", "itemId", "kills", "public", "rate", "reporters", "sourceNpcId"]);
-  expect(Object.keys(lines("drops-measured-zeros.ndjson")[0]).sort()).toEqual(["kills", "public", "reporters", "sourceObjectId"]);
+  expect(Object.keys(lines("drops.ndjson")[0]).sort()).toEqual(["drops", "itemId", "kills", "public", "rate", "reporters", "sourceNpcId", "tier"]);
+  expect(Object.keys(lines("drops-measured-zeros.ndjson")[0]).sort()).toEqual(["kills", "public", "reporters", "sourceObjectId", "tier"]);
   for (const file of ["drops.ndjson", "drops-measured-zeros.ndjson"]) expect(readFileSync(join(dir, file), "utf8")).not.toMatch(/units|averageCopper/);
+});
+
+test("bulk drop files include partial rates and zeros with tiers, without reporter identities", async () => {
+  store.loadCorpus.mockResolvedValue({ uploads: 2, records: [
+    { kind: "loot", sourceEvidence: "loot-api", installId: "fixture-a", sourceNpcId: 7001, items: [{ itemId: 8001, count: 1 }] },
+    ...["fixture-a", "fixture-b"].map((installId) => ({ kind: "loot", sourceEvidence: "loot-api", installId, sourceObjectId: 7002, items: [] })),
+  ], dataAsOf: AS_OF, unreachable: false });
+  await exportBulk(dir);
+  expect(lines("drops.ndjson")).toEqual([expect.objectContaining({ reporters: 1, public: false, tier: "reported" })]);
+  expect(lines("drops-measured-zeros.ndjson")).toEqual([expect.objectContaining({ reporters: 2, public: false, tier: "verified" })]);
+  for (const file of ["drops.ndjson", "drops-measured-zeros.ndjson"]) expect(readFileSync(join(dir, file), "utf8")).not.toMatch(/installId|fixture-a|fixture-b/);
 });
 
 test("missing corpus configuration omits the file and prints the missing variable names", async () => {
@@ -217,6 +228,6 @@ test("R2-readable drop aggregates survive missing corpus index settings", async 
   expect(index.files.some((f) => f.name === "drops-measured-zeros.ndjson")).toBe(true);
   expect(lines("drops.ndjson")[0]).toMatchObject({ itemId: 1234, public: true });
   // Stored aggregates carry the internal unit count; the export projects it away like the computed path.
-  expect(Object.keys(lines("drops.ndjson")[0]).sort()).toEqual(["drops", "itemId", "kills", "public", "rate", "reporters", "sourceNpcId"]);
+  expect(Object.keys(lines("drops.ndjson")[0]).sort()).toEqual(["drops", "itemId", "kills", "public", "rate", "reporters", "sourceNpcId", "tier"]);
   expect(readFileSync(join(dir, "drops.ndjson"), "utf8")).not.toMatch(/units|averageCopper/);
 });

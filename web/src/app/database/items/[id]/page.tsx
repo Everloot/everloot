@@ -1,3 +1,4 @@
+import { loadDropSourceNames } from "@/lib/names";
 import type { Metadata } from "next";
 import { trailFor } from "@/lib/breadcrumbs";
 import JsonLd from "@/components/JsonLd";
@@ -155,6 +156,7 @@ export default async function ItemPage(props: Props) {
   // Each source's windows, installs and dates; its rows are the public rates in page.drops.
   const loot = await loadLootTables();
   const sources = itemDropSources(loot.tables, itemId);
+  const dropNames = await loadDropSourceNames();
   // The shared pin table, with the NPC that stands there before its columns.
   const pinLead: Column<(typeof page.pins)[number]>[] = [
     { key: "npc", header: "NPC", cell: (p) => <EntityLink kind="npc" id={p.npcId} name={p.name ?? names.npcs.get(p.npcId)} /> },
@@ -187,8 +189,8 @@ export default async function ItemPage(props: Props) {
             title={title}
             dataAsOf={loot.dataAsOf}
             source={(d) => (d.sourceNpcId !== undefined
-              ? <EntityLink kind="npc" id={d.sourceNpcId} name={names.npcs.get(d.sourceNpcId)} />
-              : <EntityLink kind="object" id={d.sourceObjectId!} />)}
+              ? <EntityLink kind="npc" id={d.sourceNpcId} name={dropNames.npcs.get(d.sourceNpcId)?.name} />
+              : <EntityLink kind="object" id={d.sourceObjectId!} name={dropNames.objects.get(d.sourceObjectId!)?.name} />)}
           />
           {/* Reported windows the rates leave out: a count, never a rate. */}
           {page.pendingLoot && <p className="py-2 text-meta text-fg-2">{pendingLine(page.pendingLoot, true)}</p>}
@@ -243,7 +245,7 @@ export default async function ItemPage(props: Props) {
   // Where to get it, above the fold: the first three sources the tabs below list, drops, then vendors, then recipes.
   const getFrom = [
     ...(facts.unreachable ? [] : sources.rows.map((d) => (d.sourceNpcId !== undefined
-      ? <EntityLink key={`npc-${d.sourceNpcId}`} kind="npc" id={d.sourceNpcId} name={names.npcs.get(d.sourceNpcId)} />
+      ? <EntityLink key={`npc-${d.sourceNpcId}`} kind="npc" id={d.sourceNpcId} name={dropNames.npcs.get(d.sourceNpcId)?.name} />
       : <EntityLink key={`object-${d.sourceObjectId}`} kind="object" id={d.sourceObjectId!} />))),
     ...[...rel("sold_by"), ...rel("created_by")].map((e) => (
       <span key={`${e.rel}-${e.toKind}-${e.toId}`}><RelationTarget edge={e} rel={e.rel} client={edges.client} nameOf={nameFor} gameName={gameName} /></span>

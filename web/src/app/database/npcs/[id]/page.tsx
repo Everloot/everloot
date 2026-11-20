@@ -91,8 +91,8 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
   const pending = !unreachable && page.pendingLoot ? <p className="py-2 text-meta text-fg-2">{pendingLine(page.pendingLoot)}</p> : null;
   const shown = shownNpcName(npcId, { ...facts, unreachable }, wiki);
   const title = shown.name ?? `NPC ${page.npcId}`;
-  const zero = rollup.measuredZeros.find((row) => row.public && row.sourceNpcId === npcId);
-  const dropped = rollup.rates.filter((row) => row.public && row.sourceNpcId === npcId);
+  const zero = rollup.measuredZeros.find((row) => row.reporters > 0 && row.sourceNpcId === npcId);
+  const dropped = rollup.rates.filter((row) => row.reporters > 0 && row.sourceNpcId === npcId);
   const firstPin = unreachable ? undefined : page.pins[0];
   const zone = firstPin ? zoneByMapId(firstPin.mapId) : undefined;
   // Item names (and icons, when the game files have them) for the drop and goods lists; an item nobody named stays "Item N".
@@ -147,7 +147,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
                 { label: "Rank", value: known(traits.rank && RANK_LABELS[traits.rank]) },
                 { label: "Zone", value: zone ? <Link href={zoneHref(zone.mapId, zone.name)} className={LINK}>{zone.name}</Link> : known(null) },
                 { label: "Map positions", value: known(page.pins.length || null), numeric: true },
-                // Short of 3 installs the loot table has no rows, only its installs: that count fills the meter.
+                // Drop rows show from one install; their table labels the agreement tier.
                 { label: "Drops", value: known(zero ? `None in ${zero.kills} windows` : dropped.length ? `${dropped.length} items` : null, lootTable.state === "short" ? lootTable.span.installs : 0) },
               ]}
             />

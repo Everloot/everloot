@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { dropTierLabel } from "@kb/drop-rollup";
 import { measureDropRate } from "@kb/drop-rate-settling";
 import { computeRollups } from "@/lib/rollup-compute";
 import { dataAgeLabel } from "@/lib/data-age";
 import { loadItemTips, loadSiteAssets } from "@/lib/game-assets";
-import { loadNames } from "@/lib/names";
+import { loadDropSourceNames, loadNames } from "@/lib/names";
 import EntityLink from "@/components/EntityLink";
 import ItemTip from "@/components/game/ItemTip";
 import { Container, DataTable, DataTitle, ResultStrip, type Column } from "@/components/ui";
@@ -31,9 +32,11 @@ export default async function DropsPage(props: { searchParams?: Promise<Search> 
   const q = listQuery((await props.searchParams) ?? {}, SORTS);
   if (!q) notFound();
   const { rates, measuredZeros, stats } = await computeRollups();
-  const live = rates.filter((r) => r.public);
-  const zeros = measuredZeros.filter((z) => z.public);
-  const names = await loadNames();
+  const live = rates.filter((r) => r.reporters > 0);
+  const zeros = measuredZeros.filter((z) => z.reporters > 0);
+  const [names, dropNames] = await Promise.all([loadNames(), loadDropSourceNames()]);
+  names.npcs = new Map([...dropNames.npcs].map(([id, value]) => [id, value.name]));
+  names.objects = new Map([...dropNames.objects].map(([id, value]) => [id, value.name]));
   const all: Row[] = [
     ...live.map((r) => ({ key: `${r.sourceNpcId ?? r.sourceObjectId}-${r.itemId}`, itemId: r.itemId, sourceNpcId: r.sourceNpcId, sourceObjectId: r.sourceObjectId, kills: r.kills, drops: r.drops, rate: r.rate, reporters: r.reporters })),
     ...zeros.map((z) => ({ key: `zero-${z.sourceNpcId ?? "o"}-${z.sourceObjectId ?? "n"}`, itemId: null, sourceNpcId: z.sourceNpcId, sourceObjectId: z.sourceObjectId, kills: z.kills, drops: 0, rate: null, reporters: z.reporters })),
@@ -65,7 +68,7 @@ export default async function DropsPage(props: { searchParams?: Promise<Search> 
     { key: "windows", header: "Loot windows", numeric: true, sortable: true, cell: (r) => r.kills },
     { key: "drops", header: "Item observations", numeric: true, sortable: true, cell: (r) => r.drops },
     { key: "rate", header: "Observed frequency", numeric: true, sortable: true, cell: (r) => (r.rate === null ? "0 observed" : rateWithRange(r.drops, r.kills, r.reporters)) },
-    { key: "installs", header: "Installs", numeric: true, sortable: true, cell: (r) => r.reporters },
+    { key: "installs", header: "Reports", sortable: true, cell: (r) => dropTierLabel(r.reporters) },
   ];
 
   const strip = stats.unreachable ? null
@@ -88,8 +91,8 @@ export default async function DropsPage(props: { searchParams?: Promise<Search> 
             rowKey={(r) => r.key}
             sort={sort ? { key: sort.key, direction: sort.desc ? "desc" : "asc" } : undefined}
             sortHref={(k, dir) => href({ sort: { key: k as Sort, desc: dir === "desc" } })}
-            meta={(r) => [r.sourceNpcId !== undefined ? names.npcs.get(r.sourceNpcId) ?? `NPC ${r.sourceNpcId}` : names.objects.get(r.sourceObjectId!) ?? `Object ${r.sourceObjectId}`, `${r.rate === null ? "0 observed" : rateWithRange(r.drops, r.kills, r.reporters)} of ${r.kills} loot windows`].join(" · ")}
-            empty={<NoObservations>No public frequencies yet; one shows here once 3 installs record loot windows from the same creature or object.</NoObservations>}
+            meta={(r) => [r.sourceNpcId !== undefined ? names.npcs.get(r.sourceNpcId) ?? `NPC ${r.sourceNpcId}` : names.objects.get(r.sourceObjectId!) ?? `Object ${r.sourceObjectId}`, `${r.rate === null ? "0 observed" : rateWithRange(r.drops, r.kills, r.reporters)} of ${r.kills} loot windows`, dropTierLabel(r.reporters)].join(" · ")}
+            empty={<NoObservations>No frequencies yet; one shows here once a player reports a loot window from a creature or object.</NoObservations>}
           />
         </div>
         </>}

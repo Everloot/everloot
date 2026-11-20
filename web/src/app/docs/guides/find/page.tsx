@@ -41,7 +41,7 @@ export default function Page() {
       <H2 id="database">The database</H2>
       <P>
         The <Link href="/database" className={docLink}>database</Link> is built from what players upload. A fact is
-        public once 3 installs agree on it. It has these sections:
+        confirmed once 3 installs agree on it. Drops show from one install with their reported, verified or confirmed tier. It has these sections:
       </P>
       <List>
         <li><Link href="/database/zones" className={docLink}>Zones</Link>: every zone by continent, with its map, the dungeons and raids entered there, and the NPCs, vendors and quests players have confirmed in it.</li>

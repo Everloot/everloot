@@ -1,6 +1,6 @@
 /**
  * Drop rollup shared by the site and the item_page tool.
- * A rate is public after 3 distinct install reports. These are observed loot
+ * Rates show from one install with a tier; `public` remains confirmation at 3 distinct install reports. These are observed loot
  * windows, not a census of kills or independent people. The legacy `kills`
  * field names the window count for compatibility. Unobserved kills are unknown.
  *
@@ -13,6 +13,14 @@ import { busiestMap, npcZones, scopeSince } from "./recheck-scopes.js";
 import { isPinPosition } from "./world-pages.js";
 
 export const INDEPENDENT_INSTALLS = 3;
+
+export type DropTier = "reported" | "verified" | "confirmed";
+export function dropTier(reporters: number): DropTier {
+  return reporters >= INDEPENDENT_INSTALLS ? "confirmed" : reporters === 2 ? "verified" : "reported";
+}
+export function dropTierLabel(reporters: number): string {
+  return `${dropTier(reporters)} by ${reporters} ${reporters === 1 ? "player" : "players"}`;
+}
 
 export interface LootRow {
   installId: string;
@@ -30,6 +38,7 @@ export interface PublicDropRate {
   drops: number;
   rate: number;
   reporters: number;
+  tier: DropTier;
   public: boolean;
 }
 
@@ -43,7 +52,7 @@ export function publicDropRate(r: PublicDropRate): PublicDropRate {
   return {
     ...(r.sourceNpcId !== undefined ? { sourceNpcId: r.sourceNpcId } : {}),
     ...(r.sourceObjectId !== undefined ? { sourceObjectId: r.sourceObjectId } : {}),
-    itemId: r.itemId, kills: r.kills, drops: r.drops, rate: r.rate, reporters: r.reporters, public: r.public,
+    itemId: r.itemId, kills: r.kills, drops: r.drops, rate: r.rate, reporters: r.reporters, tier: dropTier(r.reporters), public: r.public,
   };
 }
 
@@ -51,7 +60,7 @@ export function publicMeasuredZero(r: MeasuredZero): MeasuredZero {
   return {
     ...(r.sourceNpcId !== undefined ? { sourceNpcId: r.sourceNpcId } : {}),
     ...(r.sourceObjectId !== undefined ? { sourceObjectId: r.sourceObjectId } : {}),
-    kills: r.kills, reporters: r.reporters, public: r.public,
+    kills: r.kills, reporters: r.reporters, tier: dropTier(r.reporters), public: r.public,
   };
 }
 
@@ -68,6 +77,7 @@ export interface MeasuredZero {
   sourceObjectId?: number;
   kills: number;
   reporters: number;
+  tier: DropTier;
   public: boolean;
 }
 
@@ -150,6 +160,7 @@ export function rollupDrops(windows: LootRow[]): RollupResult {
       units: d.units,
       rate: k.n > 0 ? d.n / k.n : 0,
       reporters,
+      tier: dropTier(reporters),
       public: reporters >= INDEPENDENT_INSTALLS,
     });
   }
@@ -164,6 +175,7 @@ export function rollupDrops(windows: LootRow[]): RollupResult {
       ...(kind === "npc" ? { sourceNpcId: id } : { sourceObjectId: id }),
       kills: k.n,
       reporters: k.reporters.size,
+      tier: dropTier(k.reporters.size),
       public: k.reporters.size >= INDEPENDENT_INSTALLS,
     });
   }

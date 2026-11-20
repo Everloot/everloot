@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import JsonLd from "@/components/JsonLd";
-import { AgreementMeter, DataTable, GET_THE_ADDON, installsNeeded, QUALITY_TEXT, type Column, type Quality } from "@/components/ui";
+import { AgreementMeter, DataTable, GET_THE_ADDON, QUALITY_TEXT, type Column, type Quality } from "@/components/ui";
 import { trailFor } from "@/lib/breadcrumbs";
 import { breadcrumbJsonLd, type Crumb } from "@/lib/jsonld";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
@@ -88,7 +88,7 @@ export const EMPTY = {
   givers: "No agreed giver or turn-in yet. Each shows once 3 installs report it.",
   quests: "No agreed quest yet. A quest needs its giver or turn-in from 3 installs.",
   /** `what` is "this NPC", "this object", or "this" for an item's sources. */
-  drops: (what: string) => `Nobody has looted ${what} in Forever yet. ${installsNeeded()}`,
+  drops: (what: string) => `Nobody has looted ${what} in Forever yet. Rates show from one install, with reported, verified or confirmed labels.`,
   queued: "Observed, not yet public: fewer than 3 installs so far.",
 } as const;
 

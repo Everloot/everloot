@@ -496,7 +496,7 @@ assert(select(2, labelled(rows, 'Value')) < scanned and scanned < select(2, labe
 local dropRow, drop = labelled(rows, 'Drops from Defias Bandit')
 assert(drop and drop > select(2, labelled(rows, 'Vendor')), 'the drop lines follow the prices, as before')
 -- A drop rate and its windows share the value column.
-assert(dropRow.right == '12% · 340 windows' and dropRow.rr == 1, 'the rate in the value column: ' .. dropRow.right)
+assert(dropRow.right == '12% · 340 windows · confirmed' and dropRow.rr == 1, 'the rate in the value column: ' .. dropRow.right)
 assert(not (rows[drop + 1].text or ''):find('loot windows'), 'no redundant drop detail beneath')
 for _, row in ipairs(rows) do
   assert(contrast(row.r, row.g, row.b) >= 4.5, 'legible on the tooltip background: ' .. (row.left or row.text))

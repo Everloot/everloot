@@ -7,6 +7,9 @@ required, or tightening a limit is a major release.
 ## [Unreleased]
 
 ### Added
+- Pending next minor package release: drop rates and measured zeros gain optional `tier` and `sourceNameTier`
+  fields, plus source names on measured zeros. `public` now accepts false for reported and verified rows and
+  continues to mean confirmed at three installs. `queued` counts only rows with zero reporters. Record protocol unchanged.
 - 2.5.0 (record protocol unchanged, 1.17.0): `GET /api/market/prices` takes an optional `fields=full`, which appends three
   positions to every row and to `fields`: `updatedAt` (when the scans behind the newest open public day were taken, ISO,
   or null once only closed days remain), `ageDays` (calendar days since `day`) and `change1d` (the newest solid day's

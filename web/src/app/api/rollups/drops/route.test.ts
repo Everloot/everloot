@@ -29,6 +29,21 @@ test("an unreadable store has no data time", async () => {
   expect(body.dataAsOf).toBeNull();
 });
 
+test("rates and measured zeros show every tier, with independent name tiers and no install ids", async () => {
+  const records = [1, 2, 3].flatMap((n) => Array.from({ length: n }, (_, i) => ({
+    kind: "loot", sourceEvidence: "loot-api", installId: `fixture-tier-${i}`, sourceObjectId: 7200 + n,
+    sourceObjectName: "Fixture Source", items: n === 2 ? [] : [{ itemId: 8001, count: 1 }],
+  })));
+  store.loadCorpus.mockResolvedValue({ uploads: 3, records, dataAsOf: "2026-11-19T03:00:00.000Z" });
+  const body = await (await GET(req())).json();
+  expect(body.rates.find((r: { reporters: number }) => r.reporters === 1)).toMatchObject({ tier: "reported", public: false, sourceName: "Fixture Source", sourceNameTier: "reported" });
+  expect(body.rates.find((r: { reporters: number }) => r.reporters === 3)).toMatchObject({ tier: "confirmed", public: true });
+  expect(body.measuredZeros).toEqual([expect.objectContaining({ reporters: 2, tier: "verified", public: false, sourceNameTier: "verified" })]);
+  expect(body.queued).toBe(0);
+  expect(JSON.stringify(body)).not.toMatch(/fixture-tier|installId/);
+  expect(dropsResponse.parse(body).rates).toEqual(body.rates);
+});
+
 test("every answer carries the licence and credit line, in the body and the headers", async () => {
   store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], dataAsOf: "2026-10-09T10:00:00.000Z" });
   const res = await GET(req());
@@ -57,7 +72,7 @@ test("public rates keep upload names from loot, minimap objects and targeted NPC
   expect(body.rates.find((r: { sourceNpcId: number }) => r.sourceNpcId === 7004)).toHaveProperty("sourceName", "Fixture Creature");
 });
 
-test.each(["npc", "object"] as const)("public %s drop labels require two exact, unanimous upload names", async (kind) => {
+test.each(["npc", "object"] as const)("public %s drop labels use exact, unanimous upload names from one install", async (kind) => {
   const installs = ["fixture-a", "fixture-b", "fixture-c"];
   const labels = [["Fixture Solo"], ["Fixture Pair", "Fixture Pair"], ["Fixture East", "Fixture West"],
     ["Fixture Case", "fixture case"], ["Fixture Pair", "Fixture Pair", "Fixture Other"], ["Fixture Repeat"]];
@@ -82,22 +97,23 @@ test.each(["npc", "object"] as const)("public %s drop labels require two exact, 
   }
   store.loadCorpus.mockResolvedValue({ uploads: 3, records, dataAsOf: kind === "npc" ? "2026-11-19T01:00:00.000Z" : "2026-11-19T02:00:00.000Z" });
   const body = await (await GET(req())).json();
-  expect(body.rates).toHaveLength(6);
-  expect(body.queued).toBe(1);
+  expect(body.rates).toHaveLength(7);
+  expect(body.queued).toBe(0);
   const nameOf = (id: number) => body.rates.find((r: { sourceNpcId?: number; sourceObjectId?: number }) =>
     (kind === "npc" ? r.sourceNpcId : r.sourceObjectId) === id).sourceName;
-  expect(nameOf(7101)).toBeUndefined();
+  expect(nameOf(7101)).toBe("Fixture Solo");
+  expect(body.rates.find((r: { sourceNpcId?: number; sourceObjectId?: number }) => (r.sourceNpcId ?? r.sourceObjectId) === 7101)).toMatchObject({ tier: "confirmed", sourceNameTier: "reported" });
   expect(nameOf(7102)).toBe("Fixture Pair");
   expect(nameOf(7103)).toBeUndefined();
   expect(nameOf(7104)).toBeUndefined();
   expect(nameOf(7105)).toBeUndefined();
-  expect(nameOf(7106)).toBeUndefined();
+  expect(nameOf(7106)).toBe("Fixture Repeat");
 });
 
 test("guard on: the drop list is paged for anonymous callers and limited per IP", async () => {
   vi.stubEnv("EVERLOOT_DATA_GUARD", "1");
   vi.resetModules();
-  const rate = (i: number) => ({ itemId: i, public: true });
+  const rate = (i: number) => ({ itemId: i + 1, reporters: 3, public: true });
   vi.doMock("@/lib/rollup-compute", () => ({
     computeRollups: async () => ({
       rates: Array.from({ length: 400 }, (_, i) => rate(i)),
@@ -140,17 +156,17 @@ test("each rate names its source when the site knows the name, so the price file
     }),
   }));
   vi.doMock("@/lib/names", () => ({
-    loadDropSourceNames: async () => ({ npcs: new Map([[3114, "Razormane Battleguard"]]), objects: new Map([[106318, "Battered Chest"]]), items: new Map(), quests: new Map() }),
+    loadDropSourceNames: async () => ({ npcs: new Map([[3114, { name: "Fixture Creature", tier: "confirmed" }]]), objects: new Map([[106318, { name: "Fixture Chest", tier: "confirmed" }]]), items: new Map(), quests: new Map() }),
   }));
   const { GET: named } = await import("./route");
   const body = await (await named(req())).json();
-  expect(body.rates.map((r: { sourceName?: string }) => r.sourceName)).toEqual(["Razormane Battleguard", "Battered Chest", undefined]);
+  expect(body.rates.map((r: { sourceName?: string }) => r.sourceName)).toEqual(["Fixture Creature", "Fixture Chest", undefined]);
   expect(() => dropsResponse.parse(body)).not.toThrow();
-  expect(dropsResponse.parse(body).rates[0]).toHaveProperty("sourceName", "Razormane Battleguard");
+  expect(dropsResponse.parse(body).rates[0]).toHaveProperty("sourceName", "Fixture Creature");
   vi.doUnmock("@/lib/names");
 });
 
-test("public rates carry likely ranges and settling without changing counts or leaking queued rows", async () => {
+test("public rates carry likely ranges and settling without changing counts, including partial tiers", async () => {
   vi.resetModules();
   const small = { sourceNpcId: 3114, itemId: 2589, kills: 3, drops: 3, rate: 1, reporters: 3, public: true };
   const large = { sourceObjectId: 106318, itemId: 118, kills: 1000, drops: 400, rate: 0.4, reporters: 5, public: true };
@@ -160,18 +176,18 @@ test("public rates carry likely ranges and settling without changing counts or l
       stats: { uploads: 5, lootWindows: 1006, records: 1006, unreachable: false, dataAsOf: "2026-11-13T00:00:00.000Z" },
     }),
   }));
-  vi.doMock("@/lib/names", () => ({ loadDropSourceNames: async () => ({ npcs: new Map([[3114, "Razormane Battleguard"]]), objects: new Map() }) }));
+  vi.doMock("@/lib/names", () => ({ loadDropSourceNames: async () => ({ npcs: new Map([[3114, { name: "Fixture Creature", tier: "confirmed" }]]), objects: new Map() }) }));
   try {
     const { GET: ranges } = await import("./route");
     const body = await (await ranges(req())).json();
-    expect(body.rates).toHaveLength(2);
-    expect(body.rates[0]).toMatchObject({ ...small, sourceName: "Razormane Battleguard", settled: false });
+    expect(body.rates).toHaveLength(3);
+    expect(body.rates[0]).toMatchObject({ ...small, sourceName: "Fixture Creature", settled: false });
     expect(body.rates[0].rateLow).toBeCloseTo(0.438503, 5);
     expect(body.rates[0].rateHigh).toBeCloseTo(1, 5);
     expect(body.rates[1]).toMatchObject({ ...large, settled: true });
     expect(body.rates[1].rateLow).toBeCloseTo(0.370075, 5);
     expect(body.rates[1].rateHigh).toBeCloseTo(0.430691, 5);
-    expect(body.queued).toBe(1);
+    expect(body.queued).toBe(0);
     // Older bulk files share this row schema: the added metadata must stay additive.
     expect(dropsResponse.shape.rates.element.parse(small)).toEqual(small);
     expect(dropsResponse.parse(body).rates).toEqual(body.rates);
@@ -188,14 +204,14 @@ test("public drop responses keep exactly the existing keys", async () => {
     sources: [{ sourceNpcId: 7, averageCopper: 123 }],
     stats: { uploads: 3, lootWindows: 9, records: 9, unreachable: false, dataAsOf: null },
   }) }));
-  vi.doMock("@/lib/names", () => ({ loadDropSourceNames: async () => ({ npcs: new Map([[7, "Wolf"]]), objects: new Map() }) }));
+  vi.doMock("@/lib/names", () => ({ loadDropSourceNames: async () => ({ npcs: new Map([[7, { name: "Fixture Creature", tier: "confirmed" }]]), objects: new Map() }) }));
   try {
     const { GET: projected } = await import("./route");
     const body = await (await projected(req())).json();
     expect(Object.keys(body).sort()).toEqual(["attribution", "dataAsOf", "generatedAt", "limit", "measuredZeros", "next", "offset", "queued", "rates", "stats", "total", "totalMeasuredZeros", "totalRates", "unreachable"]);
-    expect(Object.keys(body.rates[0]).sort()).toEqual(["drops", "itemId", "kills", "public", "rate", "rateHigh", "rateLow", "reporters", "settled", "sourceName", "sourceNpcId"]);
-    expect(Object.keys(body.rates[1]).sort()).toEqual(["drops", "itemId", "kills", "public", "rate", "rateHigh", "rateLow", "reporters", "settled", "sourceObjectId"]);
-    expect(Object.keys(body.measuredZeros[0]).sort()).toEqual(["kills", "public", "reporters", "sourceNpcId"]);
+    expect(Object.keys(body.rates[0]).sort()).toEqual(["drops", "itemId", "kills", "public", "rate", "rateHigh", "rateLow", "reporters", "settled", "sourceName", "sourceNameTier", "sourceNpcId", "tier"]);
+    expect(Object.keys(body.rates[1]).sort()).toEqual(["drops", "itemId", "kills", "public", "rate", "rateHigh", "rateLow", "reporters", "settled", "sourceObjectId", "tier"]);
+    expect(Object.keys(body.measuredZeros[0]).sort()).toEqual(["kills", "public", "reporters", "sourceNpcId", "tier"]);
     expect(JSON.stringify(body)).not.toMatch(/units|copper|futureInternal/i);
   } finally { vi.doUnmock("@/lib/names"); }
 });

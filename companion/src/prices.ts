@@ -106,8 +106,8 @@ export async function fetchRealmPrices(endpoint: string, realm: string, house: H
   };
 }
 
-/** [itemId, "n" (NPC) | "o" (object), sourceId, drops, loot windows, installs]: one public drop rate. */
-export type DropRow = [number, "n" | "o", number, number, number, number];
+/** [itemId, "n" (NPC) | "o" (object), sourceId, drops, loot windows, installs, tier]: one public drop rate. */
+export type DropRow = [number, "n" | "o", number, number, number, number, ("reported" | "verified" | "confirmed")?];
 /**
  * The public drop rates in the file: when the site's uploads were current, and when the app fetched them. `names`
  * holds the sources' names the site knows, keyed "n<npcId>" or "o<objectId>".
