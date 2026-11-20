@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: armory character pages gain a Play history tab from Blizzard's lifetime statistics (quests, kills, deaths, fish, flight paths, dungeons, boss kills and more), with six new rankings and each character's place on them. Owners can show it on a linked character's page with a new switch, and see their linked characters' lifetime totals in one table.
 - Site: Guild Masters can claim their guild through a linked armory character, appoint member editors, and publish a bio, raid days, links and recruiting needs. Claims are checked against the stored roster on every edit; in-game crests appear when Blizzard provides their images.
 - Site: guild progression counts each boss once enough roster members hold the kill, with group-size thresholds, clear bonuses and a private score ranking beside the raid ladder.
 - Site: character sheets gain a Progress tab with every instance and boss in the client files, observed availability and private, consented owner kill history; a shared progression model and roster loader prepare guild member progress.
