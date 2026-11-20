@@ -12,6 +12,9 @@
  */
 export const CF_CRONS: Readonly<Record<string, readonly string[]>> = {
   "*/10 * * * *": ["/api/cron/snapshot", "/api/cron/blue"],
+  // The stored views, five minutes after each snapshot run, in their own run (#1354): the snapshot run takes under a
+  // minute, so the two never hold the corpus at once.
+  "5,15,25,35,45,55 * * * *": ["/api/cron/views"],
   "23 * * * *": ["/api/cron/indexnow", "/api/cron/ops"],
   // Every 30 minutes, off the 10-minute marks so it never starts with the snapshot run (profile pipeline).
   "7,37 * * * *": ["/api/cron/profiles"],

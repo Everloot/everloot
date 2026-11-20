@@ -1010,6 +1010,21 @@ export function createUploadStore(opts: {
     return { idle, retryRollups, dataAsOf: snapshot?.generatedAt ?? null, settledWeek };
   }
 
+  /**
+   * What the stored-views run (api/cron/views) works from: the corpus as stored, dated by its `generatedAt`, and whether
+   * the last snapshot run left uploads unfolded in a rollup. A missing or unreadable heartbeat counts as pending.
+   */
+  async function viewsWork(): Promise<{ dataAsOf: string | null; rollupsPending: boolean }> {
+    if (!cloud) throw new Error("stored views need the cloud store");
+    const snapshot = await readSnapshotMark();
+    let rollupsPending = true;
+    try {
+      const run = await r2Fetch("cron/last-run.json", { method: "GET" });
+      if (run.ok) rollupsPending = (await run.json() as { completionPending?: boolean }).completionPending !== false;
+    } catch { /* pending */ }
+    return { dataAsOf: snapshot?.generatedAt || null, rollupsPending };
+  }
+
   async function writeCronRun(completionPending: boolean, dataAsOf: string | null, settledWeek: string | null): Promise<void> {
     const res = await r2Fetch("cron/last-run.json", {
       method: "PUT", headers: { "content-type": "application/json" },
@@ -1244,7 +1259,7 @@ export function createUploadStore(opts: {
     completionCached = null; censusCached = null;
   }
 
-  return { putUpload, loadCorpus, putWaitlist, snapshotWork, writeCronRun, writeSnapshot, snapshotHealth, writeMarket, loadMarket, writeCompletion, loadCompletion, writeCensus, loadCensus, installCensus, forgetReads };
+  return { putUpload, loadCorpus, putWaitlist, snapshotWork, viewsWork, writeCronRun, writeSnapshot, snapshotHealth, writeMarket, loadMarket, writeCompletion, loadCompletion, writeCensus, loadCensus, installCensus, forgetReads };
 }
 
 /** The store the routes and pages use. */
