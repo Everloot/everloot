@@ -419,9 +419,10 @@ test("the snapshot refreshes the guild ladder even when no new uploads arrive an
   expect((await GET(req())).status).toBe(200);
 });
 
-test("the heartbeat is written before the guild ladder, the boards, the coverage score and then the auction reports, and their memory is let go between steps (#1354)", async () => {
+test("the heartbeat is written before the stored views, the guild ladder, the boards, the coverage score and then the auction reports, and their memory is let go between steps (#1354)", async () => {
   const order: string[] = [];
   store.writeCronRun.mockImplementation(async () => { order.push("heartbeat"); });
+  view.writeItemView.mockImplementationOnce(async () => { order.push("item view"); throw new Error("out of memory"); });
   guilds.writeGuildLadder.mockImplementationOnce(async () => { order.push("ladder"); throw new Error("out of memory"); });
   coverage.writeCoverage.mockImplementationOnce(async () => { order.push("coverage"); throw new Error("out of memory"); });
   vi.mocked(writeMarketBoards).mockImplementationOnce(async () => { order.push("boards"); throw new Error("out of memory"); });
@@ -432,7 +433,7 @@ test("the heartbeat is written before the guild ladder, the boards, the coverage
   const res = await GET(req());
   expect(res.status).toBe(200);
   expect(await res.json()).toMatchObject({ ok: true, guildLadder: null, marketBoards: null, coverage: null });
-  expect(order).toEqual(["heartbeat", "ladder", "boards", "coverage", "reports"]);
+  expect(order).toEqual(["heartbeat", "item view", "ladder", "boards", "coverage", "reports"]);
   // Released after the corpus write, after the rollups, after each corpus view and around the steps after the heartbeat.
   expect(store.forgetReads.mock.calls.length).toBeGreaterThanOrEqual(11);
   expect(store.forgetPublished.mock.calls.length).toBe(store.forgetReads.mock.calls.length);

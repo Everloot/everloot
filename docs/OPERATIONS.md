@@ -96,7 +96,7 @@ answers 503 in that case and does not write.
 
 | Schedule | Route | What a run writes |
 |---|---|---|
-| `*/10 * * * *` | `/api/cron/snapshot` | The corpus snapshot, then the market, completion, census, coverage, settled-list, item-view and aggregate rollups, and the heartbeat object `cron/last-run.json`. A failed snapshot, market or completion step answers 500 and does not move that heartbeat, so the next run retries the same uploads (`web/src/app/api/cron/snapshot/route.ts`, `web/src/lib/upload-store.ts`). |
+| `*/10 * * * *` | `/api/cron/snapshot` | The corpus snapshot, then the market, completion and census rollups and the settled list, then the heartbeat object `cron/last-run.json`. After the heartbeat come the stored views (item view, aggregates, search names, auction history, professions, map pins, database activity), the guild ladder, the Auction House boards, the coverage score and the auction reports. Each of those is rewritten whenever its stamp is not the snapshot's, so an idle run catches up on one a run could not write. A failed snapshot, market or completion step answers 500 and does not move that heartbeat, so the next run retries the same uploads (`web/src/app/api/cron/snapshot/route.ts`, `web/src/lib/upload-store.ts`). |
 | `*/10 * * * *` | `/api/cron/blue` | The objects `changes/blue-posts.json` and `changes/blue-fetch-state.json` (`web/src/lib/blue-store.ts`). New posts revalidate the `blue` cache tag (`web/src/app/api/cron/blue/route.ts`). |
 | `23 * * * *` | `/api/cron/indexnow` | Nothing in storage. When `/changes` has an entry from the last two hours, the run submits `/changes`, `/changes/feed.xml` and `/wow-forever` (`web/src/lib/indexnow.ts`). No `INDEXNOW_KEY` means nothing is sent. An empty list sends nothing (`web/src/app/api/cron/indexnow/route.ts`). |
 | `7,37 * * * *` | `/api/cron/profiles` | The gear-board snapshot and each ranked character's tracking points (`web/src/lib/profile-pipeline.ts`). The route writes only when `leaderboardsOn()` is true: `EVERLOOT_LEADERBOARDS`, `EVERLOOT_CHARACTER_LINKS`, `EVERLOOT_SHOWCASE` and `EVERLOOT_PRIVATE_SYNC` each set to `1` (`web/src/lib/leaderboard-switch.ts`). Otherwise it writes nothing and answers `ok: true`, `skipped: "off"` (`web/src/app/api/cron/profiles/route.ts`). |
@@ -257,7 +257,9 @@ run nothing. Set `DEPLOY_CRON_WORKER` to anything but `true` to stop deploying i
 The route reads the snapshot at most once a minute.
 
 `fresh` means the heartbeat object `cron/last-run.json` has a `generatedAt` within the last 30
-minutes (`web/src/lib/upload-store.ts`). Older than that is `stale`. A missing object is `missing`.
+minutes (`web/src/lib/upload-store.ts`): the corpus, the rollups and the settled list are current. It
+does not say every stored view finished; a view that failed has an older `x-amz-meta-data-as-of`
+stamp than the snapshot's `generatedAt`. Older than that is `stale`. A missing object is `missing`.
 A read that fails, a timestamp that does not parse, or one more than 30 seconds in the future, is
 `unavailable`.
 
