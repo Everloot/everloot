@@ -101,8 +101,9 @@ two-layer model as Everloot's edge over other sites; this feature should make it
   not void the profile. Parse with a zod schema in `kb/src/armory/parse.ts` into
   `{ asOf, stats: Record<id, { q: number, d?: string }> }`, keeping Blizzard's category tree as id lists so the
   page can group them.
-- **Store.** Play history goes into `details.playHistory`. The ranked numbers also go into their own integer columns
-  on `armory_characters` so the boards can sort them. One migration adds the columns, extends
+- **Store.** Play history goes into `details.playHistory`. The six ranked numbers are also copied by the parser into
+  `details.playHistory.ranked`, and stored generated columns on `armory_characters` read them from there, so the
+  upsert functions do not change and the boards can sort and index them. One migration adds the columns, extends
   `armory_board_filtered` (and `armory_board`, if separate) with the new metrics, and adds a test in
   `supabase/tests/armory_class_boards.sql`.
 - **Boards** (my call, Carlos can change the list): quests completed (98), creatures killed (107), fish caught
@@ -113,13 +114,12 @@ two-layer model as Everloot's edge over other sites; this feature should make it
   row (quests, creatures killed, deaths, dungeons, fish, flight paths) and then each Blizzard category in a list.
   Each headline figure links to its board and shows the character's rank when they are in the top 100 of that
   board. The section joins the existing credit line and read time.
-- **Coverage.** Existing rows get play history at their next full read (about every 20 days). To fill faster, a
-  row whose `details` has no `playHistory` gets that one endpoint read on its own (one call, not eight), within the
-  existing per-run budget. Until most rows are filled, each new board shows how many characters it covers, the
-  way the census pages do.
-- **Rank on the page.** The world rank: both regions, every ruleset, no filter, the board a player reaches from
-  `/rankings`. Shown only inside the top 100, from the board RPC; no extra query per page view beyond one bounded
-  call.
+- **Coverage.** A row whose `details` has no `playHistory` skips the 304 shortcut on its next turn and is read in
+  full, the way rows without progress were backfilled (`noProgress` in `crawl.ts`). So every stored character has
+  play history within one 20-day cycle, and a player can fill theirs at once with the page's Refresh button. Until
+  then each play-history board says in one line that characters are ranked once their play history has been read.
+- **Rank on the page.** The same rank the page already shows for the gear boards: within the character's own region
+  and ruleset ("#12 of 3,400"), from `armory_rank`, linking to the board.
 - **Showcase page.** A linked character's `/characters/...` page shows the same section when its armory row is
   linked through `armory_links`, read from the armory tables, never copied. Like every other Blizzard part there
   (`BLIZZARD_SWITCH` in `web/src/lib/character-armory.ts`), it has its own owner switch: a new `show_history`
@@ -167,9 +167,11 @@ two-layer model as Everloot's edge over other sites; this feature should make it
 
 - Play history on a linked character's page gets its own switch, `show_history`, off by default, like every other
   Blizzard part.
-- The rank shown on a page is the world rank (both regions, all rulesets).
-- Rows without play history get that one endpoint read on its own to fill the boards sooner; boards show their
-  coverage until then.
+- The rank shown on a page is the rank within the character's region and ruleset, as the page already does for
+  gear (changed from "world rank" while planning: it reuses `armory_rank` and matches the ranks beside it).
+- Rows without play history are read in full on their next turn (the existing backfill rule), not by a separate
+  one-call pass; the boards carry a one-line coverage note until the cycle completes (changed while planning:
+  no new queue logic).
 - Gold lifetime figures appear on the site only. No fallback from the addon's own peak to "most gold ever held".
 - The old addon's screenshot is the evidence that the Forever client tracks the Wealth statistics, so Part 2 does
   not wait on a separate probe. The exact `GetStatistic` format is still checked in game before the addon tag.
