@@ -1,6 +1,6 @@
 import { loadGuildProgressionRanking, type GuildProgressionRank } from "./progression";
 import { unstable_cache } from "next/cache";
-import { ARMORY_BOARDS, ARMORY_METRICS, armoryOn, isArmoryRegion, type ArmoryMetric, type ArmoryRegion } from "./armory";
+import { ARMORY_BOARDS, HUB_PREVIEW_METRICS, armoryOn, isArmoryRegion, type ArmoryMetric, type ArmoryRegion } from "./armory";
 import { loadGuildDirectory } from "./armory-guilds";
 import { armoryStore, type ArmoryBoardRow, type ArmoryGuildRow } from "./armory-store";
 import { GUILD_SEARCH_TAG, guildsOn, loadGuildData, loadLadder, raidsOpen, type RankedRow } from "./guilds";
@@ -49,7 +49,7 @@ const BOARDS_KEPT_SECONDS = 300;
 /** The three boards at once; a board the store could not answer is null, the others still come. */
 const characterBoards = unstable_cache(async (region: ArmoryRegion | null): Promise<CharacterBoard[]> => {
   const store = armoryStore();
-  return Promise.all(ARMORY_METRICS.map(async (metric) => ({
+  return Promise.all(HUB_PREVIEW_METRICS.map(async (metric) => ({
     metric,
     rows: await store.boardFiltered(ARMORY_BOARDS[metric].key, region, null, null, null, BOARD_PREVIEW).catch(() => null),
   })));

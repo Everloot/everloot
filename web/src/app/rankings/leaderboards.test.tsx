@@ -77,6 +77,9 @@ test("with the armory on, the hub leads with the character boards and the guild 
   expect(characters).toContain(`href="/armory/${me.region}/${me.slug}"`);
   expect(characters).toContain('href="/armory/rankings/item-level"');
   expect(characters).toContain('href="/armory/rankings/honorable-kills"');
+  // The play history boards are listed, not previewed: the hub reads three boards, not nine.
+  expect(characters).not.toContain("Fish caught");
+  expect(html).toContain('href="/armory/rankings/fish-caught"');
   const guilds = section(html, "guilds");
   const guild = armoryGuild();
   expect(guilds).toContain(`href="/armory/${guild.region}/guilds/${guild.slug}"`);
