@@ -28,6 +28,7 @@ import { forgetAllKept } from "@/lib/kept";
  */
 function release(): void {
   uploadStore.forgetReads();
+  sharingStore.forgetPublished();
   forgetAllKept();
 }
 

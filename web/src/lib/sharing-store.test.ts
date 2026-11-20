@@ -115,4 +115,9 @@ test("a corpus that names nobody is published once per state, without reading au
   expect(first).toHaveLength(1);
   expect((await store.loadCorpus()).records).toBe(first);
   expect(reads).toBe(0);
+  // The snapshot cron drops the copy between its steps; the next read builds the same records anew.
+  grants.forgetPublished();
+  const again = (await store.loadCorpus()).records;
+  expect(again).not.toBe(first);
+  expect(again).toEqual(first);
 });

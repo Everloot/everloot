@@ -27,6 +27,7 @@ import { uploadStore } from "./upload-store";
  */
 
 import { guildsOn } from "./guild-switch";
+import { forgetWithKept } from "./kept";
 export { guildIndexingOn, guildsOn } from "./guild-switch";
 
 /** The cache tag the guild search results carry; recording a hide clears it. */
@@ -118,6 +119,7 @@ let memo: GuildRollup | null = null;
 let memoRecords: readonly IntakeRecord[] | null = null;
 let liveRollups = 0;
 let shownMemo: { key: string; boards: Map<string, GuildBoard> } | null = null;
+forgetWithKept(() => { memo = null; memoRecords = null; shownMemo = null; });
 
 /**
  * The boards a page may show, rebuilt from the facts without hidden characters. Kept while the corpus and the hidden

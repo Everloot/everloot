@@ -1,9 +1,9 @@
 vi.mock("@/lib/auction-report-store", () => ({ writeAuctionReports: vi.fn().mockResolvedValue({ written: false }) }));
 vi.mock("@/lib/market-boards", () => ({ writeMarketBoards: vi.fn().mockResolvedValue({ written: false }) }));
 import { beforeEach, expect, test, vi } from "vitest";
-const store = vi.hoisted(() => ({ loadCorpus: vi.fn(), snapshotWork: vi.fn(), writeCronRun: vi.fn(), writeSnapshot: vi.fn(), writeMarket: vi.fn(), writeCompletion: vi.fn(), writeCensus: vi.fn(), prune: vi.fn(), forgetReads: vi.fn() }));
+const store = vi.hoisted(() => ({ loadCorpus: vi.fn(), snapshotWork: vi.fn(), writeCronRun: vi.fn(), writeSnapshot: vi.fn(), writeMarket: vi.fn(), writeCompletion: vi.fn(), writeCensus: vi.fn(), prune: vi.fn(), forgetReads: vi.fn(), forgetPublished: vi.fn() }));
 vi.mock("@/lib/upload-store", () => ({ uploadStore: { loadCorpus: store.loadCorpus, snapshotWork: store.snapshotWork, writeCronRun: store.writeCronRun, writeSnapshot: store.writeSnapshot, writeMarket: store.writeMarket, writeCompletion: store.writeCompletion, writeCensus: store.writeCensus, forgetReads: store.forgetReads },
-  sharingStore: { loadState: async () => ({ grants: [], suppressions: [] }) },
+  sharingStore: { loadState: async () => ({ grants: [], suppressions: [] }), forgetPublished: store.forgetPublished },
 }));
 vi.mock("@/lib/intake-quota", () => ({ intakeQuota: { prune: store.prune } }));
 const keys = vi.hoisted(() => ({ pruneKeys: vi.fn() }));
@@ -425,6 +425,7 @@ test("the heartbeat is written before the boards and then the auction reports, a
   vi.mocked(writeMarketBoards).mockImplementationOnce(async () => { order.push("boards"); throw new Error("out of memory"); });
   vi.mocked(writeAuctionReports).mockImplementationOnce(async () => { order.push("reports"); return { written: false }; });
   store.forgetReads.mockReset();
+  store.forgetPublished.mockReset();
   vi.spyOn(console, "error").mockImplementation(() => {});
   const res = await GET(req());
   expect(res.status).toBe(200);
@@ -432,4 +433,5 @@ test("the heartbeat is written before the boards and then the auction reports, a
   expect(order).toEqual(["heartbeat", "boards", "reports"]);
   // Released after the rollups, after each corpus view and around the two market steps.
   expect(store.forgetReads.mock.calls.length).toBeGreaterThanOrEqual(8);
+  expect(store.forgetPublished.mock.calls.length).toBe(store.forgetReads.mock.calls.length);
 });

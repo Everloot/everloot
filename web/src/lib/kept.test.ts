@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { forgetAllKept, keep } from "./kept";
+import { forgetAllKept, forgetWithKept, keep } from "./kept";
 
 const counter = () => {
   let n = 0;
@@ -97,4 +97,11 @@ test("forgetAllKept empties every keeper, so the next get reads again", async ()
   expect(a.last()).toBeNull();
   expect(b.last()).toBeNull();
   expect(await a.get(undefined, 2)).toBe(2);
+});
+
+test("forgetAllKept also empties a memo registered with forgetWithKept", () => {
+  let memo: number[] | null = [1, 2, 3];
+  forgetWithKept(() => { memo = null; });
+  forgetAllKept();
+  expect(memo).toBeNull();
 });

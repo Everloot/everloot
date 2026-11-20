@@ -1239,7 +1239,7 @@ export function createUploadStore(opts: {
    * calls it between its steps; each kept copy is tens of MB that would otherwise sit beside the next step (#1354).
    */
   function forgetReads(): void {
-    corpusKept.forget(); refreshing = null;
+    corpusKept.forget(); refreshing = null; publicOf = null;
     marketCached = null; marketRead = null;
     completionCached = null; censusCached = null;
   }

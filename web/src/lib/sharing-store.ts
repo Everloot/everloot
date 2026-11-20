@@ -130,5 +130,9 @@ export function createSharingStore(opts: { cloud: CloudConfig | null; localDir: 
     published = { state, authority: key, until, records };
     return records;
   }
-  return { issue, lookup, loadState, revoke, optOut, publish };
+  /** Drop the public copy: it holds the whole corpus state and its records. The snapshot cron calls it between steps (#1354). */
+  function forgetPublished(): void {
+    published = null;
+  }
+  return { issue, lookup, loadState, revoke, optOut, publish, forgetPublished };
 }

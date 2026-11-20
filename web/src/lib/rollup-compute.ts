@@ -11,6 +11,7 @@ import type { ObjectSpawnRow } from "@kb/object-spawns";
 import type { WorldFacts } from "@kb/world-pages";
 import { buildAggregates, corpusKey, type AggregateSet } from "./aggregate-set";
 import { loadStoredAggregates } from "./aggregate-store";
+import { forgetWithKept } from "./kept";
 import type { RollupResult } from "./rollups";
 import { uploadStore, type CensusRead, type Corpus } from "./upload-store";
 
@@ -33,6 +34,7 @@ const UNREAD: CorpusStats = { uploads: 0, lootWindows: 0, records: 0, unreachabl
  * filter and find over them, never sort or push in place.
  */
 let memoized: AggregateSet | null = null;
+forgetWithKept(() => { memoized = null; censusMemo = null; });
 
 /**
  * The aggregates the answers below read. With no `read`, the set the snapshot cron stored (aggregate-store.ts), so a new
