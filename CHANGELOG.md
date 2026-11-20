@@ -24,9 +24,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: Add a missing guild or ask for an older guild to be read again from the armory's add-a-guild form.
 - Site: /players lists Blizzard profiles before a name is typed, with class, race, faction, region, ruleset, level and guild filters, gear sorting and 25 profiles per page; name searches still show addon sightings and hide links.
 - Site: each realm's Auction House page links a Market changes view (`/tools/auctions/<realm>/changes`): for one house, the week's risers and fallers by market value on solid days (up to 25 each, with from and to values, the days compared, units listed and reporters), then the items with no comparison and why (new, thin, trimmed, stale, no baseline); it reads the stored boards only and says so when they are unavailable.
-- Addon: a flight path bar traces the trip with your portrait, a mount icon and the Everloot crest; confirmed arrivals teach a local estimate for the next flight, and /everloot flight on|off controls it.
-- Addon: crafting cost rows show scan price direction and tiny price bars; hover for listed-unit changes, elapsed scan time, the 60-day median comparison and price swing, never estimated sales.
-- Addon: while a scan runs, a bar across the top of the auction tab says what the scan is doing and how far it is: waiting for the house's listings, with the seconds and the most the scan allows, reading the listings, reading again the ones whose items had not loaded, or sampling search prices. It shows on the shopping page too and goes when the scan reports.
 - Site: /rankings leads with the leaderboards: characters by item level, Gear Score and honorable kills, guilds by average item level and by raid progress in the newest raid, each a top 10 with a link to its full list and an All, US or EU tab in the URL; the census rankings follow under Who plays. The hub stays out of search engines while it shows Blizzard's boards, as every armory page does.
 - Site: the scheduled jobs can run in a Worker of their own (`everloot-cron`, same build, no routes), so the snapshot job no longer shares memory with page and MCP traffic; off until the maintainer deploys it and sets `EVERLOOT_CRON_WORKER` on the site (docs/OPERATIONS.md, "The cron Worker").
 - Site: the private operations summary job stays on the site Worker when the cron Worker takes the other jobs, since only the site holds its pseudonym key; the cron Worker no longer needs the character or operations secrets.
@@ -261,21 +258,14 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 ### Changed
 - Site: the rankings boards' faction dots use the faction colours the census introduced, the same blue and red on both pages.
 
-- Addon: compact item tooltip market and scan metadata, show drop rates with windows on one row, and date drop and disenchant evidence only when stale.
 - Site: drop rates, measured zeros and source names show from one player's reports, marked reported, verified or confirmed by how many players agree.
-- Addon: drop tooltips say whether a rate is reported, verified or confirmed.
 - Site: character and guild progression are public: every synced kill counts, the guild boards on Rankings rank every guild, and a guild's kills count once enough members hold them.
-- Addon: the completion tracker is on in a new install, so dungeon and raid kills reach your character page through the Desktop App; an older install keeps its choice.
 
 ### Fixed
 - Site: the scheduled jobs run on the cron Worker (`everloot-cron`); the site Worker keeps only the operations summary (`EVERLOOT_CRON_WORKER` is "1" in `web/wrangler.jsonc`).
 - Site: the snapshot cron lets go of each file it read before the next step (the stores kept every one for pages, and together they outgrew the Worker), and writes its heartbeat before the auction reports and Auction House boards, its two largest steps (#1354).
 - Site: the corpus snapshot is stored in parts under `snapshots/corpus/` with `snapshots/corpus.json` listing them, and the cron's work check reads only that list. Read whole, the 31 MB file needed about 107 MB of the Worker's 128 MB before any work began, so every snapshot run since 13:20 UTC on 2026-11-19 ran out of memory and `/api/health` answered stale (#1354).
 - Site: public drop sources can carry a name from two installs that report exactly the same name, when none disagree; rates still require three installs.
-- Addon: drop tooltips say "an unnamed object" or "an unnamed NPC" when no source name is known; chat keeps the source id for debugging.
-- Addon: the Everloot panel at the auction house sits above the house's own page controls, so the Auctions page's top tab, and the Sell page's item slot and Post button, no longer show through it; the house's dialogs still cover it.
-- Addon: at the auction house, the NPC portrait and the ring around it sit whole over the Everloot panel's corner, and the Everloot heading starts right of the portrait.
-- Addon: the auction tab's price lookup finds an item by name again. Forever has no global GetItemInfo, so a typed name never resolved and the hint came back; the lookup now asks C_Item and then the names the player's scans gave with their rows. Part of a name lists the matching scanned items with the scan's prices, and a name nothing matches says so instead of the hint.
 - Site: empty NPC, vendor, quest and object tabs all say what would fill them (3 installs agreeing), in one shared set of sentences, and the vendors list says a vendor is listed once 3 installs agree on an item and its price.
 - Site: the public MCP, /api/tools and the changes pages hold one copy of the uploads and the patch-notes timeline per server instance instead of one per request, which ran the site out of memory and answered 503; the MCP coverage tool says "not measured yet" when no stored score can be read instead of working it out from every report.
 - Site: the coverage pages (/database/coverage and each zone's) show the score and plateau the data update stores, instead of working them out from every report on each visit, which could make the page fail to load. Until the next data update stores the plateau, the page says it is not measured yet.
@@ -631,6 +621,26 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and report separate answerability rates.
 - Site: describe the in-game Everloot window, feature chooser, local data and how to reopen it or report a window error.
 - Site: the census adds headline tiles, faction and class colours, race and level bars, a race-by-class heatmap, and a daily chart with hover counts; every table stays, hidden counts stay hidden, and class and race icons load from Blizzard when available.
+
+## [0.3.26] - 2026-11-20
+
+At the auction house a bar across the top of the Everloot tab says what a scan is doing and how far along it is, the price lookup finds items by name again, and the panel sits cleanly over the house's own controls and portrait. Crafting cost rows show which way scan prices moved. A flight path bar traces each trip with your portrait and the Everloot crest. Drop tooltips are shorter, name the source when players agree on it, and say whether a rate is reported, verified or confirmed. The completion tracker is on in a new install so dungeon and raid kills reach your character page through the Desktop App; an install from before keeps its choice.
+
+### Added
+- A flight path bar traces the trip with your portrait, a mount icon and the Everloot crest; confirmed arrivals teach a local estimate for the next flight, and /everloot flight on|off controls it.
+- Crafting cost rows show scan price direction and tiny price bars; hover for listed-unit changes, elapsed scan time, the 60-day median comparison and price swing, never estimated sales.
+- While a scan runs, a bar across the top of the auction tab says what the scan is doing and how far it is: waiting for the house's listings, with the seconds and the most the scan allows, reading the listings, reading again the ones whose items had not loaded, or sampling search prices. It shows on the shopping page too and goes when the scan reports.
+
+### Changed
+- Compact item tooltip market and scan metadata, show drop rates with windows on one row, and date drop and disenchant evidence only when stale.
+- Drop tooltips say whether a rate is reported, verified or confirmed.
+- The completion tracker is on in a new install, so dungeon and raid kills reach your character page through the Desktop App; an older install keeps its choice.
+
+### Fixed
+- Drop tooltips say "an unnamed object" or "an unnamed NPC" when no source name is known; chat keeps the source id for debugging.
+- The Everloot panel at the auction house sits above the house's own page controls, so the Auctions page's top tab, and the Sell page's item slot and Post button, no longer show through it; the house's dialogs still cover it.
+- At the auction house, the NPC portrait and the ring around it sit whole over the Everloot panel's corner, and the Everloot heading starts right of the portrait.
+- The auction tab's price lookup finds an item by name again. Forever has no global GetItemInfo, so a typed name never resolved and the hint came back; the lookup now asks C_Item and then the names the player's scans gave with their rows. Part of a name lists the matching scanned items with the scan's prices, and a name nothing matches says so instead of the hint.
 
 ## [0.3.25] - 2026-11-18
 
