@@ -66,6 +66,9 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("snapshot failed", err);
     }
+    // The write keeps the corpus it wrote for pages. The rollups below never read it, and beside them it outgrew the
+    // Worker on runs with new uploads (#1354); the coverage step reads it again from the parts.
+    release();
     await intakeQuota.prune();
     // Key retention (lib/api-keys.ts) runs only once the data guard's tables exist; a failure is retried next run.
     if (guardOn()) {
@@ -109,15 +112,6 @@ export async function GET(req: Request) {
     if (!result) return NextResponse.json({ ok: false, error: "snapshot failed", rebuild, market, completion }, { status: 500 });
     if (!market) return NextResponse.json({ ok: false, error: "market rollup failed", rebuild, ...result, completion }, { status: 500 });
     if (!completion) return NextResponse.json({ ok: false, error: "completion rollup failed", rebuild, ...result, market }, { status: 500 });
-    // The coverage score changes only with the snapshot, so an idle run never recomputes it. It is dated by the
-    // snapshot's time, the heartbeat's `dataAsOf`. The pages show the last stored score (or say it is unreachable),
-    // so a failure here is logged and the cron carries on; the next run that adds uploads writes it again.
-    let coverage: { written: boolean } | null = null;
-    try {
-      coverage = idle ? { written: false } : await writeCoverage({ added: result.added, rebuild, dataAsOf: result.dataAsOf });
-    } catch (err) {
-      console.error("coverage failed", err);
-    }
     // The settled list (kb/src/settled-list.ts) goes beside the score, dated by the snapshot. It is also rewritten
     // once per ISO week on an idle run, so the weekly spot check rotates even when nothing new arrives. A failure is
     // logged; uploaders keep the list they have and the heartbeat keeps the week, so the next run retries it.
@@ -237,6 +231,17 @@ export async function GET(req: Request) {
     // disenchanting request: rewritten when the rollup or the UTC day changed.
     let marketBoards: { written: boolean; bytes?: number; ms?: number } | null = null;
     try { marketBoards = await writeMarketBoards(); } catch (err) { console.error("market boards failed", err); }
+    release();
+    // The coverage score, dated by the snapshot's time, the heartbeat's `dataAsOf`. It reads the whole corpus and works
+    // the score out beside it, and runs with new uploads ran out of memory there before their heartbeat (#1354), so it
+    // comes after it. Like the views, it is rewritten whenever its stamp is not the snapshot's, so an idle run catches
+    // up on a failed one. The pages show the last stored score (or say it is unreachable); a failure is logged.
+    let coverage: { written: boolean } | null = null;
+    try {
+      coverage = await writeCoverage({ added: result.added, rebuild, dataAsOf: result.dataAsOf });
+    } catch (err) {
+      console.error("coverage failed", err);
+    }
     release();
     let auctionReports: { written: boolean; reports?: number } | null = null;
     try { if (!(market.remaining ?? 0)) auctionReports = await writeAuctionReports(); } catch (err) { console.error("auction reports failed", err); }

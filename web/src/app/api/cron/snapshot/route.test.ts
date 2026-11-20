@@ -83,10 +83,10 @@ test("an idle run skips corpus and completion, day-gates market, and heartbeats"
   expect(store.prune).toHaveBeenCalledOnce();
 });
 
-test("the coverage score is written after a snapshot that changed, dated by the snapshot, and never on an idle run", async () => {
+test("the coverage step runs on every run, dated by the snapshot; the writer decides from its stamp whether an idle run writes", async () => {
   store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: "2026-W43" });
   expect(await (await GET(req())).json()).toMatchObject({ ok: true, coverage: { written: false } });
-  expect(coverage.writeCoverage).not.toHaveBeenCalled();
+  expect(coverage.writeCoverage).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-10-01" });
   store.snapshotWork.mockResolvedValue({ idle: false, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: null });
   store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-10-02T00:00:00.000Z" });
   coverage.writeCoverage.mockResolvedValue({ written: true });
@@ -419,9 +419,10 @@ test("the snapshot refreshes the guild ladder even when no new uploads arrive an
   expect((await GET(req())).status).toBe(200);
 });
 
-test("the heartbeat is written before the boards and then the auction reports, and their memory is let go between steps (#1354)", async () => {
+test("the heartbeat is written before the boards, the coverage score and then the auction reports, and their memory is let go between steps (#1354)", async () => {
   const order: string[] = [];
   store.writeCronRun.mockImplementation(async () => { order.push("heartbeat"); });
+  coverage.writeCoverage.mockImplementationOnce(async () => { order.push("coverage"); throw new Error("out of memory"); });
   vi.mocked(writeMarketBoards).mockImplementationOnce(async () => { order.push("boards"); throw new Error("out of memory"); });
   vi.mocked(writeAuctionReports).mockImplementationOnce(async () => { order.push("reports"); return { written: false }; });
   store.forgetReads.mockReset();
@@ -429,9 +430,9 @@ test("the heartbeat is written before the boards and then the auction reports, a
   vi.spyOn(console, "error").mockImplementation(() => {});
   const res = await GET(req());
   expect(res.status).toBe(200);
-  expect(await res.json()).toMatchObject({ ok: true, marketBoards: null });
-  expect(order).toEqual(["heartbeat", "boards", "reports"]);
-  // Released after the rollups, after each corpus view and around the two market steps.
-  expect(store.forgetReads.mock.calls.length).toBeGreaterThanOrEqual(8);
+  expect(await res.json()).toMatchObject({ ok: true, marketBoards: null, coverage: null });
+  expect(order).toEqual(["heartbeat", "boards", "coverage", "reports"]);
+  // Released after the corpus write, after the rollups, after each corpus view and around the steps after the heartbeat.
+  expect(store.forgetReads.mock.calls.length).toBeGreaterThanOrEqual(10);
   expect(store.forgetPublished.mock.calls.length).toBe(store.forgetReads.mock.calls.length);
 });
