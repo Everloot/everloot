@@ -237,3 +237,121 @@ test("sentences that broke on {{RaceIcon}} and {{mob}} convert without damage", 
     expect(countDamage(wtf(repairTemplates(src)).text())).toBe(0);
   }
 });
+
+test("{{-}} renders as the em dash the wiki shows", () => {
+  // Into the Basin's criteria: the dash was dropped, "The Wolvar after completing Just Following Orders".
+  expect(repairTemplates("*2. ''The Wolvar'' {{-}} after completing [[Just Following Orders]].")).toBe("*2. ''The Wolvar'' — after completing [[Just Following Orders]].");
+  expect(repairTemplates("A {{–}} B")).toBe("A — B");
+});
+
+test("doubled spaces the wiki source has are collapsed, as the wiki shows them", () => {
+  for (const [src, before, after] of [
+    ["*2. ''The Wolvar'' {{-}} after  completing [[Just Following Orders]].", "The Wolvar after  completing Just Following Orders.", "The Wolvar — after completing Just Following Orders."],
+    ["'''Garn Cloudsong ''' is a [[tauren]] [[shaman trainer]].", "Garn Cloudsong  is a tauren shaman trainer.", "Garn Cloudsong is a tauren shaman trainer."],
+    ["* In ''[[World of Warcraft: Classic| Classic]]'', mechanical mobs are immune.", "In  Classic, mechanical mobs are immune.", "In Classic, mechanical mobs are immune."],
+  ]) {
+    expect(wtf(src).text().trim().replace(/^\* (\d\. )?/, "")).toBe(before);
+    expect(wtf(repairTemplates(src)).text().trim().replace(/^\* (\d\. )?/, "")).toBe(after);
+    expect(countDamage(before)).toBeGreaterThan(0);
+    expect(countDamage(after)).toBe(0);
+  }
+  // A line that starts with a space is preformatted on the wiki, which shows its spaces.
+  expect(repairTemplates(" for i=1,2 do  print(i) end")).toBe(" for i=1,2 do  print(i) end");
+});
+
+test("footnotes in a row leave no gap", () => {
+  const src = "'''Helhounds'''<ref>[[Feral Helhound]]</ref><ref>[[Helhound Hair Bracers]]</ref><ref>[[Frothing Helhound's Fury]]</ref> are gigantic, three-headed [[hound]]s.";
+  expect(wtf(src).text()).toBe("Helhounds  are gigantic, three-headed hounds.");
+  expect(repairTemplates(src)).toBe("'''Helhounds''' are gigantic, three-headed [[hound]]s.");
+  expect(repairTemplates("the Third War,<ref name=\"encyclopedia508\"/> the night elf")).toBe("the Third War, the night elf");
+  expect(repairTemplates("See below.\n<references/>")).toBe("See below.\n<references/>");
+});
+
+test("{{Race}} shows its label, or only an icon with notext, and icons in a row leave one space", () => {
+  // The Horde page's list of allies read "Gilgoblin  Unshackled - A faction of former naga slaves."
+  expect(repairTemplates("{{Race|Gilgoblin|notext}}{{RaceIcon|Skrog}}{{RaceIcon|Makrura}} [[Unshackled]] - A faction of former [[naga]] slaves."))
+    .toBe("[[Unshackled]] - A faction of former [[naga]] slaves.");
+  expect(repairTemplates("Fought by {{Race|Orc|orcs}} and {{Race|High elf}}.")).toBe("Fought by orcs and High elf.");
+  expect(repairTemplates("Led by Genn Greymane and {{RaceIcon|Worgen|Male}}{{RaceIcon|Human|Male}} [[Darius Crowley]].")).toBe("Led by Genn Greymane and [[Darius Crowley]].");
+});
+
+test("spaces inside code, pre, nowiki, poem and syntaxhighlight are kept as written", () => {
+  expect(wtf(repairTemplates('<code>ignored  pad; local key = "a  b"</code>')).text()).toContain('local key = "a  b"');
+  for (const src of [
+    "<pre>\nlocal  x = 1\nlocal  y\n</pre>",
+    "a <nowiki>x  y</nowiki> b",
+    "<poem>\nRoses  are\nred</poem>",
+    '<syntaxhighlight lang="lua">\nlocal  s = "a  b"\n</syntaxhighlight>',
+    "<SOURCE>a  b</SOURCE> and <!-- a  b -->",
+  ]) expect(repairTemplates(src)).toBe(src);
+  // Outside them the run still collapses.
+  expect(repairTemplates("a  <nowiki>x  y</nowiki>  b")).toBe("a <nowiki>x  y</nowiki> b");
+});
+
+test("a <ref> inside a comment or a quoted attribute does not swallow prose", () => {
+  expect(wtf(repairTemplates("Intro <!-- <ref> --> KEEP <ref>source</ref> tail.")).text()).toBe("Intro KEEP tail.");
+  expect(wtf(repairTemplates('A<ref name="a>b" />KEEP<ref>citation</ref>C')).text()).toBe("AKEEPC");
+  expect(repairTemplates("Name<ref name=Kael'thas/> is here")).toBe("Name is here");
+  // A quote that never closes before the next tag ends at the first ">", as on the wiki (Hakkar the Soulflayer).
+  expect(repairTemplates("into the world.<ref name=\"Chronicle SunkenTemple>''[[World of Warcraft: Chronicle Volume 3]]'', pg. 122</ref> The Atal'ai's spiritual leader, [[Jammal'an]], had a prophecy.\"")).toBe("into the world. The Atal'ai's spiritual leader, [[Jammal'an]], had a prophecy.\"");
+  expect(repairTemplates("t<ref>a</references>b</ref>c")).toBe("tc");
+  expect(repairTemplates("x<ref>a</ref> y\n<references/>")).toBe("x y\n<references/>");
+  // A ref that never closes is left for the converter, as before.
+  expect(repairTemplates("x<ref>never closed")).toBe("x<ref>never closed");
+  // A malformed tag ends at the first ">", as on the wiki (Nightbane pack).
+  expect(repairTemplates('when captured,<ref name="Bane" /<ref name="Yorgen" /> as well as [[Manor Mistmantle]].')).toBe("when captured, as well as [[Manor Mistmantle]].");
+  // A comment inside a ref does not end it.
+  expect(wtf(repairTemplates("A<ref><!-- </ref> -->citation</ref>KEEP")).text()).toBe("AKEEP");
+});
+
+test("comments, literal tags and code are read in context, by their exact names", () => {
+  // A tag inside a comment is not a tag.
+  expect(wtf(repairTemplates("<!-- <nowiki> --> <code>KEEP</code>")).text()).toBe("KEEP");
+  // Comment syntax inside <nowiki> is text, as the wiki shows it.
+  expect(wtf(repairTemplates("<nowiki><!--</nowiki><code>KEEP</code>")).text()).toBe("<!-- KEEP");
+  // A longer name is another tag: <nowikix> is not <nowiki>, <codex> is not <code>.
+  expect(wtf(repairTemplates("<nowikix>x <code>KEEP</code>")).text()).toBe("x KEEP");
+  expect(wtf(repairTemplates("<prex>x <code>KEEP</code> and <codex>y</codex>")).text()).toBe("x KEEP and y");
+  // A </code> inside a comment does not close the code.
+  expect(repairTemplates("<code>a<!-- </code> -->b</code>c")).toBe("a<!-- </code> -->bc");
+  // Code inside a literal span keeps its text: the converter would drop it with the tags around it.
+  expect(wtf(repairTemplates("<nowiki><code>KEEP</code></nowiki>TAIL")).text()).toBe("KEEP TAIL");
+  expect(wtf(repairTemplates("<pre><code class=\"x\">KEEP</code></pre>TAIL")).text()).toBe("KEEP TAIL");
+  expect(wtf(repairTemplates("<pre><code>KEEP")).text()).toBe("KEEP");
+  // A self-closing tag may have spaces between its slash and ">".
+  expect(wtf(repairTemplates('A<ref name="x" / >KEEP<ref>citation</ref>TAIL')).text()).toBe("AKEEPTAIL");
+  expect(repairTemplates("<nowiki / >x  y")).toBe("<nowiki / >x y");
+});
+
+test("letters that grow when lower-cased do not shift where tags are found", () => {
+  // "İ".toLowerCase() is two characters; reading tags from a fully lower-cased copy cut text in the wrong place.
+  expect(wtf(repairTemplates("A<ref>İİİİİİİİ</ref>KEEP <b>tail</b>")).text()).toBe("AKEEP tail");
+  expect(wtf(repairTemplates("<code>İ</code>KEEP")).text()).toBe("İKEEP");
+});
+
+test("verbatim tags stay as written even when unclosed, long, or holding a close tag in <nowiki>", () => {
+  // An unclosed <pre> runs to the end of the page.
+  expect(repairTemplates('<pre>local key = "a  b"; <ref>LITERAL</ref>')).toBe('<pre>local key = "a  b"; <ref>LITERAL</ref>');
+  // A </code> inside <nowiki> does not close the <code>, and the ref after it is code, not a footnote.
+  expect(repairTemplates("<code><nowiki></code>KEEP  <ref>LITERAL</ref></nowiki></code>")).toBe("</code>KEEP  <ref>LITERAL</ref>");
+  // An opening tag of any length is read.
+  expect(repairTemplates("<code " + " ".repeat(2000) + '>local key = "a  b"</code>')).toBe('local key = "a  b"');
+  // The characters that mark held text are themselves held when the page has them.
+  expect(repairTemplates("a\u0002 0\u0003  b")).toBe("a\u0002 0\u0003 b");
+});
+
+test("long space runs, unclosed tags and near-miss close tags convert in linear time", () => {
+  const n = 8_000;
+  for (const src of [
+    "a" + " ".repeat(40_000) + "b", "<ref>".repeat(40_000), "<ref ".repeat(40_000), "<pre>".repeat(40_000), "<!--".repeat(40_000),
+    "<ref>".repeat(n) + "</references>".repeat(n), "<ref>".repeat(n) + "<!-- </ref> -->".repeat(n), "<code>".repeat(n) + "<!-- </code> -->".repeat(n),
+    '<ref a="'.repeat(20_000), '<ref a="x\n'.repeat(20_000), "<nowiki>".repeat(20_000) + "<code>".repeat(20_000),
+    "<code>" + "<nowiki>a</nowiki>".repeat(20_000), "<ref>a</refx>".repeat(20_000), "<ref><!--</ref>".repeat(20_000),
+    "<nowikix>".repeat(20_000) + "<code>x</code>".repeat(5_000),
+  ]) {
+    repairTemplates(src.slice(0, 1000)); // warm up
+    const start = performance.now();
+    repairTemplates(src);
+    expect(performance.now() - start).toBeLessThan(100);
+  }
+});

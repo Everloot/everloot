@@ -263,6 +263,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: character and guild progression are public: every synced kill counts, the guild boards on Rankings rank every guild, and a guild's kills count once enough members hold them.
 
 ### Fixed
+- Site: lore pages drop the doubled spaces the wiki's source had but never showed, leave no gap where footnotes or race icons sat side by side, show `{{-}}` as its dash and `{{Race|…|notext}}` as only its icon, so far fewer pages are marked damaged.
 - Site: the Privacy Policy points to Settings, where API keys, linked characters and synced data now live, instead of the old account page.
 - Site: while no guide is reviewed, `/guides`, `/classes` and each class page share one empty state that says what a reviewed guide is and how to offer one, linking the guide contract, the Talent calculator and the Guide submission form (#971).
 - Site: the scheduled jobs run on the cron Worker (`everloot-cron`); the site Worker keeps only the operations summary (`EVERLOOT_CRON_WORKER` is "1" in `web/wrangler.jsonc`).

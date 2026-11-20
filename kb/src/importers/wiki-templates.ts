@@ -18,7 +18,7 @@ export const REPAIRED_TEMPLATES = [
   "wp", "wplink", "au", "alternate universe", "loot", "coppercost", "cv-ah",
   "co", "coords", "reputation", "quality", "costitem",
   "api", "raceicon", "classicon", "socket icon", "mob", "fu", "expac", "achievement", "title", "school", "gossip", "keypress",
-  "starcraft", "sc", "overwatch", "diablo", "dash", "queststart", "queststartfinish",
+  "starcraft", "sc", "overwatch", "diablo", "dash", "-", "–", "queststart", "queststartfinish",
   "wow-inline", "bc-inline", "wotlk-inline", "legion-inline", "wod-inline", "bfa-inline", "sl-inline", "df-inline",
   "ss", "for", "stub", "removed",
 ];
@@ -120,7 +120,8 @@ function render(inner: string): string | null {
   if (name === "cost") return cost(positional, named);
   if (name === "money") return money(positional);
   if (name === "rep" || name === "faction standing") return capitalise(positional[0] ?? "");
-  if (name === "race") return positional[0] ?? "";
+  // {{Race|Gilgoblin}} shows the race's name, {{Race|Orc|orcs}} the label, {{Race|Skrog|notext}} only its icon.
+  if (name === "race") return positional[1] === "notext" ? REMOVED : positional[1] || positional[0] || "";
   if (/^patch \d/.test(name)) return `${capitalise(args[0].trim())}${named.note ? `: ${named.note}` : ""}`;
   if (["npc", "item", "quest", "spell", "zone", "ability"].includes(name)) {
     if (positional.length === 0) return "";
@@ -176,6 +177,8 @@ function render(inner: string): string | null {
   // {{StarCraft|Page|label}} and friends link another wiki: the label, else the page.
   if (["starcraft", "sc", "overwatch", "diablo"].includes(name)) return positional[1] || positional[0] || "";
   if (name === "dash") return "–";
+  // {{-}} redirects to {{–}}, which the wiki renders as an em dash: "''The Wolvar'' {{-}} after completing".
+  if (name === "-" || name === "–") return "—";
   // Icon-only templates: a race, class or socket icon, a quest marker or an expansion logo.
   if (["raceicon", "classicon", "socket icon", "queststart", "queststartfinish"].includes(name) || /^(wow|bc|wotlk|legion|wod|bfa|sl|df)-inline$/.test(name)) return REMOVED;
   // {{Alliance}}, {{Horde}}, {{Neutral}} are the small faction icon alone.
@@ -184,19 +187,214 @@ function render(inner: string): string | null {
   return null;
 }
 
+/** Tags whose content the wiki shows as written: comment syntax and other tags inside them are plain text. */
+const LITERAL_TAGS = new Set(["nowiki", "pre", "poem", "syntaxhighlight", "source"]);
+
+/** The closing tag of each tag the pass reads, matched exactly at a position: `</references>` is not `</ref>`. */
+const CLOSERS = new Map([...LITERAL_TAGS, "code", "ref"].map((name) => [name, new RegExp(`</${name}\\s*>`, "y")]));
+
 /**
- * The converter drops everything inside `<code>`, which loses lore lines like `<code>{{api|C_Map}}</code>`.
- * Unwraps the tag and any `<nowiki>` inside it, keeping the text as written.
+ * Drops `<code>` tags inside a literal span (`<nowiki><code>KEEP</code></nowiki>`): the converter drops everything
+ * inside `<code>` wherever it sits, and the wiki shows that text.
  */
-function keepCodeText(wikitext: string): string {
-  return wikitext
-    .replace(/<code\b[^>]*>([\s\S]*?)<\/code\s*>/gi, (_, body: string) => body.replace(/<\/?nowiki\s*>/gi, ""))
-    .replace(/<code\b[^>]*\/>/gi, "");
+const unwrapCode = (s: string) => s.replace(/<\/?code\b[^>]*>/gi, "");
+
+/** Holds a verbatim span's place while the spaces around it are collapsed. */
+const HELD = (n: number) => `\u0002${n}\u0003`;
+
+/** Lower-cases A to Z only, so every offset in the result is the same offset in the original ("İ" would grow). */
+const asciiLower = (s: string) => s.replace(/[A-Z]+/g, (m) => m.toLowerCase());
+
+/**
+ * Reads the opening tag at `start` up to its `>`, however long. A quoted attribute value may hold a ">"
+ * (`<ref name="a>b" />`), but a quote counts only when it closes before the next "<" or line break: the
+ * wiki has many `<ref name="Source>…</ref>` with the closing quote missing, and those end at the first ">".
+ * The quote-aware read stops at the next "<", so the reads of all tags together cover the page about once;
+ * when it meets one, the tag ends at the first ">" after it (`nextGt`), as the wiki reads a malformed
+ * `<ref name="Bane" /<ref name="Yorgen" />`.
+ */
+function readTag(text: string, start: number, nameLength: number, nextLt: number, nextGt: number): { end: number; selfClosing: boolean } | null {
+  const stop = nextLt === -1 ? text.length : nextLt;
+  let lineEnd = -1;
+  let afterEquals = false;
+  for (let i = start + 1 + nameLength; i < stop; i++) {
+    const ch = text[i];
+    if (ch === ">") return { end: i + 1, selfClosing: slashBefore(text, i, start) };
+    if (ch === "=") { afterEquals = true; continue; }
+    if (afterEquals && (ch === '"' || ch === "'")) {
+      if (lineEnd < i) { lineEnd = i; while (lineEnd < stop && text[lineEnd] !== "\n") lineEnd++; }
+      // After a quote that does not close on its line there is no other such quote on it, so these
+      // searches never read the same stretch twice.
+      const close = text.slice(i + 1, lineEnd).indexOf(ch);
+      if (close !== -1) i += close + 1;
+    }
+    if (ch !== " " && ch !== "\t" && ch !== "\n") afterEquals = false;
+  }
+  if (nextLt === -1 || nextGt === -1) return null;
+  return { end: nextGt + 1, selfClosing: slashBefore(text, nextGt, start) };
+}
+
+/** Whether the ">" at `gt` closes a self-closing tag: a "/" right before it, or before only spaces (`<ref name="x" / >`). */
+function slashBefore(text: string, gt: number, start: number): boolean {
+  let j = gt - 1;
+  while (j > start && (text[j] === " " || text[j] === "\t" || text[j] === "\n")) j--;
+  return text[j] === "/";
+}
+
+/** The first ">" at or after a position; asked in increasing order, so the page is read once. */
+function gtFinder(text: string) {
+  let at = -2;
+  return (from: number): number => {
+    if (at === -1 || (at !== -2 && at >= from)) return at;
+    at = text.indexOf(">", from);
+    return at;
+  };
+}
+
+/**
+ * The pass before templates render. One forward scan reads the page the way the wiki does, each part in
+ * its own context:
+ *
+ * - A comment is opaque: a tag inside it is not a tag. It is kept as written.
+ * - `<nowiki>`, `<pre>`, `<poem>`, `<syntaxhighlight>` and `<source>` are literal: comment syntax and tags
+ *   inside them are text, and only their own closing tag ends them. They are kept as written.
+ * - `<code>` is unwrapped (with any `<nowiki>` inside it), and its text kept as written: the converter drops
+ *   everything inside `<code>`, which lost lore lines like `<code>{{api|C_Map}}</code>`, and the spaces in
+ *   code are content. Inside it, comments and literal tags are read as above, so a `</code>` inside them
+ *   does not close it.
+ * - `<ref>` footnotes go. The converter drops them too but leaves a space for each, so a name with three
+ *   sources (`'''Helhounds'''<ref>…</ref><ref>…</ref><ref>…</ref> are`) read "Helhounds  are". A ref ends at
+ *   its own `</ref>`, not at one inside a comment; a ref that never closes is left for the converter.
+ * - A comment, literal tag or `<code>` that never closes runs to the end of the page, kept as written.
+ * - Everywhere else, runs of spaces collapse. A browser shows a run as one space, so the wiki never shows
+ *   the doubled spaces its source often has (`after  completing`, `'''Garn Cloudsong ''' is`,
+ *   `In ''[[World of Warcraft: Classic| Classic]]''`); kept, they would read as a dropped template. A
+ *   doubled space left in the output therefore still means a template was lost. A line that starts with a
+ *   space is preformatted on the wiki and shows its spaces, so it is left as written.
+ *
+ * Every search moves forward and each part of the page is read about once, so the pass is linear.
+ */
+function prepare(wikitext: string): string {
+  const lower = asciiLower(wikitext);
+  const length = wikitext.length;
+  const gt = gtFinder(wikitext);
+  const held: string[] = [];
+  const hold = (s: string) => HELD(held.push(s) - 1);
+  // A marker character already in the text is held itself, so it cannot be read as a held span.
+  const plain = (s: string) => s.replace(/[\u0002\u0003]/g, hold);
+
+  /** Where the comment opening at `at` ends. */
+  const commentEnd = (at: number) => { const close = lower.indexOf("-->", at + 4); return close === -1 ? length : close + 3; };
+
+  /** The end of `</name>` exactly at `at`, or -1. */
+  const closesAt = (name: string, at: number): number => {
+    const re = CLOSERS.get(name)!;
+    re.lastIndex = at;
+    return re.test(lower) ? re.lastIndex : -1;
+  };
+
+  /** The opening tag at `lt` when it is one this pass reads, by its exact name. */
+  const openTag = (lt: number) => {
+    const name = /^[a-z]+/.exec(lower.slice(lt + 1, lt + 17))?.[0] ?? "";
+    if (name !== "ref" && name !== "code" && !LITERAL_TAGS.has(name)) return null;
+    const boundary = lower[lt + 1 + name.length];
+    if (!(boundary === undefined || boundary === ">" || boundary === "/" || /\s/.test(boundary))) return null;
+    const tag = readTag(wikitext, lt, name.length, lower.indexOf("<", lt + 1), gt(lt));
+    return tag && { name, ...tag };
+  };
+
+  /** Where a literal tag's own closing tag starts and ends; nothing inside it is read. */
+  const literalClose = (name: string, from: number): { start: number; end: number } | null => {
+    for (let at = lower.indexOf(`</${name}`, from); at !== -1; at = lower.indexOf(`</${name}`, at + 1)) {
+      const end = closesAt(name, at);
+      if (end !== -1) return { start: at, end };
+    }
+    return null;
+  };
+
+  /** Where `</code>` closes a code body, skipping comments and literal tags; null when it never does. */
+  const codeClose = (from: number): { start: number; end: number } | null => {
+    for (let at = lower.indexOf("<", from); at !== -1; at = lower.indexOf("<", at)) {
+      if (lower.startsWith("<!--", at)) { at = commentEnd(at); continue; }
+      const end = closesAt("code", at);
+      if (end !== -1) return { start: at, end };
+      const tag = openTag(at);
+      if (tag && LITERAL_TAGS.has(tag.name) && !tag.selfClosing) {
+        const close = literalClose(tag.name, tag.end);
+        if (!close) return null;
+        at = close.end;
+        continue;
+      }
+      at = tag ? tag.end : at + 1;
+    }
+    return null;
+  };
+
+  // Once a ref finds no `</ref>` from some point on, no later ref can find one either.
+  let refNeverCloses = Infinity;
+  /** Where `</ref>` closes a ref body, skipping comments; null when it never does. */
+  const refClose = (from: number): { start: number; end: number } | null => {
+    if (from >= refNeverCloses) return null;
+    let comment = lower.indexOf("<!--", from);
+    let closer = lower.indexOf("</ref", from);
+    while (closer !== -1) {
+      if (comment !== -1 && comment < closer) {
+        const after = commentEnd(comment);
+        if (closer < after) closer = lower.indexOf("</ref", after);
+        comment = lower.indexOf("<!--", after);
+        continue;
+      }
+      const end = closesAt("ref", closer);
+      if (end !== -1) return { start: closer, end };
+      closer = lower.indexOf("</ref", closer + 1);
+    }
+    refNeverCloses = from;
+    return null;
+  };
+
+  let out = "";
+  let i = 0;
+  while (i < length) {
+    const lt = lower.indexOf("<", i);
+    if (lt === -1) { out += plain(wikitext.slice(i)); break; }
+    out += plain(wikitext.slice(i, lt));
+    i = lt;
+    if (lower.startsWith("<!--", lt)) {
+      i = commentEnd(lt);
+      out += hold(wikitext.slice(lt, i));
+      continue;
+    }
+    const tag = openTag(lt);
+    if (!tag) { out += "<"; i = lt + 1; continue; }
+    if (tag.selfClosing) {
+      if (LITERAL_TAGS.has(tag.name)) out += hold(wikitext.slice(lt, tag.end));
+      i = tag.end;
+      continue;
+    }
+    const close = tag.name === "ref" ? refClose(tag.end) : tag.name === "code" ? codeClose(tag.end) : literalClose(tag.name, tag.end);
+    if (!close) {
+      if (tag.name === "ref") { out += "<"; i = lt + 1; continue; }
+      out += hold(unwrapCode(wikitext.slice(lt))); // never closes: the rest of the page stays as written
+      break;
+    }
+    if (tag.name === "code") out += hold(wikitext.slice(tag.end, close.start).replace(/<\/?nowiki\s*>/gi, ""));
+    else if (tag.name !== "ref") out += hold(unwrapCode(wikitext.slice(lt, close.end)));
+    i = close.end;
+  }
+  return out
+    .split("\n")
+    .map((line) => (line.startsWith(" ") ? line : line
+      .replace(/( '{0,5}\[\[[^[\]|\n]*\|) +/g, "$1") // a link label that starts with a space, after a space
+      .replace(/(?<! ) +\]\](?= )/g, "]]") // a link label that ends with a space, before a space
+      .replace(/(\S) +('{2,5}) +/g, "$1$2 ") // bold or italic quotes with a space on each side
+      .replace(/(\S) {2,}(?=\S)/g, "$1 ")))
+    .join("\n")
+    .replace(/\u0002(\d+)\u0003/g, (_, n: string) => held[Number(n)]);
 }
 
 /** Renders the handled templates to text in one pass, leaving unknown templates and all line structure untouched. */
 export function repairTemplates(rawWikitext: string): string {
-  const wikitext = keepCodeText(rawWikitext);
+  const wikitext = prepare(rawWikitext);
   const stack: string[] = [];
   let cur = "";
   let literal = 0; // opens past MAX_DEPTH, kept as text along with their closes
@@ -222,7 +420,7 @@ export function repairTemplates(rawWikitext: string): string {
   return cur
     .split("\n")
     .filter((line) => !(line.includes(REMOVED) && line.replace(new RegExp(REMOVED, "g"), "").trim() === ""))
-    .map((line) => (line.includes(REMOVED) ? line.replace(new RegExp(`^(${REMOVED} *)+`), "").replace(new RegExp(` *${REMOVED} *`, "g"), " ").replace(/ +$/, "") : line))
+    .map((line) => (line.includes(REMOVED) ? line.replace(new RegExp(`^(${REMOVED} *)+`), "").replace(new RegExp(`(?<! ) *(?:${REMOVED} *)+`, "g"), " ").replace(/(?<! ) +$/, "") : line))
     .join("\n")
     .replace(/^\n+/, "")
     .replace(/\n+$/, "");
