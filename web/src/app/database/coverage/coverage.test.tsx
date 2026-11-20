@@ -191,6 +191,14 @@ test("the cron writer reads only a HEAD when the stored score is the snapshot's,
   expect(await writeCoverage({ added: 0, rebuild: true, dataAsOf: null }, { cloud, fetch: fetcher })).toMatchObject({ written: true });
   // A run that added nothing still catches up on a score stamped by an older snapshot (a run that failed here).
   expect(await writeCoverage({ added: 0, dataAsOf: "2026-10-20T00:00:00.000Z" }, { cloud, fetch: stamped("2026-10-19T00:00:00.000Z") })).toMatchObject({ written: true });
+  // The stored-views run hands over the corpus it already read; the score reads no second copy.
+  store.loadCorpus.mockClear();
+  const shared = vi.fn(async () => corpus(westfall) as unknown as import("@/lib/upload-store").Corpus);
+  const sharedFetch = stamped(null);
+  expect(await writeCoverage({ added: 0, dataAsOf: "2026-10-21T00:00:00.000Z" }, { cloud, fetch: sharedFetch, corpus: shared })).toMatchObject({ written: true });
+  expect(shared).toHaveBeenCalledOnce();
+  expect(store.loadCorpus).not.toHaveBeenCalled();
+  expect(JSON.parse(await (sharedFetch.mock.calls.at(-1)![0] as Request).text())).toMatchObject({ dataAsOf: "2026-10-21T00:00:00.000Z" });
 });
 
 test("the index states the plateau for quests, pins, vendors and drops, with how and when it was measured", async () => {
