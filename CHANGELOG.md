@@ -264,6 +264,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Addon: compact item tooltip market and scan metadata, show drop rates with windows on one row, and date drop and disenchant evidence only when stale.
 
 ### Fixed
+- Site: the scheduled jobs run on the cron Worker (`everloot-cron`); the site Worker keeps only the operations summary (`EVERLOOT_CRON_WORKER` is "1" in `web/wrangler.jsonc`).
 - Site: the snapshot cron lets go of each file it read before the next step (the stores kept every one for pages, and together they outgrew the Worker), and writes its heartbeat before the auction reports and Auction House boards, its two largest steps (#1354).
 - Site: the corpus snapshot is stored in parts under `snapshots/corpus/` with `snapshots/corpus.json` listing them, and the cron's work check reads only that list. Read whole, the 31 MB file needed about 107 MB of the Worker's 128 MB before any work began, so every snapshot run since 13:20 UTC on 2026-11-19 ran out of memory and `/api/health` answered stale (#1354).
 - Site: public drop sources can carry a name from two installs that report exactly the same name, when none disagree; rates still require three installs.
