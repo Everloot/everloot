@@ -112,28 +112,16 @@ export async function GET(req: Request) {
     if (!result) return NextResponse.json({ ok: false, error: "snapshot failed", rebuild, market, completion }, { status: 500 });
     if (!market) return NextResponse.json({ ok: false, error: "market rollup failed", rebuild, ...result, completion }, { status: 500 });
     if (!completion) return NextResponse.json({ ok: false, error: "completion rollup failed", rebuild, ...result, market }, { status: 500 });
-    // The settled list (kb/src/settled-list.ts) goes beside the score, dated by the snapshot. It is also rewritten
-    // once per ISO week on an idle run, so the weekly spot check rotates even when nothing new arrives. A failure is
-    // logged; uploaders keep the list they have and the heartbeat keeps the week, so the next run retries it.
-    const week = currentSettledWeek();
-    const settledStale = idle && work.settledWeek !== week;
-    let settled: { written: boolean; facts?: number; week?: string } | null = null;
-    try {
-      settled = idle && !settledStale
-        ? { written: false }
-        : await writeSettled({ added: result.added, rebuild, dataAsOf: result.dataAsOf, force: settledStale, week });
-    } catch (err) {
-      console.error("settled list failed", err);
-    }
-    // The heartbeat: the corpus, the rollups and the settled list are current. Everything below is a stored view or file
-    // that is rewritten whenever its stamp is not the snapshot's, so an idle run catches up on one a run could not write.
-    // A run with new uploads replays the whole corpus for them and ran out of the Worker's memory partway through them,
-    // so they come after it (#1354); /api/health says whether this pipeline runs, not whether every view finished.
-    // A rollup with uploads left over is pending: the next run folds them even when no new upload arrived.
+    // The heartbeat: the corpus and the rollups are current. Everything below is a stored view or file that is rewritten
+    // whenever its stamp is not the snapshot's, so an idle run catches up on one a run could not write. A run with new
+    // uploads replays the whole corpus for them and ran out of the Worker's memory partway through them, so they come
+    // after it (#1354); /api/health says whether this pipeline runs, not whether every view finished.
+    // A rollup with uploads left over is pending: the next run folds them even when no new upload arrived. The settled
+    // week the heartbeat carried is kept as it was; the settled list's own stamp now carries its week.
     await uploadStore.writeCronRun(
       completion.remaining > 0 || completion.rebuilding || (market.remaining ?? 0) > 0 || (census?.remaining ?? 0) > 0,
       result.dataAsOf,
-      settled?.written ? week : work.settledWeek ?? null,
+      work.settledWeek ?? null,
     );
     // The stored views below each work from the corpus as it stands. It is read once, by the first view that needs it,
     // and shared: each read runs the publication pass again. An unreachable corpus fails every view that asks for it.
@@ -142,6 +130,16 @@ export async function GET(req: Request) {
       if (c.unreachable) throw new Error("corpus unreachable");
       return c;
     }));
+    // The settled list (kb/src/settled-list.ts), dated by the snapshot and stamped with the ISO week, from the views'
+    // corpus: rewritten whenever the snapshot or the week changed, so the weekly spot check rotates even when nothing new
+    // arrives. Before the heartbeat it read the corpus again on its own, and runs with new uploads ran out of memory
+    // there (2026-11-20 23:10 and 23:20 UTC, #1354). A failure is logged; uploaders keep the list they have.
+    let settled: { written: boolean; facts?: number; week?: string } | null = null;
+    try {
+      settled = await writeSettled({ added: result.added, rebuild, dataAsOf: result.dataAsOf, week: currentSettledWeek() }, { corpus });
+    } catch (err) {
+      console.error("settled list failed", err);
+    }
     // What the item lists read (lib/item-view.ts), stored after the snapshot so a page never replays the corpus. Written
     // only when this run added uploads, rebuilt, or finds no file; a failure is logged and the pages fall back.
     let itemView: { written: boolean; items?: number } | null = null;

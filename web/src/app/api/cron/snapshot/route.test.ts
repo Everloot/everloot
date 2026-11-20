@@ -220,38 +220,29 @@ test("pull summaries are pruned with their collection switch off, and a database
   vi.unstubAllEnvs();
 });
 
-test("the settled list is written beside the score after a changed snapshot, never on an idle run, and a failure does not fail the run", async () => {
-  store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: "2026-W43" });
+test("the settled list is asked on every run after the heartbeat, with the snapshot and the week, from the views' corpus; a failure does not fail the run", async () => {
+  store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: "2026-W42" });
   expect(await (await GET(req())).json()).toMatchObject({ ok: true, settled: { written: false } });
-  expect(settled.writeSettled).not.toHaveBeenCalled();
+  // An idle run asks too: the writer rewrites it when the snapshot or the week changed (a new week rotates the spot check).
+  expect(settled.writeSettled).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-10-01", week: "2026-W43" }, { corpus: expect.any(Function) });
+  // The heartbeat keeps the week it carried.
+  expect(store.writeCronRun).toHaveBeenCalledWith(false, "2026-10-01", "2026-W42");
   store.snapshotWork.mockResolvedValue({ idle: false, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: null });
   store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-10-02T00:00:00.000Z" });
-  settled.writeSettled.mockResolvedValue({ written: true, facts: 3, week: "2026-W43" });
+  const corpus = { uploads: 9, records: [], dataAsOf: "2026-10-02T00:00:00.000Z" };
+  store.loadCorpus.mockResolvedValue(corpus);
+  view.writeItemView.mockImplementation(async (_o: unknown, deps: { build: () => Promise<unknown> }) => { await deps.build(); return { written: true }; });
+  settled.writeSettled.mockImplementation(async (_o: unknown, deps: { corpus: () => Promise<unknown> }) => ({ written: (await deps.corpus()) === corpus, facts: 3, week: "2026-W43" }));
   expect(await (await GET(req())).json()).toMatchObject({ ok: true, settled: { written: true, facts: 3 } });
-  expect(settled.writeSettled).toHaveBeenCalledWith({ added: 2, rebuild: false, dataAsOf: "2026-10-02T00:00:00.000Z", force: false, week: "2026-W43" });
-  expect(store.writeCronRun).toHaveBeenLastCalledWith(false, "2026-10-02T00:00:00.000Z", "2026-W43");
+  expect(settled.writeSettled).toHaveBeenLastCalledWith({ added: 2, rebuild: false, dataAsOf: "2026-10-02T00:00:00.000Z", week: "2026-W43" }, expect.anything());
+  // One corpus read serves the settled list and the views.
+  expect(store.loadCorpus).toHaveBeenCalledOnce();
   settled.writeSettled.mockRejectedValue(new Error("r2 down"));
   vi.spyOn(console, "error").mockImplementation(() => {});
   const res = await GET(req());
   expect(res.status).toBe(200);
   expect(await res.json()).toMatchObject({ ok: true, settled: null });
-});
-
-test("an idle run rewrites the settled list so the weekly spot check rotates without new uploads", async () => {
-  store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: "2026-W42" });
-  settled.writeSettled.mockResolvedValue({ written: true, facts: 3, week: "2026-W43" });
-  expect(await (await GET(req())).json()).toMatchObject({ ok: true, settled: { written: true, facts: 3 } });
-  expect(store.writeSnapshot).not.toHaveBeenCalled();
-  expect(settled.writeSettled).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-10-01", force: true, week: "2026-W43" });
-  expect(store.writeCronRun).toHaveBeenCalledWith(false, "2026-10-01", "2026-W43");
-});
-
-test("a failed weekly settled refresh keeps the old week so the next run retries it", async () => {
-  store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-10-01", settledWeek: "2026-W42" });
-  settled.writeSettled.mockRejectedValue(new Error("r2 down"));
-  vi.spyOn(console, "error").mockImplementation(() => {});
-  expect((await GET(req())).status).toBe(200);
-  expect(store.writeCronRun).toHaveBeenCalledWith(false, "2026-10-01", "2026-W42");
+  expect(store.writeCronRun).toHaveBeenCalledTimes(3);
 });
 
 test("the census snapshot folds on every run with uploads, skips on an idle one, and leftovers keep the run pending", async () => {
@@ -419,9 +410,10 @@ test("the snapshot refreshes the guild ladder even when no new uploads arrive an
   expect((await GET(req())).status).toBe(200);
 });
 
-test("the heartbeat is written before the stored views, the guild ladder, the boards, the coverage score and then the auction reports, and their memory is let go between steps (#1354)", async () => {
+test("the heartbeat is written before the settled list, the stored views, the guild ladder, the boards, the coverage score and then the auction reports, and their memory is let go between steps (#1354)", async () => {
   const order: string[] = [];
   store.writeCronRun.mockImplementation(async () => { order.push("heartbeat"); });
+  settled.writeSettled.mockImplementationOnce(async () => { order.push("settled"); throw new Error("out of memory"); });
   view.writeItemView.mockImplementationOnce(async () => { order.push("item view"); throw new Error("out of memory"); });
   guilds.writeGuildLadder.mockImplementationOnce(async () => { order.push("ladder"); throw new Error("out of memory"); });
   coverage.writeCoverage.mockImplementationOnce(async () => { order.push("coverage"); throw new Error("out of memory"); });
@@ -433,7 +425,7 @@ test("the heartbeat is written before the stored views, the guild ladder, the bo
   const res = await GET(req());
   expect(res.status).toBe(200);
   expect(await res.json()).toMatchObject({ ok: true, guildLadder: null, marketBoards: null, coverage: null });
-  expect(order).toEqual(["heartbeat", "item view", "ladder", "boards", "coverage", "reports"]);
+  expect(order).toEqual(["heartbeat", "settled", "item view", "ladder", "boards", "coverage", "reports"]);
   // Released after the corpus write, after the rollups, after each corpus view and around the steps after the heartbeat.
   expect(store.forgetReads.mock.calls.length).toBeGreaterThanOrEqual(11);
   expect(store.forgetPublished.mock.calls.length).toBe(store.forgetReads.mock.calls.length);
