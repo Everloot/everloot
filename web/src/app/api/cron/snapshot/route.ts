@@ -125,6 +125,16 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("settled list failed", err);
     }
+    // The heartbeat: the corpus, the rollups and the settled list are current. Everything below is a stored view or file
+    // that is rewritten whenever its stamp is not the snapshot's, so an idle run catches up on one a run could not write.
+    // A run with new uploads replays the whole corpus for them and ran out of the Worker's memory partway through them,
+    // so they come after it (#1354); /api/health says whether this pipeline runs, not whether every view finished.
+    // A rollup with uploads left over is pending: the next run folds them even when no new upload arrived.
+    await uploadStore.writeCronRun(
+      completion.remaining > 0 || completion.rebuilding || (market.remaining ?? 0) > 0 || (census?.remaining ?? 0) > 0,
+      result.dataAsOf,
+      settled?.written ? week : work.settledWeek ?? null,
+    );
     // The stored views below each work from the corpus as it stands. It is read once, by the first view that needs it,
     // and shared: each read runs the publication pass again. An unreachable corpus fails every view that asks for it.
     let corpusRead: Promise<Corpus> | null = null;
@@ -206,22 +216,15 @@ export async function GET(req: Request) {
     // The last view that reads the corpus is done.
     corpusRead = null;
     release();
-    // A rollup with uploads left over is pending: the next run folds them even when no new upload arrived.
-    await uploadStore.writeCronRun(
-      completion.remaining > 0 || completion.rebuilding || (market.remaining ?? 0) > 0 || (census?.remaining ?? 0) > 0,
-      result.dataAsOf,
-      settled?.written ? week : work.settledWeek ?? null,
-    );
-    // The auction reports and the Auction House boards come after the heartbeat. Each reads the market rollup, the
-    // aggregates and the client's item tables to name items, the run's largest working sets (#1354): if one outgrows the
-    // Worker, the corpus, the rollups and every view above are already written and the heartbeat says so. A failure is
-    // logged; the pages build the boards themselves and keep the last reports.
+    // The auction reports and the Auction House boards each read the market rollup, the aggregates and the client's item
+    // tables to name items, the run's largest working sets (#1354), so they come after the views. A failure is logged;
+    // the pages build the boards themselves and keep the last reports.
     // The boards go first: without a current file every Auction House page builds them on the site Worker, while a
     // missing day of reports only waits. The reports, the largest step (about 110 MB more than the boards in a local
     // replay, 2026-11-20), are written once a day and go last.
     release();
-    // The guild ladder reads the whole corpus again, and a run with new uploads ran out of memory there, after every view
-    // above and before its heartbeat (#1354), so it comes after it, first: its pages replay the corpus without it.
+    // The guild ladder reads the whole corpus again; a run with new uploads ran out of memory there, after every view
+    // above (#1354). It goes first of the last steps: its pages replay the corpus without it.
     // Guild authority is checked even on idle runs, and a file stamped by another snapshot is rewritten, so an idle run
     // catches up on a failed one; hides stay live in the page/tool reader.
     let guildLadder: { written: boolean; bytes?: number } | null = null;
