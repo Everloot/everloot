@@ -107,7 +107,7 @@ describe("the character page", () => {
   });
 
   test("play history ranks sit in the Play history tab, not with the gear numbers", async () => {
-    mem.putCharacter(armoryCharacter({ details: { revision: 1, playHistory: { asOf: "2026-11-09T10:00:00.000Z", groups: [], ranked: { fish: 9 } } } }));
+    mem.putCharacter(armoryCharacter({ details: { revision: 1, playHistory: { asOf: "2026-11-09T10:00:00.000Z", groups: [{ name: "Skills", rows: [{ id: 1518, name: "Fish caught", value: 9 }] }], ranked: { fish: 9 } } } }));
     const out = await html(pages.character("eu", "velkara-duskmantle"));
     const numbers = out.slice(0, out.indexOf('role="tablist"'));
     expect(numbers).not.toContain("Fish caught");

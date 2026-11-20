@@ -204,7 +204,7 @@ export function ProfileDetailsView({ character: c, categories = new Map() }: { c
       <SectionHeading id="armory-quests">Quests</SectionHeading>
       <QuestCount completed={details.quests.completed} />
     </section>}
-    {details.playHistory && <section aria-labelledby="armory-play-history" className="space-y-3">
+    {details.playHistory && details.playHistory.groups.length > 0 && <section aria-labelledby="armory-play-history" className="space-y-3">
       <SectionHeading id="armory-play-history">Play history</SectionHeading>
       <PlayHistoryView history={details.playHistory} />
     </section>}

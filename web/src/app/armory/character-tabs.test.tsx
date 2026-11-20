@@ -103,6 +103,8 @@ test("play history shows the six ranked counts, an unread one as Not read, then 
   expect(html).toContain("#2 of 40");
 });
 
-test("a character read before play history has the tab, saying it was not read", () => {
+test("a character read before play history, or with none to read, has the tab saying it was not read", () => {
   expect(emptyIds(render(partial))).toContain("history");
+  const none = armoryCharacter({ details: { revision: 1, playHistory: { asOf: at, groups: [], ranked: {} } } });
+  expect(emptyIds(render(none))).toContain("history");
 });

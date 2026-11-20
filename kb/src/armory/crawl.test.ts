@@ -827,6 +827,23 @@ it("a failed play history read keeps a recent copy and asks for a retry; a 403 s
   historyApi(denied.api, 403);
   await runCrawl({ region: "eu", budget: 11, store: denied.store, api: denied.api, details: true });
   const none = (denied.store.upsertCharacters.mock.calls[0]?.[1][0] as { details: ProfileDetails }).details;
-  expect(none.playHistory).toBeUndefined();
+  // A 403 is an answer: an empty play history is stored, so the row is not read in full on every turn.
+  expect(none.playHistory).toEqual({ asOf: expect.any(String), groups: [], ranked: {} });
   expect(none.retry).toBeUndefined();
+});
+it("a statistics 404 or a profile with no achievements link stores an empty play history, and the next turn may get a 304", async () => {
+  const { store, api } = setup();
+  api.get.mockImplementation(async (path) => path.endsWith("/achievements/statistics")
+    ? { status: 404, lastModified: null, body: null }
+    : { status: 200, lastModified: "new", body: path.endsWith("/achievements") ? achievements : path.endsWith("ember-vale-0") ? { ...bodyFor(path) as object, ...progressLinks("ember-vale-0") } : bodyFor(path) });
+  await runCrawl({ region: "eu", budget: 11, store, api, details: true });
+  const stored = (store.upsertCharacters.mock.calls[0]?.[1][0] as { details: ProfileDetails }).details;
+  expect(stored.playHistory).toEqual({ asOf: expect.any(String), groups: [], ranked: {} });
+  store.character.mockResolvedValue([{ last_modified: "date", details: stored }]);
+  api.get.mockClear();
+  await runCrawl({ region: "eu", budget: 11, store, api, details: true });
+  expect(api.get.mock.calls[0]?.[2]).toEqual({ ifModifiedSince: "date" });
+  const unlinked = setup();
+  await runCrawl({ region: "eu", budget: 11, store: unlinked.store, api: unlinked.api, details: true });
+  expect((unlinked.store.upsertCharacters.mock.calls[0]?.[1][0] as { details: ProfileDetails }).details.playHistory).toEqual({ asOf: expect.any(String), groups: [], ranked: {} });
 });

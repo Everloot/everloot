@@ -65,7 +65,7 @@ export function characterTabs(c: ArmoryCharacter, parts: SheetParts): TabItem[] 
     professions: d?.professions?.rows.length ? <ProfessionList rows={d.professions.rows} /> : null,
     reputations: d?.reputations?.rows.length ? <ReputationList rows={d.reputations.rows} /> : null,
     quests: d?.quests ? <QuestCount completed={d.quests.completed} /> : null,
-    history: d?.playHistory ? <PlayHistoryView history={d.playHistory} ranks={parts.historyRanks} /> : null,
+    history: d?.playHistory?.groups.length ? <PlayHistoryView history={d.playHistory} ranks={parts.historyRanks} /> : null,
     progress: <>
       {(!parts.progression || parts.progression.instances.every((r) => r.state === "no data")) && <p className="py-3 text-sm text-fg-2">{EMPTY_TAB.progress}</p>}
       <ProgressionMatrix {...(parts.progression ?? { instances: characterProgression(progressionCatalogue(null), null) })} />

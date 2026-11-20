@@ -103,3 +103,8 @@ test("a linked page's details show play history as its own section, and its read
   expect(html).toContain("791");
   expect(readTimes(c)).toContain(at);
 });
+
+test("an empty play history adds no section", () => {
+  const c = armoryCharacter({ details: { revision: 1, playHistory: { asOf: "2026-11-20T08:00:00.000Z", groups: [], ranked: {} } } });
+  expect(renderToStaticMarkup(<ProfileDetailsView character={c} />)).not.toContain("armory-play-history");
+});

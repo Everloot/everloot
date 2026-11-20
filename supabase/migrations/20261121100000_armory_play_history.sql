@@ -1,6 +1,11 @@
 -- Lifetime stats, part 1 (docs/superpowers/specs/2026-11-20-lifetime-stats-design.md): Blizzard's play history,
 -- crawled into armory_characters.details.playHistory (kb/src/armory/details.ts), ranked on six boards.
 -- Production application requires the owner's explicit OK.
+-- Order: apply this before the site that reads show_history deploys (the Linked characters list selects it and
+-- set_visibility must accept it); the crawler may ship first. Adding the stored columns rewrites armory_characters
+-- under an exclusive lock while every row's details is read, and armory pages answer "unreachable" until it ends:
+-- check the table's size first, apply off-peak with the Armory workflow paused, and keep the statement timeout long
+-- enough for the rewrite and the six indexes.
 --
 -- 1. Six stored generated columns read the ranked counts from details.playHistory.ranked, so no upsert changes. A value
 --    that is not a JSON number gives null, never a failed row write.
