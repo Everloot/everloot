@@ -113,21 +113,11 @@ export async function GET(req: Request) {
   } catch (err) {
     console.error("database activity failed", err);
   }
-  release();
-  // The coverage score, dated by the snapshot, from the same corpus: read again on its own, it ran out of the Worker's
-  // memory after the boards on runs with new uploads (2026-11-20 19:45, #1354). The pages show the last stored score
-  // (or say it is unreachable).
-  let coverage: { written: boolean } | null = null;
-  try {
-    coverage = await writeCoverage(opts, { corpus });
-  } catch (err) {
-    console.error("coverage failed", err);
-  }
-  // The last step that shares the corpus is done.
+  // The last view that shares the corpus is done.
   corpusRead = null;
   release();
-  // The guild ladder reads the whole corpus again, between two reads of guild authority, so a revoke or hide made during
-  // the run cannot reach the file; its pages replay the corpus without it. Hides stay live in the page/tool reader.
+  // The guild ladder reads the whole corpus again, and its pages replay the corpus without it. Guild authority is checked
+  // on every run; hides stay live in the page/tool reader.
   let guildLadder: { written: boolean; bytes?: number } | null = null;
   try {
     guildLadder = await writeGuildLadder(opts);
@@ -141,6 +131,15 @@ export async function GET(req: Request) {
   // file every Auction House page builds them, while a missing day of reports only waits.
   let marketBoards: { written: boolean; bytes?: number; ms?: number } | null = null;
   try { marketBoards = await writeMarketBoards(); } catch (err) { console.error("market boards failed", err); }
+  release();
+  // The coverage score, dated by the snapshot. It reads the whole corpus and works the score out beside it. The pages
+  // show the last stored score (or say it is unreachable).
+  let coverage: { written: boolean } | null = null;
+  try {
+    coverage = await writeCoverage(opts);
+  } catch (err) {
+    console.error("coverage failed", err);
+  }
   release();
   // The auction reports, the largest step (about 110 MB more than the boards in a local replay, 2026-11-20), are written
   // once a UTC day, and only from a market with no uploads left to fold: a day's report is never rewritten.
