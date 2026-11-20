@@ -42,7 +42,6 @@ test("the cron Worker is the site's build with the site's bindings and vars, apa
 
 test("a trigger calls its routes with the cron secret, and an unknown schedule runs nothing", () => {
   expect(cronPaths("*/10 * * * *")).toEqual(["/api/cron/snapshot", "/api/cron/blue"]);
-  expect(cronPaths("5,15,25,35,45,55 * * * *")).toEqual(["/api/cron/views"]);
   expect(cronPaths("23 * * * *")).toEqual(["/api/cron/indexnow", "/api/cron/ops"]);
   expect(cronPaths("7,37 * * * *")).toEqual(["/api/cron/profiles"]);
   expect(cronPaths("0 0 * * *")).toEqual([]);

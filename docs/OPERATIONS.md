@@ -86,9 +86,9 @@ recovery before calling it done: warm the commit that version was built from wit
 
 There is nothing to roll back when the build or deploy step failed, because the warm step never ran.
 
-## The four cron schedules
+## The three cron schedules
 
-`web/wrangler.jsonc` lists four cron triggers, and `web/wrangler.cron.jsonc` the same four (the cron
+`web/wrangler.jsonc` lists three cron triggers, and `web/wrangler.cron.jsonc` the same three (the cron
 Worker below). `web/src/lib/cf-crons.ts` maps each one to routes.
 `web/scripts/cf-entry.mjs` calls those routes with `Authorization: Bearer` plus `CRON_SECRET`
 (`web/.env.example`). If `CRON_SECRET` is unset, the entry throws and nothing runs. Each route also
@@ -96,16 +96,13 @@ answers 503 in that case and does not write.
 
 | Schedule | Route | What a run writes |
 |---|---|---|
-| `*/10 * * * *` | `/api/cron/snapshot` | The corpus snapshot, then the market, completion and census rollups and the settled list, then the heartbeat object `cron/last-run.json`. A failed snapshot, market or completion step answers 500 and does not move that heartbeat, so the next run retries the same uploads (`web/src/app/api/cron/snapshot/route.ts`, `web/src/lib/upload-store.ts`). |
-| `5,15,25,35,45,55 * * * *` | `/api/cron/views` | The stored views the pages read instead of replaying the corpus: item view, aggregates, search names, auction history, professions, map pins and database activity, then the guild ladder, the Auction House boards, the coverage score and, once a UTC day, the auction reports. Each is rewritten whenever its `x-amz-meta-data-as-of` stamp is not the stored corpus's `generatedAt`, so a run that could not write one is caught up by the next. The reports wait while the heartbeat says a rollup has uploads left to fold. A failed view is logged and the run answers 200; only an unreadable snapshot answers 500 (`web/src/app/api/cron/views/route.ts`). They ran at the end of the snapshot run until 2026-11-20, when runs with new uploads kept running out of memory in them (#1354). |
+| `*/10 * * * *` | `/api/cron/snapshot` | The corpus snapshot, then the market, completion and census rollups and the settled list, then the heartbeat object `cron/last-run.json`. After the heartbeat come the stored views (item view, aggregates, search names, auction history, professions, map pins, database activity), the guild ladder, the Auction House boards, the coverage score and the auction reports. Each of those is rewritten whenever its stamp is not the snapshot's, so an idle run catches up on one a run could not write. A failed snapshot, market or completion step answers 500 and does not move that heartbeat, so the next run retries the same uploads (`web/src/app/api/cron/snapshot/route.ts`, `web/src/lib/upload-store.ts`). |
 | `*/10 * * * *` | `/api/cron/blue` | The objects `changes/blue-posts.json` and `changes/blue-fetch-state.json` (`web/src/lib/blue-store.ts`). New posts revalidate the `blue` cache tag (`web/src/app/api/cron/blue/route.ts`). |
 | `23 * * * *` | `/api/cron/indexnow` | Nothing in storage. When `/changes` has an entry from the last two hours, the run submits `/changes`, `/changes/feed.xml` and `/wow-forever` (`web/src/lib/indexnow.ts`). No `INDEXNOW_KEY` means nothing is sent. An empty list sends nothing (`web/src/app/api/cron/indexnow/route.ts`). |
 | `7,37 * * * *` | `/api/cron/profiles` | The gear-board snapshot and each ranked character's tracking points (`web/src/lib/profile-pipeline.ts`). The route writes only when `leaderboardsOn()` is true: `EVERLOOT_LEADERBOARDS`, `EVERLOOT_CHARACTER_LINKS`, `EVERLOOT_SHOWCASE` and `EVERLOOT_PRIVATE_SYNC` each set to `1` (`web/src/lib/leaderboard-switch.ts`). Otherwise it writes nothing and answers `ok: true`, `skipped: "off"` (`web/src/app/api/cron/profiles/route.ts`). |
 
 `?rebuild=1` on `/api/cron/snapshot` rebuilds the snapshot and the market rollup from empty, and the
-same flag is passed to the census and settled-list writes. On `/api/cron/views` it rewrites every stored
-view, the ladder and the coverage score whatever their stamps; a rebuilt snapshot has a new `generatedAt`,
-so the next views run rewrites them anyway. The
+same flag is passed to the census, coverage, settled-list, item-view and aggregate writes. The
 completion rebuild is folded into a separate object over several runs and replaces the served rollup
 only when it has caught up (`web/src/app/api/cron/snapshot/route.ts`). The same query on `/api/cron/profiles`
 makes that run a full pass. `/api/cron/blue` and `/api/cron/indexnow` do not read it.
