@@ -73,6 +73,23 @@ export async function ownCharacterArmory(userId: string, linkId: string): Promis
   }
 }
 
+/**
+ * Every armory character the account's links are associated with, for the owner-only lifetime summary. Null when the
+ * armory is off or the read fails; a link whose armory row is gone is left out.
+ */
+export async function ownArmoryCharacters(userId: string): Promise<ArmoryCharacter[] | null> {
+  if (!armoryOn()) return null;
+  try {
+    const rows = await authQuery<unknown>("rpc/armory_own_links", { method: "POST", body: JSON.stringify({ p_user_id: userId }) });
+    const own = z.array(z.object({ region: z.enum(["us", "eu"]), slug: z.string() })).parse(rows);
+    const store = armoryStore();
+    const characters = await Promise.all(own.map((r) => store.character(r.region, r.slug)));
+    return characters.filter((c): c is ArmoryCharacter => c !== null);
+  } catch {
+    return null;
+  }
+}
+
 /** The character as its shown parts allow: a part switched off is removed here, so it never reaches the markup. */
 export function shownCharacter(c: ArmoryCharacter, shown: ArmoryShown): ArmoryCharacter {
   const d = c.details;

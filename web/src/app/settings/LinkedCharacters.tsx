@@ -219,6 +219,11 @@ export default function LinkedCharacters() {
           </div>
         )}
       </div>
+      {state.links.some((l) => l.armory?.path) && (
+        <p className="text-sm">
+          <a href="/me/characters/lifetime" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Lifetime totals of your linked characters</a>
+        </p>
+      )}
       {state.links.length === 0 ? (
         <p className="text-sm text-fg-2">No linked characters yet.</p>
       ) : (

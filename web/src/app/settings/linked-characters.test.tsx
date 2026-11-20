@@ -322,12 +322,14 @@ describe("private sync", () => {
     syncApi([{ links: [connected({ path: null })] }]);
     await show();
     expect(container.textContent).not.toContain(BLIZZARD_TEXT);
+    expect(container.querySelector('a[href="/me/characters/lifetime"]')).toBeNull();
     await act(async () => root.unmount());
     root = createRoot(container);
 
     const sent = syncApi([{ links: [connected({ path: "/armory/eu/thrallina-vale" })] }]);
     await show();
     expect(container.textContent).toContain(BLIZZARD_TEXT);
+    expect(container.querySelector('a[href="/me/characters/lifetime"]')?.textContent).toBe("Lifetime totals of your linked characters");
     await click("Hide Blizzard's gear from Thrallina's page");
     await click("Show Blizzard's achievements and quests on Thrallina's page");
     await click("Show Blizzard's pvp on Thrallina's page");
