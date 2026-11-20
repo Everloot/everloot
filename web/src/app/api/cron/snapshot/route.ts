@@ -206,13 +206,6 @@ export async function GET(req: Request) {
     // The last view that reads the corpus is done.
     corpusRead = null;
     release();
-    // Guild authority is checked even on idle runs; hides stay live in the page/tool reader.
-    let guildLadder: { written: boolean; bytes?: number } | null = null;
-    try {
-      guildLadder = await writeGuildLadder({ added: result.added, rebuild, dataAsOf: result.dataAsOf });
-    } catch (err) {
-      console.error("guild ladder failed", err);
-    }
     // A rollup with uploads left over is pending: the next run folds them even when no new upload arrived.
     await uploadStore.writeCronRun(
       completion.remaining > 0 || completion.rebuilding || (market.remaining ?? 0) > 0 || (census?.remaining ?? 0) > 0,
@@ -226,6 +219,17 @@ export async function GET(req: Request) {
     // The boards go first: without a current file every Auction House page builds them on the site Worker, while a
     // missing day of reports only waits. The reports, the largest step (about 110 MB more than the boards in a local
     // replay, 2026-11-20), are written once a day and go last.
+    release();
+    // The guild ladder reads the whole corpus again, and a run with new uploads ran out of memory there, after every view
+    // above and before its heartbeat (#1354), so it comes after it, first: its pages replay the corpus without it.
+    // Guild authority is checked even on idle runs, and a file stamped by another snapshot is rewritten, so an idle run
+    // catches up on a failed one; hides stay live in the page/tool reader.
+    let guildLadder: { written: boolean; bytes?: number } | null = null;
+    try {
+      guildLadder = await writeGuildLadder({ added: result.added, rebuild, dataAsOf: result.dataAsOf });
+    } catch (err) {
+      console.error("guild ladder failed", err);
+    }
     release();
     // The Auction House boards (lib/market-boards.ts), built once here instead of on every browse, realm, bags and
     // disenchanting request: rewritten when the rollup or the UTC day changed.
