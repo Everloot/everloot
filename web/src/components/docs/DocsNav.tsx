@@ -1,26 +1,42 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import LinkTabs from "@/components/ui/LinkTabs";
 import Icon from "@/components/ui/Icon";
 import { DOCS_TABS, tabFor, type DocsTab } from "@/lib/docs/nav";
 import DocsIcon from "./DocsIcon";
 
-/** The docs' tab bar: Overview, Guides, API Reference, MCP, Cookbook. The site's LinkTabs, with an icon each. */
+/**
+ * The docs' tab bar: Overview, Guides, API Reference, MCP, Cookbook. The site's LinkTabs, with an icon each, from
+ * `md` up; below it one native select, so five tabs never scroll off a phone's width.
+ */
 export function DocsTabs() {
-  const active = tabFor(usePathname() ?? "/docs").id;
+  const active = tabFor(usePathname() ?? "/docs");
+  const router = useRouter();
   return (
     <div className="mb-8">
-      <LinkTabs
-        label="Docs sections"
-        tabs={DOCS_TABS.map((tab) => ({
-          href: tab.href,
-          current: tab.id === active,
-          label: <><DocsIcon name={tab.icon} className={tab.id === active ? "text-accent" : "text-muted"} />{tab.label}</>,
-        }))}
-      />
+      <label className="block md:hidden">
+        <span className="sr-only">Docs section</span>
+        <select
+          value={active.id}
+          onChange={(event) => { const tab = DOCS_TABS.find((t) => t.id === event.target.value); if (tab) router.push(tab.href); }}
+          className="w-full rounded-control border border-edge bg-canvas px-3 py-2 text-base text-fg focus:border-accent"
+        >
+          {DOCS_TABS.map((tab) => <option key={tab.id} value={tab.id}>{tab.label}</option>)}
+        </select>
+      </label>
+      <div className="hidden md:block">
+        <LinkTabs
+          label="Docs sections"
+          tabs={DOCS_TABS.map((tab) => ({
+            href: tab.href,
+            current: tab.id === active.id,
+            label: <><DocsIcon name={tab.icon} className={tab.id === active.id ? "text-accent" : "text-muted"} />{tab.label}</>,
+          }))}
+        />
+      </div>
     </div>
   );
 }

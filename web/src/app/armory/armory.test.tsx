@@ -5,6 +5,9 @@ import { BLIZZARD_CREDIT } from "@/lib/armory";
 import { armoryCharacter, armoryGuild } from "@/lib/armory.fixture";
 import { createCloudArmoryStore, createMemoryArmoryStore, type ArmoryStore, type MemoryArmoryStore } from "@/lib/armory-store";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
+vi.mock("@/components/guild-profile", () => ({ default: () => <section aria-label="Guild profile">Claim or edit this guild</section> }));
+
+vi.mock("@/components/progression/GuildProgression", () => ({ default: () => <section data-guild-progression-hook /> }));
 
 vi.mock("next/link", () => ({
   default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => <a href={href} className={className}>{children}</a>,
@@ -88,6 +91,9 @@ describe("the character page", () => {
     expect(out).toContain("Level 60 Troll Hunter");
     expect(out).toContain('href="/armory/eu/guilds/ember-wardens"');
     expect(out).toContain("Last login");
+    expect(out).toMatch(/Last read <time dateTime="2026-11-09T10:00:00.000Z"[^>]*>2026-11-09<\/time>/);
+    expect(out).toContain('role="tablist"');
+    expect(out).toContain('data-tab-panel="pvp"');
     expect(out).toContain("57.41");
     expect(out).toContain("61.2");
     expect(out).toContain("1,234");
@@ -233,4 +239,19 @@ test("the forms keep their fields, confirm, and say what went wrong", async () =
   // Storage out of reach still draws the forms, with the read time unrecorded.
   holder.store = broken();
   expect(await html(pages.hide())).toContain("Read time unrecorded");
+});
+
+test("classification filters reach storage, preserve each other in links and link guilds", async () => {
+  const spy = vi.spyOn(mem, "boardFiltered");
+  const out = await html(pages.board("gear-score", { region: "eu", ruleset: "2", class: "hunter", faction: "horde" }));
+  expect(spy).toHaveBeenCalledWith("gear_score", "eu", 2, "Hunter", "Horde", 100);
+  expect(out).toContain('href="/armory/eu/guilds/ember-wardens"');
+  expect(out).toContain('class=hunter&amp;faction=horde');
+  expect(out).toContain('class=mage&amp;faction=horde');
+  expect(out).toContain('aria-label="Gear Score: 61.2.');
+  expect(out).toContain('Read Nov 9, 2026');
+  expect(out).toContain('aria-describedby=');
+  expect(out).toContain('text-class-hunter');
+  await expect(pages.board("gear-score", { class: "invented" })).rejects.toThrow("NEXT_NOT_FOUND");
+  await expect(pages.board("gear-score", { faction: "invented" })).rejects.toThrow("NEXT_NOT_FOUND");
 });

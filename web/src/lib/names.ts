@@ -2,7 +2,7 @@ import { agreedCatalog } from "@kb/completion-rollup";
 import type { EdgeKind } from "@kb/edges";
 import { agreedObjectNames } from "@kb/object-spawns";
 import { agreedItemNames, type ItemFacts } from "@kb/item-page";
-import { agreedNpcNames, agreedQuestTitles, type WorldFacts } from "@kb/world-pages";
+import { agreedNpcNames, agreedQuestTitles, type DropSourceName, type WorldFacts } from "@kb/world-pages";
 import type { FactNames } from "./character-facts";
 import type { StoredFact } from "./private-sync-store";
 import { RECHECK_SCOPES } from "./recheck-scopes";
@@ -14,9 +14,10 @@ import { uploadStore } from "./upload-store";
  * completion entries (docs/DATA_POLICY.md has the rules this follows).
  *
  * AGREED names live here, in names.ts: the name 3 distinct installs report alike (the kb `agreed*` rules, with the
- * recheck cutoffs), and the completion catalog's agreed entries. Every surface may use them, and the API
- * (/api/suggest), the MCP server, the bulk export and the embeddable cards use only them. This file never imports
- * the private game-file store or the shown names.
+ * recheck cutoffs), and the completion catalog's agreed entries. `loadDropSourceNames` alone permits the named
+ * tiered, unanimous source names from one install upward.
+ * Every surface may use agreed names; /api/suggest, MCP, bulk exports and cards use only them.
+ * This file never imports the private game-file store or the shown names.
  *
  * SHOWN names live in shown-item-names.ts: what a database page prints. The agreed name first; else, for items, the
  * game files where the Warcraft Wiki agrees (or the files alone, unconfirmed); for NPCs, one or two installs'
@@ -44,9 +45,10 @@ export interface Names {
 
 const NO_OBJECTS: never[] = [];
 const memo = new WeakMap<object, Map<number, string>>();
-function once(key: object, build: () => Map<number, string>): Map<number, string> {
-  let known = memo.get(key);
-  if (!known) { known = build(); memo.set(key, known); }
+const dropMemo = new WeakMap<object, Map<number, DropSourceName>>();
+function once<T = string>(key: object, build: () => Map<number, T>, cache = memo as WeakMap<object, Map<number, T>>): Map<number, T> {
+  let known = cache.get(key);
+  if (!known) { known = build(); cache.set(key, known); }
   return known;
 }
 
@@ -63,6 +65,15 @@ export async function loadNames(itemsRead: ReturnType<typeof loadItemFacts> = lo
     npcs: world.unreachable ? new Map() : npcNames(world),
     objects: items.unreachable ? new Map() : objectNames(items),
     quests: world.unreachable ? new Map() : questTitles(world),
+  };
+}
+
+/** Unanimous drop source names and their tiers; other name paths keep their confirmed threshold. */
+export async function loadDropSourceNames(): Promise<{ npcs: Map<number, DropSourceName>; objects: Map<number, DropSourceName> }> {
+  const [items, world] = await Promise.all([loadItemFacts(), loadWorldFacts()]);
+  return {
+    npcs: world.unreachable ? new Map() : once(world.npcs, () => agreedNpcNames(world, true), dropMemo),
+    objects: items.unreachable ? new Map() : once(items.objects ?? NO_OBJECTS, () => agreedObjectNames(items.objects ?? [], RECHECK_SCOPES, true), dropMemo),
   };
 }
 

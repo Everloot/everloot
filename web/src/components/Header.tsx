@@ -149,8 +149,9 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
   const searchRow = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (searchOpen) searchRow.current?.focus(); }, [searchOpen]);
-  // A new page closes the opened field.
-  useEffect(() => setSearchOpen(false), [path]);
+  // A new page closes the opened field and the menu: a suggestion picked in either is a client-side link, and the
+  // menu would otherwise stay over the page it opened.
+  useEffect(() => { setSearchOpen(false); setOpen(false); }, [path]);
 
   // A click outside the bar's menus closes the open one.
   useEffect(() => {
@@ -177,6 +178,52 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
 
   const closeAll = () => { setOpen(false); setMenu(null); };
 
+  // The menu ArrowDown opened from its closed trigger: its first link takes focus once the panel is shown.
+  const focusFirst = useRef<string | null>(null);
+  useEffect(() => {
+    if (!menu || focusFirst.current !== menu) return;
+    focusFirst.current = null;
+    document.querySelector<HTMLAnchorElement>(`#${menuId(menu)} a[href]`)?.focus();
+  }, [menu]);
+
+  // The disclosure pattern inside one top bar menu: ArrowDown/ArrowUp walk its links and wrap, Home/End jump to the
+  // ends, ArrowDown on the closed trigger opens it onto the first link, and Tab out of the panel closes it (Escape is
+  // handled on the header, which returns focus to the trigger).
+  const menuKeys = (event: React.KeyboardEvent<HTMLDivElement>, label: string) => {
+    const expanded = menu === label;
+    const trigger = event.currentTarget.querySelector<HTMLButtonElement>("button");
+    const links = Array.from(event.currentTarget.querySelectorAll<HTMLAnchorElement>("a[href]"));
+    const active = document.activeElement;
+    const at = links.findIndex((link) => link === active);
+    const go = (i: number) => { event.preventDefault(); links[(i + links.length) % links.length]?.focus(); };
+    switch (event.key) {
+      case "ArrowDown":
+        if (expanded) return go(at + 1);
+        event.preventDefault();
+        focusFirst.current = label;
+        setMenu(label);
+        return;
+      case "ArrowUp": if (expanded) go(at - 1); return;
+      case "Home": if (expanded) go(0); return;
+      case "End": if (expanded) go(-1); return;
+      case "Tab":
+        if (expanded && (event.shiftKey ? active === trigger : at === links.length - 1)) setMenu(null);
+        return;
+    }
+  };
+
+  // ArrowRight/ArrowLeft on a top bar item move to the next or previous one, wrapping, and close any open menu.
+  const barKeys = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+    const nav = event.currentTarget;
+    const tops = Array.from(nav.querySelectorAll<HTMLElement>("a, button")).filter((el) => el.parentElement === nav || el.parentElement?.parentElement === nav);
+    const at = tops.indexOf(document.activeElement as HTMLElement);
+    if (at < 0) return;
+    event.preventDefault();
+    setMenu(null);
+    tops[(at + (event.key === "ArrowRight" ? 1 : -1) + tops.length) % tops.length]?.focus();
+  };
+
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-canvas" onKeyDown={(event) => {
       if (event.key !== "Escape") return;
@@ -192,19 +239,20 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
           everloot
         </Link>
 
-        <nav ref={bar} aria-label="Primary" className="hidden shrink-0 items-center text-sm font-medium lg:flex">
+        <nav ref={bar} aria-label="Primary" onKeyDown={barKeys} className="hidden shrink-0 items-center text-sm font-medium lg:flex">
           {items.map((item) => {
             const on = current === item.label;
             if (!item.links) return <Link key={item.label} href={item.href} aria-current={isCurrent(path, item.href) ? "page" : undefined} className={`${navItem} ${navState(on)}`}>{item.label}</Link>;
             const id = menuId(item.label);
             const expanded = menu === item.label;
             return (
-              <div key={item.label} className="relative">
+              <div key={item.label} className="relative" onKeyDown={(event) => menuKeys(event, item.label)}>
                 <button
                   id={`${id}-button`}
                   type="button"
                   aria-expanded={expanded}
                   aria-controls={id}
+                  aria-haspopup="true"
                   onClick={() => setMenu(expanded ? null : item.label)}
                   className={`${navItem} gap-1.5 ${navState(on || expanded)}`}
                 >
@@ -281,8 +329,14 @@ export default function Header({ savedBuilds = false, profiles = false, accountS
           <div className="mx-auto max-w-data space-y-6 px-4 py-6 lg:px-6">
             <form action="/search" method="get" role="search" onSubmit={() => track("search", { surface: "menu" })} className="flex items-center gap-2 rounded-full border border-edge bg-canvas px-3 text-muted focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">
               <SearchIcon />
-              <label htmlFor="menu-search" className="sr-only">Search Everloot</label>
-              <input id="menu-search" name="q" type="search" maxLength={200} placeholder="Search Everloot" className="w-full min-w-0 bg-transparent text-fg placeholder:text-muted focus:outline-none" />
+              {/* The bar's suggesting field, so the menu's search finds the same pages as you type. */}
+              <SuggestField
+                id="menu-search"
+                label="Search Everloot"
+                placeholder="Search Everloot"
+                listClassName="-left-9 -right-3 mt-2"
+                className="h-9 w-full min-w-0 bg-transparent text-base text-fg placeholder:text-muted focus:outline-none"
+              />
             </form>
             {/* The top bar's menus as groups, in the same order; More holds Chat, the pages outside the bar, and the bug
                 report, whose floating pill is hidden below md. Focus moves to Menu first, so closing the dialog returns there. */}

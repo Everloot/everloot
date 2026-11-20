@@ -44,7 +44,7 @@ describe("drop rollups", () => {
       win("a", 7, []),
     ]);
     expect(rates).toHaveLength(0);
-    expect(measuredZeros).toEqual([{ sourceNpcId: 7, kills: 4, reporters: 3, public: true }]);
+    expect(measuredZeros).toEqual([{ sourceNpcId: 7, kills: 4, reporters: 3, tier: "confirmed", public: true }]);
   });
 
   test("an empty window counts in the kills of an item that did drop", () => {

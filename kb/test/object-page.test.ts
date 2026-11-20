@@ -29,7 +29,7 @@ test("an object page: public drops with windows, items and installs, agreed item
     [2835, 4, 1, 3, null],
   ]);
   expect(vein.zero).toBeNull();
-  expect(objectPage(1618, facts)).toMatchObject({ drops: [], zero: null, queued: true });
+  expect(objectPage(1618, facts)).toMatchObject({ drops: [expect.objectContaining({ reporters: 2 })], zero: null, queued: false });
   expect(objectPage(2843, facts)).toMatchObject({ drops: [], zero: { kills: 3, reporters: 3 } });
   expect(objectPage(999, facts)).toMatchObject({ drops: [], zero: null, queued: false });
 });
@@ -48,7 +48,7 @@ test("the object answer says what is known and what is not", () => {
   expect(text).toContain("Item 2770 Copper Ore  4 observed loot windows  2 windows with this item  50.0%  3 distinct install reports");
   expect(text.split("\n").slice(0, 2)).toEqual(["Object 1731", "No agreed name yet. A name needs 3 installs reporting the same one."]);
   expect(handleObjectPage({ objectId: 2843 }, facts)).toContain("0 items in 3 observed loot windows");
-  expect(handleObjectPage({ objectId: 1618 }, facts)).toContain("Loot observations unrecorded");
+  expect(handleObjectPage({ objectId: 1618 }, facts)).toContain("2 distinct install reports");
   expect(handleObjectPage({ objectId: 0 }, facts)).toBe("Name an object id.");
 });
 

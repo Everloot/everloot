@@ -5,16 +5,19 @@ import { describe } from "@kb/item-taxonomy";
 import { objectList } from "@kb/object-page";
 import { achievementHref, chainHref, factionHref, loadCatalog, titleDisplayName, titleHref } from "./completion-lists";
 import { CLIENT_TAXONOMY } from "./items";
-import { allTerms, type SearchHit } from "@kb/search";
+import type { SearchHit } from "@kb/search";
 import { classLabel } from "./class-context";
 import { CLASSES } from "@/design/tokens";
 import { instanceHref, instanceRows, instanceTitle, levelLabel, type InstanceRow } from "./instances";
 import { laterExpansionPages, loreSlug, MAX_QUERY, searchLore, searchLoreSomeWords, UNAVAILABLE } from "./lore";
+import { byPhrase, byTypo, byWords, rank, respelling, type Match } from "./name-match";
 import { loadNames, type Names } from "./names";
 import { loadObjectFacts } from "./objects";
 import { loadWiki, publishedPages, wikiHref } from "./wiki";
 import { WORLD_MAP } from "./world-map";
 import { zoneHref } from "./zones";
+
+export { byTypo, editDistance } from "./name-match";
 
 /**
  * One page the search found. `exact` is an exact id or an exact name: those lead their group, and the page.
@@ -46,114 +49,6 @@ export const PAGED_SCOPES = ["achievement", "faction", "title", "chain", "zone",
 export type ResultScope = Scope | (typeof PAGED_SCOPES)[number];
 export const isPagedScope = (v: unknown): v is (typeof PAGED_SCOPES)[number] => (PAGED_SCOPES as readonly unknown[]).includes(v);
 export const isResultScope = (v: unknown): v is ResultScope => isScope(v) || isPagedScope(v);
-/** 0 exact, 1 starts with, 2 contains, null no match; both sides lowercase. */
-function phraseRank(name: string, q: string): number | null {
-  if (name === q) return 0;
-  if (name.startsWith(q)) return 1;
-  return name.includes(q) ? 2 : null;
-}
-
-/** Whether `word` starts a word of `name`: at its start or after a character that is not a letter or digit. */
-function atWordStart(name: string, word: string): boolean {
-  for (let i = name.indexOf(word); i !== -1; i = name.indexOf(word, i + 1)) if (i === 0 || !/[\p{L}\p{N}]/u.test(name[i - 1]!)) return true;
-  return false;
-}
-
-/**
- * As `phraseRank`, then the words in any order ("cloth linen"): 3 when each word starts a word of the name, 4 when
- * each is somewhere in it. A one-word query ranks exactly as `phraseRank`.
- */
-function rank(name: string, q: string, words: readonly string[] = q.split(/\s+/)): number | null {
-  const r = phraseRank(name, q);
-  if (r !== null) return r;
-  if (words.length < 2 || !words.every((w) => name.includes(w))) return null;
-  return words.every((w) => atWordStart(name, w)) ? 3 : 4;
-}
-
-/** How a list asks whether a lowercase name matches: its rank, lowest best, or null. */
-type Match = (name: string) => number | null;
-const byWords = (q: string): Match => { const words = q.split(/\s+/); return (n) => rank(n, q, words); };
-const byPhrase = (q: string): Match => (n) => phraseRank(n, q);
-
-/** Typo tolerance needs this many letters in a word: shorter words must be typed right. */
-const TYPO_MIN = 4;
-/** The edits a typed word may be from a word of the name: one, two from 8 letters. */
-const typoEdits = (word: string) => (word.length < TYPO_MIN ? 0 : word.length >= 8 ? 2 : 1);
-
-/**
- * Edits between two words, a swap of neighbouring letters counting as one (optimal string alignment), or
- * `max + 1` as soon as it is certain to be more than `max`.
- */
-export function editDistance(a: string, b: string, max: number): number {
-  if (Math.abs(a.length - b.length) > max) return max + 1;
-  let before: number[] = [];
-  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
-  let prevLow = 0;
-  for (let i = 1; i <= a.length; i++) {
-    const cur = [i];
-    let low = i;
-    for (let j = 1; j <= b.length; j++) {
-      let v = Math.min(prev[j]! + 1, cur[j - 1]! + 1, prev[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
-      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, before[j - 2]! + 1);
-      cur[j] = v;
-      if (v < low) low = v;
-    }
-    // A swap reaches back two rows, so only two rows past `max` in a row rule a match out.
-    if (low > max && prevLow > max) return max + 1;
-    before = prev;
-    prev = cur;
-    prevLow = low;
-  }
-  return Math.min(prev[b.length]!, max + 1);
-}
-
-/**
- * The fallback when nothing matches the words as typed ("lnen clth", "hoger"): every typed word is in the name, or
- * within `typoEdits` of one of its words. Ranks 5 plus the edits, so it never ties a match `byWords` finds. A word is
- * only measured when its length is within the allowed edits of the typed one (each edit changes the length by at most
- * one, so this drops no match), and each distinct word once per query. Null when no typed word is long enough.
- */
-export function byTypo(q: string): Match | null {
-  const typed = q.split(/\s+/);
-  if (!typed.some((t) => typoEdits(t) > 0)) return null;
-  const seen = typed.map(() => new Map<string, number>());
-  return (n) => {
-    let edits = 0;
-    for (const [i, t] of typed.entries()) {
-      if (n.includes(t)) continue;
-      const k = typoEdits(t);
-      if (!k) return null;
-      // The name's words as allTerms splits them, scanned in place: this runs on every name of a list.
-      let best = k + 1;
-      for (let start = 0, end = 0; start < n.length; start = end + 1) {
-        end = start;
-        while (end < n.length && wordChar(n.charCodeAt(end))) end++;
-        if (Math.abs(end - start - t.length) > k) continue;
-        const w = n.slice(start, end);
-        let d = seen[i]!.get(w);
-        if (d === undefined) seen[i]!.set(w, (d = editDistance(t, w, k)));
-        if (d < best) best = d;
-      }
-      if (best > k) return null;
-      edits += best;
-    }
-    return 5 + edits;
-  };
-}
-
-/** A letter or digit in a lowercase name: a to z, 0 to 9, or past ASCII (accented letters). */
-const wordChar = (c: number) => (c >= 97 && c <= 122) || (c >= 48 && c <= 57) || c > 127;
-
-/** The query as a name the fallback matched spells it: each mistyped word becomes that name's nearest word. */
-function respelling(q: string, name: string): string {
-  const words = allTerms(name).split(" ");
-  return q.split(/\s+/).map((t) => {
-    if (name.toLowerCase().includes(t)) return t;
-    let best = t, edits = typoEdits(t) + 1;
-    for (const w of words) { const d = editDistance(t, w, typoEdits(t)); if (d < edits) { best = w; edits = d; } }
-    return best;
-  }).join(" ");
-}
 
 /** Every match of `entries`, best first (exact name, then prefix, then contains, then alphabetical). */
 function byName<T extends { name: string }>(entries: Iterable<T>, match: Match): { entry: T; exact: boolean; r: number }[] {
@@ -255,18 +150,29 @@ function objectRows(facts: ObjectFacts, names: Map<number, string>): { ids: Set<
   if (!byZeros) { byZeros = new WeakMap(); publicObjects.set(facts.rates, byZeros); }
   let ids = byZeros.get(facts.measuredZeros);
   if (!ids) { ids = new Set(objectList(facts).map((o) => o.objectId)); byZeros.set(facts.measuredZeros, ids); }
+  return { ids, rows: objectRowsOf(ids, names) };
+}
+
+/** The named objects among `ids`, in name order, built once per id set and names version. */
+function objectRowsOf(ids: Set<number>, names: Map<number, string>): NamedRow[] {
   let byIds = namedObjects.get(names);
   if (!byIds) { byIds = new WeakMap(); namedObjects.set(names, byIds); }
   let rows = byIds.get(ids);
-  if (!rows) { const kept = ids; rows = sortedNames(names).filter((row) => kept.has(row.id)); byIds.set(ids, rows); }
-  return { ids, rows };
+  if (!rows) { rows = sortedNames(names).filter((row) => ids.has(row.id)); byIds.set(ids, rows); }
+  return rows;
 }
 
-/** Names and ids from the same public object list as /database/objects; unavailable facts yield no hits. */
-async function objectHits(match: Match, id: number | null, names: Map<number, string>, read: Promise<ObjectFacts> = loadObjectFacts()): Promise<(SearchResult & { r: number })[]> {
-  const facts = await read;
-  if (facts.unreachable) return [];
-  const { ids, rows } = objectRows(facts, names);
+/**
+ * Names and ids from the same public object list as /database/objects: the list's ids when the caller holds them (the
+ * stored search names file), else from the object facts; unavailable facts yield no hits.
+ */
+async function objectHits(match: Match, id: number | null, names: Map<number, string>, read: Promise<ObjectFacts> | Set<number> = loadObjectFacts()): Promise<(SearchResult & { r: number })[]> {
+  let ids: Set<number>, rows: NamedRow[];
+  if (read instanceof Set) { ids = read; rows = objectRowsOf(ids, names); } else {
+    const facts = await read;
+    if (facts.unreachable) return [];
+    ({ ids, rows } = objectRows(facts, names));
+  }
   const out: (SearchResult & { r: number })[] = [];
   if (id !== null && ids.has(id)) out.push({ label: names.get(id) ?? `Object ${id}`, href: entityHref("object", id), note: `id ${id}`, exact: true, id, r: -1 });
   for (const { entry, exact, r } of bySortedName(rows, match)) if (entry.id !== id) out.push({ label: entry.name, href: entityHref("object", entry.id), note: `id ${entry.id}`, exact, id: entry.id, r });
@@ -287,8 +193,10 @@ async function loreHits(text: string): Promise<{ hits: SearchHit[]; some: Search
  * `names` when a page passes the ones it shows (never the API's caller); zones are the released ones on the map,
  * lore comes from the archive, tools from the tool list. A group with an exact id or name match comes first; an
  * empty group is left out. `only` keeps one result type; `limit` is the rows per group. Paged scopes clamp the page to the last match and return at most 50 rows.
+ * `objects` is the ids /database/objects lists when the caller already holds them (the stored search names file): the
+ * object group then reads no facts.
  */
-export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page = 1, names: given }: { only?: ResultScope; limit?: number; page?: number; names?: Names | Promise<Names> } = {}): Promise<SearchGroup[]> {
+export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page = 1, names: given, objects }: { only?: ResultScope; limit?: number; page?: number; names?: Names | Promise<Names>; objects?: Set<number> | Promise<Set<number> | undefined> } = {}): Promise<SearchGroup[]> {
   const text = raw.trim().slice(0, MAX_QUERY);
   const q = text.toLowerCase();
   if (!q) return [];
@@ -300,10 +208,12 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
   if (paged) limit = Number.isFinite(limit) ? Math.max(1, Math.min(50, Math.floor(limit))) : 50;
   // No read depends on another, so they all start now. Item, NPC, quest and object scopes do not need the completion
   // catalogue; only the unscoped page asks the lore archive.
-  const objectsRead = want("object") ? loadObjectFacts() : null;
+  // The object ids the caller holds, else the facts, both started now; a caller's promise that settles to no ids
+  // (the aggregate path) reads the facts once the names are in, which that path has loaded by then.
+  const objectsRead: Promise<ObjectFacts> | Promise<Set<number> | undefined> | Set<number> | null = want("object") ? (objects === undefined ? loadObjectFacts() : objects) : null;
   const loreRead = only ? null : loreHits(text);
   // A failed name read rejects the search before these are awaited; their own failure must not go unhandled then.
-  objectsRead?.catch(() => {});
+  if (objectsRead instanceof Promise) objectsRead.catch(() => {});
   loreRead?.catch(() => {});
   const [names, catalog] = await Promise.all([given ?? loadNames(), only && !paged ? null : loadCatalog()]);
   // The things a player meets in the game, by every typed word in any order; when none matches and no id was typed, by
@@ -311,7 +221,10 @@ export async function siteSearch(raw: string, { only, limit = GROUP_LIMIT, page 
   const game = async (match: Match) => {
     const hits = new Map<SearchType, (SearchResult & { r: number })[]>();
     for (const kind of ["item", "npc", "quest"] as const) if (want(kind)) hits.set(kind, agreed(kind, names[`${kind}s`], match, id).results);
-    if (objectsRead) hits.set("object", await objectHits(match, id, names.objects, objectsRead));
+    if (objectsRead) {
+      const held = await objectsRead;
+      hits.set("object", await objectHits(match, id, names.objects, held instanceof Set ? held : held === undefined ? loadObjectFacts() : Promise.resolve(held)));
+    }
     if (!only || paged) {
       if (want("zone")) hits.set("zone", zoneHits(match).map(({ label, href, exact, r }) => ({ label, href, note: "zone", exact, r })));
       if (want("instance")) hits.set("instance", instanceHits(match));
@@ -451,9 +364,9 @@ export const SUGGEST_LIMIT = 8;
  * and raids (or one of the first four). Names only where players agree on them, as on /search; instances from the
  * same rows as /search; no lore or tools, so it stays cheap per keystroke. `tolerant` (the site's own boxes) also
  * matches the words in any order and, when nothing matches and no id was typed, within a typo or two, as /search
- * does; without it (/api/suggest) the text matches as one phrase, as it always has.
+ * does; without it (/api/suggest) the text matches as one phrase, as it always has. `objects` as for siteSearch.
  */
-export async function suggest(raw: string, scope?: Scope, names?: Names, { tolerant = false }: { tolerant?: boolean } = {}): Promise<Suggestion[]> {
+export async function suggest(raw: string, scope?: Scope, names?: Names, { tolerant = false, objects }: { tolerant?: boolean; objects?: Set<number> } = {}): Promise<Suggestion[]> {
   const q = raw.trim().slice(0, MAX_QUERY).toLowerCase();
   if (!q) return [];
   const id = exactId(q);
@@ -463,7 +376,7 @@ export async function suggest(raw: string, scope?: Scope, names?: Names, { toler
     const ranked: { s: Suggestion; r: number; t: number }[] = [];
     for (const [t, type] of order.entries()) {
       if (type === "object") {
-        for (const o of (await objectHits(match, id, all.objects)).slice(0, SUGGEST_LIMIT)) ranked.push({ s: { type, id: o.id!, label: o.label, href: o.href }, r: o.r, t });
+        for (const o of (await objectHits(match, id, all.objects, objects)).slice(0, SUGGEST_LIMIT)) ranked.push({ s: { type, id: o.id!, label: o.label, href: o.href }, r: o.r, t });
         continue;
       }
       for (const x of agreed(type, all[`${type}s`], match, id).results.slice(0, SUGGEST_LIMIT)) {

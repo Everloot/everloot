@@ -1,12 +1,12 @@
 /**
  * Game objects (chests, herbs, ore veins, fishing pools) from loot windows players opened on them. The
- * addon records the object's entry id from its GUID (`sourceObjectId`). A frequency is public after 3
- * install reports, as for NPCs. A name is public when 3 installs agree on it; the client's GameObjects table
+ * addon records the object's entry id from its GUID (`sourceObjectId`). A frequency shows from one
+ * install report, with its tier, as for NPCs. A name is public when 3 installs agree on it; the client's GameObjects table
  * holds no lootable objects, so an object without an agreed name is known by its id. Where players saw the object
  * on the minimap is a pin at 3 installs (object-spawns.ts), and loot windows the rates leave out are only counted
  * (pending-loot.ts).
  */
-import { itemFactsFromRecords, lootWindowsFromRecords, recheckLootRecords, rollupDrops, type PublicDropRate, type ItemNameRow, type MeasuredZero } from "./drop-rollup.js";
+import { dropTierLabel, itemFactsFromRecords, lootWindowsFromRecords, recheckLootRecords, rollupDrops, type PublicDropRate, type ItemNameRow, type MeasuredZero } from "./drop-rollup.js";
 import type { RecheckScope } from "./coverage.js";
 import { formatMeasuredZero, itemPage } from "./item-page.js";
 import { agreedObjectNames, objectSightingRowsFromRecords, objectSpawns, type ObjectSpawnRow } from "./object-spawns.js";
@@ -44,10 +44,10 @@ export function objectPage(objectId: number, facts: ObjectFacts): ObjectPage {
   const mine = facts.rates.filter((r) => r.sourceObjectId === objectId);
   const zeros = facts.measuredZeros.filter((z) => z.sourceObjectId === objectId);
   const nameOf = (itemId: number) => itemPage(itemId, { rates: [], names: facts.names, npcs: [] }).name;
-  const drops = mine.filter((r) => r.public)
+  const drops = mine.filter((r) => r.reporters > 0)
     .map((r) => ({ itemId: r.itemId, itemName: nameOf(r.itemId), kills: r.kills, drops: r.drops, rate: r.rate, reporters: r.reporters }))
     .sort((a, b) => b.rate - a.rate || a.itemId - b.itemId);
-  const zero = zeros.find((z) => z.public);
+  const zero = zeros.find((z) => z.reporters > 0);
   const pendingLoot = pendingForObject(facts.pending, objectId);
   const pins = objectSpawns((facts.sightings ?? []).filter((r) => r.objectId === objectId), [], undefined, facts.recheck ?? []).pins.map(({ mapId, x, y, reporters }) => ({ mapId, x, y, reporters }));
   return {
@@ -78,13 +78,13 @@ export function formatObjectPage(page: ObjectPage): string {
   const lines = [page.name ? `Object ${page.objectId} — ${page.name}` : `Object ${page.objectId}`];
   if (!page.name) lines.push("No agreed name yet. A name needs 3 installs reporting the same one.");
   if (page.zero) {
-    lines.push(`${formatMeasuredZero(page.zero.kills)}  ${page.zero.reporters} reporters`);
+    lines.push(`${formatMeasuredZero(page.zero.kills)}  ${page.zero.reporters} reporters  ${dropTierLabel(page.zero.reporters)}`);
   } else if (!page.drops.length) {
-    lines.push("Loot observations unrecorded. Public frequencies need source observations from 3 install IDs.");
+    lines.push("Loot observations unrecorded. Frequencies need a source observation from one install.");
   } else {
     lines.push("Drops");
     for (const d of page.drops) {
-      lines.push(`Item ${d.itemId}${d.itemName ? ` ${d.itemName}` : ""}  ${d.kills} observed loot windows  ${d.drops} windows with this item  ${(d.rate * 100).toFixed(1)}%  ${d.reporters} distinct install reports`);
+      lines.push(`Item ${d.itemId}${d.itemName ? ` ${d.itemName}` : ""}  ${d.kills} observed loot windows  ${d.drops} windows with this item  ${(d.rate * 100).toFixed(1)}%  ${d.reporters} distinct install reports  ${dropTierLabel(d.reporters)}`);
     }
   }
   if (page.pendingLoot) lines.push(pendingLine(page.pendingLoot));

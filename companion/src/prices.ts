@@ -77,13 +77,14 @@ export function housesFor(realm: string, neutral: ReadonlySet<string>): House[] 
 const copper = (n: unknown): n is number => Number.isSafeInteger(n) && (n as number) >= 0;
 
 function priceRow(raw: unknown): PriceRow | null {
-  if (!Array.isArray(raw) || raw.length !== 7) return null;
+  // The site only ever appends positions (updatedAt, ageDays, change1d, ...); the file carries the first seven.
+  if (!Array.isArray(raw) || raw.length < 7) return null;
   const [itemId, market, min, historical, quantity, day, reporters] = raw as unknown[];
   if (!Number.isSafeInteger(itemId) || (itemId as number) < 1) return null;
   if (market !== null && !copper(market)) return null;
   if (![min, historical, quantity, reporters].every(copper)) return null;
   if (typeof day !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
-  return raw as PriceRow;
+  return [itemId, market, min, historical, quantity, day, reporters] as PriceRow;
 }
 
 /**
@@ -105,8 +106,8 @@ export async function fetchRealmPrices(endpoint: string, realm: string, house: H
   };
 }
 
-/** [itemId, "n" (NPC) | "o" (object), sourceId, drops, loot windows, installs]: one public drop rate. */
-export type DropRow = [number, "n" | "o", number, number, number, number];
+/** [itemId, "n" (NPC) | "o" (object), sourceId, drops, loot windows, installs, tier]: one public drop rate. */
+export type DropRow = [number, "n" | "o", number, number, number, number, ("reported" | "verified" | "confirmed")?];
 /**
  * The public drop rates in the file: when the site's uploads were current, and when the app fetched them. `names`
  * holds the sources' names the site knows, keyed "n<npcId>" or "o<objectId>".

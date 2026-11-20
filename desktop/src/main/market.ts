@@ -176,8 +176,8 @@ export function readDisenchantBlock(addonsDir: string): DisenchantSources | null
 }
 
 /**
- * The public drop rates from `GET /api/rollups/drops`, following `next` on the same site. Only rates three installs
- * looted (the site sends no others; a row under 3 is dropped here too) with one NPC or object source and at least
+ * The tiered drop rates from `GET /api/rollups/drops`, following `next` on the same site. Rates need at least
+ * one reporter, one NPC or object source and at least
  * one loot window. Measured zeros name no item and are not carried. A failed or unreachable answer throws.
  */
 export async function fetchDropSources(endpoint: string, send: typeof fetch = fetch, now = new Date()): Promise<DropSources> {
@@ -197,8 +197,9 @@ export async function fetchDropSources(endpoint: string, send: typeof fetch = fe
       const kind = count(npc) && npc > 0 && object === undefined ? "n" : count(object) && object > 0 && npc === undefined ? "o" : null;
       const source = (kind === "n" ? npc : object) as number;
       if (!kind || !count(raw.itemId) || raw.itemId < 1 || !count(raw.drops) || !count(raw.kills) || !count(raw.reporters)) continue;
-      if (raw.kills < 1 || raw.drops > raw.kills || raw.reporters < 3) continue;
-      rows.push([raw.itemId, kind, source, raw.drops, raw.kills, raw.reporters]);
+      if (raw.kills < 1 || raw.drops > raw.kills || raw.reporters < 1) continue;
+      const tier = raw.reporters >= 3 ? "confirmed" : raw.reporters === 2 ? "verified" : "reported";
+      rows.push([raw.itemId, kind, source, raw.drops, raw.kills, raw.reporters, tier]);
       // The name the site knows for the source, so a tooltip can name one the player never met.
       if (typeof raw.sourceName === "string" && raw.sourceName.trim()) names[`${kind}${source}`] = raw.sourceName;
     }
@@ -222,8 +223,9 @@ export function readDropsBlock(addonsDir: string): DropSources | null {
   const m = /\["drops"\] = \{ \["data"\] = "([\w,;]*)", \["sum"\] = \d+, \["dataAsOf"\] = "([^"\\]*)", \["fetchedAt"\] = "([^"\\]*)"(?:, \["names"\] = "((?:[^"\\]|\\.)*)")? \}/.exec(text);
   if (!m) return null;
   const rows = m[1] ? m[1].split(";").map((r) => {
-    const [item, kind, source, drops, kills, reporters] = r.split(",");
-    return [Number(item), kind as "n" | "o", Number(source), Number(drops), Number(kills), Number(reporters)] as DropRow;
+    const [item, kind, source, drops, kills, reporters, tier] = r.split(",");
+    return [Number(item), kind as "n" | "o", Number(source), Number(drops), Number(kills), Number(reporters),
+      ...(tier === "reported" || tier === "verified" || tier === "confirmed" ? [tier] : [])] as DropRow;
   }) : [];
   const names: Record<string, string> = {};
   for (const line of m[4] ? luaText(m[4]).split("\n") : []) {

@@ -524,12 +524,15 @@ describe("the guide index", () => {
   const listed = (html: string) => [...dom(html).querySelectorAll("[data-guide]")].map((li) => li.getAttribute("data-guide"));
 
   test("lists the published guides by class with the state of any that is not current, never a draft; an empty index says so and stays out of search", async () => {
+    // The shared empty state (guides-empty.test.tsx holds its words), with the class pages linked from here.
     const empty = await index();
-    expect(visible(empty)).toContain("No guide is reviewed yet.");
+    expect(dom(empty).querySelector("[data-guides-empty]")?.textContent).toContain("No guide is reviewed yet.");
+    expect(dom(empty).querySelector('[data-guides-empty] a[href="/classes"]')).not.toBeNull();
     expect((await indexMetadata()).robots).toEqual({ index: false, follow: true });
 
     stubGuides(SOME);
     const html = await index();
+    expect(dom(html).querySelector("[data-guides-empty]")).toBeNull();
     expect(listed(html)).toEqual(["warrior-tanking", "frost-leveling", "arcane-dungeons"]);
     for (const hidden of HIDDEN) expect(html, hidden).not.toContain(hidden);
     expect(html).toContain('href="/guides/frost-leveling"');

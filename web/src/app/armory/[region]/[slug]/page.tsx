@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { trailFor } from "@/lib/breadcrumbs";
 import { cache } from "react";
-import { Card, Container, Facts, PageHeader, SectionHeading, type Fact } from "@/components/ui";
+import { Card, Container, Facts, PageHeader, SectionHeading, Tabs, type Fact } from "@/components/ui";
 import ShowcaseSections from "@/components/showcase/ShowcaseSections";
 import { FOOTER_LINE } from "@/lib/character-showcase";
 import { playerPagesOn } from "@/lib/player-pages";
@@ -15,7 +15,9 @@ import { armoryStore, type ArmoryCharacter, type ArmoryRank } from "@/lib/armory
 import { loadItemTips, loadSiteAssets, unknownItemIcon } from "@/lib/game-assets";
 import { loadCatalog } from "@/lib/completion-lists";
 import { publicArmoryLink } from "@/lib/armory-links";
-import { Equipment, ProfileDetailsView, readTimes } from "../../profile";
+import { readTimes } from "../../profile";
+import { characterTabs } from "../../character-tabs";
+import { loadCharacterProgression } from "@/lib/progression";
 import Portrait from "../../portrait";
 import { addonProfile } from "../../addon-profile";
 import { classText } from "@/app/players/player-view";
@@ -95,13 +97,15 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
     storage: "We could not queue a refresh. Try again in a moment.",
   };
   const lastLogin = day(c.lastLogin);
+  const lastRead = newest(readTimes(c));
+  // The honorable-kills rank sits with the kills in the PvP tab; the gear ranks stay with the numbers above the tabs.
+  const pvpRanks = rankFacts(c, ranks.filter((r) => r.metric === "honorable_kills"));
+  const progression = await loadCharacterProgression(c.region, c.slug);
   const facts: Fact[] = [
     ...(c.itemLevel !== null ? [{ label: "Item level", value: metricValue("item-level", c.itemLevel), numeric: true }] : []),
     ...(c.averageItemLevel !== null ? [{ label: "Average item level", value: c.averageItemLevel, numeric: true }] : []),
     ...(c.gearScore !== null ? [{ label: "Gear Score", value: metricValue("gear-score", c.gearScore), numeric: true }] : []),
-    ...(c.honorableKills !== null ? [{ label: "Honorable kills", value: metricValue("honorable-kills", c.honorableKills), numeric: true }] : []),
-    ...(c.pvpRank !== null ? [{ label: "PvP rank", value: c.pvpRank, numeric: true }] : []),
-    ...rankFacts(c, ranks),
+    ...rankFacts(c, ranks.filter((r) => r.metric !== "honorable_kills")),
   ];
 
   return (
@@ -118,6 +122,7 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
               {c.faction} · {regionLabel(c.region)} {c.ruleset}
               {c.guildName && <> · {c.guildSlug ? <Link href={armoryGuildPath(c.region, c.guildSlug)} className={link}>{c.guildName}</Link> : c.guildName}</>}
               {lastLogin && <> · Last login <span className="font-mono tabular-nums">{lastLogin}</span></>}
+              {lastRead && <> · Last read <time dateTime={lastRead} className="font-mono tabular-nums">{day(lastRead)}</time></>}
             </span>
           }
         />
@@ -129,14 +134,13 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
           {playerPagesOn() && c.addonSeen && Date.now() - Date.parse(c.addonSeen) < 30 * 86_400_000 && <span className="text-meta text-muted">Seen in addon uploads {c.addonSeen}</span>}
           <form action={`${path}/refresh`} method="post"><button type="submit" className="btn btn-secondary min-h-11">Update character</button></form>
           <a href={`https://worldofwarcraft.blizzard.com/forever/${c.region}/armory/character/${encodeURIComponent(c.slug)}`} className={link}>View Blizzard armory</a>
-          <ArmoryCredit at={newest(readTimes(c))} />
+          <ArmoryCredit at={lastRead} />
         </div>
         {refresh && refreshMessages[refresh] && <p role="status" className="text-sm text-fg-2">{refreshMessages[refresh]}</p>}
 
         {facts.length > 0 && <Facts label="Numbers" items={facts} />}
 
-        <Equipment character={c} tips={tips} unknownIcon={assets ? unknownItemIcon(assets.base) : null} />
-        <div className="grid items-start gap-10 lg:grid-cols-2"><ProfileDetailsView character={c} categories={categories} /></div>
+        <Tabs label={`${fullName}: character sheet`} tabs={characterTabs(c, { tips, unknownIcon: assets ? unknownItemIcon(assets.base) : null, categories, pvpFacts: pvpRanks, progression })} />
 
         {addon && <section aria-labelledby="armory-addon" className="space-y-6 border-t border-line pt-8">
           <SectionHeading id="armory-addon">Shared through the Everloot addon</SectionHeading>

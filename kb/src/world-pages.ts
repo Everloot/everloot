@@ -6,12 +6,14 @@
  * No copied catalog.
  */
 import type { RecheckScope } from "./coverage.js";
+import { dropTier, type DropTier } from "./drop-rollup.js";
 import { pendingForNpc, pendingLine, pendingLootFromRecords, type PendingCount, type PendingLoot } from "./pending-loot.js";
 import { recheckRows, tallyVotes, WORLD_AGREEMENT } from "./fact-states.js";
 import { normName } from "./name-normalization.js";
 import { npcZones, scopeSince, type ScopedFact } from "./recheck-scopes.js";
 
 export { WORLD_AGREEMENT } from "./fact-states.js";
+export type DropSourceName = { name: string; tier: DropTier };
 
 /** How the NPC stood toward the player who saw it, as the addon records it. */
 export type NpcReaction = "friendly" | "neutral" | "hostile";
@@ -122,21 +124,32 @@ function agreedLabel(rows: (Timed & { label: string })[], since?: string | null)
 
 /**
  * `agreedLabel` for many ids in one pass: id -> the label 3 installs agree on, ids without one left out. `sinceOf`
- * gives an id's recheck cut-off.
+ * gives an id's recheck cut-off. Drop names require unanimous counted reports from one install upward.
  */
-export function agreedLabelsById(rows: (Timed & { id: number; label: string })[], sinceOf?: (id: number) => string | null): Map<number, string> {
+export function agreedLabelsById(rows: (Timed & { id: number; label: string })[], sinceOf: ((id: number) => string | null) | undefined, publicDrops: true): Map<number, DropSourceName>;
+export function agreedLabelsById(rows: (Timed & { id: number; label: string })[], sinceOf?: (id: number) => string | null, publicDrops?: false): Map<number, string>;
+export function agreedLabelsById(rows: (Timed & { id: number; label: string })[], sinceOf?: (id: number) => string | null, publicDrops = false): Map<number, string> | Map<number, DropSourceName> {
   const byId = new Map<number, (Timed & { label: string })[]>();
   for (const row of rows) {
     const list = byId.get(row.id) ?? [];
     list.push(row);
     byId.set(row.id, list);
   }
-  const out = new Map<number, string>();
+  const out = new Map<number, string | DropSourceName>();
   for (const [id, list] of byId) {
-    const label = agreedLabel(list, sinceOf?.(id));
-    if (label) out.set(id, label);
+    const since = sinceOf?.(id);
+    if (publicDrops) {
+      const named = recheckRows(list, since, { value: (r) => r.label }).rows.filter((r) => r.installId.trim() && r.label.trim());
+      const names = new Set(named.map((r) => r.label));
+      const reporters = new Set(named.map((r) => r.installId.trim())).size;
+      if (names.size === 1 && reporters > 0) out.set(id, { name: named[0]!.label, tier: dropTier(reporters) });
+    } else {
+      const label = agreedLabel(list, since);
+      if (label) out.set(id, label);
+    }
   }
-  return out;
+  // Confirmed source names precede partial names without exposing their reporters.
+  return new Map([...out].sort((a, b) => Number(typeof b[1] === "object" && b[1].tier === "confirmed") - Number(typeof a[1] === "object" && a[1].tier === "confirmed"))) as Map<number, string> | Map<number, DropSourceName>;
 }
 
 function groupRows<T, K>(rows: readonly T[], key: (r: T) => K): Map<K, T[]> {
@@ -189,15 +202,18 @@ export function questScope(questId: number, rows: readonly QuestSighting[], zone
   return { types: ["quests"], zones: [lead("giverNpcId") ?? lead("turnInNpcId")], ids: [questId, ...rewards] };
 }
 
-/** Every NPC with an agreed name, by id: the names `npcPage` gives, in one pass over the sightings. */
-export function agreedNpcNames(facts: Pick<WorldFacts, "npcs"> & Pick<Partial<WorldFacts>, "recheck">): Map<number, string> {
+/** Every NPC name in one pass; drop source names carry their own agreement tier. */
+export function agreedNpcNames(facts: Pick<WorldFacts, "npcs"> & Pick<Partial<WorldFacts>, "recheck">, publicDrops: true): Map<number, DropSourceName>;
+export function agreedNpcNames(facts: Pick<WorldFacts, "npcs"> & Pick<Partial<WorldFacts>, "recheck">, publicDrops?: false): Map<number, string>;
+export function agreedNpcNames(facts: Pick<WorldFacts, "npcs"> & Pick<Partial<WorldFacts>, "recheck">, publicDrops = false): Map<number, string> | Map<number, DropSourceName> {
   const scopes = facts.recheck ?? NO_SCOPES;
   let sinceOf: ((id: number) => string | null) | undefined;
   if (scopes.length) {
     const zones = zonesFor(facts.npcs), byId = groupRows(facts.npcs, (r) => r.npcId);
     sinceOf = (id) => scopeSince(scopes, npcScope(id, byId.get(id) ?? [], zones.get(id) ?? null).npc);
   }
-  return agreedLabelsById(facts.npcs.map((row) => ({ id: row.npcId, installId: row.installId, label: row.name, ...at(row) })), sinceOf);
+  const rows = facts.npcs.map((row) => ({ id: row.npcId, installId: row.installId, label: row.name, ...at(row) }));
+  return publicDrops ? agreedLabelsById(rows, sinceOf, true) : agreedLabelsById(rows, sinceOf);
 }
 
 /** Every quest with an agreed title, by id: the titles `questPage` gives, in one pass. Scopes by zone need the NPCs. */

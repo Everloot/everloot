@@ -124,6 +124,8 @@ test("a new knowledge release starts the knowledge version, and a feature switch
   expect(stamp(root, { vars: { ...VARS, EVERLOOT_PROFILES: "0" } }).template).not.toBe(before.template);
   expect(stamp(root, { vars: { ...VARS, EVERLOOT_NEW_SWITCH: "1" } }).template).not.toBe(before.template);
   expect(stamp(root, { env: { NEXT_PUBLIC_SITE_URL: "https://staging.example" } }).template).not.toBe(before.template);
+  // Which Worker runs the scheduled jobs changes no page.
+  expect(stamp(root, { vars: { ...VARS, EVERLOOT_CRON_WORKER: "1" } })).toEqual(before);
   // A secret in the environment is not a build input and is never part of a version.
   expect(stamp(root, { env: { CLOUDFLARE_API_TOKEN: "secret" } })).toEqual(before);
 });

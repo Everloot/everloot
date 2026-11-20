@@ -1,7 +1,7 @@
 import { CLIENT_EDGES, CLIENT_LAYER, CLIENT_SKILLS, CLIENT_TAXONOMY } from "@kb/client-layer-file";
 import { isDevelopmentItemName } from "@kb/dev-item-names";
 import { describe, filterItems, QUALITIES, slotOf, slugify, type ItemRow } from "@kb/item-taxonomy";
-import { PER_PAGE } from "@/app/database/list-parts";
+import { byRank, nameMatches, PER_PAGE } from "@/app/database/list-parts";
 
 export { CLIENT_LAYER, CLIENT_TAXONOMY };
 
@@ -274,12 +274,22 @@ export function matchesFacets(id: number, f: Pick<CategoryQuery, "crafted" | "re
   return true;
 }
 
-/** Rows of a category (`base`) that pass every filter, in the query's order. */
-export function listItems(base: readonly ItemRow[], q: CategoryQuery, ctx: ItemListContext = {}): ItemRow[] {
+/** The text of `q` as an id, or null. */
+const idOf = (text: string | undefined) => (text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null);
+
+/** The rows of `base` the query's text names (list-parts nameMatches), computed once for the list and its counts. */
+export function matchItemNames(base: readonly ItemRow[], q: CategoryQuery, ctx: ItemListContext = {}): ReturnType<typeof nameMatches<ItemRow>> {
   const text = q.q?.toLowerCase();
-  const id = text && /^#?\d+$/.test(text) ? Number(text.replace("#", "")) : null;
-  const rows = base.filter(([itemId, , , inv, quality]) => {
-    if (text && !(id !== null ? itemId === id : ctx.name?.(itemId)?.toLowerCase().includes(text))) return false;
+  return nameMatches(base, text, idOf(text), (row) => ctx.name?.(row[0]));
+}
+
+/** Rows of a category (`base`) that pass every filter, in the query's order: a text's best matches first unless a sort was asked for. */
+export function listItems(base: readonly ItemRow[], q: CategoryQuery, ctx: ItemListContext = {}, match = matchItemNames(base, q, ctx)): ItemRow[] {
+  const text = q.q?.toLowerCase();
+  const id = idOf(text);
+  const rows = base.filter((row) => {
+    const [itemId, , , inv, quality] = row;
+    if (text && !(id !== null ? itemId === id : match.ranked!.has(row))) return false;
     // A development leftover stays out unless asked for, or looked up by its id.
     if (!q.dev && id === null && isDevelopmentItemName(ctx.name?.(itemId))) return false;
     if (q.slot?.length && !q.slot.includes(slotOf(inv)?.slug ?? "")) return false;
@@ -293,7 +303,7 @@ export function listItems(base: readonly ItemRow[], q: CategoryQuery, ctx: ItemL
     if (q.bind && (!tip || BINDINGS.find((b) => b.slug === q.bind)?.value !== tip.binding)) return false;
     return matchesFacets(itemId, q);
   });
-  return sortItems(rows, q.sort, ctx);
+  return byRank(sortItems(rows, q.sort, ctx), match.ranked, Boolean(q.sort));
 }
 
 /**

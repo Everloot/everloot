@@ -8,6 +8,7 @@ import { classLabel, type ClassSlug } from "@/lib/class-context";
 import { classGuides, classesIndexable } from "@/lib/class-hub";
 import { pageMetadata } from "@/lib/seo";
 import { TALENT_CLASSES } from "@/lib/talents/catalogs";
+import GuidesEmpty from "../guides/GuidesEmpty";
 
 // Built once per deploy, and the build fails before it renders for a request: the guide counts are read from
 // kb/guides while the site builds, a folder no request can read.
@@ -51,7 +52,7 @@ export default function ClassesPage() {
       />
       <RememberedClass />
       <DataTable caption="WoW: Forever classes" columns={columns} rows={list} rowKey={(r) => r.slug} />
-      {list.every((r) => r.guides === 0) && <p className="mt-3 text-sm text-muted">No class guide is reviewed yet.</p>}
+      {list.every((r) => r.guides === 0) && <div className="mt-3"><GuidesEmpty /></div>}
     </Container>
   );
 }

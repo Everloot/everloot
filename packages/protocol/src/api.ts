@@ -77,23 +77,47 @@ export const marketRealmsResponse = z.object({
   attribution: attributionSchema,
 });
 
+/** The positions of one price row, as every reader is given them. */
 export const MARKET_PRICE_FIELDS = ["itemId", "market", "min", "historical", "quantity", "day", "reporters"] as const;
+/** The positions with `fields=full`: the seven, then when the scans were taken, the price age and the one-day change. Only ever appended to. */
+export const MARKET_PRICE_FIELDS_FULL = [...MARKET_PRICE_FIELDS, "updatedAt", "ageDays", "change1d"] as const;
 
-/** GET /api/market/prices?realm=: most-listed or explicitly selected public items, in `fields` order. */
+/**
+ * GET /api/market/prices?realm=: most-listed or explicitly selected public items, in `fields` order. Rows are seven
+ * wide; with `fields=full` in the request they are ten, and `fields` names all ten. Both shapes parse here, and
+ * every row is as wide as `fields`.
+ */
 export const marketPricesResponse = z.object({
   ok: z.literal(true),
   dataAsOf: ISO_TIME.nullable(),
   rule: z.string().describe("How a day becomes public and how the values are computed."),
-  fields: z.tuple([z.literal("itemId"), z.literal("market"), z.literal("min"), z.literal("historical"), z.literal("quantity"), z.literal("day"), z.literal("reporters")]),
+  fields: z.tuple([
+    z.literal("itemId"), z.literal("market"), z.literal("min"), z.literal("historical"), z.literal("quantity"), z.literal("day"), z.literal("reporters"),
+    z.literal("updatedAt").optional(), z.literal("ageDays").optional(), z.literal("change1d").optional(),
+  ]).describe("The row positions: seven, or ten when the request asked for fields=full."),
   realm: z.string().nullable(),
   house: z.enum(AUCTION_HOUSES).optional().describe("Present when the request named a house: the values come only from scans of that house."),
   items: z.array(z.tuple([
-    z.number().int().positive(), z.number().int().nonnegative(), z.number().int().nonnegative(), z.number().int().nonnegative(),
+    z.number().int().positive(), z.number().int().nonnegative().nullable(), z.number().int().nonnegative(), z.number().int().nonnegative(),
     z.number().int().nonnegative(), z.string(), z.number().int().nonnegative(),
-  ])).describe("[itemId, market, min, historical, quantity, day, reporters]; copper per unit."),
+    ISO_TIME.nullable().optional(), z.number().int().nonnegative().optional(), z.number().nullable().optional(),
+  ])).describe(
+    "[itemId, market, min, historical, quantity, day, reporters]; copper per unit. market is null for a thin item (no solid public day in the last 14). " +
+    "With fields=full three positions follow. updatedAt: when the scans behind the newest open public day were taken; null once only closed days remain. " +
+    "ageDays: calendar days since day. change1d: the newest solid day's market value against the solid day one calendar day before it, (to - from) / from; null without such a pair.",
+  ),
   attribution: attributionSchema,
-});
+}).refine(
+  (r) => (r.fields.length === 7 || r.fields.length === 10) && r.items.every((row) => row.length === r.fields.length),
+  { message: "fields names 7 or 10 positions and every row is as wide as fields" },
+);
 export type MarketPricesResponse = z.infer<typeof marketPricesResponse>;
+
+const dropTier = z.enum(["reported", "verified", "confirmed"]);
+const dropSourceName = {
+  sourceName: z.string().min(1).optional().describe("The source name when all counted name reports agree, from one install."),
+  sourceNameTier: dropTier.optional(),
+};
 
 const dropRate = z.object({
   sourceNpcId: z.number().int().positive().optional(),
@@ -106,8 +130,9 @@ const dropRate = z.object({
   rateHigh: z.number().min(0).max(1).nullable().optional().describe("Upper end of the descriptive 95% Wilson range for the observed window share, as a fraction from 0 to 1; null without windows."),
   settled: z.boolean().optional().describe("True at 50 or more windows from at least 5 installs when the Wilson half-width is no more than the larger of 0.03 and 30% of the observed share. Describes sample precision, not a confirmed kill chance."),
   reporters: z.number().int().nonnegative().describe("Distinct installs that looted the source."),
-  public: z.literal(true),
-  sourceName: z.string().min(1).optional().describe("The NPC's or object's name, once 3 installs agree on it; absent until then."),
+  public: z.boolean().describe("True only for confirmed rates, at three or more installs."),
+  tier: dropTier.optional(),
+  ...dropSourceName,
 });
 
 const measuredZero = z.object({
@@ -115,7 +140,9 @@ const measuredZero = z.object({
   sourceObjectId: z.number().int().positive().optional(),
   kills: z.number().int().nonnegative(),
   reporters: z.number().int().nonnegative(),
-  public: z.literal(true),
+  public: z.boolean(),
+  tier: dropTier.optional(),
+  ...dropSourceName,
 });
 
 /** GET /api/rollups/drops: corroborated drop rates, then sources looted with nothing in their windows. */
@@ -132,7 +159,7 @@ export const dropsResponse = z.object({
   unreachable: z.boolean().describe("True when storage could not be read: the lists are then empty, not zero."),
   rates: z.array(dropRate),
   measuredZeros: z.array(measuredZero),
-  queued: z.number().int().nonnegative().nullable().describe("Rates and zeros waiting for their third install; null when unreachable."),
+  queued: z.number().int().nonnegative().nullable().describe("Rates and zeros with zero reporters (normally zero); null when unreachable."),
   totalRates: z.number().int().nonnegative(),
   totalMeasuredZeros: z.number().int().nonnegative(),
   attribution: attributionSchema,
@@ -602,11 +629,12 @@ export const API_ROUTES: readonly ApiRoute[] = [
       { name: "realm", description: "Realm name. Omit it to list realms.", schema: { type: "string", minLength: 2, maxLength: 40 } },
       { name: "house", description: "Alliance, Horde or Neutral (any case). Needs realm. Without it, only scans that recorded no house are read.", schema: { type: "string", enum: ["alliance", "horde", "neutral"] } },
       { name: "items", description: "Comma-separated positive item IDs, at most 100 entries, with a realm. Selected before the row cap; unknown and non-public items are omitted. Repeated IDs are deduplicated; repeated items parameters are rejected.", schema: { type: "string", minLength: 1, maxLength: 1700, pattern: "^[1-9][0-9]*(,[1-9][0-9]*)*$", examples: ["2589,2592"] } },
+      { name: "fields", description: "`full` appends three positions to every row and to `fields`: updatedAt (when the scans behind the newest open public day were taken, or null once only closed days remain), ageDays and change1d (the one-day change of the market value, (to - from) / from, or null without a solid day and the solid day before it). Without it rows are the seven positions readers have always had.", schema: { type: "string", enum: ["full"] } },
     ],
     responses: {
       "200": { description: "Realms when `realm` is absent (marketRealmsResponse), prices when present.", schema: "marketPricesResponse" },
       ...ERROR_RESPONSES,
-      "400": { description: "Invalid realm, house or items. items requires a realm and one list of at most 100 positive safe-integer IDs.", schema: "apiError" },
+      "400": { description: "Invalid realm, house, items or fields. items requires a realm and one list of at most 100 positive safe-integer IDs; fields is `full` or absent.", schema: "apiError" },
     },
   },
   {

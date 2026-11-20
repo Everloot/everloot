@@ -1,5 +1,7 @@
 # Loot tables: what drops, from where, out of how many windows
 
+Drop-rate rule updated 2026-11-19: rates, measured zeros and unanimous drop source names now show from one install, labelled reported, verified at two, confirmed at three or more. This supersedes the drop publication thresholds described below; other thresholds stay unchanged. See [DATA_POLICY.md](../../DATA_POLICY.md).
+
 **Date:** 2026-10-21
 **Status:** design. Section 9 (the dense item-source and NPC loot tables) is built in the same pull request as
 this spec; everything else is a proposal for later slices.

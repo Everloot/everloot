@@ -81,6 +81,75 @@ test("a search result page always stays out of search engines; the bare search p
   vi.stubEnv("EVERLOOT_PLAYER_PAGES_INDEX", "1");
   expect(await searchMetadata({ searchParams: Promise.resolve({ q: "thr" }) })).toMatchObject({ robots: { index: false } });
   expect(await searchMetadata({ searchParams: Promise.resolve({}) })).toMatchObject({ robots: { index: true } });
+  for (const params of [{ class: "HUNTER" }, { page: "2" }, { sort: "level" }, { q: "" }]) {
+    expect(await searchMetadata({ searchParams: Promise.resolve(params) })).toMatchObject({ robots: { index: false } });
+  }
+});
+
+describe("player directory", () => {
+  beforeEach(() => { on(); vi.stubEnv("EVERLOOT_ARMORY", "1"); });
+  const page = async (params: Record<string, string | string[]> = {}) => {
+    const { default: Players } = await import("./page");
+    return renderToStaticMarkup(await Players({ searchParams: Promise.resolve(params) }));
+  };
+
+  test("without a name lists profiles by gear, with gear columns and hide forms", async () => {
+    armory.putCharacter(armoryCharacter());
+    armory.putCharacter(armoryCharacter({ slug: "arla-quill", name: "Arla", surname: "Quill", gearScore: 1 }));
+    const seen = vi.spyOn(holder.store!, "search");
+    const html = await page();
+    expect(html.indexOf('href="/armory/eu/velkara-duskmantle"')).toBeLessThan(html.indexOf('href="/armory/eu/arla-quill"'));
+    for (const text of ["2 Blizzard profiles", "Gear score", "Item level", "Last read", "61.2", "57.41", "/armory/hide?region=eu", "/players/opt-out", "Blizzard profile hide form"]) expect(html).toContain(text);
+    for (const name of ["q", "class", "race", "faction", "region", "ruleset", "min", "max", "guild", "sort"]) expect(html).toContain(`name="${name}"`);
+    expect(seen).not.toHaveBeenCalled();
+  });
+
+  test("parses filters for the store and keeps all of them in paging links", async () => {
+    const directory = vi.spyOn(armory, "directory").mockResolvedValue({ rows: [armoryCharacter()], total: 60 });
+    const html = await page({ q: ["Vel", "other"], class: "HUNTER", race: "Troll", faction: "Horde", region: "eu", ruleset: "2", min: "40", max: "60", guild: "Ember", sort: "item-level", page: "2" });
+    expect(directory).toHaveBeenCalledWith(expect.objectContaining({ prefix: "vel", class: "Hunter", race: "Troll", faction: "Horde", region: "eu", rulesetId: 2, minLevel: 40, maxLevel: 60, guildPrefix: "Ember", sort: "item_level", limit: 25, offset: 25 }));
+    expect(html).toContain("Previous");
+    expect(html).toContain("Next");
+    expect(html).toContain("60 Blizzard profiles");
+    expect(html).toContain("guild=Ember&amp;sort=item-level&amp;page=3");
+    expect(html).toContain("class=HUNTER&amp;race=Troll&amp;faction=Horde&amp;region=eu&amp;ruleset=2&amp;min=40&amp;max=60");
+    // Submitting filters resets the page because the form has no page control.
+    expect(html).not.toContain('name="page"');
+  });
+
+  test("pages 25 profiles at a time and a page beyond the end keeps Previous and total", async () => {
+    for (let i = 0; i < 26; i++) armory.putCharacter(armoryCharacter({ slug: `quill-${i}`, gearScore: i }));
+    const first = await page();
+    expect(first.match(/href="\/armory\/eu\/quill-/g)).toHaveLength(25);
+    expect(first).toContain("Next");
+    const last = await page({ page: "2" });
+    expect(last.match(/href="\/armory\/eu\/quill-/g)).toHaveLength(1);
+    expect(last).toContain("Previous");
+    expect(last).not.toContain(">Next<");
+    const past = await page({ page: "3" });
+    expect(past).toContain("26 Blizzard profiles");
+    expect(past).toContain("No profiles on this page");
+    expect(past).toContain("Previous");
+  });
+
+  test("one letter filters Blizzard profiles; no addon request until two letters", async () => {
+    armory.putCharacter(armoryCharacter());
+    const search = vi.spyOn(holder.store!, "search");
+    expect(await page({ q: "v" })).toContain('href="/armory/eu/velkara-duskmantle"');
+    expect(search).not.toHaveBeenCalled();
+  });
+
+  test("missing migration keeps name search, and storage failure is reported even with no name", async () => {
+    armory.putCharacter(armoryCharacter());
+    const directory = vi.spyOn(armory, "directory").mockResolvedValue(null);
+    const html = await page({ q: "vel" });
+    expect(html).toContain("once the database update is applied");
+    expect(html).toContain('href="/armory/eu/velkara-duskmantle"');
+    directory.mockRejectedValue(new Error("down"));
+    const down = await page();
+    expect(down).toContain(STORAGE_UNREACHABLE);
+    expect(down).not.toContain("once the database update is applied");
+  });
 });
 
 test("search finds a name prefix, links each result and offers to hide it", async () => {
@@ -94,6 +163,7 @@ test("search finds a name prefix, links each result and offers to hide it", asyn
   expect(html).toContain('role="search"');
   expect(html).toMatch(/text-class-shaman">Shaman</);
   expect(html).toContain("Night Watch");
+  expect(html.match(/<table /g)).toHaveLength(1);
 });
 
 test("a one-letter or malformed search never reaches the store", async () => {
@@ -151,7 +221,7 @@ describe("one list from the addon and the armory", () => {
     for (const q of ["dusk", "Velkara Duskmantle", " velkara  dusk "]) expect(await search(q)).toContain('href="/armory/eu/velkara-duskmantle"');
     armory.putCharacter(armoryCharacter({ slug: "élodie-brún", name: "Élodie", surname: "Brún" }));
     expect(await search("Élo")).toContain('href="/armory/eu/%C3%A9lodie-br%C3%BAn"');
-    expect(await search("v1")).toContain("Type 2 to 24 letters");
+    expect(await search("v1")).toContain("Type 1 to 24 letters");
   });
 
   test("with only the armory on the page answers, and the addon's store is never asked", async () => {

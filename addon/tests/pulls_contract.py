@@ -195,25 +195,37 @@ for case in main:
             assert actual.count("tooltipDisenchant") == 1
             # So is the vendor check in the auction house's Sell tab.
             assert actual.count("sellCheck") == 1
-            actual = [key for key in actual if key not in {"tooltip", "inventoryCapture", "tooltipDisenchant", "sellCheck"}]
+            # Flight timing is independent of pull recording.
+            assert actual.count("flight") == 1
+            actual = [key for key in actual if key not in {"tooltip", "inventoryCapture", "tooltipDisenchant", "sellCheck", "flight"}]
         if part == "printed":
             # The feature chooser adds /everloot setup to the command list for every install, independently of pull
             # recording. Keep the historical fixture and compare every other word.
             assert sum("/everloot setup, " in line for line in actual) == sum(line.startswith("Everloot commands:") for line in actual)
-            actual = [line.replace("/everloot setup, ", "") for line in actual]
+            assert sum("/everloot flight on|off, " in line for line in actual) == sum(line.startswith("Everloot commands:") for line in actual)
+            actual = [line.replace("/everloot setup, ", "").replace("/everloot flight on|off, ", "") for line in actual]
             # The same change turns player names on in a new install, which says so once at the first load; an
             # upgraded install keeps them off and is not told. Compare every other line.
             notices = [line for line in actual if line.startswith("Everloot: player names on.")]
             assert len(notices) == (1 if case == "new" else 0), notices
             actual = [line for line in actual if line not in notices]
+            # Completion defaults and its notice change independently of pull recording (owner, 2026-11-19).
+            completion_notices = [line for line in actual if line.startswith("Everloot: completion tracker on.")]
+            assert len(completion_notices) == (1 if case == "new" else 0), completion_notices
+            actual = [line for line in actual if line not in completion_notices]
         if part == "saved":
             # The same change, in the saved file: no gear or talents switch, and in a new install player names on and
             # their notice given. Compare every other value.
+            assert actual["toggles"]["completion"] is (case == "new")
+            assert actual.get("completionNotice") is (True if case == "new" else None)
+            actual = {k: v for k, v in actual.items() if k != "completionNotice"}
+            actual["toggles"] = {**actual["toggles"], "completion": False}
             assert "gear" not in actual["toggles"] and "talents" not in actual["toggles"], actual["toggles"]
             assert actual["toggles"]["players"] is (case == "new") and actual.get("playersNotice") is (True if case == "new" else None)
             expected = {**expected, "toggles": {k: v for k, v in expected["toggles"].items() if k not in {"gear", "talents", "players"}}}
             actual = {k: v for k, v in actual.items() if k != "playersNotice"}
-            actual["toggles"] = {k: v for k, v in actual["toggles"].items() if k != "players"}
+            assert actual["toggles"]["flight"] is True
+            actual["toggles"] = {k: v for k, v in actual["toggles"].items() if k not in {"players", "flight"}}
         assert actual == expected, f"gate off, {case} install: {part} differs from main's (fixtures/gate_off_main.json)"
 assert mine.keys() == main.keys()
 

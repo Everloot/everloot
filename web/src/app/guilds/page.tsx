@@ -11,7 +11,7 @@ import {
 } from "@/lib/armory-guilds";
 import { dataAgeLabel } from "@/lib/data-age";
 import {
-  factionLabel, guildPath, guildSearchPrefix, guildsOn, ladderHref, loadGuildData, loadGuildRealms, loadGuildSearch, loadLadder, parseLadderQuery, raidsOpen, realmPath,
+  factionLabel, guildPath, guildSearchPrefix, guildsOn, LADDER_LINE, ladderHref, loadGuildData, loadGuildRealms, loadGuildSearch, loadLadder, parseLadderQuery, RAIDS_LINE, raidsOpen, realmPath, START_LINE,
   type BossFirst, type LadderQuery, type RankedRow,
 } from "@/lib/guilds";
 import { playerStore } from "@/lib/player-store";
@@ -25,11 +25,6 @@ import { BossStrip, day, FactionMark, guildRobots, link, number, Progress, rules
 export const dynamic = "force-dynamic";
 
 const DESCRIPTION = "WoW: Forever guilds: find one by name, filter by region and ruleset, see how many members were read, and follow progression from members' uploads.";
-const START_LINE = "The ladder starts with the first kill two members report.";
-/** Before raids open, said in place of a raid ranking. Nothing is estimated in its place. */
-const RAIDS_LINE = "Ranking starts when raids open on December 9.";
-/** Before any agreed kill and before raids open: one line where the ladder will go. */
-const LADDER_LINE = "Progression ladders start December 9.";
 
 type Search = Record<string, string | string[] | undefined>;
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -97,7 +92,7 @@ const muted = (text: string) => <span className="text-muted">{text}</span>;
 
 function directoryColumns(counted: boolean): Column<ArmoryGuildRow>[] {
   const all: Column<ArmoryGuildRow>[] = [
-    { key: "name", header: "Guild", cell: (g) => <Link href={armoryGuildPath(g.region, g.slug)} className={`${link} font-medium`}>{g.name}</Link> },
+    { key: "name", header: "Guild", cell: (g) => <span className="inline-flex flex-wrap items-center gap-2"><Link href={armoryGuildPath(g.region, g.slug)} className={`${link} font-medium`}>{g.name}</Link>{g.recruiting && <span className="rounded-control border border-edge px-2 py-1 text-meta text-fg-2">Recruiting</span>}</span> },
     { key: "where", header: "Region", nowrap: true, cell: (g) => <RegionRuleset region={g.region} ruleset={g.ruleset} /> },
     { key: "faction", header: "Faction", nowrap: true, cell: (g) => g.faction },
     { key: "roster", header: "Roster", numeric: true, cell: (g) => number(g.memberCount) },
@@ -241,7 +236,7 @@ export default async function GuildsPage(props: { searchParams: Promise<Search> 
                     dir.state === "ready" && d.page > 1 && dir.total > 0 ? "No guilds on this page."
                     : d.prefix ? `No guild read yet starts with “${d.prefix}”.`
                     : dir.state === "ready" ? "No guild matches these filters yet." : "No guild to list yet."
-                  } />
+                  } action={{ href: "/armory/guilds/submit", label: "Add a guild" }} />
                 : <DataTable
                     dense
                     caption={d.prefix ? `Guilds whose name starts with ${d.prefix}` : "Guilds read from Blizzard's API"}

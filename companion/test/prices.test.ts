@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, vi } from "vitest";
 import { adler32 } from "../src/bridge/lua";
-import { fetchRealmPrices, housesFor, neutralRealmsIn, readRealms, refreshPrices, renderPricesAddon, PRICES_ADDON } from "../src/prices";
+import { fetchRealmPrices, housesFor, neutralRealmsIn, readRealms, refreshPrices, renderPricesAddon, PRICES_ADDON, type DropRow } from "../src/prices";
 import { parseEverlootLua, parseEverlootTable } from "../../web/src/lib/sv-parse";
 import { FIXTURE_DROPS, FIXTURE_REALMS, FIXTURE_SOURCES } from "../scripts/write-prices-fixture";
 
@@ -75,6 +75,17 @@ test("realms come from the player's own auction scans, once each; guild and gold
   expect(readRealms(more)).toEqual(["Forever", "Doomhowl"]);
 });
 
+test("positions the site appends after the seven known ones are read past, and the file keeps its seven", async () => {
+  const items = [
+    [2589, 100, 90, 95, 40, "2026-11-10", 3, "2026-11-10T10:00:00.000Z", 0, 0.05],
+    [765, null, 5, 5, 5, "2026-11-10", 3, null, 0, null],
+    [1, 2, 3],
+  ];
+  const prices = await fetchRealmPrices("https://e.example", "Forever", "Horde", vi.fn().mockResolvedValue(Response.json({ ...body, house: "Horde", items })));
+  expect(prices.items).toEqual([[2589, 100, 90, 95, 40, "2026-11-10", 3], [765, null, 5, 5, 5, "2026-11-10", 3]]);
+  expect(renderPricesAddon([prices]).lua).toContain("2589,100,90,95,40,2026-11-10,3;765,,5,5,5,2026-11-10,3");
+});
+
 test("a long answer is cut to the site's row cap", async () => {
   const items = Array.from({ length: 2500 }, (_, i) => [i + 1, 5, 5, 5, 5, "2026-10-20", 3]);
   const prices = await fetchRealmPrices("https://e.example", "Forever", "Horde", vi.fn().mockResolvedValue(Response.json({ ...body, house: "Horde", items })));
@@ -136,6 +147,20 @@ test("the drops table names the sources the site knows, one line each, only for 
   expect(lua).not.toContain("Not In Any Row");
   const unnamed = renderPricesAddon(FIXTURE_REALMS, { ...FIXTURE_DROPS, names: undefined }).lua;
   expect(unnamed).not.toContain('["names"]');
+});
+
+test("known source names survive while unnamed rows stay unnamed, bounded and in key order", () => {
+  const drops = {
+    dataAsOf: null, fetchedAt: "2026-11-19T00:00:00.000Z",
+    rows: [[8001, "o", 7002, 1, 5, 3], [8001, "o", 7001, 2, 5, 3]] as DropRow[],
+    names: { o7003: "Unused fixture", o7001: "Fixture Chest\n" + "x".repeat(120) },
+  };
+  const lua = renderPricesAddon([], drops).lua;
+  expect(lua).toContain('8001,o,7001,2,5,3;8001,o,7002,1,5,3');
+  expect(lua).toContain('["names"] = "o7001=' + ("Fixture Chest " + "x".repeat(120)).slice(0, 100) + '"');
+  expect(lua).not.toContain("o7002=");
+  expect(lua).not.toContain("o7003=");
+  expect(renderPricesAddon([], { ...drops, rows: [...drops.rows].reverse() }).lua).toBe(lua);
 });
 
 test("item sources follow the drops in their own checksummed block: one row per item, vendors once and ascending", () => {

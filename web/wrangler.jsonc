@@ -14,7 +14,8 @@
   ],
   // The workers.dev host would serve production with no Access in front of it.
   "workers_dev": false,
-  // The schedules in src/lib/cf-crons.ts (cf-crons.test.ts holds the two lists equal).
+  // The schedules in src/lib/cf-crons.ts (cf-crons.test.ts holds this list, wrangler.cron.jsonc's and that file's equal).
+  // The cron Worker (wrangler.cron.jsonc) carries the same triggers; EVERLOOT_CRON_WORKER below says which one runs them.
   "triggers": { "crons": ["*/10 * * * *", "23 * * * *", "7,37 * * * *"] },
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
@@ -42,7 +43,7 @@
     { "binding": "NEXT_TAG_CACHE_D1", "database_name": "everloot-next-tags", "database_id": "807622c4-4651-476c-b86a-d2cfd41ad59c" },
     // The knowledge release (lore pages, search, /api/tools, /mcp), one database per release, imported from the SQL
     // files scripts/cf-release-d1.mjs writes. Placeholder id until the database is created; set
-    // KNOWLEDGE_RELEASE_SHA256 below to the same release.
+    // KNOWLEDGE_RELEASE_SHA256 below to the same release, here and in wrangler.cron.jsonc.
     { "binding": "KNOWLEDGE_D1", "database_name": "everloot-knowledge-2026-11-01", "database_id": "47ac29c7-c9f8-4574-bb31-c27774de1e7e" }
   ],
   // Name lookups per address per minute on /search/people (src/app/search/people/route.ts), counted at each
@@ -94,8 +95,13 @@
     // Battle.net client (BNET_CLIENT_ID/SECRET, shared with sign-in); 20/h per address, 300/h site-wide (owner, 2026-11-18).
     "EVERLOOT_ARMORY_LOOKUP": "1",
     "EVERLOOT_PRIVATE_SYNC": "1",
+    "EVERLOOT_BOSS_KILL_SYNC": "1",
     // Item level and Gear Score boards for linked characters whose owner chose "Rank my gear" (owner, 2026-11-06).
     "EVERLOOT_LEADERBOARDS": "1",
+    // The cron Worker (wrangler.cron.jsonc) runs the scheduled jobs since 2026-11-20: this Worker's triggers run only
+    // the jobs that stay here (SITE_JOBS in src/lib/cf-crons.ts). Removed, this Worker runs them all again
+    // (docs/OPERATIONS.md, "The cron Worker").
+    "EVERLOOT_CRON_WORKER": "1",
     "NEWS_DIR": "/bundle/repo/kb/news",
     "GUIDES_DIR": "/bundle/repo/kb/guides",
     "WIKI_DIR": "/bundle/repo/kb/wiki",

@@ -127,13 +127,13 @@ export default function Page() {
       </List>
 
       <Callout kind="note">
-        <p>Drop rates come only from loot players record from WoW: Forever&apos;s launch on 4 November 2026, and a source has no public drop rate until 3 installs loot it, so the answer can be an empty list. The empty output below is what an empty answer gives; the rows shown after it are placeholders, so you can see the shape.</p>
+        <p>Drop rates come only from loot players record from WoW: Forever&apos;s launch on 4 November 2026, and a source has no drop rate until an install reports a loot window, and its tier says reported at one, verified at two, confirmed at three or more, so the answer can be an empty list. The empty output below is what an empty answer gives; the rows shown after it are placeholders, so you can see the shape.</p>
       </Callout>
 
       <H2 id="steps">Steps</H2>
       <Steps>
         <Step title="Read one page" id="one-page">
-          <p className="mt-2 leading-7 text-fg-2">A page of <C>GET /api/rollups/drops</C> has the rates, the credit line and a <C>next</C> link. A rate is public once three installs looted its source. Trimmed, with placeholder values:</p>
+          <p className="mt-2 leading-7 text-fg-2">A page of <C>GET /api/rollups/drops</C> has the rates, the credit line and a <C>next</C> link. A rate shows from one install: reported at one, verified at two, confirmed at three or more. Each row carries its tier. Trimmed, with placeholder values:</p>
           <div className="mt-6"><CodeGroup title="One page" tabs={[{ label: "Response", lang: "json", code: PAGE_SHAPE }]} /></div>
           <p className="mt-4 leading-7 text-fg-2"><C>kills</C> counts loot windows players opened on the source, not kills counted by the game. A rate has either <C>sourceNpcId</C> or <C>sourceObjectId</C>. <C>rate</C> is a fraction from 0 to 1.</p>
         </Step>
@@ -163,7 +163,7 @@ export default function Page() {
         <li>Every <C>rate</C> is between 0 and 1.</li>
         <li><C>drops-credit.txt</C> holds one line starting with &quot;Data from Everloot&quot;.</li>
         <li>A 429 stops the script with <C>Rate limited. Try again in N seconds.</C> N is the <C>Retry-After</C> header. Wait that long, or use a free key.</li>
-        <li>A file with only the header row is a real answer. It means no source has three installs behind it yet, not that nothing drops.</li>
+        <li>A file with only the header row is a real answer. It means no source has a reporter yet, not that nothing drops.</li>
       </List>
       <P>You can also ask for a smaller page with <C>?offset=0&amp;limit=100</C>. A <C>limit</C> above your page size is capped, and <C>next</C> still leads on.</P>
 

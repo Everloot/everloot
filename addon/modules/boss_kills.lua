@@ -1,4 +1,4 @@
--- Own kill history stays on this computer. Public encounters are recorded separately by openworld.lua.
+-- Own kill history syncs for linked characters and is public on character and guild pages. Public encounters are recorded separately by openworld.lua.
 local E = Everloot
 local world = {}
 for _, instance in ipairs(E.InstanceData.instances) do
@@ -13,7 +13,7 @@ local function note()
     if world[row.encounterId] == row.instanceMapId then count = count + row.killCount end
   end
   E:SetNote("boss_kills", "World boss kills seen: " .. count .. "; open-world ENCOUNTER_END is unconfirmed")
-  return "World boss kills seen: " .. count .. "; open-world ENCOUNTER_END is unconfirmed; kept on this computer"
+  return "World boss kills seen: " .. count .. "; open-world ENCOUNTER_END is unconfirmed; synced for linked characters"
 end
 
 local function whole(n) return type(n) == "number" and n > 0 and n == math.floor(n) end

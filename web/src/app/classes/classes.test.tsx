@@ -133,7 +133,9 @@ describe("class hubs", () => {
   test("with no reviewed guide a hub says so, names no role or talent tree, and is indexed for its racial traits", async () => {
     const html = await hub("mage");
     const page = visible(html);
-    expect(page).toContain("No Mage guide is reviewed yet.");
+    // The shared empty state (guides-empty.test.tsx holds its words), named for the class.
+    expect(visible(section(html, "guides"))).toContain("No Mage guide is reviewed yet.");
+    expect(section(html, "guides")).toContain("data-guides-empty");
     // The line under the title does not promise guides that are not there.
     expect(ledeOf(html)).toContain("talent calculator");
     expect(ledeOf(html)).not.toMatch(/guide/i);
@@ -167,10 +169,10 @@ describe("class hubs", () => {
     expect(visible(guides)).toContain("A Mage plan for levels 10 to 60.");
     expect(visible(guides)).toContain("Leveling · Levels 10–60 · Damage");
     for (const other of ["Fire draft", "fire-draft", "Warrior tanking"]) expect(mage, other).not.toContain(other);
-    expect(visible(mage)).not.toContain("No Mage guide is reviewed yet.");
+    expect(mage).not.toContain("data-guides-empty");
     expect(ledeOf(mage)).toContain("1 reviewed Mage guide, the talent calculator");
     expect(visible(section(await hub("warrior"), "guides"))).toContain("Dungeons · Levels 20–60 · Tank, Damage");
-    expect(visible(await hub("priest"))).toContain("No Priest guide is reviewed yet.");
+    expect(visible(section(await hub("priest"), "guides"))).toContain("No Priest guide is reviewed yet.");
     expect((await hubMetadata("mage")).robots).toEqual({ index: true, follow: true });
     expect((await hubMetadata("warrior")).robots).toEqual({ index: true, follow: true });
     expect((await hubMetadata("priest")).robots).toEqual({ index: true, follow: true });
@@ -283,7 +285,10 @@ describe("the class index", () => {
   test("lists the nine hubs with their reviewed guides, and is indexed once one hub is", async () => {
     const empty = await index();
     for (const slug of TALENT_CLASSES) expect(empty, slug).toContain(`href="/classes/${slug}"`);
-    expect(visible(empty)).toContain("No class guide is reviewed yet.");
+    // The shared empty state under the table (guides-empty.test.tsx holds its words); the table links the class pages.
+    const note = new DOMParser().parseFromString(empty, "text/html").querySelector("[data-guides-empty]");
+    expect(note?.textContent).toContain("No guide is reviewed yet.");
+    expect(note?.querySelector('a[href="/classes"]')).toBeNull();
     expect(ledeOf(empty)).not.toMatch(/guide/i);
     // No guide yet, but every hub carries its races' traits, so the index is indexed too.
     expect((await indexRoute.generateMetadata()).robots).toEqual({ index: true, follow: true });
@@ -293,7 +298,7 @@ describe("the class index", () => {
     expect(visible(row(listed, "mage"))).toMatch(/Mage\s+1\b/);
     expect(visible(row(listed, "warrior"))).toMatch(/Warrior\s+1\b/);
     expect(visible(row(listed, "priest"))).not.toMatch(/\d/);
-    expect(visible(listed)).not.toContain("No class guide is reviewed yet.");
+    expect(listed).not.toContain("data-guides-empty");
     expect((await indexRoute.generateMetadata()).robots).toEqual({ index: true, follow: true });
   });
 });

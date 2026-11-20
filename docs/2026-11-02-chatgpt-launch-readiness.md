@@ -97,7 +97,7 @@ Likewise, the initial generic HTTP probe's 403 and the explicit test-client prob
 
 The richer wiki pages show approved loading-screen art with credit, file-derived boss lists and difficulty
 capacity, and panels that fill from public loot and quest observations. Loot joins through confirmed boss NPC
-ids and public rates with at least three installs. Quests require the exact agreed dungeon category and dungeon
+ids and rates from one install, labelled reported, verified at two, confirmed at three or more (owner decision 2026-11-19). Quests require the exact agreed dungeon category and dungeon
 tag; unmatched aliases are left out rather than guessed. Storage failure means unknown data, never an empty
 measured result. Empty panels explain the difference and link to upload.
 

@@ -142,12 +142,28 @@
           },
           "public": {
             "type": "boolean",
-            "const": true
+            "description": "True only for confirmed rates, at three or more installs."
+          },
+          "tier": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "verified",
+              "confirmed"
+            ]
           },
           "sourceName": {
-            "description": "The NPC's or object's name, once 3 installs agree on it; absent until then.",
+            "description": "The source name when all counted name reports agree, from one install.",
             "type": "string",
             "minLength": 1
+          },
+          "sourceNameTier": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "verified",
+              "confirmed"
+            ]
           }
         },
         "required": [
@@ -187,8 +203,28 @@
             "maximum": 9007199254740991
           },
           "public": {
-            "type": "boolean",
-            "const": true
+            "type": "boolean"
+          },
+          "tier": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "verified",
+              "confirmed"
+            ]
+          },
+          "sourceName": {
+            "description": "The source name when all counted name reports agree, from one install.",
+            "type": "string",
+            "minLength": 1
+          },
+          "sourceNameTier": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "verified",
+              "confirmed"
+            ]
           }
         },
         "required": [
@@ -210,7 +246,7 @@
           "type": "null"
         }
       ],
-      "description": "Rates and zeros waiting for their third install; null when unreachable."
+      "description": "Rates and zeros with zero reporters (normally zero); null when unreachable."
     },
     "totalRates": {
       "type": "integer",

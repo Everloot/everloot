@@ -1,45 +1,79 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import JsonLd from "@/components/JsonLd";
-import { Card, Container, EmptyState, PageHeader, SectionHeading } from "@/components/ui";
+import { Card, Container, EmptyState, Field, PageHeader, SectionHeading } from "@/components/ui";
+import { armoryOn } from "@/lib/armory";
 import { dataAgeLabel } from "@/lib/data-age";
+import { guildIndexingOn, guildsOn } from "@/lib/guilds";
+import { leaderboardRegion, loadLeaderboards } from "@/lib/leaderboards";
 import {
   COLLECTING_LINE, RANKINGS, hubIndexable, hubMetrics, itemListJsonLd, loadRankingWeeks, rankingPath, rankingView, topMovers, weeklyCharacters,
 } from "@/lib/rankings";
 import { pageMetadata } from "@/lib/seo";
 import { STORAGE_UNREACHABLE } from "@/lib/upload-store";
+import { BestOfClass, CharacterBoards, GuildBoards, RegionTabs } from "./leaderboards";
 import { HowItCounts, MetricTiles, Movers, ONE_WEEK_LINE, RankCard, RankingRail, StackedWeeks, StartState, WeeklyTotals } from "./parts";
 
 export const dynamic = "force-dynamic";
 
 const DESCRIPTION =
-  "WoW Forever rankings by week: the most played classes, races and the faction balance from the Everloot census, with each rank's change against last week.";
+  "WoW Forever rankings: characters by item level, Gear Score and honorable kills, guilds by gear and raid progress, and the most played classes, races and factions week by week from the Everloot census.";
+
+/** Whether the boards the hub shows may be indexed: never Blizzard's, and the ladder only when the guild pages are. */
+const hubBoardsIndexable = () => !armoryOn() && (!guildsOn() || guildIndexingOn());
+
+type Search = Record<string, string | string[] | undefined>;
+const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 export async function generateMetadata(): Promise<Metadata> {
   const { weeks, unreachable } = await loadRankingWeeks();
-  const index = !unreachable && hubIndexable(weeks);
+  // With the armory on the hub shows Blizzard's boards, which stay out of search engines as every armory page does;
+  // the ladder's guild names follow the guild pages' own indexing switch.
+  const index = hubBoardsIndexable() && !unreachable && hubIndexable(weeks);
   return {
     ...pageMetadata({ title: "WoW Forever Rankings", description: DESCRIPTION, path: "/rankings" }),
     ...(index ? {} : { robots: { index: false, follow: true } }),
   };
 }
 
-export default async function RankingsHub() {
-  const { weeks, unreachable, dataAsOf } = await loadRankingWeeks();
+export default async function RankingsHub(props: { searchParams?: Promise<Search> }) {
+  const region = leaderboardRegion(first((await props.searchParams)?.region));
+  const [{ weeks, unreachable, dataAsOf }, boards] = await Promise.all([loadRankingWeeks(), loadLeaderboards(region)]);
   const views = RANKINGS.map((def) => rankingView(def, weeks));
   // The hero stacks the class shares: the first ranking, every class with a number in the newest week.
   const classes = views[0];
   const withNumbers = classes.weeksWithNumbers;
   const metrics = hubMetrics(views);
+  const leaderboards = boards.characters !== null || boards.guildGear !== null || boards.raids !== null;
   return (
     <Container width="data">
       <article>
         <PageHeader
           title="Rankings"
-          lede="WoW: Forever week by week, from players who turned the census on."
+          lede="Characters by gear and honor, guilds by gear and raid progress, and who plays WoW: Forever week by week."
           meta={!unreachable && <span>{dataAgeLabel(dataAsOf)}</span>}
         />
         <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            {[{ label: "Character name", action: "/players", button: "Find character" }, { label: "Guild name", action: "/guilds", button: "Find guild" }].map((search) => (
+              <form key={search.action} action={search.action} method="get" role="search" aria-label={search.button} className="flex items-end gap-2">
+                <div className="min-w-0 flex-1"><Field label={search.label} name="q" type="search" maxLength={40} required autoComplete="off" /></div>
+                <button type="submit" className="min-h-11 shrink-0 rounded-control border border-edge px-3 text-control text-fg hover:bg-panel">{search.button}</button>
+              </form>
+            ))}
+          </div>
           <RankingRail row />
+          {boards.characters !== null && <RegionTabs region={region} />}
+          {boards.characters !== null && <BestOfClass rows={boards.bestOfClass} />}
+          {boards.characters !== null && <CharacterBoards boards={boards.characters} region={region} />}
+          {(boards.guildGear !== null || boards.raids !== null) && <GuildBoards gear={boards.guildGear} raids={boards.raids} region={region} progression={boards.progression} />}
+          {boards.characters !== null && <Card>
+            <p className="text-fg">Not on the boards? <Link href="/armory/submit" className="underline underline-offset-4">Add your character</Link> or <Link href="/armory/guilds/submit" className="underline underline-offset-4">Add your guild</Link>.</p>
+            <p className="mt-1 text-sm text-fg-2">The armory reads Blizzard&apos;s API on its next run, usually within hours.</p>
+          </Card>}
+          {leaderboards && (
+            <SectionHeading id="who-plays" note="From players who turned the census on, each character counted once a week.">Who plays</SectionHeading>
+          )}
           {unreachable ? (
             <Card><p className="text-fg-2">{STORAGE_UNREACHABLE}</p></Card>
           ) : weeks.length === 0 ? (
@@ -74,7 +108,7 @@ export default async function RankingsHub() {
               <div className="grid gap-4 md:grid-cols-2 lg:gap-6">
                 {views.map((view) => <RankCard key={view.def.slug} view={view} />)}
               </div>
-              {hubIndexable(weeks) && (
+              {hubBoardsIndexable() && hubIndexable(weeks) && (
                 <JsonLd data={itemListJsonLd("WoW Forever rankings", "/rankings", RANKINGS.map((r) => ({ name: r.title, path: rankingPath(r.slug) })))} />
               )}
             </>

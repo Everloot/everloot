@@ -32,7 +32,7 @@ export function zoneItems(here: ZoneContents | undefined, tables: LootTables, ga
   for (const [id, name] of objects) rows.push(...objectLootRows(tables, id).map((row) => ({ ...row, from: { kind: "object" as const, id, name } })));
 
   const byItem = new Map<number, Map<string, ZoneItemSource>>();
-  for (const row of rows) {
+  for (const row of rows.filter((r) => r.installs >= 3)) {
     const sources = byItem.get(row.itemId) ?? new Map<string, ZoneItemSource>();
     sources.set(`${row.from.kind}-${row.from.id}`, row);
     byItem.set(row.itemId, sources);

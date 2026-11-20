@@ -65,6 +65,11 @@ export default async function VendorListPage(props: { searchParams?: Promise<Sea
           active={q.q ? 1 : 0}
           clearHref="/database/vendors"
         />
+        {!facts.unreachable && (
+          <p data-list-rule className="mt-2 max-w-reading text-meta text-fg-2">
+            A vendor is listed once 3 installs agree on an item and its price. <Link prefetch={false} href="/addon" className={LINK}>Get the addon</Link>.
+          </p>
+        )}
         <div className="mt-2">
           <DataTable
             dense

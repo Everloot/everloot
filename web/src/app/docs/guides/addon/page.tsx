@@ -114,6 +114,7 @@ export default function Page() {
           [<C key="a3">/everloot buttons off</C>, <>The drawer starts off for new installs; existing players keep their setting. Stops gathering other addons&apos; minimap buttons into the Everloot button (hover the crest to open them). They return to the minimap after <C>/reload</C>; <C>buttons on</C> gathers them again.</>],
           [<C key="a">/everloot status</C>, "Prints the version and your install id, each part of the addon and how many rows it holds."],
           [<C key="b">/everloot version</C>, "Prints the addon version."],
+          [<C key="flight">/everloot flight on|off</C>, <>The flight path bar starts on. It learns a local estimate from confirmed arrivals; a first flight shows no ETA. Off hides it immediately; on applies after <C>/reload</C>.</>],
           [<C key="c">/everloot auctions off</C>, <>Turns off auction capture, which is on in a new install. <C>auctions on</C> turns it back on. Type <C>/reload</C> to apply either.</>],
           [<C key="d">/everloot scan</C>, "At the auction house, starts a full scan, like the Scan this house button. At most one scan every 15 minutes, and nothing scans until you ask."],
           [<C key="d2">/everloot scanprompt off</C>, <>Stops the small Scan prices for Everloot prompt that shows when you open the auction house. <C>scanprompt on</C> brings it back. The button and <C>/everloot scan</C> still work.</>],
@@ -139,8 +140,9 @@ export default function Page() {
         <p>
           In a new install, auction capture and the census are on. The census says so once in chat; an install from
           before the census keeps it off. Addon releases after 0.3.23 also turn the players module on in a new install
-          and say so once; an install from before keeps its choice. The completion tracker and the installed addon list
-          are off until you turn them on. Nothing in the addon buys, bids on or posts anything at the auction house.
+          and say so once; an install from before keeps its choice. The completion tracker is also on in a new install;
+          an older install keeps its choice. Your own boss kills sync through the Desktop App for linked characters
+          and appear publicly on character and guild pages and rankings. The installed addon list stays off until you turn it on. Nothing in the addon buys, bids on or posts anything at the auction house.
         </p>
       </Callout>
 

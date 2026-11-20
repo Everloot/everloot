@@ -30,6 +30,7 @@ import CoveragePage from "./page";
 import ZoneCoveragePage from "./[zone]/page";
 import { COVERAGE_BUILD, loadCoverageExpected } from "@/lib/coverage-compute";
 import { writeCoverage } from "@/lib/coverage-store";
+import { STAMP } from "@/lib/stored-view-freshness";
 import { forgetCoverageSummary } from "@/lib/coverage-summary";
 import { plateauDetail, plateauMeasured, plateauShare, plateauVerdict } from "./plateau";
 import { cellDetail, shareText } from "@/lib/coverage-view";
@@ -162,17 +163,23 @@ test("the expected file is the maintainer report's counts, read from the private
   expect(await loadCoverageExpected(base, { read: async () => ({ ...file, rows: [{ name: "Hogger" }] }) })).toBeNull();
   expect(await loadCoverageExpected(null, { read })).toBeNull();
 });
-test("the cron writer skips a run that added nothing and writes coverage/<build>.json otherwise", async () => {
-  const fetcher = vi.fn<typeof fetch>(async () => new Response(null, { status: 200 }));
+test("the cron writer reads only a HEAD when the stored score is the snapshot's, and writes a stamped coverage/<build>.json otherwise", async () => {
+  // HEAD answers with the stored stamp; every other call succeeds.
+  const stamped = (stamp: string | null) => vi.fn<typeof fetch>(async (input) =>
+    (input as Request).method === "HEAD" ? new Response(null, { status: 200, headers: stamp ? { [STAMP]: stamp } : {} }) : new Response(null, { status: 200 }));
   const cloud = { r2AccountId: "acct", r2AccessKeyId: "k", r2SecretAccessKey: "s", r2Bucket: "b", supabaseUrl: "https://x", supabaseServiceKey: "y" };
-  expect(await writeCoverage({ added: 0, dataAsOf: null }, { cloud, fetch: fetcher })).toEqual({ written: false });
-  expect(fetcher).not.toHaveBeenCalled();
+  const current = stamped("2026-10-18T00:00:00.000Z");
+  expect(await writeCoverage({ added: 0, dataAsOf: "2026-10-18T00:00:00.000Z" }, { cloud, fetch: current })).toEqual({ written: false });
+  expect(current).toHaveBeenCalledOnce();
+  expect((current.mock.calls[0]![0] as Request).method).toBe("HEAD");
   expect(store.loadCorpus).not.toHaveBeenCalled();
   store.loadCorpus.mockResolvedValue(corpus(westfall));
+  const fetcher = stamped(null);
   const result = await writeCoverage({ added: 2, dataAsOf: "2026-10-19T00:00:00.000Z" }, { cloud, fetch: fetcher });
   expect(result).toMatchObject({ written: true, key: `coverage/${COVERAGE_BUILD}.json` });
   const sent = fetcher.mock.calls[0]![0] as Request;
   expect(sent.method).toBe("PUT");
+  expect(sent.headers.get(STAMP)).toBe("2026-10-19T00:00:00.000Z");
   expect(sent.url).toBe(`https://acct.r2.cloudflarestorage.com/b/coverage/${COVERAGE_BUILD}.json`);
   const body = JSON.parse(await sent.text());
   expect(body).toMatchObject({ schema: "everloot.coverage/1", build: COVERAGE_BUILD, dataAsOf: "2026-10-19T00:00:00.000Z", version: 2 });
@@ -182,6 +189,8 @@ test("the cron writer skips a run that added nothing and writes coverage/<build>
   expect(result.bytes).toBe(new TextEncoder().encode(JSON.stringify(body)).length);
   expect(JSON.stringify(body)).not.toContain("Guard Orin");
   expect(await writeCoverage({ added: 0, rebuild: true, dataAsOf: null }, { cloud, fetch: fetcher })).toMatchObject({ written: true });
+  // A run that added nothing still catches up on a score stamped by an older snapshot (a run that failed here).
+  expect(await writeCoverage({ added: 0, dataAsOf: "2026-10-20T00:00:00.000Z" }, { cloud, fetch: stamped("2026-10-19T00:00:00.000Z") })).toMatchObject({ written: true });
 });
 
 test("the index states the plateau for quests, pins, vendors and drops, with how and when it was measured", async () => {

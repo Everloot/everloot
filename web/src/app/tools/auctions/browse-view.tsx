@@ -13,7 +13,7 @@ import {
 import type { Crumb } from "@/lib/jsonld";
 import { trailFor } from "@/lib/breadcrumbs";
 import {
-  AH_PATH, crossRealmHref, findBoard, houseCounts, itemHref, itemIdParam, money, onRuleset, percent,
+  AH_PATH, changesHref, crossRealmHref, findBoard, houseCounts, itemHref, itemIdParam, money, onRuleset, percent,
   realmHref, rulesetSummaries, slugWords,
 } from "@/lib/auction-house";
 import { AFTER_LAUNCH, REGION_LABEL, RULESET_LABEL, inRegion, isRulesetSlug, mappedRulesets, realmRegion, realmRuleset, type RegionFilter } from "@/lib/realms";
@@ -275,6 +275,7 @@ export async function browseView({ slug, search }: { slug: string | null; search
           aside={strip}
         />
         {!slug && <p className="mb-3 text-sm"><Link href="/tools/auctions/report" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Daily market report and share image</Link></p>}
+        {slug && stored && <p className="mb-3 text-sm"><Link href={changesHref({ slug }, q.house)} className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Market changes this week: risers, fallers and what has no comparison yet</Link></p>}
         {!slug && state && (
           <>
             <LinkTabs

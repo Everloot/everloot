@@ -34,7 +34,7 @@ Player plays
   -> cron snapshot merges new events into the corpus
   -> public read: named records only with a grant (kb/src/corpus.ts)
   -> anonymous observations are public as records, a per-install pseudonym in place of the install id (/api/corpus/public)
-  -> rollups: the site states a fact once at least three installs reported it (kb/src/drop-rollup.ts)
+  -> rollups: drop rates show from one install with reported, verified or confirmed tiers (kb/src/drop-rollup.ts)
   -> site pages and MCP gameplay tools
 
 Warcraft Wiki dump (CC BY-SA 4.0) + curated entries
@@ -70,8 +70,8 @@ Where each kind of data goes, who may write it and how each tier is protected is
 - **A file bridge, never the game's memory or screen.** The addon writes its save file, and the
   companion reads it and writes answers back as an addon file. That stays inside what Blizzard
   tolerates for addons, and it is why answers appear only after `/reload`.
-- **The site states a fact only once three installs reported it.** Each one carries how many
-  installs reported it and when. One wrong upload cannot make the site state a fact; the anonymous
+- **Three installs confirm a fact.** Drop rates and measured zeros show from one install, marked
+  reported, verified at two, confirmed at three or more, with counts and dates. The anonymous
   observations behind it stay public so anyone can check the count.
 
 ## Known limits
@@ -79,8 +79,8 @@ Where each kind of data goes, who may write it and how each tier is protected is
 - Three installs are not proof of three people. An install ID cannot show that two installs
   belong to different players.
 - Drop figures are shares of the loot windows players opened, not kill-based drop chances. A drop
-  rate goes public once three installs have looted its source, even if only one of them saw the
-  item drop.
+  rate shows from one install, labelled reported, verified at two, confirmed at three or more
+  installs that looted its source, even if only one saw the item drop.
 - The lore archive is the Warcraft Wiki as of 2023-11-13, with no Forever-specific lore until a
   newer dump is allowed.
 - Blizzard's API answers for WoW: Forever since launch (`*-forever-{region}` namespaces, checked

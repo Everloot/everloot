@@ -88,14 +88,15 @@ There is nothing to roll back when the build or deploy step failed, because the 
 
 ## The three cron schedules
 
-`web/wrangler.jsonc` lists three cron triggers. `web/src/lib/cf-crons.ts` maps each one to routes.
+`web/wrangler.jsonc` lists three cron triggers, and `web/wrangler.cron.jsonc` the same three (the cron
+Worker below). `web/src/lib/cf-crons.ts` maps each one to routes.
 `web/scripts/cf-entry.mjs` calls those routes with `Authorization: Bearer` plus `CRON_SECRET`
 (`web/.env.example`). If `CRON_SECRET` is unset, the entry throws and nothing runs. Each route also
 answers 503 in that case and does not write.
 
 | Schedule | Route | What a run writes |
 |---|---|---|
-| `*/10 * * * *` | `/api/cron/snapshot` | The corpus snapshot, then the market, completion, census, coverage, settled-list, item-view and aggregate rollups, and the heartbeat object `cron/last-run.json`. A failed snapshot, market or completion step answers 500 and does not move that heartbeat, so the next run retries the same uploads (`web/src/app/api/cron/snapshot/route.ts`, `web/src/lib/upload-store.ts`). |
+| `*/10 * * * *` | `/api/cron/snapshot` | The corpus snapshot, then the market, completion and census rollups and the settled list, then the heartbeat object `cron/last-run.json`. After the heartbeat come the stored views (item view, aggregates, search names, auction history, professions, map pins, database activity), the guild ladder, the Auction House boards, the coverage score and the auction reports. Each of those is rewritten whenever its stamp is not the snapshot's, so an idle run catches up on one a run could not write. A failed snapshot, market or completion step answers 500 and does not move that heartbeat, so the next run retries the same uploads (`web/src/app/api/cron/snapshot/route.ts`, `web/src/lib/upload-store.ts`). |
 | `*/10 * * * *` | `/api/cron/blue` | The objects `changes/blue-posts.json` and `changes/blue-fetch-state.json` (`web/src/lib/blue-store.ts`). New posts revalidate the `blue` cache tag (`web/src/app/api/cron/blue/route.ts`). |
 | `23 * * * *` | `/api/cron/indexnow` | Nothing in storage. When `/changes` has an entry from the last two hours, the run submits `/changes`, `/changes/feed.xml` and `/wow-forever` (`web/src/lib/indexnow.ts`). No `INDEXNOW_KEY` means nothing is sent. An empty list sends nothing (`web/src/app/api/cron/indexnow/route.ts`). |
 | `7,37 * * * *` | `/api/cron/profiles` | The gear-board snapshot and each ranked character's tracking points (`web/src/lib/profile-pipeline.ts`). The route writes only when `leaderboardsOn()` is true: `EVERLOOT_LEADERBOARDS`, `EVERLOOT_CHARACTER_LINKS`, `EVERLOOT_SHOWCASE` and `EVERLOOT_PRIVATE_SYNC` each set to `1` (`web/src/lib/leaderboard-switch.ts`). Otherwise it writes nothing and answers `ok: true`, `skipped: "off"` (`web/src/app/api/cron/profiles/route.ts`). |
@@ -109,6 +110,146 @@ makes that run a full pass. `/api/cron/blue` and `/api/cron/indexnow` do not rea
 A cron route that answers outside 200 to 299 makes `web/scripts/cf-entry.mjs` throw, so the
 trigger is recorded as failed.
 
+## The cron Worker
+
+The site Worker `everloot-web` runs the jobs above in the same isolates that serve pages and
+`/mcp/public`. A self-request through `WORKER_SELF_REFERENCE` lands in the same isolate, and the
+128 MB memory limit is per isolate, so the snapshot job and page traffic can push each other past it
+(`exceededMemory`). The run then dies before it writes `cron/last-run.json`, and `/api/health`
+answers 503 `stale` (#1354, #1392).
+
+`web/wrangler.cron.jsonc` deploys the same `.open-next` build a second time as the Worker
+`everloot-cron`. It has the same triggers, vars and bindings as the site, except:
+
+- no routes, no workers.dev host and no preview URLs, so no visitor request reaches it;
+- `WORKER_SELF_REFERENCE` points at `everloot-cron`, so its jobs run in its own isolates;
+- the revalidation queue binding names the site's Durable Object (`script_name: "everloot-web"`),
+  so it declares no class and no migration;
+- every invocation is logged, not one in ten.
+
+`web/src/lib/cf-crons.test.ts` holds the two files equal apart from those lines. A change to the
+site's vars, bindings, knowledge release or compatibility date goes into both files.
+
+Which Worker runs which job is the var `EVERLOOT_CRON_WORKER` (`runCrons` in
+`web/src/lib/cf-crons.ts`):
+
+- unset, on the site before the switch: every job, as before;
+- `"cron"`, on the cron Worker (set in `wrangler.cron.jsonc`): every job but `SITE_JOBS`;
+- `"1"`, on the site after the switch: `SITE_JOBS` only.
+
+`SITE_JOBS` is `/api/cron/ops`. It keys install pseudonyms with `EVERLOOT_OPS_HMAC_SECRET`, which
+only the site holds; the cron Worker would need the same value, and another one would change every
+pseudonym in the summary. The var is left out of the edge cache's versions
+(`web/scripts/cache-versions.mjs`), so switching it does not empty the page cache.
+
+The cron routes on the site stay where they are, behind `CRON_SECRET`, so a job can still be called
+by hand on `https://everloot.app/api/cron/...`. Those calls run in the site's isolates.
+
+### Both Workers running the jobs for a while
+
+Between the cron Worker's first run and the switch, both Workers run every job but `/api/cron/ops`
+at the same minute. That is safe:
+
+- The corpus snapshot, market, completion and census writes are conditional on the ETag each run
+  read at its start (`web/src/lib/upload-store.ts`). When both runs fold the same uploads, the later
+  write is refused with 412. That run answers 500 before it writes any view or the heartbeat, and its
+  trigger is recorded as failed. The other run's data stands; nothing is counted twice or lost.
+- The views written after them (item view, aggregates, search names, auction history, professions,
+  map pins, database activity, coverage, settled list, market boards, auction reports, guild
+  ladder) are whole-file writes from the same snapshot. Whichever run writes last wins, with the
+  same content. The heartbeat is the same.
+- The prunes (intake quota, API keys, players, pull summaries) delete by age; a second pass deletes
+  nothing more.
+- `/api/cron/blue` reads the forum feeds twice in that slot and both runs write the same store.
+  `/api/cron/indexnow` can submit the same URLs twice in the hour. `/api/cron/profiles` deletes a
+  file that is already gone, which counts as success.
+
+The cost is a red trigger now and then on whichever Worker lost a race, and twice the R2 and
+Supabase reads. Keep the overlap short: switch after the first good run.
+
+### Secrets
+
+The cron Worker has its own secrets; it does not see the site's. Cloudflare does not show a
+secret's value. The names are from `npx wrangler secret list --name everloot-web` and from what the
+four cron routes it runs import.
+
+| Name | Read by | Value |
+|---|---|---|
+| `CRON_SECRET` | the trigger and every cron route | its own; the site's routes keep the site's |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | every stored file: uploads, snapshot, rollups, views, heartbeat, blue posts | any key pair that can read, write and delete in `everloot-uploads` |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | the upload index the snapshot reads, and the quota, API key, player and pull prunes | the project's service role key or a secret key |
+| `EVERLOOT_TRUSTED_INSTALLS` | which installs publish market and census alone | the site's: a different list builds different data |
+| `GAME_DATA_ACCESS_KEY_ID`, `GAME_DATA_SECRET_ACCESS_KEY`, `GAME_DATA_BUCKET`, `GAME_DATA_S3_ENDPOINT` | the private game-data store the auction reports, market boards and coverage read | a key that can read `everloot-game-data` |
+| `INDEXNOW_KEY` | `/api/cron/indexnow` | the site's, which `https://everloot.app/indexnow.txt` shows |
+
+`EVERLOOT_CHARACTER_KEY` and the `EVERLOOT_OPS_*` and `EVERLOOT_USAGE_METRICS` values are not
+needed: no job the cron Worker runs calls `characterSecret()`, and `/api/cron/ops` stays on the site.
+
+Not needed by any cron route: `AHLEDGER_API_KEY`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`,
+`BNET_CLIENT_ID`, `BNET_CLIENT_SECRET`, `BNET_REDIRECT_URI`, `DISCORD_CLIENT_ID`,
+`DISCORD_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MICROSOFT_CLIENT_ID`,
+`MICROSOFT_CLIENT_SECRET`, `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET`, `EVERLOOT_MCP_TOKEN`,
+`EVERLOOT_OPS_AGENT_TOKEN_HASHES`, `EVERLOOT_OPS_CONTRIBUTOR_USER_IDS`, `EVERLOOT_OPS_USER_IDS`.
+A secret added to the site later and read by a cron route must be added to the cron Worker too.
+
+### Switching over
+
+Merging the change that added the cron Worker changes nothing in production: the deploy skips it
+until `DEPLOY_CRON_WORKER` is set, and the site keeps running the jobs while `EVERLOOT_CRON_WORKER`
+is unset.
+
+1. **Deploy it.** Set the repository variable and deploy `main` by hand:
+
+       gh variable set DEPLOY_CRON_WORKER --body true -R Everloot/everloot
+       gh workflow run deploy-worker.yml -R Everloot/everloot --ref main
+
+   The run deploys the site, then "Deploy the cron Worker from the same build" deploys
+   `everloot-cron` from the same build with `npx wrangler deploy --config wrangler.cron.jsonc`. The
+   deploy token needs to be allowed to create a Worker in the account, not only to edit
+   `everloot-web`. Until the secrets are set, each of its triggers fails with "CRON_SECRET is not
+   set; nothing ran" and runs nothing.
+
+2. **Set its secrets.** Write the names in the table above and their values to a JSON file outside
+   the repository (`{ "CRON_SECRET": "...", ... }`), then from `web/`:
+
+       npx wrangler secret bulk <path-outside-the-repo>/everloot-cron-secrets.json --name everloot-cron
+       npx wrangler secret list --name everloot-cron
+
+   Delete the file. The list should show the names in the table. `secret bulk` deploys one new
+   version with them, and later deploys keep them. One at a time works too:
+   `npx wrangler secret put CRON_SECRET --name everloot-cron` asks for the value.
+
+3. **See a good run.** Both Workers now run the jobs. From `web/`, across one ten-minute mark:
+
+       npx wrangler tail everloot-cron --format pretty
+
+   A good run shows the `*/10 * * * *` trigger `ok` and `GET /api/cron/snapshot` and
+   `GET /api/cron/blue` answering 200. A 500 from the snapshot with "snapshot write failed (412)" in
+   its log is the race above, not a fault; look at the next mark. Then check the heartbeat and
+   health:
+
+       npx wrangler r2 object get everloot-uploads/cron/last-run.json --remote --file last-run.json
+       curl -s -A ops-check https://everloot.app/api/health
+
+   `generatedAt` in `last-run.json` should be from that ten-minute mark, and `/api/health` should
+   answer 200 with `"status":"fresh"`. The Workers dashboard's cron history for `everloot-cron`
+   lists each trigger as succeeded or failed.
+
+4. **Switch.** In a pull request, add `"EVERLOOT_CRON_WORKER": "1"` to the vars in
+   `web/wrangler.jsonc` (the comment there marks the place) and nothing to
+   `web/wrangler.cron.jsonc`. Merge it once step 3 has shown a good run. The deploy that follows
+   stops the site running the jobs but `/api/cron/ops`. Afterwards `npx wrangler tail everloot-web`
+   shows the triggers ending `ok` with no `/api/cron/*` request except `/api/cron/ops` at minute 23,
+   and `/api/health` stays `fresh` for the next half hour.
+
+A later change can remove the site's triggers; they cost one empty invocation per schedule until
+then.
+
+**Going back.** To run the jobs on the site again, revert the switch's pull request (or
+`npx wrangler rollback --name everloot-web` to the version before it). To stop the cron Worker
+without a deploy, `npx wrangler secret delete CRON_SECRET --name everloot-cron`: its triggers then
+run nothing. Set `DEPLOY_CRON_WORKER` to anything but `true` to stop deploying it.
+
 ## What `/api/health` answers
 
 `web/src/app/api/health/route.ts` answers JSON `{ ok, snapshot }` with `Cache-Control: no-store`.
@@ -116,7 +257,9 @@ trigger is recorded as failed.
 The route reads the snapshot at most once a minute.
 
 `fresh` means the heartbeat object `cron/last-run.json` has a `generatedAt` within the last 30
-minutes (`web/src/lib/upload-store.ts`). Older than that is `stale`. A missing object is `missing`.
+minutes (`web/src/lib/upload-store.ts`): the corpus, the rollups and the settled list are current. It
+does not say every stored view finished; a view that failed has an older `x-amz-meta-data-as-of`
+stamp than the snapshot's `generatedAt`. Older than that is `stale`. A missing object is `missing`.
 A read that fails, a timestamp that does not parse, or one more than 30 seconds in the future, is
 `unavailable`.
 
