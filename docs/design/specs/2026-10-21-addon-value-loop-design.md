@@ -1,5 +1,7 @@
 # The addon value loop: what the player gets back for recording
 
+Drop-rate rule updated 2026-11-19: rates, measured zeros and unanimous drop source names now show from one install, labelled reported, verified at two, confirmed at three or more. This supersedes the drop publication thresholds described below; other thresholds stay unchanged. See [DATA_POLICY.md](../../DATA_POLICY.md).
+
 **Date:** 2026-10-21
 **Status:** module 1 (price and drop tooltips) built in this pull request; modules 2 to 5 are design only.
 **Launch:** 2026-11-04.

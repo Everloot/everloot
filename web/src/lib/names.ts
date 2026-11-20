@@ -2,7 +2,7 @@ import { agreedCatalog } from "@kb/completion-rollup";
 import type { EdgeKind } from "@kb/edges";
 import { agreedObjectNames } from "@kb/object-spawns";
 import { agreedItemNames, type ItemFacts } from "@kb/item-page";
-import { agreedNpcNames, agreedQuestTitles, type WorldFacts } from "@kb/world-pages";
+import { agreedNpcNames, agreedQuestTitles, type DropSourceName, type WorldFacts } from "@kb/world-pages";
 import type { FactNames } from "./character-facts";
 import type { StoredFact } from "./private-sync-store";
 import { RECHECK_SCOPES } from "./recheck-scopes";
@@ -15,7 +15,7 @@ import { uploadStore } from "./upload-store";
  *
  * AGREED names live here, in names.ts: the name 3 distinct installs report alike (the kb `agreed*` rules, with the
  * recheck cutoffs), and the completion catalog's agreed entries. `loadDropSourceNames` alone permits the named
- * two-install exception for already-public drop sources (DROP_NAME_INSTALLS in kb/world-pages.ts).
+ * tiered, unanimous source names from one install upward.
  * Every surface may use agreed names; /api/suggest, MCP, bulk exports and cards use only them.
  * This file never imports the private game-file store or the shown names.
  *
@@ -45,8 +45,8 @@ export interface Names {
 
 const NO_OBJECTS: never[] = [];
 const memo = new WeakMap<object, Map<number, string>>();
-const dropMemo = new WeakMap<object, Map<number, string>>();
-function once(key: object, build: () => Map<number, string>, cache = memo): Map<number, string> {
+const dropMemo = new WeakMap<object, Map<number, DropSourceName>>();
+function once<T = string>(key: object, build: () => Map<number, T>, cache = memo as WeakMap<object, Map<number, T>>): Map<number, T> {
   let known = cache.get(key);
   if (!known) { known = build(); cache.set(key, known); }
   return known;
@@ -68,8 +68,8 @@ export async function loadNames(itemsRead: ReturnType<typeof loadItemFacts> = lo
   };
 }
 
-/** Labels for already-public drop sources only; the two-install exception never changes page or export names. */
-export async function loadDropSourceNames(): Promise<Pick<Names, "npcs" | "objects">> {
+/** Unanimous drop source names and their tiers; other name paths keep their confirmed threshold. */
+export async function loadDropSourceNames(): Promise<{ npcs: Map<number, DropSourceName>; objects: Map<number, DropSourceName> }> {
   const [items, world] = await Promise.all([loadItemFacts(), loadWorldFacts()]);
   return {
     npcs: world.unreachable ? new Map() : once(world.npcs, () => agreedNpcNames(world, true), dropMemo),

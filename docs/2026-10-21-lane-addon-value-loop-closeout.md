@@ -1,5 +1,7 @@
 # Lane closeout: the addon value loop, first slice (2026-10-21)
 
+Drop-rate rule updated 2026-11-19: rates, measured zeros and unanimous drop source names now show from one install, labelled reported, verified at two, confirmed at three or more. This supersedes the drop publication thresholds described below; other thresholds stay unchanged. See [DATA_POLICY.md](DATA_POLICY.md).
+
 Wave 2, lane D. Recording was a one-way street: the addon collected, the site stored, and the player saw almost
 nothing back in the game. The spec for the whole loop is
 [`docs/design/specs/2026-10-21-addon-value-loop-design.md`](design/specs/2026-10-21-addon-value-loop-design.md):

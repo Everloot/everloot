@@ -1,3 +1,4 @@
+import { dropTierLabel } from "@kb/drop-rollup";
 import type { Metadata } from "next";
 import JsonLd from "@/components/JsonLd";
 import { entityPageJsonLd } from "@/lib/jsonld";
@@ -43,6 +44,7 @@ const columns: Column<ObjectDrop>[] = [
   { key: "item", header: "Item", cell: (d) => <Link href={`/database/items/${d.itemId}`} className={LINK}>{d.itemName ?? `Item ${d.itemId}`}</Link> },
   { key: "windows", header: "Loot windows", numeric: true, cell: (d) => d.kills },
   { key: "drops", header: "Drops", numeric: true, cell: (d) => d.drops },
+  { key: "tier", header: "Reports", cell: (d) => dropTierLabel(d.reporters) },
   { key: "rate", header: FREQUENCY, numeric: true, cell: (d) => percent(d.rate) },
   { key: "installs", header: "Installs", numeric: true, cell: (d) => d.reporters },
 ];
@@ -109,7 +111,7 @@ export default async function ObjectPage(props: { params: Promise<{ id: string }
             panel: facts.unreachable ? <Unreachable />
               : <>
                 {page.drops.length ? <DataTable dense caption={`What players looted from ${title}`} columns={columns} rows={page.drops} rowKey={(d) => String(d.itemId)} />
-                  : page.zero ? <p className="py-3 text-meta text-fg">{formatMeasuredZero(page.zero.kills)} · {page.zero.reporters} install IDs.</p>
+                  : page.zero ? <p className="py-3 text-meta text-fg">{formatMeasuredZero(page.zero.kills)} · {dropTierLabel(page.zero.reporters)}.</p>
                   : <EmptyTab message={page.queued ? EMPTY.queued : EMPTY.drops("this object")} />}
                 {pending}
               </>,

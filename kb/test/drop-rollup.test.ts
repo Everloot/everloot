@@ -23,7 +23,7 @@ test("kills that dropped no item are a measured zero once 3 installs agree", () 
   const empty = (installId: string) => ({ installId, sourceNpcId: 7, items: [] as { itemId: number; count: number }[] });
   const { rates, measuredZeros } = rollupDrops([empty("a"), empty("b"), empty("c"), empty("a")]);
   expect(rates).toHaveLength(0);
-  expect(measuredZeros).toEqual([{ sourceNpcId: 7, kills: 4, reporters: 3, public: true }]);
+  expect(measuredZeros).toEqual([{ sourceNpcId: 7, kills: 4, reporters: 3, tier: "confirmed", public: true }]);
 });
 
 test("an empty window still counts in the kills of an item that did drop", () => {
@@ -98,7 +98,7 @@ test("stack units and source copper use the existing counted windows", () => {
     { kind: "loot", sourceEvidence: "loot-api", lootType: "skinning", installId: "c", sourceNpcId: 7, copper: 999, items: [{ itemId: 2589, count: 9 }] },
     { kind: "loot", sourceEvidence: "loot-api", installId: "c", sourceObjectId: 9, copper: 12, items: [] },
   ]));
-  expect(result.rates).toEqual([{ sourceNpcId: 7, itemId: 2589, kills: 2, drops: 1, units: 2, rate: 0.5, reporters: 2, public: false }]);
+  expect(result.rates).toEqual([{ sourceNpcId: 7, itemId: 2589, kills: 2, drops: 1, units: 2, rate: 0.5, reporters: 2, tier: "verified", public: false }]);
   expect(result.sources).toEqual([
     { sourceNpcId: 7, kills: 2, averageCopper: 45 },
     { sourceObjectId: 9, kills: 1, averageCopper: 12 },

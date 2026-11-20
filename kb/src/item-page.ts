@@ -1,9 +1,10 @@
 /**
  * One item page from Everloot rollups.
- * Observed loot-window frequency is public after 3 distinct install reports.
+ * Observed loot-window frequency shows from one install with its agreement tier.
  * A name or a map pin is public when 3 installs agree.
  * Wowhead is the page shape. Its rows stay there.
  */
+import { dropTierLabel } from "./drop-rollup.js";
 import { agreedObjectNames, type ObjectSpawnRow } from "./object-spawns.js";
 import { pendingForItem, pendingLine, type PendingCount, type PendingLoot } from "./pending-loot.js";
 
@@ -134,7 +135,7 @@ export function itemPage(itemId: number, facts: ItemFacts): ItemPage {
   );
   const objectNames = agreedObjectNames(facts.objects ?? []);
   const drops = facts.rates
-    .filter((row) => row.public && row.itemId === itemId)
+    .filter((row) => row.reporters > 0 && row.itemId === itemId)
     .map((row) => {
       const npcName =
         row.sourceNpcId === undefined
@@ -196,7 +197,7 @@ export function formatItemPage(page: ItemPage): string {
   const lines = [title];
   if (!page.name) lines.push("No agreed name yet. A name needs 3 installs reporting the same one.");
   if (page.drops.length === 0) {
-    lines.push("Drop rate unrecorded. Observed loot-window frequency needs 3 distinct install reports; total kills are unknown.");
+    lines.push("Drop rate unrecorded. Observed loot-window frequency needs a report; total kills are unknown.");
     if (page.pendingLoot) lines.push(pendingLine(page.pendingLoot, true));
     return lines.join("\n");
   }
@@ -205,7 +206,7 @@ export function formatItemPage(page: ItemPage): string {
     const rate = drop.drops === 0
       ? `${formatMeasuredZero(drop.kills)}  ${drop.reporters} reporters`
       : `${drop.kills} observed loot windows  ${drop.drops} windows with this item  ${(drop.rate * 100).toFixed(1)}%  ${drop.reporters} distinct install reports`;
-    lines.push(`${drop.source}  ${rate}`);
+    lines.push(`${drop.source}  ${rate}  ${dropTierLabel(drop.reporters)}`);
   }
   if (page.pendingLoot) lines.push(pendingLine(page.pendingLoot, true));
   lines.push("Map");

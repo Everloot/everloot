@@ -153,13 +153,13 @@ test("a stock only some installs reported is unrecorded, not unlimited", () => {
 });
 
 
-test("the public drop-name exception respects recheck and leaves other name readers at three installs", () => {
+test("tiered drop names respect recheck and leave other name readers at three installs", () => {
   const old = ["fixture-a", "fixture-b", "fixture-c"].map((installId) =>
     ({ id: 7001, installId, label: "Fixture Old", capturedAt: "2026-10-01T00:00:00Z" }));
   const fresh = ["fixture-d", "fixture-e"].map((installId) =>
     ({ id: 7001, installId, label: "Fixture New", capturedAt: "2026-11-01T00:00:00Z" }));
   const since = () => "2026-10-15T00:00:00Z";
-  expect(agreedLabelsById([...old, fresh[0]!], since, true).size).toBe(0);
-  expect(agreedLabelsById([...old, ...fresh], since, true).get(7001)).toBe("Fixture New");
+  expect(agreedLabelsById([...old, fresh[0]!], since, true).get(7001)).toEqual({ name: "Fixture New", tier: "reported" });
+  expect(agreedLabelsById([...old, ...fresh], since, true).get(7001)).toEqual({ name: "Fixture New", tier: "verified" });
   expect(agreedLabelsById([...old, ...fresh], since).size).toBe(0);
 });

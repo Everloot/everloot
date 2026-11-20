@@ -75,7 +75,7 @@ test("an empty readable corpus says nothing is public yet, with the empty state 
   const drops = await html(() => DropsPage({}));
   expect(drops).not.toContain("0 windows");
   expect(drops).toContain("data-empty-state");
-  expect(drops).toContain("No public frequencies yet");
+  expect(drops).toContain("No frequencies yet");
   expect(drops).not.toContain("95% Wilson");
   expect(await html(DatabasePage)).not.toContain(">0<");
 });
@@ -91,7 +91,7 @@ test("with loot windows recorded, the drops page counts them beside its title", 
   expect(drops).toMatch(/>1<\/span> public frequency/);
 });
 
-test("three installs with empty windows publish a measured zero; two installs publish nothing", async () => {
+test("three installs confirm an empty source; two installs show a verified rate", async () => {
   store.loadCorpus.mockResolvedValue({
     uploads: 5,
     records: [
@@ -102,8 +102,10 @@ test("three installs with empty windows publish a measured zero; two installs pu
   const drops = await html(() => DropsPage({}));
   expect(drops).toContain("No items observed");
   expect(drops).toContain("NPC 42");
-  expect(drops).not.toContain("NPC 77");
-  expect(drops).not.toContain("Item 9");
+  expect(drops).toContain("NPC 77");
+  expect(drops).toContain("verified by 2 players");
+  expect(drops).toContain("confirmed by 3 players");
+  expect(drops).toContain("Item 9");
 });
 
 
@@ -120,7 +122,8 @@ test("the drops list shows the sample range and few-windows mark for 3 of 4", as
 });
 
 test("every empty player-data tab on the NPC, vendor, quest and object pages names the 3-install rule, from one table", () => {
-  const sentences = Object.values(EMPTY).map((m) => (typeof m === "function" ? m("this NPC") : m));
+  const sentences = Object.entries(EMPTY).filter(([key]) => key !== "drops").map(([, m]) => (typeof m === "function" ? m("this NPC") : m));
+  expect(EMPTY.drops("this NPC")).toContain("one install");
   for (const sentence of sentences) expect(sentence).toContain("3 installs");
   for (const file of ["npcs/[id]/page.tsx", "vendors/[id]/page.tsx", "quests/[id]/page.tsx", "objects/[id]/page.tsx", "loot-tables.tsx"]) {
     const source = readFileSync(new URL(file, import.meta.url), "utf8");

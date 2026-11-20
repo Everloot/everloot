@@ -67,21 +67,18 @@ test("an object source gets its rows on the item page too", () => {
   expect(sources.short).toBeNull();
 });
 
-test("short of 3 installs: no rate and no item list, only what is missing", () => {
+test("two installs show the rate and source with the same denominator", () => {
   const records = [loot("install-a", { npc: 40 }, [[750, 1]]), loot("install-a", { npc: 40 }, []), loot("install-b", { npc: 40 }, [[750, 1]])];
   const tables = lootTablesFromRecords(records, asOf);
   const table = npcLootTable(tables, 40);
-  expect(table.state).toBe("short");
-  expect(table.rows).toEqual([]);
+  expect(table.state).toBe("rated");
+  expect(table.rows).toEqual([expect.objectContaining({ itemId: 750, withItem: 2, windows: 3, installs: 2 })]);
   expect(table.missingInstalls).toBe(1);
   expect(missingLine(table)).toBe("3 loot windows from 2 installs, dated 2026-10-12. A rate needs windows from 3 installs: 1 more.");
   // The item page does not name the source either: one sentence with the windows and installs.
   const item = itemDropSources(tables, 750);
-  expect(item.rows).toEqual([]);
-  expect(item.short).toEqual({ windows: 2, installs: 2 });
-  expect(shortLine(item.short!)).toBe(
-    "2 loot windows with this item from 2 installs, on sources fewer than 3 installs have looted. A rate needs windows from 3 installs on the same source.",
-  );
+  expect(item.rows).toEqual(table.rows);
+  expect(item.short).toBeNull();
 });
 
 test("a window with no reporter is left out of every count, and counted as left out", () => {
@@ -95,9 +92,9 @@ test("a window with no reporter is left out of every count, and counted as left 
   ];
   const tables = lootTablesFromRecords(records, asOf);
   const table = npcLootTable(tables, 40);
-  expect(table.state).toBe("short");
+  expect(table.state).toBe("rated");
   expect(table.span).toMatchObject({ windows: 2, installs: 2 });
-  expect(itemDropSources(tables, 750).short).toEqual({ windows: 2, installs: 2 });
+  expect(itemDropSources(tables, 750).rows[0]).toMatchObject({ windows: 2, installs: 2 });
   expect(tables.leftOut).toBe(4);
 });
 
@@ -150,12 +147,12 @@ test("an object's rows come only once 3 installs looted it, with the same number
     loot("install-b", { obj: 9 }, [[12, 1]]),
     loot("install-a", { obj: 5 }, [[14, 1]]),
   ];
-  expect(objectLootRows(lootTablesFromRecords(records, asOf), 9)).toEqual([]);
+  expect(objectLootRows(lootTablesFromRecords(records, asOf), 9)).toHaveLength(2);
   const rated = lootTablesFromRecords([...records, loot("install-c", { obj: 9 }, [])], asOf);
   const rows = objectLootRows(rated, 9);
   expect(rows.map((r) => [r.sourceObjectId, r.itemId, r.withItem, r.windows, r.installs])).toEqual([[9, 12, 2, 3, 3], [9, 13, 1, 3, 3]]);
   expect(rows[0]).toEqual(itemDropSources(rated, 12).rows[0]);
-  expect(objectLootRows(rated, 5)).toEqual([]);
+  expect(objectLootRows(rated, 5)[0]).toMatchObject({ installs: 1 });
   expect(objectLootRows(rated, 404)).toEqual([]);
 });
 

@@ -77,8 +77,8 @@ any player upload.
 Uploaded observations are public as individual, anonymous records, with no character names and
 without the addon's install id. Each record carries a per-install pseudonym instead (`pub-` and 32 hex
 characters, a keyed hash of the install id that cannot be turned back into it), so anyone can count
-installs and check our counts. The facts the site states itself, such as drop rates, spawn points and recipe
-ranges, appear only once at least three installs have reported them. Addon lists are the
+installs and check our counts. Confirmed facts, such as spawn points and recipe ranges, appear once at least three installs
+have reported them. Drop rates and measured zeros appear from one install with the tier below. Addon lists are the
 exception to public records: they are never published row by row, only as counts for addons that
 at least three installs report. Guild data is published only through an officer's
 upload, and named records only with that person's sharing choice; a guild's boss kills (`guild_kill`, below) are
@@ -176,13 +176,17 @@ installs report the same one; an object's spawn point needs three installs withi
 0 to 100 map scale), and a place seen by one or two installs is only counted, never drawn. An object's
 name is shown only when three installs report the same one; otherwise it is "Object" and its id.
 
-**Public drop source label exception (19 November 2026).** `GET /api/rollups/drops` may label an already-public
-NPC or object source with a name from two distinct installs that agree exactly, provided all its counted name
-reports agree. `DROP_NAME_INSTALLS = 2` names this exception; the existing three-install name rule takes precedence.
-The drop rows still require three installs: this names a source whose drops are already published, and never
-publishes a new source or rate. One install never supplies this fallback. Recheck cutoffs still apply. The Desktop
-App carries the label into its price file for addon tooltips. Other APIs, pages, bulk exports and MCP name rules
-stay unchanged.
+**2026-11-19 owner decision: drop tiers.** Drop rates and measured zeros appear from one distinct
+install's reports, labelled *reported by 1 player*, *verified by 2 players* or *confirmed by N players*
+at three or more distinct installs. Three remains the bar for confirmed. A drop source's name appears
+from one install's name report when every counted name report agrees exactly; disagreeing reports show
+no name. Names carry their own reported, verified or confirmed tier, with confirmed names first.
+Recheck cutoffs still apply to rates and names. The trusted-install / Everloot's own install exception
+does not raise a tier: one own install is still reported. Only counts and tiers are public, never install
+ids. The site, drop API and bulk drop exports show these tiers; the Desktop App carries each rate's tier
+and source name into the price file, and addon tooltips and chat show the tier. Other name rules,
+pins, spawns and quests keep their existing thresholds. This replaces the 19 November public drop
+source label exception.
 
 Fishing gives the zone only, never a pin. Object places come from play only: nothing is read from the game's
 files for them.

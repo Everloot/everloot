@@ -1,5 +1,7 @@
 # Object pages
 
+Drop-rate rule updated 2026-11-19: rates, measured zeros and unanimous drop source names now show from one install, labelled reported, verified at two, confirmed at three or more. This supersedes the drop publication thresholds described below; other thresholds stay unchanged. See [DATA_POLICY.md](../../DATA_POLICY.md).
+
 **Date:** 2026-10-18
 **Status:** step 4 of 5 from the [database taxonomy research](../../2026-10-18-database-taxonomy-research.md).
 **Depends on:** item taxonomy (step 3).

@@ -123,6 +123,12 @@ export declare const dropsResponse: z.ZodObject<{
     }, z.core.$strip>;
     unreachable: z.ZodBoolean;
     rates: z.ZodArray<z.ZodObject<{
+        sourceName: z.ZodOptional<z.ZodString>;
+        sourceNameTier: z.ZodOptional<z.ZodEnum<{
+            confirmed: "confirmed";
+            reported: "reported";
+            verified: "verified";
+        }>>;
         sourceNpcId: z.ZodOptional<z.ZodNumber>;
         sourceObjectId: z.ZodOptional<z.ZodNumber>;
         itemId: z.ZodNumber;
@@ -133,15 +139,30 @@ export declare const dropsResponse: z.ZodObject<{
         rateHigh: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
         settled: z.ZodOptional<z.ZodBoolean>;
         reporters: z.ZodNumber;
-        public: z.ZodLiteral<true>;
-        sourceName: z.ZodOptional<z.ZodString>;
+        public: z.ZodBoolean;
+        tier: z.ZodOptional<z.ZodEnum<{
+            confirmed: "confirmed";
+            reported: "reported";
+            verified: "verified";
+        }>>;
     }, z.core.$strip>>;
     measuredZeros: z.ZodArray<z.ZodObject<{
+        sourceName: z.ZodOptional<z.ZodString>;
+        sourceNameTier: z.ZodOptional<z.ZodEnum<{
+            confirmed: "confirmed";
+            reported: "reported";
+            verified: "verified";
+        }>>;
         sourceNpcId: z.ZodOptional<z.ZodNumber>;
         sourceObjectId: z.ZodOptional<z.ZodNumber>;
         kills: z.ZodNumber;
         reporters: z.ZodNumber;
-        public: z.ZodLiteral<true>;
+        public: z.ZodBoolean;
+        tier: z.ZodOptional<z.ZodEnum<{
+            confirmed: "confirmed";
+            reported: "reported";
+            verified: "verified";
+        }>>;
     }, z.core.$strip>>;
     queued: z.ZodNullable<z.ZodNumber>;
     totalRates: z.ZodNumber;
@@ -1507,6 +1528,12 @@ export declare const API_SCHEMAS: {
         }, z.core.$strip>;
         unreachable: z.ZodBoolean;
         rates: z.ZodArray<z.ZodObject<{
+            sourceName: z.ZodOptional<z.ZodString>;
+            sourceNameTier: z.ZodOptional<z.ZodEnum<{
+                confirmed: "confirmed";
+                reported: "reported";
+                verified: "verified";
+            }>>;
             sourceNpcId: z.ZodOptional<z.ZodNumber>;
             sourceObjectId: z.ZodOptional<z.ZodNumber>;
             itemId: z.ZodNumber;
@@ -1517,15 +1544,30 @@ export declare const API_SCHEMAS: {
             rateHigh: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
             settled: z.ZodOptional<z.ZodBoolean>;
             reporters: z.ZodNumber;
-            public: z.ZodLiteral<true>;
-            sourceName: z.ZodOptional<z.ZodString>;
+            public: z.ZodBoolean;
+            tier: z.ZodOptional<z.ZodEnum<{
+                confirmed: "confirmed";
+                reported: "reported";
+                verified: "verified";
+            }>>;
         }, z.core.$strip>>;
         measuredZeros: z.ZodArray<z.ZodObject<{
+            sourceName: z.ZodOptional<z.ZodString>;
+            sourceNameTier: z.ZodOptional<z.ZodEnum<{
+                confirmed: "confirmed";
+                reported: "reported";
+                verified: "verified";
+            }>>;
             sourceNpcId: z.ZodOptional<z.ZodNumber>;
             sourceObjectId: z.ZodOptional<z.ZodNumber>;
             kills: z.ZodNumber;
             reporters: z.ZodNumber;
-            public: z.ZodLiteral<true>;
+            public: z.ZodBoolean;
+            tier: z.ZodOptional<z.ZodEnum<{
+                confirmed: "confirmed";
+                reported: "reported";
+                verified: "verified";
+            }>>;
         }, z.core.$strip>>;
         queued: z.ZodNullable<z.ZodNumber>;
         totalRates: z.ZodNumber;

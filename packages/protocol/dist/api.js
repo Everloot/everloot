@@ -92,6 +92,11 @@ export const marketPricesResponse = z.object({
         "ageDays: calendar days since day. change1d: the newest solid day's market value against the solid day one calendar day before it, (to - from) / from; null without such a pair."),
     attribution: attributionSchema,
 }).refine((r) => (r.fields.length === 7 || r.fields.length === 10) && r.items.every((row) => row.length === r.fields.length), { message: "fields names 7 or 10 positions and every row is as wide as fields" });
+const dropTier = z.enum(["reported", "verified", "confirmed"]);
+const dropSourceName = {
+    sourceName: z.string().min(1).optional().describe("The source name when all counted name reports agree, from one install."),
+    sourceNameTier: dropTier.optional(),
+};
 const dropRate = z.object({
     sourceNpcId: z.number().int().positive().optional(),
     sourceObjectId: z.number().int().positive().optional(),
@@ -103,15 +108,18 @@ const dropRate = z.object({
     rateHigh: z.number().min(0).max(1).nullable().optional().describe("Upper end of the descriptive 95% Wilson range for the observed window share, as a fraction from 0 to 1; null without windows."),
     settled: z.boolean().optional().describe("True at 50 or more windows from at least 5 installs when the Wilson half-width is no more than the larger of 0.03 and 30% of the observed share. Describes sample precision, not a confirmed kill chance."),
     reporters: z.number().int().nonnegative().describe("Distinct installs that looted the source."),
-    public: z.literal(true),
-    sourceName: z.string().min(1).optional().describe("The NPC's or object's name, once 3 installs agree on it; absent until then."),
+    public: z.boolean().describe("True only for confirmed rates, at three or more installs."),
+    tier: dropTier.optional(),
+    ...dropSourceName,
 });
 const measuredZero = z.object({
     sourceNpcId: z.number().int().positive().optional(),
     sourceObjectId: z.number().int().positive().optional(),
     kills: z.number().int().nonnegative(),
     reporters: z.number().int().nonnegative(),
-    public: z.literal(true),
+    public: z.boolean(),
+    tier: dropTier.optional(),
+    ...dropSourceName,
 });
 /** GET /api/rollups/drops: corroborated drop rates, then sources looted with nothing in their windows. */
 export const dropsResponse = z.object({
@@ -127,7 +135,7 @@ export const dropsResponse = z.object({
     unreachable: z.boolean().describe("True when storage could not be read: the lists are then empty, not zero."),
     rates: z.array(dropRate),
     measuredZeros: z.array(measuredZero),
-    queued: z.number().int().nonnegative().nullable().describe("Rates and zeros waiting for their third install; null when unreachable."),
+    queued: z.number().int().nonnegative().nullable().describe("Rates and zeros with zero reporters (normally zero); null when unreachable."),
     totalRates: z.number().int().nonnegative(),
     totalMeasuredZeros: z.number().int().nonnegative(),
     attribution: attributionSchema,
