@@ -90,6 +90,72 @@ test("Escape closes the menu and returns focus to Tools", async () => {
   expect(document.activeElement).toBe(toolsButton());
 });
 
+const key = async (target: Element, key: string, init: KeyboardEventInit = {}) =>
+  act(async () => target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init })));
+const links = () => Array.from(menu()!.querySelectorAll("a"));
+
+test("the open menu walks its links with the arrow keys, wrapping, and Home/End jump to the ends", async () => {
+  await act(async () => toolsButton().click());
+  toolsButton().focus();
+  await key(toolsButton(), "ArrowDown");
+  expect(document.activeElement).toBe(links()[0]);
+  await key(links()[0], "ArrowDown");
+  expect(document.activeElement).toBe(links()[1]);
+  await key(links()[1], "ArrowUp");
+  expect(document.activeElement).toBe(links()[0]);
+  await key(links()[0], "ArrowUp");
+  expect(document.activeElement).toBe(links().at(-1));
+  await key(links().at(-1)!, "ArrowDown");
+  expect(document.activeElement).toBe(links()[0]);
+  await key(links()[0], "End");
+  expect(document.activeElement).toBe(links().at(-1));
+  await key(links().at(-1)!, "Home");
+  expect(document.activeElement).toBe(links()[0]);
+  expect(menu()).not.toBeNull();
+});
+
+test("ArrowDown on a closed trigger opens its menu on the first link; the trigger says it opens a popup", async () => {
+  expect(toolsButton().getAttribute("aria-haspopup")).toBe("true");
+  expect(toolsButton().getAttribute("aria-controls")).toBe("tools-menu");
+  toolsButton().focus();
+  await key(toolsButton(), "ArrowDown");
+  expect(menu()).not.toBeNull();
+  expect(document.activeElement).toBe(links()[0]);
+});
+
+test("Tab past the last link, or Shift+Tab from the trigger, closes the menu; Tab between its links keeps it open", async () => {
+  await act(async () => toolsButton().click());
+  links()[0].focus();
+  await key(links()[0], "Tab");
+  expect(menu()).not.toBeNull();
+  links().at(-1)!.focus();
+  await key(links().at(-1)!, "Tab");
+  expect(menu()).toBeNull();
+  await act(async () => toolsButton().click());
+  toolsButton().focus();
+  await key(toolsButton(), "Tab", { shiftKey: true });
+  expect(menu()).toBeNull();
+});
+
+test("ArrowRight and ArrowLeft move along the bar's items, wrapping, and close the open menu", async () => {
+  const top = (label: string) => Array.from(container.querySelectorAll<HTMLElement>('nav[aria-label="Primary"] a, nav[aria-label="Primary"] button')).find((el) => el.textContent === label)!;
+  await act(async () => toolsButton().click());
+  toolsButton().focus();
+  await key(toolsButton(), "ArrowRight");
+  expect(document.activeElement).toBe(top("Guides"));
+  expect(menu()).toBeNull();
+  await key(top("Guides"), "ArrowRight");
+  expect(document.activeElement).toBe(top("Chat"));
+  top("Lookup").focus();
+  await key(top("Lookup"), "ArrowLeft");
+  expect(document.activeElement).toBe(top("Profile"));
+  // Inside a panel the keys leave the links alone.
+  await act(async () => toolsButton().click());
+  links()[0].focus();
+  await key(links()[0], "ArrowRight");
+  expect(document.activeElement).toBe(links()[0]);
+});
+
 test("a click outside closes the menu", async () => {
   await act(async () => toolsButton().click());
   await act(async () => document.body.dispatchEvent(new Event("pointerdown", { bubbles: true })));
