@@ -5,8 +5,7 @@
 -- any of their tabs hides it. Nothing here posts, bids or buys, and a scan starts only from the player's click.
 -- The panel uses the game's fonts, gold headings and standard controls.
 -- A button at its top right swaps the panel for the shopping lists (modules/shopping.lua): the active list with each
--- item's wanted count, max price, market value and what a search found, and a Search button per item that sends one
--- search per press.
+-- item's wanted count, max price and market value. Open in Buy uses Blizzard's exact-name search when supported.
 
 local E = Everloot
 local T = {}
@@ -305,6 +304,43 @@ end
 
 local function say(text) E.Shopping.message = text end
 
+local function nativeBuy(house)
+  local mode = AuctionHouseFrameDisplayMode and AuctionHouseFrameDisplayMode.Buy
+  local filter = Enum and Enum.AuctionHouseFilter and Enum.AuctionHouseFilter.ExactMatch
+  if house and mode and filter and type(house.SetDisplayMode) == "function" and type(house.SetSearchText) == "function"
+      and type(house.SendBrowseQuery) == "function" and type(house.GetCategoriesList) == "function"
+      and C_AuctionHouse and type(C_AuctionHouse.IsThrottledMessageSystemReady) == "function" then
+    return mode, filter
+  end
+end
+
+local function openInBuy(item)
+  local S, house = E.Shopping, T.house
+  local mode, filter = nativeBuy(house)
+  if not mode then return S.Search(item.itemId, item.name) end
+  if not E.auctionHouseOpen then return say("Open the auction house first.") end
+  local ready, canSend = pcall(C_AuctionHouse.IsThrottledMessageSystemReady)
+  if E:Scanning() or S.Pending() or not ready or E.Readable(canSend) ~= true then
+    return say("The auction house is busy. Try again when it finishes.")
+  end
+  local name = S.ItemName(item.itemId, item.name)
+  if not name then return say("The client has not loaded that item's name yet. Try again in a moment.") end
+  local ok, started = pcall(function()
+    house:GetCategoriesList():SetSelectedCategory(nil)
+    house:SetDisplayMode(mode)
+    if not house:SetSearchText(name) then return false end
+    house:SendBrowseQuery(name, 0, 0, { filter })
+    return true
+  end)
+  if not ok or not started then return say("Could not open the Buy search. Try again in a moment.") end
+  T.Hide()
+  local cap = item.max and ("Max " .. S.Money(item.max) .. " each") or "no price cap"
+  local market = S.Market(item.itemId)
+  local estimate = market and ("  ·  Market " .. S.Money(market.market) .. " (" .. S.Age(market.day) .. ")") or ""
+  T.buyContext:SetText("Want " .. item.want .. "  ·  " .. cap .. "  ·  " .. S.Shown(name) .. estimate)
+  T.buyContext:Show()
+end
+
 -- Adds what the three boxes say to the active list, or updates the item when it is already there.
 local function addFromBoxes(shop)
   local S = E.Shopping
@@ -363,10 +399,18 @@ function T.RefreshShop()
   shop.file:SetText(fileLine)
   shop.file:SetTextColor(unpack(warn and WARN or tone("muted")))
   local items = list and list.items or {}
+  local opensBuy = nativeBuy(T.house) ~= nil
+  shop.head.found:SetShown(not opensBuy)
   shop.offset = math.min(shop.offset, math.floor(math.max(#items - 1, 0) / SHOP_ROWS) * SHOP_ROWS)
   for i, line in ipairs(shop.rows) do
     local item = items[shop.offset + i]
-    if item then drawShopRow(line, item); line:Show() else line.item = nil; line:Hide() end
+    if item then
+      drawShopRow(line, item)
+      if opensBuy then line.found:Hide() else line.found:Show() end
+      line.search:SetText(opensBuy and "Open in Buy" or "Search")
+      line.search:SetWidth(opensBuy and 88 or 60)
+      line:Show()
+    else line.item = nil; line:Hide() end
   end
   if #items == 0 then shop.empty:Show() else shop.empty:Hide() end
   if shop.offset > 0 then shop.up:Show() else shop.up:Hide() end
@@ -463,11 +507,11 @@ local function buildShop(panel)
       shop.wantBox:SetText(tostring(item.want))
       shop.maxBox:SetText(item.max and E.Coins(item.max) or "")
     end)
-    -- The row's buttons are its children, so they hide with it. Search sends one search per press.
-    line.search = shopButton(line, "Search", 60, function()
-      if line.item then S.Search(line.item.itemId, line.item.name) end
+    -- The row's buttons are its children, so they hide with it.
+    line.search = shopButton(line, "Search", 88, function()
+      if line.item then openInBuy(line.item) end
     end)
-    line.search:SetPoint("LEFT", line, "LEFT", 600, 0)
+    line.search:SetPoint("RIGHT", line, "LEFT", 660, 0)
     line.remove = shopButton(line, "x", 22, function()
       if line.item and S.Remove(line.item.itemId) then say("Removed " .. S.Shown(S.ItemName(line.item.itemId, line.item.name) or "the item") .. ".") end
     end)
@@ -545,6 +589,7 @@ end
 
 function T.Show()
   if not T.panel then return end
+  if T.buyContext then T.buyContext:Hide() end
   -- Blizzard disables the selected tab. Let a click on it dismiss our overlay without
   -- changing its selected display mode or enabling a tab disabled for another reason.
   local tabs = T.house and T.house.Tabs
@@ -574,6 +619,7 @@ end
 function T.Hide()
   local shown = T.panel and T.panel:IsShown()
   if T.panel then T.panel:Hide() end
+  if T.buyContext then T.buyContext:Hide() end
   for frame, level in pairs(T.lifted or {}) do frame:SetFrameLevel(level) end
   T.lifted = nil
   if shown and PanelTemplates_DeselectTab then pcall(PanelTemplates_DeselectTab, T.tab) end
@@ -783,6 +829,12 @@ function T.Attach(house)
     if tab.HookScript then tab:HookScript("OnShow", size) end
     if PanelTemplates_DeselectTab then pcall(PanelTemplates_DeselectTab, tab) end
     T.panel = buildPanel(house)
+    T.buyContext = words(house, "GameFontHighlightSmall")
+    T.buyContext:SetPoint("TOPRIGHT", house, "TOPRIGHT", -30, -6)
+    T.buyContext:SetWidth(490)
+    T.buyContext:SetJustifyH("RIGHT")
+    T.buyContext:SetWordWrap(false)
+    T.buyContext:Hide()
     tab:SetScript("OnClick", function() if T.panel:IsShown() then T.Hide() else T.Show() end end)
     for _, blizzard in ipairs(tabs) do
       if blizzard.HookScript then blizzard:HookScript("OnClick", T.Hide) end

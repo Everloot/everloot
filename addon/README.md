@@ -7,7 +7,7 @@ Everloot Desktop App, and adds auction prices to item tooltips. It uses only the
 plays the character. Records match the upload contract (`packages/protocol`, see its `schema/records/`) field for
 field.
 
-**Status:** 0.3.26, a regular release. The automated contract tests pass. No live-client check was run before this release: the auction tab's scan bar, name lookup and portrait layering, the crafting cost columns, the flight bar, the drop tooltip wording and the completion tracker default were verified by the contract tests only; the 0.3.25 in-game notes still apply to the rest.
+**Status:** 0.3.27. The shopping-list handoff to Blizzard's Buy screen has automated contract coverage. Live-client verification of the new handoff is pending.
 
 ## Run it
 
@@ -125,11 +125,11 @@ like, the most you will pay per unit. Add an item by name, id or shift-click wit
 change it), or from the Everloot window: **Professions**, **Crafting costs**, choose a recipe and a count, then
 **Add to shopping list** adds its reagents to the active list (a reagent name seen with two item ids is skipped and
 said). Each row shows the price file's market value with how old that item's value is (red past two days), and a line
-above the rows says when the file was built and which auction house its values are for. **Search** sends one
-auction-house search for that item, only when you press it and only when the client's search throttle is ready, and
-never while a scan or another search is waiting; the lowest buyout found and how many are listed show in the row,
-lit when within your max. Blizzard's Buy tab shows the same results for you to buy there yourself: nothing is bought,
-bid on or posted for you. Lists are kept in your saved file only, never uploaded: up to 10 lists of 50 items, and
+above the rows says when the file was built and which auction house its values are for. **Open in Buy** searches
+Blizzard's Buy screen for the item's exact name and shows your wanted count, cap and market estimate at the top.
+The search waits for a press while the house is ready. Clients without the native handoff keep **Search** and its
+first-page price summary. You choose the listing and confirm the purchase with Blizzard's usual controls.
+Lists are kept in your saved file only, never uploaded: up to 10 lists of 50 items, and
 the page says so. Wanted counts are your own numbers; your bags and bank are not read.
 
 ## Commands
