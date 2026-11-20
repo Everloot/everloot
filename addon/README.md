@@ -7,7 +7,7 @@ Everloot Desktop App, and adds auction prices to item tooltips. It uses only the
 plays the character. Records match the upload contract (`packages/protocol`, see its `schema/records/`) field for
 field.
 
-**Status:** 0.3.25, a regular release. The automated contract tests pass. In the live Forever client on 2026-11-18 the auction house tab and page and the Sell-tab vendor warning were tried; the rest of `docs/2026-11-17-auction-ui-checklist.md` and the window, minimap, Collection and gathering checks were not run before release.
+**Status:** 0.3.26, a regular release. The automated contract tests pass. No live-client check was run before this release: the auction tab's scan bar, name lookup and portrait layering, the crafting cost columns, the flight bar, the drop tooltip wording and the completion tracker default were verified by the contract tests only; the 0.3.25 in-game notes still apply to the rest.
 
 ## Run it
 
