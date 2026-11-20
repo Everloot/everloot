@@ -136,6 +136,23 @@ test.each(["2026-09-26", "2026-09-27"])("idle probe retries an unfinished fold (
   expect((await createUploadStore({ cloud, localDir: "unused", fetch: fn, now }).snapshotWork()).retryRollups).toBe(true);
 });
 
+test("the stored-views run reads the corpus time and the heartbeat's pending flag, and nothing else", async () => {
+  const run = (heartbeat: () => Response) => {
+    const { fn, calls } = fakeFetch([
+      [`${R2}snapshots/corpus.json`, "GET", () => Response.json({ parts: [], generatedAt: "2026-09-27", lastReceivedAt: capturedAt })],
+      [`${R2}cron/last-run.json`, "GET", heartbeat],
+    ]);
+    return { work: createUploadStore({ cloud, localDir: "unused", fetch: fn, now }).viewsWork(), calls };
+  };
+  const done = run(() => Response.json({ dataAsOf: "2026-09-27", completionPending: false }));
+  expect(await done.work).toEqual({ dataAsOf: "2026-09-27", rollupsPending: false });
+  expect(done.calls.every(c => c.method === "GET" && new URL(c.url).origin !== "https://sb.example")).toBe(true);
+  expect(await run(() => Response.json({ dataAsOf: "2026-09-27", completionPending: true })).work).toEqual({ dataAsOf: "2026-09-27", rollupsPending: true });
+  // No heartbeat, or one that cannot be read: the reports wait.
+  expect((await run(() => new Response(null, { status: 404 })).work).rollupsPending).toBe(true);
+  expect((await run(() => new Response("{not json", { status: 200 })).work).rollupsPending).toBe(true);
+});
+
 describe("upload store, cloud mode", () => {
   test("a stored upload is a signed R2 object plus one index row", async () => {
     const { fn, calls } = fakeFetch([
