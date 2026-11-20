@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
-import { ArmoryDetails, detailPath, MAX_QUESTS, normalizeDetails } from "./details.js";
+import { ArmoryDetails, detailPath, MAX_PLAY_HISTORY, MAX_QUESTS, normalizeDetails, PLAY_HISTORY_RANKED } from "./details.js";
 import achievements from "./fixtures/achievements.json";
+import playHistory from "./fixtures/play-history.json";
 import reputations from "./fixtures/reputations.json";
 import completed from "./fixtures/quests-completed.json";
 
@@ -69,4 +70,51 @@ test("bounds and de-duplicates long lists", () => {
   expect(d.quests?.completed).toHaveLength(MAX_QUESTS);
   expect(d.quests?.completed.slice(0, 3)).toEqual([1, 2, 3]);
   expect(ArmoryDetails.safeParse({ revision: 1, quests: { asOf: at, completed: Array.from({ length: MAX_QUESTS + 1 }, (_, i) => i + 1) } }).success).toBe(false);
+});
+test("reads play history from the advertised achievements link only", () => {
+  const path = "/profile/wow/character/ember-vale/achievements";
+  expect(detailPath({ achievements: { href: `https://eu.api.blizzard.com${path}?namespace=profile-forever-eu` } }, "achievement-statistics", "eu", "ember-vale"))
+    .toBe(`${path}/statistics`);
+  for (const href of [`https://evil.test${path}`, "https://eu.api.blizzard.com/profile/wow/character/other-person/achievements"]) {
+    expect(detailPath({ achievements: { href } }, "achievement-statistics", "eu", "ember-vale")).toBeNull();
+  }
+  expect(detailPath({}, "achievement-statistics", "eu", "ember-vale")).toBeNull();
+});
+test("keeps play history as groups of named counts, and the six ranked numbers", () => {
+  const d = normalizeDetails({ "achievement-statistics": playHistory }, at);
+  expect(d.playHistory?.asOf).toBe(at);
+  expect(d.playHistory?.ranked).toEqual({ quests: 791, creatures: 11256, fish: 1993, flights: 152, dungeons: 23, deaths: 56 });
+  expect(Object.keys(PLAY_HISTORY_RANKED)).toEqual(["quests", "creatures", "fish", "flights", "dungeons", "deaths"]);
+  const groups = d.playHistory?.groups ?? [];
+  expect(groups[0]).toEqual({ name: "Character", rows: [{ id: 64222, name: "Times camped", value: 74 }] });
+  expect(groups[1].name).toBe("Character · Consumables");
+  expect(groups[1].rows).toContainEqual({ id: 1125, name: "Bandage used most", value: 31, note: "Triage Bandage" });
+  expect(groups.find((g) => g.name === "Quests")?.rows).toContainEqual({ id: 95, name: "Average quests completed per day", value: 0 });
+  const stored = JSON.stringify(d);
+  for (const absent of ["last_updated_timestamp", "href", "Ember"]) expect(stored).not.toContain(absent);
+  expect(ArmoryDetails.parse(d)).toEqual(d);
+});
+test("play history drops counts it cannot read rather than storing a guess", () => {
+  const stat = (id: number, quantity: unknown, name: unknown = `Stat ${id}`) => ({ id, name, quantity });
+  const d = normalizeDetails({ "achievement-statistics": { categories: [{ name: "Quests", statistics: [
+    stat(98, 791.5), stat(60, -1), { id: 107, name: "Creatures killed" }, stat(1518, 10, ""), stat(349, 152.0), stat(932, "23"),
+  ] }] } }, at);
+  expect(d.playHistory?.ranked).toEqual({ flights: 152 });
+  expect(d.playHistory?.groups).toEqual([{ name: "Quests", rows: [{ id: 349, name: "Stat 349", value: 152 }] }]);
+});
+test("an empty play history is a read; a malformed one is not", () => {
+  expect(normalizeDetails({ "achievement-statistics": { categories: [] } }, at).playHistory).toEqual({ asOf: at, groups: [], ranked: {} });
+  expect(normalizeDetails({ "achievement-statistics": { categories: "x" } }, at)).toEqual({ revision: 1 });
+  expect(normalizeDetails({ "achievement-statistics": null }, at)).toEqual({ revision: 1 });
+});
+test("play history keeps at most its cap of counts", () => {
+  const statistics = Array.from({ length: MAX_PLAY_HISTORY + 100 }, (_, i) => ({ id: i + 1, name: `Stat ${i + 1}`, quantity: i }));
+  const d = normalizeDetails({ "achievement-statistics": { categories: [{ name: "Big", statistics }] } }, at);
+  expect(MAX_PLAY_HISTORY).toBe(300);
+  expect(d.playHistory?.groups.flatMap((g) => g.rows)).toHaveLength(MAX_PLAY_HISTORY);
+});
+test("a broken stored play history drops only itself", () => {
+  const parsed = ArmoryDetails.parse({ revision: 1, playHistory: { asOf: "x" }, quests: { asOf: at, completed: [1] } });
+  expect(parsed.playHistory).toBeUndefined();
+  expect(parsed.quests).toEqual({ asOf: at, completed: [1] });
 });

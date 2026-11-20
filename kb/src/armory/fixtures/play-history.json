@@ -1,0 +1,218 @@
+{
+  "_links": {
+    "self": {
+      "href": "https://eu.api.blizzard.com/profile/wow/character/ember-vale/achievements/statistics?namespace=profile-forever-eu"
+    }
+  },
+  "character": {
+    "key": {
+      "href": "https://eu.api.blizzard.com/profile/wow/character/ember-vale?namespace=profile-forever-eu"
+    },
+    "name": "Ember",
+    "id": 1,
+    "surname": "Vale",
+    "slug": "ember-vale"
+  },
+  "categories": [
+    {
+      "id": 130,
+      "name": "Character",
+      "sub_categories": [
+        {
+          "id": 145,
+          "name": "Consumables",
+          "statistics": [
+            {
+              "id": 344,
+              "name": "Bandages used",
+              "last_updated_timestamp": 1794868243000,
+              "quantity": 33.0
+            },
+            {
+              "id": 1125,
+              "name": "Bandage used most",
+              "last_updated_timestamp": 1794868243000,
+              "description": "Triage Bandage",
+              "quantity": 31.0
+            },
+            {
+              "id": 345,
+              "name": "Health potions consumed",
+              "last_updated_timestamp": 1795010393000,
+              "quantity": 13.0
+            }
+          ]
+        }
+      ],
+      "statistics": [
+        {
+          "id": 64222,
+          "name": "Times camped",
+          "last_updated_timestamp": 1795122341000,
+          "quantity": 74.0
+        }
+      ]
+    },
+    {
+      "id": 14807,
+      "name": "Dungeons & Raids",
+      "statistics": [
+        {
+          "id": 932,
+          "name": "Total 5-player dungeons entered",
+          "last_updated_timestamp": 1795125268000,
+          "quantity": 23.0
+        }
+      ]
+    },
+    {
+      "id": 128,
+      "name": "Kills",
+      "sub_categories": [
+        {
+          "id": 135,
+          "name": "Creatures",
+          "statistics": [
+            {
+              "id": 107,
+              "name": "Creatures killed",
+              "last_updated_timestamp": 1795131976000,
+              "quantity": 11256.0
+            },
+            {
+              "id": 1337,
+              "name": "Different creature types killed",
+              "last_updated_timestamp": 1795131976000,
+              "quantity": 9.0
+            },
+            {
+              "id": 1336,
+              "name": "Creature type killed the most",
+              "last_updated_timestamp": 1795131976000,
+              "description": "Humanoid",
+              "quantity": 6131.0
+            }
+          ]
+        }
+      ],
+      "statistics": [
+        {
+          "id": 1197,
+          "name": "Total kills",
+          "last_updated_timestamp": 1795131976000,
+          "quantity": 11342.0
+        },
+        {
+          "id": 1198,
+          "name": "Total kills that grant experience or honor",
+          "last_updated_timestamp": 1795130375000,
+          "quantity": 3771.0
+        }
+      ]
+    },
+    {
+      "id": 122,
+      "name": "Deaths",
+      "statistics": [
+        {
+          "id": 60,
+          "name": "Total deaths",
+          "last_updated_timestamp": 1795016458000,
+          "quantity": 56.0
+        }
+      ]
+    },
+    {
+      "id": 133,
+      "name": "Quests",
+      "statistics": [
+        {
+          "id": 98,
+          "name": "Quests completed",
+          "last_updated_timestamp": 1795132432000,
+          "quantity": 791.0
+        },
+        {
+          "id": 95,
+          "name": "Average quests completed per day",
+          "last_updated_timestamp": 1795132432000,
+          "quantity": 0.0
+        },
+        {
+          "id": 94,
+          "name": "Quests abandoned",
+          "last_updated_timestamp": 1795120060000,
+          "quantity": 11.0
+        }
+      ]
+    },
+    {
+      "id": 132,
+      "name": "Skills",
+      "sub_categories": [
+        {
+          "id": 178,
+          "name": "Secondary Skills",
+          "statistics": [
+            {
+              "id": 1524,
+              "name": "Cooking skill",
+              "last_updated_timestamp": 1795114817000,
+              "quantity": 300.0
+            },
+            {
+              "id": 1518,
+              "name": "Fish caught",
+              "last_updated_timestamp": 1795033257000,
+              "quantity": 1993.0
+            }
+          ]
+        }
+      ],
+      "statistics": [
+        {
+          "id": 1199,
+          "name": "Professions learned",
+          "last_updated_timestamp": 1795114817000,
+          "quantity": 2.0
+        },
+        {
+          "id": 1201,
+          "name": "Professions at maximum skill",
+          "last_updated_timestamp": 1795114817000,
+          "quantity": 2.0
+        },
+        {
+          "id": 1200,
+          "name": "Secondary skills at maximum skill",
+          "last_updated_timestamp": 1795114817000,
+          "quantity": 3.0
+        },
+        {
+          "id": 1202,
+          "name": "Weapon skills at maximum skill",
+          "last_updated_timestamp": 1795131938000,
+          "quantity": 10.0
+        }
+      ]
+    },
+    {
+      "id": 134,
+      "name": "Travel",
+      "statistics": [
+        {
+          "id": 349,
+          "name": "Flight paths taken",
+          "last_updated_timestamp": 1795132160000,
+          "quantity": 152.0
+        },
+        {
+          "id": 353,
+          "name": "Number of times hearthed",
+          "last_updated_timestamp": 1795132495000,
+          "quantity": 45.0
+        }
+      ]
+    }
+  ]
+}
