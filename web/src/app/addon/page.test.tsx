@@ -51,6 +51,7 @@ test("the page describes the in-game window, feature chooser and local-only stor
     expect(text).toContain(term);
   }
   expect(html).toContain('href="/docs/guides/addon#window"');
+  expect(text).toContain("boss kills sync with a linked character and are public");
 });
 
 test("the addon choices lead with the app, then website, then zip; desktop starts neutral", async () => {

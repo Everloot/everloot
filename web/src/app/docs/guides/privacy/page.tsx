@@ -45,7 +45,7 @@ export default function Page() {
         <li>The facts the site states, such as drop rates, spawn points and recipe ranges, appear only after at least 3 installs report them. Distinct install ids do not prove independent players.</li>
         <li>Full auction scans are not public records. They feed market values, and a value is published when 3 distinct reporters scanned the item.</li>
         <li>Character names appear in three places only: named records their owner shares with a grant (gear, gold, collection), guild boards a guild&apos;s officers publish (on the guild&apos;s page, and on the page of each character a board names), and <a href="#player-pages" className={docLink}>player pages</a>.</li>
-        <li>Guild data is published only through an authorized officer&apos;s upload.</li>
+        <li>Guild officers publish their boards. Public progression also counts synced boss kills from linked characters in the armory roster.</li>
         <li>Uploads build the public database. We never sell them.</li>
       </List>
 
@@ -91,6 +91,15 @@ export default function Page() {
           upload and keeps none of them.
         </P>
       )}
+
+      <H2 id="boss-kills">Boss kills</H2>
+      <P>
+        Your own boss kills sync through the Desktop App for a linked character, with no separate boss-kill consent.
+        They are public on the character page, the guild page and the rankings. A guild boss counts when five roster
+        members have killed it in a dungeon, the raid size in a raid, or forty for a world boss. Hiding a character
+        removes its kills from these views and counts; hiding a guild removes its page and ranking. This history
+        records no other player&apos;s name. The completion tracker is on in a new install; an older install keeps its choice.
+      </P>
 
       <H2 id="grants">Sharing grants</H2>
       <P>

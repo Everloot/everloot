@@ -209,9 +209,17 @@ for case in main:
             notices = [line for line in actual if line.startswith("Everloot: player names on.")]
             assert len(notices) == (1 if case == "new" else 0), notices
             actual = [line for line in actual if line not in notices]
+            # Completion defaults and its notice change independently of pull recording (owner, 2026-11-19).
+            completion_notices = [line for line in actual if line.startswith("Everloot: completion tracker on.")]
+            assert len(completion_notices) == (1 if case == "new" else 0), completion_notices
+            actual = [line for line in actual if line not in completion_notices]
         if part == "saved":
             # The same change, in the saved file: no gear or talents switch, and in a new install player names on and
             # their notice given. Compare every other value.
+            assert actual["toggles"]["completion"] is (case == "new")
+            assert actual.get("completionNotice") is (True if case == "new" else None)
+            actual = {k: v for k, v in actual.items() if k != "completionNotice"}
+            actual["toggles"] = {**actual["toggles"], "completion": False}
             assert "gear" not in actual["toggles"] and "talents" not in actual["toggles"], actual["toggles"]
             assert actual["toggles"]["players"] is (case == "new") and actual.get("playersNotice") is (True if case == "new" else None)
             expected = {**expected, "toggles": {k: v for k, v in expected["toggles"].items() if k not in {"gear", "talents", "players"}}}

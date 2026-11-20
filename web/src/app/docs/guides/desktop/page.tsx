@@ -75,6 +75,10 @@ export default function Page() {
         <Link href="/docs/guides/account" className={docLink}>account guide</Link> for those choices.
       </P>
       <P>
+        Boss kills sync with a linked character without a separate boss-kill switch and are public on character
+        and guild pages and rankings. Hidden characters and guilds stay out of these views.
+      </P>
+      <P>
         Signing in does not upload your local chat transcript, backups or model keys. If you choose a model provider,
         it receives your questions, conversation history and any local character details used to answer.
       </P>

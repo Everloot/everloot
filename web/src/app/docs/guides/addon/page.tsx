@@ -140,8 +140,9 @@ export default function Page() {
         <p>
           In a new install, auction capture and the census are on. The census says so once in chat; an install from
           before the census keeps it off. Addon releases after 0.3.23 also turn the players module on in a new install
-          and say so once; an install from before keeps its choice. The completion tracker and the installed addon list
-          are off until you turn them on. Nothing in the addon buys, bids on or posts anything at the auction house.
+          and say so once; an install from before keeps its choice. The completion tracker is also on in a new install;
+          an older install keeps its choice. Your own boss kills sync through the Desktop App for linked characters
+          and appear publicly on character and guild pages and rankings. The installed addon list stays off until you turn it on. Nothing in the addon buys, bids on or posts anything at the auction house.
         </p>
       </Callout>
 

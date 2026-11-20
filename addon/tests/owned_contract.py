@@ -83,8 +83,8 @@ def status(lua):
     return lua.eval("Everloot:Status()")
 
 
-# Off by default, like the completion tracker it follows: nothing is read, nothing is written.
-lua = addon(completion=None)
+# Explicitly off: follows the completion switch, reading and writing nothing.
+lua = addon(completion=False)
 lua.execute("event('PLAYER_ENTERING_WORLD'); event('SKILL_LINES_CHANGED'); event('UPDATE_INSTANCE_INFO')")
 assert plain(lua, "lockout_owned") == []
 assert lua.eval("raidInfoAsked") == 0

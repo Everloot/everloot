@@ -7,7 +7,7 @@ export default async function GuildProgression({ members, region }: { members: r
   return <section aria-labelledby="guild-progression" className="space-y-4">
     <SectionHeading id="guild-progression">Progression</SectionHeading>
     <Facts items={[{ label: "Guild progression score", value: progress.score.toLocaleString("en-US"), numeric: true }]} />
-    <p className="text-sm text-fg-2">Each counted boss earns the group size in points; a clear adds the boss count times that size. Only instances observed open score. This view includes only your own consented characters; other members&apos; histories remain private.</p>
+    <p className="text-sm text-fg-2">Each counted boss earns the group size in points; a clear adds the boss count times that size. Only instances observed open score. Synced kills from every roster member count: five members for a dungeon, the raid size for a raid, and forty for a world boss.</p>
     <ProgressionMatrix instances={progress.instances} links={progress.links} guild />
   </section>;
 }

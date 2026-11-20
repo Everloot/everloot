@@ -80,7 +80,7 @@ exports[`changes > populated 1`] = `
 
 exports[`characters > Linked characters > populated: the linked characters, a frozen one and the last sync 1`] = `
 "<section class="panel" id="linked"><h2>Linked characters</h2>
-      <p class="fg2">Characters you linked to your everloot.app account with a code from the site. After each upload their titles, raid lockouts and boss kills go to your account's private sync, only for the categories you switched on there.</p>
+      <p class="fg2">Characters you linked to your everloot.app account with a code from the site. After each upload their titles and raid lockouts go to your account's private sync for the categories you switched on there. Boss kills sync with a linked character and are public on character and guild pages and rankings.</p>
       <ul class="plain"><li><b>Thrallina of Forever Pioneer</b></li></ul><p class="warn small">Jainara of Forever Pioneer frozen: another account linked it too.</p><p class="fg2">Last synced 2026-10-20T11:30:00Z: Thrallina of Forever Pioneer (raid lockouts, boss kills)</p>
     </section>"
 `;
@@ -142,7 +142,7 @@ exports[`characters > populated, from the save fixture, with missing titles and 
         <p class="muted small">Raid lockouts never go in an upload, and Chat does not read them. Private sync sends them only for a character you linked, and everloot.app keeps only the categories you switched on.</p>
     </section>
     <section class="panel" id="linked"><h2>Linked characters</h2>
-      <p class="fg2">Characters you linked to your everloot.app account with a code from the site. After each upload their titles, raid lockouts and boss kills go to your account's private sync, only for the categories you switched on there.</p>
+      <p class="fg2">Characters you linked to your everloot.app account with a code from the site. After each upload their titles and raid lockouts go to your account's private sync for the categories you switched on there. Boss kills sync with a linked character and are public on character and guild pages and rankings.</p>
       <p class="muted small" role="status">Nothing linked yet. Type <code>/everloot link &lt;code&gt;</code> in game.</p>
     </section>
   </div>

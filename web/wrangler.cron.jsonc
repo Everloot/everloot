@@ -82,6 +82,7 @@
     "EVERLOOT_ARMORY": "1",
     "EVERLOOT_ARMORY_LOOKUP": "1",
     "EVERLOOT_PRIVATE_SYNC": "1",
+    "EVERLOOT_BOSS_KILL_SYNC": "1",
     "EVERLOOT_LEADERBOARDS": "1",
     "NEWS_DIR": "/bundle/repo/kb/news",
     "GUIDES_DIR": "/bundle/repo/kb/guides",
