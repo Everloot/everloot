@@ -1,0 +1,585 @@
+{
+  "schema": "everloot.game-changes/2",
+  "label": "found in game files, unconfirmed",
+  "id": "wowf-71037",
+  "product": "wowf",
+  "live": true,
+  "spoiler": false,
+  "detectedAt": "2026-11-20T23:20:07.596Z",
+  "build": {
+    "version": "1.60.1.71037",
+    "buildId": 71037,
+    "buildConfig": "0acab1e6aa41b46165d2ca66853b417b"
+  },
+  "previous": {
+    "version": "1.60.1.70959",
+    "buildId": 70959,
+    "buildConfig": "ad887adcf63b8746155dd40e1930b80f"
+  },
+  "initial": false,
+  "encryptedBlocks": {
+    "total": 380,
+    "tables": [
+      {
+        "table": "Achievement",
+        "blocks": 1
+      },
+      {
+        "table": "AnimKit",
+        "blocks": 1
+      },
+      {
+        "table": "AnimKitSegment",
+        "blocks": 1
+      },
+      {
+        "table": "AreaTable",
+        "blocks": 3
+      },
+      {
+        "table": "BattlePetSpecies",
+        "blocks": 5
+      },
+      {
+        "table": "CharacterLoadout",
+        "blocks": 1
+      },
+      {
+        "table": "Creature",
+        "blocks": 6
+      },
+      {
+        "table": "CreatureDifficulty",
+        "blocks": 6
+      },
+      {
+        "table": "CreatureDisplayInfo",
+        "blocks": 10
+      },
+      {
+        "table": "CreatureDisplayInfoExtra",
+        "blocks": 1
+      },
+      {
+        "table": "CreatureDisplayInfoGeosetData",
+        "blocks": 1
+      },
+      {
+        "table": "CreatureDisplayInfoOption",
+        "blocks": 1
+      },
+      {
+        "table": "CreatureMovementInfo",
+        "blocks": 1
+      },
+      {
+        "table": "CreatureSoundData",
+        "blocks": 8
+      },
+      {
+        "table": "CreatureXDisplayInfo",
+        "blocks": 6
+      },
+      {
+        "table": "Criteria",
+        "blocks": 1
+      },
+      {
+        "table": "DungeonEncounter",
+        "blocks": 3
+      },
+      {
+        "table": "Emotes",
+        "blocks": 1
+      },
+      {
+        "table": "GameObjectDisplayInfo",
+        "blocks": 2
+      },
+      {
+        "table": "GossipNPCOption",
+        "blocks": 1
+      },
+      {
+        "table": "Item",
+        "blocks": 16
+      },
+      {
+        "table": "ItemAppearance",
+        "blocks": 7
+      },
+      {
+        "table": "ItemDisplayInfo",
+        "blocks": 7
+      },
+      {
+        "table": "ItemDisplayInfoMaterialRes",
+        "blocks": 3
+      },
+      {
+        "table": "ItemEffect",
+        "blocks": 12
+      },
+      {
+        "table": "ItemModifiedAppearance",
+        "blocks": 7
+      },
+      {
+        "table": "ItemNameDescription",
+        "blocks": 1
+      },
+      {
+        "table": "ItemSearchName",
+        "blocks": 7
+      },
+      {
+        "table": "ItemSparse",
+        "blocks": 31
+      },
+      {
+        "table": "ItemXItemEffect",
+        "blocks": 12
+      },
+      {
+        "table": "LFGDungeons",
+        "blocks": 1
+      },
+      {
+        "table": "LoadingScreens",
+        "blocks": 2
+      },
+      {
+        "table": "Lock",
+        "blocks": 1
+      },
+      {
+        "table": "Map",
+        "blocks": 3
+      },
+      {
+        "table": "MapDifficulty",
+        "blocks": 1
+      },
+      {
+        "table": "Mount",
+        "blocks": 3
+      },
+      {
+        "table": "MountXDisplay",
+        "blocks": 3
+      },
+      {
+        "table": "ObjectEffect",
+        "blocks": 2
+      },
+      {
+        "table": "ObjectEffectPackageElem",
+        "blocks": 2
+      },
+      {
+        "table": "QuestV2",
+        "blocks": 5
+      },
+      {
+        "table": "SkillLineAbility",
+        "blocks": 8
+      },
+      {
+        "table": "SoundEnvelope",
+        "blocks": 4
+      },
+      {
+        "table": "SoundKit",
+        "blocks": 8
+      },
+      {
+        "table": "SoundKitAdvanced",
+        "blocks": 8
+      },
+      {
+        "table": "SoundKitChild",
+        "blocks": 2
+      },
+      {
+        "table": "SoundKitEntry",
+        "blocks": 8
+      },
+      {
+        "table": "Spell",
+        "blocks": 29
+      },
+      {
+        "table": "SpellAuraOptions",
+        "blocks": 6
+      },
+      {
+        "table": "SpellCastingRequirements",
+        "blocks": 5
+      },
+      {
+        "table": "SpellCategories",
+        "blocks": 12
+      },
+      {
+        "table": "SpellClassOptions",
+        "blocks": 2
+      },
+      {
+        "table": "SpellCooldowns",
+        "blocks": 9
+      },
+      {
+        "table": "SpellEffect",
+        "blocks": 14
+      },
+      {
+        "table": "SpellEquippedItems",
+        "blocks": 3
+      },
+      {
+        "table": "SpellFocusObject",
+        "blocks": 1
+      },
+      {
+        "table": "SpellInterrupts",
+        "blocks": 12
+      },
+      {
+        "table": "SpellItemEnchantment",
+        "blocks": 1
+      },
+      {
+        "table": "SpellLabel",
+        "blocks": 4
+      },
+      {
+        "table": "SpellLevels",
+        "blocks": 7
+      },
+      {
+        "table": "SpellMisc",
+        "blocks": 14
+      },
+      {
+        "table": "SpellName",
+        "blocks": 14
+      },
+      {
+        "table": "SpellPower",
+        "blocks": 2
+      },
+      {
+        "table": "SpellProceduralEffect",
+        "blocks": 1
+      },
+      {
+        "table": "SpellReagents",
+        "blocks": 4
+      },
+      {
+        "table": "SpellShapeshift",
+        "blocks": 1
+      },
+      {
+        "table": "SpellTargetRestrictions",
+        "blocks": 4
+      },
+      {
+        "table": "SpellTotems",
+        "blocks": 1
+      },
+      {
+        "table": "SummonProperties",
+        "blocks": 3
+      },
+      {
+        "table": "TotemCategory",
+        "blocks": 1
+      },
+      {
+        "table": "Toy",
+        "blocks": 1
+      },
+      {
+        "table": "TransmogSet",
+        "blocks": 2
+      },
+      {
+        "table": "TransmogSetItem",
+        "blocks": 2
+      },
+      {
+        "table": "ZoneLight",
+        "blocks": 1
+      }
+    ]
+  },
+  "source": {
+    "definitions": "8b1923516fda",
+    "library": "@rhyster/wow-casc-dbc@2.16.21",
+    "extractedAt": "2026-11-20T23:19:54.875Z"
+  },
+  "catalog": {
+    "classes": 9,
+    "nodes": 468
+  },
+  "talents": {
+    "classesAdded": [],
+    "classesRemoved": [],
+    "added": [],
+    "removed": [],
+    "moved": [],
+    "ranks": [],
+    "gates": [],
+    "prereqs": [],
+    "replaced": [],
+    "spellValues": [
+      {
+        "classId": 5,
+        "className": "Priest",
+        "tree": "Shadow Magic",
+        "nodeId": 105820,
+        "name": "Vampiric Embrace",
+        "spoiler": false,
+        "spellId": 15286,
+        "spellName": "Vampiric Embrace",
+        "changes": [
+          {
+            "field": "text",
+            "before": "476ba623c069",
+            "after": "26bcc00c33ad"
+          },
+          {
+            "field": "effect 1 basePoints",
+            "before": 20,
+            "after": 10
+          },
+          {
+            "field": "effect 2 basePoints",
+            "before": null,
+            "after": 100
+          },
+          {
+            "field": "effect 2 dieSides",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 periodMs",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 chainTargets",
+            "before": null,
+            "after": 0
+          },
+          {
+            "field": "effect 2 miscValue",
+            "before": null,
+            "after": 0
+          }
+        ]
+      }
+    ],
+    "pointLevels": []
+  },
+  "raidBuffs": {
+    "comparedTo": "1.60.1.70959",
+    "scopeChanges": [],
+    "spellChanges": []
+  },
+  "mapChanges": [],
+  "readSet": {
+    "tables": {
+      "before": 378,
+      "after": 378
+    },
+    "rows": {
+      "before": 1212502,
+      "after": 1212720
+    },
+    "addedTables": [],
+    "removedTables": [],
+    "changedTables": [
+      {
+        "table": "Achievement",
+        "rowsBefore": 440,
+        "rowsAfter": 438,
+        "changed": true
+      },
+      {
+        "table": "ContentTuning",
+        "rowsBefore": 100,
+        "rowsAfter": 102,
+        "changed": true
+      },
+      {
+        "table": "CreatureDisplayInfo",
+        "rowsBefore": 14209,
+        "rowsAfter": 14210,
+        "changed": true
+      },
+      {
+        "table": "CreatureModelData",
+        "rowsBefore": 1197,
+        "rowsAfter": 1198,
+        "changed": true
+      },
+      {
+        "table": "Criteria",
+        "rowsBefore": 3292,
+        "rowsAfter": 3305,
+        "changed": true
+      },
+      {
+        "table": "CriteriaTree",
+        "rowsBefore": 6759,
+        "rowsAfter": 6759,
+        "changed": true
+      },
+      {
+        "table": "Item",
+        "rowsBefore": 31981,
+        "rowsAfter": 31982,
+        "changed": true
+      },
+      {
+        "table": "ItemEffect",
+        "rowsBefore": 12672,
+        "rowsAfter": 12673,
+        "changed": true
+      },
+      {
+        "table": "ItemModifiedAppearance",
+        "rowsBefore": 16898,
+        "rowsAfter": 16898,
+        "changed": true
+      },
+      {
+        "table": "ItemSearchName",
+        "rowsBefore": 6637,
+        "rowsAfter": 6709,
+        "changed": true
+      },
+      {
+        "table": "ItemSetSpell",
+        "rowsBefore": 1505,
+        "rowsAfter": 1505,
+        "changed": true
+      },
+      {
+        "table": "ItemSparse",
+        "rowsBefore": 19300,
+        "rowsAfter": 19374,
+        "changed": true
+      },
+      {
+        "table": "ItemXItemEffect",
+        "rowsBefore": 12664,
+        "rowsAfter": 12665,
+        "changed": true
+      },
+      {
+        "table": "ModifierTree",
+        "rowsBefore": 2875,
+        "rowsAfter": 2876,
+        "changed": true
+      },
+      {
+        "table": "SoundKit",
+        "rowsBefore": 23409,
+        "rowsAfter": 23409,
+        "changed": true
+      },
+      {
+        "table": "SoundKitAdvanced",
+        "rowsBefore": 16491,
+        "rowsAfter": 16492,
+        "changed": true
+      },
+      {
+        "table": "Spell",
+        "rowsBefore": 32124,
+        "rowsAfter": 32135,
+        "changed": true
+      },
+      {
+        "table": "SpellAuraOptions",
+        "rowsBefore": 12769,
+        "rowsAfter": 12765,
+        "changed": true
+      },
+      {
+        "table": "SpellCategories",
+        "rowsBefore": 10703,
+        "rowsAfter": 10705,
+        "changed": true
+      },
+      {
+        "table": "SpellClassOptions",
+        "rowsBefore": 6119,
+        "rowsAfter": 6118,
+        "changed": true
+      },
+      {
+        "table": "SpellCooldowns",
+        "rowsBefore": 4514,
+        "rowsAfter": 4511,
+        "changed": true
+      },
+      {
+        "table": "SpellEffect",
+        "rowsBefore": 43048,
+        "rowsAfter": 43062,
+        "changed": true
+      },
+      {
+        "table": "SpellEquippedItems",
+        "rowsBefore": 1891,
+        "rowsAfter": 1891,
+        "changed": true
+      },
+      {
+        "table": "SpellInterrupts",
+        "rowsBefore": 9926,
+        "rowsAfter": 9929,
+        "changed": true
+      },
+      {
+        "table": "SpellItemEnchantment",
+        "rowsBefore": 2218,
+        "rowsAfter": 2219,
+        "changed": true
+      },
+      {
+        "table": "SpellLevels",
+        "rowsBefore": 13002,
+        "rowsAfter": 13006,
+        "changed": true
+      },
+      {
+        "table": "SpellMisc",
+        "rowsBefore": 32104,
+        "rowsAfter": 32115,
+        "changed": true
+      },
+      {
+        "table": "SpellName",
+        "rowsBefore": 32124,
+        "rowsAfter": 32135,
+        "changed": true
+      },
+      {
+        "table": "SpellTargetRestrictions",
+        "rowsBefore": 4514,
+        "rowsAfter": 4517,
+        "changed": true
+      }
+    ],
+    "layoutChanged": true
+  },
+  "warnings": [
+    "table definitions differ (WoWDBDefs 5ebf2124996b vs 8b1923516fda): a change may come from the layouts, not the game"
+  ]
+}
