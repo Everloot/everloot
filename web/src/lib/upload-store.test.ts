@@ -127,6 +127,16 @@ test.each([
   });
 });
 
+test("the stored-views job reads the heartbeat's snapshot time and pending flag; none before the first run; a failed read throws", async () => {
+  const read = (heartbeat: () => Response) => createUploadStore({ cloud, localDir: "unused", fetch: fakeFetch([[`${R2}cron/last-run.json`, "GET", heartbeat]]).fn, now }).readCronRun();
+  expect(await read(() => Response.json({ generatedAt: "2026-09-27T00:10:30Z", dataAsOf: "2026-09-27T00:10:12Z", completionPending: true, settledWeek: "2026-W39" })))
+    .toEqual({ generatedAt: "2026-09-27T00:10:30Z", dataAsOf: "2026-09-27T00:10:12Z", completionPending: true });
+  // A heartbeat from before a field existed reads as not pending, with no time.
+  expect(await read(() => Response.json({}))).toEqual({ generatedAt: null, dataAsOf: null, completionPending: false });
+  expect(await read(() => new Response(null, { status: 404 }))).toBeNull();
+  await expect(read(() => new Response(null, { status: 503 }))).rejects.toThrow("cron heartbeat read failed (503)");
+});
+
 test.each(["2026-09-26", "2026-09-27"])("idle probe retries an unfinished fold (%s)", async dataAsOf => {
   const { fn } = fakeFetch([
     [`${R2}snapshots/corpus.json`, "GET", () => Response.json({ records: [], generatedAt: "2026-09-27" })],

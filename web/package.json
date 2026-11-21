@@ -16,6 +16,7 @@
     "test": "vitest run",
     "sample-release": "tsx scripts/sample-release.ts",
     "export-bulk": "tsx scripts/export-bulk.ts",
+    "stored-views": "tsx --tsconfig tsconfig.scripts.json scripts/stored-views.ts",
     "cf:build": "opennextjs-cloudflare build && node scripts/cf-bundle-files.mjs",
     "cf:preview": "npm run cf:build && opennextjs-cloudflare preview",
     "cf:deploy": "node scripts/cf-deploy.mjs"

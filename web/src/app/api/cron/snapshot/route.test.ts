@@ -410,6 +410,25 @@ test("the snapshot refreshes the guild ladder even when no new uploads arrive an
   expect((await GET(req())).status).toBe(200);
 });
 
+test("with the stored views on the job, a run ends at its heartbeat and builds none of them (#1354)", async () => {
+  vi.stubEnv("EVERLOOT_STORED_VIEWS", "job");
+  try {
+    vi.mocked(writeMarketBoards).mockClear();
+    vi.mocked(writeAuctionReports).mockClear();
+    store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-11-21T04:10:12.000Z" });
+    const res = await GET(req());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, added: 2, storedViews: "job" });
+    expect(store.writeCronRun).toHaveBeenCalledOnce();
+    for (const write of [settled.writeSettled, view.writeItemView, aggregates.writeAggregates, searchNames.writeSearchNames, auctions.writeAuctionHistory,
+      professions.writeProfessions, mapPins.writeMapPins, activity.writeDatabaseActivity, guilds.writeGuildLadder, coverage.writeCoverage,
+      vi.mocked(writeMarketBoards), vi.mocked(writeAuctionReports)]) expect(write).not.toHaveBeenCalled();
+    expect(store.loadCorpus).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
+
 test("the heartbeat is written before the settled list, the stored views, the guild ladder, the boards, the coverage score and then the auction reports, and their memory is let go between steps (#1354)", async () => {
   const order: string[] = [];
   store.writeCronRun.mockImplementation(async () => { order.push("heartbeat"); });
@@ -424,7 +443,8 @@ test("the heartbeat is written before the settled list, the stored views, the gu
   vi.spyOn(console, "error").mockImplementation(() => {});
   const res = await GET(req());
   expect(res.status).toBe(200);
-  expect(await res.json()).toMatchObject({ ok: true, guildLadder: null, marketBoards: null, coverage: null });
+  expect(await res.json()).toMatchObject({ ok: true, guildLadder: null, marketBoards: null, coverage: null,
+    failed: ["settled", "itemView", "guildLadder", "marketBoards", "coverage"] });
   expect(order).toEqual(["heartbeat", "settled", "item view", "ladder", "boards", "coverage", "reports"]);
   // Released after the corpus write, after the rollups, after each corpus view and around the steps after the heartbeat.
   expect(store.forgetReads.mock.calls.length).toBeGreaterThanOrEqual(11);
