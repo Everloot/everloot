@@ -87,6 +87,7 @@ one is not recorded here.
 | `R2_BUCKET` | `web/src/lib/upload-store.ts` and the other bucket stores | The uploads bucket | Yes |
 | `BLUE_BUCKET` | `web/src/lib/blue-store.ts` | A separate bucket for the blue-post archive; falls back to `R2_BUCKET` | No |
 | `CRON_SECRET` | `web/src/app/api/cron/*/route.ts`, `web/scripts/cf-entry.mjs` | The scheduled jobs call their routes with it | Yes |
+| `EVERLOOT_VIEWS_DISPATCH_TOKEN` | `web/src/lib/stored-views-dispatch.ts` | On the cron Worker only: a fine-grained GitHub token for Everloot/everloot with Actions read and write and nothing else. A snapshot run that added uploads starts the stored-views workflow with it; nothing is sent without it ([OPERATIONS.md](OPERATIONS.md), "The stored-views job") | No |
 | `BNET_CLIENT_ID` | `web/src/lib/auth/battlenet.ts`, `web/src/app/api/auth/bnet/route.ts`, `web/src/lib/armory-lookup.ts` | Battle.net sign-in; the on-demand armory lookup's Profile API client | For sign-in and the lookup |
 | `BNET_CLIENT_SECRET` | `web/src/lib/auth/battlenet.ts`, `web/src/app/api/auth/bnet/route.ts`, `web/src/lib/armory-lookup.ts` | Battle.net sign-in; the on-demand armory lookup's Profile API client | For sign-in and the lookup |
 | `BNET_REDIRECT_URI` | `web/src/app/api/auth/bnet/route.ts` | The old sign-in's callback address; the new sign-in derives it | No |

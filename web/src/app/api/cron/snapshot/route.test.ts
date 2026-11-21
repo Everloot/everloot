@@ -33,6 +33,8 @@ vi.mock("@/lib/database-activity-store", () => ({ writeDatabaseActivity: activit
 vi.mock("@/lib/database-activity", () => ({ buildDatabaseActivity: activity.buildDatabaseActivity }));
 const guilds = vi.hoisted(() => ({ writeGuildLadder: vi.fn() }));
 vi.mock("@/lib/guild-ladder-store", () => guilds);
+const dispatch = vi.hoisted(() => ({ dispatchStoredViews: vi.fn() }));
+vi.mock("@/lib/stored-views-dispatch", () => dispatch);
 import { GET } from "./route";
 import { writeAuctionReports } from "@/lib/auction-report-store";
 import { writeMarketBoards } from "@/lib/market-boards";
@@ -59,6 +61,7 @@ beforeEach(() => {
   pulls.store = { insert: vi.fn(), forget: vi.fn(), prune: vi.fn().mockResolvedValue(undefined) };
   coverage.writeCoverage.mockReset().mockResolvedValue({ written: false });
   settled.writeSettled.mockReset().mockResolvedValue({ written: false });
+  dispatch.dispatchStoredViews.mockReset().mockResolvedValue("off");
 });
 const req = (auth = "Bearer synthetic-cron-key", query = "") =>
   new Request(`https://everloot.app/api/cron/snapshot${query}`, { headers: { authorization: auth } });
@@ -408,6 +411,24 @@ test("the snapshot refreshes the guild ladder even when no new uploads arrive an
   expect(guilds.writeGuildLadder).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-11-12" });
   guilds.writeGuildLadder.mockRejectedValueOnce(new Error("publication unavailable"));
   expect((await GET(req())).status).toBe(200);
+});
+
+test("a run that added uploads starts the stored-views job after its heartbeat; an idle run does not; a failed start is logged and the run succeeds", async () => {
+  const order: string[] = [];
+  store.writeCronRun.mockImplementation(async () => { order.push("heartbeat"); });
+  dispatch.dispatchStoredViews.mockImplementation(async () => { order.push("dispatch"); return "sent"; });
+  store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-11-21T06:10:12.000Z" });
+  expect(await (await GET(req())).json()).toMatchObject({ ok: true, viewsJob: "sent" });
+  expect(order).toEqual(["heartbeat", "dispatch"]);
+  store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-11-21T06:10:12.000Z", settledWeek: null });
+  expect(await (await GET(req())).json()).toMatchObject({ ok: true, viewsJob: "off" });
+  expect(dispatch.dispatchStoredViews).toHaveBeenCalledOnce();
+  store.snapshotWork.mockResolvedValue({ idle: false, retryRollups: false });
+  dispatch.dispatchStoredViews.mockRejectedValue(new Error("stored-views dispatch failed (401)"));
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const res = await GET(req());
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ ok: true, viewsJob: "failed" });
 });
 
 test("with the stored views on the job, a run ends at its heartbeat and builds none of them (#1354)", async () => {
