@@ -48,6 +48,7 @@ so `web/scripts/cf-deploy.mjs` passes every var except the `*_DIR` paths to the 
 | `PROTOCOL_SCHEMA_DIR` | `web/src/app/schema/[...path]/route.ts` | Where the bundled protocol schemas are inside the Worker | Yes |
 | `KNOWLEDGE_RELEASE_SHA256` | `web/src/lib/release.ts` | The knowledge release the `KNOWLEDGE_D1` database must match before it is served | Yes |
 | `EVERLOOT_CRON_WORKER` | `web/src/lib/cf-crons.ts` | `1` on the site Worker once the cron Worker runs the scheduled jobs: the site's triggers then run nothing ([OPERATIONS.md](OPERATIONS.md), "The cron Worker"). Never set on the cron Worker | No, unset until the switch |
+| `EVERLOOT_STORED_VIEWS` | `web/src/app/api/cron/snapshot/route.ts` | `job`: the snapshot cron ends at its heartbeat and the stored-views job builds the views ([OPERATIONS.md](OPERATIONS.md), "The stored-views job") | No, unset until the job runs reliably |
 
 Bindings declared next to the vars and read like them: `KNOWLEDGE_D1` (the knowledge release
 database, `web/src/lib/release.ts`) and `AUTH_DB_HYPERDRIVE` (the accounts database,
@@ -158,6 +159,9 @@ the Worker. The browser bundle keeps the `NEXT_PUBLIC_*` values.
 | `ANSWER_EVAL_KEY` | `.github/workflows/build-watch.yml` | The answer evaluation's model provider key | With `ANSWER_EVAL_MODEL` |
 | `CF_API_KEY` | `.github/workflows/release.yml`, `scripts/upload-curseforge.py` | Uploads the tested addon archive to CurseForge | For releases |
 | `DISCORD_BOT_TOKEN` | `.github/workflows/discord-bridge.yml`, `scripts/discord_bridge.py` | The Discord bridge | For the bridge |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | `.github/workflows/stored-views.yml` | The cron Worker's read-write uploads bucket key, for the stored-views job | For that job |
+| `VIEWS_SUPABASE_URL`, `VIEWS_SUPABASE_SERVICE_ROLE_KEY` | `.github/workflows/stored-views.yml` | The cron Worker's Supabase project, under their own names so the job's publication pass reads the same opt-outs whatever `SUPABASE_*` hold | For that job |
+| `GAME_DATA_ACCESS_KEY_ID`, `GAME_DATA_SECRET_ACCESS_KEY`, `GAME_DATA_BUCKET`, `GAME_DATA_S3_ENDPOINT`, `EVERLOOT_TRUSTED_INSTALLS` | `.github/workflows/stored-views.yml` | The game-data reader and trusted installs the views read, as on the cron Worker | For that job |
 
 ## Actions repository variables (repository settings, Variables)
 
@@ -169,6 +173,7 @@ the Worker. The browser bundle keeps the `NEXT_PUBLIC_*` values.
 | `ANSWER_EVAL_MODEL` | `.github/workflows/build-watch.yml` | The model the answer evaluation runs against; the job is skipped while empty | No |
 | `ANSWER_EVAL_BASE_URL` | `.github/workflows/build-watch.yml` | That provider's endpoint; has a default | No |
 | `BLIZZARD_AUCTIONS` | `.github/workflows/blizzard-auctions.yml` | The hourly Blizzard auction house pull runs only while this is `on` (and the Battle.net and Supabase secrets exist). GitHub starts scheduled runs late or drops them under load (every 4 to 7 hours in November 2026), so the maintainer also starts it each hour with `workflow_dispatch` from a machine of their own; a second pass in the hour writes nothing for an unchanged house | No |
+| `STORED_VIEWS_JOB` | `.github/workflows/stored-views.yml` | The stored-views job runs only while this is `on` ([OPERATIONS.md](OPERATIONS.md), "The stored-views job") | No |
 | `NEXT_PUBLIC_*` | `.github/workflows/deploy-worker.yml` | The eleven build-time names above, passed to the build | See above |
 
 ## Local development and tests (`web/.env.local`)

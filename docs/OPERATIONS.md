@@ -280,7 +280,10 @@ publication pass reads the same opt-outs whatever the other workflows' `SUPABASE
 1. Set the secrets, then the repository variable `STORED_VIEWS_JOB` to `on`. Run the workflow by
    hand once. Both the cron Worker and the job now write the views; they write the same file for
    the same snapshot, so either write is right.
-2. Once a few scheduled runs are green and the views' stamps follow the heartbeat, add
+2. GitHub starts scheduled runs late or drops them under load (every 4 to 7 hours for the Blizzard
+   pull in November 2026, `BLIZZARD_AUCTIONS` in [ENVIRONMENT.md](ENVIRONMENT.md)). While both
+   write, a late run costs nothing: the cron Worker still builds the views. Hand them over only once
+   the job's runs arrive on time for a day and the views' stamps follow the heartbeat. Then add
    `"EVERLOOT_STORED_VIEWS": "job"` to the vars in both `web/wrangler.jsonc` and
    `web/wrangler.cron.jsonc` (the site never runs the snapshot cron, so it changes nothing there).
    After that deploy the cron Worker's snapshot run ends at its heartbeat and answers
