@@ -148,7 +148,7 @@ guide at everloot.app/docs/guides/addon; `addon/tests/commands_contract.py` fail
 | `/everloot status` | Prints the version, each module and how many rows it holds, and any paused collection. |
 | `/everloot version` | Prints the addon version. |
 | `/everloot auctions on\|off` | Auction scans, on in a new install; `/reload` to apply. |
-| `/everloot flight on\|off` | The flight path bar, on by default; off hides it immediately, on after a reload. Confirmed arrivals teach the median of the last three times per route and realm, kept locally. Unknown routes show no ETA. |
+| `/everloot flight on\|off` | The flight path bar, on by default; off hides it immediately, on after a reload. Confirmed arrivals teach the median of the last three times per route and realm, kept locally. Before a route's first arrival, the time is InFlight's measured time for the whole route (`modules/flight_times.lua`, MIT, 880 routes), else the sum of its hops' lengths in the game files (`modules/flight_data.lua`) at 30 yards a second, the speed those measured times give. On a confirmed landing the crest fills green for a moment; the flight map's destination tooltips show the same time. |
 | `/everloot scan` | At the auction house, starts a full scan, like the **Scan prices** button; at most one every 15 minutes. |
 | `/everloot scanprompt on\|off` | The once-per-install chat introduction at the auction house; the button and `/everloot scan` still work with it off. |
 | `/everloot vendor on\|off` | At a merchant, sell grey items and repair with your own gold; never the guild bank. |

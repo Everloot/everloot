@@ -1,9 +1,13 @@
--- A local flight clock. Only an arrival we can confirm teaches the next trip's estimate.
+-- A local flight clock. Only an arrival we can confirm teaches the next trip's estimate; until then a route's time
+-- comes from the length of its hops in the game files (flight_data.lua).
 local E = Everloot
 local F = {}
 E.Flight = F
 local pending, active, driver
 local poll = 0
+-- Yards a second on a flight path. Blizzard publishes no figure; InFlight's measured Classic Era and Forever times
+-- against these lengths give 30.0 (266 direct flights, median difference half a second; docs/sources/LEDGER.md).
+F.SPEED = 30
 local FALLBACK = {
   accent = { 0.612, 0.941, 0.227, 1 }, muted = { 0.788, 0.765, 0.69, 1 },
 }
@@ -59,6 +63,9 @@ local function median(route)
   return values[middle]
 end
 
+-- The row's spacing and sizes, in pixels: a grey diamond ahead, a filled one behind, the start one, the face.
+local STEP, AHEAD, DIAMOND, FACE = 8, 4, 6, 28
+
 local function build()
   if F.frame then return F.frame end
   local width = read(function() return UIParent:GetWidth() end)
@@ -69,32 +76,53 @@ local function build()
   f:SetFrameStrata("HIGH")
   f:EnableMouse(false)
   f.length = width - 32
-  -- Separate squares need no client-specific tiling texture and stay eight pixels apart.
-  for x = 0, f.length, 8 do
-    local dot = f:CreateTexture(nil, "BACKGROUND")
-    dot:SetTexture("Interface\\Buttons\\WHITE8X8")
-    dot:SetSize(x == 0 and 6 or 3, x == 0 and 6 or 3)
-    dot:SetPoint("CENTER", f, "TOPLEFT", 16 + x, -12)
-    dot:SetVertexColor(unpack(tone("muted")))
+  -- The line is a row of small Everloot diamonds, eight pixels apart: a grey one ahead of the player, and a green one
+  -- over it that grows as the flight passes, so the row fills like the logo. Plain squares turned a quarter: no
+  -- client-specific texture.
+  f.diamonds = {}
+  local function diamond(layer, size, color, x)
+    local d = f:CreateTexture(nil, layer)
+    d:SetTexture("Interface\\Buttons\\WHITE8X8")
+    if d.SetRotation then pcall(d.SetRotation, d, math.pi / 4) end
+    d:SetSize(size, size)
+    d:SetPoint("CENTER", f, "TOPLEFT", 16 + x, -12)
+    d:SetVertexColor(unpack(tone(color)))
+    return d
   end
-  local bar = CreateFrame("StatusBar", nil, f)
-  bar:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -10)
-  bar:SetSize(f.length, 4)
-  bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-  bar:SetStatusBarColor(unpack(tone("accent")))
-  bar:SetMinMaxValues(0, 1)
-  f.bar = bar
+  diamond("BORDER", DIAMOND, "accent", 0)
+  for x = STEP, f.length, STEP do
+    diamond("BACKGROUND", AHEAD, "muted", x)
+    local fill = diamond("BORDER", 0, "accent", x)
+    fill.x = x
+    fill:Hide()
+    f.diamonds[#f.diamonds + 1] = fill
+  end
   local crest = f:CreateTexture(nil, "OVERLAY")
   crest:SetTexture((E.Window and E.Window.CREST) or "Interface\\AddOns\\Everloot\\media\\crest")
   crest:SetSize(20, 20)
   crest:SetPoint("CENTER", f, "TOPLEFT", width - 16, -12)
   f.crest = crest
+  -- On landing the crest fills green: a disc behind it, shown for a moment once the arrival is confirmed.
+  local landed = f:CreateTexture(nil, "ARTWORK")
+  landed:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask")
+  landed:SetSize(FACE, FACE)
+  landed:SetPoint("CENTER", crest, "CENTER", 0, 0)
+  landed:SetVertexColor(unpack(tone("accent")))
+  landed:Hide()
+  f.landed = landed
+  -- The player's face alone, ringed in green: the bar already says it is a flight.
   local marker = CreateFrame("Frame", nil, f)
-  marker:SetSize(24, 24)
-  marker:SetFrameLevel(bar:GetFrameLevel() + 1)
+  marker:SetSize(FACE + 4, FACE + 4)
+  marker:SetFrameLevel((read(f.GetFrameLevel, f) or 1) + 2)
   f.marker = marker
+  local ring = marker:CreateTexture(nil, "BORDER")
+  ring:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask")
+  ring:SetAllPoints(marker)
+  ring:SetVertexColor(unpack(tone("accent")))
+  f.ring = ring
   local portrait = marker:CreateTexture(nil, "ARTWORK")
-  portrait:SetAllPoints(marker)
+  portrait:SetSize(FACE, FACE)
+  portrait:SetPoint("CENTER", marker, "CENTER", 0, 0)
   if type(SetPortraitTexture) == "function" then pcall(SetPortraitTexture, portrait, "player") end
   -- The portrait stays usable on a client without texture masks.
   if portrait.AddMaskTexture and marker.CreateMaskTexture then
@@ -107,16 +135,6 @@ local function build()
     end)
   end
   f.portrait = portrait
-  local mount = marker:CreateTexture(nil, "OVERLAY")
-  mount:SetSize(16, 16)
-  mount:SetPoint("LEFT", marker, "RIGHT", 1, 0)
-  local faction = read(UnitFactionGroup, "player")
-  local icon = faction == "Horde" and "Interface\\Icons\\Ability_Mount_Wyvern_01"
-    or faction == "Alliance" and "Interface\\Icons\\Ability_Mount_Gryphon_01"
-  local ok, loaded
-  if icon then ok, loaded = pcall(mount.SetTexture, mount, icon) end
-  if not ok or loaded == false then mount:SetTexture("Interface\\GossipFrame\\TaxiGossipIcon") end
-  f.mount = mount
   local label = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   label:SetPoint("TOP", f, "BOTTOM", 0, -2)
   label:SetWidth(width)
@@ -127,13 +145,31 @@ local function build()
   return f
 end
 
+-- A diamond fills while the face's trailing edge crosses the gap before it; those under the face stay grey.
+local function fillTo(f, edge)
+  for _, fill in ipairs(f.diamonds) do
+    local share = math.max(0, math.min(1, (edge - fill.x + STEP) / STEP))
+    if share > 0 then
+      fill:SetSize(DIAMOND * share, DIAMOND * share)
+      fill:Show()
+    else
+      fill:Hide()
+    end
+  end
+end
+
 local function paint(now)
   local f = build()
+  -- A new flight cancels the last one's landing moment.
+  F.landing = nil
+  f.landed:Hide()
   local elapsed = math.max(0, now - active.started)
   local progress = active.duration and math.min(1, elapsed / active.duration) or math.min(0.9, elapsed / 180 * 0.9)
-  f.bar:SetValue(progress)
+  f.progress = progress
   f.marker:ClearAllPoints()
   f.marker:SetPoint("CENTER", f, "TOPLEFT", 16 + f.length * progress, -12)
+  f.marker:Show()
+  fillTo(f, f.length * progress - (FACE / 2 + 2))
   local text = active.duration and ("about " .. stamp(active.duration - elapsed) .. " left")
     or (active.key and "first flight on this route: timing it" or "timing unknown")
   -- Escape markup in client names before putting them in a font string. A flight whose selection the addon did
@@ -146,7 +182,8 @@ end
 
 function F.Clear()
   pending, active = nil, nil
-  if F.frame then F.frame:Hide() end
+  F.landing = nil
+  if F.frame then F.frame.landed:Hide(); F.frame:Hide() end
   if driver then driver:SetScript("OnUpdate", nil) end
 end
 
@@ -159,9 +196,34 @@ local function arrived(route, elapsed)
   return not route.cancelled and route.key ~= nil and elapsed >= MIN_FLIGHT
 end
 
+-- How long the landed bar stays: every diamond green, the crest filled, the face gone into it.
+local LANDED = 2.5
+
+local function land(elapsed)
+  local f, destination = F.frame, active.destination
+  pending, active = nil, nil
+  if driver then driver:SetScript("OnUpdate", nil) end
+  f.progress = 1
+  f.marker:Hide()
+  fillTo(f, f.length + STEP)
+  f.landed:Show()
+  f.label:SetText((destination and ("Landed at " .. destination:gsub("|", "||") .. " · ") or "Landed · ") .. stamp(elapsed))
+  f:Show()
+  local token = {}
+  F.landing = token
+  local function done()
+    if F.landing ~= token then return end
+    F.landing = nil
+    f.landed:Hide()
+    f:Hide()
+  end
+  if not (type(C_Timer) == "table" and pcall(C_Timer.After, LANDED, done)) then done() end
+end
+
 local function finish(now)
   local elapsed = now - active.started
-  if arrived(active, elapsed) then
+  local confirmed = arrived(active, elapsed)
+  if confirmed then
     local values = samples(active)
     values[#values + 1] = elapsed
     while #values > 3 do table.remove(values, 1) end
@@ -172,7 +234,7 @@ local function finish(now)
       print("Everloot: timed: " .. stamp(elapsed) .. ", next time you will see the time left.")
     end
   end
-  F.Clear()
+  if confirmed and F.frame and read(F.frame.IsShown, F.frame) and E:IsEnabled("flight") then land(elapsed) else F.Clear() end
 end
 
 local function check()
@@ -186,7 +248,7 @@ local function check()
       active = pending or {}
       pending = nil
       active.started = now
-      active.duration = active.key and median(active)
+      active.duration = (active.key and median(active)) or active.estimate
     end
     paint(now)
   elseif flying == false or flying == nil or flying == 0 then
@@ -212,43 +274,133 @@ end
 -- map it shows, each with the slot index TakeTaxiNode gets; the older taxi frame names them by that index
 -- directly. Both are read, so the route has names whichever frame the client opened.
 local function mapNodes()
-  if not (type(C_TaxiMap) == "table" and C_TaxiMap.GetAllTaxiNodes and type(FlightMapFrame) == "table") then return {} end
+  if not (type(C_TaxiMap) == "table" and C_TaxiMap.GetAllTaxiNodes and type(FlightMapFrame) == "table") then return {}, {} end
   local mapId = read(FlightMapFrame.GetMapID, FlightMapFrame)
   local list = type(mapId) == "number" and read(C_TaxiMap.GetAllTaxiNodes, mapId)
-  if type(list) ~= "table" then return {} end
+  if type(list) ~= "table" then return {}, {} end
   local current = type(Enum) == "table" and type(Enum.FlightPathState) == "table" and Enum.FlightPathState.Current
-  local bySlot = {}
+  local bySlot, ids = {}, {}
   for _, node in ipairs(list) do
-    if type(node) == "table" then
+    if type(node) == "table" and type(node.slotIndex) == "number" then
       local n = name(E.Readable(node.name))
-      if n and type(node.slotIndex) == "number" then bySlot[node.slotIndex] = n end
+      if n then bySlot[node.slotIndex] = n end
       if n and current ~= nil and node.state == current then bySlot.current = n end
+      local id = E.Readable(node.nodeID)
+      if type(id) == "number" then
+        ids[node.slotIndex] = id
+        if current ~= nil and node.state == current then ids.current = id end
+      end
     end
   end
-  return bySlot
+  return bySlot, ids
+end
+
+-- The game files' node ids for a name: the Alliance and Horde maps each have their own node at a shared place.
+local byName
+local function idsNamed(n)
+  if not byName then
+    byName = {}
+    for id, text in pairs(type(E.FLIGHT_NODES) == "table" and E.FLIGHT_NODES or {}) do
+      byName[text] = byName[text] or {}
+      table.insert(byName[text], id)
+    end
+  end
+  return n and byName[n] or {}
+end
+
+-- A table's value for a pair of nodes ("from-to"): by node id when the flight map gives it, else by name, the pair
+-- the table has.
+local function pairValue(values, from, to)
+  if type(values) ~= "table" then return nil end
+  local starts = from.id and { from.id } or idsNamed(from.name)
+  local ends = to.id and { to.id } or idsNamed(to.name)
+  for _, a in ipairs(starts) do
+    for _, b in ipairs(ends) do
+      if values[a .. "-" .. b] then return values[a .. "-" .. b] end
+    end
+  end
+end
+
+-- Seconds to a node from the game files: the hops the flight map draws for it, summed. Nil when a hop is unknown.
+local function estimate(index)
+  local hops = read(GetNumRoutes, index)
+  if type(hops) ~= "number" or hops < 1 or hops > 50 then return nil end
+  local names, ids = mapNodes()
+  local function node(slot)
+    return { id = ids[slot], name = name(read(TaxiNodeName, slot)) or names[slot] }
+  end
+  local total = 0
+  for hop = 1, hops do
+    local from, to = read(TaxiGetNodeSlot, index, hop, true), read(TaxiGetNodeSlot, index, hop, false)
+    local yards = type(from) == "number" and type(to) == "number" and pairValue(E.FLIGHT_YARDS, node(from), node(to))
+    if not yards then return nil end
+    total = total + yards
+  end
+  return total / F.SPEED
+end
+
+-- The route to a node of the open flight map: its names, its two nodes, the realm, and the key its own timings are
+-- kept under.
+local function routeTo(index)
+  local names, ids = mapNodes()
+  local destination = name(read(TaxiNodeName, index)) or names[index]
+  local origin, here
+  local count = read(NumTaxiNodes)
+  if type(count) == "number" and count >= 1 and count <= 1000 then
+    for i = 1, count do
+      if read(TaxiNodeGetType, i) == "CURRENT" then origin, here = name(read(TaxiNodeName, i)), i; break end
+    end
+  end
+  origin = origin or names.current
+  local route = {
+    origin = origin, destination = destination, realm = name(read(GetRealmName)),
+    from = { id = ids.current or (here and ids[here]), name = origin }, to = { id = ids[index], name = destination },
+  }
+  if origin and destination and route.realm and origin ~= destination then route.key = origin .. "|" .. destination end
+  return route
+end
+
+-- Seconds to a node before this character has timed the route: InFlight's measured time for the whole route
+-- (flight_times.lua, stops included), else the game files' hops.
+local function expected(index, route)
+  return pairValue(E.FLIGHT_TIMES, route.from, route.to) or estimate(index)
+end
+
+-- The time a tooltip shows for a node: this character's own timings of the route first.
+local function timeTo(index)
+  local route = routeTo(index)
+  return (route.key and median(route)) or expected(index, route)
 end
 
 local function selected(index)
   if not E:IsEnabled("flight") or active then return end
   local now = clock()
   if not now then return end
-  local destination = name(read(TaxiNodeName, index))
-  local origin
-  local count = read(NumTaxiNodes)
-  if type(count) == "number" and count >= 1 and count <= 1000 then
-    for i = 1, count do
-      if read(TaxiNodeGetType, i) == "CURRENT" then origin = name(read(TaxiNodeName, i)); break end
-    end
-  end
-  if not (origin and destination) then
-    local nodes = mapNodes()
-    destination = destination or nodes[index]
-    origin = origin or nodes.current
-  end
-  local realm = name(read(GetRealmName))
-  pending = { origin = origin, destination = destination, realm = realm, selected = now }
-  if origin and destination and realm and origin ~= destination then pending.key = origin .. "|" .. destination end
+  pending = routeTo(index)
+  pending.selected = now
+  pending.estimate = expected(index, pending)
   watch()
+end
+
+-- Adds the flight time under the cost in a destination's tooltip, on the flight map and on the older taxi frame.
+local function tooltip(index)
+  if not (E:IsEnabled("flight") and type(GameTooltip) == "table") then return end
+  local seconds = timeTo(index)
+  if not seconds then return end
+  local r, g, b = unpack(tone("accent"))
+  pcall(GameTooltip.AddLine, GameTooltip, "Flight: about " .. stamp(seconds), r, g, b)
+  pcall(GameTooltip.Show, GameTooltip)
+end
+
+-- Blizzard_FlightMap loads on demand; its pins copy the mixin when they are made, so the hook goes in before the first.
+local function hookFlightMap()
+  if F.mapHooked or type(FlightMap_FlightPointPinMixin) ~= "table" then return end
+  F.mapHooked = true
+  pcall(hooksecurefunc, FlightMap_FlightPointPinMixin, "OnMouseEnter", function(pin)
+    local data = type(pin) == "table" and pin.taxiNodeData
+    local reachable = type(Enum) == "table" and type(Enum.FlightPathState) == "table" and Enum.FlightPathState.Reachable
+    if type(data) == "table" and type(data.slotIndex) == "number" and reachable ~= nil and data.state == reachable then tooltip(data.slotIndex) end
+  end)
 end
 
 E:RegisterModule("flight", function()
@@ -260,12 +412,21 @@ E:RegisterModule("flight", function()
         if pending then pending.cancelled = true end
       end)
     end
+    if type(TaxiNodeOnButtonEnter) == "function" then
+      pcall(hooksecurefunc, "TaxiNodeOnButtonEnter", function(button)
+        local index = type(button) == "table" and read(button.GetID, button)
+        if type(index) == "number" and read(TaxiNodeGetType, index) == "REACHABLE" then tooltip(index) end
+      end)
+    end
+    hookFlightMap()
   end
-  for _, event in ipairs({ "PLAYER_CONTROL_LOST", "PLAYER_CONTROL_GAINED", "TAXIMAP_CLOSED", "PLAYER_LOGOUT" }) do
+  for _, event in ipairs({ "PLAYER_CONTROL_LOST", "PLAYER_CONTROL_GAINED", "TAXIMAP_CLOSED", "PLAYER_LOGOUT", "ADDON_LOADED" }) do
     pcall(E.frame.RegisterEvent, E.frame, event)
   end
-  E.frame:HookScript("OnEvent", function(_, event)
-    if event == "PLAYER_LOGOUT" then F.Clear()
+  E.frame:HookScript("OnEvent", function(_, event, arg)
+    if event == "ADDON_LOADED" then
+      if arg == "Blizzard_FlightMap" and type(hooksecurefunc) == "function" then hookFlightMap() end
+    elseif event == "PLAYER_LOGOUT" then F.Clear()
     elseif event == "PLAYER_CONTROL_LOST" then
       if E:IsEnabled("flight") then watch(); check() end
     elseif event == "PLAYER_CONTROL_GAINED" or event == "TAXIMAP_CLOSED" then

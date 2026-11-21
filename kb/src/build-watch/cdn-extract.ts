@@ -34,7 +34,8 @@ import { readTerrainAreas } from "../terrain-area.js";
 import { ClassCatalog } from "../talents/catalog.js";
 import { writeWorldMapData } from "../world-map-data.js";
 import { clientDigestsOf } from "./client-digests.js";
-import { DISENCHANT_LUA, GAME_DATA_DIR, spellValuesOf } from "./site-data.js";
+import { DISENCHANT_LUA, FLIGHT_LUA, GAME_DATA_DIR, spellValuesOf } from "./site-data.js";
+import { snapshotFlightLua } from "../flight-lua.js";
 import type { Extracted } from "./watch.js";
 
 export async function extractFromCdn(product: string, region: string, curatedPath: string, webDir: string, definitions: string | null): Promise<Extracted> {
@@ -79,7 +80,9 @@ export async function extractFromCdn(product: string, region: string, curatedPat
         web("trim-talent-catalog.mjs", join(run.dir, "talents"), join(root, GAME_DATA_DIR, "talents"));
         mkdirSync(join(root, "addon", "modules"), { recursive: true });
         web("build-raid-game-data.ts", run.dir, snapshot, root);
-        writeFileSync(join(root, GAME_DATA_DIR, "map.json"), `${JSON.stringify(writeWorldMapData(snapshot), null, 2)}\n`);
+        const map = writeWorldMapData(snapshot);
+        writeFileSync(join(root, GAME_DATA_DIR, "map.json"), `${JSON.stringify(map, null, 2)}\n`);
+        writeFileSync(join(root, FLIGHT_LUA), snapshotFlightLua(snapshot, new Set(map.continents.map((c) => c.id))));
         writeClientLayer(snapshot, join(root, GAME_DATA_DIR, "client-layer.json"));
         writeRaceTable(snapshot, join(root, GAME_DATA_DIR, "races.json"));
         writeClientAchievements(snapshot, join(root, GAME_DATA_DIR, "client-achievements.json"));

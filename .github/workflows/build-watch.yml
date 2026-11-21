@@ -140,6 +140,7 @@ jobs:
             web/src/data/game-data
             addon/modules/raid_data.lua
             addon/modules/disenchant_data.lua
+            addon/modules/flight_data.lua
             kb/curated/recheck.json
             web/src/lib/talents/freshness-records.ts
             kb/data/build-watch/out
@@ -196,9 +197,9 @@ jobs:
               [[ "$f" =~ ^web/src/data/game-data/raid-[0-9.]+\.json$ ]] || { echo "refusing to remove $f"; exit 1; }
               git rm -q -f -- "$f"
             done
-            git add -A -- web/src/data/game-data addon/modules/raid_data.lua addon/modules/disenchant_data.lua kb/curated/recheck.json web/src/lib/talents/freshness-records.ts
+            git add -A -- web/src/data/game-data addon/modules/raid_data.lua addon/modules/disenchant_data.lua addon/modules/flight_data.lua kb/curated/recheck.json web/src/lib/talents/freshness-records.ts
             # Only the files the generators write may change, and the recheck scopes the watch adds.
-            allowed='^(web/src/data/game-data/(talents/[a-z]+\.json|raid-[0-9.]+\.json|raid\.ts|map\.json|client-layer\.json|races\.json|client-achievements\.json|client-encounters\.json|client-mounts\.json|client-class-gear\.json|client-class-spells\.json|client-recipes\.json|client-bags\.json|client-terrain\.json|client-disenchant\.json|client-factions\.json|client-titles\.json|client-quest-lines\.json|spell-values\.json|client-digests\.json|changes/[a-z0-9_]+-[0-9]+\.json)|addon/modules/raid_data\.lua|addon/modules/disenchant_data\.lua|kb/curated/recheck\.json|web/src/lib/talents/freshness-records\.ts)$'
+            allowed='^(web/src/data/game-data/(talents/[a-z]+\.json|raid-[0-9.]+\.json|raid\.ts|map\.json|client-layer\.json|races\.json|client-achievements\.json|client-encounters\.json|client-mounts\.json|client-class-gear\.json|client-class-spells\.json|client-recipes\.json|client-bags\.json|client-terrain\.json|client-disenchant\.json|client-factions\.json|client-titles\.json|client-quest-lines\.json|spell-values\.json|client-digests\.json|changes/[a-z0-9_]+-[0-9]+\.json)|addon/modules/raid_data\.lua|addon/modules/disenchant_data\.lua|addon/modules/flight_data\.lua|kb/curated/recheck\.json|web/src/lib/talents/freshness-records\.ts)$'
             unexpected=$(git diff --cached --name-only | grep -Ev "$allowed" || true)
             [ -z "$unexpected" ] || { echo "unexpected files in the change:"; echo "$unexpected"; exit 1; }
             # raid.ts may change its import line and nothing else.
@@ -216,7 +217,7 @@ jobs:
             # A branch that exists is replaced only if nobody has pushed to it since we looked.
             if g fetch --quiet origin "$branch" 2>/dev/null; then
               remote=$(git rev-parse FETCH_HEAD)
-              if git diff --quiet FETCH_HEAD HEAD -- web/src/data/game-data addon/modules/raid_data.lua addon/modules/disenchant_data.lua kb/curated/recheck.json web/src/lib/talents/freshness-records.ts; then
+              if git diff --quiet FETCH_HEAD HEAD -- web/src/data/game-data addon/modules/raid_data.lua addon/modules/disenchant_data.lua addon/modules/flight_data.lua kb/curated/recheck.json web/src/lib/talents/freshness-records.ts; then
                 echo "$branch is already up to date"
               else
                 g push --force-with-lease="refs/heads/$branch:$remote" origin "$branch"

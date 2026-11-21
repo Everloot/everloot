@@ -305,7 +305,7 @@ export function buildWorldMapData(
 }
 
 /** Taxi nodes that are not flight masters: test targets, transport (boat and zeppelin) stand-ins, a ferry, quest-only paths, retired rows. */
-const NOT_A_FLIGHT_MASTER = /^(generic|transport|quest path|zzold|programmer)|\bferry\b/i;
+export const NOT_A_FLIGHT_MASTER = /^(generic|transport|quest path|zzold|programmer)|\bferry\b/i;
 /** How far a thinned flight line may stray from the full one, in yards. */
 export const FLIGHT_LINE_TOLERANCE = 20;
 
