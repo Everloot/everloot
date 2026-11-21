@@ -103,7 +103,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const ART = /<img|<image|data-game-credit|data-item-tip|data-spell-tip|data-page-banner|data-launch-banner|Blizzard Entertainment, Inc\.|Classes and professions|Game map art/;
+// The mascot is brand artwork served locally, independent of the game-asset host.
+const ART = /<img|<image(?![^>]*href="\/mascot\/glint-(?:idle|cheer|sad)\.webp")|data-game-credit|data-item-tip|data-spell-tip|data-page-banner|data-launch-banner|Blizzard Entertainment, Inc\.|Classes and professions|Game map art/;
 
 test.each(pages)("%s: with the asset URL unset there is no image, no tooltip, no credit and no fetch", async (_name, page) => {
   vi.stubEnv("NEXT_PUBLIC_GAME_ASSETS_URL", "");
