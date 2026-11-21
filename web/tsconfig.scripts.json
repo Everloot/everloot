@@ -1,0 +1,6 @@
+// For scripts run with tsx outside Next (scripts/stored-views.ts): the site's settings, with JSX compiled by React's
+// automatic runtime. Next's "preserve" leaves JSX to Next, and a few modules the stored views import carry some.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "jsx": "react-jsx" }
+}

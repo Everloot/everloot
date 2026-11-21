@@ -1140,6 +1140,20 @@ export function createUploadStore(opts: {
     if (!res.ok) throw new Error(`cron heartbeat write failed (${res.status})`);
   }
 
+  /** The last heartbeat writeCronRun wrote, or null before the first; the stored-views job reads its snapshot time. */
+  async function readCronRun(): Promise<{ generatedAt: string | null; dataAsOf: string | null; completionPending: boolean } | null> {
+    if (!cloud) throw new Error("the cron heartbeat needs the cloud store");
+    const res = await r2Fetch("cron/last-run.json", { method: "GET" });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`cron heartbeat read failed (${res.status})`);
+    const beat = await res.json() as { generatedAt?: unknown; dataAsOf?: unknown; completionPending?: unknown };
+    return {
+      generatedAt: typeof beat.generatedAt === "string" ? beat.generatedAt : null,
+      dataAsOf: typeof beat.dataAsOf === "string" ? beat.dataAsOf : null,
+      completionPending: beat.completionPending === true,
+    };
+  }
+
   function stateOf(snapshot: Snapshot): CorpusState {
     const state = snapshot.corpusState;
     if (!state) {
@@ -1366,7 +1380,7 @@ export function createUploadStore(opts: {
     completionCached = null; censusCached = null;
   }
 
-  return { putUpload, loadCorpus, putWaitlist, snapshotWork, writeCronRun, writeSnapshot, snapshotHealth, writeMarket, loadMarket, writeCompletion, loadCompletion, writeCensus, loadCensus, installCensus, forgetReads };
+  return { putUpload, loadCorpus, putWaitlist, snapshotWork, writeCronRun, readCronRun, writeSnapshot, snapshotHealth, writeMarket, loadMarket, writeCompletion, loadCompletion, writeCensus, loadCensus, installCensus, forgetReads };
 }
 
 /** The store the routes and pages use. */

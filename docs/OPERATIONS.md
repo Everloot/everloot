@@ -250,6 +250,48 @@ then.
 without a deploy, `npx wrangler secret delete CRON_SECRET --name everloot-cron`: its triggers then
 run nothing. Set `DEPLOY_CRON_WORKER` to anything but `true` to stop deploying it.
 
+## The stored-views job
+
+Everything the snapshot cron writes after its heartbeat — the settled list, the stored views, the
+guild ladder, the Auction House boards, the coverage score and the auction reports — is
+`runStoredViews` in `web/src/lib/stored-views-run.ts`. Each step reads the whole corpus or the
+market rollup, and on runs with new uploads the cron Worker's 128 MB ran out partway through them
+(about six `exceededMemory` an hour on 2026-11-21, #1354). The views then waited for a run with no
+new uploads to catch them up.
+
+`.github/workflows/stored-views.yml` runs the same steps on a GitHub runner at minutes 5, 20, 35
+and 50 (`npm run stored-views` in `web/`, `web/scripts/stored-views.ts`). It reads the heartbeat's
+`dataAsOf` and writes each file whose stamp is not that snapshot's, so a run with nothing new writes
+nothing. It takes the switches from `web/wrangler.cron.jsonc`'s vars, so it builds what the cron
+Worker would. The auction reports wait while the heartbeat's `completionPending` is true. A step
+that fails is logged and the run ends red with the names in `failed`; the next run retries it.
+A manual run with **rebuild** ticked rewrites every file.
+
+**Secrets** (repository Actions secrets): `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
+`R2_SECRET_ACCESS_KEY`, `R2_BUCKET` (the cron Worker's read-write key), `VIEWS_SUPABASE_URL` and
+`VIEWS_SUPABASE_SERVICE_ROLE_KEY` (the cron Worker's Supabase values, under their own names so the
+publication pass reads the same opt-outs whatever the other workflows' `SUPABASE_*` secrets hold),
+`GAME_DATA_ACCESS_KEY_ID`, `GAME_DATA_SECRET_ACCESS_KEY`, `GAME_DATA_BUCKET`,
+`GAME_DATA_S3_ENDPOINT` and `EVERLOOT_TRUSTED_INSTALLS`. It needs neither
+`EVERLOOT_CHARACTER_KEY` nor `EVERLOOT_OPS_HMAC_SECRET`.
+
+**Switching on, in order:**
+
+1. Set the secrets, then the repository variable `STORED_VIEWS_JOB` to `on`. Run the workflow by
+   hand once. Both the cron Worker and the job now write the views; they write the same file for
+   the same snapshot, so either write is right.
+2. GitHub starts scheduled runs late or drops them under load (every 4 to 7 hours for the Blizzard
+   pull in November 2026, `BLIZZARD_AUCTIONS` in [ENVIRONMENT.md](ENVIRONMENT.md)). While both
+   write, a late run costs nothing: the cron Worker still builds the views. Hand them over only once
+   the job's runs arrive on time for a day and the views' stamps follow the heartbeat. Then add
+   `"EVERLOOT_STORED_VIEWS": "job"` to the vars in both `web/wrangler.jsonc` and
+   `web/wrangler.cron.jsonc` (the site never runs the snapshot cron, so it changes nothing there).
+   After that deploy the cron Worker's snapshot run ends at its heartbeat and answers
+   `storedViews: "job"`.
+
+**Going back:** remove the var (or roll the cron Worker back) and the cron Worker builds the views
+again; set `STORED_VIEWS_JOB` to anything but `on` to stop the job.
+
 ## What `/api/health` answers
 
 `web/src/app/api/health/route.ts` answers JSON `{ ok, snapshot }` with `Cache-Control: no-store`.

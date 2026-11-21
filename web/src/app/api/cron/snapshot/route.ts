@@ -1,36 +1,12 @@
-import { writeAuctionReports } from "@/lib/auction-report-store";
-import { writeMarketBoards } from "@/lib/market-boards";
 import { NextResponse } from "next/server";
-import { sharingStore, uploadStore, type Corpus } from "@/lib/upload-store";
+import { sharingStore, uploadStore } from "@/lib/upload-store";
 import { intakeQuota } from "@/lib/intake-quota";
 import { pruneKeys } from "@/lib/api-keys";
 import { guardOn } from "@/lib/data-guard";
 import { playerPagesOn } from "@/lib/player-pages";
 import { playerStore } from "@/lib/player-store";
 import { pullStore } from "@/lib/pull-store";
-import { writeCoverage } from "@/lib/coverage-store";
-import { currentSettledWeek, writeSettled } from "@/lib/settled-store";
-import { buildItemView, writeItemView } from "@/lib/item-view-store";
-import { anonymousAggregates, writeAggregates } from "@/lib/aggregate-store";
-import type { AggregateSet } from "@/lib/aggregate-set";
-import { writeSearchNames } from "@/lib/search-names-store";
-import { buildAuctionHistory, writeAuctionHistory } from "@/lib/auction-history-store";
-import { buildProfessions, writeProfessions } from "@/lib/profession-store";
-import { buildDatabaseActivity } from "@/lib/database-activity";
-import { writeDatabaseActivity } from "@/lib/database-activity-store";
-import { buildMapPins, writeMapPins } from "@/lib/map-pins-store";
-import { writeGuildLadder } from "@/lib/guild-ladder-store";
-import { forgetAllKept } from "@/lib/kept";
-
-/**
- * Let go of what the steps so far read and kept for pages: the stores keep each file they read or write, tens of MB
- * apiece, and one run reads them all. Kept to the end of the run they added up past the Worker's 128 MB (#1354).
- */
-function release(): void {
-  uploadStore.forgetReads();
-  sharingStore.forgetPublished();
-  forgetAllKept();
-}
+import { releaseKept, runStoredViews } from "@/lib/stored-views-run";
 
 /**
  * GET /api/cron/snapshot — the Worker's Cron Trigger (src/lib/cf-crons.ts, every 10 minutes) extends the corpus snapshot with new uploads,
@@ -68,7 +44,7 @@ export async function GET(req: Request) {
     }
     // The write keeps the corpus it wrote for pages. The rollups below never read it, and beside them it outgrew the
     // Worker on runs with new uploads (#1354); the coverage step reads it again from the parts.
-    release();
+    releaseKept();
     await intakeQuota.prune();
     // Key retention (lib/api-keys.ts) runs only once the data guard's tables exist; a failure is retried next run.
     if (guardOn()) {
@@ -108,7 +84,7 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("census snapshot failed", err);
     }
-    release();
+    releaseKept();
     if (!result) return NextResponse.json({ ok: false, error: "snapshot failed", rebuild, market, completion }, { status: 500 });
     if (!market) return NextResponse.json({ ok: false, error: "market rollup failed", rebuild, ...result, completion }, { status: 500 });
     if (!completion) return NextResponse.json({ ok: false, error: "completion rollup failed", rebuild, ...result, market }, { status: 500 });
@@ -123,135 +99,14 @@ export async function GET(req: Request) {
       result.dataAsOf,
       work.settledWeek ?? null,
     );
-    // The stored views below each work from the corpus as it stands. It is read once, by the first view that needs it,
-    // and shared: each read runs the publication pass again. An unreachable corpus fails every view that asks for it.
-    let corpusRead: Promise<Corpus> | null = null;
-    const corpus = () => (corpusRead ??= uploadStore.loadCorpus().then((c) => {
-      if (c.unreachable) throw new Error("corpus unreachable");
-      return c;
-    }));
-    // The settled list (kb/src/settled-list.ts), dated by the snapshot and stamped with the ISO week, from the views'
-    // corpus: rewritten whenever the snapshot or the week changed, so the weekly spot check rotates even when nothing new
-    // arrives. Before the heartbeat it read the corpus again on its own, and runs with new uploads ran out of memory
-    // there (2026-11-20 23:10 and 23:20 UTC, #1354). A failure is logged; uploaders keep the list they have.
-    let settled: { written: boolean; facts?: number; week?: string } | null = null;
-    try {
-      settled = await writeSettled({ added: result.added, rebuild, dataAsOf: result.dataAsOf, week: currentSettledWeek() }, { corpus });
-    } catch (err) {
-      console.error("settled list failed", err);
+    // The settled list, the stored views, the guild ladder, the boards, the coverage score and the auction reports
+    // (lib/stored-views-run.ts). With EVERLOOT_STORED_VIEWS at "job", the stored-views job builds them outside the
+    // Worker, with the memory a run with new uploads needs (scripts/stored-views.mts, #1354), and this run ends here.
+    if (process.env.EVERLOOT_STORED_VIEWS === "job") {
+      return NextResponse.json({ ok: true, rebuild, ...result, market, completion, census, storedViews: "job" });
     }
-    // What the item lists read (lib/item-view.ts), stored after the snapshot so a page never replays the corpus. Written
-    // only when this run added uploads, rebuilt, or finds no file; a failure is logged and the pages fall back.
-    let itemView: { written: boolean; items?: number } | null = null;
-    try {
-      itemView = await writeItemView({ added: result.added, rebuild, dataAsOf: result.dataAsOf }, {
-        build: async () => buildItemView(result.dataAsOf, new Date(), await corpus()),
-      });
-    } catch (err) {
-      console.error("item view failed", err);
-    }
-    release();
-    // The tables the item, NPC, zone, instance, object, loot, edge and addon pages read (lib/aggregate-store.ts), stored so
-    // a new server instance reads one file instead of replaying the corpus. Same rule as the item view: written only when
-    // this run added uploads, rebuilt, or finds no file; a failure is logged and the pages work the tables out themselves.
-    // The set is worked out once per run: the aggregates file and the search names file are written from the same one.
-    let aggregatesRead: Promise<AggregateSet> | null = null;
-    const aggregateSet = () => (aggregatesRead ??= corpus().then(anonymousAggregates));
-    let aggregates: { written: boolean; bytes?: number } | null = null;
-    try {
-      aggregates = await writeAggregates({ added: result.added, rebuild, dataAsOf: result.dataAsOf }, { build: aggregateSet });
-    } catch (err) {
-      console.error("aggregates failed", err);
-    }
-    // The names the site's own search matches (lib/search-names-store.ts), a few hundred KB from the same set, so a fresh
-    // instance never parses the aggregates for a keystroke. Written on the runs that build the set anyway (uploads added,
-    // a rebuild, or aggregates just written), never by an idle run for itself: the set is the cron's heaviest step
-    // (#1354). A failure is logged and the search reads the aggregates as before.
-    let searchNames: { written: boolean; bytes?: number } | null = null;
-    try {
-      searchNames = aggregates?.written || rebuild || result.added > 0
-        ? await writeSearchNames({ added: result.added, rebuild, dataAsOf: result.dataAsOf }, { build: aggregateSet })
-        : { written: false };
-    } catch (err) {
-      console.error("search names failed", err);
-    }
-    // Nothing after this reads the set; the corpus stays for the views below.
-    aggregatesRead = null;
-    release();
-    // Every realm and item's public auction days (lib/auction-history-store.ts), stored so the history page and the
-    // auction_history tool never replay the corpus. Same rule as the item view; a failure is logged and they read the corpus.
-    let auctionHistory: { written: boolean; items?: number } | null = null;
-    try {
-      auctionHistory = await writeAuctionHistory({ added: result.added, rebuild, dataAsOf: result.dataAsOf }, { build: async () => buildAuctionHistory(await corpus()) });
-    } catch (err) {
-      console.error("auction history failed", err);
-    }
-    release();
-    // The profession and map views follow the auction history's rule: an idle run also rewrites a file built from
-    // another snapshot, so a failed write catches up on the next run.
-    let professions: { written: boolean; bytes?: number } | null = null;
-    let mapPins: { written: boolean; bytes?: number } | null = null;
-    try {
-      professions = await writeProfessions({ added: result.added, rebuild, dataAsOf: result.dataAsOf }, { build: async () => buildProfessions(await corpus()) });
-    } catch (err) {
-      console.error("profession view failed", err);
-    }
-    release();
-    try {
-      mapPins = await writeMapPins({ added: result.added, rebuild, dataAsOf: result.dataAsOf }, { build: async () => buildMapPins(await corpus()) });
-    } catch (err) {
-      console.error("map pins view failed", err);
-    }
-    release();
-    let databaseActivity: { written: boolean; entries?: number } | null = null;
-    try {
-      databaseActivity = await writeDatabaseActivity({ added: result.added, rebuild, dataAsOf: result.dataAsOf }, {
-        build: async (previous) => buildDatabaseActivity(await corpus(), new Date(), previous),
-      });
-    } catch (err) {
-      console.error("database activity failed", err);
-    }
-    // The last view that reads the corpus is done.
-    corpusRead = null;
-    release();
-    // The auction reports and the Auction House boards each read the market rollup, the aggregates and the client's item
-    // tables to name items, the run's largest working sets (#1354), so they come after the views. A failure is logged;
-    // the pages build the boards themselves and keep the last reports.
-    // The boards go first: without a current file every Auction House page builds them on the site Worker, while a
-    // missing day of reports only waits. The reports, the largest step (about 110 MB more than the boards in a local
-    // replay, 2026-11-20), are written once a day and go last.
-    release();
-    // The guild ladder reads the whole corpus again; a run with new uploads ran out of memory there, after every view
-    // above (#1354). It goes first of the last steps: its pages replay the corpus without it.
-    // Guild authority is checked even on idle runs, and a file stamped by another snapshot is rewritten, so an idle run
-    // catches up on a failed one; hides stay live in the page/tool reader.
-    let guildLadder: { written: boolean; bytes?: number } | null = null;
-    try {
-      guildLadder = await writeGuildLadder({ added: result.added, rebuild, dataAsOf: result.dataAsOf });
-    } catch (err) {
-      console.error("guild ladder failed", err);
-    }
-    release();
-    // The Auction House boards (lib/market-boards.ts), built once here instead of on every browse, realm, bags and
-    // disenchanting request: rewritten when the rollup or the UTC day changed.
-    let marketBoards: { written: boolean; bytes?: number; ms?: number } | null = null;
-    try { marketBoards = await writeMarketBoards(); } catch (err) { console.error("market boards failed", err); }
-    release();
-    // The coverage score, dated by the snapshot's time, the heartbeat's `dataAsOf`. It reads the whole corpus and works
-    // the score out beside it, and runs with new uploads ran out of memory there before their heartbeat (#1354), so it
-    // comes after it. Like the views, it is rewritten whenever its stamp is not the snapshot's, so an idle run catches
-    // up on a failed one. The pages show the last stored score (or say it is unreachable); a failure is logged.
-    let coverage: { written: boolean } | null = null;
-    try {
-      coverage = await writeCoverage({ added: result.added, rebuild, dataAsOf: result.dataAsOf });
-    } catch (err) {
-      console.error("coverage failed", err);
-    }
-    release();
-    let auctionReports: { written: boolean; reports?: number } | null = null;
-    try { if (!(market.remaining ?? 0)) auctionReports = await writeAuctionReports(); } catch (err) { console.error("auction reports failed", err); }
-    release();
-    return NextResponse.json({ ok: true, rebuild, ...result, market, completion, coverage, settled, census, itemView, aggregates, searchNames, auctionHistory, auctionReports, marketBoards, professions, mapPins, databaseActivity, guildLadder });
+    const views = await runStoredViews({ added: result.added, rebuild, dataAsOf: result.dataAsOf, reportsDue: !(market.remaining ?? 0) });
+    return NextResponse.json({ ok: true, rebuild, ...result, market, completion, census, ...views });
   } catch (err) {
     console.error("snapshot failed", err);
     return NextResponse.json({ ok: false, error: "snapshot failed" }, { status: 500 });
