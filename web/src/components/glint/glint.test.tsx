@@ -31,30 +31,48 @@ describe("the drawing", () => {
   });
 
   test("labelled when it carries meaning", () => {
-    const svg = renderToStaticMarkup(<Glint label="Glint, the loot raven" />);
-    expect(svg).toMatch(/^<svg[^>]*role="img"[^>]*aria-label="Glint, the loot raven"/);
+    const svg = renderToStaticMarkup(<Glint label="Glint, the Everloot mascot" />);
+    expect(svg).toMatch(/^<svg[^>]*role="img"[^>]*aria-label="Glint, the Everloot mascot"/);
     expect(svg).not.toContain("aria-hidden");
   });
 
-  test("every part is its own group, so it can move on its own", () => {
-    const svg = renderToStaticMarkup(<Glint />);
-    for (const part of ["feet", "body", "wing", "satchel", "gem", "head", "beak", "eye"]) expect(svg, part).toContain(`data-part="${part}"`);
-    for (const cls of ["glint-bob", "glint-head", "glint-wing-l", "glint-wing-r", "glint-lid", "glint-sparkle"]) expect(svg, cls).toContain(cls);
+  test.each(["idle", "cheer", "sad"] as const)("the %s expression uses its shipped illustration without cropping", (pose) => {
+    const markup = renderToStaticMarkup(<Glint pose={pose} />);
+    const asset = "/mascot/glint-" + pose + ".webp";
+    expect(markup).toContain('href="' + asset + '"');
+    expect(markup).toContain('preserveAspectRatio="xMidYMid meet"');
+    expect(markup).not.toContain("<filter");
+    const bytes = readFileSync(join(process.cwd(), "public", asset));
+    expect(bytes.subarray(0, 4).toString()).toBe("RIFF");
+    expect(bytes.subarray(8, 12).toString()).toBe("WEBP");
   });
 
-  test("the gem is Everloot green unless a quality is asked for; sad Glint's satchel is empty", () => {
-    expect(renderToStaticMarkup(<Glint />)).toContain(`fill="${tokens.dark.accent}"`);
-    expect(renderToStaticMarkup(<Glint gem="epic" />)).toContain(`fill="${tokens.dark["q-epic"]}"`);
-    const sad = renderToStaticMarkup(<Glint pose="sad" />);
-    expect(sad).toContain('data-pose="sad"');
-    expect(sad).not.toContain('data-part="gem"');
+  test("an item quality changes the small pin; the disappointed expression has no extra gem", () => {
+    expect(renderToStaticMarkup(<Glint gem="epic" />)).toContain('fill="' + tokens.dark["q-epic"] + '"');
+    expect(renderToStaticMarkup(<Glint />)).not.toContain('data-part="gem"');
+    expect(renderToStaticMarkup(<Glint pose="sad" gem="epic" />)).not.toContain('data-part="gem"');
   });
 
-  test("each Glint on a page has its own sticker filter", () => {
-    const two = renderToStaticMarkup(<><Glint /><Glint /></>);
-    const ids = [...two.matchAll(/<filter id="([^"]+)"/g)].map((m) => m[1]);
-    expect(ids).toHaveLength(2);
-    expect(new Set(ids).size).toBe(2);
+  test("still means still: marked for glint.css, and no timers at all", async () => {
+    expect(renderToStaticMarkup(<Glint still />)).toMatch(/^<svg[^>]*data-still=""/);
+    expect(renderToStaticMarkup(<Glint />)).not.toContain("data-still");
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    vi.useFakeTimers();
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    try {
+      await act(async () => root.render(<Glint still flap={1} />));
+      expect(vi.getTimerCount()).toBe(0);
+      expect(container.querySelector("svg")!.hasAttribute("data-flap")).toBe(false);
+      await act(async () => root.render(<Glint flap={1} />));
+      expect(container.querySelector("svg")!.hasAttribute("data-flap")).toBe(true);
+      await act(async () => root.render(<Glint still flap={1} />));
+      expect(vi.getTimerCount()).toBe(0);
+      expect(container.querySelector("svg")!.hasAttribute("data-flap")).toBe(false);
+    } finally {
+      await act(async () => root.unmount());
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -68,7 +86,7 @@ describe("glint.css", () => {
 
   test("takes every duration and curve from the motion variables, and moves only transforms", () => {
     const rules = css.match(/^\s*animation:[^;]*;/gm) ?? [];
-    expect(rules.length).toBeGreaterThan(4);
+    expect(rules.length).toBeGreaterThan(0);
     for (const rule of rules) expect(rule).toMatch(/none|var\(--dur-glint-[a-z]+\) var\(--ease-(?:glint|out)\)/);
     const keyframeProps = [...css.matchAll(/@keyframes[^{]+\{([\s\S]*?\n)\}/g)].flatMap((m) => [...m[1].matchAll(/^\s*([a-z-]+):/gm)].map((p) => p[1]));
     expect(new Set(keyframeProps)).toEqual(new Set(["transform"]));
@@ -76,6 +94,14 @@ describe("glint.css", () => {
 
   test("pauses the loops when Glint is off-screen or the tab is hidden", () => {
     expect(css).toMatch(/\.glint\[data-paused\] \*\s*\{\s*animation-play-state: paused;/);
+  });
+
+  test("a still Glint runs no loop at all", () => {
+    expect(css).toMatch(/\.glint\[data-still\] \*\s*\{\s*animation: none !important;/);
+  });
+
+  test("hover feedback uses a whole-character greeting", () => {
+    expect(css).toContain(".glint[data-flap] .glint-response");
   });
 });
 
@@ -182,13 +208,23 @@ describe("Glint on the home hero", () => {
     expect(live()).toBe("Haven't seen a single drop yet. Help me find them?");
   });
 
+  test("hovering shows the cheerful illustration, then returns to idle", async () => {
+    await act(async () => root.render(<GlintHero />));
+    const button = container.querySelector("button")!;
+    const enter = Object.assign(new MouseEvent("pointerover", { bubbles: true }), { pointerType: "mouse" });
+    await act(async () => { button.dispatchEvent(enter); });
+    expect(container.querySelector("image")!.getAttribute("href")).toBe("/mascot/glint-cheer.webp");
+    await wait(MOTION.glint.duration.pop);
+    expect(container.querySelector("image")!.getAttribute("href")).toBe("/mascot/glint-idle.webp");
+  });
+
   test("after launch the bubble carries the post-launch lines", async () => {
     vi.setSystemTime(at + H);
     await act(async () => root.render(<GlintHero />));
     expect(shown()).toEqual(["Forever is live. Show me what you looted!"]);
   });
 
-  test("unmounting clears every timer: the turns, the clock and the blinks", async () => {
+  test("unmounting clears every timer: the turns, the clock and the greeting", async () => {
     await act(async () => root.render(<GlintHero />));
     expect(vi.getTimerCount()).toBeGreaterThan(0);
     await act(async () => root.render(<p>gone</p>));

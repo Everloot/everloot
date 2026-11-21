@@ -1,97 +1,35 @@
-/* Glint, the loot raven (Glint.tsx). Transforms only, so nothing around him moves; every duration and curve is a
-   motion variable from src/design/tokens.ts. Pivots are set on each part in Glint.tsx. */
-
-/* One breath: the body, wings, satchel and head rise and settle; the feet stay planted. */
+/* Preserve the painted silhouette; motion stays on the whole illustration. */
 @keyframes glint-bob {
   to {
-    transform: translateY(-3px);
+    transform: translateY(-2px);
   }
 }
 .glint-bob {
   animation: glint-bob var(--dur-glint-bob) var(--ease-glint) infinite alternate;
 }
 
-/* Now and then he cocks his head, holds it, and looks back. */
-@keyframes glint-tilt {
-  0%,
-  74%,
-  100% {
-    transform: rotate(0deg);
+@keyframes glint-greeting {
+  25% {
+    transform: translateY(-3px) rotate(-2deg);
   }
-  80%,
-  92% {
-    transform: rotate(-8deg);
+  65% {
+    transform: translateY(-1px) rotate(1deg);
   }
 }
-.glint-head {
-  animation: glint-tilt var(--dur-glint-tilt) var(--ease-glint) infinite;
+.glint-response {
+  transform-origin: 108px 196px;
+}
+.glint[data-flap] .glint-response {
+  animation: glint-greeting var(--dur-glint-flap) var(--ease-out);
 }
 
-/* The gem catches the light once a cycle. */
-@keyframes glint-sparkle {
-  0%,
-  78%,
-  100% {
-    transform: scale(0) rotate(0deg);
-  }
-  86% {
-    transform: scale(1) rotate(45deg);
-  }
-  94% {
-    transform: scale(0) rotate(90deg);
-  }
+.glint[data-still] * {
+  animation: none !important;
 }
-.glint-sparkle {
-  animation: glint-sparkle var(--dur-glint-sparkle) var(--ease-glint) infinite;
-}
-
-/* A blink: Glint.tsx sets data-blink at random, every three to six seconds. */
-@keyframes glint-blink {
-  50% {
-    transform: scaleY(1);
-  }
-}
-.glint[data-blink] .glint-lid {
-  animation: glint-blink var(--dur-glint-blink) var(--ease-out);
-}
-
-/* Two quick wing beats on hover or click. */
-@keyframes glint-flap-l {
-  25%,
-  75% {
-    transform: rotate(80deg);
-  }
-  50% {
-    transform: rotate(30deg);
-  }
-}
-@keyframes glint-flap-r {
-  25%,
-  75% {
-    transform: rotate(-80deg);
-  }
-  50% {
-    transform: rotate(-30deg);
-  }
-}
-.glint[data-flap] .glint-wing-l {
-  animation: glint-flap-l var(--dur-glint-flap) var(--ease-out);
-}
-.glint[data-flap] .glint-wing-r {
-  animation: glint-flap-r var(--dur-glint-flap) var(--ease-out);
-}
-
-/* Sad Glint hangs his head and stays there. */
-.glint[data-pose="sad"] .glint-head {
-  animation: none;
-}
-
-/* Off-screen or in a hidden tab, the loops wait. */
 .glint[data-paused] * {
   animation-play-state: paused;
 }
 
-/* Asked for less motion: he holds still. The speech bubble's lines still change, without a fade. */
 @media (prefers-reduced-motion: reduce) {
   .glint *,
   .glint-line {

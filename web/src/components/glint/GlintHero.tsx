@@ -25,7 +25,7 @@ function Words({ line }: { line: GlintLine }) {
  * Glint on the home hero, holding the launch countdown in a speech bubble. The lines take turns every
  * MOTION.glint.duration.line, and wait while the pointer or keyboard focus is on him or the tab is hidden. Every line
  * sits in the same grid cell, so the bubble is as tall as its longest line and nothing below it moves when the line
- * changes. Hovering him flaps his wings and he says "Loot get!"; clicking him moves to the next line. The turns are
+ * changes. Hovering him gives a small greeting bounce and he says "Loot get!"; clicking him moves to the next line. The turns are
  * not announced: only a line asked for with a click goes to the screen reader's live region.
  */
 export default function GlintHero({ initialNow }: { initialNow?: number }) {
@@ -81,7 +81,7 @@ export default function GlintHero({ initialNow }: { initialNow?: number }) {
     >
       <button
         type="button"
-        aria-label="Glint, the loot raven. Say something else"
+        aria-label="Glint, the Everloot mascot. Say something else"
         className="shrink-0 rounded-card"
         onPointerEnter={(e) => {
           pointerOn.current = true;
@@ -89,7 +89,7 @@ export default function GlintHero({ initialNow }: { initialNow?: number }) {
         }}
         onClick={next}
       >
-        <Glint size={176} flap={flap} className="h-[72px] w-[72px] xl:h-44 xl:w-44" />
+        <Glint size={176} pose={cheering ? "cheer" : "idle"} flap={flap} className="h-[72px] w-[72px] xl:h-44 xl:w-44" />
       </button>
       <div className="relative min-w-0 flex-1 rounded-card border border-edge bg-panel px-4 py-3 text-sm text-fg xl:w-64 xl:flex-none">
         <svg aria-hidden="true" viewBox="0 0 12 16" className="absolute -left-[11px] top-1/2 h-4 w-3 -translate-y-1/2 fill-panel stroke-edge xl:hidden">

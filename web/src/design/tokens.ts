@@ -98,22 +98,15 @@ export const MOTION = {
     color: "ease",
   },
   /**
-   * Glint, the loot raven (components/glint), the one character the owner asked to move (2026-10-20): slow idle
-   * loops, a blink, a wing flap, and the turn of his speech bubble. All of it stops under `prefers-reduced-motion`.
+   * Glint, Everloot's mascot (components/glint), the one character the owner asked to move (2026-10-20): slow idle
+   * breathing, a greeting bounce, and the turn of his speech bubble. All of it stops under
+   * `prefers-reduced-motion`.
    */
   glint: {
     duration: {
       /** One breath: the body rises and settles. */
       bob: 3200,
-      /** The cycle the occasional head tilt sits in. */
-      tilt: 9000,
-      /** The cycle the gem's sparkle sits in. */
-      sparkle: 4200,
-      /** One blink; the wait between blinks is random, from blinkMin to blinkMax. */
-      blink: 160,
-      blinkMin: 3000,
-      blinkMax: 6000,
-      /** A two-beat wing flap on hover or click. */
+      /** A small greeting bounce on hover or click (the `flap` prop). */
       flap: 640,
       /** How long each line in the speech bubble stays. */
       line: 6000,
@@ -139,31 +132,10 @@ export function motionVariables(): Record<string, string> {
     "--ease-drawer": MOTION.ease.drawer,
     "--ease-color": MOTION.ease.color,
     "--dur-glint-bob": `${glint.bob}ms`,
-    "--dur-glint-tilt": `${glint.tilt}ms`,
-    "--dur-glint-sparkle": `${glint.sparkle}ms`,
-    "--dur-glint-blink": `${glint.blink}ms`,
     "--dur-glint-flap": `${glint.flap}ms`,
     "--ease-glint": MOTION.glint.ease,
   };
 }
-
-/**
- * Glint's flat colours, from the mascot's brand brief: a near-black raven
- * with blue-black highlights, a gold beak and talons, Everloot-green eyes, a brown leather satchel, and a cream
- * sticker edge so the dark bird reads on the dark canvas. The gem takes the accent or an item-quality colour.
- */
-export const GLINT = {
-  outline: "#050605",
-  body: "#15181F",
-  sheen: "#33405F",
-  gold: "#F5B726",
-  goldShade: "#C9870F",
-  leather: "#8E5A2B",
-  leatherShade: "#673F1C",
-  eye: "#9CF03A",
-  shine: "#F4EFDD",
-  sticker: "#F4EFDD",
-} as const;
 
 export const QUALITIES = ["poor", "common", "uncommon", "rare", "epic", "legendary"] as const;
 export const CLASSES = ["warrior", "paladin", "hunter", "rogue", "priest", "shaman", "mage", "warlock", "druid"] as const;
