@@ -17,19 +17,34 @@ const answer = (status: number, body?: unknown) => vi.fn(async () => new Respons
 
 beforeEach(() => { corpus.load.mockReset().mockResolvedValue({ uploads: 1, records, dataAsOf: day(29) }); });
 
-test("the cron writes the list and its values beside the score, dated by the snapshot, only after a change", async () => {
-  const fetch = vi.fn(async (_req: string | URL | Request) => new Response(null, { status: 200 }));
-  expect(await writeSettled({ added: 0, dataAsOf: day(30) }, { cloud: CLOUD, fetch })).toEqual({ written: false });
-  expect(fetch).not.toHaveBeenCalled();
-  const out = await writeSettled({ added: 2, dataAsOf: day(30) }, { cloud: CLOUD, fetch, build: BUILD, recheck: [], week: WEEK });
+test("the cron writes the list stamped with the snapshot and the week; a run that added nothing writes only when that stamp changed", async () => {
+  // HEAD answers with the stored stamp; every other call succeeds.
+  const stamped = (stamp: string | null) => vi.fn(async (req: string | URL | Request) =>
+    (req as Request).method === "HEAD" ? new Response(null, { status: 200, headers: stamp ? { "x-amz-meta-data-as-of": stamp } : {} }) : new Response(null, { status: 200 }));
+  const deps = { cloud: CLOUD, build: BUILD, recheck: [] };
+  // Current: one HEAD, no corpus read.
+  const current = stamped(`${day(30)};${WEEK}`);
+  expect(await writeSettled({ added: 0, dataAsOf: day(30), week: WEEK }, { ...deps, fetch: current })).toEqual({ written: false });
+  expect(current.mock.calls.map(([r]) => (r as Request).method)).toEqual(["HEAD"]);
+  expect(corpus.load).not.toHaveBeenCalled();
+  // New uploads: written without asking, stamped with the snapshot and the week.
+  const fetch = stamped(null);
+  const out = await writeSettled({ added: 2, dataAsOf: day(30), week: WEEK }, { ...deps, fetch });
   expect(out).toEqual({ written: true, key: `coverage/settled-${BUILD}.json`, facts: 1, week: WEEK });
   const put = fetch.mock.calls[0]![0] as Request;
   expect(put.method).toBe("PUT");
   expect(put.url).toBe(`https://acct.r2.cloudflarestorage.com/everloot-uploads/${settledKey(BUILD)}`);
+  expect(put.headers.get("x-amz-meta-data-as-of")).toBe(`${day(30)};${WEEK}`);
   expect(JSON.parse(await put.text())).toEqual(FILE);
-  const forced = await writeSettled({ added: 0, dataAsOf: day(30), force: true, week: WEEK }, { cloud: CLOUD, fetch, build: BUILD, recheck: [] });
-  expect(forced).toEqual({ written: true, key: `coverage/settled-${BUILD}.json`, facts: 1, week: WEEK });
-  expect(fetch).toHaveBeenCalledTimes(2);
+  // A new week rotates the spot check with no new upload, and so does a snapshot a failed run left behind.
+  expect(await writeSettled({ added: 0, dataAsOf: day(30), week: "2026-W04" }, { ...deps, fetch: stamped(`${day(30)};${WEEK}`) })).toMatchObject({ written: true, week: "2026-W04" });
+  expect(await writeSettled({ added: 0, dataAsOf: day(31), week: WEEK }, { ...deps, fetch: stamped(`${day(30)};${WEEK}`) })).toMatchObject({ written: true });
+  // The caller's corpus is used instead of a second read.
+  corpus.load.mockClear();
+  const shared = vi.fn(async () => ({ uploads: 1, records, dataAsOf: day(29) }) as unknown as import("./upload-store").Corpus);
+  expect(await writeSettled({ added: 1, dataAsOf: day(30), week: WEEK }, { ...deps, fetch: stamped(null), corpus: shared })).toMatchObject({ written: true });
+  expect(shared).toHaveBeenCalledOnce();
+  expect(corpus.load).not.toHaveBeenCalled();
   await expect(writeSettled({ added: 1, dataAsOf: null }, { cloud: null })).rejects.toThrow(/cloud/);
 });
 
