@@ -188,7 +188,10 @@ const BoardRow = z.object({
   faction: r.faction, ruleset: r.ruleset, rulesetId: r.ruleset_id, guildName: r.guild_name, guildSlug: r.guild_slug ?? null, value: r.value, fetchedAt: r.fetched_at,
 }));
 
-const RankRow = z.object({ metric: z.enum(["item_level", "gear_score", "honorable_kills"]), rank: num, of: num });
+const RankRow = z.object({ metric: z.string(), rank: num, of: num });
+const METRIC_KEYS = new Set<string>(ARMORY_METRICS.map((m) => ARMORY_BOARDS[m].key));
+/** Every rank the database gives for a board this site knows; one for a board it does not know is left out, not fatal. */
+const RankRows = z.array(RankRow).transform((rows) => rows.filter((r): r is ArmoryRank => METRIC_KEYS.has(r.metric)));
 
 const CountRow = z.object({
   region: z.string(), ruleset_id: num, ruleset: z.string(), characters: num, guilds: num, newest: textOrNull,
@@ -249,7 +252,7 @@ export function createCloudArmoryStore(query: Query = authQuery): ArmoryStore {
     async topPerClass(metric, region, rulesetId) {
       return rpc("armory_board_top_per_class", { p_metric: metric, p_region: region, p_ruleset_id: rulesetId }, z.array(BoardRow));
     },
-    async rank(region, slug) { return rpc("armory_rank", { p_region: region, p_slug: slug }, z.array(RankRow)); },
+    async rank(region, slug) { return rpc("armory_rank", { p_region: region, p_slug: slug }, RankRows); },
     async counts() { return rpc("armory_counts", {}, z.array(CountRow)); },
     async hide(region, slug) { await query("rpc/armory_hide", { method: "POST", body: JSON.stringify({ p_region: region, p_slug: slug }) }); },
     async enqueue(region, kind, slug, source) {
