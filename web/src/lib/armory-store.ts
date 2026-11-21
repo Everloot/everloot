@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { GuildCrest as CrestSchema } from "@kb/armory/crest";
-import { ARMORY_RECHECK_DAYS, armoryNameQuery, namesFromSlug, SEARCH_RULE, type ArmoryMetricKey } from "./armory";
+import { ARMORY_BOARDS, ARMORY_METRICS, ARMORY_RECHECK_DAYS, armoryNameQuery, namesFromSlug, SEARCH_RULE, type ArmoryMetricKey } from "./armory";
 import { authQuery, StorageError } from "./supabase/server";
-import { ArmoryDetails, type ProfileDetails } from "@kb/armory/details";
+import { ArmoryDetails, type PlayHistoryRankedKey, type ProfileDetails } from "@kb/armory/details";
 import type { CharacterRow } from "@kb/armory/parse";
 
 /**
@@ -293,7 +293,15 @@ export function createMemoryArmoryStore(now: () => Date = () => new Date()): Mem
   const queue = new Map<string, { region: string; kind: string; slug: string; source: string }>();
   const misses = new Map<string, number>();
   const key = (region: string, slug: string) => `${region}/${slug}`;
-  const valueOf = (c: ArmoryCharacter, metric: ArmoryMetricKey) => (metric === "item_level" ? c.itemLevel : metric === "gear_score" ? c.gearScore : c.honorableKills);
+  // The play history columns are generated from details.playHistory.ranked; this reads the same counts.
+  const HISTORY: Partial<Record<ArmoryMetricKey, PlayHistoryRankedKey>> = {
+    quests_completed: "quests", creatures_killed: "creatures", fish_caught: "fish", flight_paths: "flights", dungeons_entered: "dungeons", total_deaths: "deaths",
+  };
+  const valueOf = (c: ArmoryCharacter, metric: ArmoryMetricKey): number | null => {
+    const h = HISTORY[metric];
+    if (h) return c.details?.playHistory?.ranked[h] ?? null;
+    return metric === "item_level" ? c.itemLevel : metric === "gear_score" ? c.gearScore : c.honorableKills;
+  };
   const login = (c: ArmoryCharacter) => (c.lastLogin ? Date.parse(c.lastLogin) : -Infinity);
   const ranked = (metric: ArmoryMetricKey, keep: (c: ArmoryCharacter) => boolean) =>
     [...characters.values()].filter((c) => valueOf(c, metric) !== null && keep(c))
@@ -394,7 +402,7 @@ export function createMemoryArmoryStore(now: () => Date = () => new Date()): Mem
     async rank(region, slug) {
       const me = characters.get(key(region, slug));
       if (!me) return [];
-      return (["item_level", "gear_score", "honorable_kills"] as const).flatMap((metric) => {
+      return ARMORY_METRICS.map((m) => ARMORY_BOARDS[m].key).flatMap((metric) => {
         const list = ranked(metric, (c) => c.region === me.region && c.rulesetId === me.rulesetId);
         const at = list.indexOf(me);
         return at < 0 ? [] : [{ metric, rank: at + 1, of: list.length }];

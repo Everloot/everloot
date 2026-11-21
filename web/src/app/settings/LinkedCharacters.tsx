@@ -26,12 +26,12 @@ const CATEGORY: Record<SyncCategory, { name: string; show: string }> = {
   raids: { name: "Raids", show: "show_raids" }, achievements: { name: "Titles", show: "show_collections" },
 };
 /** BLIZZARD_SWITCH in web/src/lib/character-armory.ts, which is server code and cannot be imported here. */
-type BlizzardPart = "gear" | "stats" | "talents" | "pvp" | "professions" | "reputations" | "collections";
+type BlizzardPart = "gear" | "stats" | "talents" | "pvp" | "professions" | "reputations" | "collections" | "history";
 const BLIZZARD: Record<BlizzardPart, { name: string; show: string }> = {
   gear: { name: "Gear", show: "show_gear" }, stats: { name: "Stats", show: "show_stats" },
   talents: { name: "Talents", show: "show_talents" }, pvp: { name: "PvP", show: "show_pvp" },
   professions: { name: "Professions", show: "show_professions" }, reputations: { name: "Reputations", show: "show_reputations" },
-  collections: { name: "Achievements and quests", show: "show_collections" },
+  collections: { name: "Achievements and quests", show: "show_collections" }, history: { name: "Play history", show: "show_history" },
 };
 /** A build label as GET /api/me/builds lists it. */
 interface Label { id: string; name: string; classSlug: string }
@@ -219,6 +219,11 @@ export default function LinkedCharacters() {
           </div>
         )}
       </div>
+      {state.links.some((l) => l.armory?.path) && (
+        <p className="text-sm">
+          <a href="/me/characters/lifetime" className="text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Lifetime totals of your linked characters</a>
+        </p>
+      )}
       {state.links.length === 0 ? (
         <p className="text-sm text-fg-2">No linked characters yet.</p>
       ) : (

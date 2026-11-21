@@ -1056,6 +1056,7 @@ These pages are separate from the addon sightings and the linked-character gear 
   credited "Data from Blizzard Entertainment", and it disappears when the armory deletes it (the thirty days below,
   a 404 or a hide). An API or MCP answer carries it in its own field with its own notice. It never enters the
   CC BY-SA dataset, the public corpus, open-data snapshots or bulk exports. Pages that show it carry no ads.
+- **Play history.** Each armory character's lifetime statistics (Blizzard's `achievements/statistics`: quests, kills, deaths, fish, flight paths, dungeons and the like) are read and stored with the rest of its row, under every rule in this section. Six of them rank characters on the armory boards. A linked character's page shows them only while its owner turns on Play history (`show_history`, off by default); the owner's lifetime totals page is visible to that account alone.
 - **Thirty days.** Characters and guilds are checked again within 20 days. Stored data not refreshed for more
   than 30 days is deleted. A Blizzard response confirming that data has not changed (304) counts as a refresh.
   When Blizzard answers that a character or guild no longer exists (404), its stored row is deleted at once.

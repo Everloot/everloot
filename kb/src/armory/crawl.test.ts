@@ -11,6 +11,7 @@ import roster from "./fixtures/roster.json";
 import achievements from "./fixtures/achievements.json";
 import reputations from "./fixtures/reputations.json";
 import completed from "./fixtures/quests-completed.json";
+import playHistory from "./fixtures/play-history.json";
 function bodyFor(path: string): unknown {
   if (path.endsWith("equipment")) return equipment;
   if (path.endsWith("pvp-summary")) return pvp;
@@ -51,7 +52,7 @@ function setup(count = 1) {
 it("backfills details without a conditional profile read, counting optional calls", async () => {
   const { store, api } = setup();
   api.get.mockImplementation(async (path) => ({ status: 200, lastModified: "new", body: path.endsWith("statistics") ? { health: 843 } : path.endsWith("ember-vale-0") ? { ...bodyFor(path) as object, statistics: { href: "https://eu.api.blizzard.com/profile/wow/character/ember-vale-0/statistics" } } : bodyFor(path) }));
-  const s = await runCrawl({ region: "eu", budget: 10, store, api, details: true });
+  const s = await runCrawl({ region: "eu", budget: 11, store, api, details: true });
   expect(api.get.mock.calls[0]?.[2]).toBeUndefined();
   expect(s.calls).toBe(4);
   expect(store.upsertCharacters.mock.calls[0]?.[1][0]).toMatchObject({ details: { revision: 1, statistics: { rows: [{ label: "Health", value: 843 }] } } });
@@ -62,7 +63,7 @@ it.each([403, 500])("optional endpoint HTTP %i preserves the base character and 
     if (path.endsWith("statistics")) throw new ApiError(status, "api");
     return { status: 200, lastModified: "new", body: path.endsWith("ember-vale-0") ? { ...bodyFor(path) as object, statistics: { href: "https://eu.api.blizzard.com/profile/wow/character/ember-vale-0/statistics" } } : bodyFor(path) };
   });
-  const s = await runCrawl({ region: "eu", budget: 10, store, api, details: true });
+  const s = await runCrawl({ region: "eu", budget: 11, store, api, details: true });
   expect(s.characters.fetched).toBe(1);
   expect(store.missing).not.toHaveBeenCalled();
   expect(store.upsertCharacters.mock.calls[0]?.[1][0]).toMatchObject({ details: { revision: 1, ...(status === 500 ? { retry: true } : {}) } });
@@ -81,8 +82,8 @@ function progressApi(api: ReturnType<typeof setup>["api"], failing?: string) {
 it("reads achievements, reputations and completed quests from advertised links", async () => {
   const { store, api } = setup();
   progressApi(api);
-  const s = await runCrawl({ region: "eu", budget: 10, store, api, details: true });
-  expect(s.calls).toBe(6);
+  const s = await runCrawl({ region: "eu", budget: 11, store, api, details: true });
+  expect(s.calls).toBe(7);
   expect(api.get.mock.calls.map((c) => c[0])).toEqual(expect.arrayContaining([
     "/profile/wow/character/ember-vale-0/achievements",
     "/profile/wow/character/ember-vale-0/reputations",
@@ -99,11 +100,11 @@ it("a stored character without progress is read in full, not answered with a 304
   const asOf = new Date().toISOString();
   store.character.mockResolvedValue([{ last_modified: "date", details: { revision: 1, statistics: { asOf, rows: [] } } }]);
   progressApi(api);
-  await runCrawl({ region: "eu", budget: 10, store, api, details: true });
+  await runCrawl({ region: "eu", budget: 11, store, api, details: true });
   expect(api.get.mock.calls[0]?.[2]).toBeUndefined();
-  store.character.mockResolvedValue([{ last_modified: "date", details: { revision: 1, quests: { asOf, completed: [1] } } }]);
+  store.character.mockResolvedValue([{ last_modified: "date", details: { revision: 1, quests: { asOf, completed: [1] }, playHistory: { asOf, groups: [], ranked: {} } } }]);
   api.get.mockClear();
-  await runCrawl({ region: "eu", budget: 10, store, api, details: true });
+  await runCrawl({ region: "eu", budget: 11, store, api, details: true });
   expect(api.get.mock.calls[0]?.[2]).toEqual({ ifModifiedSince: "date" });
 });
 it("keeps a recent progress section when its endpoint fails, and drops one older than 30 days", async () => {
@@ -112,7 +113,7 @@ it("keeps a recent progress section when its endpoint fails, and drops one older
     const asOf = new Date(Date.now() - days * 86_400_000).toISOString();
     store.character.mockResolvedValue([{ last_modified: "date", details: { revision: 1, retry: true, quests: { asOf, completed: [42] } } }]);
     progressApi(api, "/quests/completed");
-    await runCrawl({ region: "eu", budget: 10, store, api, details: true });
+    await runCrawl({ region: "eu", budget: 11, store, api, details: true });
     const details = (store.upsertCharacters.mock.calls[0]?.[1][0] as { details: ProfileDetails }).details;
     expect(details.retry).toBe(true);
     expect(details.achievements?.rows).toHaveLength(2);
@@ -121,7 +122,7 @@ it("keeps a recent progress section when its endpoint fails, and drops one older
 });
 it("detail mode reserves the entire maximum before starting a character", async () => {
   const { store, api } = setup();
-  await runCrawl({ region: "eu", budget: 9, store, api, details: true });
+  await runCrawl({ region: "eu", budget: 10, store, api, details: true });
   expect(api.get).not.toHaveBeenCalled();
 });
 it("stops before partial rows at budget", async () => {
@@ -781,4 +782,68 @@ it("still crawls without the discovery migration, then fails naming it", async (
   await expect(runCrawl({ region: "eu", budget: 3, store, api })).rejects.toThrow(/20261117160000_armory_discovery\.sql/);
   expect(store.upsertCharacters).toHaveBeenCalledTimes(1);
   expect(store.recordRun).not.toHaveBeenCalled();
+});
+const fresh = () => new Date().toISOString();
+const storedHistory = (asOf: string) => ({ asOf, groups: [], ranked: { quests: 1 } });
+function historyApi(api: ReturnType<typeof setup>["api"], failing?: number) {
+  api.get.mockImplementation(async (path) => {
+    if (failing && path.endsWith("/achievements/statistics")) throw new ApiError(failing, "api");
+    const body = path.endsWith("/achievements/statistics") ? playHistory : path.endsWith("/achievements") ? achievements
+      : path.endsWith("ember-vale-0") ? { ...bodyFor(path) as object, ...progressLinks("ember-vale-0") } : bodyFor(path);
+    return { status: 200, lastModified: "new", body };
+  });
+}
+it("reads play history from the achievements link and stores its ranked counts", async () => {
+  const { store, api } = setup();
+  historyApi(api);
+  await runCrawl({ region: "eu", budget: 11, store, api, details: true });
+  expect(api.get.mock.calls.map((c) => c[0])).toContain("/profile/wow/character/ember-vale-0/achievements/statistics");
+  const details = (store.upsertCharacters.mock.calls[0]?.[1][0] as { details: ProfileDetails }).details;
+  expect(details.playHistory?.ranked.quests).toBe(791);
+});
+it("a stored character without play history is read in full; one with recent play history may get a 304", async () => {
+  const { store, api } = setup();
+  const asOf = fresh();
+  store.character.mockResolvedValue([{ last_modified: "date", details: { revision: 1, quests: { asOf, completed: [1] } } }]);
+  historyApi(api);
+  await runCrawl({ region: "eu", budget: 11, store, api, details: true });
+  expect(api.get.mock.calls[0]?.[2]).toBeUndefined();
+  const fiveDays = new Date(Date.now() - 5 * 86_400_000).toISOString();
+  store.character.mockResolvedValue([{ last_modified: "date", details: { revision: 1, quests: { asOf, completed: [1] }, playHistory: storedHistory(fiveDays) } }]);
+  api.get.mockClear();
+  await runCrawl({ region: "eu", budget: 11, store, api, details: true });
+  expect(api.get.mock.calls[0]?.[2]).toEqual({ ifModifiedSince: "date" });
+});
+it("a failed play history read keeps a recent copy and asks for a retry; a 403 stores none and does not", async () => {
+  const { store, api } = setup();
+  const asOf = new Date(Date.now() - 2 * 86_400_000).toISOString();
+  store.character.mockResolvedValue([{ last_modified: "date", details: { revision: 1, retry: true, playHistory: storedHistory(asOf) } }]);
+  historyApi(api, 500);
+  await runCrawl({ region: "eu", budget: 11, store, api, details: true });
+  const kept = (store.upsertCharacters.mock.calls[0]?.[1][0] as { details: ProfileDetails }).details;
+  expect(kept.playHistory).toEqual(storedHistory(asOf));
+  expect(kept.retry).toBe(true);
+  const denied = setup();
+  historyApi(denied.api, 403);
+  await runCrawl({ region: "eu", budget: 11, store: denied.store, api: denied.api, details: true });
+  const none = (denied.store.upsertCharacters.mock.calls[0]?.[1][0] as { details: ProfileDetails }).details;
+  // A 403 is an answer: an empty play history is stored, so the row is not read in full on every turn.
+  expect(none.playHistory).toEqual({ asOf: expect.any(String), groups: [], ranked: {} });
+  expect(none.retry).toBeUndefined();
+});
+it("a statistics 404 or a profile with no achievements link stores an empty play history, and the next turn may get a 304", async () => {
+  const { store, api } = setup();
+  api.get.mockImplementation(async (path) => path.endsWith("/achievements/statistics")
+    ? { status: 404, lastModified: null, body: null }
+    : { status: 200, lastModified: "new", body: path.endsWith("/achievements") ? achievements : path.endsWith("ember-vale-0") ? { ...bodyFor(path) as object, ...progressLinks("ember-vale-0") } : bodyFor(path) });
+  await runCrawl({ region: "eu", budget: 11, store, api, details: true });
+  const stored = (store.upsertCharacters.mock.calls[0]?.[1][0] as { details: ProfileDetails }).details;
+  expect(stored.playHistory).toEqual({ asOf: expect.any(String), groups: [], ranked: {} });
+  store.character.mockResolvedValue([{ last_modified: "date", details: stored }]);
+  api.get.mockClear();
+  await runCrawl({ region: "eu", budget: 11, store, api, details: true });
+  expect(api.get.mock.calls[0]?.[2]).toEqual({ ifModifiedSince: "date" });
+  const unlinked = setup();
+  await runCrawl({ region: "eu", budget: 11, store: unlinked.store, api: unlinked.api, details: true });
+  expect((unlinked.store.upsertCharacters.mock.calls[0]?.[1][0] as { details: ProfileDetails }).details.playHistory).toEqual({ asOf: expect.any(String), groups: [], ranked: {} });
 });

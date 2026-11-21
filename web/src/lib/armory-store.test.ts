@@ -174,6 +174,16 @@ describe("the memory store", () => {
     ]);
   });
 
+  test("play history boards and ranks read the ranked counts from the stored details", async () => {
+    const s = filled();
+    const history = (fish: number) => ({ revision: 1 as const, playHistory: { asOf: "2026-11-09T10:00:00.000Z", groups: [], ranked: { fish, quests: 10 } } });
+    s.putCharacter(armoryCharacter({ details: history(5) }));
+    s.putCharacter(armoryCharacter({ slug: "torvin-ashbrook", name: "Torvin", surname: "Ashbrook", details: history(50) }));
+    expect((await s.board("fish_caught", "eu", 2, 10)).map((r) => [r.slug, r.value])).toEqual([["torvin-ashbrook", 50], ["velkara-duskmantle", 5]]);
+    expect(await s.board("total_deaths", null, null, 10)).toEqual([]);
+    expect(await s.rank("eu", "velkara-duskmantle")).toContainEqual({ metric: "fish_caught", rank: 2, of: 2 });
+  });
+
   test("the roster joins stored characters' numbers", async () => {
     const roster = await filled().roster("eu", "ember-wardens");
     expect(roster.map((m) => [m.characterSlug, m.stored, m.itemLevel])).toEqual([["velkara-duskmantle", true, 57.41], ["brannoc-tide", false, null]]);

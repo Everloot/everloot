@@ -106,6 +106,15 @@ describe("the character page", () => {
     expect(out).toContain("Read 2026-11-09 10:00 UTC");
   });
 
+  test("play history ranks sit in the Play history tab, not with the gear numbers", async () => {
+    mem.putCharacter(armoryCharacter({ details: { revision: 1, playHistory: { asOf: "2026-11-09T10:00:00.000Z", groups: [{ name: "Skills", rows: [{ id: 1518, name: "Fish caught", value: 9 }] }], ranked: { fish: 9 } } } }));
+    const out = await html(pages.character("eu", "velkara-duskmantle"));
+    const numbers = out.slice(0, out.indexOf('role="tablist"'));
+    expect(numbers).not.toContain("Fish caught");
+    expect(out).toContain('data-tab-panel="history"');
+    expect(out).toContain('href="/armory/rankings/fish-caught?ruleset=2&amp;region=eu"');
+  });
+
   test("a refused Gear Score leaves it out", async () => {
     const out = await html(pages.character("eu", "torvin-ashbrook"));
     expect(out).not.toContain("Gear Score");
@@ -196,6 +205,9 @@ describe("the boards", () => {
     expect(await html(pages.board("item-level", { region: "us" }))).toContain("No character with this number here yet.");
     await expect(pages.board("dps")).rejects.toThrow("NEXT_NOT_FOUND");
     await expect(pages.board("item-level", { ruleset: "4" })).rejects.toThrow("NEXT_NOT_FOUND");
+    // A play history board says who it can rank yet; a gear board does not.
+    expect(await html(pages.board("fish-caught"))).toContain("ranked once their play history has been read");
+    expect(await html(pages.board("item-level"))).not.toContain("play history");
     holder.store = broken();
     expect(await html(pages.board("item-level"))).toContain(STORAGE_UNREACHABLE);
   });

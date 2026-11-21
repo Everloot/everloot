@@ -113,11 +113,19 @@ export function armoryHidePath(c?: { region: string; name: string; surname: stri
   return c ? `${ARMORY_HIDE_PATH}?${new URLSearchParams({ region: c.region, name: c.name, surname: c.surname })}` : ARMORY_HIDE_PATH;
 }
 
-export type ArmoryMetric = "item-level" | "gear-score" | "honorable-kills";
-/** The column armory_board ranks by. */
-export type ArmoryMetricKey = "item_level" | "gear_score" | "honorable_kills";
-export const ARMORY_METRICS: readonly ArmoryMetric[] = ["item-level", "gear-score", "honorable-kills"];
+export type ArmoryMetric = "item-level" | "gear-score" | "honorable-kills"
+  | "quests-completed" | "creatures-killed" | "fish-caught" | "flight-paths" | "dungeons-entered" | "deaths";
+/** The column armory_board ranks by; the play history ones are generated from details (20261121100000). */
+export type ArmoryMetricKey = "item_level" | "gear_score" | "honorable_kills"
+  | "quests_completed" | "creatures_killed" | "fish_caught" | "flight_paths" | "dungeons_entered" | "total_deaths";
+/** The boards ranked from Blizzard's play history (achievements/statistics), in page order. */
+export const PLAY_HISTORY_METRICS: readonly ArmoryMetric[] = ["quests-completed", "creatures-killed", "fish-caught", "flight-paths", "dungeons-entered", "deaths"];
+/** The boards the /rankings hub previews; the others are one link away, so the hub reads three boards, not nine. */
+export const HUB_PREVIEW_METRICS: readonly ArmoryMetric[] = ["item-level", "gear-score", "honorable-kills"];
+export const ARMORY_METRICS: readonly ArmoryMetric[] = [...HUB_PREVIEW_METRICS, ...PLAY_HISTORY_METRICS];
 export const isArmoryMetric = (s: string): s is ArmoryMetric => (ARMORY_METRICS as readonly string[]).includes(s);
+const history = (key: ArmoryMetricKey, title: string, counts: string) =>
+  ({ key, title, column: title, lede: `Characters by ${counts}, as Blizzard's play history gives it.` });
 export const ARMORY_BOARDS: Record<ArmoryMetric, { key: ArmoryMetricKey; title: string; column: string; lede: string }> = {
   "item-level": {
     key: "item_level", title: "Item level", column: "Item level",
@@ -131,12 +139,18 @@ export const ARMORY_BOARDS: Record<ArmoryMetric, { key: ArmoryMetricKey; title: 
     key: "honorable_kills", title: "Honorable kills", column: "Honorable kills",
     lede: "Characters by lifetime honorable kills, as their PvP summary gives them.",
   },
+  "quests-completed": history("quests_completed", "Quests completed", "quests completed"),
+  "creatures-killed": history("creatures_killed", "Creatures killed", "creatures killed"),
+  "fish-caught": history("fish_caught", "Fish caught", "fish caught"),
+  "flight-paths": history("flight_paths", "Flight paths taken", "flight paths taken"),
+  "dungeons-entered": history("dungeons_entered", "Dungeons entered", "5-player dungeons entered"),
+  "deaths": history("total_deaths", "Deaths", "total deaths"),
 };
 export const metricOfKey = (key: string): ArmoryMetric | null => ARMORY_METRICS.find((m) => ARMORY_BOARDS[m].key === key) ?? null;
 export const armoryBoardPath = (metric: ArmoryMetric) => `/armory/rankings/${metric}`;
-/** The number a board or a fact shows: whole kills, item level and Gear Score to two decimals at most. */
+/** The number a board or a fact shows: whole counts, item level and Gear Score to two decimals at most. */
 export const metricValue = (metric: ArmoryMetric, value: number) =>
-  value.toLocaleString("en-US", { maximumFractionDigits: metric === "honorable-kills" ? 0 : 2 });
+  value.toLocaleString("en-US", { maximumFractionDigits: metric === "item-level" || metric === "gear-score" ? 2 : 0 });
 
 export const ARMORY_CLASSES = ["Warrior", "Paladin", "Hunter", "Rogue", "Priest", "Shaman", "Mage", "Warlock", "Druid"] as const;
 export const ARMORY_FACTIONS = ["Alliance", "Horde"] as const;

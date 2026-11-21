@@ -16,6 +16,10 @@ const full = armoryCharacter({
     achievements: { asOf: at, rows: [{ id: 6, name: "Level 10", completedAt: "2026-11-01T12:26:40.000Z" }] },
     reputations: { asOf: at, rows: [{ id: 530, name: "Darkspear Trolls", standing: "Friendly", tier: 4 }] },
     quests: { asOf: at, completed: [788, 789, 804] },
+    playHistory: { asOf: at, ranked: { quests: 791, creatures: 11256, fish: 1993, flights: 152, dungeons: 23 }, groups: [
+      { name: "Quests", rows: [{ id: 98, name: "Quests completed", value: 791 }] },
+      { name: "Character · Consumables", rows: [{ id: 1125, name: "Bandage used most", value: 31, note: "Triage Bandage" }] },
+    ] },
   },
 });
 // A profile row from before the detail reads: gear and the PvP numbers, nothing else.
@@ -42,7 +46,7 @@ test("a character with every part stored draws every tab, none of them empty", (
 
 test("the strip holds Gear to Quests and nothing that waits on the privacy decision", () => {
   const labels = CHARACTER_TABS.map(([, label]) => label);
-  expect(labels).toEqual(["Gear", "Talents", "Stats", "PvP", "Achievements", "Professions", "Reputations", "Quests", "Progress"]);
+  expect(labels).toEqual(["Gear", "Talents", "Stats", "PvP", "Achievements", "Professions", "Reputations", "Quests", "Play history", "Progress"]);
   for (const out of ["Gold", "Completionist", "Alts", "Legacy perks"]) expect(labels).not.toContain(out);
 });
 
@@ -76,7 +80,7 @@ test("a character with partial data keeps every tab, and each empty one says why
 
 test("gear and PvP from the profile row show without any detail read", () => {
   const html = render(armoryCharacter());
-  expect(emptyIds(html)).toEqual(["talents", "stats", "achievements", "professions", "reputations", "quests"]);
+  expect(emptyIds(html)).toEqual(["talents", "stats", "achievements", "professions", "reputations", "quests", "history"]);
   expect(html).toContain("data-equipment-slot");
   expect(html).toContain("1,234");
 });
@@ -86,4 +90,21 @@ test("an achievements read with nothing completed says so, not that it was missi
   expect(html).toContain("None completed when it was read.");
   expect(emptyIds(html)).not.toContain("achievements");
   expect(emptyIds(html)).toContain("reputations");
+});
+
+test("play history shows the six ranked counts, an unread one as Not read, then every group with its notes", () => {
+  const panel = characterTabs(full, { tips: new Map(), historyRanks: [{ metric: "fish-caught", rank: 2, of: 40, href: "/armory/rankings/fish-caught?ruleset=2&region=eu" }] })
+    .find((t) => t.id === "history")!;
+  const html = renderToStaticMarkup(<>{panel.panel}</>);
+  for (const text of ["Quests completed", "791", "Fish caught", "1,993", "Dungeons entered", "Character · Consumables", "Bandage used most", "Triage Bandage"]) expect(html, text).toContain(text);
+  // No deaths count was read: the headline says so instead of a 0.
+  expect(html).toMatch(/Deaths<\/dt><dd[^>]*>(<span[^>]*>)?Not read/);
+  expect(html).toContain('href="/armory/rankings/fish-caught?ruleset=2&amp;region=eu"');
+  expect(html).toContain("#2 of 40");
+});
+
+test("a character read before play history, or with none to read, has the tab saying it was not read", () => {
+  expect(emptyIds(render(partial))).toContain("history");
+  const none = armoryCharacter({ details: { revision: 1, playHistory: { asOf: at, groups: [], ranked: {} } } });
+  expect(emptyIds(render(none))).toContain("history");
 });

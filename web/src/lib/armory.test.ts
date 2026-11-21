@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import {
+  HUB_PREVIEW_METRICS, isArmoryMetric, metricOfKey, PLAY_HISTORY_METRICS,
   armoryBoardHref, armoryBoardQuery, armoryCharacterPath, armoryGuildPath, armoryHidePath, armoryOn, characterSlugOf, classTokenOfId, classTokenOfName,
   metricValue, namesFromSlug, raceOfId, readLine, slotLabel, slugFromSegment, validArmorySlug,
 } from "./armory";
@@ -68,4 +69,14 @@ test("the read line and the figures", () => {
   expect(armoryHidePath({ region: "eu", name: "Velkara", surname: "Duskmantle" })).toBe("/armory/hide?region=eu&name=Velkara&surname=Duskmantle");
   expect(armoryCharacterPath("eu", "vélkara-duskmantle")).toBe("/armory/eu/v%C3%A9lkara-duskmantle");
   expect(armoryGuildPath("us", "wardens")).toBe("/armory/us/guilds/wardens");
+});
+
+test("six play history boards rank whole counts, after the three gear and PvP boards on the hub", () => {
+  expect(PLAY_HISTORY_METRICS).toEqual(["quests-completed", "creatures-killed", "fish-caught", "flight-paths", "dungeons-entered", "deaths"]);
+  expect(HUB_PREVIEW_METRICS).toEqual(["item-level", "gear-score", "honorable-kills"]);
+  expect(isArmoryMetric("fish-caught")).toBe(true);
+  expect(metricOfKey("total_deaths")).toBe("deaths");
+  expect(metricOfKey("quests_completed")).toBe("quests-completed");
+  expect(metricValue("quests-completed", 1234)).toBe("1,234");
+  expect(metricValue("deaths", 56.4)).toBe("56");
 });

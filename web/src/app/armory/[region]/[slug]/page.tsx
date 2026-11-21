@@ -9,7 +9,7 @@ import { FOOTER_LINE } from "@/lib/character-showcase";
 import { playerPagesOn } from "@/lib/player-pages";
 import {
   armoryBoardHref, armoryCharacterPath, armoryGuildPath, armoryHidePath, armoryOn, classTokenOfName, isArmoryRegion,
-  metricOfKey, metricValue, regionLabel, slugFromSegment, validArmorySlug, ARMORY_BOARDS,
+  metricOfKey, metricValue, PLAY_HISTORY_METRICS, regionLabel, slugFromSegment, validArmorySlug, ARMORY_BOARDS,
 } from "@/lib/armory";
 import { armoryStore, type ArmoryCharacter, type ArmoryRank } from "@/lib/armory-store";
 import { loadItemTips, loadSiteAssets, unknownItemIcon } from "@/lib/game-assets";
@@ -100,12 +100,20 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
   const lastRead = newest(readTimes(c));
   // The honorable-kills rank sits with the kills in the PvP tab; the gear ranks stay with the numbers above the tabs.
   const pvpRanks = rankFacts(c, ranks.filter((r) => r.metric === "honorable_kills"));
+  // The play-history ranks sit beside their counts in the Play history tab.
+  const historyKeys = new Set<string>(PLAY_HISTORY_METRICS.map((m) => ARMORY_BOARDS[m].key));
+  const historyRanks = ranks.flatMap((r) => {
+    const metric = metricOfKey(r.metric);
+    return metric && historyKeys.has(r.metric)
+      ? [{ metric, rank: r.rank, of: r.of, href: armoryBoardHref(metric, { region: isArmoryRegion(c.region) ? c.region : null, ruleset: c.rulesetId }) }]
+      : [];
+  });
   const progression = await loadCharacterProgression(c.region, c.slug);
   const facts: Fact[] = [
     ...(c.itemLevel !== null ? [{ label: "Item level", value: metricValue("item-level", c.itemLevel), numeric: true }] : []),
     ...(c.averageItemLevel !== null ? [{ label: "Average item level", value: c.averageItemLevel, numeric: true }] : []),
     ...(c.gearScore !== null ? [{ label: "Gear Score", value: metricValue("gear-score", c.gearScore), numeric: true }] : []),
-    ...rankFacts(c, ranks.filter((r) => r.metric !== "honorable_kills")),
+    ...rankFacts(c, ranks.filter((r) => r.metric !== "honorable_kills" && !historyKeys.has(r.metric))),
   ];
 
   return (
@@ -140,7 +148,7 @@ export default async function ArmoryCharacterPage(props: { params: Promise<Param
 
         {facts.length > 0 && <Facts label="Numbers" items={facts} />}
 
-        <Tabs label={`${fullName}: character sheet`} tabs={characterTabs(c, { tips, unknownIcon: assets ? unknownItemIcon(assets.base) : null, categories, pvpFacts: pvpRanks, progression })} />
+        <Tabs label={`${fullName}: character sheet`} tabs={characterTabs(c, { tips, unknownIcon: assets ? unknownItemIcon(assets.base) : null, categories, pvpFacts: pvpRanks, historyRanks, progression })} />
 
         {addon && <section aria-labelledby="armory-addon" className="space-y-6 border-t border-line pt-8">
           <SectionHeading id="armory-addon">Shared through the Everloot addon</SectionHeading>

@@ -351,7 +351,7 @@ describe("published sections (private sync, S6)", () => {
 
 describe("Blizzard's API part (armory association)", () => {
   const ARMORY_RPC = "rpc/public_character_armory";
-  const SWITCHES = { show_gear: true, show_stats: false, show_talents: false, show_pvp: true, show_professions: false, show_reputations: false, show_collections: true };
+  const SWITCHES = { show_gear: true, show_stats: false, show_talents: false, show_pvp: true, show_professions: false, show_reputations: false, show_collections: true, show_history: false };
   const OFF = Object.fromEntries(Object.keys(SWITCHES).map((k) => [k, false]));
   const at = "2026-10-31T08:00:00.000Z";
   const character = armoryCharacter({
@@ -362,6 +362,7 @@ describe("Blizzard's API part (armory association)", () => {
       reputations: { asOf: at, rows: [{ id: 530, name: "Darkspear Trolls", standing: "Friendly", tier: 4 }] },
       achievements: { asOf: at, rows: [{ id: 6, name: "Level 10", completedAt: "2026-10-01T12:00:00.000Z" }] },
       quests: { asOf: at, completed: [788, 789] },
+      playHistory: { asOf: at, ranked: { fish: 1993 }, groups: [{ name: "Skills", rows: [{ id: 1518, name: "Fish caught", value: 1993 }] }] },
     },
   });
   const answer = (row: unknown) => auth.authQuery.mockImplementation(async (path: string) => {
@@ -390,9 +391,19 @@ describe("Blizzard's API part (armory association)", () => {
     expect(html).toContain("321");
     expect(html).toContain('href="/database/achievements/6"');
     expect(html).toContain("completed quests");
-    // Stats and reputations are switched off: they never reach the markup.
+    // Stats, reputations and play history are switched off: they never reach the markup.
     expect(html).not.toContain("Intellect");
+    expect(html).not.toContain("armory-play-history");
     expect(html).not.toContain("Darkspear Trolls");
+  });
+
+  test("play history shows only with its own switch on", async () => {
+    answer([{ region: "eu", slug: "ember-vale", ...OFF, show_history: true }]);
+    const html = await render();
+    expect(html).toContain('data-part="armory"');
+    expect(html).toContain("armory-play-history");
+    expect(html).toContain("1,993");
+    expect(html).not.toContain("Intellect");
   });
 
   test("no association, every switch off, no armory row, the armory off or a failed read leave the part out", async () => {
