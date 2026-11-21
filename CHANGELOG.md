@@ -263,6 +263,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: drop rates, measured zeros and source names show from one player's reports, marked reported, verified or confirmed by how many players agree.
 - Site: character and guild progression are public: every synced kill counts, the guild boards on Rankings rank every guild, and a guild's kills count once enough members hold them.
 - Site: Glint uses Jovian's illustrated, top-hatted companion in place of the raven, with matching happy and disappointed expressions, transparent edges and gentle motion that respects reduced-motion settings.
+- Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
 - Site: lore pages drop the doubled spaces the wiki's source had but never showed, leave no gap where footnotes or race icons sat side by side, show `{{-}}` as its dash and `{{Race|…|notext}}` as only its icon, so far fewer pages are marked damaged.

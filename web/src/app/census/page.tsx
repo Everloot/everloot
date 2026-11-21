@@ -10,6 +10,7 @@ import { playerPagesOn } from "@/lib/player-pages";
 import { guildsOn } from "@/lib/guild-switch";
 import { PLAYER_PAGE_SHOWS } from "../players/player-view";
 import { censusIcons, type CensusIcons } from "@/lib/census-media";
+import { CLASS_BG, classColour } from "@/components/ui/class-colour";
 import { Bars, DailyChart, Factions, HeatCell, IconName } from "./charts";
 import {
   Card, Container, DataTable, EmptyState, Explainer, FilterBar, LinkTabs, PageHeader, SectionHeading, type Column, type FilterControl,
@@ -86,13 +87,13 @@ function RaceClassGrid({ faction, window: w, icons }: { faction: string; window:
     { key: "race", header: "Race", nowrap: true, cell: (race) => <span className="inline-flex items-center gap-2 font-medium"><span aria-hidden="true" className={`h-2 w-2 ${faction === "Alliance" ? "bg-faction-alliance" : "bg-faction-horde"}`} /><IconName label={race.name} url={icons[race.token]} /></span> },
     ...CENSUS_CLASSES.map((c): Column<(typeof races)[number]> => ({
       key: c.token,
-      header: <IconName label={c.name} url={icons[c.token]} />,
+      header: <span className="inline-flex items-center gap-2 text-fg"><span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${classColour(CLASS_BG, c.token)}`} /><IconName label={c.name} url={icons[c.token]} /></span>,
       numeric: true,
       cell: (race) => {
         const cell = count(race.token, c.token);
         return !cell ? <span className="sr-only">Not playable</span>
           : cell.count === null ? <span tabIndex={0} title={`${race.name}, ${c.name}: ${HIDDEN_LABEL}`}><span aria-hidden="true" className="text-muted">&mdash;</span><span className="sr-only">{HIDDEN_LABEL}</span></span>
-          : <HeatCell label={`${race.name}, ${c.name}`} count={cell.count} max={max} />;
+          : <HeatCell label={`${race.name}, ${c.name}`} classToken={c.token} count={cell.count} max={max} />;
       },
     })),
   ];
@@ -240,13 +241,13 @@ function Headline({ view, window: w }: { view: CensusView; window: CensusWindow 
   }
   return (
     <p className="max-w-prose text-lg text-fg-2">
-      About {number(w.characters!)} characters were {w.id === "week" ? "active in the last 7 days" : "seen since launch"} {span},
+      About {number(w.characters!)} characters were seen {w.id === "week" ? "in the last 7 days" : "since launch"} {span},
       counted from {plural(w.installs, "install", "installs")} that turned the census on{view.trusted ? ", including Everloot's own" : ""}.
     </p>
   );
 }
 
-function HeadlineTiles({ window: w, age }: { window: CensusWindow; age: string }) {
+function HeadlineTiles({ window: w }: { window: CensusWindow }) {
   // Compare published counts only; a hidden contender is never treated as zero.
   const top = (rows: { label: string; count: CensusCount }[]) => {
     const first = rows.filter((r) => r.count !== null).sort((a, b) => b.count! - a.count!)[0];
@@ -257,9 +258,8 @@ function HeadlineTiles({ window: w, age }: { window: CensusWindow; age: string }
     ["Faction split", w.factions.map((f) => `${f.faction}: ${f.count === null || !w.characters ? HIDDEN_LABEL : percent(f.count, w.characters)}`).join(" · ")],
     ["Top class shown", top(w.classes.map((c) => ({ label: CLASS_NAME.get(c.class)!, count: c.count })))],
     ["Top race shown", top(w.races.map((r) => ({ label: `${RACE_NAME.get(r.race)} (${r.faction})`, count: r.count })))],
-    ["Data age", age],
   ];
-  return <dl aria-label="Census headlines" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+  return <dl aria-label="Census headlines" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
     {stats.map(([label, value]) => <Card key={label} padding="sm"><dt className="text-sm text-fg-2">{label}</dt><dd className="mt-2 text-xl font-semibold tabular-nums text-fg">{value}</dd></Card>)}
   </dl>;
 }
@@ -287,6 +287,7 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
                 : plural(w.installs, "reporting install", "reporting installs")}
             </span>
             {!unreachable && <span>{dataAgeLabel(dataAsOf)}</span>}
+            <Link href="/methodology#population" className={link}>How we count</Link>
           </>}
         />
 
@@ -303,8 +304,11 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
                   tabs={WINDOWS.map((option) => ({ href: censusHref(filter, option.id), label: option.label, current: option.id === chosen }))}
                 />
               )}
-              <Headline view={view} window={w} />
-              {!w.collecting && <HeadlineTiles window={w} age={dataAgeLabel(dataAsOf)} />}
+              <div className="space-y-2">
+                <Headline view={view} window={w} />
+                {!w.collecting && <p className="text-sm text-fg-2">Coverage reflects where participating players play.</p>}
+              </div>
+              {!w.collecting && <HeadlineTiles window={w} />}
               {!w.collecting && (
                 <FilterBar
                   label="Census filters"
@@ -328,11 +332,11 @@ export default async function CensusPage({ searchParams }: { searchParams?: Prom
                 <Card as="section" aria-labelledby="grid" className="space-y-6">
                   <SectionHeading
                     id="grid"
-                    note={<>Blizzard&apos;s race and class tables from <Link href="/wow-forever" className={link}>What is WoW: Forever</Link>, with the characters in each playable combination. A dash is a hidden count.</>}
+                    note={<>Playable combinations from <Link href="/wow-forever" className={link}>What is WoW: Forever</Link>. Counts are rounded. A dash marks a hidden count.</>}
                   >
                     Race and class
                   </SectionHeading>
-                  <p className="text-sm text-fg-2">Darker cells mean more characters. Counts are rounded; hidden cells have no shade.</p>
+                  <p className="text-sm text-fg-2">Stronger class colors mean more characters. <span className="xl:hidden">Scroll sideways to see all classes.</span></p>
                   {FACTIONS.slice().reverse().map((f) => <RaceClassGrid key={f} faction={f} window={w} icons={icons} />)}
                 </Card>
                 <CountTable id="levels" title="Level bands" item="Level band" total={w.characters!} rows={LEVEL_BANDS.map((b) => ({ key: b.id, label: b.label, count: w.levels.find((l) => l.band === b.id)!.count, href: censusHref({ ...filter, level: b.id }, chosen) }))} />
