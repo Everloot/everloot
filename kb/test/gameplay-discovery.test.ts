@@ -6,6 +6,7 @@ import * as catalogModule from "../src/catalog-index.js";
 import { WORLD_MAP_DATA } from "../src/world-map-file.js";
 import { catalogId, CATALOG_ID_BASE } from "../src/catalog-index.js";
 import { replaceSourceRows } from "../src/entities.js";
+import { answerSourcesFactsFromRecords } from "../src/answer-sources.js";
 
 const dbs: DB[] = [];
 afterEach(() => { vi.restoreAllMocks(); for (const db of dbs.splice(0)) db.close(); });
@@ -155,6 +156,44 @@ test("alternating lore and item calls keep one merged index", async () => {
     await h.search_knowledge({ query: "Linen Cloth", kind: "item", limit: 5 });
   }
   expect(merge).toHaveBeenCalledTimes(1);
+});
+
+test("the host's stored facts give the same index as the corpus", () => {
+  const facts = answerSourcesFactsFromRecords(rows);
+  expect(catalogModule.gameplayIndexOf(facts, "2026-11-14T00:00:00Z")).toEqual(catalogModule.gameplayIndex(rows, "2026-11-14T00:00:00Z"));
+});
+
+test("discovery answers from the host's stored facts and never reads the corpus while they are there", async () => {
+  const db = openDb(":memory:"); dbs.push(db);
+  const catalog = buildCatalogIndex({ map: WORLD_MAP_DATA });
+  const replay = vi.spyOn(catalogModule, "gameplayIndex");
+  const build = vi.spyOn(catalogModule, "gameplayIndexOf");
+  const corpus = vi.fn(async () => ({ records: [...rows], dataAsOf: "2026-11-15T00:00:00Z" }));
+  let facts = answerSourcesFactsFromRecords(rows);
+  // A new wrapper on each read, as the site's loader makes; the item and world facts inside stay the same objects.
+  const answerSources = vi.fn(async () => ({ facts: { items: facts.items, world: facts.world }, dataAsOf: "2026-11-15T00:00:00Z" }));
+  const h = createToolHandlers(db, { catalog: () => catalog, corpus, answerSources, recheck: [] });
+  const hit = out(await h.search_knowledge({ query: "Linen Cloth", kind: "item", limit: 5 })).hits[0];
+  expect(hit).toMatchObject({ gameId: 2589, sourceKind: "observed", observed: { asOf: "2026-11-15T00:00:00Z" } });
+  expect(out(await h.get_entity({ id: hit.recordId })).hit).toEqual(hit);
+  expect(out(await h.get_by_name({ name: "Druid of the Fang", kind: "npc" })).hits[0]).toMatchObject({ gameId: 3840 });
+  expect(corpus).not.toHaveBeenCalled();
+  expect(replay).not.toHaveBeenCalled();
+  expect(build).toHaveBeenCalledTimes(1);
+  // A refreshed stored file (new facts objects) rebuilds; a name it no longer agrees on is gone.
+  facts = answerSourcesFactsFromRecords(rows.slice(0, 4));
+  expect(out(await h.get_by_name({ name: "Linen Cloth", kind: "item" })).hits).toEqual([]);
+  expect(build).toHaveBeenCalledTimes(2);
+});
+
+test("with no stored facts, discovery reads the corpus as before", async () => {
+  const db = openDb(":memory:"); dbs.push(db);
+  const corpus = vi.fn(async () => ({ records: [...rows], dataAsOf: "2026-11-16T00:00:00Z" }));
+  for (const answerSources of [async () => null, async () => { throw new Error("r2 down"); }]) {
+    const h = createToolHandlers(db, { catalog: () => buildCatalogIndex({ map: WORLD_MAP_DATA }), corpus, answerSources, recheck: [] });
+    expect(out(await h.get_by_name({ name: "Linen Cloth", kind: "item" })).hits[0]).toMatchObject({ gameId: 2589, observed: { asOf: "2026-11-16T00:00:00Z" } });
+  }
+  expect(corpus).toHaveBeenCalledTimes(2);
 });
 
 test("a new snapshot time rebuilds the gameplay index", async () => {
