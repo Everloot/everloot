@@ -86,6 +86,42 @@ assert(string.find(message, 'Desktop App', 1, true) and string.find(message, 'ev
 """)
 print("Lua 5.1 auctions: a full scan reports both upload routes")
 
+for file in ["modules/prices.lua", "modules/auctiontab.lua"]:
+    lua.execute((root / file).read_text(encoding="utf-8"))
+lua.execute("""
+-- Build 71037 gives no realm on both existing and fresh installs.
+local E = Everloot
+GetRealmName = function() return '' end
+GetRealmID = function() return 0 end
+UnitGUID = function() return 'Player-123-1234' end
+UnitClass = function() return 'Mage', 'MAGE' end
+UnitLevel = function() return 40 end
+UnitExists = function() return true end
+UnitFactionGroup = function() return 'Horde' end
+EverlootDB.lastScanAt = nil
+for _, hook in ipairs(E.frame.hooks) do hook(nil, 'AUCTION_HOUSE_SHOW') end
+local before = #E:Rows('auction_snapshot')
+E:StartScan()
+assert(E:Scanning(), 'a character without a realm can still start a scan')
+for _, hook in ipairs(E.frame.hooks) do hook(nil, 'REPLICATE_ITEM_LIST_UPDATE') end
+assert(not E:Scanning(), 'the local scan finished')
+assert(#E:Rows('auction_snapshot') == before, 'unidentified prices never go into the outbox')
+assert(E:OwnScan(nil).items[2589][4] == 100, 'the price is readable on its own character')
+assert(E.AuctionTab.Lookup('2589'):find('Your scan', 1, true), 'the auction lookup displays the local price')
+assert(E.ItemIdFrom('Item') == 2589, 'the local scan can be searched by item name')
+assert(not E:OwnScan(nil, 'Alliance'), 'the scan is isolated to its auction house')
+local player = E.CharacterKey()
+EverlootDB.roster = { [player] = { realm = 'Forever' } }
+assert(E.CurrentRealm() == 'Forever', 'an existing character can still look up their historical realm')
+assert(not E.LiveRealm(), 'the historical value is separate from the live identity used for uploads')
+UnitGUID = function() return 'Player-123-5678' end
+assert(not E:OwnScan(nil), 'an alt cannot read another character’s unidentified market')
+assert(not E.CurrentRealm(), 'an alt does not inherit another character’s historical realm')
+GetRealmName = function() return 'New Realm' end
+assert(E.CurrentRealm() == 'New Realm', 'a readable live realm wins')
+""")
+print("Lua 5.1 auctions: blank realm scans stay local and are isolated by character and house")
+
 # The scan's progress, for the tab's bar: words and a fraction through the wait, the read and the second read; nothing
 # between scans. Three rows read one a frame; the second row's item has not loaded until the second read.
 lua = LuaRuntime()

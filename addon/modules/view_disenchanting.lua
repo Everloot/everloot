@@ -38,7 +38,7 @@ local function contents()
   local log = D.History()
   for i = #log, 1, -1 do
     local row = log[i]
-    local value, missing = D.Value(GetRealmName(), row.mats)
+    local value, missing = D.Value(E.CurrentRealm(), row.mats)
     add(date("!%m-%d %H:%M", row.t) .. " " .. D.Label(row.item) .. " · estimated " .. estimate(value, missing))
     add(row.cost and ("  Cost " .. U.Money(row.cost) .. " · estimated difference " .. estimate(value - row.cost, missing)) or "  Cost and difference unknown")
     local ids = {}

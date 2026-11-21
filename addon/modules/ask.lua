@@ -8,7 +8,7 @@ local MAX_QUESTION, MAX_PENDING = 500, 20
 --- The realm the player is on, sent with the question so a price question needs no realm in its words. Only a
 --- plain name goes: anything else is left out and the companion asks which realm.
 local function currentRealm()
-  local realm = GetRealmName and GetRealmName()
+  local realm = E.LiveRealm()
   if type(realm) ~= "string" then return nil end
   realm = realm:gsub("^%s+", ""):gsub("%s+$", "")
   if #realm < 2 or #realm > 40 or realm:find("[%c|]") then return nil end

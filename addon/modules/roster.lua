@@ -67,7 +67,7 @@ function R.Update()
   EverlootDB.roster[key] = row
   R.revision = R.revision + 1
   row.name = text((call("UnitName", "player"))) or row.name
-  row.realm = text((call("GetRealmName"))) or row.realm
+  row.realm = text(E.LiveRealm()) or row.realm
   row.class = class
   row.level = level
   row.faction = text((call("UnitFactionGroup", "player"))) or row.faction

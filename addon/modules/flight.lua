@@ -352,8 +352,10 @@ local function routeTo(index)
     end
   end
   origin = origin or names.current
+  local realm = E.CurrentRealm()
+  local character = not realm and E.CharacterKey() or nil
   local route = {
-    origin = origin, destination = destination, realm = name(read(GetRealmName)),
+    origin = origin, destination = destination, realm = realm or (character and ("character:" .. character)),
     from = { id = ids.current or (here and ids[here]), name = origin }, to = { id = ids[index], name = destination },
   }
   if origin and destination and route.realm and origin ~= destination then route.key = origin .. "|" .. destination end

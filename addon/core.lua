@@ -7,7 +7,7 @@ local E = Everloot
 -- The game passes the folder name as the first argument of each file; a folder extracted as Everloot-0.3.20 is still this addon.
 local addonName = ... or "Everloot"
 
-E.VERSION = "0.3.28"
+E.VERSION = "0.3.29"
 E.MAX_ROWS_PER_KIND = 2000
 -- Boss pull timing, dungeon and raid runs, and pull summaries (docs/design/specs/2026-11-02-pull-and-run-records-design.md).
 -- Off in every build made from this file, nightlies included: openworld.lua then writes encounter rows as before,
@@ -57,6 +57,28 @@ function E.CharacterKey()
   local level = tonumber(E.Readable((playerCall("UnitLevel"))))
   if not level or level < 1 then return nil, "no level" end
   return hex8(E.Adler32((EverlootDB.installId or "") .. ":" .. guid)), token, math.min(100, math.floor(level))
+end
+
+local function realmName(value)
+  if type(value) == "string" and #value >= 2 and value:find("%S") then return value end
+end
+
+--- The realm the client identifies now. Forever can return an empty string instead of a name.
+function E.LiveRealm()
+  if type(GetRealmName) ~= "function" then return nil end
+  local ok, value = pcall(GetRealmName)
+  if ok then return realmName(E.Readable(value)) end
+end
+
+--- For local lookups only: the historical realm saved for this exact character, if any.
+function E.CurrentRealm()
+  local live = E.LiveRealm()
+  if live then return live end
+  local roster = EverlootDB and EverlootDB.roster
+  if not roster then return nil end
+  local key = E.CharacterKey()
+  local row = key and roster[key]
+  if row then return realmName(row.realm) end
 end
 
 --- The NPC id in a creature GUID (Creature-0-server-instance-zone-NPCID-spawn); nil for anything else.

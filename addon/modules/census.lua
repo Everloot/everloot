@@ -164,7 +164,7 @@ local function recordSelf(newLevel)
   local race = E.Readable((select(2, UnitRace("player"))))
   local class = E.Readable((select(2, UnitClass("player"))))
   local faction = factionOf(E.Readable((UnitFactionGroup("player"))))
-  local realm = realmOf(E.Readable(GetRealmName()))
+  local realm = realmOf(E.LiveRealm())
   if type(level) ~= "number" or level < 1 or level > MAX_LEVEL then return end
   if not token(race, RACE, 2, 24) or not token(class, CLASS, 3, 16) or not faction or not realm then return end
   local on = currentDay()

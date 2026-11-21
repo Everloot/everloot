@@ -641,6 +641,17 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: describe the in-game Everloot window, feature chooser, local data and how to reopen it or report a window error.
 - Site: the census adds headline tiles, faction and class colours, race and level bars, a race-by-class heatmap, and a daily chart with hover counts; every table stays, hidden counts stay hidden, and class and race icons load from Blizzard when available.
 
+## [0.3.29] - 2026-11-21
+
+WoW: Forever players can scan prices and keep their gold ledger when the game stops reporting realm names.
+
+### Fixed
+
+- Open the Everloot tab at the Auction House and choose **Scan prices**. New scans and partial samples with an unidentified market stay on the character that took them. Look up prices by item and choose **Save scan** to keep the scan after a reload.
+- Existing characters can still look up saved prices for their remembered realm. The local gold ledger and flight timings continue to work when the realm is unavailable.
+
+Shared scans without a verified realm are held back. Blizzard auction prices remain available on everloot.app. The add-on loaded and completed a scan in the live Forever client on build 71037.
+
 ## [0.3.28] - 2026-11-21
 
 The flight path bar knows how long a flight takes before you have flown it: InFlight's measured time for the whole route, or the route's length in the game files, from takeoff, and the flight map's destination tooltips show the same time. The bar's line is a row of Everloot diamonds that fill green behind your face, and the crest fills green when you land.

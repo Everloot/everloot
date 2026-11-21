@@ -114,15 +114,13 @@ end
 --- (the player's own last full scan), "vendor" (the game's sell price) or "none". `cut` takes the auction
 --- house's 5% from market and scan values: they are prices someone pays, not what the seller keeps.
 function G.Value(itemId, cut)
-  local realm = GetRealmName and GetRealmName()
+  local realm = E.CurrentRealm()
   local unit, source = 0, "none"
-  if type(realm) == "string" and realm ~= "" then
-    local row = E.CommunityPrice and E:CommunityPrice(realm, itemId)
-    local own = E.OwnScan and E:OwnScan(realm)
-    local scanned = own and own.items[itemId]
-    if row and row.market and row.market > 0 then unit, source = row.market, "market"
-    elseif scanned and scanned[5] and scanned[5] > 0 then unit, source = scanned[5], "scan" end
-  end
+  local row = realm and E.CommunityPrice and E:CommunityPrice(realm, itemId)
+  local own = E.OwnScan and E:OwnScan(realm)
+  local scanned = own and own.items[itemId]
+  if row and row.market and row.market > 0 then unit, source = row.market, "market"
+  elseif scanned and scanned[5] and scanned[5] > 0 then unit, source = scanned[5], "scan" end
   if source == "none" then
     local sell = vendorPrice(itemId)
     if sell then unit, source = sell, "vendor" end
@@ -166,7 +164,7 @@ end
 
 local function newSession()
   local name = UnitName and E.Readable(UnitName("player"))
-  local realm = GetRealmName and E.Readable(GetRealmName())
+  local realm = E.CurrentRealm()
   local s = {
     v = 1,
     character = type(name) == "string" and name or nil,

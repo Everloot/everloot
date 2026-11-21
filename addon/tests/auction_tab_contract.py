@@ -567,7 +567,7 @@ Everloot.PriceLines = real
 -- A realm name or item link the client will not let the addon read is missing, never an error.
 SECRET.Forever = true
 lookup('2589')
-assert(p.message.text == 'No Everloot price for that item on this realm yet.', p.message.text)
+assert(p.message.text:find('did not identify this auction market', 1, true), p.message.text)
 assert(T.StatusLines()[1] == 'No scan on this realm yet.')
 SECRET.Forever = nil
 SECRET[LINEN] = true
