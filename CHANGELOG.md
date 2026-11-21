@@ -267,7 +267,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
-- Addon: local auction scans and the gold ledger work when WoW: Forever hides realm names. Existing characters can still read their saved market prices. Scans without a confirmed realm stay on the character that took them.
 - Site: armory character pages show their board ranks again; a rank on one of the new play history boards had made the page drop them all.
 - Site: lore pages drop the doubled spaces the wiki's source had but never showed, leave no gap where footnotes or race icons sat side by side, show `{{-}}` as its dash and `{{Race|…|notext}}` as only its icon, so far fewer pages are marked damaged.
 - Site: the Privacy Policy points to Settings, where API keys, linked characters and synced data now live, instead of the old account page.
@@ -641,6 +640,17 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and report separate answerability rates.
 - Site: describe the in-game Everloot window, feature chooser, local data and how to reopen it or report a window error.
 - Site: the census adds headline tiles, faction and class colours, race and level bars, a race-by-class heatmap, and a daily chart with hover counts; every table stays, hidden counts stay hidden, and class and race icons load from Blizzard when available.
+
+## [0.3.29] - 2026-11-21
+
+WoW: Forever players can scan prices and keep their gold ledger when the game stops reporting realm names.
+
+### Fixed
+
+- Open the Everloot tab at the Auction House and choose **Scan prices**. New scans and partial samples with an unidentified market stay on the character that took them. Look up prices by item and choose **Save scan** to keep the scan after a reload.
+- Existing characters can still look up saved prices for their remembered realm. The local gold ledger and flight timings continue to work when the realm is unavailable.
+
+Shared scans without a verified realm are held back. Blizzard auction prices remain available on everloot.app. Automated compatibility checks passed. Live-client verification of this patch is pending.
 
 ## [0.3.28] - 2026-11-21
 

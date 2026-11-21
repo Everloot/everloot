@@ -7,7 +7,7 @@ Everloot Desktop App, and adds auction prices to item tooltips. It uses only the
 plays the character. Records match the upload contract (`packages/protocol`, see its `schema/records/`) field for
 field.
 
-**Status:** 0.3.28, a regular release. The automated contract tests pass. The flight bar's measured and estimated times, the flight map tooltips, the diamond line and the landing moment have contract coverage; no live-client check was run before this release. The 0.3.25 in-game notes still apply to the rest.
+**Status:** 0.3.29. Automated coverage includes auction scans with a blank realm, saved price lookup and the local gold ledger. Live-client verification of the realm-name patch is pending.
 
 ## Run it
 
@@ -22,8 +22,8 @@ lists every module and row count. Auction capture is on in a new
 install (`/everloot auctions off` turns it off). At the auction house, open the **Everloot** tab after
 Blizzard's tabs and click **Scan prices** (or type `/everloot scan`) for a full scan: at most one every 15 minutes, read in chunks, summarised per item,
 and the last three scans per realm kept. Nothing scans without that click. The tab shows the cooldown,
-whether the last scan is in your saved file yet, a **Share now** button (a `/reload`, which writes the
-file so the Desktop App can send it) and a price lookup with the tooltip's lines. If the tab cannot be
+whether the last scan is saved, a **Save scan** button that reloads the UI, and a price lookup with the tooltip's lines.
+When the game gives no realm name, the scan is saved for that character and stays out of uploads. If the tab cannot be
 added, a **Scan prices** button takes its place. The list of your
 installed addons is off until `/everloot addons on`; it is sent only from the upload page, after
 its preview. `/everloot addons off` stops it and deletes every recorded addon row.
