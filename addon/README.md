@@ -7,7 +7,7 @@ Everloot Desktop App, and adds auction prices to item tooltips. It uses only the
 plays the character. Records match the upload contract (`packages/protocol`, see its `schema/records/`) field for
 field.
 
-**Status:** 0.3.27. The shopping-list handoff to Blizzard's Buy screen has automated contract coverage. Live-client verification of the new handoff is pending.
+**Status:** 0.3.28, a regular release. The automated contract tests pass. The flight bar's measured and estimated times, the flight map tooltips, the diamond line and the landing moment have contract coverage; no live-client check was run before this release. The 0.3.25 in-game notes still apply to the rest.
 
 ## Run it
 
