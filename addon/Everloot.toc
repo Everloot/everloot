@@ -57,5 +57,6 @@ modules\view_professions.lua
 modules\view_disenchanting.lua
 modules\minimap.lua
 modules\flight_data.lua
+modules\flight_times.lua
 modules\flight.lua
 modules\drawer.lua

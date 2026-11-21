@@ -102,6 +102,14 @@ local function build()
   crest:SetSize(20, 20)
   crest:SetPoint("CENTER", f, "TOPLEFT", width - 16, -12)
   f.crest = crest
+  -- On landing the crest fills green: a disc behind it, shown for a moment once the arrival is confirmed.
+  local landed = f:CreateTexture(nil, "ARTWORK")
+  landed:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask")
+  landed:SetSize(FACE, FACE)
+  landed:SetPoint("CENTER", crest, "CENTER", 0, 0)
+  landed:SetVertexColor(unpack(tone("accent")))
+  landed:Hide()
+  f.landed = landed
   -- The player's face alone, ringed in green: the bar already says it is a flight.
   local marker = CreateFrame("Frame", nil, f)
   marker:SetSize(FACE + 4, FACE + 4)
@@ -137,15 +145,8 @@ local function build()
   return f
 end
 
-local function paint(now)
-  local f = build()
-  local elapsed = math.max(0, now - active.started)
-  local progress = active.duration and math.min(1, elapsed / active.duration) or math.min(0.9, elapsed / 180 * 0.9)
-  f.progress = progress
-  f.marker:ClearAllPoints()
-  f.marker:SetPoint("CENTER", f, "TOPLEFT", 16 + f.length * progress, -12)
-  -- A diamond fills while the face's trailing edge crosses the gap before it; those under the face stay grey.
-  local edge = f.length * progress - (FACE / 2 + 2)
+-- A diamond fills while the face's trailing edge crosses the gap before it; those under the face stay grey.
+local function fillTo(f, edge)
   for _, fill in ipairs(f.diamonds) do
     local share = math.max(0, math.min(1, (edge - fill.x + STEP) / STEP))
     if share > 0 then
@@ -155,6 +156,20 @@ local function paint(now)
       fill:Hide()
     end
   end
+end
+
+local function paint(now)
+  local f = build()
+  -- A new flight cancels the last one's landing moment.
+  F.landing = nil
+  f.landed:Hide()
+  local elapsed = math.max(0, now - active.started)
+  local progress = active.duration and math.min(1, elapsed / active.duration) or math.min(0.9, elapsed / 180 * 0.9)
+  f.progress = progress
+  f.marker:ClearAllPoints()
+  f.marker:SetPoint("CENTER", f, "TOPLEFT", 16 + f.length * progress, -12)
+  f.marker:Show()
+  fillTo(f, f.length * progress - (FACE / 2 + 2))
   local text = active.duration and ("about " .. stamp(active.duration - elapsed) .. " left")
     or (active.key and "first flight on this route: timing it" or "timing unknown")
   -- Escape markup in client names before putting them in a font string. A flight whose selection the addon did
@@ -167,7 +182,8 @@ end
 
 function F.Clear()
   pending, active = nil, nil
-  if F.frame then F.frame:Hide() end
+  F.landing = nil
+  if F.frame then F.frame.landed:Hide(); F.frame:Hide() end
   if driver then driver:SetScript("OnUpdate", nil) end
 end
 
@@ -180,9 +196,34 @@ local function arrived(route, elapsed)
   return not route.cancelled and route.key ~= nil and elapsed >= MIN_FLIGHT
 end
 
+-- How long the landed bar stays: every diamond green, the crest filled, the face gone into it.
+local LANDED = 2.5
+
+local function land(elapsed)
+  local f, destination = F.frame, active.destination
+  pending, active = nil, nil
+  if driver then driver:SetScript("OnUpdate", nil) end
+  f.progress = 1
+  f.marker:Hide()
+  fillTo(f, f.length + STEP)
+  f.landed:Show()
+  f.label:SetText((destination and ("Landed at " .. destination:gsub("|", "||") .. " · ") or "Landed · ") .. stamp(elapsed))
+  f:Show()
+  local token = {}
+  F.landing = token
+  local function done()
+    if F.landing ~= token then return end
+    F.landing = nil
+    f.landed:Hide()
+    f:Hide()
+  end
+  if not (type(C_Timer) == "table" and pcall(C_Timer.After, LANDED, done)) then done() end
+end
+
 local function finish(now)
   local elapsed = now - active.started
-  if arrived(active, elapsed) then
+  local confirmed = arrived(active, elapsed)
+  if confirmed then
     local values = samples(active)
     values[#values + 1] = elapsed
     while #values > 3 do table.remove(values, 1) end
@@ -193,7 +234,7 @@ local function finish(now)
       print("Everloot: timed: " .. stamp(elapsed) .. ", next time you will see the time left.")
     end
   end
-  F.Clear()
+  if confirmed and F.frame and read(F.frame.IsShown, F.frame) and E:IsEnabled("flight") then land(elapsed) else F.Clear() end
 end
 
 local function check()
@@ -245,7 +286,10 @@ local function mapNodes()
       if n then bySlot[node.slotIndex] = n end
       if n and current ~= nil and node.state == current then bySlot.current = n end
       local id = E.Readable(node.nodeID)
-      if type(id) == "number" then ids[node.slotIndex] = id end
+      if type(id) == "number" then
+        ids[node.slotIndex] = id
+        if current ~= nil and node.state == current then ids.current = id end
+      end
     end
   end
   return bySlot, ids
@@ -264,14 +308,15 @@ local function idsNamed(n)
   return n and byName[n] or {}
 end
 
--- One hop's length: by node id when the flight map gives it, else by name, the pair that has a path.
-local function hopYards(from, to)
-  local yards = type(E.FLIGHT_YARDS) == "table" and E.FLIGHT_YARDS or {}
+-- A table's value for a pair of nodes ("from-to"): by node id when the flight map gives it, else by name, the pair
+-- the table has.
+local function pairValue(values, from, to)
+  if type(values) ~= "table" then return nil end
   local starts = from.id and { from.id } or idsNamed(from.name)
   local ends = to.id and { to.id } or idsNamed(to.name)
   for _, a in ipairs(starts) do
     for _, b in ipairs(ends) do
-      if yards[a .. "-" .. b] then return yards[a .. "-" .. b] end
+      if values[a .. "-" .. b] then return values[a .. "-" .. b] end
     end
   end
 end
@@ -287,37 +332,44 @@ local function estimate(index)
   local total = 0
   for hop = 1, hops do
     local from, to = read(TaxiGetNodeSlot, index, hop, true), read(TaxiGetNodeSlot, index, hop, false)
-    local yards = type(from) == "number" and type(to) == "number" and hopYards(node(from), node(to))
+    local yards = type(from) == "number" and type(to) == "number" and pairValue(E.FLIGHT_YARDS, node(from), node(to))
     if not yards then return nil end
     total = total + yards
   end
   return total / F.SPEED
 end
 
--- The route to a node of the open flight map: its names, the realm, and the key its own timings are kept under.
+-- The route to a node of the open flight map: its names, its two nodes, the realm, and the key its own timings are
+-- kept under.
 local function routeTo(index)
-  local destination = name(read(TaxiNodeName, index))
-  local origin
+  local names, ids = mapNodes()
+  local destination = name(read(TaxiNodeName, index)) or names[index]
+  local origin, here
   local count = read(NumTaxiNodes)
   if type(count) == "number" and count >= 1 and count <= 1000 then
     for i = 1, count do
-      if read(TaxiNodeGetType, i) == "CURRENT" then origin = name(read(TaxiNodeName, i)); break end
+      if read(TaxiNodeGetType, i) == "CURRENT" then origin, here = name(read(TaxiNodeName, i)), i; break end
     end
   end
-  if not (origin and destination) then
-    local nodes = mapNodes()
-    destination = destination or nodes[index]
-    origin = origin or nodes.current
-  end
-  local route = { origin = origin, destination = destination, realm = name(read(GetRealmName)) }
+  origin = origin or names.current
+  local route = {
+    origin = origin, destination = destination, realm = name(read(GetRealmName)),
+    from = { id = ids.current or (here and ids[here]), name = origin }, to = { id = ids[index], name = destination },
+  }
   if origin and destination and route.realm and origin ~= destination then route.key = origin .. "|" .. destination end
   return route
 end
 
--- The time a tooltip shows for a node: this character's own timings of the route first, else the game files.
+-- Seconds to a node before this character has timed the route: InFlight's measured time for the whole route
+-- (flight_times.lua, stops included), else the game files' hops.
+local function expected(index, route)
+  return pairValue(E.FLIGHT_TIMES, route.from, route.to) or estimate(index)
+end
+
+-- The time a tooltip shows for a node: this character's own timings of the route first.
 local function timeTo(index)
   local route = routeTo(index)
-  return (route.key and median(route)) or estimate(index)
+  return (route.key and median(route)) or expected(index, route)
 end
 
 local function selected(index)
@@ -326,7 +378,7 @@ local function selected(index)
   if not now then return end
   pending = routeTo(index)
   pending.selected = now
-  pending.estimate = estimate(index)
+  pending.estimate = expected(index, pending)
   watch()
 end
 

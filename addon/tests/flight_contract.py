@@ -46,6 +46,7 @@ function Frame:SetVertexColor(r, g, b) self.color = {r, g, b} end
 function Frame:SetValue(value) self.value = value end
 function Frame:SetText(text) self.text = text end
 function Frame:Show() self.shown = true end
+function Frame:IsShown() return self.shown == true end
 function Frame:Hide() self.shown = false end
 function Frame:CreateTexture() return CreateFrame('Texture') end
 function Frame:CreateMaskTexture() return CreateFrame('MaskTexture') end
@@ -343,6 +344,68 @@ def test_a_flight_map_loaded_first_is_hooked_at_once_and_only_once():
     lua = routed(MAP)
     lua.execute("event('ADDON_LOADED', 'Blizzard_FlightMap')")
     assert lua.eval("hooks.OnMouseEnter == nil")
+
+
+def test_a_measured_route_time_wins_over_the_hops_and_a_characters_own_time_wins_over_both():
+    lua = routed()
+    # By name: the origin has one node, the destination two (10 and 21); the measured pair is 10-21.
+    lua.execute("Everloot.FLIGHT_TIMES = { ['10-21'] = 90, ['10-30'] = 140 }; depart()")
+    assert "about 1:30 left" in lua.eval("Everloot.Flight.frame.label.text")
+    lua.execute("arrive(95); depart()")
+    assert "about 1:35 left" in lua.eval("Everloot.Flight.frame.label.text")
+    # A route with stops takes the whole route's measured time, not the sum of its hops (150 seconds).
+    lua = routed()
+    lua.execute("Everloot.FLIGHT_TIMES = { ['10-30'] = 140 }; hooks.TakeTaxiNode(3); flying = true; event('PLAYER_CONTROL_LOST')")
+    assert "about 2:20 left" in lua.eval("Everloot.Flight.frame.label.text")
+    # By the flight map's ids, origin included.
+    lua = routed('''
+Enum = { FlightPathState = { Current = 0, Reachable = 1, Unreachable = 2 } }
+FlightMapFrame = { GetMapID = function() return 1414 end }
+C_TaxiMap = { GetAllTaxiNodes = function()
+  return { { name = 'Coppercloud Quay', slotIndex = 1, state = 0, nodeID = 10 }, { name = 'Amberwing Rest', slotIndex = 2, state = 1, nodeID = 20 } }
+end }
+''')
+    lua.execute("Everloot.FLIGHT_TIMES = { ['10-21'] = 90, ['10-20'] = 70 }; depart()")
+    assert "about 1:10 left" in lua.eval("Everloot.Flight.frame.label.text")
+
+
+LATER = "C_Timer = { After = function(_, fn) timers[#timers + 1] = fn end }; timers = {}"
+
+
+def test_a_confirmed_landing_fills_the_crest_for_a_moment():
+    lua = routed(LATER)
+    lua.execute("depart(); tick(30); arrive(70)")
+    f = "Everloot.Flight.frame"
+    assert lua.eval(f + ".shown")
+    assert lua.eval(f + ".label.text") == "Landed at Amberwing Rest · 1:40"
+    assert lua.eval(f + ".landed.shown") and not lua.eval(f + ".marker.shown")
+    assert all(d.shown and d.w == 6 for d in lua.eval(f + ".diamonds").values())
+    lua.execute("for _, fn in ipairs(timers) do fn() end")
+    assert not lua.eval(f + ".shown") and not lua.eval(f + ".landed.shown")
+    # A new flight inside the moment keeps its bar when the old timer fires.
+    lua = routed(LATER)
+    lua.execute("depart(); arrive(100); depart(); tick(10)")
+    assert not lua.eval("Everloot.Flight.frame.landed.shown")
+    lua.execute("for _, fn in ipairs(timers) do fn() end")
+    assert lua.eval("Everloot.Flight.frame.shown") and "about" in lua.eval("Everloot.Flight.frame.label.text")
+    # An early landing is no arrival: the bar goes at once, with no landing moment.
+    lua = routed(LATER)
+    lua.execute("depart(); tick(30); hooks.TaxiRequestEarlyLanding(); flying = false; event('PLAYER_CONTROL_GAINED')")
+    assert not lua.eval("Everloot.Flight.frame.shown") and len(lua.eval("timers")) == 0
+
+
+def test_the_shipped_measured_times_carry_infights_notice():
+    lua = fresh()
+    text = (ROOT / "modules/flight_times.lua").read_text(encoding="utf-8")
+    assert "LudiusMaximus" in text and "MIT License" in text and "Permission is hereby granted" in text
+    lua.execute(text)
+    times = dict(lua.eval("Everloot.FLIGHT_TIMES").items())
+    assert len(times) > 800
+    for key, seconds in times.items():
+        a, b = (int(x) for x in key.split("-"))
+        assert a != b and 10 < seconds < 1800
+    toc = (ROOT / "Everloot.toc").read_text(encoding="utf-8").splitlines()
+    assert toc.index("modules\\flight_times.lua") < toc.index("modules\\flight.lua")
 
 
 def test_the_shipped_table_loads_and_reads_one_way_per_key():
