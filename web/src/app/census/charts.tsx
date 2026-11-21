@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CLASS_BG, classColour } from "@/components/ui/class-colour";
+import { CLASS_BG, classColour, type ClassName } from "@/components/ui/class-colour";
 import { HIDDEN_LABEL, type CensusCount } from "@kb/census";
 import type { CensusIcons } from "@/lib/census-media";
 
@@ -56,10 +56,12 @@ export function Factions({ rows, total }: { rows: ChartRow[]; total: CensusCount
   </div>;
 }
 
-/** Five flat accent steps; ink remains readable at every magnitude in either mode. */
-const HEAT = ["bg-census-1", "bg-census-2", "bg-census-3", "bg-census-4", "bg-census-5"];
-export function HeatCell({ label, count, max }: { label: string; count: number; max: number }) {
-  return <span tabIndex={0} title={`${label}: ${number(count)}`} className={`flex min-h-10 min-w-12 items-center justify-end rounded-control px-2 text-fg ${HEAT[Math.min(4, Math.floor(count / Math.max(1, max) * 5))]}`}>{number(count)}</span>;
+/** A shared scale across both factions, with a stronger class tint for higher counts. */
+const HEAT_OPACITY = [0.1, 0.16, 0.22, 0.28, 0.34];
+export function HeatCell({ label, classToken, count, max }: { label: string; classToken: Uppercase<ClassName>; count: number; max: number }) {
+  const step = Math.min(4, Math.floor(count / Math.max(1, max) * 5));
+  const backgroundColor = `rgb(var(--class-${classToken.toLowerCase()}) / ${HEAT_OPACITY[step]})`;
+  return <span tabIndex={0} title={`${label}: ${number(count)}`} className="flex min-h-10 min-w-12 items-center justify-end rounded-control px-2 text-fg" style={{ backgroundColor }}>{number(count)}</span>;
 }
 
 export function DailyChart({ days }: { days: { day: string; count: CensusCount }[] }) {
@@ -79,7 +81,10 @@ export function DailyChart({ days }: { days: { day: string; count: CensusCount }
         {d.count !== null && <circle data-point={d.day} cx={x(i)} cy={y(d.count)} r="0.5" strokeWidth="8" vectorEffect="non-scaling-stroke" className="fill-fg-2 stroke-fg-2" />}
       </g>)}
       {active !== null && <line data-crosshair x1={x(active)} x2={x(active)} y1="24" y2="180" className="stroke-muted" strokeDasharray="4 4" />}
-      {days.map((d, i) => <rect key={d.day} x={Math.max(64, x(i) - targetWidth / 2)} y="16" width={days.length === 1 ? 600 : i === 0 || i === days.length - 1 ? targetWidth / 2 : targetWidth} height="176" fill="transparent" tabIndex={0} role="button" aria-label={`${d.day}: ${value(d.count)}`} onMouseEnter={() => setActive(i)} onFocus={() => setActive(i)} onBlur={() => setActive(null)}><title>{d.day}: {value(d.count)}</title></rect>)}
+      {days.map((d, i) => {
+        const label = `${d.day}: ${value(d.count)}`;
+        return <rect key={d.day} x={Math.max(64, x(i) - targetWidth / 2)} y="16" width={days.length === 1 ? 600 : i === 0 || i === days.length - 1 ? targetWidth / 2 : targetWidth} height="176" fill="transparent" tabIndex={0} role="button" aria-label={label} onMouseEnter={() => setActive(i)} onFocus={() => setActive(i)} onBlur={() => setActive(null)}><title>{label}</title></rect>;
+      })}
     </svg>
     {active !== null && <div role="tooltip" className="absolute right-2 top-0 rounded-control border border-edge bg-panel px-3 py-2 text-sm text-fg">{days[active].day}: {value(days[active].count)}</div>}
   </div>;

@@ -62,7 +62,8 @@ test("at launch, with nothing reported, the page is collecting: no table, no num
 test("the top sentence says how many characters, from how many installs, in which window, and links how we count", async () => {
   store.loadCensus.mockResolvedValue(corpus(RECORDS));
   const page = text(await html());
-  expect(page).toContain("About 110 characters were active in the last 7 days (2026-11-10 to 2026-11-16, UTC), counted from 3 installs");
+  expect(page).toContain("About 110 characters were seen in the last 7 days (2026-11-10 to 2026-11-16, UTC), counted from 3 installs");
+  expect(page).toContain("Coverage reflects where participating players play.");
   expect(page).toContain("How we count");
 });
 
@@ -95,6 +96,10 @@ test("the race and class grid is Blizzard's table per faction, with counts in th
   expect(grids).toHaveLength(2);
   const alliance = grids.find((g) => g.includes("Alliance races"))!;
   expect(text(alliance)).toMatch(/Human Not playable 40 /);
+  expect(alliance).toMatch(/bg-class-hunter[^>]*><\/span>[\s\S]*?Hunter<\/span>/);
+  expect(alliance).toMatch(/title="Human, Hunter: 40"[^>]+background-color:rgb\(var\(--class-hunter\)/);
+  expect(alliance).toMatch(/title="Human, Warrior: not enough reports">/);
+  expect(alliance).toMatch(/title="Gnome, Mage: not enough reports">/);
   expect(alliance).toContain("Not playable");
   expect(alliance).toContain('<span class="sr-only">not enough reports</span>');
 });
@@ -297,11 +302,12 @@ test("a hidden faction never becomes a segment or an inferred share", () => {
   expect(text(page)).not.toContain("0%");
 });
 
-test("heatmap magnitudes use different flat shades with counts in ink", () => {
-  const low = renderToStaticMarkup(<HeatCell label="Human, Hunter" count={10} max={100} />);
-  const high = renderToStaticMarkup(<HeatCell label="Human, Hunter" count={100} max={100} />);
-  expect(low).toContain("bg-census-1");
-  expect(high).toContain("bg-census-5");
+test("heatmap magnitudes use a stronger class tint for higher counts", () => {
+  const low = renderToStaticMarkup(<HeatCell label="Human, Hunter" classToken="HUNTER" count={10} max={100} />);
+  const high = renderToStaticMarkup(<HeatCell label="Human, Hunter" classToken="HUNTER" count={100} max={100} />);
+  const opacity = (markup: string) => Number(/background-color:rgb\(var\(--class-hunter\) \/ ([\d.]+)\)/.exec(markup)?.[1]);
+  expect(opacity(low)).toBeGreaterThan(0);
+  expect(opacity(high)).toBeGreaterThan(opacity(low));
   expect(text(low)).toBe(" 10 ");
   expect(text(high)).toBe(" 100 ");
   expect(high).toContain("text-fg");
