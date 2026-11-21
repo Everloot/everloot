@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Addon: the flight path bar shows the time left from your first trip on a route, estimated from the length of the route's hops in the game files at 30 yards a second (the speed InFlight's measured times give), and the flight map's destination tooltips show the same time. Your own confirmed arrivals still replace the estimate after one trip.
 - Site: Guild Masters can claim their guild through a linked armory character, appoint member editors, and publish a bio, raid days, links and recruiting needs. Claims are checked against the stored roster on every edit; in-game crests appear when Blizzard provides their images.
 - Site: guild progression counts each boss once enough roster members hold the kill, with group-size thresholds, clear bonuses and a private score ranking beside the raid ladder.
 - Site: character sheets gain a Progress tab with every instance and boss in the client files, observed availability and private, consented owner kill history; a shared progression model and roster loader prepare guild member progress.

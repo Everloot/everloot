@@ -1,9 +1,13 @@
--- A local flight clock. Only an arrival we can confirm teaches the next trip's estimate.
+-- A local flight clock. Only an arrival we can confirm teaches the next trip's estimate; until then a route's time
+-- comes from the length of its hops in the game files (flight_data.lua).
 local E = Everloot
 local F = {}
 E.Flight = F
 local pending, active, driver
 local poll = 0
+-- Yards a second on a flight path. Blizzard publishes no figure; InFlight's measured Classic Era and Forever times
+-- against these lengths give 30.0 (266 direct flights, median difference half a second; docs/sources/LEDGER.md).
+F.SPEED = 30
 local FALLBACK = {
   accent = { 0.612, 0.941, 0.227, 1 }, muted = { 0.788, 0.765, 0.69, 1 },
 }
@@ -186,7 +190,7 @@ local function check()
       active = pending or {}
       pending = nil
       active.started = now
-      active.duration = active.key and median(active)
+      active.duration = (active.key and median(active)) or active.estimate
     end
     paint(now)
   elseif flying == false or flying == nil or flying == 0 then
@@ -212,26 +216,69 @@ end
 -- map it shows, each with the slot index TakeTaxiNode gets; the older taxi frame names them by that index
 -- directly. Both are read, so the route has names whichever frame the client opened.
 local function mapNodes()
-  if not (type(C_TaxiMap) == "table" and C_TaxiMap.GetAllTaxiNodes and type(FlightMapFrame) == "table") then return {} end
+  if not (type(C_TaxiMap) == "table" and C_TaxiMap.GetAllTaxiNodes and type(FlightMapFrame) == "table") then return {}, {} end
   local mapId = read(FlightMapFrame.GetMapID, FlightMapFrame)
   local list = type(mapId) == "number" and read(C_TaxiMap.GetAllTaxiNodes, mapId)
-  if type(list) ~= "table" then return {} end
+  if type(list) ~= "table" then return {}, {} end
   local current = type(Enum) == "table" and type(Enum.FlightPathState) == "table" and Enum.FlightPathState.Current
-  local bySlot = {}
+  local bySlot, ids = {}, {}
   for _, node in ipairs(list) do
-    if type(node) == "table" then
+    if type(node) == "table" and type(node.slotIndex) == "number" then
       local n = name(E.Readable(node.name))
-      if n and type(node.slotIndex) == "number" then bySlot[node.slotIndex] = n end
+      if n then bySlot[node.slotIndex] = n end
       if n and current ~= nil and node.state == current then bySlot.current = n end
+      local id = E.Readable(node.nodeID)
+      if type(id) == "number" then ids[node.slotIndex] = id end
     end
   end
-  return bySlot
+  return bySlot, ids
 end
 
-local function selected(index)
-  if not E:IsEnabled("flight") or active then return end
-  local now = clock()
-  if not now then return end
+-- The game files' node ids for a name: the Alliance and Horde maps each have their own node at a shared place.
+local byName
+local function idsNamed(n)
+  if not byName then
+    byName = {}
+    for id, text in pairs(type(E.FLIGHT_NODES) == "table" and E.FLIGHT_NODES or {}) do
+      byName[text] = byName[text] or {}
+      table.insert(byName[text], id)
+    end
+  end
+  return n and byName[n] or {}
+end
+
+-- One hop's length: by node id when the flight map gives it, else by name, the pair that has a path.
+local function hopYards(from, to)
+  local yards = type(E.FLIGHT_YARDS) == "table" and E.FLIGHT_YARDS or {}
+  local starts = from.id and { from.id } or idsNamed(from.name)
+  local ends = to.id and { to.id } or idsNamed(to.name)
+  for _, a in ipairs(starts) do
+    for _, b in ipairs(ends) do
+      if yards[a .. "-" .. b] then return yards[a .. "-" .. b] end
+    end
+  end
+end
+
+-- Seconds to a node from the game files: the hops the flight map draws for it, summed. Nil when a hop is unknown.
+local function estimate(index)
+  local hops = read(GetNumRoutes, index)
+  if type(hops) ~= "number" or hops < 1 or hops > 50 then return nil end
+  local names, ids = mapNodes()
+  local function node(slot)
+    return { id = ids[slot], name = name(read(TaxiNodeName, slot)) or names[slot] }
+  end
+  local total = 0
+  for hop = 1, hops do
+    local from, to = read(TaxiGetNodeSlot, index, hop, true), read(TaxiGetNodeSlot, index, hop, false)
+    local yards = type(from) == "number" and type(to) == "number" and hopYards(node(from), node(to))
+    if not yards then return nil end
+    total = total + yards
+  end
+  return total / F.SPEED
+end
+
+-- The route to a node of the open flight map: its names, the realm, and the key its own timings are kept under.
+local function routeTo(index)
   local destination = name(read(TaxiNodeName, index))
   local origin
   local count = read(NumTaxiNodes)
@@ -245,10 +292,46 @@ local function selected(index)
     destination = destination or nodes[index]
     origin = origin or nodes.current
   end
-  local realm = name(read(GetRealmName))
-  pending = { origin = origin, destination = destination, realm = realm, selected = now }
-  if origin and destination and realm and origin ~= destination then pending.key = origin .. "|" .. destination end
+  local route = { origin = origin, destination = destination, realm = name(read(GetRealmName)) }
+  if origin and destination and route.realm and origin ~= destination then route.key = origin .. "|" .. destination end
+  return route
+end
+
+-- The time a tooltip shows for a node: this character's own timings of the route first, else the game files.
+local function timeTo(index)
+  local route = routeTo(index)
+  return (route.key and median(route)) or estimate(index)
+end
+
+local function selected(index)
+  if not E:IsEnabled("flight") or active then return end
+  local now = clock()
+  if not now then return end
+  pending = routeTo(index)
+  pending.selected = now
+  pending.estimate = estimate(index)
   watch()
+end
+
+-- Adds the flight time under the cost in a destination's tooltip, on the flight map and on the older taxi frame.
+local function tooltip(index)
+  if not (E:IsEnabled("flight") and type(GameTooltip) == "table") then return end
+  local seconds = timeTo(index)
+  if not seconds then return end
+  local r, g, b = unpack(tone("accent"))
+  pcall(GameTooltip.AddLine, GameTooltip, "Flight: about " .. stamp(seconds), r, g, b)
+  pcall(GameTooltip.Show, GameTooltip)
+end
+
+-- Blizzard_FlightMap loads on demand; its pins copy the mixin when they are made, so the hook goes in before the first.
+local function hookFlightMap()
+  if F.mapHooked or type(FlightMap_FlightPointPinMixin) ~= "table" then return end
+  F.mapHooked = true
+  pcall(hooksecurefunc, FlightMap_FlightPointPinMixin, "OnMouseEnter", function(pin)
+    local data = type(pin) == "table" and pin.taxiNodeData
+    local reachable = type(Enum) == "table" and type(Enum.FlightPathState) == "table" and Enum.FlightPathState.Reachable
+    if type(data) == "table" and type(data.slotIndex) == "number" and reachable ~= nil and data.state == reachable then tooltip(data.slotIndex) end
+  end)
 end
 
 E:RegisterModule("flight", function()
@@ -260,12 +343,21 @@ E:RegisterModule("flight", function()
         if pending then pending.cancelled = true end
       end)
     end
+    if type(TaxiNodeOnButtonEnter) == "function" then
+      pcall(hooksecurefunc, "TaxiNodeOnButtonEnter", function(button)
+        local index = type(button) == "table" and read(button.GetID, button)
+        if type(index) == "number" and read(TaxiNodeGetType, index) == "REACHABLE" then tooltip(index) end
+      end)
+    end
+    hookFlightMap()
   end
-  for _, event in ipairs({ "PLAYER_CONTROL_LOST", "PLAYER_CONTROL_GAINED", "TAXIMAP_CLOSED", "PLAYER_LOGOUT" }) do
+  for _, event in ipairs({ "PLAYER_CONTROL_LOST", "PLAYER_CONTROL_GAINED", "TAXIMAP_CLOSED", "PLAYER_LOGOUT", "ADDON_LOADED" }) do
     pcall(E.frame.RegisterEvent, E.frame, event)
   end
-  E.frame:HookScript("OnEvent", function(_, event)
-    if event == "PLAYER_LOGOUT" then F.Clear()
+  E.frame:HookScript("OnEvent", function(_, event, arg)
+    if event == "ADDON_LOADED" then
+      if arg == "Blizzard_FlightMap" and type(hooksecurefunc) == "function" then hookFlightMap() end
+    elseif event == "PLAYER_LOGOUT" then F.Clear()
     elseif event == "PLAYER_CONTROL_LOST" then
       if E:IsEnabled("flight") then watch(); check() end
     elseif event == "PLAYER_CONTROL_GAINED" or event == "TAXIMAP_CLOSED" then

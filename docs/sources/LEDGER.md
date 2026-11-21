@@ -86,6 +86,7 @@ Open-source projects read as references, none of their code in this repository:
 | [simulationcraft/simc](https://github.com/simulationcraft/simc) | GPL-3.0 (addon: Unlicense) | Nothing yet; a possible separate process once its `forever` branch sims |
 | [Marlamin/wow.tools.local](https://github.com/Marlamin/wow.tools.local) | MIT | Nothing; noted as a local tool, never an importer |
 | [alcaras/forever-ref](https://github.com/alcaras/forever-ref) | None published | Nothing; an example of a wago.tools consumer |
+| [LudiusMaximus/InFlight](https://github.com/LudiusMaximus/InFlight) | MIT | One number, read 2026-11-21 from `Defaults.lua` at main: its measured Classic Era and Forever flight times, set against the lengths of the same flights in our game files, put the flight speed at 30.0 yards a second (266 direct flights, median difference half a second). The addon's `F.SPEED` in `addon/modules/flight.lua` is that figure; no time, table or code was copied |
 
 ## Infrastructure and placeholders, not data sources
 

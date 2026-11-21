@@ -25,7 +25,10 @@ NumTaxiNodes = function() return #nodes end
 UnitOnTaxi = function() return flying end
 UnitFactionGroup = function() return faction end
 SetPortraitTexture = function(texture, unit) texture.unit = unit end
-hooksecurefunc = function(name, fn) hooks[name] = fn end
+hooksecurefunc = function(a, b, c) if type(a) == 'table' then hooks[b] = c else hooks[a] = b end end
+GameTooltip = { lines = {} }
+function GameTooltip:AddLine(text, r, g, b) self.lines[#self.lines + 1] = text; self.color = {r, g, b} end
+function GameTooltip:Show() self.shown = true end
 local Frame = {}
 Frame.__index = function(self, key)
   return Frame[key] or function() end
@@ -223,6 +226,120 @@ def test_toggle_and_native_art():
     lua = fresh(r"rejectedTexture = 'Interface\\Icons\\Ability_Mount_Wyvern_01'")
     lua.execute("depart()")
     assert lua.eval("Everloot.Flight.frame.mount.path").endswith("TaxiGossipIcon")
+
+
+# Three nodes: the Alliance and Horde maps each have a node named Amberwing Rest (20 and 21); the path runs from 10 to 21.
+ROUTES = '''
+nodes[3] = 'Duskhollow'
+routes = { [2] = { {1, 2} }, [3] = { {1, 2}, {2, 3} } }
+GetNumRoutes = function(i) return routes[i] and #routes[i] or 0 end
+TaxiGetNodeSlot = function(i, hop, source) local h = routes[i][hop]; return source and h[1] or h[2] end
+'''
+DATA = """
+Everloot.FLIGHT_NODES = { [10] = 'Coppercloud Quay', [20] = 'Amberwing Rest', [21] = 'Amberwing Rest', [30] = 'Duskhollow' }
+Everloot.FLIGHT_YARDS = { ['10-21'] = 3000, ['21-30'] = 1500 }
+"""
+
+
+def routed(extra=""):
+    lua = fresh(ROUTES + extra)
+    lua.execute(DATA)
+    return lua
+
+
+def test_the_game_files_time_a_route_before_its_first_flight():
+    lua = routed()
+    lua.execute("depart()")
+    # 3000 yards at 30 a second: 100 seconds.
+    assert "Coppercloud Quay → Amberwing Rest · about 1:40 left" in lua.eval("Everloot.Flight.frame.label.text")
+    lua.execute("tick(40)")
+    assert "about 1:00 left" in lua.eval("Everloot.Flight.frame.label.text")
+    assert abs(lua.eval("Everloot.Flight.frame.bar.value") - .4) < .001
+    # The arrival still teaches this character's own time, which then wins over the estimate.
+    lua.execute("arrive(80)")
+    assert lua.eval("EverlootDB.flights.Glasswind['Coppercloud Quay|Amberwing Rest'][1]") == 120
+    assert lua.eval("#printed") == 0
+    lua.execute("depart()")
+    assert "about 2:00 left" in lua.eval("Everloot.Flight.frame.label.text")
+
+
+def test_a_route_with_stops_sums_its_hops_and_an_unknown_hop_gives_no_estimate():
+    lua = routed()
+    lua.execute("hooks.TakeTaxiNode(3); flying = true; event('PLAYER_CONTROL_LOST')")
+    assert "about 2:30 left" in lua.eval("Everloot.Flight.frame.label.text")
+    lua = routed()
+    lua.execute("Everloot.FLIGHT_YARDS['21-30'] = nil; hooks.TakeTaxiNode(3); flying = true; event('PLAYER_CONTROL_LOST')")
+    assert "first flight on this route: timing it" in lua.eval("Everloot.Flight.frame.label.text")
+    for extra in ["GetNumRoutes = nil", "GetNumRoutes = function() return secret end", "TaxiGetNodeSlot = function() error('unavailable') end"]:
+        lua = routed(extra)
+        lua.execute("depart()")
+        assert "first flight on this route: timing it" in lua.eval("Everloot.Flight.frame.label.text")
+    lua = routed()
+    lua.execute("Everloot.FLIGHT_YARDS = nil; depart()")
+    assert "first flight" in lua.eval("Everloot.Flight.frame.label.text")
+
+
+def test_the_flight_maps_node_ids_win_over_names():
+    lua = routed('''
+Enum = { FlightPathState = { Current = 0, Reachable = 1, Unreachable = 2 } }
+FlightMapFrame = { GetMapID = function() return 1414 end }
+C_TaxiMap = { GetAllTaxiNodes = function()
+  return { { name = 'Coppercloud Quay', slotIndex = 1, state = 0, nodeID = 10 }, { name = 'Amberwing Rest', slotIndex = 2, state = 1, nodeID = 20 } }
+end }
+''')
+    lua.execute("Everloot.FLIGHT_YARDS['10-20'] = 6000; depart()")
+    assert "about 3:20 left" in lua.eval("Everloot.Flight.frame.label.text")
+
+
+MAP = '''
+Enum = { FlightPathState = { Current = 0, Reachable = 1, Unreachable = 2 } }
+TaxiNodeOnButtonEnter = function() end
+'''
+
+
+def test_destination_tooltips_show_the_flight_time_on_both_flight_maps():
+    lua = routed(MAP)
+    # Blizzard_FlightMap loads on demand: its pin mixin is hooked when it arrives.
+    lua.execute("FlightMap_FlightPointPinMixin = { OnMouseEnter = function() end }; event('ADDON_LOADED', 'Blizzard_FlightMap')")
+    lua.execute("hooks.OnMouseEnter({ taxiNodeData = { slotIndex = 3, state = 1 } })")
+    assert list(lua.eval("GameTooltip.lines").values()) == ["Flight: about 2:30"]
+    assert lua.eval("GameTooltip.shown")
+    lua.execute("GameTooltip.lines = {}; hooks.OnMouseEnter({ taxiNodeData = { slotIndex = 1, state = 0 } }); hooks.OnMouseEnter({})")
+    assert len(lua.eval("GameTooltip.lines")) == 0
+    lua.execute("hooks.TaxiNodeOnButtonEnter({ GetID = function() return 2 end })")
+    assert list(lua.eval("GameTooltip.lines").values()) == ["Flight: about 1:40"]
+    # The older frame's tooltip skips the node the player stands at.
+    lua.execute("GameTooltip.lines = {}; hooks.TaxiNodeOnButtonEnter({ GetID = function() return 1 end })")
+    assert len(lua.eval("GameTooltip.lines")) == 0
+    # After a timed trip the tooltip shows this character's own time.
+    lua.execute("depart(); arrive(130); GameTooltip.lines = {}; hooks.TaxiNodeOnButtonEnter({ GetID = function() return 2 end })")
+    assert list(lua.eval("GameTooltip.lines").values()) == ["Flight: about 2:10"]
+    lua.execute("SlashCmdList.EVERLOOT('flight off'); GameTooltip.lines = {}; hooks.TaxiNodeOnButtonEnter({ GetID = function() return 2 end })")
+    assert len(lua.eval("GameTooltip.lines")) == 0
+
+
+def test_a_flight_map_loaded_first_is_hooked_at_once_and_only_once():
+    lua = routed(MAP + "FlightMap_FlightPointPinMixin = { OnMouseEnter = function() end }")
+    assert lua.eval("hooks.OnMouseEnter ~= nil")
+    lua.execute("first = hooks.OnMouseEnter; event('ADDON_LOADED', 'Blizzard_FlightMap')")
+    assert lua.eval("first == hooks.OnMouseEnter")
+    lua = routed(MAP)
+    lua.execute("event('ADDON_LOADED', 'Blizzard_FlightMap')")
+    assert lua.eval("hooks.OnMouseEnter == nil")
+
+
+def test_the_shipped_table_loads_and_reads_one_way_per_key():
+    lua = fresh()
+    lua.execute((ROOT / "modules/flight_data.lua").read_text(encoding="utf-8"))
+    nodes = dict(lua.eval("Everloot.FLIGHT_NODES").items())
+    yards = dict(lua.eval("Everloot.FLIGHT_YARDS").items())
+    assert len(nodes) > 50 and len(yards) > 200
+    for key, value in yards.items():
+        a, b = (int(x) for x in key.split("-"))
+        assert a in nodes and b in nodes and a != b
+        assert 500 < value < 30000
+    toc = (ROOT / "Everloot.toc").read_text(encoding="utf-8").splitlines()
+    assert toc.index("modules\\flight_data.lua") < toc.index("modules\\flight.lua")
 
 
 if __name__ == "__main__":
