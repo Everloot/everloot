@@ -6,7 +6,7 @@ import Glint from "./Glint";
 import { FOOTER_LINES, lineText } from "./lines";
 
 /**
- * Glint perched on the footer's top edge. Hover, focus or a click flaps his wings and pops a line in a small
+ * Glint perched on the footer's top edge. Hover, focus or a click gives a greeting bounce and pops a line in a small
  * bubble, a different one each time; it goes after MOTION.glint.duration.pop. The bubble is a polite live region
  * that only changes when someone reaches for him.
  */
@@ -28,13 +28,13 @@ export default function FooterGlint() {
     <div data-footer-glint="" className="absolute bottom-full left-4 flex items-end gap-1 lg:left-6">
       <button
         type="button"
-        aria-label="Glint, the loot raven"
+        aria-label="Glint, the Everloot mascot"
         className="-mb-[3px] rounded-control"
         onPointerEnter={(e) => { if (e.pointerType === "mouse") say(); }}
         onFocus={(e) => { if (e.currentTarget.matches(":focus-visible")) say(); }}
         onClick={say}
       >
-        <Glint size={48} flap={turn} />
+        <Glint size={48} pose={open ? "cheer" : "idle"} flap={turn} />
       </button>
       <p
         aria-live="polite"

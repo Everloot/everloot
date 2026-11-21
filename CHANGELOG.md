@@ -257,11 +257,13 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
 
 ### Changed
+- Site: the header links Players, Guilds and Rankings directly, ahead of its menus, and Lookup no longer repeats them; the phone menu opens with them as Community. The bar's items show from 1280 px (the Menu button carries them below that) and the build label from 1536 px.
 - Site: the header's menus take the keyboard: each trigger says it opens a panel, ArrowDown opens it onto the first link, ArrowUp/ArrowDown walk the links and wrap, Home/End jump to the ends, Tab out closes it, and ArrowLeft/ArrowRight move along the bar; below md the docs' section tabs become one select.
 - Site: the rankings boards' faction dots use the faction colours the census introduced, the same blue and red on both pages.
 
 - Site: drop rates, measured zeros and source names show from one player's reports, marked reported, verified or confirmed by how many players agree.
 - Site: character and guild progression are public: every synced kill counts, the guild boards on Rankings rank every guild, and a guild's kills count once enough members hold them.
+- Site: Glint uses Jovian's illustrated, top-hatted companion in place of the raven, with matching happy and disappointed expressions, transparent edges and gentle motion that respects reduced-motion settings.
 
 ### Fixed
 - Site: lore pages drop the doubled spaces the wiki's source had but never showed, leave no gap where footnotes or race icons sat side by side, show `{{-}}` as its dash and `{{Race|…|notext}}` as only its icon, so far fewer pages are marked damaged.

@@ -129,7 +129,7 @@ test("Browse links the guides, and the guides feed sits beside the other feeds; 
 
 test("Glint perches on the footer's edge as a labelled button, his drawing hidden from screen readers", () => {
   const markup = html();
-  expect(markup).toMatch(/data-footer-glint[\s\S]*<button[^>]*aria-label="Glint, the loot raven"[^>]*>\s*<svg[^>]*aria-hidden="true"/);
+  expect(markup).toMatch(/data-footer-glint[\s\S]*<button[^>]*aria-label="Glint, the Everloot mascot"[^>]*>\s*<svg[^>]*aria-hidden="true"/);
   expect(markup).toMatch(/data-footer-glint[\s\S]*aria-live="polite"/);
 });
 

@@ -53,9 +53,9 @@ export default function AccessibilityPage() {
               <li>Links in running text are underlined, so colour is not their only cue.</li>
               <li>
                 Motion is small and short: 150 ms colour and opacity fades, a button sinking a little under a press, the
-                loading bar at the top of the page, a sheet sliding up on phones, and Glint, the raven on the home page and in
-                the footer, who breathes, blinks, cocks his head and flaps his wings when you hover or tap him, while the lines in his
-                speech bubble fade from one to the next while his gem sparkles. All of that movement stops when your system asks for reduced motion; the bubble still changes its line, without the fade.
+                loading bar at the top of the page, a sheet sliding up on phones, and Glint, the top-hatted mascot on the home page
+                and in the footer, who gently rises and settles, with a small greeting bounce when you hover or tap him, while the lines in his
+                speech bubble fade from one to the next. All of that movement stops when your system asks for reduced motion; the bubble still changes its line, without the fade.
               </li>
               <li>In forced-colours (high-contrast) mode, buttons keep a real border so they stay visible.</li>
               <li>Footer links and form controls are at least 44 px tall, and nothing on the page stops you from zooming.</li>
