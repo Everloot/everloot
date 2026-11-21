@@ -696,7 +696,7 @@ function E.PriceCommand(text, tries)
   for _, line in ipairs(dropLines or {}) do print(hex(line.r, line.g, line.b) .. line.text .. "|r") end
   if dropNote and type(EverlootPricesDB) == "table" then print("  " .. dropNote:gsub("^%l", string.upper)) end
   for _, line in ipairs(E:SourceLines(id)) do print(hex(line.r, line.g, line.b) .. line.text .. "|r") end
-  local url = realm and ("tools/auctions?realm=" .. encode(realm) .. "&item=" .. id) or ("blizzard-auctions/" .. id)
+  local url = realm and ("tools/auctions?realm=" .. encode(realm) .. "&item=" .. id) or ("tools/auctions/item/" .. id)
   print("  Full history and other realms: everloot.app/" .. url)
 end
 
