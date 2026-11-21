@@ -4,7 +4,7 @@ from lupa.lua51 import LuaRuntime
 
 ROOT = Path(__file__).parents[1]
 WORLD = r'''
-now, flying, landing, faction = 0, false, 'Coppercloud Quay', 'Horde'
+now, flying, landing = 0, false, 'Coppercloud Quay'
 secret = {}
 issecretvalue = function(value) return value == secret end
 time = function() return 1000000 end
@@ -23,7 +23,6 @@ TaxiNodeName = function(i) return nodes[i] end
 TaxiNodeGetType = function(i) return i == 1 and 'CURRENT' or 'REACHABLE' end
 NumTaxiNodes = function() return #nodes end
 UnitOnTaxi = function() return flying end
-UnitFactionGroup = function() return faction end
 SetPortraitTexture = function(texture, unit) texture.unit = unit end
 hooksecurefunc = function(a, b, c) if type(a) == 'table' then hooks[b] = c else hooks[a] = b end end
 GameTooltip = { lines = {} }
@@ -41,8 +40,9 @@ function Frame:SetPoint(...) self.point = {...} end
 function Frame:SetSize(w, h) self.w, self.h = w, h end
 function Frame:GetWidth() return self.w end
 function Frame:GetFrameLevel() return 1 end
-function Frame:SetTexture(path) self.path = path; return path ~= rejectedTexture end
-function Frame:SetStatusBarTexture(path) self.path = path end
+function Frame:SetTexture(path) self.path = path end
+function Frame:SetRotation(r) self.rotation = r end
+function Frame:SetVertexColor(r, g, b) self.color = {r, g, b} end
 function Frame:SetValue(value) self.value = value end
 function Frame:SetText(text) self.text = text end
 function Frame:Show() self.shown = true end
@@ -95,7 +95,7 @@ def test_first_and_known_flights():
     assert "first flight on this route: timing it" in text and "left" not in text
     lua.execute("tick(60)")
     start = lua.eval("Everloot.Flight.frame.marker.point[4]")
-    assert 0 < lua.eval("Everloot.Flight.frame.bar.value") < .9
+    assert 0 < lua.eval("Everloot.Flight.frame.progress") < .9
     lua.execute("arrive(60)")
     assert not lua.eval("Everloot.Flight.frame.shown")
     assert lua.eval("EverlootDB.flights.Glasswind['Coppercloud Quay|Amberwing Rest'][1]") == 120
@@ -103,10 +103,10 @@ def test_first_and_known_flights():
     assert "timed: 2:00" in lua.eval("printed[1]")
     lua.execute("depart(); tick(40)")
     assert "about 1:20 left" in lua.eval("Everloot.Flight.frame.label.text")
-    assert abs(lua.eval("Everloot.Flight.frame.bar.value") - 1 / 3) < .001
+    assert abs(lua.eval("Everloot.Flight.frame.progress") - 1 / 3) < .001
     assert lua.eval("Everloot.Flight.frame.marker.point[4]") > start
     lua.execute("tick(200)")
-    assert lua.eval("Everloot.Flight.frame.bar.value") == 1
+    assert lua.eval("Everloot.Flight.frame.progress") == 1
     assert "about 0:00 left" in lua.eval("Everloot.Flight.frame.label.text")
 
 
@@ -166,7 +166,7 @@ def test_unknown_progress_polling_and_cleanup():
     lua = fresh()
     lua.execute("hooks.TakeTaxiNode(2); flying = true; tick(.5); tick(400)")
     assert lua.eval("Everloot.Flight.frame.shown")
-    assert lua.eval("Everloot.Flight.frame.bar.value") == .9
+    assert lua.eval("Everloot.Flight.frame.progress") == .9
     assert "left" not in lua.eval("Everloot.Flight.frame.label.text")
     lua.execute("event('PLAYER_LOGOUT')")
     assert not lua.eval("Everloot.Flight.frame.shown")
@@ -198,10 +198,9 @@ def test_legacy_taxi_values_and_destination_labels():
     lua.execute("depart(); tick(90); flying = nil; landing = 'Amberwing Rest'; event('PLAYER_CONTROL_GAINED')")
     assert lua.eval("EverlootDB.flights.Glasswind['Coppercloud Quay|Amberwing Rest, Cloudmere'][1]") == 90
     assert not lua.eval("Everloot.Flight.frame.shown")
-    lua = fresh("UIParent.w = 600; faction = secret; SetPortraitTexture = function() error('unavailable') end")
+    lua = fresh("UIParent.w = 600; SetPortraitTexture = function() error('unavailable') end")
     lua.execute("depart()")
     assert lua.eval("Everloot.Flight.frame.w") == 320
-    assert lua.eval("Everloot.Flight.frame.mount.path").endswith("TaxiGossipIcon")
 
 
 def test_toggle_and_native_art():
@@ -214,18 +213,36 @@ def test_toggle_and_native_art():
     assert lua.eval("Everloot.Flight.frame.w") == 640
     assert lua.eval("Everloot.Flight.frame.label.font") == "GameFontHighlightSmall"
     assert lua.eval("Everloot.Flight.frame.portrait.unit") == "player"
-    assert lua.eval("Everloot.Flight.frame.mount.path").endswith("Ability_Mount_Wyvern_01")
+    # The face alone, ringed in the accent green: no mount icon beside it.
+    assert lua.eval("rawget(Everloot.Flight.frame, 'mount') == nil")
+    assert lua.eval("Everloot.Flight.frame.portrait.w") == 28
+    assert lua.eval("Everloot.Flight.frame.marker.w") == 32
+    assert lua.eval("Everloot.Flight.frame.ring.path").endswith("TempPortraitAlphaMask")
     lua.execute("SlashCmdList.EVERLOOT('flight off')")
     assert not lua.eval("Everloot.Flight.frame.shown")
     lua.execute("arrive(60)")
     assert lua.eval("EverlootDB.flights == nil")
-    for faction, icon in [("Alliance", "Ability_Mount_Gryphon_01"), ("Other", "TaxiGossipIcon")]:
-        lua = fresh(f"faction = '{faction}'")
-        lua.execute("depart()")
-        assert lua.eval("Everloot.Flight.frame.mount.path").endswith(icon)
-    lua = fresh(r"rejectedTexture = 'Interface\\Icons\\Ability_Mount_Wyvern_01'")
+
+
+def test_the_line_of_diamonds_fills_behind_the_face():
+    lua = fresh(saved="{flights={Glasswind={['Coppercloud Quay|Amberwing Rest']={100}}}}")
     lua.execute("depart()")
-    assert lua.eval("Everloot.Flight.frame.mount.path").endswith("TaxiGossipIcon")
+    fills = lambda: [(f.x, f.w, f.shown) for f in lua.eval("Everloot.Flight.frame.diamonds").values()]
+    # 640 wide: a row of 76 diamonds, 8 px apart, each turned a quarter, none filled at takeoff.
+    assert len(fills()) == 76
+    assert all(not shown for _, _, shown in fills())
+    first = lua.eval("Everloot.Flight.frame.diamonds[1]")
+    assert abs(first.rotation - 3.14159265 / 4) < 1e-6 and first.w == 0
+    lua.execute("tick(50)")
+    # Halfway: the face's centre is at 304 px and its trailing edge at 288; the diamonds before it are whole, the one
+    # it is crossing part filled, the rest grey.
+    rows = fills()
+    full = [x for x, w, shown in rows if shown and w == 6]
+    assert full and max(full) <= 288
+    assert all(not shown for x, _, shown in rows if x > 296)
+    assert any(shown and 0 < w < 6 for _, w, shown in rows) or 288 in full
+    lua.execute("tick(100)")
+    assert sum(1 for _, w, shown in fills() if shown and w == 6) >= 70
 
 
 # Three nodes: the Alliance and Horde maps each have a node named Amberwing Rest (20 and 21); the path runs from 10 to 21.
@@ -254,7 +271,7 @@ def test_the_game_files_time_a_route_before_its_first_flight():
     assert "Coppercloud Quay → Amberwing Rest · about 1:40 left" in lua.eval("Everloot.Flight.frame.label.text")
     lua.execute("tick(40)")
     assert "about 1:00 left" in lua.eval("Everloot.Flight.frame.label.text")
-    assert abs(lua.eval("Everloot.Flight.frame.bar.value") - .4) < .001
+    assert abs(lua.eval("Everloot.Flight.frame.progress") - .4) < .001
     # The arrival still teaches this character's own time, which then wins over the estimate.
     lua.execute("arrive(80)")
     assert lua.eval("EverlootDB.flights.Glasswind['Coppercloud Quay|Amberwing Rest'][1]") == 120

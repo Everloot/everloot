@@ -63,6 +63,9 @@ local function median(route)
   return values[middle]
 end
 
+-- The row's spacing and sizes, in pixels: a grey diamond ahead, a filled one behind, the start one, the face.
+local STEP, AHEAD, DIAMOND, FACE = 8, 4, 6, 28
+
 local function build()
   if F.frame then return F.frame end
   local width = read(function() return UIParent:GetWidth() end)
@@ -73,32 +76,45 @@ local function build()
   f:SetFrameStrata("HIGH")
   f:EnableMouse(false)
   f.length = width - 32
-  -- Separate squares need no client-specific tiling texture and stay eight pixels apart.
-  for x = 0, f.length, 8 do
-    local dot = f:CreateTexture(nil, "BACKGROUND")
-    dot:SetTexture("Interface\\Buttons\\WHITE8X8")
-    dot:SetSize(x == 0 and 6 or 3, x == 0 and 6 or 3)
-    dot:SetPoint("CENTER", f, "TOPLEFT", 16 + x, -12)
-    dot:SetVertexColor(unpack(tone("muted")))
+  -- The line is a row of small Everloot diamonds, eight pixels apart: a grey one ahead of the player, and a green one
+  -- over it that grows as the flight passes, so the row fills like the logo. Plain squares turned a quarter: no
+  -- client-specific texture.
+  f.diamonds = {}
+  local function diamond(layer, size, color, x)
+    local d = f:CreateTexture(nil, layer)
+    d:SetTexture("Interface\\Buttons\\WHITE8X8")
+    if d.SetRotation then pcall(d.SetRotation, d, math.pi / 4) end
+    d:SetSize(size, size)
+    d:SetPoint("CENTER", f, "TOPLEFT", 16 + x, -12)
+    d:SetVertexColor(unpack(tone(color)))
+    return d
   end
-  local bar = CreateFrame("StatusBar", nil, f)
-  bar:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -10)
-  bar:SetSize(f.length, 4)
-  bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-  bar:SetStatusBarColor(unpack(tone("accent")))
-  bar:SetMinMaxValues(0, 1)
-  f.bar = bar
+  diamond("BORDER", DIAMOND, "accent", 0)
+  for x = STEP, f.length, STEP do
+    diamond("BACKGROUND", AHEAD, "muted", x)
+    local fill = diamond("BORDER", 0, "accent", x)
+    fill.x = x
+    fill:Hide()
+    f.diamonds[#f.diamonds + 1] = fill
+  end
   local crest = f:CreateTexture(nil, "OVERLAY")
   crest:SetTexture((E.Window and E.Window.CREST) or "Interface\\AddOns\\Everloot\\media\\crest")
   crest:SetSize(20, 20)
   crest:SetPoint("CENTER", f, "TOPLEFT", width - 16, -12)
   f.crest = crest
+  -- The player's face alone, ringed in green: the bar already says it is a flight.
   local marker = CreateFrame("Frame", nil, f)
-  marker:SetSize(24, 24)
-  marker:SetFrameLevel(bar:GetFrameLevel() + 1)
+  marker:SetSize(FACE + 4, FACE + 4)
+  marker:SetFrameLevel((read(f.GetFrameLevel, f) or 1) + 2)
   f.marker = marker
+  local ring = marker:CreateTexture(nil, "BORDER")
+  ring:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask")
+  ring:SetAllPoints(marker)
+  ring:SetVertexColor(unpack(tone("accent")))
+  f.ring = ring
   local portrait = marker:CreateTexture(nil, "ARTWORK")
-  portrait:SetAllPoints(marker)
+  portrait:SetSize(FACE, FACE)
+  portrait:SetPoint("CENTER", marker, "CENTER", 0, 0)
   if type(SetPortraitTexture) == "function" then pcall(SetPortraitTexture, portrait, "player") end
   -- The portrait stays usable on a client without texture masks.
   if portrait.AddMaskTexture and marker.CreateMaskTexture then
@@ -111,16 +127,6 @@ local function build()
     end)
   end
   f.portrait = portrait
-  local mount = marker:CreateTexture(nil, "OVERLAY")
-  mount:SetSize(16, 16)
-  mount:SetPoint("LEFT", marker, "RIGHT", 1, 0)
-  local faction = read(UnitFactionGroup, "player")
-  local icon = faction == "Horde" and "Interface\\Icons\\Ability_Mount_Wyvern_01"
-    or faction == "Alliance" and "Interface\\Icons\\Ability_Mount_Gryphon_01"
-  local ok, loaded
-  if icon then ok, loaded = pcall(mount.SetTexture, mount, icon) end
-  if not ok or loaded == false then mount:SetTexture("Interface\\GossipFrame\\TaxiGossipIcon") end
-  f.mount = mount
   local label = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   label:SetPoint("TOP", f, "BOTTOM", 0, -2)
   label:SetWidth(width)
@@ -135,9 +141,20 @@ local function paint(now)
   local f = build()
   local elapsed = math.max(0, now - active.started)
   local progress = active.duration and math.min(1, elapsed / active.duration) or math.min(0.9, elapsed / 180 * 0.9)
-  f.bar:SetValue(progress)
+  f.progress = progress
   f.marker:ClearAllPoints()
   f.marker:SetPoint("CENTER", f, "TOPLEFT", 16 + f.length * progress, -12)
+  -- A diamond fills while the face's trailing edge crosses the gap before it; those under the face stay grey.
+  local edge = f.length * progress - (FACE / 2 + 2)
+  for _, fill in ipairs(f.diamonds) do
+    local share = math.max(0, math.min(1, (edge - fill.x + STEP) / STEP))
+    if share > 0 then
+      fill:SetSize(DIAMOND * share, DIAMOND * share)
+      fill:Show()
+    else
+      fill:Hide()
+    end
+  end
   local text = active.duration and ("about " .. stamp(active.duration - elapsed) .. " left")
     or (active.key and "first flight on this route: timing it" or "timing unknown")
   -- Escape markup in client names before putting them in a font string. A flight whose selection the addon did
