@@ -51,7 +51,7 @@ import {
 import { allTerms, contentTerms, respell, getByName, getDocument, getEntity, search, searchSomeWords, SOME_WORDS, type SearchHit } from "./search.js";
 import { fromSpanish } from "./spanish.js";
 import { confirmedCatalog, confirmedLine, isConfirmable, type ConfirmedIds } from "./catalog-confirmed.js";
-import { bodyOf, gameplayIndex, mergeCatalogIndexes, catalogLabel, getCatalogByName, getCatalogEntity, isCatalogId, searchCatalog, CATALOG_ID_BASE, type CatalogIndex, type CatalogRecord } from "./catalog-index.js";
+import { bodyOf, gameplayIndex, gameplayIndexOf, mergeCatalogIndexes, catalogLabel, getCatalogByName, getCatalogEntity, isCatalogId, searchCatalog, CATALOG_ID_BASE, type CatalogIndex, type CatalogRecord } from "./catalog-index.js";
 import { cutArrays, MAX_ROWS, readField, type FieldRead } from "./json-pointer.js";
 
 export const SERVER_NAME = "everloot-knowledge";
@@ -919,7 +919,7 @@ export type ToolAnswer = Answer;
 export type ToolHandlers = { [K in McpToolName]: (args: McpToolArgs<K>) => ToolAnswer | Promise<ToolAnswer> };
 
 // HTTP creates a server per request. Keep discovery across those servers by snapshot time, size and scope values.
-let gameplayMemo: { key: string; index: CatalogIndex } | undefined;
+let gameplayMemo: { key: string; items?: object; world?: object; index: CatalogIndex } | undefined;
 let mergedMemo: { catalog: CatalogIndex | null; gameplay: CatalogIndex | null; index: CatalogIndex } | undefined;
 const gameplayKind = (kind?: string): boolean => kind === undefined || ["item", "npc", "object", "quest"].includes(kind);
 // Appended observed kinds occupy slots 8-11; zones (slot 12) come from the game files.
@@ -947,10 +947,20 @@ export function createToolHandlers(db: ReleaseSource, options: ToolOptions = {})
   };
   const catalogOf = async (includeGameplay = true): Promise<CatalogIndex> => {
     const catalog = await filesCatalogOf();
-    const corpus = !includeGameplay ? null : options.corpus ? await options.corpus().catch(() => null)
+    // The host's stored facts first (the site's aggregates file, built by the cron with the same scopes), so a
+    // discovery call never replays the corpus on the site Worker (#1354). Without them, the corpus as before.
+    const stored = includeGameplay && options.answerSources ? await options.answerSources().catch(() => null) : null;
+    const corpus = !includeGameplay || stored ? null : options.corpus ? await options.corpus().catch(() => null)
       : await readCorpusRecords(["item_seen", "npc_sighting", "quest", "loot", "object_sighting"]);
     let gameplay: CatalogIndex | null = null;
-    if (corpus) {
+    if (stored) {
+      // Kept while the host hands back the same item and world facts (the site keeps its stored file between reads).
+      const { items, world } = stored.facts;
+      if (!gameplayMemo || gameplayMemo.items !== items || gameplayMemo.world !== world) {
+        gameplayMemo = { key: "", items, world, index: gameplayIndexOf(stored.facts, stored.dataAsOf, recheck) };
+      }
+      gameplay = gameplayMemo.index;
+    } else if (corpus) {
       const key = tooledKey(options.corpus ? "loader" : "url", corpus, recheck);
       if (!gameplayMemo || gameplayMemo.key !== key) {
         gameplayMemo = { key, index: gameplayIndex(corpus.records, corpus.dataAsOf ?? null, recheck) };

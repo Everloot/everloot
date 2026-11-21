@@ -25,8 +25,8 @@ import { expandAliases } from "./name-aliases.js";
 import { allTerms, contentTerms, PICK_WORDS, type SearchHit } from "./search.js";
 import { fromSpanish } from "./spanish.js";
 import { itemFactsFromRecords } from "./drop-rollup.js";
-import { agreedItemNames } from "./item-page.js";
-import { agreedNpcNames, agreedQuestTitles, worldFactsFromRecords } from "./world-pages.js";
+import { agreedItemNames, type ItemFacts } from "./item-page.js";
+import { agreedNpcNames, agreedQuestTitles, worldFactsFromRecords, type WorldFacts } from "./world-pages.js";
 import { agreedObjectNames } from "./object-spawns.js";
 import type { RecheckScope } from "./coverage.js";
 
@@ -231,11 +231,15 @@ export function buildCatalogIndex(files: CatalogFiles): CatalogIndex {
 
 /** Only agreed names and ids leave the corpus here; no tooltip, description or other game text. */
 export function gameplayIndex(records: unknown[], asOf: string | null, recheck: readonly RecheckScope[] = []): CatalogIndex {
-  const items = itemFactsFromRecords(records, recheck);
-  const world = worldFactsFromRecords(records, recheck);
+  return gameplayIndexOf({ items: itemFactsFromRecords(records, recheck), world: worldFactsFromRecords(records, recheck) }, asOf, recheck);
+}
+
+/** The same index from item and world facts a host already worked out from the corpus with the same scopes. */
+export function gameplayIndexOf(facts: { items: ItemFacts; world: WorldFacts }, asOf: string | null, recheck: readonly RecheckScope[] = []): CatalogIndex {
+  const { items, world } = facts;
   const names = {
     item: agreedItemNames(items), npc: agreedNpcNames(world), quest: agreedQuestTitles(world),
-    object: agreedObjectNames(items.objects, recheck),
+    object: agreedObjectNames(items.objects ?? [], recheck),
   };
   const all: CatalogRecord[] = [];
   for (const [kind, named] of Object.entries(names)) for (const [gameId, name] of named) {
