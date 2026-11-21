@@ -7,6 +7,7 @@ import { playerPagesOn } from "@/lib/player-pages";
 import { playerStore } from "@/lib/player-store";
 import { pullStore } from "@/lib/pull-store";
 import { releaseKept, runStoredViews } from "@/lib/stored-views-run";
+import { dispatchStoredViews } from "@/lib/stored-views-dispatch";
 
 /**
  * GET /api/cron/snapshot — the Worker's Cron Trigger (src/lib/cf-crons.ts, every 10 minutes) extends the corpus snapshot with new uploads,
@@ -99,14 +100,20 @@ export async function GET(req: Request) {
       result.dataAsOf,
       work.settledWeek ?? null,
     );
+    // A run that added uploads starts the stored-views job (lib/stored-views-dispatch.ts): GitHub's schedule for it runs
+    // late or not at all, a dispatched run starts at once. A failed dispatch is logged; the schedule is the backstop.
+    let viewsJob: "sent" | "off" | "failed" = "off";
+    if (result.added > 0 || rebuild) {
+      try { viewsJob = await dispatchStoredViews(); } catch (err) { console.error("stored-views dispatch failed", err); viewsJob = "failed"; }
+    }
     // The settled list, the stored views, the guild ladder, the boards, the coverage score and the auction reports
     // (lib/stored-views-run.ts). With EVERLOOT_STORED_VIEWS at "job", the stored-views job builds them outside the
-    // Worker, with the memory a run with new uploads needs (scripts/stored-views.mts, #1354), and this run ends here.
+    // Worker, with the memory a run with new uploads needs (scripts/stored-views.ts, #1354), and this run ends here.
     if (process.env.EVERLOOT_STORED_VIEWS === "job") {
-      return NextResponse.json({ ok: true, rebuild, ...result, market, completion, census, storedViews: "job" });
+      return NextResponse.json({ ok: true, rebuild, ...result, market, completion, census, viewsJob, storedViews: "job" });
     }
     const views = await runStoredViews({ added: result.added, rebuild, dataAsOf: result.dataAsOf, reportsDue: !(market.remaining ?? 0) });
-    return NextResponse.json({ ok: true, rebuild, ...result, market, completion, census, ...views });
+    return NextResponse.json({ ok: true, rebuild, ...result, market, completion, census, viewsJob, ...views });
   } catch (err) {
     console.error("snapshot failed", err);
     return NextResponse.json({ ok: false, error: "snapshot failed" }, { status: 500 });

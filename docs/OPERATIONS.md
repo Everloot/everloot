@@ -267,6 +267,14 @@ Worker would. The auction reports wait while the heartbeat's `completionPending`
 that fails is logged and the run ends red with the names in `failed`; the next run retries it.
 A manual run with **rebuild** ticked rewrites every file.
 
+A snapshot run that added uploads also starts the workflow itself, right after its heartbeat,
+through GitHub's `workflow_dispatch` API (`web/src/lib/stored-views-dispatch.ts`), with the cron
+Worker's secret `EVERLOOT_VIEWS_DISPATCH_TOKEN`: a fine-grained token for Everloot/everloot with
+Actions read and write and nothing else. A dispatched run starts within seconds, so the views follow
+new data without waiting for the schedule, which stays as the backstop. The run's answer says
+`viewsJob`: `sent`, `off` (no token, or no new uploads) or `failed` (logged; the run still answers 200).
+To renew the token: `npx wrangler secret put EVERLOOT_VIEWS_DISPATCH_TOKEN --name everloot-cron`.
+
 **Secrets** (repository Actions secrets): `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
 `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` (the cron Worker's read-write key), `VIEWS_SUPABASE_URL` and
 `VIEWS_SUPABASE_SERVICE_ROLE_KEY` (the cron Worker's Supabase values, under their own names so the
