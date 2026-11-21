@@ -315,11 +315,7 @@ function P.SavedBuilds()
     local ok, name = pcall(UnitName, "player")
     if ok and type(name) == "string" and name ~= "" then me = fold(name) end
   end
-  local here
-  if GetRealmName then
-    local ok, realm = pcall(GetRealmName)
-    if ok then here = realmKey(realm) end
-  end
+  local here = realmKey(E.CurrentRealm())
   local active, mine, others = {}, {}, {}
   for _, b in ipairs(data.builds) do
     if type(b) == "table" and type(b.name) == "string" and type(b.code) == "string" and type(b.class) == "string" then

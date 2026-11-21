@@ -517,8 +517,7 @@ local function drawCraftRow(line, row, selected)
 end
 
 local function refreshCrafting(c)
-  local realm = GetRealmName and E.Readable(GetRealmName())
-  realm = type(realm) == "string" and realm ~= "" and realm or nil
+  local realm = E.CurrentRealm()
   local all = craftRows(pricer(realm))
   local age, color = ageLine(realm)
   c.age:SetText(age)

@@ -99,7 +99,7 @@ end
 function U.HomeData()
   local d = {}
   local name = readable(UnitName, "player")
-  local realm = readable(GetRealmName)
+  local realm = E.CurrentRealm()
   local className, classFile = readable(UnitClass, "player")
   local race = readable(UnitRace, "player")
   local level = readable(UnitLevel, "player")

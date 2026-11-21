@@ -218,7 +218,7 @@ local function encounterEnd(encounterId, name, difficulty, size, success)
   local instanceMapId = instanceMap()
   if not encounterId or not name or type(success) ~= "boolean" or not instanceMapId then return end
   local now = time()
-  local realm = text(GetRealmName(), REALM, 2, 40)
+  local realm = text(E.LiveRealm(), REALM, 2, 40)
   local members, byGuid, byName = roster(realm)
   if #members == 0 then return end
   pending = {

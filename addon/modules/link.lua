@@ -65,7 +65,7 @@ local function own()
   if type(guid) ~= "string" or not guid:find(GUID) then return nil, "the game did not give your character's id" end
   local name = E.Readable(UnitName("player"))
   if not token(name, NAME, 2, 48) then return nil, "the game did not give your character's name" end
-  local realm = realmOf(E.Readable(GetRealmName()))
+  local realm = realmOf(E.LiveRealm())
   if not realm then return nil, "the game did not give your realm" end
   local race = E.Readable((select(2, UnitRace("player"))))
   local class = E.Readable((select(2, UnitClass("player"))))

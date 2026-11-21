@@ -442,7 +442,7 @@ local function realmsOfKeys()
     end
   end
   local ok, key = pcall(E.CharacterKey)
-  local realm = GetRealmName and E.Readable(GetRealmName())
+  local realm = E.CurrentRealm()
   if ok and validKey(key) and type(realm) == "string" and realm ~= "" and not realmOf[key] then realmOf[key] = realm end
   return realmOf
 end

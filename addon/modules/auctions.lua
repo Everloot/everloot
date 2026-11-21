@@ -24,11 +24,11 @@ end
 
 -- Older clients: the 50 rows of the list the player opened.
 local function scanList()
-  if not (GetNumAuctionItems and GetAuctionItemLink and GetAuctionItemInfo and GetRealmName) then
+  if not (GetNumAuctionItems and GetAuctionItemLink and GetAuctionItemInfo) then
     return "auction API unavailable"
   end
-  local realm = GetRealmName()
-  if type(realm) ~= "string" or #realm < 2 then return "no realm" end
+  local realm = E.LiveRealm()
+  if not realm then return "no realm" end
   local n = GetNumAuctionItems("list")
   if type(n) ~= "number" or n < 1 then return "empty list" end
   local stored = 0
@@ -68,6 +68,32 @@ function E.ScanSummary(listings)
 end
 
 local scan -- the full scan in progress, or nil
+
+--- Unidentified markets stay in SavedVariables outside the upload records, scoped to this character and house.
+local function saveLocalScan(s, partial)
+  local items = {}
+  for id, listings in pairs(s.byItem) do items[id] = { id, E.ScanSummary(listings) } end
+  EverlootDB.localAuctionScans = EverlootDB.localAuctionScans or {}
+  local houses = EverlootDB.localAuctionScans[s.character] or {}
+  EverlootDB.localAuctionScans[s.character] = houses
+  local house = s.house or "unknown"
+  local scans = houses[house] or {}
+  houses[house] = scans
+  scans[partial and "sample" or "full"] = {
+    at = s.startedAt, house = s.house, items = items, names = s.names, partial = partial,
+  }
+end
+
+function E:LocalAuctionScan(house, forDisplay)
+  local scans = EverlootDB and EverlootDB.localAuctionScans
+  if not scans then return nil end
+  local key = E.CharacterKey()
+  local houses = key and scans[key]
+  local saved = houses and (houses[house or "unknown"] or (forDisplay and houses.unknown))
+  if not saved then return nil end
+  if forDisplay and saved.sample and (not saved.full or saved.sample.at > saved.full.at) then return saved.sample end
+  return saved.full
+end
 
 --- The scanning character's faction, "Alliance" or "Horde"; nil when the client does not say.
 local function playerFaction()
@@ -130,6 +156,10 @@ local function finishFallback(s)
   if scan ~= s then return end
   scan = nil
   if s.stored == 0 then EverlootDB.lastScanAt = s.previousScanAt end
+  if s.character and s.stored > 0 then
+    saveLocalScan(s, true)
+    return say(string.format("sampled %d search rows. This partial sample stays on this character.", s.stored))
+  end
   say(string.format("partial price sample: stored %d search rows; this is not a full market scan. %s",
     s.stored, s.stored > 0 and "Upload with the Everloot Desktop App or at everloot.app/upload." or "The auction house sent no data with usable buyouts. Try again."))
 end
@@ -179,6 +209,14 @@ local function storeFallbackItem(s)
       price = math.floor(s.commodity and price or price / count)
       if price < 1 then return end
       seen[id] = true
+      if s.character then
+        local id = key.itemID
+        local listings = s.byItem[id] or {}
+        s.byItem[id] = listings
+        listings[#listings + 1] = { price, count }
+        s.stored = s.stored + 1
+        return
+      end
       if not s.pruned then s.pruned = true; pruneSamples(s.realm) end
       if E:Store("auction_scan", { installId = EverlootDB.installId, capturedAt = s.at,
         realm = s.realm, itemId = key.itemID, count = count, copper = price, priceBasis = "unit" }) then
@@ -339,11 +377,15 @@ local function finish()
   scan = nil
   local ids = {}
   for id in pairs(s.byItem) do ids[#ids + 1] = id end
-  table.sort(ids)
   if #ids == 0 then
     EverlootDB.lastScanAt = s.previousScanAt
     return say("the scan found no buyouts.")
   end
+  if s.character then
+    saveLocalScan(s)
+    return say(string.format("scanned %d items. The game did not identify the realm, so this scan stays on this character.", #ids))
+  end
+  table.sort(ids)
   local parts = math.ceil(#ids / E.SCAN_PART_ITEMS)
   local scanId = EverlootDB.installId .. "-" .. string.format("%.0f", s.startedAt)
   for p = 1, parts do
@@ -434,10 +476,11 @@ function E:StartScan()
   if scan then return say("a scan is already running.") end
   local wait = (EverlootDB.lastScanAt or 0) + E.SCAN_COOLDOWN - time()
   if wait > 0 then return say(string.format("next full scan in %d min.", math.ceil(wait / 60))) end
-  local realm = GetRealmName and GetRealmName()
-  if type(realm) ~= "string" or #realm < 2 then return say("no realm name.") end
+  local realm = E.LiveRealm()
+  local character = not realm and E.CharacterKey() or nil
+  if not (realm or character) then return say("the game did not identify this character. Try again after entering the world.") end
   local started = {
-    realm = realm, startedAt = time(), at = date("!%Y-%m-%dT%H:%M:%SZ"), waiting = true,
+    realm = realm, character = character, startedAt = time(), at = date("!%Y-%m-%dT%H:%M:%SZ"), waiting = true,
     faction = playerFaction(), house = E.auctionHouseKind,
     byItem = {}, names = {}, retry = {}, skipped = 0, incomplete = 0, next = 1, total = 0, retryNext = 1,
     previousScanAt = EverlootDB.lastScanAt,

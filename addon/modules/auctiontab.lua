@@ -40,17 +40,10 @@ local SHOP_EMPTY = "Nothing on this list yet. Add an item above, or a recipe's r
 local FALLBACK_COLORS = { text = { 1, 1, 1, 1 }, muted = { 0.788, 0.765, 0.69, 1 }, accent = { 0.612, 0.941, 0.227, 1 } }
 local WARN = { 1, 0.4, 0.4, 1 }  -- the tooltip's warning red (prices.lua)
 
-local function realmName()
-  -- A realm name the client will not let the addon read is unknown, like a missing one.
-  local realm = E.Readable(GetRealmName and GetRealmName())
-  return type(realm) == "string" and #realm >= 2 and realm or nil
-end
-
 -- Scan readiness lives on the action; the toolbar shows only the last scan, the footer its saved state.
 function T.StatusLines()
   local lines = {}
-  local realm = realmName()
-  local own = realm and E:OwnScan(realm)
+  local own = E:OwnScan(E.CurrentRealm(), nil, true)
   if not own then
     lines[1] = "No scan on this realm yet."
     return lines
@@ -58,9 +51,10 @@ function T.StatusLines()
   local items = 0
   for _ in pairs(own.items) do items = items + 1 end
   local minutes = math.floor((time() - own.at) / 60)
-  lines[1] = string.format("Last scan on this realm: %d items, %s.", items,
+  local label = own.partial and "Last partial sample" or (own.names and "Last local scan" or "Last scan on this realm")
+  lines[1] = string.format("%s: %d items, %s.", label, items,
     minutes < 1 and "just now" or minutes < 60 and (minutes .. " min ago") or (math.floor(minutes / 60) .. " h ago"))
-  lines[2] = own.at < sessionStart and "Saved in your file."
+  lines[2] = own.at < sessionStart and (own.names and "Saved for this character." or "Saved in your file.")
     or "Not saved yet. Save scan reloads the UI."
   return lines
 end
@@ -82,11 +76,11 @@ local function named(realm, text)
   text = tostring(text or ""):gsub("^%s+", ""):gsub("%s+$", "")
   if text == "" then return { message = HINT } end
   local matches = {}
-  if realm and E.ScanItemsNamed then matches = select(2, E.ScanItemsNamed(realm, text)) end
+  if E.ScanItemsNamed then matches = select(2, E.ScanItemsNamed(realm, text)) end
   if #matches == 0 then
     return { message = string.format('No item named "%s" in your scans of this realm, and the game has not loaded one by that name. Type the full name, the item\'s id, or shift-click the item here.', text) }
   end
-  local own = E:OwnScan(realm)
+  local own = E:OwnScan(realm, nil, true)
   local lines = { { text = string.format('%d items in your scans match "%s". Type one full name:', #matches, text) } }
   for k = 1, math.min(#matches, MATCHES) do
     local id, name = matches[k][1], matches[k][2]
@@ -106,10 +100,10 @@ end
 --- there is one. Part of a name lists the scanned items it matches.
 function T.Result(text)
   local id = E.ItemIdFrom(text)
-  local realm = realmName()
+  local realm = E.CurrentRealm()
   if not id then return named(realm, text) end
   local lines, entry
-  if realm and E.PriceLines then lines, entry = E.PriceLines(realm, id) end
+  if E.PriceLines then lines, entry = E.PriceLines(realm, id) end
   lines = type(lines) == "table" and lines or {}
   entry = type(entry) == "table" and entry or {}
   local note
@@ -119,7 +113,7 @@ function T.Result(text)
     note = { text = E.PriceMissingNote(realm, entry), r = 1, g = 0.4, b = 0.4 }
   end
   if #lines == 0 then
-    return { message = realm and E.PriceMissingNote and E.PriceMissingNote(realm, entry) or NONE }
+    return { message = E.PriceMissingNote and E.PriceMissingNote(realm, entry) or NONE }
   end
   local shown = { note }
   for _, line in ipairs(lines) do shown[#shown + 1] = line end
@@ -234,7 +228,7 @@ local function render(panel, result)
     panel.message:SetText(result.message)
     panel.message:Show(); panel.item:Hide(); panel.unit:Hide()
   else
-    panel.item:SetText(result.item .. "  |cffc9c3b0on " .. result.realm .. "|r")
+    panel.item:SetText(result.item .. (result.realm and ("  |cffc9c3b0on " .. result.realm .. "|r") or ""))
     panel.item:Show(); panel.message:Hide()
     -- Every amount is for one unit; the tooltip says so once in its header, and so does this heading.
     if amounts then panel.unit:Show() else panel.unit:Hide() end
@@ -566,8 +560,7 @@ function T.Refresh()
     local lines = T.StatusLines()
     T.panel.status:SetText(lines[1])
     T.panel.footer:SetText(lines[2] or "Prices from scans appear in your tooltips.")
-    local realm = realmName()
-    local own = realm and E:OwnScan(realm)
+    local own = E:OwnScan(E.CurrentRealm(), nil, true)
     T.panel.shareButton:SetEnabled(own ~= nil and own.at >= sessionStart)
     local label, enabled = E:ScanAction()
     T.panel.scanButton:SetText(label)
@@ -659,7 +652,7 @@ local function buildPanel(house)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:SetText("Auction prices")
     GameTooltip:AddLine("Scan this house's prices and quantities, never sellers. Keep the house open until scanning finishes.", 1, 1, 1, true)
-    GameTooltip:AddLine("Save scan reloads the UI to write the file. The Desktop App or everloot.app/upload sends it.", 1, 1, 1, true)
+    GameTooltip:AddLine("Save scan reloads the UI to write the file. Scans with a known market can be uploaded.", 1, 1, 1, true)
     GameTooltip:AddLine("Full price history: " .. T.SITE, 1, 1, 1, true)
     GameTooltip:Show()
   end)

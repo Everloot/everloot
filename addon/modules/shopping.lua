@@ -228,15 +228,10 @@ function S.Money(copper)
   return E.Coins(math.floor(copper))
 end
 
-local function realmName()
-  local realm = readable(GetRealmName and GetRealmName())
-  return type(realm) == "string" and #realm >= 2 and realm or nil
-end
-
 --- The price file's market value for one item ({ market, day }), or nil: no file, still being checked, failed, or no
 --- market value recorded for the item.
 function S.Market(itemId)
-  local realm = realmName()
+  local realm = E.CurrentRealm()
   local row = realm and E.CommunityPrice and E:CommunityPrice(realm, itemId)
   if row and row.market then return { market = row.market, day = row.day } end
 end
@@ -253,7 +248,7 @@ end
 
 --- One line on where the market values come from and how old the file is, and whether to warn.
 function S.FileLine()
-  local realm = realmName()
+  local realm = E.CurrentRealm()
   if type(EverlootPricesDB) ~= "table" or not realm or not E.PriceFile then
     return "Market: no price file in the game yet. The Everloot Desktop App writes it, then /reload.", false
   end

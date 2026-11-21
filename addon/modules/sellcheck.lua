@@ -86,15 +86,10 @@ local function vendorUnit(itemId)
   return whole(sell) and sell > 0 and sell or nil
 end
 
-local function realmName()
-  local realm = E.Readable(GetRealmName and GetRealmName())
-  return type(realm) == "string" and #realm >= 2 and realm or nil
-end
-
 --- This house's current market value for one unit and where it comes from, or nil when it is stale, thin or unknown.
 local function marketUnit(realm, itemId)
   local D = E.Disenchant
-  if not (realm and D and D.Price) then return nil end
+  if not (D and D.Price) then return nil end
   local value, current, source = D.Price(realm, itemId)
   if current and whole(value) and value > 0 then return value, source end
   return nil
@@ -103,7 +98,7 @@ end
 --- The gross material value of one disenchant, only when every material is priced and current.
 local function disenchantUnit(realm, itemId)
   local D = E.Disenchant
-  if not (realm and D and D.Band and D.Yields and D.Value) then return nil end
+  if not (D and D.Band and D.Yields and D.Value) then return nil end
   local band = D.Band(itemId)
   local rows = band and D.Yields(band)
   if not rows or #rows == 0 then return nil end
@@ -165,7 +160,7 @@ function S.Update(frame)
   if S.On() then
     local listing = S.Read(frame)
     if listing then
-      local realm = realmName()
+      local realm = E.CurrentRealm()
       listing.house = E:MarketHouse()
       listing.vendorUnit = vendorUnit(listing.itemId)
       listing.marketUnit, listing.marketSource = marketUnit(realm, listing.itemId)

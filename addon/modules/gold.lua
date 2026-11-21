@@ -52,7 +52,7 @@ end
 
 local function identity()
   local name = UnitName and E.Readable(UnitName("player"))
-  local realm = GetRealmName and E.Readable(GetRealmName())
+  local realm = E.LiveRealm()
   if type(name) ~= "string" or name == "" then return nil end
   if type(realm) ~= "string" or #realm < 2 then return nil end
   return name, realm
@@ -95,17 +95,19 @@ local function ledgerKey()
 end
 
 local function storeMoney(category, copper, extra)
-  local name, realm = identity()
-  if not name or type(copper) ~= "number" or copper < 1 or copper ~= math.floor(copper) then return end
+  if type(copper) ~= "number" or copper < 1 or copper ~= math.floor(copper) then return end
   if UPLOADED[category] then
-    E:Store("money_event", {
-      installId = EverlootDB.installId,
-      capturedAt = date("!%Y-%m-%dT%H:%M:%SZ"),
-      character = name,
-      realm = realm,
-      category = category,
-      copper = copper,
-    })
+    local name, realm = identity()
+    if name then
+      E:Store("money_event", {
+        installId = EverlootDB.installId,
+        capturedAt = date("!%Y-%m-%dT%H:%M:%SZ"),
+        character = name,
+        realm = realm,
+        category = category,
+        copper = copper,
+      })
+    end
   end
   local key = ledgerKey()
   if key then E.Ledger.Record(key, category, copper, extra) end
@@ -156,7 +158,7 @@ end
 --- only compared, case-insensitively, and never kept.
 local function ownAlt(other)
   other = E.Readable(other)
-  local _, realm = identity()
+  local realm = E.CurrentRealm()
   if type(other) ~= "string" or other == "" or not realm or not (E.Roster and E.Roster.Rows) then return false end
   local ok, rows = pcall(E.Roster.Rows)
   if not ok or type(rows) ~= "table" then return false end
@@ -380,7 +382,6 @@ end
 
 local function lootMoney()
   if not GetNumLootItems or not GetLootSlotType or not GetLootSlotInfo then return end
-  if not identity() then return end
   local okCount, count = pcall(GetNumLootItems)
   if not okCount or type(count) ~= "number" then return end
   for i = 1, math.min(count, 50) do

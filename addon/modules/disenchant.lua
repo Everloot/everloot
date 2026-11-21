@@ -175,7 +175,7 @@ function D.Record(id, materials, source)
   if not next(mats) then return end
   local row = { t = time(), item = id, mats = mats, source = source }
   local item = D.Item(id)
-  local h = item and item.name and E.Ledger and E.Ledger.ItemHistory(GetRealmName(), item.name)
+  local h = item and item.name and E.Ledger and E.Ledger.ItemHistory(E.CurrentRealm(), item.name)
   if h then row.cost = h.averagePaid end
   list[#list + 1] = row
   while #list > 500 do table.remove(list, 1) end
@@ -192,6 +192,6 @@ function D.Summary(since)
       if row.cost ~= nil then out.cost, out.known = out.cost + row.cost, out.known + 1 end
     end
   end
-  out.value, out.missing = D.Value(GetRealmName(), out.mats)
+  out.value, out.missing = D.Value(E.CurrentRealm(), out.mats)
   return out
 end

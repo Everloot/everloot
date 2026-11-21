@@ -688,6 +688,19 @@ assert(Everloot:Count('gold_snapshot') == 2, 'a money change inside the minute w
 """)
 check_all(reloaded)
 
+blank_realm = runtime()
+blank_realm.execute("""
+GetRealmName = function() return '' end
+event('PLAYER_ENTERING_WORLD')
+event('MERCHANT_SHOW')
+money = money + 100
+event('PLAYER_MONEY')
+local rows = EverlootDB.ledger.events
+local last = rows[#rows]
+assert(last.category == 'vendor' and last.copper == 100, 'the local ledger does not require a realm')
+assert(Everloot:Count('money_event') == 0 and Everloot:Count('gold_snapshot') == 0, 'unknown realm is never uploaded')
+""")
+
 # No addon source may call, index by string, or alias a buy, bid, post or craft function.
 import re
 names = (r"PostItem|PostCommodity|PlaceBid|PlaceAuctionBid|StartAuction|PostAuction|StartCommoditiesPurchase|"

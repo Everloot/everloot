@@ -13,14 +13,15 @@ local LOCKOUT_SLACK_SECONDS = 60    -- the client reports seconds left, so a res
 local function guildContext()
   local name, _, _, _ = GetGuildInfo and GetGuildInfo("player")
   if not name then return nil end
-  local realm = GetRealmName and GetRealmName() or "?"
+  local realm = E.LiveRealm()
+  if not realm then return nil, "the game did not give your realm" end
   local faction = (UnitFactionGroup and UnitFactionGroup("player")) or "?"
   return { guildName = name, realm = realm, faction = faction:lower() }
 end
 
 local function snapshotRoster()
-  local ctx = guildContext()
-  if not ctx then return "not in a guild" end
+  local ctx, reason = guildContext()
+  if not ctx then return reason or "not in a guild" end
   if ctx.faction ~= "alliance" and ctx.faction ~= "horde" then return "faction not alliance or horde" end
   local members = {}
   local n = GetNumGuildMembers and GetNumGuildMembers() or 0

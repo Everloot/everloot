@@ -59,6 +59,28 @@ function E.CharacterKey()
   return hex8(E.Adler32((EverlootDB.installId or "") .. ":" .. guid)), token, math.min(100, math.floor(level))
 end
 
+local function realmName(value)
+  if type(value) == "string" and #value >= 2 and value:find("%S") then return value end
+end
+
+--- The realm the client identifies now. Forever can return an empty string instead of a name.
+function E.LiveRealm()
+  if type(GetRealmName) ~= "function" then return nil end
+  local ok, value = pcall(GetRealmName)
+  if ok then return realmName(E.Readable(value)) end
+end
+
+--- For local lookups only: the historical realm saved for this exact character, if any.
+function E.CurrentRealm()
+  local live = E.LiveRealm()
+  if live then return live end
+  local roster = EverlootDB and EverlootDB.roster
+  if not roster then return nil end
+  local key = E.CharacterKey()
+  local row = key and roster[key]
+  if row then return realmName(row.realm) end
+end
+
 --- The NPC id in a creature GUID (Creature-0-server-instance-zone-NPCID-spawn); nil for anything else.
 function E.NpcIdFromGuid(guid)
   guid = E.Readable(guid)

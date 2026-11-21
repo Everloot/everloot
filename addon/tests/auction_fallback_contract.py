@@ -92,6 +92,29 @@ for i=2,#calls do assert(calls[i].at-calls[i-1].at>=1,'requests paced') end
 from protocol_schema import check_all
 check_all(lua)
 
+lua = runtime()
+lua.execute("""
+GetRealmName = function() return '' end
+UnitGUID = function() return 'Player-123-5678' end
+UnitClass = function() return 'Mage', 'MAGE' end
+UnitLevel = function() return 40 end
+UnitExists = function() return true end
+UnitFactionGroup = function() return 'Horde' end
+fire('AUCTION_HOUSE_SHOW')
+Everloot:StartScan(); tick(1)
+fire('AUCTION_HOUSE_BROWSE_RESULTS_UPDATED'); tick(1)
+fire('ITEM_SEARCH_RESULTS_UPDATED',key); tick(1)
+fire('COMMODITY_SEARCH_RESULTS_UPDATED',765); tick(1)
+assert(not Everloot:Scanning())
+assert(not EverlootDB.records.auction_scan and not EverlootDB.records.auction_snapshot, 'the sample is private')
+""")
+lua.execute((ROOT / "modules/prices.lua").read_text(encoding="utf-8"))
+lua.execute("""
+local E = Everloot
+assert(E.PriceLines(nil, 2589)[1].text:find('Your partial sample: min 1s 0c', 1, true))
+assert(E:OwnScan(nil) == nil, 'a sample does not become a full scan for valuations')
+""")
+
 for replicate in ["function() call('replicate') end", "function() error('unsupported') end"]:
     lua=runtime(replicate)
     lua.execute('''

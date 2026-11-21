@@ -152,7 +152,7 @@ local function read(unit, newLevel)
   -- remain context only and never become part of a Blizzard character slug.
   local name, unitRealm = UnitName(unit, true)
   name, unitRealm = E.Readable(name), E.Readable(unitRealm)
-  local ourRealm = E.Readable(GetRealmName())
+  local ourRealm = E.LiveRealm()
   local ourServer = E.Readable((select(2, UnitName("player"))))
   local surname = token(unitRealm, NAME, 2, 96) and unitRealm or nil
   if surname and #(surname:gsub("[\128-\191]", "")) > 24 then surname = nil end
@@ -227,7 +227,7 @@ local function guildKill(encounterId, name, difficulty, size, success)
   local _, instanceType, _, _, _, _, _, instanceMapId = GetInstanceInfo()
   if instanceType ~= "party" and instanceType ~= "raid" then return end
   instanceMapId = whole(instanceMapId, 1, MAX_ID)
-  local realm = realmOf(GetRealmName())
+  local realm = realmOf(E.LiveRealm())
   local faction = UnitFactionGroup("player")
   faction = type(faction) == "string" and faction:lower() or nil
   if not instanceMapId or not realm or (faction ~= "alliance" and faction ~= "horde") then return end
