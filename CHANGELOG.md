@@ -650,7 +650,7 @@ WoW: Forever players can scan prices and keep their gold ledger when the game st
 - Open the Everloot tab at the Auction House and choose **Scan prices**. New scans and partial samples with an unidentified market stay on the character that took them. Look up prices by item and choose **Save scan** to keep the scan after a reload.
 - Existing characters can still look up saved prices for their remembered realm. The local gold ledger and flight timings continue to work when the realm is unavailable.
 
-Shared scans without a verified realm are held back. Blizzard auction prices remain available on everloot.app. Automated compatibility checks passed. Live-client verification of this patch is pending.
+Shared scans without a verified realm are held back. Blizzard auction prices remain available on everloot.app. The add-on loaded and completed a scan in the live Forever client on build 71037.
 
 ## [0.3.28] - 2026-11-21
 
