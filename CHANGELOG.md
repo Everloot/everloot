@@ -267,6 +267,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: armory character pages show their board ranks again; a rank on one of the new play history boards had made the page drop them all.
 - Site: lore pages drop the doubled spaces the wiki's source had but never showed, leave no gap where footnotes or race icons sat side by side, show `{{-}}` as its dash and `{{Race|…|notext}}` as only its icon, so far fewer pages are marked damaged.
 - Site: the Privacy Policy points to Settings, where API keys, linked characters and synced data now live, instead of the old account page.
 - Site: while no guide is reviewed, `/guides`, `/classes` and each class page share one empty state that says what a reviewed guide is and how to offer one, linking the guide contract, the Talent calculator and the Guide submission form (#971).

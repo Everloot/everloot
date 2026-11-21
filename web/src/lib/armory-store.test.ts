@@ -57,6 +57,18 @@ describe("the Supabase store", () => {
       fetched_at: "2026-11-09T10:00:00+00:00", checked_at: "2026-11-09T10:00:00+00:00",
   };
 
+  test("reads every board's rank the database gives, the play history ones too", async () => {
+    const { store } = fake([{ metric: "item_level", rank: 2, of: 40 }, { metric: "fish_caught", rank: 1, of: 30 }, { metric: "total_deaths", rank: "5", of: "30" }]);
+    expect(await store.rank("eu", "velkara-duskmantle")).toEqual([
+      { metric: "item_level", rank: 2, of: 40 }, { metric: "fish_caught", rank: 1, of: 30 }, { metric: "total_deaths", rank: 5, of: 30 },
+    ]);
+  });
+
+  test("a rank for a board the site does not know is left out, not fatal", async () => {
+    const { store } = fake([{ metric: "gear_score", rank: 3, of: 9 }, { metric: "future_board", rank: 1, of: 9 }]);
+    expect(await store.rank("eu", "velkara-duskmantle")).toEqual([{ metric: "gear_score", rank: 3, of: 9 }]);
+  });
+
   test("maps the stored row to the page's shape, a numeric string too", async () => {
     const c = await fake([stored]).store.character("eu", "velkara-duskmantle");
     expect(c).toMatchObject({ itemLevel: 57.41, gearScore: null, pvpRank: 0, lastLogin: null, guildSlug: "ember-wardens" });
@@ -68,7 +80,7 @@ describe("the Supabase store", () => {
     for (const bad of [[noName], [{ ...stored, level: "sixty" }], [{ ...stored, equipment: [{ name: "no slot" }] }], [{ ...stored, fetched_at: null }], { rows: [] }, null]) {
       await expect(fake(bad).store.character("eu", "velkara-duskmantle")).rejects.toThrow();
     }
-    await expect(fake([{ metric: "dps", rank: 1, of: 2 }]).store.rank("eu", "a-b")).rejects.toThrow();
+    await expect(fake([{ metric: "item_level", of: 2 }]).store.rank("eu", "a-b")).rejects.toThrow();
     await expect(fake([{ rank: 1, region: "eu" }]).store.board("item_level", null, null, 10)).rejects.toThrow();
     await expect(fake([{ character_slug: "a-b", name: "A", surname: "B", level: 1, class_id: 1, race_id: 1, rank: 0, item_level: null, gear_score: null }]).store.roster("eu", "x")).rejects.toThrow();
     await expect(fake("yes").store.enqueue("eu", "character", "a-b", "website")).rejects.toThrow();
