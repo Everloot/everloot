@@ -635,6 +635,8 @@ function O.ApplySetup(name)
   for key, value in pairs(set.toggles) do
     if current(key, true) ~= value then reload = true end
     EverlootDB.toggles[key] = value
+    -- Gold off deletes the lifetime statistics, as the switch says, whichever way it was turned off.
+    if key == "gold" and not value and E.Wealth then E.Wealth.Withdraw() end
   end
   local live = {}
   for _, row in ipairs(O.ROWS) do live[row.key] = row.live end

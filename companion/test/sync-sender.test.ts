@@ -133,6 +133,33 @@ describe("sending linked characters", () => {
     expect(r).toMatchObject({ synced: ["Thrallina of Forever Pioneer"], categories: ["gold"], problem: null });
   });
 
+  test("gold left off is not a problem to report, and its changed captures wait hours before asking again", async () => {
+    const wealth = (n: number) => owned(THRALL, { installId: INSTALL, capturedAt: `2026-11-05T1${n}:00:00Z`, stats: { "328": 1000 + n } });
+    const { file, state, write } = workspace({ character_link: [link("Thrallina", THRALL)], lockout_owned: [lockout(THRALL)], wealth_owned: [wealth(0)] });
+    const api = site((characters) => Response.json({
+      characters: characters.map((c, index) => ({
+        index, result: "synced",
+        categories: Object.fromEntries(c.records.map((r) => (r.kind === "wealth_owned" ? ["gold", "no_consent"] : ["raids", "stored"]))),
+      })), skipped: 0,
+    }));
+    let clock = Date.parse("2026-11-05T12:00:00Z");
+    const now = () => clock;
+    const first = await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send, now });
+    expect(syncSummary(first)).toBe("synced 1 character");
+    // Gold alone, changed after a play session: not sent again within hours, and nothing is said.
+    write({ character_link: [link("Thrallina", THRALL)], lockout_owned: [lockout(THRALL)], wealth_owned: [wealth(1)] });
+    clock += 60 * 60_000;
+    const again = await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send, now });
+    expect(api.calls).toHaveLength(1);
+    expect(syncSummary(again)).toBeNull();
+    // Later the same capture is asked about again, in case the player turned gold on; off, it still says nothing.
+    clock += 6 * 60 * 60_000;
+    const later = await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send, now });
+    expect(api.calls).toHaveLength(2);
+    expect(api.calls[1]!.characters[0]!.records.map((x) => x.kind)).toEqual(["wealth_owned"]);
+    expect(syncSummary(later)).toBeNull();
+  });
+
   test("an answered capture is not sent again; a changed one is, alone", async () => {
     const { file, state, write } = workspace(full());
     const api = site(synced());

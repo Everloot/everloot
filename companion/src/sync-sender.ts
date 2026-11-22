@@ -21,7 +21,9 @@ import { receiptKeyForSite, type SentState } from "./sent-state";
  *
  * The site keeps a category only when the account holds that character's live link and turned the category's sync
  * on. Whatever it answers for a capture (kept, already had, older, sync off, not linked), the same capture is not sent
- * again; a changed one is. A request that fails leaves its captures to go next run.
+ * again; a changed one is. Gold, which starts off, is the exception: answered "sync off", it is not sent for that
+ * character for a few hours while the app runs, even when it changed, and nothing is said; then it is asked about again,
+ * in case the player turned it on. A request that fails leaves its captures to go next run.
  */
 
 export interface SyncSendOptions {
@@ -68,6 +70,12 @@ const CATEGORY_OF: Record<string, SendCategory> = { boss_kill_owned: "boss_kills
 
 /** A site that asked to wait, by origin: nothing goes to it before then. Kept while the app runs. */
 const waitUntil = new Map<string, number>();
+/** Categories that start off: "sync off" is the expected answer, so it is held back a while and not reported. */
+const OPT_IN: ReadonlySet<SendCategory> = new Set(["gold"]);
+/** How long an opt-in category answered "sync off" waits before it is sent again. */
+const CONSENT_RECHECK_MS = 6 * 60 * 60_000;
+/** Per sent-state: `origin|character|category` answered "sync off", and until when it is held back. Kept while the app runs. */
+const offUntil = new WeakMap<SentState, Map<string, number>>();
 
 interface Capture { category: SendCategory; records: SendRow[]; entry: string }
 interface Character { id: string; label: string; name: string; realm: string; captures: Capture[] }
@@ -174,8 +182,11 @@ export async function sendSync(file: string, options: SyncSendOptions): Promise<
   const characters = charactersOf(parsed.records);
   // Only the current capture of each category is remembered; older answers are dropped.
   for (const c of characters) options.state.keepOnly(receiptKey(c), new Set(c.captures.map((x) => x.entry)));
+  const held = offUntil.get(options.state) ?? new Map<string, number>();
+  offUntil.set(options.state, held);
+  const heldKey = (c: Character, category: SendCategory) => `${origin}|${c.id}|${category}`;
   const pending = characters
-    .map((c) => ({ ...c, captures: c.captures.filter((x) => !options.state.has(receiptKey(c), x.entry)) }))
+    .map((c) => ({ ...c, captures: c.captures.filter((x) => !options.state.has(receiptKey(c), x.entry) && (held.get(heldKey(c, x.category)) ?? 0) <= now()) }))
     .filter((c) => c.captures.length);
   if (!pending.length) return result;
 
@@ -221,7 +232,11 @@ export async function sendSync(file: string, options: SyncSendOptions): Promise<
           const outcome = outcomes[capture.category];
           if (outcome === "stored" || outcome === "duplicate" || outcome === "older") { kept.add(label); keptCategories.add(capture.category); }
           // Sync off is not remembered: the player may turn it on later, and the same capture must go then.
-          else if (outcome === "no_consent") { off.add(label); continue; }
+          else if (outcome === "no_consent") {
+            if (OPT_IN.has(capture.category)) held.set(heldKey(group.character, capture.category), now() + CONSENT_RECHECK_MS);
+            else off.add(label);
+            continue;
+          }
           else { waiting.add(label); continue; }
           answered.push(capture.entry);
         }

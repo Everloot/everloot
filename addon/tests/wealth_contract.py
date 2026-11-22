@@ -243,6 +243,17 @@ assert lua.eval("EverlootDB.records.wealth_owned") is None, "the gold delete pat
 lua.execute("asked = {}; event('PLAYER_MONEY'); event('PLAYER_LOGOUT'); advance(60)")
 assert plain(lua) == [] and lua.eval("#asked") == 0, "off stops reading at once"
 
+# The setup chooser's "Collect data only" turns gold off too, and keeps the switch's promise to delete the rows.
+lua = addon(options=True)
+lua.execute("Everloot.Wealth.Read()")
+assert len(plain(lua)) == 1
+lua.execute("Everloot.Options.ApplySetup('collect')")
+assert lua.eval("EverlootDB.toggles.gold") is False
+assert lua.eval("EverlootDB.records.wealth_owned") is None, "Collect data only deletes wealth_owned rows"
+lua = addon(options=True)
+lua.execute("Everloot.Wealth.Read(); Everloot.Options.ApplySetup('everything')")
+assert len(plain(lua)) == 1, "an answer that keeps gold on keeps the rows"
+
 # A client without GetStatistic records nothing, and status says why.
 lua = addon(setup="GetStatistic = nil")
 assert "wealth: disabled: missing GetStatistic" in status(lua), status(lua)
