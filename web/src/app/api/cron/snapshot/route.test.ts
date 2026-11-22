@@ -414,21 +414,45 @@ test("the snapshot refreshes the guild ladder even when no new uploads arrive an
 });
 
 test("a run that added uploads starts the stored-views job after its heartbeat; an idle run does not; a failed start is logged and the run succeeds", async () => {
-  const order: string[] = [];
-  store.writeCronRun.mockImplementation(async () => { order.push("heartbeat"); });
-  dispatch.dispatchStoredViews.mockImplementation(async () => { order.push("dispatch"); return "sent"; });
-  store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-11-21T06:10:12.000Z" });
-  expect(await (await GET(req())).json()).toMatchObject({ ok: true, viewsJob: "sent" });
-  expect(order).toEqual(["heartbeat", "dispatch"]);
-  store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-11-21T06:10:12.000Z", settledWeek: null });
-  expect(await (await GET(req())).json()).toMatchObject({ ok: true, viewsJob: "off" });
-  expect(dispatch.dispatchStoredViews).toHaveBeenCalledOnce();
-  store.snapshotWork.mockResolvedValue({ idle: false, retryRollups: false });
-  dispatch.dispatchStoredViews.mockRejectedValue(new Error("stored-views dispatch failed (401)"));
-  vi.spyOn(console, "error").mockImplementation(() => {});
-  const res = await GET(req());
-  expect(res.status).toBe(200);
-  expect(await res.json()).toMatchObject({ ok: true, viewsJob: "failed" });
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-11-21T06:20:00.000Z"));
+  try {
+    const order: string[] = [];
+    store.writeCronRun.mockImplementation(async () => { order.push("heartbeat"); });
+    dispatch.dispatchStoredViews.mockImplementation(async () => { order.push("dispatch"); return "sent"; });
+    store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-11-21T06:10:12.000Z" });
+    expect(await (await GET(req())).json()).toMatchObject({ ok: true, viewsJob: "sent" });
+    expect(order).toEqual(["heartbeat", "dispatch"]);
+    store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-11-21T06:10:12.000Z", settledWeek: null });
+    expect(await (await GET(req())).json()).toMatchObject({ ok: true, viewsJob: "off" });
+    expect(dispatch.dispatchStoredViews).toHaveBeenCalledOnce();
+    store.snapshotWork.mockResolvedValue({ idle: false, retryRollups: false });
+    dispatch.dispatchStoredViews.mockRejectedValue(new Error("stored-views dispatch failed (401)"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await GET(req());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, viewsJob: "failed" });
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("a run that only folded a rollup, and the first run of each hour, start the stored-views job too", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  try {
+    dispatch.dispatchStoredViews.mockResolvedValue("sent");
+    vi.setSystemTime(new Date("2026-11-21T06:20:00.000Z"));
+    store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 0, dataAsOf: "2026-11-21T06:10:12.000Z" });
+    store.writeMarket.mockResolvedValueOnce({ added: 3, scans: 3, remaining: 0 });
+    expect(await (await GET(req())).json()).toMatchObject({ ok: true, viewsJob: "sent" });
+    expect(await (await GET(req())).json()).toMatchObject({ ok: true, viewsJob: "off" });
+    store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-11-21T06:10:12.000Z", settledWeek: null });
+    vi.setSystemTime(new Date("2026-11-21T07:00:04.000Z"));
+    expect(await (await GET(req())).json()).toMatchObject({ ok: true, viewsJob: "sent" });
+    expect(dispatch.dispatchStoredViews).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test("with the stored views on the job, a run ends at its heartbeat and builds none of them (#1354)", async () => {

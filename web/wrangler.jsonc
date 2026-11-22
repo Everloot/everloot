@@ -102,6 +102,9 @@
     // the jobs that stay here (SITE_JOBS in src/lib/cf-crons.ts). Removed, this Worker runs them all again
     // (docs/OPERATIONS.md, "The cron Worker").
     "EVERLOOT_CRON_WORKER": "1",
+    // The snapshot cron ends at its heartbeat and the stored-views job (.github/workflows/stored-views.yml) builds the
+    // views, since 2026-11-22. The site never runs the snapshot cron; removed, the cron Worker builds them again (#1354).
+    "EVERLOOT_STORED_VIEWS": "job",
     "NEWS_DIR": "/bundle/repo/kb/news",
     "GUIDES_DIR": "/bundle/repo/kb/guides",
     "WIKI_DIR": "/bundle/repo/kb/wiki",

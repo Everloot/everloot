@@ -267,13 +267,17 @@ Worker would. The auction reports wait while the heartbeat's `completionPending`
 that fails is logged and the run ends red with the names in `failed`; the next run retries it.
 A manual run with **rebuild** ticked rewrites every file.
 
-A snapshot run that added uploads also starts the workflow itself, right after its heartbeat,
-through GitHub's `workflow_dispatch` API (`web/src/lib/stored-views-dispatch.ts`), with the cron
-Worker's secret `EVERLOOT_VIEWS_DISPATCH_TOKEN`: a fine-grained token for Everloot/everloot with
-Actions read and write and nothing else. A dispatched run starts within seconds, so the views follow
-new data without waiting for the schedule, which stays as the backstop. The run's answer says
-`viewsJob`: `sent`, `off` (no token, or no new uploads) or `failed` (logged; the run still answers 200).
-To renew the token: `npx wrangler secret put EVERLOOT_VIEWS_DISPATCH_TOKEN --name everloot-cron`.
+A snapshot run that folded uploads into the corpus or a rollup also starts the workflow itself,
+right after its heartbeat, through GitHub's `workflow_dispatch` API
+(`web/src/lib/stored-views-dispatch.ts`), with the cron Worker's secret
+`EVERLOOT_VIEWS_DISPATCH_TOKEN`: a fine-grained token owned by Everloot, for Everloot/everloot
+only, with Actions read and write and nothing else. So does the first snapshot run of each hour,
+so the auction reports and a view a failed job run left behind wait at most an hour. A dispatched
+run starts within seconds; the schedule stays as the backstop. The run's answer says `viewsJob`:
+`sent`, `off` (no token, or nothing to start it for) or `failed` (logged; the run still answers 200).
+The current token was made on 2026-11-22 and expires on 2026-12-21. To renew it: Settings > Developer settings > Fine-grained tokens, resource owner
+Everloot, then `npx wrangler secret put EVERLOOT_VIEWS_DISPATCH_TOKEN --name everloot-cron`. An
+expired token makes each dispatch answer `failed`; the cron Worker keeps working.
 
 **Secrets** (repository Actions secrets): `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
 `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` (the cron Worker's read-write key), `VIEWS_SUPABASE_URL` and
@@ -288,14 +292,13 @@ publication pass reads the same opt-outs whatever the other workflows' `SUPABASE
 1. Set the secrets, then the repository variable `STORED_VIEWS_JOB` to `on`. Run the workflow by
    hand once. Both the cron Worker and the job now write the views; they write the same file for
    the same snapshot, so either write is right.
-2. GitHub starts scheduled runs late or drops them under load (every 4 to 7 hours for the Blizzard
-   pull in November 2026, `BLIZZARD_AUCTIONS` in [ENVIRONMENT.md](ENVIRONMENT.md)). While both
-   write, a late run costs nothing: the cron Worker still builds the views. Hand them over only once
-   the job's runs arrive on time for a day and the views' stamps follow the heartbeat. Then add
-   `"EVERLOOT_STORED_VIEWS": "job"` to the vars in both `web/wrangler.jsonc` and
-   `web/wrangler.cron.jsonc` (the site never runs the snapshot cron, so it changes nothing there).
-   After that deploy the cron Worker's snapshot run ends at its heartbeat and answers
-   `storedViews: "job"`.
+2. GitHub starts scheduled runs late or drops them under load: the job's own schedule ran three
+   times in the 19 hours after it was switched on (2026-11-21). Store the dispatch token, so the
+   cron Worker starts the runs, and hand the views over once dispatched runs arrive and the views'
+   stamps follow the heartbeat: add `"EVERLOOT_STORED_VIEWS": "job"` to the vars in both
+   `web/wrangler.jsonc` and `web/wrangler.cron.jsonc` (the site never runs the snapshot cron, so it
+   changes nothing there). After that deploy the cron Worker's snapshot run ends at its heartbeat
+   and answers `storedViews: "job"`. Done on 2026-11-22.
 
 **Going back:** remove the var (or roll the cron Worker back) and the cron Worker builds the views
 again; set `STORED_VIEWS_JOB` to anything but `on` to stop the job.
