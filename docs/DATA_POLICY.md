@@ -1005,6 +1005,18 @@ observation of anyone else, and none of it is published as a dataset.
   hello@everloot.app) deletes everything synced for it at once. A copy a link-preview service has already fetched
   stays with that service.
 
+## Dungeon progress in player tooltips
+
+Desktop can send the full name read by the Everloot addon for the linked character together with its boss history. The
+realm feed includes only the addon-reported name and a dungeon clear count when the full name matches the connected
+Armory profile. The name is used to identify the right player in game. Blizzard API data stays on the site. A cleared
+dungeon has a recorded kill for every boss in its tracked checklist. Only dungeons with supporting reports for their
+full known boss list count. The Armory and the addon's Collection use the same dated checklist.
+
+The feed respects the existing linked-character and hide rules. Desktop replaces the downloaded realm snapshot on
+refresh. The addon suppresses a snapshot when it reaches its two-hour expiry. It leaves the tooltip alone when the
+game cannot confirm the player's name or realm. The snapshot download sends realm names and page offsets.
+
 ## Gear rankings
 
 In effect from 6 November 2026, accepted by the maintainer that day (`EVERLOOT_LEADERBOARDS`, migration

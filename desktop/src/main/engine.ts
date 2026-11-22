@@ -10,6 +10,7 @@ export interface EngineDeps {
    */
   upload(file: string): Promise<string>;
   prices(files: string[]): Promise<string>;
+  progress?(files: string[], current: () => boolean): Promise<void>;
   ask(file: string): Promise<string>;
   /** Starts watching a file and returns the function that stops it. */
   watch(file: string, onChange: () => void): () => void;
@@ -64,6 +65,7 @@ const rateLimitWait = (err: unknown): number | null | undefined => {
 export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Engine {
   const settle: Record<Job, number> = { upload: options.uploadSettleMs ?? 5000, ask: options.askSettleMs ?? 2000, prices: 0 };
   const pricesEvery = options.pricesEveryMs ?? 60 * 60 * 1000;
+  const progressCooldown = Math.min(pricesEvery, 15 * 60 * 1000);
   const rescanEvery = options.rescanMs ?? 30_000;
   const retryAfter = options.retryMs ?? [60_000, 5 * 60_000, 15 * 60_000];
   const maxLog = options.logLines ?? 200;
@@ -79,6 +81,8 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
   const timers = new Map<Job, ReturnType<typeof setTimeout>>();
   let pricesTimer: ReturnType<typeof setInterval> | null = null;
   let rescanTimer: ReturnType<typeof setInterval> | null = null;
+  let progressRunning = false;
+  let progressAt = -Infinity;
   /** Retries already spent per job since its last success. */
   const retries = new Map<Job, number>();
   const running = new Set<Job>();
@@ -102,6 +106,21 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
     if (state.log.length > maxLog) state.log.splice(0, state.log.length - maxLog);
   };
   const set = (job: Job, patch: Partial<JobStatus>) => { state.jobs[job] = { ...state.jobs[job], ...patch }; };
+
+  async function refreshProgress() {
+    if (!deps.progress || !settings || state.paused || !state.files.length || progressRunning || clock() - progressAt < progressCooldown) return;
+    const started = session;
+    const current = () => session === started && !state.paused;
+    progressRunning = true;
+    progressAt = clock();
+    try { await deps.progress([...state.files], current); }
+    catch (err) {
+      if (current()) { log("error", `dungeon progress: ${err instanceof Error ? err.message : String(err)}`); emit(); }
+    } finally {
+      progressRunning = false;
+      if (session !== started) void refreshProgress();
+    }
+  }
 
   /** `fresh` starts the job's retries over, as a run the user asked for does. */
   async function run(job: Job, fresh = false): Promise<void> {
@@ -166,7 +185,10 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
     }
     emit();
     // Prices follow every upload, as `watch --game` does on the command line.
-    if (job === "upload" && failures.length === 0 && s.prices) void run("prices");
+    if (job === "upload" && failures.length === 0) {
+      if (s.prices) void run("prices");
+      void refreshProgress();
+    }
     if (again.delete(job)) void run(job, renew.delete(job));
   }
 
@@ -188,6 +210,7 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
 
   function stop(): void {
     session++;
+    progressAt = -Infinity;
     for (const u of unwatchers) u();
     unwatchers = [];
     for (const t of timers.values()) clearTimeout(t);
@@ -223,9 +246,13 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
         if (s.ask.enabled) schedule("ask");
       }));
     }
-    if (s.prices) pricesTimer = setInterval(() => void run("prices"), pricesEvery);
+    if (s.prices || deps.progress) pricesTimer = setInterval(() => {
+      if (s.prices) void run("prices");
+      void refreshProgress();
+    }, pricesEvery);
     emit();
     if (s.upload) void run("upload"); else if (s.prices) void run("prices");
+    void refreshProgress();
     if (s.ask.enabled) void run("ask");
   }
 
@@ -252,6 +279,7 @@ export function createEngine(deps: EngineDeps, options: EngineOptions = {}): Eng
       if (!resumed || !settings) return;
       if (settings.upload) void run("upload", true); else if (settings.prices) void run("prices", true);
       if (settings.ask.enabled) void run("ask", true);
+      void refreshProgress();
     },
     snapshot,
     log: (level, text) => { log(level, text); emit(); },

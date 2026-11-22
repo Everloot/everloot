@@ -20,6 +20,10 @@ test("public boss history uses linked identities, armory rosters and hide tools"
     await db.exec(read("migrations/20261120100000_public_boss_kills.sql"));
     await db.exec(read("migrations/20261120100000_public_boss_kills.sql"));
     await db.exec(read("tests/public_boss_kills.sql"));
+    await db.exec("alter table armory_characters add column surname text default 'Dawn'");
+    await db.exec(read("migrations/20261122130000_dungeon_progress.sql"));
+    await db.exec(read("migrations/20261122130000_dungeon_progress.sql"));
+    await db.exec(read("tests/dungeon_progress.sql"));
     expect((await db.query("select count(*)::int as n from character_boss_kills")).rows).toEqual([{ n: 1 }]);
   } finally { await db.close(); }
 }, 30_000);

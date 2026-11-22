@@ -1,8 +1,10 @@
 import { afterEach, expect, test, vi } from "vitest";
-const mock = vi.hoisted(() => ({ account: vi.fn(), query: vi.fn() }));
-vi.mock("@/lib/character-links-store", async (original) => ({ ...await original<typeof import("@/lib/character-links-store")>(), linkAccount: mock.account }));
+const mock = vi.hoisted(() => ({ account: vi.fn(), session: vi.fn(), query: vi.fn() }));
+vi.mock("@/lib/character-links-store", async (original) => ({
+  ...await original<typeof import("@/lib/character-links-store")>(), linkAccount: mock.account, linkSession: mock.session,
+}));
 vi.mock("@/lib/supabase/server", () => ({ authQuery: mock.query }));
-import { POST } from "@/app/api/me/characters/[id]/armory/route";
+import { GET, POST } from "@/app/api/me/characters/[id]/armory/route";
 const id = "10000000-0000-4000-8000-000000000001";
 const call = (body: unknown) => POST(new Request("https://everloot.app/api/me/characters/x/armory", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }), { params: Promise.resolve({ id }) });
 afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); });
@@ -15,6 +17,19 @@ test("signed-in association uses the account's own id and a validated Blizzard i
   expect(mock.query).toHaveBeenCalledTimes(1);
   mock.query.mockResolvedValue(false);
   expect((await call({ armoryUrl: null })).status).toBe(409);
+});
+test("suggests stored matches and connects the selected candidate without a pasted URL", async () => {
+  vi.stubEnv("EVERLOOT_ARMORY", "1");
+  mock.session.mockResolvedValue("account-one");
+  const match = { region: "us", slug: "ember-vale", surname: "Vale" };
+  mock.query.mockResolvedValueOnce([match]).mockResolvedValueOnce(true);
+  const res = await GET(new Request("https://everloot.app"), { params: Promise.resolve({ id }) });
+  expect(await res.json()).toEqual({ matches: [match] });
+  expect(res.headers.get("cache-control")).toBe("private, no-store");
+  expect(JSON.parse(mock.query.mock.calls[0][1].body)).toEqual({ p_user_id: "account-one", p_link_id: id });
+  mock.account.mockResolvedValue("account-one");
+  expect((await call({ match })).status).toBe(200);
+  expect((await call({ match: { region: "us", slug: "../wrong" } })).status).toBe(400);
 });
 test("signed-out and disabled requests never associate characters", async () => {
   vi.stubEnv("EVERLOOT_ARMORY", "1"); mock.account.mockResolvedValue(new Response(null, { status: 401 }));

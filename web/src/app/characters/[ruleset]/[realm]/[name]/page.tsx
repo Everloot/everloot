@@ -19,6 +19,9 @@ import { InstanceCard } from "@/app/guilds/parts";
 import { characterGuild, GUILD_LINE, PLAN_LINE, raceFaction, type CharacterGuild } from "./character-guild";
 import { characterParts, characterShowcase, plannedBuilds, publishedFacts, type Params } from "./character-view";
 import { ArmoryPart, armoryHeading } from "@/app/characters/armory-part";
+import DungeonProgressSummary from "@/components/progression/DungeonProgressSummary";
+import { armoryCharacterPath } from "@/lib/armory";
+import { loadLinkedDungeonProgress } from "@/lib/progression";
 
 /**
  * Read on every request and never cached, so a page switched off, or a character hidden, is gone at once. The
@@ -224,6 +227,7 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
     : new Map();
   const name = c?.name ?? sighted!.name;
   const realm = c?.realm ?? sighted!.realm;
+  const progress = found(owner) ? await loadLinkedDungeonProgress(owner.ruleset, owner.character.realm, owner.character.name) : null;
   const path = c?.path ?? characterPath(sighted!.ruleset, sighted!.realm, sighted!.name);
   // The header's class and level: the owner's when there is a showcase, else the sighting's, as the lede says.
   const classSlug = classSlugOf(c?.class ?? sighted!.class);
@@ -255,6 +259,7 @@ export default async function CharacterPage(props: { params: Promise<Params> }) 
           {showcase
             ? <ShowcaseHeader showcase={showcase} trail={trail(name, path)} />
             : <PageHeader trail={trail(name, path)} title={<span className={classText(sighted!.class)}>{name}</span>} lede={`${describePlayer(sighted!)} · ${realm}`} />}
+          {progress && <DungeonProgressSummary progress={progress.summary} href={`${armoryCharacterPath(progress.region, progress.slug)}#progress`} />}
           {showcase ? <OwnerPart showcase={showcase} /> : owner === "unavailable" && <Unavailable text={UNAVAILABLE} />}
           {armory && <ArmoryPart armory={armory} tips={tips} />}
           {sighted ? <SightingPart seen={sighted} /> : seen === "unavailable" && <Unavailable text={PLAYER_STORAGE_UNAVAILABLE} />}

@@ -18,6 +18,28 @@ export interface ProgressionInstance {
 export interface ProgressionKill { instanceMapId: number; encounterId: number; lastKillAt: string }
 export interface CharacterProgress extends ProgressionInstance {
   killed: number | null; total: number; newestKillDay: string | null; state: ProgressionState;
+  defeated: number[];
+}
+
+const agreedBosses = new Set(agreed.bosses.map((row) => `${row.instanceMapId}/${row.encounterId}`));
+
+export function isTrackedDungeon(id: number, group: string, bosses: readonly { id: number }[], agreement: ReadonlySet<string>) {
+  return id !== 2720 && group === "Dungeons" && bosses.length > 0 && bosses.every((boss) => agreement.has(`${id}/${boss.id}`));
+}
+
+/** Counts the complete known boss checklist, using the same dated agreement shipped to Collection. */
+export function trackedDungeons() {
+  return progressionCatalogue(null).filter((row) => row.typeKnown &&
+    isTrackedDungeon(row.id, row.group, row.bosses, agreedBosses));
+}
+
+export const DUNGEON_PROGRESS_CATALOG = `${PROGRESSION_BUILD}/${agreed.asOf}`;
+
+export function dungeonProgress(kills: readonly Pick<ProgressionKill, "instanceMapId" | "encounterId">[] | null) {
+  if (kills === null || tracked.length === 0) return null;
+  const killed = new Set(kills.map((row) => `${row.instanceMapId}/${row.encounterId}`));
+  const cleared = tracked.filter((row) => row.bosses.every((boss) => killed.has(`${row.id}/${boss.id}`))).length;
+  return { cleared, total: tracked.length };
 }
 
 // Same world-boss map ids as build-instance-data.ts. File order is map id, then encounter order;
@@ -51,15 +73,18 @@ export function progressionCatalogue(facts: InstanceFacts | null): ProgressionIn
   return rows.sort((a, b) => PROGRESSION_GROUPS.indexOf(a.group) - PROGRESSION_GROUPS.indexOf(b.group) || a.id - b.id);
 }
 
+const tracked = trackedDungeons();
+
 /** Lifetime unique encounters, across difficulties; null is unavailable history, [] is known empty history. */
 export function characterProgression(catalogue: readonly ProgressionInstance[], kills: readonly ProgressionKill[] | null): CharacterProgress[] {
   return catalogue.map((instance) => {
     const ids = new Set(instance.bosses.map((b) => b.id));
     const mine = (kills ?? []).filter((k) => k.instanceMapId === instance.id && ids.has(k.encounterId));
-    const killed = kills === null ? null : new Set(mine.map((k) => k.encounterId)).size;
+    const defeated = [...new Set(mine.map((k) => k.encounterId))];
+    const killed = kills === null ? null : defeated.length;
     const days = mine.flatMap((k) => Number.isFinite(Date.parse(k.lastKillAt)) ? [new Date(k.lastKillAt).toISOString().slice(0, 10)] : []).sort();
     return {
-      ...instance, killed, total: ids.size, newestKillDay: days.at(-1) ?? null,
+      ...instance, defeated, killed, total: ids.size, newestKillDay: days.at(-1) ?? null,
       state: killed === null ? "no data" : killed === 0 ? "none" : killed === ids.size ? "cleared" : "partial",
     };
   });

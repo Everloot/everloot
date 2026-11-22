@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vitest";
 import { characterProgression, progressionCatalogue } from "@kb/progression";
 import ProgressionMatrix from "./ProgressionMatrix";
+import DungeonProgressSummary from "./DungeonProgressSummary";
 
 const catalogue = progressionCatalogue({ entrances: [], encounters: [] });
 test("every instance is drawn in three groups with honest availability, no invented links or kills", () => {
@@ -30,4 +31,16 @@ test("states, boss counts, latest UTC day and neutral bars convey actual history
   expect(html).toContain("1 / 8 bosses");
   expect(html).toContain("bg-fg-2");
   expect(html).toContain("border-radius:4px");
+  expect(html).toContain("Boss checklist");
+  expect(html).toContain("Defeated");
+});
+
+test("profile header distinguishes zero clears from unknown history", () => {
+  const known = renderToStaticMarkup(<DungeonProgressSummary progress={{ cleared: 0, total: 3 }} href="/armory/us/mira-dawn#progress" />);
+  expect(known).toContain('href="/armory/us/mira-dawn#progress"');
+  expect(known).toContain("0/3 tracked dungeons");
+  expect(known).toContain('aria-valuenow="0"');
+  const unknown = renderToStaticMarkup(<DungeonProgressSummary progress={null} />);
+  expect(unknown).toContain("No dungeon history synced");
+  expect(unknown).not.toContain('role="progressbar"');
 });

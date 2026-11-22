@@ -1,7 +1,8 @@
 -- Own characters only: one row per character the player logs in with, for the window's Home. Name, realm,
 -- class token, level, faction, gold (only while the gold module is on) and professions, under the same opaque
 -- key the completion module uses (core.lua, E.CharacterKey). It is not a record: nothing here goes through
--- E:Store, EverlootDB.records is never written, and the rows stay in EverlootDB.roster, never uploaded.
+-- E:Store and EverlootDB.records is never written. Desktop can send the character's surname with its own linked
+-- boss history. The roster table itself is kept on the computer.
 -- No other player's name is read.
 --
 -- Calls, each guarded and read through E.Readable; a missing or unreadable value records nothing for that field:
@@ -66,7 +67,9 @@ function R.Update()
   local row = EverlootDB.roster[key] or {}
   EverlootDB.roster[key] = row
   R.revision = R.revision + 1
-  row.name = text((call("UnitName", "player"))) or row.name
+  local name, surname = call("UnitName", "player")
+  row.name = text(name) or row.name
+  row.surname = text(surname)
   row.realm = text(E.LiveRealm()) or row.realm
   row.class = class
   row.level = level

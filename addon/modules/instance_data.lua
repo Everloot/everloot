@@ -7,9 +7,9 @@ Everloot = Everloot or {}
 Everloot.InstanceData = {
   build = "1.60.1.70959",
   mapNamesBuild = "1.60.1.70634",
-  asOf = "2026-11-17T22:30:16.820Z",
+  asOf = "2026-11-22T14:10:12.492Z",
   instances = {
-    { id = 33, name = "Shadowfang Keep", group = "Dungeons", unconfirmed = false, bosses = {
+    { id = 33, name = "Shadowfang Keep", group = "Dungeons", unconfirmed = false, tracked = true, bosses = {
       { id = 2748, name = "Rethilgore" },
       { id = 2749, name = "Razorclaw the Butcher" },
       { id = 2750, name = "Baron Silverlaine" },
@@ -28,7 +28,7 @@ Everloot.InstanceData = {
       { id = 2746, name = "Cookie" },
       { id = 2747, name = "Edwin VanCleef" },
     } },
-    { id = 43, name = "Wailing Caverns", group = "Dungeons", unconfirmed = false, bosses = {
+    { id = 43, name = "Wailing Caverns", group = "Dungeons", unconfirmed = false, tracked = true, bosses = {
       { id = 585, name = "Lady Anacondra" },
       { id = 586, name = "Lord Cobrahn" },
       { id = 587, name = "Kresh" },
@@ -38,6 +38,14 @@ Everloot.InstanceData = {
       { id = 591, name = "Verdan the Everliving" },
       { id = 592, name = "Mutanus the Devourer" },
     } },
+    { id = 47, name = "Razorfen Kraul", group = "Dungeons", unconfirmed = false, tracked = true, bosses = {
+      { id = 2773, name = "Roogug" },
+      { id = 2774, name = "Aggem Thorncurse" },
+      { id = 2775, name = "Death Speaker Jargba" },
+      { id = 2776, name = "Overlord Ramtusk" },
+      { id = 2777, name = "Agathelos the Raging" },
+      { id = 2778, name = "Charlga Razorflank" },
+    } },
     { id = 48, name = "Blackfathom Deeps", group = "Dungeons", unconfirmed = false, bosses = {
       { id = 2910, name = "Aku'mai" },
       { id = 2916, name = "Ghamoo-ra" },
@@ -46,10 +54,21 @@ Everloot.InstanceData = {
       { id = 2912, name = "Old Serra'kis" },
       { id = 2911, name = "Twilight Lord Kelris" },
     } },
-    { id = 189, name = "Scarlet Monastery", group = "Dungeons", unconfirmed = false, bosses = {
-      { id = 444, name = "Interrogator Vishas" },
+    { id = 129, name = "Razorfen Downs", group = "Dungeons", unconfirmed = false, bosses = {
+      { id = 2782, name = "Mordresh Fire Eye" },
+      { id = 2784, name = "Glutton" },
+      { id = 2785, name = "Amnennar the Coldbringer" },
     } },
-    { id = 389, name = "Ragefire Chasm", group = "Dungeons", unconfirmed = false, bosses = {
+    { id = 189, name = "Scarlet Monastery", group = "Dungeons", unconfirmed = false, tracked = true, bosses = {
+      { id = 444, name = "Interrogator Vishas" },
+      { id = 2779, name = "Bloodmage Thalnos" },
+      { id = 446, name = "Houndmaster Loksey" },
+      { id = 447, name = "Arcanist Doan" },
+      { id = 448, name = "Herod" },
+      { id = 449, name = "High Inquisitor Fairbanks" },
+      { id = 450, name = "High Inquisitor Whitemane" },
+    } },
+    { id = 389, name = "Ragefire Chasm", group = "Dungeons", unconfirmed = false, tracked = true, bosses = {
       { id = 2732, name = "Oggleflint" },
       { id = 2733, name = "Taragaman the Hungerer" },
       { id = 2734, name = "Jergosh the Invoker" },
@@ -69,6 +88,16 @@ Everloot.InstanceData = {
       { id = 3112, name = "Lethon" },
       { id = 3113, name = "Taerar" },
       { id = 3114, name = "Ysondre" },
+    } },
+    { id = 2959, name = "City of Dalaran", group = "Dungeons", unconfirmed = false, bosses = {
+      { id = 3298, name = "Arcane Anomaly" },
+      { id = 3299, name = "Fel Ancient" },
+      { id = 3300, name = "Mana Devourer" },
+      { id = 3301, name = "Mana Elemental" },
+      { id = 3302, name = "Unstable Sentinel" },
+      { id = 3310, name = "Lyn the Ignored" },
+      { id = 3311, name = "Atrexis the Grave Knight" },
+      { id = 3303, name = "Shade of the Archmage" },
     } },
     { id = 2998, name = "Excavation Site: Wetlands", group = "Dungeons", unconfirmed = false, bosses = {
       { id = 3480, name = "Saltspine" },

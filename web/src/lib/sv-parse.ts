@@ -177,6 +177,7 @@ export interface EverlootFile {
   /** GetBuildInfo() version and build, written by addon 0.2.6+. */
   clientBuild?: string;
   records: Array<Record<string, unknown>>;
+  roster?: unknown;
 }
 
 /**
@@ -203,7 +204,7 @@ export function parsePolestarTable(text: string): Record<string, unknown> {
 
 /** Parse Everloot.lua text into an intake-ready payload. Throws LuaParseError, for a file holding anything besides
  *  the EverlootDB assignment too: its only saved variable (addon/Everloot.toc), so a game-written file holds no more. */
-export function parseEverlootLua(text: string): EverlootFile {
+export function parseEverlootLua(text: string, withRoster = false): EverlootFile {
   const root = new Parser(text).parseWhole();
   const get = (k: string): LuaValue | undefined => root.map.get(k);
   const version = get("version");
@@ -230,5 +231,7 @@ export function parseEverlootLua(text: string): EverlootFile {
     }
   }
   const clientBuild = get("clientBuild");
-  return { version, installId, ...(typeof clientBuild === "string" ? { clientBuild } : {}), records };
+  const roster = withRoster ? get("roster") : undefined;
+  return { version, installId, ...(typeof clientBuild === "string" ? { clientBuild } : {}), records,
+    ...(roster !== undefined ? { roster: toPlain(roster) } : {}) };
 }
