@@ -14,6 +14,7 @@ import { writeDatabaseActivity } from "@/lib/database-activity-store";
 import { buildMapPins, writeMapPins } from "@/lib/map-pins-store";
 import { writeGuildLadder } from "@/lib/guild-ladder-store";
 import { forgetAllKept } from "@/lib/kept";
+import { writeViewsRun, type ViewsRun } from "@/lib/stored-views-status";
 
 /**
  * Let go of what the steps so far read and kept for pages: the stores keep each file they read or write, tens of MB
@@ -33,6 +34,40 @@ export interface StoredViewsRun {
   dataAsOf: string | null;
   /** The auction reports are written only once the market rollup has no scans left to fold. */
   reportsDue: boolean;
+  /** Times a failed step is tried again. The job retries once; the Worker never does, its memory is the limit. */
+  retries?: number;
+}
+
+/**
+ * Runs the steps: each one's time is kept, a throw is logged and named in `failed`, and the next step still runs. With
+ * `retries`, a failed step is tried again after `waitMs` first: each step writes one file whole, so a second try is
+ * safe, and a dropped connection (ECONNRESET on the settled list, 2026-11-22 13:10 UTC) no longer fails a run.
+ */
+export function stepRunner(opts: { retries: number; waitMs?: number; beforeRetry?: () => void }) {
+  const failed: string[] = [];
+  const timings: Record<string, number> = {};
+  const step = async <T>(name: string, label: string, write: () => Promise<T>): Promise<T | null> => {
+    const started = Date.now();
+    try {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          return await write();
+        } catch (err) {
+          if (attempt >= opts.retries) {
+            console.error(`${label} failed`, err);
+            failed.push(name);
+            return null;
+          }
+          console.warn(`${label} failed; trying again`, err);
+          await new Promise((resolve) => setTimeout(resolve, opts.waitMs ?? 5_000));
+          opts.beforeRetry?.();
+        }
+      }
+    } finally {
+      timings[name] = Date.now() - started;
+    }
+  };
+  return { step, failed, timings };
 }
 
 type Written = { written: boolean };
@@ -52,6 +87,8 @@ export interface StoredViewsResult {
   auctionReports: (Written & { reports?: number }) | null;
   /** The steps that threw, in order; each was logged and the next step ran. */
   failed: string[];
+  /** Milliseconds each step took, by name: how the job's time grows with the corpus. */
+  timings: Record<string, number>;
 }
 
 /**
@@ -64,22 +101,26 @@ export interface StoredViewsResult {
  */
 export async function runStoredViews(run: StoredViewsRun): Promise<StoredViewsResult> {
   const { added, rebuild, dataAsOf } = run;
-  const failed: string[] = [];
-  const step = async <T>(name: string, label: string, write: () => Promise<T>): Promise<T | null> => {
-    try {
-      return await write();
-    } catch (err) {
-      console.error(`${label} failed`, err);
-      failed.push(name);
-      return null;
-    }
-  };
   // The stored views below each work from the corpus as it stands. It is read once, by the first view that needs it,
   // and shared: each read runs the publication pass again. An unreachable corpus fails every view that asks for it.
+  // A retried step reads it again if the shared read failed; the views after it share whatever that retry read.
   let corpusRead: Promise<Corpus> | null = null;
+  let aggregatesRead: Promise<AggregateSet> | null = null;
+  const sharedFailed = { corpus: false, aggregates: false };
+  const { step, failed, timings } = stepRunner({
+    retries: run.retries ?? 0,
+    beforeRetry: () => {
+      if (sharedFailed.corpus) corpusRead = null;
+      if (sharedFailed.aggregates) aggregatesRead = null;
+      sharedFailed.corpus = sharedFailed.aggregates = false;
+    },
+  });
   const corpus = () => (corpusRead ??= uploadStore.loadCorpus().then((c) => {
     if (c.unreachable) throw new Error("corpus unreachable");
     return c;
+  }).catch((err: unknown) => {
+    sharedFailed.corpus = true;
+    throw err;
   }));
   // The settled list (kb/src/settled-list.ts), dated by the snapshot and stamped with the ISO week, from the views'
   // corpus: rewritten whenever the snapshot or the week changed, so the weekly spot check rotates even when nothing new
@@ -97,8 +138,10 @@ export async function runStoredViews(run: StoredViewsRun): Promise<StoredViewsRe
   // a new server instance reads one file instead of replaying the corpus. Same rule as the item view: written only when
   // this run added uploads, rebuilt, or finds no file; a failure is logged and the pages work the tables out themselves.
   // The set is worked out once per run: the aggregates file and the search names file are written from the same one.
-  let aggregatesRead: Promise<AggregateSet> | null = null;
-  const aggregateSet = () => (aggregatesRead ??= corpus().then(anonymousAggregates));
+  const aggregateSet = () => (aggregatesRead ??= corpus().then(anonymousAggregates).catch((err: unknown) => {
+    sharedFailed.aggregates = true;
+    throw err;
+  }));
   const aggregates = await step("aggregates", "aggregates", () => writeAggregates({ added, rebuild, dataAsOf }, { build: aggregateSet }));
   // The names the site's own search matches (lib/search-names-store.ts), a few hundred KB from the same set, so a fresh
   // instance never parses the aggregates for a keystroke. Written on the runs that build the set anyway (uploads added,
@@ -153,7 +196,7 @@ export async function runStoredViews(run: StoredViewsRun): Promise<StoredViewsRe
   releaseKept();
   const auctionReports = run.reportsDue ? await step("auctionReports", "auction reports", () => writeAuctionReports()) : null;
   releaseKept();
-  return { settled, itemView, aggregates, searchNames, auctionHistory, professions, mapPins, databaseActivity, guildLadder, marketBoards, coverage, auctionReports, failed };
+  return { settled, itemView, aggregates, searchNames, auctionHistory, professions, mapPins, databaseActivity, guildLadder, marketBoards, coverage, auctionReports, failed, timings };
 }
 
 /**
@@ -161,12 +204,27 @@ export async function runStoredViews(run: StoredViewsRun): Promise<StoredViewsRe
  * no uploads, so each view is written only when its stamp is not that snapshot's (or every one with `rebuild`). The
  * auction reports wait while the heartbeat says a rollup still has uploads to fold, as the cron's own run waits for
  * the market. No heartbeat yet means the snapshot cron has never run: there is nothing to build from.
+ * A finished run leaves its own heartbeat (lib/stored-views-status.ts), failed steps and all, which /api/health reads;
+ * a heartbeat that cannot be written is logged and fails the run, so the job shows red.
  */
 export async function runStoredViewsJob(opts: { rebuild?: boolean } = {}, deps: {
   heartbeat?: () => ReturnType<typeof uploadStore.readCronRun>; run?: typeof runStoredViews;
+  record?: (run: ViewsRun) => Promise<void>; now?: () => number;
 } = {}): Promise<StoredViewsResult & { dataAsOf: string | null }> {
+  const now = deps.now ?? Date.now;
+  const started = now();
   const beat = await (deps.heartbeat ?? uploadStore.readCronRun)();
   if (!beat) throw new Error("no cron heartbeat yet: the snapshot cron has not run");
-  const result = await (deps.run ?? runStoredViews)({ added: 0, rebuild: opts.rebuild === true, dataAsOf: beat.dataAsOf, reportsDue: !beat.completionPending });
+  const result = await (deps.run ?? runStoredViews)({ added: 0, rebuild: opts.rebuild === true, dataAsOf: beat.dataAsOf, reportsDue: !beat.completionPending, retries: 1 });
+  const finished = now();
+  try {
+    await (deps.record ?? writeViewsRun)({
+      finishedAt: new Date(finished).toISOString(), dataAsOf: beat.dataAsOf, failed: result.failed,
+      seconds: Math.round((finished - started) / 1000), timings: result.timings,
+    });
+  } catch (err) {
+    console.error("stored-views heartbeat failed", err);
+    return { dataAsOf: beat.dataAsOf, ...result, failed: [...result.failed, "heartbeat"] };
+  }
   return { dataAsOf: beat.dataAsOf, ...result };
 }

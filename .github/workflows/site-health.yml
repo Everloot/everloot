@@ -1,5 +1,6 @@
 name: Site health
-# Every 15 minutes, asks https://everloot.app/api/health (the snapshot cron's freshness and the corpus store), then
+# Every 15 minutes, asks https://everloot.app/api/health (the snapshot cron's freshness and the corpus store, the
+# stored-views job's last run and its start token's expiry), then
 # what players and AI clients use: an item page must show the item's name (it shows "Item 25" when the game build's
 # names are not uploaded), and the public MCP must list its tools (a 429 there means its hourly allowance is used
 # up for everyone). A failure opens one issue labelled site-down, or comments on the open one; the next good check
@@ -39,6 +40,24 @@ jobs:
           printf 'status %s\n%s\n' "$code" "$(printf '%s' "$body" | head -n -1 | head -c 500)"
           problems=""
           [ "$code" = 200 ] || problems="/api/health answered HTTP $code"
+          # The stored views and the stored-views job's start token (#1354): /api/health reports them beside the
+          # snapshot without changing its status. The job runs at least hourly; docs/OPERATIONS.md, "The stored-views
+          # job", says what each answer means and how the token is renewed.
+          health=$(printf '%s' "$body" | head -n -1)
+          views=$(printf '%s' "$health" | jq -r '.views.status // empty' 2>/dev/null)
+          case "$views" in
+            behind) problems="$problems${problems:+; }the stored views have not been built since $(printf '%s' "$health" | jq -r '.views.finishedAt') (is the stored-views job running?)" ;;
+            failing) problems="$problems${problems:+; }the stored-views job's last run could not write: $(printf '%s' "$health" | jq -r '.views.failed | join(", ")')" ;;
+            missing) problems="$problems${problems:+; }the stored-views job has never left a heartbeat" ;;
+          esac
+          days=$(printf '%s' "$health" | jq -r '.viewsDispatch.tokenDaysLeft // empty' 2>/dev/null)
+          if [ -n "$days" ] && [ "$days" -lt 7 ]; then
+            problems="$problems${problems:+; }the stored-views start token (EVERLOOT_VIEWS_DISPATCH_TOKEN) expires in $days days: renew it"
+          fi
+          refused=$(printf '%s' "$health" | jq -r 'select(.viewsDispatch.status == "refused") | .viewsDispatch.httpStatus' 2>/dev/null)
+          case "$refused" in
+            401|403|404|422) problems="$problems${problems:+; }GitHub refused the cron's start of the stored-views job (HTTP $refused): check EVERLOOT_VIEWS_DISPATCH_TOKEN" ;;
+          esac
           item=$(curl -sS --max-time 30 -A "$UA" "${edge[@]}" -D item-headers.txt -w '\n%{http_code}' https://everloot.app/database/items/25)
           item_code=$(printf '%s' "$item" | tail -n1)
           title=$(printf '%s' "$item" | grep -o '<title>[^<]*' | head -n1 | sed 's/<title>//')

@@ -264,7 +264,8 @@ and 50 (`npm run stored-views` in `web/`, `web/scripts/stored-views.ts`). It rea
 `dataAsOf` and writes each file whose stamp is not that snapshot's, so a run with nothing new writes
 nothing. It takes the switches from `web/wrangler.cron.jsonc`'s vars, so it builds what the cron
 Worker would. The auction reports wait while the heartbeat's `completionPending` is true. A step
-that fails is logged and the run ends red with the names in `failed`; the next run retries it.
+that fails is tried once more after five seconds; if it fails again it is logged and the run ends
+red with the names in `failed`, and the next run retries it.
 A manual run with **rebuild** ticked rewrites every file.
 
 A snapshot run that folded uploads into the corpus or a rollup also starts the workflow itself,
@@ -275,9 +276,26 @@ only, with Actions read and write and nothing else. So does the first snapshot r
 so the auction reports and a view a failed job run left behind wait at most an hour. A dispatched
 run starts within seconds; the schedule stays as the backstop. The run's answer says `viewsJob`:
 `sent`, `off` (no token, or nothing to start it for) or `failed` (logged; the run still answers 200).
-The current token was made on 2026-11-22 and expires on 2026-12-21. To renew it: Settings > Developer settings > Fine-grained tokens, resource owner
+The current token was made on 2026-11-22 and expires on 2026-12-22 at 06:42 UTC. To renew it: Settings > Developer settings > Fine-grained tokens, resource owner
 Everloot, then `npx wrangler secret put EVERLOOT_VIEWS_DISPATCH_TOKEN --name everloot-cron`. An
 expired token makes each dispatch answer `failed`; the cron Worker keeps working.
+
+**Watching it.** Each dispatch is recorded in `cron/views-dispatch.json`: when it was sent, GitHub's
+HTTP answer, and the token's expiry from the `github-authentication-token-expiration` header that
+GitHub sends with every answer. Each finished job run writes `views/last-run.json`: when it
+finished, the snapshot it built, the steps in `failed` and each step's time in milliseconds
+(`timings`, so the job's growth with the corpus shows). `/api/health` reports both beside the
+snapshot, without changing its status code:
+
+- `views.status`: `current` (a run finished in the last 90 minutes and wrote everything),
+  `failing` (the last run named steps in `failed`), `behind` (no run for 90 minutes: the cron starts
+  one at least hourly), `missing` (no run yet), `unavailable` (the file could not be read).
+- `viewsDispatch`: `status` (`sent`, `refused`, `none`), `httpStatus`, `tokenExpiresAt` and
+  `tokenDaysLeft`.
+
+The Site health workflow opens its site-down issue for `behind`, `failing` or `missing` views, for
+a token with fewer than 7 days left, and for a dispatch GitHub refused with 401, 403, 404 or 422 (a
+token or workflow problem, not a GitHub hiccup). The next clean check closes it.
 
 **Secrets** (repository Actions secrets): `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
 `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` (the cron Worker's read-write key), `VIEWS_SUPABASE_URL` and

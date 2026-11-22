@@ -1,13 +1,21 @@
+import { tokenExpiry, writeDispatchRecord, type DispatchRecord } from "./stored-views-status";
+
 /**
  * Starts the stored-views job (.github/workflows/stored-views.yml) through GitHub's workflow_dispatch API. The snapshot
  * cron calls it after the heartbeat of a run that added uploads, so the views follow new data within a minute or two.
  * GitHub starts this repository's scheduled runs late or drops them under load; a dispatched run starts at once.
  * The schedule stays as a backstop. EVERLOOT_VIEWS_DISPATCH_TOKEN is a fine-grained token for Everloot/everloot with
  * Actions read and write and nothing else (docs/ENVIRONMENT.md); without it nothing is sent.
+ * Each answer is recorded (lib/stored-views-status.ts) with the token's expiry, which GitHub sends on every answer,
+ * so /api/health and the site-health check can warn before the token runs out. A failed record never fails the start.
  */
 export const STORED_VIEWS_DISPATCH_URL = "https://api.github.com/repos/Everloot/everloot/actions/workflows/stored-views.yml/dispatches";
 
-export async function dispatchStoredViews(env: Record<string, string | undefined> = process.env, doFetch: typeof fetch = fetch): Promise<"sent" | "off"> {
+export async function dispatchStoredViews(
+  env: Record<string, string | undefined> = process.env,
+  doFetch: typeof fetch = fetch,
+  record: (r: DispatchRecord) => Promise<void> = writeDispatchRecord,
+): Promise<"sent" | "off"> {
   const token = env.EVERLOOT_VIEWS_DISPATCH_TOKEN?.trim();
   if (!token) return "off";
   const res = await doFetch(STORED_VIEWS_DISPATCH_URL, {
@@ -23,6 +31,14 @@ export async function dispatchStoredViews(env: Record<string, string | undefined
     body: JSON.stringify({ ref: "main" }),
     signal: AbortSignal.timeout(10_000),
   });
+  try {
+    await record({
+      at: new Date().toISOString(), httpStatus: res.status, sent: res.status === 204,
+      tokenExpiresAt: tokenExpiry(res.headers.get("github-authentication-token-expiration")),
+    });
+  } catch (err) {
+    console.error("stored-views dispatch record failed", err);
+  }
   // 204 is GitHub's only success answer here; the body of a refusal says why and never holds the token.
   if (res.status !== 204) throw new Error(`stored-views dispatch failed (${res.status}): ${(await res.text().catch(() => "")).slice(0, 200)}`);
   return "sent";
