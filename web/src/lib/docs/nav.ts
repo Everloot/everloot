@@ -61,7 +61,7 @@ const ENDPOINT_GROUPS: { title: string; icon: DocsIcon; paths: string[] }[] = [
   { title: "Player data", icon: "database", paths: ["/api/corpus/public", "/api/rollups/drops", "/api/rollups/disenchant", "/api/coverage/settled", "/api/market/prices"] },
   { title: "Game data", icon: "box", paths: ["/api/items", "/api/items/categories", "/api/edges", "/api/edges/client-layer"] },
   { title: "Tools and cards", icon: "spark", paths: ["/api/tools/{tool}", "/api/tooltip/{type}/{id}"] },
-  { title: "Uploads and status", icon: "upload", paths: ["/api/intake", "/api/health"] },
+  { title: "Uploads and status", icon: "upload", paths: ["/api/intake", "/api/health", "/api/history"] },
 ];
 
 /** MCP tools by what a player asks, in the protocol's order inside each group. */

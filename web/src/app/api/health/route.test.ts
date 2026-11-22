@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { healthResponse } from "@everloot/protocol";
 import type { SnapshotHealth } from "@/lib/upload-store";
 import type { DispatchHealth, ViewsHealth } from "@/lib/stored-views-status";
 
@@ -41,7 +42,9 @@ test("a fresh heartbeat is a 200 that no cache may keep, with the views and thei
   const res = await (await freshGet())();
   expect(res.status).toBe(200);
   expect(res.headers.get("cache-control")).toBe("no-store");
-  expect(await res.json()).toEqual({ ok: true, snapshot: snapshot("fresh"), views: views("current"), viewsDispatch });
+  const body = await res.json();
+  expect(body).toEqual({ ok: true, snapshot: snapshot("fresh"), views: views("current"), viewsDispatch });
+  expect(healthResponse.strict().safeParse(body).success).toBe(true);
 });
 
 test.each(["stale", "missing", "unavailable", "local"] as const)("a %s heartbeat is a 503 that no cache may keep", async (status) => {

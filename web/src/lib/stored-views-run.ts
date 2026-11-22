@@ -15,6 +15,14 @@ import { buildMapPins, writeMapPins } from "@/lib/map-pins-store";
 import { writeGuildLadder } from "@/lib/guild-ladder-store";
 import { forgetAllKept } from "@/lib/kept";
 import { writeViewsRun, type ViewsRun } from "@/lib/stored-views-status";
+import { writeDailyHistory } from "@/lib/platform-history";
+import { loadCoverageSummary } from "@/lib/coverage-summary";
+
+const writeHistory = (now: Date) => writeDailyHistory(now, {
+  corpus: () => uploadStore.loadCorpus(),
+  market: async () => (await uploadStore.loadMarket()).state,
+  coverage: () => loadCoverageSummary(),
+});
 
 /**
  * Let go of what the steps so far read and kept for pages: the stores keep each file they read or write, tens of MB
@@ -209,15 +217,26 @@ export async function runStoredViews(run: StoredViewsRun): Promise<StoredViewsRe
  */
 export async function runStoredViewsJob(opts: { rebuild?: boolean; failedBefore?: string[] } = {}, deps: {
   heartbeat?: () => ReturnType<typeof uploadStore.readCronRun>; run?: typeof runStoredViews;
-  record?: (run: ViewsRun) => Promise<void>; now?: () => number;
+  record?: (run: ViewsRun) => Promise<void>; now?: () => number; history?: (now: Date) => Promise<unknown>;
 } = {}): Promise<StoredViewsResult & { dataAsOf: string | null }> {
   const now = deps.now ?? Date.now;
   const started = now();
   const beat = await (deps.heartbeat ?? uploadStore.readCronRun)();
   if (!beat) throw new Error("no cron heartbeat yet: the snapshot cron has not run");
   const views = await (deps.run ?? runStoredViews)({ added: 0, rebuild: opts.rebuild === true, dataAsOf: beat.dataAsOf, reportsDue: !beat.completionPending, retries: 1 });
+  // The platform's own numbers for the day that just ended (lib/platform-history.ts): a GET on every run, the corpus
+  // read only on the first run after midnight UTC. A failure is logged and named; the next run tries the day again.
+  const historyFailed: string[] = [];
+  try {
+    await (deps.history ?? writeHistory)(new Date(started));
+  } catch (err) {
+    console.error("platform history failed", err);
+    historyFailed.push("history");
+  }
+  releaseKept();
   // Steps the job ran before the views (its fold, with EVERLOOT_SNAPSHOT at "job") count in the heartbeat too.
-  const result = opts.failedBefore?.length ? { ...views, failed: [...opts.failedBefore, ...views.failed] } : views;
+  const failed = [...(opts.failedBefore ?? []), ...views.failed, ...historyFailed];
+  const result = failed.length === views.failed.length ? views : { ...views, failed };
   const finished = now();
   try {
     await (deps.record ?? writeViewsRun)({

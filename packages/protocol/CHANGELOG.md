@@ -7,6 +7,10 @@ required, or tightening a limit is a major release.
 ## [Unreleased]
 
 ### Added
+- Pending next minor package release: `GET /api/history` (`historyResponse`), Everloot's own numbers, one row per UTC
+  day: uploads, records by kind, distinct contributors, the market's realms, houses and items, and the coverage
+  counts; counts only. `healthResponse` gains optional `views` and `viewsDispatch` (the stored-views job's last run,
+  and its last start with the start token's expiry), which the route has sent since 2026-11-22. Record protocol unchanged.
 - Pending next minor package release: drop rates and measured zeros gain optional `tier` and `sourceNameTier`
   fields, plus source names on measured zeros. `public` now accepts false for reported and verified rows and
   continues to mean confirmed at three installs. `queued` counts only rows with zero reporters. Record protocol unchanged.

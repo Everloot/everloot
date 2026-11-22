@@ -92,7 +92,8 @@
     "intakeRequest",
     "intakeReceipt",
     "intakeRefused",
-    "healthResponse"
+    "healthResponse",
+    "historyResponse"
   ],
   "routes": [
     "GET /api/corpus/public",
@@ -107,7 +108,8 @@
     "POST /api/intake",
     "GET /api/tools/{tool}",
     "GET /api/tooltip/{type}/{id}",
-    "GET /api/health"
+    "GET /api/health",
+    "GET /api/history"
   ],
   "mcpTools": [
     "search_knowledge",

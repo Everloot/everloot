@@ -1241,8 +1241,62 @@ export declare const healthResponse: z.ZodObject<{
         updatedAt: z.ZodNullable<z.ZodString>;
         ageSeconds: z.ZodNullable<z.ZodNumber>;
     }, z.core.$strip>;
+    views: z.ZodOptional<z.ZodObject<{
+        status: z.ZodEnum<{
+            behind: "behind";
+            current: "current";
+            failing: "failing";
+            local: "local";
+            missing: "missing";
+            unavailable: "unavailable";
+        }>;
+        finishedAt: z.ZodNullable<z.ZodString>;
+        ageSeconds: z.ZodNullable<z.ZodNumber>;
+        dataAsOf: z.ZodNullable<z.ZodString>;
+        failed: z.ZodArray<z.ZodString>;
+    }, z.core.$strip>>;
+    viewsDispatch: z.ZodOptional<z.ZodObject<{
+        status: z.ZodEnum<{
+            local: "local";
+            none: "none";
+            refused: "refused";
+            sent: "sent";
+            unavailable: "unavailable";
+        }>;
+        at: z.ZodNullable<z.ZodString>;
+        httpStatus: z.ZodNullable<z.ZodNumber>;
+        tokenExpiresAt: z.ZodNullable<z.ZodString>;
+        tokenDaysLeft: z.ZodNullable<z.ZodNumber>;
+    }, z.core.$strip>>;
 }, z.core.$strip>;
 export type HealthResponse = z.infer<typeof healthResponse>;
+/** GET /api/history: Everloot's own numbers, one row per UTC day. Counts only; nothing in it names an install, character, guild or realm. */
+export declare const historyResponse: z.ZodObject<{
+    version: z.ZodLiteral<1>;
+    days: z.ZodArray<z.ZodObject<{
+        date: z.ZodString;
+        source: z.ZodEnum<{
+            backfill: "backfill";
+            snapshot: "snapshot";
+        }>;
+        dataAsOf: z.ZodNullable<z.ZodString>;
+        uploads: z.ZodNullable<z.ZodNumber>;
+        records: z.ZodNumber;
+        contributors: z.ZodNumber;
+        kinds: z.ZodRecord<z.ZodString, z.ZodNumber>;
+        market: z.ZodNullable<z.ZodObject<{
+            realms: z.ZodNumber;
+            houses: z.ZodNumber;
+            items: z.ZodNumber;
+        }, z.core.$strip>>;
+        coverage: z.ZodNullable<z.ZodObject<{
+            installs: z.ZodNumber;
+            confirmed: z.ZodNumber;
+            waiting: z.ZodNumber;
+        }, z.core.$strip>>;
+    }, z.core.$strip>>;
+}, z.core.$strip>;
+export type HistoryResponse = z.infer<typeof historyResponse>;
 /** guild-kills.ndjson of the bulk export: the agreed guild kills, oldest first. */
 export declare const guildKillsResponse: z.ZodObject<{
     generatedAt: z.ZodString;
@@ -2679,6 +2733,58 @@ export declare const API_SCHEMAS: {
             updatedAt: z.ZodNullable<z.ZodString>;
             ageSeconds: z.ZodNullable<z.ZodNumber>;
         }, z.core.$strip>;
+        views: z.ZodOptional<z.ZodObject<{
+            status: z.ZodEnum<{
+                behind: "behind";
+                current: "current";
+                failing: "failing";
+                local: "local";
+                missing: "missing";
+                unavailable: "unavailable";
+            }>;
+            finishedAt: z.ZodNullable<z.ZodString>;
+            ageSeconds: z.ZodNullable<z.ZodNumber>;
+            dataAsOf: z.ZodNullable<z.ZodString>;
+            failed: z.ZodArray<z.ZodString>;
+        }, z.core.$strip>>;
+        viewsDispatch: z.ZodOptional<z.ZodObject<{
+            status: z.ZodEnum<{
+                local: "local";
+                none: "none";
+                refused: "refused";
+                sent: "sent";
+                unavailable: "unavailable";
+            }>;
+            at: z.ZodNullable<z.ZodString>;
+            httpStatus: z.ZodNullable<z.ZodNumber>;
+            tokenExpiresAt: z.ZodNullable<z.ZodString>;
+            tokenDaysLeft: z.ZodNullable<z.ZodNumber>;
+        }, z.core.$strip>>;
+    }, z.core.$strip>;
+    readonly historyResponse: z.ZodObject<{
+        version: z.ZodLiteral<1>;
+        days: z.ZodArray<z.ZodObject<{
+            date: z.ZodString;
+            source: z.ZodEnum<{
+                backfill: "backfill";
+                snapshot: "snapshot";
+            }>;
+            dataAsOf: z.ZodNullable<z.ZodString>;
+            uploads: z.ZodNullable<z.ZodNumber>;
+            records: z.ZodNumber;
+            contributors: z.ZodNumber;
+            kinds: z.ZodRecord<z.ZodString, z.ZodNumber>;
+            market: z.ZodNullable<z.ZodObject<{
+                realms: z.ZodNumber;
+                houses: z.ZodNumber;
+                items: z.ZodNumber;
+            }, z.core.$strip>>;
+            coverage: z.ZodNullable<z.ZodObject<{
+                installs: z.ZodNumber;
+                confirmed: z.ZodNumber;
+                waiting: z.ZodNumber;
+            }, z.core.$strip>>;
+        }, z.core.$strip>>;
     }, z.core.$strip>;
 };
 export type ApiSchemaName = keyof typeof API_SCHEMAS;
