@@ -84,6 +84,7 @@
     "EVERLOOT_PRIVATE_SYNC": "1",
     "EVERLOOT_BOSS_KILL_SYNC": "1",
     "EVERLOOT_LEADERBOARDS": "1",
+    "EVERLOOT_STORED_VIEWS": "job",
     "NEWS_DIR": "/bundle/repo/kb/news",
     "GUIDES_DIR": "/bundle/repo/kb/guides",
     "WIKI_DIR": "/bundle/repo/kb/wiki",

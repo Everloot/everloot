@@ -48,7 +48,7 @@ so `web/scripts/cf-deploy.mjs` passes every var except the `*_DIR` paths to the 
 | `PROTOCOL_SCHEMA_DIR` | `web/src/app/schema/[...path]/route.ts` | Where the bundled protocol schemas are inside the Worker | Yes |
 | `KNOWLEDGE_RELEASE_SHA256` | `web/src/lib/release.ts` | The knowledge release the `KNOWLEDGE_D1` database must match before it is served | Yes |
 | `EVERLOOT_CRON_WORKER` | `web/src/lib/cf-crons.ts` | `1` on the site Worker once the cron Worker runs the scheduled jobs: the site's triggers then run nothing ([OPERATIONS.md](OPERATIONS.md), "The cron Worker"). Never set on the cron Worker | No, unset until the switch |
-| `EVERLOOT_STORED_VIEWS` | `web/src/app/api/cron/snapshot/route.ts` | `job`: the snapshot cron ends at its heartbeat and the stored-views job builds the views ([OPERATIONS.md](OPERATIONS.md), "The stored-views job") | No, unset until the job runs reliably |
+| `EVERLOOT_STORED_VIEWS` | `web/src/app/api/cron/snapshot/route.ts` | `job`: the snapshot cron ends at its heartbeat and the stored-views job builds the views ([OPERATIONS.md](OPERATIONS.md), "The stored-views job") | No; `job` in both wrangler files since 2026-11-22 |
 
 Bindings declared next to the vars and read like them: `KNOWLEDGE_D1` (the knowledge release
 database, `web/src/lib/release.ts`) and `AUTH_DB_HYPERDRIVE` (the accounts database,
@@ -87,7 +87,7 @@ one is not recorded here.
 | `R2_BUCKET` | `web/src/lib/upload-store.ts` and the other bucket stores | The uploads bucket | Yes |
 | `BLUE_BUCKET` | `web/src/lib/blue-store.ts` | A separate bucket for the blue-post archive; falls back to `R2_BUCKET` | No |
 | `CRON_SECRET` | `web/src/app/api/cron/*/route.ts`, `web/scripts/cf-entry.mjs` | The scheduled jobs call their routes with it | Yes |
-| `EVERLOOT_VIEWS_DISPATCH_TOKEN` | `web/src/lib/stored-views-dispatch.ts` | On the cron Worker only: a fine-grained GitHub token for Everloot/everloot with Actions read and write and nothing else. A snapshot run that added uploads starts the stored-views workflow with it; nothing is sent without it ([OPERATIONS.md](OPERATIONS.md), "The stored-views job") | No |
+| `EVERLOOT_VIEWS_DISPATCH_TOKEN` | `web/src/lib/stored-views-dispatch.ts` | On the cron Worker only: a fine-grained GitHub token for Everloot/everloot with Actions read and write and nothing else. A snapshot run that folded uploads, and the first run of each hour, start the stored-views workflow with it; nothing is sent without it ([OPERATIONS.md](OPERATIONS.md), "The stored-views job") | No |
 | `BNET_CLIENT_ID` | `web/src/lib/auth/battlenet.ts`, `web/src/app/api/auth/bnet/route.ts`, `web/src/lib/armory-lookup.ts` | Battle.net sign-in; the on-demand armory lookup's Profile API client | For sign-in and the lookup |
 | `BNET_CLIENT_SECRET` | `web/src/lib/auth/battlenet.ts`, `web/src/app/api/auth/bnet/route.ts`, `web/src/lib/armory-lookup.ts` | Battle.net sign-in; the on-demand armory lookup's Profile API client | For sign-in and the lookup |
 | `BNET_REDIRECT_URI` | `web/src/app/api/auth/bnet/route.ts` | The old sign-in's callback address; the new sign-in derives it | No |

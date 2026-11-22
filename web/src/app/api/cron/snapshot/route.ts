@@ -100,10 +100,13 @@ export async function GET(req: Request) {
       result.dataAsOf,
       work.settledWeek ?? null,
     );
-    // A run that added uploads starts the stored-views job (lib/stored-views-dispatch.ts): GitHub's schedule for it runs
-    // late or not at all, a dispatched run starts at once. A failed dispatch is logged; the schedule is the backstop.
+    // A run that folded uploads into the corpus or a rollup starts the stored-views job (lib/stored-views-dispatch.ts):
+    // GitHub's schedule for it runs late or not at all, a dispatched run starts at once. So does the first run of each
+    // hour, so the auction reports and a view a failed job run left behind wait at most an hour. A failed dispatch is
+    // logged; the schedule is the backstop.
+    const folded = result.added > 0 || market.added > 0 || completion.added > 0 || (census?.added ?? 0) > 0;
     let viewsJob: "sent" | "off" | "failed" = "off";
-    if (result.added > 0 || rebuild) {
+    if (folded || rebuild || new Date().getUTCMinutes() < 10) {
       try { viewsJob = await dispatchStoredViews(); } catch (err) { console.error("stored-views dispatch failed", err); viewsJob = "failed"; }
     }
     // The settled list, the stored views, the guild ladder, the boards, the coverage score and the auction reports
