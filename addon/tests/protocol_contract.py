@@ -30,9 +30,9 @@ kinds |= completion
 
 assert SCHEMA_DIR.exists(), f"protocol schema folder missing: {SCHEMA_DIR} (run npm run build in packages/protocol)"
 assert len(kinds) >= 25, f"only {len(kinds)} kinds found in the addon; the scan is broken"
-owned_lua = (root / "modules" / "owned.lua").read_text(encoding="utf-8") + (root / "modules" / "boss_kills.lua").read_text(encoding="utf-8")
+owned_lua = "".join((root / "modules" / name).read_text(encoding="utf-8") for name in ("owned.lua", "boss_kills.lua", "wealth.lua"))
 for kind in LOCAL_ONLY_KINDS:
-    assert kind in owned_lua, f"owned.lua and boss_kills.lua no longer name {kind}; update LOCAL_ONLY_KINDS"
+    assert kind in owned_lua, f"owned.lua, boss_kills.lua and wealth.lua no longer name {kind}; update LOCAL_ONLY_KINDS"
     assert not (SCHEMA_DIR / "records" / f"{kind}.json").exists(), f"{kind} stays on the computer; the intake must have no schema for it"
 kinds -= LOCAL_ONLY_KINDS
 for kind in sorted(kinds):

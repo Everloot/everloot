@@ -22,7 +22,7 @@ TESTS = [
     "inventory_contract.py", "roster_contract.py", "ledger_contract.py", "view_gold_contract.py", "view_collection_contract.py", "collection_tree_contract.py",
     "view_professions_contract.py", "event_isolation_contract.py", "repeat_events_contract.py",
     "instances_contract.py", "commands_contract.py", "retired_kinds_contract.py", "where_contract.py", "tooltip_history_contract.py", "shopping_contract.py",
-    "sellcheck_contract.py", "flight_contract.py",
+    "sellcheck_contract.py", "flight_contract.py", "wealth_contract.py",
 ]
 # Run by the workflows' own step; scripts/test_alpha_release.py checks that step names them.
 PLANNER = ["raid_plan_contract.py", "planner_contract.py"]

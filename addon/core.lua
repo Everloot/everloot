@@ -270,7 +270,7 @@ function E:Status()
     "collection_catalog", "collection_owned", "auction_scan", "auction_snapshot", "recipe_seen", "recipe_observed", "trainer_seen", "price_seen",
     "gold_snapshot", "money_event", "addon_seen", "map_bounds",
     "achievement_catalog", "reputation_catalog", "title_catalog", "quest_chain_catalog",
-    "title_owned", "census_self", "census_seen", "player_seen", "character_link", "pull_summary" }) do
+    "title_owned", "census_self", "census_seen", "player_seen", "character_link", "pull_summary", "wealth_owned" }) do
     local count = self:Count(kind)
     if count > 0 and (E.RUN_RECORDS or not RUN_KINDS[kind]) then lines[#lines + 1] = string.format("  rows %s: %d", kind, count) end
   end

@@ -38,7 +38,7 @@ O.ROWS = {
   { key = "mapbounds", group = "data", label = "Zone map corners",
     text = "Each zone's corners in world coordinates, once per zone per game build, so the site can place zone coordinates on one map. Nothing about you. Stays in this file until it is sent." },
   { key = "gold", group = "data", label = "Your gold",
-    text = "Your own gold in and out, for gold per hour. Sent only if you share it on the upload page." },
+    text = "Your own gold in and out, for gold per hour. Sent only if you share it on the upload page. Also your character's lifetime gold statistics, which never go in an upload; only the Desktop App's private sync sends them, for a character you linked. Off deletes the lifetime statistics." },
   { key = "roster", group = "data", label = "Your characters",
     text = "Name, realm, class, level, faction, gold and professions of each character you log in with, for the window's Home. Stays in this file; never uploaded." },
   { key = "inventoryCapture", group = "data", field = true, defaultOff = true, live = true, label = "Local inventory snapshots",
@@ -110,6 +110,7 @@ O.ADDED = {
   achievement_catalog = "Achievement catalogue", reputation_catalog = "Reputation catalogue", title_catalog = "Title catalogue",
   quest_chain_catalog = "Quest chains", title_owned = "Your titles", census_self = "Your census", player_seen = "Player pages",
   character_link = "Character links", pull_summary = "Boss pulls", lockout_owned = "Your lockouts", boss_kill_owned = "Your boss kills",
+  wealth_owned = "Your lifetime gold",
 }
 
 function O.AddedRows()
@@ -151,6 +152,7 @@ function O.Set(row, on)
     if row.key == "inventoryCapture" and not on and E.Inventory then E.Inventory.Withdraw() end
   else
     EverlootDB.toggles[row.key] = on
+    if row.key == "gold" and not on and E.Wealth then E.Wealth.Withdraw() end
   end
   O.changed = O.changed or not row.live
   O.Refresh()
@@ -164,6 +166,7 @@ O.DELETES = {
   addons = { "addon_seen" },
   completion = { "achievement_catalog", "reputation_catalog", "title_catalog", "quest_chain_catalog",
     "title_owned", "lockout_owned", "boss_kill_owned" },
+  gold = { "wealth_owned" },
 }
 
 --- How many rows turning this row off would delete.
