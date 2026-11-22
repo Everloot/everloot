@@ -4,6 +4,8 @@ name: Build the stored views
 # (web/scripts/stored-views.ts). The cron Worker's 128 MB ran out partway through them on runs with new uploads; a
 # runner has gigabytes. Each view is rewritten only when its stamp is not that snapshot's, so a run with nothing new
 # writes nothing. Five minutes after the snapshot cron's runs at :00, :10, ..., every quarter hour.
+# With EVERLOOT_SNAPSHOT at "job" in web/wrangler.cron.jsonc it first folds new uploads into the corpus and the
+# rollups and writes the cron heartbeat, which also outgrew the Worker (docs/OPERATIONS.md, "The snapshot on the job").
 # Off until the repository variable STORED_VIEWS_JOB is "on"; docs/OPERATIONS.md, "The stored-views job", says how
 # it is switched on and how the cron Worker hands the views over.
 on:

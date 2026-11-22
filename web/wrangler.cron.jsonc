@@ -85,6 +85,9 @@
     "EVERLOOT_BOSS_KILL_SYNC": "1",
     "EVERLOOT_LEADERBOARDS": "1",
     "EVERLOOT_STORED_VIEWS": "job",
+    // Runs with uploads to fold hand them to the stored-views job, which folds them on a GitHub runner: writing the
+    // corpus means holding all of it, and it outgrew the cron Worker's 128 MB. Removed, the cron Worker folds them (#1354).
+    "EVERLOOT_SNAPSHOT": "job",
     "NEWS_DIR": "/bundle/repo/kb/news",
     "GUIDES_DIR": "/bundle/repo/kb/guides",
     "WIKI_DIR": "/bundle/repo/kb/wiki",

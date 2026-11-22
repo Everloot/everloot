@@ -102,10 +102,10 @@ test("idle probe is one strict watermark query with limit one and no corpus rewr
   const { fn, calls } = fakeFetch([
     [`${R2}snapshots/corpus.json`, "GET", () => Response.json({ records: [], generatedAt: "2026-09-27", lastReceivedAt: capturedAt })],
     ["https://sb.example/rest/v1/uploads", "GET", () => Response.json([])],
-    [`${R2}cron/last-run.json`, "GET", () => Response.json({ dataAsOf: "2026-09-27", completionPending: false, settledWeek: "2026-W39" })],
+    [`${R2}cron/last-run.json`, "GET", () => Response.json({ generatedAt: "2026-09-27T00:10:30Z", dataAsOf: "2026-09-27", completionPending: false, settledWeek: "2026-W39" })],
   ]);
   const store = createUploadStore({ cloud, localDir: "unused", fetch: fn, now });
-  expect(await store.snapshotWork()).toEqual({ idle: true, retryRollups: false, dataAsOf: "2026-09-27", settledWeek: "2026-W39" });
+  expect(await store.snapshotWork()).toEqual({ idle: true, retryRollups: false, dataAsOf: "2026-09-27", settledWeek: "2026-W39", heartbeatAt: "2026-09-27T00:10:30Z" });
   const index = calls.filter(c => new URL(c.url).origin === "https://sb.example");
   expect(index).toHaveLength(1);
   expect(new URL(index[0].url).searchParams.get("limit")).toBe("1");
@@ -123,7 +123,7 @@ test.each([
     [`${R2}cron/last-run.json`, "GET", heartbeat],
   ]);
   expect(await createUploadStore({ cloud, localDir: "unused", fetch: fn, now }).snapshotWork()).toEqual({
-    idle: false, retryRollups: false, dataAsOf: "2026-09-27", settledWeek: null,
+    idle: false, retryRollups: false, dataAsOf: "2026-09-27", settledWeek: null, heartbeatAt: null,
   });
 });
 

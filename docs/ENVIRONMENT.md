@@ -49,6 +49,7 @@ so `web/scripts/cf-deploy.mjs` passes every var except the `*_DIR` paths to the 
 | `KNOWLEDGE_RELEASE_SHA256` | `web/src/lib/release.ts` | The knowledge release the `KNOWLEDGE_D1` database must match before it is served | Yes |
 | `EVERLOOT_CRON_WORKER` | `web/src/lib/cf-crons.ts` | `1` on the site Worker once the cron Worker runs the scheduled jobs: the site's triggers then run nothing ([OPERATIONS.md](OPERATIONS.md), "The cron Worker"). Never set on the cron Worker | No, unset until the switch |
 | `EVERLOOT_STORED_VIEWS` | `web/src/app/api/cron/snapshot/route.ts` | `job`: the snapshot cron ends at its heartbeat and the stored-views job builds the views ([OPERATIONS.md](OPERATIONS.md), "The stored-views job") | No; `job` in both wrangler files since 2026-11-22 |
+| `EVERLOOT_SNAPSHOT` | `web/src/app/api/cron/snapshot/route.ts`, `web/scripts/stored-views.ts` | `job`: a snapshot cron run with uploads to fold (or a rollup to catch up) starts the stored-views job, which folds them into the corpus and the rollups and writes the heartbeat; runs with nothing to fold, rebuilds, and runs whose start GitHub refuses still fold on the cron Worker ([OPERATIONS.md](OPERATIONS.md), "The snapshot on the job") | No; `job` in both wrangler files since 2026-11-22 |
 
 Bindings declared next to the vars and read like them: `KNOWLEDGE_D1` (the knowledge release
 database, `web/src/lib/release.ts`) and `AUTH_DB_HYPERDRIVE` (the accounts database,

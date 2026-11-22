@@ -105,6 +105,9 @@
     // The snapshot cron ends at its heartbeat and the stored-views job (.github/workflows/stored-views.yml) builds the
     // views, since 2026-11-22. The site never runs the snapshot cron; removed, the cron Worker builds them again (#1354).
     "EVERLOOT_STORED_VIEWS": "job",
+    // Runs with uploads to fold hand them to the stored-views job, which folds them on a GitHub runner: writing the
+    // corpus means holding all of it, and it outgrew the cron Worker's 128 MB. Removed, the cron Worker folds them (#1354).
+    "EVERLOOT_SNAPSHOT": "job",
     "NEWS_DIR": "/bundle/repo/kb/news",
     "GUIDES_DIR": "/bundle/repo/kb/guides",
     "WIKI_DIR": "/bundle/repo/kb/wiki",

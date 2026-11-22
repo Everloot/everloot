@@ -1103,7 +1103,7 @@ export function createUploadStore(opts: {
   }
 
   /** One bounded index probe before any corpus replay. A successful run records its corpus generation. */
-  async function snapshotWork(): Promise<{ idle: boolean; retryRollups: boolean; dataAsOf: string | null; settledWeek: string | null }> {
+  async function snapshotWork(): Promise<{ idle: boolean; retryRollups: boolean; dataAsOf: string | null; settledWeek: string | null; heartbeatAt?: string | null }> {
     if (!cloud) throw new Error("snapshots need the cloud store");
     const snapshot = await readSnapshotMark();
     const filter = snapshot?.lastReceivedAt ? `&received_at=gt.${encodeURIComponent(snapshot.lastReceivedAt)}` : "";
@@ -1113,13 +1113,15 @@ export function createUploadStore(opts: {
     const idle = snapshot !== null && rows.length === 0;
     let retryRollups = false;
     let settledWeek: string | null = null;
+    let heartbeatAt: string | null = null;
     try {
       const run = await r2Fetch("cron/last-run.json", { method: "GET" });
       if (run.status === 404) {
         if (idle) retryRollups = true;
       } else if (run.ok) {
-        const previous = await run.json() as { dataAsOf?: string; completionPending?: boolean; settledWeek?: string };
+        const previous = await run.json() as { generatedAt?: string; dataAsOf?: string; completionPending?: boolean; settledWeek?: string };
         if (typeof previous.settledWeek === "string") settledWeek = previous.settledWeek;
+        if (typeof previous.generatedAt === "string") heartbeatAt = previous.generatedAt;
         if (idle) retryRollups = previous.dataAsOf !== snapshot.generatedAt || previous.completionPending === true;
       } else if (idle) {
         throw new Error(`cron heartbeat read failed (${run.status})`);
@@ -1129,7 +1131,9 @@ export function createUploadStore(opts: {
       // treats it as fatal (as it did before the settled week was stored there).
       if (idle) throw err;
     }
-    return { idle, retryRollups, dataAsOf: snapshot?.generatedAt ?? null, settledWeek };
+    // When the last heartbeat was written: with the fold on the stored-views job, a stale one means the job is not
+    // folding, and the cron Worker folds itself (app/api/cron/snapshot/route.ts).
+    return { idle, retryRollups, dataAsOf: snapshot?.generatedAt ?? null, settledWeek, heartbeatAt };
   }
 
   async function writeCronRun(completionPending: boolean, dataAsOf: string | null, settledWeek: string | null): Promise<void> {
@@ -1370,6 +1374,54 @@ export function createUploadStore(opts: {
     } catch { return { status: "unavailable", ...unknown }; }
   }
 
+  /** Every key under `prefix`, through R2's S3 listing, a page of 1000 at a time. */
+  async function listKeys(prefix: string): Promise<string[]> {
+    const keys: string[] = [];
+    let token: string | null = null;
+    do {
+      const query = `?list-type=2&prefix=${encodeURIComponent(prefix)}${token ? `&continuation-token=${encodeURIComponent(token)}` : ""}`;
+      const res = await r2Fetch(query, { method: "GET" });
+      if (!res.ok) throw new Error(`listing ${prefix} failed (${res.status})`);
+      const xml = await res.text();
+      for (const m of xml.matchAll(/<Key>([^<]+)<\/Key>/g)) keys.push(m[1].replace(/&amp;/g, "&"));
+      token = /<IsTruncated>true<\/IsTruncated>/.test(xml) ? /<NextContinuationToken>([^<]+)<\/NextContinuationToken>/.exec(xml)?.[1] ?? null : null;
+    } while (token);
+    return keys;
+  }
+
+  /**
+   * Delete the part folders no snapshot names (#1354). A run that wrote its parts and then ran out of memory before
+   * writing the part list left them behind, 30 to 40 MB each, four of them by 2026-11-22. The folders the current list
+   * names in `parts` or `retired` stay, and so does any folder younger than `minAgeMs`, whose write may be under way, or
+   * whose name carries no time. Without a part list nothing is deleted.
+   */
+  async function sweepSnapshotParts(minAgeMs = 60 * 60_000): Promise<{ folders: number; objects: number }> {
+    if (!cloud) throw new Error("snapshots need the cloud store");
+    const res = await r2Fetch(SNAPSHOT_KEY, { method: "GET", headers: { "accept-encoding": "identity" } });
+    if (!res.ok) throw new Error(`snapshot read failed (${res.status})`);
+    const mark = JSON.parse(await res.text()) as { parts?: unknown; retired?: unknown };
+    if (!Array.isArray(mark.parts) || mark.parts.length === 0) return { folders: 0, objects: 0 };
+    const folderOf = (key: string) => key.slice(0, key.indexOf("/", SNAPSHOT_PARTS_PREFIX.length) + 1);
+    const keep = new Set([mark.parts, mark.retired].flatMap((l) => Array.isArray(l) ? l : [])
+      .filter((k): k is string => typeof k === "string" && k.startsWith(SNAPSHOT_PARTS_PREFIX)).map(folderOf));
+    const cutoff = now().getTime() - minAgeMs;
+    const folderTime = (folder: string) => {
+      const m = /(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(\d{3})Z-[^/]+\/$/.exec(folder);
+      return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6], +m[7]) : null;
+    };
+    const doomed = (await listKeys(SNAPSHOT_PARTS_PREFIX)).filter((key) => {
+      const folder = folderOf(key);
+      const at = folderTime(folder);
+      return folder.length > SNAPSHOT_PARTS_PREFIX.length && !keep.has(folder) && at !== null && at < cutoff;
+    });
+    for (const key of doomed) {
+      const gone = await r2Fetch(key, { method: "DELETE" });
+      if (!gone.ok && gone.status !== 404) throw new Error(`snapshot part delete failed (${gone.status})`);
+      await gone.body?.cancel();
+    }
+    return { folders: new Set(doomed.map(folderOf)).size, objects: doomed.length };
+  }
+
   /**
    * Drop every read this instance keeps: the corpus, the market, the completion and census rollups. The snapshot cron
    * calls it between its steps; each kept copy is tens of MB that would otherwise sit beside the next step (#1354).
@@ -1380,7 +1432,7 @@ export function createUploadStore(opts: {
     completionCached = null; censusCached = null;
   }
 
-  return { putUpload, loadCorpus, putWaitlist, snapshotWork, writeCronRun, readCronRun, writeSnapshot, snapshotHealth, writeMarket, loadMarket, writeCompletion, loadCompletion, writeCensus, loadCensus, installCensus, forgetReads };
+  return { putUpload, loadCorpus, putWaitlist, snapshotWork, writeCronRun, readCronRun, writeSnapshot, sweepSnapshotParts, snapshotHealth, writeMarket, loadMarket, writeCompletion, loadCompletion, writeCensus, loadCensus, installCensus, forgetReads };
 }
 
 /** The store the routes and pages use. */

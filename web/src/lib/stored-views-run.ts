@@ -207,7 +207,7 @@ export async function runStoredViews(run: StoredViewsRun): Promise<StoredViewsRe
  * A finished run leaves its own heartbeat (lib/stored-views-status.ts), failed steps and all, which /api/health reads;
  * a heartbeat that cannot be written is logged and fails the run, so the job shows red.
  */
-export async function runStoredViewsJob(opts: { rebuild?: boolean } = {}, deps: {
+export async function runStoredViewsJob(opts: { rebuild?: boolean; failedBefore?: string[] } = {}, deps: {
   heartbeat?: () => ReturnType<typeof uploadStore.readCronRun>; run?: typeof runStoredViews;
   record?: (run: ViewsRun) => Promise<void>; now?: () => number;
 } = {}): Promise<StoredViewsResult & { dataAsOf: string | null }> {
@@ -215,7 +215,9 @@ export async function runStoredViewsJob(opts: { rebuild?: boolean } = {}, deps: 
   const started = now();
   const beat = await (deps.heartbeat ?? uploadStore.readCronRun)();
   if (!beat) throw new Error("no cron heartbeat yet: the snapshot cron has not run");
-  const result = await (deps.run ?? runStoredViews)({ added: 0, rebuild: opts.rebuild === true, dataAsOf: beat.dataAsOf, reportsDue: !beat.completionPending, retries: 1 });
+  const views = await (deps.run ?? runStoredViews)({ added: 0, rebuild: opts.rebuild === true, dataAsOf: beat.dataAsOf, reportsDue: !beat.completionPending, retries: 1 });
+  // Steps the job ran before the views (its fold, with EVERLOOT_SNAPSHOT at "job") count in the heartbeat too.
+  const result = opts.failedBefore?.length ? { ...views, failed: [...opts.failedBefore, ...views.failed] } : views;
   const finished = now();
   try {
     await (deps.record ?? writeViewsRun)({
