@@ -70,10 +70,11 @@ assert(m.name.text == 'Mining' and m.rank.text == '112 / 150', m.rank.text)
 assert(m.bar.lo == 0 and m.bar.hi == 150 and m.bar.value == 112)
 assert(m.recipes.text == 'Open the profession window to read its recipes.', m.recipes.text)
 assert(not m.last.shown, 'no Last read without recipes')
--- One line for the trainer: the lowest recipe at or above rank 112, which the character can learn now, lit; the
--- full list is on Ranks and trainers.
-assert(m.next.shown and m.next.text == 'Learn now: Copper Bar · ' .. U.MoneyShort(1000) .. ' · Brock Stonebrow', m.next.text)
-assert(m.next.color[2] == U.COLORS.accent[2], 'a recipe to learn now is lit')
+-- One line for the trainer: the lowest recipe at or above rank 112. The addon cannot tell whether this character
+-- already trained it, so it says "At your rank" in the text colour, never "Learn now" in the accent; the full list is
+-- on Ranks and trainers.
+assert(m.next.shown and m.next.text == 'At your rank: Copper Bar · ' .. U.MoneyShort(1000) .. ' · Brock Stonebrow', m.next.text)
+assert(m.next.color[2] == U.COLORS.text[2] and m.next.color[1] == U.COLORS.text[1], 'a recipe at your rank is plain, not lit')
 assert(rawget(m, 'trainer') == nil, 'no wall of trainer lines in the list')
 assert(m.height == 60, m.height)
 assert(m.point[1] == 'TOPLEFT' and m.point[3] == 0)
@@ -154,11 +155,11 @@ for i, k in ipairs(order) do
 end
 local s = t.sections[1]
 assert(s.shown and s.name.text == 'Mining', s.name.text)
-assert(s.summary.text == '112 / 150 · 1 to learn now', s.summary.text)
+assert(s.summary.text == '112 / 150 · 1 at your rank', s.summary.text)
 -- Lowest rank first. The row at 100 is below the character's rank and left out; Copper Bar, listed by two trainers,
--- is one row. The rank a character can learn now is lit.
+-- is one row. A rank at the character's rank is in the text colour (it may already be trained), a later one muted.
 local r = s.rows
-assert(r[1].shown and r[1].rank.text == '112' and r[1].rank.color[2] == U.COLORS.accent[2], r[1].rank.text)
+assert(r[1].shown and r[1].rank.text == '112' and r[1].rank.color[1] == U.COLORS.text[1], r[1].rank.text)
 assert(r[1].recipe.text == 'Copper Bar' and r[1].cost.text == M(1000), r[1].recipe.text)
 assert(r[1].where.text == 'Brock Stonebrow · Elwynn Forest', r[1].where.text)
 assert(r[2].rank.text == '125' and r[2].rank.color[2] == U.COLORS.muted[2] and r[2].recipe.text == 'Smelt Silver')
@@ -193,7 +194,7 @@ p.nav.scripts.OnClick()
 local t = p.trainers
 local s = t.sections[1]
 assert(s.rows[2].shown and not s.rows[3].shown, 'two rows with five professions')
-assert(s.summary.text == '112 / 150 · 1 to learn now · 2 more', s.summary.text)
+assert(s.summary.text == '112 / 150 · 1 at your rank · 2 more', s.summary.text)
 local last = t.sections[5]
 assert(last.shown and -last.point[3] + last.height <= 366, 'the last section ends above the footer')
 assert(not U.failed)

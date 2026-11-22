@@ -143,10 +143,11 @@ local function trainerRows(name, rank, names)
   return rows
 end
 
--- The block's trainer line: the first recipe a trainer teaches, and whether the character can learn it now.
+-- The block's trainer line: the first recipe a trainer teaches at or above the character's rank. Whether this
+-- character already trained it is not recorded, so a recipe at its rank is "At your rank", never "Learn now".
 local function nextLine(r, rank)
   local now = r.rank <= rank
-  local s = (now and "Learn now: " or ("Next at " .. r.rank .. ": ")) .. r.recipe
+  local s = (now and "At your rank: " or ("Next at " .. r.rank .. ": ")) .. r.recipe
   if type(r.cost) == "number" then s = s .. " · " .. U.MoneyShort(r.cost) end
   if r.trainer then s = s .. " · " .. r.trainer end
   return s, now
@@ -183,7 +184,7 @@ local function draw(block, p, names)
   if first then
     local s, now = nextLine(first, p.rank)
     block.next:SetText(s)
-    block.next:SetTextColor(unpack(now and COLORS.accent or COLORS.muted))
+    block.next:SetTextColor(unpack(now and COLORS.text or COLORS.muted))
   else
     block.next:SetText(NO_TRAINER)
     block.next:SetTextColor(unpack(COLORS.muted))
@@ -201,7 +202,7 @@ local function drawSection(s, prof, limit, names)
   local now = 0
   for _, r in ipairs(rows) do if r.rank <= prof.rank then now = now + 1 end end
   local rank = prof.maxRank and (prof.rank .. " / " .. prof.maxRank) or tostring(prof.rank)
-  local waiting = now > 0 and (now .. " to learn now") or (rows[1] and ("next at rank " .. rows[1].rank) or "no trainer seen")
+  local waiting = now > 0 and (now .. " at your rank") or (rows[1] and ("next at rank " .. rows[1].rank) or "no trainer seen")
   local more = #rows - limit
   s.name:SetText(prof.name)
   s.summary:SetText(rank .. " · " .. waiting .. (more > 0 and (" · " .. more .. " more") or ""))
@@ -210,7 +211,7 @@ local function drawSection(s, prof, limit, names)
     local r = i <= limit and rows[i]
     if r then
       line.rank:SetText(tostring(r.rank))
-      line.rank:SetTextColor(unpack(r.rank <= prof.rank and COLORS.accent or COLORS.muted))
+      line.rank:SetTextColor(unpack(r.rank <= prof.rank and COLORS.text or COLORS.muted))
       line.recipe:SetText(r.recipe)
       line.recipe:SetTextColor(unpack(COLORS.text))
       line.recipe:SetWidth(TRAIN_COLUMNS[2][3])
