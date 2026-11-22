@@ -55,7 +55,6 @@ modules\window.lua
 modules\view_gold.lua
 modules\view_collection.lua
 modules\view_professions.lua
-modules\view_disenchanting.lua
 modules\minimap.lua
 modules\flight_data.lua
 modules\flight_times.lua

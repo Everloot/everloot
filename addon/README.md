@@ -313,18 +313,17 @@ install, are saved in your SavedVariables, record nothing and apply at once, wit
 The disenchant row applies to eligible armor and weapons in Forever's game-file bands, excluding items the files
 flag as not disenchantable. Observed yields need three contributing installs. The Desktop App writes them into
 EverlootPrices, refreshed daily; reload to read an update. A band the file holds no results for shows a quiet "not enough data yet" line; a file without the block (no Desktop App, or an older one) adds nothing to the tooltip.
-The tooltip shows each material's icon, runtime name, observed chance and units range, plus an expected gross
-value using mean units across all disenchants and prices for your current realm and auction house. Missing prices
-make it "at least"; missing, stale or thin prices prevent a comparison. Estimates are before auction fees and do
-not promise a sale, profit, eligibility of an individual bound copy, or the character's enchanting skill.
+The tooltip's first disenchant line sets the expected gross value (mean units across all disenchants, at prices for
+your current realm and auction house) against selling the item, the better of its auction estimate and vendor price,
+and says which is worth more when every price is known and current. Each material follows with its icon, name,
+observed chance, units range and price. Missing prices make the value "at least"; missing, stale or thin prices
+prevent a comparison. Compact tooltips keep the first line alone. Estimates are before auction fees and do not
+promise a sale, profit, eligibility of an individual bound copy, or the character's enchanting skill.
 
-Open **Disenchanting** in the main Everloot window for today's (UTC) and the last seven days' disenchants,
-materials, estimated gross value, known cost and estimated difference, followed by recent entries. Up and Down
-page through the list. Disenchant with Everloot's open-world collection on to start. The last 500 entries per
-character stay only in `EverlootDB.disenchantLog`, outside uploaded records. When the local ledger knows a purchase,
-the entry saves that item's average paid per unit on this realm at capture time; this is a cost estimate, not proof
-of what that particular copy cost. Unknown costs stay unknown, and a period with any unknown cost shows no total
-difference. Materials are valued at current house prices when viewed, so their estimates can change after a reload.
+When a character on this install has disenchanted the item before, a last line says what those disenchants gave.
+Disenchant with Everloot's open-world collection on to start. The last 500 entries per character stay only in
+`EverlootDB.disenchantLog`, outside uploaded records; when the local ledger knows a purchase, the entry also saves
+that item's average paid per unit on this realm at capture time.
 
 ### Choosing features
 

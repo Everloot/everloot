@@ -1,4 +1,5 @@
--- Observed disenchant yields from the price file, and this character's bounded local history.
+-- Observed disenchant yields from the price file, and each character's bounded local history, which the item
+-- tooltip sums for the item under the cursor.
 -- History never goes through Store: only openworld's existing loot records are uploaded.
 local E = Everloot
 local D = {}
@@ -97,6 +98,30 @@ function D.Label(id)
   return "|T" .. icon .. ":14:14:0:0|t " .. name
 end
 
+local function itemName(id)
+  local item = D.Item(id)
+  return item and type(item.name) == "string" and item.name or ("Item " .. id)
+end
+
+-- What every character on this install got from disenchanting this item: { count, mats = { [id] = units } }, or nil.
+local function got(id)
+  local logs = type(EverlootDB) == "table" and type(EverlootDB.disenchantLog) == "table" and EverlootDB.disenchantLog
+  local out = { count = 0, mats = {} }
+  for _, list in pairs(logs or {}) do
+    for _, row in ipairs(type(list) == "table" and list or {}) do
+      if type(row) == "table" and row.item == id and type(row.mats) == "table" then
+        out.count = out.count + 1
+        for mat, n in pairs(row.mats) do out.mats[mat] = (out.mats[mat] or 0) + n end
+      end
+    end
+  end
+  return out.count > 0 and out or nil
+end
+
+--- The tooltip block for an armor or weapon in a disenchant band: one headline with the disenchant value against
+--- selling it (the better of the auction estimate and the vendor price), and which is worth more when every price is
+--- known and current; then each material with its chance, units and price; then what this install's own disenchants
+--- of the item gave. Compact mode keeps the headline alone. Nothing without a disenchant block in the price file.
 function D.Lines(realm, id, compact)
   local band = D.Band(id)
   if not band then return {} end
@@ -115,41 +140,45 @@ function D.Lines(realm, id, compact)
   local mats = {}
   for _, r in ipairs(rows) do mats[r.id] = r.mean end
   local value, missing, fresh = D.Value(realm, mats)
-  local amount = (missing and "at least " or "") .. E.PriceCoinIcons(value)
-  add("Disenchant estimate (gross): " .. (missing and "at least " or "") .. E.Coins(value), "Disenchant estimate (gross)", amount)
-  if not compact then
-    local provenance = {}
-    for _, r in ipairs(rows) do
-      local label = D.Label(r.id)
-      local quantity = r.min == r.max and tostring(r.min) or (r.min .. "-" .. r.max)
-      local detail = string.format("%.1f%% · %s units", 100 * r.hit / r.n, quantity)
-      add(label .. " · " .. detail, "  " .. label, detail)
-      local _, _, source = D.Price(realm, r.id)
-      if source then provenance[source] = true end
-    end
-    local sources = {}
-    for source in pairs(provenance) do sources[#sources + 1] = source end
-    table.sort(sources)
-    if #sources > 0 then add("  Material prices: " .. table.concat(sources, "; ")) end
-  end
   local auction, auctionFresh = D.Price(realm, id)
   local item = D.Item(id)
   local vendor = item and whole(item.sell, 0) and item.sell or nil
-  if vendor and not compact then add("Vendor: " .. E.Coins(vendor), "Vendor", E.PriceCoinIcons(vendor)) end
-  if auction then add("Auction estimate (gross): " .. E.Coins(auction), "Auction estimate (gross)", E.PriceCoinIcons(auction)) end
-  local comparison = "Not enough data to compare"
+  local sell = (auction or vendor) and math.max(auction or 0, vendor or 0) or nil
+
+  local verdict = ""
   if not missing and fresh and auction and auctionFresh and vendor then
-    if value > auction and value > vendor then comparison = "Disenchant estimate is higher"
-    elseif auction > value and auction > vendor then comparison = "Auction estimate is higher"
-    elseif vendor > value and vendor > auction then comparison = "Vendor value is higher"
-    else comparison = "Estimates are tied" end
+    verdict = value > sell and ": better than selling" or value < sell and ": selling is better" or ": same as selling"
   end
-  add(comparison)
-  if not compact then
-    local day = E.StaleDay(file.asOf)
-    add(string.format("  Observed: %d disenchants%s", rows[1].n, day and (" · " .. day) or ""))
-    add("  " .. (E:MarketHouse() or "Unknown") .. " house · gross before fees; sale and skill not guaranteed")
-    if not fresh and not missing then add("  Prices are stale, thin or their age is unknown") end
+  -- Nothing priced at all is no amount; part priced is a floor.
+  local unpriced = missing and value == 0
+  local function amount(coins)
+    if unpriced then return "not priced" end
+    return (missing and "at least " or "") .. coins(value)
+  end
+  local function against(coins) return sell and (" vs sell " .. coins(sell)) or "" end
+  add("Disenchant" .. verdict .. " · " .. amount(E.Coins) .. against(E.Coins), "Disenchant" .. verdict,
+    amount(E.PriceCoinIcons) .. against(E.PriceCoinIcons))
+  if compact then return out end
+
+  for _, r in ipairs(rows) do
+    local name = itemName(r.id)
+    local pct = 100 * r.hit / r.n
+    local quantity = r.min == r.max and tostring(r.min) or (r.min .. "-" .. r.max)
+    local chance = string.format(pct >= 10 and "%.0f%%" or "%.1f%%", pct) .. " · " .. quantity
+    local price = D.Price(realm, r.id)
+    add("  " .. name .. " · " .. chance .. " · " .. (price and (E.Coins(price) .. " each") or "no price"),
+      "  " .. D.Label(r.id), chance .. " · " .. (price and (E.PriceCoinIcons(price) .. " each") or "no price"))
+  end
+  local day = E.StaleDay(file.asOf)
+  if day then add("  Disenchant data from " .. day) end
+  if not fresh and not missing then add("  Prices are stale, thin or their age is unknown") end
+  local mine = got(id)
+  if mine then
+    local ids, parts = {}, {}
+    for mat in pairs(mine.mats) do ids[#ids + 1] = mat end
+    table.sort(ids)
+    for _, mat in ipairs(ids) do parts[#parts + 1] = itemName(mat) .. " × " .. mine.mats[mat] end
+    add("  You got: " .. table.concat(parts, ", ") .. " (" .. mine.count .. (mine.count == 1 and " disenchant)" or " disenchants)"))
   end
   return out
 end
@@ -182,16 +211,3 @@ function D.Record(id, materials, source)
 end
 
 function D.History() return history() end
-
-function D.Summary(since)
-  local out = { count = 0, mats = {}, cost = 0, known = 0 }
-  for _, row in ipairs(history()) do
-    if row.t >= since and row.t <= time() then
-      out.count = out.count + 1
-      for id, n in pairs(row.mats) do out.mats[id] = (out.mats[id] or 0) + n end
-      if row.cost ~= nil then out.cost, out.known = out.cost + row.cost, out.known + 1 end
-    end
-  end
-  out.value, out.missing = D.Value(E.CurrentRealm(), out.mats)
-  return out
-end
