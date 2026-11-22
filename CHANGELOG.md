@@ -15,6 +15,8 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Addon: with the gold switch on, the addon reads your logged-in character's lifetime gold statistics (total acquired, most ever owned, spending, auctions) into your file; they never go in an upload, and only the Desktop App's private sync sends them for a character you linked.
+- Site: a linked character's page can show its lifetime gold from the addon, under its own Gold sync and "Show gold" switches, both off by default; your lifetime totals add total gold acquired and most gold ever owned. Gold is never ranked.
 - Site: armory character pages gain a Play history tab from Blizzard's lifetime statistics (quests, kills, deaths, fish, flight paths, dungeons, boss kills and more), with six new rankings and each character's place on them. Owners can show it on a linked character's page with a new switch, and see their linked characters' lifetime totals in one table.
 - Site: Guild Masters can claim their guild through a linked armory character, appoint member editors, and publish a bio, raid days, links and recruiting needs. Claims are checked against the stored roster on every edit; in-game crests appear when Blizzard provides their images.
 - Site: guild progression counts each boss once enough roster members hold the kill, with group-size thresholds, clear bonuses and a private score ranking beside the raid ladder.
