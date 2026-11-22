@@ -95,7 +95,7 @@ describe("consent", () => {
   });
 
   test("anything but kept category names with booleans is a 400 before anything is read; a retired category is refused", async () => {
-    for (const bad of [{}, { gold: true }, { raids: "yes" }, { gear: true }, { stats: false }, { reputations: true }, [], null]) expect((await send(bad)).status).toBe(400);
+    for (const bad of [{}, { silver: true }, { gold: "yes" }, { raids: "yes" }, { gear: true }, { stats: false }, { reputations: true }, [], null]) expect((await send(bad)).status).toBe(400);
     expect(auth.authQuery).not.toHaveBeenCalled();
   });
 
@@ -112,6 +112,7 @@ describe("consent", () => {
         { category: "reputations", consented: false, captured_at: null, data: null },
         { category: "raids", consented: false, captured_at: null, data: null },
         { category: "achievements", consented: true, captured_at: null, data: null },
+        { category: "gold", consented: true, captured_at: "2026-11-06T10:00:00+00:00", data: { stats: { "328": 50 } } },
       ]);
     const res = await read();
     expect(res.status).toBe(200);
@@ -122,6 +123,7 @@ describe("consent", () => {
       categories: [
         { category: "raids", sync: false, shown: false, capturedAt: null },
         { category: "achievements", sync: true, shown: true, capturedAt: null },
+        { category: "gold", sync: true, shown: false, capturedAt: "2026-11-06T10:00:00.000Z" },
       ],
     });
     expect(JSON.stringify(body)).not.toContain(USER.id);

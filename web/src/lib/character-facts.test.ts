@@ -11,7 +11,7 @@ const base: ShowcaseInput = {
   sample: false, path: "/characters/forever/forever-pioneer/thrallina", name: "Thrallina", level: 60, race: "Orc", class: "SHAMAN",
   faction: "Horde", realm: "Forever Pioneer", title: null, guild: null, lastUpload: "2026-11-01",
   gear: { state: "empty" }, stats: { state: "unsupported" }, talents: { state: "empty" }, professions: { state: "empty" }, reputations: { state: "empty" },
-  pvp: { state: "empty" }, raids: { state: "empty" }, collections: { state: "empty" },
+  pvp: { state: "empty" }, raids: { state: "empty" }, collections: { state: "empty" }, gold: { state: "empty" },
 };
 
 describe("factSections", () => {
@@ -42,6 +42,12 @@ describe("factSections", () => {
     expect(factSections(facts, { catalog: null }, NOW).collections).toBeUndefined();
     const page = buildShowcase(withFacts(base, factSections(facts, NAMES, NOW)), NOW);
     expect(page.headlines.find((h) => h.label === "Achievement points")).toBeUndefined();
+  });
+
+  test("gold: the statistics as stored, a missing one absent; a malformed shape is left out", () => {
+    const s = factSections([at("gold", { stats: { "328": 1_150_905, "329": 1077 } })], NAMES, NOW);
+    expect(s.gold).toEqual({ state: "shown", asOf: "2026-11-05", data: { stats: { "328": 1_150_905, "329": 1077 } } });
+    for (const data of [{}, { stats: { "328": -1 } }, { stats: { "328": "115g" } }]) expect(factSections([at("gold", data)], NAMES, NOW).gold).toBeUndefined();
   });
 
   test("a retired category or a stored shape it does not know is left out, never guessed", () => {

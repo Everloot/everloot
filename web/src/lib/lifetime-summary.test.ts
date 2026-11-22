@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { armoryCharacterPath } from "./armory";
 import { armoryCharacter } from "./armory.fixture";
 import { lifetimeSummary } from "./lifetime-summary";
 
@@ -24,5 +25,28 @@ test("totals add only the characters that have each count, and say how many did"
 });
 
 test("no characters is an empty summary", () => {
-  expect(lifetimeSummary([])).toEqual({ rows: [], totals: {}, counted: { quests: 0, creatures: 0, fish: 0, flights: 0, dungeons: 0, deaths: 0 }, read: 0 });
+  expect(lifetimeSummary([])).toEqual({
+    rows: [], totals: {}, counted: { quests: 0, creatures: 0, fish: 0, flights: 0, dungeons: 0, deaths: 0 }, read: 0, goldTotals: {}, goldReported: 0,
+  });
+});
+
+test("the addon's gold: total acquired adds up, most ever owned is one character's largest, and no fact is no value", () => {
+  const s = lifetimeSummary([
+    withHistory("velkara-duskmantle", { quests: 791 }),
+    withHistory("torvin-ashbrook", { quests: 100 }),
+    armoryCharacter({ slug: "orla-fenwick", name: "Orla" }),
+  ], new Map<string, Record<string, number>>([
+    [armoryCharacterPath("eu", "velkara-duskmantle"), { "328": 1_150_905, "334": 400_000, "333": 9 }],
+    [armoryCharacterPath("eu", "torvin-ashbrook"), { "328": 50, "334": 900_000 }],
+  ]));
+  expect(s.goldTotals).toEqual({ "328": 1_150_955, "334": 900_000 });
+  expect(s.goldReported).toBe(2);
+  expect(s.rows.map((r) => r.gold)).toEqual([{ "328": 1_150_905, "334": 400_000 }, { "328": 50, "334": 900_000 }, {}]);
+});
+
+test("without gold the summary has no gold total, not a 0", () => {
+  const s = lifetimeSummary([withHistory("velkara-duskmantle", { quests: 791 })]);
+  expect(s.goldTotals).toEqual({});
+  expect(s.goldReported).toBe(0);
+  expect(s.rows[0]!.gold).toEqual({});
 });

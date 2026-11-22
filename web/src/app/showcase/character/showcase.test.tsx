@@ -52,7 +52,7 @@ test("the sample page carries the banner, the header band, every section and noi
   expect(html).toContain("Examplechar");
   expect(html).toContain("Level 60 Orc Shaman");
   expect(html).toContain("&lt;Sampleguild&gt;");
-  for (const key of ["identity", "gear", "stats", "talents", "pvp", "raids", "collections", "reputations", "professions"]) expect(html).toContain(`data-section="${key}"`);
+  for (const key of ["identity", "gear", "stats", "talents", "pvp", "raids", "collections", "reputations", "professions", "gold"]) expect(html).toContain(`data-section="${key}"`);
   expect(html).toMatch(/From the player&#x27;s own addon upload, \d{4}-\d{2}-\d{2} \(1 day ago\)/);
   expect(html).toContain('href="/database/items/1282"');
   expect(html).toContain("Item 1282");
@@ -263,6 +263,53 @@ describe("the other sections", () => {
     const groups = [...html.matchAll(/data-standing="([^"]+)"/g)].map((m) => m[1]);
     expect(groups).toEqual(["Exalted", "Revered", "Honored", "Friendly", "Renown"]);
     expect(html).toContain("6,000 / 12,000");
+  });
+
+  describe("gold", () => {
+    const stats = { "328": 1_150_905, "333": 400_000, "326": 0, "921": 50, "334": 2_500_000, "329": 1077, "330": 12, "1149": 3 };
+    const gold = (preview: boolean) => section(render({ ...base, gold: { state: "shown", asOf: "2026-10-31", data: { stats } } }, preview), "gold");
+
+    test("four groups in order, each statistic under its own label", () => {
+      const html = gold(false);
+      const groups = [...html.matchAll(/data-gold-group="([^"]+)"/g)].map((m) => m[1]);
+      expect(groups).toEqual(["Income", "Spending", "Auctions", "Records"]);
+      for (const label of ["Total gold acquired", "Looted", "Quest rewards", "Vendors", "Auctions", "Travel", "Postage", "Barber shops", "Talent respecs", "Posted", "Purchases", "Largest sale", "Largest bid", "Most gold ever owned"]) {
+        expect(html).toContain(label);
+      }
+    });
+
+    test("money in coins, counts as numbers, a reported zero as zero and a missing statistic as Not reported", () => {
+      const html = gold(false);
+      expect(html).toContain("115 gold 9 silver 5 copper");
+      expect(html).toContain("250 gold 0 silver 0 copper");
+      expect(html).toContain(">50 copper<");
+      expect(html).toContain("1,077");
+      // 326 was reported as 0: drawn as 0 copper, not as missing.
+      expect(html).toContain(">0 copper<");
+      // 919, 1146, 1148, 1147, 1150, 332 and 331 were not reported.
+      expect(html.match(/Not reported/g)).toHaveLength(7);
+      expect(html).not.toMatch(/rank|board|consistent|misconduct/i);
+    });
+
+    test("labelled as the addon's numbers with the capture date: the owner's preview says your addon, the public page the player's", () => {
+      expect(gold(true)).toContain("From your addon, captured <span class=\"font-mono\">2026-10-31</span>");
+      expect(gold(false)).toContain("From the player&#x27;s addon, captured <span class=\"font-mono\">2026-10-31</span>");
+    });
+
+    test("comes after the other sections; with nothing synced the public page leaves it out and the preview says so", () => {
+      const html = render({ ...base, gold: { state: "shown", asOf: "2026-10-31", data: { stats } } }, true);
+      expect(html.indexOf('data-section="gold"')).toBeGreaterThan(html.indexOf('data-section="professions"'));
+      expect(render({ ...base, gold: { state: "empty" } }, false)).not.toContain('data-section="gold"');
+      expect(render({ ...base, gold: { state: "private" } }, false)).not.toContain('data-section="gold"');
+      expect(section(render({ ...base, gold: { state: "empty" } }, true), "gold")).toContain(EMPTY_LINE);
+    });
+
+    test("never on the share card or in the header", () => {
+      const input = { ...base, gold: { state: "shown" as const, asOf: "2026-10-31", data: { stats } } };
+      expect(view(input).blocks).toEqual(view({ ...base, gold: { state: "empty" } }).blocks);
+      expect(view(input).headlines).toEqual(view({ ...base, gold: { state: "empty" } }).headlines);
+      expect(header(input)).not.toMatch(/Total gold acquired|115 gold/);
+    });
   });
 
   test("professions as rank bars", () => {

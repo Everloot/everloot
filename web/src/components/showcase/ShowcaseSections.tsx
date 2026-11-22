@@ -4,10 +4,11 @@ import { BossStrip, Progress } from "@/app/guilds/parts";
 import { Bar } from "@/app/tools/collections/CompletionView";
 import GameIcon from "@/components/game/GameIcon";
 import { Card, DataTable, Disclosure, Facts, PageHeader, QUALITY_TEXT, qualityOf, SectionHeading } from "@/components/ui";
+import Coins from "@/components/ui/Coins";
 import type { Crumb } from "@/lib/jsonld";
 import {
-  averageItemLevel, EMPTY_LINE, GEAR_SLOTS, isPublic, NOT_RECORDED_LINE, PAPER_DOLL, paperDoll, PLANNED_LINE, PRIVATE_LINE, reputationGroups, STALE_LINE, UNSUPPORTED_LINE,
-  type CollectionsData, type GearRow, type GearSlot, type ProfessionRow, type PvpData, type RaidsData, type ReputationRow, type Section, type Showcase, type ShownSection, type StatsData, type TalentsData,
+  averageItemLevel, EMPTY_LINE, GEAR_SLOTS, GOLD_GROUPS, isPublic, NOT_RECORDED_LINE, NOT_REPORTED, PAPER_DOLL, paperDoll, PLANNED_LINE, PRIVATE_LINE, reputationGroups, STALE_LINE, UNSUPPORTED_LINE,
+  type CollectionsData, type GearRow, type GearSlot, type GoldData, type ProfessionRow, type PvpData, type RaidsData, type ReputationRow, type Section, type Showcase, type ShownSection, type StatsData, type TalentsData,
 } from "@/lib/character-showcase";
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
@@ -238,6 +239,34 @@ function Raids({ data }: { data: RaidsData }) {
   );
 }
 
+/**
+ * The addon's lifetime gold statistics in four groups: money in coins, counts as numbers, and "Not reported" for a
+ * statistic the game did not give the addon, never a zero. Labelled as the addon's numbers with their capture date;
+ * no rank and no judgment of the player.
+ */
+function Gold({ data, asOf, preview }: { data: GoldData; asOf: string; preview: boolean }) {
+  return (
+    <Card className="space-y-4">
+      <p className="text-sm text-fg-2">{preview ? "From your addon" : "From the player's addon"}, captured <span className="font-mono">{asOf}</span></p>
+      <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
+        {GOLD_GROUPS.map((g) => (
+          <div key={g.group} className="space-y-2" data-gold-group={g.group}>
+            <Sub>{g.group}</Sub>
+            <dl className="text-meta">
+              {g.stats.map((s) => {
+                const n = data.stats[s.id];
+                return n === undefined
+                  ? <Row key={s.id} label={s.label} value={<span className="text-fg-2">{NOT_REPORTED}</span>} numeric={false} />
+                  : <Row key={s.id} label={s.label} value={s.money ? <Coins copper={n} /> : number(n)} />;
+              })}
+            </dl>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 /** Completion: the counts, the newest achievements, each category's share, titles; mounts and pets as a line each. */
 function Collections({ data }: { data: CollectionsData }) {
   return (
@@ -281,13 +310,13 @@ function Collections({ data }: { data: CollectionsData }) {
   );
 }
 
-function Body({ s, classSlug }: { s: ShownSection; classSlug: string | null }) {
+function Body({ s, classSlug, preview }: { s: ShownSection; classSlug: string | null; preview: boolean }) {
   const section = s.section;
   if (section.state === "empty") return <Line>{EMPTY_LINE}</Line>;
   if (section.state === "private") return <Line>{PRIVATE_LINE}</Line>;
   // The game shows its stats; what is missing for them is a collector, and the line says so.
   if (section.state === "unsupported") return <Line>{s.key === "stats" ? NOT_RECORDED_LINE : UNSUPPORTED_LINE}</Line>;
-  const data = (section as Extract<Section<unknown>, { state: "shown" }>).data;
+  const { data, asOf } = section as Extract<Section<unknown>, { state: "shown" }>;
   switch (s.key) {
     case "gear": return <Gear rows={data as GearRow[]} />;
     case "stats": return <Stats data={data as StatsData} />;
@@ -297,6 +326,7 @@ function Body({ s, classSlug }: { s: ShownSection; classSlug: string | null }) {
     case "reputations": return <Reputations rows={data as ReputationRow[]} />;
     case "raids": return <Raids data={data as RaidsData} />;
     case "collections": return <Collections data={data as CollectionsData} />;
+    case "gold": return <Gold data={data as GoldData} asOf={asOf} preview={preview} />;
   }
 }
 
@@ -374,7 +404,7 @@ export default function ShowcaseSections({ showcase, preview }: { showcase: Show
           >
             {s.title}
           </SectionHeading>
-          <Body s={s} classSlug={showcase.classSlug} />
+          <Body s={s} classSlug={showcase.classSlug} preview={preview} />
         </section>
       ))}
     </>

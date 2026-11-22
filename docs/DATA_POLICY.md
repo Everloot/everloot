@@ -962,6 +962,12 @@ deletes what was synced for them. The `achievements` category keeps only titles,
 Raids and boss kills stay. The list below describes the categories as they were before this amendment; the retired
 ones stop when the migration that deletes them is applied.
 
+Amended 22 November 2026, to be accepted by the maintainer in PR review (migration
+`20261123100000_private_sync_gold.sql`): a `gold` category, the character's own lifetime gold statistics as the
+game's Statistics window shows them, which Blizzard's character API does not return. The addon reads them only for the
+character you are logged in with, keeps them in your SavedVariables file, never puts them in an upload, and the Desktop
+App sends them only for a character you linked. Gold is never ranked.
+
 A signed-in player can sync their own linked characters' progress to their account and choose which parts of it
 their character's public page shows. Like saved builds and profiles, this is the player's own data, not an
 observation of anyone else, and none of it is published as a dataset.
@@ -972,7 +978,10 @@ observation of anyone else, and none of it is published as a dataset.
   difficulty, bosses killed, reset), achievements this character earned and titles held, the character sheet's stats
   (attributes, attack power, hit, crit, haste, expertise, spell power, healing, armor, defense, dodge, parry, block, as the
   game's character window shows them) and PvP standing (rank, rank points toward the next rank, top rank, season,
-  lifetime honorable kills). Each category has its own switch and every category starts off. The
+  lifetime honorable kills), and lifetime gold (from 22 November 2026: fifteen of the Statistics window's Wealth and
+  auction entries, such as total gold acquired, most gold ever owned, gold spent on travel and auctions posted; a
+  statistic the game did not give is left out, never stored as zero). Each category has its own switch and every
+  category starts off. The
   Desktop App sends these with a key made with "Sync my linked characters" (`sync:own`); that key can send and
   nothing else. It cannot turn a category on, change what the page shows, or list anything.
 - **The link decides, not the computer.** A synced row is kept only when the account that sent it holds a live
@@ -985,8 +994,8 @@ observation of anyone else, and none of it is published as a dataset.
   id, the addon's character key and the character's name are not stored with a synced row.
 - **Private by default.** Synced data is shown only to the player, on a signed-in preview of the character. It
   appears on the public page only when the page is on and the player has also switched that section on: gear,
-  stats, talents, PvP, professions, reputations, raids, and achievements and titles (under Collections), each on
-  its own switch, all off by default. A frozen or hidden character shows none of it, to anyone. The page says the data is
+  stats, talents, PvP, professions, reputations, raids, achievements and titles (under Collections), and gold
+  (`show_gold`), each on its own switch, all off by default. A frozen or hidden character shows none of it, to anyone. The page says the data is
   self-reported through the Everloot addon and not checked against Blizzard; it never says verified.
 - **Names on the page.** An item is named only when three installs agree on its name; otherwise it reads
   "Item <id>". Factions, achievements and titles are named only when the catalog's three-install rule agrees on

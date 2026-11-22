@@ -48,6 +48,45 @@ test("the summary is the signed-in account's own characters, one row each and a 
   expect(html).toContain('href="/armory/eu/velkara-duskmantle"');
 });
 
+test("with private sync off the page reads no synced facts and shows no gold", async () => {
+  const html = await render();
+  expect(auth.authQuery.mock.calls.map((c) => c[0])).not.toContain("rpc/own_character_facts");
+  expect(html).not.toContain("Total gold acquired");
+  expect(html).not.toContain("Not reported");
+});
+
+test("with private sync on, the addon's gold joins each of the account's own characters; most ever owned is one character's", async () => {
+  vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1");
+  const links = [...OWN, { link_id: "4d8f3e3f-5f65-4c6f-9c73-5f4c3f2e1f44", region: "eu", slug: "orla-fenwick" }];
+  const gold: Record<string, Record<string, number>> = {
+    [OWN[0]!.link_id]: { "328": 1_150_905, "334": 2_000_000 },
+    [OWN[1]!.link_id]: { "328": 50, "334": 30 },
+  };
+  auth.authQuery.mockImplementation(async (path: string, init: { body: string }) => {
+    if (path === "rpc/armory_own_links") return links;
+    if (path === "rpc/own_character_facts") {
+      const stats = gold[JSON.parse(init.body).p_link_id];
+      return [
+        { category: "raids", consented: false, captured_at: null, data: null },
+        stats ? { category: "gold", consented: true, captured_at: at, data: { stats } } : { category: "gold", consented: false, captured_at: null, data: null },
+      ];
+    }
+    throw new Error(`unexpected ${path}`);
+  });
+  const html = await render();
+  const reads = auth.authQuery.mock.calls.filter((c) => c[0] === "rpc/own_character_facts").map((c) => JSON.parse(c[1].body));
+  // Only the signed-in account's own links, each read as that account.
+  expect(reads).toEqual(expect.arrayContaining(links.map((l) => ({ p_user_id: USER.id, p_link_id: l.link_id }))));
+  expect(reads).toHaveLength(links.length);
+  for (const text of ["Total gold acquired", "Most gold ever owned (one character)", "from your addon"]) expect(html, text).toContain(text);
+  // 1,150,905 + 50 copper; the most ever owned total is the largest, not the sum.
+  expect(html).toContain("115 gold 9 silver 55 copper");
+  expect(html).toContain("200 gold 0 silver 0 copper");
+  expect(html).not.toContain("200 gold 0 silver 30 copper");
+  // Orla has no gold fact: "Not reported", never 0.
+  expect(html.match(/Not reported/g)).toHaveLength(2);
+});
+
 test("signed out goes to sign-in; with the armory or links off there is no page", async () => {
   auth.getUser.mockResolvedValue(null);
   await expect(render()).rejects.toThrow("NEXT_REDIRECT");

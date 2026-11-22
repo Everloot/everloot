@@ -251,6 +251,19 @@ and nothing is sent. The last 50 finished sessions are kept in `EverlootDB.gph.s
 The running session is `EverlootDB.gph.current` (item counts in `counts`, by item id); `EverlootDB.gph.cut`
 holds the cut setting.
 
+### Lifetime gold
+
+With the gold switch on, the addon reads fifteen of the Statistics window's Wealth and auction entries for the
+character you are logged in with: total gold acquired, looted, from quests, from vendors and from auctions, most gold
+ever owned, the largest bid and sale, gold spent on travel, barber shops, postage and talent respecs, auctions posted
+and bought, and talent respecs. It reads them at login, after your money changes and at logout, never in combat, and
+keeps one `wealth_owned` row per character (the latest read) in your SavedVariables file. A statistic the game does not
+give is left out, never written as zero. No other player is read.
+
+`wealth_owned` never goes in an upload. It leaves your computer only through the Everloot Desktop App's private sync,
+for a character you linked, and everloot.app keeps it only if you turned that character's gold sync on; its page shows
+it only if you also turn on "Show gold". Turning the gold switch off deletes the rows.
+
 ## Completion tracker
 
 On in a new install; an older install keeps its choice. `/everloot completion on` (then `/reload`) enables it when off. It reads the game's achievement, reputation, title and quest

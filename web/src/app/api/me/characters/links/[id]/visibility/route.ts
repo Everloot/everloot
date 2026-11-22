@@ -15,11 +15,11 @@ import { validId } from "@/lib/saved-builds";
  * exactly as an unknown one, 404. Any change clears the page and both cards from the Next cache. 404 unless both
  * EVERLOOT_CHARACTER_LINKS=1 and EVERLOOT_SHOWCASE=1.
  *
- * With EVERLOOT_PRIVATE_SYNC=1 the synced sections' switches are taken too (showcase plan S6): show_raids and
- * show_collections. Each publishes only that section's synced facts, and only while sync for it stays on.
+ * With EVERLOOT_PRIVATE_SYNC=1 the synced sections' switches are taken too (showcase plan S6): show_raids,
+ * show_collections and show_gold. Each publishes only that section's synced facts, and only while sync for it stays on.
  * With EVERLOOT_ARMORY=1 the switches of Blizzard's parts are taken too: show_gear, show_stats, show_talents, show_pvp,
- * show_professions, show_reputations, show_collections and show_history (character-armory.ts). Gold, guild and every ranking switch
- * stay refused.
+ * show_professions, show_reputations, show_collections and show_history (character-armory.ts). Guild and every ranking switch
+ * stay refused; gold is never ranked.
  */
 export const dynamic = "force-dynamic";
 

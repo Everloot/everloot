@@ -113,5 +113,7 @@ export function sampleShowcase(now: Date): ShowcaseInput {
       ],
     },
     professions: { state: "shown", asOf: recent, data: [{ name: "Mining", rank: 300, maxRank: 300 }, { name: "Blacksmithing", rank: 280, maxRank: 300 }, { name: "First Aid", rank: 225, maxRank: 300 }] },
+    // Two statistics left out, as the game can leave them: they draw as "Not reported".
+    gold: { state: "shown", asOf: recent, data: { stats: { "328": 12_345_600, "333": 4_000_000, "326": 3_000_000, "921": 2_500_000, "919": 2_845_600, "1146": 150_000, "1148": 2_000, "1147": 0, "329": 120, "330": 45, "332": 500_000, "331": 250_000, "334": 1_500_000 } } },
   };
 }

@@ -149,6 +149,29 @@ export interface CollectionsData {
   quests: number | null;
 }
 
+/**
+ * The addon's lifetime gold statistics for the character, keyed by statistic id ("328"). A statistic the game did
+ * not report is absent, and is drawn as "Not reported", never a zero. Gold is never ranked.
+ */
+export interface GoldData { stats: Record<string, number> }
+/** The four groups the Gold section draws, each statistic under its label; money ids are copper, the rest counts. */
+export const GOLD_GROUPS: { group: string; stats: { id: string; label: string; money: boolean }[] }[] = [
+  { group: "Income", stats: [
+    { id: "328", label: "Total gold acquired", money: true }, { id: "333", label: "Looted", money: true }, { id: "326", label: "Quest rewards", money: true },
+    { id: "921", label: "Vendors", money: true }, { id: "919", label: "Auctions", money: true },
+  ] },
+  { group: "Spending", stats: [
+    { id: "1146", label: "Travel", money: true }, { id: "1148", label: "Postage", money: true }, { id: "1147", label: "Barber shops", money: true },
+    { id: "1150", label: "Talent respecs", money: true },
+  ] },
+  { group: "Auctions", stats: [
+    { id: "329", label: "Posted", money: false }, { id: "330", label: "Purchases", money: false }, { id: "332", label: "Largest sale", money: true },
+    { id: "331", label: "Largest bid", money: true },
+  ] },
+  { group: "Records", stats: [{ id: "334", label: "Most gold ever owned", money: true }, { id: "1149", label: "Talent respecs", money: false }] },
+];
+export const NOT_REPORTED = "Not reported";
+
 export interface ShowcaseInput {
   /** Fixtures only: the page and card say so. */
   sample: boolean;
@@ -176,10 +199,12 @@ export interface ShowcaseInput {
   reputations: Section<ReputationRow[]>;
   raids: Section<RaidsData>;
   collections: Section<CollectionsData>;
+  /** Only from a synced gold fact the owner shows (`show_gold`); never on the card or in the header. */
+  gold: Section<GoldData>;
 }
 
-export type SectionKey = "gear" | "stats" | "talents" | "pvp" | "raids" | "collections" | "reputations" | "professions";
-/** Page order: the character sheet first, then what the character has done, then its standing and trades. */
+export type SectionKey = "gear" | "stats" | "talents" | "pvp" | "raids" | "collections" | "reputations" | "professions" | "gold";
+/** Page order: the character sheet first, then what the character has done, then its standing and trades, then gold. */
 export const SECTION_TITLES: Record<SectionKey, string> = {
   gear: "Gear",
   stats: "Stats",
@@ -189,6 +214,7 @@ export const SECTION_TITLES: Record<SectionKey, string> = {
   collections: "Progress",
   reputations: "Reputations",
   professions: "Professions",
+  gold: "Gold",
 };
 
 /** The lines each state stands for; nothing is estimated in their place. */

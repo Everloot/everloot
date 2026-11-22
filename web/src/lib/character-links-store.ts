@@ -208,7 +208,7 @@ export async function ownLinkPath(userId: string, id: string): Promise<string | 
  */
 export type VisibilityFlags = {
   page_public?: boolean; indexable?: boolean;
-  show_gear?: boolean; show_stats?: boolean; show_talents?: boolean; show_pvp?: boolean; show_professions?: boolean; show_reputations?: boolean; show_raids?: boolean; show_collections?: boolean; show_history?: boolean;
+  show_gear?: boolean; show_stats?: boolean; show_talents?: boolean; show_pvp?: boolean; show_professions?: boolean; show_reputations?: boolean; show_raids?: boolean; show_collections?: boolean; show_history?: boolean; show_gold?: boolean;
 };
 
 /** Sets the given switches through `set_visibility`. False when the link is not the account's. */
