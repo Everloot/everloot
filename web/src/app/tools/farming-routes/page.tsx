@@ -9,6 +9,7 @@ import { npcRows } from "@/lib/world-lists";
 import { LINK } from "../../database/entity";
 import { LEVEL_BRACKETS, listHref, listMetadata, range, rangeParam, type Search } from "../../database/list-parts";
 import FarmAreaTable from "./area-table";
+import { loadStoredFarmAreas } from "@/lib/farm-areas-store";
 
 const META = {
   title: "WoW Forever Farming",
@@ -68,9 +69,11 @@ export default async function FarmingRoutesPage(props: { searchParams?: Promise<
   if (to) permanentRedirect(to);
   const q = farmQuery(search);
   if (!q) notFound();
-  const [facts, { rates }] = await Promise.all([loadWorldFacts(), computeRollups()]);
-  const down = facts.unreachable;
-  const mobs = farmingAreas(down ? [] : npcRows(facts, rates), down ? [] : rates);
+  // The areas the stored-views job stored (lib/farm-areas-store.ts), a few KB; without them, the aggregates.
+  const stored = await loadStoredFarmAreas();
+  const live = stored ? null : await Promise.all([loadWorldFacts(), computeRollups()]);
+  const down = live ? live[0].unreachable : false;
+  const mobs = stored ? stored.areas : farmingAreas(down || !live ? [] : npcRows(live[0], live[1].rates), down || !live ? [] : live[1].rates);
   const areas: Record<FarmCategory, typeof mobs.gold> = { gold: mobs.gold, reputation: [] };
   const here = (over: FarmQuery) => href({ ...q, ...over });
 
