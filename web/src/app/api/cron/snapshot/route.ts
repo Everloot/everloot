@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { sharingStore, uploadStore } from "@/lib/upload-store";
+import { uploadStore } from "@/lib/upload-store";
 import { intakeQuota } from "@/lib/intake-quota";
 import { pruneKeys } from "@/lib/api-keys";
 import { guardOn } from "@/lib/data-guard";
 import { playerPagesOn } from "@/lib/player-pages";
 import { playerStore } from "@/lib/player-store";
 import { pullStore } from "@/lib/pull-store";
-import { releaseKept, runStoredViews } from "@/lib/stored-views-run";
+import { runStoredViews } from "@/lib/stored-views-run";
+import { nothingToFold, runSnapshotPass, type SnapshotWork } from "@/lib/snapshot-pass";
 import { dispatchStoredViews } from "@/lib/stored-views-dispatch";
 
 /**
@@ -34,18 +35,7 @@ export async function GET(req: Request) {
   }
   const rebuild = new URL(req.url).searchParams.get("rebuild") === "1";
   try {
-    const work = rebuild ? { idle: false, retryRollups: false, dataAsOf: null, settledWeek: null } : await uploadStore.snapshotWork();
-    const idle = work.idle && !rebuild;
-    // A corpus failure is reported at the end, after the rollups that do not depend on it have run.
-    let result: { added: number; skipped?: boolean; dataAsOf: string | null } | null = null;
-    try {
-      result = idle ? { added: 0, skipped: true, dataAsOf: work.dataAsOf } : await uploadStore.writeSnapshot({ rebuild });
-    } catch (err) {
-      console.error("snapshot failed", err);
-    }
-    // The write keeps the corpus it wrote for pages. The rollups below never read it, and beside them it outgrew the
-    // Worker on runs with new uploads (#1354); the coverage step reads it again from the parts.
-    releaseKept();
+    const work: SnapshotWork = rebuild ? { idle: false, retryRollups: false, dataAsOf: null, settledWeek: null } : await uploadStore.snapshotWork();
     await intakeQuota.prune();
     // Key retention (lib/api-keys.ts) runs only once the data guard's tables exist; a failure is retried next run.
     if (guardOn()) {
@@ -58,55 +48,29 @@ export async function GET(req: Request) {
     // Pull summaries are kept a year after they were received, switch on or off: turning collection off must not keep
     // what was collected. Before the migration there is nothing to prune, and the store says so without an error.
     try { await pullStore().prune(); } catch (err) { console.error("pull retention failed", err); }
-    // The market has its own watermark, so a failure here leaves the corpus snapshot current
-    // and the next run retries the same uploads.
-    // `dropped` scans hit a fold cap, `released` open scans were let go to make room for newer ones, and `trimmedDays` of
-    // closed history went to fit the size limit: each says the rollup is full, which is otherwise invisible.
-    let market: { added: number; scans: number; remaining?: number; dropped?: number; released?: number; trimmedDays?: number } | null = null;
-    try {
-      market = await uploadStore.writeMarket(idle && !work.retryRollups ? { idle: true } : { rebuild });
-    } catch (err) {
-      console.error("market rollup failed", err);
+    // With EVERLOOT_SNAPSHOT at "job", a run with something to fold starts the stored-views job, which folds it on a
+    // GitHub runner and then builds the views (lib/snapshot-pass.ts, scripts/stored-views.ts): writing the corpus
+    // means holding all of it, and it outgrew the Worker's 128 MB (#1354). A run with nothing to fold still writes the
+    // heartbeat here. If the job cannot be started (no token, or GitHub refused), this run folds the uploads itself, as
+    // before the hand-over. A rebuild always runs here.
+    let viewsJob: "sent" | "off" | "failed" = "off";
+    if (process.env.EVERLOOT_SNAPSHOT === "job" && !rebuild && !nothingToFold(work)) {
+      try { viewsJob = await dispatchStoredViews(); } catch (err) { console.error("stored-views dispatch failed", err); viewsJob = "failed"; }
+      if (viewsJob === "sent") return NextResponse.json({ ok: true, rebuild, snapshotJob: "sent", viewsJob });
     }
-    // The completion rollup has its own watermark too, and runs after the market so it cannot starve it.
-    let completion: { added: number; remaining: number; trimmed: number; rebuilding: boolean } | null = null;
-    try {
-      completion = idle && !work.retryRollups
-        ? { added: 0, remaining: 0, trimmed: 0, rebuilding: false }
-        : await uploadStore.writeCompletion({ rebuild, authority: () => sharingStore.loadState() });
-    } catch (err) {
-      console.error("completion rollup failed", err);
+    const pass = await runSnapshotPass(rebuild, work);
+    if (!pass.ok) {
+      const { error, result, market, completion } = pass;
+      if (!result) return NextResponse.json({ ok: false, error, rebuild, market, completion }, { status: 500 });
+      if (!market) return NextResponse.json({ ok: false, error, rebuild, ...result, completion }, { status: 500 });
+      return NextResponse.json({ ok: false, error, rebuild, ...result, market }, { status: 500 });
     }
-    // The census snapshot keeps its own watermark too: pages read it instead of every upload (lib/upload-store.ts).
-    // A failure is logged and the pages keep the last snapshot; the next run retries the same uploads.
-    let census: { added: number; rows: number; remaining: number; skipped?: boolean } | null = null;
-    try {
-      census = await uploadStore.writeCensus(idle && !work.retryRollups ? { idle: true } : { rebuild });
-    } catch (err) {
-      console.error("census snapshot failed", err);
-    }
-    releaseKept();
-    if (!result) return NextResponse.json({ ok: false, error: "snapshot failed", rebuild, market, completion }, { status: 500 });
-    if (!market) return NextResponse.json({ ok: false, error: "market rollup failed", rebuild, ...result, completion }, { status: 500 });
-    if (!completion) return NextResponse.json({ ok: false, error: "completion rollup failed", rebuild, ...result, market }, { status: 500 });
-    // The heartbeat: the corpus and the rollups are current. Everything below is a stored view or file that is rewritten
-    // whenever its stamp is not the snapshot's, so an idle run catches up on one a run could not write. A run with new
-    // uploads replays the whole corpus for them and ran out of the Worker's memory partway through them, so they come
-    // after it (#1354); /api/health says whether this pipeline runs, not whether every view finished.
-    // A rollup with uploads left over is pending: the next run folds them even when no new upload arrived. The settled
-    // week the heartbeat carried is kept as it was; the settled list's own stamp now carries its week.
-    await uploadStore.writeCronRun(
-      completion.remaining > 0 || completion.rebuilding || (market.remaining ?? 0) > 0 || (census?.remaining ?? 0) > 0,
-      result.dataAsOf,
-      work.settledWeek ?? null,
-    );
+    const { result, market, completion, census, folded } = pass;
     // A run that folded uploads into the corpus or a rollup starts the stored-views job (lib/stored-views-dispatch.ts):
     // GitHub's schedule for it runs late or not at all, a dispatched run starts at once. So does the first run of each
     // hour, so the auction reports and a view a failed job run left behind wait at most an hour. A failed dispatch is
     // logged; the schedule is the backstop.
-    const folded = result.added > 0 || market.added > 0 || completion.added > 0 || (census?.added ?? 0) > 0;
-    let viewsJob: "sent" | "off" | "failed" = "off";
-    if (folded || rebuild || new Date().getUTCMinutes() < 10) {
+    if (viewsJob !== "failed" && (folded || rebuild || new Date().getUTCMinutes() < 10)) {
       try { viewsJob = await dispatchStoredViews(); } catch (err) { console.error("stored-views dispatch failed", err); viewsJob = "failed"; }
     }
     // The settled list, the stored views, the guild ladder, the boards, the coverage score and the auction reports

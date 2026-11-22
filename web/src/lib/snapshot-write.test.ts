@@ -140,3 +140,46 @@ describe("the snapshot is stored in parts (#1354)", () => {
     expect(await createUploadStore({ cloud, localDir: "unused", fetch }).loadCorpus()).toMatchObject({ records: [], unreachable: true });
   });
 });
+
+describe("sweepSnapshotParts", () => {
+  test("deletes only part folders no list names that are older than the guard, and keeps the current and retired ones", async () => {
+    const folders = {
+      current: "snapshots/corpus/20261122T141012492Z-40861935/",
+      retired: "snapshots/corpus/20261122T140012866Z-9e2bc02f/",
+      orphan: "snapshots/corpus/20261122T130023898Z-00074976/",
+      fresh: "snapshots/corpus/20261122T143500000Z-aaaaaaaa/",
+      odd: "snapshots/corpus/handmade/",
+    };
+    const objects = new Set(Object.values(folders).flatMap((f) => [`${f}0.json`, `${f}1.json`]));
+    const mark = { format: 2, parts: [`${folders.current}0.json`, `${folders.current}1.json`], retired: [`${folders.retired}0.json`, `${folders.retired}1.json`] };
+    const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      const url = new URL(req.url);
+      if (url.searchParams.get("list-type") === "2") {
+        const prefix = url.searchParams.get("prefix") ?? "";
+        const keys = [...objects].filter((k) => k.startsWith(prefix)).map((k) => `<Contents><Key>${k}</Key></Contents>`).join("");
+        return new Response(`<ListBucketResult><IsTruncated>false</IsTruncated>${keys}</ListBucketResult>`);
+      }
+      if (url.pathname.endsWith("snapshots/corpus.json")) return Response.json(mark);
+      if (req.method === "DELETE") { objects.delete(url.pathname.replace("/bucket/", "")); return new Response(null, { status: 204 }); }
+      return new Response("missing", { status: 404 });
+    }) as typeof globalThis.fetch;
+    const store = createUploadStore({ cloud, localDir: "unused", fetch, now: () => new Date("2026-11-22T14:40:00Z") });
+    expect(await store.sweepSnapshotParts(60 * 60_000)).toEqual({ folders: 1, objects: 2 });
+    expect([...objects].some((k) => k.startsWith(folders.orphan))).toBe(false);
+    for (const f of [folders.current, folders.retired, folders.fresh, folders.odd]) expect([...objects].filter((k) => k.startsWith(f))).toHaveLength(2);
+  });
+
+  test("a snapshot without a part list deletes nothing", async () => {
+    let deletes = 0;
+    const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      if (req.method === "DELETE") deletes++;
+      if (req.url.includes("snapshots/corpus.json")) return Response.json({ format: 1, records: [] });
+      return new Response("<ListBucketResult><Contents><Key>snapshots/corpus/20261101T000000000Z-aaaaaaaa/0.json</Key></Contents></ListBucketResult>");
+    }) as typeof globalThis.fetch;
+    const store = createUploadStore({ cloud, localDir: "unused", fetch, now: () => new Date("2026-11-22T14:40:00Z") });
+    expect(await store.sweepSnapshotParts()).toEqual({ folders: 0, objects: 0 });
+    expect(deletes).toBe(0);
+  });
+});

@@ -321,6 +321,42 @@ publication pass reads the same opt-outs whatever the other workflows' `SUPABASE
 **Going back:** remove the var (or roll the cron Worker back) and the cron Worker builds the views
 again; set `STORED_VIEWS_JOB` to anything but `on` to stop the job.
 
+## The snapshot on the job
+
+After the views moved, the cron Worker still ran out of memory about once an hour on runs with new
+uploads, before its heartbeat (#1354). Writing the corpus snapshot means holding every event of it,
+and the corpus grew from 28 MB of parts on 2026-11-20 to 38 MB on 2026-11-22. Each run that died
+after writing its parts and before the part list left a 30–40 MB folder of parts that no snapshot
+named; four of them had piled up by 2026-11-22.
+
+With `"EVERLOOT_SNAPSHOT": "job"` in both wrangler files (since 2026-11-22), the snapshot route
+probes first (`snapshotWork`: one upload-index query and the small part list) and prunes as before.
+Then:
+
+- **Something to fold** (new uploads, or a rollup the heartbeat says is behind): it starts the
+  stored-views job and answers `snapshotJob: "sent"`. The job folds the uploads into the corpus,
+  the market, completion and census rollups, and writes the heartbeat (`runJobFold` in
+  `web/src/lib/snapshot-pass.ts`, the same `runSnapshotPass` the Worker ran). Then it builds the
+  views for that snapshot. A local dry run of the whole fold against production, with every write
+  blocked, took 6 seconds and peaked at 466 MB for the whole Node process.
+- **Nothing to fold:** the Worker writes the heartbeat itself, as before, so `/api/health` stays
+  fresh between job runs.
+- **GitHub refuses the start, or there is no token:** the Worker folds the uploads itself, as
+  before the hand-over. A `?rebuild=1` run always folds on the Worker.
+
+The job and the Worker can never overwrite each other. The corpus part list and the rollups are
+written with ETag conditions, so a second writer fails instead of losing the first one's work.
+
+Each job run also sweeps `snapshots/corpus/`. It deletes part folders that the current part list
+names in neither `parts` nor `retired`, but only when their name says they are more than an hour
+old (`sweepSnapshotParts` in `web/src/lib/upload-store.ts`). The job's output shows the count
+under `fold.swept`. A fold that fails is named `snapshot` in the job's `failed`, so the run shows
+red and `/api/health` reports the views as `failing`. The heartbeat then stops advancing, and
+after 30 minutes `/api/health` answers 503.
+
+**Going back:** remove `EVERLOOT_SNAPSHOT` from both wrangler files. The cron Worker then folds
+every run itself, and the job only builds views.
+
 ## What `/api/health` answers
 
 `web/src/app/api/health/route.ts` answers JSON `{ ok, snapshot }` with `Cache-Control: no-store`.

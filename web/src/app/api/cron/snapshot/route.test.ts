@@ -172,7 +172,7 @@ test("a corpus failure still folds the market and completion, is reported, and n
   store.writeMarket.mockImplementation(async () => { order.push("market"); return { added: 3, scans: 7 }; });
   store.writeCompletion.mockImplementation(async () => { order.push("completion"); return { added: 1, remaining: 0, trimmed: 0, rebuilding: false }; });
   const res = await GET(req());
-  expect(order).toEqual(["snapshot", "prune", "market", "completion"]);
+  expect(order).toEqual(["prune", "snapshot", "market", "completion"]);
   expect(res.status).toBe(500);
   expect(await res.json()).toMatchObject({ ok: false, error: "snapshot failed", market: { added: 3, scans: 7 }, completion: { added: 1 } });
   expect(store.writeMarket).toHaveBeenCalledWith({ rebuild: false });
@@ -494,4 +494,57 @@ test("the heartbeat is written before the settled list, the stored views, the gu
   // Released after the corpus write, after the rollups, after each corpus view and around the steps after the heartbeat.
   expect(store.forgetReads.mock.calls.length).toBeGreaterThanOrEqual(11);
   expect(store.forgetPublished.mock.calls.length).toBe(store.forgetReads.mock.calls.length);
+});
+
+test("with the snapshot on the job, a run with something to fold starts the job and folds nothing itself; it still prunes", async () => {
+  vi.stubEnv("EVERLOOT_SNAPSHOT", "job");
+  vi.stubEnv("EVERLOOT_STORED_VIEWS", "job");
+  try {
+    dispatch.dispatchStoredViews.mockResolvedValue("sent");
+    store.snapshotWork.mockResolvedValue({ idle: false, retryRollups: false, dataAsOf: "2026-11-22T14:10:12Z", settledWeek: null });
+    const res = await GET(req());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, rebuild: false, snapshotJob: "sent", viewsJob: "sent" });
+    expect(store.prune).toHaveBeenCalled();
+    expect(store.writeSnapshot).not.toHaveBeenCalled();
+    expect(store.writeMarket).not.toHaveBeenCalled();
+    expect(store.writeCronRun).not.toHaveBeenCalled();
+    // A rollup still pending is something to fold too.
+    store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: true, dataAsOf: "2026-11-22T14:10:12Z", settledWeek: null });
+    expect(await (await GET(req())).json()).toMatchObject({ snapshotJob: "sent" });
+    expect(store.writeMarket).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllEnvs();
+    vi.stubEnv("CRON_SECRET", "synthetic-cron-key");
+  }
+});
+
+test("with the snapshot on the job, a run with nothing to fold writes the heartbeat here, and a job GitHub will not start is folded here", async () => {
+  vi.stubEnv("EVERLOOT_SNAPSHOT", "job");
+  vi.stubEnv("EVERLOOT_STORED_VIEWS", "job");
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-11-22T14:20:00.000Z"));
+  try {
+    store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: false, dataAsOf: "2026-11-22T14:10:12Z", settledWeek: null });
+    expect(await (await GET(req())).json()).toMatchObject({ ok: true, skipped: true, viewsJob: "off", storedViews: "job" });
+    expect(store.writeCronRun).toHaveBeenCalledOnce();
+    expect(dispatch.dispatchStoredViews).not.toHaveBeenCalled();
+    // GitHub refuses the start: this run folds the uploads itself and does not ask GitHub a second time.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    dispatch.dispatchStoredViews.mockRejectedValue(new Error("stored-views dispatch failed (401)"));
+    store.snapshotWork.mockResolvedValue({ idle: false, retryRollups: false, dataAsOf: "2026-11-22T14:10:12Z", settledWeek: null });
+    store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-11-22T14:20:05.000Z" });
+    expect(await (await GET(req())).json()).toMatchObject({ ok: true, added: 2, viewsJob: "failed", storedViews: "job" });
+    expect(store.writeSnapshot).toHaveBeenCalledOnce();
+    expect(store.writeCronRun).toHaveBeenCalledTimes(2);
+    expect(dispatch.dispatchStoredViews).toHaveBeenCalledOnce();
+    // A rebuild always runs here.
+    dispatch.dispatchStoredViews.mockReset().mockResolvedValue("sent");
+    await GET(req(undefined, "?rebuild=1"));
+    expect(store.writeSnapshot).toHaveBeenLastCalledWith({ rebuild: true });
+  } finally {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+    vi.stubEnv("CRON_SECRET", "synthetic-cron-key");
+  }
 });

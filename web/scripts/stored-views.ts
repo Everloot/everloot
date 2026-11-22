@@ -10,7 +10,9 @@
  * Worker's own vars in wrangler.cron.jsonc, so the job builds exactly what the Worker would.
  *   npm run stored-views              # each view whose stamp is not the heartbeat's snapshot
  *   npm run stored-views -- --rebuild # every view
- * Exits 1 when a view failed, so the run shows red.
+ * With EVERLOOT_SNAPSHOT at "job" in those vars it first folds new uploads into the corpus and the rollups and writes
+ * the cron heartbeat, as the cron Worker did, then sweeps corpus parts no snapshot names (lib/snapshot-pass.ts).
+ * Exits 1 when the fold or a view failed, so the run shows red.
  */
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -36,8 +38,16 @@ async function main(): Promise<void> {
   // Imported after the vars are set: the stores read them when they load.
   const { runStoredViewsJob } = await import("../src/lib/stored-views-run");
   const started = Date.now();
-  const result = await runStoredViewsJob({ rebuild: process.argv.includes("--rebuild") });
-  console.log(JSON.stringify({ ...result, seconds: Math.round((Date.now() - started) / 1000) }, null, 2));
+  // With EVERLOOT_SNAPSHOT at "job" (wrangler.cron.jsonc), the cron Worker hands each run with something to fold to
+  // this job, which folds it here before the views are built for it (lib/snapshot-pass.ts).
+  let fold: Awaited<ReturnType<typeof import("../src/lib/snapshot-pass").runJobFold>> | null = null;
+  if (process.env.EVERLOOT_SNAPSHOT === "job") {
+    const { runJobFold } = await import("../src/lib/snapshot-pass");
+    fold = await runJobFold();
+  }
+  const failedBefore = fold?.status === "failed" ? ["snapshot"] : [];
+  const result = await runStoredViewsJob({ rebuild: process.argv.includes("--rebuild"), failedBefore });
+  console.log(JSON.stringify({ fold, ...result, seconds: Math.round((Date.now() - started) / 1000) }, null, 2));
   if (result.failed.length) {
     console.error(`failed: ${result.failed.join(", ")}`);
     process.exitCode = 1;
