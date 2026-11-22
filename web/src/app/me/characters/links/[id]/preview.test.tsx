@@ -108,6 +108,34 @@ test("the owner sees every synced section, switched on or not, each kept categor
   for (const secret of [USER.id, "a".repeat(64), "b".repeat(64), "Thrall#1"]) expect(html).not.toContain(secret);
 });
 
+test("the owner sees the Gold section from the addon whether show_gold is on or off", async () => {
+  const gold = { category: "gold", consented: true, captured_at: "2026-10-31T09:00:00+00:00", data: { stats: { "328": 1_150_905, "329": 1077 } } };
+  for (const showGold of [false, true]) {
+    answer([{ ...LINK, character_visibility: { ...LINK.character_visibility, show_gold: showGold } }], [...OWN, gold]);
+    const html = await render();
+    expect(html).toContain(`data-category="gold" data-sync="on" data-public="${showGold ? "on" : "off"}"`);
+    expect(html).toContain('data-section="gold" data-state="shown"');
+    const at = html.indexOf('data-section="gold"');
+    const section = html.slice(at, html.indexOf("</section>", at));
+    expect(section).toContain("From your addon");
+    expect(section).toContain("Total gold acquired");
+    expect(section).toContain("115 gold 9 silver 5 copper");
+    expect(section).toContain("1,077");
+    expect(section).toContain("Not reported");
+    expect(html).not.toMatch(/consistent|misconduct/i);
+  }
+});
+
+test("with no gold synced the owner's preview says so, never a zero", async () => {
+  answer([LINK]);
+  const html = await render();
+  const at = html.indexOf('data-section="gold"');
+  expect(at).toBeGreaterThan(-1);
+  const section = html.slice(at, html.indexOf("</section>", at));
+  expect(section).toContain("Nothing synced for this yet.");
+  expect(section).not.toContain("Total gold acquired");
+});
+
 test("a frozen link shows no synced section and says why", async () => {
   answer([{ ...LINK, status: "frozen" }], OWN.map((r) => ({ ...r, captured_at: null, data: null })));
   const html = await render();

@@ -338,7 +338,46 @@ describe("published sections (private sync, S6)", () => {
       const html = await render();
       expect(html).toContain("Thrallina");
       expect(html).not.toContain("Molten Core");
+      expect(html).not.toContain('data-section="gold"');
     }
+  });
+
+  /** The addon's lifetime gold statistics, as public_character_facts returns them only while show_gold is on. */
+  const GOLD = {
+    category: "gold", captured_at: "2026-10-31T09:00:00+00:00",
+    data: { stats: { "328": 1_150_905, "333": 400_000, "334": 2_500_000, "329": 1077, "330": 12, "1146": 9_100 } },
+  };
+
+  test("with show_gold on, the page shows the Gold section from the addon: coins, counts, and Not reported for a missing statistic", async () => {
+    on();
+    answer([GOLD]);
+    const html = await render();
+    expect(html).toContain('data-section="gold" data-state="shown"');
+    expect(html).toContain(">Gold<");
+    expect(html).toContain('href="#showcase-gold"');
+    const at = html.indexOf('data-section="gold"');
+    const gold = html.slice(at, html.indexOf("</section>", at));
+    expect(gold).toContain("From the player&#x27;s addon");
+    expect(gold).toContain("2026-10-31");
+    expect(gold).toContain("Total gold acquired");
+    expect(gold).toContain("115 gold 9 silver 5 copper");
+    expect(gold).toContain("1,077");
+    // Quest rewards (326) was not reported: said so, never a zero.
+    expect(gold).toContain("Not reported");
+    // Gold is never ranked and never judged.
+    expect(gold).not.toMatch(/rank|board|consistent|misconduct/i);
+    expect(html).not.toMatch(/consistent|misconduct/i);
+  });
+
+  test("with show_gold off, public_character_facts leaves gold out and no gold section or number reaches the markup", async () => {
+    on();
+    // The owner's switch is off: the database returns no gold fact (supabase/tests/private_sync_gold.sql).
+    answer([RAIDS]);
+    const html = await render();
+    expect(html).toContain("Molten Core");
+    expect(html).not.toContain('data-section="gold"');
+    expect(html).not.toContain("showcase-gold");
+    for (const absent of ["Total gold acquired", "Not reported", "115 gold", "1,077", "From the player&#x27;s addon"]) expect(html).not.toContain(absent);
   });
 
   test("the cards draw from the published sections too", async () => {

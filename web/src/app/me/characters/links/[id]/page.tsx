@@ -27,7 +27,7 @@ export const metadata: Metadata = { title: "Character preview", robots: { index:
 
 const link = "text-fg underline decoration-edge underline-offset-4 hover:decoration-fg";
 /** The section each category fills on the page. */
-const SECTION: Record<SyncCategory, SectionKey> = { raids: "raids", achievements: "collections" };
+const SECTION: Record<SyncCategory, SectionKey> = { raids: "raids", achievements: "collections", gold: "gold" };
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -87,7 +87,7 @@ export default async function LinkPreviewPage({ params }: Params) {
     sample: false, path, name: c.name, level: c.level, race: c.race, class: c.class, faction: c.faction, realm: c.realm, title: null, guild: null,
     lastUpload: new Date(c.lastUploadAt).toISOString().slice(0, 10),
     gear: { state: "empty" }, stats: { state: "unsupported" }, talents: { state: "empty" }, pvp: { state: "empty" }, professions: { state: "empty" }, reputations: { state: "empty" },
-    raids: { state: "empty" }, collections: { state: "empty" },
+    raids: { state: "empty" }, collections: { state: "empty" }, gold: { state: "empty" },
   }, facts.length ? factSections(facts, await loadFactNames(facts), now) : {}), now);
   // Blizzard's data for the associated armory character: every part here; the public page shows a part only while its switch is on.
   const armory = c.status === "linked" ? await ownCharacterArmory(user.id, id) : null;
@@ -112,7 +112,7 @@ export default async function LinkPreviewPage({ params }: Params) {
         <Settings link={c} categories={categories} />
         <div className="space-y-8" data-part="preview">
           {/* Only the sections sync still fills: the rest come from Blizzard's API, below. */}
-          {c.status === "linked" && <ShowcaseSections showcase={{ ...showcase, sections: showcase.sections.filter((x) => x.key === "raids" || x.key === "collections") }} preview />}
+          {c.status === "linked" && <ShowcaseSections showcase={{ ...showcase, sections: showcase.sections.filter((x) => x.key === "raids" || x.key === "collections" || x.key === "gold") }} preview />}
           <p className="text-sm text-fg-2">{FOOTER_LINE}</p>
         </div>
         {armory && (

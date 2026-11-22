@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { CollectionsData, RaidsData, Section, ShowcaseInput } from "./character-showcase";
+import type { CollectionsData, GoldData, RaidsData, Section, ShowcaseInput } from "./character-showcase";
 import type { StoredFact } from "./private-sync-store";
 
 /**
@@ -19,6 +19,7 @@ export interface FactNames {
 export interface FactSections {
   raids?: Section<RaidsData>;
   collections?: Section<CollectionsData>;
+  gold?: Section<GoldData>;
 }
 
 // The stored shapes, as private-sync.ts builds them. Read back defensively: a row of any other shape is left out.
@@ -28,6 +29,7 @@ const raidData = z.object({
   })),
 });
 const titleData = z.object({ titleIds: z.array(z.number().int()) });
+const goldData = z.object({ stats: z.record(z.string(), z.number().int().min(0)) });
 
 const day = (iso: string) => new Date(iso).toISOString().slice(0, 10);
 const shown = <T>(fact: StoredFact, data: T): Section<T> => ({ state: "shown", asOf: day(fact.capturedAt), data });
@@ -59,6 +61,13 @@ export function factSections(facts: readonly StoredFact[], names: FactNames, now
         });
         break;
       }
+      case "gold": {
+        // Only the statistics the addon read; one it could not read stays absent, never a zero.
+        const d = goldData.safeParse(fact.data);
+        if (!d.success) break;
+        out.gold = shown(fact, { stats: d.data.stats });
+        break;
+      }
     }
   }
   return out;
@@ -71,7 +80,7 @@ export function factSections(facts: readonly StoredFact[], names: FactNames, now
 export function withFacts(input: ShowcaseInput, sections: FactSections): ShowcaseInput {
   const out: ShowcaseInput = { ...input };
   const dates = [input.lastUpload];
-  for (const key of ["raids", "collections"] as const) {
+  for (const key of ["raids", "collections", "gold"] as const) {
     const s = sections[key];
     if (!s) continue;
     (out as unknown as Record<string, unknown>)[key] = s;

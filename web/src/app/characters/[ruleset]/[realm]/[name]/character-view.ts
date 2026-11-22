@@ -134,6 +134,7 @@ export function characterShowcase({ ruleset, character: c }: Found, now: Date, p
     reputations: { state: "empty" },
     raids: { state: "empty" },
     collections: { state: "empty" },
+    gold: { state: "empty" },
   }, facts), now);
 }
 
