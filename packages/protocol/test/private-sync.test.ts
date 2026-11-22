@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { parseRecords, recordSchemas } from "../src/index.js";
-import { parseSyncRow } from "../src/private-sync.js";
+import { parseSyncRow, SYNC_CATEGORIES, WEALTH_STATS } from "../src/private-sync.js";
 
 const base = { installId: "install-private-1234", capturedAt: "2026-11-05T10:00:00Z", characterKey: "a".repeat(8), class: "MAGE", level: 60 };
 const rows = [
@@ -9,7 +9,9 @@ const rows = [
   { ...base, kind: "talent_owned", treeId: 1, points: 1, nodes: [{ nodeId: 1, ranks: 1, choice: 0 }] },
   { ...base, kind: "stats_owned", stats: { strength: 0, spellPower: 42 } },
   { ...base, kind: "pvp_owned", rank: 0, honorableKills: 12 },
+  { ...base, kind: "wealth_owned", stats: { "328": 1150905, "329": 1077 } },
 ];
+const wealth = rows[5];
 
 describe("private sync transport", () => {
   test.each(rows)("accepts existing $kind payloads and strips unknown fields", (row) => {
@@ -42,6 +44,16 @@ describe("private sync transport", () => {
     ];
     for (const row of invalid) expect(parseSyncRow(row)).toBeNull();
     expect(parseSyncRow({ ...rows[3], stats: { spellPower: 42, futureStat: 1 } })).toEqual({ ...rows[3], stats: { spellPower: 42 } });
+  });
+
+  test("wealth keeps known statistic ids and refuses bad amounts", () => {
+    expect(parseSyncRow({ ...wealth, stats: { "328": 1150905, "999": 5 } })).toEqual({ ...wealth, stats: { "328": 1150905 } });
+    expect(parseSyncRow({ ...wealth, stats: { "334": Number.MAX_SAFE_INTEGER, "1149": 0 } })).toEqual({ ...wealth, stats: { "334": Number.MAX_SAFE_INTEGER, "1149": 0 } });
+    for (const stats of [{ "328": -1 }, { "328": 1.5 }, { "328": "5" }, { "328": Number.MAX_SAFE_INTEGER + 1 }, {}, { "999": 5 }]) {
+      expect(parseSyncRow({ ...wealth, stats })).toBeNull();
+    }
+    expect(Object.values(WEALTH_STATS).flat()).toHaveLength(15);
+    expect(SYNC_CATEGORIES).toContain("gold");
   });
 
   test("rejects unknown kinds and missing rows", () => {

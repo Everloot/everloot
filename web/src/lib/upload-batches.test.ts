@@ -134,6 +134,16 @@ test("the talent a character runs stays on the computer too: talent_owned is hel
   expect(session.held).toMatchObject({ local: 1, invalid: 0 });
   expect(session.batches.join("")).not.toContain("talent_owned");
 });
+test("lifetime gold stays on the computer: wealth_owned is held as local, not invalid, whatever is shared", () => {
+  const wealth = { kind: "wealth_owned", installId: "install-batches", capturedAt: row(1).capturedAt, characterKey: "0a1b2c3d", class: "MAGE", level: 60, stats: { "328": 1150905 } };
+  expect(LOCAL_ONLY_KINDS).toContain("wealth_owned");
+  expect(Object.hasOwn(recordSchemas, "wealth_owned")).toBe(false);
+  for (const sharing of [{}, { gear: true, gold: true, guild: true, collection: true }]) {
+    const session = prepareUpload({ addonVersion: "0.2.0", records: [wealth, row(1)] }, sharing, ["a".repeat(64)]);
+    expect(session.held).toMatchObject({ local: 1, invalid: 0 });
+    for (const text of ["wealth_owned", "1150905"]) expect(session.batches.join("")).not.toContain(text);
+  }
+});
 test("professions and raid lockouts stay on the computer: never in a batch, whatever is shared, and the intake refuses them", () => {
   const key = "0a1b2c3d";
   const profession = { kind: "profession_owned", installId: "install-batches", eventId: "epoch:prof", capturedAt: row(1).capturedAt, characterKey: key, class: "MAGE", level: 60, profession: "Tailoring", skillLine: 197, rank: 250, maxRank: 300 };

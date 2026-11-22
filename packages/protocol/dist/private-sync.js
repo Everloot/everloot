@@ -5,8 +5,8 @@ import { CHARACTER_KEY, INSTALL_ID, recordSchemas } from "./records.js";
  * Private-only kinds must never be added to recordSchemas: public intake rejects them.
  * Authorization, environment gates, visibility switches and storage belong to the server.
  */
-/** What a link can sync, in page order. `stats` and `pvp` are the player's own self-reported numbers. `achievements` is published under the Collections section's switch. */
-export const SYNC_CATEGORIES = ["gear", "stats", "talents", "pvp", "professions", "reputations", "raids", "achievements"];
+/** What a link can sync, in page order. `stats`, `pvp` and `gold` are the player's own self-reported numbers. `achievements` is published under the Collections section's switch. */
+export const SYNC_CATEGORIES = ["gear", "stats", "talents", "pvp", "professions", "reputations", "raids", "achievements", "gold"];
 export const isSyncCategory = (v) => SYNC_CATEGORIES.includes(v);
 /** Characters one request may carry, and rows across them. A full completion file is a few thousand rows. */
 export const SYNC_CHARACTERS_PER_REQUEST = 10;
@@ -108,6 +108,40 @@ export const pvpOwned = ownedBase.extend({
     season: pvpInt.optional(),
     honorableKills: pvpInt.optional(),
 }).refine((r) => r.rank !== undefined || r.honorableKills !== undefined, { message: "pvp needs a rank or honorable kills", path: ["rank"] });
+/**
+ * The Statistics window's Wealth and auction entries the addon reads with GetStatistic: `money` ids are copper,
+ * `counts` are plain counts. Gold is private and never ranked.
+ */
+export const WEALTH_STATS = {
+    money: [328, 333, 326, 921, 919, 334, 331, 332, 1146, 1147, 1148, 1150],
+    counts: [329, 330, 1149],
+};
+const WEALTH_IDS = new Set([...WEALTH_STATS.money, ...WEALTH_STATS.counts].map(String));
+const wealthAmount = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+/**
+ * One linked character's lifetime gold statistics, keyed by statistic id. Unknown ids are dropped, not refused; a row
+ * left with no known id is refused. An unreadable statistic is absent, never a zero.
+ */
+export const wealthOwned = ownedBase.extend({
+    kind: z.literal("wealth_owned"),
+    stats: z.record(z.string(), z.unknown()).transform((raw, ctx) => {
+        const out = {};
+        for (const [key, value] of Object.entries(raw)) {
+            if (!WEALTH_IDS.has(key))
+                continue;
+            if (!wealthAmount.safeParse(value).success) {
+                ctx.addIssue({ code: "custom", message: `${key} must be a whole number of at least 0` });
+                return z.NEVER;
+            }
+            out[key] = value;
+        }
+        if (Object.keys(out).length === 0) {
+            ctx.addIssue({ code: "custom", message: "stats needs at least one known statistic" });
+            return z.NEVER;
+        }
+        return out;
+    }),
+});
 /** The kinds this endpoint reads, each with the category it feeds. Any other kind is skipped. */
 const SCHEMAS = {
     gear_snapshot: recordSchemas.gear_snapshot,
@@ -119,6 +153,7 @@ const SCHEMAS = {
     lockout_owned: lockoutOwned,
     achievement_owned: recordSchemas.achievement_owned,
     title_owned: recordSchemas.title_owned,
+    wealth_owned: wealthOwned,
 };
 /** One row of a request, checked against its kind's schema; null when it is not one this endpoint reads. */
 export function parseSyncRow(value) {

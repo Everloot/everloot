@@ -16,7 +16,7 @@ for gone in ("gear", "charstats", "pvp"):
 
 RETIRED = ["gear_snapshot", "talent_snapshot", "achievement_owned", "reputation_owned", "quest_owned",
            "profession_owned", "talent_owned", "stats_owned", "pvp_owned"]
-KEPT = ["title_owned", "lockout_owned", "boss_kill_owned", "achievement_catalog", "reputation_catalog", "title_catalog",
+KEPT = ["title_owned", "lockout_owned", "boss_kill_owned", "wealth_owned", "achievement_catalog", "reputation_catalog", "title_catalog",
         "quest_chain_catalog", "guild_snapshot", "gold_snapshot", "money_event", "census_self", "census_seen", "player_seen",
         "loot", "npc_sighting", "auction_scan"]
 
