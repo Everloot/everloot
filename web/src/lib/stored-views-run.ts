@@ -14,6 +14,7 @@ import { writeDatabaseActivity } from "@/lib/database-activity-store";
 import { buildMapPins, writeMapPins } from "@/lib/map-pins-store";
 import { writeGuildLadder } from "@/lib/guild-ladder-store";
 import { forgetAllKept } from "@/lib/kept";
+import { writeViewsRun, type ViewsRun } from "@/lib/stored-views-status";
 
 /**
  * Let go of what the steps so far read and kept for pages: the stores keep each file they read or write, tens of MB
@@ -52,6 +53,8 @@ export interface StoredViewsResult {
   auctionReports: (Written & { reports?: number }) | null;
   /** The steps that threw, in order; each was logged and the next step ran. */
   failed: string[];
+  /** Milliseconds each step took, by name: how the job's time grows with the corpus. */
+  timings: Record<string, number>;
 }
 
 /**
@@ -65,13 +68,17 @@ export interface StoredViewsResult {
 export async function runStoredViews(run: StoredViewsRun): Promise<StoredViewsResult> {
   const { added, rebuild, dataAsOf } = run;
   const failed: string[] = [];
+  const timings: Record<string, number> = {};
   const step = async <T>(name: string, label: string, write: () => Promise<T>): Promise<T | null> => {
+    const started = Date.now();
     try {
       return await write();
     } catch (err) {
       console.error(`${label} failed`, err);
       failed.push(name);
       return null;
+    } finally {
+      timings[name] = Date.now() - started;
     }
   };
   // The stored views below each work from the corpus as it stands. It is read once, by the first view that needs it,
@@ -153,7 +160,7 @@ export async function runStoredViews(run: StoredViewsRun): Promise<StoredViewsRe
   releaseKept();
   const auctionReports = run.reportsDue ? await step("auctionReports", "auction reports", () => writeAuctionReports()) : null;
   releaseKept();
-  return { settled, itemView, aggregates, searchNames, auctionHistory, professions, mapPins, databaseActivity, guildLadder, marketBoards, coverage, auctionReports, failed };
+  return { settled, itemView, aggregates, searchNames, auctionHistory, professions, mapPins, databaseActivity, guildLadder, marketBoards, coverage, auctionReports, failed, timings };
 }
 
 /**
@@ -161,12 +168,27 @@ export async function runStoredViews(run: StoredViewsRun): Promise<StoredViewsRe
  * no uploads, so each view is written only when its stamp is not that snapshot's (or every one with `rebuild`). The
  * auction reports wait while the heartbeat says a rollup still has uploads to fold, as the cron's own run waits for
  * the market. No heartbeat yet means the snapshot cron has never run: there is nothing to build from.
+ * A finished run leaves its own heartbeat (lib/stored-views-status.ts), failed steps and all, which /api/health reads;
+ * a heartbeat that cannot be written is logged and fails the run, so the job shows red.
  */
 export async function runStoredViewsJob(opts: { rebuild?: boolean } = {}, deps: {
   heartbeat?: () => ReturnType<typeof uploadStore.readCronRun>; run?: typeof runStoredViews;
+  record?: (run: ViewsRun) => Promise<void>; now?: () => number;
 } = {}): Promise<StoredViewsResult & { dataAsOf: string | null }> {
+  const now = deps.now ?? Date.now;
+  const started = now();
   const beat = await (deps.heartbeat ?? uploadStore.readCronRun)();
   if (!beat) throw new Error("no cron heartbeat yet: the snapshot cron has not run");
   const result = await (deps.run ?? runStoredViews)({ added: 0, rebuild: opts.rebuild === true, dataAsOf: beat.dataAsOf, reportsDue: !beat.completionPending });
+  const finished = now();
+  try {
+    await (deps.record ?? writeViewsRun)({
+      finishedAt: new Date(finished).toISOString(), dataAsOf: beat.dataAsOf, failed: result.failed,
+      seconds: Math.round((finished - started) / 1000), timings: result.timings,
+    });
+  } catch (err) {
+    console.error("stored-views heartbeat failed", err);
+    return { dataAsOf: beat.dataAsOf, ...result, failed: [...result.failed, "heartbeat"] };
+  }
   return { dataAsOf: beat.dataAsOf, ...result };
 }
