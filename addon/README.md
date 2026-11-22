@@ -313,11 +313,12 @@ install, are saved in your SavedVariables, record nothing and apply at once, wit
 The disenchant row applies to eligible armor and weapons in Forever's game-file bands, excluding items the files
 flag as not disenchantable. Observed yields need three contributing installs. The Desktop App writes them into
 EverlootPrices, refreshed daily; reload to read an update. A band the file holds no results for shows a quiet "not enough data yet" line; a file without the block (no Desktop App, or an older one) adds nothing to the tooltip.
-The tooltip's first disenchant line sets the expected gross value (mean units across all disenchants, at prices for
-your current realm and auction house) against selling the item, the better of its auction estimate and vendor price,
-and says which is worth more when every price is known and current. Each material follows with its icon, name,
+The tooltip's first disenchant line sets what disenchanting pays (mean units across all disenchants, at prices for
+your current realm and auction house) against what selling the item pays, the better of its auction estimate and
+vendor price, both after the 5% house cut on anything sold at auction (a vendor takes no cut), and says which is worth
+more when every price is known and current. Each material follows with its icon, name,
 observed chance, units range and price. Missing prices make the value "at least"; missing, stale or thin prices
-prevent a comparison. Compact tooltips keep the first line alone. Estimates are before auction fees and do not
+prevent a comparison. Compact tooltips keep the first line alone. Estimates leave out the deposit and do not
 promise a sale, profit, eligibility of an individual bound copy, or the character's enchanting skill.
 
 When a character on this install has disenchanted the item before, a last line says what those disenchants gave.
@@ -346,26 +347,33 @@ and everloot.app/players/opt-out to hide a character.
 
 ## The Everloot window
 
-Left-click the minimap button, or `/everloot window`, for the Everloot window. Its sidebar has five items. Drag the
-grip in its bottom-right corner to make the whole window bigger or smaller (from three quarters to one and a half times,
+Left-click the minimap button, or `/everloot window`, for the Everloot window. Its sidebar has Home, Gold, Collection,
+Professions and Settings. Drag the grip in its bottom-right corner, which sits in its own strip under the pages, to make the whole window bigger or smaller (from three quarters to one and a half times,
 never larger than the screen); right-click the grip for the normal size. The size is kept for the next session.
 
-- **Home** lists every character this install has seen: gold, level, professions, raid lockouts (shown only while the completion tracker is on) and when it was last
-  seen, with totals for each realm and for the account and a "This week" line (gold in and out for this character over
-  seven days). Below it, the gold per hour session with a Pause button.
+- **Home** lists every character this install has seen: level, gold to the copper ("-" for none), professions, raid
+  lockouts (a column shown only while some character has one) and when it was last seen ("today", "3d ago", then a
+  short date), grouped by realm, with each realm's total when there is more than one realm and the account's total.
+  Above it, this character's gold, a "This week" line (gold in and out over seven days) and the account's week when it
+  differs, and the gold per hour session with its button. Beside it, what this character is missing (achievements,
+  factions, titles, recipes, raids), each count a click from its page; a count of 0 is left out.
 - **Gold** has four tabs. **Overview** shows the period's gold earned, spent and profit, every character's gold by realm,
   and a chart of gold earned (up) and spent (down) for each day of the period, or each UTC hour for Today; hover a
   day for its earned, spent, net and the gold held at its close. **Ledger** lists the money events by category, by
   day or by receipt. **Sales** lists auction sales one by one or by item. **Session** is the gold per hour session.
   Overview, Ledger and Sales can be set to today, 7 days, 30 days or all, and to this character or the account;
   Session has neither.
-- **Collection** shows achievements, reputation, titles, raid lockouts and quest chains (quests done of each chain's
-  total) from the rows the completion tracker wrote, so it needs `/everloot completion on`; with it off the tab says so
-  and has a button that runs that command. It shows this character, or the account: every character in the roster, each
-  item done when any of them has it, with the name of the character that does. It is drawn as completionist addons
-  draw their lists: headings in the game's gold that open and close with a click, each with how many of the marked
-  items under it are done ("3 / 8 (37%)"), an icon on each row, a green check for done and a red cross for missing,
-  and the game's tooltip on hover. The mouse wheel scrolls the list.
+- **Collection** opens on an overview: one row per area (achievements, reputation, titles, quests, dungeons and raids,
+  mounts, pets, toys and flight paths) with how much of it is done and a bar, and the overall count at the top; click a
+  row to open that area. Achievements, reputation, titles, raid lockouts and quest chains come from the rows the
+  completion tracker wrote, so they need `/everloot completion on`; with it off the tab says so and has a button that
+  runs that command. It shows this character, or the account: every character in the roster, each item done when any
+  of them has it, with the name of the character that does. Inside an area the list is grouped under headings that
+  open and close with a click (achievements by category, reputation by the reputation window's headers, quest chains,
+  mounts and pets by their journal source, flight paths by continent), each with how many of the items under it are
+  done ("3 / 8 (37%)"), an icon on each row, a green check for done and a red cross for missing, and the game's tooltip
+  on hover. **Missing only** hides what is done at every level. The mouse wheel scrolls the list; the bar beside it
+  shows where you are. Achievement points show only when they are not zero.
   - **Dungeons & raids** lists the instances players agreed on, their bosses with your kills and this week's
     lockouts. A boss opens on its drops: the public drop rates (three installs) the Desktop App wrote into the price
     file, from the creatures this install saw in that fight or, failing that, from the NPCs the file names as the
@@ -376,12 +384,18 @@ never larger than the screen); right-click the grip for the normal size. The siz
     its source. **Pets** (one row per species) and **Toys** list what the Pet Journal and the Toy Box list under their
     own filters; clear those filters in the Collections window to see everything. These three are read from the game
     and never recorded.
-- **Professions** shows each profession in the profession book with its rank and the recipes recorded for it by
-  difficulty colour. **Crafting costs**, the button at its bottom, lists the recipes this install recorded under this
+  - **Flight paths** lists the game's flight-map nodes for your faction and neutral ones, by continent, marked found
+    or not yet found, read from the game and never recorded.
+- **Professions** shows each profession in the profession book with its rank, the recipes recorded for it by
+  difficulty colour (each count in the game's colour) and one trainer line: the first recipe a trainer you visited
+  teaches at your rank ("At your rank", since whether you already trained it is not recorded) or the next rank's.
+  **Ranks and trainers**, a button at its bottom, lists per profession the recipes trainers you visited teach from
+  your rank up, lowest rank first, with the cost and the trainer and zone. **Crafting costs**, the other button, lists the recipes this install recorded under this
   character's profession names (recipe rows carry no character, so an alt's recipes in the same profession show too)
   with what their reagents cost at the price file's market value (a vendor's price instead when a vendor you visited
   sells the reagent for less), what one product item sells for and an estimated profit, sorted by that estimate or by
-  name, and says how old the price file is. How many items a craft makes is not recorded, so the estimate assumes one
+  name; profit per craft is green for a gain and red for a loss. One short line says which auction house's prices and
+  how old the price file is; hover it for what each column means. How many items a craft makes is not recorded, so the estimate assumes one
   item per craft. A reagent without a price makes the cost unknown, never zero; so does a reagent name this install
   has seen with two item ids. Choose a recipe and a count for what to buy: each reagent, how many and what they cost,
   with Up and Down past five reagents. **Add to shopping list** adds those reagents to your active shopping list (see
