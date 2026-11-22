@@ -367,8 +367,41 @@ export const healthResponse = z.object({
     updatedAt: ISO_TIME.nullable(),
     ageSeconds: z.number().nonnegative().nullable(),
   }),
+  views: z.object({
+    status: z.enum(["current", "behind", "failing", "missing", "unavailable", "local"])
+      .describe("current: the stored-views job finished within 90 minutes and wrote everything; failing: its last run named failed steps; behind: no run for 90 minutes."),
+    finishedAt: ISO_TIME.nullable(),
+    ageSeconds: z.number().nonnegative().nullable(),
+    dataAsOf: ISO_TIME.nullable().describe("The snapshot the last run built the views for."),
+    failed: z.array(z.string()),
+  }).optional().describe("The stored-views job's last run. Never changes the status code."),
+  viewsDispatch: z.object({
+    status: z.enum(["sent", "refused", "none", "unavailable", "local"]),
+    at: ISO_TIME.nullable(),
+    httpStatus: z.number().int().nullable(),
+    tokenExpiresAt: ISO_TIME.nullable(),
+    tokenDaysLeft: z.number().int().nullable(),
+  }).optional().describe("How the snapshot cron's last start of the stored-views job went, and when its start token expires."),
 });
 export type HealthResponse = z.infer<typeof healthResponse>;
+
+const historyCount = z.number().int().nonnegative();
+/** GET /api/history: Everloot's own numbers, one row per UTC day. Counts only; nothing in it names an install, character, guild or realm. */
+export const historyResponse = z.object({
+  version: z.literal(1),
+  days: z.array(z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    source: z.enum(["snapshot", "backfill"]).describe("snapshot: counted from the snapshot built just after the day ended; backfill: counted later from capture times."),
+    dataAsOf: ISO_TIME.nullable(),
+    uploads: historyCount.nullable().describe("Uploads folded into the corpus; null for a backfilled day."),
+    records: historyCount,
+    contributors: historyCount.describe("Distinct installs behind the records, counted, never named."),
+    kinds: z.record(z.string(), historyCount).describe("Records by kind."),
+    market: z.object({ realms: historyCount, houses: historyCount, items: historyCount }).nullable(),
+    coverage: z.object({ installs: historyCount, confirmed: historyCount, waiting: historyCount }).nullable(),
+  })).describe("Oldest first. A day is added after it ends, so the newest row is yesterday's."),
+});
+export type HistoryResponse = z.infer<typeof historyResponse>;
 
 /** One boss kill a guild owns: reported by 2 of its members' installs, or published by its officers. Guild and boss, never a person. */
 const guildKillRow = z.object({
@@ -494,6 +527,7 @@ export const API_SCHEMAS = {
   intakeReceipt,
   intakeRefused,
   healthResponse,
+  historyResponse,
 } as const;
 export type ApiSchemaName = keyof typeof API_SCHEMAS;
 
@@ -682,8 +716,19 @@ export const API_ROUTES: readonly ApiRoute[] = [
   {
     method: "GET", path: "/api/health",
     summary: "Whether the public snapshot is fresh",
-    description: "200 when the corpus snapshot was written recently, 503 otherwise. Metadata only.",
+    description: "200 when the corpus snapshot was written recently, 503 otherwise. Beside it, `views` (the stored-views job's last run) and `viewsDispatch` (its last start and the start token's expiry), which never change the status code. Metadata only.",
     access: "open", data: "none",
     responses: { "200": { description: "Fresh.", schema: "healthResponse" }, "503": { description: "Stale, missing or unavailable.", schema: "healthResponse" } },
+  },
+  {
+    method: "GET", path: "/api/history",
+    summary: "Everloot's own numbers, one row per UTC day",
+    description: "Per day: the uploads, the records by kind, the distinct contributors, the realms, auction houses and items the market has prices for, and the coverage counts. A day is added after it ends. Rows marked `backfill` were counted afterwards from capture times and carry no uploads, market or coverage. Counts only: nothing in it names an install, character, guild or realm. `ETag` and `If-None-Match` let a client revalidate its copy for nothing; a 304 has no body. Cached for ten minutes.",
+    access: "open", data: "observed",
+    responses: {
+      "200": { description: "The days, oldest first.", schema: "historyResponse" },
+      "304": { description: "The copy you sent in `If-None-Match` is current." },
+      "503": { description: "Storage is unreachable. The figures are unrecorded, not zero.", schema: "apiError" },
+    },
   },
 ];

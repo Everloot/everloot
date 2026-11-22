@@ -366,6 +366,29 @@ minutes, as above.
 **Going back:** remove `EVERLOOT_SNAPSHOT` from both wrangler files. The cron Worker then folds
 every run itself, and the job only builds views.
 
+## The platform history
+
+`history/daily.json` holds Everloot's own numbers, one row per UTC day:
+- uploads, records by kind, and the count of distinct contributors;
+- the realms, houses and items the market has prices for;
+- the coverage counts.
+
+The stored-views job writes it (`writeDailyHistory` in `web/src/lib/platform-history.ts`). On its
+first run after midnight UTC, it freezes the day that just ended, from the snapshot it just built;
+the row's `dataAsOf` says how current that snapshot was. Every other run reads only the file. The
+write is conditional, so two runs can't both append a day. A failed write is named `history` in
+the job's `failed`, and the next run tries the day again.
+
+The first write also fills in every earlier day the corpus can show, counted from the records'
+capture times. Those rows say `source: "backfill"`. They count records captured by the end of the
+day, including uploads that arrived later, and they have no uploads, market or coverage figures.
+
+The file holds counts only: nothing in it names an install, character, guild or realm, so nothing
+in it outlives an opt-out. Market prices have their own history in the auction reports, which are
+frozen per day and kept after the market's 60-day window. `GET /api/history` serves the file
+(described in the protocol and on `/docs/api/history`). It is cached for ten minutes and answers
+503, not an empty list, when storage can't be read.
+
 ## What `/api/health` answers
 
 `web/src/app/api/health/route.ts` answers JSON `{ ok, snapshot }` with `Cache-Control: no-store`.

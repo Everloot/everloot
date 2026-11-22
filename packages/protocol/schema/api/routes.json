@@ -641,7 +641,7 @@
     "method": "GET",
     "path": "/api/health",
     "summary": "Whether the public snapshot is fresh",
-    "description": "200 when the corpus snapshot was written recently, 503 otherwise. Metadata only.",
+    "description": "200 when the corpus snapshot was written recently, 503 otherwise. Beside it, `views` (the stored-views job's last run) and `viewsDispatch` (its last start and the start token's expiry), which never change the status code. Metadata only.",
     "access": "open",
     "data": "none",
     "responses": {
@@ -652,6 +652,27 @@
       "503": {
         "description": "Stale, missing or unavailable.",
         "schema": "healthResponse"
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/api/history",
+    "summary": "Everloot's own numbers, one row per UTC day",
+    "description": "Per day: the uploads, the records by kind, the distinct contributors, the realms, auction houses and items the market has prices for, and the coverage counts. A day is added after it ends. Rows marked `backfill` were counted afterwards from capture times and carry no uploads, market or coverage. Counts only: nothing in it names an install, character, guild or realm. `ETag` and `If-None-Match` let a client revalidate its copy for nothing; a 304 has no body. Cached for ten minutes.",
+    "access": "open",
+    "data": "observed",
+    "responses": {
+      "200": {
+        "description": "The days, oldest first.",
+        "schema": "historyResponse"
+      },
+      "304": {
+        "description": "The copy you sent in `If-None-Match` is current."
+      },
+      "503": {
+        "description": "Storage is unreachable. The figures are unrecorded, not zero.",
+        "schema": "apiError"
       }
     }
   }
