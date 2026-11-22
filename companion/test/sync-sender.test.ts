@@ -120,6 +120,19 @@ describe("sending linked characters", () => {
     expect(syncSummary(r)).toBeNull();
   });
 
+  test("a linked character's lifetime gold goes under gold; an unlinked character's does not", async () => {
+    const wealth = (key: string) => owned(key, { installId: INSTALL, stats: { "328": 1150905, "329": 1077 } });
+    const { file, state } = workspace({ character_link: [link("Thrallina", THRALL)], wealth_owned: [wealth(THRALL), wealth("ffffffff")] });
+    const api = site((characters) => Response.json({
+      characters: characters.map((_, index) => ({ index, result: "synced", categories: { gold: "stored" } })), skipped: 0,
+    }));
+    const r = await sendSync(file, { endpoint: SITE, key: KEY, state, fetch: api.send });
+    expect(api.calls).toHaveLength(1);
+    expect(api.calls[0]!.characters).toHaveLength(1);
+    expect(api.calls[0]!.characters[0]!.records).toEqual([{ kind: "wealth_owned", ...wealth(THRALL) }]);
+    expect(r).toMatchObject({ synced: ["Thrallina of Forever Pioneer"], categories: ["gold"], problem: null });
+  });
+
   test("an answered capture is not sent again; a changed one is, alone", async () => {
     const { file, state, write } = workspace(full());
     const api = site(synced());

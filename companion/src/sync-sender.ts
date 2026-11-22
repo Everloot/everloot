@@ -8,11 +8,11 @@ import { receiptKeyForSite, type SentState } from "./sent-state";
 
 /**
  * Private sync: sends the player's own linked characters' rows to the account's sync endpoint,
- * POST /api/me/characters/sync, with the account key, and nowhere else. The upload never carries lockout_owned or
- * boss_kill_owned (web/src/lib/upload-batches.ts keeps them on the computer); this is the only sender of them.
+ * POST /api/me/characters/sync, with the account key, and nowhere else. The upload never carries lockout_owned,
+ * boss_kill_owned or wealth_owned (web/src/lib/upload-batches.ts keeps them on the computer); this is the only sender of them.
  *
- * Three categories go: raids (lockout_owned), boss kills (boss_kill_owned) and the titles of the achievements category
- * (title_owned). Blizzard's character API supplies the rest (docs/design/specs/2026-11-17-blizzard-api-first.md), so the
+ * Four categories go: raids (lockout_owned), boss kills (boss_kill_owned), the titles of the achievements category
+ * (title_owned) and lifetime gold (wealth_owned), which Blizzard's API does not show. Blizzard's character API supplies the rest (docs/design/specs/2026-11-17-blizzard-api-first.md), so the
  * gear, talents, professions, stats, pvp and reputations categories and the achievement rows of the achievements
  * category are no longer sent, even from a file an older addon wrote them into.
  *
@@ -64,7 +64,7 @@ export const syncReceiptKey = (installId: string, endpoint: string, character: s
 export type SendCategory = SyncCategory | "boss_kills";
 type SendRow = SyncRow | BossKillRow;
 /** The kinds sync sends, each keyed by the completion module's characterKey. */
-const CATEGORY_OF: Record<string, SendCategory> = { boss_kill_owned: "boss_kills", lockout_owned: "raids", title_owned: "achievements" };
+const CATEGORY_OF: Record<string, SendCategory> = { boss_kill_owned: "boss_kills", lockout_owned: "raids", title_owned: "achievements", wealth_owned: "gold" };
 
 /** A site that asked to wait, by origin: nothing goes to it before then. Kept while the app runs. */
 const waitUntil = new Map<string, number>();
@@ -106,7 +106,7 @@ function charactersOf(records: Array<Record<string, unknown>>): Character[] {
     const mine = rows.get(id);
     if (!mine) continue;
     const captures: Capture[] = [];
-    for (const category of ["raids", "achievements", "boss_kills"] as const) {
+    for (const category of ["raids", "achievements", "boss_kills", "gold"] as const) {
       const records = mine.filter((r) => CATEGORY_OF[r.kind] === category);
       if (!records.length) continue;
       captures.push({ category, records, entry: `${category}|${hashOf(records)}` });

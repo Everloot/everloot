@@ -42,7 +42,7 @@ type Kind = SyncRow["kind"];
 /** The category each kind still feeds; null for a retired kind, whose rows are dropped and counted as skipped. */
 const CATEGORY_OF: Record<Kind, SyncCategory | null> = {
   gear_snapshot: null, talent_owned: null, stats_owned: null, pvp_owned: null, profession_owned: null, reputation_owned: null,
-  achievement_owned: null, lockout_owned: "raids", title_owned: "achievements",
+  achievement_owned: null, lockout_owned: "raids", title_owned: "achievements", wealth_owned: null,
 };
 
 /** One category's latest state, as stored: the server's own shape, with no install id, key or name in it. */
