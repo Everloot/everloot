@@ -7,6 +7,7 @@ import { buildItemView, writeItemView } from "@/lib/item-view-store";
 import { anonymousAggregates, writeAggregates } from "@/lib/aggregate-store";
 import type { AggregateSet } from "@/lib/aggregate-set";
 import { writeSearchNames } from "@/lib/search-names-store";
+import { writeFarmAreas } from "@/lib/farm-areas-store";
 import { buildAuctionHistory, writeAuctionHistory } from "@/lib/auction-history-store";
 import { buildProfessions, writeProfessions } from "@/lib/profession-store";
 import { buildDatabaseActivity } from "@/lib/database-activity";
@@ -85,6 +86,7 @@ export interface StoredViewsResult {
   itemView: (Written & { items?: number }) | null;
   aggregates: (Written & { bytes?: number }) | null;
   searchNames: (Written & { bytes?: number }) | null;
+  farmAreas: (Written & { bytes?: number }) | null;
   auctionHistory: (Written & { items?: number }) | null;
   professions: (Written & { bytes?: number }) | null;
   mapPins: (Written & { bytes?: number }) | null;
@@ -158,6 +160,10 @@ export async function runStoredViews(run: StoredViewsRun): Promise<StoredViewsRe
   const searchNames = await step("searchNames", "search names", async () => aggregates?.written || rebuild || added > 0
     ? await writeSearchNames({ added, rebuild, dataAsOf }, { build: aggregateSet })
     : { written: false });
+  // The zones behind each mob farm (lib/farm-areas-store.ts), a few KB from the same set, so the farming and the cloth
+  // and leather profession pages never parse the aggregates on the site Worker. Written whenever its stamp is not the
+  // snapshot's: the set is built then anyway for the aggregates, and a missing file is caught up by the next run.
+  const farmAreas = await step("farmAreas", "farm areas", () => writeFarmAreas({ added, rebuild, dataAsOf }, { build: aggregateSet }));
   // Nothing after this reads the set; the corpus stays for the views below.
   aggregatesRead = null;
   releaseKept();
@@ -204,7 +210,7 @@ export async function runStoredViews(run: StoredViewsRun): Promise<StoredViewsRe
   releaseKept();
   const auctionReports = run.reportsDue ? await step("auctionReports", "auction reports", () => writeAuctionReports()) : null;
   releaseKept();
-  return { settled, itemView, aggregates, searchNames, auctionHistory, professions, mapPins, databaseActivity, guildLadder, marketBoards, coverage, auctionReports, failed, timings };
+  return { settled, itemView, aggregates, searchNames, farmAreas, auctionHistory, professions, mapPins, databaseActivity, guildLadder, marketBoards, coverage, auctionReports, failed, timings };
 }
 
 /**

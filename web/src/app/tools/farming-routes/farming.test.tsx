@@ -7,6 +7,8 @@ vi.mock("@/lib/upload-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-store")>()),
   uploadStore: { loadCorpus: store.loadCorpus },
 }));
+const farm = vi.hoisted(() => ({ loadStoredFarmAreas: vi.fn() }));
+vi.mock("@/lib/farm-areas-store", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/farm-areas-store")>()), loadStoredFarmAreas: farm.loadStoredFarmAreas }));
 vi.mock("next/link", () => ({
   default: ({ href, children, "aria-current": current }: { href: string; children: ReactNode; "aria-current"?: "page" }) => <a href={href} aria-current={current}>{children}</a>,
 }));
@@ -41,6 +43,7 @@ const section = (page: string, slug: string) => {
 };
 const zonesIn = (part: string | null) => [...(part ?? "").matchAll(/href="\/database\/zones\/(\d+)-/g)].map((m) => Number(m[1]));
 
+beforeEach(() => farm.loadStoredFarmAreas.mockReset().mockResolvedValue(null));
 beforeEach(() => store.loadCorpus.mockReset().mockResolvedValue({ uploads: 3, records, dataAsOf: `2026-10-10T00:00:${String(n++ % 60).padStart(2, "0")}.000Z` }));
 
 test("farming has no pre-launch signup, with or without uploads", async () => {
@@ -157,4 +160,18 @@ test("only the plain page is indexed", async () => {
   expect((await generateMetadata(search())).robots).toBeUndefined();
   expect((await generateMetadata(search({ category: "gold" }))).robots).toEqual({ index: false, follow: true });
   expect((await generateMetadata(search({ level: "1-10" }))).robots).toEqual({ index: false, follow: true });
+});
+
+test("with the job's stored farm areas the page lists the same zones without reading the corpus", async () => {
+  const { anonymousAggregates } = await import("@/lib/aggregate-store");
+  const { buildFarmAreas } = await import("@/lib/farm-areas-store");
+  const live = await html(FarmingPage(search({ category: "gold" })));
+  const corpus = await store.loadCorpus();
+  const file = buildFarmAreas(anonymousAggregates(corpus));
+  farm.loadStoredFarmAreas.mockResolvedValue({ dataAsOf: file.dataAsOf, areas: file.areas });
+  store.loadCorpus.mockClear();
+  const stored = await html(FarmingPage(search({ category: "gold" })));
+  expect(store.loadCorpus).not.toHaveBeenCalled();
+  expect(zonesIn(section(stored, "gold"))).toEqual(zonesIn(section(live, "gold")));
+  expect(zonesIn(section(stored, "gold")).length).toBeGreaterThan(0);
 });
