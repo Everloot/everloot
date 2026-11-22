@@ -53,6 +53,28 @@ C_ToyBox = {{
   GetToyInfo = function(id) if id > 3000 and id <= 3020 then return id, string.format('Toy %02d', id - 3000), 'toy' .. id end end,
 }}
 PlayerHasToy = function(id) return id == 3001 end
+UnitFactionGroup = function() return 'Horde', 'Horde' end
+Enum.UIMapType = {{ Cosmic = 0, World = 1, Continent = 2, Zone = 3 }}
+Enum.FlightPathFaction = {{ Neutral = 0, Horde = 1, Alliance = 2 }}
+local maps = {{ [1411] = {{ mapID = 1411, name = 'Durotar', mapType = 3, parentMapID = 1414 }},
+  [1414] = {{ mapID = 1414, name = 'Kalimdor', mapType = 2, parentMapID = 947 }},
+  [947] = {{ mapID = 947, name = 'Azeroth', mapType = 1, parentMapID = 946 }} }}
+C_Map = {{
+  GetBestMapForUnit = function(unit) if unit == 'player' then return 1411 end end,
+  GetMapInfo = function(id) return maps[id] end,
+  GetMapChildrenInfo = function(id, kind)
+    if id == 947 and kind == 2 then
+      return {{ {{ mapID = 1414, name = 'Kalimdor', mapType = 2 }}, {{ mapID = 1415, name = 'Eastern Kingdoms', mapType = 2 }} }}
+    end
+  end,
+}}
+taxiNodes = {{
+  [1414] = {{ {{ nodeID = 23, name = 'Orgrimmar, Durotar', faction = 1, isUndiscovered = false }},
+    {{ nodeID = 25, name = 'Crossroads, The Barrens', faction = 0, isUndiscovered = true }},
+    {{ nodeID = 26, name = 'Auberdine, Darkshore', faction = 2, isUndiscovered = true }} }},
+  [1415] = {{ {{ nodeID = 11, name = 'Undercity, Tirisfal', faction = 1, isUndiscovered = true }} }},
+}}
+C_TaxiMap = {{ GetTaxiNodesForMap = function(id) return taxiNodes[id] or {{}} end }}
 GameTooltip = {{ lines = {{}} }}
 function GameTooltip:SetOwner(owner) self.owner, self.item, self.spell, self.lines = owner, nil, nil, {{}} end
 function GameTooltip:SetItemByID(id) self.item = id end
@@ -81,10 +103,20 @@ lua.execute(HELPERS + r"""
 assert(U.Open('collection') == true)
 local c = EverlootWindow.collection
 local rows = c.rows
--- Two rows of sections: the words, then the lists the game keeps.
+-- Two rows of sections: the overview and the words, then the lists the game keeps.
+assert(c.sections.overview.point[2] == 0 and c.sections.overview.point[3] == -8, 'Overview first')
 assert(c.sections.achievements.point[3] == -8 and c.sections.raids.point[3] == -32 and c.sections.raids.point[2] == 0, 'two rows')
-for _, key in ipairs({ 'mounts', 'pets', 'toys' }) do assert(c.sections[key].point[3] == -32, key) end
-assert(c.sections.toys.point[2] + c.sections.toys.width <= 604, 'the second row fits the view')
+for _, key in ipairs({ 'mounts', 'pets', 'toys', 'flights' }) do assert(c.sections[key].point[3] == -32, key) end
+assert(c.sections.flights.point[2] + c.sections.flights.width <= 604, 'the second row fits the view')
+assert(c.sections.quests.point[2] + c.sections.quests.width <= 604 - 100 - 4, 'the first row clears Missing only')
+
+-- The overview counts the journals and the flight map: mounts 1 of 2, pets 1 of 2, toys 1 of 20, flight paths 1 of 3.
+assert(c.section == 'overview', c.section)
+local area = {}
+for _, r in ipairs(rows) do if r.shown then area[r.name.text] = r end end
+assert(area['Mounts'].detail.text == '1 / 2 (50%)' and area['Pets'].detail.text == '1 / 2 (50%)', area['Mounts'].detail.text)
+assert(area['Toys'].detail.text == '1 / 20 (5%)' and area['Flight paths'].detail.text == '1 / 3 (33%)', area['Flight paths'].detail.text)
+assert(area['Dungeons & raids'].detail.text == '1 / 3 (33%)', 'a boss and its collectible drops: ' .. area['Dungeons & raids'].detail.text)
 
 -- The price file's checksum holds (a block this small is checked within the call), so the drops are read.
 click(c.sections.raids)
@@ -151,17 +183,29 @@ assert(table.concat(GameTooltip.lines, ' | '):find('creatures you saw in this fi
 -- Mounts: every mount the game lists, the other faction's left out unless collected, with its source on one line.
 click(c.sections.mounts)
 assert(c.summary.text == 'Mounts: 1 of 2 (50%)', c.summary.text)
-assert(names(rows) == 'Deep Horse | Red Wolf', names(rows))
-assert(rows[1].detail.text == 'Drop: Ghamoo-ra Blackfathom Deeps' and mark(rows[1]) == NOT_READY and mark(rows[2]) == READY, rows[1].detail.text)
-assert(rows[1].icon.path == 'mount77', 'the mount icon')
-rows[2].scripts.OnEnter(rows[2])
+assert(names(rows) == 'Drop' and rows[1].detail.text == '1 / 2 (50%)' and rows[1].toggle.shown, names(rows))
+click(rows[1])
+assert(names(rows) == 'Drop | Deep Horse | Red Wolf', names(rows))
+assert(rows[2].detail.text == 'Ghamoo-ra Blackfathom Deeps' and mark(rows[2]) == NOT_READY and mark(rows[3]) == READY, rows[2].detail.text)
+assert(rows[2].icon.path == 'mount77', 'the mount icon')
+rows[3].scripts.OnEnter(rows[3])
 assert(GameTooltip.spell == 1078, 'the mount spell tooltip')
+click(c.missingOnly)
+assert(names(rows) == 'Drop | Deep Horse', 'missing only: ' .. names(rows))
+click(c.missingOnly)
 
 -- Pets: one row per species, owned when any pet of it is.
 click(c.sections.pets)
 assert(c.summary.text == "Pets: 1 of 2 species (50%) · as the Pet Journal's filters list them", c.summary.text)
-assert(names(rows) == 'Cat | Frog' and mark(rows[1]) == READY and mark(rows[2]) == NOT_READY and rows[2].detail.text == 'Zone: Swamp')
+assert(names(rows) == 'Vendor | Zone', names(rows))
+click(rows[1]); click(rows[3])
+assert(names(rows) == 'Vendor | Cat | Zone | Frog' and mark(rows[2]) == READY and mark(rows[4]) == NOT_READY and rows[4].detail.text == 'Swamp', names(rows))
+click(c.missingOnly)
+assert(names(rows) == 'Zone | Frog', 'a source group with nothing missing leaves: ' .. names(rows))
+click(c.missingOnly)
 
+-- A short list has no scroll thumb.
+assert(not c.rows.thumb.shown and not c.rows.track.shown, 'nothing to scroll')
 -- Toys: the mouse wheel scrolls three rows, and the list stops with its last row at the bottom.
 click(c.sections.toys)
 assert(c.summary.text == "Toys: 1 of 20 (5%) · as the Toy Box's filters list them", c.summary.text)
@@ -174,10 +218,32 @@ list.scripts.OnMouseWheel(list, -1)
 assert(asks == 0, 'a scroll reads nothing again')
 C_ToyBox.GetNumFilteredToys = ask
 assert(c.rows.offset == 3 and rows[1].name.text == 'Toy 04', rows[1].name.text)
+-- The thumb: as tall as the share of the list on screen, as far down as the list is scrolled.
+local track, thumb = rows.track, rows.thumb
+assert(track.shown and thumb.shown and thumb.height == math.floor(track.height * 12 / 20), thumb.height)
+local room = track.height - thumb.height
+assert(thumb.point[5] == -math.floor(room * 3 / 8 + 0.5), thumb.point[5])
 for _ = 1, 5 do list.scripts.OnMouseWheel(list, -1) end
-assert(c.rows.offset == 8 and rows[12].name.text == 'Toy 20' and not rows.down.shown, 'the last row stays at the bottom')
+assert(c.rows.offset == 8 and rows[12].name.text == 'Toy 20', 'the last row stays at the bottom')
+assert(thumb.point[5] == -room, 'the thumb at the bottom')
 list.scripts.OnMouseWheel(list, 1)
 assert(c.rows.offset == 5)
+for _ = 1, 4 do list.scripts.OnMouseWheel(list, 1) end
+assert(c.rows.offset == 0 and rows[1].name.text == 'Toy 01' and thumb.point[5] == 0, 'the top holds')
+assert(rows.up == nil and rows.down == nil, 'the wheel and the thumb replace the paging buttons')
+
+-- Flight paths: each continent the world map lists, the nodes this character's faction can use, discovered or not.
+click(c.sections.flights)
+assert(c.summary.text == 'Flight paths: 1 of 3 (33%)', c.summary.text)
+assert(names(rows) == 'Eastern Kingdoms | Undercity, Tirisfal | Kalimdor | Crossroads, The Barrens | Orgrimmar, Durotar', names(rows))
+assert(rows[3].detail.text == '1 / 2 (50%)' and mark(rows[5]) == READY and mark(rows[4]) == NOT_READY, rows[3].detail.text)
+click(c.missingOnly)
+assert(names(rows) == 'Eastern Kingdoms | Undercity, Tirisfal | Kalimdor | Crossroads, The Barrens', names(rows))
+click(c.missingOnly)
+-- An overview row opens its area.
+click(c.sections.overview)
+for _, r in ipairs(rows) do if r.shown and r.name.text == 'Mounts' then click(r) end end
+assert(c.section == 'mounts' and c.summary.text == 'Mounts: 1 of 2 (50%)', c.section)
 
 -- Nothing listed: the journal says how to fill it.
 pets = {}
@@ -217,7 +283,10 @@ click(c.sections.mounts)
 assert(c.rows.empty.shown and c.rows.empty.text == 'The game lists no mounts on this client.', c.rows.empty.text)
 click(c.sections.toys)
 assert(c.rows.empty.shown and c.rows.empty.text:find('Toy Box lists no toys', 1, true))
+click(c.sections.flights)
+assert(c.rows.empty.shown and c.rows.empty.text:find('no flight paths', 1, true), c.rows.empty.text)
 assert(EverlootWindow.shown and not U.failed)
 """)
 print("Lua 5.1 Collection tree: boss drops from the price file by the creatures seen or the boss's name, open and close with "
-      "counts, quality colours, icons and the game's tooltip; Missing only; mounts, pets and toys from the journals; wheel scroll")
+      "counts, quality colours, icons and the game's tooltip; Missing only; mounts and pets by source, toys from the journals; "
+      "flight paths from the flight map; the overview's counts; wheel scroll with a thumb")
