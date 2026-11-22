@@ -4,8 +4,8 @@ import { z } from "zod";
  * Private-only kinds must never be added to recordSchemas: public intake rejects them.
  * Authorization, environment gates, visibility switches and storage belong to the server.
  */
-/** What a link can sync, in page order. `stats` and `pvp` are the player's own self-reported numbers. `achievements` is published under the Collections section's switch. */
-export declare const SYNC_CATEGORIES: readonly ["gear", "stats", "talents", "pvp", "professions", "reputations", "raids", "achievements"];
+/** What a link can sync, in page order. `stats`, `pvp` and `gold` are the player's own self-reported numbers. `achievements` is published under the Collections section's switch. */
+export declare const SYNC_CATEGORIES: readonly ["gear", "stats", "talents", "pvp", "professions", "reputations", "raids", "achievements", "gold"];
 export type SyncCategory = (typeof SYNC_CATEGORIES)[number];
 export declare const isSyncCategory: (v: unknown) => v is SyncCategory;
 /** Characters one request may carry, and rows across them. A full completion file is a few thousand rows. */
@@ -95,6 +95,27 @@ export declare const pvpOwned: z.ZodObject<{
     rankMax: z.ZodOptional<z.ZodNumber>;
     season: z.ZodOptional<z.ZodNumber>;
     honorableKills: z.ZodOptional<z.ZodNumber>;
+}, z.core.$strip>;
+/**
+ * The Statistics window's Wealth and auction entries the addon reads with GetStatistic: `money` ids are copper,
+ * `counts` are plain counts. Gold is private and never ranked.
+ */
+export declare const WEALTH_STATS: {
+    readonly money: readonly [328, 333, 326, 921, 919, 334, 331, 332, 1146, 1147, 1148, 1150];
+    readonly counts: readonly [329, 330, 1149];
+};
+/**
+ * One linked character's lifetime gold statistics, keyed by statistic id. Unknown ids are dropped, not refused; a row
+ * left with no known id is refused. An unreadable statistic is absent, never a zero.
+ */
+export declare const wealthOwned: z.ZodObject<{
+    installId: z.ZodString;
+    capturedAt: z.ZodString;
+    characterKey: z.ZodString;
+    class: z.ZodString;
+    level: z.ZodNumber;
+    kind: z.ZodLiteral<"wealth_owned">;
+    stats: z.ZodPipe<z.ZodRecord<z.ZodString, z.ZodUnknown>, z.ZodTransform<Record<string, number>, Record<string, unknown>>>;
 }, z.core.$strip>;
 /** The kinds this endpoint reads, each with the category it feeds. Any other kind is skipped. */
 declare const SCHEMAS: {
@@ -217,6 +238,15 @@ declare const SCHEMAS: {
         level: z.ZodNumber;
         kind: z.ZodLiteral<"title_owned">;
         titleIds: z.ZodArray<z.ZodNumber>;
+    }, z.core.$strip>;
+    readonly wealth_owned: z.ZodObject<{
+        installId: z.ZodString;
+        capturedAt: z.ZodString;
+        characterKey: z.ZodString;
+        class: z.ZodString;
+        level: z.ZodNumber;
+        kind: z.ZodLiteral<"wealth_owned">;
+        stats: z.ZodPipe<z.ZodRecord<z.ZodString, z.ZodUnknown>, z.ZodTransform<Record<string, number>, Record<string, unknown>>>;
     }, z.core.$strip>;
 };
 type Kind = keyof typeof SCHEMAS;
