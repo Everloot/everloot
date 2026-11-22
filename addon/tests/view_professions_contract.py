@@ -19,6 +19,10 @@ code = "\n".join(line.split("--")[0] for line in source.splitlines())
 for word in ["RegisterEvent", "HookScript", "hooksecurefunc", "E:Store", "EverlootDB.records[", "SendAddonMessage"]:
     assert word not in code, f"the Professions view reads and displays only: {word} found"
 assert "Coming soon" not in source
+# Every character the window draws is one the game's fonts have: the Scan column's arrows drew as empty boxes.
+# Comments aside, the file's only non-ASCII characters are the middle dot, the times sign and the em dash.
+for ch in set(code):
+    assert ord(ch) < 128 or ch in "·×—", f"a character the font may not draw: {ch!r} (U+{ord(ch):04X})"
 
 # The key core.lua's E.CharacterKey gives this install and player GUID.
 ME = "%08x" % zlib.adler32(b"abcd-1234:Player-1-0001")
@@ -66,56 +70,144 @@ assert(m.name.text == 'Mining' and m.rank.text == '112 / 150', m.rank.text)
 assert(m.bar.lo == 0 and m.bar.hi == 150 and m.bar.value == 112)
 assert(m.recipes.text == 'Open the profession window to read its recipes.', m.recipes.text)
 assert(not m.last.shown, 'no Last read without recipes')
--- Trainer recipes at or above rank 112, lowest first, with cost and the trainer's name; the row at 100 and the
--- fourth row are left out, and the recipe two trainers list is one line.
-assert(#m.trainer == 3, 'three trainer lines per block')
-assert(m.trainer[1].shown and m.trainer[1].text == 'Rank 112: Copper Bar · ' .. U.MoneyShort(1000) .. ' · Brock Stonebrow', m.trainer[1].text)
-assert(m.trainer[2].shown and m.trainer[2].text == 'Rank 125: Smelt Silver', m.trainer[2].text)
-assert(m.trainer[3].shown and m.trainer[3].text == 'Rank 150: Smelt Gold · ' .. U.MoneyShort(2500) .. ' · Brock Stonebrow', m.trainer[3].text)
-assert(m.height == 44 + 3 * 13, m.height)
+-- One line for the trainer: the lowest recipe at or above rank 112. The addon cannot tell whether this character
+-- already trained it, so it says "At your rank" in the text colour, never "Learn now" in the accent; the full list is
+-- on Ranks and trainers.
+assert(m.next.shown and m.next.text == 'At your rank: Copper Bar · ' .. U.MoneyShort(1000) .. ' · Brock Stonebrow', m.next.text)
+assert(m.next.color[2] == U.COLORS.text[2] and m.next.color[1] == U.COLORS.text[1], 'a recipe at your rank is plain, not lit')
+assert(rawget(m, 'trainer') == nil, 'no wall of trainer lines in the list')
+assert(m.height == 60, m.height)
 assert(m.point[1] == 'TOPLEFT' and m.point[3] == 0)
 local fi = p.blocks[2]
 assert(fi.name.text == 'Fishing' and fi.rank.text == '20 / 75')
-assert(fi.trainer[1].shown and fi.trainer[1].text == "Nothing from a trainer yet. Open a trainer's window.", fi.trainer[1].text)
-assert(not fi.trainer[2].shown and not fi.trainer[3].shown)
-assert(fi.height == 44 + 13 and fi.point[3] == -(83 + 4), 'the next block sits under the previous one: ' .. fi.point[3])
+assert(fi.next.text == "Nothing from a trainer yet. Open a trainer's window.", fi.next.text)
+assert(fi.next.color[2] == U.COLORS.muted[2])
+assert(fi.height == 60 and fi.point[3] == -64, 'the next block sits under the previous one: ' .. fi.point[3])
 local c = p.blocks[3]
 assert(c.name.text == 'Cooking' and c.rank.text == '1 / 75')
-assert(c.recipes.text == '2 recipes recorded: 1 orange · 1 yellow · 0 green · 0 grey', c.recipes.text)
+-- Each colour's count in the game's own difficulty colour; colours with no recipe are left out.
+assert(c.recipes.text == '2 recipes: |cffff80401 orange|r · |cffffff001 yellow|r', c.recipes.text)
 assert(c.last.shown and c.last.text == 'Last read: 2026-11-07', c.last.text)
-assert(c.trainer[1].text == "Nothing from a trainer yet. Open a trainer's window.")
-assert(c.point[3] == -(83 + 4 + 57 + 4), c.point[3])
+assert(c.point[3] == -128, c.point[3])
+-- Nothing truncates: every line fits its width (the stub world's 6 px a character).
+for i = 1, 3 do
+  local b = p.blocks[i]
+  for _, s in ipairs({ b.name, b.recipes, b.next }) do
+    local plain = s.text:gsub('|c%x%x%x%x%x%x%x%x', ''):gsub('|r', ''):gsub('|T.-|t', 'xx')
+    assert(#plain * 6 <= s.width, 'fits: ' .. plain .. ' in ' .. s.width)
+  end
+end
 assert(not p.blocks[4].shown, 'only the learned professions show')
 assert(p.empty.shown == false)
 -- Other characters, by realm then name, this character left out, professions with ranks.
 assert(p.others.shown and p.others.text == 'Other characters')
-assert(p.others.point[1] == 'TOPLEFT' and p.others.point[3] == -(83 + 4 + 57 + 4 + 57 + 4 + 4), p.others.point[3])
+assert(p.others.point[1] == 'TOPLEFT' and p.others.point[3] == -(3 * 64 + 4), p.others.point[3])
 assert(p.other[1].shown and p.other[1].text == 'Alt · Forever: Cooking 40, Fishing 5', p.other[1].text)
 assert(p.other[2].shown and p.other[2].text == 'Mage · Nightfall: no professions read yet', p.other[2].text)
 assert(not p.other[3].shown)
-assert(p.footer.text == 'Full planner: everloot.app/tools/profession-planner')
+assert(p.footer.text == 'Planner: everloot.app/tools/profession-planner')
 assert(p.footer.point[1] == 'BOTTOMLEFT' and p.footer.point[2] == 8 and p.footer.point[3] == 8, 'the footer sits at the bottom of the view')
+assert(#p.footer.text * 6 <= p.footer.width, 'the footer fits beside the two buttons')
+-- Two buttons name the other two screens.
+assert(p.nav.text == 'Ranks and trainers' and p.toggle.text == 'Crafting costs', p.nav.text)
+assert(p.toggle.point[1] == 'BOTTOMRIGHT' and p.nav.point[1] == 'BOTTOMRIGHT')
+assert(8 + p.footer.width <= 604 + p.nav.point[2] - p.nav.width, 'the footer ends before the buttons')
 assert(#p.blocks == 5, 'one block per profession book slot')
 assert(f.shown and not U.failed)
 """)
 
-# Five professions share the view: two trainer lines each, every block above the footer, other characters only as they fit.
+# Five professions share the view: every block above the footer, other characters only as they fit.
 lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {RECORDS}, roster = {ROSTER} }}",
             API + "GetProfessions = function() return 1, 4, 5, 1, 4 end\n")
 lua.execute("""
 local U = Everloot.Window
 assert(U.Open('professions') == true)
 local p = EverlootWindow.professions
-local m = p.blocks[1]
-assert(m.trainer[1].shown and m.trainer[2].shown and not m.trainer[3].shown, 'two trainer lines with five professions')
-assert(m.trainer[2].text == 'Rank 125: Smelt Silver', m.trainer[2].text)
-assert(m.height == 44 + 2 * 13)
 local last = p.blocks[5]
 assert(last.shown and -last.point[3] + last.height <= 390 - 24, 'the last block ends above the footer')
--- 331 of the view's 366 are blocks; one other-character row fits above the footer, the second is left out.
-assert(p.others.shown and p.others.point[3] == -(70 + 57 + 57 + 70 + 57 + 5 * 4 + 4), p.others.point[3])
+-- 320 of the view's 366 are blocks; one other-character row fits above the footer, the second is left out.
+assert(p.others.shown and p.others.point[3] == -(5 * 64 + 4), p.others.point[3])
 assert(p.other[1].shown and p.other[1].text == 'Alt · Forever: Cooking 40, Fishing 5' and not p.other[2].shown, 'only the rows that fit')
 assert(EverlootWindow.shown and not U.failed)
+""")
+
+# Ranks and trainers: per profession, what a trainer teaches next, at what rank, for how much and where. Grouped
+# under each profession's heading, the trainer named once for a run of its recipes, the zone from its sighting.
+TRAINER_API = API + "C_Map = { GetMapInfo = function(id) if id == 1 then return { name = 'Elwynn Forest' } end end }\n"
+lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {RECORDS}, roster = {ROSTER} }}", TRAINER_API)
+lua.execute("""
+local U = Everloot.Window
+local M = U.MoneyShort
+assert(U.Open('professions') == true)
+local p = EverlootWindow.professions
+p.nav.scripts.OnClick()
+local t = p.trainers
+assert(t.page.shown and not p.craft.page.shown and not p.blocks[1].shown and not p.others.shown and not p.other[1].shown)
+assert(p.nav.text == 'Professions' and p.toggle.text == 'Crafting costs', p.nav.text)
+assert(t.head.rank.text == 'Rank' and t.head.recipe.text == 'Recipe' and t.head.cost.text == 'Cost'
+  and t.head.where.text == 'Trainer', t.head.where.text)
+-- The columns never run together, and each heading fits its column.
+local order = { 'rank', 'recipe', 'cost', 'where' }
+for i, k in ipairs(order) do
+  local s = t.head[k]
+  assert(#s.text * 6 <= s.width, k)
+  if order[i + 1] then assert(s.point[2] + s.width <= t.head[order[i + 1]].point[2], k .. ' overlaps') end
+end
+local s = t.sections[1]
+assert(s.shown and s.name.text == 'Mining', s.name.text)
+assert(s.summary.text == '112 / 150 · 1 at your rank', s.summary.text)
+-- Lowest rank first. The row at 100 is below the character's rank and left out; Copper Bar, listed by two trainers,
+-- is one row. A rank at the character's rank is in the text colour (it may already be trained), a later one muted.
+local r = s.rows
+assert(r[1].shown and r[1].rank.text == '112' and r[1].rank.color[1] == U.COLORS.text[1], r[1].rank.text)
+assert(r[1].recipe.text == 'Copper Bar' and r[1].cost.text == M(1000), r[1].recipe.text)
+assert(r[1].where.text == 'Brock Stonebrow · Elwynn Forest', r[1].where.text)
+assert(r[2].rank.text == '125' and r[2].rank.color[2] == U.COLORS.muted[2] and r[2].recipe.text == 'Smelt Silver')
+assert(r[2].cost.text == '-' and r[2].where.text == 'Trainer not seen', r[2].where.text)
+assert(r[3].rank.text == '150' and r[3].cost.text == M(2500) and r[3].where.text == 'Brock Stonebrow · Elwynn Forest')
+-- The same trainer as the row above is not named again.
+assert(r[4].shown and r[4].rank.text == '175' and r[4].recipe.text == 'Smelt Iron' and r[4].where.text == '', r[4].where.text)
+assert(not r[5].shown)
+assert(s.point[3] == -20, s.point[3])
+local fish = t.sections[2]
+assert(fish.name.text == 'Fishing' and fish.summary.text == '20 / 75 · no trainer seen', fish.summary.text)
+assert(fish.rows[1].shown and fish.rows[1].recipe.text == "Nothing from a trainer yet. Open a trainer's window.")
+assert(fish.rows[1].rank.text == '' and fish.rows[1].cost.text == '' and not fish.rows[2].shown)
+-- Each section is as tall as its rows and sits under the one before.
+assert(fish.point[3] == s.point[3] - s.height - 4, fish.point[3])
+assert(t.sections[3].shown and t.sections[3].name.text == 'Cooking' and not t.sections[4].shown)
+for _, sec in ipairs(t.sections) do
+  if sec.shown then assert(-sec.point[3] + sec.height <= 366, 'above the footer') end
+end
+-- Back to the list.
+p.nav.scripts.OnClick()
+assert(not t.page.shown and p.blocks[1].shown and p.nav.text == 'Ranks and trainers' and not U.failed)
+""")
+# Five professions: two rows each, the rest counted in the heading, every section above the footer.
+lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {RECORDS} }}",
+            TRAINER_API + "GetProfessions = function() return 1, 4, 5, 1, 4 end\n")
+lua.execute("""
+local U = Everloot.Window
+assert(U.Open('professions') == true)
+local p = EverlootWindow.professions
+p.nav.scripts.OnClick()
+local t = p.trainers
+local s = t.sections[1]
+assert(s.rows[2].shown and not s.rows[3].shown, 'two rows with five professions')
+assert(s.summary.text == '112 / 150 · 1 at your rank · 2 more', s.summary.text)
+local last = t.sections[5]
+assert(last.shown and -last.point[3] + last.height <= 366, 'the last section ends above the footer')
+assert(not U.failed)
+""")
+# No profession book: the trainers screen says so.
+lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {RECORDS} }}", "GetProfessions = nil\n")
+lua.execute("""
+local U = Everloot.Window
+assert(U.Open('professions') == true)
+local p = EverlootWindow.professions
+p.nav.scripts.OnClick()
+assert(p.empty.shown and p.empty.text == 'No profession book in this client.' and not p.trainers.sections[1].shown)
+assert(not U.failed)
 """)
 
 lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {RECORDS} }}", "GetProfessions = nil\n")
@@ -147,7 +239,7 @@ lua.execute("""
 local U = Everloot.Window
 assert(U.Open('professions') == true)
 local b = EverlootWindow.professions.blocks[1]
-assert(b.recipes.text == '1 recipe recorded: 0 orange · 1 yellow · 0 green · 0 grey', b.recipes.text)
+assert(b.recipes.text == '1 recipe: |cffffff001 yellow|r', b.recipes.text)
 assert(b.last.text == 'Last read: 2026-11-05', b.last.text)
 assert(b.rank.text == '5' and not U.failed, b.rank.text)
 """)
@@ -202,38 +294,69 @@ local M = U.MoneyShort
 assert(U.Open('professions') == true)
 local p = EverlootWindow.professions
 assert(p.toggle.text == 'Crafting costs' and not p.craft.page.shown, 'the blocks show first')
-assert(p.toggle.point[1] == 'BOTTOMRIGHT' and p.footer.width == 604 - 160, 'the button sits beside the footer')
 -- Each item's price is looked up once per redraw, however many recipes use it.
 local calls = {}
 local real = E.CommunityPrice
 E.CommunityPrice = function(self, realm, id) calls[id] = (calls[id] or 0) + 1; return real(self, realm, id) end
 p.toggle.scripts.OnClick()
 local c = p.craft
-assert(c.page.shown and p.toggle.text == 'Ranks and trainers' and not p.blocks[1].shown and not p.others.shown)
+assert(c.page.shown and p.toggle.text == 'Ranks and trainers' and p.nav.text == 'Professions' and not p.blocks[1].shown and not p.others.shown)
 for id, n in pairs(calls) do assert(n == 1, 'item ' .. id .. ' priced ' .. n .. ' times in one redraw') end
 assert(calls[2678] == 1 and calls[2840] == 1)
-assert(c.age.text == 'Market values from the price file built 2026-10-29 (1 day ago), Alliance auction house; a vendor price when it is lower.', c.age.text)
-assert(c.note.text == 'Value is per item. Est. profit assumes one item per craft: how many items a craft makes is not recorded.')
-assert(c.head.value.text == 'Value per item' and c.head.profit.text == 'Est. profit (1/craft)', c.head.profit.text)
+-- One short source line beside the buttons, on one line; the full sentence is in its hover.
+assert(c.age.text == 'Alliance AH prices, 2026-10-29 (1 day ago)', c.age.text)
+assert(c.ageDetail == 'Market values from the price file built 2026-10-29 (1 day ago), Alliance auction house; a vendor price when it is lower.', c.ageDetail)
+assert(#c.age.text * 6 <= c.age.width, 'the source line fits on one line')
+assert(c.age.point[1] == 'TOPRIGHT' and 604 + c.age.point[2] - c.age.width >= c.filterButton.point[2] + c.filterButton.width,
+  'the source line starts right of the buttons')
+-- Nothing is drawn over it: the list box starts under the line, and the note sits inside the list box.
+assert(-c.age.point[3] + 12 <= -c.list.point[3], 'the list box starts under the source line')
+assert(c.note.point[1] == 'BOTTOMLEFT', 'the note sits at the bottom of the list box')
+assert(c.note.text == 'Value is per item. Profit per craft = value - reagent cost.', c.note.text)
+assert(#c.note.text * 6 <= c.note.width, 'the note fits on one line')
+GameTooltip = { lines = {}, SetOwner = function(self) self.lines = {} end,
+  AddLine = function(self, s) self.lines[#self.lines + 1] = s end,
+  Show = function(self) self.shown = true end, Hide = function(self) self.shown = false end }
+c.source.scripts.OnEnter(c.source)
+local help = table.concat(GameTooltip.lines, '|')
+assert(help:find(c.ageDetail, 1, true) and help:find('how many items a craft makes is not recorded', 1, true), help)
+assert(help:find('Green profit is a gain, red is a loss', 1, true) and help:find('listings, not sales', 1, true), help)
+c.source.scripts.OnLeave(); assert(not GameTooltip.shown)
+GameTooltip = nil
+-- The column headings: readable words, each fitting its column, never running together.
+assert(c.head.name.text == 'Recipe' and c.head.cost.text == 'Craft cost' and c.head.value.text == 'Item value'
+  and c.head.profit.text == 'Profit / craft' and c.head.change.text == 'Your scans', c.head.profit.text)
+local order = { 'name', 'cost', 'value', 'profit', 'change' }
+for i, k in ipairs(order) do
+  local h = c.head[k]
+  assert(#h.text * 6 <= h.width, k .. ' fits')
+  local nxt = order[i + 1] and c.head[order[i + 1]]
+  if nxt then assert(h.point[2] + h.width < nxt.point[2], k .. ' runs into ' .. order[i + 1]) end
+end
 assert(c.sortButton.text == 'Sort: est. profit' and c.filterButton.text == 'Est. profitable only', c.filterButton.text)
 local function row(i) local r = c.rows[i]; return r.shown and r.name.text or nil end
 -- Sorted by profit: known profits highest first, then no product price, then unknown costs, by name.
 assert(row(1) == 'Smelt Copper' and row(2) == 'Spiced Wolf Meat' and row(3) == 'Herb Baked Egg'
   and row(4) == 'Boiled Clams' and row(5) == 'Mystery Stew' and not c.rows[6].shown, tostring(row(1)))
 local r1 = c.rows[1]
--- Priced: the newest row's reagents (one Copper Ore at its 20c market value, not the vendor's 30c).
-assert(r1.cost.text == M(20) and r1.value.text == M(150) and r1.profit.text == M(130), r1.cost.text)
+-- Priced: the newest row's reagents (one Copper Ore at its 20c market value, not the vendor's 30c). A gain is signed
+-- and green.
+assert(r1.cost.text == M(20) and r1.value.text == M(150) and r1.profit.text == '+' .. M(130), r1.profit.text)
+assert(r1.profit.color[1] == U.COLORS.accent[1] and r1.profit.color[2] == U.COLORS.accent[2], 'a gain is green')
 assert(r1.name.color[2] == U.COLORS.accent[2], 'the chosen recipe is lit')
--- A vendor sells Mild Spices for 10c, under its 40c market value: 50 + 10 against 45.
+-- A vendor sells Mild Spices for 10c, under its 40c market value: 50 + 10 against 45. A loss is red.
 local r2 = c.rows[2]
 assert(r2.cost.text == M(60) and r2.value.text == M(45) and r2.profit.text == M(-15), r2.profit.text)
+assert(r2.profit.color[1] == 1 and r2.profit.color[2] == 0.4 and r2.profit.color[3] == 0.4, 'a loss is red')
 -- No output price: the cost stands, the value says so, no profit.
 local r3 = c.rows[3]
 assert(r3.cost.text == M(40) and r3.value.shown and r3.value.text == 'no price' and r3.profit.text == '-', r3.value.text)
+assert(r3.profit.color[2] == U.COLORS.muted[2], 'no profit is muted')
 -- Partly unpriced: never a zero, and the product's value still shows.
 local r4 = c.rows[4]
-assert(r4.cost.text == 'unknown (1 unpriced)' and r4.value.shown and r4.value.text == M(100) and r4.profit.text == '-', r4.cost.text)
-assert(c.rows[5].cost.text == 'unknown (2 unpriced)' and c.rows[5].value.text == M(500), c.rows[5].cost.text)
+assert(r4.cost.text == '1 unpriced' and r4.value.shown and r4.value.text == M(100) and r4.profit.text == '-', r4.cost.text)
+assert(c.rows[5].cost.text == '2 unpriced' and c.rows[5].value.text == M(500), c.rows[5].cost.text)
+assert(#c.rows[5].cost.text * 6 <= c.rows[5].cost.width, 'an unknown cost fits its column')
 for i = 1, 5 do assert(not c.rows[i].cost.text:find('^0') and c.rows[i].cost.text ~= M(0)) end
 
 -- What to buy for the first row by default.
@@ -284,8 +407,10 @@ c.sortButton.scripts.OnClick()
 c.sortButton.scripts.OnClick()
 -- No product price: after Herb Baked Egg by name.
 assert(row(4) == 'Smelt Tin' and c.rows[4].cost.text == M(60) and c.rows[4].value.text == 'no price', tostring(row(4)))
--- Back to the blocks.
+-- On to Ranks and trainers, then back to the blocks.
 p.toggle.scripts.OnClick()
+assert(not c.page.shown and p.trainers.page.shown and p.toggle.text == 'Crafting costs')
+p.nav.scripts.OnClick()
 assert(not c.page.shown and p.blocks[1].shown and p.toggle.text == 'Crafting costs')
 assert(EverlootWindow.shown and not U.failed)
 """)
@@ -298,10 +423,11 @@ assert(U.Open('professions') == true)
 local p = EverlootWindow.professions
 p.toggle.scripts.OnClick()
 local c = p.craft
-assert(c.age.text:find('^No price file in the game yet'), c.age.text)
+assert(c.age.text == 'No price file: vendor prices only', c.age.text)
+assert(c.ageDetail:find('^No price file in the game yet'), c.ageDetail)
 local names = {}
 for i = 1, 5 do names[c.rows[i].name.text] = c.rows[i] end
-assert(names['Spiced Wolf Meat'].cost.text == 'unknown (1 unpriced)')
+assert(names['Spiced Wolf Meat'].cost.text == '1 unpriced')
 assert(names['Smelt Copper'].cost.text == U.MoneyShort(30) and names['Smelt Copper'].value.text == 'no price')
 assert(not U.failed)
 """)
@@ -312,7 +438,9 @@ assert(U.Open('professions') == true)
 local p = EverlootWindow.professions
 p.toggle.scripts.OnClick()
 local c = p.craft
-assert(c.age.text == 'OLD FILE: market values from 2026-10-20 (10 days ago). The Everloot Desktop App refreshes it, then /reload.', c.age.text)
+assert(c.age.text == 'Old price file: 2026-10-20 (10 days ago)', c.age.text)
+assert(c.ageDetail == 'OLD FILE: market values from 2026-10-20 (10 days ago). The Everloot Desktop App refreshes it, then /reload.', c.ageDetail)
+assert(#c.age.text * 6 <= c.age.width)
 assert(c.age.color[1] == 1 and c.age.color[2] == 0.4)
 assert(not U.failed)
 """)
@@ -337,7 +465,7 @@ p.toggle.scripts.OnClick()
 local c = p.craft
 local smelt
 for i = 1, 6 do if c.rows[i].shown and c.rows[i].name.text == 'Smelt Copper' then smelt = c.rows[i] end end
-assert(smelt and smelt.cost.text == 'unknown (1 unpriced)' and smelt.value.text == M(150) and smelt.profit.text == '-',
+assert(smelt and smelt.cost.text == '1 unpriced' and smelt.value.text == M(150) and smelt.profit.text == '-',
   smelt and smelt.cost.text)
 smelt.scripts.OnClick()
 assert(c.buy.lines[1].text == '1 × Copper Ore · unpriced (ambiguous name)', c.buy.lines[1].text)
@@ -451,7 +579,7 @@ def change_world(records=CHANGE_RECORDS, prices=CHANGE_FILE):
 lua = change_world()
 lua.execute(r"""
 assert(r.cost.text == Everloot.Window.MoneyShort(20))
-assert(r.value.text == Everloot.Window.MoneyShort(150) and r.profit.text == Everloot.Window.MoneyShort(130))
+assert(r.value.text == Everloot.Window.MoneyShort(150) and r.profit.text == '+' .. Everloot.Window.MoneyShort(130))
 r.scripts.OnEnter(r)
 local said = table.concat(GameTooltip.lines, '|')
 assert(said:find('Min buyout: +20.0%', 1, true), said)
@@ -461,7 +589,8 @@ assert(said:find('+50.0% vs 60-day median', 1, true), said)
 -- 100,110,120,130 from scans, 150,100 from file: spread / mean = 42.3%.
 assert(said:find('42.3% swing', 1, true), said)
 assert(said:find('not sales', 1, true), said)
-assert(r.change.text == '▲' and r.change.color[2] == Everloot.Window.COLORS.accent[2])
+-- The product's lowest buyout rose 20% since the previous scan: said in figures the font draws, green.
+assert(r.change.text == '+20%' and r.change.color[2] == Everloot.Window.COLORS.accent[2], r.change.text)
 assert(r.bars[1].shown and r.bars[2].shown and not r.bars[3].shown)
 assert(r.bars[1].path == 'Interface\\Buttons\\WHITE8X8')
 assert(math.abs(r.bars[1].height - 10) < 0.01 and r.bars[2].height == 12)
@@ -473,7 +602,7 @@ Everloot.ownScanCache = nil
 Everloot.Window.Views.professions.refresh(EverlootWindow)
 r.scripts.OnEnter(r)
 assert(table.concat(GameTooltip.lines, '|'):find('Min buyout: -20.0%', 1, true))
-assert(r.change.text == '▼' and r.change.color[1] == Everloot.Window.COLORS.gold[1])
+assert(r.change.text == '-20%' and r.change.color[1] == Everloot.Window.COLORS.gold[1], r.change.text)
 """)
 lua = change_world(prices='')
 lua.execute("""
@@ -488,7 +617,7 @@ lua.execute("""
 r.scripts.OnEnter(r)
 local said = table.concat(GameTooltip.lines, '|')
 assert(said:find('one scan so far: scan again later to see change', 1, true), said)
-assert(r.change.text == '—' and r.bars[1].shown and not r.bars[2].shown)
+assert(r.change.text == '' and r.bars[1].shown and not r.bars[2].shown, r.change.text)
 """)
 lua = change_world(CHANGE_RECORDS.replace('990102, 4, 20, 100, 110', '990105, 4, 20, 100, 110')
                    .replace('990102, 3, 12, 120, 130', '990105, 3, 12, 120, 130'), '')
@@ -534,6 +663,6 @@ lua = change_world(CHANGE_RECORDS.replace("house = 'Alliance'", "house = 'Neutra
 lua.execute("""
 r.scripts.OnEnter(r)
 assert(table.concat(GameTooltip.lines, '|'):find('No own scan of this house yet.', 1, true))
-assert(r.change.text == '—' and not r.bars[1].shown and not Everloot.Window.failed)
+assert(r.change.text == '' and not r.bars[1].shown and not Everloot.Window.failed)
 """)
 print('Professions market changes: three scans, multipart completeness, long intervals and sparse prices PASS')

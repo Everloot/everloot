@@ -111,6 +111,11 @@ assert(b.edgeFile == 'Interface\\\\DialogFrame\\\\UI-DialogBox-Gold-Border' and 
 assert(b.insets.left == 11 and b.insets.right == 12 and b.insets.top == 12 and b.insets.bottom == 11, "Blizzard's gold dialog insets")
 assert(f.border[1] == 1 and f.border[2] == 1 and f.border[3] == 1, 'untinted, so the edge stays gold')
 assert(f.grip.point[1] == 'BOTTOMRIGHT' and f.grip.point[2] <= -12 and f.grip.point[3] >= 12, 'the grip sits inside the gold edge')
+-- The grip has its own strip under the views, so it never covers a view's bottom-right button or panel corner.
+assert(48 + f.home.height <= f.height - f.grip.point[3] - f.grip.height, 'the grip sits below the views')
+assert(f.home.width == 604 and f.home.height == 390, 'every view keeps its 604 x 390 frame')
+-- Opaque: the game world does not show through the window.
+assert(U.COLORS.canvas[4] == 1, 'the canvas is opaque')
 assert(f.crest.path == 'Interface\\\\AddOns\\\\Everloot\\\\media\\\\crest', 'the crest')
 -- The title crown: the crest centred on the top edge, half above it, and the name centred beneath it, all above the
 -- views and the sidebar, which start 48 below the top.
@@ -149,7 +154,7 @@ assert(scale == 1 and EverlootDB.windowScale == 1 and grip.scripts.OnUpdate == n
 EverlootDB.windowScale = 1.4
 U.Toggle(); assert(U.Open() == true and scale == 1.4, 'the kept size at the next open: ' .. scale)
 UIParent.GetHeight = function() return 600 end
-U.Toggle(); assert(U.Open() == true and scale == (600 - 32) / 450, 'never larger than the screen holds: ' .. scale)
+U.Toggle(); assert(U.Open() == true and scale == (600 - 32) / f.height, 'never larger than the screen holds: ' .. scale)
 UIParent.GetHeight = function() return 1080 end
 EverlootDB.windowScale = nil
 U.Toggle(); assert(U.Open() == true and scale == 1, 'normal size until the grip is used')
@@ -166,6 +171,7 @@ assert(f.week.text == 'This week: +' .. U0.Money(12345 + 41000 + 67500) .. ' / -
 assert(rawget(f, 'ledger') == nil, 'the Recorded line is the week line now')
 -- The account line sums every roster key (Alt's 999 quest reward joins); the character line above does not.
 assert(f.weekAccount.text == 'Account this week: +' .. U0.Money(12345 + 41000 + 67500 + 999) .. ' / -' .. U0.Money(77 + 55), 'every character, last 7 days: ' .. f.weekAccount.text)
+assert(f.weekAccount.shown, 'the account line shows when it differs from this character')
 
 -- The Missing strip with the tracker off: the recipes line alone (Mining and Fishing have no recipe recorded), then
 -- the note and the Turn on button Collection has.
@@ -200,14 +206,48 @@ assert(mine == money, 'this character reads gold from the client when the window
 assert(r.realmTotals.Forever.text == 'Forever · ' .. Everloot.Window.Money(mine + 500) and r.realmTotals.Forever.copper == mine + 500, r.realmTotals.Forever.text)
 assert(r.realmTotals.Nightfall.text == 'Nightfall · -' and r.realmTotals.Nightfall.copper == nil, 'no gold read, a dash')
 assert(r.accountTotal.text == 'Account: ' .. Everloot.Window.Money(mine + 500), r.accountTotal.text)
-assert(r.rows[3].level.text == '24' and r.rows[3].gold.text == Everloot.Window.MoneyShort(mine) and r.rows[2].gold.text == Everloot.Window.MoneyShort(500), r.rows[2].gold.text)
+-- The whole amount, every coin, as on the Gold tab's totals; a character with no gold is a dash, not "0c".
+assert(r.rows[3].level.text == '24' and r.rows[3].gold.text == Everloot.Window.Money(mine) and r.rows[2].gold.text == Everloot.Window.Money(500), r.rows[2].gold.text)
+EverlootDB.roster.aaaa0001.copper = 0
+Everloot.Window.Refresh()
+assert(r.rows[2].gold.text == '-', 'no gold, a dash: ' .. r.rows[2].gold.text)
+EverlootDB.roster.aaaa0001.copper = 500
+Everloot.Window.Refresh()
 assert(r.rows[3].profs.text == 'Mining 112, Fishing 20, Cooking 1' and r.rows[2].profs.text == '-', r.rows[3].profs.text)
-assert(r.rows[3].lockouts.text == '-' and r.rows[5].lockouts.text == '-', 'lockouts are read only while the completion tracker is on')
-assert(r.rows[3].seen.text == '1970-01-12' and r.rows[2].seen.text == '-', r.rows[3].seen.text)
+-- Columns: Gold is wide enough for gold, silver and copper, and a gap keeps its heading apart from Professions.
+local col = {}
+for _, c in ipairs(Everloot.Window.ROSTER_COLUMNS) do col[c[1]] = c end
+assert(col.gold[3] >= 100, 'the gold column fits "20g 82s 65c"')
+assert(col.profs[2] - (col.gold[2] + col.gold[3]) >= 10, 'Gold and Professions headings stand apart')
+assert(col.seen[2] + col.seen[3] <= 436 and col.lockouts[2] + col.lockouts[3] <= col.seen[2], 'every column inside the row')
+-- No character on the list has a raid lockout (the tracker is off): no Raids column, and Professions takes its room.
+assert(r.heads.lockouts.shown == false and r.rows[3].lockouts.shown == false, 'no lockouts, no Raids column')
+assert(r.rows[3].profs.width == col.seen[2] - col.profs[2] - 4, 'Professions takes the Raids room: ' .. r.rows[3].profs.width)
+-- Seen: today, days ago for a week, then a short date.
+assert(r.rows[3].seen.text == 'today' and r.rows[2].seen.text == '-', r.rows[3].seen.text)
+EverlootDB.roster.aaaa0001.lastSeen = now - 86400
+Everloot.Window.Refresh()
+assert(r.rows[2].seen.text == '1d ago', r.rows[2].seen.text)
+EverlootDB.roster.aaaa0001.lastSeen = now - 6 * 86400
+Everloot.Window.Refresh()
+assert(r.rows[2].seen.text == '6d ago', r.rows[2].seen.text)
+EverlootDB.roster.aaaa0001.lastSeen = now - 8 * 86400
+Everloot.Window.Refresh()
+assert(r.rows[2].seen.text == os.date('%m-%d', now - 8 * 86400), r.rows[2].seen.text)
+EverlootDB.roster.aaaa0001.lastSeen = nil
+-- One realm: its line names it without a total, which would only repeat the Account line under the list.
+local mage = EverlootDB.roster.bbbb0002
+EverlootDB.roster.bbbb0002 = nil
+Everloot.Window.Refresh()
+assert(r.rows[1].name.text == 'Forever' and r.accountTotal.text == 'Account: ' .. Everloot.Window.Money(mine + 500), r.rows[1].name.text)
+EverlootDB.roster.bbbb0002 = mage
+Everloot.Window.Refresh()
+assert(r.rows[1].name.text == r.realmTotals.Forever.text, 'two realms: each line carries its total')
 EverlootDB.toggles.completion = true
 Everloot.Window.Refresh()
 -- Magtheridon's and Zul Gurub's reset times have passed: live lockouts only, as the Collection view counts them.
 assert(r.rows[5].lockouts.text == '2 raids' and r.rows[3].lockouts.text == '2 raids' and r.rows[2].lockouts.text == '-', r.rows[5].lockouts.text)
+assert(r.heads.lockouts.shown and r.rows[3].lockouts.shown and r.rows[3].profs.width == col.profs[3], 'a lockout brings the Raids column back')
 EverlootDB.records.lockout_owned[2].resetAt = '1970-01-03T00:00:00Z'
 Everloot.Window.Refresh()
 assert(r.rows[5].lockouts.text == '1 raid', 'one live, two past their reset: ' .. r.rows[5].lockouts.text)
@@ -220,6 +260,20 @@ assert(line(1) == 'Achievements left: 2' and line(2) == 'Factions not exalted: 1
   and line(4) == 'Recipes to read: 2' and line(5) == 'Raids not cleared: 1', line(1) .. ' / ' .. line(2) .. ' / ' .. line(3) .. ' / ' .. line(5))
 for i = 1, 5 do assert(m.lines[i].shown and m.lines[i].point[2] == m.title and m.lines[i].point[5] == -2 - (i - 1) * 16, 'line ' .. i .. ' in order') end
 assert(not m.off.shown and not m.turnOn.shown, 'the note and button leave with the tracker on')
+assert(not m.none.shown, 'something is missing')
+-- A count of 0 is left out, the rest pack up; with every count at 0 the strip says so.
+local missingData = Everloot.Window.MissingData
+Everloot.Window.MissingData = function() return { achievements = 0, factions = 3, titles = 0, recipes = 0, raids = 0 } end
+Everloot.Window.Refresh()
+assert(m.lines[2].shown and m.lines[2].point[5] == -2 and line(2) == 'Factions not exalted: 3', 'the one count left moves to the top')
+assert(not m.lines[1].shown and not m.lines[3].shown and not m.lines[4].shown and not m.lines[5].shown and not m.none.shown, 'zeros are hidden')
+Everloot.Window.MissingData = function() return { achievements = 0, factions = 0, titles = 0, recipes = 0, raids = 0 } end
+Everloot.Window.Refresh()
+assert(m.none.shown and m.none.text == 'Nothing missing', 'all done')
+for i = 1, 5 do assert(not m.lines[i].shown) end
+Everloot.Window.MissingData = missingData
+Everloot.Window.Refresh()
+assert(not m.none.shown and m.lines[1].shown)
 -- A line opens the tab that lists it: the Collection view for the tracker counts, Professions for the recipes.
 m.lines[2].scripts.OnClick(m.lines[2])
 assert(f.home.shown == false and f.views.collection and f.views.collection.shown and f.subtitle.text == 'Collection', 'a factions line opens Collection')
@@ -231,6 +285,12 @@ assert(f.home.shown and m.lines[1].shown and not f.views.collection.shown and no
 EverlootDB.toggles.completion = false
 Everloot.Window.Refresh()
 assert(not m.lines[1].shown and m.lines[4].shown and m.off.shown, 'off again: the recipes line stays, the rest wait')
+-- Off, with every recipe read: no line, no "Nothing missing" (the tracker counts are unknown), the note under the title.
+Everloot.Window.MissingData = function() return { recipes = 0 } end
+Everloot.Window.Refresh()
+assert(not m.lines[4].shown and not m.none.shown and m.off.shown and m.off.point[5] == -4, 'off and nothing to read: the note alone')
+Everloot.Window.MissingData = missingData
+Everloot.Window.Refresh()
 
 -- Paging: more than 10 lines show Down only; Down moves a page and clamps at the end; Up goes back.
 assert(r.up.shown == false and r.down.shown == false, 'a short list pages nowhere')
@@ -256,6 +316,7 @@ assert(EverlootDB.gph.current.runningSince == nil and f.gphButton.text == 'Resum
 -- Sidebar: Home, Gold, Collection, Professions, Settings. A view registers by key; one that did not load says so.
 assert(f.nav.ask == nil and f.nav.plan == nil and f.nav.auctions == nil, 'Ask, Build plan and Auctions left the sidebar')
 assert(f.nav.gold and f.nav.collection and f.nav.professions and f.nav.settings, 'Home, Gold, Collection, Professions, Settings')
+assert(f.nav.disenchanting == nil and Everloot.Window.Views.disenchanting == nil, 'Disenchanting moved into the item tooltip')
 -- The strip's click built the real Collection view above; a stub in its place checks that a view is built once, on
 -- its first open, and refreshed on each.
 f.views.collection = nil
@@ -353,7 +414,7 @@ local f = EverlootWindow
 assert(f.name.text == '-' and f.onHand.text == '-' and f.peak.text == '-' and f.perHour.text == '-', 'dashes, not numbers')
 assert(f.profRows[1].name.text == '-' and f.profRows[1].bar.shown == false, 'no profession book, no bars')
 assert(f.week.text == 'This week: -', f.week.text)
-assert(f.weekAccount.text == 'Account this week: -', f.weekAccount.text)
+assert(f.weekAccount.shown == false, 'the account line says nothing the character line does not: ' .. f.weekAccount.text)
 assert(f.roster.accountTotal.text == 'Account: -' and not f.roster.rows[1].shown, 'no characters, no rows')
 assert(f.missing.lines[4].label.text == 'Recipes to read: -', 'no profession book, no recipe count: ' .. f.missing.lines[4].label.text)
 EverlootDB.toggles.completion = true

@@ -15,6 +15,9 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Addon: Collection opens on an overview of every area with its progress, groups each area's list under headings that count what is missing, adds Flight paths, and scrolls with the mouse wheel.
+- Addon: the Gold view charts earned and spent per day with dates, a scale and hover details; Professions gains a Ranks and trainers screen and a Crafting costs list that shows profit or loss per craft.
+- Addon: the item tooltip compares disenchanting with selling and says what your own disenchants of that item gave; the Disenchanting tab is removed.
 - Addon: with the gold switch on, the addon reads your logged-in character's lifetime gold statistics (total acquired, most ever owned, spending, auctions) into your file; they never go in an upload, and only the Desktop App's private sync sends them for a character you linked.
 - Site: a linked character's page can show its lifetime gold from the addon, under its own Gold sync and "Show gold" switches, both off by default; your lifetime totals add total gold acquired and most gold ever owned. Gold is never ranked.
 - Site: armory character pages gain a Play history tab from Blizzard's lifetime statistics (quests, kills, deaths, fish, flight paths, dungeons, boss kills and more), with six new rankings and each character's place on them. Owners can show it on a linked character's page with a new switch, and see their linked characters' lifetime totals in one table.
@@ -269,6 +272,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Addon: the window is opaque, its resize grip no longer covers buttons, and Home shows full gold amounts, short dates and only the columns and counts that say something.
 - Site: armory character pages show their board ranks again; a rank on one of the new play history boards had made the page drop them all.
 - Site: lore pages drop the doubled spaces the wiki's source had but never showed, leave no gap where footnotes or race icons sat side by side, show `{{-}}` as its dash and `{{Race|…|notext}}` as only its icon, so far fewer pages are marked damaged.
 - Site: the Privacy Policy points to Settings, where API keys, linked characters and synced data now live, instead of the old account page.

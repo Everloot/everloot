@@ -340,7 +340,8 @@ function L.Summary(keys, fromTs, toTs)
     end)
     for n, r in ipairs(list) do
       local e = r.e
-      list[n] = { at = e.at, key = e.key, category = e.category, direction = r.direction, copper = e.copper, itemName = e.itemName, count = e.count }
+      list[n] = { at = e.at, key = e.key, category = e.category, direction = r.direction, copper = e.copper, itemName = e.itemName, count = e.count,
+        ownAlt = e.ownAlt == true or nil }
     end
     return list
   end

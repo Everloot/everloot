@@ -65,7 +65,7 @@ O.ROWS[#O.ROWS + 1] = { key = "tooltipHistory", group = "tooltips", field = true
 O.ROWS[#O.ROWS + 1] = { key = "tooltipSources", group = "tooltips", field = true, live = true, label = "Item sources",
   text = "Who drops it, who sells it, the recipes it is a reagent for and the zones you met its sources in. Records nothing; applies at once." }
 O.ROWS[#O.ROWS + 1] = { key = "tooltipDisenchant", group = "tooltips", field = true, live = true, label = "Disenchant estimate",
-  text = "Observed material yields and estimated value at this character's house prices. Records nothing; applies at once." }
+  text = "Disenchanting against selling at this character's house prices, observed material yields, and what your own disenchants of the item gave. Records nothing; applies at once." }
 
 -- The settings pages, in the game's list under Everloot. Everloot itself is the overview: what this file holds and
 -- where the switches are. A client without sub-pages keeps every switch on one page, in O.ROWS order.

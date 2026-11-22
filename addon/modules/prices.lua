@@ -534,11 +534,7 @@ local function addLines(tooltip, itemId)
     for _, line in ipairs(historyLines(realm, itemId)) do lines[#lines + 1] = line end
   end
   if E.Disenchant and E.TooltipShows("tooltipDisenchant") then
-    local vendorShown = false
-    for _, line in ipairs(lines) do if line.left == "Vendor" then vendorShown = true end end
-    for _, line in ipairs(E.Disenchant.Lines(realm, itemId, mode == "compact")) do
-      if line.left ~= "Vendor" or not vendorShown then lines[#lines + 1] = line end
-    end
+    for _, line in ipairs(E.Disenchant.Lines(realm, itemId, mode == "compact")) do lines[#lines + 1] = line end
   end
   -- The unit and the realm belong to the price amounts; a drop rate is neither per unit nor per realm.
   local amounts = false
