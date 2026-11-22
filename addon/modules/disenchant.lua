@@ -118,10 +118,15 @@ local function got(id)
   return out.count > 0 and out or nil
 end
 
---- The tooltip block for an armor or weapon in a disenchant band: one headline with the disenchant value against
---- selling it (the better of the auction estimate and the vendor price), and which is worth more when every price is
---- known and current; then each material with its chance, units and price; then what this install's own disenchants
---- of the item gave. Compact mode keeps the headline alone. Nothing without a disenchant block in the price file.
+-- The faction houses' cut (gph.lua's G.AH_CUT): materials and the item sold at auction pay this much less.
+local AH_CUT = 0.05
+local function afterCut(copper) return copper and math.floor(copper * (1 - AH_CUT)) end
+
+--- The tooltip block for an armor or weapon in a disenchant band: one headline with what disenchanting pays against
+--- what selling pays (the better of the auction estimate and the vendor price), both as the player is paid, after the
+--- house cut on anything sold at auction, and which is worth more when every price is known and current; then each
+--- material with its chance, units and price; then what this install's own disenchants of the item gave. Compact mode
+--- keeps the headline alone. Nothing without a disenchant block in the price file.
 function D.Lines(realm, id, compact)
   local band = D.Band(id)
   if not band then return {} end
@@ -139,18 +144,19 @@ function D.Lines(realm, id, compact)
   end
   local mats = {}
   for _, r in ipairs(rows) do mats[r.id] = r.mean end
-  local value, missing, fresh = D.Value(realm, mats)
+  local gross, missing, fresh = D.Value(realm, mats)
+  local value = afterCut(gross)
   local auction, auctionFresh = D.Price(realm, id)
   local item = D.Item(id)
   local vendor = item and whole(item.sell, 0) and item.sell or nil
-  local sell = (auction or vendor) and math.max(auction or 0, vendor or 0) or nil
+  local sell = (auction or vendor) and math.max(afterCut(auction) or 0, vendor or 0) or nil
 
   local verdict = ""
   if not missing and fresh and auction and auctionFresh and vendor then
     verdict = value > sell and ": better than selling" or value < sell and ": selling is better" or ": same as selling"
   end
   -- Nothing priced at all is no amount; part priced is a floor.
-  local unpriced = missing and value == 0
+  local unpriced = missing and gross == 0
   local function amount(coins)
     if unpriced then return "not priced" end
     return (missing and "at least " or "") .. coins(value)
@@ -169,6 +175,7 @@ function D.Lines(realm, id, compact)
     add("  " .. name .. " · " .. chance .. " · " .. (price and (E.Coins(price) .. " each") or "no price"),
       "  " .. D.Label(r.id), chance .. " · " .. (price and (E.PriceCoinIcons(price) .. " each") or "no price"))
   end
+  if not unpriced or auction then add("  Auction amounts are after the 5% house cut") end
   local day = E.StaleDay(file.asOf)
   if day then add("  Disenchant data from " .. day) end
   if not fresh and not missing then add("  Prices are stale, thin or their age is unknown") end

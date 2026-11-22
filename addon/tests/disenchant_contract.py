@@ -74,23 +74,28 @@ value, missing = D.Value('Forever', { [200] = 1.6, [998] = 1 })
 assert(value == 160 and missing, 'an unpriced material makes the known value a floor')
 local lines = D.Lines('Forever', 100)
 local function joined(lines) local t = {}; for _, l in ipairs(lines) do t[#t + 1] = l.text end; return table.concat(t, '\n') end
--- One headline: the disenchant value (1.6 x 1s + 0.1 x 50c = 1s 65c) against selling it (the 70c auction estimate
--- beats the 20c vendor price); then each material with its chance, units and its own price; nothing else when the
--- data is current and this install never disenchanted the item.
-assert(lines[1].text == 'Disenchant: better than selling · 1s 65c vs sell 70c', lines[1].text)
+-- One headline: what disenchanting pays against what selling pays, both as the player would be paid. The materials
+-- (1.6 x 1s + 0.1 x 50c = 1s 65c) and the item at auction (70c) both lose the 5% house cut (1s 56c and 66c); the 20c
+-- vendor price has no cut. Then each material with its chance, units and its own price, and a note on the cut;
+-- nothing else when the data is current and this install never disenchanted the item.
+assert(lines[1].text == 'Disenchant: better than selling · 1s 56c vs sell 66c', lines[1].text)
 assert(lines[1].left == 'Disenchant: better than selling' and lines[1].right:find('vs sell'), 'amounts in the value column')
 assert(lines[2].text:find('Item 200 · 80%% · 1%-3 · 1s 0c each$'), lines[2].text)
 assert(lines[3].text:find('Item 203 · 10%% · 1 · 50c each$'), lines[3].text)
-assert(#lines == 3, joined(lines))
+assert(lines[4].text == '  Auction amounts are after the 5% house cut', lines[4].text)
+assert(#lines == 4, joined(lines))
 now = now + 2 * 86400
-assert(#D.Lines('Forever', 100) == 3, 'two days is fresh')
+assert(#D.Lines('Forever', 100) == 4, 'two days is fresh')
 now = now + 86400
 assert(joined(D.Lines('Forever', 100)):find('Disenchant data from Nov 17', 1, true), 'old uploads carry a short day')
 now = now - 3 * 86400
 prices(10, 70)
-assert(D.Lines('Forever', 100)[1].text == 'Disenchant: selling is better · 21c vs sell 70c', D.Lines('Forever', 100)[1].text)
+assert(D.Lines('Forever', 100)[1].text == 'Disenchant: selling is better · 19c vs sell 66c', D.Lines('Forever', 100)[1].text)
 prices(1, 2)
-assert(D.Lines('Forever', 100)[1].text == 'Disenchant: selling is better · 6c vs sell 20c', 'the vendor pays more than the house: ' .. D.Lines('Forever', 100)[1].text)
+assert(D.Lines('Forever', 100)[1].text == 'Disenchant: selling is better · 5c vs sell 20c', 'the vendor pays more than the house: ' .. D.Lines('Forever', 100)[1].text)
+-- 21c of materials beats the 20c vendor price before the cut, not after it (19c): the verdict follows what is paid.
+prices(10, 2)
+assert(D.Lines('Forever', 100)[1].text == 'Disenchant: selling is better · 19c vs sell 20c', D.Lines('Forever', 100)[1].text)
 EverlootPricesDB.realms = nil; E:ResetPrices()
 -- No house prices: the value is a floor and nothing is compared; the vendor price is still what selling pays.
 assert(D.Lines('Forever', 100)[1].text == 'Disenchant · not priced vs sell 20c', D.Lines('Forever', 100)[1].text)
@@ -100,7 +105,7 @@ local data = EverlootPricesDB.realms['forever|alliance'].data
 EverlootPricesDB.realms['forever|alliance'].data = data:gsub('2026%-11%-17', '2026-11-01')
 EverlootPricesDB.realms['forever|alliance'].sum = E.Adler32(EverlootPricesDB.realms['forever|alliance'].data)
 E:ResetPrices()
-assert(D.Lines('Forever', 100)[1].text == 'Disenchant · 1s 65c vs sell 70c', 'stale prices: no verdict')
+assert(D.Lines('Forever', 100)[1].text == 'Disenchant · 1s 56c vs sell 66c', 'stale prices: no verdict')
 assert(joined(D.Lines('Forever', 100)):find('Prices are stale, thin or their age is unknown'))
 prices(100, 70)
 E:InitModules()
