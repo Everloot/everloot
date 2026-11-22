@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { runStoredViewsJob, type StoredViewsResult } from "./stored-views-run";
+import { runStoredViewsJob, stepRunner, type StoredViewsResult } from "./stored-views-run";
 
 const none: StoredViewsResult = {
   settled: null, itemView: null, aggregates: null, searchNames: null, auctionHistory: null, professions: null, mapPins: null,
@@ -11,9 +11,9 @@ test("the job builds the views for the heartbeat's snapshot, adding no uploads, 
   const record = vi.fn(async () => {});
   const beat = { generatedAt: "2026-11-21T04:00:30Z", dataAsOf: "2026-11-21T04:00:12Z", completionPending: false };
   expect(await runStoredViewsJob({}, { heartbeat: async () => beat, run, record })).toMatchObject({ dataAsOf: "2026-11-21T04:00:12Z", failed: ["coverage"] });
-  expect(run).toHaveBeenLastCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-11-21T04:00:12Z", reportsDue: true });
+  expect(run).toHaveBeenLastCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-11-21T04:00:12Z", reportsDue: true, retries: 1 });
   await runStoredViewsJob({ rebuild: true }, { heartbeat: async () => ({ ...beat, completionPending: true }), run, record });
-  expect(run).toHaveBeenLastCalledWith({ added: 0, rebuild: true, dataAsOf: "2026-11-21T04:00:12Z", reportsDue: false });
+  expect(run).toHaveBeenLastCalledWith({ added: 0, rebuild: true, dataAsOf: "2026-11-21T04:00:12Z", reportsDue: false, retries: 1 });
 });
 
 test("a finished run leaves its heartbeat with the snapshot it built, its failed steps and how long each step took", async () => {
@@ -43,4 +43,26 @@ test("with no heartbeat the snapshot cron has never run, and the job builds noth
   await expect(runStoredViewsJob({}, { heartbeat: async () => null, run, record })).rejects.toThrow("no cron heartbeat yet");
   expect(run).not.toHaveBeenCalled();
   expect(record).not.toHaveBeenCalled();
+});
+
+test("a failed step is tried again once when retries allow, and named in failed only when the retry fails too", async () => {
+  vi.spyOn(console, "warn").mockImplementation(() => {});
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const beforeRetry = vi.fn();
+  const { step, failed, timings } = stepRunner({ retries: 1, waitMs: 0, beforeRetry });
+  let calls = 0;
+  expect(await step("settled", "settled list", async () => { if (++calls === 1) throw new Error("read ECONNRESET"); return { written: true }; }))
+    .toEqual({ written: true });
+  expect(calls).toBe(2);
+  // The run forgets a failed shared corpus read there, so the retry reads it again.
+  expect(beforeRetry).toHaveBeenCalledOnce();
+  expect(await step("coverage", "coverage", async () => { throw new Error("still down"); })).toBeNull();
+  expect(failed).toEqual(["coverage"]);
+  expect(Object.keys(timings)).toEqual(["settled", "coverage"]);
+  const once = stepRunner({ retries: 0, waitMs: 0 });
+  let tries = 0;
+  expect(await once.step("settled", "settled list", async () => { tries++; throw new Error("down"); })).toBeNull();
+  expect(tries).toBe(1);
+  expect(once.failed).toEqual(["settled"]);
+  vi.restoreAllMocks();
 });

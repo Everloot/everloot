@@ -264,7 +264,8 @@ and 50 (`npm run stored-views` in `web/`, `web/scripts/stored-views.ts`). It rea
 `dataAsOf` and writes each file whose stamp is not that snapshot's, so a run with nothing new writes
 nothing. It takes the switches from `web/wrangler.cron.jsonc`'s vars, so it builds what the cron
 Worker would. The auction reports wait while the heartbeat's `completionPending` is true. A step
-that fails is logged and the run ends red with the names in `failed`; the next run retries it.
+that fails is tried once more after five seconds; if it fails again it is logged and the run ends
+red with the names in `failed`, and the next run retries it.
 A manual run with **rebuild** ticked rewrites every file.
 
 A snapshot run that folded uploads into the corpus or a rollup also starts the workflow itself,
