@@ -26,6 +26,8 @@ import { dispatchStoredViews } from "@/lib/stored-views-dispatch";
  */
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
+/** A heartbeat this old, with the fold on the stored-views job, means the job is not folding: the Worker folds instead. */
+const JOB_STALL_MS = 20 * 60_000;
 
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
@@ -52,9 +54,16 @@ export async function GET(req: Request) {
     // GitHub runner and then builds the views (lib/snapshot-pass.ts, scripts/stored-views.ts): writing the corpus
     // means holding all of it, and it outgrew the Worker's 128 MB (#1354). A run with nothing to fold still writes the
     // heartbeat here. If the job cannot be started (no token, or GitHub refused), this run folds the uploads itself, as
-    // before the hand-over. A rebuild always runs here.
+    // before the hand-over. So it does when the heartbeat is over JOB_STALL_MS old (or missing): the job was started
+    // and did not fold, whether GitHub queued it, the workflow is off or main does not build. A rebuild always runs here.
     let viewsJob: "sent" | "off" | "failed" = "off";
-    if (process.env.EVERLOOT_SNAPSHOT === "job" && !rebuild && !nothingToFold(work)) {
+    const beatAge = work.heartbeatAt ? Date.now() - Date.parse(work.heartbeatAt) : Number.NaN;
+    const jobFolding = beatAge < JOB_STALL_MS;
+    const handOff = process.env.EVERLOOT_SNAPSHOT === "job" && !rebuild && !nothingToFold(work);
+    if (handOff && !jobFolding) {
+      console.warn(`the stored-views job has not folded for ${Number.isFinite(beatAge) ? `${Math.round(beatAge / 60_000)} minutes` : "an unknown time"}; folding here`);
+    }
+    if (handOff && jobFolding) {
       try { viewsJob = await dispatchStoredViews(); } catch (err) { console.error("stored-views dispatch failed", err); viewsJob = "failed"; }
       if (viewsJob === "sent") return NextResponse.json({ ok: true, rebuild, snapshotJob: "sent", viewsJob });
     }

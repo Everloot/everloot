@@ -34,5 +34,10 @@ test("a failed fold is reported, and a failed sweep is logged without failing th
     .toMatchObject({ status: "failed", swept: { folders: 1, objects: 20 } });
   expect(await runJobFold({ work: async () => work(false), pass: async () => folded, sweep: async () => { throw new Error("list failed"); } }))
     .toMatchObject({ status: "folded", swept: null });
+  // A probe or a fold that throws is a failed fold, not a crashed run: the views still get built.
+  expect(await runJobFold({ work: async () => { throw new Error("upload index probe failed (503)"); }, sweep: async () => ({ folders: 0, objects: 0 }) }))
+    .toMatchObject({ status: "failed", pass: { ok: false, error: "upload index probe failed (503)" } });
+  expect(await runJobFold({ work: async () => work(false), pass: async () => { throw new Error("cron heartbeat write failed (500)"); }, sweep: async () => ({ folders: 0, objects: 0 }) }))
+    .toMatchObject({ status: "failed" });
   vi.restoreAllMocks();
 });

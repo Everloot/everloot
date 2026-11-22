@@ -183,3 +183,29 @@ describe("sweepSnapshotParts", () => {
     expect(deletes).toBe(0);
   });
 });
+describe("sweepSnapshotParts across listing pages", () => {
+  test("follows continuation tokens, so an orphan on the second page of the listing is swept too", async () => {
+    const current = "snapshots/corpus/20261122T141012492Z-40861935/";
+    const orphan = "snapshots/corpus/20261120T084026764Z-e8d130a4/";
+    const deleted: string[] = [];
+    const tokens: (string | null)[] = [];
+    const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = new Request(input, init);
+      const url = new URL(req.url);
+      if (url.searchParams.get("list-type") === "2") {
+        const token = url.searchParams.get("continuation-token");
+        tokens.push(token);
+        return token === null
+          ? new Response(`<ListBucketResult><IsTruncated>true</IsTruncated><NextContinuationToken>page+2/=</NextContinuationToken><Contents><Key>${current}0.json</Key></Contents></ListBucketResult>`)
+          : new Response(`<ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>${orphan}0.json</Key></Contents></ListBucketResult>`);
+      }
+      if (url.pathname.endsWith("snapshots/corpus.json")) return Response.json({ format: 2, parts: [`${current}0.json`], retired: [] });
+      if (req.method === "DELETE") { deleted.push(url.pathname.replace("/bucket/", "")); return new Response(null, { status: 204 }); }
+      return new Response("missing", { status: 404 });
+    }) as typeof globalThis.fetch;
+    const store = createUploadStore({ cloud, localDir: "unused", fetch, now: () => new Date("2026-11-22T14:40:00Z") });
+    expect(await store.sweepSnapshotParts()).toEqual({ folders: 1, objects: 1 });
+    expect(tokens).toEqual([null, "page+2/="]);
+    expect(deleted).toEqual([`${orphan}0.json`]);
+  });
+});

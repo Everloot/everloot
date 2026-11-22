@@ -501,7 +501,7 @@ test("with the snapshot on the job, a run with something to fold starts the job 
   vi.stubEnv("EVERLOOT_STORED_VIEWS", "job");
   try {
     dispatch.dispatchStoredViews.mockResolvedValue("sent");
-    store.snapshotWork.mockResolvedValue({ idle: false, retryRollups: false, dataAsOf: "2026-11-22T14:10:12Z", settledWeek: null });
+    store.snapshotWork.mockResolvedValue({ idle: false, retryRollups: false, dataAsOf: "2026-11-22T14:10:12Z", settledWeek: null, heartbeatAt: new Date().toISOString() });
     const res = await GET(req());
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, rebuild: false, snapshotJob: "sent", viewsJob: "sent" });
@@ -510,7 +510,7 @@ test("with the snapshot on the job, a run with something to fold starts the job 
     expect(store.writeMarket).not.toHaveBeenCalled();
     expect(store.writeCronRun).not.toHaveBeenCalled();
     // A rollup still pending is something to fold too.
-    store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: true, dataAsOf: "2026-11-22T14:10:12Z", settledWeek: null });
+    store.snapshotWork.mockResolvedValue({ idle: true, retryRollups: true, dataAsOf: "2026-11-22T14:10:12Z", settledWeek: null, heartbeatAt: new Date().toISOString() });
     expect(await (await GET(req())).json()).toMatchObject({ snapshotJob: "sent" });
     expect(store.writeMarket).not.toHaveBeenCalled();
   } finally {
@@ -532,7 +532,7 @@ test("with the snapshot on the job, a run with nothing to fold writes the heartb
     // GitHub refuses the start: this run folds the uploads itself and does not ask GitHub a second time.
     vi.spyOn(console, "error").mockImplementation(() => {});
     dispatch.dispatchStoredViews.mockRejectedValue(new Error("stored-views dispatch failed (401)"));
-    store.snapshotWork.mockResolvedValue({ idle: false, retryRollups: false, dataAsOf: "2026-11-22T14:10:12Z", settledWeek: null });
+    store.snapshotWork.mockResolvedValue({ idle: false, retryRollups: false, dataAsOf: "2026-11-22T14:10:12Z", settledWeek: null, heartbeatAt: "2026-11-22T14:10:30Z" });
     store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-11-22T14:20:05.000Z" });
     expect(await (await GET(req())).json()).toMatchObject({ ok: true, added: 2, viewsJob: "failed", storedViews: "job" });
     expect(store.writeSnapshot).toHaveBeenCalledOnce();
@@ -542,6 +542,35 @@ test("with the snapshot on the job, a run with nothing to fold writes the heartb
     dispatch.dispatchStoredViews.mockReset().mockResolvedValue("sent");
     await GET(req(undefined, "?rebuild=1"));
     expect(store.writeSnapshot).toHaveBeenLastCalledWith({ rebuild: true });
+  } finally {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+    vi.stubEnv("CRON_SECRET", "synthetic-cron-key");
+  }
+});
+test("with the snapshot on the job, a heartbeat over 20 minutes old, or no token, means this run folds the uploads itself", async () => {
+  vi.stubEnv("EVERLOOT_SNAPSHOT", "job");
+  vi.stubEnv("EVERLOOT_STORED_VIEWS", "job");
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-11-22T14:40:00.000Z"));
+  try {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    dispatch.dispatchStoredViews.mockResolvedValue("sent");
+    store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-11-22T14:40:05.000Z" });
+    // Started at 14:10, the job never folded: the heartbeat is 30 minutes old.
+    store.snapshotWork.mockResolvedValue({ idle: false, retryRollups: false, dataAsOf: "2026-11-22T14:10:12Z", settledWeek: null, heartbeatAt: "2026-11-22T14:10:30Z" });
+    expect(await (await GET(req())).json()).toMatchObject({ ok: true, added: 2, storedViews: "job" });
+    expect(store.writeSnapshot).toHaveBeenCalledOnce();
+    expect(store.writeCronRun).toHaveBeenCalledOnce();
+    // No heartbeat at all reads the same way.
+    store.snapshotWork.mockResolvedValue({ idle: false, retryRollups: false, dataAsOf: null, settledWeek: null, heartbeatAt: null });
+    await GET(req());
+    expect(store.writeSnapshot).toHaveBeenCalledTimes(2);
+    // A fresh heartbeat but no token: nothing is sent, so this run folds.
+    dispatch.dispatchStoredViews.mockResolvedValue("off");
+    store.snapshotWork.mockResolvedValue({ idle: false, retryRollups: false, dataAsOf: "2026-11-22T14:30:12Z", settledWeek: null, heartbeatAt: "2026-11-22T14:30:30Z" });
+    expect(await (await GET(req())).json()).toMatchObject({ ok: true, added: 2, viewsJob: "off" });
+    expect(store.writeSnapshot).toHaveBeenCalledTimes(3);
   } finally {
     vi.useRealTimers();
     vi.unstubAllEnvs();

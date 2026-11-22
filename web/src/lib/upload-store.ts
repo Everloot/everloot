@@ -1103,7 +1103,7 @@ export function createUploadStore(opts: {
   }
 
   /** One bounded index probe before any corpus replay. A successful run records its corpus generation. */
-  async function snapshotWork(): Promise<{ idle: boolean; retryRollups: boolean; dataAsOf: string | null; settledWeek: string | null }> {
+  async function snapshotWork(): Promise<{ idle: boolean; retryRollups: boolean; dataAsOf: string | null; settledWeek: string | null; heartbeatAt?: string | null }> {
     if (!cloud) throw new Error("snapshots need the cloud store");
     const snapshot = await readSnapshotMark();
     const filter = snapshot?.lastReceivedAt ? `&received_at=gt.${encodeURIComponent(snapshot.lastReceivedAt)}` : "";
@@ -1113,13 +1113,15 @@ export function createUploadStore(opts: {
     const idle = snapshot !== null && rows.length === 0;
     let retryRollups = false;
     let settledWeek: string | null = null;
+    let heartbeatAt: string | null = null;
     try {
       const run = await r2Fetch("cron/last-run.json", { method: "GET" });
       if (run.status === 404) {
         if (idle) retryRollups = true;
       } else if (run.ok) {
-        const previous = await run.json() as { dataAsOf?: string; completionPending?: boolean; settledWeek?: string };
+        const previous = await run.json() as { generatedAt?: string; dataAsOf?: string; completionPending?: boolean; settledWeek?: string };
         if (typeof previous.settledWeek === "string") settledWeek = previous.settledWeek;
+        if (typeof previous.generatedAt === "string") heartbeatAt = previous.generatedAt;
         if (idle) retryRollups = previous.dataAsOf !== snapshot.generatedAt || previous.completionPending === true;
       } else if (idle) {
         throw new Error(`cron heartbeat read failed (${run.status})`);
@@ -1129,7 +1131,9 @@ export function createUploadStore(opts: {
       // treats it as fatal (as it did before the settled week was stored there).
       if (idle) throw err;
     }
-    return { idle, retryRollups, dataAsOf: snapshot?.generatedAt ?? null, settledWeek };
+    // When the last heartbeat was written: with the fold on the stored-views job, a stale one means the job is not
+    // folding, and the cron Worker folds itself (app/api/cron/snapshot/route.ts).
+    return { idle, retryRollups, dataAsOf: snapshot?.generatedAt ?? null, settledWeek, heartbeatAt };
   }
 
   async function writeCronRun(completionPending: boolean, dataAsOf: string | null, settledWeek: string | null): Promise<void> {

@@ -343,16 +343,25 @@ Then:
   fresh between job runs.
 - **GitHub refuses the start, or there is no token:** the Worker folds the uploads itself, as
   before the hand-over. A `?rebuild=1` run always folds on the Worker.
+- **The heartbeat is over 20 minutes old, or missing:** the Worker folds itself and logs that the
+  job has not folded. This covers the cases where GitHub accepts the start but no fold follows: a
+  queued run, a workflow switched off, or `main` failing to build. Normally the job keeps the
+  heartbeat within about 10 minutes, so the Worker takes over before `/api/health` reaches its
+  30-minute limit.
 
-The job and the Worker can never overwrite each other. The corpus part list and the rollups are
-written with ETag conditions, so a second writer fails instead of losing the first one's work.
+Neither writer can lose the other's work. The corpus part list and the rollups are written with
+ETag conditions, so if both fold in the same minutes, the slower one fails with a 412 and the next
+run retries. The heartbeat is written unconditionally. An idle Worker run that probed just before a
+job's fold could write the older `dataAsOf`. The next probe then sees a heartbeat that doesn't
+match the snapshot and folds again (`retryRollups`).
 
 Each job run also sweeps `snapshots/corpus/`. It deletes part folders that the current part list
 names in neither `parts` nor `retired`, but only when their name says they are more than an hour
 old (`sweepSnapshotParts` in `web/src/lib/upload-store.ts`). The job's output shows the count
-under `fold.swept`. A fold that fails is named `snapshot` in the job's `failed`, so the run shows
-red and `/api/health` reports the views as `failing`. The heartbeat then stops advancing, and
-after 30 minutes `/api/health` answers 503.
+under `fold.swept`. A fold that fails or throws is named `snapshot` in the job's `failed`. The run
+shows red, the views are still built for the last snapshot, and `/api/health` reports them as
+`failing`. If the job keeps failing, the heartbeat stops advancing and the Worker folds after 20
+minutes, as above.
 
 **Going back:** remove `EVERLOOT_SNAPSHOT` from both wrangler files. The cron Worker then folds
 every run itself, and the job only builds views.

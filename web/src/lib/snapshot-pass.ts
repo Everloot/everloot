@@ -87,13 +87,21 @@ export interface JobFold {
 /**
  * The stored-views job's half of the snapshot cron, with EVERLOOT_SNAPSHOT at "job": the fold, when the cron's probe
  * finds something to fold, then the sweep of corpus parts no snapshot names. A run with nothing to fold writes nothing
- * here: the cron Worker writes the heartbeat on those runs itself. A failed sweep is logged and never fails the fold.
+ * here: the cron Worker writes the heartbeat on those runs itself. A probe or a fold that throws (an unreachable upload
+ * index, a heartbeat that cannot be written) is logged and reported as failed, so the views are still built for the
+ * last snapshot and the job's heartbeat names it. A failed sweep is logged and never fails the fold.
  */
 export async function runJobFold(deps: {
   work?: () => Promise<SnapshotWork>; pass?: typeof runSnapshotPass; sweep?: () => Promise<{ folders: number; objects: number }>;
 } = {}): Promise<JobFold> {
-  const work = await (deps.work ?? uploadStore.snapshotWork)();
-  const pass = nothingToFold(work) ? null : await (deps.pass ?? runSnapshotPass)(false, work);
+  let pass: SnapshotPass | null = null;
+  try {
+    const work = await (deps.work ?? uploadStore.snapshotWork)();
+    if (!nothingToFold(work)) pass = await (deps.pass ?? runSnapshotPass)(false, work);
+  } catch (err) {
+    console.error("snapshot fold failed", err);
+    pass = { ok: false, error: err instanceof Error ? err.message : String(err), result: null, market: null, completion: null };
+  }
   let swept: JobFold["swept"] = null;
   try {
     swept = await (deps.sweep ?? (() => uploadStore.sweepSnapshotParts()))();
