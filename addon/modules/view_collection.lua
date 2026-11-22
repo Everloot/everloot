@@ -149,8 +149,10 @@ end
 local pendingNames, asked = false, {}
 local function itemFacts(itemId)
   local name, quality, icon
-  if type(GetItemInfo) == "function" then
-    local ok, n, _, q, _, _, _, _, _, _, t = pcall(GetItemInfo, itemId)
+  -- Forever has no global GetItemInfo; C_Item.GetItemInfo names loaded items only.
+  local info = (type(C_Item) == "table" and C_Item.GetItemInfo) or GetItemInfo
+  if type(info) == "function" then
+    local ok, n, _, q, _, _, _, _, _, _, t = pcall(info, itemId)
     if ok then name, quality, icon = n, q, t end
   end
   icon = icon or nth(5, C_Item and C_Item.GetItemInfoInstant, itemId) or nth(5, GetItemInfoInstant, itemId)

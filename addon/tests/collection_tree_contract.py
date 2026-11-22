@@ -21,10 +21,11 @@ EverlootPricesDB = {{ drops = {{ data = '{DROPS}', sum = {SUM}, dataAsOf = '2026
 ITEM_QUALITY_COLORS = {{ [2] = {{ r = 0.12, g = 1, b = 0 }}, [4] = {{ r = 0.64, g = 0.21, b = 0.93 }} }}
 local items = {{ [2001] = {{ 'Reins of the Deep Horse', 4, 'iconHorse' }}, [2002] = {{ 'Shiny Robe', 2, 'iconRobe' }},
   [2003] = {{ 'Murky Scale', 1, 'iconScale' }}, [3001] = {{ 'Toy 01', 3, 'iconToy' }} }}
-GetItemInfo = function(id)
+-- Forever has no global GetItemInfo: only C_Item.GetItemInfo, for items the client has loaded.
+C_Item = {{ GetItemInfo = function(id)
   local i = items[id]
   if i then return i[1], 'link', i[2], 1, 1, 'Type', 'Sub', 1, '', i[3] end
-end
+end }}
 GetItemInfoInstant = function(id) return id, 'Type', 'Sub', '', 'instant' .. id end
 -- Item 2001 teaches mount 77, not collected; item 2002 is an appearance this character has.
 mountsCollected = {{ [78] = true }}
