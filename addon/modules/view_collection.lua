@@ -3,12 +3,13 @@
 -- area's done of total, then inside an area a tree of headings that open and close, each with how much of it is done,
 -- an icon on each row, a green check for done and a red cross for missing. Achievements sit under their category (and
 -- its parent), reputation under the reputation window's headers, quests under their chain, mounts and pets under the
--- source the journal gives, flight paths under their continent. An area is read when it is opened (the overview reads
--- them all once); scrolling, opening a heading and Missing only redraw from that read.
+-- source the journal gives, flight paths under their continent. An area is read when it is opened; the overview reads
+-- each area once per scope and character, then keeps each area's count from its last read, so opening an area
+-- refreshes its row and nothing else is read again. Scrolling, opening a heading and Missing only redraw from that read.
 -- The lists are the catalog rows the completion tracker (completion.lua) wrote; titles, lockouts and boss kills are the
 -- rows it and owned.lua wrote, read through Everloot:Rows. Achievements, reputation, completed quests, mounts, pets and
 -- toys are not recorded: they are read from the game when the view draws, so they are this character's only; so are
--- the flight paths, from the flight map's nodes on each continent the world map lists (C_TaxiMap). A boss's
+-- the flight paths, from the flight map's nodes on every continent under the top of the world map (C_TaxiMap). A boss's
 -- drops are the public drop rates the Desktop App wrote into the price file (drops.lua), from the creatures this
 -- install saw in that encounter or, failing that, the creatures the file names as the boss is named; whether a drop is
 -- collected (its mount, pet, toy or appearance) is read from the game. This character by default; Account joins every
@@ -144,8 +145,10 @@ local function plain(s)
   return (s:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|n", " "):gsub("%s+", " "):gsub("^ ", ""):gsub(" $", ""))
 end
 
--- An item as the client knows it now: its name, icon and quality colour. The name may not be cached yet; the client
--- is asked for it, twice at most per item, and the view draws again a moment later.
+-- An item as the client knows it now: its name, icon and quality colour, asked for when its row is drawn. The name may
+-- not be cached yet; the client is asked for it, twice at most per item, and the rows on screen draw again a moment
+-- later, from the list as last read, when the open section is one that names items.
+local NAMED = { raids = true, toys = true }
 local pendingNames, asked = false, {}
 local function itemFacts(itemId)
   local name, quality, icon
@@ -163,12 +166,24 @@ local function itemFacts(itemId)
       pendingNames = true
       C_Timer.After(1, function()
         pendingNames = false
-        if U.frame and U.frame:IsShown() and U.view == "collection" then pcall(refresh, U.frame) end
+        local c = U.frame and U.frame.collection
+        if c and U.frame:IsShown() and U.view == "collection" and NAMED[c.section] then
+          c.soft = true
+          redraw()
+        end
       end)
     end
   end
   local color = type(quality) == "number" and type(ITEM_QUALITY_COLORS) == "table" and ITEM_QUALITY_COLORS[quality]
   return name or ("Item " .. itemId), icon, color and { color.r, color.g, color.b, 1 } or nil
+end
+
+-- A drop's or toy's row as it is drawn: the item's name (unless the Toy Box named it), its icon and quality colour.
+local function facts(item)
+  local label, icon, color = itemFacts(item.itemId)
+  item.name = item.label or label
+  item.icon = item.ownIcon or icon or QUESTION
+  item.color = color
 end
 
 -- A quest's title, asked for when its row is drawn: only the rows on screen ask. A title the client has not loaded
@@ -263,7 +278,9 @@ local function known(kind, s, field)
   return out
 end
 
--- Each section returns its items, in order, and its summary line. An item is { name, detail, done, heading, depth,
+-- Each section returns its items, in order, its summary line (one line beside the scope buttons), what the summary
+-- leaves out (shown on its hover, or nil) and, when the area is not counted by its marks (quests count chains), its
+-- done and total for the overview. An item is { name, detail, done, heading, depth,
 -- icon, color, itemId, spellId, achievementId, bar = { floor, ceiling, standing } }. `done` true draws a check and
 -- false a cross; an information line leaves it nil and draws neither. A heading opens and closes the items under it
 -- (those after it with a greater `depth`, 0 when left out); `open` is whether it starts open. A heading flagged
@@ -384,9 +401,9 @@ local function bossNpcs(instance, boss)
   return {}, "named"
 end
 
--- One boss's drops as items under it (depth 3): each with its icon, name in its quality colour, the rate players
--- recorded and, for a mount, pet, toy or appearance, whether this character has it. Nil and the drops block's status
--- while the block cannot be read.
+-- One boss's drops as items under it (depth 3): each with the rate players recorded and, for a mount, pet, toy or
+-- appearance, whether this character has it; its icon and name in its quality colour are asked for when its row is
+-- drawn (facts). Nil and the drops block's status while the block cannot be read.
 local function bossDrops(instance, boss)
   if not E.DropsFrom then return nil, "absent" end
   local ready, status = E:DropsFrom("npc", 0) -- the block's state, before any boss is looked up in it
@@ -410,16 +427,16 @@ local function bossDrops(instance, boss)
   local items = {}
   for _, itemId in ipairs(order) do
     local d = best[itemId]
-    local label, icon, color = itemFacts(itemId)
-    items[#items + 1] = { name = label, icon = icon or QUESTION, color = color, itemId = itemId, depth = 3, done = collected(itemId),
+    items[#items + 1] = { name = "Item " .. itemId, icon = QUESTION, facts = true, itemId = itemId, depth = 3, done = collected(itemId),
       detail = string.format("%.1f%% · %d of %d loot windows", 100 * d.drops / d.windows, d.drops, d.windows) }
   end
   return items, "ready", how
 end
 
--- What the summary says about drops while the block cannot be read.
-local DROPS_STATUS = { absent = "drops: not in the price file yet (the Desktop App writes it)",
-  verifying = "drops: checking the price file", bad = "drops: the price file failed its checksum" }
+-- What the summary says about drops while the block cannot be read: a short form, and the sentence for its hover.
+local DROPS_STATUS = { absent = { "none yet", "Drop rates: not in the price file yet (the Desktop App writes it)." },
+  verifying = { "checking", "Drop rates: checking the price file." },
+  bad = { "failed check", "Drop rates: the price file failed its checksum." } }
 
 -- The shipped player agreement gates instances; personal kills never change that public catalog.
 local function raids(s)
@@ -489,7 +506,9 @@ local function raids(s)
       key = "other", open = true, depth = 0 }
     for _, item in ipairs(other) do items[#items + 1] = item end
   end
-  return items, "Dungeons & raids / as of " .. data.asOf:sub(1, 10) .. (dropStatus and (" · " .. DROPS_STATUS[dropStatus]) or "")
+  local status = dropStatus and DROPS_STATUS[dropStatus]
+  return items, "Dungeons & raids / as of " .. data.asOf:sub(1, 10) .. (status and (" · drops: " .. status[1]) or ""),
+    status and status[2]
 end
 
 -- Every mount the game lists for this character, under the kind of source the Mount Journal names (Drop, Vendor,
@@ -534,8 +553,8 @@ local function pets(s)
     end
   end
   table.sort(items, byName)
-  return grouped(items, "pet:", false),
-    live("Pets: " .. n .. " of " .. #items .. " species" .. percent(n, #items) .. " · as the Pet Journal's filters list them", s)
+  return grouped(items, "pet:", false), live("Pets: " .. n .. " of " .. #items .. " species" .. percent(n, #items), s),
+    "Counted as the Pet Journal's filters list them."
 end
 
 -- Whether this character's faction can use a flight path, as the world map decides which to draw
@@ -547,25 +566,29 @@ local function forFaction(nodeFaction, mine)
   return true
 end
 
--- The flight paths of every continent the world map lists, under their continent, by name: done when this character
--- has found it (the flight map's isUndiscovered), read from the game without a flight master.
+-- The flight paths of every continent under the top of the world map, under their continent, by name: done when this
+-- character has found it (the flight map's isUndiscovered), read from the game without a flight master. The list starts
+-- at the top of the map tree, not at the player's map, so it is the same wherever the player stands; a continent the
+-- world map draws no flight paths on (C_TaxiMap.ShouldMapShowTaxiNodes, where the client has it) is left out.
 local function flights(s)
   local M, T = C_Map, C_TaxiMap
-  local types = Enum and Enum.UIMapType or {}
-  local WORLD, CONTINENT = types.World or 1, types.Continent or 2
-  -- Up from the player's map to the world it belongs to.
-  local world = M and T and nth(1, M.GetBestMapForUnit, "player")
+  local CONTINENT = (Enum and Enum.UIMapType or {}).Continent or 2
+  -- The world map's own starting map (else the player's), then up to the map with no parent above it.
+  local top = M and T and (nth(1, M.GetFallbackWorldMapID) or nth(1, M.GetBestMapForUnit, "player"))
   for _ = 1, 10 do
-    local info = number(world) and nth(1, M.GetMapInfo, world)
-    if type(info) ~= "table" then world = nil; break end
-    if info.mapType == WORLD then break end
-    world = info.parentMapID
+    local info = number(top) and nth(1, M.GetMapInfo, top)
+    local parent = type(info) == "table" and info.parentMapID
+    if not (number(parent) and parent > 0 and type(nth(1, M.GetMapInfo, parent)) == "table") then break end
+    top = parent
   end
-  local continents = number(world) and nth(1, M.GetMapChildrenInfo, world, CONTINENT)
+  local continents = number(top) and nth(1, M.GetMapChildrenInfo, top, CONTINENT, true)
+  local shows = T and T.ShouldMapShowTaxiNodes
   local mine = nth(1, UnitFactionGroup, "player")
   local items, seen, n = {}, {}, 0
   for _, continent in ipairs(type(continents) == "table" and continents or {}) do
-    local nodes = type(continent) == "table" and number(continent.mapID) and nth(1, T.GetTaxiNodesForMap, continent.mapID)
+    local id = type(continent) == "table" and continent.mapID
+    local nodes = number(id) and (type(shows) ~= "function" or nth(1, shows, id) ~= false)
+      and nth(1, T.GetTaxiNodesForMap, id)
     for _, node in ipairs(type(nodes) == "table" and nodes or {}) do
       if type(node) == "table" and number(node.nodeID) and not seen[node.nodeID] and type(node.name) == "string"
         and forFaction(node.faction, mine) then
@@ -580,7 +603,8 @@ local function flights(s)
   return grouped(items, "flight:", true), live("Flight paths: " .. n .. " of " .. #items .. percent(n, #items), s)
 end
 
--- The toys the Toy Box lists under its own filters, by name.
+-- The toys the Toy Box lists under its own filters, by name; a toy's quality colour (and its name and icon when the
+-- Toy Box gives none) is asked for when its row is drawn.
 local function toys(s)
   local TB = C_ToyBox
   local count = TB and nth(1, TB.GetNumFilteredToys)
@@ -590,15 +614,15 @@ local function toys(s)
     if number(itemId) and itemId > 0 then
       local r = { pcall(TB.GetToyInfo, itemId) }
       local label, icon = r[1] and r[3], r[1] and r[4]
+      label = type(label) == "string" and label ~= "" and label or nil
       local has = nth(1, PlayerHasToy, itemId) == true
-      local fallback, fallbackIcon, color = itemFacts(itemId)
-      items[#items + 1] = { name = type(label) == "string" and label or fallback, icon = icon or fallbackIcon, color = color,
-        itemId = itemId, done = has, detail = "" }
+      items[#items + 1] = { name = label or ("Item " .. itemId), label = label, ownIcon = icon or nil, icon = icon or QUESTION,
+        facts = true, itemId = itemId, done = has, detail = "" }
       if has then n = n + 1 end
     end
   end
   table.sort(items, byName)
-  return items, live("Toys: " .. n .. " of " .. #items .. percent(n, #items) .. " · as the Toy Box's filters list them", s)
+  return items, live("Toys: " .. n .. " of " .. #items .. percent(n, #items), s), "Counted as the Toy Box's filters list them."
 end
 
 -- One heading per chain the tracker read, closed, with a bar of this character's quests done of its total, from the
@@ -646,8 +670,9 @@ local function quests(s)
     end
     head.chain = nil
   end
+  -- The overview counts chains too, so its Quests row and this summary agree.
   return items, live("Quests: " .. complete .. " of " .. #heads .. (#heads == 1 and " chain" or " chains") .. " complete"
-    .. percent(complete, #heads), s)
+    .. percent(complete, #heads), s), nil, complete, #heads
 end
 
 local READ = { achievements = achievements, reputation = reputation, titles = titles, raids = raids, quests = quests,
@@ -691,19 +716,36 @@ local function count(items)
   return got, all
 end
 
--- The overview: one row per area with its icon, done of total, percent and a bar, read through the area's own
--- reader, and the overall count in the summary. A row opens its area; an area with nothing to count shows a dash.
-local function overview(s)
+-- An area's done and total as the overview shows it: its own count when it gives one (quests count chains), else the
+-- marks in its list.
+local function tally(list, _, _, g, t)
+  local marked, total = count(list)
+  if number(g) and number(t) then return g, t end
+  return marked, total
+end
+
+-- The overview: one row per area with its icon, done of total, percent and a bar, and the overall count in the
+-- summary. `areas` keeps each area's count for this scope and character: an area not counted yet is read through its
+-- own reader, once; opening an area counts it again (refresh). An area whose reader fails shows a dash, as does one
+-- with nothing to count, and the others still show. A row opens its area.
+local function overview(s, areas)
   local items, got, all = {}, 0, 0
   for _, a in ipairs(AREAS) do
-    local g, t = count((READ[a[1]](s)))
+    local kept = areas[a[1]]
+    if kept == nil then
+      local ok, g, t = pcall(function() return tally(READ[a[1]](s)) end)
+      kept = ok and { g, t } or false
+      areas[a[1]] = kept
+    end
+    local g, t = 0, 0
+    if kept then g, t = kept[1], kept[2] end
     got, all = got + g, all + t
     items[#items + 1] = { name = a[2], icon = "Interface\\Icons\\" .. a[3], area = a[1],
       detail = t > 0 and (g .. " / " .. t .. percent(g, t)) or "-", bar = t > 0 and { 0, t, g } or nil,
       done = (t > 0 and g == t) or nil, finished = g == t }
   end
-  return items, "Overall: " .. got .. " of " .. all .. percent(got, all)
-    .. (s.holder and " · titles and boss kills across your characters" or "")
+  return items, "Overall: " .. got .. " of " .. all .. percent(got, all),
+    s.holder and "Titles and boss kills count across your characters; the rest is this character's." or nil
 end
 READ.overview = overview
 
@@ -737,6 +779,7 @@ end
 local function draw(row, item)
   local x = 4 + (item.depth or 0) * INDENT
   row.item = item
+  if item.facts then facts(item) end
   if item.heading then
     row.toggle:SetTexture(item.isOpen and OPEN_BUTTON or CLOSED_BUTTON)
     row.toggle:SetPoint("LEFT", x, 0)
@@ -807,18 +850,23 @@ function refresh(f)
   for _, s in ipairs(SCOPES) do lit(c.scopes[s[1]], s[1] == c.scope) end
   c.missingOnly:SetText(c.missing and "Show all" or "Missing only")
   local ok, key = pcall(E.CharacterKey)
-  local items, summary, empty = {}, "", NO_KEY
+  local items, summary, tip, empty = {}, "", nil, NO_KEY
   if ok and key then
     -- Scrolling, opening a heading and Missing only reuse the section as last read; anything else reads it again.
     -- Scrolling also reuses the rows to draw; opening a heading and Missing only work them out again (c.list = nil).
     local cache = c.cache
     if not (c.soft and cache and cache.section == c.section and cache.scope == c.scope and cache.key == key) then
-      local all, said = READ[c.section](scopeFor(c.scope, key))
-      count(all)
-      cache = { section = c.section, scope = c.scope, key = key, items = all, summary = said }
+      -- Each area's count for the overview, kept per scope and character; reading an area counts it again.
+      local areaKey = c.scope .. ":" .. key
+      local areas = c.areas[areaKey] or {}
+      c.areas[areaKey] = areas
+      local all, said, hint, g, t = READ[c.section](scopeFor(c.scope, key), areas)
+      local done, total = tally(all, said, hint, g, t)
+      if c.section ~= "overview" then areas[c.section] = { done, total } end
+      cache = { section = c.section, scope = c.scope, key = key, items = all, summary = said, tip = hint }
       c.cache, c.list = cache, nil
       -- A price file still being checked is read again each second until the check ends, while Dungeons & raids is open.
-      if c.section == "raids" and said:find(DROPS_STATUS.verifying, 1, true) and not c.recheck and C_Timer and C_Timer.After then
+      if c.section == "raids" and said:find("drops: " .. DROPS_STATUS.verifying[1], 1, true) and not c.recheck and C_Timer and C_Timer.After then
         c.recheck = true
         C_Timer.After(1, function()
           c.recheck = false
@@ -826,7 +874,7 @@ function refresh(f)
         end)
       end
     end
-    items, summary = cache.items, cache.summary
+    items, summary, tip = cache.items, cache.summary, cache.tip
     empty = EMPTY[c.section] or NOTHING_READ
     if #items > 0 then
       c.list = c.list or visible(items, c.open, c.missing)
@@ -836,6 +884,7 @@ function refresh(f)
   end
   c.soft = false
   c.summary:SetText(summary)
+  c.summaryTip = tip
   show(c.rows, items, empty)
 end
 
@@ -859,7 +908,7 @@ local function tooltip(row)
 end
 
 local function build(f, parent)
-  local c = { section = "overview", scope = "character", missing = false, sections = {}, scopes = {}, open = {} }
+  local c = { section = "overview", scope = "character", missing = false, sections = {}, scopes = {}, open = {}, areas = {} }
   f.collection = c
 
   -- Off: what the tracker reads and where its rows go, and the command that turns it on.
@@ -904,6 +953,21 @@ local function build(f, parent)
   c.summary = text(c.onPage, 13)
   c.summary:SetPoint("TOPLEFT", 4, -64)
   c.summary:SetWidth(W - 8 - right)
+  if c.summary.SetWordWrap then c.summary:SetWordWrap(false) end
+  -- The summary is one line; what it leaves out (which lists the Account scope joins, the journal filters, the drops
+  -- block's state) shows when the mouse is over it.
+  c.summaryHit = CreateFrame("Frame", nil, c.onPage)
+  c.summaryHit:SetPoint("TOPLEFT", 0, -60)
+  c.summaryHit:SetSize(W - 4 - right, 20)
+  if c.summaryHit.EnableMouse then c.summaryHit:EnableMouse(true) end
+  c.summaryHit:SetScript("OnEnter", function(self)
+    if not c.summaryTip or type(GameTooltip) ~= "table" then return end
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+    GameTooltip:AddLine(c.summary:GetText() or "", 1, 1, 1)
+    GameTooltip:AddLine(c.summaryTip, 0.788, 0.765, 0.69, true)
+    GameTooltip:Show()
+  end)
+  c.summaryHit:SetScript("OnLeave", function() if type(GameTooltip) == "table" then GameTooltip:Hide() end end)
 
   local list = box(c.onPage, 0, -86, W, TRACK_H + 16)
   local rows = { offset = 0 }

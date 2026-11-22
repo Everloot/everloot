@@ -197,7 +197,7 @@ click(c.missingOnly)
 
 -- Pets: one row per species, owned when any pet of it is.
 click(c.sections.pets)
-assert(c.summary.text == "Pets: 1 of 2 species (50%) · as the Pet Journal's filters list them", c.summary.text)
+assert(c.summary.text == 'Pets: 1 of 2 species (50%)', c.summary.text)
 assert(names(rows) == 'Vendor | Zone', names(rows))
 click(rows[1]); click(rows[3])
 assert(names(rows) == 'Vendor | Cat | Zone | Frog' and mark(rows[2]) == READY and mark(rows[4]) == NOT_READY and rows[4].detail.text == 'Swamp', names(rows))
@@ -209,7 +209,7 @@ click(c.missingOnly)
 assert(not c.rows.thumb.shown and not c.rows.track.shown, 'nothing to scroll')
 -- Toys: the mouse wheel scrolls three rows, and the list stops with its last row at the bottom.
 click(c.sections.toys)
-assert(c.summary.text == "Toys: 1 of 20 (5%) · as the Toy Box's filters list them", c.summary.text)
+assert(c.summary.text == 'Toys: 1 of 20 (5%)', c.summary.text)
 assert(rows[1].name.text == 'Toy 01' and mark(rows[1]) == READY and rows[1].icon.path == 'toy3001')
 local list = rows[1].parent
 -- Scrolling redraws from the list as last read: the Toy Box is not asked again.
@@ -246,6 +246,26 @@ click(c.sections.overview)
 for _, r in ipairs(rows) do if r.shown and r.name.text == 'Mounts' then click(r) end end
 assert(c.section == 'mounts' and c.summary.text == 'Mounts: 1 of 2 (50%)', c.section)
 
+-- Every summary fits on one line beside the scope buttons, in both scopes (six pixels a character, as the other
+-- window tests measure); what it leaves out is in its hover.
+for _, scope in ipairs({ 'character', 'account' }) do
+  click(c.scopes[scope])
+  for _, key in ipairs({ 'overview', 'achievements', 'reputation', 'titles', 'quests', 'raids', 'mounts', 'pets', 'toys', 'flights' }) do
+    click(c.sections[key])
+    assert(#c.summary.text * 6 <= c.summary.width, key .. ' (' .. scope .. ') wraps: ' .. c.summary.text)
+  end
+end
+click(c.sections.pets)
+assert(c.summary.text == 'Pets: 1 of 2 species (50%) · this character', c.summary.text)
+c.summaryHit.scripts.OnEnter(c.summaryHit)
+assert(table.concat(GameTooltip.lines, ' | '):find("Pet Journal's filters", 1, true), table.concat(GameTooltip.lines, ' | '))
+c.summaryHit.scripts.OnLeave(c.summaryHit)
+assert(not GameTooltip.shown)
+click(c.sections.overview)
+c.summaryHit.scripts.OnEnter(c.summaryHit)
+assert(table.concat(GameTooltip.lines, ' | '):find('across your characters', 1, true), table.concat(GameTooltip.lines, ' | '))
+click(c.scopes.character)
+
 -- Nothing listed: the journal says how to fill it.
 pets = {}
 click(c.sections.pets)
@@ -263,7 +283,7 @@ lua.execute(HELPERS + r"""
 assert(U.Open('collection') == true)
 local c = EverlootWindow.collection
 click(c.sections.raids)
-assert(c.summary.text:find('drops: checking the price file', 1, true) and not c.rows[3].toggle.shown, c.summary.text)
+assert(c.summary.text:find('drops: checking', 1, true) and not c.rows[3].toggle.shown, c.summary.text)
 drain()
 assert(not c.summary.text:find('drops:', 1, true) and c.rows[3].toggle.shown and c.rows[3].name.text == 'Ghamoo-ra',
   'redrawn with the drops once the check ended: ' .. c.summary.text)
@@ -277,7 +297,9 @@ lua.execute(HELPERS + r"""
 assert(U.Open('collection') == true)
 local c = EverlootWindow.collection
 click(c.sections.raids)
-assert(c.summary.text:find('drops: not in the price file yet (the Desktop App writes it)', 1, true), c.summary.text)
+assert(c.summary.text == 'Dungeons & raids / as of 2026-11-17 · drops: none yet', c.summary.text)
+assert(#c.summary.text * 6 <= c.summary.width, 'one line: ' .. c.summary.text)
+assert(c.summaryTip and c.summaryTip:find('not in the price file yet (the Desktop App writes it)', 1, true), tostring(c.summaryTip))
 assert(names(c.rows) == 'Dungeons | Blackfathom Deeps | Ghamoo-ra' .. TAIL and not c.rows[3].toggle.shown, names(c.rows))
 -- Without the journals the sections say so instead of failing.
 click(c.sections.mounts)
@@ -286,6 +308,165 @@ click(c.sections.toys)
 assert(c.rows.empty.shown and c.rows.empty.text:find('Toy Box lists no toys', 1, true))
 click(c.sections.flights)
 assert(c.rows.empty.shown and c.rows.empty.text:find('no flight paths', 1, true), c.rows.empty.text)
+assert(EverlootWindow.shown and not U.failed)
+""")
+
+# --- The overview reads each area once per scope and character, then only the area just opened; a drop's name is
+# asked for when its row is drawn, and the retry redraws those rows without reading anything again ---
+lua = fresh("{ installId = 'abcd-1234', toggles = { completion = true }, records = {} }", API,
+            extra=("modules/completion.lua", "modules/owned.lua"))
+lua.execute(HELPERS + r"""
+reads = {}
+local function wrap(t, k, label)
+  local f = t[k]
+  t[k] = function(...) reads[label] = (reads[label] or 0) + 1; return f(...) end
+end
+wrap(C_ToyBox, 'GetNumFilteredToys', 'toys'); wrap(C_MountJournal, 'GetMountIDs', 'mounts')
+wrap(C_PetJournal, 'GetNumPets', 'pets'); wrap(C_TaxiMap, 'GetTaxiNodesForMap', 'flights')
+local rowsOf = Everloot.Rows
+Everloot.Rows = function(self, kind) reads[kind] = (reads[kind] or 0) + 1; return rowsOf(self, kind) end
+local function snap() local t = {}; for k, v in pairs(reads) do t[k] = v end; return t end
+local function same(a, b, why)
+  for k, v in pairs(a) do assert(b[k] == v, why .. ': ' .. k .. ' ' .. tostring(v) .. ' -> ' .. tostring(b[k])) end
+  for k, v in pairs(b) do assert(a[k] == v, why .. ': ' .. k .. ' ' .. tostring(a[k]) .. ' -> ' .. tostring(v)) end
+end
+-- Item 2002 (a drop) is not loaded yet.
+local itemInfo, loaded, requested = C_Item.GetItemInfo, false, {}
+C_Item.GetItemInfo = function(id) if id == 2002 and not loaded then return nil end; return itemInfo(id) end
+C_Item.RequestLoadItemDataByID = function(id) requested[#requested + 1] = id end
+
+assert(U.Open('collection') == true)
+local c = EverlootWindow.collection
+local rows = c.rows
+local first = snap()
+for _, k in ipairs({ 'toys', 'mounts', 'pets', 'title_catalog', 'achievement_catalog', 'quest_chain_catalog' }) do
+  assert(first[k] == 1, k .. ' read once on the first overview: ' .. tostring(first[k]))
+end
+assert(#requested == 0, 'the overview asks for no item names')
+drain()
+same(first, snap(), 'nothing the overview scheduled reads again')
+for _ = 1, 3 do click(c.sections.overview) end
+assert(U.Open('collection') == true)
+same(first, snap(), 'the overview drawn again reads nothing')
+
+-- Account is read once on its first overview; switching back and forth reads nothing more.
+click(c.scopes.account)
+local acct = snap()
+for _, k in ipairs({ 'toys', 'mounts', 'pets', 'title_catalog' }) do
+  assert(acct[k] == first[k] + 1, 'the account overview reads ' .. k .. ' once: ' .. tostring(acct[k]))
+end
+click(c.scopes.character); click(c.scopes.account); click(c.sections.overview)
+same(acct, snap(), 'each scope is read once')
+
+-- Opening an area reads it and nothing else, and the overview then shows that read.
+PlayerHasToy = function(id) return id == 3001 or id == 3002 end
+click(c.sections.toys)
+local after = snap()
+assert(after.toys == acct.toys + 1, 'opening Toys reads the Toy Box')
+after.toys = acct.toys
+same(acct, after, 'and nothing else')
+click(c.sections.overview)
+local area = {}
+for _, r in ipairs(rows) do if r.shown then area[r.name.text] = r end end
+assert(area['Toys'].detail.text == '2 / 20 (10%)', 'the area just opened is refreshed: ' .. area['Toys'].detail.text)
+assert(area['Mounts'].detail.text == '1 / 2 (50%)')
+
+-- A drop's name is asked for when its row is drawn; the retry redraws the rows on screen and reads nothing again.
+-- (The toys drawn above asked for their own names; only the drop rows drawn now ask for 2002.)
+local asked = #requested
+click(c.sections.raids)
+assert(#requested == asked, 'the closed boss draws no drop rows, so nothing is asked')
+for _, r in ipairs(rows) do if r.shown and r.name.text == 'Ghamoo-ra' then click(r) end end
+assert(requested[asked + 1] == 2002 and rows[4].name.text == 'Item 2002', 'asked when drawn: ' .. rows[4].name.text)
+local opened = snap()
+loaded = true
+drain()
+same(opened, snap(), 'the name retry reads nothing again')
+assert(rows[4].name.text == 'Shiny Robe' and rows[4].icon.path == 'iconRobe' and rows[4].name.color[1] == 0.12, rows[4].name.text)
+assert(EverlootWindow.shown and not U.failed)
+""")
+
+# --- One area failing does not close the window: the overview shows a dash for it and counts the rest ---
+lua = fresh("{ installId = 'abcd-1234', toggles = { completion = true }, records = {} }", API,
+            extra=("modules/completion.lua", "modules/owned.lua"))
+lua.execute(HELPERS + r"""
+-- An instance without its boss list: the Dungeons & raids reader errors.
+Everloot.InstanceData = { asOf = '2026-11-17', instances = { { id = 1, name = 'Broken', group = 'Dungeons' } } }
+assert(U.Open('collection') == true)
+local c = EverlootWindow.collection
+local area = {}
+for _, r in ipairs(c.rows) do if r.shown then area[r.name.text] = r end end
+assert(area['Dungeons & raids'] and area['Dungeons & raids'].detail.text == '-' and not area['Dungeons & raids'].bar.shown,
+  'a failing area shows a dash')
+assert(area['Mounts'].detail.text == '1 / 2 (50%)' and area['Toys'].detail.text == '1 / 20 (5%)', 'the others still show')
+assert(c.summary.text == 'Overall: 4 of 27 (14%)', c.summary.text)
+assert(EverlootWindow.shown and not U.failed, 'the window stays open')
+""")
+
+# --- Flight paths come from the top of the map tree, so the list and its total do not depend on where the player is;
+# a continent the world map draws no flight paths on (C_TaxiMap.ShouldMapShowTaxiNodes) is left out ---
+FLIGHTS = r"""
+local maps = {
+  [946] = { mapID = 946, name = 'Cosmic', mapType = 0, parentMapID = 0 },
+  [947] = { mapID = 947, name = 'Azeroth', mapType = 1, parentMapID = 946 },
+  [1414] = { mapID = 1414, name = 'Kalimdor', mapType = 2, parentMapID = 947 },
+  [1411] = { mapID = 1411, name = 'Durotar', mapType = 3, parentMapID = 1414 },
+  [1945] = { mapID = 1945, name = 'Outland', mapType = 2, parentMapID = 946 },
+  [1944] = { mapID = 1944, name = 'Hellfire Peninsula', mapType = 3, parentMapID = 1945 },
+  [2000] = { mapID = 2000, name = 'Hidden Isle', mapType = 2, parentMapID = 947 },
+}
+playerMap = 1411
+C_Map = {
+  GetBestMapForUnit = function(unit) if unit == 'player' then return playerMap end end,
+  GetFallbackWorldMapID = function() return 947 end,
+  GetMapInfo = function(id) return maps[id] end,
+  -- The children of a map, or with allDescendants every map under it, of one map type.
+  GetMapChildrenInfo = function(id, kind, all)
+    local out = {}
+    for _, m in pairs(maps) do
+      local p = m.parentMapID
+      local hit = p == id
+      while all and not hit and maps[p] do p = maps[p].parentMapID; hit = p == id end
+      if hit and (kind == nil or m.mapType == kind) then out[#out + 1] = m end
+    end
+    table.sort(out, function(a, b) return a.mapID < b.mapID end)
+    return out
+  end,
+}
+taxiNodes = {
+  [1414] = { { nodeID = 23, name = 'Orgrimmar, Durotar', faction = 1, isUndiscovered = false },
+    { nodeID = 25, name = 'Crossroads, The Barrens', faction = 0, isUndiscovered = true } },
+  [1945] = { { nodeID = 99, name = 'Thrallmar, Hellfire Peninsula', faction = 1, isUndiscovered = true } },
+  [2000] = { { nodeID = 70, name = 'Hidden Dock', faction = 0, isUndiscovered = true },
+    { nodeID = 71, name = 'Hidden Pier', faction = 0, isUndiscovered = true } },
+}
+C_TaxiMap = { GetTaxiNodesForMap = function(id) return taxiNodes[id] or {} end,
+  ShouldMapShowTaxiNodes = function(id) return id ~= 2000 end }
+"""
+lua = fresh("{ installId = 'abcd-1234', toggles = { completion = true }, records = {} }", API + FLIGHTS,
+            extra=("modules/completion.lua", "modules/owned.lua"))
+lua.execute(HELPERS + r"""
+assert(U.Open('collection') == true)
+local c = EverlootWindow.collection
+local function flightRow()
+  for _, r in ipairs(c.rows) do if r.shown and r.name.text == 'Flight paths' then return r.detail.text end end
+end
+assert(flightRow() == '1 / 3 (33%)', 'standing in Durotar: ' .. tostring(flightRow()))
+click(c.sections.flights)
+local LIST = 'Kalimdor | Crossroads, The Barrens | Orgrimmar, Durotar | Outland | Thrallmar, Hellfire Peninsula'
+assert(c.summary.text == 'Flight paths: 1 of 3 (33%)' and names(c.rows) == LIST, c.summary.text .. ' / ' .. names(c.rows))
+-- The player goes to Outland: the same list and total.
+playerMap = 1944
+click(c.sections.flights)
+assert(c.summary.text == 'Flight paths: 1 of 3 (33%)' and names(c.rows) == LIST, 'in Outland: ' .. c.summary.text .. ' / ' .. names(c.rows))
+click(c.scopes.account)
+click(c.sections.overview)
+assert(flightRow() == '1 / 3 (33%)', 'the overview read in Outland: ' .. tostring(flightRow()))
+click(c.scopes.character)
+-- A client without ShouldMapShowTaxiNodes lists every continent's flight paths.
+C_TaxiMap.ShouldMapShowTaxiNodes = nil
+click(c.sections.flights)
+assert(c.summary.text == 'Flight paths: 1 of 5 (20%)', c.summary.text)
 assert(EverlootWindow.shown and not U.failed)
 """)
 print("Lua 5.1 Collection tree: boss drops from the price file by the creatures seen or the boss's name, open and close with "

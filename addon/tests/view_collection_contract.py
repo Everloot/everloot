@@ -126,11 +126,12 @@ assert(c.scopes.character.text == 'This character' and c.scopes.account.text == 
 -- The landing screen is the overview: one row per area with its icon, done / total, percent and a bar, the overall
 -- total in the summary. An area with nothing to count shows a dash and no bar.
 assert(c.section == 'overview' and c.sections.overview.text == 'Overview', 'Collection opens on the overview')
-assert(c.summary.text == 'Overall: 11 of 23 (47%)', c.summary.text)
+assert(c.summary.text == 'Overall: 5 of 15 (33%)', c.summary.text)
 local AREAS = 'Achievements | Reputation | Titles | Quests | Dungeons & raids | Mounts | Pets | Toys | Flight paths'
 assert(names(rows) == AREAS, names(rows))
+-- Quests count chains, as the Quests summary does: one of four complete (the cut chain never is).
 assert(rows[1].detail.text == '2 / 4 (50%)' and rows[2].detail.text == '1 / 3 (33%)' and rows[3].detail.text == '1 / 3 (33%)'
-  and rows[4].detail.text == '7 / 12 (58%)', rows[4].detail.text)
+  and rows[4].detail.text == '1 / 4 (25%)', rows[4].detail.text)
 assert(rows[1].bar.shown and rows[1].bar.lo == 0 and rows[1].bar.hi == 4 and rows[1].bar.value == 2, 'a bar per area')
 -- Dungeons & raids counts this week's live lockout in Molten Core, not cleared.
 assert(rows[5].detail.text == '0 / 1 (0%)' and rows[6].detail.text == '-' and not rows[6].bar.shown, 'nothing to count: a dash')
@@ -201,6 +202,13 @@ assert(c.sections.raids.text == 'Dungeons & raids')
 -- with a check or a cross. A chain cut at the tracker's limit is never complete.
 click(c.sections.quests)
 assert(c.section == 'quests' and c.summary.text == 'Quests: 1 of 4 chains complete (25%)', c.summary.text)
+-- The overview's Quests row counts the same unit as this summary.
+do
+  local done, total = c.summary.text:match('^Quests: (%d+) of (%d+) chains')
+  click(c.sections.overview)
+  assert(rows[4].name.text == 'Quests' and rows[4].detail.text:find('^' .. done .. ' / ' .. total .. ' '), rows[4].detail.text)
+  click(c.sections.quests)
+end
 assert(names(rows) == 'Kolkar Raiders | The Defias Brotherhood | The Long Road | Wayward Trail', names(rows))
 assert(rows[4].detail.text == '2 / 4 (50%)' and rows[1].detail.text == '1 / 2 (50%)', rows[4].detail.text)
 assert(rows[1].bar.shown and rows[1].bar.lo == 0 and rows[1].bar.hi == 2 and rows[1].bar.value == 1, 'the bar runs to the chain total')
@@ -320,12 +328,15 @@ assert(rows[7].detail.text == '' and mark(rows[7]) == 'missing', rows[7].detail.
 assert(rows[4].detail.text == '2 / 4 (50%)', 'the heading counts, unnamed: ' .. rows[4].detail.text)
 
 -- The overview in the account scope: titles held by any character count, and Velda's live Zul Gurub lockout.
+-- The summary stays on one line beside the scope buttons; what the account scope joins is in its hover.
 click(c.sections.overview)
-assert(c.summary.text == 'Overall: 13 of 24 (54%) · titles and boss kills across your characters', c.summary.text)
+assert(c.summary.text == 'Overall: 7 of 16 (43%)', c.summary.text)
+assert(#c.summary.text * 6 <= c.summary.width, 'the summary fits on one line: ' .. c.summary.text)
+assert(c.summaryTip and c.summaryTip:find('across your characters', 1, true), tostring(c.summaryTip))
 
 -- Back to this character: the same progress, without the names.
 click(c.scopes.character)
-assert(c.summary.text == 'Overall: 11 of 23 (47%)', c.summary.text)
+assert(c.summary.text == 'Overall: 5 of 15 (33%)', c.summary.text)
 click(c.sections.quests)
 assert(rows[5].detail.text == '', rows[5].detail.text)
 assert(EverlootWindow.shown and not U.failed)
