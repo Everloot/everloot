@@ -174,6 +174,7 @@ assert sorted(c["category"] for c in py(both.categories)) == ["mail_out", "repai
 assert [d["inCopper"] for d in py(both.days)] == [0] and [d["outCopper"] for d in py(both.days)] == [800], py(both.days)
 listed = py(both.receipts("2026-11-07"))
 assert sorted(r["category"] for r in listed) == ["mail_out", "repair", "trade_in", "trade_out"], listed
+assert sorted(r["category"] for r in listed if r.get("ownAlt")) == ["trade_in", "trade_out"], "a receipt says it was a transfer"
 one = L.Summary(keys(A), 0, NOW)
 assert (one.totalIn, one.totalOut, one.moved) == (0, 2800, 2000), (one.totalIn, one.totalOut, one.moved)
 assert sorted(c["category"] for c in py(one.categories)) == ["mail_out", "repair", "trade_out"], py(one.categories)
