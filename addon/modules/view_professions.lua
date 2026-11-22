@@ -1,12 +1,16 @@
--- Everloot window, Professions: each profession in the character's profession book with its rank bar, how many recipes
--- the addon has recorded for it by difficulty colour (professions.lua writes them, read here through Everloot:Rows),
--- the day they were last read, and the next recipes a trainer teaches at or above the current rank, with the cost and
--- the trainer's name (trainer_seen rows, the name from the matching npc_sighting row). Under the blocks, every other
--- character in the roster (roster.lua) with its professions and ranks. A button at the bottom swaps the blocks for
--- the crafting costs: each recorded recipe of the character's professions with its reagents' cost, its product's
--- market value and an estimated profit, and what to buy for a chosen recipe and count, which a button adds to the active
--- shopping list (modules/shopping.lua, saved in this install's file). Otherwise display only: it registers no events and
--- records nothing; the window builds it the first time Professions is opened.
+-- Everloot window, Professions: three screens behind two buttons at the bottom.
+--   Professions: each profession in the character's profession book with its rank bar, how many recipes the addon
+--     has recorded for it in each difficulty colour (professions.lua writes them, read here through Everloot:Rows),
+--     the day they were last read, and one line for the next recipe a trainer teaches. Under the blocks, every other
+--     character in the roster (roster.lua) with its professions and ranks.
+--   Ranks and trainers: per profession, the recipes a trainer teaches at or above the current rank, lowest first,
+--     with the rank, the cost and where: the trainer's name and zone (trainer_seen rows; name and map from the
+--     matching npc_sighting row).
+--   Crafting costs: each recorded recipe of the character's professions with its reagents' cost, its product's
+--     market value and an estimated profit per craft, and what to buy for a chosen recipe and count, which a button
+--     adds to the active shopping list (modules/shopping.lua, saved in this install's file).
+-- Otherwise display only: it registers no events and records nothing; the window builds it the first time
+-- Professions is opened.
 
 local E = Everloot
 if not (E.Window and E.Window.Views) then return end
@@ -14,36 +18,54 @@ local U = E.Window
 local COLORS, NARROW, text, surface = U.COLORS, U.NARROW, U.Text, U.Surface
 
 local W, H = 604, 390  -- the view frame window.lua gives every view (W - MAIN - 12 wide, H - 60 tall)
-local BLOCKS, GAP = 5, 4           -- the profession book has five slots
-local HEAD_H, LINE_H = 44, 13      -- a block: the name, bar and recipe line, then one line per trainer recipe
-local TRAINER_LINES = 3            -- per block; two when four or five professions must share the view
-local OTHER_ROWS = 6               -- the most characters the list under the blocks holds
 local FOOTER_H = 24
+local PAGE_H = H - FOOTER_H        -- what a screen has above the footer
+local BLOCKS, GAP = 5, 4           -- the profession book has five slots
+local HEAD_H, LINE_H = 44, 15      -- a block: the name, bar and recipe line, then the trainer line
+local BLOCK_H = HEAD_H + 16
+local OTHER_ROWS = 6               -- the most characters the list under the blocks holds
 local BUCKETS = { optimal = "orange", medium = "yellow", easy = "green", trivial = "grey" }
+-- The colours the game's trade-skill window gives each recipe difficulty (TradeSkillTypeColor), hardest first.
+local SHADES = { { "orange", "ff8040" }, { "yellow", "ffff00" }, { "green", "40c040" }, { "grey", "808080" } }
 local READ_IT = "Open the profession window to read its recipes."
 local NO_TRAINER = "Nothing from a trainer yet. Open a trainer's window."
+local NOT_SEEN = "Trainer not seen"
 local OTHERS = "Other characters"
 local NO_OTHERS = "No other characters seen by this install yet."
 local NO_BOOK = "No profession book in this client."
 local NONE_LEARNED = "No professions learned yet."
-local FOOTER = "Full planner: everloot.app/tools/profession-planner"
+local FOOTER = "Planner: everloot.app/tools/profession-planner"
 local FALLBACK_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
+
+-- The screens, and the two the buttons at the bottom open from each: the left one, then the right one.
+local TO_LIST, TO_CRAFTING, TO_RANKS = "Professions", "Crafting costs", "Ranks and trainers"
+local SCREENS = { list = TO_LIST, crafting = TO_CRAFTING, trainers = TO_RANKS }
+local GO = { list = { "trainers", "crafting" }, crafting = { "list", "trainers" }, trainers = { "list", "crafting" } }
+local NAV_W = 136
+
+-- The ranks and trainers page: a heading row, then a box per profession with its rows.
+local TRAIN_ROWS, TRAIN_HEAD, SECTION_HEAD, ROW_H = 5, 20, 26, 16
+local TRAIN_COLUMNS = { { "rank", 10, 34 }, { "recipe", 48, 200 }, { "cost", 252, 70 }, { "where", 330, 264 } }
 
 -- The crafting costs page.
 local CRAFT_ROWS, CRAFT_ROW_H = 8, 16
 local BUY_LINES = 5
 local MAX_COUNT = 999
-local TO_CRAFTING, TO_RANKS = "Crafting costs", "Ranks and trainers"
 local SORT_PROFIT, PROFITABLE = "Sort: est. profit", "Est. profitable only"
 local NO_RECIPES = "No recipes with reagents recorded for your professions yet. Open a profession window to read them."
 local NONE_PROFITABLE = "No recipe shows an estimated profit at these prices, assuming one item per craft."
-local PER_ITEM = "Value is per item. Est. profit assumes one item per craft: how many items a craft makes is not recorded."
+local PER_ITEM = "Value is per item. Profit per craft = value - reagent cost."
+local HELP_PROFIT = "Item value is the market value of one item. Profit per craft is one item's value minus what one craft's "
+  .. "reagents cost: how many items a craft makes is not recorded, so a craft that makes more than one earns more."
+local HELP_COLOUR = "Green profit is a gain, red is a loss. Est. profitable only keeps the green ones."
+local HELP_SCANS = "Your scans: how the lowest buyout of what the recipe makes moved between your last two scans of this "
+  .. "auction house, with bars for up to three scans. These are listings, not sales; hover a recipe for the numbers."
 local NO_FILE = "No price file in the game yet: the Everloot Desktop App writes it, then /reload. Vendor prices you saw still count."
 local CHECKING = "Checking the price file..."
 local FAILED = "The price file failed its checksum and is not used. Vendor prices you saw still count."
 local NO_REALM = "The price file has no market values for this realm yet. Vendor prices you saw still count."
 local WARN = { 1, 0.4, 0.4, 1 }  -- the tooltip's warning red (prices.lua)
-local TO_LIST = "Add to shopping list"
+local ADD_TO_LIST = "Add to shopping list"
 
 local refresh, buildCrafting
 
@@ -77,18 +99,30 @@ local function recorded(name)
   return out
 end
 
--- The trainer's name for an NPC id, from the newest npc_sighting row that has one.
+-- The trainer's name and map for an NPC id, from the newest npc_sighting row that has a name.
 local function trainerNames()
   local names = {}
   for _, r in ipairs(E:Rows("npc_sighting")) do
-    if type(r) == "table" and r.npcId ~= nil and type(r.name) == "string" and r.name ~= "" then names[r.npcId] = r.name end
+    if type(r) == "table" and r.npcId ~= nil and type(r.name) == "string" and r.name ~= "" then
+      names[r.npcId] = { name = r.name, mapId = type(r.mapId) == "number" and r.mapId or nil }
+    end
   end
   return names
 end
 
--- The recipes a trainer teaches for one profession at or above the character's rank, lowest rank first, at most
--- `limit` of them. A recipe listed by two trainers at the same rank is one line.
-local function nextFromTrainer(name, rank, limit, names)
+-- The zone's name for a UiMap id, as the client names it, or nil. Display text only: its pipes are doubled.
+local function zoneName(mapId)
+  local get = mapId and type(C_Map) == "table" and C_Map.GetMapInfo
+  if type(get) ~= "function" then return nil end
+  local ok, info = pcall(get, mapId)
+  local name = ok and type(info) == "table" and E.Readable(info.name)
+  if type(name) ~= "string" or name == "" then return nil end
+  return (name:gsub("|", "||"))
+end
+
+-- The recipes a trainer teaches for one profession at or above the character's rank, lowest rank first. A recipe
+-- listed by two trainers at the same rank is one row, from the first trainer read.
+local function trainerRows(name, rank, names)
   local rows, seen = {}, {}
   for _, r in ipairs(E:Rows("trainer_seen")) do
     if type(r) == "table" and r.profession == name and type(r.requiredRank) == "number" and r.requiredRank >= rank
@@ -96,7 +130,9 @@ local function nextFromTrainer(name, rank, limit, names)
       local key = r.recipe .. "|" .. r.requiredRank
       if not seen[key] then
         seen[key] = true
-        rows[#rows + 1] = { rank = r.requiredRank, recipe = r.recipe, cost = r.costCopper, trainer = names[r.trainerNpcId] }
+        local who = names[r.trainerNpcId]
+        rows[#rows + 1] = { rank = r.requiredRank, recipe = r.recipe, cost = r.costCopper,
+          trainer = who and who.name, mapId = who and who.mapId }
       end
     end
   end
@@ -104,52 +140,119 @@ local function nextFromTrainer(name, rank, limit, names)
     if a.rank ~= b.rank then return a.rank < b.rank end
     return a.recipe < b.recipe
   end)
-  for i = #rows, limit + 1, -1 do rows[i] = nil end
   return rows
 end
 
-local function trainerLine(r)
-  local s = "Rank " .. r.rank .. ": " .. r.recipe
+-- The block's trainer line: the first recipe a trainer teaches, and whether the character can learn it now.
+local function nextLine(r, rank)
+  local now = r.rank <= rank
+  local s = (now and "Learn now: " or ("Next at " .. r.rank .. ": ")) .. r.recipe
   if type(r.cost) == "number" then s = s .. " · " .. U.MoneyShort(r.cost) end
   if r.trainer then s = s .. " · " .. r.trainer end
-  return s
+  return s, now
+end
+
+-- "39 recipes: 2 orange · 1 yellow · 3 green · 33 grey", each colour's count in the game's colour for it; a colour
+-- with no recipe is left out.
+local function recipeLine(got)
+  local parts = {}
+  for _, shade in ipairs(SHADES) do
+    local n = got[shade[1]]
+    if n > 0 then parts[#parts + 1] = "|cff" .. shade[2] .. n .. " " .. shade[1] .. "|r" end
+  end
+  local s = got.n .. (got.n == 1 and " recipe" or " recipes")
+  return #parts > 0 and (s .. ": " .. table.concat(parts, " · ")) or s
 end
 
 -- Draws one block and returns its height.
-local function draw(block, p, lines, names)
+local function draw(block, p, names)
   local got = recorded(p.name)
   block.name:SetText(p.name)
   block.icon:SetTexture(p.icon or FALLBACK_ICON)
   block.bar:SetMinMaxValues(0, p.maxRank or math.max(p.rank, 1))
   block.bar:SetValue(p.rank)
   block.rank:SetText(p.maxRank and (p.rank .. " / " .. p.maxRank) or tostring(p.rank))
-  if got.n == 0 then
-    block.recipes:SetText(READ_IT)
-  else
-    block.recipes:SetText(got.n .. (got.n == 1 and " recipe" or " recipes") .. " recorded: " .. got.orange .. " orange · "
-      .. got.yellow .. " yellow · " .. got.green .. " green · " .. got.grey .. " grey")
-  end
+  block.recipes:SetText(got.n == 0 and READ_IT or recipeLine(got))
   if got.n > 0 and got.newest then
     block.last:SetText("Last read: " .. got.newest)
     block.last:Show()
   else
     block.last:Hide()
   end
-  local rows = nextFromTrainer(p.name, p.rank, lines, names)
-  for i, line in ipairs(block.trainer) do
-    if rows[i] then
-      line:SetText(trainerLine(rows[i]))
+  local first = trainerRows(p.name, p.rank, names)[1]
+  if first then
+    local s, now = nextLine(first, p.rank)
+    block.next:SetText(s)
+    block.next:SetTextColor(unpack(now and COLORS.accent or COLORS.muted))
+  else
+    block.next:SetText(NO_TRAINER)
+    block.next:SetTextColor(unpack(COLORS.muted))
+  end
+  block:SetSize(W, BLOCK_H)
+  return BLOCK_H
+end
+
+-- Ranks and trainers ------------------------------------------------------------------------------------------
+
+-- One profession's box: its name, rank and what is waiting at a trainer, then a row per recipe up to `limit`. The
+-- trainer and zone are said once for a run of rows from the same trainer. Returns the box's height.
+local function drawSection(s, prof, limit, names)
+  local rows = trainerRows(prof.name, prof.rank, names)
+  local now = 0
+  for _, r in ipairs(rows) do if r.rank <= prof.rank then now = now + 1 end end
+  local rank = prof.maxRank and (prof.rank .. " / " .. prof.maxRank) or tostring(prof.rank)
+  local waiting = now > 0 and (now .. " to learn now") or (rows[1] and ("next at rank " .. rows[1].rank) or "no trainer seen")
+  local more = #rows - limit
+  s.name:SetText(prof.name)
+  s.summary:SetText(rank .. " · " .. waiting .. (more > 0 and (" · " .. more .. " more") or ""))
+  local last
+  for i, line in ipairs(s.rows) do
+    local r = i <= limit and rows[i]
+    if r then
+      line.rank:SetText(tostring(r.rank))
+      line.rank:SetTextColor(unpack(r.rank <= prof.rank and COLORS.accent or COLORS.muted))
+      line.recipe:SetText(r.recipe)
+      line.recipe:SetTextColor(unpack(COLORS.text))
+      line.recipe:SetWidth(TRAIN_COLUMNS[2][3])
+      line.cost:SetText(type(r.cost) == "number" and U.MoneyShort(r.cost) or "-")
+      local zone = zoneName(r.mapId)
+      local where = r.trainer and (r.trainer .. (zone and (" · " .. zone) or "")) or NOT_SEEN
+      line.where:SetText(where == last and "" or where)
+      last = where
       line:Show()
     elseif i == 1 then
-      line:SetText(NO_TRAINER)
+      line.rank:SetText(""); line.cost:SetText(""); line.where:SetText("")
+      line.recipe:SetText(NO_TRAINER)
+      line.recipe:SetTextColor(unpack(COLORS.muted))
+      line.recipe:SetWidth(W - 60)
       line:Show()
     else
       line:Hide()
     end
   end
-  local height = HEAD_H + LINE_H * math.max(#rows, 1)
-  block:SetSize(W, height)
+  local height = SECTION_HEAD + ROW_H * math.max(1, math.min(#rows, limit)) + 4
+  s:SetSize(W, height)
   return height
+end
+
+local function refreshTrainers(t, list)
+  for _, cell in pairs(t.head) do if #list > 0 then cell:Show() else cell:Hide() end end
+  -- As many rows per profession as let every box fit above the footer, at least one and at most five.
+  local k = math.max(#list, 1)
+  local each = (PAGE_H - TRAIN_HEAD - (k - 1) * GAP) / k
+  local limit = math.max(1, math.min(TRAIN_ROWS, math.floor((each - SECTION_HEAD - 4) / ROW_H)))
+  local names = trainerNames()
+  local y = TRAIN_HEAD
+  for i, s in ipairs(t.sections) do
+    local prof = list[i]
+    if prof then
+      s:SetPoint("TOPLEFT", 0, -y)
+      y = y + drawSection(s, prof, limit, names) + GAP
+      s:Show()
+    else
+      s:Hide()
+    end
+  end
 end
 
 local function professionText(list)
@@ -430,22 +533,42 @@ end
 
 local function plural(n, word) return n .. " " .. word .. (n == 1 and "" or "s") end
 
--- How old the market values are, and the colour to say it in.
+-- Where the market values come from and how old they are: a short line that fits beside the buttons, the colour to
+-- say it in, and the full sentence for its hover.
 local function ageLine(realm)
-  if type(EverlootPricesDB) ~= "table" or not realm or not E.PriceFile then return NO_FILE, COLORS.muted end
+  if type(EverlootPricesDB) ~= "table" or not realm or not E.PriceFile then
+    return "No price file: vendor prices only", COLORS.muted, NO_FILE
+  end
   local file = E:PriceFile(realm)
-  if file.status == "verifying" then return CHECKING, COLORS.muted end
-  if file.status == "bad" then return file.silent and NO_REALM or FAILED, file.silent and COLORS.muted or WARN end
+  if file.status == "verifying" then return CHECKING, COLORS.muted, CHECKING end
+  if file.status == "bad" then
+    if file.silent then return "No market values for this realm", COLORS.muted, NO_REALM end
+    return "Price file failed its check", WARN, FAILED
+  end
   local today, built = E.DayNumber(date("!%Y-%m-%d")), E.DayNumber(file.asOf or "")
-  if not today or not built then return "Market values from the price file; when it was built is unknown.", WARN end
+  if not today or not built then
+    return "Price file date unknown", WARN, "Market values from the price file; when it was built is unknown."
+  end
   local days = today - built
+  local day = file.asOf:sub(1, 10)
   local age = days <= 0 and "today" or (plural(days, "day") .. " ago")
   if days > E.STALE_DAYS then
-    return "OLD FILE: market values from " .. file.asOf:sub(1, 10) .. " (" .. age .. "). The Everloot Desktop App "
-      .. "refreshes it, then /reload.", WARN
+    return "Old price file: " .. day .. " (" .. age .. ")", WARN, "OLD FILE: market values from " .. day .. " (" .. age
+      .. "). The Everloot Desktop App refreshes it, then /reload."
   end
-  return "Market values from the price file built " .. file.asOf:sub(1, 10) .. " (" .. age .. "), " .. file.house
-    .. " auction house; a vendor price when it is lower.", COLORS.muted
+  return file.house .. " AH prices, " .. day .. " (" .. age .. ")", COLORS.muted, "Market values from the price file built "
+    .. day .. " (" .. age .. "), " .. file.house .. " auction house; a vendor price when it is lower."
+end
+
+-- The hover on the source line and the note: where the prices come from and how to read the columns.
+local function explain(owner, c)
+  if not GameTooltip then return end
+  GameTooltip:SetOwner(owner, "ANCHOR_BOTTOM")
+  GameTooltip:AddLine(TO_CRAFTING)
+  for _, said in ipairs({ c.ageDetail or "", HELP_PROFIT, HELP_COLOUR, HELP_SCANS }) do
+    GameTooltip:AddLine(said, COLORS.text[1], COLORS.text[2], COLORS.text[3], true)
+  end
+  GameTooltip:Show()
 end
 
 local function buyLine(part, count)
@@ -495,14 +618,19 @@ local function drawCraftRow(line, row, selected)
   line.name:SetText(row.name)
   line.name:SetTextColor(unpack(selected and COLORS.accent or COLORS.text))
   -- An unknown cost says in its own column how many reagents have no price; the product's value still shows.
-  line.cost:SetText(row.cost and U.MoneyShort(row.cost) or ("unknown (" .. row.unpriced .. " unpriced)"))
+  line.cost:SetText(row.cost and U.MoneyShort(row.cost) or (row.unpriced .. " unpriced"))
+  line.cost:SetTextColor(unpack(row.cost and COLORS.text or COLORS.muted))
   line.value:SetText(row.value and U.MoneyShort(row.value) or "no price")
-  line.profit:SetText(row.profit and U.MoneyShort(row.profit) or "-")
-  line.profit:SetTextColor(unpack(row.profit and row.profit > 0 and COLORS.accent or COLORS.text))
+  line.value:SetTextColor(unpack(row.value and COLORS.text or COLORS.muted))
+  -- Profit per craft: a gain signed and green, a loss red, none muted.
+  local profit = row.profit
+  line.profit:SetText(profit and ((profit > 0 and "+" or "") .. U.MoneyShort(profit)) or "-")
+  line.profit:SetTextColor(unpack(not profit and COLORS.muted or (profit > 0 and COLORS.accent) or (profit < 0 and WARN) or COLORS.text))
+  -- Your scans: the product's lowest buyout change since the previous scan of this house, in figures the font draws.
   local change = row.marketChange
   local direction = change.change
   local color = direction and direction > 0 and COLORS.accent or (direction and direction < 0 and COLORS.gold or COLORS.muted)
-  line.change:SetText(direction and direction > 0 and "▲" or (direction and direction < 0 and "▼" or "—"))
+  line.change:SetText(direction and string.format("%+.0f%%", direction) or "")
   line.change:SetTextColor(unpack(color))
   local max = 0
   for _, price in ipairs(change.bars) do if price then max = math.max(max, price) end end
@@ -519,9 +647,10 @@ end
 local function refreshCrafting(c)
   local realm = E.CurrentRealm()
   local all = craftRows(pricer(realm))
-  local age, color = ageLine(realm)
+  local age, color, detail = ageLine(realm)
   c.age:SetText(age)
   c.age:SetTextColor(unpack(color))
+  c.ageDetail = detail
   -- What the last Add to shopping list did, until another recipe is chosen; else what the values mean.
   c.note:SetText(c.added or PER_ITEM)
   c.note:SetTextColor(unpack(c.added and COLORS.accent or COLORS.muted))
@@ -563,33 +692,36 @@ end
 
 function refresh(f)
   local p = f.professions
-  local crafting = p.mode == "crafting"
-  p.toggle:SetText(crafting and TO_RANKS or TO_CRAFTING)
-  if crafting then
-    for _, block in ipairs(p.blocks) do block:Hide() end
-    p.empty:Hide(); p.others:Hide()
-    for _, line in ipairs(p.other) do line:Hide() end
+  local go = GO[p.mode]
+  p.nav:SetText(SCREENS[go[1]])
+  p.toggle:SetText(SCREENS[go[2]])
+  for _, block in ipairs(p.blocks) do block:Hide() end
+  p.empty:Hide(); p.others:Hide()
+  for _, line in ipairs(p.other) do line:Hide() end
+  p.craft.page:Hide(); p.trainers.page:Hide()
+  if p.mode == "crafting" then
     p.craft.page:Show()
     refreshCrafting(p.craft)
     return
   end
-  p.craft.page:Hide()
   local list = U.Professions()
   local empty = list == nil and NO_BOOK or (#list == 0 and NONE_LEARNED) or nil
-  local lines = list and #list > 3 and TRAINER_LINES - 1 or TRAINER_LINES
+  if empty then p.empty:SetText(empty); p.empty:Show() end
+  if p.mode == "trainers" then
+    p.trainers.page:Show()
+    refreshTrainers(p.trainers, list or {})
+    return
+  end
   local names = trainerNames()
   local y = 0
   for i, block in ipairs(p.blocks) do
     local prof = list and list[i]
     if prof then
       block:SetPoint("TOPLEFT", 0, -y)
-      y = y + draw(block, prof, lines, names) + GAP
+      y = y + draw(block, prof, names) + GAP
       block:Show()
-    else
-      block:Hide()
     end
   end
-  if empty then p.empty:SetText(empty); p.empty:Show() else p.empty:Hide() end
   drawOthers(p, empty and 32 or y + 4)
 end
 
@@ -608,16 +740,30 @@ local function box(parent, x, y, w, h)
   return surface(b)
 end
 
--- Recipe 4..204, cost 208..318, value 322..432, profit 436..546; the amounts are set to the right of their columns.
-local CRAFT_COLUMNS = { { "name", 4, 200 }, { "cost", 208, 110 }, { "value", 322, 110 }, { "profit", 436, 110 } }
+-- Recipe 4..200, cost 206..296, value 302..392, profit 398..502, your scans from 510 (the change, then three bars);
+-- the amounts are set to the right of their columns. Row positions; the headings sit 4 further right, as the rows do.
+local CRAFT_COLUMNS = { { "name", 4, 196 }, { "cost", 206, 90 }, { "value", 302, 90 }, { "profit", 398, 104 } }
+local SCAN_X = 510
 
--- The sort and filter buttons and the price file's age, the recipe list, and under it what to buy for the recipe
--- chosen in the list, with buttons for the count and, past five reagents, Up and Down for the rest of them.
+-- A frame over a line of text that shows what the page's figures mean while the mouse is on it.
+local function helpOver(parent, c, anchor, x, y, w)
+  local h = CreateFrame("Frame", nil, parent)
+  h:SetPoint(anchor, x, y)
+  h:SetSize(w, 18)
+  if h.EnableMouse then h:EnableMouse(true) end
+  h:SetScript("OnEnter", function(self) explain(self, c) end)
+  h:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+  return h
+end
+
+-- The sort and filter buttons with the price file's source line beside them, the recipe list with what its figures
+-- mean under it, and under the list what to buy for the recipe chosen in it, with buttons for the count and, past
+-- five reagents, Up and Down for the rest of them.
 buildCrafting = function(parent)
   local c = { sort = "profit", profitable = false, count = 1 }
   c.page = CreateFrame("Frame", nil, parent)
   c.page:SetPoint("TOPLEFT", 0, 0)
-  c.page:SetSize(W, H - FOOTER_H)
+  c.page:SetSize(W, PAGE_H)
   c.page:Hide()
   c.sortButton = button(c.page, SORT_PROFIT, 150, function()
     c.sort = c.sort == "name" and "profit" or "name"; c.rows.offset = 0
@@ -625,15 +771,16 @@ buildCrafting = function(parent)
   c.sortButton:SetPoint("TOPLEFT", 0, -6)
   c.filterButton = button(c.page, PROFITABLE, 150, function() c.profitable = not c.profitable; c.rows.offset = 0 end)
   c.filterButton:SetPoint("TOPLEFT", 154, -6)
+  -- One line right of the buttons; the full sentence and how to read the columns are in its hover.
   c.age = text(c.page, 12, nil, COLORS.muted)
-  c.age:SetPoint("TOPLEFT", 4, -32)
-  c.age:SetWidth(W - 8)
-  c.note = text(c.page, 12, nil, COLORS.muted)
-  c.note:SetPoint("TOPLEFT", 4, -45)
-  c.note:SetWidth(W - 8)
-  c.note:SetText(PER_ITEM)
+  c.age:SetPoint("TOPRIGHT", -4, -10)
+  c.age:SetWidth(W - 316)
+  c.age:SetJustifyH("RIGHT")
+  if c.age.SetWordWrap then c.age:SetWordWrap(false) end
+  c.source = helpOver(c.page, c, "TOPRIGHT", -4, -7, W - 316)
 
-  local list = box(c.page, 0, -60, W, 186)
+  local list = box(c.page, 0, -30, W, 184)
+  c.list = list
   c.head = {}
   for _, col in ipairs(CRAFT_COLUMNS) do
     local s = text(list, 12, nil, COLORS.muted)
@@ -643,13 +790,20 @@ buildCrafting = function(parent)
     c.head[col[1]] = s
   end
   c.head.change = text(list, 12, nil, COLORS.muted)
-  c.head.change:SetPoint("TOPLEFT", 553, -6)
-  c.head.change:SetWidth(43)
-  c.head.change:SetText("Scan")
+  c.head.change:SetPoint("TOPLEFT", SCAN_X + 4, -6)
+  c.head.change:SetWidth(W - SCAN_X - 14)
+  c.head.change:SetText("Your scans")
   c.head.name:SetText("Recipe")
-  c.head.cost:SetText("Cost")
-  c.head.value:SetText("Value per item")
-  c.head.profit:SetText("Est. profit (1/craft)")
+  c.head.cost:SetText("Craft cost")
+  c.head.value:SetText("Item value")
+  c.head.profit:SetText("Profit / craft")
+  -- Under the rows, beside Up and Down: what the figures mean, or what Add to shopping list just did.
+  c.note = text(list, 12, nil, COLORS.muted)
+  c.note:SetPoint("BOTTOMLEFT", 8, 10)
+  c.note:SetWidth(W - 16 - 110)
+  if c.note.SetWordWrap then c.note:SetWordWrap(false) end
+  c.note:SetText(PER_ITEM)
+  helpOver(list, c, "BOTTOMLEFT", 8, 7, W - 16 - 110)
   local rows = { offset = 0 }
   for i = 1, CRAFT_ROWS do
     local line = CreateFrame("Button", nil, list)
@@ -663,14 +817,15 @@ buildCrafting = function(parent)
       if col[1] ~= "name" then s:SetJustifyH("RIGHT") end
       line[col[1]] = s
     end
-    line.change = text(line, 12, nil, COLORS.muted)
-    line.change:SetPoint("LEFT", 549, 0)
-    line.change:SetWidth(14)
+    line.change = text(line, 12, NARROW, COLORS.muted)
+    line.change:SetPoint("LEFT", SCAN_X, 0)
+    line.change:SetWidth(38)
+    if line.change.SetWordWrap then line.change:SetWordWrap(false) end
     line.bars = {}
     for j = 1, 3 do
       local bar = line:CreateTexture(nil, "ARTWORK")
       bar:SetTexture("Interface\\Buttons\\WHITE8X8")
-      bar:SetPoint("BOTTOMLEFT", 567 + (j - 1) * 7, 2)
+      bar:SetPoint("BOTTOMLEFT", SCAN_X + 40 + (j - 1) * 7, 2)
       line.bars[j] = bar
     end
     line:SetScript("OnEnter", function(self)
@@ -695,7 +850,7 @@ buildCrafting = function(parent)
   rows.down:SetPoint("BOTTOMRIGHT", -6, 6)
   c.rows = rows
 
-  local buy = box(c.page, 0, -252, W, 110)
+  local buy = box(c.page, 0, -220, W, PAGE_H - 220)
   local b = { lines = {}, steps = {}, offset = 0 }
   b.title = text(buy, 12)
   b.title:SetPoint("TOPLEFT", 8, -9)
@@ -712,16 +867,16 @@ buildCrafting = function(parent)
   -- The lines and the total leave the bottom right to Up and Down (106 wide).
   for i = 1, BUY_LINES do
     local line = text(buy, 12, nil, COLORS.muted)
-    line:SetPoint("TOPLEFT", 8, -30 - (i - 1) * LINE_H)
+    line:SetPoint("TOPLEFT", 8, -32 - (i - 1) * LINE_H)
     line:SetWidth(W - 16 - 110)
     if line.SetWordWrap then line:SetWordWrap(false) end
     b.lines[i] = line
   end
   b.total = text(buy, 12)
-  b.total:SetPoint("TOPLEFT", 8, -30 - BUY_LINES * LINE_H - 2)
+  b.total:SetPoint("TOPLEFT", 8, -32 - BUY_LINES * LINE_H - 4)
   b.total:SetWidth(W - 16 - 110)
-  -- Adds this recipe's reagents for the chosen count to the active shopping list; the outcome shows under the age.
-  b.add = button(buy, TO_LIST, 146, function()
+  -- Adds this recipe's reagents for the chosen count to the active shopping list; the outcome shows under the list.
+  b.add = button(buy, ADD_TO_LIST, 146, function()
     if not (E.Shopping and b.row) then return end
     local _, _, _, said = E.Shopping.AddReagents(b.row.parts, c.count)
     c.added = said
@@ -735,13 +890,64 @@ buildCrafting = function(parent)
   return c
 end
 
+-- The heading row, then a box per profession slot, each with its name and summary and TRAIN_ROWS rows.
+local function buildTrainers(parent)
+  local t = { head = {}, sections = {} }
+  t.page = CreateFrame("Frame", nil, parent)
+  t.page:SetPoint("TOPLEFT", 0, 0)
+  t.page:SetSize(W, PAGE_H)
+  t.page:Hide()
+  local HEADINGS = { rank = "Rank", recipe = "Recipe", cost = "Cost", where = "Trainer" }
+  for _, col in ipairs(TRAIN_COLUMNS) do
+    local s = text(t.page, 12, nil, COLORS.muted)
+    s:SetPoint("TOPLEFT", col[2], -4)
+    s:SetWidth(col[3])
+    if col[1] == "cost" then s:SetJustifyH("RIGHT") end
+    s:SetText(HEADINGS[col[1]])
+    t.head[col[1]] = s
+  end
+  for i = 1, BLOCKS do
+    local s = CreateFrame("Frame", nil, t.page)
+    s:SetPoint("TOPLEFT", 0, -TRAIN_HEAD)
+    s:SetSize(W, SECTION_HEAD + ROW_H + 4)
+    surface(s)
+    s.name = text(s, 14)
+    s.name:SetPoint("TOPLEFT", 10, -6)
+    s.name:SetWidth(200)
+    s.summary = text(s, 12, nil, COLORS.muted)
+    s.summary:SetPoint("TOPRIGHT", -10, -8)
+    s.summary:SetWidth(W - 230)
+    s.summary:SetJustifyH("RIGHT")
+    s.rows = {}
+    for j = 1, TRAIN_ROWS do
+      local line = CreateFrame("Frame", nil, s)
+      line:SetPoint("TOPLEFT", 0, -(SECTION_HEAD + (j - 1) * ROW_H))
+      line:SetSize(W, ROW_H)
+      for _, col in ipairs(TRAIN_COLUMNS) do
+        -- Ranks and costs in the narrow figures, words in Friz; the trainer in the muted colour.
+        local figures = col[1] == "rank" or col[1] == "cost"
+        local cell = text(line, 12, figures and NARROW or nil, col[1] == "where" and COLORS.muted or nil)
+        cell:SetPoint("LEFT", col[2], 0)
+        cell:SetWidth(col[3])
+        if cell.SetWordWrap then cell:SetWordWrap(false) end
+        if col[1] == "cost" then cell:SetJustifyH("RIGHT") end
+        line[col[1]] = cell
+      end
+      s.rows[j] = line
+    end
+    s:Hide()
+    t.sections[i] = s
+  end
+  return t
+end
+
 local function build(f, parent)
   local p = { blocks = {} }
   f.professions = p
   for i = 1, BLOCKS do
     local b = CreateFrame("Frame", nil, parent)
-    b:SetPoint("TOPLEFT", 0, -(i - 1) * (HEAD_H + LINE_H + GAP))
-    b:SetSize(W, HEAD_H + LINE_H)
+    b:SetPoint("TOPLEFT", 0, -(i - 1) * (BLOCK_H + GAP))
+    b:SetSize(W, BLOCK_H)
     surface(b)
     b.icon = b:CreateTexture(nil, "ARTWORK")
     b.icon:SetSize(28, 28)
@@ -768,13 +974,10 @@ local function build(f, parent)
     b.last:SetPoint("TOPRIGHT", -10, -28)
     b.last:SetWidth(170)
     b.last:SetJustifyH("RIGHT")
-    b.trainer = {}
-    for j = 1, TRAINER_LINES do
-      local line = text(b, 12, nil, COLORS.muted)
-      line:SetPoint("TOPLEFT", 46, -(HEAD_H + (j - 1) * LINE_H))
-      line:SetWidth(W - 56)
-      b.trainer[j] = line
-    end
+    b.next = text(b, 12, nil, COLORS.muted)
+    b.next:SetPoint("TOPLEFT", 46, -HEAD_H)
+    b.next:SetWidth(W - 56)
+    if b.next.SetWordWrap then b.next:SetWordWrap(false) end
     p.blocks[i] = b
   end
   p.empty = text(parent, 12, nil, COLORS.muted)
@@ -792,15 +995,19 @@ local function build(f, parent)
     p.other[i] = line
   end
   p.footer = text(parent, 12, nil, COLORS.muted)
-  -- At the bottom of the view, under the blocks and the other characters.
+  -- At the bottom of the view, under every screen; the two buttons beside it.
   p.footer:SetPoint("BOTTOMLEFT", 8, 8)
-  p.footer:SetWidth(W - 160)  -- the button beside it is 140 wide
+  p.footer:SetWidth(W - 2 * NAV_W - 20)
+  if p.footer.SetWordWrap then p.footer:SetWordWrap(false) end
   p.footer:SetText(FOOTER)
-  -- Beside the footer: swaps the blocks for the crafting costs and back.
-  p.mode = "ranks"
-  p.toggle = button(parent, TO_CRAFTING, 140, function() p.mode = p.mode == "crafting" and "ranks" or "crafting" end)
+  -- Beside the footer: the other two screens, named on the buttons (GO).
+  p.mode = "list"
+  p.nav = button(parent, TO_RANKS, NAV_W, function() p.mode = GO[p.mode][1] end)
+  p.nav:SetPoint("BOTTOMRIGHT", -(NAV_W + 4), 2)
+  p.toggle = button(parent, TO_CRAFTING, NAV_W, function() p.mode = GO[p.mode][2] end)
   p.toggle:SetPoint("BOTTOMRIGHT", 0, 2)
   p.craft = buildCrafting(parent)
+  p.trainers = buildTrainers(parent)
 end
 
 U.Views.professions = { build = build, refresh = refresh }
