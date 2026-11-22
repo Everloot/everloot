@@ -204,7 +204,7 @@ test("planned builds: no picker and no label read unless the list offers it; the
 
 describe("private sync", () => {
   const PATH = "/characters/forever/forever-pioneer/thrallina";
-  const CATEGORIES = ["raids", "achievements"] as const;
+  const CATEGORIES = ["raids", "achievements", "gold"] as const;
   type Category = (typeof CATEGORIES)[number];
   const sync = (on: Category[] = []) => CATEGORIES.map((category) => ({ category, on: on.includes(category), capturedAt: null }));
   const sections = (shown: Category[] = []) => Object.fromEntries(CATEGORIES.map((c) => [c, shown.includes(c)])) as Record<Category, boolean>;
@@ -247,6 +247,17 @@ describe("private sync", () => {
     for (const retired of ["gear", "stats", "talents", "pvp", "professions", "reputations"]) expect(button(`Turn on ${retired} sync for Thrallina`)).toBeUndefined();
     expect(container.querySelector(`a[href="/me/characters/links/${LINK.id}"]`)?.textContent).toBe("See what's synced");
     expect(container.textContent!.toLowerCase()).not.toMatch(/verified|owner|proven|rank my gear/);
+  });
+
+  test("gold has its own sync and page switch, both off until the owner turns them on", async () => {
+    const sent = syncApi([{ links: [synced({ public: true })] }, { links: [synced({ public: true, on: ["gold"] })] }]);
+    await show();
+    expect(container.textContent).toContain("Gold");
+    expect(button("Show gold on Thrallina's page")!.disabled).toBe(true);
+    await click("Turn on gold sync for Thrallina");
+    expect(sent).toEqual([{ url: `/api/me/characters/links/${LINK.id}/sync`, body: { gold: true } }]);
+    await click("Show gold on Thrallina's page");
+    expect(sent[1]).toEqual({ url: `/api/me/characters/links/${LINK.id}/visibility`, body: { show_gold: true } });
   });
 
   test("turning sync on sends that category alone and reads the list again", async () => {

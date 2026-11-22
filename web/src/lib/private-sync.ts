@@ -26,14 +26,15 @@ export function privateSyncOn(env: Record<string, string | undefined> = process.
  * What a link can still sync, in page order. Blizzard's character API supplies gear, stats, talents, PvP,
  * professions, reputations and earned achievements, so those categories are retired (the data policy's amendment of
  * 17 November 2026): `achievements` keeps only titles, which the API does not return. The protocol still lists the
- * retired categories, so an older Desktop App that sends them gets a success answer that drops them.
+ * retired categories, so an older Desktop App that sends them gets a success answer that drops them. `gold` is the
+ * addon's lifetime gold statistics, which the API does not show either; it is never ranked.
  */
-export const SYNC_CATEGORIES = ["raids", "achievements"] as const;
+export const SYNC_CATEGORIES = ["raids", "achievements", "gold"] as const;
 export type SyncCategory = (typeof SYNC_CATEGORIES)[number];
 export const isSyncCategory = (v: unknown): v is SyncCategory => (SYNC_CATEGORIES as readonly unknown[]).includes(v);
 
 /** The visibility switch that publishes each category. */
-export const SHOW_SWITCH: Record<SyncCategory, string> = { raids: "show_raids", achievements: "show_collections" };
+export const SHOW_SWITCH: Record<SyncCategory, string> = { raids: "show_raids", achievements: "show_collections", gold: "show_gold" };
 
 /** A capture dated further ahead than this is dropped: stored, it would block every later capture. */
 const FUTURE_MS = 86_400_000;
@@ -42,7 +43,7 @@ type Kind = SyncRow["kind"];
 /** The category each kind still feeds; null for a retired kind, whose rows are dropped and counted as skipped. */
 const CATEGORY_OF: Record<Kind, SyncCategory | null> = {
   gear_snapshot: null, talent_owned: null, stats_owned: null, pvp_owned: null, profession_owned: null, reputation_owned: null,
-  achievement_owned: null, lockout_owned: "raids", title_owned: "achievements", wealth_owned: null,
+  achievement_owned: null, lockout_owned: "raids", title_owned: "achievements", wealth_owned: "gold",
 };
 
 /** One category's latest state, as stored: the server's own shape, with no install id, key or name in it. */
@@ -129,6 +130,9 @@ function categoryData(category: SyncCategory, rows: readonly SyncRow[], now: Dat
     case "achievements":
       // Titles only: earned achievements come from Blizzard's character API through the armory.
       return { titleIds: [...new Set(only(rows, "title_owned").flatMap((r) => r.titleIds))].sort((a, b) => a - b) };
+    case "gold":
+      // One row per capture holds every statistic the addon could read; the newest is the state.
+      return { stats: { ...newest(only(rows, "wealth_owned")).stats } };
   }
 }
 

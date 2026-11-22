@@ -266,7 +266,7 @@ describe("the owner's list", () => {
     vi.stubEnv("EVERLOOT_SHOWCASE", "1");
     vi.stubEnv("EVERLOOT_PRIVATE_SYNC", "1");
     // The database may still list the retired categories until the migration runs; the list keeps only raids and achievements.
-    const consent = (on: string[], captured: Record<string, string> = {}) => ["gear", "stats", "talents", "pvp", "professions", "reputations", "raids", "achievements"]
+    const consent = (on: string[], captured: Record<string, string> = {}) => ["gear", "stats", "talents", "pvp", "professions", "reputations", "raids", "achievements", "gold"]
       .map((category) => ({ category, consented: on.includes(category), captured_at: captured[category] ?? null, data: captured[category] ? { secret: "fact-data" } : null }));
     auth.authQuery.mockImplementation(async (path: string, init?: { body: string }) => {
       if (path.startsWith("character_links?")) {
@@ -285,15 +285,16 @@ describe("the owner's list", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     const [path] = auth.authQuery.mock.calls[0];
-    expect(path).toContain("character_visibility(page_public,show_raids,show_collections)");
-    expect(body.links[0].page.sections).toEqual({ raids: false, achievements: true });
+    expect(path).toContain("character_visibility(page_public,show_raids,show_collections,show_gold)");
+    expect(body.links[0].page.sections).toEqual({ raids: false, achievements: true, gold: false });
     expect(body.links[0].page.blizzard).toBeUndefined();
     expect(body.links[0].sync).toEqual([
       { category: "raids", on: false, capturedAt: null },
       { category: "achievements", on: true, capturedAt: "2026-11-04T10:00:00.000Z" },
+      { category: "gold", on: false, capturedAt: null },
     ]);
     // A link with no visibility row has every switch off.
-    expect(Object.values(body.links[1].page.sections)).toEqual([false, false]);
+    expect(Object.values(body.links[1].page.sections)).toEqual([false, false, false]);
     expect(body.links[1].sync.find((c: { category: string }) => c.category === "raids").on).toBe(true);
     // Each read is the session's own account.
     for (const [p, init] of auth.authQuery.mock.calls.slice(1)) {

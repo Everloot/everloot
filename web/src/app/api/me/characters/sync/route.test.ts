@@ -107,6 +107,17 @@ describe("what is stored", () => {
     for (const secret of [ACCOUNT, KEY, INSTALL, CHARACTER_KEY, call.p_source_ref]) expect(text).not.toContain(secret);
   });
 
+  test("lifetime gold is one gold fact holding the statistics as the addon read them", async () => {
+    answers([{ category: "gold", outcome: "stored" }]);
+    const older = { kind: "wealth_owned", ...owned, capturedAt: "2026-11-05T09:00:00Z", stats: { "328": 50 } };
+    const wealth = { kind: "wealth_owned", ...owned, capturedAt: "2026-11-05T13:00:00Z", stats: { "328": 1_150_905, "329": 1077, "999": 4 } };
+    const res = await send(thrallina([older, wealth]));
+    expect(await res.json()).toEqual({ characters: [{ index: 0, result: "synced", categories: { gold: "stored" } }], skipped: 0 });
+    expect(syncCalls()[0].p_facts).toEqual([
+      { category: "gold", captured_at: "2026-11-05T13:00:00.000Z", data: { stats: { "328": 1_150_905, "329": 1077 } } },
+    ]);
+  });
+
   test("an older Desktop App's retired rows get a success answer that drops them; its kept rows still sync", async () => {
     answers([{ category: "raids", outcome: "stored" }]);
     const achievement = { kind: "achievement_owned", ...owned, capturedAt: "2026-11-05T12:00:00Z", achievementId: 6, completed: true, earnedByMe: true, criteriaMet: 1, criteriaTotal: 1 };

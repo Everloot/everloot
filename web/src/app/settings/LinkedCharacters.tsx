@@ -20,10 +20,11 @@ export interface ListedLink {
   sync?: { category: SyncCategory; on: boolean; capturedAt: string | null }[];
 }
 /** SYNC_CATEGORIES in web/src/lib/private-sync.ts, which is server code and cannot be imported here. */
-type SyncCategory = "raids" | "achievements";
+type SyncCategory = "raids" | "achievements" | "gold";
 /** Each category's name here, and the visibility switch that shows it (SHOW_SWITCH in private-sync.ts). */
 const CATEGORY: Record<SyncCategory, { name: string; show: string }> = {
   raids: { name: "Raids", show: "show_raids" }, achievements: { name: "Titles", show: "show_collections" },
+  gold: { name: "Gold", show: "show_gold" },
 };
 /** BLIZZARD_SWITCH in web/src/lib/character-armory.ts, which is server code and cannot be imported here. */
 type BlizzardPart = "gear" | "stats" | "talents" | "pvp" | "professions" | "reputations" | "collections" | "history";
