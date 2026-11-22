@@ -353,10 +353,12 @@ never larger than the screen); right-click the grip for the normal size. The siz
 - **Home** lists every character this install has seen: gold, level, professions, raid lockouts (shown only while the completion tracker is on) and when it was last
   seen, with totals for each realm and for the account and a "This week" line (gold in and out for this character over
   seven days). Below it, the gold per hour session with a Pause button.
-- **Gold** has four tabs. **Overview** shows every character's gold by realm and the last 30 days as bars. **Ledger**
-  lists the money events by category, by day or by receipt. **Sales** lists auction sales one by one or by item.
-  **Session** is the gold per hour session. Ledger and Sales can be set to today, 7 days, 30 days or all; Overview always
-  shows the last 30 days. Overview, Ledger and Sales can be set to this character or the account; Session has neither.
+- **Gold** has four tabs. **Overview** shows the period's gold earned, spent and profit, every character's gold by realm,
+  and a chart of gold earned (up) and spent (down) for each day of the period, or each UTC hour for Today; hover a
+  day for its earned, spent, net and the gold held at its close. **Ledger** lists the money events by category, by
+  day or by receipt. **Sales** lists auction sales one by one or by item. **Session** is the gold per hour session.
+  Overview, Ledger and Sales can be set to today, 7 days, 30 days or all, and to this character or the account;
+  Session has neither.
 - **Collection** shows achievements, reputation, titles, raid lockouts and quest chains (quests done of each chain's
   total) from the rows the completion tracker wrote, so it needs `/everloot completion on`; with it off the tab says so
   and has a button that runs that command. It shows this character, or the account: every character in the roster, each
@@ -398,7 +400,7 @@ read by an upload, and nothing in the window uploads anything. An auction sale i
 letter at the mailbox, from the invoice: item name, count, the price after the auction house's cut and the deposit.
 The buyer's name is never read.
 
-When the game says a buyer was found, Sales lists the item at once as "sold, gold pending". Collecting the letter
+When the game says a buyer was found, Sales lists the item at once as "gold pending". Collecting the letter
 turns that row "paid" with the price; a row with no letter after 48 hours reads "unmatched", and a letter collected
 later still fills it. The ledger also records repairs and vendor purchases at an open merchant (a repair paid from the
 guild bank costs you nothing and is left out), gold traded with another player (Trades in, Trades out), gold sent with
