@@ -82,3 +82,12 @@ test("the day's platform history is written after the views; a failure is named 
   expect(record).toHaveBeenCalledWith(expect.objectContaining({ failed: ["history"] }));
   vi.restoreAllMocks();
 });
+test("a fold that failed before the views is named first in failed and in the heartbeat, and the views are still built", async () => {
+  const beat = { generatedAt: "2026-11-22T15:00:30Z", dataAsOf: "2026-11-22T14:50:12Z", completionPending: false };
+  const run = vi.fn(async () => ({ ...none, failed: ["coverage"] }));
+  const record = vi.fn(async () => {});
+  const result = await runStoredViewsJob({ failedBefore: ["snapshot"] }, { heartbeat: async () => beat, run, record, history });
+  expect(run).toHaveBeenCalledOnce();
+  expect(result.failed).toEqual(["snapshot", "coverage"]);
+  expect(record).toHaveBeenCalledWith(expect.objectContaining({ dataAsOf: "2026-11-22T14:50:12Z", failed: ["snapshot", "coverage"] }));
+});
