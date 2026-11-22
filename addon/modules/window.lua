@@ -26,7 +26,7 @@ do
   if ok and type(path) == "string" and path ~= "" then TITLE = path end
 end
 local COLORS = {
-  canvas = { 0.055, 0.059, 0.051, 0.97 }, surface = { 0.082, 0.09, 0.102, 1 }, line = { 0.17, 0.176, 0.157, 1 },
+  canvas = { 0.055, 0.059, 0.051, 1 }, surface = { 0.082, 0.09, 0.102, 1 }, line = { 0.17, 0.176, 0.157, 1 },
   bronze = { 0.478, 0.416, 0.298, 1 }, text = { 0.957, 0.937, 0.867, 1 }, muted = { 0.788, 0.765, 0.69, 1 },
   accent = { 0.612, 0.941, 0.227, 1 }, gold = { 0.941, 0.78, 0.353, 1 },
 }
@@ -38,7 +38,6 @@ U.NAV = {
   { key = "gold", label = "Gold", icon = "INV_Misc_Coin_02" },
   { key = "collection", label = "Collection", icon = "INV_Misc_Bag_10" },
   { key = "professions", label = "Professions", icon = "Trade_BlackSmithing" },
-  { key = "disenchanting", label = "Disenchanting", icon = "Trade_Engraving" },
   { key = "settings", label = "Settings", icon = "Trade_Engineering", bottom = true },
 }
 
@@ -310,7 +309,10 @@ local function stat(parent, x, path, caption)
   return v
 end
 
-local W, H, SIDE, MAIN = 800, 450, 160, 184
+-- Every view is VIEW_W x VIEW_H, 48 below the top; the strip under it holds the corner grip, so the grip never covers
+-- a view's bottom-right button.
+local W, SIDE, MAIN, VIEW_H = 800, 160, 184, 390
+local VIEW_W, H = W - MAIN - 12, 48 + VIEW_H + 28
 local MIN_SCALE, MAX_SCALE = 0.75, 1.5 -- how small and how large the corner grip makes the window
 
 -- The largest scale at which the whole window fits on the screen, with a margin; nil when the screen has no size.
@@ -341,17 +343,19 @@ local TRACKER_OFF = "The completion tracker is off: achievements, factions, titl
 local TRACKER_TURNED_ON = "Turned on. /reload to start reading."
 
 -- The roster list on Home: { field, x, width, right aligned, heading, narrow figures }. Words are in Friz; the
--- figures, the dates and the dense professions list in the narrow number font, which fits them at 12 px.
+-- figures, the dates and the dense professions list in the narrow number font, which fits them at 12 px. Gold holds
+-- a whole amount ("1234g 56s 78c"), with a gap before Professions so the two headings read apart. Raids shows only
+-- while a listed character has a lockout; without it Professions runs to Seen.
 U.ROSTER_ROWS = 10
 U.ROSTER_COLUMNS = {
-  { "name", 4, 88, false, "Name" }, { "level", 94, 22, true, "Lv", true }, { "gold", 120, 76, true, "Gold", true },
-  { "profs", 200, 130, false, "Professions", true }, { "lockouts", 334, 42, false, "Raids" }, { "seen", 380, 56, false, "Seen", true },
+  { "name", 4, 88, false, "Name" }, { "level", 94, 22, true, "Lv", true }, { "gold", 120, 104, true, "Gold", true },
+  { "profs", 236, 106, false, "Professions", true }, { "lockouts", 346, 42, false, "Raids" }, { "seen", 392, 44, false, "Seen", true },
 }
 
 local function buildHome(f)
   local home = CreateFrame("Frame", nil, f)
   home:SetPoint("TOPLEFT", MAIN, -48)
-  home:SetSize(W - MAIN - 12, H - 60)
+  home:SetSize(VIEW_W, VIEW_H)
   f.home = home
 
   -- The character.
@@ -392,6 +396,9 @@ local function buildHome(f)
     b:SetScript("OnClick", function() U.Select(item.view) end)
     m.lines[i] = b
   end
+  m.none = text(who, 12, FRIZ, COLORS.muted)
+  m.none:SetPoint("TOPLEFT", m.title, "BOTTOMLEFT", 0, -4)
+  m.none:SetText("Nothing missing")
   m.off = text(who, 12, FRIZ, COLORS.muted)
   m.off:SetWidth(130)
   m.off:SetJustifyV("TOP")
@@ -455,7 +462,7 @@ local function buildHome(f)
 
   -- Every character the roster holds, by realm: 10 rows at a time, Up and Down for more.
   local roster = box(home, 160, -175, 444, 215)
-  local r = { rows = {}, realmTotals = {}, offset = 0 }
+  local r = { rows = {}, heads = {}, realmTotals = {}, offset = 0 }
   f.roster = r
   local title = text(roster, 12)
   title:SetPoint("TOPLEFT", 8, -6)
@@ -466,6 +473,7 @@ local function buildHome(f)
     head:SetWidth(c[3])
     if c[4] then head:SetJustifyH("RIGHT") end
     head:SetText(c[5])
+    r.heads[c[1]] = head
   end
   for i = 1, U.ROSTER_ROWS do
     local row = CreateFrame("Frame", nil, roster)
@@ -682,6 +690,7 @@ function U.AccountWeekLine()
 end
 
 --- The Missing strip: the lines the file can count, packed from the top, then the tracker-off note and its button.
+--- A count of 0 is left out; with the tracker on and nothing left to count, "Nothing missing".
 function U.RefreshMissing()
   local f = U.frame
   local m = f.missing
@@ -690,8 +699,8 @@ function U.RefreshMissing()
   local slot = 0
   for i, item in ipairs(U.MISSING) do
     local b = m.lines[i]
-    if item.tracker == false or on then
-      local n = d and d[item.key]
+    local n = d and d[item.key]
+    if (item.tracker == false or on) and n ~= 0 then
       b.label:SetText(item.label .. ": " .. (type(n) == "number" and tostring(n) or "-"))
       b:ClearAllPoints()
       b:SetPoint("TOPLEFT", m.title, "BOTTOMLEFT", -4, -(2 + slot * MISSING_LINE))
@@ -702,9 +711,11 @@ function U.RefreshMissing()
     end
   end
   if on and not m.turnedOn then
+    if slot == 0 then m.none:Show() else m.none:Hide() end
     m.off:Hide(); m.turnOn:Hide()
     return
   end
+  m.none:Hide()
   m.off:ClearAllPoints()
   m.off:SetPoint("TOPLEFT", m.title, "BOTTOMLEFT", 0, -(4 + slot * MISSING_LINE))
   m.off:SetText(m.turnedOn and TRACKER_TURNED_ON or TRACKER_OFF)
@@ -741,7 +752,20 @@ local function classColor(token)
   return unpack(COLORS.text)
 end
 
---- Home's list of characters: a line per realm with its gold, then its characters; the account total under it.
+-- When a character was last seen, by the player's own calendar: "today", "1d ago" to "6d ago", then "11-14" (the
+-- month and day), or "2025-11" from another year.
+local function seenText(t)
+  if type(t) ~= "number" then return "-" end
+  local now = time()
+  local days = (E.DayNumber(date("%Y-%m-%d", now)) or 0) - (E.DayNumber(date("%Y-%m-%d", t)) or 0)
+  if days == 0 then return "today" end
+  if days >= 1 and days <= 6 then return days .. "d ago" end
+  if date("%Y", t) == date("%Y", now) then return date("%m-%d", t) end
+  return date("%Y-%m", t)
+end
+
+--- Home's list of characters: a line per realm, with its gold when there is more than one realm, then its
+--- characters; the account total under it.
 function U.RefreshRoster()
   local f = U.frame
   local r = f.roster
@@ -749,7 +773,8 @@ function U.RefreshRoster()
   if E.Roster and E.Roster.Rows then ok, rows = pcall(E.Roster.Rows) end
   if not (ok and type(rows) == "table") then rows = {} end
   local current = E.Roster and E.Roster.Current()
-  local items, realm, header, account = {}, nil, nil, nil
+  local items, realm, header, account, realms = {}, nil, nil, nil, 0
+  local lockouts, raids = {}, false
   r.realmTotals = {}
   for _, c in ipairs(rows) do
     if not header or c.realm ~= realm then
@@ -757,15 +782,24 @@ function U.RefreshRoster()
       header = { header = true, realm = realm or "-" }
       items[#items + 1] = header
       r.realmTotals[header.realm] = header
+      realms = realms + 1
     end
     items[#items + 1] = c
     if type(c.copper) == "number" then
       header.copper = (header.copper or 0) + c.copper
       account = (account or 0) + c.copper
     end
+    lockouts[c] = lockoutText(c.key)
+    raids = raids or lockouts[c] ~= "-"
   end
-  for _, h in pairs(r.realmTotals) do h.text = h.realm .. " · " .. U.Money(h.copper) end
+  -- With one realm its total is the account's, which the line under the list already says.
+  for _, h in pairs(r.realmTotals) do h.text = realms > 1 and (h.realm .. " · " .. U.Money(h.copper)) or h.realm end
   r.accountTotal:SetText("Account: " .. U.Money(account))
+  local cols = {}
+  for _, c in ipairs(U.ROSTER_COLUMNS) do cols[c[1]] = c end
+  if raids then r.heads.lockouts:Show() else r.heads.lockouts:Hide() end
+  local profsWidth = raids and cols.profs[3] or (cols.seen[2] - cols.profs[2] - 4)
+  r.heads.profs:SetWidth(profsWidth)
 
   local n = #items
   r.offset = math.min(r.offset, math.floor(math.max(n - 1, 0) / U.ROSTER_ROWS) * U.ROSTER_ROWS)
@@ -785,11 +819,13 @@ function U.RefreshRoster()
         if item.key == current then row.name:SetTextColor(unpack(COLORS.accent))
         else row.name:SetTextColor(classColor(item.class)) end
         row.level:SetText(type(item.level) == "number" and tostring(item.level) or "-")
-        row.gold:SetText(U.MoneyShort(item.copper))
+        row.gold:SetText((type(item.copper) == "number" and item.copper > 0) and U.Money(item.copper) or "-")
         row.profs:SetText(professionText(item.professions))
-        row.lockouts:SetText(lockoutText(item.key))
-        row.seen:SetText(type(item.lastSeen) == "number" and date("!%Y-%m-%d", item.lastSeen) or "-")
+        row.lockouts:SetText(lockouts[item])
+        row.seen:SetText(seenText(item.lastSeen))
       end
+      row.profs:SetWidth(profsWidth)
+      if raids then row.lockouts:Show() else row.lockouts:Hide() end
       row:Show()
     end
   end
@@ -817,8 +853,11 @@ function U.Refresh()
   if SetPortraitTexture then pcall(SetPortraitTexture, f.portrait, "player") end
 
   f.peak:SetText(d.peak and U.Money(d.peak) or "-")
-  f.week:SetText(U.WeekLine())
-  f.weekAccount:SetText(U.AccountWeekLine())
+  -- The account's week only when it says something this character's does not (another character moved gold).
+  local mine, account = U.WeekLine(), U.AccountWeekLine()
+  f.week:SetText(mine)
+  f.weekAccount:SetText(account)
+  if account:match(": (.*)$") == mine:match(": (.*)$") then f.weekAccount:Hide() else f.weekAccount:Show() end
   U.RefreshMissing()
 
   local profs = d.professions
@@ -880,7 +919,7 @@ function U.Select(key)
   if not f.views[key] then
     local parent = CreateFrame("Frame", nil, f)
     parent:SetPoint("TOPLEFT", MAIN, -48)
-    parent:SetSize(W - MAIN - 12, H - 60)
+    parent:SetSize(VIEW_W, VIEW_H)
     parent:Hide()
     local ok, err = pcall(view.build, f, parent)
     if not ok then U.Fail(err); return end
