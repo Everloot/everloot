@@ -291,9 +291,10 @@ describe("the other sections", () => {
       expect(html).not.toMatch(/rank|board|consistent|misconduct/i);
     });
 
-    test("labelled as the addon's numbers with the capture date: the owner's preview says your addon, the public page the player's", () => {
-      expect(gold(true)).toContain("From your addon, captured <span class=\"font-mono\">2026-10-31</span>");
-      expect(gold(false)).toContain("From the player&#x27;s addon, captured <span class=\"font-mono\">2026-10-31</span>");
+    test("labelled as the addon's numbers, dated once by the section heading: the owner's preview says your addon, the public page the player's", () => {
+      expect(gold(true)).toContain(">From your addon<");
+      expect(gold(false)).toContain(">From the player&#x27;s addon<");
+      for (const preview of [true, false]) expect(gold(preview).match(/2026-10-31/g)).toHaveLength(1);
     });
 
     test("comes after the other sections; with nothing synced the public page leaves it out and the preview says so", () => {
