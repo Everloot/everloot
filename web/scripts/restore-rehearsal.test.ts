@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync, unlinkSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync, unlinkSync, renameSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
@@ -109,4 +109,88 @@ test("an unreadable raw upload fails even when other uploads cover the snapshot"
   const dir = mirror({ "a.json": [row] }, [row]);
   writeFileSync(join(dir, "uploads", "2026-10-10", "corrupt.json"), "{");
   await expect(rehearseRestore(dir)).rejects.toThrow(/invalid JSON/);
+});
+
+function sharded(dir: string, rows: unknown[]) {
+  const folder = "snapshots/corpus/20261123T000000Z-test";
+  mkdirSync(join(dir, folder), { recursive: true });
+  const parts = rows.map((record, i) => {
+    const key = `${folder}/${i}.json`;
+    writeFileSync(join(dir, key), JSON.stringify([{ record, grants: [] }]));
+    return key;
+  });
+  const snapshot = { format: 2, state: { version: 1, conflicts: [], legacyRecords: 0 }, parts };
+  writeFileSync(join(dir, "snapshots/corpus.json"), JSON.stringify(snapshot));
+  return snapshot;
+}
+
+test("format-2 parts rebuild and compare every internal event", async () => {
+  const rows = [loot("e:1"), loot("e:2")];
+  const dir = mirror({ "a.json": rows }, []);
+  sharded(dir, rows);
+  expect(await rehearseRestore(dir)).toMatchObject({ ok: true, snapshot: 2, rebuilt: 2, changed: [] });
+});
+
+test("format-2 still detects missing and changed events", async () => {
+  const dir = mirror({ "a.json": [loot("e:1")] }, []);
+  sharded(dir, [{ ...loot("e:1"), items: [{ itemId: 5, count: 99 }] }, loot("e:9")]);
+  expect(await rehearseRestore(dir)).toMatchObject({ ok: false,
+    changed: ["install-aaaa|e:1"], missing: ["install-aaaa|e:9"] });
+});
+
+test("format-2 refuses a missing or non-array part", async () => {
+  const dir = mirror({ "a.json": [loot("e:1")] }, []);
+  const snapshot = sharded(dir, [loot("e:1")]);
+  unlinkSync(join(dir, snapshot.parts[0]));
+  await expect(rehearseRestore(dir)).rejects.toThrow("snapshot part is missing or invalid JSON");
+  writeFileSync(join(dir, snapshot.parts[0]), "{}");
+  await expect(rehearseRestore(dir)).rejects.toThrow("snapshot part is not a list");
+  writeFileSync(join(dir, snapshot.parts[0]), "{");
+  await expect(rehearseRestore(dir)).rejects.toThrow("snapshot part is missing or invalid JSON");
+});
+
+test("format-2 refuses unsafe or duplicate part paths", async () => {
+  const dir = mirror({ "a.json": [loot("e:1")] }, []);
+  const snapshot = sharded(dir, [loot("e:1")]);
+  for (const [parts, message] of [
+    [["../outside.json"], "snapshot part path is invalid"],
+    [[snapshot.parts[0], snapshot.parts[0]], "snapshot part manifest is invalid"],
+  ] as const) {
+    writeFileSync(join(dir, "snapshots/corpus.json"), JSON.stringify({ ...snapshot, parts }));
+    await expect(rehearseRestore(dir)).rejects.toThrow(message);
+  }
+});
+
+test("format-2 rejects duplicate event identities across parts", async () => {
+  const row = loot("e:1");
+  const dir = mirror({ "a.json": [row] }, []);
+  sharded(dir, [row, row]);
+  await expect(rehearseRestore(dir)).rejects.toThrow(/duplicate snapshot event/);
+});
+
+test("a valid part key cannot follow a junction outside the mirror", async () => {
+  const row = loot("e:1");
+  const dir = mirror({ "a.json": [row] }, []);
+  const snapshot = sharded(dir, [row]);
+  const folder = join(dir, "snapshots/corpus/20261123T000000Z-test");
+  renameSync(folder, `${folder}-original`);
+  const outside = mkdtempSync(join(tmpdir(), "everloot-outside-"));
+  writeFileSync(join(outside, "0.json"), JSON.stringify([{ record: row, grants: [] }]));
+  symlinkSync(outside, folder, "junction");
+  expect(snapshot.parts[0]).toContain("/0.json");
+  await expect(rehearseRestore(dir)).rejects.toThrow("snapshot part is missing or invalid JSON");
+});
+
+test.each([{ parts: null }, { state: null }, { state: [] }])("malformed format-2 manifest fails: %j", async (invalid) => {
+  const dir = mirror({ "a.json": [loot("e:1")] }, []);
+  const snapshot = sharded(dir, [loot("e:1")]);
+  writeFileSync(join(dir, "snapshots/corpus.json"), JSON.stringify({ ...snapshot, ...invalid }));
+  await expect(rehearseRestore(dir)).rejects.toThrow("snapshot part manifest is invalid");
+});
+
+test("format-2 preserves conflict verification", async () => {
+  const row = loot("e:2");
+  const dir = mirror({ "a.json": [loot("e:1"), row], "b.json": [{ ...row, items: [{ itemId: 5, count: 99 }] }] }, []);
+  sharded(dir, [loot("e:1")]);
+  expect(await rehearseRestore(dir)).toMatchObject({ ok: false, conflictsMatch: false });
 });
