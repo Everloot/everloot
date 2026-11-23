@@ -5,11 +5,11 @@ import { trailFor } from "@/lib/breadcrumbs";
 import { Container, DataTable, FilterBar, LinkTabs, PageHeader, type Column, type FilterControl } from "@/components/ui";
 import {
   ARMORY_CLASSES, ARMORY_FACTIONS, ARMORY_BOARDS, ARMORY_METRICS, PLAY_HISTORY_METRICS, ARMORY_REGIONS, ARMORY_RULESETS, armoryBoardHref, armoryBoardPath, armoryBoardQuery,
-  armoryCharacterPath, armoryOn, isArmoryMetric, regionLabel, type ArmoryBoardQuery, type ArmoryMetric,
+  armoryCharacterPath, armoryOn, isArmoryMetric, regionLabel, type ArmoryBoardQuery, type ArmoryMetric, type ArmoryRegion,
 } from "@/lib/armory";
 import { armoryStore, type ArmoryBoardRow } from "@/lib/armory-store";
 import { classText } from "@/app/players/player-view";
-import { BoardClass, BoardGuild, BoardMetric, BoardValue } from "../../board-parts";
+import { BoardClass, BoardGuild, BoardMetric, BoardValue, RegionBoard } from "../../board-parts";
 import { ArmoryCredit, armoryMetadata, link, newest, NOT_FOUND_METADATA, RegionRuleset, Unreachable } from "../../parts";
 
 export const revalidate = 1800;
@@ -43,7 +43,7 @@ function controls(metric: ArmoryMetric, q: ArmoryBoardQuery): FilterControl[] {
     {
       type: "menu", key: "region", label: "Region",
       options: [
-        { label: "All regions", href: href({ region: null }), on: q.region === null, reset: true },
+        { label: "US and EU", href: href({ region: null }), on: q.region === null, reset: true },
         ...ARMORY_REGIONS.map((r) => ({ label: regionLabel(r), href: href({ region: r }), on: q.region === r })),
       ],
     },
@@ -77,7 +77,13 @@ export default async function ArmoryBoardPage(props: { params: Promise<{ metric:
   if (!q) notFound();
   const def = ARMORY_BOARDS[metric];
   const path = armoryBoardPath(metric);
-  const rows = await armoryStore().boardFiltered(def.key, q.region, q.ruleset, q.class ?? null, q.faction ?? null, BOARD_ROWS).catch(() => null);
+  const read = (region: ArmoryRegion | null) =>
+    armoryStore().boardFiltered(def.key, region, q.ruleset, q.class ?? null, q.faction ?? null, BOARD_ROWS).catch(() => null);
+  // No region chosen: each region ranked on its own, side by side, so the one with more characters read never hides
+  // the other. One region chosen: its one table, with level, race and realm.
+  const split = q.region === null ? await Promise.all(ARMORY_REGIONS.map(async (region) => ({ region, rows: await read(region) }))) : null;
+  const rows = split ? null : await read(q.region);
+  const fetched = split ? split.flatMap((s) => s.rows ?? []) : rows ?? [];
   const active = [q.ruleset, q.region, q.class ?? null, q.faction ?? null].filter((v) => v !== null).length;
 
   return (
@@ -87,13 +93,23 @@ export default async function ArmoryBoardPage(props: { params: Promise<{ metric:
           trail={[...trailFor("/armory")!, { name: def.title, path }]}
           title={`${def.title} rankings`}
           lede={def.lede}
-          meta={<ArmoryCredit at={rows ? newest(rows.map((r) => r.fetchedAt)) : null} />}
+          meta={<ArmoryCredit at={fetched.length ? newest(fetched.map((r) => r.fetchedAt)) : null} />}
         />
         {PLAY_HISTORY_METRICS.includes(metric) && <p className="text-sm text-fg-2">
           Characters are ranked once their play history has been read; the armory reads each character at least every 20 days.
         </p>}
         <LinkTabs label="Armory rankings" tabs={ARMORY_METRICS.map((m) => ({ href: armoryBoardHref(m, q), label: ARMORY_BOARDS[m].title, current: m === metric }))} />
-        {rows === null ? <Unreachable /> : (
+        {split ? (
+          <>
+            <FilterBar label="Ranking filters" controls={controls(metric, q)} active={active} clearHref={path} />
+            <div className="grid gap-4 lg:grid-cols-2">
+              {split.map(({ region, rows: regionRows }) => (
+                <RegionBoard key={region} metric={metric} region={region} rows={regionRows}
+                  footer={<Link href={armoryBoardHref(metric, { ...q, region })} className={link}>{regionLabel(region)} only, with level, race and realm</Link>} />
+              ))}
+            </div>
+          </>
+        ) : rows === null ? <Unreachable /> : (
           <>
             <FilterBar label="Ranking filters" controls={controls(metric, q)} active={active} clearHref={path} />
             {rows.length === 0

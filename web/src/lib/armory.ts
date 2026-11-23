@@ -120,7 +120,7 @@ export type ArmoryMetricKey = "item_level" | "gear_score" | "honorable_kills"
   | "quests_completed" | "creatures_killed" | "fish_caught" | "flight_paths" | "dungeons_entered" | "total_deaths";
 /** The boards ranked from Blizzard's play history (achievements/statistics), in page order. */
 export const PLAY_HISTORY_METRICS: readonly ArmoryMetric[] = ["quests-completed", "creatures-killed", "fish-caught", "flight-paths", "dungeons-entered", "deaths"];
-/** The boards the /rankings hub previews; the others are one link away, so the hub reads three boards, not nine. */
+/** The gear and PvP boards, first in every list of boards; the /rankings hub opens on the first. */
 export const HUB_PREVIEW_METRICS: readonly ArmoryMetric[] = ["item-level", "gear-score", "honorable-kills"];
 export const ARMORY_METRICS: readonly ArmoryMetric[] = [...HUB_PREVIEW_METRICS, ...PLAY_HISTORY_METRICS];
 export const isArmoryMetric = (s: string): s is ArmoryMetric => (ARMORY_METRICS as readonly string[]).includes(s);

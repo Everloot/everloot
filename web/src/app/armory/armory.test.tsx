@@ -211,6 +211,25 @@ describe("the boards", () => {
     holder.store = broken();
     expect(await html(pages.board("item-level"))).toContain(STORAGE_UNREACHABLE);
   });
+
+  test("with no region chosen US and EU stand side by side, each ranked on its own, so the bigger region never hides the other", async () => {
+    mem.putCharacter(armoryCharacter({ region: "us", slug: "maren-holt", name: "Maren", surname: "Holt", class: "Mage", classId: 8, itemLevel: 40, fetchedAt: "2026-11-09T08:00:00.000Z" }));
+    const spy = vi.spyOn(mem, "boardFiltered");
+    const out = await html(pages.board("item-level", { class: "mage" }));
+    expect(spy).toHaveBeenCalledWith("item_level", "us", null, "Mage", null, 100);
+    expect(spy).toHaveBeenCalledWith("item_level", "eu", null, "Mage", null, 100);
+    const us = out.slice(out.indexOf('aria-labelledby="board-us"'), out.indexOf('aria-labelledby="board-eu"'));
+    expect(us).toContain('href="/armory/us/maren-holt"');
+    expect(us).toMatch(/<span[^>]*>1<\/span><a href="\/armory\/us\/maren-holt" class="[^"]*text-class-mage/);
+    // Each column opens its region's full table, the other filters kept.
+    expect(us).toContain('href="/armory/rankings/item-level?region=us&amp;class=mage"');
+    expect(out).toContain("No character with this number here yet.");
+    expect(out).toContain("US and EU");
+    // One region chosen: the one table with level, race and realm, as before.
+    const eu = await html(pages.board("item-level", { region: "eu" }));
+    expect(eu).not.toContain('aria-labelledby="board-us"');
+    expect(eu).not.toContain("maren-holt");
+  });
 });
 
 describe("the hub", () => {
