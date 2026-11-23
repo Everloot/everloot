@@ -16,13 +16,17 @@ const market = {
 } as unknown as MarketState;
 const coverage = { installs: 4, confirmed: 120, waiting: 30, dataAsOf: null, build: "1.60.1.70959" };
 
-/** An R2 holding one history file, honouring if-match and if-none-match as R2 does. */
+/**
+ * An R2 holding one history file, honouring if-match and if-none-match as R2 does. Like R2, a read that may be
+ * compressed (no `accept-encoding: identity`) answers with a weak ETag, which no If-Match accepts.
+ */
 function bucket(initial?: unknown) {
   const state = { body: initial === undefined ? undefined : JSON.stringify(initial), etag: 1 };
   const fetch = vi.fn(async (input: RequestInfo | URL) => {
     const req = input as Request;
     expect(new URL(req.url).pathname).toBe(`/bucket/${HISTORY_KEY}`);
-    if (req.method === "GET") return state.body === undefined ? new Response("missing", { status: 404 }) : new Response(state.body, { headers: { etag: `"${state.etag}"` } });
+    const weak = req.headers.get("accept-encoding") === "identity" ? "" : "W/";
+    if (req.method === "GET") return state.body === undefined ? new Response("missing", { status: 404 }) : new Response(state.body, { headers: { etag: `${weak}"${state.etag}"` } });
     const match = req.headers.get("if-match");
     if ((match && match !== `"${state.etag}"`) || (req.headers.get("if-none-match") === "*" && state.body !== undefined)) return new Response("precondition", { status: 412 });
     state.body = await req.text();
@@ -63,14 +67,23 @@ test("the first write starts the file with the backfill and the completed day; t
   expect(await readDailyHistory({ cloud, fetch })).toHaveLength(3);
 });
 
-test("a later day is appended to the file as it stands, and a run that loses the race leaves the day to the winner", async () => {
+test("each later day is appended to the file as it stands, read uncompressed so its ETag is strong", async () => {
   const { fetch, state } = bucket({ version: 1, days: [{ date: "2026-11-21", source: "snapshot" }] });
   expect(await writeDailyHistory(new Date("2026-11-23T00:05:00Z"), { cloud, fetch, ...sources() })).toMatchObject({ written: true, days: 2 });
-  expect((JSON.parse(state.body!).days as DayRow[]).map((d) => d.date)).toEqual(["2026-11-21", "2026-11-22"]);
+  expect(await writeDailyHistory(new Date("2026-11-24T00:05:00Z"), { cloud, fetch, ...sources() })).toMatchObject({ written: true, days: 3 });
+  expect((JSON.parse(state.body!).days as DayRow[]).map((d) => d.date)).toEqual(["2026-11-21", "2026-11-22", "2026-11-23"]);
+  const get = (fetch.mock.calls[0][0] as Request);
+  expect(get.headers.get("accept-encoding")).toBe("identity");
+});
+
+test("a file that changed since it was read, or answers without a strong ETag, fails the write loudly so the next run retries", async () => {
   const racing = bucket({ version: 1, days: [] });
   const slow = sources();
   slow.corpus.mockImplementation(async () => { racing.state.etag++; return corpus; });
-  expect(await writeDailyHistory(new Date("2026-11-24T00:05:00Z"), { cloud, fetch: racing.fetch, ...slow })).toEqual({ written: false, date: "2026-11-23" });
+  await expect(writeDailyHistory(new Date("2026-11-24T00:05:00Z"), { cloud, fetch: racing.fetch, ...slow })).rejects.toThrow("412");
+  const weak = vi.fn(async () => new Response(JSON.stringify({ version: 1, days: [] }), { headers: { etag: 'W/"1"' } }));
+  await expect(writeDailyHistory(new Date("2026-11-24T00:05:00Z"), { cloud, fetch: weak, ...sources() })).rejects.toThrow("no strong ETag");
+  expect(weak).toHaveBeenCalledOnce();
 });
 
 test("a file this code cannot read is left alone, and an unreachable corpus writes nothing", async () => {
