@@ -81,6 +81,11 @@ export interface FetchState extends Validators {
   newsFailed?: string[];
   /** An unfinished list scan. Only candidate topic ids/times are retained, never player records. */
   scan?: { nextPage: number; newest: string | null; complete: boolean; pending: { id: number; bumpedAt: string }[]; opened?: { id: number; bumpedAt: string }[] };
+  /**
+   * Topic lists: per topic id, the furthest tracked post already read. MVP posts are never kept, so without this a
+   * thread's next read would walk its MVP posts again, and a read cut short would start over. At most WALKED_MAX.
+   */
+  walked?: Record<string, number>;
   /** Roster sources: the forum's staff list as last read. */
   staff?: StaffMember[];
 }
@@ -97,6 +102,8 @@ export const MAX_PAGES = 3;
 const PAGE_SIZE = 30;
 /** Topics per list page; Discourse allows up to 100, which costs a third of the requests of the default 30. */
 export const LIST_PAGE_SIZE = 100;
+/** Walked marks kept per topic list, newest topics first. */
+export const WALKED_MAX = 500;
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
@@ -327,6 +334,11 @@ export interface IngestOptions {
   forumOnly?: boolean;
   /** Omit the news source for a forum/Bluesky-only pass. */
   skipNews?: boolean;
+  /**
+   * A backfill through the scheduled reader: every topic list's handled time moves back to this time (ISO; never
+   * forward), so topics last active since then are listed and read again over the next runs.
+   */
+  rescanSince?: string;
 }
 
 export interface IngestResult {
@@ -475,13 +487,16 @@ function session(opts: IngestOptions) {
 
   /**
    * Open one topic and keep its staff posts. The forum chains its staff posts (each post names the next
-   * one), so this reads the topic from the last staff post already kept (or from the start: a new topic,
-   * or `fromStart` for the backfill), then follows the chain 20 posts at a time to the end. A re-opened
-   * topic usually costs one request. Null when the topic is gone.
+   * one), so this reads the topic from the last staff post already kept or the furthest tracked post an
+   * earlier read reached (`walked`), whichever is later (or from the start: a new topic, or `fromStart`
+   * for the backfill), then follows the chain 20 posts at a time to the end. A re-opened topic usually
+   * costs one request. `reached` hears how far the read got, also when it is cut short; a cut-short read
+   * keeps the staff posts it found before it throws, so the next run continues after them. Null when the
+   * topic is gone.
    */
-  const openTopic = async (region: BlueRegion, topicId: number, fromStart = false): Promise<BluePost[] | null> => {
+  const openTopic = async (region: BlueRegion, topicId: number, fromStart = false, walked = 0, reached?: (n: number) => void): Promise<BluePost[] | null> => {
     const known = knownNumbers(region, topicId);
-    const last = fromStart ? 0 : Math.max(0, ...[...known].filter((n): n is number => typeof n === "number"));
+    const last = fromStart ? 0 : Math.max(walked, ...[...known].filter((n): n is number => typeof n === "number"));
     const json = await forumJson("topic", region, last > 1 ? `/en/wow/t/${topicId}/${last}.json` : `/en/wow/t/${topicId}.json`);
     if (json === null) return null;
     const view = parseTopicView(json);
@@ -491,22 +506,32 @@ function session(opts: IngestOptions) {
     const tracked = new Set(view.tracked);
     const chain = new Set(view.chain);
     const asked = new Set<number>();
-    for (;;) {
-      // Re-reading from the last kept post, only the chain after it matters.
-      const n = [...chain].filter((m) => !loaded.has(m) && !asked.has(m) && (fromStart || (m > last && !known.has(m)))).sort((a, b) => a - b)[0];
-      if (n === undefined) break;
-      // A number a chunk does not bring back (deleted since) is not asked for twice.
-      asked.add(n);
-      const chunk = await forumJson("posts", region, `/en/wow/t/${topicId}/posts.json?post_number=${n - 1}&asc=true`);
-      const more = chunk === null ? [] : parsePostChunk(chunk);
-      posts.push(...more);
-      for (const p of more) loaded.add(p.post_number);
-      for (const m of nextTracked(more)) {
-        chain.add(m.n);
-        if (isBlueGroup(m.group)) tracked.add(m.n);
+    const found = () => bluePostsOf(region, { ...view, tracked: [...tracked] }, posts, staff.get(region)!, opts.now);
+    // Every tracked post up to here has been read, MVP posts included.
+    const reach = () => Math.max(last, ...[...asked, ...[...chain].filter((m) => loaded.has(m))]);
+    try {
+      for (;;) {
+        // Re-reading from the last kept post, only the chain after it matters.
+        const n = [...chain].filter((m) => !loaded.has(m) && !asked.has(m) && (fromStart || (m > last && !known.has(m)))).sort((a, b) => a - b)[0];
+        if (n === undefined) break;
+        const chunk = await forumJson("posts", region, `/en/wow/t/${topicId}/posts.json?post_number=${n - 1}&asc=true`);
+        // A number a chunk does not bring back (deleted since) is not asked for twice.
+        asked.add(n);
+        const more = chunk === null ? [] : parsePostChunk(chunk);
+        posts.push(...more);
+        for (const p of more) loaded.add(p.post_number);
+        for (const m of nextTracked(more)) {
+          chain.add(m.n);
+          if (isBlueGroup(m.group)) tracked.add(m.n);
+        }
       }
+    } catch (err) {
+      merge(found());
+      reached?.(reach());
+      throw err;
     }
-    return bluePostsOf(region, { ...view, tracked: [...tracked] }, posts, staff.get(region)!, opts.now);
+    reached?.(reach());
+    return found();
   };
   return { s, get, setState, merge, forumJson, readRobots, loadStaff, openTopic, budget };
 }
@@ -555,7 +580,13 @@ export async function ingestBluePosts(opts: IngestOptions): Promise<IngestResult
         const staff = await x.loadStaff(region);
         for (const list of REGIONS[region].lists) {
           const key = `list:${region}:${list.key}`;
-          const state = s.store.fetched[key];
+          let state = s.store.fetched[key];
+          if (opts.rescanSince && state?.newestSeen && Date.parse(state.newestSeen) > Date.parse(opts.rescanSince)) {
+            // Saved at once, so a list skipped below still starts the rescan on its next turn.
+            const { scan: _scan, ...rest } = state;
+            state = { ...rest, newestSeen: opts.rescanSince };
+            x.setState(key, state);
+          }
           if (state && opts.now.getTime() - Date.parse(state.at) < minInterval) { s.skipped.push(`${key}: asked less than ${Math.round(minInterval / 60000)} minutes ago`); continue; }
           try {
             await readList(x, opts.now, region, key, list.path, state, staff, maxPages);
@@ -591,12 +622,15 @@ async function readList(x: Session, now: Date, region: BlueRegion, key: string, 
   // ids/activity times to avoid opening an unchanged topic again. The overlap is one extra list page.
   const overlap = !scan.complete && scan.nextPage > 0;
   if (overlap) scan.nextPage--;
-  const save = () => x.setState(key, { at: now.toISOString(), ...(since ? { newestSeen: since } : {}), scan });
+  const walked = new Map(Object.entries(state?.walked ?? {}));
+  const walkedState = () => (walked.size ? { walked: Object.fromEntries([...walked].slice(-WALKED_MAX)) } : {});
+  const save = () => x.setState(key, { at: now.toISOString(), ...(since ? { newestSeen: since } : {}), scan, ...walkedState() });
   const drain = async () => {
     while (scan.pending.length) {
       const topic = scan.pending[0];
+      const reached = (n: number) => { if (n > 0) { walked.delete(String(topic.id)); walked.set(String(topic.id), n); } };
       try {
-        const posts = await x.openTopic(region, topic.id);
+        const posts = await x.openTopic(region, topic.id, false, walked.get(String(topic.id)) ?? 0, reached);
         if (posts === null) s.skipped.push(`${key}: topic ${topic.id} is gone`);
         else x.merge(posts);
       } catch (err) {
@@ -634,7 +668,7 @@ async function readList(x: Session, now: Date, region: BlueRegion, key: string, 
     s.skipped.push(`${key}: more than ${maxPages} pages changed since ${since}; continuing from page ${scan.nextPage} next run`);
     return;
   }
-  x.setState(key, { at: now.toISOString(), ...(scan.newest ? { newestSeen: scan.newest } : {}) });
+  x.setState(key, { at: now.toISOString(), ...(scan.newest ? { newestSeen: scan.newest } : {}), ...walkedState() });
 }
 
 /** The Bluesky feed, page by page up to MAX_PAGES, stopping at what the last read already showed. */
