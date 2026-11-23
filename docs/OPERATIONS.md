@@ -362,7 +362,11 @@ Then:
   job has not folded. This covers the cases where GitHub accepts the start but no fold follows: a
   queued run, a workflow switched off, or `main` failing to build. Normally the job keeps the
   heartbeat within about 10 minutes, so the Worker takes over before `/api/health` reaches its
-  30-minute limit.
+  30-minute limit. It starts the job again first. After an outage the backlog can be more than
+  the Worker can fold, and its run then runs out of memory, but the job still folds and the heartbeat
+  recovers. On 2026-11-23 a lost R2 key stopped the cron for 70 minutes, and the first runs on the
+  new key ran out of memory folding the backlog without starting the job. A manual start of
+  `stored-views.yml` cleared it.
 
 Neither writer can lose the other's work. The corpus part list and the rollups are written with
 ETag conditions, so if both fold in the same minutes, the slower one fails with a 412 and the next
