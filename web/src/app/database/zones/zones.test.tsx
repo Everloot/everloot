@@ -235,6 +235,17 @@ test("the header links the coverage page and the published wiki page, and farmin
   expect(page).toContain('href="/tools/farming-routes"');
 });
 
+test("a mob with no pin links farming from the zone where 3 installs looted its kills; kills with no place link none", async () => {
+  const kills = (place: Record<string, unknown>) => installs.map((i) => loot(i, { npc: 300 }, [750], { lootType: "kill", ...place }));
+  store.loadCorpus.mockResolvedValue(corpus(kills({ mapId: 1436, x: 40, y: 50 })));
+  expect(await html(ZonePage(props("1436-westfall")))).toContain('href="/tools/farming-routes"');
+  expect(await html(ZonePage(props("1411-durotar")))).not.toContain('href="/tools/farming-routes"');
+  // An older addon's kill windows carry no place: the same loot, no zone and no error.
+  // (Another date: the aggregates are kept per corpus count and date.)
+  store.loadCorpus.mockResolvedValue({ ...corpus(kills({})), dataAsOf: "2026-10-11T00:00:00.000Z" });
+  expect(await html(ZonePage(props("1436-westfall")))).not.toContain('href="/tools/farming-routes"');
+});
+
 test("storage down shows no Items tab, no empty items copy and no farming links, but still the coverage link", async () => {
   store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], unreachable: true });
   const page = await html(ZonePage(props("1436-westfall")));

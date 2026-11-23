@@ -124,6 +124,16 @@ describe("POST /api/intake", () => {
     expect(await response.json()).toMatchObject({ ok: true, persisted: true, accepted: [{ index: 0, kind: "loot" }] });
   });
 
+  test("a kill window keeps the map and position it was looted at; one without a place is stored as before", async () => {
+    const POST = await freshPost();
+    const kill = { ...canonicalLoot, sourceEvidence: "loot-api", lootType: "kill", mapId: 1436, x: 40.5, y: 50.25 };
+    const old = { ...canonicalLoot, sourceEvidence: "loot-api", lootType: "kill", sourceNpcId: 124 };
+    const response = await POST(request({ addonVersion: "0.3.30", records: [kill, old, { ...kill, sourceNpcId: 125, x: undefined, y: undefined }] }));
+
+    expect(response.status).toBe(200);
+    expect(store.putUpload).toHaveBeenCalledWith(expect.any(String), "install-1234", { addonVersion: "0.3.30", records: [kill, old] }, []);
+  });
+
   test("two accepted install ids reject the whole submission and write nothing", async () => {
     const POST = await freshPost();
     const response = await POST(request({ addonVersion: "0.1.0", records: [loot("install-aaaa"), loot("install-bbbb")] }));

@@ -122,7 +122,7 @@ export default async function ZonePage(props: Props) {
     ? await Promise.all([loadSpellNames(CLIENT_LAYER.build.version), gear.some((g) => g.set) ? loadItemSetNames(CLIENT_LAYER.build.version) : null])
     : [null, null];
   const tips = await loadItemTips(assets, [...shownItems.map((i) => i.itemId), ...gear.flatMap((g) => g.set?.pieces ?? [g.itemId])]);
-  const farmLinks = !gathering ? [] : zoneFarmLinks(zone, (here?.npcs ?? []).map((n) => n.npcId), rates, gatherRows);
+  const farmLinks = !gathering ? [] : zoneFarmLinks(zone, (here?.npcs ?? []).map((n) => n.npcId), rates, gatherRows, facts.kills);
   const wiki = zoneWikiPage(zone.mapId);
   const nameOf = (n: ZoneNpc) => n.name ?? `NPC ${n.npcId}`;
   // The page in a few lines, from the lists below only: what it is, what players reported with its agreement and date,

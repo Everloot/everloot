@@ -19,6 +19,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Desktop: refreshes shared dungeon progress for in-game tooltips and syncs boss kills for linked characters. Older sites and sites with Dungeon Progress turned off can still acknowledge boss kills.
 - Addon: a kill's loot window also records the map and position you looted the corpse from, so the site can tell which zone a mob is farmed in. Inside an instance, or when the game gives no position, it records none.
 - Site: farming routes and the Tailoring, Leatherworking and Skinning gather lists place a mob in a zone once 3 installs looted its kills on that zone's map; until then the mob's agreed map pin decides, as before.
+- Site: a zone's page links to Farming routes and the cloth and leather lists by the same rule: a mob counts in the zone where 3 installs looted its kills, otherwise where its agreed pin is.
 - Addon: Collection opens on an overview of every area with its progress, groups each area's list under headings that count what is missing, adds Flight paths, and scrolls with the mouse wheel.
 - Addon: the Gold view charts earned and spent per day with dates, a scale and hover details; Professions gains a Ranks and trainers screen and a Crafting costs list that shows profit or loss per craft.
 - Addon: Gold links to Professions crafting costs. Select a recipe to see material subtotals, output, cost per item and estimated profit after the auction-house cut.
