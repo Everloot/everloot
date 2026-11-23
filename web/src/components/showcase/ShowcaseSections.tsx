@@ -247,7 +247,7 @@ function Raids({ data }: { data: RaidsData }) {
 function Gold({ data, asOf, preview }: { data: GoldData; asOf: string; preview: boolean }) {
   return (
     <Card className="space-y-4">
-      <p className="text-sm text-fg-2">{preview ? "From your addon" : "From the player's addon"}, captured <span className="font-mono">{asOf}</span></p>
+      <p className="text-sm text-fg-2">{preview ? "From your addon" : "From the player's addon"}</p>
       <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
         {GOLD_GROUPS.map((g) => (
           <div key={g.group} className="space-y-2" data-gold-group={g.group}>

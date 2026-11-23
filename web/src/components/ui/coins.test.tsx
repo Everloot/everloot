@@ -19,6 +19,17 @@ test.each([
   expect(letters).toEqual(spoken.split(" ").filter((w) => ["gold", "silver", "copper"].includes(w)).map((m) => m[0]));
 });
 
+test("large gold amounts group their thousands", () => {
+  const root = document.createElement("div");
+  root.innerHTML = renderToStaticMarkup(<Coins copper={12_345_678_901} />);
+  expect(root.querySelector('[aria-hidden="true"]')?.textContent).toBe("1,234,567g 89s 1c");
+  expect(root.querySelector(".sr-only")?.textContent).toBe("1,234,567 gold 89 silver 1 copper");
+  root.innerHTML = renderToStaticMarkup(<Coins copper={9_999_0000} />);
+  expect(root.querySelector('[aria-hidden="true"]')?.textContent).toBe("9,999g 0s 0c");
+  root.innerHTML = renderToStaticMarkup(<Coins copper={999_0000} />);
+  expect(root.querySelector('[aria-hidden="true"]')?.textContent).toBe("999g 0s 0c");
+});
+
 test("unknown and unavailable amounts remain text", () => {
   expect(renderToStaticMarkup(<Coins copper={null} />)).toBe("unrecorded");
   expect(renderToStaticMarkup(<CoinText text="unavailable" />)).toBe("unavailable");

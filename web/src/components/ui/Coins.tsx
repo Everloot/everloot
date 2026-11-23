@@ -18,10 +18,13 @@ export function CoinText({ text }: { text: string }) {
   const parsed = tipLine(`Sell Price: ${text.replace(/^-/, "")}`);
   if (parsed.kind !== "price") return text;
   return <span className="whitespace-nowrap tabular-nums">
-    <span className="sr-only">{text.startsWith("-") ? "minus " : ""}{parsed.coins.map((c) => `${c.amount} ${c.metal}`).join(" ")}</span>
-    <span aria-hidden="true">{text.startsWith("-") && "-"}{parsed.coins.map((c, i) => <span key={c.metal}>{i > 0 && " "}{c.amount}<Coin metal={c.metal} /></span>)}</span>
+    <span className="sr-only">{text.startsWith("-") ? "minus " : ""}{parsed.coins.map((c) => `${grouped(c.amount)} ${c.metal}`).join(" ")}</span>
+    <span aria-hidden="true">{text.startsWith("-") && "-"}{parsed.coins.map((c, i) => <span key={c.metal}>{i > 0 && " "}{grouped(c.amount)}<Coin metal={c.metal} /></span>)}</span>
   </span>;
 }
+
+/** Thousands grouped, so a lifetime total like 1,234,567g reads at a glance; silver and copper never reach 1,000. */
+const grouped = (n: number) => n.toLocaleString("en-US");
 
 export default function Coins({ copper }: { copper: number | null }) {
   if (copper === null) return "unrecorded";
