@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: dungeon progress is on: the Desktop App can download shared dungeon clears for player tooltips, and boss-kill sync records the addon's full character name (migration `20261123110000_dungeon_progress.sql` applied 2026-11-23).
 - Addon: Collection shows dungeon clears, and a compact green progress bar appears on player tooltips when the Desktop App has synced their shared progress.
 - Addon: a kill's loot window also records the map and position you looted the corpse from, so the site can tell which zone a mob is farmed in. Inside an instance, or when the game gives no position, it records none.
 - Site: farming routes and the Tailoring, Leatherworking and Skinning gather lists place a mob in a zone once 3 installs looted its kills on that zone's map; until then the mob's agreed map pin decides, as before.
@@ -302,6 +303,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the database pages no longer parse every raw NPC sighting. The stored-views job stores what the agreement rules give each NPC (name, map pins, level, reaction, type, rank) in a 0.7 MB file and leaves the 12 MB of sightings out of the aggregates file, which drops from 19.4 MB to 7.4 MB; the pages show the same NPCs, quests, vendors and zones as before.
 - Site: the rankings pages read the weeks they draw from a 20 KB file the stored-views job stores, instead of parsing all 59,000 stored census rows on the site Worker; /rankings was the last page to answer 503 in the deploy warm-up (#1354).
 - Site: the snapshot cron starts the site-health check once an hour. GitHub ran its 15-minute schedule only 4 times in a day, so an alarm on stale views, a failing job or an expiring token could lag by hours (#1354).
+- Site: when the stored-views job's heartbeat is stale, the snapshot cron starts the job before folding the uploads itself. After a 70-minute outage on 2026-11-23 the backlog was more than the cron Worker could fold, and each run ran out of memory without starting the job, so the heartbeat never recovered until the job was started by hand (#1354).
 - Site: the farming page and the Tailoring, Leatherworking and Skinning pages read the zones behind each mob farm from a few-KB file the stored-views job stores, instead of parsing the 19 MB aggregates on every fresh server instance. Every out-of-memory error the site logged in a tail on 2026-11-22 was the Tailoring page (#1354).
 - Site: the corpus snapshot is stored in parts under `snapshots/corpus/` with `snapshots/corpus.json` listing them, and the cron's work check reads only that list. Read whole, the 31 MB file needed about 107 MB of the Worker's 128 MB before any work began, so every snapshot run since 13:20 UTC on 2026-11-19 ran out of memory and `/api/health` answered stale (#1354).
 - Site: public drop sources can carry a name from two installs that report exactly the same name, when none disagree; rates still require three installs.

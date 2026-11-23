@@ -589,20 +589,33 @@ test("with the snapshot on the job, a heartbeat over 20 minutes old, or no token
     vi.spyOn(console, "warn").mockImplementation(() => {});
     dispatch.dispatchStoredViews.mockResolvedValue("sent");
     store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-11-22T14:40:05.000Z" });
-    // Started at 14:10, the job never folded: the heartbeat is 30 minutes old.
+    // Started at 14:10, the job never folded: the heartbeat is 30 minutes old. The job is started again first, once, so
+    // a backlog this run cannot fold still gets folded, and then this run folds too.
+    const order: string[] = [];
+    dispatch.dispatchStoredViews.mockImplementation(async () => { order.push("dispatch"); return "sent"; });
+    store.writeSnapshot.mockImplementation(async () => { order.push("fold"); return { uploads: 9, added: 2, dataAsOf: "2026-11-22T14:40:05.000Z" }; });
     store.snapshotWork.mockResolvedValue({ idle: false, retryRollups: false, dataAsOf: "2026-11-22T14:10:12Z", settledWeek: null, heartbeatAt: "2026-11-22T14:10:30Z" });
-    expect(await (await GET(req())).json()).toMatchObject({ ok: true, added: 2, storedViews: "job" });
+    expect(await (await GET(req())).json()).toMatchObject({ ok: true, added: 2, viewsJob: "sent", storedViews: "job" });
+    expect(order).toEqual(["dispatch", "fold"]);
     expect(store.writeSnapshot).toHaveBeenCalledOnce();
     expect(store.writeCronRun).toHaveBeenCalledOnce();
+    // A refused start is logged and this run still folds.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    dispatch.dispatchStoredViews.mockRejectedValueOnce(new Error("stored-views dispatch failed (401)"));
+    expect(await (await GET(req())).json()).toMatchObject({ ok: true, added: 2, viewsJob: "failed" });
+    expect(store.writeSnapshot).toHaveBeenCalledTimes(2);
+    dispatch.dispatchStoredViews.mockReset().mockResolvedValue("sent");
+    store.writeSnapshot.mockReset().mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-11-22T14:40:05.000Z" });
     // No heartbeat at all reads the same way.
     store.snapshotWork.mockResolvedValue({ idle: false, retryRollups: false, dataAsOf: null, settledWeek: null, heartbeatAt: null });
     await GET(req());
-    expect(store.writeSnapshot).toHaveBeenCalledTimes(2);
+    expect(store.writeSnapshot).toHaveBeenCalledTimes(1);
+    expect(dispatch.dispatchStoredViews).toHaveBeenCalledOnce();
     // A fresh heartbeat but no token: nothing is sent, so this run folds.
     dispatch.dispatchStoredViews.mockResolvedValue("off");
     store.snapshotWork.mockResolvedValue({ idle: false, retryRollups: false, dataAsOf: "2026-11-22T14:30:12Z", settledWeek: null, heartbeatAt: "2026-11-22T14:30:30Z" });
     expect(await (await GET(req())).json()).toMatchObject({ ok: true, added: 2, viewsJob: "off" });
-    expect(store.writeSnapshot).toHaveBeenCalledTimes(3);
+    expect(store.writeSnapshot).toHaveBeenCalledTimes(2);
   } finally {
     vi.useRealTimers();
     vi.unstubAllEnvs();
