@@ -62,12 +62,17 @@ export async function GET(req: Request) {
     // heartbeat here. If the job cannot be started (no token, or GitHub refused), this run folds the uploads itself, as
     // before the hand-over. So it does when the heartbeat is over JOB_STALL_MS old (or missing): the job was started
     // and did not fold, whether GitHub queued it, the workflow is off or main does not build. A rebuild always runs here.
+    // A stale heartbeat also starts the job first: the backlog behind a stale heartbeat can be more than this Worker
+    // can fold, and when this run then runs out of memory, the job still folds it and the heartbeat recovers. On
+    // 2026-11-23 a lost R2 key stopped the cron for 70 minutes, and every run after the new key ran out of memory folding
+    // the backlog here without starting the job. Both folding the same uploads is safe: the later corpus write gets 412.
     let viewsJob: "sent" | "off" | "failed" = "off";
     const beatAge = work.heartbeatAt ? Date.now() - Date.parse(work.heartbeatAt) : Number.NaN;
     const jobFolding = beatAge < JOB_STALL_MS;
     const handOff = process.env.EVERLOOT_SNAPSHOT === "job" && !rebuild && !nothingToFold(work);
     if (handOff && !jobFolding) {
-      console.warn(`the stored-views job has not folded for ${Number.isFinite(beatAge) ? `${Math.round(beatAge / 60_000)} minutes` : "an unknown time"}; folding here`);
+      console.warn(`the stored-views job has not folded for ${Number.isFinite(beatAge) ? `${Math.round(beatAge / 60_000)} minutes` : "an unknown time"}; starting it and folding here`);
+      try { viewsJob = await dispatchStoredViews(); } catch (err) { console.error("stored-views dispatch failed", err); viewsJob = "failed"; }
     }
     if (handOff && jobFolding) {
       try { viewsJob = await dispatchStoredViews(); } catch (err) { console.error("stored-views dispatch failed", err); viewsJob = "failed"; }
@@ -85,7 +90,7 @@ export async function GET(req: Request) {
     // GitHub's schedule for it runs late or not at all, a dispatched run starts at once. So does the first run of each
     // hour, so the auction reports and a view a failed job run left behind wait at most an hour. A failed dispatch is
     // logged; the schedule is the backstop.
-    if (viewsJob !== "failed" && (folded || rebuild || new Date().getUTCMinutes() < 10)) {
+    if (viewsJob === "off" && (folded || rebuild || new Date().getUTCMinutes() < 10)) {
       try { viewsJob = await dispatchStoredViews(); } catch (err) { console.error("stored-views dispatch failed", err); viewsJob = "failed"; }
     }
     // The settled list, the stored views, the guild ladder, the boards, the coverage score and the auction reports
