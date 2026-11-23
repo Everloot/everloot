@@ -1,6 +1,6 @@
 # Everloot on CurseForge
 
-Open [description.html](description.html) for the complete description. In the CurseForge source editor, paste the fragment between the body comments with the relative banner path replaced by the public, commit-pinned URL for [the banner](everloot-banner-branded.png). Keep the brand mark and core feature copy version-independent. The Files tab carries the release number and changelog.
+Open [description.html](description.html) for the complete description. In the CurseForge source editor, paste the fragment between the body comments with each relative image path replaced by its public, commit-pinned URL. The [banner](everloot-banner-branded.png) and in-game screenshots are shown directly in the description. Keep the brand mark and core feature copy version-independent. The Files tab carries the release number and changelog.
 
 ## Gallery capture queue
 
