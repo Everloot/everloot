@@ -497,6 +497,10 @@ local function build(f, parent)
     page:SetSize(W, 326)
     g.pages[t[1]] = page
   end
+  if U.OpenCrafting then
+    g.crafting = button(parent, "Crafting costs", 132, U.OpenCrafting)
+    g.crafting:SetPoint("TOPRIGHT", 0, -8)
+  end
   for i, p in ipairs(PERIODS) do
     g.periods[p[1]] = button(parent, p[2], 64, function() g.period = p[1]; reset() end)
     g.periods[p[1]]:SetPoint("TOPLEFT", (i - 1) * 68, -36)

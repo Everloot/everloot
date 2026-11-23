@@ -164,8 +164,11 @@ itemsLoaded = true
 fire('TRADE_SKILL_LIST_UPDATE')
 assert(byName('Late Potion').reagents[1].item == 'Late Herb' and byName('Late Potion').reagents[1].count == 3)
 assert(#rows() == 5)
+EverlootDB.recipeOutput[1002] = nil
 fire('TRADE_SKILL_SHOW'); fire('TRADE_SKILL_LIST_UPDATE'); fire('TRADE_SKILL_DATA_SOURCE_CHANGED')
 assert(#rows() == 5, 'same rank and colour is not observed twice')
+local yield = EverlootDB.recipeOutput[1002]
+assert(yield.itemId == 858 and yield.minimum == 1 and yield.maximum == 1, 'reopening backfills output without adding an observation')
 
 -- A higher rank at the same colour waits: only a colour's lowest and highest rank bound a threshold.
 child.skillLevel = 65

@@ -588,7 +588,7 @@ local list = Everloot.Shopping.Active()
 assert(#list.items == 1 and list.items[1].itemId == 2770 and list.items[1].want == 6 and list.items[1].name == 'Copper Ore')
 assert(not U.failed)
 c.rows[1].scripts.OnClick()
-assert(c.note.text:find('Value is per item', 1, true), 'choosing a recipe again brings the note back')
+assert(c.note.text == 'Select a recipe for the cost and profit breakdown.', 'choosing a recipe again brings the note back')
 """)
 # Without the shopping file (an older load order), the button stays hidden.
 lua = window_fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {RECORDS} }}", API)

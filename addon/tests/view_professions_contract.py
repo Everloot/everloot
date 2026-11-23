@@ -287,7 +287,9 @@ def price_file(as_of: str) -> str:
             f"dataAsOf = '{as_of}' }} }} }}\n")
 
 
-lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {CRAFT_RECORDS} }}", API + price_file("2026-10-29T06:00:00Z"))
+lua = fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {CRAFT_RECORDS}, "
+            "recipeOutput = { [10] = { itemId = 2840, minimum = 2, maximum = 2 } } }",
+            API + price_file("2026-10-29T06:00:00Z"), extra=("modules/sellcheck.lua",))
 lua.execute("""
 local U, E = Everloot.Window, Everloot
 local M = U.MoneyShort
@@ -312,14 +314,14 @@ assert(c.age.point[1] == 'TOPRIGHT' and 604 + c.age.point[2] - c.age.width >= c.
 -- Nothing is drawn over it: the list box starts under the line, and the note sits inside the list box.
 assert(-c.age.point[3] + 12 <= -c.list.point[3], 'the list box starts under the source line')
 assert(c.note.point[1] == 'BOTTOMLEFT', 'the note sits at the bottom of the list box')
-assert(c.note.text == 'Value is per item. Profit per craft = value - reagent cost.', c.note.text)
+assert(c.note.text == 'Select a recipe for the cost and profit breakdown.', c.note.text)
 assert(#c.note.text * 6 <= c.note.width, 'the note fits on one line')
 GameTooltip = { lines = {}, SetOwner = function(self) self.lines = {} end,
   AddLine = function(self, s) self.lines[#self.lines + 1] = s end,
   Show = function(self) self.shown = true end, Hide = function(self) self.shown = false end }
 c.source.scripts.OnEnter(c.source)
 local help = table.concat(GameTooltip.lines, '|')
-assert(help:find(c.ageDetail, 1, true) and help:find('how many items a craft makes is not recorded', 1, true), help)
+assert(help:find(c.ageDetail, 1, true) and help:find('the estimate assumes one', 1, true), help)
 assert(help:find('Green profit is a gain, red is a loss', 1, true) and help:find('listings, not sales', 1, true), help)
 c.source.scripts.OnLeave(); assert(not GameTooltip.shown)
 GameTooltip = nil
@@ -341,12 +343,12 @@ assert(row(1) == 'Smelt Copper' and row(2) == 'Spiced Wolf Meat' and row(3) == '
 local r1 = c.rows[1]
 -- Priced: the newest row's reagents (one Copper Ore at its 20c market value, not the vendor's 30c). A gain is signed
 -- and green.
-assert(r1.cost.text == M(20) and r1.value.text == M(150) and r1.profit.text == '+' .. M(130), r1.profit.text)
+assert(r1.cost.text == M(20) and r1.value.text == M(150) and r1.profit.text == '+' .. M(265), r1.profit.text)
 assert(r1.profit.color[1] == U.COLORS.accent[1] and r1.profit.color[2] == U.COLORS.accent[2], 'a gain is green')
 assert(r1.name.color[2] == U.COLORS.accent[2], 'the chosen recipe is lit')
 -- A vendor sells Mild Spices for 10c, under its 40c market value: 50 + 10 against 45. A loss is red.
 local r2 = c.rows[2]
-assert(r2.cost.text == M(60) and r2.value.text == M(45) and r2.profit.text == M(-15), r2.profit.text)
+assert(r2.cost.text == M(60) and r2.value.text == M(45) and r2.profit.text == M(-18), r2.profit.text)
 assert(r2.profit.color[1] == 1 and r2.profit.color[2] == 0.4 and r2.profit.color[3] == 0.4, 'a loss is red')
 -- No output price: the cost stands, the value says so, no profit.
 local r3 = c.rows[3]
@@ -365,6 +367,13 @@ assert(b.title.text == 'What to buy: 1 × Smelt Copper', b.title.text)
 assert(b.lines[1].shown and b.lines[1].text == '1 × Copper Ore · ' .. M(20) .. ' each · ' .. M(20), b.lines[1].text)
 assert(not b.lines[2].shown and b.total.text == 'Total: ' .. M(20), b.total.text)
 assert(not b.up.shown and not b.down.shown, 'one reagent needs no paging')
+assert(b.output.text == 'Makes 2 items per craft · ' .. U.Money(10) .. ' materials per item', b.output.text)
+assert(b.math.shown and b.math.text == 'Sale: ' .. U.Money(300) .. ' - 5% AH cut: ' .. U.Money(15)
+  .. ' - materials: ' .. U.Money(20) .. ' = ' .. U.Money(265) .. ' profit', b.math.text)
+EverlootDB.recipeOutput[10].maximum = 3
+r1.scripts.OnClick()
+assert(b.output.text == 'Makes 2-3 items per craft · ' .. U.Money(8) .. ' materials per item (avg.)', b.output.text)
+assert(r1.profit.text == '+' .. M(336), r1.profit.text)
 -- Choose Spiced Wolf Meat and eleven crafts.
 c.rows[2].scripts.OnClick()
 b.steps[4].scripts.OnClick()
@@ -372,6 +381,9 @@ assert(b.title.text == 'What to buy: 11 × Spiced Wolf Meat', b.title.text)
 assert(b.lines[1].text == '11 × Wolf Meat · ' .. M(50) .. ' each · ' .. M(550), b.lines[1].text)
 assert(b.lines[2].text == '11 × Mild Spices · ' .. M(10) .. ' each (vendor) · ' .. M(110), b.lines[2].text)
 assert(b.total.text == 'Total: ' .. M(660), b.total.text)
+assert(b.output.text == 'Output unknown · sale estimate assumes 1 item per craft', b.output.text)
+assert(b.math.text == 'Sale: ' .. U.Money(495) .. ' - 5% AH cut: ' .. U.Money(25)
+  .. ' - materials: ' .. U.Money(660) .. ' = ' .. U.Money(-190) .. ' profit', b.math.text)
 assert(c.rows[2].name.color[2] == U.COLORS.accent[2] and c.rows[1].name.color[2] == U.COLORS.text[2])
 -- The count stays between 1 and 999.
 for _ = 1, 3 do b.steps[1].scripts.OnClick() end
@@ -386,6 +398,7 @@ c.rows[4].scripts.OnClick()
 assert(b.lines[1].text == '2 × Clam Meat · no price', b.lines[1].text)
 assert(b.lines[2].text == '2 × Refreshing Spring Water · ' .. M(25) .. ' each (vendor) · ' .. M(50), b.lines[2].text)
 assert(b.total.text == 'Total unknown: 1 reagent unpriced · the priced ones ' .. M(50), b.total.text)
+assert(b.math.text == 'Profit unknown: missing material prices.', b.math.text)
 c.rows[5].scripts.OnClick()
 assert(b.total.text == 'Total unknown: 2 reagents unpriced', b.total.text)
 
@@ -413,6 +426,9 @@ assert(not c.page.shown and p.trainers.page.shown and p.toggle.text == 'Crafting
 p.nav.scripts.OnClick()
 assert(not c.page.shown and p.blocks[1].shown and p.toggle.text == 'Crafting costs')
 assert(EverlootWindow.shown and not U.failed)
+assert(U.Open('gold'))
+EverlootWindow.gold.crafting.scripts.OnClick()
+assert(U.view == 'professions' and p.craft.page.shown and not p.blocks[1].shown)
 """)
 
 # Without a price file only vendor prices count; an old file says so in the warning red.
@@ -579,7 +595,7 @@ def change_world(records=CHANGE_RECORDS, prices=CHANGE_FILE):
 lua = change_world()
 lua.execute(r"""
 assert(r.cost.text == Everloot.Window.MoneyShort(20))
-assert(r.value.text == Everloot.Window.MoneyShort(150) and r.profit.text == '+' .. Everloot.Window.MoneyShort(130))
+assert(r.value.text == Everloot.Window.MoneyShort(150) and r.profit.text == '+' .. Everloot.Window.MoneyShort(122))
 r.scripts.OnEnter(r)
 local said = table.concat(GameTooltip.lines, '|')
 assert(said:find('Min buyout: +20.0%', 1, true), said)
