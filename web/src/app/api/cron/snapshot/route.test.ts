@@ -37,7 +37,7 @@ vi.mock("@/lib/database-activity-store", () => ({ writeDatabaseActivity: activit
 vi.mock("@/lib/database-activity", () => ({ buildDatabaseActivity: activity.buildDatabaseActivity }));
 const guilds = vi.hoisted(() => ({ writeGuildLadder: vi.fn() }));
 vi.mock("@/lib/guild-ladder-store", () => guilds);
-const dispatch = vi.hoisted(() => ({ dispatchStoredViews: vi.fn() }));
+const dispatch = vi.hoisted(() => ({ dispatchStoredViews: vi.fn(), dispatchSiteHealth: vi.fn() }));
 vi.mock("@/lib/stored-views-dispatch", () => dispatch);
 import { GET } from "./route";
 import { writeAuctionReports } from "@/lib/auction-report-store";
@@ -68,6 +68,7 @@ beforeEach(() => {
   coverage.writeCoverage.mockReset().mockResolvedValue({ written: false });
   settled.writeSettled.mockReset().mockResolvedValue({ written: false });
   dispatch.dispatchStoredViews.mockReset().mockResolvedValue("off");
+  dispatch.dispatchSiteHealth.mockReset().mockResolvedValue("off");
 });
 const req = (auth = "Bearer synthetic-cron-key", query = "") =>
   new Request(`https://everloot.app/api/cron/snapshot${query}`, { headers: { authorization: auth } });
@@ -581,5 +582,24 @@ test("with the snapshot on the job, a heartbeat over 20 minutes old, or no token
     vi.useRealTimers();
     vi.unstubAllEnvs();
     vi.stubEnv("CRON_SECRET", "synthetic-cron-key");
+  }
+});
+test("the first run of each hour starts the site-health check, whatever the run does next; other runs and rebuilds do not; a refusal is logged", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  try {
+    vi.setSystemTime(new Date("2026-11-23T04:20:00.000Z"));
+    await GET(req());
+    expect(dispatch.dispatchSiteHealth).not.toHaveBeenCalled();
+    vi.setSystemTime(new Date("2026-11-23T05:00:04.000Z"));
+    await GET(req(undefined, "?rebuild=1"));
+    expect(dispatch.dispatchSiteHealth).not.toHaveBeenCalled();
+    expect((await GET(req())).status).toBe(200);
+    expect(dispatch.dispatchSiteHealth).toHaveBeenCalledOnce();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    dispatch.dispatchSiteHealth.mockRejectedValueOnce(new Error("site-health.yml dispatch failed (403)"));
+    expect((await GET(req())).status).toBe(200);
+    expect(dispatch.dispatchSiteHealth).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
   }
 });

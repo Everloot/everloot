@@ -293,6 +293,11 @@ snapshot, without changing its status code:
 - `viewsDispatch`: `status` (`sent`, `refused`, `none`), `httpStatus`, `tokenExpiresAt` and
   `tokenDaysLeft`.
 
+GitHub ran the Site health workflow's own 15-minute schedule only 4 times in the 24 hours to
+2026-11-23 03:40 UTC. So the snapshot cron also starts it, on the first run of each hour, with the
+same token (`dispatchSiteHealth` in `web/src/lib/stored-views-dispatch.ts`). The schedule stays as
+the backstop for when the cron Worker itself has stopped.
+
 The Site health workflow opens its site-down issue for `behind`, `failing` or `missing` views, for
 a token with fewer than 7 days left, and for a dispatch GitHub refused with 401, 403, 404 or 422 (a
 token or workflow problem, not a GitHub hiccup). The next clean check closes it.
