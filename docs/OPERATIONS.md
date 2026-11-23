@@ -274,9 +274,9 @@ rules give each NPC, about 0.7 MB for 4,471 NPCs on 2026-11-23, where the sighti
 Pages read the two files together. An aggregates file without the NPC facts beside it reads as no
 file, and the pages work everything out from the corpus. If the NPC facts step fails, that run's
 aggregates file keeps the sightings and an older stamp, so the next run writes both again (#1464).
-The switch is `NPC_SIGHTINGS_APART` in `web/src/lib/stored-views-run.ts`. It ships off: the job runs
-main's code as soon as a change merges, before the site deploy, and the old site code reads a file
-without the sightings as no file. It is turned on in its own change once the reading code is live.
+The switch is `NPC_SIGHTINGS_APART` in `web/src/lib/stored-views-run.ts`. Before rolling the site back
+past #1472, turn it off and let one job run write the sightings back: the older site code reads a file
+without them as no file. The job runs main's code as soon as a change merges, before the site deploy.
 
 A snapshot run that folded uploads into the corpus or a rollup also starts the workflow itself,
 right after its heartbeat, through GitHub's `workflow_dispatch` API
