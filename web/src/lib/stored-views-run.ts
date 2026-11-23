@@ -23,11 +23,11 @@ import { writeDailyHistory } from "@/lib/platform-history";
 import { loadCoverageSummary } from "@/lib/coverage-summary";
 
 /**
- * Whether the aggregates file leaves the raw NPC sightings out (#1464). Off for the first release: the job runs main's
- * code as soon as it merges, while the site is still on the old code, which rejects a file without the sightings and
- * rebuilds every page's tables from the corpus. Turned on in a follow-up once the site reading npc-facts.json is live.
+ * Whether the aggregates file leaves the raw NPC sightings out (#1464). It shipped off in #1472, because the job runs
+ * main's code before the site deploy lands, and the old site code read a file without the sightings as no file. On
+ * now that the site reading npc-facts.json is live. Rolling the site back past #1472 needs this off again first.
  */
-const NPC_SIGHTINGS_APART = false;
+const NPC_SIGHTINGS_APART = true;
 
 const writeHistory = (now: Date) => writeDailyHistory(now, {
   corpus: () => uploadStore.loadCorpus(),
