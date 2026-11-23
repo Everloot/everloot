@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, test, vi } from "vitest";
 import nextConfig from "../../../next.config.js";
-import { latestAddonRelease } from "@/lib/addon-release";
+import { ADDON_LIVE_VERIFIED, latestAddonRelease } from "@/lib/addon-release";
 import { servedFile } from "@/lib/everloot-releases";
 
 vi.mock("next/link", () => ({
@@ -69,10 +69,16 @@ test("the addon choices lead with the app, then website, then zip; desktop start
   expect(visible(html)).toContain("Choose your download");
 });
 
-test("the download is a regular release, not labelled Alpha, without the pending note once checked in the live client", async () => {
+test("the download is a regular release, not labelled Alpha, with the pending note exactly until the live client check", async () => {
   const html = await render(() => Promise.resolve(Response.json(releases)));
   expect(visible(html)).not.toContain("Alpha");
-  expect(visible(html)).not.toContain("Live-client verification is pending");
+  expect(visible(html).includes("Live-client verification is pending")).toBe(!ADDON_LIVE_VERIFIED);
+});
+
+test("the release paragraph describes this release: the Disenchanting tab is gone and its estimate is in the tooltip", async () => {
+  const text = visible(await render(() => Promise.resolve(Response.json(releases))));
+  expect(text).not.toContain("talent and raid plan imports");
+  expect(text).toContain("The Disenchanting tab is removed: item tooltips now compare disenchanting with selling.");
 });
 
 test.each([
