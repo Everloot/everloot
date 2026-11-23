@@ -20,6 +20,7 @@ test("signed-in association uses the account's own id and a validated Blizzard i
 });
 test("suggests stored matches and connects the selected candidate without a pasted URL", async () => {
   vi.stubEnv("EVERLOOT_ARMORY", "1");
+  vi.stubEnv("EVERLOOT_DUNGEON_PROGRESS", "1");
   mock.session.mockResolvedValue("account-one");
   const match = { region: "us", slug: "ember-vale", surname: "Vale" };
   mock.query.mockResolvedValueOnce([match]).mockResolvedValueOnce(true);
@@ -30,6 +31,14 @@ test("suggests stored matches and connects the selected candidate without a past
   mock.account.mockResolvedValue("account-one");
   expect((await call({ match })).status).toBe(200);
   expect((await call({ match: { region: "us", slug: "../wrong" } })).status).toBe(400);
+});
+test("keeps URL connection available while the dungeon migration is pending", async () => {
+  vi.stubEnv("EVERLOOT_ARMORY", "1");
+  vi.stubEnv("EVERLOOT_DUNGEON_PROGRESS", "");
+  mock.session.mockResolvedValue("account-one");
+  const response = await GET(new Request("https://everloot.app"), { params: Promise.resolve({ id }) });
+  expect(await response.json()).toEqual({ matches: null });
+  expect(mock.query).not.toHaveBeenCalled();
 });
 test("signed-out and disabled requests never associate characters", async () => {
   vi.stubEnv("EVERLOOT_ARMORY", "1"); mock.account.mockResolvedValue(new Response(null, { status: 401 }));

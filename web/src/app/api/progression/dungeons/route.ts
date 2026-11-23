@@ -2,7 +2,7 @@ import { z } from "zod";
 import { validRealm } from "@everloot/protocol";
 import { DUNGEON_PROGRESS_CATALOG, dungeonProgress, trackedDungeons } from "@kb/progression";
 import { armoryOn, NAME_RULE, SURNAME_RULE } from "@/lib/armory";
-import { bossKillSyncOn } from "@/lib/boss-kill-sync";
+import { bossKillSyncOn, dungeonProgressOn } from "@/lib/boss-kill-sync";
 import { linkRealmKey } from "@/lib/character-links";
 import { admit } from "@/lib/data-guard";
 import { authQuery } from "@/lib/supabase/server";
@@ -22,7 +22,7 @@ const maps = trackedDungeons().map((row) => row.id);
 
 /** Desktop reads only one realm's public addon summaries. No Blizzard API fields are returned. */
 export async function GET(request: Request) {
-  if (!armoryOn() || !bossKillSyncOn() || process.env.EVERLOOT_DUNGEON_PROGRESS !== "1") {
+  if (!armoryOn() || !bossKillSyncOn() || !dungeonProgressOn()) {
     return Response.json({ error: "Dungeon summaries are unavailable" }, { status: 404, headers });
   }
   const params = new URL(request.url).searchParams;

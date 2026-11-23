@@ -256,6 +256,22 @@ test("boss kills use the authenticated account and opaque source hash, never pub
   expect(syncCalls()[0].p_facts).toEqual([]);
 });
 
+test.each([false, true])("surname-aware Desktop keeps syncing boss kills with rollout enabled=%s", async (enabled) => {
+  vi.stubEnv("EVERLOOT_BOSS_KILL_SYNC", "1");
+  vi.stubEnv("EVERLOOT_DUNGEON_PROGRESS", enabled ? "1" : "");
+  answers([], "stored");
+  const input = thrallina([bossKill]);
+  const response = await send({ characters: input.characters.map((row) => ({ ...row, surname: "Dawn" })) });
+  expect(response.status).toBe(200);
+  expect((await response.json()).characters[0].categories).toEqual({
+    boss_kills: "stored", ...(enabled ? { dungeon_identity: "stored" } : {}),
+  });
+  const path = enabled ? "rpc/sync_dungeon_progress" : "rpc/sync_boss_kills";
+  const call = auth.authQuery.mock.calls.find((item) => item[0] === path);
+  expect(call).toBeDefined();
+  expect(JSON.parse(call![1].body).p_surname).toBe(enabled ? "Dawn" : undefined);
+});
+
 test("a missing boss-kill table is retriable, never silently acknowledged", async () => {
   vi.stubEnv("EVERLOOT_BOSS_KILL_SYNC", "1");
   answers([]);

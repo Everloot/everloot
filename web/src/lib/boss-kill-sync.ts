@@ -24,6 +24,11 @@ export function bossKillSyncOn(env: Record<string, string | undefined> = process
   return privateSyncOn(env) && env.EVERLOOT_BOSS_KILL_SYNC === "1";
 }
 
+/** Keep the new RPCs dark until the dungeon migration is applied. */
+export function dungeonProgressOn(): boolean {
+  return process.env.EVERLOOT_DUNGEON_PROGRESS === "1";
+}
+
 /** Last kill, not the original capture time: the addon updates cumulative rows in place. */
 export function bossKillCapture(rows: readonly BossKillRow[], now: Date) {
   const usable = rows.filter((r) => Date.parse(r.lastKillAt) <= now.getTime() + 86_400_000);

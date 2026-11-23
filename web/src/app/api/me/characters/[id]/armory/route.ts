@@ -3,6 +3,7 @@ import { z } from "zod";
 import { armoryOn, characterFromArmoryUrl, validArmorySlug } from "@/lib/armory";
 import { fail, linkAccount, linkSession, NO_STORE, unavailable } from "@/lib/character-links-store";
 import { authQuery } from "@/lib/supabase/server";
+import { dungeonProgressOn } from "@/lib/boss-kill-sync";
 
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ id: string }> };
@@ -17,6 +18,7 @@ export async function GET(_req: Request, props: Props) {
     if (user instanceof Response) return user;
     const { id } = await props.params;
     if (!idRule.test(id)) return fail(400, "Invalid character");
+    if (!dungeonProgressOn()) return NextResponse.json({ matches: null }, { headers: NO_STORE });
     const rows = candidates.parse(await authQuery("rpc/armory_match_candidates", {
       method: "POST", body: JSON.stringify({ p_user_id: user, p_link_id: id }),
     }));

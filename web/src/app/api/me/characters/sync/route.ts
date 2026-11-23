@@ -1,4 +1,4 @@
-import { parseBossKillRow } from "@/lib/boss-kill-sync";
+import { dungeonProgressOn, parseBossKillRow } from "@/lib/boss-kill-sync";
 import { syncBossKills } from "@/lib/boss-kill-sync-store";
 import { NextResponse } from "next/server";
 import { validPlayerName } from "@everloot/protocol";
@@ -74,7 +74,8 @@ export async function POST(req: Request) {
     let skipped = 0;
     let failed = false;
     for (let index = 0; index < list.length; index++) {
-      const { name, records, surname } = list[index]!;
+      const { name, records } = list[index]!;
+      const surname = dungeonProgressOn() ? list[index]!.surname : undefined;
       const realm = list[index]!.realm.trim();
       if (failed) { characters.push({ index, result: "retry" }); continue; }
       const rows = records.flatMap((r) => { const row = parseSyncRow(r); return row ? [row] : []; });
