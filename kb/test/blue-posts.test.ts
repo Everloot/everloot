@@ -464,6 +464,65 @@ test("ingest: a run stops at its time budget before the next request, saves its 
   expect(forumIds(done.store)).toEqual(["forum:500001", "forum:500030", "forum:502002"]);
 });
 
+// A busy thread as on 2026-11-18 (topic 2419757): after the opening post, the chain of tracked posts runs
+// through MVP posts (players, never kept) with one Blizzard reply among them, longer than one run can read.
+const mvpChain = (bumped = "2026-10-17T11:00:00.000Z") => {
+  const link = (n: number) => (n > 180 ? {} : { extra: { next_tracked_post: { group: n === 90 ? "community-manager" : "cs-mvp", post_number: n } } });
+  const at = (n: number): Post => (n === 90 ? linxy(90, link(120)) : { n, user: 950, username: "Helper-1", title: "MVP", ...link(n + 30) });
+  const opening = { tracked: [["community-manager", 1], ["cs-mvp", 30]] as [string, number][] };
+  return fakeServer({
+    "list:us:wow-forever": () => jsonRes(list([{ id: 800, bumped, tracked: "community-manager" }])),
+    "topic:us": (url) => {
+      const from = /\/t\/800\/(\d+)\.json$/.exec(url.pathname);
+      return jsonRes(topic(800, { ...opening, posts: from ? [at(Number(from[1]))] : [linxy(1, link(30)), player(2)] }));
+    },
+    "posts:us": (url) => jsonRes(chunk(800, [at(Number(url.searchParams.get("post_number")) + 1)])),
+  });
+};
+
+test("ingest: a thread whose chain of tracked posts outlasts one run is continued where the run stopped", async () => {
+  // Each run fits robots.txt and four more requests; the whole chain needs a topic view and six chunks.
+  let store = emptyStore();
+  for (let runs = 0; runs < 4 && !forumIds(store).includes("forum:800090"); runs++) {
+    store = (await run(mvpChain(), { store, now: minutes(30 * runs), forumOnly: true, regions: ["us"], maxRequests: 5 })).store;
+  }
+  expect(forumIds(store)).toEqual(["forum:800001", "forum:800090"]);
+  for (let runs = 4; runs < 6 && store.fetched["list:us:forever"].scan; runs++) {
+    store = (await run(mvpChain(), { store, now: minutes(30 * runs), forumOnly: true, regions: ["us"], maxRequests: 5 })).store;
+  }
+  expect(store.fetched["list:us:forever"].scan).toBeUndefined();
+  expect(store.fetched["list:us:forever"].walked).toEqual({ 800: 180 });
+});
+
+test("ingest: a thread bumped again is read from the end of its last read, not walked through its MVP posts again", async () => {
+  const first = await run(mvpChain(), { forumOnly: true, regions: ["us"] });
+  expect(forumIds(first.store)).toEqual(["forum:800001", "forum:800090"]);
+  const later = mvpChain("2026-10-17T13:00:00.000Z");
+  const second = await run(later, { store: first.store, now: minutes(60), forumOnly: true, regions: ["us"] });
+  expect(second.errors).toEqual([]);
+  expect(later.of("topic").map((c) => new URL(c.url).pathname)).toEqual(["/en/wow/t/800/180.json"]);
+  expect(later.of("posts")).toEqual([]);
+});
+
+test("ingest: rescanSince moves every list's handled time back to it, so topics passed before are read again", async () => {
+  const first = await run(fakeServer(), { regions: ["us"], forumOnly: true });
+  const handled = first.store.fetched["list:us:forever"].newestSeen!;
+  // A topic last active before the handled time, whose staff post the earlier reader could not keep.
+  const missed = () => fakeServer({
+    "list:us:wow-forever": () => jsonRes(list([{ id: 700, bumped: "2026-10-17T08:00:00.000Z", tracked: "community-manager" }])),
+    "topic:us": () => jsonRes(topic(700, { tracked: [["community-manager", 1]], posts: [linxy(1)] })),
+  });
+  const plain = await run(missed(), { store: first.store, now: minutes(60), regions: ["us"], forumOnly: true });
+  expect(forumIds(plain.store)).not.toContain("forum:700001");
+  const rescan = await run(missed(), { store: first.store, now: minutes(60), regions: ["us"], forumOnly: true, rescanSince: "2026-10-17T00:00:00.000Z" });
+  expect(rescan.errors).toEqual([]);
+  expect(forumIds(rescan.store)).toContain("forum:700001");
+  // It never moves a handled time forward.
+  const later = await run(missed(), { store: first.store, now: minutes(60), regions: ["us"], forumOnly: true, rescanSince: "2026-10-18T00:00:00.000Z" });
+  expect(forumIds(later.store)).not.toContain("forum:700001");
+  expect(later.store.fetched["list:us:forever"].newestSeen).toBe(handled);
+});
+
 test("ingest: a list asked less than 25 minutes ago is skipped; Bluesky validators are sent back", async () => {
   const first = await run(fakeServer({ bluesky: () => jsonRes(feed(), { headers: { etag: '"v1"' } }) }));
   const quick = fakeServer();

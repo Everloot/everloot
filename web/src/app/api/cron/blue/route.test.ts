@@ -44,6 +44,21 @@ it.each([false, true])("persists both stores and invalidates only with added pos
   if (added) expect(revalidateTag).toHaveBeenCalledWith("blue");
 });
 
+it("passes a one-off rescanSince to the reader, and refuses one that is not a time", async () => {
+  vi.stubEnv("CRON_SECRET", "test-secret");
+  const store = { posts: [], fetched: {} };
+  vi.mocked(readBlueStore).mockResolvedValue(store);
+  vi.mocked(ingestBluePosts).mockResolvedValue({ store, added: [], skipped: [], errors: [], requests: {} });
+  const at = (query: string) => GET(new Request(`https://everloot.app/api/cron/blue${query}`, { headers: { authorization: "Bearer test-secret" } }));
+  expect((await at("?rescanSince=2026-11-13")).status).toBe(200);
+  expect(ingestBluePosts).toHaveBeenLastCalledWith(expect.objectContaining({ rescanSince: "2026-11-13T00:00:00.000Z" }));
+  expect((await at("")).status).toBe(200);
+  expect(vi.mocked(ingestBluePosts).mock.lastCall![0].rescanSince).toBeUndefined();
+  const calls = vi.mocked(ingestBluePosts).mock.calls.length;
+  expect((await at("?rescanSince=soon")).status).toBe(400);
+  expect(ingestBluePosts).toHaveBeenCalledTimes(calls);
+});
+
 it("does not invalidate when storage fails", async () => {
   vi.stubEnv("CRON_SECRET", "test-secret");
   vi.mocked(readBlueStore).mockRejectedValueOnce(new Error("unavailable"));

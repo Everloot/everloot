@@ -107,6 +107,10 @@ completion rebuild is folded into a separate object over several runs and replac
 only when it has caught up (`web/src/app/api/cron/snapshot/route.ts`). The same query on `/api/cron/profiles`
 makes that run a full pass. `/api/cron/blue` and `/api/cron/indexnow` do not read it.
 
+`?rescanSince=<ISO time>` on `/api/cron/blue` is its backfill: that run moves every forum list's
+handled time back to that time (never forward), and the scheduled runs after it read the topics
+active since then again. Its writes are not conditional, so call it between the 10-minute marks.
+
 A cron route that answers outside 200 to 299 makes `web/scripts/cf-entry.mjs` throw, so the
 trigger is recorded as failed.
 
