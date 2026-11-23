@@ -7,7 +7,7 @@ import { publicZones, type ZoneSummary } from "./zones";
 
 /**
  * What players farm, in the order the farming page shows it: gold (mobs with public loot in a placed zone) and
- * reputation, which comes from kills and quests that cannot be placed in a zone yet, so it stays empty.
+ * reputation, which comes from kills and quests; the reputation a kill gives is not recorded, so it stays empty.
  */
 export const FARM_CATEGORIES = [
   { slug: "gold", label: "Gold", noun: "gold" },
@@ -166,16 +166,21 @@ export interface FarmLink { label: string; href: string }
 /**
  * Where a zone is farmed or gathered, as links: the farming page when public loot comes from NPCs placed in the zone, and
  * each profession's "where to gather" section that lists the zone, by the same rules as `farmingAreas` and
- * `gatherAreas`. A zone with nothing agreed has none, so no link points at a list the zone is not on. `sightings` are
- * the loot-derived object rows the professions pages read; only the objects opened in this zone are worked out.
+ * `gatherAreas`. A zone with nothing agreed has none, so no link points at a list the zone is not on. `npcIds` are the
+ * NPCs pinned in the zone; a mob `killZones` places counts where it was killed instead. `sightings` are the
+ * loot-derived object rows the professions pages read; only the objects opened in this zone are worked out.
  */
 export function zoneFarmLinks(
   zone: ZoneSummary,
   npcIds: readonly number[],
   rates: readonly { sourceNpcId?: number; itemId: number; drops: number; public: boolean }[],
   sightings: readonly ObjectSpawnRow[],
+  kills: readonly KillPlace[] = [],
+  zones: readonly ZoneSummary[] = publicZones(),
 ): FarmLink[] {
-  const here = new Set(npcIds);
+  const killed = killZones(kills, zones);
+  const here = new Set(npcIds.filter((id) => !killed.has(id)));
+  for (const [npcId, placed] of killed) if (placed.some((z) => z.mapId === zone.mapId)) here.add(npcId);
   const dropped = new Set(rates.filter((r) => r.public && r.drops > 0 && r.sourceNpcId !== undefined && here.has(r.sourceNpcId)).map((r) => r.itemId));
   const holds = (subclass: number) => [...dropped].some((id) => itemSubclass.get(id) === subclass);
   const opened = new Set(sightings.filter((r) => r.mapId === zone.mapId).map((r) => r.objectId));

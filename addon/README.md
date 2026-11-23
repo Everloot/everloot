@@ -181,7 +181,9 @@ pin. Looting an object adds where you stand (`mapId`, `x`, `y`), a `gatherKind` 
 other) from the spell you cast just before (`UNIT_SPELLCAST_SENT`) and the object's name from that cast's
 target (`sourceObjectName`). A herb, ore or skinning window also carries your own rank in that skill
 (`gatherSkill`), from the game's profession book, plus the rank bonus from race and gear (what a node's requirement is checked against); when the client cannot give it,
-the row has none. A kill's loot window with nothing in it is recorded too, so drop rates count the
+the row has none. From 0.3.30 a kill's loot window also carries where you looted the corpse (`mapId`, `x`, `y`), so the
+site can tell which zone a mob is farmed in; inside an instance, or when the game gives no position, it carries none.
+A kill's loot window with nothing in it is recorded too, so drop rates count the
 corpses that dropped nothing: the game names no source for an empty window, so the addon takes the one dead
 creature you could loot among the units you interacted with, pointed at or targeted, and writes a loot row with no
 items and no coin (`sourceEvidence = "empty-window"`), once per corpse. Two different dead creatures there, a

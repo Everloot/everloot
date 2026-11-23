@@ -108,7 +108,7 @@ export default async function FarmingRoutesPage(props: { searchParams?: Promise<
             const all = areas[c.slug];
             const rows = q.level ? all.filter((a) => inLevels(a, q.level!)) : all;
             const body = rows.length > 0 ? <FarmAreaTable areas={rows} backing="mobs" caption={`${c.label} areas: ${rows.length}`} />
-              : c.slug === "reputation" ? quiet("Reputation comes from kills and quests, which the addon does not yet place in a zone. Nothing here is estimated.")
+              : c.slug === "reputation" ? quiet("Reputation comes from kills and quests. The addon records where you loot a kill, not the reputation it gives, so nothing is listed here. Nothing here is estimated.")
               : down ? quiet(STORAGE_UNREACHABLE)
               : all.length === 0 ? emptyFor(c.noun)
               : quiet(`Nothing here for levels ${rangeParam(q.level)}.`);

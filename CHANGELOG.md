@@ -17,8 +17,10 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 ### Added
 - Site: dungeon progress is on: the Desktop App can download shared dungeon clears for player tooltips, and boss-kill sync records the addon's full character name (migration `20261123110000_dungeon_progress.sql` applied 2026-11-23).
 - Addon: Collection shows dungeon clears, and a compact green progress bar appears on player tooltips when the Desktop App has synced their shared progress.
+- Site: rankings show US and EU side by side, each ranked on its own, so the region with more characters read no longer hides the other. The Rankings page shows one character board at a time with a tab for each, and names carry their class colour.
 - Addon: a kill's loot window also records the map and position you looted the corpse from, so the site can tell which zone a mob is farmed in. Inside an instance, or when the game gives no position, it records none.
 - Site: farming routes and the Tailoring, Leatherworking and Skinning gather lists place a mob in a zone once 3 installs looted its kills on that zone's map; until then the mob's agreed map pin decides, as before.
+- Site: a zone's page links to Farming routes and the cloth and leather lists by the same rule: a mob counts in the zone where 3 installs looted its kills, otherwise where its agreed pin is.
 - Addon: Collection opens on an overview of every area with its progress, groups each area's list under headings that count what is missing, adds Flight paths, and scrolls with the mouse wheel.
 - Addon: the Gold view charts earned and spent per day with dates, a scale and hover details; Professions gains a Ranks and trainers screen and a Crafting costs list that shows profit or loss per craft.
 - Addon: Gold links to Professions crafting costs. Select a recipe to see material subtotals, output, cost per item and estimated profit after the auction-house cut.
