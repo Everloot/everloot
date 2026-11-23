@@ -73,7 +73,7 @@ export default async function FarmingRoutesPage(props: { searchParams?: Promise<
   const stored = await loadStoredFarmAreas();
   const live = stored ? null : await Promise.all([loadWorldFacts(), computeRollups()]);
   const down = live ? live[0].unreachable : false;
-  const mobs = stored ? stored.areas : farmingAreas(down || !live ? [] : npcRows(live[0], live[1].rates), down || !live ? [] : live[1].rates);
+  const mobs = stored ? stored.areas : farmingAreas(down || !live ? [] : npcRows(live[0], live[1].rates), down || !live ? [] : live[1].rates, down || !live ? [] : live[0].kills);
   const areas: Record<FarmCategory, typeof mobs.gold> = { gold: mobs.gold, reputation: [] };
   const here = (over: FarmQuery) => href({ ...q, ...over });
 

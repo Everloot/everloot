@@ -86,6 +86,12 @@ export type VendorSighting = {
   capturedAt?: string;
 };
 
+/**
+ * A kill loot window with the player's place (`loot` rows with `lootType` `kill`, newer addons): one row per install,
+ * NPC and map, however many kills it looted there. The site places a mob in a zone from these (web lib/farming.ts).
+ */
+export type KillPlace = { installId: string; npcId: number; mapId: number };
+
 export type WorldFacts = {
   npcs: NpcSightingRow[];
   quests: QuestSighting[];
@@ -94,6 +100,8 @@ export type WorldFacts = {
   pending?: PendingLoot;
   /** The scopes in `kb/curated/recheck.json`; without them every row counts. */
   recheck?: readonly RecheckScope[];
+  /** Where installs looted each NPC's kills; absent when no kill window carried a place. */
+  kills?: KillPlace[];
 };
 
 export type NpcPin = { mapId: number; x: number; y: number; reporters: number };
@@ -505,10 +513,18 @@ export function npcFactsFromRecords(records: unknown[], recheck: readonly Rechec
 
 export function worldFactsFromRecords(records: unknown[], recheck: readonly RecheckScope[] = NO_SCOPES): WorldFacts {
   const facts: WorldFacts = { npcs: [], quests: [], vendors: [], ...(recheck.length ? { recheck } : {}) };
+  const kills = new Map<string, KillPlace>();
   for (const raw of records) {
     if (!raw || typeof raw !== "object") continue;
     const row = raw as Record<string, unknown>;
     if (typeof row.installId !== "string") continue;
+    // A kill window's place, from the loot API only: an empty-window row names its creature by a guess.
+    if (row.kind === "loot" && row.lootType === "kill" && row.sourceEvidence === "loot-api" && row.installId.trim() &&
+      typeof row.sourceNpcId === "number" && Number.isInteger(row.sourceNpcId) && row.sourceNpcId > 0 &&
+      typeof row.mapId === "number" && Number.isInteger(row.mapId) && row.mapId > 0 && typeof row.x === "number" && typeof row.y === "number") {
+      const installId = row.installId.trim();
+      kills.set(`${installId}|${row.sourceNpcId}|${row.mapId}`, { installId, npcId: row.sourceNpcId, mapId: row.mapId });
+    }
     const when = typeof row.capturedAt === "string" && Number.isFinite(Date.parse(row.capturedAt)) ? { capturedAt: row.capturedAt } : {};
     if (
       row.kind === "npc_sighting" &&
@@ -558,5 +574,6 @@ export function worldFactsFromRecords(records: unknown[], recheck: readonly Rech
       }
     }
   }
+  if (kills.size) facts.kills = [...kills.values()];
   return facts;
 }

@@ -554,15 +554,17 @@ local function lootCapture(_, isFromItem)
     if not skip then
       group.itemGuid = nil
       group.lootType = lootType
-      -- An object stays where it is: the player's position, how it was opened and its name go with it.
-      if group.sourceObjectId then
+      -- An object stays where it is: the player's position, how it was opened and its name go with it. A kill
+      -- window carries the player's position too, which places the mob's zone. No position (an instance, no map)
+      -- sends none.
+      if group.sourceObjectId or (group.sourceNpcId and lootType == "kill") then
         if where == nil then
           local ok, pos = pcall(mapPosition)
           where = ok and pos and pos.x and pos.y and pos or false
         end
         if where then group.mapId, group.x, group.y = where.mapId, where.x, where.y end
-        if cast then group.gatherKind, group.sourceObjectName = cast.gatherKind, cast.name end
       end
+      if group.sourceObjectId and cast then group.gatherKind, group.sourceObjectName = cast.gatherKind, cast.name end
       -- A herb, ore or skinning window carries the player's rank in that skill.
       if lootType == "gather" or lootType == "skinning" then group.gatherSkill = gatherSkill(cast) end
       group.installId = EverlootDB.installId

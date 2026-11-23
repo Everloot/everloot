@@ -1,8 +1,9 @@
 import { CLIENT_TAXONOMY } from "./items";
 import { agreedGatherKinds, objectSpawns, skillRange, type ObjectSpawnRow, type SkillRange } from "@kb/object-spawns";
 import { INDEPENDENT_INSTALLS } from "@kb/drop-rollup";
+import type { KillPlace } from "@kb/world-pages";
 import type { NpcRow } from "./world-lists";
-import type { ZoneSummary } from "./zones";
+import { publicZones, type ZoneSummary } from "./zones";
 
 /**
  * What players farm, in the order the farming page shows it: gold (mobs with public loot in a placed zone) and
@@ -53,15 +54,39 @@ export interface FarmArea {
 
 const itemSubclass = new Map(CLIENT_TAXONOMY.items.filter((r) => r[1] === TRADE_GOODS).map((r) => [r[0], r[2]]));
 
-function byZone(npcs: readonly NpcRow[], items: Map<number, Set<number>>, keep: (items: Set<number>) => boolean): FarmArea[] {
+/**
+ * The released zones each NPC was killed in, by NPC id: a zone counts once 3 installs looted the NPC's kills on its
+ * map (`WorldFacts.kills`), the way a gathering spot counts. An NPC killed in two zones is in both.
+ */
+export function killZones(kills: readonly KillPlace[], zones: readonly ZoneSummary[]): Map<number, ZoneSummary[]> {
+  const byMap = new Map(zones.map((z) => [z.mapId, z]));
+  const installs = new Map<string, Set<string>>();
+  for (const k of kills) {
+    if (!byMap.has(k.mapId) || !k.installId.trim()) continue;
+    const key = `${k.npcId}|${k.mapId}`;
+    installs.set(key, (installs.get(key) ?? new Set()).add(k.installId.trim()));
+  }
+  const out = new Map<number, ZoneSummary[]>();
+  for (const [key, seen] of installs) {
+    if (seen.size < INDEPENDENT_INSTALLS) continue;
+    const [npcId, mapId] = key.split("|").map(Number) as [number, number];
+    out.set(npcId, [...(out.get(npcId) ?? []), byMap.get(mapId)!]);
+  }
+  return out;
+}
+
+function byZone(npcs: readonly NpcRow[], items: Map<number, Set<number>>, killed: Map<number, ZoneSummary[]>, keep: (items: Set<number>) => boolean): FarmArea[] {
   const zones = new Map<number, { zone: ZoneSummary; levels: number[]; mobs: number }>();
   for (const n of npcs) {
     const dropped = items.get(n.npcId);
-    if (!n.zone || !dropped || !keep(dropped)) continue;
-    const here = zones.get(n.zone.mapId) ?? { zone: n.zone, levels: [], mobs: 0 };
-    here.mobs++;
-    if (n.level !== null) here.levels.push(n.level);
-    zones.set(n.zone.mapId, here);
+    if (!dropped || !keep(dropped)) continue;
+    // Where 3 installs looted its kills; without that, the zone of its agreed pin.
+    for (const zone of killed.get(n.npcId) ?? (n.zone ? [n.zone] : [])) {
+      const here = zones.get(zone.mapId) ?? { zone, levels: [], mobs: 0 };
+      here.mobs++;
+      if (n.level !== null) here.levels.push(n.level);
+      zones.set(zone.mapId, here);
+    }
   }
   return [...zones.values()].map((z) => ({
     key: String(z.zone.mapId), zone: z.zone, mobs: z.mobs, nodes: 0,
@@ -76,19 +101,23 @@ export type MobFarm = "gold" | "leather" | "cloth";
 
 /**
  * The zones whose mobs back each mob farm, from the NPC list rows and the public loot rates: any public loot for
- * gold, and Trade Goods of the kind for cloth or leather. Both are empty when storage is down.
+ * gold, and Trade Goods of the kind for cloth or leather. A mob is in each zone where 3 installs looted its kills
+ * (`killZones`), else in its agreed pin's zone. Both are empty when storage is down.
  */
 export function farmingAreas(
   npcs: readonly NpcRow[],
   rates: readonly { sourceNpcId?: number; itemId: number; drops: number; public: boolean }[],
+  kills: readonly KillPlace[] = [],
+  zones: readonly ZoneSummary[] = publicZones(),
 ): Record<MobFarm, FarmArea[]> {
   const items = new Map<number, Set<number>>();
   for (const r of rates) if (r.public && r.drops > 0 && r.sourceNpcId !== undefined) items.set(r.sourceNpcId, (items.get(r.sourceNpcId) ?? new Set()).add(r.itemId));
   const holds = (subclass: number) => (dropped: Set<number>) => [...dropped].some((id) => itemSubclass.get(id) === subclass);
+  const killed = killZones(kills, zones);
   return {
-    gold: order(byZone(npcs, items, () => true)),
-    leather: order(byZone(npcs, items, holds(SUBCLASS.leather))),
-    cloth: order(byZone(npcs, items, holds(SUBCLASS.cloth))),
+    gold: order(byZone(npcs, items, killed, () => true)),
+    leather: order(byZone(npcs, items, killed, holds(SUBCLASS.leather))),
+    cloth: order(byZone(npcs, items, killed, holds(SUBCLASS.cloth))),
   };
 }
 

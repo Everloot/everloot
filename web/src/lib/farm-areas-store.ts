@@ -17,7 +17,7 @@ import { npcRows } from "./world-lists";
 
 export const FARM_AREAS_KEY = "snapshots/farm-areas.json";
 /** The file's shape in its stamp. Change it when the file changes shape, so the next job run rewrites it. */
-export const FARM_AREAS_REVISION = "farm-1";
+export const FARM_AREAS_REVISION = "farm-2";
 const KEEP_MS = 5 * 60_000;
 const RETRY_MS = 60_000;
 
@@ -26,7 +26,7 @@ export type FarmAreas = Pick<FarmAreasFile, "dataAsOf" | "areas">;
 
 /** The areas from the set the job just stored. */
 export function buildFarmAreas(set: AggregateSet): FarmAreasFile {
-  return { version: 1, revision: FARM_AREAS_REVISION, dataAsOf: set.dataAsOf, areas: farmingAreas(npcRows(set.world, set.drops.rates), set.drops.rates) };
+  return { version: 1, revision: FARM_AREAS_REVISION, dataAsOf: set.dataAsOf, areas: farmingAreas(npcRows(set.world, set.drops.rates), set.drops.rates, set.world.kills) };
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);

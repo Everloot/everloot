@@ -174,7 +174,7 @@ export default async function ProfessionPage(props: Props) {
         }
         const [world, rollups] = await Promise.all([loadWorldFacts(view.corpus), computeRollups(view.corpus)]);
         const down = world.unreachable || rollups.stats.unreachable;
-        const all = down ? [] : farmingAreas(npcRows(world, rollups.rates), rollups.rates)[mobFarm];
+        const all = down ? [] : farmingAreas(npcRows(world, rollups.rates), rollups.rates, world.kills)[mobFarm];
         return { rows: level ? all.filter((a) => inLevels(a, level)) : all, all: all.length, down };
       })();
   const gatherRows = gathered.rows;

@@ -397,6 +397,16 @@ describe("intake contract", () => {
     expect(result.receipt.rejected[0]!.reason).toBe("a loot position needs mapId, x and y together");
   });
 
+  test("a kill window may carry where the player looted the corpse, kept as sent", () => {
+    const kill = { ...base, kind: "loot", sourceEvidence: "loot-api", sourceNpcId: 6, lootType: "kill", items: [{ itemId: 2589, count: 1 }] };
+    const result = parseRecords([{ ...kill, mapId: 1429, x: 40.5, y: 61.2 }, kill, { ...kill, mapId: 1429 }]);
+    expect(result.records).toEqual([
+      expect.objectContaining({ sourceNpcId: 6, lootType: "kill", mapId: 1429, x: 40.5, y: 61.2 }),
+      expect.not.objectContaining({ mapId: expect.anything() }),
+    ]);
+    expect(result.receipt.rejected.map((r) => r.reason)).toEqual(["a loot position needs mapId, x and y together"]);
+  });
+
   test("a gathering window may carry the player's skill rank, a whole number from 1 to 500", () => {
     const herb = { ...base, kind: "loot", sourceEvidence: "loot-api", sourceObjectId: 1618, lootType: "gather", gatherKind: "herb", items: [{ itemId: 2447, count: 2 }] };
     const result = parseRecords([

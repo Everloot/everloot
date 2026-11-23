@@ -7,6 +7,9 @@ required, or tightening a limit is a major release.
 ## [Unreleased]
 
 ### Added
+- Pending next minor package release: `loot`'s `mapId`, `x` and `y` now also come on kill windows (`lootType` `kill`):
+  the map and position the player looted the corpse from, which the site uses to place a mob's zone. The descriptions
+  say so; no field is new and nothing is tightened. Record protocol unchanged.
 - Pending next minor package release: `GET /api/history` (`historyResponse`), Everloot's own numbers, one row per UTC
   day: uploads, records by kind, distinct contributors, the market's realms, houses and items, and the coverage
   counts; counts only. `healthResponse` gains optional `views` and `viewsDispatch` (the stored-views job's last run,
