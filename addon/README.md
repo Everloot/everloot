@@ -395,10 +395,12 @@ never larger than the screen); right-click the grip for the normal size. The siz
   with what their reagents cost at the price file's market value (a vendor's price instead when a vendor you visited
   sells the reagent for less), what one product item sells for and an estimated profit, sorted by that estimate or by
   name; profit per craft is green for a gain and red for a loss. One short line says which auction house's prices and
-  how old the price file is; hover it for what each column means. How many items a craft makes is not recorded, so the estimate assumes one
-  item per craft. A reagent without a price makes the cost unknown, never zero; so does a reagent name this install
-  has seen with two item ids. Choose a recipe and a count for what to buy: each reagent, how many and what they cost,
-  with Up and Down past five reagents. **Add to shopping list** adds those reagents to your active shopping list (see
+  how old the price file is. Choose a recipe and a craft count to see each reagent's unit price and subtotal, the output
+  per craft, the materials cost per item, and estimated sales minus the auction-house cut and materials. Reopen your
+  in-game profession window to read the output of previously recorded recipes. The estimate assumes one item if the
+  output is unknown. A missing or ambiguous reagent price leaves the material total and profit unknown.
+  Use Up and Down past five reagents. Gold also has a **Crafting costs** shortcut to this screen.
+  **Add to shopping list** adds those reagents to your active shopping list (see
   Shopping lists). Your bags and bank are not read.
 - **Settings** opens this page. "What you've added", the row counts in your saved file, is on that page now.
 

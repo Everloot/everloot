@@ -53,10 +53,10 @@ local BUY_LINES = 5
 local MAX_COUNT = 999
 local SORT_PROFIT, PROFITABLE = "Sort: est. profit", "Est. profitable only"
 local NO_RECIPES = "No recipes with reagents recorded for your professions yet. Open a profession window to read them."
-local NONE_PROFITABLE = "No recipe shows an estimated profit at these prices, assuming one item per craft."
-local PER_ITEM = "Value is per item. Profit per craft = value - reagent cost."
-local HELP_PROFIT = "Item value is the market value of one item. Profit per craft is one item's value minus what one craft's "
-  .. "reagents cost: how many items a craft makes is not recorded, so a craft that makes more than one earns more."
+local NONE_PROFITABLE = "No recipe shows an estimated profit at these prices."
+local PER_ITEM = "Select a recipe for the cost and profit breakdown."
+local HELP_PROFIT = "Profit is the estimated sale value of a craft's average output, minus the auction house cut and "
+  .. "materials. If the output is unknown, the estimate assumes one. Unsold auction deposits are excluded."
 local HELP_COLOUR = "Green profit is a gain, red is a loss. Est. profitable only keeps the green ones."
 local HELP_SCANS = "Your scans: how the lowest buyout of what the recipe makes moved between your last two scans of this "
   .. "auction house, with bars for up to three scans. These are listings, not sales; hover a recipe for the numbers."
@@ -317,7 +317,7 @@ local INDEX_ROWS = {
     -- A recipe whose slot takes several items is stored without reagents (professions.lua): it has no cost here.
     if #reagents == 0 then return end
     local key = r.profession .. "|" .. tostring(r.recipeId ~= nil and r.recipeId or r.recipe)
-    index.recipes[key] = { key = key, profession = r.profession, name = r.recipe, reagents = reagents,
+    index.recipes[key] = { key = key, profession = r.profession, name = r.recipe, reagents = reagents, id = r.recipeId,
       product = type(r.productItemId) == "number" and r.productItemId or nil }
   end,
   item_seen = function(r)
@@ -444,6 +444,7 @@ local function pricer(realm)
   local ids, units, markets = {}, {}, {}
   local scans = keptScans(realm)
   local P = {}
+  P.cut = E.SellCheck and math.floor(E.SellCheck.Cut(E:MarketHouse()) * 100 + 0.5) or 5
   -- The item id for a reagent name, or nil and true when the name is ambiguous.
   function P.id(name)
     if ids[name] == nil then
@@ -480,11 +481,20 @@ local function pricer(realm)
   return P
 end
 
--- One recipe at these prices: its reagents ({ item, id, count, unit, vendor, ambiguous }), the cost (nil when a reagent
--- has no price, with `unpriced` saying how many), the product's market value and, when both are known, the profit:
--- an estimate, because it sets one item's value against a whole craft's cost.
+local function saleEstimate(row, count)
+  local sale = math.floor(row.value * row.yield * count)
+  local net = math.floor(sale * (100 - row.cut) / 100)
+  return sale, sale - net, net - row.cost * count
+end
+
+-- A recipe's material cost, item price and estimated profit after the auction house cut.
 local function evaluate(recipe, P)
-  local out = { key = recipe.key, name = recipe.name, parts = {}, unpriced = 0 }
+  local out = { key = recipe.key, name = recipe.name, parts = {}, unpriced = 0, cut = P.cut, yield = 1 }
+  local output = recipe.id and EverlootDB.recipeOutput and EverlootDB.recipeOutput[recipe.id]
+  if output and output.itemId == recipe.product then
+    out.output = output
+    out.yield = (output.minimum + output.maximum) / 2
+  end
   local cost = 0
   for _, g in ipairs(recipe.reagents) do
     local id, ambiguous = P.id(g.item)
@@ -496,7 +506,10 @@ local function evaluate(recipe, P)
   if out.unpriced == 0 then out.cost = cost end
   out.value = recipe.product and P.market(recipe.product) or nil
   out.marketChange = P.change(recipe.product)
-  if out.cost and out.value then out.profit = out.value - out.cost end
+  if out.cost and out.value then
+    local _, _, profit = saleEstimate(out, 1)
+    out.profit = profit
+  end
   return out
 end
 
@@ -576,8 +589,8 @@ local function buyLine(part, count)
   local need = part.count * count
   local s = need .. " × " .. part.item
   if not part.unit then return s .. (part.ambiguous and " · unpriced (ambiguous name)" or " · no price") end
-  return s .. " · " .. U.MoneyShort(part.unit) .. " each" .. (part.vendor and " (vendor)" or "") .. " · "
-    .. U.MoneyShort(part.unit * need)
+  return s .. " · " .. U.Money(part.unit) .. " each" .. (part.vendor and " (vendor)" or "") .. " · "
+    .. U.Money(part.unit * need)
 end
 
 -- The reagents for `count` crafts of one recipe, a page at a time, and their total; a reagent without a price is
@@ -588,6 +601,7 @@ local function drawBuy(c, row)
     b.title:SetText("What to buy")
     for _, line in ipairs(b.lines) do line:Hide() end
     b.up:Hide(); b.down:Hide(); b.add:Hide()
+    b.output:Hide(); b.math:Hide()
     b.total:SetText("Choose a recipe in the list.")
     return
   end
@@ -608,11 +622,35 @@ local function drawBuy(c, row)
     if part.unit then priced = priced + part.unit * part.count * c.count end
   end
   if row.unpriced == 0 then
-    b.total:SetText("Total: " .. U.MoneyShort(priced))
+    b.total:SetText("Total: " .. U.Money(priced))
   else
     b.total:SetText("Total unknown: " .. plural(row.unpriced, "reagent") .. " unpriced"
-      .. (row.unpriced < #row.parts and (" · the priced ones " .. U.MoneyShort(priced)) or ""))
+      .. (row.unpriced < #row.parts and (" · the priced ones " .. U.Money(priced)) or ""))
   end
+  local output = row.output
+  if output then
+    local amount = output.minimum == output.maximum and plural(output.minimum, "item")
+      or (output.minimum .. "-" .. output.maximum .. " items")
+    b.output:SetText("Makes " .. amount .. " per craft"
+      .. (row.cost and (" · " .. U.Money(math.floor(row.cost / row.yield)) .. " materials per item"
+        .. (output.minimum ~= output.maximum and " (avg.)" or "")) or ""))
+  else
+    b.output:SetText("Output unknown · sale estimate assumes 1 item per craft")
+  end
+  local calculation
+  if row.profit then
+    local sale, cut, profit = saleEstimate(row, c.count)
+    calculation = "Sale: " .. U.Money(sale) .. " - " .. row.cut .. "% AH cut: " .. U.Money(cut)
+      .. " - materials: " .. U.Money(priced) .. " = " .. U.Money(profit) .. " profit"
+  elseif not row.cost and not row.value then
+    calculation = "Profit unknown: missing material prices and sale estimate."
+  elseif not row.cost then
+    calculation = "Profit unknown: missing material prices."
+  else
+    calculation = "Profit unknown: no market price for the finished item."
+  end
+  b.math:SetText(calculation)
+  b.output:Show(); b.math:Show()
 end
 
 local function drawCraftRow(line, row, selected)
@@ -852,7 +890,7 @@ buildCrafting = function(parent)
   rows.down:SetPoint("BOTTOMRIGHT", -6, 6)
   c.rows = rows
 
-  local buy = box(c.page, 0, -220, W, PAGE_H - 220)
+  local buy = box(c.page, 0, -218, W, PAGE_H - 218)
   local b = { lines = {}, steps = {}, offset = 0 }
   b.title = text(buy, 12)
   b.title:SetPoint("TOPLEFT", 8, -9)
@@ -866,17 +904,26 @@ buildCrafting = function(parent)
     s:SetPoint("TOPRIGHT", -6 - (4 - i) * 40, -6)
     b.steps[i] = s
   end
-  -- The lines and the total leave the bottom right to Up and Down (106 wide).
+  -- The reagent lines and the calculation leave the bottom right to Up and Down (106 wide).
+  local spacing = 13
   for i = 1, BUY_LINES do
     local line = text(buy, 12, nil, COLORS.muted)
-    line:SetPoint("TOPLEFT", 8, -32 - (i - 1) * LINE_H)
+    line:SetPoint("TOPLEFT", 8, -32 - (i - 1) * spacing)
     line:SetWidth(W - 16 - 110)
     if line.SetWordWrap then line:SetWordWrap(false) end
     b.lines[i] = line
   end
   b.total = text(buy, 12)
-  b.total:SetPoint("TOPLEFT", 8, -32 - BUY_LINES * LINE_H - 4)
+  b.total:SetPoint("TOPLEFT", 8, -32 - BUY_LINES * spacing)
   b.total:SetWidth(W - 16 - 110)
+  b.output = text(buy, 12, nil, COLORS.muted)
+  b.output:SetPoint("TOPLEFT", 8, -32 - (BUY_LINES + 1) * spacing)
+  b.output:SetWidth(W - 16 - 110)
+  if b.output.SetWordWrap then b.output:SetWordWrap(false) end
+  b.math = text(buy, 12, nil, COLORS.muted)
+  b.math:SetPoint("TOPLEFT", 8, -32 - (BUY_LINES + 2) * spacing)
+  b.math:SetWidth(W - 16 - 110)
+  if b.math.SetWordWrap then b.math:SetWordWrap(false) end
   -- Adds this recipe's reagents for the chosen count to the active shopping list; the outcome shows under the list.
   b.add = button(buy, ADD_TO_LIST, 146, function()
     if not (E.Shopping and b.row) then return end
@@ -1013,3 +1060,9 @@ local function build(f, parent)
 end
 
 U.Views.professions = { build = build, refresh = refresh }
+
+function U.OpenCrafting()
+  if not U.Open("professions") then return end
+  U.frame.professions.mode = "crafting"
+  redraw()
+end

@@ -19,6 +19,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: farming routes and the Tailoring, Leatherworking and Skinning gather lists place a mob in a zone once 3 installs looted its kills on that zone's map; until then the mob's agreed map pin decides, as before.
 - Addon: Collection opens on an overview of every area with its progress, groups each area's list under headings that count what is missing, adds Flight paths, and scrolls with the mouse wheel.
 - Addon: the Gold view charts earned and spent per day with dates, a scale and hover details; Professions gains a Ranks and trainers screen and a Crafting costs list that shows profit or loss per craft.
+- Addon: Gold links to Professions crafting costs. Select a recipe to see material subtotals, output, cost per item and estimated profit after the auction-house cut.
 - Addon: the item tooltip compares disenchanting with selling and says what your own disenchants of that item gave; the Disenchanting tab is removed.
 - Addon: with the gold switch on, the addon reads your logged-in character's lifetime gold statistics (total acquired, most ever owned, spending, auctions) into your file; they never go in an upload, and only the Desktop App's private sync sends them for a character you linked.
 - Site: a linked character's page can show its lifetime gold from the addon, under its own Gold sync and "Show gold" switches, both off by default; your lifetime totals add total gold acquired and most gold ever owned. Gold is never ranked.

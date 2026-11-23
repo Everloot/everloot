@@ -158,10 +158,19 @@ local function readRecipe(id, profession, rank, maxRank, skillLineId)
   if skillLineId then recipe = recipe .. "|skill:" .. skillLineId end
   local key = "id|" .. recipe .. "|" .. colour .. "|" .. tostring(learned)
   local span = EverlootDB.recipeSpan[key]
-  if span and rank >= span.min and rank <= span.max then return "known" end
+  local known = span and rank >= span.min and rank <= span.max
+  if known and EverlootDB.recipeOutput[recipeId] then return "known" end
 
   local okSchematic, schematic = pcall(T.GetRecipeSchematic, id, false)
-  if not okSchematic or type(schematic) ~= "table" then return "skipped" end
+  schematic = E.Readable(schematic)
+  if not okSchematic or type(schematic) ~= "table" then return known and "known" or "skipped" end
+  -- Keep display-only output data beside the recipe index, outside the uploaded recipe observations.
+  local output = E.Readable(schematic.outputItemID)
+  local minimum, maximum = E.Readable(schematic.quantityMin), E.Readable(schematic.quantityMax)
+  if whole(output) and whole(minimum) and whole(maximum) and minimum <= maximum then
+    EverlootDB.recipeOutput[recipeId] = { itemId = output, minimum = minimum, maximum = maximum }
+  end
+  if known then return "known" end
   local reagents, pending, ambiguous = {}, false, false
   for _, slot in ipairs(type(schematic.reagentSlotSchematics) == "table" and schematic.reagentSlotSchematics or {}) do
     -- Only the basic reagents a craft always uses. Optional, finishing and currency slots are not its cost.
@@ -197,7 +206,7 @@ local function readRecipe(id, profession, rank, maxRank, skillLineId)
     recipeId = recipeId,
     learned = learned,
     difficulty = colour,
-    productItemId = whole(schematic.outputItemID) and schematic.outputItemID or nil,
+    productItemId = whole(output) and output or nil,
     reagents = reagents,
   }
   -- The colour changed: the highest rank the last colour was seen at is now final.
@@ -253,6 +262,7 @@ readWindow = function()
   if not okIds or type(ids) ~= "table" then lastWindow = "nothing recorded: no recipe list"; updateNote(); return end
   EverlootDB.recipeSpan = EverlootDB.recipeSpan or {}
   EverlootDB.recipeWaiting = EverlootDB.recipeWaiting or {}
+  EverlootDB.recipeOutput = EverlootDB.recipeOutput or {}
   pass = pass + 1
   local mine = pass
   local total = math.min(#ids, MAX_RECIPES)
