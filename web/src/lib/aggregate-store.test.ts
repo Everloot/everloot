@@ -205,6 +205,12 @@ test("a file stamped before the current revision is rewritten by an idle run, an
   const keptPut = (kept.mock.calls[0] as unknown as [Request])[0];
   expect(keptPut.headers.get("x-amz-meta-data-as-of")).not.toBe(`${AS_OF};${AGGREGATES_REVISION}`);
   expect(parseAggregates(await keptPut.text())?.npcsApart).toBe(false);
+  // An idle run that keeps the sightings again finds that stamp current and only asks; one that leaves them out rewrites.
+  const stamp = keptPut.headers.get("x-amz-meta-data-as-of")!;
+  const build = vi.fn(async () => set);
+  expect(await writeAggregates({ added: 0, dataAsOf: AS_OF, keepNpcRows: true }, { cloud: CLOUD, fetch: head(200, stamp) as unknown as typeof fetch, build })).toEqual({ written: false });
+  expect(build).not.toHaveBeenCalled();
+  expect(await writeAggregates({ added: 0, dataAsOf: AS_OF }, { cloud: CLOUD, fetch: head(200, stamp) as unknown as typeof fetch, build })).toMatchObject({ written: true });
 });
 
 test("the cron writes the file when the run added uploads or rebuilt, or when there is none; an idle run with a file only asks", async () => {

@@ -22,6 +22,13 @@ import { writeViewsRun, type ViewsRun } from "@/lib/stored-views-status";
 import { writeDailyHistory } from "@/lib/platform-history";
 import { loadCoverageSummary } from "@/lib/coverage-summary";
 
+/**
+ * Whether the aggregates file leaves the raw NPC sightings out (#1464). Off for the first release: the job runs main's
+ * code as soon as it merges, while the site is still on the old code, which rejects a file without the sightings and
+ * rebuilds every page's tables from the corpus. Turned on in a follow-up once the site reading npc-facts.json is live.
+ */
+const NPC_SIGHTINGS_APART = false;
+
 const writeHistory = (now: Date) => writeDailyHistory(now, {
   corpus: () => uploadStore.loadCorpus(),
   market: async () => (await uploadStore.loadMarket()).state,
@@ -161,7 +168,7 @@ export async function runStoredViews(run: StoredViewsRun): Promise<StoredViewsRe
   // aggregates file leaves the raw NPC sightings out, so the pages read this table instead (#1464). When it could not
   // be written, the aggregates keep the sightings this run, stamped so the next run writes both again.
   const npcFacts = await step("npcFacts", "NPC facts", () => writeNpcFacts({ added, rebuild, dataAsOf }, { build: aggregateSet }));
-  const aggregates = await step("aggregates", "aggregates", () => writeAggregates({ added, rebuild, dataAsOf, keepNpcRows: npcFacts === null }, { build: aggregateSet }));
+  const aggregates = await step("aggregates", "aggregates", () => writeAggregates({ added, rebuild, dataAsOf, keepNpcRows: !NPC_SIGHTINGS_APART || npcFacts === null }, { build: aggregateSet }));
   // The names the site's own search matches (lib/search-names-store.ts), a few hundred KB from the same set, so a fresh
   // instance never parses the aggregates for a keystroke. Written on the runs that build the set anyway (uploads added,
   // a rebuild, or aggregates just written), never by an idle run for itself: the set is the cron's heaviest step

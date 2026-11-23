@@ -292,7 +292,7 @@ test("the stored aggregates are written after the item view with what that run a
   aggregates.writeAggregates.mockImplementation(async () => { order.push("aggregates"); return { written: true, bytes: 4096 }; });
   expect(await (await GET(req())).json()).toMatchObject({ ok: true, itemView: { written: true }, aggregates: { written: true, bytes: 4096 } });
   expect(order).toEqual(["itemView", "aggregates"]);
-  expect(aggregates.writeAggregates).toHaveBeenCalledWith({ added: 2, rebuild: false, dataAsOf: "2026-10-02T00:00:00.000Z", keepNpcRows: false }, expect.anything());
+  expect(aggregates.writeAggregates).toHaveBeenCalledWith({ added: 2, rebuild: false, dataAsOf: "2026-10-02T00:00:00.000Z", keepNpcRows: true }, expect.anything());
   await GET(req("Bearer synthetic-cron-key", "?rebuild=1"));
   expect(aggregates.writeAggregates).toHaveBeenLastCalledWith(expect.objectContaining({ rebuild: true }), expect.anything());
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -331,7 +331,7 @@ test("an idle run still asks for the stored aggregates, so a missing file is wri
   await GET(req());
   // The names file never makes an idle run build the set for itself: it waits for a run that builds it anyway.
   expect(searchNames.writeSearchNames).not.toHaveBeenCalled();
-  expect(aggregates.writeAggregates).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-10-01", keepNpcRows: false }, expect.anything());
+  expect(aggregates.writeAggregates).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-10-01", keepNpcRows: true }, expect.anything());
 });
 
 test("the NPC facts are written before the aggregates from the same set; when they fail, the aggregates keep the sightings", async () => {

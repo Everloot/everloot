@@ -127,9 +127,10 @@ export async function writeAggregates(opts: { added: number; rebuild?: boolean; 
   const cloud = deps.cloud === undefined ? r2FromEnv() : deps.cloud;
   if (!cloud) throw new Error("the stored aggregates need the cloud store");
   const doFetch = deps.fetch ?? fetch;
-  if (opts.added <= 0 && !opts.rebuild && !await storedViewNeedsWrite(r2(cloud), r2Url(cloud), opts.dataAsOf, doFetch, AGGREGATES_REVISION)) return { written: false };
-  const body = encodeAggregates(await (deps.build ?? currentSet)(), (deps.now?.() ?? new Date()).toISOString(), { keepNpcRows: opts.keepNpcRows });
+  // Compared with the revision this write would stamp, so a file kept with the sightings is not rewritten on every idle run.
   const revision = opts.keepNpcRows ? WITH_NPC_ROWS_REVISION : AGGREGATES_REVISION;
+  if (opts.added <= 0 && !opts.rebuild && !await storedViewNeedsWrite(r2(cloud), r2Url(cloud), opts.dataAsOf, doFetch, revision)) return { written: false };
+  const body = encodeAggregates(await (deps.build ?? currentSet)(), (deps.now?.() ?? new Date()).toISOString(), { keepNpcRows: opts.keepNpcRows });
   const put = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "PUT", body, headers: { "content-type": "application/json", [STAMP]: stampOf(opts.dataAsOf, revision) } }));
   if (!put.ok) throw new Error(`aggregates write failed (${put.status})`);
   return { written: true, bytes: new TextEncoder().encode(body).length };
