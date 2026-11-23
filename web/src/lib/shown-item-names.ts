@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { agreedItemNames } from "@kb/item-page";
-import { npcReportedName, type WorldFacts } from "@kb/world-pages";
+import { agreedNpcsOf, type WorldFacts } from "@kb/world-pages";
 import { loadItemNames, PRIVATE_UNREACHABLE, type ItemNames, type QuestNames } from "@/lib/game-assets";
 import { CLIENT_LAYER, shownItemName } from "@/lib/items";
 import { npcNames, questTitles, type Names } from "@/lib/names";
@@ -66,21 +66,19 @@ function mergedOnce<T extends { name: string }>(agreed: Map<number, string>, rul
 }
 
 // The NPC page's rule (shownNpcName): one or two installs' unanimous name, where it matches a Warcraft Wiki NPC name.
-// One pass over the sightings per corpus and wiki file version.
+// One pass over the agreed NPC table per corpus (or stored table) and wiki file version.
 const wikiNpcMemo = new WeakMap<object, WeakMap<object, Map<number, { name: string }>>>();
 function wikiNpcNames(facts: WorldFacts & { unreachable?: boolean }, wiki: WikiEntityNames | null): Map<number, { name: string }> | null {
   if (facts.unreachable || !wiki?.names.size) return null;
-  let inner = wikiNpcMemo.get(facts.npcs);
-  if (!inner) { inner = new WeakMap(); wikiNpcMemo.set(facts.npcs, inner); }
+  const table = agreedNpcsOf(facts);
+  let inner = wikiNpcMemo.get(table);
+  if (!inner) { inner = new WeakMap(); wikiNpcMemo.set(table, inner); }
   let out = inner.get(wiki);
   if (!out) {
-    const byNpc = new Map<number, WorldFacts["npcs"]>();
-    for (const row of facts.npcs) { const rows = byNpc.get(row.npcId); if (rows) rows.push(row); else byNpc.set(row.npcId, [row]); }
     out = new Map();
-    for (const [id, npcs] of byNpc) {
-      const candidate = npcReportedName(id, { ...facts, npcs });
-      const hit = candidate ? wiki.names.get(candidate) : undefined;
-      if (hit) out.set(id, { name: hit.name });
+    for (const { npcId, reportedName } of table.values()) {
+      const hit = reportedName ? wiki.names.get(reportedName) : undefined;
+      if (hit) out.set(npcId, { name: hit.name });
     }
     inner.set(wiki, out);
   }

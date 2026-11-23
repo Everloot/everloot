@@ -1,6 +1,7 @@
 import type { Edge } from "@kb/edges";
 import { categoryOf } from "@kb/item-taxonomy";
 import { pendingForNpc } from "@kb/pending-loot";
+import { agreedNpcsOf } from "@kb/world-pages";
 import { CLIENT_TAXONOMY } from "@/lib/items";
 import type { computeRollups, loadWorldFacts } from "@/lib/rollup-compute";
 import type { ShownNames } from "@/lib/shown-item-names";
@@ -24,7 +25,7 @@ export function unknownItem(itemId: number, facts: ShownNames["facts"], relation
  */
 export function unknownNpc(npcId: number, facts: Awaited<ReturnType<typeof loadWorldFacts>>, rollup: Awaited<ReturnType<typeof computeRollups>>): boolean {
   if (facts.unreachable || rollup.stats.unreachable) return false;
-  return !facts.npcs.some((r) => r.npcId === npcId)
+  return !agreedNpcsOf(facts).has(npcId)
     && !facts.vendors.some((r) => r.vendorNpcId === npcId)
     && !facts.quests.some((r) => r.giverNpcId === npcId || r.turnInNpcId === npcId)
     && !rollup.rates.some((r) => r.sourceNpcId === npcId)

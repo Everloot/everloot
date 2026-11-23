@@ -39,6 +39,7 @@ import MapPage, { generateMetadata as mapMeta } from "./page";
 import ContinentMapPage, { generateMetadata as continentMeta } from "./[continent]/page";
 import { WORLD_MAP } from "@/lib/world-map";
 import { AGGREGATES_KEY, anonymousAggregates, encodeAggregates, forgetStoredAggregates } from "@/lib/aggregate-store";
+import { buildNpcFacts, forgetStoredNpcFacts, NPC_FACTS_KEY } from "@/lib/npc-facts-store";
 import { buildMapPins, encodeMapPins, forgetStoredMapPins, MAP_PINS_KEY } from "@/lib/map-pins-store";
 import { CATEGORY_GROUPS, type MapItems } from "@/lib/map-view";
 
@@ -379,10 +380,12 @@ test("both map pages render identical stored pins and bounds without reading the
   expect(before[0]).toContain("Guard Marlow");
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
   const snapshot = encodeMapPins(buildMapPins(corpus), "snapshot");
-  const aggregates = encodeAggregates(anonymousAggregates(corpus as unknown as import("@/lib/upload-store").Corpus), "snapshot");
+  const set = anonymousAggregates(corpus as unknown as import("@/lib/upload-store").Corpus);
+  const stored = new Map([[MAP_PINS_KEY, snapshot], [AGGREGATES_KEY, encodeAggregates(set, "snapshot")], [NPC_FACTS_KEY, JSON.stringify(buildNpcFacts(set))]]);
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const url = input instanceof Request ? input.url : String(input);
-    return new Response(url.endsWith(MAP_PINS_KEY) ? snapshot : url.endsWith(AGGREGATES_KEY) ? aggregates : "{}", { status: url.endsWith(MAP_PINS_KEY) || url.endsWith(AGGREGATES_KEY) ? 200 : 404 });
+    const body = [...stored].find(([key]) => url.endsWith(key))?.[1];
+    return new Response(body ?? "{}", { status: body === undefined ? 404 : 200 });
   }));
   store.loadCorpus.mockClear();
   try {
@@ -392,6 +395,7 @@ test("both map pages render identical stored pins and bounds without reading the
   } finally {
     forgetStoredMapPins();
     forgetStoredAggregates();
+    forgetStoredNpcFacts();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   }

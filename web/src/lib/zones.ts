@@ -128,7 +128,7 @@ export function treasurePins(seen: ZoneSightings): (ObjectSpawnPin & { name: str
  * entrance instead, so no entrance has two pins. Treasures are objects seen on the minimap, pinned at 3 installs.
  */
 export function zoneContents(
-  facts: Pick<WorldFacts, "npcs" | "quests" | "vendors" | "recheck">, data: Pick<WorldMapData, "zones" | "heldBackZones" | "continents" | "entrances"> = WORLD_MAP,
+  facts: Pick<WorldFacts, "npcs" | "quests" | "vendors" | "recheck" | "agreedNpcs">, data: Pick<WorldMapData, "zones" | "heldBackZones" | "continents" | "entrances"> = WORLD_MAP,
   seen: ZoneSightings = {},
 ): Map<number, ZoneContents> {
   const zones = zoneTable(data);
@@ -145,7 +145,7 @@ export function zoneContents(
   const byQuest = new Map<number, WorldFacts["quests"]>();
   for (const q of facts.quests) byQuest.set(q.questId, [...(byQuest.get(q.questId) ?? []), q]);
   for (const [questId, rows] of byQuest) {
-    const q = questPage(questId, { npcs: facts.npcs, quests: rows, vendors: [], recheck: facts.recheck });
+    const q = questPage(questId, { npcs: facts.npcs, quests: rows, vendors: [], recheck: facts.recheck, ...(facts.agreedNpcs ? { agreedNpcs: facts.agreedNpcs } : {}) });
     for (const [mapId, npcs] of npcsHere) {
       if ((q.giverNpcId !== null && npcs.has(q.giverNpcId)) || (q.turnInNpcId !== null && npcs.has(q.turnInNpcId))) {
         out.get(mapId)!.quests.push({ questId, title: q.title, level: q.level, giverNpcId: q.giverNpcId, turnInNpcId: q.turnInNpcId });

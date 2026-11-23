@@ -3,7 +3,7 @@ import { runStoredViewsJob, stepRunner, type StoredViewsResult } from "./stored-
 
 const history = async () => {};
 const none: StoredViewsResult = {
-  settled: null, itemView: null, aggregates: null, searchNames: null, farmAreas: null, rankingWeeks: null, auctionHistory: null, professions: null, mapPins: null,
+  settled: null, itemView: null, npcFacts: null, aggregates: null, searchNames: null, farmAreas: null, rankingWeeks: null, auctionHistory: null, professions: null, mapPins: null,
   databaseActivity: null, guildLadder: null, marketBoards: null, coverage: null, auctionReports: null, failed: [], timings: {},
 };
 

@@ -1,4 +1,4 @@
-import { questPage, questScope, zonesFor, type QuestSighting, type VendorOffer, type WorldFacts } from "@kb/world-pages";
+import { npcZonesOf, questPage, questScope, type QuestSighting, type VendorOffer, type WorldFacts } from "@kb/world-pages";
 import { recheckRows } from "@kb/fact-states";
 import { scopeSince } from "@kb/recheck-scopes";
 
@@ -15,7 +15,7 @@ function reported(rows: readonly { installId: string; capturedAt?: string }[], n
 
 /** Uses only the stored world facts already loaded for the page. */
 export function npcRelations(npcId: number, facts: WorldFacts, now: number) {
-  const zones = facts.recheck?.length ? zonesFor(facts.npcs) : new Map<number, number | null>();
+  const zones = facts.recheck?.length ? npcZonesOf(facts) : new Map<number, number | null>();
   let questsReported = 0;
   const candidates = new Set(facts.quests.filter((r) => r.giverNpcId === npcId || r.turnInNpcId === npcId).map((r) => r.questId));
   const grouped = new Map<number, QuestSighting[]>();

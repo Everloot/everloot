@@ -104,6 +104,7 @@ test("stored facts give the same answer with zero corpus reads", async () => {
   const { buildMapPins, encodeMapPins, forgetStoredMapPins, MAP_PINS_KEY } = await import("@/lib/map-pins-store");
   const { buildAggregates } = await import("@/lib/aggregate-set");
   const { encodeAggregates, forgetStoredAggregates } = await import("@/lib/aggregate-store");
+  const { buildNpcFacts, forgetStoredNpcFacts, NPC_FACTS_KEY } = await import("@/lib/npc-facts-store");
   // An NPC, a vendor three installs agree on, both on Eastern Kingdoms, and an NPC in a held-back zone on Kalimdor.
   const vendor = ["install-secret-a", "install-secret-b", "install-secret-c"].map((installId) => ({
     kind: "vendor", installId, vendorNpcId: 8, items: [{ itemId: 159, priceCopper: 25 }], capturedAt: "2026-10-17T00:00:00Z",
@@ -122,11 +123,14 @@ test("stored facts give the same answer with zero corpus reads", async () => {
   store.loadCorpus.mockClear();
   forgetStoredMapPins();
   forgetStoredAggregates();
+  forgetStoredNpcFacts();
   for (const [key, value] of Object.entries({ R2_ACCOUNT_ID: "acct", R2_ACCESS_KEY_ID: "id", R2_SECRET_ACCESS_KEY: "secret", R2_BUCKET: "uploads" })) vi.stubEnv(key, value);
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const url = (input as Request).url;
     return new Response(url.endsWith("snapshots/aggregates.json")
       ? encodeAggregates(buildAggregates(corpus as unknown as import("@/lib/upload-store").Corpus), "now")
+      : url.endsWith(NPC_FACTS_KEY)
+        ? JSON.stringify(buildNpcFacts(buildAggregates(corpus as unknown as import("@/lib/upload-store").Corpus)))
       : url.endsWith(MAP_PINS_KEY)
         ? encodeMapPins(buildMapPins(corpus), "now") : "{}" );
   }));

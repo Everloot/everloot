@@ -114,7 +114,7 @@ async function overviewFacts(groups: SearchGroup[]): Promise<OverviewFacts> {
   if (!got || got[0].unreachable) return NO_FACTS;
   const [facts, rollup] = got;
   const quests = questIds.size ? publicQuests({ ...facts, quests: facts.quests.filter((r) => questIds.has(r.questId)) }) : [];
-  const npcs = npcIds.size ? npcRows({ ...facts, npcs: facts.npcs.filter((r) => npcIds.has(r.npcId)) }, rollup.rates.filter((r) => r.sourceNpcId !== undefined && npcIds.has(r.sourceNpcId))) : [];
+  const npcs = npcIds.size ? npcRows(facts, rollup.rates.filter((r) => r.sourceNpcId !== undefined && npcIds.has(r.sourceNpcId)), npcIds) : [];
   return { quests: new Map(quests.map((x) => [x.questId, x])), npcs: new Map(npcs.map((n) => [n.npcId, n])) };
 }
 

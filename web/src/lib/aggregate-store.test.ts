@@ -9,12 +9,15 @@ import { buildAggregates, type AggregateSet } from "./aggregate-set";
 import {
   AGGREGATES_KEY, AGGREGATES_REVISION, anonymousAggregates, encodeAggregates, forgetStoredAggregates, loadStoredAggregates, parseAggregates, writeAggregates,
 } from "./aggregate-store";
-import { computeRollups, loadAddonLeaderboard, loadItemFacts } from "./rollup-compute";
+import { buildNpcFacts, forgetStoredNpcFacts, NPC_FACTS_KEY } from "./npc-facts-store";
+import { computeRollups, loadAddonLeaderboard, loadItemFacts, loadWorldFacts } from "./rollup-compute";
+import { npcRows, publicQuests, publicVendors } from "./world-lists";
+import { npcNames } from "./names";
 
 test.each(["error", "throw", "malformed", "missing"])("strict hover-card reads reject a %s refresh, including its retry window", async (failure) => {
   forgetStoredAggregates();
   let now = 0;
-  const text = encodeAggregates(buildAggregates(corpus(anonymousRows())), "2026-11-06T12:00:00.000Z");
+  const text = encodeAggregates(buildAggregates(corpus(anonymousRows())), "2026-11-06T12:00:00.000Z", WITH_ROWS);
   const fetcher = vi.fn(async () => new Response(text));
   const deps = { cloud: CLOUD, fetch: fetcher, now: () => now };
   expect(await loadStoredAggregates({ ...deps, strict: true })).not.toBeNull();
@@ -102,11 +105,16 @@ function namedRows(): IntakeRecord[] {
 const corpus = (records: IntakeRecord[]) => ({ uploads: INSTALLS.length, records, dataAsOf: AS_OF });
 /** A set with its addon history worked out, so two sets compare as values. */
 const plain = (set: AggregateSet) => ({ ...set, addonTrends: set.addonTrends() });
+/** The set as a file without the NPC sightings reads back: their agreed table is stored apart (npc-facts-store.ts). */
+const apart = (set: AggregateSet) => ({ ...plain(set), world: { ...set.world, npcs: [] } });
+/** A file written the old way, with the sightings in it: the loader tests below serve this one file alone. */
+const WITH_ROWS = { keepNpcRows: true };
 /** The tables alone: the key and record count say how many rows went in, not what any table holds. */
 const tables = (set: AggregateSet) => { const { key: _key, records: _records, ...rest } = plain(set); return rest; };
 
 beforeEach(() => {
   forgetStoredAggregates();
+  forgetStoredNpcFacts();
   store.loadCorpus.mockReset();
 });
 afterEach(() => {
@@ -127,11 +135,16 @@ test("the fixture fills every table, so the round trip below checks each one", (
   expect(empty).toEqual([]);
 });
 
-test("the stored file reads back as exactly the set the cron worked out", () => {
+test("the stored file reads back as exactly the set the cron worked out, the NPC sightings left out", () => {
   const set = buildAggregates(corpus(anonymousRows()));
   const read = parseAggregates(encodeAggregates(set, "2026-11-06T12:05:00.000Z"));
   expect(read?.generatedAt).toBe("2026-11-06T12:05:00.000Z");
-  expect(plain(read!.set)).toEqual(plain(set));
+  expect(read?.npcsApart).toBe(true);
+  expect(plain(read!.set)).toEqual(apart(set));
+  // A file that kept them (the old shape, or a run whose NPC facts failed) reads back whole.
+  const whole = parseAggregates(encodeAggregates(set, "2026-11-06T12:05:00.000Z", WITH_ROWS));
+  expect(whole?.npcsApart).toBe(false);
+  expect(plain(whole!.set)).toEqual(plain(set));
   expect(read!.set.itemFacts).toBeInstanceOf(Map);
   expect(read!.set.crafted).toBeInstanceOf(Set);
   expect(read!.set.loot.sources).toBeInstanceOf(Map);
@@ -186,6 +199,12 @@ test("a file stamped before the current revision is rewritten by an idle run, an
   const put = (older.mock.calls[1] as unknown as [Request])[0];
   expect(put.method).toBe("PUT");
   expect(put.headers.get("x-amz-meta-data-as-of")).toBe(`${AS_OF};${AGGREGATES_REVISION}`);
+  // A file that keeps the sightings carries the revision before, so the next run writes it again without them.
+  const kept = head(404);
+  await writeAggregates({ added: 1, dataAsOf: AS_OF, keepNpcRows: true }, { cloud: CLOUD, fetch: kept as unknown as typeof fetch, build: async () => set });
+  const keptPut = (kept.mock.calls[0] as unknown as [Request])[0];
+  expect(keptPut.headers.get("x-amz-meta-data-as-of")).not.toBe(`${AS_OF};${AGGREGATES_REVISION}`);
+  expect(parseAggregates(await keptPut.text())?.npcsApart).toBe(false);
 });
 
 test("the cron writes the file when the run added uploads or rebuilt, or when there is none; an idle run with a file only asks", async () => {
@@ -203,7 +222,7 @@ test("the cron writes the file when the run added uploads or rebuilt, or when th
   expect(put.url).toContain(AGGREGATES_KEY);
   const body = await put.text();
   expect(wrote.bytes).toBe(new TextEncoder().encode(body).length);
-  expect(plain(parseAggregates(body)!.set)).toEqual(plain(set));
+  expect(plain(parseAggregates(body)!.set)).toEqual(apart(set));
   for (const opts of [{ added: 3, dataAsOf: AS_OF }, { added: 0, rebuild: true, dataAsOf: AS_OF }]) {
     const f = head(200);
     expect(await writeAggregates(opts, { cloud: CLOUD, fetch: f as unknown as typeof fetch, build })).toMatchObject({ written: true });
@@ -219,7 +238,7 @@ test("by default the cron builds from the corpus's anonymous rows, and an unreac
   const f = head(404);
   await writeAggregates({ added: 1, dataAsOf: AS_OF }, { cloud: CLOUD, fetch: f as unknown as typeof fetch });
   const body = await ((f.mock.calls[0] as unknown as [Request])[0]).text();
-  expect(plain(parseAggregates(body)!.set)).toEqual(plain(buildAggregates(corpus(anonymousRows()))));
+  expect(plain(parseAggregates(body)!.set)).toEqual(apart(buildAggregates(corpus(anonymousRows()))));
   expect(body).not.toContain("Shadowed");
   expect(body).not.toContain("Hidden Guild");
   store.loadCorpus.mockResolvedValue({ uploads: 0, records: [], unreachable: true });
@@ -229,7 +248,7 @@ test("by default the cron builds from the corpus's anonymous rows, and an unreac
 });
 
 test("a page keeps the file five minutes, sends its ETag after, and keeps the same set while the file is the same", async () => {
-  const text = encodeAggregates(buildAggregates(corpus(anonymousRows())), AS_OF);
+  const text = encodeAggregates(buildAggregates(corpus(anonymousRows())), AS_OF, WITH_ROWS);
   const fetch = vi.fn(async (req: Request) => req.headers.get("if-none-match") === "\"v1\""
     ? new Response(null, { status: 304 })
     : new Response(text, { status: 200, headers: { etag: "\"v1\"" } }));
@@ -280,7 +299,7 @@ test("the answers read the stored set instead of the corpus; with no file, or a 
   vi.stubEnv("R2_SECRET_ACCESS_KEY", "s");
   vi.stubEnv("R2_BUCKET", "uploads");
   const live = buildAggregates(corpus(anonymousRows()));
-  const fetch = vi.fn(async () => new Response(encodeAggregates(live, AS_OF), { status: 200 }));
+  const fetch = vi.fn(async () => new Response(encodeAggregates(live, AS_OF, WITH_ROWS), { status: 200 }));
   vi.stubGlobal("fetch", fetch);
   const facts = await loadItemFacts();
   expect(facts.unreachable).toBe(false);
@@ -300,7 +319,7 @@ test("the answers read the stored set instead of the corpus; with no file, or a 
 });
 
 test("concurrent cold aggregate readers download and parse one shared set", async () => {
-  const text = encodeAggregates(buildAggregates(corpus(anonymousRows())), AS_OF);
+  const text = encodeAggregates(buildAggregates(corpus(anonymousRows())), AS_OF, WITH_ROWS);
   const fetcher = vi.fn(async () => new Response(text));
   const values = await Promise.all(Array.from({ length: 8 }, (_, i) => loadStoredAggregates({ cloud: CLOUD, fetch: fetcher, strict: i % 2 === 0 })));
   expect(fetcher).toHaveBeenCalledTimes(1);
@@ -312,7 +331,7 @@ test("concurrent cold aggregate readers download and parse one shared set", asyn
 
 test("concurrent refreshes share the read while strict readers still reject stale data on failure", async () => {
   let now = 0;
-  const text = encodeAggregates(buildAggregates(corpus(anonymousRows())), AS_OF);
+  const text = encodeAggregates(buildAggregates(corpus(anonymousRows())), AS_OF, WITH_ROWS);
   const fetcher = vi.fn(async () => new Response(text));
   const deps = { cloud: CLOUD, fetch: fetcher, now: () => now };
   const first = await loadStoredAggregates(deps);
@@ -325,4 +344,37 @@ test("concurrent refreshes share the read while strict readers still reject stal
   fetcher.mockImplementation(async () => new Response(text));
   expect(await loadStoredAggregates(deps)).toBe(first);
   expect(fetcher).toHaveBeenCalledTimes(3);
+});
+
+test("a file without the NPC sightings reads with the stored NPC table on its world facts, and the NPC answers are the same", async () => {
+  vi.stubEnv("R2_ACCOUNT_ID", "acct");
+  vi.stubEnv("R2_ACCESS_KEY_ID", "id");
+  vi.stubEnv("R2_SECRET_ACCESS_KEY", "s");
+  vi.stubEnv("R2_BUCKET", "uploads");
+  const live = buildAggregates(corpus(anonymousRows()));
+  const files = new Map([[AGGREGATES_KEY, encodeAggregates(live, AS_OF)], [NPC_FACTS_KEY, JSON.stringify(buildNpcFacts(live))]]);
+  const fetch = vi.fn(async (req: Request) => {
+    const body = files.get(new URL(req.url).pathname.split("/").slice(2).join("/"));
+    return body === undefined ? new Response(null, { status: 404 }) : new Response(body, { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetch);
+  const world = await loadWorldFacts();
+  expect(world.unreachable).toBe(false);
+  expect(world.npcs).toEqual([]);
+  expect([...world.agreedNpcs!.keys()]).toEqual([100, 200, 300]);
+  expect(npcRows(world, live.drops.rates)).toEqual(npcRows(live.world, live.drops.rates));
+  expect(publicQuests(world)).toEqual(publicQuests(live.world));
+  expect(publicVendors(world)).toEqual(publicVendors(live.world));
+  expect([...npcNames(world)]).toEqual([...npcNames(live.world)]);
+  // Read again within the five minutes: the same set, so the memos keyed on it hold.
+  expect(await loadStoredAggregates()).toBe(await loadStoredAggregates());
+  expect(store.loadCorpus).not.toHaveBeenCalled();
+  // With no table beside it the set is incomplete: it reads as no file, and the answers work it out from the corpus.
+  forgetStoredAggregates();
+  forgetStoredNpcFacts();
+  files.delete(NPC_FACTS_KEY);
+  expect(await loadStoredAggregates()).toBeNull();
+  store.loadCorpus.mockResolvedValue(corpus(anonymousRows()));
+  expect(npcRows(await loadWorldFacts(), live.drops.rates)).toEqual(npcRows(live.world, live.drops.rates));
+  expect(store.loadCorpus).toHaveBeenCalled();
 });

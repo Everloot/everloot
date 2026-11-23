@@ -8,6 +8,7 @@ import { anonymousAggregates, writeAggregates } from "@/lib/aggregate-store";
 import type { AggregateSet } from "@/lib/aggregate-set";
 import { writeSearchNames } from "@/lib/search-names-store";
 import { writeFarmAreas } from "@/lib/farm-areas-store";
+import { writeNpcFacts } from "@/lib/npc-facts-store";
 import { writeRankingWeeks } from "@/lib/ranking-weeks-store";
 import { rankingWeeks } from "@/lib/rankings";
 import { buildAuctionHistory, writeAuctionHistory } from "@/lib/auction-history-store";
@@ -86,6 +87,7 @@ type Written = { written: boolean };
 export interface StoredViewsResult {
   settled: (Written & { facts?: number; week?: string }) | null;
   itemView: (Written & { items?: number }) | null;
+  npcFacts: (Written & { npcs?: number; bytes?: number }) | null;
   aggregates: (Written & { bytes?: number }) | null;
   searchNames: (Written & { bytes?: number }) | null;
   farmAreas: (Written & { bytes?: number }) | null;
@@ -155,7 +157,11 @@ export async function runStoredViews(run: StoredViewsRun): Promise<StoredViewsRe
     sharedFailed.aggregates = true;
     throw err;
   }));
-  const aggregates = await step("aggregates", "aggregates", () => writeAggregates({ added, rebuild, dataAsOf }, { build: aggregateSet }));
+  // What the agreement rules give each NPC (lib/npc-facts-store.ts), from the same set and before the aggregates: the
+  // aggregates file leaves the raw NPC sightings out, so the pages read this table instead (#1464). When it could not
+  // be written, the aggregates keep the sightings this run, stamped so the next run writes both again.
+  const npcFacts = await step("npcFacts", "NPC facts", () => writeNpcFacts({ added, rebuild, dataAsOf }, { build: aggregateSet }));
+  const aggregates = await step("aggregates", "aggregates", () => writeAggregates({ added, rebuild, dataAsOf, keepNpcRows: npcFacts === null }, { build: aggregateSet }));
   // The names the site's own search matches (lib/search-names-store.ts), a few hundred KB from the same set, so a fresh
   // instance never parses the aggregates for a keystroke. Written on the runs that build the set anyway (uploads added,
   // a rebuild, or aggregates just written), never by an idle run for itself: the set is the cron's heaviest step
@@ -217,7 +223,7 @@ export async function runStoredViews(run: StoredViewsRun): Promise<StoredViewsRe
   releaseKept();
   const auctionReports = run.reportsDue ? await step("auctionReports", "auction reports", () => writeAuctionReports()) : null;
   releaseKept();
-  return { settled, itemView, aggregates, searchNames, farmAreas, auctionHistory, professions, mapPins, databaseActivity, rankingWeeks: rankingWeeksView, guildLadder, marketBoards, coverage, auctionReports, failed, timings };
+  return { settled, itemView, npcFacts, aggregates, searchNames, farmAreas, auctionHistory, professions, mapPins, databaseActivity, rankingWeeks: rankingWeeksView, guildLadder, marketBoards, coverage, auctionReports, failed, timings };
 }
 
 /**

@@ -11,7 +11,8 @@ vi.mock("./settled-store", () => ({ readSettledList: vi.fn() }));
 
 import { createToolHandlers, type ToolName } from "@kb/mcp-server";
 import { openDb, type DB } from "@kb/db";
-import { anonymousAggregates } from "./aggregate-store";
+import { anonymousAggregates, encodeAggregates, parseAggregates } from "./aggregate-store";
+import { buildNpcFacts, parseNpcFacts } from "./npc-facts-store";
 import { storedToolFacts, toolLoaders } from "./mcp-mount";
 
 /**
@@ -48,7 +49,10 @@ function rows(): IntakeRecord[] {
 }
 
 const corpus = { uploads: INSTALLS.length, records: rows(), dataAsOf: AS_OF, unreachable: false };
-const set = anonymousAggregates(corpus);
+/** The set as loadStoredAggregates gives it: the file without the NPC sightings, with the stored NPC table on its world facts. */
+const live = anonymousAggregates(corpus);
+const read = parseAggregates(encodeAggregates(live, AS_OF))!.set;
+const set = { ...read, world: { ...read.world, agreedNpcs: parseNpcFacts(JSON.stringify(buildNpcFacts(live)))!.npcs } };
 
 /** One call per switched tool, each on an entity the fixture fills. */
 const CALLS: Record<string, (h: ReturnType<typeof createToolHandlers>) => unknown> = {

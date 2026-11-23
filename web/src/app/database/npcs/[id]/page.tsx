@@ -8,7 +8,7 @@ import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasCard } from "@/lib/tooltip";
-import { npcNameReporters, npcPage, npcTraits, vendorPage, type NpcPin, type NpcRank } from "@kb/world-pages";
+import { agreedNpc, npcNameReporters, npcPage, npcTraits, vendorPage, type NpcPin, type NpcRank } from "@kb/world-pages";
 import { pendingLine } from "@kb/pending-loot";
 import { npcLootTable } from "@kb/loot-tables";
 import { computeRollups, loadLootTables, loadWorldFacts } from "@/lib/rollup-compute";
@@ -87,7 +87,7 @@ export default async function NpcPage(props: { params: Promise<{ id: string }> }
   const now = Date.now();
   const { quests, goodsEvidence, goodsReported, questsReported } = npcRelations(npcId, facts, now);
   // The same traits as the NPC list, each shown when 3 installs agree.
-  const traits = npcTraits(facts.npcs.filter((r) => r.npcId === npcId), facts.recheck);
+  const traits = agreedNpc(npcId, facts) ?? npcTraits([]);
   const pending = !unreachable && page.pendingLoot ? <p className="py-2 text-meta text-fg-2">{pendingLine(page.pendingLoot)}</p> : null;
   const shown = shownNpcName(npcId, { ...facts, unreachable }, wiki);
   const title = shown.name ?? `NPC ${page.npcId}`;
