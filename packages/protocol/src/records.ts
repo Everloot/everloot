@@ -88,7 +88,7 @@ export const lootWindow = base.extend({
   copper: z.number().int().min(1).max(10_000_000_000).optional().describe("The coin in the window, in copper. Absent when the window held none or the addon could not read it."),
   sourceEvidence: z.enum(["loot-api", "empty-window"]).optional().describe("Where the source came from (`loot-api`: the loot API named it; `empty-window`: a kill window with nothing in it, which the loot API cannot name, so the addon took the one dead creature the player could loot, and the row has no items and no coin, so it only adds a window to the count of its source). Legacy target guesses are withheld from public loot observations."),
   items: z.array(z.object({ itemId: z.number().int().positive(), count: z.number().int().min(1).max(1000) })).max(50),
-  mapId: z.number().int().nonnegative().optional().describe("With an object source: the map the player stood on when the object was opened. Older addons send none."),
+  mapId: z.number().int().nonnegative().optional().describe("The map the player stood on: with an object source, when the object was opened; with a kill window (`lootType` `kill`), when the corpse was looted, a few yards from where the creature died. Absent when the client gave no position (an instance), on other windows and from older addons."),
   x: z.number().min(0).max(100).optional().describe("The player's x on that map, 0 to 100."),
   y: z.number().min(0).max(100).optional().describe("The player's y on that map, 0 to 100."),
   gatherKind: z.enum(GATHER_KINDS).optional().describe("How the object was opened, from the spell cast on it (`GATHER_KINDS`); `other` when the spell is not one the addon knows."),

@@ -163,3 +163,18 @@ test("tiered drop names respect recheck and leave other name readers at three in
   expect(agreedLabelsById([...old, ...fresh], since, true).get(7001)).toEqual({ name: "Fixture New", tier: "verified" });
   expect(agreedLabelsById([...old, ...fresh], since).size).toBe(0);
 });
+
+test("a kill loot window with a place adds one kill place per install, NPC and map; other windows add none", () => {
+  const kill = { kind: "loot", installId: "a", sourceEvidence: "loot-api", lootType: "kill", sourceNpcId: 6, items: [], mapId: 1429, x: 40, y: 60 };
+  const facts = worldFactsFromRecords([
+    kill, { ...kill, x: 41 }, { ...kill, installId: "b" }, { ...kill, mapId: 1436 },
+    { ...kill, installId: "c", mapId: undefined, x: undefined, y: undefined },
+    { ...kill, installId: "d", lootType: "skinning" },
+    { ...kill, installId: "e", sourceEvidence: "empty-window" },
+    { ...kill, installId: "f", sourceNpcId: undefined, sourceObjectId: 1618, lootType: "gather" },
+  ]);
+  expect(facts.kills).toEqual([
+    { installId: "a", npcId: 6, mapId: 1429 }, { installId: "b", npcId: 6, mapId: 1429 }, { installId: "a", npcId: 6, mapId: 1436 },
+  ]);
+  expect(worldFactsFromRecords([{ ...kill, mapId: undefined }])).not.toHaveProperty("kills");
+});

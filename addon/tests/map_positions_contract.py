@@ -2,7 +2,8 @@
 
 Positions for the world map. At an NPC window the player's position is recorded as the NPC's
 (`positionKind = "interaction"`) with the window's role; at an object's loot window the row gains the
-player's position, how the object was opened (from UNIT_SPELLCAST_SENT) and its name. The event names
+player's position, how the object was opened (from UNIT_SPELLCAST_SENT) and its name; a kill's loot window gains
+the player's position alone, which places the mob's zone. The event names
 and the spellcast arguments follow Blizzard's documented signatures and were not checked on the Forever
 client, so every missing event, call or field must record nothing rather than error.
 """
@@ -284,15 +285,37 @@ event('UNIT_SPELLCAST_SENT')
 loot('GameObject-0-1-2-3-7008-0000000001')
 assert(lastLoot().gatherKind == 'other' and lastLoot().sourceObjectName == nil, 'odd arguments never error')
 
--- A creature's corpse gets no position or object fields, even right after a cast.
+-- A kill window carries the player's position, which places the mob's zone, and no object fields, even right after
+-- a cast that never succeeded.
 local count = #rows()
 event('UNIT_SPELLCAST_SENT', 'player', 'Kobold', 'Cast-10', 8613)
 loot('Creature-0-1-2-3-6-0000000099')
-local corpse = lastLoot()
-assert(#rows() == count + 1 and corpse.sourceNpcId == 6 and corpse.mapId == nil and corpse.x == nil and corpse.gatherKind == nil)
+local kill = lastLoot()
+assert(#rows() == count + 1 and kill.sourceNpcId == 6 and kill.lootType == 'kill', 'a kill window')
+assert(kill.mapId == 1411 and math.abs(kill.x - 51.2) < 1e-9 and math.abs(kill.y - 42.8) < 1e-9, 'the kill carries the player position')
+assert(kill.gatherKind == nil and kill.sourceObjectName == nil and kill.sourceObjectId == nil)
+-- Skinning and pick-pocketing the creature place nothing: only the kill does.
+event('UNIT_SPELLCAST_SENT', 'player', 'Kobold', 'Cast-10b', 8613)
+event('UNIT_SPELLCAST_SUCCEEDED', 'player', 'Cast-10b', 8613)
+loot('Creature-0-1-2-3-6-0000000099')
+assert(#rows() == count + 2 and lastLoot().lootType == 'skinning' and lastLoot().mapId == nil and lastLoot().x == nil and lastLoot().gatherKind == nil)
+event('UNIT_SPELLCAST_SENT', 'player', 'Kobold', 'Cast-pp', 921)
+loot('Creature-0-1-2-3-6-0000000101')
+assert(#rows() == count + 3 and lastLoot().lootType == 'pickpocket' and lastLoot().mapId == nil, 'a pickpocket window carries no position')
 
--- No position: the object row is kept, without one.
+-- No position: the kill and object rows are kept, without one (an instance has a map but no position).
 px = nil
+loot('Creature-0-1-2-3-6-0000000102')
+assert(lastLoot().lootType == 'kill' and lastLoot().mapId == nil and lastLoot().x == nil and lastLoot().y == nil, 'no position on the kill')
+map = nil
+loot('Creature-0-1-2-3-6-0000000103')
+assert(lastLoot().lootType == 'kill' and lastLoot().mapId == nil, 'no map: no position')
+map = 1411
+local getPos = C_Map.GetPlayerMapPosition
+C_Map.GetPlayerMapPosition = function() error('broken') end
+loot('Creature-0-1-2-3-6-0000000104')
+assert(lastLoot().lootType == 'kill' and lastLoot().mapId == nil, 'a failing position call records the kill without one')
+C_Map.GetPlayerMapPosition = getPos
 event('UNIT_SPELLCAST_SENT', 'player', 'Peacebloom', 'Cast-11', 2366)
 loot('GameObject-0-1-2-3-1618-0000000099')
 assert(lastLoot().mapId == nil and lastLoot().x == nil and lastLoot().gatherKind == 'herb')
@@ -310,7 +333,7 @@ loot('GameObject-0-1-2-3-1618-0000000097')
 assert(#rows() == count)
 """)
 counts = check_all(lua)
-assert counts["loot"] == 23, counts
+assert counts["loot"] == 28, counts
 
 # --- Budgets: a full targeting share and a full corpse share never stop NPC windows or object positions ---
 # An upgraded file: five targeting rows (one from before positionKind existed) and five corpse rows, with
@@ -540,4 +563,4 @@ counts = check_all(lua)
 assert counts == {"instance_entrance": 2, "encounter": 3}, counts
 print("Lua 5.1 map positions: NPC windows (merchant, repair, trainer, quest detail and greeting, taxi, bank, auction house, "
       "stable, innkeeper, gossip, interaction manager) record interaction positions once per NPC, role and map; targeting stays "
-      "player; object loot rows carry position, gather kind and name; missing events, calls and fields record nothing")
+      "player; object loot rows carry position, gather kind and name; kill loot rows carry position; missing events, calls and fields record nothing")

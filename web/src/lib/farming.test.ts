@@ -1,6 +1,8 @@
 import { describe, expect, test } from "vitest";
 import type { ObjectSpawnRow } from "@kb/object-spawns";
-import { gatherAreas, HERB_IDS, HERBALISM_SKILL_LINE, herbIndex, herbZones, professionTrainers } from "./farming";
+import type { KillPlace } from "@kb/world-pages";
+import { farmingAreas, gatherAreas, HERB_IDS, HERBALISM_SKILL_LINE, herbIndex, herbZones, professionTrainers } from "./farming";
+import { bareNpcRow } from "./world-lists";
 import { publicZones, type ZoneSummary } from "./zones";
 
 const zones: ZoneSummary[] = [
@@ -28,6 +30,35 @@ describe("gathering areas", () => {
     ];
     expect(gatherAreas(rows, "herb", zones)).toEqual([{ key: "1", zone: zones[0], levels: null, mobs: 0, nodes: 1, skill: { min: 1, median: 25, installs: 3 } }]);
     expect(gatherAreas(rows, "ore", zones)[0]!.skill).toEqual({ min: 125, median: 125, installs: 3 });
+  });
+});
+
+describe("mob farming areas", () => {
+  // A mob with public loot whose agreed pin is in Zone Two, and kills looted on Zone One's map.
+  const mob = { ...bareNpcRow(6), zone: zones[1]!, level: 7 };
+  const rates = [{ sourceNpcId: 6, itemId: 2589, drops: 3, public: true }];
+  const kill = (installId: string, mapId = 1): KillPlace => ({ installId, npcId: 6, mapId });
+  const gold = (kills: KillPlace[]) => farmingAreas([mob], rates, kills, zones).gold.map((a) => [a.zone.mapId, a.mobs, a.levels]);
+
+  test("3 installs looting a mob's kills on a zone's map place it in that zone", () => {
+    expect(gold([kill("a"), kill("b"), kill(" c ")])).toEqual([[1, 1, { min: 7, max: 7 }]]);
+  });
+
+  test("2 installs, one install looting many times, or another zone's map fall back to the agreed pin", () => {
+    expect(gold([kill("a"), kill("b")])).toEqual([[2, 1, { min: 7, max: 7 }]]);
+    expect(gold([kill("a"), kill("a"), kill("a ")])).toEqual([[2, 1, { min: 7, max: 7 }]]);
+    expect(gold(["a", "b", "c"].map((i) => kill(i, 99)))).toEqual([[2, 1, { min: 7, max: 7 }]]);
+  });
+
+  test("with no kill places the agreed pin decides, and a mob with neither has no zone", () => {
+    expect(gold([])).toEqual([[2, 1, { min: 7, max: 7 }]]);
+    expect(farmingAreas([{ ...mob, zone: null }], rates, [], zones).gold).toEqual([]);
+    expect(farmingAreas([{ ...mob, zone: null }], rates).gold).toEqual([]);
+  });
+
+  test("a mob killed by 3 installs in two zones counts in both", () => {
+    const both = ["a", "b", "c"].flatMap((i) => [kill(i, 1), kill(i, 2)]);
+    expect(gold(both)).toEqual([[1, 1, { min: 7, max: 7 }], [2, 1, { min: 7, max: 7 }]]);
   });
 });
 

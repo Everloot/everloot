@@ -25,7 +25,7 @@ import { uploadStore, type Corpus, type R2Config } from "./upload-store";
 
 export const AGGREGATES_KEY = "snapshots/aggregates.json";
 /** The set's shape in the file's stamp. Change it when the set gains a table, so the next cron rewrites the file. */
-export const AGGREGATES_REVISION = "disenchant-1";
+export const AGGREGATES_REVISION = "kills-1";
 /** How long one server instance keeps the file before asking for it again: the cron rewrites it at most every 10 minutes. */
 const KEEP_MS = 5 * 60_000;
 /** A missing or unreadable file is asked for again after a minute, not after the full KEEP_MS. */
