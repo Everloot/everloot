@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Everloot on CurseForge</title>
+  <style>
+    body { margin: 0 auto; max-width: 900px; font: 1rem/1.6 system-ui, sans-serif; }
+    h1, h2, h3 { line-height: 1.2; }
+    h1 { margin: .9em 0 .4em; }
+    h2 { margin: 1.3em 0 .45em; }
+    h3 { margin: .9em 0 .3em; }
+    p { margin: .7em 0; }
+    h3 + p { margin-top: .35em; }
+    img { vertical-align: middle; }
+    a { color: inherit; }
+    li + li { margin-top: .35em; }
+    p > code { overflow-wrap: break-word; }
+  </style>
+</head>
+<body>
+<!-- Replace the relative image paths with their public image URLs, then copy the description between the comments into the CurseForge editor. -->
+<div>
+  <img src="everloot-banner-branded.png" alt="Everloot for World of Warcraft: Forever. Everloot's lime diamond and wordmark beside a treasure chest filled with glowing green crystals." style="display:block;width:100%;border-radius:8px">
+
+  <h1>Track gold and price loot in WoW: Forever</h1>
+  <p>Everloot is a free, open-source add-on. See what a farm earns, check prices and drop sources on item tooltips, and compare recipe costs before buying materials. It also brings flight timers, a minimap button drawer, and talent and raid planners into the game.</p>
+  <p><strong>Just installed?</strong> Click the lime diamond on your minimap or type <code>/everloot window</code>. To time your first farm, type <code>/everloot gph start</code>.</p>
+
+  <h2>See Everloot in game</h2>
+  <div style="display:flex;flex-wrap:wrap;gap:16px">
+    <div style="flex:1;min-width:220px">
+      <h3>Gold Overview</h3>
+      <img src="screenshots/gold-overview.webp" alt="Gold earned, gold spent, profit, and a 30-day balance history in the Everloot Gold window." style="display:block;width:100%;border-radius:6px">
+    </div>
+    <div style="flex:1;min-width:220px">
+      <h3>Everloot Home</h3>
+      <img src="screenshots/everloot-home.webp" alt="The Home screen with gold on hand, profession ranks, and a character roster." style="display:block;width:100%;border-radius:6px">
+    </div>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:16px">
+    <div style="flex:1;min-width:220px">
+      <h3>Profession ranks and trainers</h3>
+      <img src="screenshots/profession-ranks.webp" alt="The Professions view with skill bars, recipe counts, and trainer entries." style="display:block;width:100%;border-radius:6px">
+    </div>
+    <div style="flex:1;min-width:220px">
+      <h3>Achievement progress</h3>
+      <img src="screenshots/achievement-progress.webp" alt="The Collection tab with achievement progress and character and account filters." style="display:block;width:100%;border-radius:6px">
+    </div>
+  </div>
+
+  <h2>Gold, auctions &amp; professions</h2>
+  <div style="border:solid #68894a;border-width:0 0 0 2px;padding-left:16px">
+    <h3>Gold &amp; farming</h3>
+    <p>See the gold on every character you play. The ledger shows income and spending, the Sales tab tracks auction proceeds, and the session timer measures gold per hour while you farm.</p>
+
+    <h3>Auction house</h3>
+    <p>Start a scan from the Everloot tab, look up items by name and keep shopping lists with quantities and price caps. <strong>Open in Buy</strong> searches the game's Buy tab for the item. The Sell tab can flag when vendoring or disenchanting may pay more. You control every purchase, bid and listing.</p>
+
+    <h3>Crafting costs</h3>
+    <p>See your profession ranks and recipe costs, compare the product's estimated value with its reagent costs, and send the materials for a batch to your shopping list.</p>
+
+    <h3>Item tooltips &amp; disenchanting</h3>
+    <p>Hover an item to see available auction and vendor prices, your own sale and purchase history, drop rates, sources and disenchant estimates. Open <strong>Disenchanting</strong> in Everloot to review your materials and their estimated value. Use <code>/everloot price</code> or <code>/everloot where</code> with an item link to look it up in chat.</p>
+  </div>
+  <p>Your own scans can supply prices in game. The optional <a href="https://everloot.app/addon">Everloot Desktop App</a> adds community prices, observed drop rates and crafting market estimates when data is available. Auction snapshots show asking prices. Drop rates include the number of loot windows behind the estimate.</p>
+
+  <h2>Minimap &amp; travel</h2>
+  <h3>Minimap button drawer</h3>
+  <p>Gather compatible add-on buttons into a drawer beside the Everloot crest. Run <code>/everloot buttons on</code>, then <code>/reload</code>. Hover the crest to open the drawer. Left-click opens Everloot and right-click opens settings. <code>/everloot buttons off</code> puts the buttons back after a reload.</p>
+  <div style="background-color:#0e0f0d;color:#f1eddd;border:1px solid #465433;border-radius:8px;padding-left:16px">
+    <p><strong style="color:#9cf03a">◇ Everloot crest</strong> &nbsp;→&nbsp; <span style="border:1px solid #66794b;border-radius:6px">&nbsp; ● &nbsp; ▲ &nbsp; ■ &nbsp;</span></p>
+    <p style="font-size:13px;color:#c4cbb9">Hover the crest to reveal the grouped buttons. Illustration.</p>
+  </div>
+
+  <h3>Flight path tracker</h3>
+  <p>Hover over a destination on the flight map to see its estimated travel time. Once airborne, the bar shows the route and time remaining when available. Everloot remembers completed trips to improve your estimates. Toggle it with <code>/everloot flight on</code> or <code>/everloot flight off</code>.</p>
+  <div style="background-color:#0e0f0d;color:#f1eddd;border:1px solid #465433;border-radius:8px;padding-left:16px">
+    <p><strong style="color:#9cf03a">◆ ◆ ◆ ◈</strong> <span style="color:#929c85">◇ ◇ ◇</span> &nbsp; About 0:48 left</p>
+    <p style="font-size:13px;color:#c4cbb9">Diamonds fill as you fly. Example flight display.</p>
+  </div>
+
+  <h2>Planners &amp; everyday helpers</h2>
+  <ul>
+    <li><strong>Talent and raid planners.</strong> Type <code>/everloot</code> to import a plan from the <a href="https://everloot.app/tools/talents">talent calculator</a> or <a href="https://everloot.app/tools/raid">raid planner</a>. Follow the next talent point when the plan includes an order, or compare your raid groups and check for missing buffs.</li>
+    <li><strong>Merchant and auction mail.</strong> Opt in to selling grey items and repairing with your own gold at merchants. The optional mailbox button collects gold and items from auction mail when you click it.</li>
+    <li><strong>Ask in chat.</strong> Use <code>/ask</code> with the optional Desktop App to look up recorded prices and other Everloot data. Answers appear in chat after the app processes the question and you reload.</li>
+  </ul>
+
+  <h2>See what you've collected</h2>
+  <p>The Collection tab tracks achievements, reputation, titles, quests, dungeon and raid kills, lockouts, mounts, pets and toys. Switch between the current character and your account where supported. Optional local inventory snapshots count items in your bags, bank and mail when the game makes them available.</p>
+
+  <h2>Get started</h2>
+  <ol>
+    <li>Install Everloot with the CurseForge app for <strong>WoW: Forever</strong>, then restart the game. For a manual install, see the <a href="https://everloot.app/docs/guides/addon">installation guide</a>.</li>
+    <li>Run <code>/everloot window</code> to open the add-on or <code>/everloot setup</code> to choose a preset. Use <code>/everloot options</code> to choose features individually or see the <a href="https://everloot.app/docs/guides/addon#commands">full command list</a>.</li>
+    <li>At an auctioneer, open the Everloot tab and click <strong>Scan prices</strong> for your first price snapshot.</li>
+  </ol>
+
+  <h2>Help build the Forever database</h2>
+  <p>Everloot records observations such as loot, NPC sightings, vendor stock, recipes, gathering and auction prices in <code>SavedVariables/Everloot.lua</code>. To contribute, log out or use <code>/reload</code>, then <a href="https://everloot.app/upload">preview and upload</a> the file, or set up the optional Desktop App. Census, player and guild data have their own settings, and <code>/everloot link</code> connects your character to your Everloot account using a code from the site. Your gold ledger and local character roster stay in your save file. See <a href="https://everloot.app/privacy">what is shared</a>.</p>
+
+  <p><strong><a href="https://everloot.app/">Explore the database</a> · <a href="https://discord.gg/9CKsbHTRu3">Discord</a> · <a href="https://github.com/Everloot/everloot">Source</a> · <a href="https://github.com/Everloot/everloot/issues">Report a bug</a></strong></p>
+  <p>Everloot is an independent fan project. Code is licensed AGPL-3.0 and data is CC BY-SA 4.0.</p>
+</div>
+<!-- End CurseForge description. -->
+</body>
+</html>
