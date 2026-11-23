@@ -8,6 +8,8 @@ import { anonymousAggregates, writeAggregates } from "@/lib/aggregate-store";
 import type { AggregateSet } from "@/lib/aggregate-set";
 import { writeSearchNames } from "@/lib/search-names-store";
 import { writeFarmAreas } from "@/lib/farm-areas-store";
+import { writeRankingWeeks } from "@/lib/ranking-weeks-store";
+import { rankingWeeks } from "@/lib/rankings";
 import { buildAuctionHistory, writeAuctionHistory } from "@/lib/auction-history-store";
 import { buildProfessions, writeProfessions } from "@/lib/profession-store";
 import { buildDatabaseActivity } from "@/lib/database-activity";
@@ -87,6 +89,7 @@ export interface StoredViewsResult {
   aggregates: (Written & { bytes?: number }) | null;
   searchNames: (Written & { bytes?: number }) | null;
   farmAreas: (Written & { bytes?: number }) | null;
+  rankingWeeks: (Written & { weeks?: number; bytes?: number }) | null;
   auctionHistory: (Written & { items?: number }) | null;
   professions: (Written & { bytes?: number }) | null;
   mapPins: (Written & { bytes?: number }) | null;
@@ -186,6 +189,10 @@ export async function runStoredViews(run: StoredViewsRun): Promise<StoredViewsRe
   // The last view that reads the corpus is done.
   corpusRead = null;
   releaseKept();
+  // The weeks the rankings pages draw (lib/ranking-weeks-store.ts), 20 KB from the census rollup, so /rankings never
+  // parses every census row on the site Worker. Stamped with the census's own time: rewritten when it moved on.
+  const rankingWeeksView = await step("rankingWeeks", "ranking weeks", () => writeRankingWeeks({ census: () => uploadStore.loadCensus(), weeks: rankingWeeks }));
+  releaseKept();
   // The auction reports and the Auction House boards each read the market rollup, the aggregates and the client's item
   // tables to name items, the run's largest working sets (#1354), so they come after the views. A failure is logged;
   // the pages build the boards themselves and keep the last reports.
@@ -210,7 +217,7 @@ export async function runStoredViews(run: StoredViewsRun): Promise<StoredViewsRe
   releaseKept();
   const auctionReports = run.reportsDue ? await step("auctionReports", "auction reports", () => writeAuctionReports()) : null;
   releaseKept();
-  return { settled, itemView, aggregates, searchNames, farmAreas, auctionHistory, professions, mapPins, databaseActivity, guildLadder, marketBoards, coverage, auctionReports, failed, timings };
+  return { settled, itemView, aggregates, searchNames, farmAreas, auctionHistory, professions, mapPins, databaseActivity, rankingWeeks: rankingWeeksView, guildLadder, marketBoards, coverage, auctionReports, failed, timings };
 }
 
 /**

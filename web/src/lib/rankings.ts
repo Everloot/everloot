@@ -7,6 +7,7 @@ import { censusHref } from "./census-filter";
 import type { JsonLd } from "./jsonld";
 import { absoluteUrl } from "./seo";
 import { uploadStore, type CensusRead } from "./upload-store";
+import { loadStoredRankingWeeks } from "./ranking-weeks-store";
 
 /**
  * The rankings hub, first version: the census rankings (classes, races, faction balance), one ISO week at a time.
@@ -353,8 +354,13 @@ export function itemListJsonLd(name: string, path: string, items: { name: string
 
 let memo: { read: CensusRead; weeks: RankingWeek[] } | null = null;
 
-/** The ranking weeks from the stored census rows. An unreadable store is unavailable, never zero. */
+/**
+ * The ranking weeks: the ones the stored-views job stored (lib/ranking-weeks-store.ts, 20 KB), else worked out from
+ * the stored census rows, which are tens of MB to parse on a page (#1354). An unreadable store is unavailable, never zero.
+ */
 export async function loadRankingWeeks(): Promise<{ weeks: RankingWeek[]; unreachable: boolean; dataAsOf: string | null }> {
+  const stored = await loadStoredRankingWeeks();
+  if (stored) return { weeks: stored.weeks, unreachable: false, dataAsOf: stored.dataAsOf };
   let read: CensusRead;
   try {
     read = await uploadStore.loadCensus();
