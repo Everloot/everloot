@@ -83,6 +83,7 @@
     "EVERLOOT_ARMORY_LOOKUP": "1",
     "EVERLOOT_PRIVATE_SYNC": "1",
     "EVERLOOT_BOSS_KILL_SYNC": "1",
+    "EVERLOOT_DUNGEON_PROGRESS": "1",
     "EVERLOOT_LEADERBOARDS": "1",
     "EVERLOOT_STORED_VIEWS": "job",
     // Runs with uploads to fold hand them to the stored-views job, which folds them on a GitHub runner: writing the
