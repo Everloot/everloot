@@ -73,12 +73,15 @@ test("with the armory on, the hub leads with the character boards and the guild 
   const html = await hub();
   const me = armoryCharacter();
   const characters = section(html, "characters");
-  for (const title of ["Item level", "Gear Score", "Honorable kills"]) expect(characters, title).toContain(title);
+  for (const title of ["Item level", "Gear Score", "Honorable kills", "Fish caught"]) expect(characters, title).toContain(title);
   expect(characters).toContain(`href="/armory/${me.region}/${me.slug}"`);
-  expect(characters).toContain('href="/armory/rankings/item-level"');
-  expect(characters).toContain('href="/armory/rankings/honorable-kills"');
-  // The play history boards are listed, not previewed: the hub reads three boards, not nine.
-  expect(characters).not.toContain("Fish caught");
+  expect(characters).toContain('href="/armory/rankings/item-level?region=eu"');
+  expect(characters).toContain('href="/armory/rankings/item-level?region=us"');
+  // One board at a time: the hub reads the shown board, one region each, never all nine.
+  const spy = vi.spyOn(holder.store!, "boardFiltered");
+  await hub({ metric: "honorable-kills" });
+  // (The memory store answers best-of-class through boardFiltered too, one row a class; those are left out.)
+  expect(spy.mock.calls.filter((c) => c[5] === 10).map((c) => [c[0], c[1]])).toEqual([["honorable_kills", "us"], ["honorable_kills", "eu"]]);
   expect(html).toContain('href="/armory/rankings/fish-caught"');
   const guilds = section(html, "guilds");
   const guild = armoryGuild();
@@ -104,6 +107,27 @@ test("a region tab narrows the boards and rides on their full-list links", async
   // An unknown region reads as every region; any casing is read.
   expect(section(await hub({ region: "kr" }), "characters")).toContain(`href="/armory/eu/${armoryCharacter().slug}"`);
   expect(section(await hub({ region: "EU" }), "characters")).toContain(`href="/armory/eu/${armoryCharacter().slug}"`);
+});
+
+test("the character board shows US and EU side by side for one metric at a time, the metric and region in the URL", async () => {
+  vi.stubEnv("EVERLOOT_ARMORY", "1");
+  (holder.store as ReturnType<typeof createMemoryArmoryStore>).putCharacter(armoryCharacter({ region: "us", slug: "maren-holt", name: "Maren", surname: "Holt", class: "Mage", classId: 8, itemLevel: 40, gearScore: 45, honorableKills: 9 }));
+  const html = await hub();
+  const characters = section(html, "characters");
+  const us = characters.slice(characters.indexOf('aria-labelledby="board-us"'), characters.indexOf('aria-labelledby="board-eu"'));
+  expect(us).toContain('href="/armory/us/maren-holt"');
+  expect(us).toContain('href="/armory/rankings/item-level?region=us"');
+  expect(characters.slice(characters.indexOf('aria-labelledby="board-eu"'))).toContain(`href="/armory/eu/${armoryCharacter().slug}"`);
+  // Every board is a tab; the current one is marked, and a tab keeps the region.
+  const tabs = html.match(/<nav aria-label="Character rankings"[\s\S]*?<\/nav>/)?.[0] ?? "";
+  expect(tabs).toMatch(/href="\/rankings"[^>]*aria-current="page"[^>]*>Item level/);
+  expect(tabs).toContain('href="/rankings?metric=fish-caught"');
+  const gear = section(await hub({ metric: "gear-score", region: "us" }), "characters");
+  expect(gear).toContain('href="/armory/rankings/gear-score?region=us"');
+  expect(gear).not.toContain('aria-labelledby="board-eu"');
+  expect((await hub({ metric: "gear-score", region: "us" })).match(/<nav aria-label="Character rankings"[\s\S]*?<\/nav>/)?.[0]).toContain('href="/rankings?metric=deaths&amp;region=us"');
+  // An unknown metric reads as the first board rather than a missing page.
+  expect(section(await hub({ metric: "dps" }), "characters")).toContain('href="/armory/rankings/item-level?region=eu"');
 });
 
 test("raid progress lists the ladder's top guilds, and says where it will start before any kill", async () => {
@@ -149,7 +173,7 @@ test("the hub is kept out of search engines while it shows Blizzard's boards, as
 
 test("on a phone the first column carries the rank with the name, so a folded row still names who it ranks", async () => {
   vi.stubEnv("EVERLOOT_ARMORY", "1");
-  const characters = section(await hub(), "characters");
+  const characters = section(await hub({ metric: "gear-score" }), "characters");
   const me = armoryCharacter();
   expect(characters).toMatch(new RegExp(`<td[^>]*><span[^>]*><span[^>]*>1</span><a href="/armory/${me.region}/${me.slug}"`));
   expect(characters).not.toContain(">#<");

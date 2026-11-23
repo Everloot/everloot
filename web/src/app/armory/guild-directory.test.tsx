@@ -45,7 +45,7 @@ const pages = {
   directory: async (search: Record<string, string> = {}) => (await import("../guilds/page")).default({ searchParams: Promise.resolve(search) }),
   moved: async (search: Record<string, string | string[]> = {}) => (await import("./guilds/page")).default({ searchParams: Promise.resolve(search) }),
   guild: async (region: string, slug: string, search: Record<string, string> = {}) => (await import("./[region]/guilds/[slug]/page")).default({ params: Promise.resolve({ region, slug }), searchParams: Promise.resolve(search) }),
-  board: async (metric: string) => (await import("./rankings/[metric]/page")).default({ params: Promise.resolve({ metric }), searchParams: Promise.resolve({}) }),
+  board: async (metric: string, search: Record<string, string> = {}) => (await import("./rankings/[metric]/page")).default({ params: Promise.resolve({ metric }), searchParams: Promise.resolve(search) }),
 };
 const html = async (page: Promise<React.ReactElement>) => renderToStaticMarkup(await page);
 
@@ -217,8 +217,9 @@ describe("the guild page summary", () => {
   });
 });
 
-test("ranking rows carry the region chip", async () => {
-  expect(await html(pages.board("item-level"))).toMatch(/data-region="eu"[^>]*>EU<\/span>Normal/);
+test("ranking rows carry the region chip, and each side-by-side column its region's", async () => {
+  expect(await html(pages.board("item-level", { region: "eu" }))).toMatch(/data-region="eu"[^>]*>EU<\/span>Normal/);
+  expect(await html(pages.board("item-level"))).toMatch(/id="board-us"[^>]*><span data-region="us"[^>]*>US<\/span>Item level/);
 });
 
 test("guild progression hook follows the population summary", async () => {
