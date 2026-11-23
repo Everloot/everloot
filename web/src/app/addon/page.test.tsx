@@ -52,6 +52,7 @@ test("the page describes the in-game window, feature chooser and local-only stor
   }
   expect(html).toContain('href="/docs/guides/addon#window"');
   expect(text).toContain("boss kills sync with a linked character and are public");
+  expect(text).toContain("Player tooltips require Desktop App 0.1.24 or later to show shared dungeon progress once it is available for your realm.");
 });
 
 test("the addon choices lead with the app, then website, then zip; desktop starts neutral", async () => {

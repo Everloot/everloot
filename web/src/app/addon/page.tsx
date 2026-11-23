@@ -110,7 +110,7 @@ export default async function AddonPage() {
                   </TrackedDownload>
                   <p className="text-sm text-fg-2">Addon {addon.version}{served ? ` (.zip, ${fileSize(served.size)})` : ""}</p>
                 </div>
-                <p className="text-sm text-fg-2">{ADDON_LIVE_VERIFIED ? "" : "Live-client verification is pending. "}This release opens Collection on an overview of every area, charts your gold per day, adds a Ranks and trainers screen and a crafting cost breakdown, and shows dungeon progress on player tooltips. The Disenchanting tab is removed: item tooltips now compare disenchanting with selling.</p>
+                <p className="text-sm text-fg-2">{ADDON_LIVE_VERIFIED ? "" : "Live-client verification is pending. "}This release opens Collection on an overview of every area, charts your gold per day, and adds a Ranks and trainers screen and a crafting cost breakdown. The Disenchanting tab is removed: item tooltips now compare disenchanting with selling.</p>
                 <div>
                   <SectionHeading as="h3">Install</SectionHeading>
                   <ol className="list-decimal space-y-1 pl-5 text-sm text-fg-2">
@@ -286,7 +286,7 @@ export default async function AddonPage() {
             <li><strong>Collection:</strong> an overview of every area with its progress, then achievements, reputation, titles, quest chains, dungeon and raid progress, mounts, pets, toys and flight paths, each grouped under headings that count what is missing. Achievements, reputation, titles and raids need the completion tracker on.</li>
             <li><strong>Professions:</strong> ranks, recorded recipes by difficulty colour, a Ranks and trainers screen, and crafting costs with each recipe&apos;s materials, cost per item and estimated profit, plus reagents to add to your shopping list.</li>
             <li><strong>Settings:</strong> switches for each part of the addon and counts of what you&apos;ve recorded.</li>
-            <li>Item tooltips show prices, your own sale and purchase history, recorded sources and, for armor and weapons, whether disenchanting beats selling. Player tooltips show shared dungeon progress when the Desktop App has synced it.</li>
+            <li>Item tooltips show prices, your own sale and purchase history, recorded sources and, for armor and weapons, whether disenchanting beats selling. Player tooltips require Desktop App 0.1.24 or later to show shared dungeon progress once it is available for your realm.</li>
             <li>Optional helpers sell grey items and repair with your own gold at merchants, and add a Collect all button at the mailbox.</li>
           </ul>
           <p className="text-sm text-fg-2">
