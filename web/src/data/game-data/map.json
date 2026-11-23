@@ -6,11 +6,11 @@
     "licence": "Blizzard game data, not under our licence",
     "licenceUrl": "https://github.com/Everloot/everloot/blob/main/docs/DATA_POLICY.md",
     "product": "wowf",
-    "buildId": 70959,
-    "version": "1.60.1.70959",
-    "buildConfig": "ad887adcf63b8746155dd40e1930b80f",
-    "definitions": "ae1b35fdd977",
-    "extractedAt": "2026-11-18T23:48:24.798Z",
+    "buildId": 71037,
+    "version": "1.60.1.71037",
+    "buildConfig": "0acab1e6aa41b46165d2ca66853b417b",
+    "definitions": "3a7954cfb8ee",
+    "extractedAt": "2026-11-23T17:39:13.986Z",
     "tables": [
       {
         "table": "Map",
@@ -54,7 +54,7 @@
       },
       {
         "table": "ContentTuning",
-        "rows": 100,
+        "rows": 102,
         "encryptedBlocks": 0
       },
       {
