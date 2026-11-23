@@ -7,7 +7,7 @@ import { publicZones, type ZoneSummary } from "./zones";
 
 /**
  * What players farm, in the order the farming page shows it: gold (mobs with public loot in a placed zone) and
- * reputation, which comes from kills and quests that cannot be placed in a zone yet, so it stays empty.
+ * reputation, which comes from kills and quests; the reputation a kill gives is not recorded, so it stays empty.
  */
 export const FARM_CATEGORIES = [
   { slug: "gold", label: "Gold", noun: "gold" },

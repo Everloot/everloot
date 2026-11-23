@@ -60,7 +60,7 @@ test("gold lists the zones its mobs back, with levels, the zone page and the map
   expect(zonesIn(section(page, "gold"))).toEqual([1411, 1429]);
   expect(section(page, "gold")).toContain("11–15");
   expect(section(page, "gold")).toContain('href="/map?zone=1429"');
-  expect(section(page, "reputation")).toContain("does not yet place in a zone");
+  expect(section(page, "reputation")).toContain("not the reputation it gives");
   expect(section(page, "reputation")).not.toContain("<table");
   // Gathering and dungeons are not tabs here any more.
   for (const slug of ["herbs", "ore", "leather", "cloth", "dungeons"]) expect(section(page, slug)).toBeNull();
