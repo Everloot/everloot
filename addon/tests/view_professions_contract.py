@@ -603,6 +603,16 @@ Everloot.Window.Views.professions.refresh(EverlootWindow)
 r.scripts.OnEnter(r)
 assert(table.concat(GameTooltip.lines, '|'):find('Min buyout: -20.0%', 1, true))
 assert(r.change.text == '-20%' and r.change.color[1] == Everloot.Window.COLORS.gold[1], r.change.text)
+-- A change that rounds to nothing (+0.4%, then -0.4%) is "0%" in the muted colour, never a green "+0%".
+local items = EverlootDB.records.auction_snapshot
+items[1].items[1][4], items[2].items[1][4] = 1000, 1004
+Everloot.ownScanCache = nil
+Everloot.Window.Views.professions.refresh(EverlootWindow)
+assert(r.change.text == '0%' and r.change.color[1] == Everloot.Window.COLORS.muted[1], r.change.text)
+items[2].items[1][4] = 996
+Everloot.ownScanCache = nil
+Everloot.Window.Views.professions.refresh(EverlootWindow)
+assert(r.change.text == '0%' and r.change.color[1] == Everloot.Window.COLORS.muted[1], r.change.text)
 """)
 lua = change_world(prices='')
 lua.execute("""

@@ -136,8 +136,15 @@ assert(#E:Rows('loot') == records and EverlootDB.records.disenchantLog == nil)
 E.Ledger.Record(key, 'auction_spend', 1000, { itemName = 'Item 100', count = 1 })
 assert(D.History()[1].cost == 20, 'cost saved at the time, not repriced')
 -- The tooltip says what this install got from the item, from the local history; last in the block, in full mode only.
+-- The history (up to 500 rows a character) is read once per item, not on every tooltip; a new disenchant rereads it.
+local reads, rawPairs = 0, pairs
+pairs = function(t, ...) if t == EverlootDB.disenchantLog then reads = reads + 1 end return rawPairs(t, ...) end
 assert(gotLine() == '  You got: Item 200 × 3 (1 disenchant)', gotLine())
 assert(D.Lines('Forever', 100)[#D.Lines('Forever', 100)].text == gotLine(), 'the last line of the block')
+assert(reads == 1, 'four tooltips read the history once: ' .. reads)
+D.Record(100, { { itemId = 200, count = 4 } }, 'source-new')
+assert(gotLine() == '  You got: Item 200 × 7 (2 disenchants)' and reads == 2, 'a new disenchant clears the cache: ' .. reads)
+pairs = rawPairs
 assert(#D.Lines('Forever', 100, true) == 1, 'compact keeps the headline alone')
 for i = 2, 502 do D.Record(100, { { itemId = 200, count = 1 } }, 'source-' .. i) end
 assert(#D.History() == 500 and D.History()[1].source == 'source-3')

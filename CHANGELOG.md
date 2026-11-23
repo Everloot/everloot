@@ -273,6 +273,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 
 ### Fixed
 - Site: coin amounts group their thousands (1,234,567g), and a character's Gold section is dated once, by its heading.
+- Addon: Home fits 100,000 gold and more in its gold column (copper left off), the Gold chart's hour tooltips say UTC, a crafting price change that rounds to nothing shows a muted "0%", turning off the gold switch no longer says its rows may not have been uploaded, and the disenchant tooltip no longer rereads your disenchant history each time.
 - Addon: the window is opaque, its resize grip no longer covers buttons, and Home shows full gold amounts, short dates and only the columns and counts that say something.
 - Site: armory character pages show their board ranks again; a rank on one of the new play history boards had made the page drop them all.
 - Site: lore pages drop the doubled spaces the wiki's source had but never showed, leave no gap where footnotes or race icons sat side by side, show `{{-}}` as its dash and `{{Race|…|notext}}` as only its icon, so far fewer pages are marked damaged.

@@ -661,6 +661,7 @@ byKey.census.checked = false
 byKey.census.scripts.OnClick(byKey.census)
 assert(shown and shown[1] == 'EVERLOOT_TURN_OFF' and shown[2] == 'Census' and shown[3] == 5, 'asks with the label and the row count')
 assert(#EverlootDB.records.census_seen == 5 and EverlootDB.toggles.census == true, 'nothing is deleted before the answer')
+assert(dialog.text == 'Turn off %s and delete %d recorded rows? They have not necessarily been uploaded.', 'census rows upload: ' .. dialog.text)
 assert(byKey.census.checked, 'the switch stays ticked while the question is open')
 -- Cancel leaves the rows and the tick.
 byKey.census.checked = false
@@ -698,6 +699,23 @@ byKey.gold.scripts.OnClick(byKey.gold)
 byKey.scanPrompt.checked = false
 byKey.scanPrompt.scripts.OnClick(byKey.scanPrompt)
 assert(shown == nil and EverlootDB.toggles.gold == false and EverlootDB.scanPrompt == false)
+
+-- Gold deletes only wealth_owned, which never leaves the computer: the question does not talk about uploads.
+EverlootDB.toggles.gold = true
+EverlootDB.records.wealth_owned = { {}, {} }
+byKey.gold.checked = false
+byKey.gold.scripts.OnClick(byKey.gold)
+assert(shown and shown[1] == 'EVERLOOT_TURN_OFF' and shown[3] == 2, 'the gold switch asks')
+assert(dialog.text == 'Turn off %s and delete %d recorded rows?', 'local-only rows were never to be uploaded: ' .. dialog.text)
+dialog.OnCancel()
+-- Completion deletes uploaded catalogs as well as local-only rows: the sentence stays.
+EverlootDB.records.lockout_owned = { {} }
+EverlootDB.toggles.completion = true
+shown = nil
+byKey.completion.checked = false
+byKey.completion.scripts.OnClick(byKey.completion)
+assert(shown and dialog.text:find('not necessarily been uploaded', 1, true), dialog.text)
+dialog.OnCancel()
 
 -- The other deleting rows count their own kinds.
 EverlootDB.records.addon_seen = { {}, {} }

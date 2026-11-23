@@ -34,6 +34,11 @@ owned_lua = "".join((root / "modules" / name).read_text(encoding="utf-8") for na
 for kind in LOCAL_ONLY_KINDS:
     assert kind in owned_lua, f"owned.lua, boss_kills.lua and wealth.lua no longer name {kind}; update LOCAL_ONLY_KINDS"
     assert not (SCHEMA_DIR / "records" / f"{kind}.json").exists(), f"{kind} stays on the computer; the intake must have no schema for it"
+# The addon's own list (core.lua E.LOCAL_ONLY_KINDS, which the Settings turn-off question reads) is the same set.
+core_lua = (root / "core.lua").read_text(encoding="utf-8")
+assert "E.LOCAL_ONLY_KINDS = {" in core_lua, "core.lua lists the kinds that never leave the computer"
+start = core_lua.index("E.LOCAL_ONLY_KINDS = {")
+assert set(re.findall(r'"([a-z_]+)"', core_lua[start:core_lua.index("}", start)])) == LOCAL_ONLY_KINDS, "core.lua E.LOCAL_ONLY_KINDS"
 kinds -= LOCAL_ONLY_KINDS
 for kind in sorted(kinds):
     schema_for(kind)

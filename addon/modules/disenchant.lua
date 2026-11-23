@@ -104,7 +104,11 @@ local function itemName(id)
 end
 
 -- What every character on this install got from disenchanting this item: { count, mats = { [id] = units } }, or nil.
+-- Kept per item until D.Record adds a row, so a tooltip does not reread up to 500 rows a character each time.
+local gotCache = {}
 local function got(id)
+  local hit = gotCache[id]
+  if hit ~= nil then return hit or nil end
   local logs = type(EverlootDB) == "table" and type(EverlootDB.disenchantLog) == "table" and EverlootDB.disenchantLog
   local out = { count = 0, mats = {} }
   for _, list in pairs(logs or {}) do
@@ -115,6 +119,7 @@ local function got(id)
       end
     end
   end
+  gotCache[id] = out.count > 0 and out or false
   return out.count > 0 and out or nil
 end
 
@@ -215,6 +220,7 @@ function D.Record(id, materials, source)
   if h then row.cost = h.averagePaid end
   list[#list + 1] = row
   while #list > 500 do table.remove(list, 1) end
+  gotCache = {}
 end
 
 function D.History() return history() end
