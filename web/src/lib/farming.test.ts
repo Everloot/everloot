@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { ObjectSpawnRow } from "@kb/object-spawns";
 import type { KillPlace } from "@kb/world-pages";
-import { farmingAreas, gatherAreas, HERB_IDS, HERBALISM_SKILL_LINE, herbIndex, herbZones, professionTrainers } from "./farming";
+import { farmingAreas, gatherAreas, HERB_IDS, HERBALISM_SKILL_LINE, herbIndex, herbZones, professionTrainers, zoneFarmLinks } from "./farming";
 import { bareNpcRow } from "./world-lists";
 import { publicZones, type ZoneSummary } from "./zones";
 
@@ -59,6 +59,17 @@ describe("mob farming areas", () => {
   test("a mob killed by 3 installs in two zones counts in both", () => {
     const both = ["a", "b", "c"].flatMap((i) => [kill(i, 1), kill(i, 2)]);
     expect(gold(both)).toEqual([[1, 1, { min: 7, max: 7 }], [2, 1, { min: 7, max: 7 }]]);
+  });
+
+  test("a zone page links to farming by the same rule: kill places first, else the pin", () => {
+    // Item 2589 is cloth, so the mob backs the Tailoring and First Aid lists as well as farming routes.
+    const links = (zone: ZoneSummary, pinned: number[], kills: KillPlace[]) => zoneFarmLinks(zone, pinned, rates, [], kills, zones).map((l) => l.label);
+    const three = ["a", "b", "c"].map((i) => kill(i));
+    expect(links(zones[0]!, [], three)).toEqual(["Farming routes", "Tailoring", "First Aid"]);
+    // Placed in Zone One by its kills, the mob no longer counts in its pin's zone; with no kill places, the pin decides.
+    expect(links(zones[1]!, [6], three)).toEqual([]);
+    expect(links(zones[1]!, [6], [])).toEqual(["Farming routes", "Tailoring", "First Aid"]);
+    expect(links(zones[0]!, [], three.slice(0, 2))).toEqual([]);
   });
 });
 
