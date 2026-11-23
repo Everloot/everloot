@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { dispatchStoredViews, STORED_VIEWS_DISPATCH_URL } from "./stored-views-dispatch";
+import { dispatchSiteHealth, dispatchStoredViews, SITE_HEALTH_DISPATCH_URL, STORED_VIEWS_DISPATCH_URL } from "./stored-views-dispatch";
 
 const token = { EVERLOOT_VIEWS_DISPATCH_TOKEN: "synthetic-dispatch-value" };
 
@@ -40,4 +40,13 @@ test("a record that cannot be written never fails the start", async () => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   expect(await dispatchStoredViews(token, fetch, async () => { throw new Error("R2 down"); })).toBe("sent");
   vi.restoreAllMocks();
+});
+
+test("the site-health start uses the same token on the site-health workflow and records nothing", async () => {
+  const fetch = vi.fn(async () => new Response(null, { status: 204 }));
+  expect(await dispatchSiteHealth(token, fetch)).toBe("sent");
+  expect((fetch.mock.calls[0] as unknown as [string])[0]).toBe(SITE_HEALTH_DISPATCH_URL);
+  expect(SITE_HEALTH_DISPATCH_URL).toContain("/workflows/site-health.yml/dispatches");
+  expect(await dispatchSiteHealth({}, fetch)).toBe("off");
+  await expect(dispatchSiteHealth(token, vi.fn(async () => new Response("no", { status: 403 })))).rejects.toThrow("site-health.yml dispatch failed (403)");
 });

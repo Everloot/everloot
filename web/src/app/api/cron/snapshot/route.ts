@@ -8,7 +8,7 @@ import { playerStore } from "@/lib/player-store";
 import { pullStore } from "@/lib/pull-store";
 import { runStoredViews } from "@/lib/stored-views-run";
 import { nothingToFold, runSnapshotPass, type SnapshotWork } from "@/lib/snapshot-pass";
-import { dispatchStoredViews } from "@/lib/stored-views-dispatch";
+import { dispatchSiteHealth, dispatchStoredViews } from "@/lib/stored-views-dispatch";
 
 /**
  * GET /api/cron/snapshot — the Worker's Cron Trigger (src/lib/cf-crons.ts, every 10 minutes) extends the corpus snapshot with new uploads,
@@ -50,6 +50,12 @@ export async function GET(req: Request) {
     // Pull summaries are kept a year after they were received, switch on or off: turning collection off must not keep
     // what was collected. Before the migration there is nothing to prune, and the store says so without an error.
     try { await pullStore().prune(); } catch (err) { console.error("pull retention failed", err); }
+    // The first run of each hour starts the site-health check (lib/stored-views-dispatch.ts): GitHub ran its own
+    // 15-minute schedule 4 times in 24 hours, so the alarm on stale views, a failing job or an expiring token could lag
+    // by hours. Here, before any hand-off, so it runs whatever this run does. A failure is logged; the schedule remains.
+    if (!rebuild && new Date().getUTCMinutes() < 10) {
+      try { await dispatchSiteHealth(); } catch (err) { console.error("site-health dispatch failed", err); }
+    }
     // With EVERLOOT_SNAPSHOT at "job", a run with something to fold starts the stored-views job, which folds it on a
     // GitHub runner and then builds the views (lib/snapshot-pass.ts, scripts/stored-views.ts): writing the corpus
     // means holding all of it, and it outgrew the Worker's 128 MB (#1354). A run with nothing to fold still writes the

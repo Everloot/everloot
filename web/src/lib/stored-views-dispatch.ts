@@ -10,15 +10,35 @@ import { tokenExpiry, writeDispatchRecord, type DispatchRecord } from "./stored-
  * so /api/health and the site-health check can warn before the token runs out. A failed record never fails the start.
  */
 export const STORED_VIEWS_DISPATCH_URL = "https://api.github.com/repos/Everloot/everloot/actions/workflows/stored-views.yml/dispatches";
+/**
+ * The site-health check (.github/workflows/site-health.yml). Its own 15-minute schedule ran 4 times in the 24 hours to
+ * 2026-11-23 03:40 UTC, as GitHub throttles this repository's schedules, so the snapshot cron also starts it once an
+ * hour with the same token. The schedule stays: it still runs when the cron Worker itself has stopped.
+ */
+export const SITE_HEALTH_DISPATCH_URL = "https://api.github.com/repos/Everloot/everloot/actions/workflows/site-health.yml/dispatches";
 
 export async function dispatchStoredViews(
   env: Record<string, string | undefined> = process.env,
   doFetch: typeof fetch = fetch,
   record: (r: DispatchRecord) => Promise<void> = writeDispatchRecord,
 ): Promise<"sent" | "off"> {
+  return dispatchWorkflow(STORED_VIEWS_DISPATCH_URL, env, doFetch, record);
+}
+
+/** Starts the site-health check. Nothing is recorded: the stored-views start's record is what /api/health reports. */
+export async function dispatchSiteHealth(env: Record<string, string | undefined> = process.env, doFetch: typeof fetch = fetch): Promise<"sent" | "off"> {
+  return dispatchWorkflow(SITE_HEALTH_DISPATCH_URL, env, doFetch);
+}
+
+async function dispatchWorkflow(
+  url: string,
+  env: Record<string, string | undefined>,
+  doFetch: typeof fetch,
+  record?: (r: DispatchRecord) => Promise<void>,
+): Promise<"sent" | "off"> {
   const token = env.EVERLOOT_VIEWS_DISPATCH_TOKEN?.trim();
   if (!token) return "off";
-  const res = await doFetch(STORED_VIEWS_DISPATCH_URL, {
+  const res = await doFetch(url, {
     method: "POST",
     headers: {
       authorization: `Bearer ${token}`,
@@ -31,15 +51,21 @@ export async function dispatchStoredViews(
     body: JSON.stringify({ ref: "main" }),
     signal: AbortSignal.timeout(10_000),
   });
-  try {
-    await record({
-      at: new Date().toISOString(), httpStatus: res.status, sent: res.status === 204,
-      tokenExpiresAt: tokenExpiry(res.headers.get("github-authentication-token-expiration")),
-    });
-  } catch (err) {
-    console.error("stored-views dispatch record failed", err);
+  const workflow = url.split("/workflows/")[1]?.split("/")[0] ?? url;
+  if (record) {
+    try {
+      await record({
+        at: new Date().toISOString(), httpStatus: res.status, sent: res.status === 204,
+        tokenExpiresAt: tokenExpiry(res.headers.get("github-authentication-token-expiration")),
+      });
+    } catch (err) {
+      console.error(`${workflow} dispatch record failed`, err);
+    }
   }
   // 204 is GitHub's only success answer here; the body of a refusal says why and never holds the token.
-  if (res.status !== 204) throw new Error(`stored-views dispatch failed (${res.status}): ${(await res.text().catch(() => "")).slice(0, 200)}`);
+  if (res.status !== 204) {
+    const name = workflow === "stored-views.yml" ? "stored-views" : workflow;
+    throw new Error(`${name} dispatch failed (${res.status}): ${(await res.text().catch(() => "")).slice(0, 200)}`);
+  }
   return "sent";
 }
