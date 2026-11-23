@@ -24,6 +24,8 @@ const searchNames = vi.hoisted(() => ({ writeSearchNames: vi.fn() }));
 vi.mock("@/lib/search-names-store", () => searchNames);
 const farmAreas = vi.hoisted(() => ({ writeFarmAreas: vi.fn() }));
 vi.mock("@/lib/farm-areas-store", () => farmAreas);
+const rankingWeeksStore = vi.hoisted(() => ({ writeRankingWeeks: vi.fn() }));
+vi.mock("@/lib/ranking-weeks-store", () => rankingWeeksStore);
 const auctions = vi.hoisted(() => ({ writeAuctionHistory: vi.fn(), buildAuctionHistory: vi.fn() }));
 vi.mock("@/lib/auction-history-store", () => auctions);
 const professions = vi.hoisted(() => ({ writeProfessions: vi.fn(), buildProfessions: vi.fn() }));
@@ -45,6 +47,7 @@ beforeEach(() => {
   guilds.writeGuildLadder.mockReset().mockResolvedValue({ written: false });
   searchNames.writeSearchNames.mockReset().mockResolvedValue({ written: false });
   farmAreas.writeFarmAreas.mockReset().mockResolvedValue({ written: false });
+  rankingWeeksStore.writeRankingWeeks.mockReset().mockResolvedValue({ written: false });
   activity.writeDatabaseActivity.mockReset().mockResolvedValue({ written: false });
   professions.writeProfessions.mockReset().mockResolvedValue({ written: false });
   mapPins.writeMapPins.mockReset().mockResolvedValue({ written: false });
