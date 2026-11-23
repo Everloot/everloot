@@ -28,6 +28,10 @@ updates:
       # Major versions are planned upgrades (Next, ESLint, Tailwind, Node types), done by hand.
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # 2.17 calls the Temporal API with no fallback; the build watch's Node 22 has none, so every CDN read fails.
+      # Lift this once the build watch runs on a Node with Temporal or the library adds a fallback (#1448).
+      - dependency-name: "@rhyster/wow-casc-dbc"
+        versions: [">=2.17.0"]
   - package-ecosystem: npm
     directory: /companion
     schedule:
