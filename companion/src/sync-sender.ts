@@ -243,7 +243,7 @@ export async function sendSync(file: string, options: SyncSendOptions): Promise<
             continue;
           }
           else { waiting.add(label); continue; }
-          if (capture.category === "boss_kills" && group.character.surname && !outcomes.dungeon_identity) continue;
+          // Older sites and sites with Dungeon Progress off acknowledge kills without an identity receipt.
           answered.push(capture.entry);
         }
       } else if (answer?.result === "not_linked") {
