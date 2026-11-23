@@ -163,7 +163,11 @@ name as the game showed it, taken only from a herb, ore or chest cast, so the ta
 player you healed, say) never becomes a name. A herb, ore or skinning window also carries the player's own rank in
 the skill the cast used (`gatherSkill`), as the game's profession book shows it, rank plus the bonus from race and gear: a
 number about the character, never a name, that goes wherever its loot row goes (the public corpus included). The
-gathering lists read it only as the lowest and middle rank among 3 or more installs. Where you stand when you only target or mouse over an NPC
+gathering lists read it only as the lowest and middle rank among 3 or more installs. A kill's loot window (addon
+0.3.30) carries the player's position too: where the corpse was looted, a few yards from where the creature died.
+Inside an instance, or when the game gives no position, it carries none, and older addons never sent one. It goes
+wherever its loot row goes (the public corpus included). The farming lists place a mob in a zone once three installs
+looted its kills on that zone's map, and otherwise by its agreed NPC pin; a kill's position never becomes a pin. Where you stand when you only target or mouse over an NPC
 (`positionKind: "player"`) is never used as the NPC's place. A Polestar Recorder file's NPC windows become
 the same `interaction` positions, and its kills and rares seen on the unit become `player` ones. A rare or
 treasure the minimap showed is at its own position, as the game's vignette API gives it (`vignette` for a
