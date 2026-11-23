@@ -6,6 +6,7 @@ import { lazyEngine, mcpAnswerSources, mcpEngine, mcpMarketValue, siteItemSearch
 import { llmEngine } from "../../../companion/src/bridge/llm-engine";
 import { providersOnDemand } from "../../../companion/src/providers/config";
 import { linkSummary, sendLinks } from "../../../companion/src/link-sender";
+import { refreshDungeonProgress } from "../../../companion/src/dungeon-progress";
 import { findEverlootFiles } from "../../../companion/src/savedvariables";
 import { createSentState } from "../../../companion/src/sent-state";
 import { createSiteCollects } from "../../../companion/src/site-collects";
@@ -18,7 +19,7 @@ import { accountKeyForSite } from "./account";
 import { backupSavedVariables } from "./backups";
 import { pruneSettledLists } from "./data-folder";
 import type { EngineDeps } from "./engine";
-import { refreshMarket } from "./market";
+import { characterRealms, refreshMarket } from "./market";
 import { readyFacts, saveFacts } from "./save-facts";
 import { readForUpload } from "./save-reader";
 
@@ -139,6 +140,17 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
       lastMarket = r.realms;
       const realms = new Set(r.realms.map((x) => x.realm.toLowerCase())).size;
       return `${r.items} items in ${r.realms.length} auction house(s) on ${realms} realm(s) and ${r.drops} drop sources written; /reload in game to see them`;
+    },
+    async progress(files, isCurrent) {
+      const s = current();
+      const dir = addonsDir();
+      await readyFacts(files);
+      await refreshDungeonProgress({
+        realms: characterRealms(files).slice(0, 6),
+        endpoint: s.endpoint,
+        addonsDir: dir,
+        current: () => isCurrent() && current().endpoint === s.endpoint && addonsDir() === dir,
+      });
     },
     async ask(file) {
       const s = current();

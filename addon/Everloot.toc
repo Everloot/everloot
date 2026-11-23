@@ -9,7 +9,7 @@
 ## Version: 0.3.29
 ## X-License: AGPL-3.0
 ## SavedVariables: EverlootDB
-## OptionalDeps: EverlootAnswers, EverlootPrices, EverlootBuilds
+## OptionalDeps: EverlootAnswers, EverlootPrices, EverlootBuilds, EverlootProgress
 ## IconTexture: Interface\AddOns\Everloot\media\crest
 ## AddonCompartmentFunc: Everloot_OnAddonCompartmentClick
 
@@ -34,6 +34,7 @@ modules\instance_data.lua
 modules\boss_kills.lua
 modules\census.lua
 modules\players.lua
+modules\player_progress.lua
 modules\pulls.lua
 modules\link.lua
 modules\selftest.lua

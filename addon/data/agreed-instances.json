@@ -1,8 +1,13 @@
 {
   "source": "https://everloot.app/api/corpus/public?kinds=instance_entrance,encounter",
-  "asOf": "2026-11-17T22:30:16.820Z",
+  "asOf": "2026-11-22T14:10:12.492Z",
   "label": "Agreed by players, 3 installs; Data from Everloot (https://everloot.app), CC BY-SA 4.0",
-  "entrances": [],
+  "entrances": [
+    {
+      "instanceMapId": 189,
+      "instanceType": "party"
+    }
+  ],
   "bosses": [
     {
       "instanceMapId": 48,
@@ -41,8 +46,144 @@
       "encounterId": 3482
     },
     {
+      "instanceMapId": 47,
+      "encounterId": 2773
+    },
+    {
+      "instanceMapId": 47,
+      "encounterId": 2774
+    },
+    {
+      "instanceMapId": 47,
+      "encounterId": 2775
+    },
+    {
+      "instanceMapId": 47,
+      "encounterId": 2776
+    },
+    {
+      "instanceMapId": 47,
+      "encounterId": 2777
+    },
+    {
+      "instanceMapId": 47,
+      "encounterId": 2778
+    },
+    {
+      "instanceMapId": 2959,
+      "encounterId": 3298
+    },
+    {
+      "instanceMapId": 2959,
+      "encounterId": 3299
+    },
+    {
+      "instanceMapId": 2959,
+      "encounterId": 3300
+    },
+    {
+      "instanceMapId": 2959,
+      "encounterId": 3301
+    },
+    {
+      "instanceMapId": 2959,
+      "encounterId": 3302
+    },
+    {
+      "instanceMapId": 2959,
+      "encounterId": 3303
+    },
+    {
+      "instanceMapId": 2959,
+      "encounterId": 3310
+    },
+    {
+      "instanceMapId": 2959,
+      "encounterId": 3311
+    },
+    {
       "instanceMapId": 189,
       "encounterId": 444
+    },
+    {
+      "instanceMapId": 189,
+      "encounterId": 446
+    },
+    {
+      "instanceMapId": 189,
+      "encounterId": 447
+    },
+    {
+      "instanceMapId": 189,
+      "encounterId": 448
+    },
+    {
+      "instanceMapId": 189,
+      "encounterId": 449
+    },
+    {
+      "instanceMapId": 189,
+      "encounterId": 450
+    },
+    {
+      "instanceMapId": 189,
+      "encounterId": 2779
+    },
+    {
+      "instanceMapId": 129,
+      "encounterId": 2782
+    },
+    {
+      "instanceMapId": 129,
+      "encounterId": 2784
+    },
+    {
+      "instanceMapId": 129,
+      "encounterId": 2785
+    },
+    {
+      "instanceMapId": 2970,
+      "encounterId": 3474
+    },
+    {
+      "instanceMapId": 2970,
+      "encounterId": 3475
+    },
+    {
+      "instanceMapId": 2970,
+      "encounterId": 3476
+    },
+    {
+      "instanceMapId": 2970,
+      "encounterId": 3478
+    },
+    {
+      "instanceMapId": 2970,
+      "encounterId": 3479
+    },
+    {
+      "instanceMapId": 2970,
+      "encounterId": 3511
+    },
+    {
+      "instanceMapId": 3039,
+      "encounterId": 3449
+    },
+    {
+      "instanceMapId": 3039,
+      "encounterId": 3450
+    },
+    {
+      "instanceMapId": 3039,
+      "encounterId": 3451
+    },
+    {
+      "instanceMapId": 3039,
+      "encounterId": 3452
+    },
+    {
+      "instanceMapId": 3039,
+      "encounterId": 3453
     },
     {
       "instanceMapId": 389,

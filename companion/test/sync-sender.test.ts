@@ -39,12 +39,12 @@ const talent: Row = {
 const talentOwned = (key: string, nodeId = 11) => owned(key, { installId: INSTALL, treeId: 3, points: 2, nodes: [{ nodeId, ranks: 2 }] });
 
 /** A save file holding `rows` under their kinds, the way the addon writes it. */
-function workspace(rows: Record<string, Row[]>) {
+function workspace(rows: Record<string, Row[]>, roster?: Record<string, Row>) {
   const dir = mkdtempSync(join(tmpdir(), "everloot-sync-"));
   const file = join(dir, "Everloot.lua");
   const write = (next: Record<string, Row[]>) => writeFileSync(file, `EverlootDB = {\n["version"] = "0.3.14",\n["installId"] = "${INSTALL}",\n["records"] = {\n${
     Object.entries(next).map(([kind, list]) => `["${kind}"] = {\n${list.map((r) => `${lua(r)},`).join("\n")}\n},`).join("\n")
-  }\n},\n}\n`);
+  }\n},\n${roster ? `["roster"] = ${lua(roster)},\n` : ""}}\n`);
   write(rows);
   return { file, write, state: createSentState(join(dir, "state", "sent.json")) };
 }
@@ -62,7 +62,7 @@ const full = (): Record<string, Row[]> => ({
   loot: [{ eventId: "epoch:1", capturedAt: "2026-11-01T00:00:00Z", sourceNpcId: 42, sourceEvidence: "loot-api", items: [{ itemId: 5, count: 1 }] }],
 });
 
-type Sent = { name: string; realm: string; records: Row[] };
+type Sent = { name: string; realm: string; surname?: string; records: Row[] };
 /** A fake site: answers each request with `answer(characters)`, and remembers every request. */
 function site(answer: (characters: Sent[]) => Response) {
   const calls: { url: string; init: RequestInit; characters: Sent[] }[] = [];
@@ -83,6 +83,33 @@ const synced = (outcome = "stored") => (characters: Sent[]) => Response.json({
 });
 
 describe("sending linked characters", () => {
+  test("remembers legacy boss-kill receipts and sends changed captures after Dungeon Progress is enabled", async () => {
+    const rows = {
+      character_link: [link("Thrallina", THRALL)],
+      boss_kill_owned: [{ characterKey: THRALL, instanceMapId: 33, encounterId: 2748, difficulty: 1, killCount: 1,
+        firstKillAt: "2026-11-18T00:00:00Z", lastKillAt: "2026-11-18T00:00:00Z" }],
+    };
+    const { file, write, state } = workspace(rows, {
+      [THRALL]: { name: "Thrallina", realm: "Forever Pioneer", surname: "Dawn", privateField: "never sent" },
+      [JAINA]: { name: "Thrallina", realm: "Forever Pioneer", surname: "Vale" },
+    });
+    const old = site(synced("duplicate"));
+    const options = { endpoint: SITE, key: KEY, state };
+    await sendSync(file, { ...options, fetch: old.send });
+    expect(old.calls[0]?.characters[0]).toMatchObject({ name: "Thrallina", surname: "Dawn" });
+    expect(old.calls[0]?.init.body).not.toContain("privateField");
+    await sendSync(file, { ...options, fetch: old.send });
+    expect(old.calls).toHaveLength(1);
+
+    write({ ...rows, boss_kill_owned: [{ ...rows.boss_kill_owned[0]!, killCount: 2, lastKillAt: "2026-11-19T00:00:00Z" }] });
+    const updated = site(() => Response.json({ characters: [{ index: 0, result: "synced",
+      categories: { boss_kills: "stored", dungeon_identity: "stored" } }] }));
+    await sendSync(file, { ...options, fetch: updated.send });
+    await sendSync(file, { ...options, fetch: updated.send });
+    expect(updated.calls).toHaveLength(1);
+    expect(updated.calls[0]?.characters[0]).toMatchObject({ surname: "Dawn", records: [{ killCount: 2 }] });
+  });
+
   test("only the linked character's accepted rows go, to the sync endpoint, with the key", async () => {
     const { file, state } = workspace(full());
     const api = site(synced());

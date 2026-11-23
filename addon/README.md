@@ -508,6 +508,15 @@ saved as `playersAsked`, and the question never comes back. `addon/tests/options
   pages with the uploads" setting is on (on in a new Desktop App install). The command-line uploader never sends them.
   The site drops them until the owner has turned the player pages on.
 
+## Dungeon progress
+
+Open Collection → Dungeons & raids to see your tracked dungeon clears and expand the boss checklist. A clear counts
+when you have recorded a kill for every boss on that dungeon's tracked checklist. The Armory uses the same checklist.
+
+With Everloot Desktop, public progress for a matched player on your realm can appear as a slim green bar on the game's
+player tooltip. Desktop refreshes the file in the background. The addon reads the new data after a UI reload once
+Everloot Progress is installed and loaded. A tooltip appears only while its data is current.
+
 ## Boss pulls
 
 Not in any build until `E.RUN_RECORDS` is on (`docs/RELEASING.md`, "Release gates"). Then it is on by default, new

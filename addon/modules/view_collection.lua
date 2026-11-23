@@ -445,6 +445,31 @@ local function raids(s)
   local keys = {}
   for _, key in ipairs(s.keys) do keys[key] = true end
   local items, listed, dropStatus = {}, {}, nil
+  local kills, hasHistory = {}, false
+  for _, row in ipairs(E:Rows("boss_kill_owned")) do
+    if keys[row.characterKey] and row.instanceMapId and row.encounterId and type(row.lastKillAt) == "string" then
+      hasHistory = true
+      local id = row.instanceMapId .. ":" .. row.encounterId
+      if not kills[id] or row.lastKillAt > kills[id].lastKillAt then kills[id] = row end
+    end
+  end
+  local cleared, tracked = 0, 0
+  for _, instance in ipairs(data.instances) do
+    if instance.tracked then
+      tracked = tracked + 1
+      local complete = true
+      for _, boss in ipairs(instance.bosses) do
+        if not kills[instance.id .. ":" .. boss.id] then complete = false; break end
+      end
+      if complete then cleared = cleared + 1 end
+    end
+  end
+  if tracked > 0 then
+    items[#items + 1] = { name = "Dungeon progress", color = COLORS.accent,
+      detail = hasHistory and (cleared .. "/" .. tracked .. " tracked dungeons") or "No boss history recorded",
+      bar = hasHistory and { 0, tracked, cleared } or nil,
+      tip = "A tracked dungeon counts when every boss on its supported checklist is recorded." }
+  end
   for _, group in ipairs({ "Dungeons", "Raids", "World bosses" }) do
     items[#items + 1] = { name = group, detail = group == "World bosses" and "Found in game files, unconfirmed" or "Agreed by players",
       heading = true, key = "group:" .. group, open = true, depth = 0 }
@@ -454,7 +479,7 @@ local function raids(s)
     end
     table.sort(instances, byName)
     for _, instance in ipairs(instances) do
-      items[#items + 1] = { name = instance.name, detail = instance.unconfirmed and "Unconfirmed" or "", heading = true,
+      items[#items + 1] = { name = instance.name, detail = instance.tracked and "Tracked dungeon" or (instance.unconfirmed and "Unconfirmed" or ""), heading = true,
         key = "instance:" .. instance.id, open = true, depth = 1 }
       for _, r in ipairs(E:Rows("lockout_owned")) do
         if keys[r.characterKey] and (r.instanceId == instance.id or r.instance == instance.name)
@@ -466,12 +491,7 @@ local function raids(s)
         end
       end
       for _, boss in ipairs(instance.bosses) do
-        local kill
-        -- The most recent kill across the scope gives both the date and the holder, including across difficulties.
-        for _, r in ipairs(E:Rows("boss_kill_owned")) do
-          if keys[r.characterKey] and r.instanceMapId == instance.id and r.encounterId == boss.id
-            and type(r.lastKillAt) == "string" and (not kill or r.lastKillAt > kill.lastKillAt) then kill = r end
-        end
+        local kill = kills[instance.id .. ":" .. boss.id]
         local item = { name = boss.name, done = kill ~= nil, depth = 2,
           detail = kill and held("Last killed " .. kill.lastKillAt:sub(1, 10), s, kill.characterKey) or "No kill recorded" }
         items[#items + 1] = item

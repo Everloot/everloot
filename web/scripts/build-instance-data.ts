@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { confirmedEntrances, instanceBosses, instanceFactsFromRecords } from "../../kb/src/instances";
+import { isTrackedDungeon } from "../../kb/src/progression";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const snapshotPath = resolve(root, "addon/data/agreed-instances.json");
@@ -27,6 +28,7 @@ if (process.argv[2] === "--snapshot") {
 
 export function renderInstanceData(): string {
   const snapshot = JSON.parse(readFileSync(snapshotPath, "utf8"));
+  const agreement = new Set<string>(snapshot.bosses.map((boss: { instanceMapId: number; encounterId: number }) => `${boss.instanceMapId}/${boss.encounterId}`));
   const client = JSON.parse(readFileSync(resolve(root, "web/src/data/game-data/client-encounters.json"), "utf8"));
   const map = JSON.parse(readFileSync(resolve(root, "web/src/data/game-data/map.json"), "utf8"));
   const names = JSON.parse(readFileSync(resolve(root, "addon/data/instance-map-names.json"), "utf8"));
@@ -42,7 +44,8 @@ export function renderInstanceData(): string {
   for (const [key, encounters] of Object.entries(client.instances ?? client.encounters)) {
     const id = Number(key);
     const entrance = snapshot.entrances.find((e: { instanceMapId: number; instanceType: string }) => e.instanceMapId === id && ["party", "raid"].includes(e.instanceType));
-    const bosses = (encounters as { id: number; name: string }[]).filter((b) => world[id] || snapshot.bosses.some((s: { instanceMapId: number; encounterId: number }) => s.instanceMapId === id && s.encounterId === b.id));
+    const knownBosses = [...new Map((encounters as { id: number; name: string }[]).map((boss) => [boss.id, boss])).values()];
+    const bosses = knownBosses.filter((b) => world[id] || agreement.has(`${id}/${b.id}`));
     if (id === 2720 || !bosses.length) continue;
     const place = map.entrances.find((e: { mapId: number }) => e.mapId === id)
       ?? names.instances.find((e: { id: number }) => e.id === id);
@@ -51,7 +54,8 @@ export function renderInstanceData(): string {
     // Boss agreement can precede entrance agreement. Game-file type fills that gap, never inventing reports.
     const raid = entrance ? entrance.instanceType === "raid" : place?.raid;
     const group = world[id] ? "World bosses" : raid ? "Raids" : "Dungeons";
-    lines.push(`    { id = ${id}, name = ${JSON.stringify(name)}, group = ${JSON.stringify(group)}, unconfirmed = ${Boolean(world[id])}, bosses = {`);
+    const tracked = isTrackedDungeon(id, group, knownBosses, agreement);
+    lines.push(`    { id = ${id}, name = ${JSON.stringify(name)}, group = ${JSON.stringify(group)}, unconfirmed = ${Boolean(world[id])},${tracked ? " tracked = true," : ""} bosses = {`);
     for (const b of bosses) lines.push(`      { id = ${b.id}, name = ${JSON.stringify(b.name)} },`);
     lines.push("    } },");
   }

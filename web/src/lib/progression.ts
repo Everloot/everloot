@@ -1,9 +1,10 @@
 import { guildProgression, guildProgressionScore } from "@kb/guild-progression";
 import { unstable_cache } from "next/cache";
-import { characterProgression, progressionCatalogue, rosterProgression } from "@kb/progression";
-import { isArmoryRegion, validArmorySlug } from "./armory";
+import { characterProgression, dungeonProgress, progressionCatalogue, rosterProgression } from "@kb/progression";
+import { armoryOn, isArmoryRegion, validArmorySlug } from "./armory";
 import type { ArmoryMember } from "./armory-store";
-import { progressionStore, type PublicHistory } from "./progression-store";
+import { progressionByLink, progressionStore, type PublicHistory } from "./progression-store";
+import { bossKillSyncOn } from "./boss-kill-sync";
 import { instanceHref, instanceRows } from "./instances";
 import { loadInstanceFacts } from "./rollup-compute";
 
@@ -33,7 +34,14 @@ async function histories(characters: readonly { region: string; slug: string }[]
 
 export async function loadCharacterProgression(region: string, slug: string) {
   const [{ catalogue, links }, kills] = await Promise.all([catalogueData(), histories([{ region, slug }])]);
-  return { instances: characterProgression(catalogue, kills.get(`${region}/${slug}`) ?? null), links };
+  const history = kills.get(`${region}/${slug}`) ?? null;
+  return { instances: characterProgression(catalogue, history), links, summary: dungeonProgress(history) };
+}
+
+export async function loadLinkedDungeonProgress(ruleset: string, realm: string, name: string) {
+  if (!armoryOn() || !bossKillSyncOn()) return null;
+  const history = await progressionByLink({ ruleset, realm, name });
+  return history ? { ...history, summary: dungeonProgress(history.kills) } : null;
 }
 
 async function rosterHistories(members: readonly ProgressionMember[]) {

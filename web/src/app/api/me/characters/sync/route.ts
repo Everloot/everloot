@@ -1,4 +1,4 @@
-import { parseBossKillRow } from "@/lib/boss-kill-sync";
+import { dungeonProgressOn, parseBossKillRow } from "@/lib/boss-kill-sync";
 import { syncBossKills } from "@/lib/boss-kill-sync-store";
 import { NextResponse } from "next/server";
 import { validPlayerName } from "@everloot/protocol";
@@ -8,6 +8,7 @@ import { linkRealmKey } from "@/lib/character-links";
 import { characterSecret } from "@/lib/census-intake";
 import { intakeQuota } from "@/lib/intake-quota";
 import { rulesetOf } from "@/lib/player-pages";
+import { SURNAME_RULE } from "@/lib/armory";
 import { buildCharacterFacts, parseSyncRow, SYNC_CHARACTERS_PER_REQUEST, SYNC_ROWS_PER_REQUEST } from "@/lib/private-sync";
 import { syncAccount, syncCharacterFacts, unavailable, type CharacterOutcome } from "@/lib/private-sync-store";
 
@@ -33,7 +34,7 @@ const SYNC_PER_KEY_HOUR = 20;
 
 type Receipt = { index: number } & (CharacterOutcome | { result: "synced"; categories: Record<string, string> } | { result: "invalid" | "retry" });
 
-interface Group { name: string; realm: string; records: unknown[] }
+interface Group { name: string; realm: string; surname?: string; records: unknown[] }
 
 /** The groups, or null for a body that is not `{ characters: [...] }` within the limits. */
 function groups(body: unknown): Group[] | null {
@@ -45,6 +46,7 @@ function groups(body: unknown): Group[] | null {
     if (!g || typeof g.name !== "string" || !validPlayerName(g.name) || typeof g.realm !== "string" || !Array.isArray(g.records)) return null;
     const realm = g.realm.trim();
     if (realm.length < 2 || realm.length > 40) return null;
+    if (g.surname !== undefined && (typeof g.surname !== "string" || !SURNAME_RULE.test(g.surname))) return null;
     rows += g.records.length;
   }
   return rows > SYNC_ROWS_PER_REQUEST ? null : (characters as Group[]);
@@ -73,6 +75,7 @@ export async function POST(req: Request) {
     let failed = false;
     for (let index = 0; index < list.length; index++) {
       const { name, records } = list[index]!;
+      const surname = dungeonProgressOn() ? list[index]!.surname : undefined;
       const realm = list[index]!.realm.trim();
       if (failed) { characters.push({ index, result: "retry" }); continue; }
       const rows = records.flatMap((r) => { const row = parseSyncRow(r); return row ? [row] : []; });
@@ -92,9 +95,10 @@ export async function POST(req: Request) {
       try {
         const result = await syncCharacterFacts(account, rulesetOf(linkRealmKey(realm)), realm, name, built.class, built.facts, secret);
         if (result.result === "synced" && bossRows.length) {
-          const outcome = await syncBossKills(account, rulesetOf(linkRealmKey(realm)), realm, name, bossRows, secret, now);
+          const outcome = await syncBossKills(account, rulesetOf(linkRealmKey(realm)), realm, name, bossRows, secret, now, surname);
           if (outcome === "not_linked") { characters.push({ index, result: "not_linked" }); continue; }
-          characters.push({ index, result: "synced", categories: { ...result.categories, boss_kills: outcome } });
+          characters.push({ index, result: "synced", categories: { ...result.categories, boss_kills: outcome,
+            ...(surname && outcome !== "no_consent" ? { dungeon_identity: outcome } : {}) } });
         } else characters.push({ index, ...result });
       } catch {
         failed = true;

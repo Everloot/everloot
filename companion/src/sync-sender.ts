@@ -78,14 +78,14 @@ const CONSENT_RECHECK_MS = 6 * 60 * 60_000;
 const offUntil = new WeakMap<SentState, Map<string, number>>();
 
 interface Capture { category: SendCategory; records: SendRow[]; entry: string }
-interface Character { id: string; label: string; name: string; realm: string; captures: Capture[] }
+interface Character { id: string; label: string; name: string; realm: string; surname?: string; captures: Capture[] }
 interface Group { character: Character; captures: Capture[] }
 
 const characterId = (name: string, realm: string) => `${name.toLowerCase()}-${linkRealmKey(realm)}`;
 const hashOf = (records: readonly SendRow[]) => createHash("sha256").update(JSON.stringify(records)).digest("hex").slice(0, 32);
 
 /** The file's linked characters with their rows by category, in file order. */
-function charactersOf(records: Array<Record<string, unknown>>): Character[] {
+function charactersOf(records: Array<Record<string, unknown>>, roster: unknown): Character[] {
   // The newest link row names each character; its completionKey ties the keyed rows to it.
   const links = new Map<string, { name: string; realm: string; key: string; at: string }>();
   for (const r of records) {
@@ -113,13 +113,17 @@ function charactersOf(records: Array<Record<string, unknown>>): Character[] {
   for (const [id, link] of links) {
     const mine = rows.get(id);
     if (!mine) continue;
+    const entry = (roster as Record<string, { name?: unknown; realm?: unknown; surname?: unknown }> | null)?.[link.key];
+    const candidate = typeof entry?.surname === "string" ? entry.surname.normalize("NFC") : "";
+    const surname = entry?.name === link.name && typeof entry.realm === "string"
+      && linkRealmKey(entry.realm) === linkRealmKey(link.realm) && /^\p{L}{2,24}$/u.test(candidate) ? candidate : undefined;
     const captures: Capture[] = [];
     for (const category of ["raids", "achievements", "boss_kills", "gold"] as const) {
       const records = mine.filter((r) => CATEGORY_OF[r.kind] === category);
       if (!records.length) continue;
-      captures.push({ category, records, entry: `${category}|${hashOf(records)}` });
+      captures.push({ category, records, entry: `${category}|${hashOf(records)}${category === "boss_kills" && surname ? `|${surname}` : ""}` });
     }
-    out.push({ id, label: `${link.name} of ${link.realm}`, name: link.name, realm: link.realm, captures });
+    out.push({ id, label: `${link.name} of ${link.realm}`, name: link.name, realm: link.realm, surname, captures });
   }
   return out;
 }
@@ -177,9 +181,9 @@ export async function sendSync(file: string, options: SyncSendOptions): Promise<
   const text = readFileSync(file, "utf8");
   // Without a link row no character can be named; skip the parse.
   if (!text.includes("character_link")) return result;
-  const parsed = parseEverlootLua(text);
+  const parsed = parseEverlootLua(text, true);
   const receiptKey = (c: Character) => syncReceiptKey(parsed.installId, options.endpoint, c.id);
-  const characters = charactersOf(parsed.records);
+  const characters = charactersOf(parsed.records, parsed.roster);
   // Only the current capture of each category is remembered; older answers are dropped.
   for (const c of characters) options.state.keepOnly(receiptKey(c), new Set(c.captures.map((x) => x.entry)));
   const held = offUntil.get(options.state) ?? new Map<string, number>();
@@ -203,7 +207,8 @@ export async function sendSync(file: string, options: SyncSendOptions): Promise<
       response = await send(url, {
         method: "POST",
         headers: { authorization: `Bearer ${options.key}`, "content-type": "application/json", "user-agent": "everloot-desktop" },
-        body: JSON.stringify({ characters: batch.map((g) => ({ name: g.character.name, realm: g.character.realm, records: g.captures.flatMap((x) => x.records) })) }),
+        body: JSON.stringify({ characters: batch.map((g) => ({ name: g.character.name, realm: g.character.realm,
+          surname: g.captures.some((x) => x.category === "boss_kills") ? g.character.surname : undefined, records: g.captures.flatMap((x) => x.records) })) }),
         redirect: "error",
         signal: AbortSignal.timeout(options.timeoutMs ?? 30_000),
       });
@@ -238,6 +243,7 @@ export async function sendSync(file: string, options: SyncSendOptions): Promise<
             continue;
           }
           else { waiting.add(label); continue; }
+          // Older sites and sites with Dungeon Progress off acknowledge kills without an identity receipt.
           answered.push(capture.entry);
         }
       } else if (answer?.result === "not_linked") {

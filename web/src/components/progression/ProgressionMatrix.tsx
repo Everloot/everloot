@@ -1,6 +1,6 @@
 import type { GuildProgress } from "@kb/guild-progression";
 import Link from "next/link";
-import { PROGRESSION_BUILD, PROGRESSION_GROUPS, type CharacterProgress } from "@kb/progression";
+import { PROGRESSION_BUILD, PROGRESSION_GROUPS, trackedDungeons, type CharacterProgress } from "@kb/progression";
 import { Badge } from "@/components/ui";
 import { SPACE } from "@/design/tokens";
 
@@ -11,12 +11,15 @@ export interface ProgressionMatrixProps {
   links?: Readonly<Record<number, string>>;
 }
 
+const tracked = new Set(trackedDungeons().map((dungeon) => dungeon.id));
+
 export default function ProgressionMatrix({ instances, links = {}, guild = false }: ProgressionMatrixProps) {
   return <div className="space-y-6">
     <div className="space-y-2 text-sm text-fg-2">
       {guild ? <p>Counts synced kills from every linked character in the armory roster; members without synced history count as not having the kill.</p> : <>
       <p>Kills come from linked characters through the Everloot Desktop App. Synced boss history is public; hidden characters are excluded. Blizzard&apos;s API gives no encounter data for this game.</p>
       <p>Lifetime progress counts each boss once across difficulties. No data from this character means no synced history is available, rather than no kills.</p>
+        <p>A tracked dungeon counts as cleared when every boss on its supported checklist is recorded.</p>
       </>}
       <p>Not seen open yet means no upload has seen an entrance or a boss kill here; it is not a Blizzard release announcement. The files can include test and unused content.</p>
       <p>Found in game files, build {PROGRESSION_BUILD}; game data copyright Blizzard Entertainment, Inc. Unconfirmed means players have not agreed on the entry.</p>
@@ -32,13 +35,24 @@ export default function ProgressionMatrix({ instances, links = {}, guild = false
               {r.unconfirmed && <Badge tone="files" />}
               {!r.typeKnown && <span className="text-xs text-muted">type unconfirmed</span>}
             </div>
-            <Badge tone="neutral">{r.availability === "unknown" ? "availability unavailable" : r.availability}</Badge>
+            <div className="flex flex-wrap gap-1">
+              <Badge tone="neutral">{r.availability === "unknown" ? "availability unavailable" : r.availability}</Badge>
+              {!guild && tracked.has(r.id) && <Badge tone="neutral">Tracked dungeon</Badge>}
+            </div>
           </div>
           <div className="space-y-2">
             <p className="font-mono text-sm tabular-nums text-fg-2">{r.killed === null ? `${r.total} bosses` : `${r.killed} / ${r.total} bosses`}</p>
             {r.killed !== null && <div role="progressbar" aria-label={`${r.name}: bosses ${guild ? "counted" : "killed"}`} aria-valuemin={0} aria-valuemax={r.total} aria-valuenow={r.killed} className="h-1 overflow-hidden bg-line" style={{ borderRadius: SPACE[0] }}>
               <div className="h-1 bg-fg-2" style={{ borderRadius: SPACE[0], width: `${r.total ? r.killed / r.total * 100 : 0}%` }} />
             </div>}
+            {"defeated" in r && r.bosses.length > 0 && <details className="text-sm text-fg-2">
+              <summary className="cursor-pointer">Boss checklist</summary>
+              <ul className="mt-2 space-y-1">
+                {r.bosses.map((boss) => <li key={boss.id}>{boss.name}{r.killed !== null && (
+                  <span className="text-muted"> · {r.defeated.includes(boss.id) ? "Defeated" : "No kill recorded"}</span>
+                )}</li>)}
+              </ul>
+            </details>}
           </div>
           <div className="space-y-2 text-sm">
             <span className="text-fg">{r.state}</span>

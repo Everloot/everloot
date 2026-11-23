@@ -57,6 +57,31 @@ test("prices refresh on the hour even with no upload", async () => {
   expect(deps.prices).toHaveBeenCalledTimes(1);
 });
 
+test("dungeon downloads run without market or upload jobs and an old folder cannot receive a late result", async () => {
+  const { deps, settings, flush } = harness();
+  let complete!: () => void;
+  const progress = vi.fn(async (_files: string[], current: () => boolean) => {
+    if (progress.mock.calls.length === 1) {
+      await new Promise<void>((resolve) => { complete = resolve; });
+      expect(current()).toBe(false);
+    }
+  });
+  const engine = createEngine({ ...deps, progress }, { pricesEveryMs: 60_000 });
+  const readOnly = mergeSettings(settings, { upload: false, prices: false });
+  engine.start(readOnly);
+  await flush();
+  expect(progress).toHaveBeenCalledTimes(1);
+  engine.start(mergeSettings(readOnly, { gameFolder: "D:/Forever" }));
+  complete();
+  await flush();
+  expect(progress).toHaveBeenCalledTimes(2);
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(progress).toHaveBeenCalledTimes(3);
+  expect(deps.prices).not.toHaveBeenCalled();
+  expect(deps.upload).not.toHaveBeenCalled();
+  engine.stop();
+});
+
 test("a failing upload is recorded and the other jobs keep going", async () => {
   const { deps, settings, engine, flush } = harness();
   deps.upload.mockRejectedValueOnce(new Error("intake answered 429"));

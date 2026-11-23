@@ -15,7 +15,7 @@ TESTS = [
     "ask_contract.py", "recipes_contract.py", "addons_contract.py", "mapbounds_contract.py", "market_contract.py",
     "drops_contract.py", "scan_prompt_contract.py", "auction_tab_contract.py", "options_contract.py",
     "gph_contract.py", "talents_contract.py", "plan_contract.py", "raid_contract.py", "completion_contract.py",
-    "census_contract.py", "players_contract.py", "link_contract.py", "conveniences_contract.py",
+    "census_contract.py", "players_contract.py", "player_progress_contract.py", "link_contract.py", "conveniences_contract.py",
     "protocol_contract.py", "no_ads_contract.py", "minimap_contract.py", "secret_values_contract.py",
     "ui_window_contract.py", "answers_contract.py", "pulls_contract.py",
     "drawer_contract.py", "owned_contract.py", "guild_contract.py",
