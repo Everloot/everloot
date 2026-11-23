@@ -267,6 +267,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
 
 ### Changed
+- Site: blue posts on /changes read like WoW's blue tracker: the poster and the excerpt in Blizzard blue, a Blizzard badge, the poster's role and a chip for where it was posted. Builds stay a compact row.
 - Site: the header links Players, Guilds and Rankings directly, ahead of its menus, and Lookup no longer repeats them; the phone menu opens with them as Community. The bar's items show from 1280 px (the Menu button carries them below that) and the build label from 1536 px.
 - Site: the header's menus take the keyboard: each trigger says it opens a panel, ArrowDown opens it onto the first link, ArrowUp/ArrowDown walk the links and wrap, Home/End jump to the ends, Tab out closes it, and ArrowLeft/ArrowRight move along the bar; below md the docs' section tabs become one select.
 - Site: the rankings boards' faction dots use the faction colours the census introduced, the same blue and red on both pages.
@@ -277,6 +278,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: the blue-post tracker no longer stalls on a long thread. A run cut off while following a thread's chain of tracked posts saves how far it got, so the next run continues instead of starting over. `?rescanSince=` on the cron route re-reads posts the reader passed before.
 - Site: coin amounts group their thousands (1,234,567g), and a character's Gold section is dated once, by its heading.
 - Addon: Home fits 100,000 gold and more in its gold column (copper left off), the Gold chart's hour tooltips say UTC, a crafting price change that rounds to nothing shows a muted "0%", turning off the gold switch no longer says its rows may not have been uploaded, and the disenchant tooltip no longer rereads your disenchant history each time.
 - Addon: the window is opaque, its resize grip no longer covers buttons, and Home shows full gold amounts, short dates and only the columns and counts that say something.
