@@ -124,7 +124,7 @@ export async function readDailyHistory(deps: Deps = {}): Promise<DayRow[] | null
 /**
  * Freezes the last completed day if the file does not have it yet (and starts the file with the backfill). Reads the
  * corpus, the market and the coverage only when there is a day to write. The write is conditional on the file read,
- * so two runs cannot both append; the loser leaves the day to the winner.
+ * so two runs cannot both append; a refused write throws, and the next run reads the file again.
  */
 export async function writeDailyHistory(now: Date, deps: Deps & {
   corpus: () => Promise<Corpus>; market: () => Promise<MarketState | null>; coverage: () => Promise<CoverageSummary | null>;
@@ -132,7 +132,9 @@ export async function writeDailyHistory(now: Date, deps: Deps & {
   const s = storage(deps);
   if (!s) throw new Error("the platform history needs the cloud store");
   const date = completedDay(now);
-  const res = await s.send({ method: "GET" });
+  // Uncompressed, so R2 answers with the object's strong ETag: a compressed answer carries a weak one, which no
+  // If-Match accepts. Without this every write after the first failed with 412 (2026-11-23, no 11/22 row).
+  const res = await s.send({ method: "GET", headers: { "accept-encoding": "identity" } });
   let file: HistoryFile | null = null;
   if (res.status !== 404) {
     if (!res.ok) throw new Error(`history read failed (${res.status})`);
@@ -141,6 +143,7 @@ export async function writeDailyHistory(now: Date, deps: Deps & {
     if (file.days.some((d) => d.date === date)) return { written: false, date };
   }
   const etag = res.headers.get("etag");
+  if (file && (!etag || etag.startsWith("W/"))) throw new Error(`history file has no strong ETag (${etag ?? "none"}): cannot append safely`);
   const corpus = await deps.corpus();
   if (corpus.unreachable) throw new Error("corpus unreachable");
   const row = snapshotRow(date, corpus, await deps.market(), await deps.coverage());
@@ -149,9 +152,11 @@ export async function writeDailyHistory(now: Date, deps: Deps & {
   const days = [...earlier.filter((d) => d.date !== date), row].sort((a, b) => a.date.localeCompare(b.date));
   const put = await s.send({
     method: "PUT", body: JSON.stringify({ version: 1, days } satisfies HistoryFile),
-    headers: { "content-type": "application/json", ...(file && etag ? { "if-match": etag } : { "if-none-match": "*" }) },
+    headers: { "content-type": "application/json", ...(file ? { "if-match": etag! } : { "if-none-match": "*" }) },
   });
-  if (put.status === 412) return { written: false, date };
+  // The job's runs never overlap (one concurrency group), so a 412 means the file changed under this run: say so,
+  // so the run names `history` and the health check shows it, and the next run reads the file again.
+  if (put.status === 412) throw new Error("history write refused (412): the file changed since it was read; the next run retries the day");
   if (!put.ok) throw new Error(`history write failed (${put.status})`);
   return { written: true, date, days: days.length };
 }
