@@ -474,7 +474,8 @@ click(g.periods.today)
 assert(g.chartTitle.text == 'Per hour, UTC' and shown(g.slots) == 24 and g.slots[1].point[2] == 10 and g.slots[1].width == 12)
 assert(g.axis.first.text == '00:00' and g.axis.middle.text == '12:00' and g.axis.last.text == '24:00')
 g.slots[11].scripts.OnEnter(g.slots[11])
-assert(lines() == '10:00 to 11:00 / Earned = ' .. U.Money(67500) .. ' / Spent = ' .. U.Money(55) .. ' / Net = ' .. U.Money(67445), lines())
+-- The hour says UTC, as the chart title does.
+assert(lines() == '10:00 to 11:00 UTC / Earned = ' .. U.Money(67500) .. ' / Spent = ' .. U.Money(55) .. ' / Net = ' .. U.Money(67445), lines())
 -- All, with ninety days of events: three-pixel slots that stay inside the plot.
 EverlootDB.ledger.events[#EverlootDB.ledger.events + 1] = { at = now - 89 * 86400, key = Everloot.CharacterKey(), category = 'quest', copper = 100 }
 Everloot.Ledger.revision = Everloot.Ledger.revision + 1

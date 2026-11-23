@@ -176,9 +176,22 @@ function O.RowsToDelete(row)
   return n
 end
 
+local ASK = "Turn off %s and delete %d recorded rows?"
+local NOT_UPLOADED = " They have not necessarily been uploaded."
+
+--- The question for turning this row off: the upload sentence only when a kind it deletes can be uploaded at all.
+function O.TurnOffText(row)
+  local localOnly = {}
+  for _, kind in ipairs(E.LOCAL_ONLY_KINDS or {}) do localOnly[kind] = true end
+  for _, kind in ipairs(O.DELETES[row.key] or {}) do
+    if not localOnly[kind] then return ASK .. NOT_UPLOADED end
+  end
+  return ASK
+end
+
 if StaticPopupDialogs then
   StaticPopupDialogs["EVERLOOT_TURN_OFF"] = {
-    text = "Turn off %s and delete %d recorded rows? They have not necessarily been uploaded.",
+    text = ASK .. NOT_UPLOADED,
     button1 = "Turn off and delete",
     button2 = "Cancel",
     OnAccept = function()
@@ -201,6 +214,7 @@ function O.Click(row, on)
     local n = O.RowsToDelete(row)
     if n > 0 then
       O.pending = row
+      StaticPopupDialogs["EVERLOOT_TURN_OFF"].text = O.TurnOffText(row)
       local ok, shown = pcall(StaticPopup_Show, "EVERLOOT_TURN_OFF", row.label, n)
       if ok and shown then
         O.Refresh() -- the switch stays on until the answer

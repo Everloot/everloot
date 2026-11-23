@@ -176,7 +176,7 @@ local function chartSlots(g, keys, sum, now)
   local slots = {}
   if g.period == "today" then
     local midnight = now - now % DAY
-    for h = 1, 24 do slots[h] = { label = string.format("%02d:00 to %02d:00", h - 1, h), earned = 0, spent = 0 } end
+    for h = 1, 24 do slots[h] = { label = string.format("%02d:00 to %02d:00 UTC", h - 1, h), earned = 0, spent = 0 } end
     local netted = #keys > 1
     for _, r in ipairs(sum.receipts(date("!%Y-%m-%d", now))) do
       local slot = slots[math.floor((r.at - midnight) / 3600) + 1]

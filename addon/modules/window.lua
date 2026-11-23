@@ -352,6 +352,11 @@ U.ROSTER_COLUMNS = {
   { "profs", 236, 106, false, "Professions", true }, { "lockouts", 346, 42, false, "Raids" }, { "seen", 392, 44, false, "Seen", true },
 }
 
+-- A roster gold cell: every coin below 100,000 gold; from there gold and silver only, so it fits the 104 px column.
+local function rosterMoney(copper)
+  return copper >= 100000 * 10000 and U.MoneyShort(copper) or U.Money(copper)
+end
+
 local function buildHome(f)
   local home = CreateFrame("Frame", nil, f)
   home:SetPoint("TOPLEFT", MAIN, -48)
@@ -819,7 +824,7 @@ function U.RefreshRoster()
         if item.key == current then row.name:SetTextColor(unpack(COLORS.accent))
         else row.name:SetTextColor(classColor(item.class)) end
         row.level:SetText(type(item.level) == "number" and tostring(item.level) or "-")
-        row.gold:SetText((type(item.copper) == "number" and item.copper > 0) and U.Money(item.copper) or "-")
+        row.gold:SetText((type(item.copper) == "number" and item.copper > 0) and rosterMoney(item.copper) or "-")
         row.profs:SetText(professionText(item.professions))
         row.lockouts:SetText(lockouts[item])
         row.seen:SetText(seenText(item.lastSeen))

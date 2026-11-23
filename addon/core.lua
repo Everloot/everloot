@@ -137,6 +137,10 @@ local defaults = {
 E.RETIRED_KINDS = { "gear_snapshot", "talent_snapshot", "achievement_owned", "reputation_owned", "quest_owned",
   "profession_owned", "talent_owned", "stats_owned", "pvp_owned" }
 
+--- Kinds the addon writes that are never in an upload (web/src/lib/upload-batches.ts LOCAL_ONLY_KINDS).
+--- protocol_contract.py keeps the two lists in step.
+E.LOCAL_ONLY_KINDS = { "lockout_owned", "boss_kill_owned", "wealth_owned" }
+
 --- Deletes the retired kinds' rows, their paused flags and their modules' saved state. Nothing writes them again,
 --- so after the first load of this release it finds nothing.
 function E.DropRetired()

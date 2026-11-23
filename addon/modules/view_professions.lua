@@ -628,10 +628,11 @@ local function drawCraftRow(line, row, selected)
   line.profit:SetText(profit and ((profit > 0 and "+" or "") .. U.MoneyShort(profit)) or "-")
   line.profit:SetTextColor(unpack(not profit and COLORS.muted or (profit > 0 and COLORS.accent) or (profit < 0 and WARN) or COLORS.text))
   -- Your scans: the product's lowest buyout change since the previous scan of this house, in figures the font draws.
+  -- A change that rounds to 0% is "0%", muted, not a coloured "+0%".
   local change = row.marketChange
-  local direction = change.change
+  local direction = change.change and math.floor(change.change + 0.5)
   local color = direction and direction > 0 and COLORS.accent or (direction and direction < 0 and COLORS.gold or COLORS.muted)
-  line.change:SetText(direction and string.format("%+.0f%%", direction) or "")
+  line.change:SetText(direction and (direction == 0 and "0%" or string.format("%+d%%", direction)) or "")
   line.change:SetTextColor(unpack(color))
   local max = 0
   for _, price in ipairs(change.bars) do if price then max = math.max(max, price) end end

@@ -211,6 +211,18 @@ assert(r.rows[3].level.text == '24' and r.rows[3].gold.text == Everloot.Window.M
 EverlootDB.roster.aaaa0001.copper = 0
 Everloot.Window.Refresh()
 assert(r.rows[2].gold.text == '-', 'no gold, a dash: ' .. r.rows[2].gold.text)
+-- 100,000 gold and up leaves the copper off, so the amount fits the column (6 px a character, a coin icon 12 px).
+local function cellWidth(s) return 6 * #(s:gsub('|T.-|t', 'xx')) end
+local goldWidth
+for _, c in ipairs(Everloot.Window.ROSTER_COLUMNS) do if c[1] == 'gold' then goldWidth = c[3] end end
+EverlootDB.roster.aaaa0001.copper = 1234567890
+Everloot.Window.Refresh()
+local big = r.rows[2].gold.text
+assert(cellWidth(big) <= goldWidth, 'fits: ' .. big .. ' in ' .. goldWidth)
+assert(big:find('^123456|T[^|]-UI%-GoldIcon') and big:find(' 78|T[^|]-UI%-SilverIcon') and not big:find('Copper'), big)
+EverlootDB.roster.aaaa0001.copper = 999999999
+Everloot.Window.Refresh()
+assert(r.rows[2].gold.text == Everloot.Window.Money(999999999) and cellWidth(r.rows[2].gold.text) <= goldWidth, 'under 100,000 gold, every coin')
 EverlootDB.roster.aaaa0001.copper = 500
 Everloot.Window.Refresh()
 assert(r.rows[3].profs.text == 'Mining 112, Fishing 20, Cooking 1' and r.rows[2].profs.text == '-', r.rows[3].profs.text)
