@@ -1,5 +1,8 @@
 import { expect, test } from "vitest";
-import { agreedLabelsById, handleNpcPage, handleQuestPage, handleVendorPage, npcNameReporters, npcTraits, questTraits, worldFactsFromRecords } from "../src/world-pages.js";
+import {
+  agreedLabelsById, agreedNpc, agreedNpcFacts, agreedNpcNames, agreedQuestTitles, handleNpcPage, handleQuestPage, handleVendorPage, npcNameReporters, npcPage,
+  npcReportedName, npcTraits, npcZonesOf, questPage, questTraits, vendorPage, worldFactsFromRecords, zonesFor, type WorldFacts,
+} from "../src/world-pages.js";
 
 test("an NPC's level and reaction are kept from sightings and public once 3 installs agree", () => {
   const sight = (installId: string, level: unknown, reaction: unknown) =>
@@ -152,6 +155,46 @@ test("a stock only some installs reported is unrecorded, not unlimited", () => {
   expect(text).not.toContain("not limited");
 });
 
+
+test("the agreed NPC table gives every NPC reader the answer the sightings give, recheck scopes included", () => {
+  const old = "2026-10-01T00:00:00Z", fresh = "2026-11-01T00:00:00Z";
+  const sight = (installId: string, npcId: number, name: string, extra: Record<string, unknown> = {}) =>
+    ({ kind: "npc_sighting", installId, npcId, name, mapId: 12, x: 40, y: 60, positionKind: "npc", level: 10, reaction: "hostile", creatureType: "Beast", rank: "rare", capturedAt: old, ...extra });
+  const records = [
+    // Outside the scope: agreed name, pin and traits. Where the player stood never dates the pin.
+    ...["a", "b", "c"].map((i) => sight(i, 7, "Hogger", { mapId: 14 })), sight("d", 7, "Hogger", { mapId: 14, capturedAt: fresh, positionKind: "player" }), sight("e", 7, "Hogger", { mapId: 15, capturedAt: fresh }),
+    // Two installs: a candidate name with its reporter count, and a drop source name.
+    ...["a", "b"].map((i) => sight(i, 8, "Old Murk-Eye", { mapId: 13 })),
+    // A rare on map 12 the scope below rechecks: the old name was agreed before it, two new installs report another.
+    ...["a", "b", "c"].map((i) => sight(i, 9, "Old Name")), ...["d", "e"].map((i) => sight(i, 9, "New Name", { capturedAt: fresh })),
+    ...["a", "b", "c"].map((installId) => ({ kind: "quest", installId, questId: 50, title: "Old Title", level: 5, giverNpcId: 9, rewardItemIds: [1], capturedAt: old })),
+    ...["d", "e", "f"].map((installId) => ({ kind: "quest", installId, questId: 50, title: "New Title", level: 5, giverNpcId: 9, rewardItemIds: [1], capturedAt: fresh })),
+    ...["a", "b", "c"].map((installId) => ({ kind: "vendor", installId, vendorNpcId: 9, items: [{ itemId: 5, priceCopper: 10 }], capturedAt: old })),
+    ...["d", "e", "f"].map((installId) => ({ kind: "vendor", installId, vendorNpcId: 9, items: [{ itemId: 5, priceCopper: 12 }], capturedAt: fresh })),
+  ];
+  const recheck = [{ since: "2026-10-15T00:00:00Z", source: "fixture", zones: [12] }];
+  const raw = worldFactsFromRecords(records, recheck);
+  const table: WorldFacts = { ...raw, npcs: [], agreedNpcs: agreedNpcFacts(raw) };
+  for (const npcId of [7, 8, 9, 404]) {
+    expect(npcPage(npcId, table)).toEqual(npcPage(npcId, raw));
+    expect(npcNameReporters(npcId, table)).toBe(npcNameReporters(npcId, raw));
+    expect(npcReportedName(npcId, table)).toBe(npcReportedName(npcId, raw));
+    expect(agreedNpc(npcId, table)).toEqual(agreedNpc(npcId, raw));
+  }
+  expect([...agreedNpcNames(table)]).toEqual([...agreedNpcNames(raw)]);
+  expect([...agreedNpcNames(table, true)]).toEqual([...agreedNpcNames(raw, true)]);
+  expect([...agreedQuestTitles(table)]).toEqual([...agreedQuestTitles(raw)]);
+  expect(questPage(50, table)).toEqual(questPage(50, raw));
+  expect(questTraits(raw.quests, table)).toEqual(questTraits(raw.quests, raw));
+  expect(vendorPage(9, table)).toEqual(vendorPage(9, raw));
+  expect([...npcZonesOf(table)]).toEqual([...zonesFor(raw.npcs)]);
+  // The scope is what the zone is for: the rare's name and its quest's title are the new reports'.
+  expect(questPage(50, table).title).toBe("New Title");
+  expect(vendorPage(9, table).offers.map((o) => o.priceCopper)).toEqual([12]);
+  expect(agreedNpc(7, table)).toMatchObject({ name: "Hogger", level: 10, reaction: "hostile", creatureType: "Beast", rank: "rare", pinDates: [[14, "2026-10-01"]] });
+  expect(agreedNpc(8, table)).toMatchObject({ name: null, nameReporters: 2, reportedName: "old murk-eye", dropName: { name: "Old Murk-Eye" } });
+  expect(agreedNpc(404, table)).toBeNull();
+});
 
 test("tiered drop names respect recheck and leave other name readers at three installs", () => {
   const old = ["fixture-a", "fixture-b", "fixture-c"].map((installId) =>

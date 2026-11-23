@@ -1,7 +1,7 @@
 import { loadWikiEntityNames, shownNpcName } from "./wiki-entity-names";
 import { itemPage } from "@kb/item-page";
 import { objectPage } from "@kb/object-page";
-import { npcPage, questPage, vendorPage } from "@kb/world-pages";
+import { agreedNpcsOf, npcPage, questPage, vendorPage } from "@kb/world-pages";
 import { loadEdges } from "./edges";
 import { loadSpellNames } from "./game-assets";
 import { itemIndexable, npcIndexable, objectIndexable, questIndexable, spellIndexable, vendorIndexable } from "./indexable";
@@ -76,18 +76,18 @@ export async function databasePaths(): Promise<string[] | null> {
     return itemIndexable(page, false, shownItemName(id, agreed, matched?.names));
   });
 
-  const none = { npcs: [], quests: [], vendors: [], recheck: world.recheck };
-  const npcRows = byKey(world.npcs, (r) => r.npcId);
+  // Every NPC answers from the agreed table (kb world-pages agreedNpcsOf), the stored one or one worked out once.
+  const none = { npcs: [], quests: [], vendors: [], recheck: world.recheck, agreedNpcs: agreedNpcsOf(world) };
   const npcWiki = await loadWikiEntityNames("npc");
   const spellWiki = await loadWikiEntityNames("spell");
-  const npcs = ascending(npcRows.keys()).filter((id) => {
-    const page = npcPage(id, { ...none, npcs: npcRows.get(id) ?? [] });
-    return npcIndexable({ ...page, name: shownNpcName(id, { ...none, npcs: npcRows.get(id) ?? [] }, npcWiki).name ?? null }, false);
+  const npcs = ascending(none.agreedNpcs.keys()).filter((id) => {
+    const page = npcPage(id, none);
+    return npcIndexable({ ...page, name: shownNpcName(id, none, npcWiki).name ?? null }, false);
   });
   const questRows = byKey(world.quests, (r) => r.questId);
-  const quests = ascending(questRows.keys()).filter((id) => questIndexable(questPage(id, { ...none, quests: questRows.get(id)!, npcs: world.npcs }), false));
+  const quests = ascending(questRows.keys()).filter((id) => questIndexable(questPage(id, { ...none, quests: questRows.get(id)! }), false));
   const vendorRows = byKey(world.vendors, (r) => r.vendorNpcId);
-  const vendors = ascending(vendorRows.keys()).filter((id) => vendorIndexable(vendorPage(id, { ...none, vendors: vendorRows.get(id)!, npcs: world.npcs }), false));
+  const vendors = ascending(vendorRows.keys()).filter((id) => vendorIndexable(vendorPage(id, { ...none, vendors: vendorRows.get(id)! }), false));
 
   const objectRates = byKey(objects.rates, (r) => r.sourceObjectId);
   const objectZeros = byKey(objects.measuredZeros, (r) => r.sourceObjectId);

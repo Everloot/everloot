@@ -20,6 +20,7 @@ import { createToolHandlers } from "@kb/mcp-server";
 import { openDb } from "@kb/db";
 import { uploadStore } from "./upload-store";
 import { anonymousAggregates, encodeAggregates, parseAggregates } from "./aggregate-store";
+import { buildNpcFacts, parseNpcFacts } from "./npc-facts-store";
 import type { IntakeRecord } from "@everloot/protocol";
 import { answerSourcesFactsFromRecords } from "@kb/answer-sources";
 
@@ -117,8 +118,11 @@ describe("stored answer_sources facts", () => {
     { kind: "guild_snapshot", installId, guildName: "Unpublished Guild", realm: "Realm Four", members: [{ name: "Suppressed Player", rank: "Officer", level: 20, class: "Rogue" }] },
     { kind: "gear_snapshot", installId, character: "Suppressed Player", realm: "Realm Four", equipped: [] },
   ]);
+  /** The set as loadStoredAggregates gives it: the file without the NPC sightings, with the stored NPC table on its world facts. */
   function stored() {
-    return parseAggregates(encodeAggregates(anonymousAggregates({ uploads: 3, records: records as unknown as IntakeRecord[], dataAsOf: date }), date))!.set;
+    const live = anonymousAggregates({ uploads: 3, records: records as unknown as IntakeRecord[], dataAsOf: date });
+    const set = parseAggregates(encodeAggregates(live, date))!.set;
+    return { ...set, world: { ...set.world, agreedNpcs: parseNpcFacts(JSON.stringify(buildNpcFacts(live)))!.npcs } };
   }
 
   it("answers the fixed question set identically using stored facts without a corpus/publication read", async () => {

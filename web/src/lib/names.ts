@@ -53,7 +53,9 @@ function once<T = string>(key: object, build: () => Map<number, T>, cache = memo
 }
 
 export const itemNames = (facts: Pick<ItemFacts, "names">) => once(facts.names, () => agreedItemNames(facts));
-export const npcNames = (facts: Pick<WorldFacts, "npcs">) => once(facts.npcs, () => agreedNpcNames(facts));
+/** The NPC names' memo key: the stored agreed table when the facts carry one (its sightings are then empty), else the sightings. */
+const npcKey = (facts: Pick<WorldFacts, "npcs" | "agreedNpcs">): object => facts.agreedNpcs ?? facts.npcs;
+export const npcNames = (facts: Pick<WorldFacts, "npcs" | "agreedNpcs" | "recheck">) => once(npcKey(facts), () => agreedNpcNames(facts));
 export const objectNames = (facts: Pick<ItemFacts, "objects">) => once(facts.objects ?? NO_OBJECTS, () => agreedObjectNames(facts.objects ?? [], RECHECK_SCOPES));
 export const questTitles = (facts: Pick<WorldFacts, "quests">) => once(facts.quests, () => agreedQuestTitles(facts));
 
@@ -72,7 +74,7 @@ export async function loadNames(itemsRead: ReturnType<typeof loadItemFacts> = lo
 export async function loadDropSourceNames(): Promise<{ npcs: Map<number, DropSourceName>; objects: Map<number, DropSourceName> }> {
   const [items, world] = await Promise.all([loadItemFacts(), loadWorldFacts()]);
   return {
-    npcs: world.unreachable ? new Map() : once(world.npcs, () => agreedNpcNames(world, true), dropMemo),
+    npcs: world.unreachable ? new Map() : once(npcKey(world), () => agreedNpcNames(world, true), dropMemo),
     objects: items.unreachable ? new Map() : once(items.objects ?? NO_OBJECTS, () => agreedObjectNames(items.objects ?? [], RECHECK_SCOPES, true), dropMemo),
   };
 }

@@ -301,8 +301,9 @@ test.each(["alchemy", "herbalism", "mining", "tailoring", "skinning"])("stored %
   const { buildProfessions, encodeProfessions, forgetStoredProfessions } = await import("@/lib/profession-store");
   const { buildAggregates } = await import("@/lib/aggregate-set");
   const { encodeAggregates, forgetStoredAggregates } = await import("@/lib/aggregate-store");
+  const { buildNpcFacts, forgetStoredNpcFacts, NPC_FACTS_KEY } = await import("@/lib/npc-facts-store");
   const { buildItemView, forgetItemView } = await import("@/lib/item-view-store");
-  const forget = () => { forgetStoredProfessions(); forgetStoredAggregates(); forgetItemView(); };
+  const forget = () => { forgetStoredProfessions(); forgetStoredAggregates(); forgetStoredNpcFacts(); forgetItemView(); };
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   forget();
@@ -323,6 +324,8 @@ test.each(["alchemy", "herbalism", "mining", "tailoring", "skinning"])("stored %
     const url = (input as Request).url;
     return new Response(url.endsWith("snapshots/aggregates.json")
       ? encodeAggregates(buildAggregates(corpus as unknown as import("@/lib/upload-store").Corpus), "now")
+      : url.endsWith(NPC_FACTS_KEY)
+        ? JSON.stringify(buildNpcFacts(buildAggregates(corpus as unknown as import("@/lib/upload-store").Corpus)))
       : url.endsWith("snapshots/professions.json")
         ? encodeProfessions(buildProfessions(corpus), "now")
         : url.endsWith("snapshots/item-view.json") ? JSON.stringify(view) : "{}" );

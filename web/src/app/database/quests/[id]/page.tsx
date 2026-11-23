@@ -9,7 +9,7 @@ import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { hasCard } from "@/lib/tooltip";
-import { isPinPosition, npcPage, questPage } from "@kb/world-pages";
+import { agreedNpc, npcPage, questPage } from "@kb/world-pages";
 import { loadWorldFacts } from "@/lib/rollup-compute";
 import { pinLink } from "@/lib/world-map";
 import { trailFor } from "@/lib/breadcrumbs";
@@ -90,8 +90,7 @@ export default async function QuestPage(props: { params: Promise<{ id: string }>
   const next = chain?.questIds[position + 1];
   const giverPin = people.find((p) => p.role === "Giver")?.map;
   const zone = giverPin ? zoneByMapId(giverPin.mapId) : undefined;
-  const zoneDate = giverPin ? facts.npcs.filter((r) => r.npcId === page.giverNpcId && r.mapId === giverPin.mapId && isPinPosition(r.positionKind))
-    .flatMap((r) => r.capturedAt ? [r.capturedAt] : []).sort().at(-1)?.slice(0, 10) : undefined;
+  const zoneDate = giverPin && page.giverNpcId !== null ? agreedNpc(page.giverNpcId, facts)?.pinDates.find(([mapId]) => mapId === giverPin.mapId)?.[1] : undefined;
   const chainDate = chain?.confirmed ? catalog?.dataAsOf : CLIENT_QUEST_LINES.build.extractedAt;
 
   const named = title !== `Quest ${page.questId}`;

@@ -102,6 +102,12 @@ export type WorldFacts = {
   recheck?: readonly RecheckScope[];
   /** Where installs looted each NPC's kills; absent when no kill window carried a place. */
   kills?: KillPlace[];
+  /**
+   * What the agreement rules give each NPC (`agreedNpcFacts`), worked out once from `npcs`. When it is here, the NPC
+   * readers below answer from it and never read `npcs`, which may then be empty: the site stores this table instead of
+   * the raw sightings (#1464).
+   */
+  agreedNpcs?: ReadonlyMap<number, AgreedNpc>;
 };
 
 export type NpcPin = { mapId: number; x: number; y: number; reporters: number };
@@ -118,6 +124,33 @@ export type QuestPage = {
 /** `limitedStock` null with `unlimited` false means the stock is unrecorded, not unlimited. */
 export type VendorOffer = { itemId: number; priceCopper: number; limitedStock: number | null; unlimited: boolean; reporters: number };
 export type VendorPage = { vendorNpcId: number; offers: VendorOffer[] };
+
+/**
+ * One NPC as the readers below see it, from its sightings: each field is what the named function gives. Every NPC
+ * with a sighting has one, agreed facts or not, so "no row" means no upload saw it.
+ */
+export type AgreedNpc = {
+  npcId: number;
+  /** `npcPage`'s name and pins. */
+  name: string | null;
+  pins: NpcPin[];
+  /** `npcTraits`. */
+  level: number | null;
+  reaction: NpcReaction | null;
+  creatureType: string | null;
+  rank: NpcRank | null;
+  /** Where the coverage score counts it (`zonesFor`), for the recheck scopes of its quests and goods. */
+  zone: number | null;
+  /** `agreedNpcNames`' name, kept apart only where it differs from `name` (a row with no install can tip a scope). */
+  listName?: string | null;
+  /** `agreedNpcNames(facts, true)`: the unanimous drop source name and its tier. */
+  dropName: DropSourceName | null;
+  /** `npcNameReporters` and `npcReportedName`. */
+  nameReporters: number;
+  reportedName: string | null;
+  /** The date (YYYY-MM-DD) of the latest pin-position sighting on each pinned map, by map id: the quest page's "seen" date. */
+  pinDates: [number, string][];
+};
 
 const EMPTY: WorldFacts = { npcs: [], quests: [], vendors: [] };
 
@@ -184,6 +217,19 @@ export function zonesFor(npcs: readonly NpcSightingRow[]): Map<number, number | 
   return zones;
 }
 
+/** Each NPC's coverage zone: the stored table's when there is one, else `zonesFor` over the sightings. */
+const tableZones = new WeakMap<ReadonlyMap<number, AgreedNpc>, Map<number, number | null>>();
+export function npcZonesOf(facts: Pick<Partial<WorldFacts>, "npcs" | "agreedNpcs">): ReadonlyMap<number, number | null> {
+  const table = facts.agreedNpcs;
+  if (!table) return zonesFor(facts.npcs ?? []);
+  let zones = tableZones.get(table);
+  if (!zones) {
+    zones = new Map([...table.values()].map((n) => [n.npcId, n.zone]));
+    tableZones.set(table, zones);
+  }
+  return zones;
+}
+
 /** A rare, as the score counts one: its agreed rank, or with none agreed, any report of a rare rank. */
 function isRare(rows: readonly NpcSightingRow[]): boolean {
   const rare = (v: unknown) => v === "rare" || v === "rare_elite";
@@ -211,9 +257,18 @@ export function questScope(questId: number, rows: readonly QuestSighting[], zone
 }
 
 /** Every NPC name in one pass; drop source names carry their own agreement tier. */
-export function agreedNpcNames(facts: Pick<WorldFacts, "npcs"> & Pick<Partial<WorldFacts>, "recheck">, publicDrops: true): Map<number, DropSourceName>;
-export function agreedNpcNames(facts: Pick<WorldFacts, "npcs"> & Pick<Partial<WorldFacts>, "recheck">, publicDrops?: false): Map<number, string>;
-export function agreedNpcNames(facts: Pick<WorldFacts, "npcs"> & Pick<Partial<WorldFacts>, "recheck">, publicDrops = false): Map<number, string> | Map<number, DropSourceName> {
+export function agreedNpcNames(facts: Pick<WorldFacts, "npcs"> & Pick<Partial<WorldFacts>, "recheck" | "agreedNpcs">, publicDrops: true): Map<number, DropSourceName>;
+export function agreedNpcNames(facts: Pick<WorldFacts, "npcs"> & Pick<Partial<WorldFacts>, "recheck" | "agreedNpcs">, publicDrops?: false): Map<number, string>;
+export function agreedNpcNames(facts: Pick<WorldFacts, "npcs"> & Pick<Partial<WorldFacts>, "recheck" | "agreedNpcs">, publicDrops = false): Map<number, string> | Map<number, DropSourceName> {
+  if (facts.agreedNpcs) {
+    const out = new Map<number, string | DropSourceName>();
+    for (const n of facts.agreedNpcs.values()) {
+      const value = publicDrops ? n.dropName : n.listName === undefined ? n.name : n.listName;
+      if (value) out.set(n.npcId, value);
+    }
+    // The order `agreedLabelsById` gives: first sighting first, confirmed source names ahead.
+    return new Map([...out].sort((a, b) => Number(typeof b[1] === "object" && b[1].tier === "confirmed") - Number(typeof a[1] === "object" && a[1].tier === "confirmed"))) as Map<number, string> | Map<number, DropSourceName>;
+  }
   const scopes = facts.recheck ?? NO_SCOPES;
   let sinceOf: ((id: number) => string | null) | undefined;
   if (scopes.length) {
@@ -225,11 +280,11 @@ export function agreedNpcNames(facts: Pick<WorldFacts, "npcs"> & Pick<Partial<Wo
 }
 
 /** Every quest with an agreed title, by id: the titles `questPage` gives, in one pass. Scopes by zone need the NPCs. */
-export function agreedQuestTitles(facts: Pick<WorldFacts, "quests"> & Pick<Partial<WorldFacts>, "npcs" | "recheck">): Map<number, string> {
+export function agreedQuestTitles(facts: Pick<WorldFacts, "quests"> & Pick<Partial<WorldFacts>, "npcs" | "recheck" | "agreedNpcs">): Map<number, string> {
   const scopes = facts.recheck ?? NO_SCOPES;
   let sinceOf: ((id: number) => string | null) | undefined;
   if (scopes.length) {
-    const zones = zonesFor(facts.npcs ?? []), byId = groupRows(facts.quests, (r) => r.questId);
+    const zones = npcZonesOf(facts), byId = groupRows(facts.quests, (r) => r.questId);
     sinceOf = (id) => scopeSince(scopes, questScope(id, byId.get(id) ?? [], zones));
   }
   return agreedLabelsById(facts.quests.map((row) => ({ id: row.questId, installId: row.installId, label: row.title, ...at(row) })), sinceOf);
@@ -280,6 +335,7 @@ function npcRows(npcId: number, facts: WorldFacts) {
  * count short of 3. 0 when none did, when a name is agreed, and when two names each have 3. A count only, never the name.
  */
 export function npcNameReporters(npcId: number, facts: WorldFacts): number {
+  if (facts.agreedNpcs) return facts.agreedNpcs.get(npcId)?.nameReporters ?? 0;
   const { names, since } = npcRows(npcId, facts);
   const tally = tallyVotes(names.map((row) => ({ installId: row.installId, value: row.label, ...at(row) })), since ? { recheckSince: since } : {});
   const most = Math.max(0, ...tally.groups.map((group) => group.voters.size));
@@ -288,6 +344,7 @@ export function npcNameReporters(npcId: number, facts: WorldFacts): number {
 
 /** A unanimous, below-threshold candidate for the site's wiki comparison. Never returns identities. */
 export function npcReportedName(npcId: number, facts: WorldFacts): string | null {
+  if (facts.agreedNpcs) return facts.agreedNpcs.get(npcId)?.reportedName ?? null;
   const { names, since } = npcRows(npcId, facts);
   const rows = recheckRows(names.map((r) => ({ ...r, value: r.label })), since, { value: (r) => r.value }).rows;
   const tally = tallyVotes(rows.map((r) => ({ ...r, value: normName(r.value) })));
@@ -296,6 +353,11 @@ export function npcReportedName(npcId: number, facts: WorldFacts): string | null
 }
 
 export function npcPage(npcId: number, facts: WorldFacts): NpcPage {
+  if (facts.agreedNpcs) {
+    const agreed = facts.agreedNpcs.get(npcId);
+    const pendingLoot = pendingForNpc(facts.pending, npcId);
+    return { npcId, name: agreed?.name ?? null, pins: agreed ? [...agreed.pins] : [], ...(pendingLoot ? { pendingLoot } : {}) };
+  }
   const { rows, scopes, scope, names, since } = npcRows(npcId, facts);
   const name = agreedLabel(names, since);
   const placed = groupRows(rows.filter((row) => isPinPosition(row.positionKind) && Number.isInteger(row.mapId) && row.mapId >= 0
@@ -333,6 +395,54 @@ export function npcTraits(rows: NpcSightingRow[], recheck: readonly RecheckScope
   return { level, reaction: reaction as NpcReaction | null, creatureType, rank: rank as NpcRank | null };
 }
 
+/** One NPC's agreed facts: the stored table's row, else worked out from its sightings; null when no upload saw it. */
+export function agreedNpc(npcId: number, facts: WorldFacts): AgreedNpc | null {
+  if (facts.agreedNpcs) return facts.agreedNpcs.get(npcId) ?? null;
+  const rows = facts.npcs.filter((row) => row.npcId === npcId);
+  return rows.length ? agreedNpcFacts({ npcs: rows, ...(facts.recheck ? { recheck: facts.recheck } : {}) }).get(npcId) ?? null : null;
+}
+
+/**
+ * The agreed facts of every NPC with a sighting, by id in the order first seen: the readers' answers, worked out once
+ * so a reader can keep this table instead of the sightings. Each field is the named function's own answer.
+ */
+export function agreedNpcFacts(facts: Pick<WorldFacts, "npcs"> & Pick<Partial<WorldFacts>, "recheck">): Map<number, AgreedNpc> {
+  const recheck = facts.recheck ?? NO_SCOPES;
+  const scoped = recheck.length ? { recheck } : {};
+  const zones = zonesFor(facts.npcs), listNames = agreedNpcNames({ npcs: facts.npcs, ...scoped }), dropNames = agreedNpcNames({ npcs: facts.npcs, ...scoped }, true);
+  const out = new Map<number, AgreedNpc>();
+  for (const [npcId, rows] of groupRows(facts.npcs, (r) => r.npcId)) {
+    const own: WorldFacts = { npcs: rows, quests: [], vendors: [], ...scoped };
+    const { name, pins } = npcPage(npcId, own);
+    const listName = listNames.get(npcId) ?? null;
+    const pinDates = pins.flatMap((pin): [number, string][] => {
+      const last = rows.filter((r) => r.mapId === pin.mapId && isPinPosition(r.positionKind)).flatMap((r) => (r.capturedAt ? [r.capturedAt] : [])).sort().at(-1);
+      return last ? [[pin.mapId, last.slice(0, 10)]] : [];
+    });
+    out.set(npcId, {
+      npcId, name, pins, ...npcTraits(rows, recheck), zone: zones.get(npcId) ?? null,
+      ...(listName === name ? {} : { listName }), dropName: dropNames.get(npcId) ?? null,
+      nameReporters: npcNameReporters(npcId, own), reportedName: npcReportedName(npcId, own), pinDates,
+    });
+  }
+  return out;
+}
+
+/** The table the readers answer from: the stored one, else worked out once per sightings array and scope list. */
+const tables = new WeakMap<readonly NpcSightingRow[], WeakMap<readonly RecheckScope[], Map<number, AgreedNpc>>>();
+export function agreedNpcsOf(facts: Pick<WorldFacts, "npcs"> & Pick<Partial<WorldFacts>, "recheck" | "agreedNpcs">): ReadonlyMap<number, AgreedNpc> {
+  if (facts.agreedNpcs) return facts.agreedNpcs;
+  const scopes = facts.recheck ?? NO_SCOPES;
+  let byScopes = tables.get(facts.npcs);
+  if (!byScopes) { byScopes = new WeakMap(); tables.set(facts.npcs, byScopes); }
+  let table = byScopes.get(scopes);
+  if (!table) {
+    table = agreedNpcFacts(facts);
+    byScopes.set(scopes, table);
+  }
+  return table;
+}
+
 /** The recheck cut-off for one NPC's name and traits, from its own rows. */
 function npcSince(rows: readonly NpcSightingRow[], recheck: readonly RecheckScope[]): string | null {
   const npcId = rows[0]?.npcId;
@@ -365,10 +475,10 @@ export function handleNpcPage(args: { npcId: number }, facts: WorldFacts = EMPTY
 }
 
 /** The recheck cut-off for one quest's fields, placed by its giver among `facts.npcs`. */
-function questSince(questId: number, rows: readonly QuestSighting[], facts: Pick<Partial<WorldFacts>, "npcs" | "recheck">, zones?: ReadonlyMap<number, number | null>): string | null {
+function questSince(questId: number, rows: readonly QuestSighting[], facts: Pick<Partial<WorldFacts>, "npcs" | "recheck" | "agreedNpcs">, zones?: ReadonlyMap<number, number | null>): string | null {
   const scopes = facts.recheck ?? NO_SCOPES;
   if (!scopes.length) return null;
-  return scopeSince(scopes, questScope(questId, rows, zones ?? zonesFor(facts.npcs ?? [])));
+  return scopeSince(scopes, questScope(questId, rows, zones ?? npcZonesOf(facts)));
 }
 
 export function questPage(questId: number, facts: WorldFacts, zones?: ReadonlyMap<number, number | null>): QuestPage {
@@ -396,7 +506,7 @@ export function questPage(questId: number, facts: WorldFacts, zones?: ReadonlyMa
  * faction and none reports the other, Both when 3 installs report each, and no side otherwise. It is never
  * guessed from the title, giver or zone.
  */
-export function questTraits(rows: QuestSighting[], facts: Pick<Partial<WorldFacts>, "npcs" | "recheck"> = {}): { category: string | null; side: QuestSide | null; suggestedGroup: number | null; tag: QuestTag | null } {
+export function questTraits(rows: QuestSighting[], facts: Pick<Partial<WorldFacts>, "npcs" | "recheck" | "agreedNpcs"> = {}): { category: string | null; side: QuestSide | null; suggestedGroup: number | null; tag: QuestTag | null } {
   const s = rows.length ? questSince(rows[0]!.questId, rows, facts) : null;
   const category = agreedLabel(rows.filter((row) => row.category !== undefined).map((row) => ({ installId: row.installId, label: row.category!, ...at(row) })), s);
   const suggestedGroup = agreedNumber(rows.filter((row) => row.suggestedGroup !== undefined).map((row) => ({ installId: row.installId, value: row.suggestedGroup!, ...at(row) })), s);
@@ -449,7 +559,7 @@ export function vendorPage(vendorNpcId: number, facts: WorldFacts): VendorPage {
   const valid = facts.vendors.filter((row) => row.vendorNpcId === vendorNpcId && row.installId.trim()
     && Number.isInteger(row.itemId) && row.itemId >= 1 && Number.isInteger(row.priceCopper) && row.priceCopper >= 0);
   // An item under a recheck scope whose price was agreed before it counts only the rows after it, for its stock too.
-  const zone = scopes.length ? zonesFor(facts.npcs).get(vendorNpcId) ?? null : null;
+  const zone = scopes.length ? npcZonesOf(facts).get(vendorNpcId) ?? null : null;
   const rows = scopes.length ? [...groupRows(valid, (row) => row.itemId)].flatMap(([itemId, list]) =>
     recheckRows(list, scopeSince(scopes, { types: ["vendors"], zones: [zone], ids: [vendorNpcId, itemId] }), { value: (row) => row.priceCopper }).rows) : valid;
   for (const row of rows) {

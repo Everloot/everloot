@@ -3,6 +3,7 @@ import { keep } from "./kept";
 import { STAMP, stampOf, storedViewNeedsWrite } from "./stored-view-freshness";
 import { namedRecord } from "@kb/corpus";
 import { buildAggregates, type AggregateSet } from "./aggregate-set";
+import { loadStoredNpcFacts, type StoredNpcFacts } from "./npc-facts-store";
 import { uploadStore, type Corpus, type R2Config } from "./upload-store";
 
 /**
@@ -20,12 +21,20 @@ import { uploadStore, type Corpus, type R2Config } from "./upload-store";
  * a revoke or a hide cannot change it, and the file never holds anything a hide should remove. The test beside this
  * file adds named rows of every kind to a corpus and checks that no table changes.
  *
+ * The raw NPC sightings are not in the file: the job stores what the agreement rules give each NPC beside it
+ * (npc-facts-store.ts), and the read set carries that table as `world.agreedNpcs`, with `world.npcs` empty (#1464).
+ *
  * This file holds no game-file names, so the cron (API code) may import it.
  */
 
 export const AGGREGATES_KEY = "snapshots/aggregates.json";
 /** The set's shape in the file's stamp. Change it when the set gains a table, so the next cron rewrites the file. */
-export const AGGREGATES_REVISION = "kills-1";
+export const AGGREGATES_REVISION = "npc-facts-1";
+/**
+ * The stamp of a file that still holds the NPC sightings, written when the NPC facts could not be: the revision before
+ * they moved out, so the next run, with the facts written, rewrites the file without them.
+ */
+const WITH_NPC_ROWS_REVISION = "kills-1";
 /** How long one server instance keeps the file before asking for it again: the cron rewrites it at most every 10 minutes. */
 const KEEP_MS = 5 * 60_000;
 /** A missing or unreadable file is asked for again after a minute, not after the full KEEP_MS. */
@@ -48,18 +57,25 @@ export function anonymousAggregates(corpus: Pick<Corpus, "uploads" | "records" |
 /**
  * The file's text. Maps and Sets, which JSON has no form for, are written as `{"$map": [[key, value], ...]}` and
  * `{"$set": [value, ...]}` wherever they sit; the addon history, worked out lazily on a page, is worked out here.
+ * The NPC sightings are left out (the job stores their agreed table instead) unless `keepNpcRows` says otherwise.
  */
-export function encodeAggregates(set: AggregateSet, generatedAt: string): string {
+export function encodeAggregates(set: AggregateSet, generatedAt: string, opts: { keepNpcRows?: boolean } = {}): string {
   const { addonTrends, ...rest } = set;
-  return JSON.stringify({ version: 1, revision: AGGREGATES_REVISION, generatedAt, set: { ...rest, addonTrends: addonTrends() } }, (_, value: unknown) =>
+  const { npcs: _npcs, agreedNpcs: _agreed, ...apart } = set.world;
+  const world = opts.keepNpcRows ? { ...apart, npcs: set.world.npcs } : apart;
+  const revision = opts.keepNpcRows ? WITH_NPC_ROWS_REVISION : AGGREGATES_REVISION;
+  return JSON.stringify({ version: 1, revision, generatedAt, set: { ...rest, world, addonTrends: addonTrends() } }, (_, value: unknown) =>
     value instanceof Map ? { $map: [...value] } : value instanceof Set ? { $set: [...value] } : value);
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const arrays = (v: unknown, ...keys: string[]) => isObject(v) && keys.every((k) => Array.isArray(v[k]));
 
-/** The file as read, or null for text that is not JSON or a shape this code does not know (the pages then fall back). Never throws. */
-export function parseAggregates(text: string): { generatedAt: string; set: AggregateSet } | null {
+/**
+ * The file as read, or null for text that is not JSON or a shape this code does not know (the pages then fall back). Never throws.
+ * `npcsApart`: the file left the NPC sightings out; the set's `world.npcs` is empty until the stored table is put on it.
+ */
+export function parseAggregates(text: string): { generatedAt: string; set: AggregateSet; npcsApart: boolean } | null {
   let raw: unknown;
   try {
     raw = JSON.parse(text, (_, value: unknown) => {
@@ -78,6 +94,8 @@ export function parseAggregates(text: string): { generatedAt: string; set: Aggre
   // pages would otherwise rebuild the whole set until the cron's next write.
   if (s.disenchant === undefined) s.disenchant = { bands: new Map(), items: new Map(), unplaced: 0, playerBands: new Map() };
   const dis = s.disenchant;
+  const npcsApart = isObject(s.world) && s.world.npcs === undefined;
+  if (npcsApart) (s.world as Record<string, unknown>).npcs = [];
   const ok = isObject(dis) && dis.bands instanceof Map && dis.items instanceof Map && dis.playerBands instanceof Map && Number.isFinite(dis.unplaced) &&
     typeof s.key === "string" && [s.uploads, s.records, s.windows].every(Number.isFinite) &&
     (s.dataAsOf === null || typeof s.dataAsOf === "string") &&
@@ -89,7 +107,7 @@ export function parseAggregates(text: string): { generatedAt: string; set: Aggre
     isObject(s.loot) && s.loot.sources instanceof Map && Number.isFinite(s.loot.leftOut);
   if (!ok) return null;
   const trends = s.addonTrends;
-  return { generatedAt: raw.generatedAt, set: { ...(s as unknown as AggregateSet), addonTrends: () => trends as ReturnType<AggregateSet["addonTrends"]> } };
+  return { generatedAt: raw.generatedAt, set: { ...(s as unknown as AggregateSet), addonTrends: () => trends as ReturnType<AggregateSet["addonTrends"]> }, npcsApart };
 }
 
 /** The set the cron stores, from the corpus as it stands. Throws when the corpus is out of reach. */
@@ -103,21 +121,23 @@ async function currentSet(): Promise<AggregateSet> {
  * The cron's step: writes the set when this run added uploads or rebuilt, or when the file is missing, unstamped or stale. An idle run
  * with a current file reads only a HEAD, falling back to GET if HEAD fails. `bytes` is the file's size, for the run's log.
  */
-export async function writeAggregates(opts: { added: number; rebuild?: boolean; dataAsOf: string | null }, deps: {
+export async function writeAggregates(opts: { added: number; rebuild?: boolean; dataAsOf: string | null; keepNpcRows?: boolean }, deps: {
   cloud?: R2Config | null; fetch?: typeof fetch; build?: () => Promise<AggregateSet>; now?: () => Date;
 } = {}): Promise<{ written: boolean; bytes?: number }> {
   const cloud = deps.cloud === undefined ? r2FromEnv() : deps.cloud;
   if (!cloud) throw new Error("the stored aggregates need the cloud store");
   const doFetch = deps.fetch ?? fetch;
-  if (opts.added <= 0 && !opts.rebuild && !await storedViewNeedsWrite(r2(cloud), r2Url(cloud), opts.dataAsOf, doFetch, AGGREGATES_REVISION)) return { written: false };
-  const body = encodeAggregates(await (deps.build ?? currentSet)(), (deps.now?.() ?? new Date()).toISOString());
-  const put = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "PUT", body, headers: { "content-type": "application/json", [STAMP]: stampOf(opts.dataAsOf, AGGREGATES_REVISION) } }));
+  // Compared with the revision this write would stamp, so a file kept with the sightings is not rewritten on every idle run.
+  const revision = opts.keepNpcRows ? WITH_NPC_ROWS_REVISION : AGGREGATES_REVISION;
+  if (opts.added <= 0 && !opts.rebuild && !await storedViewNeedsWrite(r2(cloud), r2Url(cloud), opts.dataAsOf, doFetch, revision)) return { written: false };
+  const body = encodeAggregates(await (deps.build ?? currentSet)(), (deps.now?.() ?? new Date()).toISOString(), { keepNpcRows: opts.keepNpcRows });
+  const put = await doFetch(await r2(cloud).sign(r2Url(cloud), { method: "PUT", body, headers: { "content-type": "application/json", [STAMP]: stampOf(opts.dataAsOf, revision) } }));
   if (!put.ok) throw new Error(`aggregates write failed (${put.status})`);
   return { written: true, bytes: new TextEncoder().encode(body).length };
 }
 
 /** The read set and what identifies the file it came from. */
-type Read = { set: AggregateSet | null; generatedAt?: string; etag?: string; failed?: boolean };
+type Read = { set: AggregateSet | null; generatedAt?: string; etag?: string; failed?: boolean; npcsApart?: boolean };
 type Deps = { cloud?: R2Config | null; fetch?: typeof fetch; now?: () => number; strict?: boolean };
 
 /**
@@ -140,7 +160,7 @@ const stored = keep<Read, { cloud: R2Config; fetch: typeof fetch }>(async ({ clo
       const read = parseAggregates(await res.text());
       const same = read && kept?.value.set && kept.value.generatedAt === read.generatedAt;
       return read
-        ? { value: { set: same ? kept!.value.set : read.set, generatedAt: read.generatedAt, etag: res.headers.get("etag") ?? undefined } }
+        ? { value: { set: same ? kept!.value.set : read.set, generatedAt: read.generatedAt, etag: res.headers.get("etag") ?? undefined, npcsApart: read.npcsApart } }
         : { value: { set: null }, ...retry };
     }
     if (res.status === 404 || !kept?.value.set) return { value: { set: null }, ...retry };
@@ -150,9 +170,27 @@ const stored = keep<Read, { cloud: R2Config; fetch: typeof fetch }>(async ({ clo
   }
 }, { ttlMs: KEEP_MS });
 
+/** Each read set with the stored NPC table on its world facts, kept while neither file changes, so memos keyed on it hold. */
+const withTable = new WeakMap<AggregateSet, { npcs: StoredNpcFacts["npcs"]; set: AggregateSet }>();
+
+/**
+ * A set read from a file without the NPC sightings carries the stored table instead (npc-facts-store.ts); with no
+ * table to read, the set is incomplete and counts as unread, so the caller falls back as for a missing file.
+ */
+async function withNpcFacts(read: Read, deps: Deps): Promise<AggregateSet | null> {
+  if (!read.set || !read.npcsApart) return read.set;
+  const facts = await loadStoredNpcFacts({ cloud: deps.cloud, fetch: deps.fetch, now: deps.now });
+  if (!facts) return null;
+  const hit = withTable.get(read.set);
+  if (hit?.npcs === facts.npcs) return hit.set;
+  const set = { ...read.set, world: { ...read.set.world, agreedNpcs: facts.npcs } };
+  withTable.set(read.set, { npcs: facts.npcs, set });
+  return set;
+}
+
 export async function loadStoredAggregates(deps: Deps = {}): Promise<AggregateSet | null> {
   const now = (deps.now ?? Date.now)();
-  const strict = (read: Read) => (deps.strict && read.failed ? null : read.set);
+  const strict = (read: Read) => (deps.strict && read.failed ? null : withNpcFacts(read, deps));
   const hit = stored.fresh(now);
   if (hit) return strict(hit.value);
   const cloud = deps.cloud === undefined ? r2FromEnv() : deps.cloud;

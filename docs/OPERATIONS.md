@@ -154,9 +154,9 @@ at the same minute. That is safe:
   read at its start (`web/src/lib/upload-store.ts`). When both runs fold the same uploads, the later
   write is refused with 412. That run answers 500 before it writes any view or the heartbeat, and its
   trigger is recorded as failed. The other run's data stands; nothing is counted twice or lost.
-- The views written after them (item view, aggregates, search names, auction history, professions,
-  map pins, database activity, coverage, settled list, market boards, auction reports, guild
-  ladder) are whole-file writes from the same snapshot. Whichever run writes last wins, with the
+- The views written after them (item view, NPC facts, aggregates, search names, auction history,
+  professions, map pins, database activity, coverage, settled list, market boards, auction reports,
+  guild ladder) are whole-file writes from the same snapshot. Whichever run writes last wins, with the
   same content. The heartbeat is the same.
 - The prunes (intake quota, API keys, players, pull summaries) delete by age; a second pass deletes
   nothing more.
@@ -267,6 +267,16 @@ Worker would. The auction reports wait while the heartbeat's `completionPending`
 that fails is tried once more after five seconds; if it fails again it is logged and the run ends
 red with the names in `failed`, and the next run retries it.
 A manual run with **rebuild** ticked rewrites every file.
+
+`snapshots/aggregates.json` holds no raw NPC sightings. The step before it writes
+`snapshots/npc-facts.json` from the same set (`web/src/lib/npc-facts-store.ts`): what the agreement
+rules give each NPC, about 0.7 MB for 4,471 NPCs on 2026-11-23, where the sightings took 12 MB.
+Pages read the two files together. An aggregates file without the NPC facts beside it reads as no
+file, and the pages work everything out from the corpus. If the NPC facts step fails, that run's
+aggregates file keeps the sightings and an older stamp, so the next run writes both again (#1464).
+The switch is `NPC_SIGHTINGS_APART` in `web/src/lib/stored-views-run.ts`. It ships off: the job runs
+main's code as soon as a change merges, before the site deploy, and the old site code reads a file
+without the sightings as no file. It is turned on in its own change once the reading code is live.
 
 A snapshot run that folded uploads into the corpus or a rollup also starts the workflow itself,
 right after its heartbeat, through GitHub's `workflow_dispatch` API

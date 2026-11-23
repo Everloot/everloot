@@ -3,7 +3,7 @@ import { openDb, type DB } from "../src/db.js";
 import { createMcpHttpHandler } from "../src/mcp-http-server.js";
 import type { CorpusLoader } from "../src/mcp-server.js";
 import { distanceYards, handleWorldMapNear, mapFactsFromRecords, NEAR_MAX_LIMIT, nearResult, observedPins } from "../src/world-map-near.js";
-import { worldFactsFromRecords } from "../src/world-pages.js";
+import { agreedNpcFacts, worldFactsFromRecords } from "../src/world-pages.js";
 import type { WorldMapData } from "../src/world-map-data.js";
 
 // SYNTHETIC map data; the numbers are made up. Zone 1429 spans worldX -7940..-10254 and worldY 1535..-1935,
@@ -51,6 +51,11 @@ describe("observed pins", () => {
   test("need 3 installs, and a vendor is told apart from a plain NPC", () => {
     const pins = observedPins(facts(corpus), data);
     expect(pins.map((p) => [p.npcId, p.kind, p.spoiler])).toEqual([[1, "npc", false], [2, "npc", false], [3, "vendor", false], [4, "npc", true]]);
+  });
+
+  test("are the same from the agreed NPC table, with no sightings beside it", () => {
+    const raw = facts(corpus);
+    expect(observedPins({ ...raw, npcs: [], agreedNpcs: agreedNpcFacts(raw) }, data)).toEqual(observedPins(raw, data));
   });
 });
 

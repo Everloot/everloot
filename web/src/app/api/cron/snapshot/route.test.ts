@@ -24,6 +24,8 @@ const searchNames = vi.hoisted(() => ({ writeSearchNames: vi.fn() }));
 vi.mock("@/lib/search-names-store", () => searchNames);
 const farmAreas = vi.hoisted(() => ({ writeFarmAreas: vi.fn() }));
 vi.mock("@/lib/farm-areas-store", () => farmAreas);
+const npcFactsStore = vi.hoisted(() => ({ writeNpcFacts: vi.fn(), loadStoredNpcFacts: vi.fn(async () => null) }));
+vi.mock("@/lib/npc-facts-store", () => npcFactsStore);
 const rankingWeeksStore = vi.hoisted(() => ({ writeRankingWeeks: vi.fn() }));
 vi.mock("@/lib/ranking-weeks-store", () => rankingWeeksStore);
 const auctions = vi.hoisted(() => ({ writeAuctionHistory: vi.fn(), buildAuctionHistory: vi.fn() }));
@@ -47,6 +49,7 @@ beforeEach(() => {
   guilds.writeGuildLadder.mockReset().mockResolvedValue({ written: false });
   searchNames.writeSearchNames.mockReset().mockResolvedValue({ written: false });
   farmAreas.writeFarmAreas.mockReset().mockResolvedValue({ written: false });
+  npcFactsStore.writeNpcFacts.mockReset().mockResolvedValue({ written: false });
   rankingWeeksStore.writeRankingWeeks.mockReset().mockResolvedValue({ written: false });
   activity.writeDatabaseActivity.mockReset().mockResolvedValue({ written: false });
   professions.writeProfessions.mockReset().mockResolvedValue({ written: false });
@@ -289,7 +292,7 @@ test("the stored aggregates are written after the item view with what that run a
   aggregates.writeAggregates.mockImplementation(async () => { order.push("aggregates"); return { written: true, bytes: 4096 }; });
   expect(await (await GET(req())).json()).toMatchObject({ ok: true, itemView: { written: true }, aggregates: { written: true, bytes: 4096 } });
   expect(order).toEqual(["itemView", "aggregates"]);
-  expect(aggregates.writeAggregates).toHaveBeenCalledWith({ added: 2, rebuild: false, dataAsOf: "2026-10-02T00:00:00.000Z" }, expect.anything());
+  expect(aggregates.writeAggregates).toHaveBeenCalledWith({ added: 2, rebuild: false, dataAsOf: "2026-10-02T00:00:00.000Z", keepNpcRows: true }, expect.anything());
   await GET(req("Bearer synthetic-cron-key", "?rebuild=1"));
   expect(aggregates.writeAggregates).toHaveBeenLastCalledWith(expect.objectContaining({ rebuild: true }), expect.anything());
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -328,7 +331,29 @@ test("an idle run still asks for the stored aggregates, so a missing file is wri
   await GET(req());
   // The names file never makes an idle run build the set for itself: it waits for a run that builds it anyway.
   expect(searchNames.writeSearchNames).not.toHaveBeenCalled();
-  expect(aggregates.writeAggregates).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-10-01" }, expect.anything());
+  expect(aggregates.writeAggregates).toHaveBeenCalledWith({ added: 0, rebuild: false, dataAsOf: "2026-10-01", keepNpcRows: true }, expect.anything());
+});
+
+test("the NPC facts are written before the aggregates from the same set; when they fail, the aggregates keep the sightings", async () => {
+  const order: string[] = [];
+  store.writeSnapshot.mockResolvedValue({ uploads: 9, added: 2, dataAsOf: "2026-10-02T00:00:00.000Z" });
+  store.loadCorpus.mockResolvedValue({ uploads: 9, records: [], dataAsOf: "2026-10-02T00:00:00.000Z" });
+  const set = { key: "set" };
+  aggregates.anonymousAggregates.mockReturnValue(set);
+  const built: unknown[] = [];
+  npcFactsStore.writeNpcFacts.mockImplementation(async (_o: unknown, deps: { build: () => Promise<unknown> }) => { order.push("npcFacts"); built.push(await deps.build()); return { written: true, npcs: 3, bytes: 512 }; });
+  aggregates.writeAggregates.mockImplementation(async (_o: unknown, deps: { build: () => Promise<unknown> }) => { order.push("aggregates"); built.push(await deps.build()); return { written: true }; });
+  expect(await (await GET(req())).json()).toMatchObject({ ok: true, npcFacts: { written: true, npcs: 3 }, aggregates: { written: true } });
+  expect(order).toEqual(["npcFacts", "aggregates"]);
+  expect(npcFactsStore.writeNpcFacts).toHaveBeenCalledWith({ added: 2, rebuild: false, dataAsOf: "2026-10-02T00:00:00.000Z" }, expect.anything());
+  expect(built).toEqual([set, set]);
+  expect(aggregates.anonymousAggregates).toHaveBeenCalledTimes(1);
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  npcFactsStore.writeNpcFacts.mockRejectedValue(new Error("r2 down"));
+  const res = await GET(req());
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ ok: true, npcFacts: null, aggregates: { written: true } });
+  expect(aggregates.writeAggregates).toHaveBeenLastCalledWith(expect.objectContaining({ keepNpcRows: true }), expect.anything());
 });
 
 test("the stored auction history is written after the snapshot with what that run added; a failure is logged and the run succeeds", async () => {
