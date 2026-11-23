@@ -17,6 +17,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 ### Added
 - Site: dungeon progress is on: the Desktop App can download shared dungeon clears for player tooltips, and boss-kill sync records the addon's full character name (migration `20261123110000_dungeon_progress.sql` applied 2026-11-23).
 - Desktop: refreshes shared dungeon progress for in-game tooltips and syncs boss kills for linked characters. Older sites and sites with Dungeon Progress turned off can still acknowledge boss kills.
+- Site: rankings show US and EU side by side, each ranked on its own, so the region with more characters read no longer hides the other. The Rankings page shows one character board at a time with a tab for each, and names carry their class colour.
 - Site: farming routes and the Tailoring, Leatherworking and Skinning gather lists place a mob in a zone once 3 installs looted its kills on that zone's map; until then the mob's agreed map pin decides, as before.
 - Site: a zone's page links to Farming routes and the cloth and leather lists by the same rule: a mob counts in the zone where 3 installs looted its kills, otherwise where its agreed pin is.
 - Site: a linked character's page can show its lifetime gold from the addon, under its own Gold sync and "Show gold" switches, both off by default; your lifetime totals add total gold acquired and most gold ever owned. Gold is never ranked.
