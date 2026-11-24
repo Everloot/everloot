@@ -5,8 +5,10 @@ import type { Region, RulesetSlug } from "@/data/realms";
  * (ahledger.com/developers, read 2026-11-15) let community tools given to players without charge use the API with a
  * free key and a credit link; a site earning from the data through ads needs a licence, so this holds only while
  * Everloot shows no ads. Answers may be kept no longer than their Cache-Control allows, so the proxy route
- * (app/api/ahledger) passes that lifetime on and keeps nothing else. The prices reach pages only, in the browser:
- * never the database, the MCP server, Chat, the API's own data or the open-data exports (ahledger.test.ts).
+ * (app/api/ahledger) passes that lifetime on and keeps nothing else. The prices reach pages only, read in the browser
+ * or, for the profession pages' crafting margins, at render on the server (ahledger-proxy.ts `readAhledgerPage`, whose
+ * page the edge keeps 5 minutes, AH Ledger's own max-age): never the database, the MCP server, Chat, the API's own
+ * data or the open-data exports (ahledger.test.ts).
  */
 
 export const AHLEDGER_API = "https://api.ahledger.com";
@@ -161,13 +163,19 @@ export function priceHistory(body: unknown): AhledgerHistory {
   return { median7d: num(latest.median7d), median30d: num(latest.median30d), salesPerDay: num(sales.estimatedPerDay), windowDays: num(sales.windowDays), series };
 }
 
-export interface AhledgerCraft { spellId: number; name: string; cost: number | null; netValue: number | null; margin: number | null; salesPerDay: number | null; profitPerDay: number | null }
+/** Estimated sales a day, to one decimal; "unrecorded" when AH Ledger has too few scans for one. */
+export const salesText = (n: number | null) => n === null ? "unrecorded" : n.toLocaleString("en-US", { maximumFractionDigits: 1 });
+
+export interface AhledgerCraft { spellId: number; name: string; skill: number | null; cost: number | null; netValue: number | null; margin: number | null; salesPerDay: number | null; profitPerDay: number | null }
 export function craftingMargins(body: unknown): AhledgerCraft[] {
   return rows(body, "recipes").flatMap((raw) => {
     const r = record(raw), recipe = record(r.recipe), spellId = id(recipe.spellId);
-    return spellId === null ? [] : [{ spellId, name: text(recipe.name) ?? `Spell ${spellId}`, cost: num(r.cost), netValue: num(r.netValue), margin: num(r.margin), salesPerDay: num(r.resultSalesPerDay), profitPerDay: num(r.profitPerDay) }];
+    return spellId === null ? [] : [{ spellId, name: text(recipe.name) ?? `Spell ${spellId}`, skill: num(recipe.skillRequired), cost: num(r.cost), netValue: num(r.netValue), margin: num(r.margin), salesPerDay: num(r.resultSalesPerDay), profitPerDay: num(r.profitPerDay) }];
   }).sort((a, b) => (b.profitPerDay ?? -Infinity) - (a.profitPerDay ?? -Infinity));
 }
+
+/** When AH Ledger's crafting prices were scanned (`pricesAsOf`), or null when the answer gives no date. */
+export const craftingAsOf = (body: unknown): string | null => date(record(body).pricesAsOf);
 
 export interface AhledgerDeal { itemId: number; name: string; minBuyout: number | null; referenceMedian: number | null; basis: string | null; quantity: number | null; saving: number | null }
 export function dealPrices(body: unknown): AhledgerDeal[] {

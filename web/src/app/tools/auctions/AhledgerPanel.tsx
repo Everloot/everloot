@@ -83,5 +83,3 @@ export function AhledgerMarketPicker({ market, onChange }: { market: string; onC
     </select></label>
   </fieldset>;
 }
-
-export const salesText = (n: number | null) => n === null ? "unrecorded" : n.toLocaleString("en-US", { maximumFractionDigits: 1 });

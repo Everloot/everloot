@@ -1,8 +1,9 @@
 import { CoinText } from "@/components/ui/Coins";
-import AhledgerCrafting from "../../auctions/AhledgerCrafting";
+import AhledgerCrafting, { type CraftingRead } from "../../auctions/AhledgerCrafting";
 import { RealmHousePicker, realmHouseHref, realmHouseParams } from "../../auctions/RealmHousePicker";
 import type { AuctionHouse } from "@everloot/protocol";
-import { ahledgerMarket, isAhledgerMarket, isAhledgerProfession } from "@/lib/ahledger";
+import { ahledgerMarket, craftingAsOf, craftingMargins, isAhledgerMarket, isAhledgerProfession } from "@/lib/ahledger";
+import { readAhledgerPage } from "@/lib/ahledger-proxy";
 import { busiestHouse, findBoard, realmBoards } from "@/lib/auction-house";
 import { realmRegion, realmRuleset } from "@/lib/realms";
 import type { Metadata } from "next";
@@ -74,12 +75,12 @@ const rangeText = (r: Range) => (r.min === null && r.max === null ? "?" : r.min 
 const LEDGER_HOUSES: readonly AuctionHouse[] = ["Alliance", "Horde"];
 
 /**
- * The AH Ledger margins under the realm and house picker: the realm's region and ruleset and the house's faction name
- * AH Ledger's market. A realm is offered only where AH Ledger has a market for it. With no house asked, the realm's
- * busier faction house. A link with no realm keeps working as before: `?market=` (the old Region, Ruleset and Faction
- * selects' parameter) names the market, else the AH Ledger panels' default, PvE Alliance in the US.
+ * The AH Ledger market and its picker: the realm's region and ruleset and the house's faction name AH Ledger's market.
+ * A realm is offered only where AH Ledger has a market for it. With no house asked, the realm's busier faction house.
+ * A link with no realm keeps working as before: `?market=` (the old Region, Ruleset and Faction selects' parameter)
+ * names the market, else the AH Ledger panels' default, PvE Alliance in the US.
  */
-function ledgerPanel(profession: string, search: Search, path: string, state: Parameters<typeof realmBoards>[0] | null) {
+function ledgerMarket(search: Search, path: string, state: Parameters<typeof realmBoards>[0] | null) {
   const { realm, house: asked } = realmHouseParams(search);
   const legacy = realm ? null : one(search.market);
   const shared = legacy && isAhledgerMarket(legacy) ? legacy : null;
@@ -108,7 +109,14 @@ function ledgerPanel(profession: string, search: Search, path: string, state: Pa
       remember={shared ? "save" : "redirect"}
     />
   );
-  return <AhledgerCrafting profession={profession} market={market} picker={picker} none={none} />;
+  return { market, picker, none };
+}
+
+/** The margins for that market, read on the server: only the rows and their time, kept nowhere but this render. */
+async function readCrafting(market: string | null, profession: string): Promise<CraftingRead | null> {
+  if (!market) return null;
+  const read = await readAhledgerPage(`crafting/${market}?profession=${encodeURIComponent(profession)}`, (body) => ({ recipes: craftingMargins(body), asOf: craftingAsOf(body) }));
+  return read.ok ? { ok: true, ...read.value, credit: read.credit } : { ok: false };
 }
 
 /**
@@ -147,7 +155,11 @@ export default async function ProfessionPage(props: Props) {
   ]);
   // Names, icons and qualities of the items the recipes make and use, under the item name rule (shown-item-names.ts).
   const ids = [...new Set([...recipeItemIds(p.recipes), ...teachingItemIds(p.recipes.map(r => r.spellId))])].filter(shown.showsTip);
-  const tips: Map<number, ItemTip> = await loadItemTips(ids.length ? assets : null, ids);
+  const ledgerAt = ledger ? ledgerMarket(searchParams, path, market?.state ?? null) : null;
+  const [tips, crafting]: [Map<number, ItemTip>, CraftingRead | null] = await Promise.all([
+    loadItemTips(ids.length ? assets : null, ids),
+    readCrafting(ledgerAt?.market ?? null, p.name),
+  ]);
   const names = new Map<number, ShownItemName | null>(ids.map((id) => [id, shownItemName(id, shown.agreed, shown.matched?.names, tips.get(id))]));
   const fileQuality = new Map(CLIENT_TAXONOMY.items.map((row) => [row[0], row[4]]));
 
@@ -300,7 +312,7 @@ export default async function ProfessionPage(props: Props) {
 
   return (
     <Container width="data">
-      <EdgeDegraded when={view.unreachable === true || gathered.down} />
+      <EdgeDegraded when={view.unreachable === true || gathered.down || crafting?.ok === false} />
       <PageHeader
         trail={trail}
         title={p.slug === "herbalism" ? "Herbalism gathering" : `${p.name} recipes`}
@@ -322,7 +334,11 @@ export default async function ProfessionPage(props: Props) {
       <div className="space-y-8">
         <ProfessionPicker professions={CLIENT_PROFESSIONS} icons={icons} current={p.slug} context={context} />
         {p.slug === "herbalism" && gatheringSection}
-        {ledger && <div id="ahledger-margins" className="scroll-mt-24">{ledgerPanel(p.name, searchParams, path, market?.state ?? null)}</div>}
+        {ledgerAt && (
+          <div id="ahledger-margins" className="scroll-mt-24">
+            <AhledgerCrafting profession={p.name} market={ledgerAt.market} read={crafting} path={path} search={searchParams} spellIcon={(id) => assets?.spellIcons.get(id)} picker={ledgerAt.picker} none={ledgerAt.none} />
+          </div>
+        )}
 
         <section id="prof-recipes" aria-labelledby="prof-recipes-heading" className="scroll-mt-24 space-y-4" data-recipes={p.slug}>
           <SectionHeading id="prof-recipes-heading" as="h2">{p.slug === "herbalism" ? "Herbalism crafts (new in Forever)" : "Recipes from the game files"}</SectionHeading>

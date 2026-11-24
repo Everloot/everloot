@@ -4,7 +4,6 @@ import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import AhledgerHistory from "./AhledgerHistory";
-import AhledgerCrafting from "./AhledgerCrafting";
 import { AhledgerDeals, AhledgerEconomySummary } from "./AhledgerMarket";
 import { AHLEDGER_MARKET_SLOT } from "./AhledgerPanel";
 
@@ -23,7 +22,6 @@ const history = { median7d: 123456, median30d: 234567, salesPerDay: 3.5, windowD
 const credit = { text: "Prices from AHledger", url: "https://ahledger.com/test-credit" };
 const panels: { name: string; panel: () => ReactNode; field: string; empty: unknown; message: string }[] = [
   { name: "history", panel: () => <AhledgerHistory itemId={42} />, field: "history", empty: { ...history, median7d: null, median30d: null, salesPerDay: null, series: [] }, message: "No price history" },
-  { name: "crafting", panel: () => <AhledgerCrafting profession="Enchanting" market="forever.normal.alliance.us" />, field: "recipes", empty: [], message: "No crafting margins" },
   { name: "deals", panel: () => <AhledgerDeals />, field: "deals", empty: [], message: "No deals meet" },
   { name: "economy", panel: () => <AhledgerEconomySummary />, field: "markets", empty: [], message: "No full scans" },
 ];
@@ -75,16 +73,6 @@ test("history reads the realm's initial market, renders both lines and band, and
   expect((fetchImpl.mock.calls[1] as unknown[])[0]).toBe("/api/ahledger/forever.pvp.horde.eu/history?item=42");
 });
 
-test("crafting renders monetary margins and unpriced rows, with unsupported professions making no request", async () => {
-  const fetchImpl = vi.fn(async () => Response.json({ ok: true, recipes: [{ spellId: 42, name: "Test recipe", cost: null, netValue: 20, margin: null, salesPerDay: null, profitPerDay: null }], credit })); vi.stubGlobal("fetch", fetchImpl);
-  await act(async () => root.render(<AhledgerCrafting profession="Fishing" market="forever.normal.alliance.us" />));
-  expect(fetchImpl).not.toHaveBeenCalled(); expect(container.innerHTML).toBe("");
-  await act(async () => root.render(<AhledgerCrafting profession="Enchanting" market="forever.normal.alliance.us" />));
-  expect(container.textContent).toContain("unpriced"); expect(container.textContent).toContain("unrecorded");
-  expect(container.textContent).toContain("upper bound");
-  expect(container.querySelector('a[href="/database/spells/42"]')?.textContent).toBe("Test recipe");
-});
-
 test("deals link to Everloot items and show the reference basis, then region and ruleset changes fetch that market", async () => {
   const fetchImpl = vi.fn(async () => Response.json({ ok: true, deals: [{ itemId: 42, name: "Test item", minBuyout: 10, referenceMedian: 20, basis: "7d", quantity: 5, saving: 50 }], credit })); vi.stubGlobal("fetch", fetchImpl);
   await act(async () => root.render(<AhledgerDeals />));
@@ -118,7 +106,7 @@ test("an unreadable success body is a failed read", async () => {
 });
 
 test("a market picked in one panel is the next panel's market; a realm page's own market comes first", async () => {
-  const fetchImpl = vi.fn(async () => Response.json({ ok: true, deals: [], recipes: [], history, credit })); vi.stubGlobal("fetch", fetchImpl);
+  const fetchImpl = vi.fn(async () => Response.json({ ok: true, deals: [], history, credit })); vi.stubGlobal("fetch", fetchImpl);
   await act(async () => root.render(<AhledgerDeals />));
   expect((fetchImpl.mock.calls[0] as unknown[])[0]).toBe("/api/ahledger/forever.normal.alliance.us/deals");
   await act(async () => { const el = container.querySelectorAll("select")[2]; el.value = "horde"; el.dispatchEvent(new Event("change", { bubbles: true })); });
@@ -140,85 +128,3 @@ test("a remembered value that is not a market, or storage the browser refuses, r
   } finally { blocked.mockRestore(); }
 });
 
-const recipes = [
-  { spellId: 1, name: "Test alpha", cost: 30, netValue: 40, margin: 10, salesPerDay: 2, profitPerDay: 20 },
-  { spellId: 2, name: "Test beta", cost: 10, netValue: 60, margin: 50, salesPerDay: 1, profitPerDay: 50 },
-  { spellId: 3, name: "Test gamma", cost: null, netValue: 60, margin: null, salesPerDay: null, profitPerDay: null },
-];
-const recipeOrder = () => [...container.querySelectorAll('tbody a')].map((el) => el.textContent);
-test("crafting sorts profit, margin and cost in both directions with unknown values last, and filters names", async () => {
-  vi.stubGlobal("fetch", vi.fn(async () => Response.json({ ok: true, recipes, credit })));
-  await act(async () => root.render(<AhledgerCrafting profession="Enchanting" market="forever.normal.alliance.us" />));
-  expect(recipeOrder()).toEqual(["Test beta", "Test alpha", "Test gamma"]);
-  const select = container.querySelector('select[aria-label="Sort crafting margins"]') as HTMLSelectElement;
-  expect(select).not.toBeNull();
-  for (const [value, order] of [
-    ["profit", ["Test alpha", "Test beta", "Test gamma"]],
-    ["-margin", ["Test beta", "Test alpha", "Test gamma"]],
-    ["margin", ["Test alpha", "Test beta", "Test gamma"]],
-    ["cost", ["Test beta", "Test alpha", "Test gamma"]],
-    ["-cost", ["Test alpha", "Test beta", "Test gamma"]],
-    ["-net", ["Test beta", "Test gamma", "Test alpha"]],
-    ["net", ["Test alpha", "Test beta", "Test gamma"]],
-    ["-sales", ["Test alpha", "Test beta", "Test gamma"]],
-    ["sales", ["Test beta", "Test alpha", "Test gamma"]],
-  ] as const) {
-    await act(async () => { select.value = value; select.dispatchEvent(new Event("change", { bubbles: true })); });
-    expect(recipeOrder(), value).toEqual(order);
-    expect(new URL(window.location.href).searchParams.get("sort"), value).toBe(value);
-  }
-  // The default order leaves no parameter behind.
-  await act(async () => { select.value = "-profit"; select.dispatchEvent(new Event("change", { bubbles: true })); });
-  expect(new URL(window.location.href).searchParams.has("sort")).toBe(false);
-  const input = container.querySelector('input[type="search"]') as HTMLInputElement;
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, " BETA ");
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-  expect(recipeOrder()).toEqual(["Test beta"]);
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "missing");
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-  expect(container.textContent).toContain("No recipes match");
-  expect(container.textContent).not.toContain("Prices as of");
-});
-
-test("crafting reads the market the page chose from its realm and house, never the URL or the browser's memory", async () => {
-  localStorage.setItem(AHLEDGER_MARKET_SLOT, "forever.normal.alliance.us");
-  window.history.replaceState({ marker: 1 }, "", "/tools/professions/enchanting?other=keep&market=forever.pvp.horde.eu#recipes");
-  const fetchImpl = vi.fn(async () => Response.json({ ok: true, recipes, credit })); vi.stubGlobal("fetch", fetchImpl);
-  await act(async () => root.render(<AhledgerCrafting profession="Enchanting" market="forever.rp.horde.kr" picker={<nav data-test-picker />} />));
-  expect(fetchImpl.mock.calls.map((c) => (c as unknown[])[0])).toEqual(["/api/ahledger/forever.rp.horde.kr/crafting?profession=Enchanting"]);
-  expect(container.querySelector("[data-test-picker]")).not.toBeNull();
-  expect(container.querySelector("[data-ahledger-market]")?.textContent).toBe("AH Ledger market: RP Horde");
-  // The old Region, Ruleset and Faction selects are gone, and the URL is left as it was.
-  expect(container.querySelectorAll("select")).toHaveLength(1);
-  expect(window.location.search).toBe("?other=keep&market=forever.pvp.horde.eu");
-  expect(window.history.state).toEqual({ marker: 1 });
-});
-
-test("crafting with no AH Ledger market for the realm or house says so and asks AH Ledger nothing", async () => {
-  const fetchImpl = vi.fn(); vi.stubGlobal("fetch", fetchImpl);
-  await act(async () => root.render(<AhledgerCrafting profession="Enchanting" market={null} none="AH Ledger has no market for this realm." picker={<nav data-test-picker />} />));
-  expect(fetchImpl).not.toHaveBeenCalled();
-  expect(container.querySelector("[data-ahledger]")?.getAttribute("data-ahledger")).toBe("none");
-  expect(container.textContent).toContain("AH Ledger has no market for this realm.");
-  expect(container.querySelector("[data-test-picker]")).not.toBeNull();
-});
-
-test("crafting reads its sort from a shared URL, marks the sorted column, follows browser navigation and ignores an unknown sort", async () => {
-  window.history.replaceState(null, "", "/tools/professions/enchanting?market=forever.pvp.horde.eu&sort=-net");
-  vi.stubGlobal("fetch", vi.fn(async () => Response.json({ ok: true, recipes, credit })));
-  await act(async () => root.render(<AhledgerCrafting profession="Enchanting" market="forever.normal.alliance.us" />));
-  const select = () => container.querySelector('select[aria-label="Sort crafting margins"]') as HTMLSelectElement;
-  expect(recipeOrder()).toEqual(["Test beta", "Test gamma", "Test alpha"]);
-  expect(select().value).toBe("-net");
-  expect(container.querySelector('th[aria-sort="descending"]')?.textContent).toContain("Net value");
-  await act(async () => { window.history.replaceState(null, "", "?market=forever.pvp.horde.eu&sort=sales"); window.dispatchEvent(new PopStateEvent("popstate")); });
-  expect(recipeOrder()).toEqual(["Test beta", "Test alpha", "Test gamma"]);
-  expect(container.querySelector('th[aria-sort="ascending"]')?.textContent).toContain("Sales per day");
-  await act(async () => { window.history.replaceState(null, "", "?market=forever.pvp.horde.eu&sort=-name"); window.dispatchEvent(new PopStateEvent("popstate")); });
-  expect(recipeOrder()).toEqual(["Test beta", "Test alpha", "Test gamma"]);
-  expect(select().value).toBe("-profit");
-});
