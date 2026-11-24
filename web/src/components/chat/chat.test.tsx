@@ -3,6 +3,7 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { AccountShell } from "@/lib/account-shell-types";
+import { REPORT_BUG_EVENT } from "@/components/BugReport";
 import ChatClient, { SUGGESTIONS } from "./ChatClient";
 import ChatKeys from "./ChatKeys";
 import { AssistantMessage } from "./Message";
@@ -102,6 +103,19 @@ function setValue(el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
 }
 
 describe("the chat page", () => {
+  test("its toolbar opens the bug report from md up, in place of the floating pill that would cover the composer", async () => {
+    api({ signed: false });
+    await render(<ChatClient />);
+    const report = button("Report a bug")!;
+    expect(report.className.split(" ")).toEqual(expect.arrayContaining(["hidden", "md:inline-flex", "ml-auto"]));
+    expect(report.getAttribute("aria-haspopup")).toBe("dialog");
+    const heard = vi.fn();
+    window.addEventListener(REPORT_BUG_EVENT, heard);
+    await click(report);
+    window.removeEventListener(REPORT_BUG_EVENT, heard);
+    expect(heard).toHaveBeenCalledTimes(1);
+  });
+
   test("setup and limits are collapsed behind the current mode", async () => {
     api({ signed: false });
     await render(<ChatClient profiles />);
