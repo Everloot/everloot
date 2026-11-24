@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -102,6 +104,13 @@ test("the pill is hidden below md on every page, chat included, and sits bottom-
     expect(classes, route).toContain("left-4");
     expect(trigger().className, route).not.toContain("top-header");
   }
+});
+
+test("on /chat the pill steps aside at every width: the chat's toolbar and the menu open the report there", () => {
+  // From md the pill would cover the composer's corner, and from lg the conversation rail's last rows.
+  expect(trigger().hasAttribute("data-report-pill")).toBe(true);
+  const globals = readFileSync(resolve(process.cwd(), "src/app/globals.css"), "utf8");
+  expect(globals).toMatch(/body:has\(\[data-chat-page\]\) \[data-report-pill\] \{\s*display: none;/);
 });
 
 test("the phone menu's report event opens the same dialog, and closing it returns focus to what opened it", async () => {

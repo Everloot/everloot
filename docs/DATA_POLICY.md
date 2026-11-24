@@ -1082,6 +1082,10 @@ These pages are separate from the addon sightings and the linked-character gear 
   a 404 or a hide). An API or MCP answer carries it in its own field with its own notice. It never enters the
   CC BY-SA dataset, the public corpus, open-data snapshots or bulk exports. Pages that show it carry no ads.
 - **Play history.** Each armory character's lifetime statistics (Blizzard's `achievements/statistics`: quests, kills, deaths, fish, flight paths, dungeons and the like) are read and stored with the rest of its row, under every rule in this section. Six of them rank characters on the armory boards. A linked character's page shows them only while its owner turns on Play history (`show_history`, off by default); the owner's lifetime totals page is visible to that account alone.
+- **Search.** Amended 23 November 2026 (#1271): the site search and its type-ahead list armory characters and
+  guilds by name, with what their own pages already show (level, class, faction, region, ruleset, roster size), and
+  link to those credited pages. No new field is read or published; hidden characters and guilds are left out. The
+  answer is never cached outside the server, so a hide takes effect at once.
 - **Thirty days.** Characters and guilds are checked again within 20 days. Stored data not refreshed for more
   than 30 days is deleted. A Blizzard response confirming that data has not changed (304) counts as a refresh.
   When Blizzard answers that a character or guild no longer exists (404), its stored row is deleted at once.

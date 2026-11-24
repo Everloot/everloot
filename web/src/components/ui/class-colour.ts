@@ -9,6 +9,11 @@ export const CLASS_BG: Record<ClassName, string> = {
   rogue: "bg-class-rogue", priest: "bg-class-priest", shaman: "bg-class-shaman",
   mage: "bg-class-mage", warlock: "bg-class-warlock", druid: "bg-class-druid",
 };
+export const CLASS_TEXT: Record<ClassName, string> = {
+  warrior: "text-class-warrior", paladin: "text-class-paladin", hunter: "text-class-hunter",
+  rogue: "text-class-rogue", priest: "text-class-priest", shaman: "text-class-shaman",
+  mage: "text-class-mage", warlock: "text-class-warlock", druid: "text-class-druid",
+};
 export const CLASS_STROKE: Record<ClassName, string> = {
   warrior: "stroke-class-warrior", paladin: "stroke-class-paladin", hunter: "stroke-class-hunter",
   rogue: "stroke-class-rogue", priest: "stroke-class-priest", shaman: "stroke-class-shaman",
