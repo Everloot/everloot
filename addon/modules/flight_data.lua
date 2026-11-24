@@ -1,4 +1,4 @@
--- Forever flight paths from the game files (build 1.60.1.71037); lengths in yards, found in game files, unconfirmed.
+-- Forever flight paths from the game files (build 1.60.1.71091); lengths in yards, found in game files, unconfirmed.
 -- Regenerated with the game data on every client build (kb/src/flight-lua.ts).
 local E = Everloot
 E.FLIGHT_NODES = {
