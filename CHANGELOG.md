@@ -283,6 +283,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: on /chat the floating Report a bug pill no longer covers the composer or the conversation list from tablet width up; the chat toolbar opens the report instead (#1277).
 - Site: the blue-post tracker no longer stalls on a long thread. A run cut off while following a thread's chain of tracked posts saves how far it got, so the next run continues instead of starting over. `?rescanSince=` on the cron route re-reads posts the reader passed before.
 - Site: coin amounts group their thousands (1,234,567g), and a character's Gold section is dated once, by its heading.
 - Addon: Home fits 100,000 gold and more in its gold column (copper left off), the Gold chart's hour tooltips say UTC, a crafting price change that rounds to nothing shows a muted "0%", turning off the gold switch no longer says its rows may not have been uploaded, and the disenchant tooltip no longer rereads your disenchant history each time.

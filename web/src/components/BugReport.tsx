@@ -54,6 +54,7 @@ export default function BugReport() {
         aria-label="Report a bug"
         aria-haspopup="dialog"
         title="Report a bug"
+        data-report-pill
         className="fixed bottom-[var(--report-bottom)] left-4 z-40 hidden min-h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-edge bg-panel px-3 text-sm text-accent transition-colors hover:border-accent hover:bg-canvas md:inline-flex"
         style={{ "--report-bottom": clearance } as React.CSSProperties}
         onClick={show}
