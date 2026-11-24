@@ -1,12 +1,12 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import GameIcon from "@/components/game/GameIcon";
-import Coins from "@/components/ui/Coins";
 import { DataTable, FilterBar, ResultStrip, type Column, type SortDirection } from "@/components/ui";
 import { ahledgerMarketLabel, isAhledgerProfession, salesText, type AhledgerCraft, type AhledgerCredit } from "@/lib/ahledger";
 import { SKILL_BRACKETS } from "@/lib/professions";
 import { clampPageSize, DEFAULT_RECIPE_PAGE_SIZE, RECIPE_PAGE_SIZES, recipePage } from "@/lib/recipe-list";
 import { AhledgerPanel } from "./AhledgerPanel";
+import Coins from "./ClientCoins";
 
 /**
  * The profession page's AH Ledger crafting margins, read, filtered, sorted and paged on the server, with all of it in
