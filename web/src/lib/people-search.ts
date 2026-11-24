@@ -1,7 +1,8 @@
 import { unstable_cache } from "next/cache";
 import { className, PLAYER_SEARCH_TAG } from "@/app/players/player-view";
-import { armoryCharacterPath, armoryNameQuery, armoryOn, regionLabel } from "./armory";
-import { armoryStore, type ArmoryHit } from "./armory-store";
+import { CLASSES } from "@/design/tokens";
+import { armoryCharacterPath, armoryGuildPath, armoryNameQuery, armoryOn, regionLabel } from "./armory";
+import { armoryStore, type ArmoryGuildHit, type ArmoryHit, type SitePeople, type SitePlayerHit } from "./armory-store";
 import { GUILD_SEARCH_TAG, guildPath, guildSearchPrefix, guildsOn, loadGuildSearch } from "./guilds";
 import { playerPagesOn, playerPath, searchPrefix } from "./player-pages";
 import type { PeopleSearch, PersonGroup, PersonResult } from "./people-search-types";
@@ -46,20 +47,44 @@ function group(lookups: PersonResult[][], limit: number): PersonGroup {
   return { results: sorted.slice(0, limit), total: rows.length, capped: lookups.some((l) => l.length >= LOOKUP_CAP) };
 }
 
+/** A class as the colour tokens name it ("warrior"), from a store token ("WARRIOR") or the armory's name ("Warrior"). */
+function classKey(name: string): { class?: string } {
+  const c = CLASSES.find((k) => k === name.toLowerCase());
+  return c ? { class: c } : {};
+}
+
 /** An armory character as a search row; exact when the text is its full name or its first name. */
-function armoryRow(h: ArmoryHit, fullName: string): PersonResult {
+function armoryRow(h: Pick<ArmoryHit, "region" | "slug" | "name" | "surname" | "level" | "class" | "ruleset"> & { faction?: string }, fullName: string): PersonResult {
   const label = `${h.name} ${h.surname}`;
   return {
     type: "character", label, href: armoryCharacterPath(h.region, h.slug), meta: `Level ${h.level} ${h.class} · ${regionLabel(h.region)} ${h.ruleset}`,
-    exact: label.toLowerCase() === fullName || h.name.toLowerCase() === fullName,
+    exact: label.toLowerCase() === fullName || h.name.toLowerCase() === fullName, ...classKey(h.class), ...(h.faction ? { faction: h.faction } : {}),
+  };
+}
+
+/** A character the addon saw as a search row. */
+function playerRow(p: SitePlayerHit, q: string): PersonResult {
+  return {
+    type: "character", label: p.name, href: playerPath(p), meta: `Level ${p.level} ${className(p.class)} · ${p.realm}`, exact: p.name.toLowerCase() === q, ...classKey(p.class),
+  };
+}
+
+/** An armory guild as a search row: its region, ruleset and the roster size Blizzard reports, as /guilds lists it. */
+function armoryGuildRow(g: ArmoryGuildHit, q: string): PersonResult {
+  return {
+    type: "guild", label: g.name, href: armoryGuildPath(g.region, g.slug),
+    meta: `${regionLabel(g.region)} ${g.ruleset} · ${g.memberCount.toLocaleString("en-US")} ${g.memberCount === 1 ? "member" : "members"}`,
+    exact: g.name.toLowerCase() === q, faction: g.faction,
   };
 }
 
 /**
  * Characters seen by the addon whose name starts with the text (switch on, 2 to 12 letters), armory characters whose
  * first name, surname or "first surname" does (switch on, see armoryNameQuery), and guilds whose name does (switch
- * on, 2 to 24 characters). Addon rows have no surname, so a full name finds armory rows only. Characters from both
- * lookups share one group, one row per page. A lookup that fails leaves its rows out; the others still answer.
+ * on, 2 to 24 characters), plus, with the armory on, armory guilds. Addon rows have no surname, so a full name finds armory rows only. Characters from both
+ * lookups share one group, one row per page. Both character kinds and the armory guilds come from one read
+ * (site_people_search); until its migration is applied, or when it fails, the separate reads answer as before, without
+ * armory guilds. A lookup that fails leaves its rows out; the others still answer.
  * `lookup` (the /search page's on-demand armory lookup, armory-lookup.ts) runs only when the armory answered and
  * had nobody for the text; its hit, if any, is the armory's one row.
  */
@@ -69,23 +94,29 @@ export async function peopleSearch(raw: string, limit = PEOPLE_LIMIT, lookup?: (
   const name = playerPagesOn() ? searchPrefix(text) : null;
   const fullName = armoryOn() ? armoryNameQuery(text) : null;
   const guild = guildsOn() ? guildSearchPrefix(text) : null;
+  const armoryGuild = armoryOn() ? guildSearchPrefix(text) : null;
+  const one = name || fullName || armoryGuild ? await oneRead(text) : null;
   const [players, armory, guilds] = await Promise.all([
-    name ? orNone(async () => (await searchPlayers(name.toLowerCase())).map((p) => ({
-      type: "character" as const, label: p.name, href: playerPath(p), meta: `Level ${p.level} ${className(p.class)} · ${p.realm}`, exact: p.name.toLowerCase() === q,
-    }))) : null,
+    name ? (one ? one.players.map((p) => playerRow(p, q)) : orNone(async () => (await searchPlayers(name.toLowerCase())).map((p) => playerRow(p, q)))) : null,
     fullName ? orNone(async () => {
-      const stored = await armoryStore().search(fullName, LOOKUP_CAP);
+      const stored = one ? one.armory : await armoryStore().search(fullName, LOOKUP_CAP);
       const found = !stored.length && lookup ? await lookup(text) : null;
       return (found ? [found] : stored).map((h) => armoryRow(h, fullName));
     }) : null,
     guild ? orNone(async () => (await searchGuildsKept(guild.toLowerCase())).map((g) => ({
       type: "guild" as const, label: g.guildName, href: guildPath(g.realm, g.guildName),
       meta: g.membersSeen === null ? g.realm : `${g.realm} · ${g.membersSeen.toLocaleString("en-US")} ${g.membersSeen === 1 ? "member" : "members"} seen`,
-      exact: g.guildName.toLowerCase() === q,
+      exact: g.guildName.toLowerCase() === q, ...(g.faction ? { faction: g.faction } : {}),
     }))) : null,
   ]);
   const characterLookups = [players, armory].filter((l): l is PersonResult[] => l !== null);
-  return { characters: characterLookups.length ? group(characterLookups, limit) : EMPTY, guilds: guilds ? group([guilds], limit) : EMPTY };
+  const guildLookups = [guilds, armoryGuild && one ? one.guilds.map((g) => armoryGuildRow(g, q)) : null].filter((l): l is PersonResult[] => l !== null);
+  return { characters: characterLookups.length ? group(characterLookups, limit) : EMPTY, guilds: guildLookups.length ? group(guildLookups, limit) : EMPTY };
+}
+
+/** The one read, or null before its migration (and in development) or when it fails (logged), for the separate reads to answer. */
+async function oneRead(text: string): Promise<SitePeople | null> {
+  try { return await armoryStore().people(text, LOOKUP_CAP); } catch (err) { console.error("site search: the characters and guilds read failed", err); return null; }
 }
 
 /** A lookup's rows, or null when it failed (logged), so the group is built from the lookups that answered. */
