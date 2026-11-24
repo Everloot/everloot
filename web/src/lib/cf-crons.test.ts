@@ -8,8 +8,9 @@ const site = read("wrangler.jsonc");
 const cron = read("wrangler.cron.jsonc");
 
 test("both Workers' triggers are exactly the schedules this file runs", () => {
-  expect([...site.triggers.crons].sort()).toEqual(Object.keys(CF_CRONS).sort());
-  expect([...cron.triggers.crons].sort()).toEqual(Object.keys(CF_CRONS).sort());
+  // Wrangler 4.165 types `crons` as optional; a missing list must still fail here.
+  expect([...(site.triggers.crons ?? [])].sort()).toEqual(Object.keys(CF_CRONS).sort());
+  expect([...(cron.triggers.crons ?? [])].sort()).toEqual(Object.keys(CF_CRONS).sort());
 });
 
 test("the cron Worker serves no visitor and sends its jobs to itself", () => {
