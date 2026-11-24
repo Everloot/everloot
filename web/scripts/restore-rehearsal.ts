@@ -4,9 +4,9 @@
  * event the backed-up snapshot published comes back. Nothing touches production.
  * Run: npx tsx scripts/restore-rehearsal.ts <mirror folder>
  */
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { createUploadStore } from "../src/lib/upload-store";
 import { canonicalJson, publicRecords, type CorpusState } from "../../kb/src/corpus";
 
@@ -44,6 +44,30 @@ function index(rows: unknown[], internal: boolean) {
 
 export async function rehearseRestore(mirror: string) {
   const snapshot = readObject(join(mirror, "snapshots", "corpus.json"));
+  if (snapshot.format === 2) {
+    if (!Array.isArray(snapshot.parts) || new Set(snapshot.parts).size !== snapshot.parts.length
+        || !snapshot.state || typeof snapshot.state !== "object" || Array.isArray(snapshot.state)) {
+      throw new Error("snapshot part manifest is invalid");
+    }
+    const root = realpathSync(mirror);
+    const events: unknown[] = [];
+    for (const key of snapshot.parts) {
+      if (typeof key !== "string" || !/^snapshots\/corpus\/[A-Za-z0-9_-]+\/\d+\.json$/.test(key)) {
+        throw new Error("snapshot part path is invalid");
+      }
+      let part: unknown;
+      try {
+        const path = realpathSync(join(root, key));
+        if (!path.startsWith(root + sep)) throw new Error();
+        part = JSON.parse(readFileSync(path, "utf8"));
+      } catch {
+        throw new Error("snapshot part is missing or invalid JSON");
+      }
+      if (!Array.isArray(part)) throw new Error("snapshot part is not a list");
+      for (const event of part) events.push(event);
+    }
+    snapshot.corpusState = { ...snapshot.state, events };
+  }
   const internal = "corpusState" in snapshot;
   const state = snapshot.corpusState as CorpusState | undefined;
   const rows = internal ? state?.events : snapshot.records;

@@ -263,6 +263,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
 
 ### Changed
+- Site: blue posts on /changes read like WoW's blue tracker: the poster and the excerpt in Blizzard blue, a Blizzard badge, the poster's role and a chip for where it was posted. Builds stay a compact row.
 - Site: the header links Players, Guilds and Rankings directly, ahead of its menus, and Lookup no longer repeats them; the phone menu opens with them as Community. The bar's items show from 1280 px (the Menu button carries them below that) and the build label from 1536 px.
 - Site: the header's menus take the keyboard: each trigger says it opens a panel, ArrowDown opens it onto the first link, ArrowUp/ArrowDown walk the links and wrap, Home/End jump to the ends, Tab out closes it, and ArrowLeft/ArrowRight move along the bar; below md the docs' section tabs become one select.
 - Site: the rankings boards' faction dots use the faction colours the census introduced, the same blue and red on both pages.
@@ -273,6 +274,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the census race and class tables use WoW class colours, with a stronger shade for higher counts. The sample limits and counting method are easier to find.
 
 ### Fixed
+- Site: the blue-post tracker no longer stalls on a long thread. A run cut off while following a thread's chain of tracked posts saves how far it got, so the next run continues instead of starting over. `?rescanSince=` on the cron route re-reads posts the reader passed before.
 - Site: coin amounts group their thousands (1,234,567g), and a character's Gold section is dated once, by its heading.
 - Site: armory character pages show their board ranks again; a rank on one of the new play history boards had made the page drop them all.
 - Site: lore pages drop the doubled spaces the wiki's source had but never showed, leave no gap where footnotes or race icons sat side by side, show `{{-}}` as its dash and `{{Race|…|notext}}` as only its icon, so far fewer pages are marked damaged.
@@ -684,7 +686,7 @@ statistics for private sync.
 
 Lifetime gold leaves your computer only through the Desktop App's private sync (0.1.24) for a character you linked,
 and everloot.app keeps it only while that character's Gold sync is on. Dungeon progress on player tooltips needs the
-Desktop App 0.1.24 and shows only players who shared it.
+Desktop App 0.1.24 and shows only players who shared it. The bundled dungeon and raid data targets Forever build 1.60.1.71037.
 
 ## [0.3.29] - 2026-11-21
 

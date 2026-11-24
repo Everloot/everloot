@@ -137,6 +137,12 @@ describe("Badge", () => {
     expect(html).toContain("text-q-epic");
     expect(text(html)).toBe("Epic");
   });
+
+  test("the blizzard badge marks Blizzard staff in the blue-post colour", () => {
+    const html = render(<Badge tone="blizzard" />);
+    expect(html).toContain("border-blue-post text-blue-post");
+    expect(text(html)).toBe("Blizzard");
+  });
 });
 
 describe("AgreementMeter", () => {
