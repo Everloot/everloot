@@ -27,6 +27,8 @@ export interface FilterBarProps {
   clearHref: string;
   /** Right of the filters: the result strip. */
   aside?: ReactNode;
+  /** Every choice and Clear filters carry rel="nofollow": for filters a crawler should not walk. */
+  nofollow?: boolean;
 }
 
 const control = "ctl inline-flex items-center gap-1.5 whitespace-nowrap border px-3";
@@ -38,7 +40,7 @@ function Chevron() {
   return <Icon name="chevron" className="text-muted [[open]>summary>&]:rotate-180" />;
 }
 
-function Menu({ c: given, phone }: { c: Extract<FilterControl, { type: "menu" }>; phone: boolean }) {
+function Menu({ c: given, phone, rel }: { c: Extract<FilterControl, { type: "menu" }>; phone: boolean; rel?: string }) {
   // A choice that matches nothing is noise ("Alliance 0" before launch): it stays only while selected, and a menu
   // left with nothing to pick is not drawn.
   const c = { ...given, options: given.options.filter((o) => o.reset || o.on || o.count !== 0) };
@@ -54,7 +56,7 @@ function Menu({ c: given, phone }: { c: Extract<FilterControl, { type: "menu" }>
       <ul className="pop z-30 mt-1 max-h-80 min-w-52 overflow-y-auto rounded-control border border-edge bg-panel p-1 sm:absolute sm:left-0 sm:top-full">
         {c.options.map((o, i) => (
           <li key={i}>
-            <Link href={o.href} aria-current={o.on ? "true" : undefined} className="flex min-h-8 items-center gap-2 rounded-control px-2 text-control text-fg-2 hover:bg-canvas hover:text-fg">
+            <Link href={o.href} rel={rel} aria-current={o.on ? "true" : undefined} className="flex min-h-8 items-center gap-2 rounded-control px-2 text-control text-fg-2 hover:bg-canvas hover:text-fg">
               {c.multi && <span aria-hidden="true" className={`h-3.5 w-3.5 shrink-0 rounded-control border ${o.on ? "border-accent bg-accent" : "border-edge"}`} />}
               <span className={`min-w-0 flex-1 truncate ${o.on && !c.multi ? "text-fg" : ""} ${o.className ?? ""}`} style={o.style}>{o.label}</span>
               {o.count !== undefined && <span className="tabular-nums text-muted">{o.count.toLocaleString("en-US")}</span>}
@@ -67,7 +69,8 @@ function Menu({ c: given, phone }: { c: Extract<FilterControl, { type: "menu" }>
   );
 }
 
-function Controls({ search, controls, active, clearHref, phone }: FilterBarProps & { phone: boolean }) {
+function Controls({ search, controls, active, clearHref, phone, nofollow }: FilterBarProps & { phone: boolean }) {
+  const rel = nofollow ? "nofollow" : undefined;
   return (
     <>
       {search && (
@@ -89,11 +92,11 @@ function Controls({ search, controls, active, clearHref, phone }: FilterBarProps
       )}
       {controls.map((c) => c.type === "menu"
         // Keyed on its choices, so after a client-side navigation the menu comes back closed.
-        ? <Menu key={`${c.key}-${c.options.map((o) => Number(o.on)).join("")}`} c={c} phone={phone} />
-        : <Link key={c.key} href={c.href} aria-current={c.on ? "true" : undefined} className={`${control} ${c.on ? lit : idle}`}>
+        ? <Menu key={`${c.key}-${c.options.map((o) => Number(o.on)).join("")}`} c={c} phone={phone} rel={rel} />
+        : <Link key={c.key} href={c.href} rel={rel} aria-current={c.on ? "true" : undefined} className={`${control} ${c.on ? lit : idle}`}>
             <span aria-hidden="true" className={`h-3 w-3 shrink-0 rounded-control border ${c.on ? "border-accent bg-accent" : "border-edge"}`} />{c.label}
           </Link>)}
-      {active > 0 && <Link href={clearHref} className="ctl inline-flex items-center px-2 text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Clear filters</Link>}
+      {active > 0 && <Link href={clearHref} rel={rel} className="ctl inline-flex items-center px-2 text-fg underline decoration-edge underline-offset-4 hover:decoration-fg">Clear filters</Link>}
     </>
   );
 }

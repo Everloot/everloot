@@ -142,7 +142,7 @@ export default function AhledgerCrafting({ profession, market, read, path, searc
     { key: "profit", header: "Profit per day", numeric: true, sortable: true, cell: (r) => coins(r.profitPerDay) },
   ];
   const active = Number(q.skillMin !== null || q.skillMax !== null) + Number(q.minSales !== null) + Number(q.priced);
-  const strip = <ResultStrip total={listed.total} noun={listed.total === 1 ? "recipe" : "recipes"} page={listed.page} perPage={q.size} href={(page) => here({ page })} label={`${profession} crafting margin pages`} />;
+  const strip = <ResultStrip total={listed.total} noun={listed.total === 1 ? "recipe" : "recipes"} page={listed.page} perPage={q.size} href={(page) => here({ page })} label={`${profession} crafting margin pages`} nofollow />;
 
   return <AhledgerPanel title="AH Ledger crafting margins" state="ready" credit={read.credit} controls={controls}>
     {read.asOf && <p data-prices-as-of className="text-meta text-fg-2">Prices as of <time dateTime={read.asOf}>{utc(read.asOf)}</time> · AH Ledger</p>}
@@ -174,6 +174,7 @@ export default function AhledgerCrafting({ profession, market, read, path, searc
           { type: "menu", key: "craft-size", label: "Rows", options: RECIPE_PAGE_SIZES.map((size) => ({ label: String(size), href: here({ size }), on: q.size === size })) },
         ]}
         aside={strip}
+        nofollow
       />
       <DataTable
         dense
@@ -184,7 +185,7 @@ export default function AhledgerCrafting({ profession, market, read, path, searc
         sort={{ key: q.sort.key, direction: q.sort.desc ? "desc" : "asc" }}
         sortHref={(key, direction: SortDirection) => here({ sort: { key: key as CraftSort, desc: direction === "desc" } })}
         empty={<p className="py-3 text-meta text-fg-2">No recipes match these filters.</p>}
-        meta={(r) => <>Skill: {r.skill ?? "—"} · Cost: {r.cost === null ? "unpriced" : <Coins copper={r.cost} />} · Net: {coins(r.netValue)} · Margin: {coins(r.margin)} · Sales/day: {salesText(r.salesPerDay)} · Profit/day: {coins(r.profitPerDay)}</>}
+        nofollow
       />
       {listed.pages > 1 && strip}
     </>}

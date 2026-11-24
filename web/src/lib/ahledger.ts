@@ -6,9 +6,10 @@ import type { Region, RulesetSlug } from "@/data/realms";
  * free key and a credit link; a site earning from the data through ads needs a licence, so this holds only while
  * Everloot shows no ads. Answers may be kept no longer than their Cache-Control allows, so the proxy route
  * (app/api/ahledger) passes that lifetime on and keeps nothing else. The prices reach pages only, read in the browser
- * or, for the profession pages' crafting margins, at render on the server (ahledger-proxy.ts `readAhledgerPage`, whose
- * page the edge keeps 5 minutes, AH Ledger's own max-age): never the database, the MCP server, Chat, the API's own
- * data or the open-data exports (ahledger.test.ts).
+ * or, for the profession pages' crafting margins, at render on the server (ahledger-proxy.ts `readAhledgerPage`). That
+ * read is shared by the market's sorts, filters and pages in the Worker's Cache API for as long as AH Ledger's
+ * Cache-Control allows, at most 5 minutes, and the page the edge keeps 5 minutes with no stale copy: never the
+ * database, the MCP server, Chat, the API's own data or the open-data exports (ahledger.test.ts).
  */
 
 export const AHLEDGER_API = "https://api.ahledger.com";

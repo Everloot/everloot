@@ -4,7 +4,7 @@ import { expect, test, vi } from "vitest";
 import type { AhledgerCraft } from "@/lib/ahledger";
 import AhledgerCrafting, { craftingHref, craftingQuery, craftingRows, type CraftingRead } from "./AhledgerCrafting";
 
-vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> }));
+vi.mock("next/link", () => ({ default: ({ href, rel, children }: { href: string; rel?: string; children: ReactNode }) => <a href={href} rel={rel}>{children}</a> }));
 
 const credit = { text: "Prices from AHledger", url: "https://ahledger.com/test-credit" };
 const craft = (spellId: number, over: Partial<AhledgerCraft> = {}): AhledgerCraft => ({
@@ -102,4 +102,23 @@ test("a failed read says so and keeps the credit; no market says why; a professi
   expect(none).toContain("AH Ledger has no market for this realm.");
   expect(draw({}, ready(), "forever.normal.alliance.us", "Fishing")).toBe("");
   expect(draw({}, ready([]))).toContain("No crafting margins on this market yet.");
+});
+
+test("every sort, filter and page link is nofollow, so a crawler does not walk the variants; the recipe and credit links are not", () => {
+  const many = Array.from({ length: 120 }, (_, i) => craft(i + 1, { profitPerDay: 1000 - i }));
+  const html = draw({ min_sales: "1" }, ready(many));
+  const links = [...html.matchAll(/<a href="([^"]*)"([^>]*)>/g)];
+  const own = links.filter(([, href]) => href.startsWith(path));
+  // Sort headers, filter options, the toggle, Clear filters and the pager, top and bottom.
+  expect(own.length).toBeGreaterThan(15);
+  for (const [tag, , attrs] of own) expect(attrs, tag).toMatch(/rel="[^"]*nofollow[^"]*"/);
+  expect(html).toMatch(/rel="next nofollow"/);
+  for (const [tag, , attrs] of links.filter(([, href]) => !href.startsWith(path))) expect(attrs, tag).not.toContain("nofollow");
+});
+
+test("each money value is drawn once: no phone line repeats the columns", () => {
+  const html = draw();
+  // Three rows; the non-null amounts are cost 2, net 3, margin 2, profit 2 = 9 coin amounts.
+  expect(html.match(/class="whitespace-nowrap tabular-nums"/g)).toHaveLength(9);
+  expect(html).not.toContain("Sales/day:");
 });

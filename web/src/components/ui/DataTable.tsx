@@ -42,6 +42,8 @@ export interface DataTableProps<Row> {
   dense?: boolean;
   /** Dense tables on a phone: the other columns' facts in one muted line under the first cell. */
   meta?: (row: Row) => ReactNode;
+  /** Sort links carry rel="nofollow": for a table whose every order is its own URL a crawler should not walk. */
+  nofollow?: boolean;
 }
 
 /**
@@ -61,7 +63,7 @@ const ariaSort = (direction: SortDirection) => (direction === "asc" ? "ascending
  */
 export default function DataTable<Row>(props: DataTableProps<Row>) {
   if (props.dense) return <DenseTable {...props} />;
-  const { columns, rows, rowKey, caption, sort, sortHref, empty, footer, toolbar } = props;
+  const { columns, rows, rowKey, caption, sort, sortHref, empty, footer, toolbar, nofollow } = props;
   return (
     <div data-table className="min-w-0 overflow-hidden rounded-card border border-line bg-panel">
       {toolbar && <div className="border-b border-line">{toolbar}</div>}
@@ -83,7 +85,7 @@ export default function DataTable<Row>(props: DataTableProps<Row>) {
                     className={`h-9 whitespace-nowrap border-b border-line bg-canvas px-4 font-mono text-xs font-medium ${sorted ? "text-fg" : "text-muted"} ${col.numeric ? "text-right" : "text-left"}`}
                   >
                     {col.sortable && sortHref ? (
-                      <Link href={sortHref(col.key, next)} className="inline-flex min-h-6 items-center gap-1 hover:text-fg">
+                      <Link href={sortHref(col.key, next)} rel={nofollow ? "nofollow" : undefined} className="inline-flex min-h-6 items-center gap-1 hover:text-fg">
                         {col.header}
                         {sorted && <span aria-hidden="true" className="text-accent">{sorted === "desc" ? "↓" : "↑"}</span>}
                       </Link>
@@ -127,7 +129,7 @@ export default function DataTable<Row>(props: DataTableProps<Row>) {
  * The dense list table. Every sortable header is a link that says its direction (▲ ascending, ▼ descending)
  * on the sorted column, with aria-sort. On a phone the first column carries the row; the others hide.
  */
-function DenseTable<Row>({ columns, rows, rowKey, caption, sort, sortHref, empty, footer, toolbar, meta }: DataTableProps<Row>) {
+function DenseTable<Row>({ columns, rows, rowKey, caption, sort, sortHref, empty, footer, toolbar, meta, nofollow }: DataTableProps<Row>) {
   // Without a phone line the other columns cannot fold away. Either way a table too wide for its column scrolls inside
   // itself below 1024 px (the sticky header needs the page as its scroll parent, so it applies from `lg`).
   const folds = Boolean(meta);
@@ -155,7 +157,7 @@ function DenseTable<Row>({ columns, rows, rowKey, caption, sort, sortHref, empty
                   >
                     {col.sortable && sortHref ? (
                       // Block-level, so the link fills the 32 px cell without a line box around it.
-                      <Link href={sortHref(col.key, next)} className={`flex items-center gap-1 hover:text-fg ${col.numeric ? "flex-row-reverse" : ""}`}>
+                      <Link href={sortHref(col.key, next)} rel={nofollow ? "nofollow" : undefined} className={`flex items-center gap-1 hover:text-fg ${col.numeric ? "flex-row-reverse" : ""}`}>
                         {col.header}{arrow}
                       </Link>
                     ) : (
