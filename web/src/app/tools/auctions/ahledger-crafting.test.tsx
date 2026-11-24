@@ -31,7 +31,7 @@ test("the margins are drawn on the server: profit per day first, with the recipe
   expect(html).toContain("unpriced");
   expect(html).toContain("upper bound");
   expect(html).toContain('dateTime="2026-11-24T05:45:44.000Z"');
-  expect(html.replace(/<[^>]*>/g, "")).toContain("Prices as of 2026-11-24 05:45 UTC · AH Ledger");
+  expect(html).toMatch(/Prices as of (?:<[^>]*>)*2026-11-24 05:45 UTC(?:<[^>]*>)* · (?:<[^>]*>)*AH Ledger/);
   expect(html).toContain('href="https://ahledger.com/test-credit"');
   expect(html).toContain("data-test-picker");
   expect(html).toContain("AH Ledger market: PvE Alliance");
