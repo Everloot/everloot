@@ -15,6 +15,7 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
+- Site: the header search groups its suggestions into Characters, Guilds, Items and Zones & NPCs, colours characters by class and guilds by faction, finds armory guilds, and Enter opens an exact match (#1271).
 - Site: dungeon progress is on: the Desktop App can download shared dungeon clears for player tooltips, and boss-kill sync records the addon's full character name (migration `20261123110000_dungeon_progress.sql` applied 2026-11-23).
 - Addon: Collection shows dungeon clears, and a compact green progress bar appears on player tooltips when the Desktop App has synced their shared progress.
 - Desktop: refreshes shared dungeon progress for in-game tooltips and syncs boss kills for linked characters. Older sites and sites with Dungeon Progress turned off can still acknowledge boss kills.

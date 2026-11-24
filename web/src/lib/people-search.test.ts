@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { GuildSummary } from "@kb/guilds";
-import { createMemoryArmoryStore, type MemoryArmoryStore } from "./armory-store";
+import { createMemoryArmoryStore, type MemoryArmoryStore, type SitePeople } from "./armory-store";
 import { createMemoryPlayerStore, type PlayerStore } from "./player-store";
 
 const held = vi.hoisted(() => ({ store: null as PlayerStore | null, armory: null as MemoryArmoryStore | null, guilds: [] as unknown[] | Error, partial: false, guildAsked: [] as string[], kept: [] as { key: string[]; tags: string[] }[] }));
@@ -18,7 +18,7 @@ vi.mock("./guilds", async (importOriginal) => ({
   },
 }));
 
-import { armoryCharacterPath } from "./armory";
+import { armoryCharacterPath, armoryGuildPath } from "./armory";
 import { armoryCharacter } from "./armory.fixture";
 import { guildPath } from "./guilds";
 import { peopleSearch } from "./people-search";
@@ -74,8 +74,8 @@ test("rows link through the page helpers, name level, class and realm, and put a
   expect(found.characters).toEqual({
     total: 2, capped: false,
     results: [
-      { type: "character", label: "Thrall", href: playerPath({ ruleset: "forever", realm: "Forever Pioneer", name: "Thrall" }), meta: "Level 60 Warrior · Forever Pioneer", exact: true },
-      { type: "character", label: "Thrallina", href: playerPath({ ruleset: "forever", realm: "Forever Pioneer", name: "Thrallina" }), meta: "Level 24 Shaman · Forever Pioneer", exact: false },
+      { type: "character", label: "Thrall", href: playerPath({ ruleset: "forever", realm: "Forever Pioneer", name: "Thrall" }), meta: "Level 60 Warrior · Forever Pioneer", exact: true, class: "warrior" },
+      { type: "character", label: "Thrallina", href: playerPath({ ruleset: "forever", realm: "Forever Pioneer", name: "Thrallina" }), meta: "Level 24 Shaman · Forever Pioneer", exact: false, class: "shaman" },
     ],
   });
   expect(found.guilds.results).toEqual([
@@ -154,7 +154,7 @@ describe("armory characters", () => {
   test("the full name is an exact match and comes first; a surname that only starts with the name does not", async () => {
     armoryOn();
     const found = await peopleSearch("Volvik Morningstar");
-    expect(found.characters.results[0]).toEqual({ ...us, exact: true });
+    expect(found.characters.results[0]).toEqual({ ...us, exact: true, class: "warrior" });
     expect(found.characters.results.map((r) => r.label)).not.toContain("Orla Volvikson");
     expect((await peopleSearch("volvik")).characters.results.map((r) => r.label)).toContain("Orla Volvikson");
   });
@@ -200,7 +200,7 @@ describe("armory characters", () => {
       const lookup = vi.fn(async () => found);
       const { characters } = await peopleSearch("  Nera   Ashcombe ", undefined, lookup);
       expect(lookup).toHaveBeenCalledExactlyOnceWith("Nera   Ashcombe");
-      expect(characters.results).toEqual([{ type: "character", label: "Nera Ashcombe", href: armoryCharacterPath("us", "nera-ashcombe"), meta: "Level 22 Mage · US PvP", exact: true }]);
+      expect(characters.results).toEqual([{ type: "character", label: "Nera Ashcombe", href: armoryCharacterPath("us", "nera-ashcombe"), meta: "Level 22 Mage · US PvP", exact: true, class: "mage" }]);
     });
 
     test("no lookup when the armory has the name, failed, or is switched off; a miss lists nothing", async () => {
@@ -216,5 +216,72 @@ describe("armory characters", () => {
       expect((await peopleSearch("Nera Ashcombe", undefined, lookup)).characters.results).toEqual([]);
       expect(lookup).toHaveBeenCalledOnce();
     });
+  });
+});
+
+describe("one read for characters and guilds (site_people_search)", () => {
+  const allOn = () => { on(); vi.stubEnv("EVERLOOT_ARMORY", "1"); };
+  const answer: SitePeople = {
+    armory: [{ region: "us", slug: "volvik-morningstar", name: "Volvik", surname: "Morningstar", level: 31, class: "Warrior", faction: "Alliance", ruleset: "PvP" }],
+    players: [{ name: "Volvikar", level: 24, class: "SHAMAN", ruleset: "forever", realm: "Forever Pioneer" }],
+    guilds: [{ region: "eu", slug: "volvik-guard", name: "Volvik Guard", faction: "Horde", ruleset: "Normal", memberCount: 12 }],
+  };
+
+  test("answers both groups from it, with class and faction for the colours, and armory guilds join the guild group", async () => {
+    allOn();
+    const people = vi.spyOn(held.armory!, "people").mockResolvedValue(answer);
+    const players = vi.spyOn(held.store!, "search");
+    const armory = vi.spyOn(held.armory!, "search");
+    held.guilds = [guild("Volvik Fans", 3)];
+    const found = await peopleSearch("Volvik");
+    expect(people).toHaveBeenCalledExactlyOnceWith("Volvik", 25);
+    expect(players).not.toHaveBeenCalled();
+    expect(armory).not.toHaveBeenCalled();
+    expect(found.characters.results).toEqual([
+      { type: "character", label: "Volvik Morningstar", href: armoryCharacterPath("us", "volvik-morningstar"), meta: "Level 31 Warrior · US PvP", exact: true, class: "warrior", faction: "Alliance" },
+      { type: "character", label: "Volvikar", href: playerPath({ ruleset: "forever", realm: "Forever Pioneer", name: "Volvikar" }), meta: "Level 24 Shaman · Forever Pioneer", exact: false, class: "shaman" },
+    ]);
+    expect(found.guilds.results).toEqual([
+      { type: "guild", label: "Volvik Fans", href: guildPath("Forever Pioneer", "Volvik Fans"), meta: "Forever Pioneer · 3 members seen", exact: false },
+      { type: "guild", label: "Volvik Guard", href: armoryGuildPath("eu", "volvik-guard"), meta: "EU Normal · 12 members", exact: false, faction: "Horde" },
+    ]);
+  });
+
+  test("each kind still needs its switch: armory rows and armory guilds the armory's, addon rows the player pages'", async () => {
+    vi.stubEnv("EVERLOOT_PLAYER_PAGES", "1");
+    vi.spyOn(held.armory!, "people").mockResolvedValue(answer);
+    const found = await peopleSearch("Volvik");
+    expect(found.characters.results.map((r) => r.label)).toEqual(["Volvikar"]);
+    expect(found.guilds.results).toEqual([]);
+    vi.unstubAllEnvs();
+    vi.stubEnv("EVERLOOT_ARMORY", "1");
+    const armoryOnly = await peopleSearch("Volvik");
+    expect(armoryOnly.characters.results.map((r) => r.label)).toEqual(["Volvik Morningstar"]);
+    expect(armoryOnly.guilds.results.map((r) => r.label)).toEqual(["Volvik Guard"]);
+    expect(held.guildAsked).toEqual([]);
+  });
+
+  test("before its migration (null) or when it fails, the separate reads answer as before", async () => {
+    allOn();
+    const players = vi.spyOn(held.store!, "search");
+    vi.spyOn(held.armory!, "people").mockResolvedValueOnce(null);
+    expect((await peopleSearch("thrall")).characters.total).toBe(2);
+    expect(players).toHaveBeenCalledTimes(1);
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(held.armory!, "people").mockRejectedValueOnce(new Error("down"));
+    expect((await peopleSearch("thrall")).characters.total).toBe(2);
+    expect(players).toHaveBeenCalledTimes(2);
+    expect(log).toHaveBeenCalledOnce();
+  });
+
+  test("text no kind can match asks nothing, and the on-demand lookup still runs when the armory had nobody", async () => {
+    allOn();
+    const people = vi.spyOn(held.armory!, "people").mockResolvedValue({ armory: [], players: [], guilds: [] });
+    await peopleSearch("t");
+    expect(people).not.toHaveBeenCalled();
+    const lookup = vi.fn(async () => ({ region: "us", slug: "nera-ashcombe", name: "Nera", surname: "Ashcombe", level: 22, class: "Mage", race: "Human", ruleset: "PvP", guildName: null }));
+    const { characters } = await peopleSearch("Nera Ashcombe", undefined, lookup);
+    expect(lookup).toHaveBeenCalledOnce();
+    expect(characters.results.map((r) => r.label)).toEqual(["Nera Ashcombe"]);
   });
 });
