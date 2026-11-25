@@ -33,11 +33,12 @@ function Instance({ row }: { row: InstanceClear }) {
                 <span className={boss.killed ? "text-fg" : "text-muted"}>
                   <span aria-hidden="true" className="mr-2 inline-block w-3 font-mono">{boss.killed ? "●" : "–"}</span>{boss.name}
                 </span>
+                {/* Each fact keeps its words together, so a phone wraps between facts, never inside a date. */}
                 <span className="font-mono text-meta tabular-nums text-fg-2">{boss.killed ? [
                   boss.kills !== null ? `${boss.kills} ${boss.kills === 1 ? "kill" : "kills"}` : null,
                   boss.firstKillDay ? `first ${boss.firstKillDay}` : null,
                   boss.lastKillDay ? `last ${boss.lastKillDay}` : null,
-                ].filter(Boolean).join(" · ") : "Not killed"}</span>
+                ].filter(Boolean).map((fact, i) => <span key={i}>{i > 0 && " · "}<span className="whitespace-nowrap">{fact}</span></span>) : "Not killed"}</span>
               </li>
             ))}
           </ul>

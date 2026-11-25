@@ -31,7 +31,9 @@ test("each instance with a kill lists its bosses, cleared or not, with kill coun
   const rfc = html.split('data-dungeon-instance="389"')[1]!.split("data-dungeon-instance")[0]!;
   expect(text(rfc)).toContain("|Cleared|");
   expect(text(rfc)).toContain("First cleared |2026-11-14| UTC");
-  expect(text(rfc)).toMatch(/Oggleflint\|3 kills · first 2026-11-10 · last 2026-11-20/);
+  // Each fact is its own unbreakable piece, so a phone never wraps inside a date.
+  expect(text(rfc)).toContain("Oggleflint|3 kills| · |first 2026-11-10| · |last 2026-11-20|");
+  expect(rfc).toContain('<span class="whitespace-nowrap">first 2026-11-10</span>');
   const mc = html.split('data-dungeon-instance="409"')[1]!;
   expect(text(mc)).toMatch(/\|2 \/ 11 bosses\|/);
   expect(text(mc)).toMatch(/Ragnaros\|Not killed/);
