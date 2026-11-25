@@ -372,7 +372,9 @@ describe("market", () => {
     const html = market(s, view({ state: s, data: { market: marketInfo() } }));
     expect(html).toContain("The site has no public values yet.");
     expect(empty(html)).toEqual({ cause: "No full scan in your save file yet", action: null });
-    expect(empty(html.split("Written into the game")[1])).toEqual({ cause: "Nothing written into the game yet", action: "Refresh prices" });
+    expect(empty(html.split("Price file for the add-on")[1])).toEqual({ cause: "Nothing written into the game yet", action: "Refresh prices" });
+    expect(html).toContain("Verify in WoW");
+    expect(html).toContain("/everloot price 2589");
     expect(disabled(html, 'data-run="prices"')).toBe(false);
     expect(disabled(market(withSettings({ prices: false }), view({ data: { market: marketInfo() } })), 'data-run="prices"')).toBe(true);
   });

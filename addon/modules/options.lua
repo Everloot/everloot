@@ -228,6 +228,22 @@ end
 
 local words
 
+local function tooltipExample()
+  local mode = EverlootDB.tooltip
+  if mode == "off" then return "Sample tooltip\nEverloot tooltip details are off." end
+  local lines = {}
+  if EverlootDB.tooltipMarket ~= false then
+    lines[#lines + 1] = "Market value · 2g 40s · Horde · 1 day old"
+    if mode ~= "compact" then lines[#lines + 1] = "Minimum buyout · 2g 15s" end
+  end
+  if mode ~= "compact" then
+    if EverlootDB.tooltipHistory ~= false then lines[#lines + 1] = "Last sale · 2g 25s" end
+    if EverlootDB.tooltipSources ~= false then lines[#lines + 1] = "Source · Quest reward" end
+  end
+  if EverlootDB.tooltipDisenchant ~= false then lines[#lines + 1] = "Disenchant estimate · 1g 70s" end
+  return "Sample tooltip · illustrative values\n" .. (#lines > 0 and table.concat(lines, "\n") or "No tooltip sections selected.")
+end
+
 function O.Refresh()
   for _, page in ipairs(O.pages or {}) do
     for _, box in ipairs(page.boxes or {}) do
@@ -241,8 +257,9 @@ function O.Refresh()
         page.added[i]:Show()
       end
       for i = #page.addedRows + 1, #page.added do page.added[i]:Hide() end
-      if page:IsShown() then page.layout() end
     end
+    if page.tooltipPreview then page.tooltipPreview:SetText(tooltipExample()) end
+    if (page.added or page.tooltipPreview) and page:IsShown() then page.layout() end
     if page.note then
       page.note:SetText(O.changed and "Changes apply after a reload." or ("Everloot " .. E.VERSION .. ". Changes apply after a reload."))
     end
@@ -304,6 +321,7 @@ local function build(frameName, name, introText, rows, added, branded)
   page.scroll = scroll
   page.content = content
   page.boxes = {}
+  page.tooltipPreview = false
   for _, row in ipairs(rows) do
     local box = CreateFrame(row.choices and "Button" or "CheckButton", nil, content,
       row.choices and "UIPanelButtonTemplate" or "UICheckButtonTemplate")
@@ -326,6 +344,10 @@ local function build(frameName, name, introText, rows, added, branded)
       else O.Click(row, self:GetChecked() and true or false) end
     end)
     page.boxes[#page.boxes + 1] = box
+    if row.key == "tooltip" then
+      page.tooltipPreview = pageWords(content, "GameFontHighlight", 12, "text")
+      page.tooltipPreview:SetJustifyV("TOP")
+    end
   end
   -- False, not nil, on the pages without it: a frame's methods would answer for a missing field.
   page.addedHeading, page.added = false, false
@@ -344,6 +366,12 @@ local function build(frameName, name, introText, rows, added, branded)
       box.label:SetWidth(math.max(1, width - 2 * PAD - (box.row.choices and 76 or 38)))
       box.description:SetWidth(math.max(1, width - 2 * PAD - (box.row.choices and 76 or 38)))
       y = y + math.max(32, 4 + box.label:GetStringHeight() + 2 + box.description:GetStringHeight()) + 12
+      if box.row.key == "tooltip" then
+        local preview = page.tooltipPreview
+        preview:SetPoint("TOPLEFT", content, "TOPLEFT", PAD, -y)
+        preview:SetWidth(math.max(1, width - 2 * PAD))
+        y = y + preview:GetStringHeight() + 16
+      end
     end
     if page.addedHeading then
       page.addedHeading:SetPoint("TOPLEFT", content, "TOPLEFT", PAD, -y)

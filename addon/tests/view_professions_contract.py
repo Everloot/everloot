@@ -305,12 +305,12 @@ local c = p.craft
 assert(c.page.shown and p.toggle.text == 'Ranks and trainers' and p.nav.text == 'Professions' and not p.blocks[1].shown and not p.others.shown)
 for id, n in pairs(calls) do assert(n == 1, 'item ' .. id .. ' priced ' .. n .. ' times in one redraw') end
 assert(calls[2678] == 1 and calls[2840] == 1)
--- One short source line beside the buttons, on one line; the full sentence is in its hover.
+-- One dedicated source line below the buttons; the full sentence is in its hover.
 assert(c.age.text == 'Alliance AH prices, 2026-10-29 (1 day ago)', c.age.text)
 assert(c.ageDetail == 'Market values from the price file built 2026-10-29 (1 day ago), Alliance auction house; a vendor price when it is lower.', c.ageDetail)
 assert(#c.age.text * 6 <= c.age.width, 'the source line fits on one line')
-assert(c.age.point[1] == 'TOPRIGHT' and 604 + c.age.point[2] - c.age.width >= c.filterButton.point[2] + c.filterButton.width,
-  'the source line starts right of the buttons')
+assert(c.age.point[1] == 'TOPLEFT' and -c.age.point[3] > -c.filterButton.point[3] + c.filterButton.height,
+  'the source line starts below the buttons')
 -- Nothing is drawn over it: the list box starts under the line, and the note sits inside the list box.
 assert(-c.age.point[3] + 12 <= -c.list.point[3], 'the list box starts under the source line')
 assert(c.note.point[1] == 'BOTTOMLEFT', 'the note sits at the bottom of the list box')
@@ -368,15 +368,20 @@ assert(b.lines[1].shown and b.lines[1].text == '1 × Copper Ore · ' .. M(20) ..
 assert(not b.lines[2].shown and b.total.text == 'Total: ' .. M(20), b.total.text)
 assert(not b.up.shown and not b.down.shown, 'one reagent needs no paging')
 assert(b.output.text == 'Makes 2 items per craft · ' .. U.Money(10) .. ' materials per item', b.output.text)
+assert(not b.math.shown)
+b.details.scripts.OnClick()
 assert(b.math.shown and b.math.text == 'Sale: ' .. U.Money(300) .. ' - 5% AH cut: ' .. U.Money(15)
   .. ' - materials: ' .. U.Money(20) .. ' = ' .. U.Money(265) .. ' profit', b.math.text)
+b.details.scripts.OnClick()
+assert(not b.math.shown and b.lines[1].shown)
 EverlootDB.recipeOutput[10].maximum = 3
 r1.scripts.OnClick()
 assert(b.output.text == 'Makes 2-3 items per craft · ' .. U.Money(8) .. ' materials per item (avg.)', b.output.text)
 assert(r1.profit.text == '+' .. M(336), r1.profit.text)
 -- Choose Spiced Wolf Meat and eleven crafts.
 c.rows[2].scripts.OnClick()
-b.steps[4].scripts.OnClick()
+IsShiftKeyDown = function() return true end
+b.steps[2].scripts.OnClick()
 assert(b.title.text == 'What to buy: 11 × Spiced Wolf Meat', b.title.text)
 assert(b.lines[1].text == '11 × Wolf Meat · ' .. M(50) .. ' each · ' .. M(550), b.lines[1].text)
 assert(b.lines[2].text == '11 × Mild Spices · ' .. M(10) .. ' each (vendor) · ' .. M(110), b.lines[2].text)
@@ -388,10 +393,11 @@ assert(c.rows[2].name.color[2] == U.COLORS.accent[2] and c.rows[1].name.color[2]
 -- The count stays between 1 and 999.
 for _ = 1, 3 do b.steps[1].scripts.OnClick() end
 assert(c.count == 1 and b.title.text == 'What to buy: 1 × Spiced Wolf Meat', b.title.text)
-for _ = 1, 120 do b.steps[4].scripts.OnClick() end
+for _ = 1, 120 do b.steps[2].scripts.OnClick() end
 assert(c.count == 999, c.count)
 for _ = 1, 100 do b.steps[1].scripts.OnClick() end
-b.steps[3].scripts.OnClick()
+IsShiftKeyDown = nil
+b.steps[2].scripts.OnClick()
 assert(c.count == 2, c.count)
 -- Partly unpriced totals say what is missing and what the priced reagents cost.
 c.rows[4].scripts.OnClick()
@@ -515,7 +521,7 @@ local seven
 for i = 1, 8 do if c.rows[i].shown and c.rows[i].name.text == 'Seven Ores' then seven = c.rows[i] end end
 assert(seven, 'the seven-reagent recipe is listed')
 seven.scripts.OnClick()
-c.buy.steps[3].scripts.OnClick()
+c.buy.steps[2].scripts.OnClick()
 local b = c.buy
 assert(b.title.text == 'What to buy: 2 × Seven Ores', b.title.text)
 for i = 1, 5 do
@@ -531,7 +537,7 @@ assert(b.lines[2].text == '14 × Ore 7 · ' .. M(7) .. ' each (vendor) · ' .. M
 assert(not b.lines[3].shown and b.up.shown and not b.down.shown)
 assert(b.total.text == 'Total: ' .. M(280), b.total.text)
 -- The page holds while the count changes, and Up goes back.
-b.steps[3].scripts.OnClick()
+b.steps[2].scripts.OnClick()
 assert(b.lines[2].text == '21 × Ore 7 · ' .. M(7) .. ' each (vendor) · ' .. M(147), b.lines[2].text)
 b.up.scripts.OnClick()
 assert(b.lines[1].text == '3 × Ore 1 · ' .. M(1) .. ' each (vendor) · ' .. M(3) and b.down.shown, b.lines[1].text)

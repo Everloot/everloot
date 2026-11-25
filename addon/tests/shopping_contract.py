@@ -398,11 +398,12 @@ for files in (STYLED, FILES):
 local T, S = Everloot.AuctionTab, Everloot.Shopping
 local p = T.panel
 local shop = p.shop
-assert(p.modeButton.text == 'Shopping list' and not shop.page.shown and p.lookup.shown, 'the lookup shows first')
+assert(p.lookupModeButton.text == 'Price lookup' and p.modeButton.text == 'Shopping list' and not shop.page.shown and p.lookup.shown,
+  'both destinations are visible when lookup opens')
 click(p.modeButton)
 assert(shop.page.shown and not p.lookup.shown and not p.results.shown and not p.scanButton.shown and not p.status.shown,
   'the shopping page covers the scan controls and the lookup')
-assert(p.modeButton.text == 'Price lookup')
+assert(p.lookupModeButton.text == 'Price lookup' and p.modeButton.text == 'Shopping list')
 assert(shop.listName.text == 'No list yet' and shop.empty.shown and not shop.rows[1].shown, 'an empty start says how to begin')
 assert(shop.caps.text:find('10 lists of 50 items', 1, true) and shop.caps.text:find('Nothing is uploaded, bought or posted', 1, true))
 assert(shop.file.text == 'Market: price file built 2026-10-19 (1 day ago), Horde auction house; each value\\'s age beside it.', shop.file.text)
@@ -416,6 +417,7 @@ local r = shop.rows[1]
 assert(r.shown and r.name.text == 'Linen Cloth' and r.want.text == '20', tostring(r.name.text))
 assert(r.max.text == S.Money(250) and r.market.text == S.Money(205) .. ' · today', 'the Horde value, not the Alliance one: ' .. r.market.text)
 assert(r.found.text == '-', 'nothing searched yet')
+assert(r.decision.text == 'Below cap', r.decision.text)
 -- A shift-clicked item goes into the Item box while it has focus; an unpriced, stale item says so.
 shop.itemBox.focus = true
 hooks.ChatEdit_InsertLink('|cffffffff|Hitem:765::|h[Silverleaf]|h|r')
@@ -423,9 +425,11 @@ shop.itemBox.focus = false
 assert(shop.itemBox.text == '|cffffffff|Hitem:765::|h[Silverleaf]|h|r')
 click(shop.addButton)
 assert(shop.rows[2].name.text == 'Silverleaf' and shop.rows[2].max.text == 'no limit' and shop.rows[2].market.text == 'no price')
+assert(shop.rows[2].decision.text == 'No quote')
 shop.itemBox:SetText('2770'); click(shop.addButton)
 assert(shop.rows[3].market.text == S.Money(30) .. ' · 4 d' and shop.rows[3].market.color[1] == 1 and shop.rows[3].market.color[2] == 0.4,
   'a value older than two days is in warning red: ' .. shop.rows[3].market.text)
+assert(shop.rows[3].decision.text == 'Stale quote')
 -- Bad input is refused in words.
 shop.itemBox:SetText('2589'); shop.wantBox:SetText('lots'); click(shop.addButton)
 assert(shop.message.text == 'Want is a whole number of at least 1.', shop.message.text)
@@ -464,7 +468,7 @@ click(shop.addButton)
 assert(shop.deleteButton.text == 'Delete', 'any other button cancels the delete')
 click(shop.deleteButton); click(shop.deleteButton)
 assert(#S.DB().lists == 1 and shop.listName.text:find('Shopping', 1, true) and shop.rows[1].shown, shop.listName.text)
-click(p.modeButton)
+click(p.lookupModeButton)
 assert(not shop.page.shown and p.lookup.shown and p.scanButton.shown and p.modeButton.text == 'Shopping list')
 """)
 
@@ -578,17 +582,20 @@ local p = EverlootWindow.professions
 p.toggle.scripts.OnClick()
 local c = p.craft
 local b = c.buy
-assert(b.add.shown and b.add.text == 'Add to shopping list', 'the what-to-buy list has the button')
-b.steps[3].scripts.OnClick(); b.steps[3].scripts.OnClick()
+assert(b.add.shown and b.add.text == 'Add reagents to shopping list', 'the what-to-buy list has the button')
+assert(#b.steps == 2 and b.count.text == '1 craft')
+assert(not b.math.shown and not b.output.shown)
+b.details.scripts.OnClick()
+assert(b.math.shown and b.output.shown)
+b.steps[2].scripts.OnClick(); b.steps[2].scripts.OnClick()
 assert(c.count == 3)
 b.add.scripts.OnClick()
-assert(c.note.text == 'Added 1 reagent to Shopping. 1 without a known item id was not added.', c.note.text)
-assert(c.note.color[2] == U.COLORS.accent[2], 'the outcome is lit where the note was')
+assert(b.receipt.text == 'Added 1 reagent to Shopping. 1 without a known item id was not added.', b.receipt.text)
 local list = Everloot.Shopping.Active()
 assert(#list.items == 1 and list.items[1].itemId == 2770 and list.items[1].want == 6 and list.items[1].name == 'Copper Ore')
 assert(not U.failed)
 c.rows[1].scripts.OnClick()
-assert(c.note.text == 'Select a recipe for the cost and profit breakdown.', 'choosing a recipe again brings the note back')
+assert(b.receipt.text == '', 'choosing a recipe clears the previous shopping receipt')
 """)
 # Without the shopping file (an older load order), the button stays hidden.
 lua = window_fresh(f"{{ installId = 'abcd-1234', toggles = {{}}, records = {RECORDS} }}", API)

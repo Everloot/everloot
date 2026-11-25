@@ -74,6 +74,17 @@ test("the game file recipes show in skill brackets, labelled, with the item and 
   expect(html).toContain('data-badge="files"');
 });
 
+test("a recipe row opens a shareable one-recipe shopping plan with the original filters", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  expect(await render("alchemy", { q: "Minor Strength" })).toContain("recipe=2329&amp;q=Minor+Strength#recipe-shopping");
+  const html = await render("alchemy", { recipe: "2329", crafts: "3" });
+  expect(html).toContain('id="recipe-shopping"');
+  expect(html).toContain('value="3"');
+  expect(html).toContain("Copy recipe shopping list");
+  expect(html).toContain('id="shopping-list"');
+  expect(await render("alchemy", { recipe: "3755" })).not.toContain('id="recipe-shopping"');
+});
+
 test("on a phone the recipe tables scroll sideways instead of hiding what a recipe makes and takes", async () => {
   store.loadCorpus.mockResolvedValue(empty);
   const html = await render();

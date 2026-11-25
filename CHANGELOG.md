@@ -263,6 +263,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: /tools/bags shows the cheapest bag of each size on one realm's auction house and what each added slot costs over your smallest bag, and item tooltips print a bag's "14 Slot Bag" line; slot counts come from the game files, prices from players' scans.
 - Site: the world map shows zone or continent coordinates on hover and shares pins in the address; Shift-click or use Pin map centre, and Clear pin removes it.
 - Knowledge base: count stack units and average coin per loot window internally, keeping public answers and exports unchanged.
+- Addon: Crafting Costs highlights the selected recipe and shopping result, auction lists show price caps, and Settings previews tooltip choices. Web profession pages plan an individual recipe, and Desktop Market explains how to verify its price file in WoW.
 
 ### Changed
 - Site: blue posts on /changes read like WoW's blue tracker: the poster and the excerpt in Blizzard blue, a Blizzard badge, the poster's role and a chip for where it was posted. Builds stay a compact row.
