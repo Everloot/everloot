@@ -4,11 +4,11 @@
   "credit": "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.",
   "build": {
     "product": "wowf",
-    "buildId": 71037,
-    "version": "1.60.1.71037",
-    "buildConfig": "0acab1e6aa41b46165d2ca66853b417b",
-    "definitions": "3a7954cfb8ee",
-    "extractedAt": "2026-11-23T17:42:38.688Z"
+    "buildId": 71091,
+    "version": "1.60.1.71091",
+    "buildConfig": "3cd52a7a64f9bad078020b1e95af8a00",
+    "definitions": "3783c908726e",
+    "extractedAt": "2026-11-25T05:58:53.872Z"
   },
   "traitSystemId": 45,
   "currencies": [
@@ -885,8 +885,8 @@
   "tables": [
     {
       "table": "SpellName",
-      "rows": 32135,
-      "hash": "5e9fb7709180",
+      "rows": 32143,
+      "hash": "574fbc6b2acb",
       "encryptedBlocks": 14
     },
     {
