@@ -109,7 +109,7 @@ test("a named item the files give only an icon for (no ItemSparse row) shows tha
   state.matched = matchedNames([7230]);
   state.iconOnly = new Map([[7230, `${BASE}/icons/135661.webp`]]);
   const page = await html(ItemPage(props("7230")));
-  expect(page).toMatch(new RegExp(`<img src="${BASE}/icons/135661\.webp"[^>]*border-q-epic`));
+  expect(page).toMatch(new RegExp(`<img src="${BASE}/icons/135661\\.webp"[^>]*border-q-epic`));
   expect(page).not.toContain(`${BASE}/icons/134400.webp`);
   expect(page).toContain("data-unconfirmed");
 });
