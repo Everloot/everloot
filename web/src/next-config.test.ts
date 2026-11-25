@@ -116,7 +116,10 @@ test("the public pages rendered on every request are kept at the CDN; the pages 
   // Found live 10/27: /database, /map and /changes answered private, no-store, so every visit ran the server.
   const hour = "max-age=3600, stale-while-revalidate=86400";
   const brief = "max-age=300, stale-while-revalidate=3600";
-  for (const [path, value] of [["/database/items", hour], ["/database/items/2589", hour], ["/map", hour], ["/map/kalimdor", hour], ["/changes", brief], ["/search", brief], ["/tools/professions", brief], ["/tools/professions/alchemy", brief], ["/tools/professions/blacksmithing", brief], ["/tools/bags", brief], ["/tools/disenchanting", brief], ["/tools/farming-routes", brief]] as const) {
+  // The profession pages carry AH Ledger prices, which may be kept no longer than AH Ledger's max-age=300: the shared
+  // read's 120 s plus the page's 180 s, and no stale copy.
+  const ahledger = "max-age=180";
+  for (const [path, value] of [["/database/items", hour], ["/database/items/2589", hour], ["/map", hour], ["/map/kalimdor", hour], ["/changes", brief], ["/search", brief], ["/tools/professions", ahledger], ["/tools/professions/alchemy", ahledger], ["/tools/professions/blacksmithing", ahledger],["/tools/bags", brief], ["/tools/disenchanting", brief], ["/tools/farming-routes", brief]] as const) {
     const got = await headersFor(path);
     expect(got["CDN-Cache-Control"], path).toBe(value);
   }

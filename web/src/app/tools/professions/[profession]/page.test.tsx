@@ -40,6 +40,9 @@ vi.mock("next/navigation", () => ({
   permanentRedirect: (to: string) => { throw new Error(`308 ${to}`); },
 }));
 vi.mock("@/components/EmailCapture", () => ({ default: () => null }));
+// AH Ledger is read on the server for the crafting margins; no test reaches the real API.
+const ledger = vi.hoisted(() => ({ read: vi.fn() }));
+vi.mock("@/lib/ahledger-proxy", () => ({ readAhledgerPage: ledger.read }));
 
 import ProfessionPage, { generateMetadata } from "./page";
 import { professionBySegment } from "@/lib/professions";
@@ -55,6 +58,7 @@ const empty = { uploads: 0, records: [], dataAsOf: "2026-10-10T00:00:00.000Z" };
 beforeEach(() => {
   store.loadCorpus.mockReset(); fail.world = false; fail.rollups = false;
   store.loadMarket.mockReset().mockResolvedValue({ state: null, dataAsOf: null });
+  ledger.read.mockReset().mockResolvedValue({ ok: false });
 });
 
 test("the game file recipes show in skill brackets, labelled, with the item and its reagents", async () => {
@@ -451,4 +455,35 @@ test("an old margins link with ?market= still shows that market; with no realm o
   const pickerLinks = [...html.matchAll(/href="([^"]*#ahledger-margins)"/g)].map((m) => m[1]);
   expect(pickerLinks.length).toBeGreaterThan(0);
   for (const link of pickerLinks) expect(link).not.toContain("market=");
+});
+
+test("the AH Ledger margins are read once on the server for the chosen market and drawn into the page; a failed read is degraded", async () => {
+  store.loadCorpus.mockResolvedValue(empty);
+  const credit = { text: "Prices from AHledger", url: "https://ahledger.com/crafting" };
+  ledger.read.mockResolvedValue({ ok: true, credit, value: { asOf: "2026-11-24T05:45:44.000Z", recipes: [
+    { spellId: 2329, name: "Elixir of Minor Strength", skill: 1, cost: 10, netValue: 50, margin: 40, salesPerDay: 3, profitPerDay: 120 },
+  ] } });
+  const html = await render("alchemy", { market: "forever.rp.horde.eu", sort: "-margin" });
+  expect(ledger.read).toHaveBeenCalledTimes(1);
+  const [path, select] = ledger.read.mock.calls[0] as [string, (body: unknown) => unknown];
+  expect(path).toBe("crafting/forever.rp.horde.eu?profession=Alchemy");
+  // The page keeps only the margins and the time from AH Ledger's answer.
+  expect(select({ pricesAsOf: "2026-11-24T05:45:44.000Z", recipes: [{ recipe: { spellId: 7, name: "Test", skillRequired: 40 }, cost: 1, reagents: [{ id: 1 }] }] }))
+    .toEqual({ asOf: "2026-11-24T05:45:44.000Z", recipes: [{ spellId: 7, name: "Test", skill: 40, cost: 1, netValue: null, margin: null, salesPerDay: null, profitPerDay: null }] });
+  expect(html).toContain('data-ahledger="ready"');
+  expect(html).toContain("Prices as of");
+  expect(html).toContain('href="https://ahledger.com/crafting"');
+  expect(html).toContain('aria-sort="descending"');
+  expect(edgeDegraded(html)).toBe(false);
+
+  ledger.read.mockResolvedValue({ ok: false });
+  const failed = await render("alchemy");
+  expect(failed).toContain('data-ahledger="failed"');
+  expect(edgeDegraded(failed)).toBe(true);
+
+  // No market, or a profession AH Ledger lacks: nothing is asked.
+  ledger.read.mockClear();
+  await render("fishing");
+  await render("alchemy", { realm: "nowhere" });
+  expect(ledger.read).not.toHaveBeenCalled();
 });

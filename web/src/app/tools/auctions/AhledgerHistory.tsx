@@ -2,8 +2,8 @@
 
 import { useId } from "react";
 import Coins from "@/components/ui/Coins";
-import { type AhledgerHistory as History, type AhledgerPoint } from "@/lib/ahledger";
-import { AhledgerMarketPicker, AhledgerPanel, salesText, useAhledger, useAhledgerMarket } from "./AhledgerPanel";
+import { salesText, type AhledgerHistory as History, type AhledgerPoint } from "@/lib/ahledger";
+import { AhledgerMarketPicker, AhledgerPanel, useAhledger, useAhledgerMarket } from "./AhledgerPanel";
 
 function HistoryChart({ series }: { series: AhledgerPoint[] }) {
   const title = useId();

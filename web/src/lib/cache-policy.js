@@ -47,9 +47,10 @@ const CACHE_POLICY = {
     pages: ["tools/auctions/item/[itemId]", "tools/auctions/[realm]/[itemId]"],
   },
   professions: {
-    maxAge: 300,
-    staleWhileRevalidate: 3600,
-    reason: "Each page renders every recipe with the corpus's gathering areas (2 to 5 s); short, so a page drawn while storage was unreachable does not stay long.",
+    maxAge: 180,
+    // The pages carry AH Ledger crafting prices, which may be kept no longer than AH Ledger's max-age=300: the shared
+    // read (at most 120 s) plus this page's 180 s stays within it, so no stale-while-revalidate either.
+    reason: "Each page renders every recipe with the corpus's gathering areas (2 to 5 s); short, so a page drawn while storage was unreachable does not stay long, and no older than AH Ledger's prices may be.",
     sources: ["/tools/professions/:path*"],
   },
   briefTools: {

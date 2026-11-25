@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { ahledgerCredit, craftingMargins, dealPrices, economyMarkets, priceHistory, upstreamCacheHeaders, AHLEDGER_PROFESSIONS } from "./ahledger";
+import { ahledgerCredit, craftingAsOf, craftingMargins, dealPrices, economyMarkets, priceHistory, upstreamCacheHeaders, AHLEDGER_PROFESSIONS } from "./ahledger";
 import { CLIENT_PROFESSIONS } from "./professions";
 
 test("credit accepts only AH Ledger's HTTPS host", () => {
@@ -30,6 +30,13 @@ test("crafts use nested recipe ids, preserve unpriced costs and sort by daily pr
   expect(rows[0]).not.toHaveProperty("reagents");
   expect(AHLEDGER_PROFESSIONS.every((name) => CLIENT_PROFESSIONS.some((p) => p.name === name))).toBe(true);
   expect(AHLEDGER_PROFESSIONS).not.toContain("Fishing");
+});
+
+test("crafts carry AH Ledger's required skill, and an answer's prices-as-of time only when it is a date", () => {
+  const rows = craftingMargins({ recipes: [{ recipe: { spellId: 7, name: "Test recipe 7", skillRequired: 235 } }, { recipe: { spellId: 8, skillRequired: "235" } }] });
+  expect(rows.map((r) => r.skill)).toEqual([235, null]);
+  expect(craftingAsOf({ pricesAsOf: "2026-11-24T05:45:44.000Z", recipes: [] })).toBe("2026-11-24T05:45:44.000Z");
+  for (const body of [null, {}, { pricesAsOf: "soon" }, { pricesAsOf: 1 }]) expect(craftingAsOf(body)).toBeNull();
 });
 
 test("deals keep their reference basis and sort savings; economy selects listed values only", () => {
