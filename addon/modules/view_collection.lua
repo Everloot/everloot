@@ -37,6 +37,7 @@ local AREAS = { { "achievements", "Achievements", "Achievement_General" }, { "re
   { "flights", "Flight paths", "Ability_Mount_Wyvern_01" } }
 local SCOPES = { { "character", "This character", 110 }, { "account", "Account", 80 } }
 local EXALTED = 8
+local STANDINGS = { "Hated", "Hostile", "Unfriendly", "Neutral", "Friendly", "Honored", "Revered", "Exalted" }
 local OFF_TEXT = "The completion tracker reads the game's achievement, reputation, title and quest chain lists, and records "
   .. "the titles you hold, this week's raid lockouts and your boss kills, never writing back. This page shows your "
   .. "achievements, reputation and quests from the game as it draws; they are not recorded. The lists and your titles leave "
@@ -53,7 +54,7 @@ local NO_FLIGHTS = "The game lists no flight paths here."
 -- The columns: the name after the indent, the open/close button and the icon; the detail from DETAIL_X, narrower
 -- beside a bar; the mark at the right edge.
 local INDENT, NAME_END, DETAIL_X = 14, 296, 304
-local DETAIL_W, DETAIL_WIDE = 140, 262
+local DETAIL_W, DETAIL_WIDE, REPUTATION_DETAIL_W = 140, 262, 224
 -- The game's ready-check marks, as completionist lists draw them: a green check for done, a red cross for missing.
 local DONE_MARK, MISSING_MARK = "Interface\\RaidFrame\\ReadyCheck-Ready", "Interface\\RaidFrame\\ReadyCheck-NotReady"
 local OPEN_BUTTON, CLOSED_BUTTON = "Interface\\Buttons\\UI-MinusButton-Up", "Interface\\Buttons\\UI-PlusButton-Up"
@@ -356,8 +357,14 @@ local function reputation(s)
       local item = { name = name(r.name), detail = "-", done = false }
       if type(r.header) == "string" and r.header ~= "" then item.group, headed = r.header, true else item.group = "Other" end
       if o and number(o.standing) and number(o.floor) and number(o.ceiling) and o.floor <= o.ceiling then
+        local label = STANDINGS[o.reaction]
+        if label then
+          local localized = E.Readable(_G["FACTION_STANDING_LABEL" .. o.reaction])
+          if type(localized) == "string" and localized ~= "" then label = localized end
+          item.detailWidth = REPUTATION_DETAIL_W
+        end
         item.bar = { o.floor, o.ceiling, o.standing }
-        item.detail = held(o.standing .. " / " .. o.ceiling, s, me)
+        item.detail = held(joined(label, o.standing .. " / " .. o.ceiling), s, me)
       end
       if o and number(o.reaction) and o.reaction >= EXALTED then item.done, exalted = true, exalted + 1 end
       items[#items + 1] = item
@@ -826,7 +833,11 @@ local function draw(row, item)
   if done == nil then row.done:Hide()
   else row.done:SetTexture(done and DONE_MARK or MISSING_MARK); row.done:Show() end
   if item.bar then
-    row.detail:SetWidth(DETAIL_W)
+    local width = item.detailWidth or DETAIL_W
+    row.detail:SetWidth(width)
+    row.bar:ClearAllPoints()
+    row.bar:SetPoint("LEFT", DETAIL_X + width + 6, 0)
+    row.bar:SetSize(DETAIL_WIDE - width - 6, 6)
     row.bar:SetMinMaxValues(item.bar[1], item.bar[2])
     row.bar:SetValue(item.bar[3])
     row.bar:Show()
@@ -1013,8 +1024,6 @@ local function build(f, parent)
     row.done:SetSize(14, 14)
     row.done:SetPoint("RIGHT", -6, 0)
     local bar = CreateFrame("StatusBar", nil, row)
-    bar:SetPoint("LEFT", DETAIL_X + DETAIL_W + 6, 0)
-    bar:SetSize(DETAIL_WIDE - DETAIL_W - 6, 6)
     bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
     bar:SetStatusBarColor(unpack(COLORS.accent))
     local back = bar:CreateTexture(nil, "BACKGROUND")

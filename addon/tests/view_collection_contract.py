@@ -39,6 +39,7 @@ factions = {
  { factionID = 530, reaction = 5, currentStanding = 4500, currentReactionThreshold = 3000, nextReactionThreshold = 9000 },
 }
 C_Reputation = { GetNumFactions = function() return #factions end, GetFactionDataByIndex = function(i) return factions[i] end }
+FACTION_STANDING_LABEL5 = 'Amistoso'
 completedQuests = { 101, 102, 201, 103, 104, 401, 402 }
 questTitles = { [401] = 'A Wayward Start', [402] = 'The Middle Road' }
 questLoads = {}
@@ -180,7 +181,8 @@ assert(names(rows) == 'Alliance | Darnassus | Horde | Darkspear Trolls | Orgrimm
 assert(rows[1].detail.text == '0 / 1 (0%)' and rows[3].detail.text == '1 / 2 (50%)', rows[3].detail.text)
 local bar = rows[4].bar
 assert(bar.shown and bar.lo == 3000 and bar.hi == 9000 and bar.value == 4500, 'the bar runs floor to ceiling')
-assert(rows[4].detail.text == '4500 / 9000' and mark(rows[4]) == 'missing' and mark(rows[5]) == 'done', rows[4].detail.text)
+assert(rows[4].detail.text == 'Amistoso · 4500 / 9000' and mark(rows[4]) == 'missing', rows[4].detail.text)
+assert(rows[5].detail.text == 'Exalted · 42500 / 42999' and mark(rows[5]) == 'done', rows[5].detail.text)
 assert(rows[2].detail.text == '-', 'a faction not listed now')
 click(c.missingOnly)
 assert(names(rows) == 'Alliance | Darnassus | Horde | Darkspear Trolls', 'exalted is done: ' .. names(rows))
@@ -311,8 +313,13 @@ assert(rows[3].name.text == 'Zul Farrak' and mark(rows[3]) == 'missing' and rows
 -- Reputation: this character's standing, named.
 click(c.sections.reputation)
 assert(c.summary.text == 'Reputation: 3 factions · 1 exalted · this character', c.summary.text)
-assert(rows[4].name.text == 'Darkspear Trolls' and rows[4].detail.text == '4500 / 9000 · Brakka' and mark(rows[4]) == 'missing', rows[4].detail.text)
-assert(rows[5].name.text == 'Orgrimmar' and rows[5].detail.text == '42500 / 42999 · Brakka', rows[5].detail.text)
+assert(rows[4].name.text == 'Darkspear Trolls' and rows[4].detail.text == 'Amistoso · 4500 / 9000 · Brakka' and mark(rows[4]) == 'missing', rows[4].detail.text)
+assert(rows[5].name.text == 'Orgrimmar' and rows[5].detail.text == 'Exalted · 42500 / 42999 · Brakka', rows[5].detail.text)
+for _, row in ipairs({rows[4], rows[5]}) do
+  assert(#row.detail.text * 6 <= row.detail.width, 'standing, progress and holder fit in the detail column')
+  assert(row.detail.point[2] + row.detail.width < row.bar.point[2], 'the progress bar starts after the text')
+  assert(row.bar.point[2] + row.bar.width <= row.width + row.done.point[2] - row.done.width, 'the bar stops before the mark')
+end
 
 -- Titles: known on any character, named.
 click(c.sections.titles)
