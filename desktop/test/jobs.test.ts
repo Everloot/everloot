@@ -9,11 +9,56 @@ import { createSentState, receiptKeyForSite } from "../../companion/src/sent-sta
 import { FIXTURE_STRUCTURED, FIXTURE_URL } from "../../web/src/lib/chat/market-fixture";
 import { ACCOUNT_KEY_FILE, writeKeyOrigin } from "../src/main/account";
 import { afterLinks, afterSync, companionJobs } from "../src/main/jobs";
+import { readPricesFile } from "../src/main/market";
 import { defaultSettings } from "../src/main/settings";
 
 const dirs: string[] = [];
 const dir = () => { const d = mkdtempSync(join(tmpdir(), "everloot-desktop-")); dirs.push(d); return d; };
 afterEach(() => { for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }); });
+
+describe("Market refresh scope", () => {
+  function setup() {
+    const first = dir(), second = dir();
+    let settings = { ...defaultSettings(), gameFolder: first, endpoint: "https://first.test" };
+    settings.market.realms = ["Nightslayer"];
+    const jobs = companionJobs(dir(), () => settings);
+    const request = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      if (url.host === "second.test" || url.pathname !== "/api/market/prices") return new Response("", { status: 503 });
+      const house = url.searchParams.get("house") === "alliance" ? "Alliance" : "Horde";
+      return Response.json({ ok: true, house, dataAsOf: "2026-10-18", items: [[2589, 100, 90, 110, 20, "2026-10-18", 3]] });
+    });
+    const switchFolder = (endpoint = "https://first.test") => { settings = { ...settings, gameFolder: second, endpoint }; };
+    const read = (folder: string) => readPricesFile(join(folder, "Interface", "AddOns"))?.realms ?? [];
+    return { first, second, jobs, request, switchFolder, read };
+  }
+
+  test("an in-flight refresh writes to the installation that started it", async () => {
+    const { first, second, jobs, request, switchFolder, read } = setup();
+    try {
+      const refreshing = jobs.deps.prices([]);
+      switchFolder();
+      await refreshing;
+      expect(read(first)).toMatchObject([
+        { realm: "nightslayer", house: "Alliance" }, { realm: "nightslayer", house: "Horde" },
+      ]);
+      expect(read(second)).toEqual([]);
+      expect(jobs.lastMarket()).toEqual([]);
+    } finally { request.mockRestore(); }
+  });
+
+  test("a failed refresh after a scope change does not display the old receipt", async () => {
+    const { second, jobs, request, switchFolder, read } = setup();
+    try {
+      await jobs.deps.prices([]);
+      expect(jobs.lastMarket().map((row) => row.realm)).toEqual(["Nightslayer", "Nightslayer"]);
+      switchFolder("https://second.test");
+      await expect(jobs.deps.prices([])).rejects.toThrow(/HTTP 503/);
+      expect(read(second)).toEqual([]);
+      expect(jobs.lastMarket()).toEqual([]);
+    } finally { request.mockRestore(); }
+  });
+});
 
 test.each(["https://other.test", "http://everloot.app", "https://everloot.app"])("the ask job scopes the account key to its checked site: %s", async (endpoint) => {
   const d = dir();

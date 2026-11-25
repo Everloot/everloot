@@ -59,7 +59,8 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
   const collects = createSiteCollects(join(dataFolder, "site-collects.json"), recovered);
   const answerStore = createAnswerStore(join(dataFolder, "answers.json"), recovered);
   const addonsDir = () => join(current().gameFolder ?? "", "Interface", "AddOns");
-  let lastMarket: RealmSummary[] = [];
+  const marketScope = (s: Settings) => JSON.stringify([s.gameFolder, s.endpoint]);
+  let lastMarket: { scope: string; realms: RealmSummary[] } | undefined;
   // The last link and sync results per account file, for the Characters page, kept while the app runs. Each belongs to the
   // site and account it was sent with (a short hash of the key, never the key): signing in to another account or
   // changing the site drops them, and an answer that arrives after such a change is not kept.
@@ -135,9 +136,12 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
     },
     async prices(files) {
       const s = current();
+      const scope = marketScope(s);
+      const dir = join(s.gameFolder ?? "", "Interface", "AddOns");
+      const followed = [...s.market.realms];
       await readyFacts(files);
-      const r = await refreshMarket({ svFiles: files, followed: s.market.realms, addonsDir: addonsDir(), endpoint: s.endpoint });
-      lastMarket = r.realms;
+      const r = await refreshMarket({ svFiles: files, followed, addonsDir: dir, endpoint: s.endpoint });
+      if (marketScope(current()) === scope) lastMarket = { scope, realms: r.realms };
       const realms = new Set(r.realms.map((x) => x.realm.toLowerCase())).size;
       return `${r.items} items in ${r.realms.length} auction house(s) on ${realms} realm(s) and ${r.drops} drop sources written; /reload in game to see them`;
     },
@@ -189,5 +193,8 @@ export function companionJobs(dataFolder: string, current: () => Settings): { de
     for (const [file, kept] of links) if (kept.scope !== scope || (active && !active.includes(file))) links.delete(file);
     return [...links.values()].map((kept) => kept.status);
   };
-  return { deps, lastMarket: () => lastMarket, links: visibleLinks, answerStore, notices };
+  return {
+    deps, links: visibleLinks, answerStore, notices,
+    lastMarket: () => lastMarket?.scope === marketScope(current()) ? lastMarket.realms : [],
+  };
 }

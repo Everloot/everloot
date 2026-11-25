@@ -53,7 +53,7 @@ end
 lua.execute("""
 local prices = { [1] = 200, [2] = 500, [3] = 700, [4] = 900 }
 function Everloot:CommunityPrice(realm, id)
-  if priceStatus == 'ready' and prices[id] then return { market = prices[id] } end
+  if priceStatus == 'ready' and prices[id] then return { market = prices[id], day = priceDay } end
 end
 function Everloot:PriceFile(realm) return { status = priceStatus, house = 'Alliance', asOf = priceDate } end
 """)
@@ -100,7 +100,8 @@ form:Init(fish, { outputItemID = 4, quantityMin = 1, quantityMax = 1, reagentSlo
 drain()
 assert(rendered('Unavailable') and not rendered(money(-345)), 'missing price clears old value')
 details = hover()
-assert(details:find('Missing Reagent', 1, true) and details:find('No price', 1, true), details)
+assert(details:find('Missing Reagent', 1, true) and details:find('No price', 1, true)
+  and details:find('Finished item: ' .. money(900), 1, true), details)
 
 local alternative = slot(2, 1)
 alternative.reagents[2] = { itemID = 3 }
@@ -124,10 +125,46 @@ priceStatus = 'ready'
 drain()
 assert(rendered('+' .. money(1510)), 'the open window refreshes after price verification')
 
+local today = Everloot.DayNumber('2026-10-30') * 86400
+time = function() return today + 3600 end
+local recentScan = { at = time() - 60, house = 'Alliance', items = { [4] = { 4, 6, 24, 380, 400 } } }
+function Everloot:OwnScan(realm, house) return recentScan end
+Everloot.RefreshNativeCrafting()
+drain()
+assert(rendered('+' .. money(560)) and panel().cost.text == 'Cost per craft: ' .. money(200),
+  'fresh scan updates the open recipe and community quote fills missing reagent')
+details = hover()
+assert(details:find('24 units listed', 1, true) and details:find(money(380), 1, true)
+  and details:find('Alliance scan', 1, true) and details:find('Community', 1, true), details)
+recentScan.house = 'Horde'
+Everloot.RefreshNativeCrafting()
+drain()
+assert(rendered('+' .. money(1510)), 'a different house does not set the margin')
+recentScan.house, recentScan.at = 'Alliance', time() - 86401
+Everloot.RefreshNativeCrafting()
+drain()
+assert(rendered('+' .. money(1510)), 'an older scan does not replace the community quote')
+priceDay, recentScan.at = '2026-10-30', today - 60
+Everloot.RefreshNativeCrafting()
+drain()
+assert(rendered('+' .. money(1510)), 'a fresh scan from before the item observation day keeps the newer community quote')
+recentScan = nil
+
+priceDay = '2026-10-26'
+form:Init(fish, fishSchematic)
+drain()
+assert(rendered('Old prices') and hover():find('community Oct 26', 1, true), 'an individual quote can be old in a recent file')
+priceDay = nil
+
 priceDate = '2026-10-25'
 form:Init(fish, fishSchematic)
 drain()
 assert(rendered('Old prices') and hover():find('2026-10-25', 1, true), 'stale estimates are labelled in the window')
+recentScan = { at = time() - 60, house = 'Alliance', items = { [1] = { 1, 3, 9, 160, 200 }, [4] = { 4, 6, 24, 380, 400 } } }
+Everloot.RefreshNativeCrafting()
+drain()
+assert(rendered('+' .. money(560)) and not rendered('Old prices'), 'an unused old fallback does not mark fresh scan prices old')
+recentScan = nil
 form.Reagents.GetBottom = function() return 155 end
 form:Init(fish, fishSchematic)
 drain()

@@ -77,10 +77,14 @@ for file in ["core.lua", "modules/auctions.lua"]:
     lua.execute((root / file).read_text(encoding="utf-8"))
 lua.execute("""
 Everloot.frame.onEvent(nil, 'ADDON_LOADED', 'Everloot')
+craftingRefreshes = 0
+function Everloot.RefreshNativeCrafting() craftingRefreshes = craftingRefreshes + 1 end
 for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'AUCTION_HOUSE_SHOW') end
 Everloot:StartScan()
+assert(craftingRefreshes == 0, 'starting a scan does not refresh the recipe estimate')
 for _, hook in ipairs(Everloot.frame.hooks) do hook(nil, 'REPLICATE_ITEM_LIST_UPDATE') end
 assert(not Everloot:Scanning(), 'the scan finished')
+assert(craftingRefreshes == 1, 'a completed scan refreshes the recipe estimate')
 local message = printed[#printed]
 assert(string.find(message, 'Desktop App', 1, true) and string.find(message, 'everloot.app/upload', 1, true), 'scan completion names both upload routes')
 """)
@@ -105,6 +109,7 @@ E:StartScan()
 assert(E:Scanning(), 'a character without a realm can still start a scan')
 for _, hook in ipairs(E.frame.hooks) do hook(nil, 'REPLICATE_ITEM_LIST_UPDATE') end
 assert(not E:Scanning(), 'the local scan finished')
+assert(craftingRefreshes == 2, 'a completed character-only scan also refreshes the recipe estimate')
 assert(#E:Rows('auction_snapshot') == before, 'unidentified prices never go into the outbox')
 assert(E:OwnScan(nil).items[2589][4] == 100, 'the price is readable on its own character')
 assert(E.AuctionTab.Lookup('2589'):find('Your scan', 1, true), 'the auction lookup displays the local price')

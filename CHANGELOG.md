@@ -15,7 +15,9 @@ build that has a zip in the repository. Earlier builds have none.
 Pull requests merged to `main` are listed in the nightly pre-releases until the next tagged release.
 
 ### Added
-- Addon: select a recipe in WoW's Professions window to see its materials cost and estimated profit per craft. Hover over Details for reagent prices, the auction-house cut and the price file's date.
+- Addon: select a recipe in WoW's Professions window to see its materials cost and estimated profit per craft. Details shows reagent prices, the auction-house cut and each quote's source. A recent full scan of the same house can update the estimate and show units listed and lowest buyout.
+- Addon: Collection shows faction standing names beside reputation progress.
+- Desktop: Market keeps price refreshes tied to the selected game installation and shows the age of saved full scans.
 - Site: the signed-in home leads with your main linked character: level, race, class, item level and, only to you, the gold your Desktop App syncs. Your other characters follow as alts, then the Forever blue posts since that character's last login. With no character, one action: Install addon + Connect.
 - Site: the header search groups its suggestions into Characters, Guilds, Items and Zones & NPCs, colours characters by class and guilds by faction, finds armory guilds, and Enter opens an exact match (#1271).
 - Site: profession pages draw the AH Ledger crafting margins on the server, with each recipe's icon and skill, sorting on every money column, skill, sales-per-day and priced-only filters, 25 to 200 rows a page, all kept in the link, and the time AH Ledger last scanned the prices.

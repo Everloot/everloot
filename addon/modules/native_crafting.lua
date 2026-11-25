@@ -54,6 +54,12 @@ local function hideTooltip(panel)
   if GameTooltip and GameTooltip:IsOwned(panel) then GameTooltip:Hide() end
 end
 
+local function priceSource(source, observed)
+  if source == "scan" then return "your scan" end
+  local day = observed and E.ShortDay(observed)
+  return day and ("community " .. day) or "community"
+end
+
 local function showDetails(panel)
   local row = panel.estimate
   if not row or not GameTooltip then return end
@@ -61,13 +67,18 @@ local function showDetails(panel)
   GameTooltip:AddLine("Everloot Crafting Costs")
   for _, part in ipairs(row.parts) do
     local name = part.ambiguous and part.item or (part.count .. " x " .. part.item)
-    local price = part.unit and (U.Money(part.unit * part.count) .. (part.vendor and " (vendor)" or "")) or "No price"
+    local source = part.vendor and "vendor" or priceSource(part.source, part.observed)
+    local price = part.unit and (U.Money(part.unit * part.count) .. " (" .. source .. ")") or "No price"
     GameTooltip:AddLine(name .. ": " .. price, 1, 1, 1, true)
   end
   if row.output then
     local quantity = row.output.minimum == row.output.maximum and tostring(row.output.minimum)
       or (row.output.minimum .. "-" .. row.output.maximum)
     GameTooltip:AddLine("Output per craft: " .. quantity, 1, 1, 1)
+  end
+  if row.value then
+    local source = priceSource(row.source, row.observed)
+    GameTooltip:AddLine("Finished item: " .. U.Money(row.value) .. " each (" .. source .. ")", 1, 1, 1, true)
   end
   if row.profit then
     GameTooltip:AddLine("Estimated sale after " .. row.cut .. "% AH cut, less required materials.", 1, 1, 1, true)
@@ -76,6 +87,11 @@ local function showDetails(panel)
   elseif not row.output then
     GameTooltip:AddLine("Recipe yield unavailable.", 1, 1, 1, true)
   end
+  local listing = row.listing
+  if listing then
+    GameTooltip:AddLine(E.ListedCount(listing[3]) .. " units listed, lowest buyout " .. U.Money(listing[4]), 1, 1, 1, true)
+  end
+  if row.scanInfo then GameTooltip:AddLine(row.scanInfo, 0.8, 0.8, 0.8, true) end
   GameTooltip:AddLine(panel.source, 0.8, 0.8, 0.8, true)
   GameTooltip:Show()
 end
@@ -138,14 +154,14 @@ local function refresh(form, panel)
     panel:Hide()
     return
   end
-  local row, status, source, checking = U.NativeCraftEstimate(recipe)
+  local row, source, checking = U.NativeCraftEstimate(recipe)
   local unavailable = checking and "Checking prices..." or "Unavailable"
   local profit = row.profit
   local profitAmount = profit and ((profit > 0 and "+" or "") .. U.Money(profit)) or unavailable
   if profit and profit ~= 0 then profitAmount = (profit > 0 and "|cff80e080" or "|cffff8080") .. profitAmount .. "|r" end
   panel.cost:SetText("Cost per craft: " .. (row.cost and U.Money(row.cost) or unavailable))
   panel.profit:SetText("Est. profit: " .. profitAmount)
-  panel.details:SetText(status:find("^Old price file") and "|cffffc66dOld prices|r" or "Details")
+  panel.details:SetText(row.oldQuote and "|cffffc66dOld prices|r" or "Details")
   panel.estimate, panel.source = row, source
   panel:Show()
   if GameTooltip and GameTooltip:IsOwned(panel) then showDetails(panel) end
@@ -158,7 +174,6 @@ local function attach()
   if not form or type(form.Init) ~= "function" or type(form.GetRecipeInfo) ~= "function" or not hooksecurefunc then return end
   if panels[form] then return end
   local panel = createPanel(form)
-  panels[form] = panel
   local pending
   local function schedule(delay, retries)
     -- Run after Blizzard's layout and coalesce several Init calls in the same frame.
@@ -170,15 +185,25 @@ local function attach()
     end)
   end
   local function changed() schedule(0, 20) end
+  panels[form] = changed
   hooksecurefunc(form, "Init", changed)
   if type(form.UpdateRecipeDescription) == "function" then hooksecurefunc(form, "UpdateRecipeDescription", changed) end
   form:HookScript("OnShow", changed)
   changed()
 end
 
+function E.RefreshNativeCrafting()
+  local page = ProfessionsFrame and ProfessionsFrame.CraftingPage
+  local refreshPanel = page and panels[page.SchematicForm]
+  if refreshPanel then refreshPanel() end
+end
+
 local listener = CreateFrame("Frame")
 listener:RegisterEvent("ADDON_LOADED")
 listener:RegisterEvent("TRADE_SKILL_SHOW")
+listener:RegisterEvent("AUCTION_HOUSE_SHOW")
+listener:RegisterEvent("AUCTION_HOUSE_CLOSED")
 listener:SetScript("OnEvent", function(_, event, name)
   if event == "TRADE_SKILL_SHOW" or name == "Everloot" or name == "Blizzard_Professions" then attach() end
+  if event == "AUCTION_HOUSE_SHOW" or event == "AUCTION_HOUSE_CLOSED" then E.RefreshNativeCrafting() end
 end)

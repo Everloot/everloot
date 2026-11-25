@@ -95,7 +95,11 @@ export function scanAgesIn(db: Record<string, unknown>): ScanAge[] {
   if (!scans || typeof scans !== "object") return [];
   const out: ScanAge[] = [];
   for (const [realm, v] of Object.entries(scans as Record<string, unknown>)) {
-    const at = v && typeof v === "object" && typeof (v as { at?: unknown }).at === "string" ? (v as { at: string }).at : null;
+    const savedAt = v && typeof v === "object" ? (v as { at?: unknown }).at : null;
+    const scanTime = typeof savedAt === "number" && Number.isSafeInteger(savedAt) && savedAt > 0
+      ? new Date(savedAt * 1000) : null;
+    const at = typeof savedAt === "string" ? savedAt
+      : scanTime && Number.isFinite(scanTime.getTime()) ? scanTime.toISOString() : null;
     if (realm.trim().length >= 2) out.push({ realm: realm.trim(), at });
   }
   return out.sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
