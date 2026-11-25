@@ -538,6 +538,13 @@ the item pages. They come from the game files alone, so:
   One without a name keeps "item set N" or "spell N".
 - Pages only, in the same private storage, made by the same command. In build 1.60.1.70450: 536 sets, all
   named; 31,939 spells, 31,926 named.
+- *Added 2026-11-25.* Each set has its own page (`/database/item-sets/<id>`) and a list. What a set holds comes
+  from a committed game-data file, `web/src/data/game-data/client-item-sets.json`, with ids and numbers only:
+  the piece item ids, each bonus's spell id and pieces needed, and the skill line and rank a crafted set asks for.
+  No names are in it; a set with no name or a development leftover's name is left out of it. The page shows the
+  set and bonus names from the private file above, and its pieces' names and icons under the item name rule. A
+  set page is indexed and listed in the sitemap only when the names file names the set. Search does not read set
+  names, as it does not read spell names.
 
 **The talent catalog.** The talent calculator at `/tools/talents` uses our own catalog, read from
 the public client by a maintainer, not taken from any other site. The catalog is the trait node
