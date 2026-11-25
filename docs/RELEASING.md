@@ -42,6 +42,8 @@ with its area before it merges.
    For an Alpha, put the exact line `Release channel: Alpha` in that version's changelog section.
    The publisher then marks the GitHub release as a pre-release. Keep live-client verification limits in the notes.
    Before a verified stable release, update the Alpha copy on the home, upload and download pages together.
+   Record the live WoW: Forever check for the exact release ZIP in the pull request before setting
+   `ADDON_LIVE_VERIFIED` in `web/src/lib/addon-release.ts` to `true`.
 5. Tag the merge commit and push the tag:
 
    ```bash
