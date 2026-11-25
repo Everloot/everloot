@@ -442,7 +442,7 @@ end
 local AMBIGUOUS = "ambiguous"
 local function pricer(realm)
   local ids, units, markets = {}, {}, {}
-  local scans = keptScans(realm)
+  local scans
   local P = {}
   P.cut = E.SellCheck and math.floor(E.SellCheck.Cut(E:MarketHouse()) * 100 + 0.5) or 5
   -- The item id for a reagent name, or nil and true when the name is ambiguous.
@@ -464,6 +464,7 @@ local function pricer(realm)
     return row and row.market or nil
   end
   function P.change(itemId)
+    scans = scans or keptScans(realm)
     if itemId then P.market(itemId) end
     return marketChange(itemId, scans, itemId and markets[itemId])
   end
@@ -490,14 +491,16 @@ end
 -- A recipe's material cost, item price and estimated profit after the auction house cut.
 local function evaluate(recipe, P)
   local out = { key = recipe.key, name = recipe.name, parts = {}, unpriced = 0, cut = P.cut, yield = 1 }
-  local output = recipe.id and EverlootDB.recipeOutput and EverlootDB.recipeOutput[recipe.id]
+  local output = recipe.output
+  if not recipe.live then output = recipe.id and EverlootDB.recipeOutput and EverlootDB.recipeOutput[recipe.id] end
   if output and output.itemId == recipe.product then
     out.output = output
     out.yield = (output.minimum + output.maximum) / 2
   end
   local cost = 0
   for _, g in ipairs(recipe.reagents) do
-    local id, ambiguous = P.id(g.item)
+    local id, ambiguous = g.id, g.ambiguous
+    if not id and not ambiguous then id, ambiguous = P.id(g.item) end
     local unit, vendor
     if id then unit, vendor = P.unit(id) end
     out.parts[#out.parts + 1] = { item = g.item, id = id, count = g.count, unit = unit, vendor = vendor, ambiguous = ambiguous }
@@ -505,8 +508,8 @@ local function evaluate(recipe, P)
   end
   if out.unpriced == 0 then out.cost = cost end
   out.value = recipe.product and P.market(recipe.product) or nil
-  out.marketChange = P.change(recipe.product)
-  if out.cost and out.value then
+  if not recipe.live then out.marketChange = P.change(recipe.product) end
+  if out.cost and out.value and (not recipe.live or out.output) then
     local _, _, profit = saleEstimate(out, 1)
     out.profit = profit
   end
@@ -572,6 +575,15 @@ local function ageLine(realm)
   end
   return file.house .. " AH prices, " .. day .. " (" .. age .. ")", COLORS.muted, "Market values from the price file built "
     .. day .. " (" .. age .. "), " .. file.house .. " auction house; a vendor price when it is lower."
+end
+
+-- The native window prices the current schematic directly. It does not depend on a saved recipe observation.
+function U.NativeCraftEstimate(recipe)
+  indexRows()
+  local realm = E.CurrentRealm()
+  local row = evaluate(recipe, pricer(realm))
+  local status, _, detail = ageLine(realm)
+  return row, status, detail, status == CHECKING
 end
 
 -- The hover on the source line and the note: where the prices come from and how to read the columns.
