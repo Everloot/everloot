@@ -53,7 +53,7 @@ test("resting the pointer on an item link shows the in-game card: icon, name in 
   expect(fetcher).not.toHaveBeenCalled();
   expect(card()).toBeNull();
   await wait(20);
-  expect(fetcher).toHaveBeenCalledWith("/database/card/item/19019");
+  expect(fetcher).toHaveBeenCalledWith("/api/card/item/19019");
   const shown = card()!;
   expect(shown.getAttribute("role")).toBe("tooltip");
   expect(shown.querySelector("[data-tooltip-frame]")).not.toBeNull();
@@ -314,7 +314,7 @@ test.each([["spells", "spell"], ["vendors", "vendor"]])("%s links use the frame,
   pointer("pointerover", a);
   await wait(SHOW_DELAY);
   expect(card()!.textContent).toBe("Shown name");
-  expect(fetcher).toHaveBeenCalledWith(`/database/card/${type}/10`);
+  expect(fetcher).toHaveBeenCalledWith(`/api/card/${type}/10`);
   pointer("pointerout", a, "mouse", document.body);
   pointer("pointerover", a);
   await wait(SHOW_DELAY);

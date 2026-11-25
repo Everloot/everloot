@@ -6,7 +6,7 @@ import Card from "@/components/ui/Card";
 import { suggestItems, type ItemChoice, type ItemRef } from "@/lib/chat/items";
 import { pendingLine, type PendingCount } from "@kb/pending-loot";
 
-// An answer's item inside Chat: the site's own card (/database/card/item/<id>) and the drops the player-data tool
+// An answer's item inside Chat: the site's own card (/api/card/item/<id>) and the drops the player-data tool
 // publishes (/api/tools/item_page), fetched fresh each time the answer is shown. Both stay on this page: nothing
 // here goes into the conversation's text, the model's messages or its tools.
 
@@ -23,7 +23,7 @@ export const LOAD_MS = 10_000;
 const ICON_HOST = /^(?:\/(?![\/\\])|https:\/\/assets\.everloot\.app\/)/;
 
 async function loadCard(id: number, signal: AbortSignal): Promise<Card> {
-  const res = await fetch(`/database/card/item/${id}`, { signal });
+  const res = await fetch(`/api/card/item/${id}`, { signal });
   if (res.status === 404) return { state: "missing" };
   if (!res.ok) return { state: "unavailable" };
   const card = ((await res.json()) as { card?: CardContent }).card;

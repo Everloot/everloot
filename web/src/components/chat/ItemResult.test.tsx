@@ -51,7 +51,7 @@ const text = () => container.textContent ?? "";
 
 test("an item shows its game card, the canonical database link and published drops as observed samples", async () => {
   site({
-    "/database/card/item/2589": () => Response.json({ ok: true, card: CARD }),
+    "/api/card/item/2589": () => Response.json({ ok: true, card: CARD }),
     "/api/tools/item_page": () => tool({ connected: true, dataAsOf: AS_OF, page: page({
       drops: [
         { sourceNpcId: 1, source: "Defias Thug", kills: 120, drops: 30, rate: 0.25, reporters: 4 },
@@ -61,7 +61,7 @@ test("an item shows its game card, the canonical database link and published dro
     }) }),
   });
   await render(<ItemResult item={{ id: 2589 }} onChoose={() => {}} />);
-  expect(urls).toEqual(["/database/card/item/2589", "/api/tools/item_page?itemId=2589"]);
+  expect(urls).toEqual(["/api/card/item/2589", "/api/tools/item_page?itemId=2589"]);
   expect(text()).toContain("Linen Cloth");
   expect(text()).toContain("Sell Price 13c");
   expect(text()).toContain("Name from Warcraft Wiki");
@@ -79,7 +79,7 @@ test("an item shows its game card, the canonical database link and published dro
 
 test("an item with no published drops says they are not recorded yet, without naming a pending source", async () => {
   site({
-    "/database/card/item/2589": () => Response.json({ ok: true, card: CARD }),
+    "/api/card/item/2589": () => Response.json({ ok: true, card: CARD }),
     "/api/tools/item_page": () => tool({ connected: true, dataAsOf: AS_OF, url: "https://everloot.app/database/items/2589", page: page({ pendingLoot: { windows: 1, reporters: 1 } }) }),
   });
   await render(<ItemResult item={{ id: 2589 }} onChoose={() => {}} />);
@@ -95,7 +95,7 @@ test("unreachable drop data is said to be unavailable, never that the item does 
     () => Response.json({ ok: false, error: "Knowledge release unavailable." }, { status: 503 }),
     () => Promise.reject(new Error("offline")),
   ]) {
-    site({ "/database/card/item/2589": () => Response.json({ ok: true, card: CARD }), "/api/tools/item_page": answer });
+    site({ "/api/card/item/2589": () => Response.json({ ok: true, card: CARD }), "/api/tools/item_page": answer });
     await render(<ItemResult key={Math.random()} item={{ id: 2589 }} onChoose={() => {}} />);
     expect(text()).toContain("Drop data is unavailable right now");
     expect(text()).not.toContain("No drops recorded");
@@ -103,11 +103,11 @@ test("unreachable drop data is said to be unavailable, never that the item does 
 });
 
 test("a missing card still links the database page; a failed one says so", async () => {
-  site({ "/database/card/item/2589": () => Response.json({ ok: false }, { status: 404 }), "/api/tools/item_page": () => tool({ connected: true, dataAsOf: AS_OF, page: page() }) });
+  site({ "/api/card/item/2589": () => Response.json({ ok: false }, { status: 404 }), "/api/tools/item_page": () => tool({ connected: true, dataAsOf: AS_OF, page: page() }) });
   await render(<ItemResult item={{ id: 2589 }} onChoose={() => {}} />);
   expect(container.querySelector('a[href="/database/items/2589"]')).not.toBeNull();
   expect(text()).toContain("No card for this item yet");
-  site({ "/database/card/item/2589": () => Response.json({ ok: false }, { status: 503 }), "/api/tools/item_page": () => tool({ connected: true, dataAsOf: AS_OF, page: page() }) });
+  site({ "/api/card/item/2589": () => Response.json({ ok: false }, { status: 503 }), "/api/tools/item_page": () => tool({ connected: true, dataAsOf: AS_OF, page: page() }) });
   await render(<ItemResult key="again" item={{ id: 2589 }} onChoose={() => {}} />);
   expect(text()).toContain("The item card is unavailable right now");
   expect(Array.from(container.querySelectorAll('a[href="/database/items/2589"]')).map((a) => a.textContent)).toContain("Open the item page");
@@ -118,7 +118,7 @@ test("a card or drops request that never answers (a challenge page) is given up 
   try {
     // Like fetch: open until its signal aborts.
     const hang = () => new Promise<Response>((_, reject) => { signals.at(-1)!.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError"))); });
-    site({ "/database/card/item/2589": hang, "/api/tools/item_page": hang });
+    site({ "/api/card/item/2589": hang, "/api/tools/item_page": hang });
     await act(async () => root.render(<ItemResult item={{ id: 2589 }} onChoose={() => {}} />));
     expect(text()).toContain("Loading drops");
     await act(async () => { await vi.advanceTimersByTimeAsync(LOAD_MS); });
@@ -152,7 +152,7 @@ test("choices that cannot load point to the search page instead", async () => {
 });
 
 test("leaving the answer stops its lookups", async () => {
-  site({ "/database/card/item/2589": () => new Promise<Response>(() => {}), "/api/tools/item_page": () => new Promise<Response>(() => {}) });
+  site({ "/api/card/item/2589": () => new Promise<Response>(() => {}), "/api/tools/item_page": () => new Promise<Response>(() => {}) });
   await render(<ItemResult item={{ id: 2589 }} onChoose={() => {}} />);
   expect(signals).toHaveLength(2);
   await act(async () => root.unmount());

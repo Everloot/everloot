@@ -19,5 +19,5 @@ export const PAGE_INTERNAL_ROUTES = [
   { path: "/api/map/pins", file: "api/map/pins", what: "the pins the map draws on a continent" },
   { path: "/search/suggest", file: "search/suggest", what: "the type-ahead under the site's search boxes, matched on the names the pages show" },
   { path: "/search/people", file: "search/people", what: "the player results on the search page, asked for from the browser" },
-  { path: "/database/card/{type}/{id}", file: "database/card/[type]/[id]", what: "the hover card on the site's own links" },
+  { path: "/api/card/{type}/{id}", file: "api/card/[type]/[id]", what: "the hover card on the site's own links" },
 ] as const;

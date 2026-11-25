@@ -76,7 +76,7 @@ test("no key: a price question gets the recorded price, its page and no knowledg
   expect(text()).toContain(FIXTURE_ANSWER);
   expect(urls()).toContain("/api/tools/market_value?realm=Forever&itemId=2589");
   expect(urls().some((u) => u.startsWith("/api/tools/answer_sources"))).toBe(false);
-  expect(urls().some((u) => u.startsWith("/database/card/"))).toBe(false);
+  expect(urls().some((u) => u.startsWith("/api/card/"))).toBe(false);
   expect(text()).toContain("From Everloot");
   expect(container.querySelector('a[href="https://everloot.app/tools/auctions?realm=Forever&item=2589"]')).not.toBeNull();
   expect(stored()).toContain("\"role\":\"assistant\"");
