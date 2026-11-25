@@ -79,7 +79,7 @@ export function cardFor(key: string): Promise<SiteCard | null> {
   let asked = asking.get(key);
   if (!asked) {
     const fail = () => { failed.set(key, Date.now()); return null; };
-    asked = fetch(`/api/card/${key}`)
+    asked = fetch(`/card/${key}`)
       .then(async (res) => {
         // Only a 404 says there is no card; a 503 says the card could not be read this time.
         if (res.status === 404) { cards.set(key, null); return null; }

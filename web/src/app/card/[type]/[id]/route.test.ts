@@ -26,7 +26,7 @@ import { forgetItemView } from "@/lib/item-view-store";
 import { GET } from "./route";
 
 const three = (make: (installId: string) => object) => ["a", "b", "c"].map(make);
-const call = (type: string, id: string) => GET(new Request(`https://everloot.app/api/card/${type}/${id}`), { params: Promise.resolve({ type, id }) });
+const call = (type: string, id: string) => GET(new Request(`https://everloot.app/card/${type}/${id}`), { params: Promise.resolve({ type, id }) });
 const TIP = { name: "Destiny", color: "#a335ee", quality: "Epic", icon: "https://assets.everloot.app/b/icons/7.webp", lines: ["Two-Hand", "+[?] Strength"], partial: true, why: ["[?] stat amounts: reason."], label: "Found in game files, unconfirmed · build 70450" };
 
 beforeEach(() => {

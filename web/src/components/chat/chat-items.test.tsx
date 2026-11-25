@@ -33,7 +33,7 @@ function api() {
       const q = new URL(url, "http://x").searchParams.get("q")!.toLowerCase();
       return Response.json({ results: LINEN.filter((r) => r.label.toLowerCase().includes(q)) });
     }
-    if (url === "/api/card/item/2589") return Response.json({ ok: true, card: CARD });
+    if (url === "/card/item/2589") return Response.json({ ok: true, card: CARD });
     if (url.startsWith("/api/tools/item_page?")) {
       return Response.json({ answer: { connected: true, dataAsOf: "2026-10-22T01:30:27.923Z", page: { itemId: 2589, name: null, drops: [], pins: [], reported: { shown: [], contested: [] } } }, text: "unknown stats" });
     }
@@ -126,7 +126,7 @@ test("a partial name offers choices in Chat; the chosen item is kept by id and o
   await settle();
   expect(text()).toContain("Which item did you mean?");
   expect(stored()).toContain("\"item\":{\"query\":\"Linen\"}");
-  expect(calls.some((c) => c.url.startsWith("/api/card/"))).toBe(false);
+  expect(calls.some((c) => c.url.startsWith("/card/"))).toBe(false);
   await click(button("Linen Cloth"));
   expect(text()).toContain("Sell Price 13c");
   expect(text()).not.toContain("A robe.");
@@ -151,7 +151,7 @@ test("an older conversation without item references still opens", async () => {
   if (!container.querySelector('nav[aria-label="Conversations"]')) await click(button("Chats"));
   await click(Array.from(container.querySelectorAll('nav[aria-label="Conversations"] li button')).find((b) => b.textContent === "Where does Linen Cloth drop?"));
   expect(text()).toContain("A robe.");
-  expect(calls.some((c) => c.url.startsWith("/api/card/"))).toBe(false);
+  expect(calls.some((c) => c.url.startsWith("/card/"))).toBe(false);
 });
 
 test("stopping while the item is looked up writes no answer", async () => {
