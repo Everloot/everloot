@@ -474,6 +474,15 @@ The rules:
 - An item no source names keeps "Item N". The game server sends those names while the game runs, so they come
   from the addon's uploads, after 3 installs agree. A category page where fewer than half the rows have a name
   stays out of search.
+- Icons of items the files give only an icon for (added 2026-11-25, at Carlos's request that gear show its icon, not
+  a question mark). Forever's `Item` table lists about 12,600 items in build 1.60.1.71091 whose `ItemSparse` row
+  (name, quality, tooltip) the server sends while the game runs; for those the files hold only the icon
+  (`Item.IconFileDataID`). The private item folder keeps that icon beside the tooltips, and a page shows it,
+  with the quiet unconfirmed marker, where it would show the item's tooltip (the rule above: an agreed name, a
+  public drop or a name from a source), and on a character's gear, which Blizzard's armory reports equipped and so
+  is in the game. The gear's card there takes the name and quality from the armory, the icon from the files,
+  and says so. No name, tooltip line, drop rate or price comes from this; an id no rule shows keeps "Item N" and the
+  question mark.
 - Pages only. The data downloads, the API and the MCP server carry no item names and no tooltip facts for these
   items, as before; a test checks that their code does not read the names. The embeddable cards keep the
   three-install rule.
