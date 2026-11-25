@@ -3,6 +3,7 @@ import { revalidateTag } from "next/cache";
 import { readBlueStore, writeBlueStore } from "@/lib/blue-store";
 import { ingestBluePosts } from "@kb/blue-posts";
 import { parseOverrides } from "@kb/blue-forum";
+import { isoTime } from "@kb/text-safety";
 import accounts from "../../../../../../kb/curated/blue-accounts.json";
 import { REQUEST_TIMEOUT_MS, RUN_BUDGET_MS, WORK_ENDS_MS } from "./budget";
 
@@ -15,6 +16,10 @@ export async function GET(req: Request) {
   if (req.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
+  // A one-off backfill: `?rescanSince=<ISO time>` moves every forum list back to that time; later runs carry the rescan on.
+  const rescan = new URL(req.url).searchParams.get("rescanSince");
+  const rescanSince = rescan === null ? undefined : isoTime(rescan);
+  if (rescanSince === null) return NextResponse.json({ ok: false, error: "rescanSince is not a time" }, { status: 400 });
   // One clock for the whole run (see ./budget): the read counts against the work time, and the writes get what is left.
   const started = Date.now();
   try {
@@ -24,6 +29,7 @@ export async function GET(req: Request) {
       overrides: parseOverrides(accounts),
       now: new Date(),
       minIntervalMs: 8 * 60_000,
+      ...(rescanSince ? { rescanSince } : {}),
       deadlineMs: Math.max(0, WORK_ENDS_MS - (Date.now() - started)),
       fetcher: (url, init) => fetch(url, { ...init, cache: "no-store", redirect: "manual", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }),
     });

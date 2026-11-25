@@ -121,12 +121,22 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
     : e.source === "manual"
       ? <>Summary by Everloot{e.url ? "; the title links the original source" : ""}.{e.summary && <> {e.summary}</>}</>
       : (e.summary ?? e.excerpt) && <WithSpells text={(e.summary ?? e.excerpt)!} index={index} />;
+  // A blue post's byline, as on WoW's blue tracker: the poster in blue, a Blizzard badge, the role, and where it was posted.
+  const blueByline = (e: ChangeEntry) => (
+    <p data-byline className="flex flex-wrap items-center gap-2 text-cell-2">
+      {e.author && <span data-poster className="font-semibold text-blue-post">{e.author}</span>}
+      <Badge tone="blizzard" />
+      {e.role && e.role !== SOURCE_LABEL(e) && <span data-role className="text-fg-2">{e.role}</span>}
+      <span data-source-chip><Badge tone="neutral">{SOURCE_LABEL(e)}</Badge></span>
+    </p>
+  );
   const card = (e: ChangeEntry) => {
     const body = excerpt(e);
+    const blue = isBluePost(e);
     const byline = [e.author && (e.role ? `${e.author} (${e.role})` : e.author), SOURCE_LABEL(e)].filter(Boolean).join(" · ");
     return (
-      <Card as="li" key={e.id} padding="none" className={`p-4${isBluePost(e) ? " border-l-4 border-l-blue-post" : ""}`}>
-        <div data-change-row data-blue-post={isBluePost(e) ? "" : undefined} className="min-w-0 space-y-1.5">
+      <Card as="li" key={e.id} padding="none" className={`p-4${blue ? " border-l-4 border-l-blue-post" : ""}`}>
+        <div data-change-row data-blue-post={blue ? "" : undefined} className="min-w-0 space-y-1.5">
           <p className="flex flex-wrap items-center gap-2 text-cell-2 text-fg-2">
             <time
               dateTime={e.source === "manual" ? e.at.slice(0, 10) : e.at}
@@ -139,8 +149,8 @@ export default async function ChangesPage({ searchParams }: { searchParams: Prom
             {q.game === "all" && <span className="text-muted">{GAME_LABEL[e.game]}</span>}
           </p>
           <h2 className="text-base">{title(e)}</h2>
-          {byline && <p data-byline className="text-cell-2 text-fg-2">{byline}</p>}
-          {body && <p data-excerpt className="text-cell text-fg">{body}</p>}
+          {blue ? blueByline(e) : byline && <p data-byline className="text-cell-2 text-fg-2">{byline}</p>}
+          {body && <p data-excerpt className={`text-cell ${blue ? "text-blue-post" : "text-fg"}`}>{body}</p>}
         </div>
       </Card>
     );

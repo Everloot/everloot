@@ -4,11 +4,11 @@
  "credit": "Game data © Blizzard Entertainment, Inc., read from the public client; not under Everloot's licence. Column names from WoWDBDefs (https://github.com/wowdev/WoWDBDefs), CC BY-SA 4.0.",
  "build": {
   "product": "wowf",
-  "buildId": 70959,
-  "version": "1.60.1.70959",
-  "buildConfig": "ad887adcf63b8746155dd40e1930b80f",
-  "definitions": "5ebf2124996b",
-  "extractedAt": "2026-11-17T20:46:15.377Z"
+  "buildId": 71037,
+  "version": "1.60.1.71037",
+  "buildConfig": "0acab1e6aa41b46165d2ca66853b417b",
+  "definitions": "3a7954cfb8ee",
+  "extractedAt": "2026-11-23T17:39:13.986Z"
  },
  "note": "ids, numbers, area names and the terrain words are the game files'; item and spell names follow the site's name rules",
  "areaGroups": {
@@ -190,10 +190,8 @@
   [280074,1309551,"use",null,"run",14],
   [280766,1309685,"use",null,"run",50],
   [281598,1311895,"equip",9253,"run",4],
-  [282631,1314065,"equip",null,"mount",5],
   [284266,1315778,"equip",6601,"mount",6],
   [285089,1317486,"equip",9338,"run",3],
-  [287010,1314065,"equip",null,"mount",5],
   [287043,1308520,"equip",9161,"run",2],
   [287975,2379,"use",null,"run",50],
   [288898,2379,"use",null,"run",50],

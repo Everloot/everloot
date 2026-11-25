@@ -150,6 +150,10 @@ body:has([data-chat-page]) {
 body:has([data-chat-page]) > footer {
   display: none;
 }
+/* The floating bug pill would cover the composer's corner and the rail's last rows; the chat's toolbar opens the report instead. */
+body:has([data-chat-page]) [data-report-pill] {
+  display: none;
+}
 
 html,
 body {

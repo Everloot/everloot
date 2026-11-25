@@ -28,6 +28,11 @@ vi.mock("@/lib/changes", () => ({
   filterTimeline: (all: Array<{ game: string }>, _f: string, game?: string) => all.filter((e) => !game || e.game === game),
 }));
 
+// The account's linked characters (armory rows) and their synced gold; none unless a test sets them.
+const linked = vi.hoisted(() => ({ characters: null as object[] | null, gold: null as Map<string, Record<string, number>> | null, goldFor: [] as string[] }));
+vi.mock("@/lib/character-armory", () => ({ ownArmoryCharacters: async () => linked.characters }));
+vi.mock("@/lib/own-gold", () => ({ ownGold: async (userId: string) => { linked.goldFor.push(userId); return linked.gold; } }));
+
 import SignedInHome, { dynamic, metadata } from "./page";
 
 const USER = { id: "11111111-2222-4333-8444-555555555555", name: "Thrall#1234" };
@@ -45,6 +50,9 @@ beforeEach(() => {
   vi.stubEnv("EVERLOOT_SAVED_BUILDS", "1");
   request.headers = new Headers();
   request.cookies = {};
+  linked.characters = null;
+  linked.gold = null;
+  linked.goldFor = [];
   profileRow = { handle: "thrall", display_name: "Go'el", status_emoji: "🔥", status_text: "Raiding", status_clears_at: null, public_profile: false,
     show_characters: true, show_builds: true, show_status: true, main_character_id: THRALL, active_character_id: JAINA };
   auth.getUser.mockReset().mockResolvedValue(USER);
@@ -225,12 +233,12 @@ test("no characters and no builds: one card with the ways in, no empty rails and
   expect(html).not.toContain('aria-label="Alts"');
   const card = html.slice(html.indexOf('aria-labelledby="your-characters"'), html.indexOf("</section>", html.indexOf('aria-labelledby="your-characters"')));
   expect(card).toContain("Bring in your characters");
-  // The addon is the filled action; Battle.net goes to the account's existing integrations; the rest are links.
-  expect(card).toMatch(/<a href="\/addon" class="btn btn-primary[^"]*">Get the addon</);
-  expect(card).toMatch(/<a href="\/settings#integrations" class="btn [^"]*">Connect Battle.net</);
+  // One action: install the addon, then connect the Desktop App on its existing page; adding by name stays a link.
+  expect(card).toMatch(/<a href="\/addon" class="btn btn-primary[^"]*">Install addon \+ Connect</);
+  expect(card).toContain('href="/desktop/connect"');
   expect(card).toContain('href="/me"');
-  expect(card).toContain('href="/upload"');
-  expect(card.match(/btn-primary/g)).toHaveLength(1);
+  expect(card).not.toContain("Connect Battle.net");
+  expect(card.match(/class="btn/g)).toHaveLength(1);
   // Latest from Forever still shows.
   expect(html).toContain("Latest from Forever");
   expect(html).toContain("Entry 0");
@@ -249,6 +257,92 @@ test("characters but no builds for the one being played: one link to plan a buil
   expect(html).toMatch(/<a href="\/tools\/talents\/mage" class="btn [^"]*">Plan a build for Jaina</);
   expect(html).not.toContain("Bring in your characters");
   expect(html).not.toContain('aria-label="Alts"');
+});
+
+const armory = (over: object) => ({
+  region: "us", slug: "thrall-doomhammer", characterId: 1, name: "Thrall", surname: "Doomhammer", level: 60, rulesetId: 2, ruleset: "Normal",
+  raceId: 2, race: "Orc", classId: 1, class: "Warrior", faction: "Horde", gender: null, guildSlug: null, guildName: null,
+  lastLogin: "2026-10-17T08:00:00Z", equippedItemLevel: null, averageItemLevel: null, itemLevel: 62, gearScore: null, honorableKills: null,
+  pvpRank: null, equipment: [], fetchedAt: "2026-10-20T00:00:00Z", checkedAt: "2026-10-20T00:00:00Z", addonSeen: null, ...over,
+});
+const GARROSH = armory({ slug: "garrosh-hellscream", characterId: 2, name: "Garrosh", surname: "Hellscream", level: 42, lastLogin: "2026-10-19T08:00:00Z", itemLevel: null });
+const charactersSection = (html: string) => {
+  const at = html.indexOf('aria-labelledby="your-characters"');
+  return html.slice(at, html.indexOf("</section>", html.indexOf('aria-label="Alts"', at)));
+};
+
+test("linked characters lead: the main's sheet summary as the hero, then the other characters as alts", async () => {
+  vi.stubEnv("EVERLOOT_CHARACTER_LINKS", "1");
+  linked.characters = [GARROSH, armory({})];
+  const html = renderToStaticMarkup(await SignedInHome({}));
+  const section = charactersSection(html);
+  const hero = section.slice(0, section.indexOf('aria-label="Alts"'));
+  // Thrall is the main by name, so he leads over Garrosh, who played more recently.
+  expect(hero).toContain('href="/armory/us/thrall-doomhammer"');
+  expect(hero).toContain("Thrall Doomhammer");
+  expect(hero).toContain("Level 60 Orc Warrior");
+  expect(hero).toContain("Horde · US Normal");
+  expect(hero).toMatch(/Item level <span[^>]*>62</);
+  expect(hero).toMatch(/data-badge="neutral"[^>]*>Main</);
+  // The alts: the other linked character, and the added character no link covers. Thrall is not repeated.
+  const alts = section.slice(section.indexOf('aria-label="Alts"'));
+  expect(alts).toContain('href="/armory/us/garrosh-hellscream"');
+  expect(alts).toContain("Level 42 Warrior");
+  expect(alts).toContain(`href="/me/characters/${JAINA}"`);
+  expect(section).not.toContain(`href="/me/characters/${THRALL}"`);
+  // No gold without the owner's synced statistics.
+  expect(section).not.toContain("gold");
+});
+
+test("with no main the most recently seen linked character leads, unmarked; links off shows none of them", async () => {
+  vi.stubEnv("EVERLOOT_CHARACTER_LINKS", "1");
+  profileRow = { ...profileRow!, main_character_id: null, active_character_id: null };
+  linked.characters = [armory({}), GARROSH];
+  let section = charactersSection(renderToStaticMarkup(await SignedInHome({})));
+  expect(section.indexOf('href="/armory/us/garrosh-hellscream"')).toBeLessThan(section.indexOf('href="/armory/us/thrall-doomhammer"'));
+  expect(section).not.toContain('data-badge="neutral"');
+  vi.stubEnv("EVERLOOT_CHARACTER_LINKS", "0");
+  linked.goldFor = [];
+  section = charactersSection(renderToStaticMarkup(await SignedInHome({})));
+  expect(section).not.toContain("/armory/");
+  expect(linked.goldFor).toEqual([]);
+});
+
+test("gold shows on the hero only from the owner's own synced statistics", async () => {
+  vi.stubEnv("EVERLOOT_CHARACTER_LINKS", "1");
+  linked.characters = [armory({}), GARROSH];
+  linked.gold = new Map([["/armory/us/thrall-doomhammer", { 328: 1_234_500, 334: 500_000 }]]);
+  const html = renderToStaticMarkup(await SignedInHome({}));
+  const section = charactersSection(html);
+  const hero = section.slice(0, section.indexOf('aria-label="Alts"'));
+  expect(linked.goldFor).toEqual([USER.id]);
+  expect(hero).toContain("Total gold acquired");
+  expect(hero).toContain("123 gold 45 silver 0 copper");
+  expect(hero).toContain("Most gold ever owned");
+  expect(hero).toContain("50 gold 0 silver 0 copper");
+  expect(hero).toContain("Only you see your gold.");
+  expect(section.slice(section.indexOf('aria-label="Alts"'))).not.toContain("gold");
+});
+
+test("since you last played: the Forever blue posts after the hero's last login, and nothing without one", async () => {
+  vi.stubEnv("EVERLOOT_CHARACTER_LINKS", "1");
+  linked.characters = [armory({})];
+  let html = renderToStaticMarkup(await SignedInHome({}));
+  const at = html.indexOf('aria-labelledby="since-last-played"');
+  expect(at).toBeGreaterThan(-1);
+  const since = html.slice(at, html.indexOf("</section>", at));
+  expect(since).toContain("Since you last played");
+  expect(since).toContain('<time dateTime="2026-10-17T08:00:00Z">2026-10-17</time>');
+  // Entry 2 (10-18) and Entry 3 (10-17 10:00) are Forever blue posts after the login; Entry 0 is a build, Entry 1 Classic.
+  expect(since).toMatch(/<a href="\/changes\/us-2-entry-2"[^>]*>Entry 2</);
+  expect(since).toContain("Entry 3<");
+  for (const other of ["Entry 0<", "Entry 1<", "Entry 4<"]) expect(since).not.toContain(other);
+  // It sits after the characters and before the builds.
+  expect(html.indexOf('id="your-characters"')).toBeLessThan(at);
+  expect(at).toBeLessThan(html.indexOf('id="active-builds"'));
+  linked.characters = [armory({ lastLogin: null })];
+  html = renderToStaticMarkup(await SignedInHome({}));
+  expect(html).not.toContain("since-last-played");
 });
 
 test("signed-in home exposes the same start jobs", async () => {

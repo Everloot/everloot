@@ -46,6 +46,10 @@ export interface ArmoryDirectoryFilter {
 }
 export interface ArmoryDirectoryPage { rows: ArmoryDirectoryRow[]; total: number }
 export interface ArmoryGuildHit { region: string; slug: string; name: string; faction: string; ruleset: string; memberCount: number }
+/** A character the addon saw (the players table): no surname, a realm instead of a region. */
+export interface SitePlayerHit { name: string; level: number; class: string; ruleset: string; realm: string }
+/** The site search's characters and guilds from one read (20261123120000_site_people_search.sql), each kind in name order. */
+export interface SitePeople { armory: (Omit<ArmoryHit, "race" | "guildName"> & { faction: string })[]; players: SitePlayerHit[]; guilds: ArmoryGuildHit[] }
 
 /** How the guild directory sorts: characters read, their average item level, or how many of them are level 60. */
 export type ArmoryGuildSort = "members" | "item_level" | "level_60";
@@ -79,6 +83,11 @@ export interface ArmoryStore {
   /** Characters whose first name, surname or "first surname" starts with `prefix` (2 letters or more), name then surname order. */
   search(prefix: string, limit: number): Promise<ArmoryHit[]>;
   searchGuilds(prefix: string, limit: number): Promise<ArmoryGuildHit[]>;
+  /**
+   * Armory characters, addon characters and armory guilds starting with `prefix`, at most `limit` of each, hidden ones
+   * out, in one read. Null while its migration is not applied, and in development, so the caller keeps its separate reads.
+   */
+  people(prefix: string, limit: number): Promise<SitePeople | null>;
   /**
    * One page of the guild directory (20261117170000_armory_guild_directory.sql), hidden characters out of every count.
    * Null while that migration is not applied, so the page can say the directory is not ready rather than down.
@@ -167,6 +176,20 @@ const GuildHitRow = z.object({
   region: z.string(), slug: z.string(), name: z.string(), faction: z.string(), ruleset: z.string(), member_count: num,
 }).transform((r): ArmoryGuildHit => ({ region: r.region, slug: r.slug, name: r.name, faction: r.faction, ruleset: r.ruleset, memberCount: r.member_count }));
 
+const SitePeopleRows = z.array(z.union([
+  z.object({ kind: z.literal("character"), source: z.literal("armory"), region: z.string(), slug: z.string(), name: z.string(), surname: z.string(), level: num, class: z.string(), faction: z.string(), ruleset: z.string() }),
+  z.object({ kind: z.literal("character"), source: z.literal("players"), name: z.string(), level: num, class: z.string(), ruleset: z.string(), realm: z.string() }),
+  z.object({ kind: z.literal("guild"), source: z.literal("armory"), region: z.string(), slug: z.string(), name: z.string(), faction: z.string(), ruleset: z.string(), member_count: num }),
+])).transform((rows): SitePeople => {
+  const out: SitePeople = { armory: [], players: [], guilds: [] };
+  for (const r of rows) {
+    if (r.kind === "guild") out.guilds.push({ region: r.region, slug: r.slug, name: r.name, faction: r.faction, ruleset: r.ruleset, memberCount: r.member_count });
+    else if (r.source === "armory") out.armory.push({ region: r.region, slug: r.slug, name: r.name, surname: r.surname, level: r.level, class: r.class, faction: r.faction, ruleset: r.ruleset });
+    else out.players.push({ name: r.name, level: r.level, class: r.class, ruleset: r.ruleset, realm: r.realm });
+  }
+  return out;
+});
+
 const PlayerDirectoryRow = z.object({
   region: z.string(), slug: z.string(), name: z.string(), surname: z.string(), level: num, class: z.string(), race: z.string(),
   faction: z.string(), ruleset_id: num, ruleset: z.string(), guild_name: textOrNull, item_level: numOrNull, gear_score: numOrNull, fetched_at: z.string(), total: num,
@@ -224,6 +247,14 @@ export function createCloudArmoryStore(query: Query = authQuery): ArmoryStore {
     async roster(region, slug) { return rpc("armory_roster", { p_region: region, p_slug: slug }, z.array(MemberRow)); },
     async search(prefix, limit) { return rpc("armory_search", { p_prefix: prefix, p_limit: limit }, z.array(HitRow)); },
     async searchGuilds(prefix, limit) { return rpc("armory_search_guilds", { p_prefix: prefix, p_limit: limit }, z.array(GuildHitRow)); },
+    async people(prefix, limit) {
+      try {
+        return await rpc("site_people_search", { p_prefix: prefix, p_limit: limit }, SitePeopleRows);
+      } catch (err) {
+        if (err instanceof StorageError && err.status === 404 && (err.code === "PGRST202" || err.code === "42883")) return null;
+        throw err;
+      }
+    },
     async guildDirectory(f) {
       let rows: z.output<typeof DirectoryRow>[];
       try {
@@ -270,7 +301,7 @@ const unavailableReason = new WeakMap<ArmoryStore, string>();
 /** A store with nothing behind it: every call fails, so each page shows storage as out of reach. */
 export function createUnavailableArmoryStore(reason: string): ArmoryStore {
   const fail = async (): Promise<never> => { throw new Error(reason); };
-  const store = { directory: fail, character: fail, guild: fail, roster: fail, search: fail, searchGuilds: fail, guildDirectory: fail, board: fail, boardFiltered: fail, topPerClass: fail, rank: fail, counts: fail, hide: fail, enqueue: fail, refresh: fail, lookupRegions: fail, lookupMiss: fail, storeLookup: fail };
+  const store = { directory: fail, character: fail, guild: fail, roster: fail, search: fail, searchGuilds: fail, people: fail, guildDirectory: fail, board: fail, boardFiltered: fail, topPerClass: fail, rank: fail, counts: fail, hide: fail, enqueue: fail, refresh: fail, lookupRegions: fail, lookupMiss: fail, storeLookup: fail };
   unavailableReason.set(store, reason);
   return store;
 }
@@ -349,6 +380,8 @@ export function createMemoryArmoryStore(now: () => Date = () => new Date()): Mem
       return [...guilds.values()].filter((g) => g.name.toLowerCase().startsWith(p)).sort((a, b) => a.name.localeCompare(b.name)).slice(0, limit)
         .map((g) => ({ region: g.region, slug: g.slug, name: g.name, faction: g.faction, ruleset: g.ruleset, memberCount: g.memberCount }));
     },
+    // No players table here to read with the armory, so the site keeps its separate reads in development.
+    async people() { return null; },
     async directory(f) {
       const prefix = f.prefix?.normalize("NFC").toLowerCase() ?? null;
       if (prefix !== null && !/^\p{L}{1,24}( \p{L}{1,24})?$/u.test(prefix)) return { rows: [], total: 0 };

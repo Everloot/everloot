@@ -102,10 +102,9 @@ test("one column of cards: date, type chip, title linked to the post's page on E
   expect(html).toContain('href="/changes/eu-2-wow-forever-hotfixes"');
   // The original is one click further, on the post's page.
   expect(html).not.toContain("forums.blizzard.com");
-  // The excerpt is in the body colour, not the blue of the title.
-  expect(html).toContain('<p data-excerpt="true" class="text-cell text-fg">A short excerpt. Second sentence.</p>');
-  expect(html).toContain(">Linxy (Community Manager) · US forum</p>");
-  expect(html).toContain(">Kaivax (Community Manager) · EU forum</p>");
+  expect(html).toContain('<p data-excerpt="true" class="text-cell text-blue-post">A short excerpt. Second sentence.</p>');
+  expect(html).toMatch(/data-poster[^>]*>Linxy<\/span>[\s\S]*?>Community Manager<\/span>[\s\S]*?>US forum<\/span>/);
+  expect(html).toMatch(/data-poster[^>]*>Kaivax<\/span>[\s\S]*?>Community Manager<\/span>[\s\S]*?>EU forum<\/span>/);
   expect(html).not.toContain("Classic realm move");
   // The title is each card's only link.
   for (const card of cards(html)) expect(card.match(/<a /g)?.length ?? 0).toBeLessThanOrEqual(1);
@@ -276,9 +275,9 @@ test("an announcement posted on both forums is one row, linking the US copy, wit
   expect(html).toContain('href="/changes/us-30552118-world-of-warcraft-forever-raid-overview-locations-raid-sizes-and-attunement"');
   expect(html).not.toContain("us-30552119");
   expect(html).not.toContain("eu-6443510");
-  expect(tableRows.find((r) => r.includes("Raid Overview"))).toContain(" · US · EU forum</p>");
+  expect(tableRows.find((r) => r.includes("Raid Overview"))).toMatch(/data-source-chip[^>]*><span data-badge="neutral"[^>]*>US · EU forum<\/span>/);
   // A post on one forum still says just that forum.
-  expect(tableRows.find((r) => r.includes("Synthetic beta notice"))).toContain(" · US forum</p>");
+  expect(tableRows.find((r) => r.includes("Synthetic beta notice"))).toMatch(/data-source-chip[^>]*><span data-badge="neutral"[^>]*>US forum<\/span>/);
 });
 
 test("filters and counts count announcements; the region filter finds one posted in that region", async () => {
@@ -337,10 +336,42 @@ test("news announcements link to Blizzard from the title and name the news sourc
     url: "https://news.blizzard.com/en-us/article/24315281/wow-forever-hotfixes-november-16-2026" }];
   const html = await page();
   expect(html).toMatch(/<a href="https:\/\/news.blizzard.com\/en-us\/article\/24315281\/wow-forever-hotfixes-november-16-2026"[^>]*>Synthetic Forever hotfix announcement<\/a>/);
-  expect(html).toContain(">Blizzard Entertainment · Blizzard News</p>");
+  expect(html).toMatch(/data-poster[^>]*>Blizzard Entertainment<\/span>[\s\S]*?data-source-chip[^>]*><span data-badge="neutral"[^>]*>Blizzard News<\/span>/);
   // No body: no empty excerpt.
   expect(html).not.toContain("data-excerpt");
   expect(await page({ region: "us" })).not.toContain("Synthetic Forever hotfix announcement");
+});
+test("a blue post reads like Blizzard's blue tracker: blue poster and words, a Blizzard badge, the role, a source chip and a quote edge", async () => {
+  const bluesky: ChangeEntry = { id: "bluesky:abc", source: "bluesky", type: "post", game: "forever", at: "2026-10-16T20:00:00.000Z",
+    title: "Synthetic Bluesky post", url: "https://bsky.app/profile/worldofwarcraft.blizzard.com/post/abc", author: "World of Warcraft", role: "Official account", excerpt: "See you there." };
+  timeline.entries = [...entries, bluesky];
+  const html = await page();
+  const card = (text: string) => cards(html).find((c) => c.includes(text))!;
+  for (const [text, author, role, where] of [
+    ["Synthetic beta notice", "Linxy", "Community Manager", "US forum"],
+    ["WoW: Forever Hotfixes", "Kaivax", "Community Manager", "EU forum"],
+    ["Synthetic Bluesky post", "World of Warcraft", "Official account", "Bluesky"],
+  ]) {
+    const c = card(text);
+    expect(c).toContain("border-l-4 border-l-blue-post");
+    expect(c).toMatch(new RegExp(`<span data-poster="true" class="[^"]*text-blue-post[^"]*">${author}</span>`));
+    expect(c).toMatch(/<span data-badge="blizzard" class="[^"]*border-blue-post text-blue-post[^"]*">Blizzard<\/span>/);
+    expect(c).toContain(`<span data-role="true" class="text-fg-2">${role}</span>`);
+    expect(c).toMatch(new RegExp(`<span data-source-chip="true"><span data-badge="neutral"[^>]*>${where}</span></span>`));
+    expect(c).toMatch(/<p data-excerpt="true" class="text-cell text-blue-post">/);
+    // Still one link per card: the title.
+    expect(c.match(/<a /g)).toHaveLength(1);
+  }
+  // A news card's role is its source, so it is said once, by the chip.
+  timeline.entries = [{ id: "news:1", source: "news", type: "hotfix", game: "forever", at: "2026-11-17T02:17:13.000Z", title: "Synthetic news hotfix",
+    author: "Blizzard Entertainment", role: "Blizzard News", url: "https://news.blizzard.com/en-us/article/1/wow-forever-hotfixes" }];
+  const news = await page();
+  expect(news).not.toContain("data-role");
+  expect(news.match(/>Blizzard News</g)).toHaveLength(1);
+  // Builds stay a compact row: no badge, poster or chip.
+  for (const text of ["1.60.1.70460", "1.60.1.70450"]) {
+    for (const mark of ["data-badge=\"blizzard\"", "data-poster", "data-source-chip"]) expect(card(text)).not.toContain(mark);
+  }
 });
 test("builds are plain cards without the blue edge", async () => {
   timeline.entries = [entries[0]];

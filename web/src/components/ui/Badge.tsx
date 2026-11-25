@@ -14,12 +14,14 @@ export const UNCONFIRMED_TITLE = "From the game files, not yet confirmed by play
  * - `confirmed`: solid accent, for a fact three installs agree on.
  * - `neutral`: a plain fact (a build, a type).
  * - `quality`: an item quality in its own colour.
+ * - `blizzard`: a post by Blizzard staff, in the blue-post colour, as on WoW's blue tracker.
  */
 export type BadgeProps =
   | { tone: "files"; children?: ReactNode; title?: string; href?: string }
   | { tone: "confirmed"; children?: ReactNode }
   | { tone: "neutral"; children: ReactNode }
-  | { tone: "quality"; quality: Quality; children?: ReactNode };
+  | { tone: "quality"; quality: Quality; children?: ReactNode }
+  | { tone: "blizzard" };
 
 const BASE = "inline-flex h-6 max-w-full items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 font-mono text-xs";
 
@@ -41,5 +43,7 @@ export default function Badge(props: BadgeProps) {
       return <span data-badge="neutral" className={`${BASE} border-line text-fg-2`}>{props.children}</span>;
     case "quality":
       return <span data-badge="quality" className={`${BASE} border-current ${QUALITY_TEXT[props.quality]}`}>{props.children ?? QUALITY_LABEL[props.quality]}</span>;
+    case "blizzard":
+      return <span data-badge="blizzard" className={`${BASE} border-blue-post text-blue-post`}>Blizzard</span>;
   }
 }

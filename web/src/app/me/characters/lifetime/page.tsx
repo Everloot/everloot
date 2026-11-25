@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { z } from "zod";
 import { ArmoryCredit, link, newest } from "@/app/armory/parts";
 import { readTimes } from "@/app/armory/profile";
 import { Card, Container, DataTable, PageHeader } from "@/components/ui";
@@ -9,14 +8,12 @@ import Coins from "@/components/ui/Coins";
 import type { Column } from "@/components/ui/DataTable";
 import type { PlayHistoryRankedKey } from "@kb/armory/details";
 import { ARMORY_BOARDS, armoryCharacterPath, armoryOn, metricValue, PLAY_HISTORY_METRICS } from "@/lib/armory";
-import { ownArmoryLinks } from "@/lib/armory-links";
 import { signInPath } from "@/lib/auth/return-to";
 import { trailFor } from "@/lib/breadcrumbs";
 import { ownArmoryCharacters } from "@/lib/character-armory";
 import { characterLinksOn } from "@/lib/character-links";
 import { lifetimeSummary, type GoldStat, type LifetimeRow } from "@/lib/lifetime-summary";
-import { privateSyncOn } from "@/lib/private-sync";
-import { ownCharacterFacts } from "@/lib/private-sync-store";
+import { ownGold } from "@/lib/own-gold";
 import { getUser } from "@/lib/supabase/server";
 
 /**
@@ -39,29 +36,6 @@ const GOLD_COLUMNS: { stat: GoldStat; header: string }[] = [
   { stat: "328", header: "Total gold acquired" },
   { stat: "334", header: "Most gold ever owned (one character)" },
 ];
-const Stats = z.record(z.string(), z.number().finite());
-
-/**
- * The addon's gold statistics for each of the account's own links, keyed by the associated armory character's path.
- * Only while private sync is on, and only through the account's own links and consented facts. Null when it is off or
- * the read fails, so the page shows no gold columns rather than wrong ones.
- */
-async function ownGold(userId: string): Promise<Map<string, Record<string, number>> | null> {
-  if (!privateSyncOn()) return null;
-  try {
-    const links = await ownArmoryLinks(userId);
-    const gold = new Map<string, Record<string, number>>();
-    await Promise.all([...links].map(async ([linkId, path]) => {
-      const fact = (await ownCharacterFacts(userId, linkId)).find((c) => c.category === "gold" && c.consented)?.fact;
-      const stats = Stats.safeParse(fact?.data.stats);
-      if (stats.success) gold.set(path, stats.data);
-    }));
-    return gold;
-  } catch {
-    return null;
-  }
-}
-
 export default async function LifetimePage() {
   if (!armoryOn() || !characterLinksOn()) notFound();
   const user = await getUser();
