@@ -28,6 +28,7 @@ import { writeClientDisenchant } from "./client-disenchant.js";
 import { writeClientFactions } from "./client-factions.js";
 import { writeClientTitles } from "./client-titles.js";
 import { writeClientQuestLines } from "./client-quest-lines.js";
+import { writeClientCollections } from "./client-collections.js";
 import { writeClientLayer } from "./client-layer.js";
 import { writeRaceTable } from "./client-races.js";
 import { evaluateWritten, formatAnswerEval, openAiCompatible, sampleKeyed } from "./answer-eval.js";
@@ -230,6 +231,7 @@ const USAGE = `usage: npm run kb -- <command> --db <path>
   client-titles <snapshot.sqlite> [--out ../web/src/data/game-data/client-titles.json]
     (every character title, the %s placeholder kept. Pages and search, as above)
   client-quest-lines <snapshot.sqlite> [--out ../web/src/data/game-data/client-quest-lines.json]
+  client-collections <snapshot.sqlite> [--out ../web/src/data/game-data/client-collections.json]
     (every quest line with its quest ids in order. Pages and search, as above)
   item-names <snapshot.sqlite> --wiki <knowledge base or release .sqlite> [--ledger data/item-names/ledger.json] [--out data/assets]
     (adds the snapshot's item names and the Warcraft Wiki dump's item names to the name ledger, which only
@@ -799,6 +801,13 @@ async function main(): Promise<number> {
       const path = flags.get("out") || "../web/src/data/game-data/client-quest-lines.json";
       const table = writeClientQuestLines(args[0], path);
       console.log(`${table.build.product} ${table.build.version}: ${table.questLines.length} quest lines -> ${path}`);
+      return 0;
+    }
+    case "client-collections": {
+      if (!args[0]) break;
+      const path = flags.get("out") || "../web/src/data/game-data/client-collections.json";
+      const table = writeClientCollections(args[0], path);
+      console.log(`${table.build.product} ${table.build.version}: ${table.currencies.length} currencies, ${table.pets.length} pets, ${table.toys.length} toys -> ${path}`);
       return 0;
     }
     case "client-diff": {
