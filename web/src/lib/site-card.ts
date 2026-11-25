@@ -148,7 +148,7 @@ async function itemCard(id: number): Promise<SiteCardResult> {
   return {
     status: 200,
     body: {
-      type: "item", id, title: name?.name ?? `Item ${id}`, quality, color: name && quality === null ? name.color : null, icon: tip?.icon ?? null, lines, ...(reasons.length ? { notes: reasons } : {}),
+      type: "item", id, title: name?.name ?? `Item ${id}`, quality, color: name && quality === null ? name.color : null, icon: tip?.icon ?? files.icons.get(id) ?? null, lines, ...(reasons.length ? { notes: reasons } : {}),
       foot: join([name && name.source !== "files" ? NAME_FROM[name.source] : null, tip?.label]),
     },
   };

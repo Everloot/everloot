@@ -150,6 +150,18 @@ test("a broken item folder is told apart from an item with no tooltip: a listed 
   expect((await readItemTips(a, [9], memoryStore({ [`${FOLDER}/items.json`]: { ...itemIndex, build: { version: "9.9.9.1" } } }))).degraded).toBe(false);
 });
 
+test("an item the files give only an icon for reads as an icon, not a tooltip, and is no broken record", async () => {
+  const a = parseSiteManifest(siteManifest, BASE)!;
+  const store = memoryStore({ [`${FOLDER}/items.json`]: itemIndex, [`${FOLDER}/items/0.json`]: { ...shard0, "30": { i: 135661 }, "31": { i: 0 } } });
+  const read = await readItemTips(a, [9, 30, 31], store);
+  expect(read).toMatchObject({ unreachable: false });
+  expect([...read.tips.keys()]).toEqual([9]);
+  expect(read.icons).toEqual(new Map([[9, `${BASE}/icons/132889.webp`], [30, `${BASE}/icons/135661.webp`]]));
+  // 31's record is neither a tooltip nor an icon.
+  expect(read.degraded).toBe(true);
+  expect((await readItemTips(a, [30], store)).degraded).toBe(false);
+});
+
 test("the private bucket needs all four server-only variables, signs its reads, and keeps what it read", async () => {
   expect(privateStoreFromEnv({})).toBeNull();
   expect(privateStoreFromEnv({ GAME_DATA_S3_ENDPOINT: "https://r2.example.test", GAME_DATA_BUCKET: "private" })).toBeNull();

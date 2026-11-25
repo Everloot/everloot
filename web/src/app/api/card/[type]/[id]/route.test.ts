@@ -14,7 +14,7 @@ vi.mock("@/lib/game-assets", () => ({
   readItemTips: async (assets: never, ids: number[]) => {
     const store = mocks.store();
     if (store) return (await vi.importActual<typeof import("@/lib/game-assets")>("@/lib/game-assets")).readItemTips(assets, ids, store);
-    return { tips: await mocks.tips(assets, ids), unreachable: mocks.tipsDown(), degraded: false };
+    return { tips: await mocks.tips(assets, ids), icons: new Map(), unreachable: mocks.tipsDown(), degraded: false };
   },
   PRIVATE_UNREACHABLE: Symbol.for("unreachable"),
 }));
@@ -246,6 +246,14 @@ test("the private item files read whole make a card the edge keeps; an item its 
   expect(edgeTtl(await call("item", "647"))).toBe(3600);
   privateFolder(undefined, false);
   expect(edgeTtl(await call("item", "647"))).toBe(3600);
+});
+
+test("an item the files give only an icon for gets that icon on its card, the type and slot as its lines", async () => {
+  privateFolder({ "647": { i: 135661 } });
+  const res = await call("item", "647");
+  expect(res.status).toBe(200);
+  expect((await res.json()).card.icon).toBe(`https://assets.everloot.app/${FOLDER}/icons/135661.webp`);
+  expect(edgeTtl(res)).toBe(3600);
 });
 
 test("a shard the index lists that is not there is a 503, not a card without its game file lines", async () => {

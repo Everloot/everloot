@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, test, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
-  missingTip: false,
+  missingTip: false, iconOnly: new Map<number, string>(),
   assets: null as unknown, names: [] as unknown[], tipCalls: [] as number[][], matched: null as unknown,
   levels: new Map<number, { level: number; required: number; binding: number }>(),
   progress: [] as { fact: "armor"; reporters: number; build: string }[],
@@ -17,6 +17,10 @@ vi.mock("@/lib/game-assets", async (importOriginal) => ({
     if (state.missingTip) return new Map();
     return new Map(ids.map((id) => [id, { name: `Game name ${id}`, color: "#fff", quality: "Common", icon: `https://assets.example.test/b/icons/i${id}.webp`, lines: [], partial: false, why: [], label: "found in game files, unconfirmed · build 1.60.1.70450", level: 0, required: 0, binding: 0, ...state.levels.get(id) }]));
   },
+}));
+vi.mock("@/lib/item-icons", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/item-icons")>()),
+  loadItemIcons: async (_assets: unknown, ids: readonly number[]) => new Map(ids.flatMap((id) => (state.iconOnly.has(id) ? [[id, state.iconOnly.get(id)!] as const] : []))),
 }));
 vi.mock("@/lib/rollup-compute", () => ({
   loadItemFacts: async () => ({ rates: [], names: state.names, npcs: [], unreachable: false }),
@@ -51,7 +55,7 @@ const html = async (el: Promise<ReactNode>) => renderToStaticMarkup(await el);
 const props = (id: string) => ({ params: Promise.resolve({ id }), searchParams: Promise.resolve({}) });
 const agreed = (itemId: number) => ["a", "b", "c"].map((installId) => ({ installId, itemId, name: `Agreed ${itemId}` }));
 
-beforeEach(() => { state.missingTip = false; state.assets = null; state.names = []; state.tipCalls = []; state.matched = null; state.levels = new Map(); state.progress = []; });
+beforeEach(() => { state.iconOnly = new Map(); state.missingTip = false; state.assets = null; state.names = []; state.tipCalls = []; state.matched = null; state.levels = new Map(); state.progress = []; });
 
 test("a below-threshold item fact shows report progress even without a game-file tooltip", async () => {
   state.progress = [{ fact: "armor", reporters: 1, build: "1.60.1.70450" }];
@@ -98,6 +102,17 @@ const matchedNames = (ids: number[]) => ({
 });
 const clothIds = () => CLIENT_TAXONOMY.items.filter((r) => r[1] === 4 && r[2] === 1).map((r) => r[0]);
 const cloth = () => SubclassPage({ params: Promise.resolve({ id: "armor", subclass: "cloth" }), searchParams: Promise.resolve({}) });
+
+test("a named item the files give only an icon for (no ItemSparse row) shows that icon, unconfirmed, not the question mark", async () => {
+  state.assets = assets;
+  state.missingTip = true;
+  state.matched = matchedNames([7230]);
+  state.iconOnly = new Map([[7230, `${BASE}/icons/135661.webp`]]);
+  const page = await html(ItemPage(props("7230")));
+  expect(page).toMatch(new RegExp(`<img src="${BASE}/icons/135661\.webp"[^>]*border-q-epic`));
+  expect(page).not.toContain(`${BASE}/icons/134400.webp`);
+  expect(page).toContain("data-unconfirmed");
+});
 
 test("the audited item keeps its quality when its icon and taxonomy quality are missing: the question mark from the asset folder, the theme's token on the name", async () => {
   state.assets = assets;
