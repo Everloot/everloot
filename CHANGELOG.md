@@ -18,7 +18,6 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the signed-in home leads with your main linked character: level, race, class, item level and, only to you, the gold your Desktop App syncs. Your other characters follow as alts, then the Forever blue posts since that character's last login. With no character, one action: Install addon + Connect.
 - Site: the header search groups its suggestions into Characters, Guilds, Items and Zones & NPCs, colours characters by class and guilds by faction, finds armory guilds, and Enter opens an exact match (#1271).
 - Site: dungeon progress is on: the Desktop App can download shared dungeon clears for player tooltips, and boss-kill sync records the addon's full character name (migration `20261123110000_dungeon_progress.sql` applied 2026-11-23).
-- Desktop: refreshes shared dungeon progress for in-game tooltips and syncs boss kills for linked characters. Older sites and sites with Dungeon Progress turned off can still acknowledge boss kills.
 - Site: rankings show US and EU side by side, each ranked on its own, so the region with more characters read no longer hides the other. The Rankings page shows one character board at a time with a tab for each, and names carry their class colour.
 - Site: farming routes and the Tailoring, Leatherworking and Skinning gather lists place a mob in a zone once 3 installs looted its kills on that zone's map; until then the mob's agreed map pin decides, as before.
 - Site: a zone's page links to Farming routes and the cloth and leather lists by the same rule: a mob counts in the zone where 3 installs looted its kills, otherwise where its agreed pin is.
@@ -43,9 +42,7 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
 - Site: the header and database search find NPCs by the Warcraft Wiki name their pages print and suggest zones as you type; each suggestion says what it is, the list ends with "All results", and search answers every casing of a query from one cached page.
 - Site: Herbalism has a gathering guide at /tools/professions/herbalism/gathering: herb zones with the herbs looted in each, every herb's zones and the Herbalism trainers players saw, all at 3 installs.
 - Site: the world map has a Flights for switch (Alliance, Horde or both, from the game files' flight map flags), a zone in focus links to its zone page and, where players placed herb spots, the Herbalism gathering guide, and a spot's card copies a link in the zone's own coordinates.
-- Desktop: the Characters page shows how many titles each keyed character is missing, with links to the site's collections tool and, for a linked character, its page, and a Linked characters panel with the characters you linked, the last private sync and the last link or sync problem.
 - Site: profession pages list the game-file recipes 50 at a time (25 to 200), with search and skill range filters in the URL, instead of sending every recipe; AH Ledger crafting margins also sort by net value and sales per day, and the sort is kept in the URL.
-- Desktop: refreshes the disenchant results once a day into the game's price file and keeps the last good copy when a fetch fails.
 - Site: the armory crawl spiders every guild its stored characters name, refreshes active and top-ranked characters daily (others every 20 days), raises its hourly budget to 12,000 calls per region, and fails the job after 6 runs in a row with no Blizzard call.
 - Site: `/tools/disenchanting` shows what disenchanting gives on WoW: Forever by the game files' own bands (armor or weapon, quality, item level range), from the disenchants players recorded once 3 installs disenchanted in a band: each material's chance and units, the value per disenchant on your realm's auction house before and after the cut, the materials' prices, and the listed items worth more as materials than their buyout. Item pages gain a Disenchant tab, and `GET /api/rollups/disenchant` serves the bands.
 - Site: AH Ledger crafting margins can be sorted and filtered, with shareable market URLs.
@@ -664,6 +661,20 @@ Pull requests merged to `main` are listed in the nightly pre-releases until the 
   and report separate answerability rates.
 - Site: describe the in-game Everloot window, feature chooser, local data and how to reopen it or report a window error.
 - Site: the census adds headline tiles, faction and class colours, race and level bars, a race-by-class heatmap, and a daily chart with hover counts; every table stays, hidden counts stay hidden, and class and race icons load from Blizzard when available.
+
+## [desktop-v0.1.24] - 2026-11-24
+
+Goes with addon 0.3.30. Private sync can carry a linked character's lifetime gold statistics, which the addon reads;
+everloot.app keeps them only for a character whose Gold sync you turned on. The app also refreshes shared dungeon
+progress for player tooltips into a small companion addon, Everloot Progress, which appears in the game's AddOns
+list and stays empty while everloot.app has Dungeon Progress turned off.
+
+### Added
+
+- Private sync sends a linked character's lifetime gold statistics (total acquired, most ever owned, spending, auctions) under its own Gold category. While that category is off, it is asked about again only every few hours and is not reported as "not synced".
+- Refreshes shared dungeon progress for in-game tooltips and syncs boss kills for linked characters. Older sites and sites with Dungeon Progress turned off can still acknowledge boss kills.
+- The Characters page shows how many titles each keyed character is missing, with links to the site's collections tool and, for a linked character, its page, and a Linked characters panel with the characters you linked, the last private sync and the last link or sync problem.
+- Refreshes the disenchant results once a day into the game's price file and keeps the last good copy when a fetch fails.
 
 ## [0.3.30] - 2026-11-24
 
